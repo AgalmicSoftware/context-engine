@@ -315,52 +315,6 @@
   min-width: 132px;
 }
 
-.headerIconButton {
-  width: 56px;
-  min-width: 56px;
-  padding: 0;
-}
-
-.headerSessionSelector {
-  position: relative;
-  display: inline-flex;
-}
-
-.headerSessionSelectorPanel {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  z-index: 4;
-  width: min(540px, calc(100vw - 32px));
-  padding: 14px;
-  border-radius: var(--ce-radius-16);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  background: color-mix(in srgb, var(--ce-overlay-surface) 98%, transparent);
-  box-shadow: 0 18px 36px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
-}
-
-.headerSessionSelectorHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.headerSessionSelectorHint {
-  color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
-  font-size: 0.86rem;
-}
-
-.headerSessionResetButton {
-  min-height: 38px;
-  padding: 8px 12px;
-  font-size: 0.86rem;
-  text-transform: none;
-  font-weight: 600;
-  gap: 6px;
-}
-
 .headerActionButtonActive {
   background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
   color: var(--ce-action-accent);
@@ -415,22 +369,9 @@
     min-height: 50px;
     padding: 12px 18px;
   }
-
-  .headerIconButton {
-    width: 50px;
-    min-width: 50px;
-    padding: 0;
-  }
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  .headerSessionSelectorPanel {
-    right: auto;
-    left: 50%;
-    width: min(460px, calc(100vw - 48px));
-    transform: translateX(-50%);
-  }
-
   .explorerContainerSparse {
     min-height: clamp(400px, 48vh, 620px);
   }
@@ -804,12 +745,6 @@
     border-color: var(--ce-border-inset);
     box-shadow: var(--ce-shadow-pressed);
   }
-
-  .headerIconButton {
-    width: 34px;
-    min-width: 34px;
-    padding: 0;
-  }
 }
 
 @media (max-width: 640px) {
@@ -844,8 +779,7 @@
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
-  .legendText,
-  .headerSessionSelectorHint {
+  .legendText {
     color: var(--ce-document-text-muted);
     opacity: 1;
   }
@@ -903,13 +837,6 @@
       background: var(--ce-action-primary-hover);
       color: var(--ce-selection-text);
     }
-  }
-
-  .headerSessionSelectorPanel {
-    background: var(--ce-overlay-surface);
-    color: var(--ce-overlay-text);
-    border-color: var(--ce-document-border-strong);
-    box-shadow: var(--ce-card-shadow);
   }
 
   .title {

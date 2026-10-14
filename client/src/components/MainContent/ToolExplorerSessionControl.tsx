@@ -17,10 +17,14 @@ export const resolveToolSessionConfig = (slug: string, supplied: unknown): Recor
 const ToolExplorerSessionControl = ({
   activeSessionSlug,
   sessionConfig,
+  inheritedSessionSlug,
+  onUseInheritedSession,
   onChange,
 }: {
   activeSessionSlug: string;
   sessionConfig: unknown;
+  inheritedSessionSlug?: string;
+  onUseInheritedSession?: () => void;
   onChange: (slug: string) => void;
 }) => {
   const [, refreshCatalog] = useState(0);
@@ -31,7 +35,11 @@ const ToolExplorerSessionControl = ({
   }, []);
 
   const slugs = Array.from(
-    new Set([activeSessionSlug, '', ...(getAllSessionSlugs({ includeEmpty: true }) || [])].map(normalizeSessionSlug)),
+    new Set(
+      [activeSessionSlug, inheritedSessionSlug ?? '', '', ...(getAllSessionSlugs({ includeEmpty: true }) || [])].map(
+        normalizeSessionSlug,
+      ),
+    ),
   );
   const options = slugs.map((slug) => {
     const config = resolveToolSessionConfig(slug, slug === activeSessionSlug ? sessionConfig : null);
@@ -39,6 +47,10 @@ const ToolExplorerSessionControl = ({
     const description = slug && name.toLowerCase() !== slug ? `${name} (${slug})` : name;
     return { slug, name, description };
   });
+
+  let inheritedOptionValue = '__ce_inherited_session__';
+  while (slugs.includes(inheritedOptionValue)) inheritedOptionValue += '_';
+  const inheritedSessionName = options.find((option) => option.slug === inheritedSessionSlug)?.name;
 
   return (
     <label className={`${accountStyles.settingsSessionRoute} ${styles.activeSessionControl}`}>
@@ -50,8 +62,14 @@ const ToolExplorerSessionControl = ({
         value={activeSessionSlug}
         title={options.find((option) => option.slug === activeSessionSlug)?.description}
         onFocus={refresh}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          if (onUseInheritedSession && event.target.value === inheritedOptionValue) onUseInheritedSession();
+          else onChange(event.target.value);
+        }}
       >
+        {onUseInheritedSession && (
+          <option value={inheritedOptionValue}>Use global default ({inheritedSessionName})</option>
+        )}
         {options.map((option) => (
           <option key={option.slug || 'general'} value={option.slug}>
             {option.slug === activeSessionSlug ? option.name : option.description}

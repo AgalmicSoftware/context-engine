@@ -6,7 +6,6 @@ import { updateGlobalSessionSelection } from '../../actions/sessionStateActions.
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
-  faCog,
   faExclamationTriangle,
   faExpand,
   faEye,
@@ -21,7 +20,6 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
-import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { readStoredGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -31,7 +29,6 @@ import { Container, Row, Col } from 'reactstrap';
 import ToolExplorerPluginExplainer from './ToolExplorerPluginExplainer';
 import ToolExplorerSessionControl, { resolveToolSessionConfig } from './ToolExplorerSessionControl';
 import LazyFallback from '../Shared/LazyFallback';
-import SessionChipSelector from '../Shared/SessionChipSelector';
 
 import riskMatrixImage from '../../assets/img/risk_matrix.jpg';
 import modelDirectoryImage from '../../assets/img/model_directory.jpg';
@@ -81,7 +78,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
   const [expandedComponent, setExpandedComponent] = useState<ExpandedComponentState>(null);
   const [createGroupSessionSlug, setCreateGroupSessionSlug] = useState<string | null>(null);
   const [dataToolMode, setDataToolMode] = useState('add');
-  const [showDataSessionSelector, setShowDataSessionSelector] = useState(false);
   const [dataSessionOverrideSlug, setDataSessionOverrideSlug] = useState<string | null>(null);
   const [dataSessionOverrideTouched, setDataSessionOverrideTouched] = useState(false);
   const demoSurfaceEnabled = props.demoSurfaceMode !== false;
@@ -180,36 +176,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
         : normalizeSessionSlug(props.activeSessionSlug || ''),
     [dataSessionOverrideSlug, dataSessionOverrideTouched, props.activeSessionSlug],
   );
-  const dataSessionSelectorOptions = useMemo(() => {
-    const options = new Map();
-    const pushOption = (slugIn = '') => {
-      const slug = normalizeSessionSlug(slugIn || '');
-      if (options.has(slug)) return;
-      const cfg = getSessionConfigBySlug(slug) || {};
-      const sessionName = toStr(cfg?.sessionName || '').trim();
-      const slugLabel = slug || 'General';
-      const label =
-        sessionName && sessionName.toLowerCase() !== slugLabel.toLowerCase()
-          ? `${sessionName} (${slugLabel})`
-          : sessionName || slugLabel;
-      options.set(slug, {
-        key: `database-session-${slug || 'general'}`,
-        slug,
-        label,
-        selected: selectedDataSessionSlug === slug,
-        general: slug === '',
-        primary: normalizeSessionSlug(props.activeSessionSlug || '') === slug,
-        chipTestId: `ce-database-session-chip-${slug || 'general'}`,
-      });
-    };
-
-    pushOption(selectedDataSessionSlug);
-    pushOption(toStr(props.activeSessionSlug));
-    pushOption('');
-    (getAllSessionSlugs({ includeEmpty: true }) || []).forEach(pushOption);
-    return Array.from(options.values());
-  }, [props.activeSessionSlug, selectedDataSessionSlug]);
-
   const readInitialGroupsCreateState = () =>
     hasCachedCreateSbtForm({
       sessionSlug: toStr(props.activeSessionSlug),
@@ -220,7 +186,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
   const handleClick = (Component: ToolComponent, data: ToolData) => {
     if (!data.disabled) {
       setDataToolMode('add');
-      setShowDataSessionSelector(false);
       if (data.name === 'Groups') {
         setCreateGroupSessionSlug(readInitialGroupsCreateState() ? activeSessionSlug : null);
       } else {
@@ -236,7 +201,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
   const resetExpandedComponent = () => {
     setCreateGroupSessionSlug(null);
     setDataToolMode('add');
-    setShowDataSessionSelector(false);
     setDataSessionOverrideSlug(null);
     setDataSessionOverrideTouched(false);
     setExpandedComponent(null);
@@ -246,9 +210,11 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
     setCreateGroupSessionSlug((previousSlug) => (previousSlug === activeSessionSlug ? null : activeSessionSlug));
   };
 
-  const handleDataSessionSelect = (slugIn: unknown) => {
-    setDataSessionOverrideSlug(normalizeSessionSlug(slugIn || ''));
-    setDataSessionOverrideTouched(true);
+  const handleDataSessionSelect = (slugIn: string) => {
+    const nextSlug = normalizeSessionSlug(slugIn);
+    const useInheritedSession = nextSlug === activeSessionSlug;
+    setDataSessionOverrideSlug(useInheritedSession ? null : nextSlug);
+    setDataSessionOverrideTouched(!useInheritedSession);
   };
 
   const resetDataSessionSelection = () => {
@@ -368,13 +334,17 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
                     {...(expandedComponent.props || {})}
                   />
                 </div>
-                {!showDataHeaderActions && (
-                  <ToolExplorerSessionControl
-                    activeSessionSlug={activeSessionSlug}
-                    sessionConfig={activeSessionConfig}
-                    onChange={handleActiveSessionChange}
-                  />
-                )}
+                <ToolExplorerSessionControl
+                  activeSessionSlug={showDataHeaderActions ? selectedDataSessionSlug : activeSessionSlug}
+                  sessionConfig={
+                    showDataHeaderActions
+                      ? resolveToolSessionConfig(selectedDataSessionSlug, props.sessionConfig)
+                      : activeSessionConfig
+                  }
+                  inheritedSessionSlug={showDataHeaderActions ? activeSessionSlug : undefined}
+                  onUseInheritedSession={showDataHeaderActions ? resetDataSessionSelection : undefined}
+                  onChange={showDataHeaderActions ? handleDataSessionSelect : handleActiveSessionChange}
+                />
               </div>
 
               <div className={styles.expandedHeaderActions}>
@@ -419,44 +389,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
                       <FontAwesomeIcon icon={faEye} />
                       View
                     </button>
-                    <div className={styles.headerSessionSelector} data-testid="ce-database-session-selector">
-                      <button
-                        type="button"
-                        className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerIconButton} ${showDataSessionSelector ? styles.headerActionButtonActive : ''}`}
-                        onClick={() => setShowDataSessionSelector((value) => !value)}
-                        aria-label="Context session selector"
-                        data-testid="ce-database-session-selector-toggle"
-                      >
-                        <FontAwesomeIcon icon={faCog} />
-                      </button>
-                      {showDataSessionSelector && (
-                        <div
-                          className={styles.headerSessionSelectorPanel}
-                          data-testid="ce-database-session-selector-panel"
-                        >
-                          <div className={styles.headerSessionSelectorHeader}>
-                            <div className={styles.headerSessionSelectorHint}>
-                              {dataSessionOverrideTouched
-                                ? 'Using a local AudioSurveyGenerator override.'
-                                : 'Using the global primary session by default.'}
-                            </div>
-                            {dataSessionOverrideTouched ? (
-                              <button
-                                type="button"
-                                className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerSessionResetButton}`}
-                                onClick={resetDataSessionSelection}
-                              >
-                                Use global default
-                              </button>
-                            ) : null}
-                          </div>
-                          <SessionChipSelector
-                            options={dataSessionSelectorOptions}
-                            onToggle={handleDataSessionSelect}
-                          />
-                        </div>
-                      )}
-                    </div>
                   </div>
                 )}
 

@@ -83,7 +83,9 @@ jest.mock('../SurveyTool/SurveyGenerator/SurveyGenerator', () => ({
         data-session-override-slug={props.sessionOverrideSlug || ''}
         data-session-override-touched={String(!!props.sessionOverrideTouched)}
         data-hide-internal-session-selector={String(!!props.hideInternalSessionSelector)}
-      />
+      >
+        <input aria-label="Context draft" defaultValue="" />
+      </div>
     );
   },
 }));
@@ -200,6 +202,7 @@ describe('ToolExplorer session propagation', () => {
     await screen.findByTestId('mock-survey-tool');
     const selector = screen.getByRole('combobox', { name: 'Active session' });
     expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Current Session$/);
+    expect(screen.queryByRole('option', { name: /^Use global default/ })).not.toBeInTheDocument();
     fireEvent.change(selector, { target: { value: 'edge' } });
     expect(updateGlobalSessionSelection).not.toHaveBeenCalled();
 
@@ -403,42 +406,124 @@ describe('ToolExplorer session propagation', () => {
     );
   });
 
-  it('renders Add, View, then the header gear and forwards session overrides into Context', async () => {
-    const { container } = renderToolExplorer({ activeSessionSlug: 'edge' });
-
+  it('uses the uniform session chooser for local Context overrides while preserving its mode and draft', async () => {
+    const updateGlobalSessionSelection = jest.fn();
+    const { container } = renderToolExplorer({ activeSessionSlug: 'edge', updateGlobalSessionSelection });
     fireEvent.click(screen.getByText('Context'));
-
-    expect(await screen.findByTestId('mock-audio-survey-generator')).toBeInTheDocument();
+    const context = await screen.findByTestId('mock-audio-survey-generator');
+    const draft = screen.getByRole('textbox', { name: 'Context draft' });
+    fireEvent.change(draft, { target: { value: 'Keep this draft' } });
+    const selector = screen.getByRole('combobox', { name: 'Active session' });
+    expect(selector).toHaveValue('edge');
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Edge Session$/);
+    expect(selector.closest(`.${styles.expandedHeaderLead}`)).toBeInTheDocument();
     const headerGroup = container.querySelector(`.${styles.headerModeToggleGroup}`) as HTMLElement | null;
     if (!headerGroup) throw new Error('Expected header mode toggle group');
-    const headerButtons = Array.from(headerGroup.querySelectorAll('button')).map(
-      (node) => node.getAttribute('aria-label') || node.textContent?.trim(),
-    );
+    expect(Array.from(headerGroup.querySelectorAll('button')).map((node) => node.textContent?.trim())).toEqual([
+      'Add',
+      'View',
+    ]);
+    expect(screen.queryByTestId('ce-database-session-selector-toggle')).not.toBeInTheDocument();
 
-    expect(headerButtons).toEqual(['Add', 'View', 'Context session selector']);
-    expect(screen.queryByRole('combobox', { name: 'Active session' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.TOOL_EXPLORER_DATA_VIEW));
+    fireEvent.change(selector, { target: { value: 'rxc' } });
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Debate Session$/);
+    expect(screen.getByTestId('mock-audio-survey-generator')).toBe(context);
+    expect(context).toHaveAttribute('data-explorer-mode', 'view');
+    expect(draft).toHaveValue('Keep this draft');
     expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        sessionOverrideSlug: null,
-        sessionOverrideTouched: false,
-        hideInternalSessionSelector: true,
-      }),
-    );
-
-    fireEvent.click(screen.getByTestId('ce-database-session-selector-toggle'));
-
-    expect(screen.getByTestId('ce-database-session-selector-panel')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('ce-database-session-chip-rxc'));
-
-    expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        explorerMode: 'add',
+        activeSessionSlug: 'edge',
         sessionOverrideSlug: 'rxc',
         sessionOverrideTouched: true,
         hideInternalSessionSelector: true,
       }),
     );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.TOOL_EXPLORER_DATA_ADD));
+    expect(context).toHaveAttribute('data-explorer-mode', 'add');
+    expect(draft).toHaveValue('Keep this draft');
+    expect(updateGlobalSessionSelection).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '← Back' }));
+    fireEvent.click(screen.getByText('Context'));
+    expect(await screen.findByTestId('mock-audio-survey-generator')).toHaveAttribute('data-explorer-mode', 'add');
+    expect(screen.getByRole('combobox', { name: 'Active session' })).toHaveValue('edge');
+    expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionOverrideSlug: null, sessionOverrideTouched: false }),
+    );
   });
+
+  it('keeps an explicit General override across global changes and resumes inheritance when the global session is chosen', async () => {
+    const updateGlobalSessionSelection = jest.fn();
+    const { rerender } = renderToolExplorer({ activeSessionSlug: 'edge', updateGlobalSessionSelection });
+    fireEvent.click(screen.getByText('Context'));
+    await screen.findByTestId('mock-audio-survey-generator');
+    const selector = screen.getByRole('combobox', { name: 'Active session' });
+    rerender(<ToolExplorer activeSessionSlug="rxc" updateGlobalSessionSelection={updateGlobalSessionSelection} />);
+    expect(selector).toHaveValue('rxc');
+
+    fireEvent.change(selector, { target: { value: '' } });
+    rerender(<ToolExplorer activeSessionSlug="edge" updateGlobalSessionSelection={updateGlobalSessionSelection} />);
+    expect(selector).toHaveValue('');
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^General$/);
+    expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
+      expect.objectContaining({ activeSessionSlug: 'edge', sessionOverrideSlug: '', sessionOverrideTouched: true }),
+    );
+
+    fireEvent.change(selector, { target: { value: 'edge' } });
+    expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionOverrideSlug: null, sessionOverrideTouched: false }),
+    );
+    rerender(<ToolExplorer activeSessionSlug="rxc" updateGlobalSessionSelection={updateGlobalSessionSelection} />);
+    expect(selector).toHaveValue('rxc');
+    expect(updateGlobalSessionSelection).not.toHaveBeenCalled();
+  });
+
+  it('explicitly resumes inheritance when the pinned Context session and global session coincide', async () => {
+    mockGetAllSessionSlugs.mockReturnValue(['edge', 'rxc', '__ce_inherited_session__', '__ce_inherited_session___']);
+    const { rerender } = renderToolExplorer({ activeSessionSlug: 'edge' });
+    fireEvent.click(screen.getByText('Context'));
+    await screen.findByTestId('mock-audio-survey-generator');
+    const selector = screen.getByRole('combobox', { name: 'Active session' });
+    fireEvent.change(selector, { target: { value: 'rxc' } });
+    rerender(<ToolExplorer activeSessionSlug="rxc" />);
+    expect(selector).toHaveValue('rxc');
+    expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionOverrideSlug: 'rxc', sessionOverrideTouched: true }),
+    );
+
+    const inheritOption = screen.getByRole('option', {
+      name: 'Use global default (Debate Session)',
+    }) as HTMLOptionElement;
+    expect(mockGetAllSessionSlugs()).not.toContain(inheritOption.value);
+    fireEvent.change(selector, { target: { value: inheritOption.value } });
+    expect(selector).toHaveValue('rxc');
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Debate Session$/);
+    expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionOverrideSlug: null, sessionOverrideTouched: false }),
+    );
+    rerender(<ToolExplorer activeSessionSlug="edge" />);
+    expect(selector).toHaveValue('edge');
+  });
+
+  it.each(['', 'uncatalogued'])(
+    'keeps the inherited %j session available after a local override',
+    async (inherited) => {
+      mockGetAllSessionSlugs.mockReturnValue(['rxc']);
+      const { rerender } = renderToolExplorer({ activeSessionSlug: inherited });
+      fireEvent.click(screen.getByText('Context'));
+      await screen.findByTestId('mock-audio-survey-generator');
+      const selector = screen.getByRole('combobox', { name: 'Active session' });
+      fireEvent.change(selector, { target: { value: 'rxc' } });
+      expect(screen.getByRole('option', { name: inherited || 'General' })).toHaveValue(inherited);
+      fireEvent.change(selector, { target: { value: inherited } });
+      expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sessionOverrideSlug: null, sessionOverrideTouched: false }),
+      );
+      rerender(<ToolExplorer activeSessionSlug="edge" />);
+      expect(selector).toHaveValue('edge');
+    },
+  );
 
   it('passes demoSurfaceMode through to the expanded Context tool', async () => {
     renderToolExplorer({ activeSessionSlug: 'edge', demoSurfaceMode: false });

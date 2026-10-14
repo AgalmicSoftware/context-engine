@@ -41,6 +41,16 @@ export async function inspectCivicExplorerContent(page) {
   await back.click();
 
   await open('Context');
+  await sessionSelector.waitFor({ state: 'visible' });
+  assert.equal(await sessionSelector.getAttribute('aria-label'), 'Active session');
+  assert.equal(await page.getByTestId('ce-database-session-selector-toggle').count(), 0);
+  const inheritedContextSession = await sessionSelector.inputValue();
+  await sessionSelector.selectOption('');
+  assert.equal(await sessionSelector.inputValue(), '');
+  const inheritOptionValue = await sessionSelector.getByRole('option', { name: /^Use global default/ }).getAttribute('value');
+  assert(inheritOptionValue, 'Context offers an explicit return to the global session');
+  await sessionSelector.selectOption(inheritOptionValue);
+  assert.equal(await sessionSelector.inputValue(), inheritedContextSession);
   await page.getByRole('button', { name: 'View', exact: true }).waitFor({ state: 'visible' });
   await assertReadable(body);
   await page.getByRole('button', { name: 'View', exact: true }).click();
