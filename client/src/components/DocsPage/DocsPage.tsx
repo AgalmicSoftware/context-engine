@@ -17,6 +17,7 @@ import { questionSelectionPrompt } from '../../prompts/questionSelectionPrompt.j
 import buildUserAnalysisPrompt from '../../prompts/userAnalysisPrompt.js';
 // CSS
 import styles from './DocsPage.module.scss';
+import deploymentModesGraphic from '../../../../docs/assets/readme-architecture-deployment-modes.jpg';
 //
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
@@ -35,7 +36,11 @@ import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { DOCS_PAGE_COPY, FAQ_ITEMS, GUIDE_TOPICS, QUICKSTART_STEPS } from './docsContent.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import { PUBLIC_REPO_URL, buildPublicContractSourceUrl } from '../../variables/publicRepoMetadata.js';
+import {
+  PUBLIC_REPO_URL,
+  buildPublicContractSourceUrl,
+  buildPublicRepoBlobUrl,
+} from '../../variables/publicRepoMetadata.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 
@@ -63,6 +68,7 @@ type DocsSectionProps = {
   children: React.ReactNode;
   contentClassName?: string;
   defaultOpen?: boolean;
+  testId?: string;
   id: string;
   title: string;
 };
@@ -70,7 +76,7 @@ type DocsSectionProps = {
 const DOCS_GENERAL_SESSION_SELECT_VALUE = '__general__';
 const DOCS_GENERAL_SESSION_QUERY_VALUE = 'general';
 
-const DocsSection = ({ children, contentClassName = '', defaultOpen = false, id, title }: DocsSectionProps) => {
+const DocsSection = ({ children, contentClassName = '', defaultOpen = false, id, testId, title }: DocsSectionProps) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const contentId = `docs-section-${id}`;
 
@@ -79,6 +85,7 @@ const DocsSection = ({ children, contentClassName = '', defaultOpen = false, id,
       <button
         type="button"
         className={styles.docsSectionToggle}
+        data-testid={testId}
         onClick={() => setIsOpen((open) => !open)}
         aria-expanded={isOpen}
         aria-controls={contentId}
@@ -468,6 +475,45 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
           </nav>
         </div>
         <p>{DOCS_PAGE_COPY.introduction}</p>
+        <div className={styles.docsGraphicDisclosure}>
+          <DocsSection
+            id="graphic"
+            title="Graphic"
+            testId={E2E_TESTIDS.DOCS_GRAPHIC_TOGGLE}
+            contentClassName={styles.docsGraphicContent}
+          >
+            <figure className={styles.docsGraphicFigure}>
+              <a
+                href={deploymentModesGraphic}
+                className={styles.docsGraphicImageLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open full-size graphic"
+              >
+                <img
+                  src={deploymentModesGraphic}
+                  alt="Context Engine deployment diagram showing Web App and AI Agent access to shared sessions across Hosted and Fast, Trustless and Slower, and planned Company-Operated infrastructure modes."
+                  data-testid={E2E_TESTIDS.DOCS_GRAPHIC_IMAGE}
+                  loading="lazy"
+                  decoding="async"
+                />
+                <span className={styles.docsGraphicOpenLabel}>Full-size graphic</span>
+              </a>
+              <figcaption className={styles.docsGraphicCaption}>
+                Hosted setup uses a Cloudflare dashboard login and an AI provider key; no Cloudflare API token is
+                needed.{' '}
+                <a
+                  href={buildPublicRepoBlobUrl('docs/session-creation-guide.md')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Current setup guide
+                </a>
+                .
+              </figcaption>
+            </figure>
+          </DocsSection>
+        </div>
       </header>
 
       <DocsSection id="quickstart" title="Quickstart" defaultOpen>

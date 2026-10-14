@@ -744,6 +744,42 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
 
   if (routeCase.requiresReadableDocs) {
+    const graphicToggle = page.getByTestId('ce-docs-graphic-toggle');
+    const graphicImage = page.getByTestId('ce-docs-graphic-image');
+    const quickstartToggle = page.getByRole('button', { name: 'Quickstart', exact: true });
+    await graphicToggle.waitFor({ state: 'visible' });
+    assert.equal(await graphicToggle.getAttribute('aria-expanded'), 'false', 'Graphic starts collapsed');
+    assert.equal(await graphicImage.count(), 0, 'The collapsed Graphic does not mount its image');
+    await graphicToggle.press('Enter');
+    await graphicImage.waitFor({ state: 'visible' });
+    await page.waitForFunction(() => {
+      const image = document.querySelector('[data-testid="ce-docs-graphic-image"]');
+      return image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0;
+    });
+    const graphicState = await graphicImage.evaluate((image) => {
+      const link = image.closest('a');
+      const header = image.closest('header');
+      return {
+        inHeader: Boolean(header),
+        imageWidth: image.getBoundingClientRect().width,
+        headerWidth: header?.getBoundingClientRect().width ?? 0,
+        source: image.currentSrc,
+        href: link?.href,
+        target: link?.target,
+        rel: link?.rel,
+      };
+    });
+    assert.equal(graphicState.inHeader, true, 'Graphic expands inside the Docs header');
+    assert(graphicState.imageWidth > 0 && graphicState.imageWidth <= graphicState.headerWidth, 'Graphic fits its header');
+    assert.equal(graphicState.href, graphicState.source, 'Full-size link opens the same bundled graphic');
+    assert.equal(graphicState.target, '_blank');
+    assert.equal(graphicState.rel, 'noopener noreferrer');
+    await graphicToggle.press('Space');
+    assert.equal(await graphicToggle.getAttribute('aria-expanded'), 'false', 'Space closes Graphic');
+    assert.equal(await graphicImage.count(), 0);
+    assert.equal(await quickstartToggle.getAttribute('aria-expanded'), 'true', 'Graphic leaves Quickstart open');
+    await graphicToggle.press('Enter');
+    await graphicImage.waitFor({ state: 'visible' });
     await page.getByTestId('ce-contract-viewer-card-surveys').waitFor({ state: 'visible' });
     await page.getByTestId('ce-contract-viewer-card-sbtFactory').waitFor({ state: 'visible' });
     await page.getByTestId('ce-contract-viewer-card-customSBT').waitFor({ state: 'visible' });
@@ -1228,6 +1264,9 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
             '[data-testid="ce-page-docs-root"] > header',
           ),
           sample('Docs GitHub link', '[data-testid="ce-docs-github-link"]'),
+          sample('Graphic title bar', '[data-testid="ce-docs-graphic-toggle"]'),
+          sample('Graphic caption', '#docs-section-graphic figcaption', '#docs-section-graphic'),
+          sample('Graphic full-size link', '#docs-section-graphic a[aria-label="Open full-size graphic"]', '#docs-section-graphic'),
           sample('Quickstart title bar', 'button[aria-controls="docs-section-quickstart"]'),
           sample(
             'Quickstart card title',

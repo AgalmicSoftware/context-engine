@@ -153,6 +153,57 @@
   background: var(--docs-surface);
 }
 
+.docsGraphicDisclosure {
+  margin-top: 18px;
+}
+
+.docsGraphicContent {
+  background: var(--docs-document);
+}
+
+.docsGraphicFigure {
+  min-width: 0;
+  margin: 0;
+}
+
+.docsGraphicImageLink {
+  display: block;
+  color: var(--docs-document-text);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--ce-radius-8);
+  }
+}
+
+.docsGraphicOpenLabel {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.docsGraphicCaption {
+  color: var(--docs-document-text);
+  font-size: 0.95rem;
+  line-height: 1.6;
+
+  a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+  }
+}
+
+.docsGraphicImageLink:focus-visible,
+.docsGraphicCaption a:focus-visible {
+  outline: 3px solid var(--ce-focus-ring);
+  outline-offset: 3px;
+}
+
 .quickstartList {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

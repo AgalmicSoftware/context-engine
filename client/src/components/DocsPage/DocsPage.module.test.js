@@ -16,6 +16,9 @@ describe('Docs page theme readability styles', () => {
     expect(scss).toMatch(
       /\.docsHeader\s*\{[\s\S]*?background:\s*var\(--docs-titlebar-bg\);[\s\S]*?h1\s*\{[\s\S]*?color:\s*var\(--docs-titlebar-text\);[\s\S]*?p\s*\{[\s\S]*?color:\s*var\(--docs-titlebar-text\);/,
     );
+    expect(scss).toMatch(/\.docsGraphicContent\s*\{\s*background:\s*var\(--docs-document\);/);
+    expect(scss).toMatch(/\.docsGraphicCaption\s*\{\s*color:\s*var\(--docs-document-text\);/);
+    expect(scss).toMatch(/\.docsGraphicImageLink\s*\{[\s\S]*?img\s*\{[^}]*width:\s*100%;[^}]*height:\s*auto;/);
     expect(scss).toMatch(
       /\.quickstartStep\s*\{[\s\S]*?background:\s*var\(--docs-document\);[\s\S]*?h2\s*\{[\s\S]*?color:\s*var\(--docs-document-text\);[\s\S]*?p\s*\{[\s\S]*?color:\s*var\(--docs-document-muted\);/,
     );
