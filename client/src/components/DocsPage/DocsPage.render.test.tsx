@@ -160,18 +160,10 @@ describe('DocsPage contract deep links', () => {
       'Context Engine deployment diagram showing Web App and AI Agent access to shared sessions across Hosted and Fast, Trustless and Slower, and planned Company-Operated infrastructure modes.',
     );
     expect(graphic).toHaveAttribute('loading', 'lazy');
-    const fullSizeLink = within(header).getByRole('link', { name: 'Open full-size graphic' });
-    expect(fullSizeLink).toContainElement(graphic);
-    expect(fullSizeLink).toHaveAttribute('href', deploymentModesGraphic);
-    expect(fullSizeLink).toHaveAttribute('target', '_blank');
-    expect(fullSizeLink).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(within(header).getByText(/no Cloudflare API token is needed/)).toHaveTextContent(
-      'Hosted setup uses a Cloudflare dashboard login and an AI provider key;',
-    );
-    expect(within(header).getByRole('link', { name: 'Current setup guide' })).toHaveAttribute(
-      'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-creation-guide.md',
-    );
+    expect(within(header).getByRole('button', { name: 'Enlarge deployment graphic' })).toContainElement(graphic);
+    expect(within(header).queryByText('Full-size graphic')).not.toBeInTheDocument();
+    expect(within(header).queryByText(/Hosted setup uses/)).not.toBeInTheDocument();
+    expect(within(header).queryByRole('link', { name: 'Current setup guide' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Open or create a session' })).toBeInTheDocument();
 
     fireEvent.click(graphicToggle);
@@ -179,6 +171,26 @@ describe('DocsPage contract deep links', () => {
     expect(screen.queryByTestId('ce-docs-graphic-image')).not.toBeInTheDocument();
     expect(quickstartToggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('heading', { name: 'Open or create a session' })).toBeInTheDocument();
+  });
+
+  it('opens the enlarged graphic in a dialog and restores focus after closing', async () => {
+    render(<DocsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Graphic' }));
+    const opener = screen.getByRole('button', { name: 'Enlarge deployment graphic' });
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole('dialog', { name: 'Deployment graphic' });
+    expect(within(dialog).getByRole('img')).toHaveAttribute('src', deploymentModesGraphic);
+    expect(document.body).toHaveClass('modal-open');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close deployment graphic' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
+    expect(document.body).not.toHaveClass('modal-open');
+
+    fireEvent.click(opener);
+    fireEvent.keyUp(screen.getByRole('dialog'), { key: 'Escape', keyCode: 27 });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
   });
 
   it('renders the user guide, session context, and no longer exposes the bundle or converters', async () => {

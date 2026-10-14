@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { connect } from 'react-redux';
+import { Modal, ModalBody } from 'reactstrap';
 import {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
@@ -36,11 +37,7 @@ import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { DOCS_PAGE_COPY, FAQ_ITEMS, GUIDE_TOPICS, QUICKSTART_STEPS } from './docsContent.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import {
-  PUBLIC_REPO_URL,
-  buildPublicContractSourceUrl,
-  buildPublicRepoBlobUrl,
-} from '../../variables/publicRepoMetadata.js';
+import { PUBLIC_REPO_URL, buildPublicContractSourceUrl } from '../../variables/publicRepoMetadata.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 
@@ -357,6 +354,7 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
 
   const [openPromptItems, setOpenPromptItems] = useState<Record<string, boolean>>({});
   const [copiedPromptKey, setCopiedPromptKey] = useState('');
+  const [graphicOpen, setGraphicOpen] = useState(false);
   const copyResetTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(
@@ -483,12 +481,14 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
             contentClassName={styles.docsGraphicContent}
           >
             <figure className={styles.docsGraphicFigure}>
-              <a
-                href={deploymentModesGraphic}
-                className={styles.docsGraphicImageLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Open full-size graphic"
+              <button
+                type="button"
+                className={styles.docsGraphicImageButton}
+                data-ce-control-appearance="frameless"
+                onClick={() => setGraphicOpen(true)}
+                aria-label="Enlarge deployment graphic"
+                aria-haspopup="dialog"
+                data-testid={E2E_TESTIDS.DOCS_GRAPHIC_OPEN}
               >
                 <img
                   src={deploymentModesGraphic}
@@ -497,24 +497,38 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
                   loading="lazy"
                   decoding="async"
                 />
-                <span className={styles.docsGraphicOpenLabel}>Full-size graphic</span>
-              </a>
-              <figcaption className={styles.docsGraphicCaption}>
-                Hosted setup uses a Cloudflare dashboard login and an AI provider key; no Cloudflare API token is
-                needed.{' '}
-                <a
-                  href={buildPublicRepoBlobUrl('docs/session-creation-guide.md')}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Current setup guide
-                </a>
-                .
-              </figcaption>
+              </button>
             </figure>
           </DocsSection>
         </div>
       </header>
+
+      <Modal
+        isOpen={graphicOpen}
+        toggle={() => setGraphicOpen(false)}
+        centered
+        trapFocus
+        fade={false}
+        className={styles.docsGraphicModal}
+        contentClassName={styles.docsGraphicModalContent}
+        labelledBy="docs-graphic-modal-title"
+        data-testid={E2E_TESTIDS.DOCS_GRAPHIC_MODAL}
+      >
+        <div className={styles.docsGraphicModalHeader}>
+          <h2 id="docs-graphic-modal-title">Deployment graphic</h2>
+          <button
+            type="button"
+            onClick={() => setGraphicOpen(false)}
+            aria-label="Close deployment graphic"
+            data-testid={E2E_TESTIDS.DOCS_GRAPHIC_CLOSE}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+        <ModalBody className={styles.docsGraphicModalBody}>
+          <img src={deploymentModesGraphic} alt="Context Engine deployment diagram, enlarged." />
+        </ModalBody>
+      </Modal>
 
       <DocsSection id="quickstart" title="Quickstart" defaultOpen>
         <ol className={styles.quickstartList}>

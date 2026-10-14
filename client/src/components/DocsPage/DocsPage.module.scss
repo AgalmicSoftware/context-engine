@@ -166,42 +166,78 @@
   margin: 0;
 }
 
-.docsGraphicImageLink {
+.docsGraphicImageButton {
   display: block;
-  color: var(--docs-document-text);
-  text-decoration: underline;
-  text-underline-offset: 0.18em;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ce-radius-8);
+  background: transparent;
+  cursor: zoom-in;
 
   img {
     display: block;
     width: 100%;
     height: auto;
-    border-radius: var(--ce-radius-8);
+    border-radius: inherit;
   }
 }
 
-.docsGraphicOpenLabel {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-}
-
-.docsGraphicCaption {
-  color: var(--docs-document-text);
-  font-size: 0.95rem;
-  line-height: 1.6;
-
-  a {
-    color: inherit;
-    text-decoration: underline;
-    text-underline-offset: 0.18em;
-  }
-}
-
-.docsGraphicImageLink:focus-visible,
-.docsGraphicCaption a:focus-visible {
+.docsGraphicImageButton:focus-visible,
+.docsGraphicModalHeader button:focus-visible {
   outline: 3px solid var(--ce-focus-ring);
   outline-offset: 3px;
+}
+
+.docsGraphicModal {
+  width: calc(100vw - 32px);
+  max-width: 1800px;
+  margin: 16px auto;
+}
+
+.docsGraphicModalContent {
+  border: 1px solid var(--ce-document-border-strong);
+  background: var(--ce-document-surface);
+  color: var(--ce-document-text);
+  border-radius: var(--ce-radius-8);
+  overflow: hidden;
+}
+
+.docsGraphicModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--ce-titlebar-bg);
+  color: var(--ce-titlebar-text);
+
+  h2 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+
+  button {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 1.6rem;
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+  }
+}
+
+.docsGraphicModalBody {
+  padding: 8px;
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: calc(100dvh - 112px);
+    object-fit: contain;
+  }
 }
 
 .quickstartList {

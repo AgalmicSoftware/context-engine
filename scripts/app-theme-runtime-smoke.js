@@ -757,29 +757,46 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       return image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0;
     });
     const graphicState = await graphicImage.evaluate((image) => {
-      const link = image.closest('a');
       const header = image.closest('header');
       return {
         inHeader: Boolean(header),
         imageWidth: image.getBoundingClientRect().width,
         headerWidth: header?.getBoundingClientRect().width ?? 0,
-        source: image.currentSrc,
-        href: link?.href,
-        target: link?.target,
-        rel: link?.rel,
       };
     });
     assert.equal(graphicState.inHeader, true, 'Graphic expands inside the Docs header');
     assert(graphicState.imageWidth > 0 && graphicState.imageWidth <= graphicState.headerWidth, 'Graphic fits its header');
-    assert.equal(graphicState.href, graphicState.source, 'Full-size link opens the same bundled graphic');
-    assert.equal(graphicState.target, '_blank');
-    assert.equal(graphicState.rel, 'noopener noreferrer');
+    const graphicOpener = page.getByTestId('ce-docs-graphic-open');
+    const graphicModal = page.getByRole('dialog', { name: 'Deployment graphic', exact: true });
+    const closeGraphic = page.getByTestId('ce-docs-graphic-close');
+    await graphicOpener.press('Enter');
+    await graphicModal.waitFor({ state: 'visible' });
+    const enlargedImage = graphicModal.getByRole('img');
+    assert.equal(await enlargedImage.getAttribute('src'), await graphicImage.getAttribute('src'));
+    const enlargedBox = await enlargedImage.boundingBox();
+    assert(enlargedBox.width > graphicState.imageWidth, 'Modal graphic is larger than the inline image');
+    assert(enlargedBox.x >= 0 && enlargedBox.x + enlargedBox.width <= page.viewportSize().width, 'Modal fits viewport');
+    await closeGraphic.focus();
+    await closeGraphic.press('Tab');
+    assert(await closeGraphic.evaluate((button) => document.activeElement === button), 'Modal traps keyboard focus');
+    await closeGraphic.press('Escape');
+    await graphicModal.waitFor({ state: 'detached' });
+    assert(await graphicOpener.evaluate((button) => document.activeElement === button), 'Escape restores trigger focus');
+    await graphicOpener.click();
+    await closeGraphic.click();
+    await graphicModal.waitFor({ state: 'detached' });
+    await graphicOpener.click();
+    await page.mouse.click(2, 2);
+    await graphicModal.waitFor({ state: 'detached' });
+    assert.equal(await page.locator('#docs-section-graphic figcaption').count(), 0, 'Graphic has no caption');
+    assert.equal(await page.getByText('Full-size graphic', { exact: true }).count(), 0, 'Graphic has no full-size label');
     await graphicToggle.press('Space');
     assert.equal(await graphicToggle.getAttribute('aria-expanded'), 'false', 'Space closes Graphic');
     assert.equal(await graphicImage.count(), 0);
     assert.equal(await quickstartToggle.getAttribute('aria-expanded'), 'true', 'Graphic leaves Quickstart open');
     await graphicToggle.press('Enter');
     await graphicImage.waitFor({ state: 'visible' });
+    if (routeCase.graphicOnly) return;
     await page.getByTestId('ce-contract-viewer-card-surveys').waitFor({ state: 'visible' });
     await page.getByTestId('ce-contract-viewer-card-sbtFactory').waitFor({ state: 'visible' });
     await page.getByTestId('ce-contract-viewer-card-customSBT').waitFor({ state: 'visible' });
@@ -1265,8 +1282,6 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           ),
           sample('Docs GitHub link', '[data-testid="ce-docs-github-link"]'),
           sample('Graphic title bar', '[data-testid="ce-docs-graphic-toggle"]'),
-          sample('Graphic caption', '#docs-section-graphic figcaption', '#docs-section-graphic'),
-          sample('Graphic full-size link', '#docs-section-graphic a[aria-label="Open full-size graphic"]', '#docs-section-graphic'),
           sample('Quickstart title bar', 'button[aria-controls="docs-section-quickstart"]'),
           sample(
             'Quickstart card title',
@@ -3919,13 +3934,14 @@ async function main() {
   const sessionSetupOnly = process.argv.includes('--session-setup-only');
   const footerOnly = process.argv.includes('--footer-only');
   const aboutOnly = process.argv.includes('--about-only');
-  const docsOnly = process.argv.includes('--docs-only');
+  const graphicOnly = process.argv.includes('--docs-graphic-only');
+  const docsOnly = graphicOnly || process.argv.includes('--docs-only');
   const tagOnly = process.argv.includes('--tag-only');
   const toolCardsOnly = process.argv.includes('--tool-cards-only');
   const routeCases = aboutOnly
     ? ROUTE_CASES.filter((routeCase) => routeCase.requiresClassicAboutHeroControls)
     : docsOnly
-      ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableDocs)
+      ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableDocs).map((routeCase) => ({ ...routeCase, graphicOnly }))
     : tagOnly
       ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableTagRelatedChips)
     : homeTabsOnly
@@ -3974,23 +3990,34 @@ async function main() {
               : sessionSetupOnly
                 ? SESSION_SETUP_VIEWPORTS
                 : VIEWPORTS;
+  const initializeThemePage = (themeId) => {
+    window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
+    window.localStorage.setItem('ce_onboarding_complete', 'true');
+    window.localStorage.setItem('firstVisit', 'false');
+    window.localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
+    window.localStorage.setItem('ce:theme', themeId);
+    window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
+    window.localStorage.setItem('ce:selectedSessionScope', 'active');
+  };
   const browser = await chromium.launch({ headless: true });
 
   try {
     if (!welcomeFitOnly) {
       for (const viewport of viewports) {
         const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
-        await page.addInitScript(() => {
-          window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
-          window.localStorage.setItem('ce_onboarding_complete', 'true');
-          window.localStorage.setItem('firstVisit', 'false');
-          window.localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
-          window.localStorage.setItem('ce:theme', 'classic-95');
-          window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
-          window.localStorage.setItem('ce:selectedSessionScope', 'active');
-        });
+        await page.addInitScript(initializeThemePage, 'classic-95');
         for (const routeCase of routeCases) {
-          await inspectRoute(page, baseUrl, routeCase, viewport.name);
+          if (graphicOnly) {
+            for (const themeId of themeRegistry.themes.map((theme) => theme.id)) {
+              const themedPage = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
+              await themedPage.addInitScript(initializeThemePage, themeId);
+              await inspectRoute(themedPage, baseUrl, routeCase, viewport.name);
+              assert.equal(await themedPage.evaluate(() => document.documentElement.dataset.ceTheme), themeId);
+              await themedPage.close();
+            }
+          } else {
+            await inspectRoute(page, baseUrl, routeCase, viewport.name);
+          }
         }
         await page.close();
       }
@@ -4020,6 +4047,8 @@ async function main() {
         ? `Welcome fit Playwright smoke passed (${WELCOME_FIT_THEME_IDS.length} themes × ${WELCOME_FIT_VIEWPORTS.length} viewports).`
         : aboutOnly
           ? `Classic 95 About hero Playwright smoke passed (${viewports.length} viewports).`
+        : graphicOnly
+          ? `Docs graphic modal smoke passed (${viewports.length} viewports × ${themeRegistry.themes.length} themes).`
         : docsOnly
           ? `Classic 95 Docs structure Playwright smoke passed (${viewports.length} viewports).`
         : tagOnly

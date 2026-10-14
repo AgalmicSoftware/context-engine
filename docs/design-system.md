@@ -342,7 +342,9 @@ The Docs route follows the same pairings end to end: page and section headers
 use `--ce-titlebar-*`, prose cards use `--ce-document-*`, controls use
 `--ce-control-*`, and source/prompt readers use `--ce-overlay-*`. Keep those
 foreground/background pairs together so every bundled theme remains readable;
-the app-theme Playwright smoke checks the rendered Docs pairs at 4.5:1.
+the app-theme Playwright smoke checks the rendered Docs pairs at 4.5:1. The
+Graphic disclosure contains a clickable image that opens a viewport-sized modal;
+Escape, the backdrop, or its close button dismiss it and restore trigger focus.
 
 ## Typography
 
