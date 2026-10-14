@@ -30,6 +30,7 @@ export type WorkerSessionGroupsPanelProps = {
   sessionName?: string;
   showCreate: boolean;
   createOnly?: boolean;
+  scrollToCreate?: boolean;
   refreshNonce?: number;
   refreshControlTarget?: HTMLElement | null;
   selectedGroupId?: string;
@@ -70,6 +71,7 @@ const WorkerSessionGroupsPanel = ({
   sessionName,
   showCreate,
   createOnly = false,
+  scrollToCreate = false,
   authenticateOnRender = true,
   refreshNonce = 0,
   refreshControlTarget,
@@ -83,6 +85,22 @@ const WorkerSessionGroupsPanel = ({
   membershipsOnly = false,
   toggleLoginModal,
 }: WorkerSessionGroupsPanelProps) => {
+  const createPanelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showCreate || !scrollToCreate) return;
+    const frame = requestAnimationFrame(() => {
+      const panel = createPanelRef.current;
+      if (!panel) return;
+      const bounds = panel.getBoundingClientRect();
+      // Long forms need their heading and first controls visible, not their entire height.
+      if (bounds.top >= 0 && bounds.top + Math.min(bounds.height, 160) <= window.innerHeight) return;
+      panel.scrollIntoView({
+        block: 'start',
+        behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [showCreate, scrollToCreate]);
   const config = asRecord(sessionConfig);
   const canonicalSessionSlug = canonicalizeSessionSlug(sessionSlug);
   const configuredSessionSlug = canonicalizeSessionSlug(config.slug);
@@ -474,7 +492,7 @@ const WorkerSessionGroupsPanel = ({
           onGroupsChanged={broadcastGroupsChanged}
         />
       ) : null}
-      {showCreate ? renderCreatePanel() : null}
+      {showCreate ? <div ref={createPanelRef}>{renderCreatePanel()}</div> : null}
     </div>
   );
 };

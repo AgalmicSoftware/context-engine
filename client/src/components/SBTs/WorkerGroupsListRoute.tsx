@@ -164,6 +164,7 @@ const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListR
         sessionSlug={sessionSlug}
         refreshNonce={workerGroupsRefreshNonce}
         showCreate={showWorkerCreate}
+        scrollToCreate={true}
         showMembershipListHeader={Boolean(props.embeddedMode)}
         createOnly={false}
         selectedGroupId={selectedGroupId}

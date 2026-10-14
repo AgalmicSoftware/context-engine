@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Bring the group creation form into view when opening it below the visible list.
+
 - Center the session loading message with larger text and a spinner while keeping
   the elapsed-seconds counter visible across themes.
 
