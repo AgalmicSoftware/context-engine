@@ -1,6 +1,5 @@
 import CommunityTab from './CommunityTab';
-import { ModalBody, ModalHeader } from 'reactstrap';
-import { LoginSettingsSessionSummary } from '../Account/LoginSettingsControlRow';
+import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import * as polisReportModule from '../PolisReport/PolisReport';
 import {
   initCacheManager,
@@ -345,47 +344,51 @@ describe('CommunityTab helpers', () => {
     expect(collectNodeText(content)).toContain('1 of 2 sessions1Centralized0Decentralized');
   });
 
-  it('groups the chart and leaderboard under one selected-session label', () => {
-    const instance = new CommunityTab({
-      activeSessionSlug: 'cloud',
-      sessionConfig: { slug: 'cloud', sessionName: 'Cloud forum' },
-    });
-    instance._getSelectedSessionSlugs = jest.fn(() => ['cloud']);
-    instance._shouldUseDemoBeeswarmData = jest.fn(() => false);
-    instance._beeswarmPoints = [{ questionId: 'q1', total: 1 }];
-    const [section] = collectTreeNodes(
-      instance.render(),
-      (node) => node.props?.['data-testid'] === 'ce-community-session-section',
-    );
-    const labels = collectTreeNodes(section, (node) => node.props?.id === section.props['aria-labelledby']);
-    expect(labels.map((node) => node.props['aria-label'])).toEqual(['Session: Cloud forum (cloud)']);
-    const [summary] = collectTreeNodes(labels, (node) => node.type === LoginSettingsSessionSummary);
-    const summaryContent = LoginSettingsSessionSummary(summary.props);
-    expect(collectNodeText(summaryContent)).toBe('SESSIONCloud forum');
-    expect(collectTreeNodes(summaryContent, (node) => node.type === 'a')[0].props).toMatchObject({
-      href: '/session/cloud',
-      'aria-label': 'Open session Cloud forum',
-    });
-    for (const id of ['ce-community-beeswarm-section', 'ce-community-leaderboard-section']) {
-      expect(collectTreeNodes(section, (node) => node.props?.['data-testid'] === id)).toHaveLength(1);
+  it.each([false, true])('shows only the Stats counters while the lower panels are hidden (demo: %s)', (demo) => {
+    const instance = new CommunityTab({ activeSessionSlug: 'cloud' });
+    instance._shouldUseDemoBeeswarmData = jest.fn(() => demo);
+    const tree = instance.render();
+    const counters = collectTreeNodes(tree, (node) => node.type === 'button' && node.props?.['data-ce-count']);
+    expect(counters.map((node) => node.props['data-testid'])).toEqual([
+      'ce-community-stat-users',
+      'ce-community-stat-questions',
+      'ce-community-stat-surveys',
+      'ce-community-stat-groups',
+      'ce-community-stat-sessions',
+    ]);
+    for (const id of [
+      'ce-community-session-section',
+      'ce-community-session-scope',
+      'ce-community-leaderboard-section',
+      'ce-community-beeswarm-section',
+    ]) {
+      expect(collectTreeNodes(tree, (node) => node.props?.['data-testid'] === id)).toHaveLength(0);
     }
-    expect(
-      collectTreeNodes(section, (node) => node.props?.['data-testid'] === 'ce-community-beeswarm-session'),
-    ).toHaveLength(0);
+    expect(collectTreeNodes(tree, (node) => node.props?.['aria-label'] === 'Leaderboard filters')).toHaveLength(0);
+    expect(collectTreeNodes(tree, (node) => node.type === BeeswarmPlot)).toHaveLength(0);
+  });
 
-    instance._shouldUseDemoBeeswarmData = jest.fn(() => true);
-    instance._iterScopeCaches = jest.fn(() => [{ slug: 'cloud' }]);
-    instance._buildDemoBeeswarmPoints = jest.fn(() => []);
-    const [demoLabel] = collectTreeNodes(
+  it.each([
+    ['users', 'users'],
+    ['questions', 'questions'],
+    ['surveys', 'surveys'],
+    ['groups', 'sbtgroups'],
+    ['sessions', 'sessions'],
+  ])('keeps the %s counter opening its detail modal after hiding the lower panels', (id, modalType) => {
+    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+    attachMutableSetState(instance);
+    const [counter] = collectTreeNodes(
       instance.render(),
-      (node) => node.props?.['data-testid'] === 'ce-community-session-scope',
+      (node) => node.props?.['data-testid'] === `ce-community-stat-${id}`,
     );
-    expect(demoLabel.props['aria-label']).toBe('Demo session: Cloud forum (cloud)');
-    expect(collectNodeText(demoLabel)).toBe('Demo');
-    expect(collectTreeNodes(demoLabel, (node) => node.type === LoginSettingsSessionSummary)[0].props).toMatchObject({
-      activeSession: { label: 'Cloud forum', slug: 'cloud' },
-      sessionHref: '/session/cloud',
-    });
+    counter.props.onClick();
+    expect(instance.state).toMatchObject({ showModal: true, modalType });
+    const tree = instance.render();
+    expect(collectTreeNodes(tree, (node) => node.type === Modal)[0].props.isOpen).toBe(true);
+    if (modalType === 'questions') {
+      const [body] = collectTreeNodes(tree, (node) => node.type === ModalBody);
+      expect(collectTreeNodes(body, (node) => node.type === BeeswarmPlot)).toHaveLength(1);
+    }
   });
 
   it('names selected sessions and uses an all-session label for combined scope', () => {
@@ -399,34 +402,8 @@ describe('CommunityTab helpers', () => {
     instance._shouldUseDemoBeeswarmData = jest.fn(() => false);
     instance._beeswarmPoints = [{ questionId: 'q1', total: 1 }];
     expect(instance._communityScopeLabel()).toBe('Sessions: alpha, beta');
-    const [selectedScope] = collectTreeNodes(
-      instance.render(),
-      (node) => node.props?.['data-testid'] === 'ce-community-session-scope',
-    );
-    expect(collectNodeText(selectedScope)).toBe('Sessions: alpha, beta');
-    expect(collectTreeNodes(selectedScope, (node) => node.type === LoginSettingsSessionSummary)).toHaveLength(0);
     instance._isUniverseEnabled = jest.fn(() => true);
     expect(instance._communityScopeLabel()).toBe('All sessions');
-    const [allScope] = collectTreeNodes(
-      instance.render(),
-      (node) => node.props?.['data-testid'] === 'ce-community-session-scope',
-    );
-    expect(collectNodeText(allScope)).toBe('All sessions');
-    expect(collectTreeNodes(allScope, (node) => node.type === LoginSettingsSessionSummary)).toHaveLength(0);
-  });
-
-  it('links the General session summary to the unqualified session route', () => {
-    jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockReturnValue(null);
-    jest.spyOn(chainGateway, 'getDemoSessionConfigBySlug').mockReturnValue(null);
-    const instance = new CommunityTab({ activeSessionSlug: '' });
-    instance._getSelectedSessionSlugs = jest.fn(() => ['']);
-    instance._shouldUseDemoBeeswarmData = jest.fn(() => false);
-    instance._beeswarmPoints = [{ questionId: 'q1', total: 1 }];
-    const [summary] = collectTreeNodes(instance.render(), (node) => node.type === LoginSettingsSessionSummary);
-    expect(summary.props).toMatchObject({
-      activeSession: { label: 'General', slug: '' },
-      sessionHref: '/session',
-    });
   });
 
   it('reuses the scope label until its session inputs change', () => {
@@ -459,17 +436,6 @@ describe('CommunityTab helpers', () => {
       scopeLabel: 'Demo session: demo',
       isDemoFallback: true,
     });
-    instance._communityScopeLabel = jest.fn(() => 'Session: cloud');
-    const labels = collectTreeNodes(instance.render(), (node) =>
-      ['ce-community-session-scope', 'ce-community-beeswarm-session'].includes(node.props?.['data-testid']),
-    );
-    expect(labels.map((node) => node.props['aria-label'] || collectNodeText(node))).toEqual([
-      'Session: cloud',
-      'Demo session: demo',
-    ]);
-    expect(collectTreeNodes(labels[0], (node) => node.type === LoginSettingsSessionSummary)[0].props.sessionHref).toBe(
-      '/session/cloud',
-    );
   });
 
   it('keeps /session/debate as its explicit slug', () => {
@@ -1007,7 +973,7 @@ describe('CommunityTab helpers', () => {
     expect(instance._currentSlug()).toBe('demo');
   });
 
-  it('removes the community stats session selector while keeping the leaderboard controls gear', () => {
+  it('keeps retired Stats session and leaderboard controls out of the page', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'demo' });
 
     const tree = instance.render();
@@ -1026,7 +992,7 @@ describe('CommunityTab helpers', () => {
 
     expect(toggleNode).toBeFalsy();
     expect(panelNode).toBeFalsy();
-    expect(leaderboardToggleNode).toBeTruthy();
+    expect(leaderboardToggleNode).toBeFalsy();
   });
 
   it('renders leaderboard hide filters behind a cog panel', () => {
@@ -1038,7 +1004,7 @@ describe('CommunityTab helpers', () => {
       hideHumanUsers: false,
     };
 
-    const tree = instance.render();
+    const tree = instance.renderLeaderboardControls();
     const [toggleNode] = collectTreeNodes(
       tree,
       (node) => node?.props?.['data-testid'] === 'ce-community-leaderboard-controls-toggle',
@@ -1083,7 +1049,7 @@ describe('CommunityTab helpers', () => {
     expect(modalNode.props.scrollable).toBe(true);
   });
 
-  it('keeps the default layout minimal while exposing the classic participant window label', () => {
+  it('keeps retired section headings out of the Stats page', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'demo' });
     const tree = instance.render();
     const headings = collectTreeNodes(tree, (node) => node?.type === 'h2');
@@ -1091,7 +1057,7 @@ describe('CommunityTab helpers', () => {
 
     expect(headingText).not.toContain('Leaderboard');
     expect(headingText).not.toContain('Statistics');
-    expect(headingText).toEqual(expect.arrayContaining([expect.stringMatching(/^Participants \(\d+\)$/)]));
+    expect(headingText).toEqual([]);
   });
 
   it('renders survey links with session query suffix in modal content', () => {

@@ -792,11 +792,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
 
   if (routeCase.requiresReadableStats) {
-    await page.waitForFunction(() => document.querySelectorAll('.nav-tabs .nav-link').length >= 4, null, {
-      timeout: 15000,
-    });
-    await page.locator('.nav-tabs .nav-link').nth(1).click();
-    await page.getByTestId('ce-community-beeswarm-section').waitFor({ state: 'visible' });
+    await page.getByTestId('ce-main-stats-tab').click();
+    assert.equal(await page.getByTestId('ce-community-session-section').count(), 0);
+    await page.getByTestId('ce-community-stat-questions').click();
+    await page.getByRole('dialog').waitFor({ state: 'visible' });
     await page.waitForFunction(
       () => document.querySelectorAll('[data-testid^="ce-beeswarm-point-"]').length >= 20,
       null,
@@ -1492,17 +1491,14 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         const pointXs = points.map((point) => Number(point.getAttribute('cx'))).filter(Number.isFinite);
         const firstPointStyle = points[0] ? window.getComputedStyle(points[0]) : null;
         const firstPointRect = points[0]?.getBoundingClientRect();
-        const beeswarmSection = document.querySelector('[data-testid="ce-community-beeswarm-section"]');
+        const beeswarmSection = document.querySelector('[role="dialog"] [class*="questionsModalPlot"]');
         const beeswarmSectionRect = beeswarmSection?.getBoundingClientRect();
-        const svg = document.querySelector('[data-testid="ce-community-beeswarm-section"] svg');
+        const svg = document.querySelector('[role="dialog"] [class*="questionsModalPlot"] svg');
         const svgRect = svg?.getBoundingClientRect();
         const tooltip = document.querySelector('[data-testid="ce-beeswarm-tooltip"]');
         const tooltipText = tooltip?.textContent || '';
         const tooltipRect = tooltip?.getBoundingClientRect();
         const tooltipStyle = tooltip ? window.getComputedStyle(tooltip) : null;
-        const leaderboardName = document.querySelector('[class*="leaderboardItem"] [class*="name"]');
-        const leaderboardText = leaderboardName?.querySelector('a') || leaderboardName;
-        const leaderboardTextRect = leaderboardText?.getBoundingClientRect();
         const tooltipPointGap =
           tooltipRect && firstPointRect
             ? tooltipRect.right <= firstPointRect.left
@@ -1523,27 +1519,22 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         return {
           pointCount: points.length,
           pointSpread: pointXs.length ? Math.max(...pointXs) - Math.min(...pointXs) : 0,
-          beeswarmVerticalDelta:
-            beeswarmSectionRect && svgRect
-              ? Math.abs(
-                  (svgRect.top - beeswarmSectionRect.top) -
-                    (beeswarmSectionRect.bottom - svgRect.bottom),
-                )
-              : Number.POSITIVE_INFINITY,
+          plotWidth: svgRect?.width || 0,
+          plotFitsHost: Boolean(
+            beeswarmSectionRect &&
+              svgRect &&
+              svgRect.width > 0 &&
+              svgRect.height > 0 &&
+              svgRect.left >= beeswarmSectionRect.left &&
+              svgRect.right <= beeswarmSectionRect.right &&
+              svgRect.top >= beeswarmSectionRect.top &&
+              svgRect.bottom <= beeswarmSectionRect.bottom,
+          ),
           hasCountedVotes: /Counted\s+[1-9]\d*/i.test(tooltipText),
           statIconRatio: textRatio('[class*="statIcon"]'),
           statCountRatio: textRatio('[class*="statCount"]'),
           statLabelRatio: textRatio('[class*="statLabel"]'),
-          leaderboardRatio: leaderboardText
-            ? ratio(window.getComputedStyle(leaderboardText).color, backgroundFor(leaderboardText))
-            : 0,
-          leaderboardTextColor: leaderboardText ? window.getComputedStyle(leaderboardText).color : '',
-          leaderboardTextOpacity: leaderboardText
-            ? Number.parseFloat(window.getComputedStyle(leaderboardText).opacity)
-            : 0,
-          leaderboardTextWidth: leaderboardTextRect?.width || 0,
-          leaderboardTextHeight: leaderboardTextRect?.height || 0,
-          axisLabelRatio: textRatio('[data-testid="ce-community-beeswarm-section"] text', 'fill'),
+          axisLabelRatio: textRatio('[role="dialog"] [class*="questionsModalPlot"] text', 'fill'),
           pointRatio:
             firstPointStyle && svg ? ratio(firstPointStyle.fill, window.getComputedStyle(svg).backgroundColor) : 0,
           tooltipPromptRatio: textRatio('[data-testid="ce-beeswarm-tooltip"] p'),
@@ -3131,13 +3122,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   if (statsContrastState) {
     assert.ok(statsContrastState.pointCount >= 20, 'Community Stats should render the default-session questions');
     assert.ok(
-      statsContrastState.pointSpread >= 200,
+      statsContrastState.pointSpread >= Math.min(200, statsContrastState.plotWidth * 0.4),
       `Community Stats should preserve the default-session consensus cluster; received ${statsContrastState.pointSpread.toFixed(2)}px spread`,
     );
-    assert.ok(
-      statsContrastState.beeswarmVerticalDelta <= 8,
-      `Classic 95 Community Stats should vertically center the beeswarm plot; received ${statsContrastState.beeswarmVerticalDelta.toFixed(2)}px top/bottom gap delta`,
-    );
+    assert.equal(statsContrastState.plotFitsHost, true, 'Questions modal chart fits its visible host');
     assert.equal(
       statsContrastState.hasCountedVotes,
       true,
@@ -3156,25 +3144,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'none',
       'Community Stats hover details should not block nearby points',
     );
-    assert.equal(
-      statsContrastState.leaderboardTextColor,
-      'rgb(0, 0, 0)',
-      'Classic 95 participant addresses should use readable black text on light rows',
-    );
-    assert.equal(
-      statsContrastState.leaderboardTextOpacity,
-      1,
-      'Classic 95 participant addresses should be fully opaque',
-    );
-    assert.ok(
-      statsContrastState.leaderboardTextWidth > 0 && statsContrastState.leaderboardTextHeight > 0,
-      `Classic 95 participant addresses should occupy visible layout space; received ${statsContrastState.leaderboardTextWidth.toFixed(2)}x${statsContrastState.leaderboardTextHeight.toFixed(2)}px`,
-    );
     [
       ['stat icon', statsContrastState.statIconRatio, 3],
       ['stat count', statsContrastState.statCountRatio, 4.5],
       ['stat label', statsContrastState.statLabelRatio, 4.5],
-      ['leaderboard row', statsContrastState.leaderboardRatio, 4.5],
       ['axis label', statsContrastState.axisLabelRatio, 4.5],
       ['question point', statsContrastState.pointRatio, 3],
       ['tooltip prompt', statsContrastState.tooltipPromptRatio, 4.5],

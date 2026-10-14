@@ -32,7 +32,6 @@ import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
 import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import CETooltip from '../Shared/CETooltip';
-import { LoginSettingsSessionSummary } from '../Account/LoginSettingsControlRow';
 import { buildSettingsSessionHref } from '../Account/loginSettingsRouteHelpers';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -2429,15 +2428,8 @@ class CommunityTab extends Component<any, any> {
 
   render() {
     const { showModal, modalTitle, loadingSbtsCreated, stats, initialLoadDone } = this.state;
-    const participantCount = this.getMemoizedLeaderboardData().length;
     const displayStats = [...stats, { icon: faLayerGroup, count: this.state.sessions.length, label: 'Sessions' }];
     const sessionFiltersActive = Object.values(this.state.sessionFilters).some((value) => String(value).trim());
-    const swarmView = this._getQuestionSwarmView();
-    const scopeLabel = swarmView.isDemoFallback ? this._communityScopeLabel() : swarmView.scopeLabel;
-    const selectedSlugs = this._getSelectedSessionSlugs();
-    const summarySlug =
-      !this._isUniverseEnabled() && selectedSlugs.length <= 1 ? (selectedSlugs[0] ?? this._currentSlug()) : null;
-
     return (
       <div className={styles.communityTab}>
         <div className={styles.statsSection}>
@@ -2477,43 +2469,6 @@ class CommunityTab extends Component<any, any> {
             ))}
           </div>
         </div>
-        <section
-          className={styles.sessionSection}
-          data-testid="ce-community-session-section"
-          aria-labelledby="ce-community-session-scope"
-        >
-          <div
-            id="ce-community-session-scope"
-            className={`${styles.scopeLabel} ${styles.sessionScope}`}
-            data-testid="ce-community-session-scope"
-            aria-label={scopeLabel}
-          >
-            {summarySlug !== null ? (
-              <>
-                {scopeLabel.startsWith('Demo session: ') && <span>Demo</span>}
-                <LoginSettingsSessionSummary
-                  activeSession={{ slug: summarySlug, label: this._sessionName(summarySlug) }}
-                  sessionHref={buildSettingsSessionHref(summarySlug)}
-                />
-              </>
-            ) : (
-              scopeLabel
-            )}
-          </div>
-          <div className={styles.sessionContent}>
-            <div className={styles.leaderboardSection} data-testid="ce-community-leaderboard-section">
-              <div className={styles.leaderboardTopBar}>
-                <h2 className={styles.leaderboardTitle}>Participants ({participantCount})</h2>
-                <div className={styles.headerActionsRight}>{this.renderLeaderboardControls()}</div>
-              </div>
-              <div className={styles.content}>
-                <div className={styles.leaderboard}>{this.renderLeaderboard()}</div>
-              </div>
-            </div>
-            {this.renderQuestionSwarm(swarmView)}
-          </div>
-        </section>
-
         <Modal
           isOpen={showModal}
           toggle={this.toggleModal}

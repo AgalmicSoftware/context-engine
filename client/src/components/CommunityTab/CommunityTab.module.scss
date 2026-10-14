@@ -15,7 +15,7 @@
   color: var(--ce-panel-text);
   border-radius: var(--ce-radius-5);
   margin-bottom: 10px;
-  height: 500px;
+  height: auto;
   gap: 1px;
 
   .sectionTitle {
@@ -449,11 +449,11 @@
   }
 }
 
-/* Classic 95 keeps the participant list and plot in a split pane below the
- * summary counts and their shared session heading. */
+/* Classic 95 frames the summary counts. Split-pane rules are retained for
+ * the temporarily hidden participant and chart panel. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
   .communityTab {
-    height: 500px;
+    height: auto;
     gap: 0;
     margin: 0;
     overflow: hidden;
