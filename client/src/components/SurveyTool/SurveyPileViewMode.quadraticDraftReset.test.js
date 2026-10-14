@@ -79,14 +79,22 @@ describe('quadratic Reset in interview draft editors', () => {
 describe('quadratic Reset in the pile', () => {
   const savedState = { editBaseline: { answers: { '0xq': { value: [1, 2] } } } };
 
-  it('undoes an edited allocation to the saved answer', () => {
+  it('undoes an edited allocation to the saved answer without advancing the pile', () => {
     const engine = createEngine(savedState);
+    engine.handleNext = jest.fn();
     renderQuadratic(engine, { answer: { value: [3, -2] } });
 
     const reset = screen.getByRole('button', { name: 'Reset' });
     expect(reset).toHaveAttribute('title', 'Undo answer changes');
     fireEvent.click(reset);
-    expect(engine.handleAnswerPile).toHaveBeenCalledWith('0xq', [1, 2]);
+    expect(engine.handleAnswerPile).toHaveBeenCalledTimes(1);
+    expect(engine.handleAnswerPile).toHaveBeenCalledWith(
+      '0xq',
+      [1, 2],
+      expect.objectContaining({ afterUpdate: expect.any(Function) }),
+    );
+    engine.handleAnswerPile.mock.calls[0][2].afterUpdate();
+    expect(engine.handleNext).not.toHaveBeenCalled();
   });
 
   it('keeps Reset disabled for an untouched saved allocation', () => {

@@ -1724,7 +1724,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
           }
         : {},
     );
-    mockedCheckSponsoredAccess.mockResolvedValue({ status: 'unknown' });
+    mockedReadWorkerResourcePresence.mockResolvedValueOnce({ ai: true });
     const subject = mountClassSubject(
       new LoginAndSettingsModalSubject(
         buildProps({
@@ -1741,19 +1741,23 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     await subject.loadSponsoredAccess();
 
-    expect(mockedCheckSponsoredAccess).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionConfig: workerConfig,
-        sessionSlug: 'worker-session',
-        resourceKey: 'ai',
-      }),
-    );
+    expect(mockedCheckSponsoredAccess).not.toHaveBeenCalled();
+    expect(mockedRefreshSessionRegistryFieldsCache).not.toHaveBeenCalled();
     expect(mockedReadWorkerResourcePresence).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionConfig: workerConfig,
         sessionSlug: 'worker-session',
       }),
     );
+    expect(subject.state.sponsoredSessionConfig).toBe(workerConfig);
+    expect(subject.state.sponsoredAccess).toEqual({
+      ai: { resourceKey: 'ai', status: 'worker-managed' },
+      arweave: null,
+      rpc: null,
+      txGas: null,
+    });
+    expect(subject.state.workerResourcePresence).toEqual({ ai: true });
+    expect(subject.state.sponsoredAccessLoading).toBe(false);
   });
 
   it('keeps loadSponsoredAccess strict when only a demo-session config exists', async () => {

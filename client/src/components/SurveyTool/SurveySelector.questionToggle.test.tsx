@@ -419,7 +419,7 @@ describe('SurveySelector question toggle', () => {
     expect(treeHasText(encryptedCountBadge, '1')).toBe(true);
   });
 
-  it('does not reuse the sticky questions selector count after a session switch', () => {
+  it('hides stale counts after a session switch until the new session confirms its count', () => {
     const subject = new SurveySelector({
       autoOpenResults: false,
       filterState: {},
@@ -478,9 +478,26 @@ describe('SurveySelector question toggle', () => {
     );
 
     expect(questionToggle).toBeTruthy();
-    expect(questionToggleCount).toBeTruthy();
-    expect(renderToStaticMarkup(questionToggleCount)).not.toContain('(12)');
-    expect(renderToStaticMarkup(questionToggleCount)).toContain('(0)');
+    expect(questionToggleCount).toBeNull();
+    expect(treeHasText(questionToggle, 'Loading...')).toBe(true);
+    expect(findElement(questionToggle, (element) => element?.props?.icon?.iconName === 'spinner')).toBeTruthy();
     expect(encryptedCountBadge).toBeNull();
+
+    Object.defineProperty(subject, 'props', {
+      configurable: true,
+      value: { ...subject.props, isQuestionCacheReady: true },
+    });
+    subject.state = { ...subject.state, loading: false };
+    subject.handleFilteredQuestionCountUpdate(0, 0);
+
+    const loadedToggle = findElement(
+      subject.render(),
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE,
+    );
+    const loadedCount = findElement(loadedToggle, (element) => nodeHasClassName(element, styles.questionSelectorCount));
+    expect(loadedCount).toBeTruthy();
+    expect(renderToStaticMarkup(loadedCount)).toContain('(0)');
+    expect(treeHasText(loadedToggle, 'Loading...')).toBe(false);
+    expect(findElement(loadedToggle, (element) => element?.props?.icon?.iconName === 'spinner')).toBeNull();
   });
 });
