@@ -2509,38 +2509,41 @@ export class CommunityTab extends Component<any, any> {
         // Render user list with filter
         return (
           <div>
-            <GlobalSessionSelector
-              selection={this._readGlobalSelection()}
-              sessionConfig={this.props.sessionConfig}
-              onChange={this.props.updateGlobalSessionSelection}
-              testId={E2E_TESTIDS.COMMUNITY_USERS_SESSION_SELECT}
-              className={styles.usersSessionSelector}
-            />
-            {ready && (
-              <SBTFilter
-                key={generation}
-                items={this.state.uniqueUsers} // Filter based on the full uniqueUsers list
-                mode="addresses"
-                provider={provider}
-                network={network}
-                sessionSlug={this._currentSlug()}
-                onFilter={(newFilteredUsers: any) => {
-                  this._updateUsersFilter(generation, selectionKey, {
-                    filteredUsers: newFilteredUsers,
-                    loadingFilter: false,
-                  });
-                }}
-                setFilterLoading={(isLoading: any) =>
-                  this._updateUsersFilter(generation, selectionKey, { loadingFilter: isLoading })
-                }
-                autoExpand={false} // Changed this to false to allow internal button toggle
-                expandToSbtHolders={true}
-
-                // this below value is probably not passed-in, but should be
-                isSBTCacheReady={this.props.isSBTCacheReady}
-                sbtCacheRevision={this.props.sbtCacheRevision}
+            <div className={styles.usersControls}>
+              <GlobalSessionSelector
+                selection={this._readGlobalSelection()}
+                sessionConfig={this.props.sessionConfig}
+                onChange={this.props.updateGlobalSessionSelection}
+                testId={E2E_TESTIDS.COMMUNITY_USERS_SESSION_SELECT}
+                className={styles.usersSessionSelector}
               />
-            )}
+              {ready && (
+                <SBTFilter
+                  className={styles.usersFilter}
+                  key={generation}
+                  items={this.state.uniqueUsers} // Filter based on the full uniqueUsers list
+                  mode="addresses"
+                  provider={provider}
+                  network={network}
+                  sessionSlug={this._currentSlug()}
+                  onFilter={(newFilteredUsers: any) => {
+                    this._updateUsersFilter(generation, selectionKey, {
+                      filteredUsers: newFilteredUsers,
+                      loadingFilter: false,
+                    });
+                  }}
+                  setFilterLoading={(isLoading: any) =>
+                    this._updateUsersFilter(generation, selectionKey, { loadingFilter: isLoading })
+                  }
+                  autoExpand={false} // Changed this to false to allow internal button toggle
+                  expandToSbtHolders={true}
+
+                  // this below value is probably not passed-in, but should be
+                  isSBTCacheReady={this.props.isSBTCacheReady}
+                  sbtCacheRevision={this.props.sbtCacheRevision}
+                />
+              )}
+            </div>
             {!ready || loadingFilter ? (
               <div className={styles.loadingContainer}>
                 <FontAwesomeIcon icon={faSpinner} spin /> Loading filtered users...

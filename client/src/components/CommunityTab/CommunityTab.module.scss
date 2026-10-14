@@ -854,22 +854,64 @@
   }
 }
 
-.modal .modalBody .usersSessionSelector {
-  display: flex;
+.usersControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  width: min(100%, 420px);
+  margin-bottom: 18px;
+}
+
+// Keep the toggle in the toolbar and expanded options across both columns.
+.modal .modalBody .usersFilter {
+  display: contents;
+
+  > button {
+    grid-column: 2;
+    margin: 0;
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 1rem;
+    justify-content: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  > div {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+}
+
+.modal .modalBody .usersSessionSelector {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
   min-width: 0;
-  margin: 0 0 18px;
+  margin: 0;
 
   > span {
     color: var(--ce-panel-text);
   }
 
-  select {
-    flex: 1;
+  // This toolbar fills its column; don't let the shared label measurement
+  // establish an intrinsic width beyond the space reserved for the link.
+  > span:nth-child(2) {
+    display: block;
     min-width: 0;
+    max-width: 100%;
+
+    &::after {
+      display: none;
+    }
+  }
+
+  select {
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
     color: var(--ce-control-text);
     background: var(--ce-control-face);
     border-color: var(--ce-input-border);
@@ -878,6 +920,26 @@
   option {
     color: var(--ce-control-text);
     background: var(--ce-control-face);
+  }
+}
+
+@media (max-width: 480px) {
+  .modal .modalBody:has(.usersControls) {
+    padding: 16px 12px;
+  }
+
+  .usersControls {
+    gap: 8px;
+  }
+
+  .modal .modalBody .usersSessionSelector {
+    gap: 4px;
+    padding: 4px;
+
+    > span:first-child {
+      font-size: 0.65rem;
+      letter-spacing: 0.04em;
+    }
   }
 }
 

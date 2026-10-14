@@ -19,6 +19,10 @@ describe('CommunityTab module styles', () => {
     expect(selector).toContain('color: var(--ce-control-text)');
     expect(selector).toContain('background: var(--ce-control-face)');
     expect(selector).toContain('border-color: var(--ce-input-border)');
+    expect(selector).toContain('min-width: 0');
+    expect(selector).toContain('max-width: 100%');
+    expect(css).toContain('grid-template-columns: auto minmax(0, 1fr) 32px');
+    expect(css).toMatch(/usersSessionSelector > span:nth-child\(2\)::after\s*\{\s*display: none;/);
     expect(css).toMatch(/\.modal \.modalBody \.usersSessionSelector > span\s*\{[^}]*color: var\(--ce-panel-text\)/);
     expect(css).toMatch(/\.usersSessionSelector option\s*\{[^}]*color: var\(--ce-control-text\)/);
     expect(css).toMatch(/\.usersSessionSelector option\s*\{[^}]*background: var\(--ce-control-face\)/);

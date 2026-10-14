@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep the Users Details session selector and Filter on one row, with long session
+  titles contained beside the external-link icon.
+
 - Fit Appearance controls into a compact row, align question navigation with
   the action buttons, and retain loaded results during background refreshes.
 
