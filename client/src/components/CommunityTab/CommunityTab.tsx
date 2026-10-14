@@ -200,6 +200,8 @@ export class CommunityTab extends Component<any, any> {
       questionsTableSignature: '',
       filteredUsers: [], // Initialize as empty, will be set when modal opens
       loadingFilter: false,
+      usersSnapshotSelectionKey: null,
+      usersFilterSelectionKey: null,
       stats: [
         { icon: faUsers, count: 0, label: 'Users' },
         { icon: faVoteYea, count: 0, label: 'Questions' },
@@ -215,6 +217,8 @@ export class CommunityTab extends Component<any, any> {
     };
 
     this._holdersHydrationInFlight = false;
+    this._usersFilterGeneration = 0;
+    this._usersFilterSelectionKey = null;
     this._holdersHydrationAbort = false;
     this._holdersHydrationPromise = null;
     this._cacheRefIds = new WeakMap();
@@ -1331,6 +1335,7 @@ export class CommunityTab extends Component<any, any> {
 
   _queueCacheDrivenRefresh = ({ force = false }: any = {}) => {
     if (this._isUnmounted || this._isDocumentHidden()) return;
+    this._resetUsersFilterForSelection();
     this._cacheUpdateRefreshQueuedForce = this._cacheUpdateRefreshQueuedForce || !!force;
     if (this._statsCacheRefreshCoalescer) {
       this._statsCacheRefreshCoalescer.schedule();
@@ -1363,8 +1368,34 @@ export class CommunityTab extends Component<any, any> {
     ]);
   };
 
+  _resetUsersFilterForSelection = () => {
+    const selectionKey = this._statsSelectionKey();
+    if (!this.state.showModal || this.state.modalType !== 'users' || this._usersFilterSelectionKey === selectionKey) {
+      return;
+    }
+    this._usersFilterSelectionKey = selectionKey;
+    this._usersFilterGeneration += 1;
+    this.setState({ usersFilterSelectionKey: null, filteredUsers: [], loadingFilter: true });
+  };
+
+  _updateUsersFilter = (generation: number, selectionKey: string, patch: Record<string, unknown>) => {
+    // A filter may finish after unmount, or after A → B → A. Scope equality
+    // alone cannot distinguish that obsolete filter from the current one.
+    this.setState((state: Readonly<CommunityTab['state']>) =>
+      !this._isUnmounted &&
+      generation === this._usersFilterGeneration &&
+      selectionKey === this._statsSelectionKey() &&
+      state.usersFilterSelectionKey === selectionKey &&
+      state.showModal &&
+      state.modalType === 'users'
+        ? patch
+        : null,
+    );
+  };
+
   _runStatsRefreshCycle = async ({ force = false, markLoading = false, request = null }: any = {}) => {
     if (this._isUnmounted) return { changed: false };
+    this._resetUsersFilterForSelection();
     const selectionKey = this._statsSelectionKey();
     const isCurrent = () =>
       !this._isUnmounted &&
@@ -1413,6 +1444,7 @@ export class CommunityTab extends Component<any, any> {
       }
       if (changed && snapshot) {
         next.uniqueUsers = snapshot.uniqueUsers;
+        next.usersSnapshotSelectionKey = selectionKey;
         next.surveysCreatedCount = snapshot.surveysCreatedCount;
         next.surveyResponsesCount = snapshot.surveyResponsesCount;
         next.uniqueQuestionsCount = snapshot.uniqueQuestionsCount;
@@ -1422,10 +1454,13 @@ export class CommunityTab extends Component<any, any> {
         if (
           prevState.showModal &&
           prevState.modalType === 'users' &&
-          !prevState.loadingFilter &&
-          this._areAddressListsEqual(prevState.filteredUsers || [], prevState.uniqueUsers || [])
+          (prevState.usersFilterSelectionKey !== selectionKey ||
+            (!prevState.loadingFilter &&
+              this._areAddressListsEqual(prevState.filteredUsers || [], prevState.uniqueUsers || [])))
         ) {
           next.filteredUsers = snapshot.uniqueUsers;
+          next.usersFilterSelectionKey = selectionKey;
+          next.loadingFilter = false;
         }
         next.stats = this._buildStatsArray(prevState.stats, {
           users: snapshot.uniqueUsers.length,
@@ -1627,6 +1662,7 @@ export class CommunityTab extends Component<any, any> {
   };
 
   componentDidUpdate(prevProps: any, prevState: any) {
+    this._resetUsersFilterForSelection();
     const globalSelectionChanged =
       prevProps.globalSessionSelection?.primarySessionSlug !== this.props.globalSessionSelection?.primarySessionSlug ||
       prevProps.globalSessionSelection?.selectedSessionScope !==
@@ -1685,14 +1721,20 @@ export class CommunityTab extends Component<any, any> {
       .toLowerCase()
       .replace(/\s+/g, '');
     if (labelKey === 'sessions') this._refreshSessionCatalog();
+    this._usersFilterGeneration += 1;
     if (labelKey === 'users') {
+      const selectionKey = this._statsSelectionKey();
+      const ready = this.state.usersSnapshotSelectionKey === selectionKey;
+      this._usersFilterSelectionKey = selectionKey;
       this.setState({
         modalTitle: `${stat.label} Details`,
         modalType: 'users',
         showModal: true,
-        filteredUsers: this.state.uniqueUsers, // Initialize filter with all users when modal opens
-        loadingFilter: false, // Set loading to false initially
+        usersFilterSelectionKey: ready ? selectionKey : null,
+        filteredUsers: ready ? this.state.uniqueUsers : [],
+        loadingFilter: !ready,
       });
+      if (!ready) this._queueCacheDrivenRefresh({ force: true });
     } else if (labelKey === 'groups' || labelKey === 'sbts' || labelKey === 'sbtgroups') {
       this.setState({
         modalTitle: t('sbts'),
@@ -1710,6 +1752,7 @@ export class CommunityTab extends Component<any, any> {
 
   // Helper to toggle modal visibility
   toggleModal = () => {
+    this._usersFilterGeneration += 1;
     this.setState((prevState: Readonly<CommunityTab['state']>) => ({
       showModal: !prevState.showModal,
       modalType: !prevState.showModal ? prevState.modalType : null,
@@ -2459,29 +2502,46 @@ export class CommunityTab extends Component<any, any> {
           />
         );
       }
-      case 'users':
+      case 'users': {
+        const selectionKey = this._statsSelectionKey();
+        const generation = this._usersFilterGeneration;
+        const ready = this.state.usersFilterSelectionKey === selectionKey;
         // Render user list with filter
         return (
           <div>
-            <SBTFilter
-              items={this.state.uniqueUsers} // Filter based on the full uniqueUsers list
-              mode="addresses"
-              provider={provider}
-              network={network}
-              sessionSlug={this._currentSlug()}
-              onFilter={(newFilteredUsers: any) => {
-                // This setState call now reliably updates the filtered list
-                this.setState({ filteredUsers: newFilteredUsers, loadingFilter: false });
-              }}
-              setFilterLoading={(isLoading: any) => this.setState({ loadingFilter: isLoading })} // Pass loading state setter
-              autoExpand={false} // Changed this to false to allow internal button toggle
-              expandToSbtHolders={true}
-
-              // this below value is probably not passed-in, but should be
-              isSBTCacheReady={this.props.isSBTCacheReady}
-              sbtCacheRevision={this.props.sbtCacheRevision}
+            <GlobalSessionSelector
+              selection={this._readGlobalSelection()}
+              sessionConfig={this.props.sessionConfig}
+              onChange={this.props.updateGlobalSessionSelection}
+              testId={E2E_TESTIDS.COMMUNITY_USERS_SESSION_SELECT}
+              className={styles.usersSessionSelector}
             />
-            {loadingFilter ? (
+            {ready && (
+              <SBTFilter
+                key={generation}
+                items={this.state.uniqueUsers} // Filter based on the full uniqueUsers list
+                mode="addresses"
+                provider={provider}
+                network={network}
+                sessionSlug={this._currentSlug()}
+                onFilter={(newFilteredUsers: any) => {
+                  this._updateUsersFilter(generation, selectionKey, {
+                    filteredUsers: newFilteredUsers,
+                    loadingFilter: false,
+                  });
+                }}
+                setFilterLoading={(isLoading: any) =>
+                  this._updateUsersFilter(generation, selectionKey, { loadingFilter: isLoading })
+                }
+                autoExpand={false} // Changed this to false to allow internal button toggle
+                expandToSbtHolders={true}
+
+                // this below value is probably not passed-in, but should be
+                isSBTCacheReady={this.props.isSBTCacheReady}
+                sbtCacheRevision={this.props.sbtCacheRevision}
+              />
+            )}
+            {!ready || loadingFilter ? (
               <div className={styles.loadingContainer}>
                 <FontAwesomeIcon icon={faSpinner} spin /> Loading filtered users...
               </div>
@@ -2514,6 +2574,7 @@ export class CommunityTab extends Component<any, any> {
             )}
           </div>
         );
+      }
       case 'surveys':
         // Render survey list
         return (

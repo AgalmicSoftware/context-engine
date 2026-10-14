@@ -122,6 +122,13 @@ export async function inspectCivicStats(page) {
       await dialog.getByTestId('ce-community-questions-session-link').waitFor({ state: 'visible' });
     }
     if (name === 'Users') {
+      const usersSelector = dialog.getByTestId('ce-community-users-session-select');
+      await usersSelector.waitFor({ state: 'visible' });
+      const previousSelection = await usersSelector.inputValue();
+      await usersSelector.selectOption('');
+      await page.waitForFunction(() => document.querySelector('[data-testid="ce-community-session-select"]')?.value === '');
+      await usersSelector.selectOption(previousSelection);
+      await page.waitForFunction((value) => document.querySelector('[data-testid="ce-community-session-select"]')?.value === value, previousSelection);
       const [profilePage] = await Promise.all([
         page.waitForEvent('popup'),
         dialog.locator('[class*="userItem_"]').first().click(),

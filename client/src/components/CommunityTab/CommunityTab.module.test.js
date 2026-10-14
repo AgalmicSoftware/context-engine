@@ -1,7 +1,29 @@
 import fs from 'fs';
 import path from 'path';
+import * as sass from 'sass';
 
 describe('CommunityTab module styles', () => {
+  it('gives the portal Users selector an opaque theme control surface and readable text', () => {
+    const css = sass.compile(path.join(__dirname, 'CommunityTab.module.scss')).css;
+    const controlRule = css.match(/([^{}]+\.usersSessionSelector select)\s*\{([^}]+)\}/);
+    const selector = controlRule?.[2] || '';
+    const controlSelector = controlRule?.[1].trim() || '';
+    expect(controlSelector).toBe('.modal .modalBody .usersSessionSelector select');
+    // The actual global recipe sets --ce-text on all themed selects. The
+    // portal-local control must outrank its root pseudo-class and attribute.
+    const recipes = sass.compile(path.join(__dirname, '../../scss/themes/_recipes.scss')).css;
+    const recipeSelector = ':root[data-ce-theme] select';
+    expect(recipes).toContain(recipeSelector);
+    const classSpecificity = (value) => (value.match(/\.[\w-]+|\[[^\]]+\]|:[\w-]+/g) || []).length;
+    expect(classSpecificity(controlSelector)).toBeGreaterThan(classSpecificity(recipeSelector));
+    expect(selector).toContain('color: var(--ce-control-text)');
+    expect(selector).toContain('background: var(--ce-control-face)');
+    expect(selector).toContain('border-color: var(--ce-input-border)');
+    expect(css).toMatch(/\.modal \.modalBody \.usersSessionSelector > span\s*\{[^}]*color: var\(--ce-panel-text\)/);
+    expect(css).toMatch(/\.usersSessionSelector option\s*\{[^}]*color: var\(--ce-control-text\)/);
+    expect(css).toMatch(/\.usersSessionSelector option\s*\{[^}]*background: var\(--ce-control-face\)/);
+  });
+
   it('stacks mobile sections as statistics, beeswarm, then leaderboard', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
 

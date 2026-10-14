@@ -103,6 +103,7 @@
   "COMMUNITY_STAT_QUESTIONS": "ce-community-stat-questions",
   "COMMUNITY_QUESTIONS_TABLE": "ce-community-questions-table",
   "COMMUNITY_SESSION_SELECT": "ce-community-session-select",
+  "COMMUNITY_USERS_SESSION_SELECT": "ce-community-users-session-select",
   "COMMUNITY_STAT_SURVEYS": "ce-community-stat-surveys",
   "COMMUNITY_STAT_GROUPS": "ce-community-stat-groups",
   "COMMUNITY_STAT_SESSIONS": "ce-community-stat-sessions",

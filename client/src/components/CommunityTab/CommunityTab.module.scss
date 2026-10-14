@@ -852,6 +852,33 @@
   }
 }
 
+.modal .modalBody .usersSessionSelector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 420px);
+  min-width: 0;
+  margin: 0 0 18px;
+
+  > span {
+    color: var(--ce-panel-text);
+  }
+
+  select {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    color: var(--ce-control-text);
+    background: var(--ce-control-face);
+    border-color: var(--ce-input-border);
+  }
+
+  option {
+    color: var(--ce-control-text);
+    background: var(--ce-control-face);
+  }
+}
+
 .userList {
   max-height: 400px;
   overflow-y: auto;

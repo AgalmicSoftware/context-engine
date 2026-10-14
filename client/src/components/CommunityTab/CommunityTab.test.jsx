@@ -35,6 +35,7 @@ import {
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import SBTsList from '../SBTs/SBTsList';
+import SBTFilter from '../SBTs/SBTFilter';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import demoSessions from '../../variables/demo/demo_sessions.json';
 import { writeGlobalSessionSelection } from '../../utilities/session/globalSessionState';
@@ -271,11 +272,16 @@ describe('CommunityTab helpers', () => {
       const statsSelector = screen.getByTestId('ce-community-session-select');
       const settingsSelector = screen.getByTestId('settings-selector');
       const allValue = Array.from(statsSelector.options).find((option) => option.text === 'ALL').value;
-      fireEvent.change(statsSelector, { target: { value: allValue } });
+      fireEvent.click(screen.getByTestId('ce-community-stat-users'));
+      const usersSelector = await screen.findByTestId('ce-community-users-session-select');
+      expect(usersSelector).toHaveValue('alpha');
+      fireEvent.change(usersSelector, { target: { value: allValue } });
       await waitFor(() =>
         expect(screen.getByTestId('ce-community-stat-questions')).toHaveAttribute('data-ce-count', '3'),
       );
       expect(settingsSelector).toHaveValue(allValue);
+      expect(statsSelector).toHaveValue(allValue);
+      await waitFor(() => expect(statsInstance.state.filteredUsers).toEqual(['0x1', '0x2']));
       expect(screen.getByTestId('ce-community-stat-sessions')).toBeVisible();
       expect(screen.getByTestId('ce-community-stat-surveys')).toHaveAttribute('data-ce-count', '2');
       expect(ensureUniverse).toHaveBeenCalledTimes(1);
@@ -284,6 +290,8 @@ describe('CommunityTab helpers', () => {
         expect(screen.getByTestId('ce-community-stat-questions')).toHaveAttribute('data-ce-count', '2'),
       );
       expect(statsSelector).toHaveValue('beta');
+      expect(usersSelector).toHaveValue('beta');
+      await waitFor(() => expect(statsInstance.state.filteredUsers).toEqual(['0x2']));
       expect(screen.queryByTestId('ce-community-stat-sessions')).not.toBeInTheDocument();
       fireEvent.change(screen.getByTestId('settings-scope-mode'), { target: { value: 'list' } });
       fireEvent.change(statsSelector, { target: { value: 'alpha' } });
@@ -298,11 +306,14 @@ describe('CommunityTab helpers', () => {
         expect(screen.getByTestId('ce-community-stat-questions')).toHaveAttribute('data-ce-count', '0'),
       );
       expect(statsSelector).toHaveValue('');
+      expect(usersSelector).toHaveValue('');
+      await waitFor(() => expect(statsInstance.state.filteredUsers).toEqual([]));
       fireEvent.change(statsSelector, { target: { value: allValue } });
       await waitFor(() =>
         expect(screen.getByTestId('ce-community-stat-questions')).toHaveAttribute('data-ce-count', '3'),
       );
       expect(ensureUniverse).toHaveBeenCalledTimes(1);
+      expect(usersSelector).toHaveValue(allValue);
     } finally {
       view.unmount();
     }
@@ -2355,6 +2366,97 @@ describe('CommunityTab helpers', () => {
     expect(instance.state.filteredUsers).toEqual(['0xaaa', '0xbbb']);
   });
 
+  it('resets Users filters only on session changes and rejects callbacks across revisits and reopen', async () => {
+    const alpha = { primarySessionSlug: 'alpha', selectedSessionScope: 'active', selectedSessionSlugs: [] };
+    const beta = { ...alpha, primarySessionSlug: 'beta' };
+    const instance = attachMutableSetState(new CommunityTab({ globalSessionSelection: alpha }));
+    instance.state.initialLoadDone = true;
+    jest.spyOn(instance, '_resolveNetKeyForSlug').mockReturnValue('11155420');
+    jest.spyOn(instance, '_refreshSessionCatalog').mockImplementation(() => {});
+    jest.spyOn(instance, '_scheduleNextStatsPoll').mockImplementation(() => {});
+    jest.spyOn(instance, '_queueCacheDrivenRefresh').mockImplementation(() => {});
+    jest.spyOn(instance, '_hydrateSbtHoldersForUsersModal').mockResolvedValue(undefined);
+    for (const [slug, creator] of [
+      ['alpha', '0xaaa'],
+      ['beta', '0xbbb'],
+    ]) {
+      await writeCache('questionsCache', slug, { 11155420: { questions: { q: { type: 'binary', creator } } } });
+    }
+    const filter = () => collectTreeNodes(instance.renderModalContent(), (node) => node.type === SBTFilter)[0];
+    const changeScope = (selection) => {
+      const previousProps = instance.props;
+      const previousState = instance.state;
+      instance.props = { ...instance.props, globalSessionSelection: selection };
+      instance.componentDidUpdate(previousProps, previousState);
+    };
+    await instance._runStatsRefreshCycle({ force: true });
+    instance.handleStatClick({ label: 'Users' });
+    const original = filter();
+    original.props.onFilter([]);
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(filter().key).toBe(original.key);
+    expect(instance.state.filteredUsers).toEqual([]);
+
+    changeScope(beta);
+    expect(filter()).toBeUndefined();
+    expect(collectNodeText(instance.renderModalContent())).not.toContain('0xaaa');
+    original.props.onFilter(['0xstale']);
+    original.props.setFilterLoading(false);
+    expect(instance.state.filteredUsers).toEqual([]);
+    expect(instance.state.loadingFilter).toBe(true);
+    await instance._runStatsRefreshCycle({ force: true });
+    const second = filter();
+    expect(second.key).not.toBe(original.key);
+    expect(second.props.items).toEqual(['0xbbb']);
+    expect(instance.state.filteredUsers).toEqual(['0xbbb']);
+
+    changeScope(alpha);
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(filter().key).not.toBe(original.key);
+    original.props.onFilter(['0xstale']);
+    original.props.setFilterLoading(true);
+    second.props.onFilter(['0xstale']);
+    expect(instance.state.filteredUsers).toEqual(['0xaaa']);
+    expect(instance.state.loadingFilter).toBe(false);
+    const beforeClose = filter();
+    instance.toggleModal();
+    instance.handleStatClick({ label: 'Users' });
+    beforeClose.props.onFilter(['0xstale']);
+    beforeClose.props.setFilterLoading(true);
+    expect(filter().key).not.toBe(beforeClose.key);
+    expect(instance.state.filteredUsers).toEqual(['0xaaa']);
+    expect(instance.state.loadingFilter).toBe(false);
+  });
+
+  it('does not expose old Users when opened before the new scope snapshot is ready', async () => {
+    const alpha = { primarySessionSlug: 'alpha', selectedSessionScope: 'active', selectedSessionSlugs: [] };
+    const instance = attachMutableSetState(new CommunityTab({ globalSessionSelection: alpha }));
+    instance.state.initialLoadDone = true;
+    jest.spyOn(instance, '_refreshSessionCatalog').mockImplementation(() => {});
+    jest.spyOn(instance, '_queueCacheDrivenRefresh').mockImplementation(() => {});
+    jest.spyOn(instance, '_iterScopeCaches').mockReturnValue([]);
+    jest.spyOn(instance, '_computeStatsSnapshot').mockReturnValue({
+      uniqueUsers: ['0xaaa'],
+      surveysCreatedCount: 0,
+      surveyResponsesCount: 0,
+      uniqueQuestionsCount: 0,
+      surveysList: [],
+      sbtsCreatedCount: 0,
+    });
+    await instance._runStatsRefreshCycle({ force: true });
+    instance.props = { ...instance.props, globalSessionSelection: { ...alpha, primarySessionSlug: 'beta' } };
+    instance.handleStatClick({ label: 'Users' });
+    expect(instance.state.filteredUsers).toEqual([]);
+    expect(instance.state.loadingFilter).toBe(true);
+    expect(collectTreeNodes(instance.renderModalContent(), (node) => node.type === SBTFilter)).toHaveLength(0);
+    expect(
+      collectTreeNodes(
+        instance.renderModalContent(),
+        (node) => node.props?.testId === 'ce-community-users-session-select',
+      ),
+    ).toHaveLength(1);
+  });
+
   it('publishes the newly selected scope while old hydration and current readiness are still pending', async () => {
     const alpha = { primarySessionSlug: 'alpha', selectedSessionScope: 'active', selectedSessionSlugs: [] };
     const general = { primarySessionSlug: '', selectedSessionScope: 'general', selectedSessionSlugs: [] };
@@ -2575,6 +2677,7 @@ describe('CommunityTab helpers', () => {
       loadingFilter: false,
       uniqueUsers: [address],
       filteredUsers: [address],
+      usersFilterSelectionKey: instance._statsSelectionKey(),
     };
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
 
