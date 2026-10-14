@@ -136,7 +136,9 @@ question cards and account controls. The home Explorer offers Stats, Tools, and
 Welcome; Tools remains the default, including for a retained Latest-tab selection.
 Session title tooltips share the Results description cleanup for retired RxC instructions.
 Explorer tabs use blue selected/hover text
-and dark inactive icons on the light header. Expanded Explorer controls, group
+and dark inactive icons on the light header. On narrow Minimal phones, the
+selected label is 20px and the tab icons are 22px, with 44px minimum touch targets.
+Expanded Explorer controls, group
 names, Context corpus cards, Risk Matrix details, and Debate Map labels use
 explicit light-surface text pairs. Stats leaderboard addresses, detail dialogs,
 and group filter controls also use these pairs. Debate details use light argument cards,
@@ -212,7 +214,9 @@ raised bevel, compact black shadow, and gray hover face without a colored halo.
 
 Footer navigation consumes `--ce-footer-bar-*`, `--ce-footer-link-*`, and
 `--ce-footer-copyright-*` tokens. Context Engine keeps its unframed spacing,
-while `classic-95` presents a gray taskbar at the end of the document. Its
+and narrow-phone link rows use 14px text with compact spacing and 44px height so
+all five links fit together, retaining wrapping for exceptionally narrow widths.
+The `classic-95` theme presents a gray taskbar at the end of the document. Its
 compact, icon-only **Start** button opens an upward Windows-style menu containing
 the five route actions while retaining an accessible text label, and its larger
 GitHub icon stays aligned at the taskbar's right edge. The taskbar is never fixed over page content: long pages reveal it only

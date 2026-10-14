@@ -934,6 +934,23 @@
       outline-offset: 2px;
     }
   }
+
+  @media (max-width: 465px) {
+    .mainTabsCardHeader :global(.nav-tabs.nav-tabs-info > .nav-item > .nav-link) {
+      min-width: 44px;
+      min-height: 44px;
+
+      .navTabIcon {
+        width: 1.375rem;
+        height: 1.375rem;
+        font-size: 1.375rem;
+      }
+
+      &:global(.active) > :global(#mainContentTabTitle) {
+        font-size: 1.25rem;
+      }
+    }
+  }
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
