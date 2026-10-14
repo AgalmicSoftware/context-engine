@@ -395,7 +395,9 @@ describe('ToolExplorer session propagation', () => {
     const primary = container.querySelector(`.${styles.expandedHeaderPrimaryControls}`);
     expect(primary).toContainElement(screen.getByRole('button', { name: '← Back' }));
     expect(primary).toContainElement(screen.getByRole('combobox', { name: 'Active session' }));
-    expect(primary?.nextElementSibling).toBe(container.querySelector(`.${styles.expandedHeaderActions}`));
+    const toolbar = container.querySelector(`.${styles.expandedQuestionsToolbar}`);
+    expect(primary?.parentElement?.nextElementSibling).toBe(toolbar);
+    expect(toolbar?.nextElementSibling).toBe(screen.getByTestId('mock-survey-tool'));
     expect(primary?.parentElement).toHaveClass(styles.expandedHeaderQuestions);
   });
 

@@ -21,7 +21,9 @@ and open-session action. The native selector sizes to the selected label and
 shrinks within narrow viewports. Stats centers the unit; expanded tools align it
 right. In Questions, Back and Session occupy the top header row, with question
 actions in a full-width bordered panel directly above the list. The controls
-spread across the panel and center when wrapping on phones. JSON debug controls are hidden
+spread across the panel and center when wrapping on phones. The toolbar stays
+pinned 10px below the viewport top while the question list scrolls, including
+pending Submit controls; Back and Session scroll away. JSON debug controls are hidden
 in this embedded Questions view; the underlying JSON UI remains available to other
 surfaces. Run `node scripts/session-selector-layout-smoke.mjs` against the local
 server to check short and long selections at mobile, compact, and desktop widths.

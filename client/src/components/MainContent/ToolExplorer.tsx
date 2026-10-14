@@ -378,66 +378,72 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
                 </>
               )}
 
-              <div
-                className={styles.expandedHeaderActions}
-                ref={showQuestionsHeaderActions ? setQuestionsToolbarTarget : undefined}
-              >
-                {showGroupsHeaderActions && (
-                  <>
+              {!showQuestionsHeaderActions && (
+                <div className={styles.expandedHeaderActions}>
+                  {showGroupsHeaderActions && (
+                    <>
+                      <a
+                        href={buildPublicRoute(sbtsListPath())}
+                        className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerActionLink}`}
+                      >
+                        <FontAwesomeIcon icon={faExpand} />
+                        View All
+                      </a>
+                      <button
+                        type="button"
+                        className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary}`}
+                        onClick={toggleEmbeddedCreateGroup}
+                        data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
+                      >
+                        <FontAwesomeIcon icon={faPlus} />
+                        {showEmbeddedCreateGroup ? 'Exit' : 'Create'}
+                      </button>
+                    </>
+                  )}
+
+                  {showDataHeaderActions && (
+                    <div className={styles.headerModeToggleGroup}>
+                      <button
+                        type="button"
+                        className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerModeButton} ${dataToolMode === 'add' ? styles.headerActionButtonActive : ''}`}
+                        onClick={() => setDataToolMode('add')}
+                        data-testid={E2E_TESTIDS.TOOL_EXPLORER_DATA_ADD}
+                      >
+                        <FontAwesomeIcon icon={faPlus} />
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerModeButton} ${dataToolMode === 'view' ? styles.headerActionButtonActive : ''}`}
+                        onClick={() => setDataToolMode('view')}
+                        data-testid={E2E_TESTIDS.TOOL_EXPLORER_DATA_VIEW}
+                      >
+                        <FontAwesomeIcon icon={faEye} />
+                        View
+                      </button>
+                    </div>
+                  )}
+
+                  {expandedComponent.data.name === 'Debate Map' && (
                     <a
-                      href={buildPublicRoute(sbtsListPath())}
+                      href={buildPublicRoute('/atlas')}
                       className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerActionLink}`}
+                      title="Open in Full Screen"
                     >
                       <FontAwesomeIcon icon={faExpand} />
-                      View All
+                      Full Screen
                     </a>
-                    <button
-                      type="button"
-                      className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary}`}
-                      onClick={toggleEmbeddedCreateGroup}
-                      data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
-                    >
-                      <FontAwesomeIcon icon={faPlus} />
-                      {showEmbeddedCreateGroup ? 'Exit' : 'Create'}
-                    </button>
-                  </>
-                )}
-
-                {showDataHeaderActions && (
-                  <div className={styles.headerModeToggleGroup}>
-                    <button
-                      type="button"
-                      className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerModeButton} ${dataToolMode === 'add' ? styles.headerActionButtonActive : ''}`}
-                      onClick={() => setDataToolMode('add')}
-                      data-testid={E2E_TESTIDS.TOOL_EXPLORER_DATA_ADD}
-                    >
-                      <FontAwesomeIcon icon={faPlus} />
-                      Add
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerModeButton} ${dataToolMode === 'view' ? styles.headerActionButtonActive : ''}`}
-                      onClick={() => setDataToolMode('view')}
-                      data-testid={E2E_TESTIDS.TOOL_EXPLORER_DATA_VIEW}
-                    >
-                      <FontAwesomeIcon icon={faEye} />
-                      View
-                    </button>
-                  </div>
-                )}
-
-                {expandedComponent.data.name === 'Debate Map' && (
-                  <a
-                    href={buildPublicRoute('/atlas')}
-                    className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerActionLink}`}
-                    title="Open in Full Screen"
-                  >
-                    <FontAwesomeIcon icon={faExpand} />
-                    Full Screen
-                  </a>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
+
+            {showQuestionsHeaderActions && (
+              <div
+                className={`${styles.expandedHeaderActions} ${styles.expandedQuestionsToolbar}`}
+                ref={setQuestionsToolbarTarget}
+              />
+            )}
 
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="30vh" />}>
               {React.createElement(expandedComponent.component, {

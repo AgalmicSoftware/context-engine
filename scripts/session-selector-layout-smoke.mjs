@@ -40,9 +40,10 @@ export async function inspectQuestionsHeader(page) {
   const toolbar = page.getByTestId('ce-survey-toolbar');
   await toolbar.waitFor({ state: 'visible' });
   const layout = await toolbar.evaluate((element) => {
-    const row = element.closest('[class*="expandedHeaderRow_"]');
+    const row = element.closest('[class*="breadcrumbContainer_"]');
     const primary = row.querySelector('[class*="expandedHeaderPrimaryControls_"]');
     const primaryRect = primary.getBoundingClientRect();
+    const columnRect = row.getBoundingClientRect();
     const toolbarRect = element.getBoundingClientRect();
     const toolbarStyle = getComputedStyle(element);
     const controls = Array.from(element.children, (child) => child.getBoundingClientRect());
@@ -53,7 +54,7 @@ export async function inspectQuestionsHeader(page) {
       actionsBelow: element.getBoundingClientRect().top >= primaryRect.bottom - 1,
       primaryCenters: [back.top + back.height / 2, session.top + session.height / 2],
       toolbarEdges: [toolbarRect.left, toolbarRect.right],
-      headerEdges: [primaryRect.left, primaryRect.right],
+      columnEdges: [columnRect.left, columnRect.right],
       border: parseFloat(toolbarStyle.borderLeftWidth),
       background: toolbarStyle.backgroundColor,
       controlsInside: controls.every((control) => control.left >= toolbarRect.left && control.right <= toolbarRect.right),
@@ -61,8 +62,8 @@ export async function inspectQuestionsHeader(page) {
     };
   });
   assert(layout.actionsBelow, 'Question actions sit below Back and Session');
-  assert(layout.toolbarEdges.every((edge, index) => Math.abs(edge - layout.headerEdges[index]) < 2),
-    'Question toolbar spans the available question column');
+  assert(layout.toolbarEdges.every((edge, index) => Math.abs(edge - layout.columnEdges[index]) < 2),
+    `Question toolbar spans the available question column: ${JSON.stringify(layout)}`);
   assert(layout.border > 0 && layout.background !== 'rgba(0, 0, 0, 0)' && layout.background !== 'transparent',
     'Question controls share a visible bordered panel');
   assert(layout.controlsInside && !layout.overflow, 'Question controls fit without horizontal overflow');
@@ -74,6 +75,36 @@ export async function inspectQuestionsHeader(page) {
   }
 }
 
+
+async function inspectQuestionsStickyToolbar(page, theme) {
+  const toolbar = page.getByTestId('ce-survey-toolbar');
+  await page.getByRole('radio', { name: 'Agree', exact: true }).first().waitFor({ state: 'visible' });
+  const initial = await toolbar.boundingBox();
+  const scrollAndCheck = async (pending) => {
+    for (const scrollY of [initial.y + 300, initial.y + 1000]) {
+      await page.evaluate((y) => window.scrollTo({ top: y, behavior: 'instant' }), scrollY);
+      await page.waitForFunction(() => {
+        const rect = document.querySelector('[data-testid="ce-survey-toolbar"]').getBoundingClientRect();
+        return Math.abs(rect.top - 10) < 2;
+      }, undefined, { timeout: 3000 });
+      const bounds = await toolbar.boundingBox();
+      assert(Math.abs(bounds.width - initial.width) < 2, 'Sticky toolbar preserves the question column width');
+      assert(bounds.height < 853 / 2, 'Wrapped controls leave room for the questions');
+      if (pending) assert(await toolbar.getByTestId('ce-survey-submit').isVisible(), 'Pending submit stays visible while scrolling');
+    }
+    if (pending && theme === 'civic' && page.viewportSize().width === 705) {
+      await page.screenshot({ path: '/tmp/questions-sticky-705.png' });
+    }
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  };
+  await scrollAndCheck(false);
+  await page.getByText('Agree', { exact: true }).first().click();
+  await toolbar.getByTestId('ce-survey-submit').waitFor({ state: 'visible' });
+  await scrollAndCheck(true);
+  await page.getByText('Agree', { exact: true }).first().click();
+  await toolbar.getByTestId('ce-survey-submit').waitFor({ state: 'hidden' });
+}
+
 export async function runSmoke() {
   const { chromium } = await import('playwright');
   const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3000';
@@ -81,6 +112,7 @@ export async function runSmoke() {
   try {
     for (const theme of ['civic', 'classic-95', 'context-engine']) {
       for (const width of [320, 390, 705, 1280]) {
+        console.log(`Checking ${theme} ${width}`);
         const page = await browser.newPage({ viewport: { width, height: 853 } });
         await page.addInitScript((themeId) => {
           localStorage.setItem('ce:theme', themeId);
@@ -104,7 +136,10 @@ export async function runSmoke() {
           await page.getByText(tool, { exact: true }).filter({ visible: true }).click();
           const selector = page.getByTestId('ce-tool-explorer-active-session');
           await selector.waitFor({ state: 'visible' });
-          if (tool === 'Questions') await inspectQuestionsHeader(page);
+          if (tool === 'Questions') {
+            await inspectQuestionsHeader(page);
+            await inspectQuestionsStickyToolbar(page, theme);
+          }
           await inspectSessionSelectorLayout(selector, 'right');
           await selector.selectOption({ label: 'General' });
           await inspectSessionSelectorLayout(selector, 'right');

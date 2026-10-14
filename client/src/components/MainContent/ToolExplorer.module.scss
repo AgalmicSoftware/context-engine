@@ -511,10 +511,24 @@
   }
 }
 
-.expandedHeaderQuestions .expandedHeaderPrimaryControls,
-.expandedHeaderQuestions .expandedHeaderActions {
+.expandedHeaderQuestions {
+  margin-bottom: 10px;
+}
+
+.expandedHeaderQuestions .expandedHeaderPrimaryControls {
   flex-basis: 100%;
   width: 100%;
+}
+
+// Keep the sticky slot beside the question body so the short navigation header
+// cannot constrain it as the page scrolls.
+.expandedQuestionsToolbar {
+  position: sticky;
+  top: 10px;
+  z-index: 20;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 18px;
 }
 
 @media (max-width: 640px) {

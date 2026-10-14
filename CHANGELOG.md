@@ -7,7 +7,8 @@ All notable changes to this project will be documented in this file.
 ### Client — available when the site deploys
 
 - Restore the Questions toolbar as a full-width bordered panel with evenly
-  distributed controls and centered wrapping on phones across all themes.
+  distributed controls and centered wrapping on phones across all themes. Keep
+  it pinned near the viewport top while scrolling, including pending Submit controls.
 - Show the owning session name and slug for session-wide group member visibility.
   Keep shared group links scoped with an explicit `sessionSlug`, including when
   a different session is active, while supporting older links.
