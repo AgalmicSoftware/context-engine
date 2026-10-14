@@ -734,6 +734,7 @@ export default function OnePageSessionStandardShell({
         )}
 
         <div
+          id="report"
           ref={resultsSectionRef}
           className={`${styles.sectionContainer} ${showResults ? styles.sectionExpanded : ''}`}
         >

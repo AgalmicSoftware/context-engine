@@ -1,4 +1,5 @@
 import {
+  readOnePageSessionReportIntent,
   resolveOnePageSessionAggregatorCacheScope,
   resolveOnePageSessionRouteUiState,
 } from './onePageSessionRouteRuntime';
@@ -28,6 +29,37 @@ const buildWorkerHybridProfile = (kind: 'sbt' | 'lit') => {
 };
 
 describe('onePageSessionRouteRuntime', () => {
+  it('matches only the owning session and exact Report hash under the public base path', () => {
+    const priorBase = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+    try {
+      expect(
+        readOnePageSessionReportIntent(
+          { slug: 'Edge Session' },
+          { pathname: '/ce/session/edge%20session', hash: '#report' },
+        ),
+      ).toBe('/ce/session/edge%20session#report');
+      expect(readOnePageSessionReportIntent({ slug: '' }, { pathname: '/ce/session', hash: '#report' })).toBe(
+        '/ce/session#report',
+      );
+      expect(
+        readOnePageSessionReportIntent({ slug: 'edge' }, { pathname: '/ce/session/second', hash: '#report' }),
+      ).toBe('');
+      expect(
+        readOnePageSessionReportIntent({ slug: 'edge' }, { pathname: '/ce/session/edge', hash: '#questions' }),
+      ).toBe('');
+      expect(
+        readOnePageSessionReportIntent(
+          { slug: 'edge' },
+          { pathname: '/ce/session/edge/questions/results', hash: '#report' },
+        ),
+      ).toBe('');
+    } finally {
+      if (priorBase === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = priorBase;
+    }
+  });
+
   it('uses the Worker cache partition for a pure Worker profile despite stale top-level chain metadata', () => {
     expect(
       resolveOnePageSessionAggregatorCacheScope({

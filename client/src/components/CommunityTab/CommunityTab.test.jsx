@@ -1,3 +1,5 @@
+import React from 'react';
+import { act, render, screen } from '@testing-library/react';
 import CommunityTab from './CommunityTab';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import * as polisReportModule from '../PolisReport/PolisReport';
@@ -387,7 +389,7 @@ describe('CommunityTab helpers', () => {
     expect(collectTreeNodes(tree, (node) => node.type === Modal)[0].props.isOpen).toBe(true);
     if (modalType === 'questions') {
       const [body] = collectTreeNodes(tree, (node) => node.type === ModalBody);
-      expect(collectTreeNodes(body, (node) => node.type === BeeswarmPlot)).toHaveLength(1);
+      expect(collectTreeNodes(body, (node) => node.type === 'table')).toHaveLength(1);
     }
   });
 
@@ -1151,7 +1153,190 @@ describe('CommunityTab helpers', () => {
     }
   });
 
-  it('keeps the questions preview in the body and links the active session from the Details header', () => {
+  it('lists scoped questions of every type with their own session report links', () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+    try {
+      const instance = new CommunityTab({ activeSessionSlug: 'active' });
+      instance.state.modalType = 'questions';
+      instance._iterScopeCaches = jest.fn(() => [
+        {
+          slug: '',
+          sessionConfig: {},
+          questionsCache: {
+            questions: {
+              repeated: { prompt: 'General freeform question', type: 'freeform' },
+              rating: { prompt: 'General rating question', type: 'rating' },
+            },
+          },
+        },
+        {
+          slug: 'edge session',
+          sessionConfig: { slug: 'edge session', sessionName: 'Edge discussion' },
+          questionsCache: {
+            questions: {
+              repeated: { prompt: 'Named session binary question', type: 'binary' },
+              multi: { prompt: 'Named multiple choice question', type: 'multichoice' },
+              quadratic: { prompt: 'Named allocation question', type: 'quadratic' },
+            },
+          },
+        },
+      ]);
+      const tree = instance.renderModalContent();
+      const [table] = collectTreeNodes(tree, (node) => node.type === 'table');
+      expect(table.props['aria-label']).toBe('Questions by session');
+      expect(collectTreeNodes(table, (node) => node.type === 'th').map(collectNodeText)).toEqual([
+        'Session',
+        'Question',
+      ]);
+      const rows = collectTreeNodes(table, (node) => node.props?.['data-ce-question-id']);
+      expect(rows).toHaveLength(5);
+      expect(rows.map((row) => row.props['data-ce-session-slug'])).toEqual([
+        '',
+        '',
+        'edge session',
+        'edge session',
+        'edge session',
+      ]);
+      expect(
+        collectTreeNodes(rows, (node) => node.type === 'a').map((node) => [collectNodeText(node), node.props.href]),
+      ).toEqual([
+        ['General freeform question', '/ce/session#report'],
+        ['General rating question', '/ce/session#report'],
+        ['Named session binary question', '/ce/session/edge%20session#report'],
+        ['Named multiple choice question', '/ce/session/edge%20session#report'],
+        ['Named allocation question', '/ce/session/edge%20session#report'],
+      ]);
+      expect(collectNodeText(rows[0])).toContain('General');
+      expect(collectNodeText(rows[2])).toContain('Edge discussion');
+      expect(new Set(rows.map((row) => row.key)).size).toBe(5);
+      expect(collectTreeNodes(tree, (node) => node.type === BeeswarmPlot)).toHaveLength(0);
+    } finally {
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
+  });
+
+  it('refreshes open question titles as cached metadata arrives without recounting Stats', async () => {
+    class QuestionsTableView extends CommunityTab {
+      componentDidMount() {}
+      componentDidUpdate() {}
+      render() {
+        return this.renderQuestionsModalContent();
+      }
+    }
+    const ref = React.createRef();
+    const view = render(<QuestionsTableView ref={ref} activeSessionSlug="" />);
+    const instance = ref.current;
+    const netKey = String(instance._resolveNetKeyForSlug(''));
+    const writeQuestion = (question) =>
+      writeCache('questionsCache', '', {
+        [netKey]: { questionsLatestBlock: 10, questions: { q1: question }, questionResponses: {} },
+      });
+    const refresh = () =>
+      act(async () => {
+        await instance._runStatsRefreshCycle({ force: false });
+      });
+    try {
+      await writeQuestion({ creator: '0xabc', type: 'freeform' });
+      act(() => instance.setState({ showModal: true, modalType: 'questions', initialLoadDone: true }));
+      await refresh();
+      expect(screen.getByRole('link', { name: 'Question q1' })).toBeVisible();
+      const originalStats = instance.state.stats;
+      const computeStats = jest.spyOn(instance, '_computeStatsSnapshot');
+      const renderTable = jest.spyOn(instance, 'renderQuestionsModalContent');
+      await writeQuestion({ creator: '0xabc', type: 'freeform', prompt: 'Hydrated question title' });
+      await refresh();
+      expect(screen.getByRole('link', { name: 'Hydrated question title' })).toHaveAttribute('href', '/session#report');
+      expect(instance.state.stats).toBe(originalStats);
+      expect(computeStats).not.toHaveBeenCalled();
+      renderTable.mockClear();
+      await refresh();
+      expect(renderTable).not.toHaveBeenCalled();
+      peekCacheSync('questionsCache', '', { clone: false })[netKey].questions.q1.prompt = 'Updated in place';
+      await refresh();
+      expect(screen.getByRole('link', { name: 'Updated in place' })).toBeVisible();
+      act(() => instance.setState({ showModal: false, modalType: null }));
+      renderTable.mockClear();
+      await writeQuestion({ creator: '0xabc', type: 'freeform', prompt: 'Changed while closed' });
+      await refresh();
+      expect(renderTable).not.toHaveBeenCalled();
+      act(() => instance.setState({ showModal: true, modalType: 'questions' }));
+      expect(screen.getByRole('link', { name: 'Changed while closed' })).toBeVisible();
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it('uses identity-matched Worker questions without stale numeric metadata', async () => {
+    await writeWorkerStatsCaches();
+    const instance = new CommunityTab({ activeSessionSlug: 'demo-sh', sessionConfig: WORKER_SESSION_CONFIG });
+    instance.state.modalType = 'questions';
+    instance._getSelectedSessionSlugs = jest.fn(() => ['demo-sh']);
+    const content = instance.renderModalContent();
+    expect(collectNodeText(content)).toContain('Worker question');
+    expect(collectNodeText(content)).not.toContain('Stale numeric question');
+    expect(collectTreeNodes(content, (node) => node.type === 'a').map((node) => node.props.href)).toEqual([
+      '/session/demo-sh#report',
+    ]);
+  });
+
+  it('keeps unknown session labels and empty scopes free of unrelated demo fallbacks', () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'unknown' });
+    instance.state.modalType = 'questions';
+    jest
+      .spyOn(chainGateway, 'getDemoSessionConfigBySlug')
+      .mockReturnValue({ slug: 'demo', sessionName: 'Unrelated demo' });
+    instance._iterScopeCaches = jest.fn(() => [
+      {
+        slug: 'unknown',
+        sessionConfig: {},
+        questionsCache: {
+          questions: {
+            unnamed: {},
+            encrypted: { prompt: '[encrypted]' },
+          },
+        },
+      },
+    ]);
+    const text = collectNodeText(instance.renderModalContent());
+    expect(text).toContain('unknown');
+    expect(text).not.toContain('Unrelated demo');
+    expect(text).toContain('Question unnamed');
+    expect(text).toContain('Encrypted question');
+    instance._iterScopeCaches.mockReturnValue([{ slug: 'unknown', sessionConfig: {}, questionsCache: {} }]);
+    const empty = instance.renderModalContent();
+    expect(collectNodeText(empty)).toContain('No questions available for the selected sessions.');
+    expect(collectTreeNodes(empty, (node) => node.type === 'a')).toHaveLength(0);
+  });
+
+  it('uses exact-session demo question names only when that demo has no cached questions', () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'demo' });
+    instance.state.modalType = 'questions';
+    const exactDataset = { comments: [{ commentId: 'demo-1', commentBody: 'Exact demo question', type: 'rating' }] };
+    const lookup = jest
+      .spyOn(polisReportModule, 'getPolisDemoDatasetForSlug')
+      .mockImplementation((slug, options) =>
+        slug === 'demo' && options?.allowFallback === false
+          ? exactDataset
+          : { comments: [{ commentId: 'wrong', commentBody: 'Wrong fallback' }] },
+      );
+    instance._iterScopeCaches = jest.fn(() => [
+      { slug: 'demo', sessionConfig: { slug: 'demo', sessionName: 'Demo Session' }, questionsCache: {} },
+      { slug: 'unknown', sessionConfig: {}, questionsCache: {} },
+      { slug: 'demo-sh', isWorkerCanonical: true, sessionConfig: WORKER_SESSION_CONFIG, questionsCache: {} },
+    ]);
+    const content = instance.renderModalContent();
+    expect(collectNodeText(content)).toContain('Exact demo question');
+    expect(collectNodeText(content)).not.toContain('Wrong fallback');
+    expect(collectTreeNodes(content, (node) => node.type === 'a').map((node) => node.props.href)).toEqual([
+      '/session/demo#report',
+    ]);
+    expect(lookup).toHaveBeenCalledWith('demo', { allowFallback: false });
+    expect(lookup).not.toHaveBeenCalledWith('demo-sh', expect.anything());
+  });
+
+  it('keeps the questions table in the body and links the active session from the Details header', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'edge' });
     instance.state = {
       ...instance.state,
@@ -1159,29 +1344,21 @@ describe('CommunityTab helpers', () => {
       modalTitle: 'Questions Details',
     };
     instance._getSelectedSessionSlugs = jest.fn(() => ['other-session', 'edge']);
-    instance._beeswarmPoints = [
+    instance._iterScopeCaches = jest.fn(() => [
       {
-        questionId: 'q1',
-        label: 'Prompt one',
-        value: 0.34,
-        agrees: 2,
-        disagrees: 1,
-        unsure: 0,
-        total: 3,
+        slug: 'other-session',
+        sessionConfig: {},
+        questionsCache: { questions: { q1: { prompt: 'Prompt one' } } },
       },
-    ];
+    ]);
 
     const tree = instance.render();
     const [header] = collectTreeNodes(tree, (node) => node.type === ModalHeader);
     const [body] = collectTreeNodes(tree, (node) => node.type === ModalBody);
-    const [plotNode] = collectTreeNodes(body, (node) => node.type === BeeswarmPlot);
+    const [table] = collectTreeNodes(body, (node) => node.type === 'table');
     const [anchorNode] = collectTreeNodes(header, (node) => node.type === 'a');
 
-    expect(plotNode).toBeTruthy();
-    expect(plotNode.props.points).toEqual(instance._beeswarmPoints);
-    expect(plotNode.props.domain).toEqual([0, 1]);
-    expect(plotNode.props.height).toBe(240);
-    expect(plotNode.props.showIdleSummary).toBe(false);
+    expect(collectNodeText(table)).toContain('Prompt one');
     expect(anchorNode).toBeTruthy();
     expect(anchorNode.props.href).toBe('/session/edge');
     expect(collectNodeText(anchorNode)).toBe('View Full Questions');
@@ -1190,7 +1367,7 @@ describe('CommunityTab helpers', () => {
     expect(collectTreeNodes(header, (node) => node.type === 'h5').map(collectNodeText)).toEqual(['Questions Details']);
     expect(header.props.tag).toBe('div');
     expect(header.props.toggle).toBe(instance.toggleModal);
-    expect(collectTreeNodes(body, (node) => node.type === 'a')).toHaveLength(0);
+    expect(collectTreeNodes(body, (node) => node.type === 'a')[0].props.href).toBe('/session/other-session#report');
   });
 
   it.each([
@@ -1222,35 +1399,6 @@ describe('CommunityTab helpers', () => {
       expect(header.props.tag).toBe(type === 'sessions' ? 'div' : 'h5');
     },
   );
-
-  it('falls back to computed beeswarm points in the questions modal when no cached points exist', () => {
-    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
-    instance.state = {
-      ...instance.state,
-      modalType: 'questions',
-    };
-    instance._beeswarmPoints = [];
-    const fallbackPoints = [
-      {
-        questionId: 'q-fallback',
-        label: 'Fallback prompt',
-        value: 0,
-        agrees: 0,
-        disagrees: 0,
-        unsure: 0,
-        total: 0,
-      },
-    ];
-    jest.spyOn(instance, '_shouldUseDemoBeeswarmData').mockReturnValue(false);
-    const buildSpy = jest.spyOn(instance, '_buildCommunityBeeswarmPoints').mockReturnValue(fallbackPoints);
-
-    const tree = instance.renderModalContent();
-    const [plotNode] = collectTreeNodes(tree, (node) => node?.type === BeeswarmPlot);
-
-    expect(buildSpy).toHaveBeenCalledTimes(1);
-    expect(plotNode).toBeTruthy();
-    expect(plotNode.props.points).toBe(fallbackPoints);
-  });
 
   it('opts the CommunityTab SBT modal into compact SBT settings without affecting other SBTsList uses', () => {
     const instance = new CommunityTab({

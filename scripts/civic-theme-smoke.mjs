@@ -108,12 +108,17 @@ export async function inspectCivicStats(page) {
   await inspectStatsCounters(page);
   await assertReadable(stats);
   let profilePath = null;
+  let reportHref = null;
   for (const name of ['Users', 'Questions', 'Surveys', 'Groups']) {
     await stats.getByTestId(`ce-community-stat-${name.toLowerCase()}`).click();
     const dialog = page.getByRole('dialog');
     await assertReadable(dialog);
     if (name === 'Questions') {
-      await dialog.locator('svg').waitFor({ state: 'visible' });
+      const table = dialog.getByTestId('ce-community-questions-table');
+      await table.waitFor({ state: 'visible' });
+      assert.deepEqual(await table.getByRole('columnheader').allTextContents(), ['Session', 'Question']);
+      reportHref = await table.getByRole('link').first().getAttribute('href');
+      assert(reportHref?.endsWith('#report'), 'Question links target their session report');
       await dialog.getByTestId('ce-community-questions-session-link').waitFor({ state: 'visible' });
     }
     if (name === 'Users') {
@@ -137,6 +142,21 @@ export async function inspectCivicStats(page) {
     await dialog.waitFor({ state: 'hidden' });
   }
   await inspectSessionDirectory(page);
+  assert(reportHref, 'Questions Details exposes a report link');
+  const reportPage = await page.context().newPage();
+  try {
+    await reportPage.goto(new URL(reportHref, page.url()).href, { waitUntil: 'domcontentloaded' });
+    const report = reportPage.locator('#report');
+    await report.waitFor({ state: 'visible' });
+    await report.getByRole('button', { name: 'Report', exact: true }).waitFor({ state: 'visible' });
+    assert.equal(await report.getByRole('button', { name: 'Report', exact: true }).getAttribute('aria-pressed'), 'true');
+    await reportPage.waitForFunction(() => {
+      const rect = document.getElementById('report')?.getBoundingClientRect();
+      return rect && rect.top >= -2 && rect.top < innerHeight;
+    });
+  } finally {
+    await reportPage.close();
+  }
   return profilePath;
 }
 

@@ -796,13 +796,9 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.equal(await page.getByTestId('ce-community-session-section').count(), 0);
     await page.getByTestId('ce-community-stat-questions').click();
     await page.getByRole('dialog').waitFor({ state: 'visible' });
-    await page.waitForFunction(
-      () => document.querySelectorAll('[data-testid^="ce-beeswarm-point-"]').length >= 20,
-      null,
-      { timeout: 15000 },
-    );
-    await page.getByTestId('ce-beeswarm-point-0').hover();
-    await page.getByTestId('ce-beeswarm-tooltip').waitFor({ state: 'visible' });
+    const table = page.getByTestId('ce-community-questions-table');
+    await table.waitFor({ state: 'visible' });
+    await table.getByRole('link').first().waitFor({ state: 'visible' });
   }
 
   if (routeCase.requiresReadableAuthoring) {
@@ -1487,75 +1483,21 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           const style = window.getComputedStyle(element);
           return ratio(style[colorProperty], backgroundFor(element));
         };
-        const points = Array.from(document.querySelectorAll('[data-testid^="ce-beeswarm-point-"]'));
-        const pointXs = points.map((point) => Number(point.getAttribute('cx'))).filter(Number.isFinite);
-        const firstPointStyle = points[0] ? window.getComputedStyle(points[0]) : null;
-        const firstPointRect = points[0]?.getBoundingClientRect();
-        const beeswarmSection = document.querySelector('[role="dialog"] [class*="questionsModalPlot"]');
-        const beeswarmSectionRect = beeswarmSection?.getBoundingClientRect();
-        const svg = document.querySelector('[role="dialog"] [class*="questionsModalPlot"] svg');
-        const svgRect = svg?.getBoundingClientRect();
-        const tooltip = document.querySelector('[data-testid="ce-beeswarm-tooltip"]');
-        const tooltipText = tooltip?.textContent || '';
-        const tooltipRect = tooltip?.getBoundingClientRect();
-        const tooltipStyle = tooltip ? window.getComputedStyle(tooltip) : null;
-        const tooltipPointGap =
-          tooltipRect && firstPointRect
-            ? tooltipRect.right <= firstPointRect.left
-              ? firstPointRect.left - tooltipRect.right
-              : firstPointRect.right <= tooltipRect.left
-                ? tooltipRect.left - firstPointRect.right
-                : tooltipRect.bottom <= firstPointRect.top
-                  ? firstPointRect.top - tooltipRect.bottom
-                  : firstPointRect.bottom <= tooltipRect.top
-                    ? tooltipRect.top - firstPointRect.bottom
-                    : -Math.min(
-                        tooltipRect.right - firstPointRect.left,
-                        firstPointRect.right - tooltipRect.left,
-                        tooltipRect.bottom - firstPointRect.top,
-                        firstPointRect.bottom - tooltipRect.top,
-                      )
-            : -1;
+        const table = document.querySelector('[data-testid="ce-community-questions-table"]');
+        const links = Array.from(table?.querySelectorAll('tbody a') || []);
+        const tableRect = table?.getBoundingClientRect();
+        const bodyRect = table?.closest('.modal-body')?.getBoundingClientRect();
         return {
-          pointCount: points.length,
-          pointSpread: pointXs.length ? Math.max(...pointXs) - Math.min(...pointXs) : 0,
-          plotWidth: svgRect?.width || 0,
-          plotFitsHost: Boolean(
-            beeswarmSectionRect &&
-              svgRect &&
-              svgRect.width > 0 &&
-              svgRect.height > 0 &&
-              svgRect.left >= beeswarmSectionRect.left &&
-              svgRect.right <= beeswarmSectionRect.right &&
-              svgRect.top >= beeswarmSectionRect.top &&
-              svgRect.bottom <= beeswarmSectionRect.bottom,
-          ),
-          hasCountedVotes: /Counted\s+[1-9]\d*/i.test(tooltipText),
+          questionCount: table?.querySelectorAll('tbody [data-ce-question-id]').length || 0,
+          reportLinksValid: links.length > 0 && links.every((link) => link.getAttribute('href')?.endsWith('#report')),
+          tableFitsModal: Boolean(tableRect && bodyRect && tableRect.width > 0 &&
+            tableRect.left >= bodyRect.left && tableRect.right <= bodyRect.right),
           statIconRatio: textRatio('[class*="statIcon"]'),
           statCountRatio: textRatio('[class*="statCount"]'),
           statLabelRatio: textRatio('[class*="statLabel"]'),
-          axisLabelRatio: textRatio('[role="dialog"] [class*="questionsModalPlot"] text', 'fill'),
-          pointRatio:
-            firstPointStyle && svg ? ratio(firstPointStyle.fill, window.getComputedStyle(svg).backgroundColor) : 0,
-          tooltipPromptRatio: textRatio('[data-testid="ce-beeswarm-tooltip"] p'),
-          tooltipAgreeRatio: textRatio('[data-testid="ce-beeswarm-tooltip-agree"]'),
-          tooltipUnsureRatio: textRatio('[data-testid="ce-beeswarm-tooltip-unsure"]'),
-          tooltipDisagreeRatio: textRatio('[data-testid="ce-beeswarm-tooltip-disagree"]'),
-          tooltipTotalRatio: textRatio('[data-testid="ce-beeswarm-tooltip-total"]'),
-          tooltipWidth: tooltipRect?.width || 0,
-          tooltipPointGap,
-          tooltipRect: tooltipRect
-            ? { left: tooltipRect.left, right: tooltipRect.right, top: tooltipRect.top, bottom: tooltipRect.bottom }
-            : null,
-          hoveredPointRect: firstPointRect
-            ? {
-                left: firstPointRect.left,
-                right: firstPointRect.right,
-                top: firstPointRect.top,
-                bottom: firstPointRect.bottom,
-              }
-            : null,
-          tooltipPointerEvents: tooltipStyle?.pointerEvents || '',
+          tableHeadingRatio: textRatio('[data-testid="ce-community-questions-table"] th'),
+          tableSessionRatio: textRatio('[data-testid="ce-community-questions-table"] td'),
+          tableLinkRatio: textRatio('[data-testid="ce-community-questions-table"] a'),
         };
       })
     : null;
@@ -3120,46 +3062,19 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
   }
   if (statsContrastState) {
-    assert.ok(statsContrastState.pointCount >= 20, 'Community Stats should render the default-session questions');
-    assert.ok(
-      statsContrastState.pointSpread >= Math.min(200, statsContrastState.plotWidth * 0.4),
-      `Community Stats should preserve the default-session consensus cluster; received ${statsContrastState.pointSpread.toFixed(2)}px spread`,
-    );
-    assert.equal(statsContrastState.plotFitsHost, true, 'Questions modal chart fits its visible host');
-    assert.equal(
-      statsContrastState.hasCountedVotes,
-      true,
-      'Community Stats hover details should use default-session votes',
-    );
-    assert.ok(
-      statsContrastState.tooltipWidth <= 320,
-      `Community Stats hover details should stay compact; received ${statsContrastState.tooltipWidth.toFixed(2)}px`,
-    );
-    assert.ok(
-      statsContrastState.tooltipPointGap >= 8,
-      `Community Stats hover details should leave the hovered dot visible; received ${statsContrastState.tooltipPointGap.toFixed(2)}px gap (${JSON.stringify({ tooltip: statsContrastState.tooltipRect, point: statsContrastState.hoveredPointRect })})`,
-    );
-    assert.equal(
-      statsContrastState.tooltipPointerEvents,
-      'none',
-      'Community Stats hover details should not block nearby points',
-    );
+    assert.ok(statsContrastState.questionCount > 0, 'Questions Details lists scoped questions');
+    assert.equal(statsContrastState.reportLinksValid, true, 'Questions link to their session Report');
+    assert.equal(statsContrastState.tableFitsModal, true, 'Questions table fits its modal');
     [
       ['stat icon', statsContrastState.statIconRatio, 3],
       ['stat count', statsContrastState.statCountRatio, 4.5],
       ['stat label', statsContrastState.statLabelRatio, 4.5],
-      ['axis label', statsContrastState.axisLabelRatio, 4.5],
-      ['question point', statsContrastState.pointRatio, 3],
-      ['tooltip prompt', statsContrastState.tooltipPromptRatio, 4.5],
-      ['tooltip Agree state', statsContrastState.tooltipAgreeRatio, 4.5],
-      ['tooltip Unsure state', statsContrastState.tooltipUnsureRatio, 4.5],
-      ['tooltip Disagree state', statsContrastState.tooltipDisagreeRatio, 4.5],
-      ['tooltip total', statsContrastState.tooltipTotalRatio, 4.5],
+      ['question table heading', statsContrastState.tableHeadingRatio, 4.5],
+      ['question table session', statsContrastState.tableSessionRatio, 4.5],
+      ['question table link', statsContrastState.tableLinkRatio, 4.5],
     ].forEach(([label, received, minimum]) => {
-      assert.ok(
-        received >= minimum,
-        `Classic 95 ${label} contrast should be at least ${minimum}:1; received ${received.toFixed(2)}:1`,
-      );
+      assert.ok(received >= minimum,
+        `Classic 95 ${label} contrast should be at least ${minimum}:1; received ${received.toFixed(2)}:1`);
     });
   }
   if (authoringContrastState) {

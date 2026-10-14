@@ -85,6 +85,7 @@ import {
   buildOnePageSessionCanonicalBaseUrl,
   buildOnePageSessionRawResultsRoute,
   removeOnePageSessionInterviewIntent,
+  readOnePageSessionReportIntent,
   resolveOnePageSessionAggregatorCacheScope,
   resolveOnePageSessionRouteUiState,
 } from './onePageSessionRouteRuntime';
@@ -419,6 +420,8 @@ class OnePageSession extends Component<any, any> {
 
     initializeSbtAutoMintRuntime(this, (error) => demoLog.warn('OnePageSession: fallback', error));
 
+    window.addEventListener('hashchange', this.handleReportNavigation);
+    window.addEventListener('popstate', this.handleReportNavigation);
     window.addEventListener('sbt-mint-success', this.onSbtMintSuccess);
     window.addEventListener('ce-agent-client-login', this.handleAgentClientLoginEvent as EventListener);
 
@@ -438,6 +441,7 @@ class OnePageSession extends Component<any, any> {
 
     this.bootstrapTelegramSession();
     this.ensureDemoSessionFixtures();
+    this.handleReportNavigation();
   }
 
   // Loads the demo fixtures only for a demo session; the state flip rebuilds
@@ -466,6 +470,9 @@ class OnePageSession extends Component<any, any> {
   }
 
   componentWillUnmount() {
+    window.removeEventListener('hashchange', this.handleReportNavigation);
+    window.removeEventListener('popstate', this.handleReportNavigation);
+    this._pendingReportScroll = false;
     this._demoFixturesDisposed = true;
     this.disposeTelegramActions();
     this._autoMintLegacyCredentialQuery = '';
@@ -681,6 +688,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   componentDidUpdate(prevProps: any, prevState: any) {
+    this.handleReportNavigation();
     const prevSlug = normalizeOnePageSessionSlug(prevProps.slug || prevProps.sessionConfig?.slug || '');
     const nextSlug = normalizeOnePageSessionSlug(this.props.slug || this.props.sessionConfig?.slug || '');
     const slugChanged = prevSlug !== nextSlug;
@@ -2181,10 +2189,50 @@ class OnePageSession extends Component<any, any> {
     this.setState((prevState: Readonly<OnePageSession['state']>) => ({ showGroupsAbout: !prevState.showGroupsAbout }));
   }
 
-  viewSessionResults() {
-    this.setState({ showResults: true, autoOpenResults: false }, () => {
-      this.resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  isCurrentReportNavigation = (intent: string) =>
+    intent === this._reportNavigationKey && readOnePageSessionReportIntent(this.props) === intent;
+
+  handleReportNavigation = () => {
+    const intent = readOnePageSessionReportIntent(this.props);
+    if (!intent) {
+      if (this._reportNavigationKey) this._pendingReportScroll = false;
+      this._reportNavigationKey = '';
+      return;
+    }
+    if (intent === this._reportNavigationKey) return;
+    this._reportNavigationKey = intent;
+    this.setState({ resultsViewMode: 'polis' }, () => {
+      // Another hash/session navigation can supersede this request before React commits.
+      if (this.isCurrentReportNavigation(intent)) this.viewSessionResults(intent);
     });
+  };
+
+  scrollPendingReportIntoView = () => {
+    if (this._pendingReportScrollIntent && !this.isCurrentReportNavigation(this._pendingReportScrollIntent)) {
+      this._pendingReportScroll = false;
+      return;
+    }
+    const target = this.resultsSectionRef.current;
+    if (!this._pendingReportScroll || typeof target?.scrollIntoView !== 'function') return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    this._pendingReportScroll = false;
+  };
+
+  setResultsSectionRef = (target: HTMLElement | null) => {
+    this.resultsSectionRef.current = target;
+    this.scrollPendingReportIntoView();
+  };
+
+  viewSessionResults(reportIntent = '') {
+    this._pendingReportScroll = true;
+    this._pendingReportScrollIntent = reportIntent;
+    this.setState(
+      () =>
+        reportIntent && !this.isCurrentReportNavigation(reportIntent)
+          ? null
+          : { showResults: true, autoOpenResults: false },
+      this.scrollPendingReportIntoView,
+    );
   }
 
   toggleResults() {
@@ -2346,6 +2394,7 @@ class OnePageSession extends Component<any, any> {
     if (isTelegramSession) {
       return (
         <OnePageSessionTelegramShell
+          resultsSectionRef={this.setResultsSectionRef}
           account={this.props.account}
           blockLimits={blockLimits}
           contracts={contracts}
@@ -2484,7 +2533,7 @@ class OnePageSession extends Component<any, any> {
         onLoadFullCorpusClick={this.handleLoadFullCorpusClick}
         onOpenResults={this.handleOpenResults}
         onViewSessionResults={this.viewSessionResults}
-        resultsSectionRef={this.resultsSectionRef}
+        resultsSectionRef={this.setResultsSectionRef}
         onPileSubmitRailVisibilityChange={this.handlePileSubmitRailVisibilityChange}
         onResultsModalClose={this.handleResultsModalClose}
         onResultsModeChange={(resultsViewMode) => this.setState({ resultsViewMode })}

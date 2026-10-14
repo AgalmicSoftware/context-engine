@@ -64,6 +64,23 @@ const baseProps = {
 };
 
 describe('OnePageSessionTelegramShell', () => {
+  it('attaches the pending Report target when authentication reveals its results section', () => {
+    const resultsSectionRef = jest.fn();
+    const view = render(
+      <OnePageSessionTelegramShell
+        {...baseProps}
+        telegramClientEnvelope={null}
+        resultsSectionRef={resultsSectionRef}
+      />,
+    );
+    expect(resultsSectionRef).not.toHaveBeenCalled();
+    view.rerender(<OnePageSessionTelegramShell {...baseProps} resultsSectionRef={resultsSectionRef} />);
+    expect(resultsSectionRef).toHaveBeenLastCalledWith(screen.getByTestId('ce-session-telegram-results'));
+    expect(screen.getByTestId('ce-session-telegram-results')).toHaveAttribute('id', 'report');
+    view.unmount();
+    expect(resultsSectionRef).toHaveBeenLastCalledWith(null);
+  });
+
   it('states generated AI results are unsupported in the Telegram shell', () => {
     render(<OnePageSessionTelegramShell {...baseProps} />);
 

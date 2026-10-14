@@ -91,6 +91,12 @@ const COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG = 'demo';
 const SESSION_FILTER_SUMMARY_ID = 'ce-community-session-filter-summary';
 const COMMUNITY_BEESWARM_DOMAIN = [0, 1] as const;
 type CacheReadOptions = { clone?: boolean };
+type CommunityQuestionRow = {
+  sessionSlug: string;
+  sessionName: string;
+  questionId: string;
+  prompt: string;
+};
 type SessionSelectorOption = { value: string; label: string };
 type ScopeCacheEntry = {
   slug: string;
@@ -190,6 +196,7 @@ class CommunityTab extends Component<any, any> {
       loadingSurveyData: true,
       surveysList: [],
       questionsList: [],
+      questionsTableSignature: '',
       filteredUsers: [], // Initialize as empty, will be set when modal opens
       loadingFilter: false,
       stats: [
@@ -1390,6 +1397,13 @@ class CommunityTab extends Component<any, any> {
 
     this.setState((prevState: Readonly<CommunityTab['state']>) => {
       const next: Record<string, any> = {};
+      if (prevState.showModal && prevState.modalType === 'questions') {
+        // Prompt hydration does not change counter signatures, but the open table must still refresh.
+        const questionsTableSignature = JSON.stringify(this._getQuestionDetailsRows(scopeEntries));
+        if (questionsTableSignature !== prevState.questionsTableSignature) {
+          next.questionsTableSignature = questionsTableSignature;
+        }
+      }
       if (changed && snapshot) {
         next.uniqueUsers = snapshot.uniqueUsers;
         next.surveysCreatedCount = snapshot.surveysCreatedCount;
@@ -2158,13 +2172,87 @@ class CommunityTab extends Component<any, any> {
 
   _getQuestionSwarmPoints = () => this._getQuestionSwarmView().points;
 
+  _getQuestionDetailsRows = (
+    scopeEntries: ScopeCacheEntry[] = this._iterScopeCaches({ clone: false }),
+  ): CommunityQuestionRow[] => {
+    const rows: CommunityQuestionRow[] = [];
+    const seen = new Set<string>();
+    scopeEntries.forEach((scope) => {
+      const sessionSlug = normalizeSessionSlug(scope.slug);
+      // Scope authority already requires an exact config slug; never reuse a demo label for an unknown session.
+      const sessionName = String(scope.sessionConfig?.sessionName || '').trim() || sessionSlug || 'General';
+      const addQuestion = (id: unknown, rawQuestion: unknown) => {
+        const questionId = String(id ?? '').trim();
+        const key = JSON.stringify([sessionSlug, questionId]);
+        if (!questionId || seen.has(key)) return;
+        seen.add(key);
+        const question = this._parseCachedJson(rawQuestion);
+        const prompt = typeof question?.prompt === 'string' ? question.prompt.trim() : '';
+        rows.push({
+          sessionSlug,
+          sessionName,
+          questionId,
+          prompt: prompt === '[encrypted]' ? 'Encrypted question' : prompt || `Question ${questionId}`,
+        });
+      };
+      const cachedQuestions = scope.questionsCache?.questions;
+      const entries =
+        cachedQuestions && typeof cachedQuestions === 'object' && !Array.isArray(cachedQuestions)
+          ? Object.entries(cachedQuestions)
+          : [];
+      entries.forEach(([questionId, question]) => addQuestion(questionId, question));
+      // Worker scopes must stay identity-bound, even when their cache is empty or stale.
+      if (!entries.length && !scope.isWorkerCanonical && POLIS_DEMO_DATA_AUTOLOAD_SLUGS.includes(sessionSlug)) {
+        const dataset = getPolisDemoDatasetForSlug(sessionSlug, { allowFallback: false }) as {
+          comments?: unknown[];
+        } | null;
+        const comments = Array.isArray(dataset?.comments) ? dataset.comments : [];
+        comments.forEach((rawComment, index) => {
+          const comment = this._parseCachedJson(rawComment);
+          if (typeof comment?.commentBody === 'string') {
+            addQuestion(comment.commentId ?? index, { prompt: comment.commentBody });
+          }
+        });
+      }
+    });
+    return rows;
+  };
+
   renderQuestionsModalContent = () => {
-    const points = this._getQuestionSwarmPoints();
+    const rows = this._getQuestionDetailsRows();
     return (
       <div className={styles.questionsModalContent}>
-        <div className={styles.questionsModalPlot}>
-          <BeeswarmPlot points={points} domain={COMMUNITY_BEESWARM_DOMAIN} height={240} showIdleSummary={false} />
-        </div>
+        <table
+          className={styles.questionsTable}
+          aria-label="Questions by session"
+          data-testid={E2E_TESTIDS.COMMUNITY_QUESTIONS_TABLE}
+        >
+          <thead>
+            <tr>
+              <th scope="col">Session</th>
+              <th scope="col">Question</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ sessionSlug, sessionName, questionId, prompt }) => (
+              <tr
+                key={JSON.stringify([sessionSlug, questionId])}
+                data-ce-session-slug={sessionSlug}
+                data-ce-question-id={questionId}
+              >
+                <td>{sessionName}</td>
+                <td>
+                  <a href={`${buildSettingsSessionHref(sessionSlug)}#report`}>{prompt}</a>
+                </td>
+              </tr>
+            ))}
+            {!rows.length && (
+              <tr>
+                <td colSpan={2}>No questions available for the selected sessions.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     );
   };

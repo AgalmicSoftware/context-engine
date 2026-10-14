@@ -1,3 +1,4 @@
+import { canonicalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { resolveEffectiveSlug } from '../SurveyTool/surveyToolUtils';
@@ -68,4 +69,28 @@ export const buildOnePageSessionCanonicalBaseUrl = (props: any = {}) => {
 export const buildOnePageSessionRawResultsRoute = (props: any = {}) => {
   const slug = resolveEffectiveSlug(props);
   return buildOnePageSessionPublicRoute(slug ? `/session/${slug}/questions/results` : '/questions/results');
+};
+
+/** A Report deep link only applies once the component owns the URL's session. */
+export const readOnePageSessionReportIntent = (
+  props: Record<string, unknown> = {},
+  locationIn?: { pathname?: unknown; hash?: unknown },
+): string => {
+  const location = locationIn ?? (typeof window !== 'undefined' ? window.location : null);
+  if (location?.hash !== '#report') return '';
+  const config =
+    props.sessionConfig && typeof props.sessionConfig === 'object'
+      ? (props.sessionConfig as Record<string, unknown>)
+      : {};
+  const explicitSlug = [props.slug, config.slug, props.sessionSlug, props.activeSessionSlug].find(
+    (value) => typeof value === 'string',
+  );
+  const slug = canonicalizeSessionSlug(
+    String(explicitSlug ?? resolveEffectiveSlug(props))
+      .trim()
+      .toLowerCase(),
+  );
+  const expectedPath = buildOnePageSessionPublicRoute(`/session${slug ? `/${encodeURIComponent(slug)}` : ''}`);
+  const pathname = String(location.pathname || '').replace(/\/+$/, '');
+  return pathname === expectedPath ? `${pathname}#report` : '';
 };
