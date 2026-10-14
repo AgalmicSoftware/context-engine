@@ -20,7 +20,7 @@ const createStore = (loginInProgress = false) => ({
 });
 
 describe('LoginButton', () => {
-  it('pairs Civic account text and inline editor fields with the blue account surface', () => {
+  it('pairs Civic account text and inline editor fields with the light-blue account surface', () => {
     const civicStyles = accountStylesheet.slice(
       accountStylesheet.indexOf('@container ce-theme style(--ce-layout-profile: minimal-app)'),
     );
@@ -28,26 +28,26 @@ describe('LoginButton', () => {
       civicStyles.indexOf('#accountModalPanel {'),
       civicStyles.indexOf('.navConnectContainer {'),
     );
-    expect(accountPanel).toContain('--ce-panel-text: var(--ce-action-primary-text);');
-    expect(accountPanel).toContain('--ce-input-bg: var(--ce-action-primary-hover);');
-    expect(accountPanel).toContain(
-      '--ce-input-border: color-mix(in srgb, var(--ce-action-primary-text) 35%, transparent);',
-    );
-    expect(accountPanel).toContain('--ce-text-inverse: var(--ce-action-primary-text);');
-    expect(accountPanel).toContain('--ce-status-error: var(--ce-action-primary-text);');
-    expect(accountPanel).toContain('--ce-status-success-text: var(--ce-action-primary-text);');
-    expect(accountPanel).toContain('--ce-focus-ring: var(--ce-action-primary-text);');
-    expect(accountPanel).toContain('linear-gradient(135deg, var(--ce-action-primary), var(--ce-action-primary-hover))');
+    expect(accountPanel).toContain('color-mix(in srgb, var(--ce-action-submit) 16%, var(--ce-color-white))');
+    expect(accountPanel).toContain('color-mix(in srgb, var(--ce-action-submit) 22%, var(--ce-color-white))');
+    expect(accountPanel).toContain('color: var(--ce-panel-text);');
+    expect(accountPanel).toContain('--ce-text-inverse: var(--ce-panel-text);');
+    expect(accountPanel).not.toContain('--ce-panel-text:');
+    expect(accountPanel).not.toContain('--ce-input-bg:');
+    expect(accountPanel).not.toContain('--ce-focus-ring:');
   });
 
-  it('keeps the light profile error text out of the Disconnect danger-gradient tokens', () => {
+  it('keeps the dark profile error text out of the Disconnect danger-gradient tokens', () => {
     const panelBlocks = [...compiledAccountStylesheet.matchAll(/#accountModalPanel\s*\{([^}]+)\}/g)];
-    const civicPanel = panelBlocks.find(([, declarations]) => declarations.includes('--ce-panel-text:'))?.[1];
+    const civicPanel = panelBlocks.find(([, declarations]) => declarations.includes('--ce-action-submit'))?.[1];
     expect(civicPanel).toBeDefined();
     expect(civicPanel).not.toContain('--ce-status-error:');
     expect(civicPanel).not.toContain('--ce-status-danger:');
     expect(compiledAccountStylesheet).toMatch(
-      /#accountModalPanel \.accountModalProfileShell\s*\{[^}]*--ce-status-error:\s*var\(--ce-action-primary-text\);/,
+      /#accountModalPanel \.accountModalProfileShell\s*\{[^}]*--ce-status-error:\s*var\(--ce-status-danger-text\);/,
+    );
+    expect(compiledAccountStylesheet).toMatch(
+      /#accountModalPanel \.disconnectButton\s*\{[^}]*color:\s*var\(--ce-action-primary-text\);/,
     );
   });
 

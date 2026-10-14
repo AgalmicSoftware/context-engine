@@ -4079,38 +4079,36 @@ h1 {
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
   #accountModalPanel {
-    --ce-panel-text: var(--ce-action-primary-text);
-    --ce-text: var(--ce-action-primary-text);
-    --ce-document-text: var(--ce-action-primary-text);
-    --ce-text-inverse: var(--ce-action-primary-text);
-    --ce-input-bg: var(--ce-action-primary-hover);
-    --ce-input-border: color-mix(in srgb, var(--ce-action-primary-text) 35%, transparent);
-    --ce-status-success-text: var(--ce-action-primary-text);
-    --ce-focus-ring: var(--ce-action-primary-text);
-    --ce-panel-text-muted: color-mix(in srgb, var(--ce-action-primary-text) 82%, transparent);
-    --ce-action-accent: var(--ce-action-primary-text);
-
-    background: linear-gradient(135deg, var(--ce-action-primary), var(--ce-action-primary-hover));
-    color: var(--ce-action-primary-text);
-    border: 1px solid var(--ce-action-primary-hover);
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--ce-action-submit) 16%, var(--ce-color-white)),
+      color-mix(in srgb, var(--ce-action-submit) 22%, var(--ce-color-white))
+    );
+    color: var(--ce-panel-text);
+    border: 1px solid color-mix(in srgb, var(--ce-action-primary) 28%, var(--ce-color-white));
 
     .accountModalProfileShell {
-      --ce-status-error: var(--ce-action-primary-text);
+      --ce-text-inverse: var(--ce-panel-text);
+      --ce-status-error: var(--ce-status-danger-text);
     }
 
     .walletButton,
     .disconnectButton {
-      color: var(--ce-action-primary-text);
       opacity: 1;
     }
 
+    .disconnectButton {
+      color: var(--ce-action-primary-text);
+    }
+
     .walletButton {
-      background: color-mix(in srgb, var(--ce-action-primary-text) 10%, transparent);
-      border: 1px solid color-mix(in srgb, var(--ce-action-primary-text) 35%, transparent);
+      color: var(--ce-panel-text);
+      background: color-mix(in srgb, var(--ce-color-white) 65%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-action-primary) 28%, var(--ce-color-white));
 
       &:hover,
       &:focus-visible {
-        background: color-mix(in srgb, var(--ce-action-primary-text) 20%, transparent);
+        background: color-mix(in srgb, var(--ce-color-white) 90%, transparent);
       }
     }
   }

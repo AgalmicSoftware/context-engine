@@ -141,9 +141,10 @@ uses the light-surface response palette. The contrast checks cover text,
 controls, disabled actions, session chrome, and focus indicators; this is not a
 claim of complete accessibility certification.
 
-The Civic Account card uses a deep blue gradient with white account text and
-actions. Inline account fields keep dark backgrounds and light text, validation
-indicators, and focus outlines. This treatment is scoped to the Account card.
+The Civic Account card uses a light-blue gradient with dark account text and
+Bookmarks controls. Inline fields retain light backgrounds, dark text, and
+visible validation and focus indicators. Disconnect stays red with white text.
+This treatment is scoped to the Account card.
 
 The Stats tab includes a Sessions count across the app's discovered registry
 sessions, configured Worker sessions, and previously visited Worker sessions.
