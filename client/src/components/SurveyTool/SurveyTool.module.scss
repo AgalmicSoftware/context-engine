@@ -1815,6 +1815,40 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+#surveysRow.embeddedSessionToolbar.toolbarWithoutSelector {
+  justify-content: space-between;
+  column-gap: 8px;
+
+  @media (min-width: 601px) and (max-width: 768px) {
+    width: auto;
+    margin-left: 10px;
+    margin-right: 10px;
+  }
+
+  @media (max-width: 466px) {
+    padding: 10px;
+
+    #filterButton,
+    #showResultsButton,
+    #createSurveyButton {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 8px;
+      font-size: 1rem;
+    }
+
+    #filterButton {
+      width: 44px;
+      height: 44px;
+    }
+  }
+
+  #createSurveyButton,
+  .headerSubmitButton {
+    margin-left: 0 !important;
+  }
+}
+
 @media (hover: none), (pointer: coarse), (max-width: 768px) {
   #surveysRow {
     backdrop-filter: none;

@@ -1557,7 +1557,21 @@
   color: var(--ce-color-white);
 }
 
+.pileHeaderCount {
+  font-size: 0.85em;
+  font-weight: 600;
+  white-space: nowrap;
+
+  &:empty {
+    display: none;
+  }
+}
+
 .pileHeaderTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3em;
+  min-width: 0;
   opacity: 0.82;
   margin: 0;
   font-size: 2rem;
@@ -2028,6 +2042,28 @@
 
   .miniSectionContent {
     padding: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .pileHeaderRow {
+    gap: 8px;
+  }
+
+  .pileBackButton {
+    min-width: 0;
+    min-height: 44px;
+    padding: 10px 8px;
+    font-size: 1rem;
+    gap: 6px;
+  }
+
+  .pileHeaderTitleWrap {
+    gap: 6px;
+  }
+
+  .pileHeaderTitle {
+    font-size: clamp(1.05rem, 3.8vw, 1.45rem);
   }
 }
 

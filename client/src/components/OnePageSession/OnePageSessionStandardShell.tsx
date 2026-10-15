@@ -453,6 +453,7 @@ export default function OnePageSessionStandardShell({
   ]
     .filter(Boolean)
     .join(' ');
+  const [questionCountTarget, setQuestionCountTarget] = React.useState<HTMLSpanElement | null>(null);
   const questionsSectionTitle = renderSectionHeading('Questions');
   const questionsSectionTooltip =
     'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering.';
@@ -516,7 +517,10 @@ export default function OnePageSessionStandardShell({
               </button>
             </div>
             <div className={styles.pileHeaderTitleWrap}>
-              <h2 className={styles.pileHeaderTitle}>{questionsSectionTitle}</h2>
+              <h2 className={styles.pileHeaderTitle}>
+                {questionsSectionTitle}
+                <span className={styles.pileHeaderCount} ref={setQuestionCountTarget} />
+              </h2>
               <div className={`${styles.tooltip} ${styles.pileHeaderTooltip}`} tabIndex={0} aria-label="Questions info">
                 <FontAwesomeIcon icon={faQuestionCircle} />
                 <span className={styles.tooltiptext}>{questionsSectionTooltip}</span>
@@ -580,6 +584,7 @@ export default function OnePageSessionStandardShell({
               <MemoSurveyPage
                 miniMode={true}
                 hideEmbeddedDebugUi={true}
+                questionCountTarget={questionCountTarget}
                 account={account}
                 provider={provider}
                 network={network}

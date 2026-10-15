@@ -3,6 +3,7 @@ import {
   SURVEY_SELECTOR_CREATE_BUTTON_STYLE,
   SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE,
   SurveySelector,
+  QuestionsDashboard,
   buildSurveySelectorDropdownItemClassName,
   buildSurveySelectorHeaderSubmitButtonClassName,
   resolveSurveySelectorFilterButtonStyle,
@@ -209,6 +210,95 @@ describe('SurveySelector display guards', () => {
     rendered.unmount();
     expect(toolbarTarget).toBeEmptyDOMElement();
     toolbarTarget.remove();
+  });
+
+  it('moves the filtered count into the session heading and keeps it accurate for empty filters', () => {
+    const questionCountTarget = document.createElement('span');
+    const toolbarTarget = document.createElement('div');
+    document.body.append(questionCountTarget, toolbarTarget);
+    const subject = new SurveySelector({
+      questionCountTarget,
+      toolbarTarget,
+      embeddedSessionToolbar: true,
+      preventUrlChange: true,
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      network: { id: 11155420 },
+    });
+    syncClassSetState(subject);
+    subject.getParsedQuestionsCacheForRender = jest.fn(() => ({}));
+    subject.state = { ...subject.state, loading: false };
+    subject.handleFilteredQuestionCountUpdate(50, 0);
+    const getHeaderAndToolbar = () => {
+      const tree = subject.render();
+      return [questionCountTarget, toolbarTarget].map((target) =>
+        findElement(tree, (node) => node?.containerInfo === target),
+      );
+    };
+    const rendered = render(getHeaderAndToolbar());
+    expect(questionCountTarget).toHaveTextContent('(50)');
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filter questions' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Results' })).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_CREATE_TOGGLE)).toBeInTheDocument();
+
+    subject.handleFilteredQuestionCountUpdate(7, 0);
+    rendered.rerender(getHeaderAndToolbar());
+    expect(questionCountTarget).toHaveTextContent('(7)');
+    subject.handleFilteredQuestionCountUpdate(0, 0);
+    rendered.rerender(getHeaderAndToolbar());
+    expect(questionCountTarget).toHaveTextContent('(7)');
+    const dashboardElement = findElement(subject.render(), (node) => node?.type === QuestionsDashboard);
+    const dashboard = new QuestionsDashboard(dashboardElement.props);
+    dashboard.handleFilterCountUpdate(0, 0);
+    rendered.rerender(getHeaderAndToolbar());
+    expect(questionCountTarget).toHaveTextContent('(0)');
+    subject.handleFilteredQuestionsWithState([], {});
+    subject.handleFilteredQuestionCountUpdate(50, 0);
+    rendered.rerender(getHeaderAndToolbar());
+    expect(questionCountTarget).toHaveTextContent('(50)');
+
+    subject.state = { ...subject.state, surveys: [{ id: 'survey-one', title: 'Example survey', questionIDs: [] }] };
+    rendered.rerender(getHeaderAndToolbar());
+    expect(questionCountTarget).toBeEmptyDOMElement();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE)).toHaveTextContent(/Questions\s*\(50\)/);
+
+    rendered.unmount();
+    expect(questionCountTarget).toBeEmptyDOMElement();
+    questionCountTarget.remove();
+    toolbarTarget.remove();
+  });
+
+  it.each([
+    { isSurveyCacheReady: false },
+    { cacheInitializationError: 'Unavailable' },
+    { embeddedSessionToolbar: false },
+    { questionCountTarget: null },
+  ])('keeps the selector when there is no confirmed empty-survey heading (%j)', (overrides) => {
+    const questionCountTarget = document.createElement('span');
+    const subject = new SurveySelector({
+      questionCountTarget,
+      embeddedSessionToolbar: true,
+      isSurveyCacheReady: true,
+      isQuestionCacheReady: true,
+      network: { id: 11155420 },
+      ...overrides,
+    });
+    subject.state = { ...subject.state, loading: false };
+    const tree = subject.render();
+    expect(
+      findElement(tree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE),
+    ).toBeTruthy();
+    expect(findElement(tree, (node) => node?.containerInfo === questionCountTarget)).toBeNull();
+  });
+
+  it('retains the selector until its survey read finishes', () => {
+    const questionCountTarget = document.createElement('span');
+    const subject = new SurveySelector({ questionCountTarget, embeddedSessionToolbar: true, isSurveyCacheReady: true });
+    expect(findElement(subject.render(), (node) => node?.containerInfo === questionCountTarget)).toBeNull();
+    expect(
+      findElement(subject.render(), (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE),
+    ).toBeTruthy();
   });
 
   it('renders the SurveySelector header submit CTA with submitGlow when pending edits exist', () => {
