@@ -14,8 +14,8 @@ const questions = Array.from({ length: 50 }, (_, index) => ({
 const browser = await chromium.launch({ headless: true });
 try {
   for (const theme of ['civic', 'classic-95', 'context-engine']) {
-    for (const width of [320, 705, 773, 937, 1280]) {
-      const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+    for (const width of [320, 335, 390, 640, 705, 768, 773, 937, 1280]) {
+      const page = await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width <= 768, reducedMotion: 'reduce' });
       await page.addInitScript(theme => {
         localStorage.setItem('ce:theme', theme);
         localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
@@ -35,6 +35,27 @@ try {
       await page.getByTestId('ce-pile-active-question').waitFor({ timeout: 60000 });
       const next = page.getByRole('button', { name: 'Next Question', exact: true });
       const prev = page.getByRole('button', { name: 'Previous Question', exact: true });
+      const menu = page.getByRole('button', { name: 'Question actions', exact: true });
+      const filter = page.getByTestId('ce-survey-filter-toggle');
+      if (width <= 768) {
+        assert(await menu.isVisible(), 'Mobile hamburger is available before answering');
+        assert(!await filter.isVisible(), 'Mobile actions start collapsed');
+        await menu.tap();
+        await filter.waitFor({ state: 'visible' });
+        for (const name of ['Create New Question', 'Open voice mode', 'View All Questions']) {
+          assert(await page.getByRole('button', { name, exact: true }).isVisible(), `${name} is available in the menu`);
+        }
+        if (process.env.OUTPUT_DIR) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-menu.png` });
+        await menu.focus();
+        await page.keyboard.press('Tab');
+        assert(await filter.evaluate(element => element === document.activeElement), 'Menu actions are keyboard reachable');
+        await next.tap();
+        await filter.waitFor({ state: 'hidden' });
+        await prev.tap();
+      } else {
+        assert(!await menu.isVisible(), 'Desktop keeps inline actions');
+        assert(await filter.isVisible(), 'Desktop filter remains directly accessible');
+      }
       const inspect = async expected => {
         await page.waitForFunction(expected => {
           const card = document.querySelector('[data-testid="ce-pile-active-question"]');
@@ -47,18 +68,29 @@ try {
           const card = controls.parentElement.querySelector('[data-testid="ce-pile-active-question"] .card');
           const counter = nav.querySelector('span');
           const actions = controls.querySelector('[class*="pileActions_"]');
-          const range = document.createRange(); range.selectNodeContents(counter);
-          const rect = element => { const r = element.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, cx: r.left + r.width / 2 }; };
+          const textRects = [...counter.children].flatMap(part => {
+            const range = document.createRange(); range.selectNodeContents(part);
+            return [...range.getClientRects()];
+          });
+          const rect = element => { const r = element.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, cx: r.left + r.width / 2, cy: r.top + r.height / 2, width: r.width }; };
           return {
-            nav: rect(nav), counter: rect(counter), card: rect(card), prev: rect(nav.querySelector('button')), actions: rect(actions),
+            nav: rect(nav), menu: rect(actions.querySelector('button')), next: rect(button), counter: rect(counter), card: rect(card), prev: rect(nav.querySelector('button')), actions: rect(actions),
             buttons: [...controls.querySelectorAll('button')].filter(button => button.getBoundingClientRect().width > 0 && getComputedStyle(button).visibility !== 'hidden').map(rect),
-            text: counter.textContent.trim(), lineTops: [...new Set([...range.getClientRects()].map(r => Math.round(r.top)))],
+            text: counter.textContent.trim(), lineTops: [...new Set(textRects.map(r => Math.round(r.top)))],
             overflow: document.documentElement.scrollWidth > innerWidth + 1,
           };
         });
         const detail = JSON.stringify({ theme, width, expected, layout });
         assert.equal(layout.text, `${expected} / 50`, detail);
-        assert.equal(layout.lineTops.length, 1, `Counter stays on one line: ${detail}`);
+        if (width <= 640) {
+          assert.equal(layout.lineTops.length, 3, `Phone counter uses a narrow column: ${detail}`);
+          assert(layout.counter.width < 32, `Counter leaves room for the controls: ${detail}`);
+        } else assert.equal(layout.lineTops.length, 1, `Wide counter stays on one line: ${detail}`);
+        if (width <= 768) {
+          for (const control of [layout.menu, layout.prev, layout.next]) {
+            assert(Math.abs(control.cy - layout.nav.cy) <= 1, `Menu and arrows share a row: ${detail}`);
+          }
+        }
         assert(layout.counter.left >= layout.nav.left && layout.counter.right <= layout.nav.right, `Counter fits its rail: ${detail}`);
         assert(!layout.overflow, `No horizontal overflow: ${detail}`);
         for (const [index, button] of layout.buttons.entries()) {

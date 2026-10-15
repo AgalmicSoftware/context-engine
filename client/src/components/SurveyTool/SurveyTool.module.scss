@@ -5492,18 +5492,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 @media (max-width: 640px) {
   .pileControls {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
-      'footer nav'
-      'actions actions';
+      'footer footer'
+      'actions nav';
     justify-content: stretch;
     gap: 8px;
   }
 
   .pileControls > .pileActions {
-    justify-self: stretch;
-    justify-content: center;
-    width: 100%;
+    justify-self: start;
+    width: auto;
   }
 
   .pileFooter {
@@ -5515,16 +5514,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     display: none;
   }
 
-  .pileControls:has(.pileActionsMenuEligible) {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'footer footer'
-      'actions nav';
+  // Keep the counter in a narrow column between the arrows on phones.
+  .pileNavCounterText {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 2ch;
+    line-height: 1.1;
+    margin: 0;
   }
 
-  .pileControls > .pileActions.pileActionsMenuEligible {
-    justify-self: start;
-    width: auto;
+  .pileNavCounterSeparator {
+    line-height: 0.8;
   }
 }
 
@@ -5931,7 +5932,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-/* Compact Classic 95 uses the shared action menu when Submit needs the space.
+/* Compact Classic 95 shares the default mobile action menu.
  * Open upward to keep the lower session panels accessible. */
 @media (max-width: 768px) {
   @container ce-theme style(--ce-layout-profile: desktop-window) {
@@ -6076,10 +6077,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     .pileControls {
       position: static;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: auto minmax(0, 1fr);
       grid-template-areas:
-        'footer nav'
-        'actions actions';
+        'footer footer'
+        'actions nav';
       align-items: center;
       justify-content: stretch;
       width: 100%;
@@ -6091,8 +6092,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       position: static;
       grid-area: actions;
       flex-direction: row;
-      justify-self: stretch;
-      width: 100%;
+      justify-self: start;
+      width: auto;
       transform: none;
     }
 
@@ -6117,19 +6118,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       flex-direction: column;
     }
 
-    .pileControls:has(.pileActionsMenuEligible) {
-      grid-template-columns: auto minmax(0, 1fr);
-      grid-template-areas:
-        'footer footer'
-        'actions nav';
-    }
-
-    .pileControls > .pileActions.pileActionsMenuEligible {
-      width: auto;
-      justify-self: start;
-    }
-
-    .pileControls:has(.pileActionsMenuEligible) > .pileNav {
+    .pileControls > .pileNav {
       justify-self: end;
     }
   }

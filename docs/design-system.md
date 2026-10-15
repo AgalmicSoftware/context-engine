@@ -144,7 +144,10 @@ The Account button retains its own sizing. Narrow Classic 95 headers let the
 Account control wrap below the logo when needed.
 The profile presents session
 sections as a single column of compact rows, and removes decorative depth from
-question cards and account controls. The home Explorer offers Stats, Tools, and
+question cards and account controls. At widths up to 768px, question actions
+start in the hamburger menu. The menu and previous/next arrows share one row;
+at phone widths up to 640px, the question counter forms a narrow column between
+the arrows and pending Submit controls occupy their own row. The home Explorer offers Stats, Tools, and
 Welcome; Tools remains the default, including for a retained Latest-tab selection.
 Session title tooltips share the Results description cleanup for retired RxC instructions.
 Explorer tabs use blue selected/hover text

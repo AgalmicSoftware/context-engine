@@ -45,7 +45,6 @@ type PileNavControlsProps = {
 };
 
 type PileActionControlsProps = {
-  collapseActionsIntoMenu?: boolean;
   isFilterActive: boolean;
   toggleFilterModal: VoidHandler;
   showCreate: boolean;
@@ -183,33 +182,12 @@ export const buildPileFilterButtonClassName = (styleMap: Record<string, string>,
 export const buildPileFooterClassName = (styleMap: Record<string, string>, pileTopRailVisible: unknown) =>
   `${styleMap.pileFooter}${pileTopRailVisible ? '' : ` ${styleMap.pileFooterHidden}`}`;
 
-export const buildPileActionsClassName = (styleMap: Record<string, string>, collapseActionsIntoMenu: unknown) =>
-  [styleMap.pileActions, collapseActionsIntoMenu ? styleMap.pileActionsMenuEligible : ''].filter(Boolean).join(' ');
-
 export const buildPileSubmitButtonClassName = (
   styleMap: Record<string, string>,
   hasPendingPileChanges: unknown,
   shouldHidePileSubmitButton: unknown,
 ) =>
   `${styleMap.pileSubmitButton}${hasPendingPileChanges ? ` ${styleMap.submitGlow}` : ''}${shouldHidePileSubmitButton ? ` ${styleMap.pileSubmitButtonInactive}` : ''}`;
-
-export const shouldCollapsePileActionsIntoMenu = ({
-  pileTopRailVisible,
-  showSubmitButton,
-  hasPendingPileChanges,
-  isSubmitting,
-  shouldHidePileSubmitButton,
-}: {
-  pileTopRailVisible: unknown;
-  showSubmitButton: unknown;
-  hasPendingPileChanges: unknown;
-  isSubmitting: unknown;
-  shouldHidePileSubmitButton: unknown;
-}): boolean =>
-  !!pileTopRailVisible &&
-  !!showSubmitButton &&
-  (!!hasPendingPileChanges || !!isSubmitting) &&
-  !shouldHidePileSubmitButton;
 
 export const resolvePileCardStatusClassName = (styleMap: Record<string, string>, offset: number) => {
   if (offset === 0) return styleMap.pileCardActive;
@@ -267,7 +245,9 @@ const renderPileNavControls = ({
       <FontAwesomeIcon icon={faChevronLeft} />
     </button>
     <span className={styles.pileNavCounterText} style={resolvePileNavCounterStyle(navCounterVisible)}>
-      {pileQuestions.length === 0 ? 0 : activePileIndex + 1} / {pileQuestions.length}
+      <span>{pileQuestions.length === 0 ? 0 : activePileIndex + 1}</span>
+      <span className={styles.pileNavCounterSeparator}> / </span>
+      <span>{pileQuestions.length}</span>
     </span>
     <button
       onClick={handleNext}
@@ -282,7 +262,6 @@ const renderPileNavControls = ({
 );
 
 const renderPileActionControls = ({
-  collapseActionsIntoMenu = false,
   isFilterActive,
   toggleFilterModal,
   showCreate,
@@ -299,7 +278,7 @@ const renderPileActionControls = ({
   const filterIconStyle = resolvePileFilterIconStyle(isFilterActive);
 
   return (
-    <div className={buildPileActionsClassName(styles, collapseActionsIntoMenu)}>
+    <div className={`${styles.pileActions} ${styles.pileActionsMenuEligible}`}>
       <button
         type="button"
         className={`${styles.actionButton} ${styles.pileActionMenuToggle}`}
@@ -687,13 +666,6 @@ export const renderPileInteractionSurface = ({
     {!showHologramAssistant && (
       <div className={styles.pileControls}>
         {renderPileActionControls({
-          collapseActionsIntoMenu: shouldCollapsePileActionsIntoMenu({
-            pileTopRailVisible,
-            showSubmitButton,
-            hasPendingPileChanges,
-            isSubmitting,
-            shouldHidePileSubmitButton,
-          }),
           isFilterActive,
           toggleFilterModal,
           showCreate,
