@@ -1,6 +1,7 @@
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { createMainSiteSessionScanPolicy } from './mainSiteSessionScanPolicyBinding';
 import { createWorkerCanonicalRouteController } from './workerCanonicalRouteController';
+import type { AppShell } from './AppShell';
 
 const SESSION_SLUG = 'worker-session';
 const FIRST_ORIGIN = 'https://first.example.com';
@@ -13,6 +14,61 @@ const ALL_SCOPE = {
 };
 
 describe('mainSiteSessionScanPolicyBinding', () => {
+  afterEach(() => window.history.replaceState({}, '', '/'));
+
+  it.each([`/session/${SESSION_SLUG}`, '/'])(
+    'retains verified Worker on-chain SBT scans without a worker query on %s',
+    (path) => {
+      window.history.replaceState({}, '', path);
+      const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+      profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+      profile.evm.registryChainId = 11155420;
+      profile.encryption.accessConditions = {
+        match: 'any',
+        conditions: [
+          {
+            kind: 'sbt_onchain',
+            chainId: 11155420,
+            contract: '0x1111111111111111111111111111111111111111',
+            anyOrAll: 'any',
+          },
+        ],
+      };
+      const controller = createWorkerCanonicalRouteController({
+        getCurrentPathname: () => window.location.pathname,
+        getSessionTokenFromPath: () => SESSION_SLUG,
+        getSessionSlugFromState: () => SESSION_SLUG,
+        setState: jest.fn(),
+      } as unknown as AppShell);
+      const policy = createMainSiteSessionScanPolicy({
+        _routeRenderers: { workerCanonicalRoutes: controller },
+        getActiveSessionSlug: () => SESSION_SLUG,
+        getCurrentPathname: () => window.location.pathname,
+        getSessionSlugHintFromSearch: () => null,
+        getSessionTokenFromPath: () => SESSION_SLUG,
+        getDisplaySessionCfg: () => ({ __registry: { registryChainId: 11155420 } }),
+        isSbtListRoutePath: () => false,
+      } as unknown as AppShell);
+      controller.handleBootstrapResolved({
+        config: { slug: SESSION_SLUG, sessionModeProfile: profile },
+        configRevision: 'revision-1',
+        sessionId: '0x00112233445566778899aabbccddeeff',
+        sessionSlug: SESSION_SLUG,
+        workerOrigin: FIRST_ORIGIN,
+      });
+      expect(policy.shouldSkipSessionScanForSlug(SESSION_SLUG, 'sbt', ALL_SCOPE)).toBe(false);
+      for (const query of [
+        `worker=${encodeURIComponent(SECOND_ORIGIN)}`,
+        'worker=',
+        'worker=https%3A%2F%2Fsecret%40worker.example.com',
+        `worker=${encodeURIComponent(FIRST_ORIGIN)}&worker=${encodeURIComponent(SECOND_ORIGIN)}`,
+      ]) {
+        window.history.replaceState({}, '', `${path}?${query}`);
+        expect(policy.shouldSkipSessionScanForSlug(SESSION_SLUG, 'sbt', ALL_SCOPE)).toBe(true);
+      }
+    },
+  );
+
   it('uses only the active origin-and-slug config when deciding whether SBT scans are allowed', () => {
     const controller = createWorkerCanonicalRouteController({
       getCurrentPathname: () => `/session/${SESSION_SLUG}`,

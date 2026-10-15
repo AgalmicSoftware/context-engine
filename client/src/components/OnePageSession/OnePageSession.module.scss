@@ -298,10 +298,15 @@
 
 .workerGroupsListPanel {
   width: 100%;
+  min-width: 0;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--ce-document-surface);
+
+  .telegramListEmpty {
+    overflow-wrap: anywhere;
+  }
 }
 
 .workerGroupCardGrid {

@@ -100,9 +100,14 @@ test('route docs preserve legacy address-shaped Worker group links', () => {
     assert.match(routeDoc, /non-address[\s\S]{0,160}Worker[\s\S]{0,160}`\/group\/<groupId>/i, relativePath);
     assert.match(
       routeDoc,
-      /address-shaped[\s\S]{0,160}Worker[\s\S]{0,160}`\/groups\?sessionName=<slug>#group-<groupId>`/i,
+      /address-shaped[\s\S]{0,160}Worker[\s\S]{0,160}`\/groups\?session(?:Slug|Name)=<slug>#group-<groupId>`/i,
       relativePath,
     );
+  }
+  if (fs.existsSync(path.join(ROOT, 'docs/MainSite.MAP.md'))) {
+    const currentMap = read('docs/MainSite.MAP.md');
+    assert.match(currentMap, /Legacy `sessionName` query links remain supported/);
+    assert.match(currentMap, /`\/groups\?sessionSlug=<slug>#group-<groupId>`/);
   }
   assert.ok(checkedDocuments > 0, 'expected at least one public route document');
 });

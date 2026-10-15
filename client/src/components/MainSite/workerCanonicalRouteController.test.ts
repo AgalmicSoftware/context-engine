@@ -2,6 +2,9 @@ import {
   createWorkerCanonicalRouteController,
   getWorkerCanonicalRouteController,
 } from './workerCanonicalRouteController';
+import { resolveMainSiteDisplaySessionConfig } from './mainSiteCapabilityHostRuntime';
+import { resolveMainSiteGroupWorkerRoute } from './workerCanonicalRouteResolution';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 const buildHost = () => {
   let state = { sessionPathResolutionNonce: 0 };
@@ -69,6 +72,102 @@ describe('workerCanonicalRouteController', () => {
     host.getSessionSlugFromState.mockReturnValue('other-session');
     expect(controller.getActiveVerifiedConfig('eddy-fixture')).toBeNull();
   });
+
+  it.each(['https://canonical.example.com', 'https://other.example.com'])(
+    'requires Home verification after visiting the same slug through %s',
+    (routeOrigin) => {
+      const slug = 'worker-session';
+      const canonicalConfig = {
+        slug,
+        corsWorkerUrl: 'https://canonical.example.com',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      };
+      const routeConfig = { ...canonicalConfig, corsWorkerUrl: routeOrigin, configRevision: 'route-revision' };
+      window.history.replaceState({}, '', `/session/${slug}?worker=${encodeURIComponent(routeOrigin)}`);
+      const { host, readState } = buildHost();
+      host.getSessionSlugFromState = jest.fn(() => slug);
+      host.getSessionCfg = jest.fn(() => canonicalConfig);
+      const controller = getWorkerCanonicalRouteController(host);
+      const routeResolved = controller.handleBootstrapResolved;
+      const bootstrap = {
+        config: routeConfig,
+        sessionSlug: slug,
+        sessionId: '0x00112233445566778899aabbccddeeff',
+        workerOrigin: routeOrigin,
+        configRevision: 'route-revision',
+      };
+      routeResolved(bootstrap);
+      expect(controller.getActiveVerifiedConfig(slug)).toBe(routeConfig);
+
+      window.history.replaceState({}, '', '/');
+      expect(controller.getActiveVerifiedConfig(slug)).toBeNull();
+      expect(controller.hasVerifiedRoute(slug, routeOrigin)).toBe(false);
+      expect(controller.getVerifiedConfig(slug, routeOrigin)).toBeNull();
+      const displayConfig = resolveMainSiteDisplaySessionConfig(host, slug);
+      expect(displayConfig?.corsWorkerUrl).toBe(canonicalConfig.corsWorkerUrl);
+      expect(
+        resolveMainSiteGroupWorkerRoute({
+          workerSessionSlug: slug,
+          sessionConfig: displayConfig,
+          searchStr: '',
+          controller,
+        }),
+      ).toMatchObject({ kind: 'bootstrap', workerOrigin: canonicalConfig.corsWorkerUrl });
+
+      // A completion retained by the previous route cannot establish Home authority.
+      const nonce = readState().sessionPathResolutionNonce;
+      routeResolved(bootstrap);
+      expect(controller.getActiveVerifiedConfig(slug)).toBeNull();
+      expect(readState().sessionPathResolutionNonce).toBe(nonce);
+      const homeResolved = controller.handleBootstrapResolved;
+      expect(homeResolved).not.toBe(routeResolved);
+      expect(controller.handleBootstrapResolved).toBe(homeResolved);
+      homeResolved({ ...bootstrap, config: canonicalConfig, workerOrigin: canonicalConfig.corsWorkerUrl });
+      expect(controller.getActiveVerifiedConfig(slug)).toBe(canonicalConfig);
+      expect(controller.hasVerifiedRoute(slug, canonicalConfig.corsWorkerUrl)).toBe(true);
+
+      window.history.replaceState({}, '', `/session/${slug}?worker=${encodeURIComponent(routeOrigin)}`);
+      const resumedRouteConfig = routeOrigin === canonicalConfig.corsWorkerUrl ? routeConfig : null;
+      expect(controller.getActiveVerifiedConfig(slug)).toBe(resumedRouteConfig);
+      homeResolved({ ...bootstrap, config: canonicalConfig, workerOrigin: canonicalConfig.corsWorkerUrl });
+      expect(controller.getActiveVerifiedConfig(slug)).toBe(resumedRouteConfig);
+    },
+  );
+
+  it.each([
+    ['https://other.example.com', '0x00112233445566778899aabbccddeeff', 'home-revision', true],
+    ['https://canonical.example.com', '0xffeeddccbbaa99887766554433221100', 'home-revision', true],
+    ['https://canonical.example.com', '0x00112233445566778899aabbccddeeff', 'route-revision', true],
+    ['https://canonical.example.com', '0x00112233445566778899aabbccddeeff', 'home-revision', false],
+  ])(
+    'invalidates prior Home proof only after identity or revision changes (%s, %s, %s)',
+    (workerOrigin, sessionId, configRevision, changed) => {
+      const slug = 'worker-session';
+      window.history.replaceState({}, '', '/');
+      const { host } = buildHost();
+      host.getSessionSlugFromState = jest.fn(() => slug);
+      const controller = createWorkerCanonicalRouteController(host);
+      const homeBootstrap = {
+        config: { slug, configRevision: 'home-revision' },
+        sessionSlug: slug,
+        sessionId: '0x00112233445566778899aabbccddeeff',
+        workerOrigin: 'https://canonical.example.com',
+        configRevision: 'home-revision',
+      };
+      controller.handleBootstrapResolved(homeBootstrap);
+      window.history.replaceState({}, '', `/session/${slug}?worker=${encodeURIComponent(workerOrigin)}`);
+      controller.handleBootstrapResolved({
+        ...homeBootstrap,
+        config: { slug, configRevision },
+        workerOrigin,
+        sessionId,
+        configRevision,
+      });
+      window.history.replaceState({}, '', '/');
+      expect(controller.getActiveVerifiedConfig(slug)).toBe(changed ? null : homeBootstrap.config);
+      expect(controller.hasVerifiedRoute(slug, homeBootstrap.workerOrigin)).toBe(!changed);
+    },
+  );
 
   it('replaces same-slug route state without leaking config across Worker origins', () => {
     const { host } = buildHost();

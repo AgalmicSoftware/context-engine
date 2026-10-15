@@ -874,6 +874,79 @@ describe('PolisReport cache read options', () => {
     expect(screen.queryByLabelText('Refreshing report')).not.toBeInTheDocument();
   });
 
+  it('updates a settled partial Worker snapshot while retaining it during the next unfinished refresh', async () => {
+    const sessionConfig = {
+      slug: 'large-worker',
+      sessionId: `0x${'3'.repeat(32)}`,
+      corsWorkerUrl: 'https://large-worker.example.test',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: sessionConfig.slug });
+    let status = 'partial';
+    let cachedIdentity = identity;
+    cacheScripts.peekCacheSync.mockImplementation((namespace, slug) =>
+      namespace === 'questionsCache' && slug === sessionConfig.slug
+        ? {
+            worker: withWorkerCanonicalCacheIdentity(
+              { questions: {}, workerResponseHydrationStatus: status },
+              cachedIdentity,
+            ),
+          }
+        : {},
+    );
+    const props = { ...baseReportProps, slug: sessionConfig.slug, sessionConfig, isResponsesCacheReady: false };
+    const { rerender } = render(<PolisReport {...props} questionResponses={seededQuestionResponses} />);
+    await screen.findByText('Summary and Statistics');
+    const calls = computePolisConversationMath.mock.calls.length;
+    const updated = {
+      ...seededQuestionResponses,
+      secondQuestion: [
+        {
+          ...seededQuestionResponses.seedQuestion[0],
+          questionId: 'secondQuestion',
+          response: JSON.stringify({ type: 'binary', prompt: 'Newly loaded prompt', answer: { value: 'Disagree' } }),
+        },
+      ],
+    };
+    status = 'loading';
+    rerender(<PolisReport {...props} questionResponses={updated} questionResponsesNonce={1} />);
+    expect(computePolisConversationMath).toHaveBeenCalledTimes(calls);
+    expect(screen.getByLabelText('Refreshing report')).toBeInTheDocument();
+    status = 'partial';
+    rerender(<PolisReport {...props} questionResponses={updated} questionResponsesNonce={2} />);
+    await waitFor(() => expect(computePolisConversationMath).toHaveBeenCalledTimes(calls + 1));
+    expect(screen.queryByLabelText('Refreshing report')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByText(/^Questions/, { selector: 'span' }).closest('div')).getByText('2'),
+    ).toBeInTheDocument();
+    status = 'loading';
+    rerender(<PolisReport {...props} questionResponses={{}} questionResponsesNonce={3} />);
+    expect(
+      within(screen.getByText(/^Questions/, { selector: 'span' }).closest('div')).getByText('2'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Refreshing report')).toBeInTheDocument();
+    status = 'partial';
+    cachedIdentity = resolveWorkerCanonicalCacheIdentity({
+      sessionConfig: { ...sessionConfig, corsWorkerUrl: 'https://different-worker.example.test' },
+      sessionSlug: sessionConfig.slug,
+    });
+    rerender(<PolisReport {...props} questionResponses={seededQuestionResponses} questionResponsesNonce={4} />);
+    expect(computePolisConversationMath).toHaveBeenCalledTimes(calls + 1);
+    expect(screen.getByLabelText('Refreshing report')).toBeInTheDocument();
+    cachedIdentity = identity;
+    status = 'complete';
+    rerender(
+      <PolisReport
+        {...props}
+        isResponsesCacheReady
+        questionResponses={seededQuestionResponses}
+        questionResponsesNonce={5}
+      />,
+    );
+    await waitFor(() => expect(computePolisConversationMath).toHaveBeenCalledTimes(calls + 2));
+    expect(screen.queryByLabelText('Refreshing report')).not.toBeInTheDocument();
+  });
+
   it.each(['session', 'filter', 'viewer', 'worker'])(
     'does not retain report data across a %s change during refresh',
     async (change) => {

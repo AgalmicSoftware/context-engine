@@ -210,6 +210,7 @@ export class CommunityTab extends Component<any, any> {
       ],
       lastSbtGroupsCount: null,
       initialLoadDone: false,
+      initialLoadSelectionKey: this._statsSelectionKey(),
       showLeaderboardControls: false,
       sessions: [],
       showSessionFilters: false,
@@ -496,11 +497,20 @@ export class CommunityTab extends Component<any, any> {
   _pickWorkerCanonicalCache = (cacheObj: unknown, identity: WorkerCanonicalCacheIdentity | null) =>
     pickCommunityWorkerCanonicalCache(cacheObj, identity);
 
+  // Catalog aggregation must not prompt for unrelated Workers. Keep the same
+  // account choice in the request and cache key so private counts never leak into anonymous reads.
+  _workerGroupCountAccount = (sessionSlug: unknown) =>
+    normalizeSessionSlug(sessionSlug) === normalizeSessionSlug(this._resolveRouteSlug()) ? this.props.account : '';
+
   _getWorkerGroupCountCacheKey = (identity: WorkerCanonicalCacheIdentity) =>
-    getCommunityWorkerGroupCountCacheKey(identity, this.props.account);
+    getCommunityWorkerGroupCountCacheKey(identity, this._workerGroupCountAccount(identity.sessionSlug));
 
   _getWorkerGroupCountState = (identity: WorkerCanonicalCacheIdentity | null) =>
-    getCommunityWorkerGroupCountState(identity, this.props.account, this._workerGroupCountCache);
+    getCommunityWorkerGroupCountState(
+      identity,
+      this._workerGroupCountAccount(identity?.sessionSlug),
+      this._workerGroupCountCache,
+    );
 
   _invalidateWorkerGroupCountCache = (detail: WorkerGroupsChangedDetail) =>
     invalidateCommunityWorkerGroupCountCache({
@@ -559,7 +569,7 @@ export class CommunityTab extends Component<any, any> {
     loadCommunityWorkerGroupCount({
       scopeEntry,
       runtime: {
-        account: this.props.account,
+        account: this._workerGroupCountAccount(scopeEntry.slug),
         provider: this.props.provider,
         networkChainId: this.props.networkChainId,
         network: this.props.network,
@@ -1201,8 +1211,21 @@ export class CommunityTab extends Component<any, any> {
 
   _isWorkerScopeEntryReady = (scopeEntry: ScopeCacheEntry) => {
     const groupsSettled = ['ready', 'error', 'unavailable'].includes(scopeEntry.workerGroupsStatus);
-    const questionsReady = this.props.isQuestionCacheReady || this._countKeys(scopeEntry.questionsCache) > 0;
-    const surveysReady = this.props.isSurveyCacheReady || this._countKeys(scopeEntry.surveysCache) > 0;
+    // Identity fields and empty initialization maps do not prove metadata has arrived.
+    // The global readiness props belong only to the active session.
+    const isActive = normalizeSessionSlug(scopeEntry.slug) === normalizeSessionSlug(this._resolveRouteSlug());
+    const questionsReady =
+      scopeEntry.questionsCache?.workerMetadataHydrationStatus === 'complete' ||
+      (scopeEntry.questionsCache?.workerMetadataHydrationStatus !== 'loading' &&
+        isActive &&
+        this.props.isQuestionCacheReady) ||
+      this._countKeys(scopeEntry.questionsCache?.questions) > 0;
+    const surveysReady =
+      scopeEntry.surveysCache?.workerMetadataHydrationStatus === 'complete' ||
+      (scopeEntry.surveysCache?.workerMetadataHydrationStatus !== 'loading' &&
+        isActive &&
+        this.props.isSurveyCacheReady) ||
+      this._countKeys(scopeEntry.surveysCache?.surveys) > 0;
     return groupsSettled && questionsReady && surveysReady;
   };
 
@@ -1365,6 +1388,12 @@ export class CommunityTab extends Component<any, any> {
       selection.primarySessionSlug,
       selection.selectedSessionScope,
       selection.selectedSessionSlugs,
+      normalizeSessionSlug(this._resolveRouteSlug()),
+      String(this.props.account || '')
+        .trim()
+        .toLowerCase(),
+      this.props.sessionConfig?.sessionId,
+      this.props.sessionConfig?.corsWorkerUrl,
     ]);
   };
 
@@ -1401,6 +1430,10 @@ export class CommunityTab extends Component<any, any> {
       !this._isUnmounted &&
       selectionKey === this._statsSelectionKey() &&
       (!request || this._activeStatsRefresh === request);
+    if (this.state.initialLoadSelectionKey !== selectionKey) {
+      this._lastInitialLoadCheckMs = 0;
+      this.setState({ initialLoadDone: false, initialLoadSelectionKey: selectionKey });
+    }
     this._refreshSessionCatalog();
 
     if (markLoading && (!this.state.loadingSbtsCreated || !this.state.loadingSurveyData)) {
@@ -1421,7 +1454,6 @@ export class CommunityTab extends Component<any, any> {
     }
     const nextBeeswarmPoints = this._buildCommunityBeeswarmPoints(scopeEntries);
     this._beeswarmPoints = nextBeeswarmPoints;
-    const plottableQuestionsCount = this._countPlottableQuestionsFromBeeswarmPoints(nextBeeswarmPoints);
 
     if (force || signature !== this._latestCacheSignature) {
       snapshot = this._computeStatsSnapshot(scopeEntries);
@@ -1464,7 +1496,8 @@ export class CommunityTab extends Component<any, any> {
         }
         next.stats = this._buildStatsArray(prevState.stats, {
           users: snapshot.uniqueUsers.length,
-          questions: plottableQuestionsCount,
+          // This tile opens the all-type table; the separate plot remains binary-only.
+          questions: this._getQuestionDetailsRows(scopeEntries).length,
           surveys: snapshot.surveysCreatedCount,
           groups: snapshot.sbtsCreatedCount,
         });
@@ -2059,20 +2092,6 @@ export class CommunityTab extends Component<any, any> {
     });
   };
 
-  _countPlottableQuestionsFromBeeswarmPoints = (points: unknown[] = []) => {
-    if (!Array.isArray(points)) return 0;
-    const ids = new Set();
-    points.forEach((point: unknown) => {
-      const questionId = String(
-        point && typeof point === 'object' ? (point as { questionId?: unknown }).questionId || '' : '',
-      )
-        .trim()
-        .toLowerCase();
-      if (questionId) ids.add(questionId);
-    });
-    return ids.size;
-  };
-
   renderLeaderboard() {
     const { showMoreLeaderboard } = this.state;
     const uniqueLeaderboardData = this.getMemoizedLeaderboardData();
@@ -2623,7 +2642,13 @@ export class CommunityTab extends Component<any, any> {
   };
 
   render() {
-    const { showModal, modalTitle, loadingSbtsCreated, stats, initialLoadDone } = this.state;
+    const { showModal, modalTitle, loadingSbtsCreated, stats } = this.state;
+    const selectionKey = this._statsSelectionKey();
+    const initialLoadDone = this.state.initialLoadDone && this.state.initialLoadSelectionKey === selectionKey;
+    const selectionPublished = this.state.usersSnapshotSelectionKey === selectionKey;
+    const isCountPending = (stat: { label: string; count: number }) =>
+      (stat.label !== 'Sessions' && (!selectionPublished || (!initialLoadDone && !stat.count))) ||
+      (stat.label === 'Groups' && loadingSbtsCreated);
     const displayStats = this._isUniverseEnabled()
       ? [...stats, { icon: faLayerGroup, count: this.state.sessions.length, label: 'Sessions' }]
       : stats;
@@ -2660,14 +2685,11 @@ export class CommunityTab extends Component<any, any> {
                 onClick={() => this.handleStatClick(stat)}
                 data-testid={COMMUNITY_STAT_TEST_IDS[stat.label]}
                 data-ce-count={String(stat.count)}
+                aria-busy={isCountPending(stat)}
               >
                 <FontAwesomeIcon icon={stat.icon} size="2x" className={styles.statIcon} />
                 <span className={styles.statCount}>
-                  {stat.label === 'Groups' && loadingSbtsCreated ? (
-                    <FontAwesomeIcon icon={faSpinner} spin />
-                  ) : (
-                    stat.count
-                  )}
+                  {isCountPending(stat) ? <FontAwesomeIcon icon={faSpinner} spin /> : stat.count}
                 </span>
                 <span className={styles.statLabel}>{stat.label === 'Groups' ? t('sbts') : stat.label}</span>
               </button>

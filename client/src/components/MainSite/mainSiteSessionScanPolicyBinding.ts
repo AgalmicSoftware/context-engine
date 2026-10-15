@@ -1,6 +1,5 @@
 import { createSessionScanPolicy } from '../../utilities/session/mainSiteSessionScanPolicy.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
-import { parseSessionWorkerDiscoveryQuery } from '../../utilities/session/sessionWorkerDiscovery.js';
 import type { AppShell } from './AppShell';
 
 type MainSiteSessionScanPolicyHost = Pick<
@@ -23,19 +22,10 @@ export const createMainSiteSessionScanPolicy = (host: MainSiteSessionScanPolicyH
     isSbtListRoutePath: (path: string) => host.isSbtListRoutePath(path),
     shouldSuppressSbtScansForSessionSlug: (slug: string) => {
       const workerRoutes = host._routeRenderers.workerCanonicalRoutes;
-      const explicitWorkerRoute = workerRoutes.isSessionSlug(slug);
-      let workerOrigin = '';
-      if (explicitWorkerRoute) {
-        try {
-          workerOrigin = parseSessionWorkerDiscoveryQuery(
-            typeof window !== 'undefined' ? window.location.search || '' : '',
-          );
-        } catch {
-          workerOrigin = '';
-        }
-      }
-      const config = explicitWorkerRoute
-        ? workerRoutes.getVerifiedConfig(slug, workerOrigin)
+      // The controller retains exact origin authority for clean routes and Home,
+      // where there is no worker query to reconstruct the verified config key.
+      const config = workerRoutes.isSessionSlug(slug)
+        ? workerRoutes.getActiveVerifiedConfig(slug)
         : host.getDisplaySessionCfg(slug);
       const projection = resolveSessionCapabilityProjection(config);
       if (projection.source === 'legacy_registry') return false;

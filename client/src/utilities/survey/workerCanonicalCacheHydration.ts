@@ -126,16 +126,24 @@ const hydrateWorkerCanonicalCache = async (
   try {
     const prepared = prepare(options);
     if (!workerMetadataTargetIsCurrent(options, prepared.identity)) return;
-    const initialized = await options.persist((current) =>
-      workerMetadataTargetIsCurrent(options, prepared.identity) ? prepared.merge(current) : current,
-    );
+    const initialized = await options.persist((current) => {
+      if (!workerMetadataTargetIsCurrent(options, prepared.identity)) return current;
+      const merged = prepared.merge(current) as Record<string, Record<string, unknown>>;
+      merged.worker.workerMetadataHydrationStatus = 'loading';
+      return merged;
+    });
     if (!initialized) throw options.createPersistenceError();
     if (!workerMetadataTargetIsCurrent(options, prepared.identity)) return;
     const metadata = await load(options, prepared.identity);
     if (!workerMetadataTargetIsCurrent(options, metadata.identity)) return;
-    const persisted = await options.persist((current) =>
-      workerMetadataTargetIsCurrent(options, metadata.identity) ? metadata.merge(current) : current,
-    );
+    const persisted = await options.persist((current) => {
+      if (!workerMetadataTargetIsCurrent(options, metadata.identity)) return current;
+      const merged = metadata.merge(current) as Record<string, Record<string, unknown>>;
+      // An empty initialized map is not a completed empty catalog. Keep that
+      // distinction in the exact Worker cache for Stats after switching sessions.
+      merged.worker.workerMetadataHydrationStatus = 'complete';
+      return merged;
+    });
     if (!persisted) throw options.createPersistenceError();
     if (!workerMetadataTargetIsCurrent(options, metadata.identity)) return;
     options.onSuccess(metadata.count);

@@ -400,14 +400,21 @@ Each session can override it with a top-level boolean in its session config:
 An explicit session boolean takes precedence over the environment default.
 Omitting the field inherits that default. This is session configuration; there
 is no user Settings toggle, and the retired browser preference is ignored.
-Manual navigation remains available and submission remains explicit.
+Manual navigation remains available and submission remains explicit. Radio arrow
+keys change the answer within the current card. Auto-advance waits while the
+comment editor is open, and a double-click or double-tap cannot answer the next
+card before it is deliberately selected.
 
 ## Worker questions in Tools
 
 The home Tools → Questions view verifies the selected Worker configuration before
 hydrating its questions. Switching sessions retains the open tool and loads the
 new session's data. The question selector omits an unknown zero while loading or
-after a cache error; a completed empty read displays zero.
+after a cache error; a completed empty read displays zero. Home verifies its own
+configured Worker independently of explicit session links; a different Worker
+opened earlier for the same slug does not become Home's verified authority.
+Existing identity-pin conflicts still require resolution. Verified hybrid Worker
+profiles retain their authorized on-chain SBT reads.
 
 ## Worker session AI defaults and sponsorship
 
@@ -415,11 +422,21 @@ Settings resolves directory selections through the session Worker's verified
 configuration before checking `/resource-presence`. A confirmed AI key appears
 as Sponsored; failed or malformed checks appear as Check unavailable and can be
 retried by reopening Settings. Sponsorship describes key availability; the
-Worker still enforces the session's access permissions on requests.
+Worker still enforces the session's access permissions on requests. Equivalent
+parent renders do not restart the check. Opening Settings, changing the account
+or effective session, or receiving a new verified Worker identity/revision
+refreshes it. An unresolved active config does not hide General's sponsorship
+from the other-session list.
+
+On an explicit session route, Settings displays that session and preserves its
+Worker discovery link. Elsewhere, its Session selector edits the shared global
+selection. Long labels stay within the selector beside its link icon; on phones,
+Appearance places its label above the controls to keep the theme name readable.
 
 Text AI and transcription retain the selected Worker's configured model defaults.
-Explicit browser-local AI overrides still take precedence. Provider secrets stay
-on the Worker and are not returned by these configuration or presence reads.
+Context's View AI prompt uses those same model defaults. Explicit browser-local
+AI overrides still take precedence. Provider secrets stay on the Worker and are
+not returned by these configuration or presence reads.
 
 ## Current Migration Toggle
 

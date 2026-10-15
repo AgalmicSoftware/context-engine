@@ -1,10 +1,33 @@
 import React from 'react';
 import { Button } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './Account.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+
+export const LoginSettingsSessionSummary = ({
+  label,
+  sessionHref,
+}: {
+  label: string;
+  sessionHref: string;
+}): React.ReactElement => (
+  <div className={styles.settingsSessionSummary}>
+    <div className={styles.settingsSessionRoute} aria-label={`Active session: ${label}`}>
+      <span className={styles.settingsSessionLabel}>SESSION</span>
+      <span className={styles.settingsSessionName}>{label}</span>
+      <a
+        href={sessionHref}
+        className={styles.settingsSessionLink}
+        aria-label={`Open session ${label}`}
+        title={`Open session ${label}`}
+      >
+        <FontAwesomeIcon icon={faExternalLinkAlt} />
+      </a>
+    </div>
+  </div>
+);
 
 export const LoginSettingsConfigToggleControl = ({
   expanded = false,

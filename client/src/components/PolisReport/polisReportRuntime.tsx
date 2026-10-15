@@ -529,6 +529,7 @@ export function readPolisReportCacheContext(
 
   // Safe cache reads (group-aware dg:* keys)
   const qMap: Record<string, PolisQuestionMeta> = {};
+  let workerResponseHydrationStatus = '';
   const sbtList: Record<string, PolisSbtEntry> = {};
   readSlugs.forEach((readSlug) => {
     const qParsed = peekCacheSync('questionsCache', readSlug, { clone: false });
@@ -553,6 +554,9 @@ export function readPolisReportCacheContext(
           sessionSlug: readSlug,
         })
       : null;
+    if (workerTarget.isWorkerCanonical && readSlug === slug) {
+      workerResponseHydrationStatus = String(questionNode?.workerResponseHydrationStatus || '');
+    }
     const scopedQuestions =
       questionNode?.questions && typeof questionNode.questions === 'object'
         ? (questionNode.questions as Record<string, PolisQuestionMeta>)
@@ -568,7 +572,7 @@ export function readPolisReportCacheContext(
     Object.assign(sbtList, scopedSbtList);
   });
 
-  return { qMap, sbtList };
+  return { qMap, sbtList, workerResponseHydrationStatus };
 }
 
 export function applyFilterStateToAggregator(

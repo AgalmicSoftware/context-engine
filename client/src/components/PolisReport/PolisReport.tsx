@@ -759,9 +759,10 @@ export default function PolisReport({
   };
 
   const pendingReportData = useMemo(() => {
+    const cacheContext = readPolisReportCacheContext(network, activeReportSlug, sessionConfig);
     const metadata = effectiveUseDemoData
       ? buildPolisDemoSurveyResultsNetworkData(activeDemoData, { sessionSlug: activeReportSlug }).questions
-      : readPolisReportCacheContext(network, activeReportSlug, sessionConfig).qMap;
+      : cacheContext.qMap;
     const source = effectiveUseDemoData
       ? buildPolisDemoSurveyResultsAggregatorData(activeDemoData, { sessionSlug: activeReportSlug })
       : questionResponses;
@@ -780,6 +781,7 @@ export default function PolisReport({
     return {
       filtered,
       metadata,
+      workerResponseHydrationStatus: cacheContext.workerResponseHydrationStatus,
       responseStats: buildReportResponseStats(filtered, metadata, {
         sessionSlug: activeReportSlug,
         allowDemo: effectiveUseDemoData,
@@ -821,7 +823,11 @@ export default function PolisReport({
     filterState,
   ]);
   const retainedReport = useRef<{ scope: string; data: typeof pendingReportData } | null>(null);
-  const cacheRefreshPending = !effectiveUseDemoData && (!isQuestionCacheReady || !isResponsesCacheReady);
+  // Worker pagination can settle with a partial snapshot. Accept that snapshot
+  // without claiming complete response readiness or freezing all future refreshes.
+  const partialWorkerSnapshotSettled = pendingReportData.workerResponseHydrationStatus === 'partial';
+  const cacheRefreshPending =
+    !effectiveUseDemoData && (!isQuestionCacheReady || (!isResponsesCacheReady && !partialWorkerSnapshotSettled));
   const reportData =
     cacheRefreshPending &&
     retainedReport.current?.scope === reportScope &&
@@ -2409,8 +2415,7 @@ export default function PolisReport({
     loadingScanProgress.requestedTotalBlocks > 0 &&
     loadingScanProgress.remainingBlocks === 0 &&
     loadingScanProgress.percentComplete >= 100;
-  const isRefreshing =
-    !effectiveUseDemoData && !hasCompletedScopedBlockScan && (!isQuestionCacheReady || !isResponsesCacheReady);
+  const isRefreshing = !hasCompletedScopedBlockScan && cacheRefreshPending;
   const isLoading = isRefreshing && !hasRenderableReport;
   // A failed session load never settles on its own; say so and offer a retry instead of spinning.
   const loadFailed = isLoading && !!cacheInitializationError && typeof onRetryLoad === 'function';

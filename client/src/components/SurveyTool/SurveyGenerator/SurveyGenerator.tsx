@@ -265,6 +265,7 @@ type BuildSessionDocLibraryViewerUrlArgs = {
 };
 type GetEffectiveAiConfigArgs = {
   sessionSlug?: unknown;
+  sessionConfig?: unknown;
   context?: unknown;
   resolveSecrets?: boolean;
 };
@@ -1425,8 +1426,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const refreshAIPromptModelLabel = React.useCallback(async () => {
     try {
       const aiCfg = await getEffectiveAiConfigForGenerator({
-        sessionSlug: aiRequestOptions.sessionSlug,
-        context: aiRequestOptions.context,
+        ...aiRequestOptions,
         resolveSecrets: false,
       });
       if (abortedRef.current) return;

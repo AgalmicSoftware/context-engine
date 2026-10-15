@@ -92,6 +92,7 @@ export const hydrateWorkerCanonicalResponses = async ({
       : current || {};
     // Only reuse refs after the merge has checked the exact Worker/session identity.
     const worker = (merged as CacheRecord).worker as CacheRecord | undefined;
+    if (targetIsCurrent() && worker) worker.workerResponseHydrationStatus = 'loading';
     cachedStorageRefIds = new Set(Object.keys((worker?.workerResponseStorageRefs as CacheRecord) || {}));
     const responses = (worker?.questionResponses || {}) as Record<string, Record<string, CacheRecord>>;
     const metadata = (worker?.questionResponsesMeta || {}) as Record<string, Record<string, CacheRecord>>;
@@ -132,11 +133,14 @@ export const hydrateWorkerCanonicalResponses = async ({
   });
   if (shouldStop()) return;
 
-  const questionsPersisted = await updateQuestionsCacheAtomic((current) =>
-    targetIsCurrent()
-      ? workerHydration.mergeWorkerQuestionResponses(current, rows, sessionSlug, run.identity)
-      : current || {},
-  );
+  const questionsPersisted = await updateQuestionsCacheAtomic((current) => {
+    if (!targetIsCurrent()) return current || {};
+    const merged = workerHydration.mergeWorkerQuestionResponses(current, rows, sessionSlug, run.identity);
+    // A capped listing is a settled snapshot, not a complete history. Reports
+    // may display its new rows while missing-answer checks still remain unready.
+    (merged.worker as CacheRecord).workerResponseHydrationStatus = partial ? 'partial' : 'complete';
+    return merged;
+  });
   if (!questionsPersisted) {
     throw createPersistenceError(`Failed to persist Worker questions cache for ${sessionSlug}`);
   }

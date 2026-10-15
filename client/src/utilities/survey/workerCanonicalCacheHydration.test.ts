@@ -29,7 +29,11 @@ describe.each([
   ['survey', hydrateWorkerCanonicalSurveyCache, 'loadSurveys'],
 ] as const)('Worker %s cache hydration', (_label, hydrate, loaderKey) => {
   it('seeds the session cache before yielding to load anything else', async () => {
-    const persist = jest.fn(async () => true);
+    let cache: unknown = {};
+    const persist = jest.fn(async (merge) => {
+      cache = merge(cache);
+      return true;
+    });
     const onSuccess = jest.fn();
     const hydration = hydrate({
       host: {
@@ -45,8 +49,14 @@ describe.each([
 
     // No code chunk sits between the session bootstrap and its first cache write.
     expect(persist).toHaveBeenCalledTimes(1);
+    expect((cache as { worker: { workerMetadataHydrationStatus: string } }).worker.workerMetadataHydrationStatus).toBe(
+      'loading',
+    );
     await hydration;
     expect(persist).toHaveBeenCalledTimes(2);
     expect(onSuccess).toHaveBeenCalledWith(0);
+    expect((cache as { worker: { workerMetadataHydrationStatus: string } }).worker.workerMetadataHydrationStatus).toBe(
+      'complete',
+    );
   });
 });

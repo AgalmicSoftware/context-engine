@@ -38,6 +38,7 @@ import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import demoSessions from '../../variables/demo/demo_sessions.json';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { writeGlobalSessionSelection } from '../../utilities/session/globalSessionState';
 
 const ORIGINAL_SESSION_SCAN_SCOPE = globalThis.CE_SESSION_SCAN_SCOPE;
@@ -744,6 +745,123 @@ describe('CommunityTab helpers', () => {
     expect(instance.state.stats.find((stat) => stat.label === 'Groups').count).toBe(2);
     expect(instance.state.stats.find((stat) => stat.label === 'Users').count).toBe(3);
     expect(instance.state.uniqueUsers).toContain('0x0000000000000000000000000000000000000011');
+  });
+
+  it('only authenticates the active Worker while counting the broader catalog', async () => {
+    const token = jest.spyOn(workerAuth, 'getWorkerSessionToken').mockResolvedValue('worker-token');
+    jest
+      .spyOn(workerGroupPorts, 'loadWorkerGroupOverview')
+      .mockResolvedValue({ groups: [{ groupId: 'private-active' }], memberships: [] });
+    const publicGroups = jest
+      .spyOn(workerGroupPorts, 'loadPublicWorkerGroups')
+      .mockResolvedValue([{ groupId: 'public-catalog' }]);
+    const instance = new CommunityTab({
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: WORKER_SESSION_CONFIG,
+      account: '0xparticipant',
+    });
+    const entries = instance._buildScopeEntriesFromSlugs(['demo-sh', 'demo-interview']);
+    await instance._hydrateWorkerGroupCounts(entries);
+    expect(token.mock.calls.map(([request]) => request.sessionSlug)).toEqual(['demo-sh']);
+    expect(publicGroups).toHaveBeenCalledWith(expect.objectContaining({ sessionSlug: 'demo-interview' }));
+    expect(entries.map((entry) => entry.workerGroupIds)).toEqual([['private-active'], ['public-catalog']]);
+    expect(instance._getWorkerGroupCountCacheKey(entries[1].workerCanonicalIdentity)).toMatch(/\nanonymous$/);
+    instance.props = { ...instance.props, activeSessionSlug: 'demo-interview' };
+    const nextEntries = instance._buildScopeEntriesFromSlugs(['demo-sh', 'demo-interview']);
+    expect(nextEntries.map((entry) => entry.workerGroupIds)).toEqual([[], []]);
+    await instance._hydrateWorkerGroupCounts(nextEntries);
+    expect(token.mock.calls.map(([request]) => request.sessionSlug)).toEqual(['demo-sh', 'demo-interview']);
+    expect(nextEntries.map((entry) => entry.workerGroupIds)).toEqual([['public-catalog'], ['private-active']]);
+  });
+
+  it('does not turn a nonactive gated Worker into an anonymous group read', async () => {
+    const token = jest.spyOn(workerAuth, 'getWorkerSessionToken').mockResolvedValue('worker-token');
+    const publicGroups = jest.spyOn(workerGroupPorts, 'loadPublicWorkerGroups').mockResolvedValue([]);
+    const instance = new CommunityTab({
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: WORKER_SESSION_CONFIG,
+      account: '0xparticipant',
+    });
+    const [entry] = instance._buildScopeEntriesFromSlugs(['demo-interview']);
+    entry.sessionConfig = {
+      ...entry.sessionConfig,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    await instance._hydrateWorkerGroupCounts([entry]);
+    expect(token).not.toHaveBeenCalled();
+    expect(publicGroups).not.toHaveBeenCalled();
+    expect(entry.workerGroupsStatus).toBe('unavailable');
+  });
+
+  it('counts every Questions table row while the plot remains binary-only', async () => {
+    const instance = attachMutableSetState(new CommunityTab({ activeSessionSlug: 'edge' }));
+    const entries = ['edge', 'other'].map((slug) => ({
+      slug,
+      netKey: '11155420',
+      sessionConfig: { slug },
+      surveysCache: {},
+      sbtCache: {},
+      questionsCache: {
+        questions: {
+          repeated: { type: 'binary', prompt: 'Binary prompt' },
+          text: { type: 'freeform', prompt: 'Text prompt' },
+        },
+      },
+    }));
+    jest.spyOn(instance, '_iterScopeCaches').mockReturnValue(entries);
+    jest.spyOn(instance, 'checkIfInitialLoadDone').mockResolvedValue(true);
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(instance._getQuestionDetailsRows(entries)).toHaveLength(4);
+    expect(instance.state.stats.find(({ label }) => label === 'Questions').count).toBe(4);
+    expect(instance._beeswarmPoints).toHaveLength(1);
+  });
+
+  it('keeps zero counts pending until this selection is ready and never flashes prior counts', async () => {
+    const selection = { primarySessionSlug: 'alpha', selectedSessionScope: 'active', selectedSessionSlugs: [] };
+    const instance = attachMutableSetState(new CommunityTab({ globalSessionSelection: selection }));
+    const tile = (label) =>
+      collectTreeNodes(instance.render(), (node) => node.props?.['data-testid'] === `ce-community-stat-${label}`)[0];
+    jest.spyOn(instance, '_iterScopeCaches').mockReturnValue([]);
+    jest.spyOn(instance, 'checkIfInitialLoadDone').mockResolvedValue(false);
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(collectNodeText(tile('questions'))).toBe('Questions');
+    expect(tile('questions').props['aria-busy']).toBe(true);
+    instance.checkIfInitialLoadDone.mockResolvedValue(true);
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(collectNodeText(tile('questions'))).toBe('0Questions');
+    instance.state.stats = instance._buildStatsArray(instance.state.stats, {
+      users: 7,
+      questions: 9,
+      surveys: 4,
+      groups: 3,
+    });
+    instance.props = { ...instance.props, globalSessionSelection: { ...selection, primarySessionSlug: 'beta' } };
+    expect(collectNodeText(tile('questions'))).toBe('Questions');
+    instance.checkIfInitialLoadDone.mockResolvedValue(false);
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(collectNodeText(tile('questions'))).toBe('Questions');
+    instance.checkIfInitialLoadDone.mockResolvedValue(true);
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(collectNodeText(tile('questions'))).toBe('0Questions');
+  });
+
+  it('does not mistake an empty identity-bound Worker cache for completed metadata hydration', async () => {
+    writeGlobalSessionSelection({ selectedSessionScope: 'active', primarySessionSlug: 'demo-sh' });
+    await writeWorkerStatsCaches({ workerQuestions: {}, workerQuestionResponses: {}, workerSurveys: {} });
+    const instance = new CommunityTab({ activeSessionSlug: 'demo-sh', sessionConfig: WORKER_SESSION_CONFIG });
+    const [entry] = instance._iterScopeCaches();
+    entry.workerGroupsStatus = 'ready';
+    expect(instance._isWorkerScopeEntryReady(entry)).toBe(false);
+    instance.props = { ...instance.props, isQuestionCacheReady: true, isSurveyCacheReady: true };
+    expect(instance._isWorkerScopeEntryReady(entry)).toBe(true);
+    entry.questionsCache.workerMetadataHydrationStatus = 'loading';
+    entry.surveysCache.workerMetadataHydrationStatus = 'loading';
+    expect(instance._isWorkerScopeEntryReady(entry)).toBe(false);
+    instance.props = { ...instance.props, activeSessionSlug: 'another-worker' };
+    expect(instance._isWorkerScopeEntryReady(entry)).toBe(false);
+    entry.questionsCache.workerMetadataHydrationStatus = 'complete';
+    entry.surveysCache.workerMetadataHydrationStatus = 'complete';
+    expect(instance._isWorkerScopeEntryReady(entry)).toBe(true);
   });
 
   it('counts authorized Worker groups for a signed-in Cloudflare session', async () => {

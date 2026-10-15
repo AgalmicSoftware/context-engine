@@ -11,7 +11,19 @@ This doc covers the two session-scoped content caches:
 `<slug>` is the canonical session slug (`demo_sessions.json`, registry slug, or `""`
 for the general session).
 
-Network keys inside these cache values are always strings such as `"84532"`.
+Contract sessions use string network keys such as `"84532"`. Worker-canonical
+sessions use a `worker` node validated against their exact Worker origin, session
+slug, and session ID. Within that node, `workerMetadataHydrationStatus` is
+`loading` during metadata retrieval and `complete` after a successful catalog
+load, including an empty catalog. This distinguishes a confirmed zero count from
+an empty cache created before loading.
+
+The question node also records `workerResponseHydrationStatus`: `loading`,
+`partial`, or `complete`. A partial response snapshot has finished its bounded
+load but does not establish complete response readiness. Public response loading
+retains the 100-page, 100-items-per-page cap and the visible incomplete-results
+notice. Reports may display newly persisted partial snapshots; missing-answer
+checks must continue using complete response readiness.
 
 ## `surveysCache`
 
