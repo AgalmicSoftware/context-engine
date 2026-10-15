@@ -180,7 +180,7 @@ export const PRACTICE_ENTRIES: PracticeEntry[] = [
   },
   {
     id: 'patagonia',
-    title: 'd/acc residency · Patagonia 2025',
+    title: 'd/acc residency · Edge Patagonia 2025',
     url: 'https://www.edgecity.live/blog/the-d-acc-residency-at-edge-city-patagonia-2025',
     description:
       'Context Engine was developed and tested during Edge City’s d/acc residency in Patagonia with Protocol Labs. The residency write-up highlights how testing with participants helped shape Context Engine’s move to passkey sign-on.',

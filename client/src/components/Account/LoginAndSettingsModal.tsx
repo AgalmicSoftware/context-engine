@@ -30,6 +30,7 @@ import { faWindowClose } from '@fortawesome/free-solid-svg-icons';
 import { Button, Card, CardHeader, CardFooter, Modal } from 'reactstrap';
 
 import SessionChipSelector from '../Shared/SessionChipSelector';
+import GlobalSessionSelector from '../Shared/GlobalSessionSelector';
 import { LoginSettingsSupportedResourceCard } from './LoginSettingsResourceSummary';
 import { LoginSettingsInlineNetworkSummary, LoginSettingsPanelNetworkSummary } from './LoginSettingsNetworkSummary';
 import { LoginSettingsConfigToggleControl, LoginSettingsControlRow } from './LoginSettingsControlRow';
@@ -79,7 +80,12 @@ import {
 } from '../../utilities/session/sessionScanScope.js';
 import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../utilities/cache/cacheScripts.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
+import {
+  derivePrimarySessionSlugFromList,
+  normalizeGlobalSessionSelection,
+  readStoredGlobalSessionSelection,
+  type GlobalSessionSelection,
+} from '../../utilities/session/globalSessionState.js';
 import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
@@ -93,7 +99,6 @@ import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainBy
 import { createLogger } from 'utilities/logging.js';
 import {
   buildBookmarksRoutePath,
-  buildSettingsSessionHref,
   formatSettingsSessionSlug,
   normalizeSettingsSessionSlug,
 } from './loginSettingsRouteHelpers';
@@ -116,6 +121,7 @@ import LoginAgentTokenPanel from './LoginAgentTokenPanel';
 import {
   createLoginAgentActions,
   resolveValidatedWorkerCanonicalLoginConfig,
+  type LoginDisplaySessionConfig,
 } from './loginAndSettingsAgentTokenActions';
 import { createLoginPasskeyActions, restorePasskeyLoginPassively } from './loginAndSettingsPasskeyActions';
 import type { LoginPasskeyNetwork, PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
@@ -143,6 +149,7 @@ interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'n
   demoSurfaceMode: RootState['sessionState']['demoSurfaceMode'];
   focusedTab: number;
   activeSessionSlug: string;
+  primarySessionSlug?: string;
   primarySessionExplicit: boolean | undefined;
   selectedSessionScope: string;
   selectedSessionSlugs: string[];
@@ -186,6 +193,7 @@ interface LoginAndSettingsModalState {
   sponsoredAccess: any;
   sponsoredAccessLoading: boolean;
   workerResourcePresence: WorkerResourcePresence | null;
+  sponsoredSessionConfig: LoginDisplaySessionConfig | null;
   sessionScanScope: string;
   sessionScanSlugs: string[];
   sessionScanSlugsInput: string;
@@ -361,6 +369,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       sponsoredAccess: null,
       sponsoredAccessLoading: false,
       workerResourcePresence: null,
+      sponsoredSessionConfig: null,
       sessionScanScope: normalizeSessionScanScope(this.props.selectedSessionScope || readSessionScanScope()),
       sessionScanSlugs: Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [],
       sessionScanSlugsInput: (Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [])
@@ -443,7 +452,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
     windowTarget: typeof window !== 'undefined' ? window : null,
   });
-  getDisplaySessionConfig = this._agentTokenActions.getDisplaySessionConfig;
+  getDisplaySessionConfig = (slugIn: unknown = '', cfgIn: unknown = null) => {
+    const slug = normalizeSettingsSessionSlug(slugIn);
+    const resolved = this.state.sponsoredSessionConfig;
+    if (!cfgIn && resolved && normalizeSettingsSessionSlug(resolved.slug) === slug) return resolved;
+    return this._agentTokenActions.getDisplaySessionConfig(slugIn, cfgIn);
+  };
   getAgentTokenLoginSessionContext = this._agentTokenActions.getAgentTokenLoginSessionContext;
   shouldShowAgentTokenLogin = this._agentTokenActions.shouldShowAgentTokenLogin;
   toggleAgentTokenLogin = this._agentTokenActions.toggleAgentTokenLogin;
@@ -862,7 +876,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     if (this.props.loginModalToggled && (settingsOpened || focusChanged)) {
       this.applyLoginModalFocus(this.props.loginModalFocus);
     }
-    const needsSponsoredAccessRefresh = accountChanged || activeSessionChanged || settingsOpened;
+    const needsSponsoredAccessRefresh =
+      accountChanged || activeSessionChanged || settingsOpened || this.props.sessionConfig !== prevProps.sessionConfig;
     if (this.getWalletChainId() !== this.getWalletChainId(prevProps)) needsBalanceCheck = true;
     if (accountChanged) {
       needsBalanceCheck = true;
@@ -933,7 +948,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const nextScope = normalizeSessionScanScope(this.props.selectedSessionScope || '');
     const prevScopeSlugs = normalizeSessionScanSlugs(prevProps.selectedSessionSlugs || []);
     const nextScopeSlugs = normalizeSessionScanSlugs(this.props.selectedSessionSlugs || []);
-    if (prevScope !== nextScope || JSON.stringify(prevScopeSlugs) !== JSON.stringify(nextScopeSlugs)) {
+    if (
+      prevScope !== nextScope ||
+      JSON.stringify(prevScopeSlugs) !== JSON.stringify(nextScopeSlugs) ||
+      prevProps.primarySessionSlug !== this.props.primarySessionSlug
+    ) {
       this.loadSessionScanSettings();
     }
   }
@@ -1144,7 +1163,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   loadAiSettings = () => {
     const sessionSlug = this.getActiveSessionSlug();
     const aiSettings = getLocalAiSettings();
-    const aiGroupSettings = getSessionAiSettings(sessionSlug);
+    const aiGroupSettings = getSessionAiSettings(sessionSlug, this.getDisplaySessionConfig(sessionSlug));
     this.setStateIfMounted({
       aiSettings,
       aiGroupSettings,
@@ -1212,10 +1231,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       normalizeSessionSlug: normalizeSettingsSessionSlug,
     });
     const reqId = (this._sponsoredReqId = (this._sponsoredReqId || 0) + 1);
-    this.setStateIfMounted({ sponsoredAccessLoading: true, workerResourcePresence: null });
+    this.setStateIfMounted({
+      sponsoredAccessLoading: true,
+      workerResourcePresence: null,
+      sponsoredAccess: null,
+      sponsoredSessionConfig: null,
+    });
     try {
       const { loadLoginSettingsSponsoredAccess } = await import('./loginSettingsSponsoredAccessRuntime');
-      const { accessMap, workerResourcePresence } = await loadLoginSettingsSponsoredAccess({
+      const { accessMap, workerResourcePresence, sessionConfig } = await loadLoginSettingsSponsoredAccess({
         slug,
         sessionConfig: verifiedWorkerConfig || getSessionConfigBySlugOrDefault(slug) || {},
         account: this.props.account || '',
@@ -1229,6 +1253,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         sponsoredAccess: accessMap,
         sponsoredAccessLoading: false,
         workerResourcePresence,
+        sponsoredSessionConfig: sessionConfig,
+        aiGroupSettings: getSessionAiSettings(slug, sessionConfig),
       });
     } catch (_) {
       if (reqId !== this._sponsoredReqId) return;
@@ -1582,7 +1608,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
 
   renderSettingsControlRow = ({
-    activeSession = this.getSessionDescriptor(this.getActiveSessionSlug()),
     configOpen = false,
     onToggleConfig = null,
     configTestId = '',
@@ -1598,7 +1623,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     themeControl = null,
   }: any = {}) =>
     LoginSettingsControlRow({
-      activeSession,
       configOpen,
       onToggleConfig,
       configTestId,
@@ -1619,15 +1643,47 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       containerClassName,
       rowClassName,
       showSession,
-      sessionHref: buildSettingsSessionHref(activeSession.slug),
+      sessionControl: this.renderGlobalSessionSelector(),
       themeControl,
     });
+
+  renderGlobalSessionSelector = ({ testId = 'ce-web3modal-session-select' }: { testId?: string } = {}) => (
+    <GlobalSessionSelector
+      selection={this.getGlobalSessionSelection()}
+      sessionConfig={this.props.sessionConfig}
+      onChange={this.handleGlobalSessionSelectionChange}
+      testId={testId}
+    />
+  );
 
   handleActiveSessionChange = (event: any) => {
     const nextSlug = normalizeSettingsSessionSlug(event?.target?.value || '');
     if (nextSlug === this.getActiveSessionSlug()) return;
     this.props.updateGlobalSessionSelection?.({
       primarySessionSlug: nextSlug,
+    });
+  };
+
+  getGlobalSessionSelection = (): GlobalSessionSelection => {
+    const stored = readStoredGlobalSessionSelection();
+    return normalizeGlobalSessionSelection({
+      ...stored,
+      primarySessionSlug: this.props.primarySessionSlug ?? this.props.activeSessionSlug ?? stored.primarySessionSlug,
+      primarySessionExplicit: this.props.primarySessionExplicit ?? stored.primarySessionExplicit,
+      selectedSessionScope: this.props.selectedSessionScope ?? stored.selectedSessionScope,
+      selectedSessionSlugs: this.props.selectedSessionSlugs ?? stored.selectedSessionSlugs,
+    });
+  };
+
+  handleGlobalSessionSelectionChange = (selection: Partial<GlobalSessionSelection>) => {
+    this.props.updateGlobalSessionSelection?.(selection);
+    // The immediate selector supersedes unsaved advanced-scope drafts, including same-scope choices.
+    const next = { ...this.getGlobalSessionSelection(), ...selection };
+    this.setState({
+      sessionScanScope: next.selectedSessionScope,
+      sessionScanSlugs: next.selectedSessionSlugs,
+      sessionScanSlugsInput: this.formatSessionScanSlugsInput(next.selectedSessionSlugs),
+      sessionScanStatus: '',
     });
   };
 
@@ -1893,13 +1949,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     />
   );
 
-  renderGlobalSessionSettings = ({
-    compact = false,
-    sessionSelectTestId = 'ce-web3modal-session-select',
-    scopePrefix = 'ce-web3modal-session-scope',
-  }: any = {}) => {
-    const sessionOptions = this.getSettingsSessionOptions();
-    const activeSessionSlug = this.getActiveSessionSlug();
+  renderGlobalSessionSettings = ({ compact = false, scopePrefix = 'ce-web3modal-session-scope' }: any = {}) => {
     const sessionScanScope = this.getSessionScanScopeValue();
     const selectedSessionSlugs = this.getConfiguredSessionScanSlugs();
     const selectedSessionLabels = this.buildSessionScopeChipOptions({
@@ -1912,23 +1962,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
     return (
       <>
-        <label className={compact ? styles.preLoginSettingsField : styles.aiSettingsRow}>
-          <span className={compact ? styles.preLoginSettingsLabel : styles.aiSettingsLabel}>Primary session</span>
-          <select
-            aria-label="Active session"
-            className={compact ? styles.preLoginSettingsInput : styles.aiSettingsSelect}
-            value={activeSessionSlug}
-            onChange={this.handleActiveSessionChange}
-            data-testid={sessionSelectTestId}
-          >
-            {sessionOptions.map((descriptor: any) => (
-              <option key={descriptor.slug || 'general'} value={descriptor.slug}>
-                {this.formatSettingsSessionOptionLabel(descriptor)}
-              </option>
-            ))}
-          </select>
-        </label>
-
         <label className={compact ? styles.preLoginSettingsField : styles.aiSettingsRow}>
           <span className={compact ? styles.preLoginSettingsLabel : styles.aiSettingsLabel}>
             Selected-session scope
@@ -1993,7 +2026,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         openAiApiKey={openAiApiKey}
         sessionSettings={this.renderGlobalSessionSettings({
           compact: true,
-          sessionSelectTestId: 'ce-prelogin-session-select',
           scopePrefix: 'ce-prelogin-session-scope',
         })}
       />
@@ -2113,7 +2145,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const sessionSlug = this.getActiveSessionSlug();
     const aiGroup = this.state.aiGroupSettings || getSessionAiSettings(sessionSlug) || {};
     const sessionConfig = this.getDisplaySessionConfig(sessionSlug);
-    const sponsoredKeys = sessionConfig?.sponsoredKeys || {};
+    const sponsoredKeys = mergeWorkerResourcePresenceIntoSponsoredKeys(
+      sessionConfig?.sponsoredKeys || {},
+      this.state.workerResourcePresence,
+    );
     const useLocalAi = !!aiLocal.useLocal;
     const aiDisplay = useLocalAi ? aiLocal : aiGroup;
     const resourceKeys = this.state.resourceKeys || getLocalSessionResourceKeys(sessionSlug) || {};
@@ -2233,7 +2268,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                       <div className={styles.aiSettingsGrid}>
                         {this.renderGlobalSessionSettings({
                           compact: false,
-                          sessionSelectTestId: 'ce-web3modal-session-select',
                           scopePrefix: 'ce-web3modal-session-scope',
                         })}
                       </div>
@@ -2341,10 +2375,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       nextProps.provider !== this.props.provider ||
       nextProps.account !== this.props.account ||
       nextProps.activeSessionSlug !== this.props.activeSessionSlug ||
+      nextProps.primarySessionSlug !== this.props.primarySessionSlug ||
       nextProps.selectedSessionScope !== this.props.selectedSessionScope ||
       JSON.stringify(nextProps.selectedSessionSlugs || []) !== JSON.stringify(this.props.selectedSessionSlugs || []) ||
       nextProps.demoSurfaceMode !== this.props.demoSurfaceMode ||
       nextProps.tooltipsEnabled !== this.props.tooltipsEnabled ||
+      nextProps.sessionConfig !== this.props.sessionConfig ||
       nextProps.network?.id !== this.props.network?.id ||
       this.state !== nextState ||
       nextProps.wagmiNetwork?.id !== this.props.wagmiNetwork?.id ||
@@ -2425,6 +2461,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       overview,
       preLoginConfigOpen: this.state.preLoginConfigOpen,
       preLoginSettingsOpen: this.state.preLoginSettingsOpen,
+      sessionControl: this.renderGlobalSessionSelector({ testId: 'ce-prelogin-session-select' }),
       renderInlineNetworkSummary: this.renderInlineNetworkSummary,
       renderPreLoginConfigPanel: this.renderPreLoginConfigPanel,
       renderSettingsControlRow: this.renderSettingsControlRow,
@@ -2555,6 +2592,7 @@ const mapStateToProps = (state: RootState) => ({
   demoSurfaceMode: state.sessionState.demoSurfaceMode,
   focusedTab: state.sessionState.focusedTab,
   activeSessionSlug: state.sessionState.activeSessionSlug,
+  primarySessionSlug: state.sessionState.primarySessionSlug,
   primarySessionExplicit: state.sessionState.primarySessionExplicit,
   selectedSessionScope: state.sessionState.selectedSessionScope,
   selectedSessionSlugs: state.sessionState.selectedSessionSlugs,

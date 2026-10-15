@@ -2361,9 +2361,9 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
     // Cache busting (versioned; slug-scoped)
     try {
-      // Demo question data and OP Sepolia SBT log-provider inputs both changed.
-      // Force a one-time refresh so stale derived caches cannot survive the sync.
-      const CURRENT_CACHE_VERSION = '2026-06-19-demo-session-and-sbt-cache-sync-v1';
+      // Refresh derived caches once for the Minimal client rollout. The pre-paint
+      // theme migration has its own marker so later theme choices are preserved.
+      const CURRENT_CACHE_VERSION = '2026-10-13-civic-client-refresh-v1';
       const VERSION_KEY = 'appCacheVersion';
       const storedVersion = localStorage.getItem(VERSION_KEY);
       if (storedVersion !== CURRENT_CACHE_VERSION) {
@@ -3018,7 +3018,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       })();
     }
 
-    if (sessionPathResolutionChanged && !isStaticNonCacheRoute(currPath)) {
+    const homeSessionChanged = currPath === '/' && prevProps.activeSessionSlug !== this.props.activeSessionSlug;
+    if ((sessionPathResolutionChanged || homeSessionChanged) && !isStaticNonCacheRoute(currPath)) {
       const workerRouteSlug = this.getBootstrapActiveSessionSlug(currPath, currSearch);
       void this.initializeWorkerCanonicalCachesForGroup(workerRouteSlug, { resetReadiness: true });
     }

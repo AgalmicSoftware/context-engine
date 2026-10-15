@@ -10,7 +10,7 @@ const LoginThemeQuickControl = (): React.ReactElement => (
       className={styles.settingsThemeQuickLabel}
       htmlFor={CE_THEME_SELECTOR_ENABLED ? 'ce-settings-theme-select' : undefined}
     >
-      Theme
+      Appearance
     </label>
     <div className={styles.settingsThemeQuickSelect}>
       {CE_THEME_SELECTOR_ENABLED && <AppThemeSelector />}

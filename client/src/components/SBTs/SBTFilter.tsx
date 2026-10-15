@@ -123,6 +123,7 @@ type SbtFilterCallback = (result: unknown, filterState: SbtFilterSelectionState)
 type SbtFilterProps = {
   activeSessionSlug?: unknown;
   autoExpand?: unknown;
+  className?: string;
   buttonSurface?: unknown;
   defaultFeaturedSBTs?: unknown;
   externalSBTFilterState?: unknown;
@@ -1212,7 +1213,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
     }
 
     return (
-      <div className={styles.sbtFilter}>
+      <div className={[styles.sbtFilter, this.props.className].filter(Boolean).join(' ')}>
         {/* If not autoExpand, show a settings/cog button to toggle filter options */}
         {panelDisplayState.shouldRenderFilterToggleButton && (
           <Button

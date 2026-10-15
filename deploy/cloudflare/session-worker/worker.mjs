@@ -26303,6 +26303,7 @@ var init_workerSessionPublicConfig = __esm({
       "sessionHeaderImg",
       "sessionEndsAt",
       "interviewModeEnabled",
+      "pileAutoAdvanceEnabled",
       "interviewMode",
       "defaultTags",
       "defaultGroupTags",
@@ -26358,6 +26359,7 @@ var init_workerSessionConfig = __esm({
       "sessionHeaderImg",
       "sessionEndsAt",
       "interviewModeEnabled",
+      "pileAutoAdvanceEnabled",
       "interviewMode",
       "defaultTags",
       "defaultGroupTags",
@@ -30294,7 +30296,7 @@ var init_authorizationScopeFreshness = __esm({
 });
 
 // workers/sessionCorsWorker/sessionConfigMutation.js
-var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEYS, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
+var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEYS, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
 var init_sessionConfigMutation = __esm({
   "workers/sessionCorsWorker/sessionConfigMutation.js"() {
     init_interviewSettings();
@@ -30326,6 +30328,7 @@ var init_sessionConfigMutation = __esm({
       "questionsGenPrompt",
       "interviewMode",
       "interviewModeEnabled",
+      "pileAutoAdvanceEnabled",
       "defaultFilterState",
       "defaultFeaturedSBTs",
       "autoFeatureSBTsBySessionSlug",
@@ -30363,6 +30366,7 @@ var init_sessionConfigMutation = __esm({
       if (!hasOwn4(config, "resultsAnalysis")) return true;
       return validResultsAnalysisSettings(config.resultsAnalysis);
     };
+    validPileAutoAdvanceConfig = (config) => !hasOwn4(config, "pileAutoAdvanceEnabled") || typeof config.pileAutoAdvanceEnabled === "boolean";
     validInterviewModeConfig = (config) => {
       if (hasOwn4(config, "interviewModeEnabled") && typeof config.interviewModeEnabled !== "boolean") return false;
       if (!hasOwn4(config, "interviewMode")) return true;
@@ -30561,6 +30565,9 @@ var init_sessionConfigMutation = __esm({
         if (!validAppearanceConfig(incomingConfig)) {
           return { ok: false, status: 400, error: "Invalid session appearance config." };
         }
+        if (!validPileAutoAdvanceConfig(incomingConfig)) {
+          return { ok: false, status: 400, error: "Invalid pile auto-advance config." };
+        }
         if (!validInterviewModeConfig(incomingConfig)) {
           return { ok: false, status: 400, error: "Invalid interview mode config." };
         }
@@ -30610,6 +30617,9 @@ var init_sessionConfigMutation = __esm({
       }
       if (!validAppearanceConfig(mergedConfig)) {
         return { ok: false, status: 400, error: "Invalid session appearance config." };
+      }
+      if (!validPileAutoAdvanceConfig(mergedConfig)) {
+        return { ok: false, status: 400, error: "Invalid pile auto-advance config." };
       }
       if (!validInterviewModeConfig(mergedConfig)) {
         return { ok: false, status: 400, error: "Invalid interview mode config." };

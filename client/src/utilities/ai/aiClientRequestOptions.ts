@@ -177,6 +177,7 @@ export const buildAiConfigRequest = (
   preferLocal: boolean | undefined;
   provider: unknown;
   sessionSlug: string;
+  sessionConfig: SessionConfig | null;
   thinking: boolean;
 } => {
   const opts = asOptionRecord(input);
@@ -186,6 +187,7 @@ export const buildAiConfigRequest = (
     preferLocal: readPreferLocal(opts.preferLocal),
     provider: opts.provider,
     sessionSlug: resolveAiSessionSlug(opts),
+    sessionConfig: resolveAiSessionOptions(opts).sessionConfig,
     thinking: !!thinking,
   };
 };
@@ -200,6 +202,7 @@ export const buildTranscriptionConfigRequest = (
   provider: unknown;
   rpcUrl: unknown;
   sessionSlug: string;
+  sessionConfig: SessionConfig | null;
 } => {
   const opts = asOptionRecord(input);
   return {
@@ -210,6 +213,7 @@ export const buildTranscriptionConfigRequest = (
     provider: opts.provider,
     rpcUrl: opts.rpcUrl,
     sessionSlug: resolveAiSessionSlug(opts),
+    sessionConfig: resolveAiSessionOptions(opts).sessionConfig,
   };
 };
 

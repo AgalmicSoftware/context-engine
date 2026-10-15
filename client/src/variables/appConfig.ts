@@ -9,12 +9,12 @@ import {
   WORKER_RELEASE_MANIFEST_URL,
 } from './publicDeploymentConfig.js';
 
-const DEFAULT_SESSION_SCAN_SCOPE = 'list';
+const DEFAULT_SESSION_SCAN_SCOPE = 'all';
 // Demo-like sessions that should receive public demo UI affordances. The first
 // entry is the About-page CTA target; keep older slugs in the list while links migrate.
 const DEFAULT_DEMO_SESSION_SLUGS = Object.freeze(['demo-sh', 'demo-1', 'demo-3', 'demo-2', 'demo']);
-// Default cross-session scans follow the active public demo while legacy slugs
-// remain demo-like for direct links during migration.
+// Retain the public demo as the fresh primary and initial saved-list choice;
+// the default scan scope includes all sessions.
 const DEFAULT_SESSION_SCAN_SLUGS = Object.freeze([DEFAULT_DEMO_SESSION_SLUGS[0]]);
 
 // ****************************************** BOOLEAN OPTIONS ******************************************* //
@@ -56,6 +56,8 @@ export const MAX_SBT_INSTANCE_LISTENERS = readPublicIntEnv('REACT_APP_MAX_SBT_IN
 export const SBT_INSTANCE_LISTENER_GROUPS = readPublicListEnv('REACT_APP_SBT_INSTANCE_LISTENER_GROUPS', ['general']);
 // When false, skip mint/burn history scans during SBT cache initialization.
 export const ENABLE_SBT_HISTORY_SCAN = readPublicBoolEnv('REACT_APP_ENABLE_SBT_HISTORY_SCAN', false);
+// Sessions may override this deployment default with pileAutoAdvanceEnabled.
+export const DEFAULT_PILE_AUTO_ADVANCE_ENABLED = readPublicBoolEnv('REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED', true);
 // Toggle the Conviction/Importance slider swap UI (SurveyTool)
 export const ENABLE_IMPORTANCE_SLIDER_TOGGLE = readPublicBoolEnv('REACT_APP_ENABLE_IMPORTANCE_SLIDER_TOGGLE', true);
 // When true, unresolved SBT labels can trigger targeted metadata lookups (cache-first fallback path).

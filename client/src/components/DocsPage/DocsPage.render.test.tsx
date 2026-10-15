@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import fs from 'fs';
 import path from 'path';
 import { DocsPage } from './DocsPage';
+import deploymentModesGraphic from '../../../../docs/assets/readme-architecture-deployment-modes.jpg';
 import { buildDocsContractsHref, getContractViewerSourceTestId } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
@@ -136,6 +137,60 @@ describe('DocsPage contract deep links', () => {
         return entries;
       },
     );
+  });
+
+  it('opens and closes the header Graphic independently of Quickstart', () => {
+    render(<DocsPage />);
+    const header = screen.getByRole('heading', { level: 1, name: 'Docs' }).closest('header')!;
+    const graphicToggle = within(header).getByRole('button', { name: 'Graphic' });
+    const quickstartToggle = screen.getByRole('button', { name: 'Quickstart' });
+
+    expect(graphicToggle).toHaveAttribute('data-testid', 'ce-docs-graphic-toggle');
+    expect(graphicToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(graphicToggle).toHaveAttribute('aria-controls', 'docs-section-graphic');
+    expect(screen.queryByTestId('ce-docs-graphic-image')).not.toBeInTheDocument();
+    expect(quickstartToggle).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(graphicToggle);
+    expect(graphicToggle).toHaveAttribute('aria-expanded', 'true');
+    const graphic = within(header).getByTestId('ce-docs-graphic-image');
+    expect(graphic).toHaveAttribute('src', deploymentModesGraphic);
+    expect(graphic).toHaveAttribute(
+      'alt',
+      'Context Engine deployment diagram showing Web App and AI Agent access to shared sessions across Hosted and Fast, Trustless and Slower, and planned Company-Operated infrastructure modes.',
+    );
+    expect(graphic).toHaveAttribute('loading', 'lazy');
+    expect(within(header).getByRole('button', { name: 'Enlarge deployment graphic' })).toContainElement(graphic);
+    expect(within(header).queryByText('Full-size graphic')).not.toBeInTheDocument();
+    expect(within(header).queryByText(/Hosted setup uses/)).not.toBeInTheDocument();
+    expect(within(header).queryByRole('link', { name: 'Current setup guide' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Open or create a session' })).toBeInTheDocument();
+
+    fireEvent.click(graphicToggle);
+    expect(graphicToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('ce-docs-graphic-image')).not.toBeInTheDocument();
+    expect(quickstartToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('heading', { name: 'Open or create a session' })).toBeInTheDocument();
+  });
+
+  it('opens the enlarged graphic in a dialog and restores focus after closing', async () => {
+    render(<DocsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Graphic' }));
+    const opener = screen.getByRole('button', { name: 'Enlarge deployment graphic' });
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole('dialog', { name: 'Deployment graphic' });
+    expect(within(dialog).getByRole('img')).toHaveAttribute('src', deploymentModesGraphic);
+    expect(document.body).toHaveClass('modal-open');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close deployment graphic' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
+    expect(document.body).not.toHaveClass('modal-open');
+
+    fireEvent.click(opener);
+    fireEvent.keyUp(screen.getByRole('dialog'), { key: 'Escape', keyCode: 27 });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
   });
 
   it('renders the user guide, session context, and no longer exposes the bundle or converters', async () => {

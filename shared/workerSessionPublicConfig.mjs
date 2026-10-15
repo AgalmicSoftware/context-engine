@@ -11,6 +11,7 @@ export const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'sessionHeaderImg',
   'sessionEndsAt',
   'interviewModeEnabled',
+  'pileAutoAdvanceEnabled',
   'interviewMode',
   'defaultTags',
   'defaultGroupTags',

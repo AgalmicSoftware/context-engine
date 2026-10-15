@@ -1,5 +1,8 @@
 /** @file CommunityTab.tsx */
 import { Component } from 'react';
+import { connect } from 'react-redux';
+import type { RootState } from '../../reducers';
+import { updateGlobalSessionSelection } from '../../actions/sessionStateActions';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faUsers,
@@ -22,7 +25,6 @@ import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import contractScripts, {
   getAllSessionSlugs,
-  getAllSessionEntries,
   getSessionConfigBySlug,
   getDemoSessionConfigBySlug,
   getSessionChainId,
@@ -32,7 +34,7 @@ import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
 import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import CETooltip from '../Shared/CETooltip';
-import { LoginSettingsSessionSummary } from '../Account/LoginSettingsControlRow';
+import GlobalSessionSelector from '../Shared/GlobalSessionSelector';
 import { buildSettingsSessionHref } from '../Account/loginSettingsRouteHelpers';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -74,11 +76,9 @@ import {
 } from './communityWorkerGroupStats';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry';
-import { getAllDemoSessionConfigs } from '../../utilities/session/sessionSourceResolver';
-import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection';
-import { readSessionWorkerConfigCache } from '../../utilities/session/sessionWorkerConfigCache';
+import { readKnownSessionCatalog } from '../../utilities/session/sessionCatalog';
+import { SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT } from '../../utilities/session/sessionWorkerConfigCache';
 import {
-  buildCommunitySessionCatalog,
   countCommunitySessions,
   createCommunitySessionFilters,
   filterCommunitySessions,
@@ -92,6 +92,12 @@ const COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG = 'demo';
 const SESSION_FILTER_SUMMARY_ID = 'ce-community-session-filter-summary';
 const COMMUNITY_BEESWARM_DOMAIN = [0, 1] as const;
 type CacheReadOptions = { clone?: boolean };
+type CommunityQuestionRow = {
+  sessionSlug: string;
+  sessionName: string;
+  questionId: string;
+  prompt: string;
+};
 type SessionSelectorOption = { value: string; label: string };
 type ScopeCacheEntry = {
   slug: string;
@@ -170,7 +176,7 @@ const getDisplaySessionChainId = (slugIn = '') => {
   return Number.isFinite(demoChainId) && demoChainId > 0 ? demoChainId : null;
 };
 
-class CommunityTab extends Component<any, any> {
+export class CommunityTab extends Component<any, any> {
   [key: string]: any;
 
   constructor(props: any) {
@@ -191,8 +197,11 @@ class CommunityTab extends Component<any, any> {
       loadingSurveyData: true,
       surveysList: [],
       questionsList: [],
+      questionsTableSignature: '',
       filteredUsers: [], // Initialize as empty, will be set when modal opens
       loadingFilter: false,
+      usersSnapshotSelectionKey: null,
+      usersFilterSelectionKey: null,
       stats: [
         { icon: faUsers, count: 0, label: 'Users' },
         { icon: faVoteYea, count: 0, label: 'Questions' },
@@ -208,6 +217,8 @@ class CommunityTab extends Component<any, any> {
     };
 
     this._holdersHydrationInFlight = false;
+    this._usersFilterGeneration = 0;
+    this._usersFilterSelectionKey = null;
     this._holdersHydrationAbort = false;
     this._holdersHydrationPromise = null;
     this._cacheRefIds = new WeakMap();
@@ -245,17 +256,17 @@ class CommunityTab extends Component<any, any> {
   // === Universe helpers (encapsulated) ===
   _refreshSessionCatalog = () => {
     if (this._isUnmounted) return;
-    const sessions = buildCommunitySessionCatalog({
-      entries: [
-        ...getAllSessionEntries(),
-        ...getAllDemoSessionConfigs().filter(([, config]) => claimsWorkerCanonicalAuthority(config)),
-      ],
-      workerRecords: Object.values(readSessionWorkerConfigCache().bySession),
-    });
+    const sessions = readKnownSessionCatalog();
+    this._knownSessionCatalog = sessions;
     if (JSON.stringify(sessions) !== JSON.stringify(this.state.sessions)) this.setState({ sessions });
   };
 
-  _readGlobalSelection = () => readStoredGlobalSessionSelection();
+  _handleWorkerSessionCatalogUpdate = () => {
+    this._refreshSessionCatalog();
+    this._queueCacheDrivenRefresh({ force: true });
+  };
+
+  _readGlobalSelection = () => this.props.globalSessionSelection || readStoredGlobalSessionSelection();
 
   _isUniverseEnabled = () => this._readGlobalSelection().selectedSessionScope === 'all';
 
@@ -377,19 +388,13 @@ class CommunityTab extends Component<any, any> {
     const availableSlugs = this._getSessionSelectorOptions().map((option: SessionSelectorOption) => option.value);
     const availableSet = new Set<string>(availableSlugs);
     const routeSlug = normalizeSessionSlug(this._resolveRouteSlug() || '');
-    if (this._hasPinnedRouteSession() && availableSet.has(routeSlug)) {
-      return [routeSlug];
-    }
     const selection = this._readGlobalSelection();
-    const fallbackPrimarySlug = normalizeSessionSlug(
-      typeof this.props.activeSessionSlug === 'string' ? this.props.activeSessionSlug : selection.primarySessionSlug,
-    );
     const scopedDefaults =
       selection.selectedSessionScope === 'all'
         ? availableSlugs
         : resolveScopedSessionSlugsFromSelection({
             ...selection,
-            primarySessionSlug: fallbackPrimarySlug,
+            primarySessionSlug: selection.primarySessionSlug,
           });
     const filteredDefaults = this._dedupeNormalizedSlugs(scopedDefaults).filter((slug: string) =>
       availableSet.has(slug),
@@ -426,13 +431,20 @@ class CommunityTab extends Component<any, any> {
   };
 
   listAllSlugs = () => {
-    if (readSessionScanScope() === 'list') {
-      const scopedSlugs = this._dedupeNormalizedSlugs(readSessionScanSlugs());
+    const selection = this._readGlobalSelection();
+    if (selection.selectedSessionScope === 'list') {
+      const scopedSlugs = this._dedupeNormalizedSlugs(selection.selectedSessionSlugs);
       if (scopedSlugs.length > 0) return scopedSlugs;
       const routeSlug = normalizeSessionSlug(this._resolveRouteSlug() || '');
       return routeSlug ? [routeSlug] : [''];
     }
-    return this._dedupeNormalizedSlugs([this._resolveRouteSlug(), '', ...getAllSessionSlugs()]);
+    return this._dedupeNormalizedSlugs([
+      this._resolveRouteSlug(),
+      selection.primarySessionSlug,
+      '',
+      ...getAllSessionSlugs(),
+      ...(this._knownSessionCatalog || this.state.sessions).map(({ slug }: CommunitySessionEntry) => slug),
+    ]);
   };
 
   _resolveNetKeyForSlug = (slug: string) => {
@@ -1323,6 +1335,7 @@ class CommunityTab extends Component<any, any> {
 
   _queueCacheDrivenRefresh = ({ force = false }: any = {}) => {
     if (this._isUnmounted || this._isDocumentHidden()) return;
+    this._resetUsersFilterForSelection();
     this._cacheUpdateRefreshQueuedForce = this._cacheUpdateRefreshQueuedForce || !!force;
     if (this._statsCacheRefreshCoalescer) {
       this._statsCacheRefreshCoalescer.schedule();
@@ -1346,8 +1359,48 @@ class CommunityTab extends Component<any, any> {
     }, safeDelay);
   };
 
-  _runStatsRefreshCycle = async ({ force = false, markLoading = false }: any = {}) => {
+  _statsSelectionKey = () => {
+    const selection = this._readGlobalSelection();
+    return JSON.stringify([
+      selection.primarySessionSlug,
+      selection.selectedSessionScope,
+      selection.selectedSessionSlugs,
+    ]);
+  };
+
+  _resetUsersFilterForSelection = () => {
+    const selectionKey = this._statsSelectionKey();
+    if (!this.state.showModal || this.state.modalType !== 'users' || this._usersFilterSelectionKey === selectionKey) {
+      return;
+    }
+    this._usersFilterSelectionKey = selectionKey;
+    this._usersFilterGeneration += 1;
+    this.setState({ usersFilterSelectionKey: null, filteredUsers: [], loadingFilter: true });
+  };
+
+  _updateUsersFilter = (generation: number, selectionKey: string, patch: Record<string, unknown>) => {
+    // A filter may finish after unmount, or after A → B → A. Scope equality
+    // alone cannot distinguish that obsolete filter from the current one.
+    this.setState((state: Readonly<CommunityTab['state']>) =>
+      !this._isUnmounted &&
+      generation === this._usersFilterGeneration &&
+      selectionKey === this._statsSelectionKey() &&
+      state.usersFilterSelectionKey === selectionKey &&
+      state.showModal &&
+      state.modalType === 'users'
+        ? patch
+        : null,
+    );
+  };
+
+  _runStatsRefreshCycle = async ({ force = false, markLoading = false, request = null }: any = {}) => {
     if (this._isUnmounted) return { changed: false };
+    this._resetUsersFilterForSelection();
+    const selectionKey = this._statsSelectionKey();
+    const isCurrent = () =>
+      !this._isUnmounted &&
+      selectionKey === this._statsSelectionKey() &&
+      (!request || this._activeStatsRefresh === request);
     this._refreshSessionCatalog();
 
     if (markLoading && (!this.state.loadingSbtsCreated || !this.state.loadingSurveyData)) {
@@ -1359,6 +1412,7 @@ class CommunityTab extends Component<any, any> {
 
     const scopeEntries = this._iterScopeCaches({ clone: false });
     await this._hydrateWorkerGroupCounts(scopeEntries);
+    if (!isCurrent()) return { changed: false };
     const coarseSignature = this._buildCoarseCacheSignature(scopeEntries);
     let signature = this._latestCacheSignature;
     if (force || coarseSignature !== this._latestCoarseCacheSignature) {
@@ -1378,21 +1432,19 @@ class CommunityTab extends Component<any, any> {
       this._statsUnchangedStreak += 1;
     }
 
-    let nextInitialLoadDone = this.state.initialLoadDone;
-    if (!nextInitialLoadDone) {
-      const now = Date.now();
-      const checkIntervalMs = force ? 0 : this._statsUnchangedStreak >= 3 ? 5000 : 2000;
-      if (now - this._lastInitialLoadCheckMs >= checkIntervalMs) {
-        this._lastInitialLoadCheckMs = now;
-        const loadDone = await this.checkIfInitialLoadDone();
-        if (loadDone) nextInitialLoadDone = true;
-      }
-    }
-
     this.setState((prevState: Readonly<CommunityTab['state']>) => {
+      if (!isCurrent()) return null;
       const next: Record<string, any> = {};
+      if (prevState.showModal && prevState.modalType === 'questions') {
+        // Prompt hydration does not change counter signatures, but the open table must still refresh.
+        const questionsTableSignature = JSON.stringify(this._getQuestionDetailsRows(scopeEntries));
+        if (questionsTableSignature !== prevState.questionsTableSignature) {
+          next.questionsTableSignature = questionsTableSignature;
+        }
+      }
       if (changed && snapshot) {
         next.uniqueUsers = snapshot.uniqueUsers;
+        next.usersSnapshotSelectionKey = selectionKey;
         next.surveysCreatedCount = snapshot.surveysCreatedCount;
         next.surveyResponsesCount = snapshot.surveyResponsesCount;
         next.uniqueQuestionsCount = snapshot.uniqueQuestionsCount;
@@ -1402,10 +1454,13 @@ class CommunityTab extends Component<any, any> {
         if (
           prevState.showModal &&
           prevState.modalType === 'users' &&
-          !prevState.loadingFilter &&
-          this._areAddressListsEqual(prevState.filteredUsers || [], prevState.uniqueUsers || [])
+          (prevState.usersFilterSelectionKey !== selectionKey ||
+            (!prevState.loadingFilter &&
+              this._areAddressListsEqual(prevState.filteredUsers || [], prevState.uniqueUsers || [])))
         ) {
           next.filteredUsers = snapshot.uniqueUsers;
+          next.usersFilterSelectionKey = selectionKey;
+          next.loadingFilter = false;
         }
         next.stats = this._buildStatsArray(prevState.stats, {
           users: snapshot.uniqueUsers.length,
@@ -1416,58 +1471,72 @@ class CommunityTab extends Component<any, any> {
       }
       if (prevState.loadingSbtsCreated) next.loadingSbtsCreated = false;
       if (prevState.loadingSurveyData) next.loadingSurveyData = false;
-      if (nextInitialLoadDone !== prevState.initialLoadDone) {
-        next.initialLoadDone = nextInitialLoadDone;
-      }
       return Object.keys(next).length ? next : null;
     });
+
+    // Cached counts are useful before a slow chain readiness check settles.
+    // A newer selection also owns readiness; old asynchronous work cannot publish it.
+    if (!this.state.initialLoadDone && isCurrent()) {
+      const now = Date.now();
+      const checkIntervalMs = force ? 0 : this._statsUnchangedStreak >= 3 ? 5000 : 2000;
+      if (now - this._lastInitialLoadCheckMs >= checkIntervalMs) {
+        this._lastInitialLoadCheckMs = now;
+        const loadDone = await this.checkIfInitialLoadDone();
+        if (loadDone && isCurrent()) {
+          this.setState(() => (isCurrent() ? { initialLoadDone: true } : null));
+        }
+      }
+    }
 
     return { changed };
   };
 
   _refreshCommunityStats = async ({ force = false, markLoading = false }: any = {}) => {
     if (this._isUnmounted) return { changed: false };
-    if (this._statsRefreshInFlight) {
+    const selectionKey = this._statsSelectionKey();
+    if (this._statsRefreshInFlight && this._statsRefreshSelectionKey === selectionKey) {
       this._statsRefreshQueued = true;
       this._statsRefreshQueuedForce = this._statsRefreshQueuedForce || force;
       this._statsRefreshQueuedLoading = this._statsRefreshQueuedLoading || markLoading;
       return { changed: false, queued: true };
     }
 
+    // Switching scopes supersedes pending I/O. Its eventual finally block must
+    // not unlock or drain the refresh that belongs to the newer selection.
+    const request = {};
+    this._activeStatsRefresh = request;
+    this._statsRefreshSelectionKey = selectionKey;
+    this._statsRefreshQueued = false;
+    this._statsRefreshQueuedForce = false;
+    this._statsRefreshQueuedLoading = false;
     this._statsRefreshInFlight = true;
     let result = { changed: false };
     try {
-      result = await this._runStatsRefreshCycle({ force, markLoading });
+      result = await this._runStatsRefreshCycle({ force, markLoading, request });
     } catch (error) {
       uiLog.error('CommunityTab refresh failed:', error);
-      this.setState({ loadingSbtsCreated: false, loadingSurveyData: false });
+      if (this._activeStatsRefresh === request) {
+        this.setState({ loadingSbtsCreated: false, loadingSurveyData: false });
+      }
     } finally {
-      this._statsRefreshInFlight = false;
-      if (this._statsRefreshQueued && !this._isUnmounted) {
-        const queuedForce = this._statsRefreshQueuedForce;
-        const queuedLoading = this._statsRefreshQueuedLoading;
-        this._statsRefreshQueued = false;
-        this._statsRefreshQueuedForce = false;
-        this._statsRefreshQueuedLoading = false;
-        setTimeout(() => {
-          this._refreshCommunityStats({ force: queuedForce, markLoading: queuedLoading });
-        }, 0);
+      if (this._activeStatsRefresh === request) {
+        this._statsRefreshInFlight = false;
+        if (this._statsRefreshQueued && !this._isUnmounted) {
+          const queuedForce = this._statsRefreshQueuedForce;
+          const queuedLoading = this._statsRefreshQueuedLoading;
+          this._statsRefreshQueued = false;
+          this._statsRefreshQueuedForce = false;
+          this._statsRefreshQueuedLoading = false;
+          setTimeout(() => {
+            this._refreshCommunityStats({ force: queuedForce, markLoading: queuedLoading });
+          }, 0);
+        }
       }
     }
     return result;
   };
 
-  componentDidMount() {
-    uiLog.log('CommunityTab mounted. Fetching initial data...');
-    this._isUnmounted = false;
-    this._refreshSessionCatalog();
-    this._statsPollStartedAtMs = Date.now();
-    this._statsUnchangedStreak = 0;
-    this._latestCacheSignature = '';
-    this._latestCoarseCacheSignature = '';
-    this.setState({ initialLoadDone: false, loadingSbtsCreated: true, loadingSurveyData: true });
-
-    if (this._universeKickoffDone == null) this._universeKickoffDone = false;
+  _ensureUniverseWarmup = () => {
     if (
       this._isUniverseEnabled() &&
       typeof this.props.ensureLightSbtUniverse === 'function' &&
@@ -1480,6 +1549,18 @@ class CommunityTab extends Component<any, any> {
         uiLog.warn('CommunityTab: callback', e);
       }
     }
+  };
+
+  componentDidMount() {
+    uiLog.log('CommunityTab mounted. Fetching initial data...');
+    this._isUnmounted = false;
+    this._refreshSessionCatalog();
+    this._statsPollStartedAtMs = Date.now();
+    this._statsUnchangedStreak = 0;
+    this._latestCacheSignature = '';
+    this._latestCoarseCacheSignature = '';
+    this.setState({ initialLoadDone: false, loadingSbtsCreated: true, loadingSurveyData: true });
+    this._ensureUniverseWarmup();
 
     this._statsCacheRefreshCoalescer = createCacheUpdateCoalescer(
       () => {
@@ -1510,10 +1591,12 @@ class CommunityTab extends Component<any, any> {
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       this._globalSessionSelectionListener = () => {
         if (this._isUnmounted) return;
+        this._ensureUniverseWarmup();
         this._queueCacheDrivenRefresh({ force: true });
       };
       window.addEventListener(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, this._globalSessionSelectionListener);
       window.addEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, this._refreshSessionCatalog);
+      window.addEventListener(SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT, this._handleWorkerSessionCatalogUpdate);
     }
 
     // Eagerly start SBT holder hydration so uniqueUsers is complete before modal opens
@@ -1528,6 +1611,7 @@ class CommunityTab extends Component<any, any> {
     this._isUnmounted = true;
     if (typeof window !== 'undefined') {
       window.removeEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, this._refreshSessionCatalog);
+      window.removeEventListener(SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT, this._handleWorkerSessionCatalogUpdate);
     }
     this._holdersHydrationAbort = true;
     if (this._eagerHydrationTimer) {
@@ -1578,6 +1662,13 @@ class CommunityTab extends Component<any, any> {
   };
 
   componentDidUpdate(prevProps: any, prevState: any) {
+    this._resetUsersFilterForSelection();
+    const globalSelectionChanged =
+      prevProps.globalSessionSelection?.primarySessionSlug !== this.props.globalSessionSelection?.primarySessionSlug ||
+      prevProps.globalSessionSelection?.selectedSessionScope !==
+        this.props.globalSessionSelection?.selectedSessionScope ||
+      JSON.stringify(prevProps.globalSessionSelection?.selectedSessionSlugs) !==
+        JSON.stringify(this.props.globalSessionSelection?.selectedSessionSlugs);
     const cacheInputsChanged =
       prevProps.network?.id !== this.props.network?.id ||
       prevProps.provider !== this.props.provider ||
@@ -1589,9 +1680,11 @@ class CommunityTab extends Component<any, any> {
       prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady ||
       prevProps.questionResponsesNonce !== this.props.questionResponsesNonce ||
       prevProps.activeSessionSlug !== this.props.activeSessionSlug ||
-      prevProps.sessionConfig !== this.props.sessionConfig;
+      prevProps.sessionConfig !== this.props.sessionConfig ||
+      globalSelectionChanged;
 
     if (cacheInputsChanged) {
+      this._ensureUniverseWarmup();
       this._queueCacheDrivenRefresh({ force: true });
       this._scheduleNextStatsPoll(this._computeFallbackPollDelayMs());
     }
@@ -1628,14 +1721,20 @@ class CommunityTab extends Component<any, any> {
       .toLowerCase()
       .replace(/\s+/g, '');
     if (labelKey === 'sessions') this._refreshSessionCatalog();
+    this._usersFilterGeneration += 1;
     if (labelKey === 'users') {
+      const selectionKey = this._statsSelectionKey();
+      const ready = this.state.usersSnapshotSelectionKey === selectionKey;
+      this._usersFilterSelectionKey = selectionKey;
       this.setState({
         modalTitle: `${stat.label} Details`,
         modalType: 'users',
         showModal: true,
-        filteredUsers: this.state.uniqueUsers, // Initialize filter with all users when modal opens
-        loadingFilter: false, // Set loading to false initially
+        usersFilterSelectionKey: ready ? selectionKey : null,
+        filteredUsers: ready ? this.state.uniqueUsers : [],
+        loadingFilter: !ready,
       });
+      if (!ready) this._queueCacheDrivenRefresh({ force: true });
     } else if (labelKey === 'groups' || labelKey === 'sbts' || labelKey === 'sbtgroups') {
       this.setState({
         modalTitle: t('sbts'),
@@ -1653,6 +1752,7 @@ class CommunityTab extends Component<any, any> {
 
   // Helper to toggle modal visibility
   toggleModal = () => {
+    this._usersFilterGeneration += 1;
     this.setState((prevState: Readonly<CommunityTab['state']>) => ({
       showModal: !prevState.showModal,
       modalType: !prevState.showModal ? prevState.modalType : null,
@@ -2159,18 +2259,87 @@ class CommunityTab extends Component<any, any> {
 
   _getQuestionSwarmPoints = () => this._getQuestionSwarmView().points;
 
+  _getQuestionDetailsRows = (
+    scopeEntries: ScopeCacheEntry[] = this._iterScopeCaches({ clone: false }),
+  ): CommunityQuestionRow[] => {
+    const rows: CommunityQuestionRow[] = [];
+    const seen = new Set<string>();
+    scopeEntries.forEach((scope) => {
+      const sessionSlug = normalizeSessionSlug(scope.slug);
+      // Scope authority already requires an exact config slug; never reuse a demo label for an unknown session.
+      const sessionName = String(scope.sessionConfig?.sessionName || '').trim() || sessionSlug || 'General';
+      const addQuestion = (id: unknown, rawQuestion: unknown) => {
+        const questionId = String(id ?? '').trim();
+        const key = JSON.stringify([sessionSlug, questionId]);
+        if (!questionId || seen.has(key)) return;
+        seen.add(key);
+        const question = this._parseCachedJson(rawQuestion);
+        const prompt = typeof question?.prompt === 'string' ? question.prompt.trim() : '';
+        rows.push({
+          sessionSlug,
+          sessionName,
+          questionId,
+          prompt: prompt === '[encrypted]' ? 'Encrypted question' : prompt || `Question ${questionId}`,
+        });
+      };
+      const cachedQuestions = scope.questionsCache?.questions;
+      const entries =
+        cachedQuestions && typeof cachedQuestions === 'object' && !Array.isArray(cachedQuestions)
+          ? Object.entries(cachedQuestions)
+          : [];
+      entries.forEach(([questionId, question]) => addQuestion(questionId, question));
+      // Worker scopes must stay identity-bound, even when their cache is empty or stale.
+      if (!entries.length && !scope.isWorkerCanonical && POLIS_DEMO_DATA_AUTOLOAD_SLUGS.includes(sessionSlug)) {
+        const dataset = getPolisDemoDatasetForSlug(sessionSlug, { allowFallback: false }) as {
+          comments?: unknown[];
+        } | null;
+        const comments = Array.isArray(dataset?.comments) ? dataset.comments : [];
+        comments.forEach((rawComment, index) => {
+          const comment = this._parseCachedJson(rawComment);
+          if (typeof comment?.commentBody === 'string') {
+            addQuestion(comment.commentId ?? index, { prompt: comment.commentBody });
+          }
+        });
+      }
+    });
+    return rows;
+  };
+
   renderQuestionsModalContent = () => {
-    const points = this._getQuestionSwarmPoints();
+    const rows = this._getQuestionDetailsRows();
     return (
       <div className={styles.questionsModalContent}>
-        <div className={styles.questionsModalTopBar}>
-          <a href={buildPublicRoute('/questions')} className={styles.questionsModalLink}>
-            View Full Questions
-          </a>
-        </div>
-        <div className={styles.questionsModalPlot}>
-          <BeeswarmPlot points={points} domain={COMMUNITY_BEESWARM_DOMAIN} height={240} showIdleSummary={false} />
-        </div>
+        <table
+          className={styles.questionsTable}
+          aria-label="Questions by session"
+          data-testid={E2E_TESTIDS.COMMUNITY_QUESTIONS_TABLE}
+        >
+          <thead>
+            <tr>
+              <th scope="col">Session</th>
+              <th scope="col">Question</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ sessionSlug, sessionName, questionId, prompt }) => (
+              <tr
+                key={JSON.stringify([sessionSlug, questionId])}
+                data-ce-session-slug={sessionSlug}
+                data-ce-question-id={questionId}
+              >
+                <td>{sessionName}</td>
+                <td>
+                  <a href={`${buildSettingsSessionHref(sessionSlug)}#report`}>{prompt}</a>
+                </td>
+              </tr>
+            ))}
+            {!rows.length && (
+              <tr>
+                <td colSpan={2}>No questions available for the selected sessions.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     );
   };
@@ -2333,29 +2502,49 @@ class CommunityTab extends Component<any, any> {
           />
         );
       }
-      case 'users':
+      case 'users': {
+        const selectionKey = this._statsSelectionKey();
+        const generation = this._usersFilterGeneration;
+        const ready = this.state.usersFilterSelectionKey === selectionKey;
         // Render user list with filter
         return (
           <div>
-            <SBTFilter
-              items={this.state.uniqueUsers} // Filter based on the full uniqueUsers list
-              mode="addresses"
-              provider={provider}
-              network={network}
-              sessionSlug={this._currentSlug()}
-              onFilter={(newFilteredUsers: any) => {
-                // This setState call now reliably updates the filtered list
-                this.setState({ filteredUsers: newFilteredUsers, loadingFilter: false });
-              }}
-              setFilterLoading={(isLoading: any) => this.setState({ loadingFilter: isLoading })} // Pass loading state setter
-              autoExpand={false} // Changed this to false to allow internal button toggle
-              expandToSbtHolders={true}
+            <div className={styles.usersControls}>
+              <GlobalSessionSelector
+                selection={this._readGlobalSelection()}
+                sessionConfig={this.props.sessionConfig}
+                onChange={this.props.updateGlobalSessionSelection}
+                testId={E2E_TESTIDS.COMMUNITY_USERS_SESSION_SELECT}
+                className={styles.usersSessionSelector}
+              />
+              {ready && (
+                <SBTFilter
+                  className={styles.usersFilter}
+                  key={generation}
+                  items={this.state.uniqueUsers} // Filter based on the full uniqueUsers list
+                  mode="addresses"
+                  provider={provider}
+                  network={network}
+                  sessionSlug={this._currentSlug()}
+                  onFilter={(newFilteredUsers: any) => {
+                    this._updateUsersFilter(generation, selectionKey, {
+                      filteredUsers: newFilteredUsers,
+                      loadingFilter: false,
+                    });
+                  }}
+                  setFilterLoading={(isLoading: any) =>
+                    this._updateUsersFilter(generation, selectionKey, { loadingFilter: isLoading })
+                  }
+                  autoExpand={false} // Changed this to false to allow internal button toggle
+                  expandToSbtHolders={true}
 
-              // this below value is probably not passed-in, but should be
-              isSBTCacheReady={this.props.isSBTCacheReady}
-              sbtCacheRevision={this.props.sbtCacheRevision}
-            />
-            {loadingFilter ? (
+                  // this below value is probably not passed-in, but should be
+                  isSBTCacheReady={this.props.isSBTCacheReady}
+                  sbtCacheRevision={this.props.sbtCacheRevision}
+                />
+              )}
+            </div>
+            {!ready || loadingFilter ? (
               <div className={styles.loadingContainer}>
                 <FontAwesomeIcon icon={faSpinner} spin /> Loading filtered users...
               </div>
@@ -2388,6 +2577,7 @@ class CommunityTab extends Component<any, any> {
             )}
           </div>
         );
+      }
       case 'surveys':
         // Render survey list
         return (
@@ -2434,19 +2624,21 @@ class CommunityTab extends Component<any, any> {
 
   render() {
     const { showModal, modalTitle, loadingSbtsCreated, stats, initialLoadDone } = this.state;
-    const participantCount = this.getMemoizedLeaderboardData().length;
-    const displayStats = [...stats, { icon: faLayerGroup, count: this.state.sessions.length, label: 'Sessions' }];
+    const displayStats = this._isUniverseEnabled()
+      ? [...stats, { icon: faLayerGroup, count: this.state.sessions.length, label: 'Sessions' }]
+      : stats;
     const sessionFiltersActive = Object.values(this.state.sessionFilters).some((value) => String(value).trim());
-    const swarmView = this._getQuestionSwarmView();
-    const scopeLabel = swarmView.isDemoFallback ? this._communityScopeLabel() : swarmView.scopeLabel;
-    const selectedSlugs = this._getSelectedSessionSlugs();
-    const summarySlug =
-      !this._isUniverseEnabled() && selectedSlugs.length <= 1 ? (selectedSlugs[0] ?? this._currentSlug()) : null;
-
     return (
       <div className={styles.communityTab}>
         <div className={styles.statsSection}>
           <div className={styles.statsHeader}>
+            <GlobalSessionSelector
+              selection={this._readGlobalSelection()}
+              sessionConfig={this.props.sessionConfig}
+              onChange={this.props.updateGlobalSessionSelection}
+              testId={E2E_TESTIDS.COMMUNITY_SESSION_SELECT}
+              className={styles.sessionSelector}
+            />
             <div className={styles.headerActionsRight}>
               {!initialLoadDone && (
                 <FontAwesomeIcon
@@ -2482,43 +2674,6 @@ class CommunityTab extends Component<any, any> {
             ))}
           </div>
         </div>
-        <section
-          className={styles.sessionSection}
-          data-testid="ce-community-session-section"
-          aria-labelledby="ce-community-session-scope"
-        >
-          <div
-            id="ce-community-session-scope"
-            className={`${styles.scopeLabel} ${styles.sessionScope}`}
-            data-testid="ce-community-session-scope"
-            aria-label={scopeLabel}
-          >
-            {summarySlug !== null ? (
-              <>
-                {scopeLabel.startsWith('Demo session: ') && <span>Demo</span>}
-                <LoginSettingsSessionSummary
-                  activeSession={{ slug: summarySlug, label: this._sessionName(summarySlug) }}
-                  sessionHref={buildSettingsSessionHref(summarySlug)}
-                />
-              </>
-            ) : (
-              scopeLabel
-            )}
-          </div>
-          <div className={styles.sessionContent}>
-            <div className={styles.leaderboardSection} data-testid="ce-community-leaderboard-section">
-              <div className={styles.leaderboardTopBar}>
-                <h2 className={styles.leaderboardTitle}>Participants ({participantCount})</h2>
-                <div className={styles.headerActionsRight}>{this.renderLeaderboardControls()}</div>
-              </div>
-              <div className={styles.content}>
-                <div className={styles.leaderboard}>{this.renderLeaderboard()}</div>
-              </div>
-            </div>
-            {this.renderQuestionSwarm(swarmView)}
-          </div>
-        </section>
-
         <Modal
           isOpen={showModal}
           toggle={this.toggleModal}
@@ -2529,8 +2684,8 @@ class CommunityTab extends Component<any, any> {
         >
           <ModalHeader
             toggle={this.toggleModal}
-            className={styles.modalHeader}
-            tag={this.state.modalType === 'sessions' ? 'div' : 'h5'}
+            className={`${styles.modalHeader} ${this.state.modalType === 'questions' ? styles.questionsModalHeader : ''}`}
+            tag={['sessions', 'questions'].includes(this.state.modalType) ? 'div' : 'h5'}
           >
             {this.state.modalType === 'sessions' ? (
               <div className={styles.sessionModalHeading}>
@@ -2550,6 +2705,17 @@ class CommunityTab extends Component<any, any> {
                   <FontAwesomeIcon icon={faFilter} />
                 </button>
               </div>
+            ) : this.state.modalType === 'questions' ? (
+              <>
+                <h5>{modalTitle}</h5>
+                <a
+                  href={buildSettingsSessionHref(this._resolveRouteSlug())}
+                  className={styles.questionsModalLink}
+                  data-testid="ce-community-questions-session-link"
+                >
+                  View Full Questions
+                </a>
+              </>
             ) : (
               modalTitle
             )}
@@ -2561,4 +2727,6 @@ class CommunityTab extends Component<any, any> {
   }
 }
 
-export default CommunityTab;
+export default connect((state: RootState) => ({ globalSessionSelection: state.sessionState }), {
+  updateGlobalSessionSelection,
+})(CommunityTab);

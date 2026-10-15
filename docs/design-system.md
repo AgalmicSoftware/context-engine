@@ -16,6 +16,18 @@ global compatibility styles, and browser-rendered visualizations.
 - `client/src/scss/_variables.scss` remains for structural/build-time Sass
   values. Do not add theme-dependent component values there.
 
+Session controls share one bordered unit containing the label, selected session,
+and open-session action. The native selector sizes to the selected label and
+shrinks within narrow viewports. Stats centers the unit; expanded tools align it
+right. In Questions, Back and Session occupy the top header row, with question
+actions in a full-width bordered panel directly above the list. The controls
+spread across the panel and center when wrapping on phones. The toolbar stays
+pinned 10px below the viewport top while the question list scrolls, including
+pending Submit controls; Back and Session scroll away. JSON debug controls are hidden
+in this embedded Questions view; the underlying JSON UI remains available to other
+surfaces. Run `node scripts/session-selector-layout-smoke.mjs` against the local
+server to check short and long selections at mobile, compact, and desktop widths.
+
 ## Runtime Resolution
 
 Session section headers show their action subtitles only while collapsed:
@@ -41,7 +53,14 @@ order is:
 3. built-in Minimal (`civic`).
 
 `client/public/theme-bootstrap.js` applies user/deployment state before the app
-bundle runs. `client/src/utilities/ui/themeRuntime.ts` validates and persists
+bundle runs. The October 2026 Minimal rollout clears a previously saved app
+theme once on default/Minimal deployments, recording `ce:theme-default-version`
+before paint. Later user choices are preserved, including across routine data
+cache refreshes. Explicit non-Minimal deployment defaults retain their existing
+preferences. The migration leaves color-vision, authentication, wallet, and
+authored content storage untouched; blocked storage falls back to the retained
+preference without interrupting startup.
+`client/src/utilities/ui/themeRuntime.ts` validates and persists
 only a bundled app-theme ID and emits `ce:theme-change` for SVG, canvas, and
 chart consumers. Both set `<meta name="theme-color">` to the theme's
 `themeColor` from `registry.json`, so the browser bar matches the page. Session metadata is not an app-theme resolution layer. Those
@@ -102,7 +121,10 @@ Minimal is the default white theme. Its stable configuration and storage ID rema
 for a deployment default. It uses dark slate text, blue actions, subtle borders,
 modest corner radii, sans-serif typography with system fallbacks, and flat surfaces.
 Login and Submit share the brighter blue submit palette, including hover states.
-Minimal Welcome slides use a white canvas, opaque artwork, dark copy, and blue navigation. White line-art illustrations are inverted only within this profile; color illustrations retain their original colors.
+Minimal Welcome slides use a white canvas, dark copy, and blue navigation.
+White line-art illustrations are inverted only within this profile. The Because
+helmet and Built to Help robot use reduced opacity, muted colors, and multiply
+blending to sit softly on the canvas; other artwork retains its existing treatment.
 Article chart labels, totals, tooltips, code blocks, and expanded methodology use
 explicit light-surface text pairs. Participant colors appear as swatches beside
 readable quote labels.
@@ -115,13 +137,20 @@ Engine, with the shared five-second fade and hover/focus reveal. Loading labels
 use `--ce-loading-text`: black on the Minimal and Classic 95 light surfaces and
 near-white in Context Engine. On mobile, Minimal uses a compact navigation header
 with the visible logo artwork matched to the Login button's height while preserving
-the account controls. The profile presents session
+the account controls. Across themes and responsive breakpoints, the visible logo
+artwork matches the Login button's height and keeps that size after signing in.
+Both account states retain 16px of header padding above and below the logo.
+The Account button retains its own sizing. Narrow Classic 95 headers let the
+Account control wrap below the logo when needed.
+The profile presents session
 sections as a single column of compact rows, and removes decorative depth from
 question cards and account controls. The home Explorer offers Stats, Tools, and
 Welcome; Tools remains the default, including for a retained Latest-tab selection.
 Session title tooltips share the Results description cleanup for retired RxC instructions.
 Explorer tabs use blue selected/hover text
-and dark inactive icons on the light header. Expanded Explorer controls, group
+and dark inactive icons on the light header. On narrow Minimal phones, the
+selected label is 20px and the tab icons are 22px, with 44px minimum touch targets.
+Expanded Explorer controls, group
 names, Context corpus cards, Risk Matrix details, and Debate Map labels use
 explicit light-surface text pairs. Stats leaderboard addresses, detail dialogs,
 and group filter controls also use these pairs. Debate details use light argument cards,
@@ -134,15 +163,42 @@ uses the light-surface response palette. The contrast checks cover text,
 controls, disabled actions, session chrome, and focus indicators; this is not a
 claim of complete accessibility certification.
 
-The Stats tab includes a Sessions count across the app's discovered registry
-sessions, configured Worker sessions, and previously visited Worker sessions.
+The Civic Account card uses a light-blue gradient with dark account text and
+Bookmarks controls. Inline fields retain light backgrounds, dark text, and
+visible validation and focus indicators. Disconnect stays red with white text.
+This treatment is scoped to the Account card.
+
+When ALL is selected, the Stats tab includes a Sessions count across the app's
+discovered registry sessions, configured Worker sessions, and previously visited
+Worker sessions.
 Opening it shows centralized and decentralized totals and a scrollable list of
 session links. Classification follows canonical authority: Worker authority is
 centralized and EVM registry authority is decentralized, even when a session also
 uses the other backend for supporting services. Missing authority metadata is
 shown as "Type unavailable." This directory is independent of the selected
-session scope used by the other Stats counts. Its five summary buttons wrap to
-three columns on narrow phones.
+session scope used by the other Stats counts. The four or five visible summary
+buttons share the available width evenly. On narrow phones, four buttons form
+two balanced rows of two, while five buttons wrap to three columns.
+Stats, Users Details, and Settings share one Session dropdown with an adjacent
+external-link icon. A concrete selection opens its session page in a new tab;
+General opens the general session, while ALL and multi-session selections leave
+the icon disabled. Worker links retain their validated discovery origin. Settings
+shows this same control in its quick summary and keeps only advanced scope
+editing behind Config.
+
+Expanded tool headers keep Back, help, and the Session chooser together for
+Groups and Context, wrapping the chooser only when the controls cannot fit.
+Groups keeps View All, Create, and Refresh together on a separate row below
+Back and Session at every width; Context actions also stay below. Questions keeps Back, help, and
+Session above a bordered toolbar spanning the question column, with its controls
+distributed across the panel and centered when wrapping on phones. Questions keeps one toolbar
+with its existing state and handlers in the Explorer header; standalone and
+session views retain their own toolbar placement. Explorer help buttons open on
+click, Enter, or Space even when automatic Explainers are off, and close on a
+second activation, Escape, or a click outside.
+Selected and unselected options show `Name (slug)` to distinguish repeated
+names. Context retains its local session override and explicit return to the
+global default; its link follows the currently selected local session.
 The Sessions dialog's header filter button opens type, creation-date range,
 last-activity range, and admin-address filters. These combine immediately and
 update the visible totals. Date ranges include both local calendar dates;
@@ -176,7 +232,9 @@ raised bevel, compact black shadow, and gray hover face without a colored halo.
 
 Footer navigation consumes `--ce-footer-bar-*`, `--ce-footer-link-*`, and
 `--ce-footer-copyright-*` tokens. Context Engine keeps its unframed spacing,
-while `classic-95` presents a gray taskbar at the end of the document. Its
+and narrow-phone link rows use 14px text with compact spacing and 44px height so
+all five links fit together, retaining wrapping for exceptionally narrow widths.
+The `classic-95` theme presents a gray taskbar at the end of the document. Its
 compact, icon-only **Start** button opens an upward Windows-style menu containing
 the five route actions while retaining an accessible text label, and its larger
 GitHub icon stays aligned at the taskbar's right edge. The taskbar is never fixed over page content: long pages reveal it only
@@ -213,7 +271,8 @@ mobile and checks its visible control/text pairs at 4.5:1.
 
 When the bundled-theme selector is enabled, signed-in Settings exposes it
 directly beneath the equal 2×2 Config, Session, Explainers, and Demo Mode quick
-controls. Signed-out Settings keeps it in the final `Appearance & colors`
+controls. At phone widths up to 480px, these controls stack into full-width rows
+so the Session dropdown remains readable. Signed-out Settings keeps it in the final `Appearance & colors`
 section. This selector changes the complete app theme; it is separate from a
 session's curated color scheme and does not accept arbitrary color values. Its
 default option reads `<theme label> (default)` for a valid embedded
@@ -295,7 +354,9 @@ The Docs route follows the same pairings end to end: page and section headers
 use `--ce-titlebar-*`, prose cards use `--ce-document-*`, controls use
 `--ce-control-*`, and source/prompt readers use `--ce-overlay-*`. Keep those
 foreground/background pairs together so every bundled theme remains readable;
-the app-theme Playwright smoke checks the rendered Docs pairs at 4.5:1.
+the app-theme Playwright smoke checks the rendered Docs pairs at 4.5:1. The
+Graphic disclosure contains a clickable image that opens a viewport-sized modal;
+Escape, the backdrop, or its close button dismiss it and restore trigger focus.
 
 ## Typography
 

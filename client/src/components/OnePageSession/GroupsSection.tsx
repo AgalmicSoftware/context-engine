@@ -12,7 +12,7 @@ import { resolveAdminCapabilities } from '../Admin/adminPageHelpers';
 import LazyFallback from '../Shared/LazyFallback';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection.js';
-import { isCryptoMode, t } from '../../utilities/ui/terminology.js';
+import { t } from '../../utilities/ui/terminology.js';
 import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import {
   GROUP_CREATION_POLICIES,
@@ -25,8 +25,6 @@ import LinkedWorkerGroup, { type LinkedWorkerGroupReference } from './LinkedWork
 
 // Only registry (on-chain) sessions render the SBT groups page, so Worker-native Groups skip its code.
 const SBTsPage = lazyWithRetry(() => import('../SBTs/SBTsPage'));
-
-const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
 
 export type GroupsSectionProps = {
   account: unknown;
@@ -189,12 +187,7 @@ const OnePageSessionGroupsSection = ({
             >
               <FontAwesomeIcon icon={faQuestionCircle} />
               <span className={styles.tooltiptext}>
-                {usesWorkerNativeGroups
-                  ? 'These session-native groups store membership and permissions in the Cloudflare worker, without deploying a contract.'
-                  : usesRegistryGroups
-                    ? `${SBT_TOOLTIP_LABEL} enable groups to organize membership, roles, and permissions on-chain.`
-                    : 'Groups are unavailable because this session does not have a valid Groups authority profile.'}
-                {' They unlock private coordination, community-governed tools, and shared AI training.'}
+                Use groups to organize people and manage access to shared content and tools.
               </span>
             </div>
           ) : null}

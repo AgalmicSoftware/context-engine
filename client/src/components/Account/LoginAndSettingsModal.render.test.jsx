@@ -41,16 +41,26 @@ jest.mock('../Shared/CETooltip', () => ({
   ),
 }));
 
-jest.mock('../../utilities/web3/chainGateway.js', () => ({
-  __esModule: true,
-  default: {
-    sendTestnetFunds: jest.fn(),
-  },
-  getDemoSessionConfigBySlug: jest.fn(() => null),
-  getSessionNetwork: jest.fn(() => ({ id: 84532, chainId: 84532, name: 'Base Sepolia' })),
-  getSessionConfigBySlugOrDefault: jest.fn(() => ({})),
-  getAllSessionSlugs: jest.fn(() => []),
-}));
+jest.mock('../../utilities/web3/chainGateway.js', () => {
+  const getSlugs = jest.fn(() => []);
+  const getConfig = jest.fn(() => ({}));
+  const getExactConfig = jest.fn((slug) => {
+    const config = getConfig(slug);
+    return config?.slug === slug ? config : null;
+  });
+  return {
+    __esModule: true,
+    default: {
+      sendTestnetFunds: jest.fn(),
+    },
+    getDemoSessionConfigBySlug: jest.fn(() => null),
+    getSessionNetwork: jest.fn(() => ({ id: 84532, chainId: 84532, name: 'Base Sepolia' })),
+    getSessionConfigBySlugOrDefault: getConfig,
+    getSessionConfigBySlug: getExactConfig,
+    getAllSessionSlugs: getSlugs,
+    getAllSessionEntries: jest.fn(() => getSlugs().map((slug) => [slug, getExactConfig(slug) || { slug }])),
+  };
+});
 
 jest.mock('../../wallet/passkeyWallet.js', () => ({
   createPasskeyWallet: jest.fn(),
@@ -104,6 +114,7 @@ jest.mock('../../utilities/worker/workerAuth.js', () => ({
 }));
 
 jest.mock('../../utilities/session/sessionNaming.js', () => ({
+  ...jest.requireActual('../../utilities/session/sessionNaming.js'),
   normalizeSessionSlug: jest.fn((value = '') => {
     const normalized = String(value || '')
       .trim()
@@ -556,16 +567,16 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
   });
 
-  it('shows the old network-style active session row up top and keeps network details out of the collapsed row in plain mode', () => {
+  it('shows the shared session dropdown above Config and keeps network details out of the collapsed row in plain mode', () => {
     const subject = buildWrongNetworkSubject();
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByText('SESSION')).toBeInTheDocument();
-    expect(screen.getAllByText('Edge Session').length).toBeGreaterThan(0);
+    expect(screen.getByRole('combobox', { name: 'Session' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Edge Session (edge)' })).toHaveProperty('selected', true);
     const sessionLink = screen.getByRole('link', { name: 'Open session Edge Session' });
     expect(sessionLink).toHaveAttribute('href', '/session/edge');
-    expect(sessionLink).not.toHaveAttribute('target');
+    expect(sessionLink).toHaveAttribute('target', '_blank');
     expect(screen.queryByText('session:')).not.toBeInTheDocument();
     expect(screen.queryByText('network:')).not.toBeInTheDocument();
     expect(screen.queryByText('wallet:')).not.toBeInTheDocument();
@@ -621,7 +632,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.getByTestId('ce-settings-quick-controls').children).toHaveLength(4);
     expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
     expect(screen.getByTestId('ce-settings-color-blind')).toHaveAccessibleName('Color-blind mode');
-    expect(screen.getByText('Theme')).toBeInTheDocument();
+    expect(screen.getByText('Appearance')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Appearance & colors/i })).not.toBeInTheDocument();
     expect(screen.queryByText('Bundled app themes')).not.toBeInTheDocument();
     expect(screen.queryByText(/Changes the complete app appearance/i)).not.toBeInTheDocument();
@@ -647,7 +658,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByRole('link', { name: 'Open session general' })).toHaveAttribute('href', '/session');
+    expect(screen.getByRole('link', { name: 'Open session General' })).toHaveAttribute('href', '/session');
   });
 
   it('renders the list-derived primary session in the summary when list scope excludes general', () => {
@@ -687,7 +698,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByText('Edge Session')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Edge Session (edge)' })).toHaveProperty('selected', true);
     expect(screen.queryByText('session:')).not.toBeInTheDocument();
     expect(screen.getByText('network:')).toBeInTheDocument();
     expect(screen.getByText('Base Sepolia')).toBeInTheDocument();
@@ -738,6 +749,14 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(toggleTooltips.mock.calls[0]).toEqual([]);
   });
 
+  it.each([false, true])('keeps session auto-advance out of user settings (signed in: %s)', async (signedIn) => {
+    const props = buildProps(signedIn ? { account: WAGMI_ADDRESS, loginComplete: true, provider: 'wagmi' } : {});
+    render(<LoginAndSettingsModal {...props} />);
+    if (!signedIn) await openPreLoginSettingsDrawer();
+    expect(screen.queryByTestId('ce-settings-auto-advance')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Auto-advance/i })).not.toBeInTheDocument();
+  });
+
   it('exposes pre-login settings so tooltip preference and custom AI endpoint can be updated before sign-in', async () => {
     const props = buildProps({
       setDemoSurfaceMode: jest.fn(),
@@ -750,7 +769,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     await openPreLoginSettingsDrawer();
 
     expect(screen.getByTestId('ce-prelogin-settings-panel')).toBeInTheDocument();
-    expect(screen.getByText('Appearance & colors')).toBeInTheDocument();
+    expect(screen.getByText('Appearance')).toBeInTheDocument();
     expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
     expect(screen.getByTestId('ce-settings-color-blind')).toHaveAccessibleName('Color-blind mode');
     expect(screen.queryByText('Bundled app themes')).not.toBeInTheDocument();
@@ -794,9 +813,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getPreLoginSettingsDisplay());
 
-    expect(screen.getByText('SESSION')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Session' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open session Edge Session' })).toHaveAttribute('href', '/session/edge');
-    expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
   });
 
   it('shows the shared network summary and sponsored-resource cards in the logged-out drawer before login', async () => {
@@ -850,7 +869,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getPreLoginSettingsDisplay());
 
-    expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
     expect(screen.queryByLabelText('AI endpoint')).not.toBeInTheDocument();
 
     await waitFor(() => {
@@ -869,7 +888,65 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
   });
 
-  it('keeps pre-login session and local AI controls behind Config with a capability-driven overview', async () => {
+  it.each([false, true])('loads Worker sponsorship from a directory selection (signed in: %s)', async (signedIn) => {
+    const slug = 'sponsored-session';
+    const origin = `https://sponsored-${signedIn}.example.test`;
+    const sessionId = '0x00112233445566778899aabbccddeeff';
+    const hint = {
+      slug,
+      sessionId,
+      sessionName: 'Sponsored session',
+      corsWorkerUrl: origin,
+      workerCanonicalCleanRoute: true,
+    };
+    const config = buildPureWorkerSessionConfig({ ...hint, workerCanonicalCleanRoute: false, configRevision: 'v1' });
+    getSessionConfigBySlugOrDefault.mockImplementation((selected) => (selected === slug ? hint : {}));
+    const previousFetch = global.fetch;
+    global.fetch = jest.fn(
+      async (url) =>
+        new Response(
+          JSON.stringify(
+            String(url).includes('/session-config')
+              ? { ok: true, sessionSlug: slug, config }
+              : { ok: true, sessionSlug: slug, resources: { ai: true, arweave: false, rpc: false, txGas: false } },
+          ),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    try {
+      const ref = React.createRef();
+      render(
+        <LoginAndSettingsModal
+          ref={ref}
+          {...buildProps({
+            activeSessionSlug: slug,
+            ...(signedIn ? { account: WAGMI_ADDRESS, loginComplete: true, provider: 'passkey_eoa' } : {}),
+          })}
+        />,
+      );
+      if (!signedIn) await openPreLoginSettingsDrawer();
+      else await clickAndSettle(screen.getByRole('button', { name: 'Config' }));
+      await waitFor(
+        () =>
+          expect(ref.current.state).toMatchObject({ sponsoredAccessLoading: false, sponsoredSessionConfig: config }),
+        { timeout: 1000 },
+      );
+      expect(await screen.findByText('Sponsored')).toBeInTheDocument();
+      expect(screen.queryByText('Not sponsored')).not.toBeInTheDocument();
+      expect(screen.getByText(/Access follows the session permissions/)).toBeInTheDocument();
+      expect(ref.current.getDisplaySessionConfig(slug).sessionModeProfile).toEqual(config.sessionModeProfile);
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${origin}/resource-presence`,
+        expect.objectContaining({
+          headers: { 'X-Session-Slug': slug },
+        }),
+      );
+    } finally {
+      global.fetch = previousFetch;
+    }
+  });
+
+  it('keeps advanced scope and local AI controls behind Config with a visible shared session selector', async () => {
     getAllSessionSlugs.mockReturnValue(['demo']);
     getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
       String(slug || '')
@@ -892,7 +969,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     expect(await screen.findByText('AI')).toBeInTheDocument();
     expect(screen.queryByText('Network')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
     expect(screen.queryByLabelText('OpenAI API key')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI endpoint')).not.toBeInTheDocument();
 
@@ -900,6 +977,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     expect(screen.queryByText('Network')).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
+    expect(screen.getAllByRole('combobox', { name: 'Session', exact: true })).toHaveLength(1);
     expect(screen.getByLabelText('OpenAI API key')).toBeInTheDocument();
     expect(screen.getByLabelText('AI endpoint')).toBeInTheDocument();
   });
@@ -912,7 +990,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(<LoginAndSettingsModal {...props} />);
 
-    const sessionSummary = screen.getByLabelText(/^Active session:/);
+    const sessionSummary = screen.getByTestId('ce-prelogin-session-select');
     expect(screen.queryByRole('button', { name: 'Demo Mode On' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-prelogin-settings-panel')).not.toBeInTheDocument();
     expect(sessionSummary).toBeInTheDocument();
@@ -1059,13 +1137,14 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Active session'), {
+    fireEvent.change(screen.getByLabelText('Session'), {
       target: { value: 'edge' },
     });
 
     expect(props.updateGlobalSessionSelection).toHaveBeenCalledTimes(1);
     expect(props.updateGlobalSessionSelection).toHaveBeenCalledWith({
       primarySessionSlug: 'edge',
+      selectedSessionScope: 'active',
     });
   });
 
@@ -1097,7 +1176,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getPreLoginSettingsDisplay());
 
-    expect(screen.getByTestId('ce-prelogin-session-select')).toHaveValue('edge');
+    expect(screen.getByTestId('ce-prelogin-session-select').selectedOptions[0]).toHaveTextContent(
+      'Selected sessions (2)',
+    );
     expect(screen.getByTestId('ce-prelogin-session-scope-chip-edge')).toBeInTheDocument();
     expect(screen.getByTestId('ce-prelogin-session-scope-chip-rxc')).toBeInTheDocument();
   });

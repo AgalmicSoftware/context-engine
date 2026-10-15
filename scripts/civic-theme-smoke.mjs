@@ -1,6 +1,7 @@
 // Run against a local server with demo surfaces enabled. Answers stay in the
 // isolated browser context and are cleared; this smoke never submits responses.
 import assert from 'node:assert/strict';
+import { inspectSessionSelectorLayout } from './session-selector-layout-smoke.mjs';
 import { assertReadable, auditPanelContrast, clickQuestionAction, inspectCivicOverlays } from './civic-theme-overlay-smoke.mjs';
 import { inspectCivicExplorerContent } from './civic-theme-explorer-smoke.mjs';
 import { inspectCivicWizard } from './civic-theme-wizard-smoke.mjs';
@@ -105,23 +106,41 @@ export async function inspectCivicExplorer(page) {
 export async function inspectCivicStats(page) {
   await page.getByRole('tab', { name: 'Stats', exact: true }).click();
   const stats = page.locator('[class*="communityTab_"]');
-  await inspectStatsSessionLabels(page);
+  await inspectStatsCounters(page);
   await assertReadable(stats);
-  const more = stats.getByRole('button', { name: /^Show More/ });
-  if (await more.isVisible()) {
-    await more.click();
-    await assertReadable(stats);
-    await stats.getByRole('button', { name: /^Show Less/ }).press('Enter');
-  }
-  const filters = stats.getByRole('button', { name: 'Leaderboard filters', exact: true });
-  await filters.click();
-  await assertReadable(stats);
-  await filters.click();
+  let profilePath = null;
+  let reportHref = null;
   for (const name of ['Users', 'Questions', 'Surveys', 'Groups']) {
-    await stats.getByText(name, { exact: true }).click();
+    await stats.getByTestId(`ce-community-stat-${name.toLowerCase()}`).click();
     const dialog = page.getByRole('dialog');
     await assertReadable(dialog);
+    if (name === 'Questions') {
+      const table = dialog.getByTestId('ce-community-questions-table');
+      await table.waitFor({ state: 'visible' });
+      assert.deepEqual(await table.getByRole('columnheader').allTextContents(), ['Session', 'Question']);
+      reportHref = await table.getByRole('link').first().getAttribute('href');
+      assert(reportHref?.endsWith('#report'), 'Question links target their session report');
+      await dialog.getByTestId('ce-community-questions-session-link').waitFor({ state: 'visible' });
+    }
     if (name === 'Users') {
+      const usersSelector = dialog.getByTestId('ce-community-users-session-select');
+      await usersSelector.waitFor({ state: 'visible' });
+      const previousSelection = await usersSelector.inputValue();
+      await usersSelector.selectOption('');
+      await page.waitForFunction(() => document.querySelector('[data-testid="ce-community-session-select"]')?.value === '');
+      await usersSelector.selectOption(previousSelection);
+      await page.waitForFunction((value) => document.querySelector('[data-testid="ce-community-session-select"]')?.value === value, previousSelection);
+      const [profilePage] = await Promise.all([
+        page.waitForEvent('popup'),
+        dialog.locator('[class*="userItem_"]').first().click(),
+      ]);
+      try {
+        await profilePage.waitForURL(/\/u\//);
+        const profileUrl = new URL(profilePage.url());
+        profilePath = `${profileUrl.pathname}${profileUrl.search}`;
+      } finally {
+        await profilePage.close();
+      }
       await dialog.getByRole('button', { name: 'Filter', exact: true }).click();
       await assertReadable(dialog);
       await dialog.getByRole('button', { name: 'Select Group...', exact: true }).first().click();
@@ -131,21 +150,45 @@ export async function inspectCivicStats(page) {
     await dialog.waitFor({ state: 'hidden' });
   }
   await inspectSessionDirectory(page);
+  assert(reportHref, 'Questions Details exposes a report link');
+  const reportPage = await page.context().newPage();
+  try {
+    await reportPage.goto(new URL(reportHref, page.url()).href, { waitUntil: 'domcontentloaded' });
+    const report = reportPage.locator('#report');
+    await report.waitFor({ state: 'visible' });
+    await report.getByRole('button', { name: 'Report', exact: true }).waitFor({ state: 'visible' });
+    assert.equal(await report.getByRole('button', { name: 'Report', exact: true }).getAttribute('aria-pressed'), 'true');
+    await reportPage.waitForFunction(() => {
+      const rect = document.getElementById('report')?.getBoundingClientRect();
+      return rect && rect.top >= -2 && rect.top < innerHeight;
+    });
+  } finally {
+    await reportPage.close();
+  }
+  return profilePath;
 }
 
-export async function inspectStatsSessionLabels(page) {
-  const section = page.getByTestId('ce-community-session-section');
-  const label = section.getByTestId('ce-community-session-scope');
-  await label.waitFor({ state: 'visible' });
-  assert(await label.isVisible(), 'One shared session label is visible above the chart and leaderboard');
-  assert.match((await label.innerText()).trim(), /^(?:Demo session: .+|Sessions?: .+|All sessions)$/);
-  await assertReadable(label);
-  const labelBottom = await label.evaluate((element) => element.getBoundingClientRect().bottom);
-  for (const id of ['ce-community-beeswarm-section', 'ce-community-leaderboard-section']) {
-    const child = section.getByTestId(id);
-    assert.equal(await child.count(), 1, `${id} belongs to the shared session section`);
-    const top = await child.evaluate((element) => element.getBoundingClientRect().top);
-    assert(top >= labelBottom - 1, `${id} appears below the shared session label`);
+export async function inspectStatsCounters(page) {
+  const selector = page.getByTestId('ce-community-session-select');
+  await selector.waitFor({ state: 'visible' });
+  await selector.selectOption({ label: 'General' });
+  await inspectSessionSelectorLayout(selector, 'center');
+  const sessionLink = page.getByTestId('ce-community-session-select-link');
+  assert.equal(await sessionLink.getAttribute('target'), '_blank', 'A concrete session opens in a new tab');
+  assert(new URL(await sessionLink.getAttribute('href'), page.url()).pathname.endsWith('/session'), 'General links to its session page');
+  assert.equal(await page.getByTestId('ce-community-stat-sessions').count(), 0, 'Specific session scope hides the Sessions total');
+  await selector.selectOption({ label: 'ALL' });
+  assert.equal(await sessionLink.isDisabled(), true, 'Aggregate scope has no single-session destination');
+  for (const name of ['users', 'questions', 'surveys', 'groups', 'sessions']) {
+    await page.getByTestId(`ce-community-stat-${name}`).waitFor({ state: 'visible' });
+  }
+  for (const id of [
+    'ce-community-session-section',
+    'ce-community-session-scope',
+    'ce-community-beeswarm-section',
+    'ce-community-leaderboard-section',
+  ]) {
+    assert.equal(await page.getByTestId(id).count(), 0, `${id} is hidden from Stats`);
   }
 }
 
@@ -367,9 +410,8 @@ export async function runSmoke() {
       });
       await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
       await inspectCivicExplorer(page);
-      await inspectCivicStats(page);
-      const profilePath = await page.locator('a[href^="/u/"]').first().getAttribute('href');
-      assert(profilePath, 'The demo leaderboard links to a public profile');
+      const profilePath = await inspectCivicStats(page);
+      assert(profilePath, 'The Users detail modal links to a public profile');
       await page.goto(`${baseUrl}${profilePath}`, { waitUntil: 'domcontentloaded' });
       await inspectMinimalProfile(page);
       await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });

@@ -2,7 +2,12 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { refreshSessionRegistryFieldsCache } from '../../utilities/web3/sessionRegistry.js';
 import { readWorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
+import { resolveLoginSettingsSessionConfig } from './loginSettingsSessionConfig';
 import { loadLoginSettingsSponsoredAccess } from './loginSettingsSponsoredAccessRuntime';
+
+jest.mock('./loginSettingsSessionConfig', () => ({
+  resolveLoginSettingsSessionConfig: jest.fn(async (_slug, config) => config),
+}));
 
 jest.mock('../../utilities/web3/sponsoredAccess.js', () => ({
   checkSponsoredAccess: jest.fn(async ({ resourceKey }) => ({ resourceKey, status: 'ok' })),
@@ -40,12 +45,9 @@ describe('loadLoginSettingsSponsoredAccess', () => {
     });
 
     expect(mockedRefreshSessionRegistryFieldsCache).not.toHaveBeenCalled();
-    expect(mockedCheckSponsoredAccess).toHaveBeenCalledTimes(1);
-    expect(mockedCheckSponsoredAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ resourceKey: 'ai', sessionConfig }),
-    );
+    expect(mockedCheckSponsoredAccess).not.toHaveBeenCalled();
     expect(result.accessMap).toEqual({
-      ai: { resourceKey: 'ai', status: 'ok' },
+      ai: { resourceKey: 'ai', status: 'worker-managed' },
       arweave: null,
       rpc: null,
       txGas: null,
@@ -56,6 +58,24 @@ describe('loadLoginSettingsSponsoredAccess', () => {
         context: expect.objectContaining({ chainId: null }),
       }),
     );
+  });
+
+  it('loads the complete Worker config before choosing resource and gate checks', async () => {
+    const complete = {
+      slug: 'session-a',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    jest.mocked(resolveLoginSettingsSessionConfig).mockResolvedValueOnce(complete);
+    const result = await loadLoginSettingsSponsoredAccess({
+      slug: 'session-a',
+      account: '',
+      sessionConfig: { slug: 'session-a', workerCanonicalCleanRoute: true },
+    });
+    expect(result.sessionConfig).toEqual(complete);
+    expect(result.workerResourcePresence?.ai).toBe(true);
+    expect(result.accessMap.ai).toEqual({ resourceKey: 'ai', status: 'worker-managed' });
+    expect(mockedReadWorkerResourcePresence).toHaveBeenCalledWith(expect.objectContaining({ sessionConfig: complete }));
+    expect(mockedCheckSponsoredAccess).not.toHaveBeenCalled();
   });
 
   it('refreshes registry-backed sessions and checks every projected registry resource', async () => {

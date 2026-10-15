@@ -380,6 +380,15 @@
   }
 }
 
+@media (min-width: 320px) and (max-width: 465px) {
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    #navbarContainerLoggedIn {
+      flex-wrap: wrap;
+      row-gap: 8px;
+    }
+  }
+}
+
 /* --- AccountSection --- */
 
 @media (min-width: 0px) and (max-width: 319px) {
@@ -415,6 +424,7 @@
 @media (min-width: 320px) and (max-width: 465px) {
   #AccountSectionLoggedIn {
     transform: scale(var(--ce-navbar-control-scale, 0.8));
+    transform-origin: right center;
     display: flex;
     flex-direction: column-reverse;
     align-items: flex-end;
@@ -558,6 +568,10 @@
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
+  #addressDisplay .addressButton:not(:active) {
+    border-color: var(--ce-document-border);
+  }
+
   #navbarContainer,
   #navbarContainerLoggedIn {
     align-items: center;
@@ -579,12 +593,16 @@
   }
 }
 
-// Share the account control's unscaled box and responsive scale with the logo.
+// Keep the logo at the signed-out size when the smaller account control appears.
 #navbarContainer,
 #navbarContainerLoggedIn {
+  --ce-navbar-logo-size: 100px;
+  --ce-navbar-logo-scale: 1;
   --ce-navbar-control-size: 100px;
   --ce-navbar-control-scale: 1;
   align-items: center;
+  padding-top: 16px;
+  padding-bottom: 16px;
 }
 
 #navbarContainerLoggedIn {
@@ -598,6 +616,11 @@
 }
 
 @media (max-width: 768px) {
+  #navbarContainer,
+  #navbarContainerLoggedIn {
+    --ce-navbar-logo-size: 80px;
+  }
+
   #navbarContainer {
     --ce-navbar-control-size: 80px;
   }
@@ -608,6 +631,12 @@
 }
 
 @media (max-width: 465px) {
+  #navbarContainer,
+  #navbarContainerLoggedIn {
+    --ce-navbar-logo-size: 70px;
+    --ce-navbar-logo-scale: 0.9;
+  }
+
   #navbarContainer {
     --ce-navbar-control-size: 70px;
     --ce-navbar-control-scale: 0.9;
@@ -627,13 +656,14 @@
 #mainLogo,
 #mainLogoLoggedIn {
   display: block;
-  width: var(--ce-navbar-control-size);
-  max-width: var(--ce-navbar-control-size);
+  width: var(--ce-navbar-logo-size);
+  max-width: var(--ce-navbar-logo-size);
   min-height: 0;
-  height: var(--ce-navbar-control-size);
+  height: var(--ce-navbar-logo-size);
   margin: 0;
   object-fit: contain;
-  transform: scale(var(--ce-navbar-control-scale));
+  // The SVG artwork fills 74.5% of its viewBox height; keep the layout box fixed.
+  transform: scale(calc(var(--ce-navbar-logo-scale) * 1.343));
 }
 
 .logoHomeLink {

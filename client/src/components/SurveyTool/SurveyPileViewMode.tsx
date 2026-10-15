@@ -16,6 +16,7 @@ import QuadraticAllocationInput from './QuadraticAllocationInput';
 /** @file SurveyPileViewMode.tsx */
 
 import React from 'react';
+import { resolvePileAutoAdvanceEnabled } from './surveyPileNavigation';
 // Styles
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyTool.module.scss';
@@ -1363,7 +1364,7 @@ const triggerNavFade = (engine: PileViewModeEngine) => {
   }, 2000);
 };
 
-const handleNext = (engine: PileViewModeEngine) => {
+const handleNext = (engine: PileViewModeEngine, focusQuestion = false) => {
   if (engine._persistTimer) {
     clearTimeout(engine._persistTimer);
     engine._persistTimer = null;
@@ -1389,6 +1390,11 @@ const handleNext = (engine: PileViewModeEngine) => {
     },
     () => {
       engine.ensureVisiblePileResponseState();
+      if (focusQuestion === true) {
+        const card = engine.pileContainer?.querySelector('[data-testid="ce-pile-active-question"]');
+        card?.focus({ preventScroll: true });
+        card?.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
+      }
     },
   );
   engine.triggerNavFade();
@@ -2594,7 +2600,46 @@ const renderPileResponseInput = (
     enableAiRewrite = true,
   }: any,
 ) => {
-  const updateAnswer = onAnswerChange || ((value: unknown) => engine.handleAnswerPile(question.id, value));
+  const updateAnswer =
+    onAnswerChange ||
+    ((value: unknown) => {
+      const questionId = normalizeQuestionIdKey(question.id);
+      const inputType = normalizePileQuestionInputType(question);
+      const canAdvance =
+        inputType === 'binary' ||
+        (inputType === 'multichoice' && (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question)));
+      engine.handleAnswerPile(question.id, value, {
+        afterUpdate: () => {
+          if (!canAdvance || !resolvePileAutoAdvanceEnabled(engine.getEffectivePileSessionConfig())) return;
+          // Inspect the committed answer: clicking a selected binary option clears it.
+          // Only direct card edits reach this callback; interview drafts and hydration do not.
+          const savedValue = readPlainRecord(engine.state.surveysResponseState?.[0]?.answers?.[questionId]).value;
+          if (
+            inputType === 'binary'
+              ? typeof savedValue !== 'string' || !['Agree', 'Unsure', 'Disagree'].includes(savedValue)
+              : normalizeMultichoiceValue(savedValue).length !== 1
+          )
+            return;
+          const visibleQuestions = resolveEarlyVisiblePileQuestions({
+            pileQuestions: engine.state.pileQuestions,
+            questionPool: (engine.state.questionPool?.length
+              ? engine.state.questionPool
+              : engine.props.questionPool) as EarlyVisiblePileQuestion[],
+            isFilterActive: !!engine.state.isFilterActive || isSurveyToolFilterStateActive(engine.state.filterState),
+          });
+          const index = Math.min(
+            Math.max(0, Number(engine.state.activePileIndex || 0)),
+            Math.max(visibleQuestions.length - 1, 0),
+          );
+          if (
+            normalizeQuestionIdKey(visibleQuestions[index]?.id) !== questionId ||
+            index >= visibleQuestions.length - 1
+          )
+            return;
+          engine.handleNext(true);
+        },
+      });
+    });
   if (maskedAnswer) {
     return engine.renderQuestionFieldDecryptControl({
       questionId: question.id,
@@ -3174,7 +3219,12 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
   const showListeningAside = showListeningPanel && !showHologramAssistant;
 
   return (
-    <div className={styles.pileViewContainer}>
+    <div
+      className={styles.pileViewContainer}
+      ref={(node) => {
+        engine.pileContainer = node;
+      }}
+    >
       <div className={showListeningAside ? styles.pileListeningLayout : undefined}>
         <div className={styles.pileWrapper}>
           {renderPileInteractionSurface({

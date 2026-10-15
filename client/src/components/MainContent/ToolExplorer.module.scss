@@ -178,11 +178,11 @@
 }
 
 .expandedHeaderRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  flex-wrap: wrap;
   margin: 20px 0 18px;
 }
 
@@ -190,15 +190,40 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.expandedHeaderSession {
+  justify-self: end;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.expandedHeaderSession .activeSessionControl {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  cursor: pointer;
+
+  select.activeSessionSelect {
+    min-width: 100%;
+  }
 }
 
 .expandedHeaderActions {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
   justify-content: flex-end;
+
+  &:empty {
+    display: none;
+  }
 }
 
 .expandedHeaderMeta {
@@ -284,52 +309,6 @@
   min-width: 132px;
 }
 
-.headerIconButton {
-  width: 56px;
-  min-width: 56px;
-  padding: 0;
-}
-
-.headerSessionSelector {
-  position: relative;
-  display: inline-flex;
-}
-
-.headerSessionSelectorPanel {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  z-index: 4;
-  width: min(540px, calc(100vw - 32px));
-  padding: 14px;
-  border-radius: var(--ce-radius-16);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  background: color-mix(in srgb, var(--ce-overlay-surface) 98%, transparent);
-  box-shadow: 0 18px 36px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
-}
-
-.headerSessionSelectorHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.headerSessionSelectorHint {
-  color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
-  font-size: 0.86rem;
-}
-
-.headerSessionResetButton {
-  min-height: 38px;
-  padding: 8px 12px;
-  font-size: 0.86rem;
-  text-transform: none;
-  font-weight: 600;
-  gap: 6px;
-}
-
 .headerActionButtonActive {
   background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
   color: var(--ce-action-accent);
@@ -384,22 +363,9 @@
     min-height: 50px;
     padding: 12px 18px;
   }
-
-  .headerIconButton {
-    width: 50px;
-    min-width: 50px;
-    padding: 0;
-  }
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  .headerSessionSelectorPanel {
-    right: auto;
-    left: 50%;
-    width: min(460px, calc(100vw - 48px));
-    transform: translateX(-50%);
-  }
-
   .explorerContainerSparse {
     min-height: clamp(400px, 48vh, 620px);
   }
@@ -459,13 +425,11 @@
     align-items: flex-start;
   }
 
-  .expandedHeaderLead,
   .expandedHeaderActions {
     width: 100%;
   }
 
   .expandedHeaderMeta {
-    width: 100%;
     min-height: 0;
   }
 
@@ -473,6 +437,138 @@
     min-height: 48px;
     padding: 11px 16px;
     font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .expandedHeaderRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .expandedHeaderSession {
+    width: fit-content;
+  }
+}
+
+.expandedHeaderPrimaryControls {
+  grid-column: 1 / -1;
+  flex: 1 1 350px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  min-width: 0;
+
+  .expandedHeaderLead {
+    flex: 0 0 auto;
+  }
+
+  .expandedHeaderSession {
+    flex: 0 1 auto;
+    width: fit-content;
+    max-width: 100%;
+    margin-left: auto;
+  }
+}
+
+.expandedHeaderCompact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+
+  .expandedHeaderLead {
+    flex: 0 0 auto;
+    gap: 8px;
+  }
+
+  .expandedHeaderMeta {
+    min-height: 44px;
+  }
+
+  .headerActionButton {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 1rem;
+  }
+
+  .expandedHeaderActions {
+    flex: 0 1 auto;
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+
+  .expandedHeaderSession {
+    flex: 0 1 auto;
+    width: fit-content;
+    max-width: 100%;
+    margin-left: auto;
+  }
+}
+
+.expandedHeaderQuestions {
+  margin-bottom: 10px;
+}
+
+.expandedHeaderQuestions .expandedHeaderPrimaryControls {
+  flex-basis: 100%;
+  width: 100%;
+}
+
+.expandedHeaderGroups .expandedHeaderPrimaryControls,
+.expandedHeaderGroups .expandedHeaderActions {
+  flex-basis: 100%;
+  width: 100%;
+}
+
+.expandedHeaderGroups .expandedHeaderActions {
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+
+  > button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  @media (max-width: 466px) {
+    gap: 6px;
+
+    .headerActionButton {
+      gap: 6px;
+      padding: 10px 8px;
+      font-size: 0.875rem;
+    }
+  }
+}
+
+// Keep the sticky slot beside the question body so the short navigation header
+// cannot constrain it as the page scrolls.
+.expandedQuestionsToolbar {
+  position: sticky;
+  top: 10px;
+  z-index: 20;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 640px) {
+  .expandedHeaderCompact > .expandedHeaderSession {
+    flex-basis: auto;
+    max-width: 100%;
+  }
+
+  .expandedHeaderPrimaryControls {
+    flex-basis: 100%;
+
+    + .expandedHeaderActions {
+      flex-basis: 100%;
+    }
   }
 }
 
@@ -520,10 +616,38 @@
 }
 
 .explainerTooltipIcon {
-  display: inline-block;
-  margin-left: 8px;
-  vertical-align: middle;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
   font-size: 2em;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.explainerPopover {
+  max-width: min(320px, calc(100vw - 24px));
+  background: var(--ce-document-surface);
+  color: var(--ce-document-text);
+  border: 1px solid var(--ce-border-strong);
+}
+
+.explainerPopoverContent {
+  padding: 12px;
+  color: inherit;
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
 
 #aboutText {
@@ -773,12 +897,6 @@
     border-color: var(--ce-border-inset);
     box-shadow: var(--ce-shadow-pressed);
   }
-
-  .headerIconButton {
-    width: 34px;
-    min-width: 34px;
-    padding: 0;
-  }
 }
 
 @media (max-width: 640px) {
@@ -813,8 +931,7 @@
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
-  .legendText,
-  .headerSessionSelectorHint {
+  .legendText {
     color: var(--ce-document-text-muted);
     opacity: 1;
   }
@@ -872,13 +989,6 @@
       background: var(--ce-action-primary-hover);
       color: var(--ce-selection-text);
     }
-  }
-
-  .headerSessionSelectorPanel {
-    background: var(--ce-overlay-surface);
-    color: var(--ce-overlay-text);
-    border-color: var(--ce-document-border-strong);
-    box-shadow: var(--ce-card-shadow);
   }
 
   .title {

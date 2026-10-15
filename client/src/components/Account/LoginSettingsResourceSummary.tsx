@@ -67,7 +67,7 @@ export const LoginSettingsSupportedResourceCard = ({
   const extraCount = extraSessions.length;
 
   return (
-    <div className={styles.supportedResourceCard}>
+    <div className={styles.supportedResourceCard} data-testid={`ce-settings-resource-${card.key}`}>
       <div className={styles.supportedResourceHeader}>
         <div className={styles.supportedResourceName}>{card.title}</div>
         <span className={`${styles.aiSponsoredStatus} ${styles[`aiSponsoredStatus${card.status.tone}`]}`}>

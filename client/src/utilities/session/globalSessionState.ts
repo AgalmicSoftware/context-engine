@@ -4,7 +4,7 @@ import { CE_SESSION_SCAN_SCOPE, CE_SESSION_SCAN_SLUGS } from '../../variables/ap
 
 type GlobalSessionScope = 'all' | 'active' | 'general' | 'list';
 type GlobalSessionSelectionInput = Record<string, unknown>;
-type GlobalSessionSelection = {
+export type GlobalSessionSelection = {
   primarySessionSlug: string;
   primarySessionExplicit: boolean;
   activeSessionSlug: string;
@@ -166,7 +166,11 @@ export const readStoredGlobalSessionSelection = (): GlobalSessionSelection => {
     CE_SESSION_SCAN_SLUGS;
 
   return normalizeGlobalSessionSelection({
-    ...(primarySessionSlug != null ? { primarySessionSlug } : {}),
+    ...(primarySessionSlug != null
+      ? { primarySessionSlug }
+      : selectedSessionScope === 'all'
+        ? { primarySessionSlug: derivePrimarySessionSlugFromList(parseStoredSlugList(selectedSessionSlugsRaw)) }
+        : {}),
     primarySessionExplicit: readStoredPrimarySessionExplicit(),
     selectedSessionScope,
     selectedSessionSlugs: parseStoredSlugList(selectedSessionSlugsRaw),

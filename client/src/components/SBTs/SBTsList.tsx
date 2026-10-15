@@ -3006,7 +3006,13 @@ const OnChainSBTsList = ({
 const SBTsList = (props: SBTsListProps) => {
   const workerSessionConfig = resolveSbtListWorkerRouteConfig(props);
   if (!workerSessionConfig) return <OnChainSBTsList {...props} />;
-  return <WorkerGroupsListRoute props={props} workerSessionConfig={workerSessionConfig} />;
+  return (
+    <WorkerGroupsListRoute
+      key={String(props.sessionSlug || workerSessionConfig.slug || '')}
+      props={props}
+      workerSessionConfig={workerSessionConfig}
+    />
+  );
 };
 
 export { resolveSbtListWorkerRouteConfig };

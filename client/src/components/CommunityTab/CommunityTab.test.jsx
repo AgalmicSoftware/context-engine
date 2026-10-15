@@ -1,5 +1,16 @@
-import CommunityTab from './CommunityTab';
-import { LoginSettingsSessionSummary } from '../Account/LoginSettingsControlRow';
+import React from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { Provider, connect } from 'react-redux';
+import { applyMiddleware, combineReducers, createStore } from 'redux';
+import thunk from 'redux-thunk';
+import ConnectedCommunityTab, { CommunityTab } from './CommunityTab';
+import { LoginAndSettingsModal } from '../Account/LoginAndSettingsModal';
+import sessionStateReducer from '../../reducers/sessionStateReducer';
+import { updateGlobalSessionSelection } from '../../actions/sessionStateActions';
+
+jest.mock('../HooksHOC/withWagmiBridge', () => ({ WagmiHooksHOC: (Component) => Component }));
+jest.mock('@rainbow-me/rainbowkit', () => ({ ConnectButton: () => null }));
+import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import * as polisReportModule from '../PolisReport/PolisReport';
 import {
   initCacheManager,
@@ -12,6 +23,7 @@ import {
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import contractScripts, * as chainGateway from '../../utilities/web3/chainGateway.js';
 import * as sessionSources from '../../utilities/session/sessionSourceResolver';
+import * as workerConfigCache from '../../utilities/session/sessionWorkerConfigCache';
 import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry';
 import * as workerGroupPorts from '../../domains/worker/workerGroupPorts';
 import * as workerAuth from '../../utilities/worker/workerAuth';
@@ -23,8 +35,10 @@ import {
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import SBTsList from '../SBTs/SBTsList';
+import SBTFilter from '../SBTs/SBTFilter';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import demoSessions from '../../variables/demo/demo_sessions.json';
+import { writeGlobalSessionSelection } from '../../utilities/session/globalSessionState';
 
 const ORIGINAL_SESSION_SCAN_SCOPE = globalThis.CE_SESSION_SCAN_SCOPE;
 const ORIGINAL_SESSION_SCAN_SLUGS = globalThis.CE_SESSION_SCAN_SLUGS;
@@ -177,6 +191,156 @@ describe('CommunityTab helpers', () => {
   it('prefers activeSessionSlug over URL parsing', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'edge' });
     expect(instance._currentSlug()).toBe('edge');
+  });
+
+  it('starts fresh global Stats selection at ALL', () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+    expect(instance._isUniverseEnabled()).toBe(true);
+  });
+
+  it('keeps actual Stats counters and Settings selection synchronized through the shared Redux action', async () => {
+    const configs = {
+      alpha: { slug: 'alpha', sessionName: 'Alpha discussion', networkChainId: 11155420, contracts: {} },
+      beta: { slug: 'beta', sessionName: 'Beta discussion', networkChainId: 11155420, contracts: {} },
+    };
+    jest.spyOn(chainGateway, 'getAllSessionSlugs').mockReturnValue(['alpha', 'beta']);
+    jest.spyOn(chainGateway, 'getAllSessionEntries').mockReturnValue(Object.entries(configs));
+    jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockImplementation((slug) => configs[slug] || null);
+    jest.spyOn(chainGateway, 'getSessionChainId').mockReturnValue(11155420);
+    for (const [index, slug] of ['alpha', 'beta'].entries()) {
+      await writeCache('questionsCache', slug, {
+        11155420: {
+          questions: Object.fromEntries(
+            Array.from({ length: index + 1 }, (_, n) => [
+              `${slug}-q${n}`,
+              { type: 'binary', creator: `0x${index + 1}`, prompt: `${slug} question ${n + 1}` },
+            ]),
+          ),
+          questionResponses: {},
+        },
+      });
+      await writeCache('surveysCache', slug, {
+        11155420: { surveys: { [slug]: { title: `${slug} survey`, creator: `0x${index + 1}` } }, surveyResponses: {} },
+      });
+    }
+    writeGlobalSessionSelection({ primarySessionSlug: 'alpha', selectedSessionScope: 'active' });
+    const store = createStore(combineReducers({ sessionState: sessionStateReducer }), applyMiddleware(thunk));
+    let statsInstance;
+    const ensureUniverse = jest.fn();
+    jest.spyOn(CommunityTab.prototype, 'componentDidMount').mockImplementation(function () {
+      statsInstance = this;
+      this._isUnmounted = false;
+      this._hydrateWorkerGroupCounts = jest.fn(async () => {});
+      this._isDocumentHidden = () => false;
+      this._scheduleNextStatsPoll = jest.fn();
+      this.setState({ initialLoadDone: true, loadingSbtsCreated: false, loadingSurveyData: false });
+      this._refreshSessionCatalog();
+      this._ensureUniverseWarmup();
+    });
+    class SettingsView extends LoginAndSettingsModal {
+      componentDidMount() {
+        this._isMounted = true;
+      }
+      componentWillUnmount() {
+        this._isMounted = false;
+      }
+      loadAiSettings = jest.fn();
+      loadResourceKeys = jest.fn();
+      loadSponsoredAccess = jest.fn();
+      syncPasskeyWalletChain = jest.fn();
+      checkAndSendTestFundsIfNeeded = jest.fn();
+      render() {
+        return (
+          <>
+            {this.renderGlobalSessionSelector({ testId: 'settings-selector' })}
+            {this.renderGlobalSessionSettings({ scopePrefix: 'settings-scope' })}
+          </>
+        );
+      }
+    }
+    const Settings = connect((state) => state.sessionState, { updateGlobalSessionSelection })(SettingsView);
+    const view = render(
+      <Provider store={store}>
+        <ConnectedCommunityTab activeSessionSlug="stale-route" ensureLightSbtUniverse={ensureUniverse} />
+        <Settings provider="" network={null} account="" toggleLoginModal={jest.fn()} />
+      </Provider>,
+    );
+    try {
+      await act(async () => {
+        await statsInstance._runStatsRefreshCycle({ force: true });
+      });
+      expect(screen.getByTestId('ce-community-stat-questions')).toHaveAttribute('data-ce-count', '1');
+      expect(ensureUniverse).not.toHaveBeenCalled();
+      const statsSelector = screen.getByTestId('ce-community-session-select');
+      const settingsSelector = screen.getByTestId('settings-selector');
+      const allValue = Array.from(statsSelector.options).find((option) => option.text === 'ALL').value;
+      fireEvent.click(screen.getByTestId('ce-community-stat-users'));
+      const usersSelector = await screen.findByTestId('ce-community-users-session-select');
+      expect(usersSelector).toHaveValue('alpha');
+      fireEvent.change(usersSelector, { target: { value: allValue } });
+      await waitFor(() =>
+        expect(screen.getByTestId('ce-community-stat-questions')).toHaveAttribute('data-ce-count', '3'),
+      );
+      expect(settingsSelector).toHaveValue(allValue);
+      expect(statsSelector).toHaveValue(allValue);
+      await waitFor(() => expect(statsInstance.state.filteredUsers).toEqual(['0x1', '0x2']));
+      expect(screen.getByTestId('ce-community-stat-sessions')).toBeVisible();
+      expect(screen.getByTestId('ce-community-stat-surveys')).toHaveAttribute('data-ce-count', '2');
+      expect(ensureUniverse).toHaveBeenCalledTimes(1);
+      fireEvent.change(settingsSelector, { target: { value: 'beta' } });
+      await waitFor(() =>
+        expect(screen.getByTestId('ce-community-stat-questions')).toHaveAttribute('data-ce-count', '2'),
+      );
+      expect(statsSelector).toHaveValue('beta');
+      expect(usersSelector).toHaveValue('beta');
+      await waitFor(() => expect(statsInstance.state.filteredUsers).toEqual(['0x2']));
+      expect(screen.queryByTestId('ce-community-stat-sessions')).not.toBeInTheDocument();
+      fireEvent.change(screen.getByTestId('settings-scope-mode'), { target: { value: 'list' } });
+      fireEvent.change(statsSelector, { target: { value: 'alpha' } });
+      await waitFor(() => expect(screen.getByTestId('settings-scope-mode')).toHaveValue('active'));
+      fireEvent.click(screen.getByRole('button', { name: 'Save session settings' }));
+      expect(store.getState().sessionState).toMatchObject({
+        primarySessionSlug: 'alpha',
+        selectedSessionScope: 'active',
+      });
+      fireEvent.change(settingsSelector, { target: { value: '' } });
+      await waitFor(() =>
+        expect(screen.getByTestId('ce-community-stat-questions')).toHaveAttribute('data-ce-count', '0'),
+      );
+      expect(statsSelector).toHaveValue('');
+      expect(usersSelector).toHaveValue('');
+      await waitFor(() => expect(statsInstance.state.filteredUsers).toEqual([]));
+      fireEvent.change(statsSelector, { target: { value: allValue } });
+      await waitFor(() =>
+        expect(screen.getByTestId('ce-community-stat-questions')).toHaveAttribute('data-ce-count', '3'),
+      );
+      expect(ensureUniverse).toHaveBeenCalledTimes(1);
+      expect(usersSelector).toHaveValue(allValue);
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it.each([
+    { selectedSessionScope: 'active', primarySessionSlug: 'edge', selectedSessionSlugs: [], expected: ['edge'] },
+    { selectedSessionScope: 'general', primarySessionSlug: '', selectedSessionSlugs: [], expected: [''] },
+    {
+      selectedSessionScope: 'list',
+      primarySessionSlug: 'edge',
+      selectedSessionSlugs: ['edge', 'alpha'],
+      expected: ['edge', 'alpha'],
+    },
+  ])('hides Sessions and scopes details to the saved $selectedSessionScope selection', ({ expected, ...selection }) => {
+    writeGlobalSessionSelection(selection);
+    const instance = new CommunityTab({ activeSessionSlug: 'demo' });
+    jest.spyOn(instance, 'listAllSlugs').mockReturnValue(['demo', '', 'edge', 'alpha']);
+    expect(instance._getSelectedSessionSlugs()).toEqual(expected);
+    expect(
+      collectTreeNodes(instance.render(), (node) => node.props?.['data-testid'] === 'ce-community-stat-sessions'),
+    ).toHaveLength(0);
+    expect(
+      collectTreeNodes(instance.render(), (node) => node.props?.testId === 'ce-community-session-select'),
+    ).toHaveLength(1);
   });
 
   it('opens a session directory with authority totals and links independently of the selected stats scope', () => {
@@ -344,50 +508,55 @@ describe('CommunityTab helpers', () => {
     expect(collectNodeText(content)).toContain('1 of 2 sessions1Centralized0Decentralized');
   });
 
-  it('groups the chart and leaderboard under one selected-session label', () => {
-    const instance = new CommunityTab({
-      activeSessionSlug: 'cloud',
-      sessionConfig: { slug: 'cloud', sessionName: 'Cloud forum' },
-    });
-    instance._getSelectedSessionSlugs = jest.fn(() => ['cloud']);
-    instance._shouldUseDemoBeeswarmData = jest.fn(() => false);
-    instance._beeswarmPoints = [{ questionId: 'q1', total: 1 }];
-    const [section] = collectTreeNodes(
-      instance.render(),
-      (node) => node.props?.['data-testid'] === 'ce-community-session-section',
-    );
-    const labels = collectTreeNodes(section, (node) => node.props?.id === section.props['aria-labelledby']);
-    expect(labels.map((node) => node.props['aria-label'])).toEqual(['Session: Cloud forum (cloud)']);
-    const [summary] = collectTreeNodes(labels, (node) => node.type === LoginSettingsSessionSummary);
-    const summaryContent = LoginSettingsSessionSummary(summary.props);
-    expect(collectNodeText(summaryContent)).toBe('SESSIONCloud forum');
-    expect(collectTreeNodes(summaryContent, (node) => node.type === 'a')[0].props).toMatchObject({
-      href: '/session/cloud',
-      'aria-label': 'Open session Cloud forum',
-    });
-    for (const id of ['ce-community-beeswarm-section', 'ce-community-leaderboard-section']) {
-      expect(collectTreeNodes(section, (node) => node.props?.['data-testid'] === id)).toHaveLength(1);
+  it.each([false, true])('shows only the Stats counters while the lower panels are hidden (demo: %s)', (demo) => {
+    const instance = new CommunityTab({ activeSessionSlug: 'cloud' });
+    instance._shouldUseDemoBeeswarmData = jest.fn(() => demo);
+    const tree = instance.render();
+    const counters = collectTreeNodes(tree, (node) => node.type === 'button' && node.props?.['data-ce-count']);
+    expect(counters.map((node) => node.props['data-testid'])).toEqual([
+      'ce-community-stat-users',
+      'ce-community-stat-questions',
+      'ce-community-stat-surveys',
+      'ce-community-stat-groups',
+      'ce-community-stat-sessions',
+    ]);
+    for (const id of [
+      'ce-community-session-section',
+      'ce-community-session-scope',
+      'ce-community-leaderboard-section',
+      'ce-community-beeswarm-section',
+    ]) {
+      expect(collectTreeNodes(tree, (node) => node.props?.['data-testid'] === id)).toHaveLength(0);
     }
-    expect(
-      collectTreeNodes(section, (node) => node.props?.['data-testid'] === 'ce-community-beeswarm-session'),
-    ).toHaveLength(0);
+    expect(collectTreeNodes(tree, (node) => node.props?.['aria-label'] === 'Leaderboard filters')).toHaveLength(0);
+    expect(collectTreeNodes(tree, (node) => node.type === BeeswarmPlot)).toHaveLength(0);
+  });
 
-    instance._shouldUseDemoBeeswarmData = jest.fn(() => true);
-    instance._iterScopeCaches = jest.fn(() => [{ slug: 'cloud' }]);
-    instance._buildDemoBeeswarmPoints = jest.fn(() => []);
-    const [demoLabel] = collectTreeNodes(
+  it.each([
+    ['users', 'users'],
+    ['questions', 'questions'],
+    ['surveys', 'surveys'],
+    ['groups', 'sbtgroups'],
+    ['sessions', 'sessions'],
+  ])('keeps the %s counter opening its detail modal after hiding the lower panels', (id, modalType) => {
+    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+    attachMutableSetState(instance);
+    const [counter] = collectTreeNodes(
       instance.render(),
-      (node) => node.props?.['data-testid'] === 'ce-community-session-scope',
+      (node) => node.props?.['data-testid'] === `ce-community-stat-${id}`,
     );
-    expect(demoLabel.props['aria-label']).toBe('Demo session: Cloud forum (cloud)');
-    expect(collectNodeText(demoLabel)).toBe('Demo');
-    expect(collectTreeNodes(demoLabel, (node) => node.type === LoginSettingsSessionSummary)[0].props).toMatchObject({
-      activeSession: { label: 'Cloud forum', slug: 'cloud' },
-      sessionHref: '/session/cloud',
-    });
+    counter.props.onClick();
+    expect(instance.state).toMatchObject({ showModal: true, modalType });
+    const tree = instance.render();
+    expect(collectTreeNodes(tree, (node) => node.type === Modal)[0].props.isOpen).toBe(true);
+    if (modalType === 'questions') {
+      const [body] = collectTreeNodes(tree, (node) => node.type === ModalBody);
+      expect(collectTreeNodes(body, (node) => node.type === 'table')).toHaveLength(1);
+    }
   });
 
   it('names selected sessions and uses an all-session label for combined scope', () => {
+    writeGlobalSessionSelection({ selectedSessionScope: 'list', selectedSessionSlugs: ['alpha', 'beta'] });
     jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockReturnValue(null);
     jest.spyOn(chainGateway, 'getDemoSessionConfigBySlug').mockReturnValue(null);
     const instance = new CommunityTab({
@@ -398,37 +567,12 @@ describe('CommunityTab helpers', () => {
     instance._shouldUseDemoBeeswarmData = jest.fn(() => false);
     instance._beeswarmPoints = [{ questionId: 'q1', total: 1 }];
     expect(instance._communityScopeLabel()).toBe('Sessions: alpha, beta');
-    const [selectedScope] = collectTreeNodes(
-      instance.render(),
-      (node) => node.props?.['data-testid'] === 'ce-community-session-scope',
-    );
-    expect(collectNodeText(selectedScope)).toBe('Sessions: alpha, beta');
-    expect(collectTreeNodes(selectedScope, (node) => node.type === LoginSettingsSessionSummary)).toHaveLength(0);
     instance._isUniverseEnabled = jest.fn(() => true);
     expect(instance._communityScopeLabel()).toBe('All sessions');
-    const [allScope] = collectTreeNodes(
-      instance.render(),
-      (node) => node.props?.['data-testid'] === 'ce-community-session-scope',
-    );
-    expect(collectNodeText(allScope)).toBe('All sessions');
-    expect(collectTreeNodes(allScope, (node) => node.type === LoginSettingsSessionSummary)).toHaveLength(0);
-  });
-
-  it('links the General session summary to the unqualified session route', () => {
-    jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockReturnValue(null);
-    jest.spyOn(chainGateway, 'getDemoSessionConfigBySlug').mockReturnValue(null);
-    const instance = new CommunityTab({ activeSessionSlug: '' });
-    instance._getSelectedSessionSlugs = jest.fn(() => ['']);
-    instance._shouldUseDemoBeeswarmData = jest.fn(() => false);
-    instance._beeswarmPoints = [{ questionId: 'q1', total: 1 }];
-    const [summary] = collectTreeNodes(instance.render(), (node) => node.type === LoginSettingsSessionSummary);
-    expect(summary.props).toMatchObject({
-      activeSession: { label: 'General', slug: '' },
-      sessionHref: '/session',
-    });
   });
 
   it('reuses the scope label until its session inputs change', () => {
+    writeGlobalSessionSelection({ selectedSessionScope: 'active', primarySessionSlug: 'alpha' });
     const configLookup = jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockReturnValue(null);
     jest.spyOn(chainGateway, 'getDemoSessionConfigBySlug').mockReturnValue(null);
     const instance = new CommunityTab({ activeSessionSlug: 'alpha' });
@@ -458,17 +602,6 @@ describe('CommunityTab helpers', () => {
       scopeLabel: 'Demo session: demo',
       isDemoFallback: true,
     });
-    instance._communityScopeLabel = jest.fn(() => 'Session: cloud');
-    const labels = collectTreeNodes(instance.render(), (node) =>
-      ['ce-community-session-scope', 'ce-community-beeswarm-session'].includes(node.props?.['data-testid']),
-    );
-    expect(labels.map((node) => node.props['aria-label'] || collectNodeText(node))).toEqual([
-      'Session: cloud',
-      'Demo session: demo',
-    ]);
-    expect(collectTreeNodes(labels[0], (node) => node.type === LoginSettingsSessionSummary)[0].props.sessionHref).toBe(
-      '/session/cloud',
-    );
   });
 
   it('keeps /session/debate as its explicit slug', () => {
@@ -569,6 +702,7 @@ describe('CommunityTab helpers', () => {
   });
 
   it('counts the public Worker group catalog for an active Cloudflare session', async () => {
+    writeGlobalSessionSelection({ selectedSessionScope: 'active', primarySessionSlug: 'demo-sh' });
     await writeWorkerStatsCaches();
     jest.spyOn(workerGroupPorts, 'loadPublicWorkerGroups').mockResolvedValue([
       {
@@ -613,6 +747,7 @@ describe('CommunityTab helpers', () => {
   });
 
   it('counts authorized Worker groups for a signed-in Cloudflare session', async () => {
+    writeGlobalSessionSelection({ selectedSessionScope: 'active', primarySessionSlug: 'demo-sh' });
     await writeWorkerStatsCaches();
     jest.spyOn(workerAuth, 'getWorkerSessionToken').mockResolvedValue('worker-token');
     jest.spyOn(workerGroupPorts, 'loadPublicWorkerGroups');
@@ -828,7 +963,7 @@ describe('CommunityTab helpers', () => {
   it('uses the default demo report votes for an auto-demo alias so the default session keeps its real cluster', () => {
     const priorUrl = window.location.href;
     try {
-      localStorage.removeItem('ce:sessionScanScope');
+      writeGlobalSessionSelection({ selectedSessionScope: 'active', primarySessionSlug: 'demo-sh' });
       globalThis.CE_SESSION_SCAN_SCOPE = 'active';
       window.history.replaceState({}, '', '/session/demo-sh');
 
@@ -1006,7 +1141,7 @@ describe('CommunityTab helpers', () => {
     expect(instance._currentSlug()).toBe('demo');
   });
 
-  it('removes the community stats session selector while keeping the leaderboard controls gear', () => {
+  it('keeps retired Stats session and leaderboard controls out of the page', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'demo' });
 
     const tree = instance.render();
@@ -1025,7 +1160,7 @@ describe('CommunityTab helpers', () => {
 
     expect(toggleNode).toBeFalsy();
     expect(panelNode).toBeFalsy();
-    expect(leaderboardToggleNode).toBeTruthy();
+    expect(leaderboardToggleNode).toBeFalsy();
   });
 
   it('renders leaderboard hide filters behind a cog panel', () => {
@@ -1037,7 +1172,7 @@ describe('CommunityTab helpers', () => {
       hideHumanUsers: false,
     };
 
-    const tree = instance.render();
+    const tree = instance.renderLeaderboardControls();
     const [toggleNode] = collectTreeNodes(
       tree,
       (node) => node?.props?.['data-testid'] === 'ce-community-leaderboard-controls-toggle',
@@ -1082,7 +1217,7 @@ describe('CommunityTab helpers', () => {
     expect(modalNode.props.scrollable).toBe(true);
   });
 
-  it('keeps the default layout minimal while exposing the classic participant window label', () => {
+  it('keeps retired section headings out of the Stats page', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'demo' });
     const tree = instance.render();
     const headings = collectTreeNodes(tree, (node) => node?.type === 'h2');
@@ -1090,7 +1225,7 @@ describe('CommunityTab helpers', () => {
 
     expect(headingText).not.toContain('Leaderboard');
     expect(headingText).not.toContain('Statistics');
-    expect(headingText).toEqual(expect.arrayContaining([expect.stringMatching(/^Participants \(\d+\)$/)]));
+    expect(headingText).toEqual([]);
   });
 
   it('renders survey links with session query suffix in modal content', () => {
@@ -1163,12 +1298,12 @@ describe('CommunityTab helpers', () => {
         ...instance.state,
         modalType: 'questions',
       };
-      const questionsTree = instance.renderModalContent();
+      const [questionsTree] = collectTreeNodes(instance.render(), (node) => node.type === ModalHeader);
       const [questionsAnchor] = collectTreeNodes(
         questionsTree,
         (node) => node?.type === 'a' && typeof node?.props?.href === 'string',
       );
-      expect(questionsAnchor.props.href).toBe('/ce/questions');
+      expect(questionsAnchor.props.href).toBe('/ce/session/edge');
 
       instance.handleUserClick({ username: '0xabc' });
       instance.handleUserClick({ username: 'ada' });
@@ -1184,77 +1319,252 @@ describe('CommunityTab helpers', () => {
     }
   });
 
-  it('renders a beeswarm preview alongside the full questions link in modal content', () => {
+  it('lists scoped questions of every type with their own session report links', () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+    try {
+      const instance = new CommunityTab({ activeSessionSlug: 'active' });
+      instance.state.modalType = 'questions';
+      instance._iterScopeCaches = jest.fn(() => [
+        {
+          slug: '',
+          sessionConfig: {},
+          questionsCache: {
+            questions: {
+              repeated: { prompt: 'General freeform question', type: 'freeform' },
+              rating: { prompt: 'General rating question', type: 'rating' },
+            },
+          },
+        },
+        {
+          slug: 'edge session',
+          sessionConfig: { slug: 'edge session', sessionName: 'Edge discussion' },
+          questionsCache: {
+            questions: {
+              repeated: { prompt: 'Named session binary question', type: 'binary' },
+              multi: { prompt: 'Named multiple choice question', type: 'multichoice' },
+              quadratic: { prompt: 'Named allocation question', type: 'quadratic' },
+            },
+          },
+        },
+      ]);
+      const tree = instance.renderModalContent();
+      const [table] = collectTreeNodes(tree, (node) => node.type === 'table');
+      expect(table.props['aria-label']).toBe('Questions by session');
+      expect(collectTreeNodes(table, (node) => node.type === 'th').map(collectNodeText)).toEqual([
+        'Session',
+        'Question',
+      ]);
+      const rows = collectTreeNodes(table, (node) => node.props?.['data-ce-question-id']);
+      expect(rows).toHaveLength(5);
+      expect(rows.map((row) => row.props['data-ce-session-slug'])).toEqual([
+        '',
+        '',
+        'edge session',
+        'edge session',
+        'edge session',
+      ]);
+      expect(
+        collectTreeNodes(rows, (node) => node.type === 'a').map((node) => [collectNodeText(node), node.props.href]),
+      ).toEqual([
+        ['General freeform question', '/ce/session#report'],
+        ['General rating question', '/ce/session#report'],
+        ['Named session binary question', '/ce/session/edge%20session#report'],
+        ['Named multiple choice question', '/ce/session/edge%20session#report'],
+        ['Named allocation question', '/ce/session/edge%20session#report'],
+      ]);
+      expect(collectNodeText(rows[0])).toContain('General');
+      expect(collectNodeText(rows[2])).toContain('Edge discussion');
+      expect(new Set(rows.map((row) => row.key)).size).toBe(5);
+      expect(collectTreeNodes(tree, (node) => node.type === BeeswarmPlot)).toHaveLength(0);
+    } finally {
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
+  });
+
+  it('refreshes open question titles as cached metadata arrives without recounting Stats', async () => {
+    class QuestionsTableView extends CommunityTab {
+      componentDidMount() {}
+      componentDidUpdate() {}
+      render() {
+        return this.renderQuestionsModalContent();
+      }
+    }
+    const ref = React.createRef();
+    const view = render(<QuestionsTableView ref={ref} activeSessionSlug="" />);
+    const instance = ref.current;
+    const netKey = String(instance._resolveNetKeyForSlug(''));
+    const writeQuestion = (question) =>
+      writeCache('questionsCache', '', {
+        [netKey]: { questionsLatestBlock: 10, questions: { q1: question }, questionResponses: {} },
+      });
+    const refresh = () =>
+      act(async () => {
+        await instance._runStatsRefreshCycle({ force: false });
+      });
+    try {
+      await writeQuestion({ creator: '0xabc', type: 'freeform' });
+      act(() => instance.setState({ showModal: true, modalType: 'questions', initialLoadDone: true }));
+      await refresh();
+      expect(screen.getByRole('link', { name: 'Question q1' })).toBeVisible();
+      const originalStats = instance.state.stats;
+      const computeStats = jest.spyOn(instance, '_computeStatsSnapshot');
+      const renderTable = jest.spyOn(instance, 'renderQuestionsModalContent');
+      await writeQuestion({ creator: '0xabc', type: 'freeform', prompt: 'Hydrated question title' });
+      await refresh();
+      expect(screen.getByRole('link', { name: 'Hydrated question title' })).toHaveAttribute('href', '/session#report');
+      expect(instance.state.stats).toBe(originalStats);
+      expect(computeStats).not.toHaveBeenCalled();
+      renderTable.mockClear();
+      await refresh();
+      expect(renderTable).not.toHaveBeenCalled();
+      peekCacheSync('questionsCache', '', { clone: false })[netKey].questions.q1.prompt = 'Updated in place';
+      await refresh();
+      expect(screen.getByRole('link', { name: 'Updated in place' })).toBeVisible();
+      act(() => instance.setState({ showModal: false, modalType: null }));
+      renderTable.mockClear();
+      await writeQuestion({ creator: '0xabc', type: 'freeform', prompt: 'Changed while closed' });
+      await refresh();
+      expect(renderTable).not.toHaveBeenCalled();
+      act(() => instance.setState({ showModal: true, modalType: 'questions' }));
+      expect(screen.getByRole('link', { name: 'Changed while closed' })).toBeVisible();
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it('uses identity-matched Worker questions without stale numeric metadata', async () => {
+    await writeWorkerStatsCaches();
+    const instance = new CommunityTab({ activeSessionSlug: 'demo-sh', sessionConfig: WORKER_SESSION_CONFIG });
+    instance.state.modalType = 'questions';
+    instance._getSelectedSessionSlugs = jest.fn(() => ['demo-sh']);
+    const content = instance.renderModalContent();
+    expect(collectNodeText(content)).toContain('Worker question');
+    expect(collectNodeText(content)).not.toContain('Stale numeric question');
+    expect(collectTreeNodes(content, (node) => node.type === 'a').map((node) => node.props.href)).toEqual([
+      '/session/demo-sh#report',
+    ]);
+  });
+
+  it('keeps unknown session labels and empty scopes free of unrelated demo fallbacks', () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'unknown' });
+    instance.state.modalType = 'questions';
+    jest
+      .spyOn(chainGateway, 'getDemoSessionConfigBySlug')
+      .mockReturnValue({ slug: 'demo', sessionName: 'Unrelated demo' });
+    instance._iterScopeCaches = jest.fn(() => [
+      {
+        slug: 'unknown',
+        sessionConfig: {},
+        questionsCache: {
+          questions: {
+            unnamed: {},
+            encrypted: { prompt: '[encrypted]' },
+          },
+        },
+      },
+    ]);
+    const text = collectNodeText(instance.renderModalContent());
+    expect(text).toContain('unknown');
+    expect(text).not.toContain('Unrelated demo');
+    expect(text).toContain('Question unnamed');
+    expect(text).toContain('Encrypted question');
+    instance._iterScopeCaches.mockReturnValue([{ slug: 'unknown', sessionConfig: {}, questionsCache: {} }]);
+    const empty = instance.renderModalContent();
+    expect(collectNodeText(empty)).toContain('No questions available for the selected sessions.');
+    expect(collectTreeNodes(empty, (node) => node.type === 'a')).toHaveLength(0);
+  });
+
+  it('uses exact-session demo question names only when that demo has no cached questions', () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'demo' });
+    instance.state.modalType = 'questions';
+    const exactDataset = { comments: [{ commentId: 'demo-1', commentBody: 'Exact demo question', type: 'rating' }] };
+    const lookup = jest
+      .spyOn(polisReportModule, 'getPolisDemoDatasetForSlug')
+      .mockImplementation((slug, options) =>
+        slug === 'demo' && options?.allowFallback === false
+          ? exactDataset
+          : { comments: [{ commentId: 'wrong', commentBody: 'Wrong fallback' }] },
+      );
+    instance._iterScopeCaches = jest.fn(() => [
+      { slug: 'demo', sessionConfig: { slug: 'demo', sessionName: 'Demo Session' }, questionsCache: {} },
+      { slug: 'unknown', sessionConfig: {}, questionsCache: {} },
+      { slug: 'demo-sh', isWorkerCanonical: true, sessionConfig: WORKER_SESSION_CONFIG, questionsCache: {} },
+    ]);
+    const content = instance.renderModalContent();
+    expect(collectNodeText(content)).toContain('Exact demo question');
+    expect(collectNodeText(content)).not.toContain('Wrong fallback');
+    expect(collectTreeNodes(content, (node) => node.type === 'a').map((node) => node.props.href)).toEqual([
+      '/session/demo#report',
+    ]);
+    expect(lookup).toHaveBeenCalledWith('demo', { allowFallback: false });
+    expect(lookup).not.toHaveBeenCalledWith('demo-sh', expect.anything());
+  });
+
+  it('keeps the questions table in the body and links the active session from the Details header', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'edge' });
     instance.state = {
       ...instance.state,
       modalType: 'questions',
+      modalTitle: 'Questions Details',
     };
-    instance._beeswarmPoints = [
+    instance._getSelectedSessionSlugs = jest.fn(() => ['other-session', 'edge']);
+    instance._iterScopeCaches = jest.fn(() => [
       {
-        questionId: 'q1',
-        label: 'Prompt one',
-        value: 0.34,
-        agrees: 2,
-        disagrees: 1,
-        unsure: 0,
-        total: 3,
+        slug: 'other-session',
+        sessionConfig: {},
+        questionsCache: { questions: { q1: { prompt: 'Prompt one' } } },
       },
-    ];
+    ]);
 
-    const tree = instance.renderModalContent();
-    const [plotNode] = collectTreeNodes(tree, (node) => node?.type === BeeswarmPlot);
-    const [anchorNode] = collectTreeNodes(tree, (node) => node?.type === 'a' && node?.props?.href === '/questions');
-    const modalChildren = Array.isArray(tree?.props?.children)
-      ? tree.props.children
-      : [tree?.props?.children].filter(Boolean);
-    const [topBarNode, plotWrapNode] = modalChildren;
+    const tree = instance.render();
+    const [header] = collectTreeNodes(tree, (node) => node.type === ModalHeader);
+    const [body] = collectTreeNodes(tree, (node) => node.type === ModalBody);
+    const [table] = collectTreeNodes(body, (node) => node.type === 'table');
+    const [anchorNode] = collectTreeNodes(header, (node) => node.type === 'a');
 
-    expect(plotNode).toBeTruthy();
-    expect(plotNode.props.points).toEqual(instance._beeswarmPoints);
-    expect(plotNode.props.domain).toEqual([0, 1]);
-    expect(plotNode.props.height).toBe(240);
-    expect(plotNode.props.showIdleSummary).toBe(false);
+    expect(collectNodeText(table)).toContain('Prompt one');
     expect(anchorNode).toBeTruthy();
+    expect(anchorNode.props.href).toBe('/session/edge');
     expect(collectNodeText(anchorNode)).toBe('View Full Questions');
     expect(anchorNode.props.target).toBeUndefined();
     expect(anchorNode.props.rel).toBeUndefined();
-    expect(topBarNode).toBeTruthy();
-    expect(plotWrapNode).toBeTruthy();
-    expect(
-      collectTreeNodes(topBarNode, (node) => node?.type === 'a' && node?.props?.href === '/questions'),
-    ).toHaveLength(1);
-    expect(collectTreeNodes(plotWrapNode, (node) => node?.type === BeeswarmPlot)).toHaveLength(1);
+    expect(collectTreeNodes(header, (node) => node.type === 'h5').map(collectNodeText)).toEqual(['Questions Details']);
+    expect(header.props.tag).toBe('div');
+    expect(header.props.toggle).toBe(instance.toggleModal);
+    expect(collectTreeNodes(body, (node) => node.type === 'a')[0].props.href).toBe('/session/other-session#report');
   });
 
-  it('falls back to computed beeswarm points in the questions modal when no cached points exist', () => {
-    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
-    instance.state = {
-      ...instance.state,
-      modalType: 'questions',
-    };
-    instance._beeswarmPoints = [];
-    const fallbackPoints = [
-      {
-        questionId: 'q-fallback',
-        label: 'Fallback prompt',
-        value: 0,
-        agrees: 0,
-        disagrees: 0,
-        unsure: 0,
-        total: 0,
-      },
-    ];
-    jest.spyOn(instance, '_shouldUseDemoBeeswarmData').mockReturnValue(false);
-    const buildSpy = jest.spyOn(instance, '_buildCommunityBeeswarmPoints').mockReturnValue(fallbackPoints);
-
-    const tree = instance.renderModalContent();
-    const [plotNode] = collectTreeNodes(tree, (node) => node?.type === BeeswarmPlot);
-
-    expect(buildSpy).toHaveBeenCalledTimes(1);
-    expect(plotNode).toBeTruthy();
-    expect(plotNode.props.points).toBe(fallbackPoints);
+  it.each([
+    ['', '', '/session'],
+    ['general', '/ce/', '/ce/session'],
+    [' Edge Session ', '/ce/', '/ce/session/edge%20session'],
+  ])('uses the active session route for %p under base path %p', (activeSessionSlug, publicUrl, expectedHref) => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = publicUrl;
+    try {
+      const instance = new CommunityTab({ activeSessionSlug });
+      instance.state.modalType = 'questions';
+      instance._getSelectedSessionSlugs = jest.fn(() => ['different-session']);
+      const [header] = collectTreeNodes(instance.render(), (node) => node.type === ModalHeader);
+      expect(collectTreeNodes(header, (node) => node.type === 'a')[0].props.href).toBe(expectedHref);
+    } finally {
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
   });
+
+  it.each(['users', 'surveys', 'sbtgroups', 'sessions'])(
+    'keeps the questions link out of the %s modal header',
+    (type) => {
+      const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+      instance.state.modalType = type;
+      const [header] = collectTreeNodes(instance.render(), (node) => node.type === ModalHeader);
+      expect(collectTreeNodes(header, (node) => node.type === 'a')).toHaveLength(0);
+      expect(header.props.tag).toBe(type === 'sessions' ? 'div' : 'h5');
+    },
+  );
 
   it('opts the CommunityTab SBT modal into compact SBT settings without affecting other SBTsList uses', () => {
     const instance = new CommunityTab({
@@ -1285,6 +1595,7 @@ describe('CommunityTab helpers', () => {
   });
 
   it('routes the Groups modal through the exact active Worker session', () => {
+    writeGlobalSessionSelection({ selectedSessionScope: 'active', primarySessionSlug: 'demo-sh' });
     const instance = new CommunityTab({
       activeSessionSlug: 'demo-sh',
       sessionConfig: WORKER_SESSION_CONFIG,
@@ -1859,6 +2170,7 @@ describe('CommunityTab helpers', () => {
   });
 
   it('recomputes stats when SBT hidden metadata mutates in place with stable holder lists', async () => {
+    writeGlobalSessionSelection({ selectedSessionScope: 'general', primarySessionSlug: '' });
     const instance = attachMutableSetState(new CommunityTab({ activeSessionSlug: '' }));
     const netKey = String(instance._resolveNetKeyForSlug('') || '');
     expect(netKey).not.toBe('');
@@ -2056,6 +2368,308 @@ describe('CommunityTab helpers', () => {
     expect(instance.state.filteredUsers).toEqual(['0xaaa', '0xbbb']);
   });
 
+  it('resets Users filters only on session changes and rejects callbacks across revisits and reopen', async () => {
+    const alpha = { primarySessionSlug: 'alpha', selectedSessionScope: 'active', selectedSessionSlugs: [] };
+    const beta = { ...alpha, primarySessionSlug: 'beta' };
+    const instance = attachMutableSetState(new CommunityTab({ globalSessionSelection: alpha }));
+    instance.state.initialLoadDone = true;
+    jest.spyOn(instance, '_resolveNetKeyForSlug').mockReturnValue('11155420');
+    jest.spyOn(instance, '_refreshSessionCatalog').mockImplementation(() => {});
+    jest.spyOn(instance, '_scheduleNextStatsPoll').mockImplementation(() => {});
+    jest.spyOn(instance, '_queueCacheDrivenRefresh').mockImplementation(() => {});
+    jest.spyOn(instance, '_hydrateSbtHoldersForUsersModal').mockResolvedValue(undefined);
+    for (const [slug, creator] of [
+      ['alpha', '0xaaa'],
+      ['beta', '0xbbb'],
+    ]) {
+      await writeCache('questionsCache', slug, { 11155420: { questions: { q: { type: 'binary', creator } } } });
+    }
+    const filter = () => collectTreeNodes(instance.renderModalContent(), (node) => node.type === SBTFilter)[0];
+    const changeScope = (selection) => {
+      const previousProps = instance.props;
+      const previousState = instance.state;
+      instance.props = { ...instance.props, globalSessionSelection: selection };
+      instance.componentDidUpdate(previousProps, previousState);
+    };
+    await instance._runStatsRefreshCycle({ force: true });
+    instance.handleStatClick({ label: 'Users' });
+    const original = filter();
+    original.props.onFilter([]);
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(filter().key).toBe(original.key);
+    expect(instance.state.filteredUsers).toEqual([]);
+
+    changeScope(beta);
+    expect(filter()).toBeUndefined();
+    expect(collectNodeText(instance.renderModalContent())).not.toContain('0xaaa');
+    original.props.onFilter(['0xstale']);
+    original.props.setFilterLoading(false);
+    expect(instance.state.filteredUsers).toEqual([]);
+    expect(instance.state.loadingFilter).toBe(true);
+    await instance._runStatsRefreshCycle({ force: true });
+    const second = filter();
+    expect(second.key).not.toBe(original.key);
+    expect(second.props.items).toEqual(['0xbbb']);
+    expect(instance.state.filteredUsers).toEqual(['0xbbb']);
+
+    changeScope(alpha);
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(filter().key).not.toBe(original.key);
+    original.props.onFilter(['0xstale']);
+    original.props.setFilterLoading(true);
+    second.props.onFilter(['0xstale']);
+    expect(instance.state.filteredUsers).toEqual(['0xaaa']);
+    expect(instance.state.loadingFilter).toBe(false);
+    const beforeClose = filter();
+    instance.toggleModal();
+    instance.handleStatClick({ label: 'Users' });
+    beforeClose.props.onFilter(['0xstale']);
+    beforeClose.props.setFilterLoading(true);
+    expect(filter().key).not.toBe(beforeClose.key);
+    expect(instance.state.filteredUsers).toEqual(['0xaaa']);
+    expect(instance.state.loadingFilter).toBe(false);
+  });
+
+  it('does not expose old Users when opened before the new scope snapshot is ready', async () => {
+    const alpha = { primarySessionSlug: 'alpha', selectedSessionScope: 'active', selectedSessionSlugs: [] };
+    const instance = attachMutableSetState(new CommunityTab({ globalSessionSelection: alpha }));
+    instance.state.initialLoadDone = true;
+    jest.spyOn(instance, '_refreshSessionCatalog').mockImplementation(() => {});
+    jest.spyOn(instance, '_queueCacheDrivenRefresh').mockImplementation(() => {});
+    jest.spyOn(instance, '_iterScopeCaches').mockReturnValue([]);
+    jest.spyOn(instance, '_computeStatsSnapshot').mockReturnValue({
+      uniqueUsers: ['0xaaa'],
+      surveysCreatedCount: 0,
+      surveyResponsesCount: 0,
+      uniqueQuestionsCount: 0,
+      surveysList: [],
+      sbtsCreatedCount: 0,
+    });
+    await instance._runStatsRefreshCycle({ force: true });
+    instance.props = { ...instance.props, globalSessionSelection: { ...alpha, primarySessionSlug: 'beta' } };
+    instance.handleStatClick({ label: 'Users' });
+    expect(instance.state.filteredUsers).toEqual([]);
+    expect(instance.state.loadingFilter).toBe(true);
+    expect(collectTreeNodes(instance.renderModalContent(), (node) => node.type === SBTFilter)).toHaveLength(0);
+    expect(
+      collectTreeNodes(
+        instance.renderModalContent(),
+        (node) => node.props?.testId === 'ce-community-users-session-select',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('publishes the newly selected scope while old hydration and current readiness are still pending', async () => {
+    const alpha = { primarySessionSlug: 'alpha', selectedSessionScope: 'active', selectedSessionSlugs: [] };
+    const general = { primarySessionSlug: '', selectedSessionScope: 'general', selectedSessionSlugs: [] };
+    const instance = attachMutableSetState(
+      new CommunityTab({ globalSessionSelection: alpha, activeSessionSlug: 'alpha' }),
+    );
+    let releaseOldHydration;
+    let releaseGeneralReadiness;
+    const oldHydration = new Promise((resolve) => {
+      releaseOldHydration = resolve;
+    });
+    const generalReadiness = new Promise((resolve) => {
+      releaseGeneralReadiness = resolve;
+    });
+    jest.spyOn(instance, '_refreshSessionCatalog').mockImplementation(() => {});
+    jest.spyOn(instance, '_resolveNetKeyForSlug').mockReturnValue('11155420');
+    jest
+      .spyOn(instance, '_hydrateWorkerGroupCounts')
+      .mockImplementation((entries) => (entries[0]?.slug === 'alpha' ? oldHydration : Promise.resolve()));
+    jest.spyOn(instance, 'checkIfInitialLoadDone').mockReturnValue(generalReadiness);
+    await writeCache('questionsCache', 'alpha', {
+      11155420: { questions: { alpha: { type: 'binary', prompt: 'Alpha', creator: '0xaaa' } } },
+    });
+    await writeCache('questionsCache', '', {
+      11155420: { questions: { general: { type: 'binary', prompt: 'General', creator: '0xbbb' } } },
+    });
+    const oldRefresh = instance._refreshCommunityStats({ force: true });
+    instance.props = { ...instance.props, globalSessionSelection: general };
+    const currentRefresh = instance._refreshCommunityStats({ force: true });
+    try {
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(instance.state.uniqueUsers).toEqual(['0xbbb']);
+      expect(instance.state.stats.find(({ label }) => label === 'Questions').count).toBe(1);
+      const latestSignature = instance._latestCacheSignature;
+      const latestPoints = instance._beeswarmPoints;
+      releaseOldHydration();
+      await oldRefresh;
+      expect(instance.state.uniqueUsers).toEqual(['0xbbb']);
+      expect(instance._latestCacheSignature).toBe(latestSignature);
+      expect(instance._beeswarmPoints).toBe(latestPoints);
+      expect(instance._statsRefreshInFlight).toBe(true);
+      expect(instance.state.initialLoadDone).toBe(false);
+      releaseGeneralReadiness(true);
+      await currentRefresh;
+      expect(instance._statsRefreshInFlight).toBe(false);
+      expect(instance.state.initialLoadDone).toBe(true);
+    } finally {
+      releaseOldHydration();
+      releaseGeneralReadiness(true);
+      await Promise.all([oldRefresh, currentRefresh]);
+      instance._isUnmounted = true;
+    }
+  });
+
+  it('includes known Worker-only sessions in ALL after General without admitting numeric or mismatched caches', async () => {
+    const bundled = WORKER_SESSION_CONFIG;
+    const discovered = {
+      ...bundled,
+      slug: 'worker-discovered',
+      sessionName: 'Discovered Worker',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      corsWorkerUrl: 'https://worker.example',
+    };
+    const bundledHint = {
+      slug: bundled.slug,
+      sessionId: bundled.sessionId,
+      sessionName: bundled.sessionName,
+      corsWorkerUrl: bundled.corsWorkerUrl,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    const configs = { [bundled.slug]: bundled, [discovered.slug]: discovered };
+    jest.spyOn(chainGateway, 'getAllSessionSlugs').mockReturnValue([]);
+    jest.spyOn(chainGateway, 'getAllSessionEntries').mockReturnValue([]);
+    jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockReturnValue(null);
+    jest
+      .spyOn(chainGateway, 'getDemoSessionConfigBySlug')
+      .mockImplementation((slug) => (slug === bundled.slug ? bundledHint : null));
+    jest.spyOn(sessionSources, 'getAllDemoSessionConfigs').mockReturnValue([[bundled.slug, bundledHint]]);
+    const all = { primarySessionSlug: '', selectedSessionScope: 'all', selectedSessionSlugs: [] };
+    const instance = attachMutableSetState(new CommunityTab({ globalSessionSelection: all, activeSessionSlug: '' }));
+    instance.state.initialLoadDone = true;
+    instance._hydrateWorkerGroupCounts = jest.fn(async () => {});
+    instance._resolveNetKeyForSlug = () => '11155420';
+    for (const [index, config] of Object.values(configs).entries()) {
+      expect(
+        workerConfigCache.upsertWorkerCanonicalSessionBootstrap({
+          slug: config.slug,
+          sessionIdHex: config.sessionId,
+          workerOrigin: config.corsWorkerUrl,
+          config,
+        }).status,
+      ).toBe('cached');
+      const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: config.slug });
+      await writeCache('questionsCache', config.slug, {
+        11155420: { questions: { stale: { type: 'binary', prompt: 'Wrong numeric question', creator: '0xstale' } } },
+        worker: withWorkerCanonicalCacheIdentity(
+          { questions: { [config.slug]: { type: 'binary', prompt: config.sessionName, creator: `0x${index + 1}` } } },
+          identity,
+        ),
+      });
+      instance._workerGroupCountCache.set(instance._getWorkerGroupCountCacheKey(identity), {
+        count: index + 1,
+        groupIds: Array.from({ length: index + 1 }, (_, n) => `group-${n}`),
+        visibleUserIds: [],
+        status: 'ready',
+        updatedAtMs: Date.now(),
+      });
+    }
+    await writeCache('questionsCache', '', {
+      11155420: { questions: { general: { type: 'binary', prompt: 'General seed' } } },
+    });
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(instance.state.sessions.map(({ slug }) => slug)).toEqual(expect.arrayContaining(Object.keys(configs)));
+    expect(instance._iterScopeCaches().map(({ slug }) => slug)).toEqual(expect.arrayContaining(Object.keys(configs)));
+    expect(instance.state.uniqueUsers).toEqual(['0x1', '0x2']);
+    expect(instance.state.sbtsCreatedCount).toBe(3);
+    expect(instance.state.stats.find(({ label }) => label === 'Questions').count).toBe(3);
+    instance.props = { ...instance.props, globalSessionSelection: { ...all, selectedSessionScope: 'general' } };
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(instance.state.uniqueUsers).toEqual([]);
+    expect(instance.state.sbtsCreatedCount).toBe(0);
+    instance.props = { ...instance.props, globalSessionSelection: all };
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(instance.state.uniqueUsers).toEqual(['0x1', '0x2']);
+    const badIdentity = resolveWorkerCanonicalCacheIdentity({
+      sessionConfig: { ...discovered, corsWorkerUrl: 'https://mismatch.example' },
+      sessionSlug: discovered.slug,
+    });
+    await writeCache('questionsCache', discovered.slug, {
+      worker: withWorkerCanonicalCacheIdentity(
+        { questions: { wrong: { type: 'binary', creator: '0xwrong' } } },
+        badIdentity,
+      ),
+    });
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(instance.state.uniqueUsers).toEqual(['0x1']);
+    expect(instance.state.stats.find(({ label }) => label === 'Questions').count).toBe(2);
+  });
+
+  it.each(['missing', 'wrong-slug', 'wrong-origin', 'wrong-session-id', 'ambiguous'])(
+    'keeps %s Worker bootstrap authority fail-closed for Stats caches',
+    async (variant) => {
+      const config = { ...WORKER_SESSION_CONFIG, slug: 'worker-only', corsWorkerUrl: 'https://worker.example' };
+      const hint = {
+        slug: config.slug,
+        sessionId: config.sessionId,
+        corsWorkerUrl: config.corsWorkerUrl,
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      };
+      jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockReturnValue(null);
+      jest.spyOn(chainGateway, 'getDemoSessionConfigBySlug').mockReturnValue(variant === 'ambiguous' ? null : hint);
+      if (variant !== 'missing') {
+        const { cacheKey } = workerConfigCache.upsertWorkerCanonicalSessionBootstrap({
+          slug: config.slug,
+          sessionIdHex: config.sessionId,
+          workerOrigin: config.corsWorkerUrl,
+          config,
+        });
+        const store = workerConfigCache.readSessionWorkerConfigCache();
+        const record = store.bySession[cacheKey];
+        if (variant === 'wrong-slug') record.canonicalConfig.slug = 'unrelated';
+        if (variant === 'wrong-origin') record.canonicalConfig.corsWorkerUrl = 'https://unrelated.example';
+        if (variant === 'wrong-session-id') record.canonicalConfig.sessionId = '0x00112233445566778899aabbccddeeff';
+        if (variant === 'ambiguous') {
+          const otherId = '0x00112233445566778899aabbccddeeff';
+          store.bySession[`session:0:${otherId}`] = {
+            ...record,
+            sessionIdHex: otherId,
+            workerOrigin: 'https://unrelated.example',
+            canonicalConfig: { ...config, sessionId: otherId, corsWorkerUrl: 'https://unrelated.example' },
+          };
+        }
+        localStorage.setItem('ce:sessionWorkerConfigCache:v1', JSON.stringify(store));
+      }
+      const instance = new CommunityTab({});
+      instance._resolveNetKeyForSlug = () => '11155420';
+      const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: config.slug });
+      await writeCache('questionsCache', config.slug, {
+        11155420: { questions: { wrongNumeric: {} } },
+        worker: withWorkerCanonicalCacheIdentity({ questions: { wrongWorker: {} } }, identity),
+      });
+      const [scope] = instance._buildScopeEntriesFromSlugs([config.slug]);
+      expect(scope.isWorkerCanonical).toBe(true);
+      expect(scope.workerCanonicalIdentity).toBeNull();
+      expect(scope.questionsCache).toEqual({});
+    },
+  );
+
+  it('keeps a configured registry session authoritative over a cached Worker with the same slug', () => {
+    const config = { ...WORKER_SESSION_CONFIG, slug: 'registered', corsWorkerUrl: 'https://worker.example' };
+    workerConfigCache.upsertWorkerCanonicalSessionBootstrap({
+      slug: config.slug,
+      sessionIdHex: config.sessionId,
+      workerOrigin: config.corsWorkerUrl,
+      config,
+    });
+    const registered = {
+      slug: config.slug,
+      networkChainId: 11155420,
+      sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } },
+    };
+    jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockReturnValue(registered);
+    const instance = new CommunityTab({});
+    expect(instance._resolveScopeAuthority(config.slug)).toMatchObject({
+      isWorkerCanonical: false,
+      sessionConfig: registered,
+      workerCanonicalIdentity: null,
+    });
+  });
+
   it('isolates new tabs opened from filtered user results', () => {
     const address = '0x1234567890abcdef1234567890abcdef12345678';
     const instance = new CommunityTab({ activeSessionSlug: 'edge' });
@@ -2065,6 +2679,7 @@ describe('CommunityTab helpers', () => {
       loadingFilter: false,
       uniqueUsers: [address],
       filteredUsers: [address],
+      usersFilterSelectionKey: instance._statsSelectionKey(),
     };
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
 

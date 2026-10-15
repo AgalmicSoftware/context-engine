@@ -9,6 +9,7 @@ const mockGetAllSessionSlugs = jest.fn();
 const mockGetSessionConfigBySlug = jest.fn();
 const mockDocumentLibraryPanel = jest.fn();
 const mockCorpusViewer = jest.fn();
+const mockAudioInput = jest.fn();
 const mockUploadDocLibraryFile = jest.fn();
 const mockUploadDocLibraryUrlRecord = jest.fn();
 const mockFetchImageFromURL = jest.fn();
@@ -42,6 +43,10 @@ jest.mock('../../../utilities/web3/chainGateway.js', () => ({
   getSessionConfigBySlug: (...args) => mockGetSessionConfigBySlug(...args),
 }));
 
+jest.mock('../../../utilities/session/sessionCatalog', () => ({
+  readKnownSessionCatalog: () => [],
+}));
+
 jest.mock('../../../utilities/docLibrary/uploads.js', () => {
   const actual = jest.requireActual('../../../utilities/docLibrary/uploads.js');
   return {
@@ -55,15 +60,18 @@ jest.mock('../../../utilities/docLibrary/uploads.js', () => {
 import AudioSurveyGenerator from './SurveyGenerator';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 
-jest.mock('../../Shared/AudioInput/AudioInput', () => (props) => (
-  <textarea
-    data-testid="audio-input"
-    data-enable-downloads={String(!!props.enableDownloads)}
-    placeholder={props.placeholder}
-    value={props.value || ''}
-    onChange={(event) => props.updateFunction?.(event.target.value)}
-  />
-));
+jest.mock('../../Shared/AudioInput/AudioInput', () => (props) => {
+  mockAudioInput(props);
+  return (
+    <textarea
+      data-testid="audio-input"
+      data-enable-downloads={String(!!props.enableDownloads)}
+      placeholder={props.placeholder}
+      value={props.value || ''}
+      onChange={(event) => props.updateFunction?.(event.target.value)}
+    />
+  );
+});
 
 jest.mock('../CreateQuestionsAndSurveys', () => () => <div data-testid="create-questions-and-surveys" />);
 
@@ -231,6 +239,7 @@ export const setupAudioSurveyGeneratorTestLifecycle = () => {
     mockGetSessionConfigBySlug.mockReset();
     mockDocumentLibraryPanel.mockReset();
     mockCorpusViewer.mockReset();
+    mockAudioInput.mockReset();
     mockUploadDocLibraryFile.mockReset();
     mockUploadDocLibraryUrlRecord.mockReset();
     mockFetchImageFromURL.mockReset();
@@ -327,6 +336,7 @@ export {
   mockGetSessionConfigBySlug,
   mockDocumentLibraryPanel,
   mockCorpusViewer,
+  mockAudioInput,
   mockUploadDocLibraryFile,
   mockUploadDocLibraryUrlRecord,
   mockFetchImageFromURL,

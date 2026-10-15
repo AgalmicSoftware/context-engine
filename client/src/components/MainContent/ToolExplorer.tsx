@@ -1,10 +1,11 @@
 /** @file ToolExplorer.tsx */
 
 import React, { useEffect, useMemo, useState, Suspense } from 'react';
+import { connect } from 'react-redux';
+import { updateGlobalSessionSelection } from '../../actions/sessionStateActions.js';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
-  faCog,
   faExclamationTriangle,
   faExpand,
   faEye,
@@ -19,15 +20,15 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
-import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { readStoredGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
 import { Container, Row, Col } from 'reactstrap';
 
 import ToolExplorerPluginExplainer from './ToolExplorerPluginExplainer';
+import ToolExplorerSessionControl, { resolveToolSessionConfig } from './ToolExplorerSessionControl';
 import LazyFallback from '../Shared/LazyFallback';
-import SessionChipSelector from '../Shared/SessionChipSelector';
 
 import riskMatrixImage from '../../assets/img/risk_matrix.jpg';
 import modelDirectoryImage from '../../assets/img/model_directory.jpg';
@@ -68,19 +69,25 @@ type ExpandedComponentState = {
 
 type ToolExplorerProps = {
   activeSessionSlug?: unknown;
+  sessionLoadingView?: React.ReactNode;
   demoSurfaceMode?: unknown;
+  updateGlobalSessionSelection?: (selection: { primarySessionSlug: string; selectedSessionSlugs?: string[] }) => void;
   [key: string]: unknown;
 };
 
-const ToolExplorer = (props: ToolExplorerProps) => {
+export const ToolExplorer = (props: ToolExplorerProps) => {
   const [expandedComponent, setExpandedComponent] = useState<ExpandedComponentState>(null);
-  const [showEmbeddedCreateGroup, setShowEmbeddedCreateGroup] = useState(false);
+  const [createGroupSessionSlug, setCreateGroupSessionSlug] = useState<string | null>(null);
   const [dataToolMode, setDataToolMode] = useState('add');
-  const [showDataSessionSelector, setShowDataSessionSelector] = useState(false);
+  const [questionsToolbarTarget, setQuestionsToolbarTarget] = useState<HTMLDivElement | null>(null);
+  const [groupsActionsTarget, setGroupsActionsTarget] = useState<HTMLDivElement | null>(null);
   const [dataSessionOverrideSlug, setDataSessionOverrideSlug] = useState<string | null>(null);
   const [dataSessionOverrideTouched, setDataSessionOverrideTouched] = useState(false);
   const demoSurfaceEnabled = props.demoSurfaceMode !== false;
   const showDemoCards = demoSurfaceEnabled;
+  const activeSessionSlug = normalizeSessionSlug(props.activeSessionSlug || '');
+  const activeSessionConfig = resolveToolSessionConfig(activeSessionSlug, props.sessionConfig);
+  const showEmbeddedCreateGroup = createGroupSessionSlug === activeSessionSlug;
 
   const exampleData: ToolData[] = [
     {
@@ -163,7 +170,10 @@ const ToolExplorer = (props: ToolExplorerProps) => {
 
   const expandedToolName = expandedComponent?.data?.name || '';
   const showGroupsHeaderActions = expandedToolName === 'Groups';
+  const showQuestionsHeaderActions = expandedToolName === 'Questions';
+  const useCompactExpandedHeader = showGroupsHeaderActions || showQuestionsHeaderActions;
   const showDataHeaderActions = expandedToolName === 'Context';
+  const usePrimaryHeaderControls = showGroupsHeaderActions || showDataHeaderActions || showQuestionsHeaderActions;
   const expandedDemoCard = expandedComponent?.data?.status === 'future';
   const selectedDataSessionSlug = useMemo(
     () =>
@@ -172,36 +182,6 @@ const ToolExplorer = (props: ToolExplorerProps) => {
         : normalizeSessionSlug(props.activeSessionSlug || ''),
     [dataSessionOverrideSlug, dataSessionOverrideTouched, props.activeSessionSlug],
   );
-  const dataSessionSelectorOptions = useMemo(() => {
-    const options = new Map();
-    const pushOption = (slugIn = '') => {
-      const slug = normalizeSessionSlug(slugIn || '');
-      if (options.has(slug)) return;
-      const cfg = getSessionConfigBySlug(slug) || {};
-      const sessionName = toStr(cfg?.sessionName || '').trim();
-      const slugLabel = slug || 'General';
-      const label =
-        sessionName && sessionName.toLowerCase() !== slugLabel.toLowerCase()
-          ? `${sessionName} (${slugLabel})`
-          : sessionName || slugLabel;
-      options.set(slug, {
-        key: `database-session-${slug || 'general'}`,
-        slug,
-        label,
-        selected: selectedDataSessionSlug === slug,
-        general: slug === '',
-        primary: normalizeSessionSlug(props.activeSessionSlug || '') === slug,
-        chipTestId: `ce-database-session-chip-${slug || 'general'}`,
-      });
-    };
-
-    pushOption(selectedDataSessionSlug);
-    pushOption(toStr(props.activeSessionSlug));
-    pushOption('');
-    (getAllSessionSlugs({ includeEmpty: true }) || []).forEach(pushOption);
-    return Array.from(options.values());
-  }, [props.activeSessionSlug, selectedDataSessionSlug]);
-
   const readInitialGroupsCreateState = () =>
     hasCachedCreateSbtForm({
       sessionSlug: toStr(props.activeSessionSlug),
@@ -212,11 +192,10 @@ const ToolExplorer = (props: ToolExplorerProps) => {
   const handleClick = (Component: ToolComponent, data: ToolData) => {
     if (!data.disabled) {
       setDataToolMode('add');
-      setShowDataSessionSelector(false);
       if (data.name === 'Groups') {
-        setShowEmbeddedCreateGroup(readInitialGroupsCreateState());
+        setCreateGroupSessionSlug(readInitialGroupsCreateState() ? activeSessionSlug : null);
       } else {
-        setShowEmbeddedCreateGroup(false);
+        setCreateGroupSessionSlug(null);
       }
       setExpandedComponent(() => ({
         component: Component,
@@ -226,21 +205,22 @@ const ToolExplorer = (props: ToolExplorerProps) => {
   };
 
   const resetExpandedComponent = () => {
-    setShowEmbeddedCreateGroup(false);
+    setCreateGroupSessionSlug(null);
     setDataToolMode('add');
-    setShowDataSessionSelector(false);
     setDataSessionOverrideSlug(null);
     setDataSessionOverrideTouched(false);
     setExpandedComponent(null);
   };
 
   const toggleEmbeddedCreateGroup = () => {
-    setShowEmbeddedCreateGroup((prevState) => !prevState);
+    setCreateGroupSessionSlug((previousSlug) => (previousSlug === activeSessionSlug ? null : activeSessionSlug));
   };
 
-  const handleDataSessionSelect = (slugIn: unknown) => {
-    setDataSessionOverrideSlug(normalizeSessionSlug(slugIn || ''));
-    setDataSessionOverrideTouched(true);
+  const handleDataSessionSelect = (slugIn: string) => {
+    const nextSlug = normalizeSessionSlug(slugIn);
+    const useInheritedSession = nextSlug === activeSessionSlug;
+    setDataSessionOverrideSlug(useInheritedSession ? null : nextSlug);
+    setDataSessionOverrideTouched(!useInheritedSession);
   };
 
   const resetDataSessionSelection = () => {
@@ -248,9 +228,27 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     setDataSessionOverrideTouched(false);
   };
 
+  const handleActiveSessionChange = (slugIn: string) => {
+    const nextSlug = normalizeSessionSlug(slugIn);
+    if (nextSlug === activeSessionSlug) return;
+    const selection = readStoredGlobalSessionSelection();
+    props.updateGlobalSessionSelection?.({
+      primarySessionSlug: nextSlug,
+      // A list that excludes General would coerce its blank primary back to
+      // the first named session. Retain that list and include General explicitly.
+      ...(nextSlug === '' && selection.selectedSessionScope === 'list' && !selection.selectedSessionSlugs.includes('')
+        ? { selectedSessionSlugs: [...selection.selectedSessionSlugs, ''] }
+        : {}),
+    });
+  };
+
+  useEffect(() => {
+    setCreateGroupSessionSlug(null);
+  }, [activeSessionSlug]);
+
   useEffect(() => {
     if (props.demoSurfaceMode === false && expandedDemoCard) {
-      setShowEmbeddedCreateGroup(false);
+      setCreateGroupSessionSlug(null);
       setExpandedComponent(null);
     }
   }, [expandedDemoCard, props.demoSurfaceMode]);
@@ -262,7 +260,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
         provider: props.provider,
         litHooks: props.litHooks,
         activeSessionSlug: props.activeSessionSlug,
-        sessionConfig: props.sessionConfig || getSessionConfigBySlug(props.activeSessionSlug || '') || null,
+        sessionConfig: activeSessionConfig,
         ensureLightSbtUniverse: props.ensureLightSbtUniverse,
         loginComplete: props.loginComplete,
         toggleLoginModal: props.toggleLoginModal,
@@ -271,12 +269,15 @@ const ToolExplorer = (props: ToolExplorerProps) => {
         isSBTCacheReady: props.isSBTCacheReady,
         isSurveyCacheReady: props.isSurveyCacheReady,
         isQuestionCacheReady: props.isQuestionCacheReady,
+        cacheInitializationError: props.cacheInitializationError,
         isResponsesCacheReady: props.isResponsesCacheReady,
         questionResponsesNonce: props.questionResponsesNonce,
         questionScanProgress: props.questionScanProgress,
         ...(expandedToolName === 'Questions'
           ? {
               preventUrlChange: true,
+              hideEmbeddedDebugUi: true,
+              toolbarTarget: questionsToolbarTarget,
             }
           : {}),
         ...(expandedToolName === 'Debate Map'
@@ -291,6 +292,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
           ? {
               sessionSlug: props.activeSessionSlug,
               embeddedWorkerGroups: true,
+              refreshControlTarget: groupsActionsTarget,
               hideMiniActionRow: true,
               showCreateGroupAboveFeatured: true,
               showCreateGroupExternal: showEmbeddedCreateGroup,
@@ -309,6 +311,45 @@ const ToolExplorer = (props: ToolExplorerProps) => {
       }
     : null;
 
+  const expandedHeaderHelp = expandedComponent && (
+    <div className={styles.expandedHeaderMeta}>
+      <ToolExplorerPluginExplainer
+        explainText={expandedComponent.data.explainText}
+        label={`About ${expandedToolName}`}
+        {...(expandedComponent.props || {})}
+      />
+    </div>
+  );
+
+  const expandedHeaderLead = (
+    <div className={styles.expandedHeaderLead}>
+      <button
+        type="button"
+        className={`${styles.headerActionButton} ${styles.headerActionButtonPrimary}`}
+        onClick={resetExpandedComponent}
+      >
+        ← Back
+      </button>
+      {expandedHeaderHelp}
+    </div>
+  );
+
+  const expandedHeaderSession = (
+    <div className={styles.expandedHeaderSession}>
+      <ToolExplorerSessionControl
+        activeSessionSlug={showDataHeaderActions ? selectedDataSessionSlug : activeSessionSlug}
+        sessionConfig={
+          showDataHeaderActions
+            ? resolveToolSessionConfig(selectedDataSessionSlug, props.sessionConfig)
+            : activeSessionConfig
+        }
+        inheritedSessionSlug={showDataHeaderActions ? activeSessionSlug : undefined}
+        onUseInheritedSession={showDataHeaderActions ? resetDataSessionSelection : undefined}
+        onChange={showDataHeaderActions ? handleDataSessionSelect : handleActiveSessionChange}
+      />
+    </div>
+  );
+
   return (
     <>
       {showDemoCards ? (
@@ -326,122 +367,97 @@ const ToolExplorer = (props: ToolExplorerProps) => {
       <Container className={`${styles.explorerContainer} ${useSparseGrid ? styles.explorerContainerSparse : ''}`}>
         {expandedComponent ? (
           <div className={styles.breadcrumbContainer}>
-            <div className={styles.expandedHeaderRow}>
-              <div className={styles.expandedHeaderLead}>
-                <button
-                  type="button"
-                  className={`${styles.headerActionButton} ${styles.headerActionButtonPrimary}`}
-                  onClick={resetExpandedComponent}
-                >
-                  ← Back
-                </button>
-
-                <div className={styles.expandedHeaderMeta}>
-                  <ToolExplorerPluginExplainer
-                    explainText={expandedComponent.data.explainText}
-                    {...(expandedComponent.props || {})}
-                  />
+            <div
+              className={`${styles.expandedHeaderRow} ${useCompactExpandedHeader ? styles.expandedHeaderCompact : ''} ${showQuestionsHeaderActions ? styles.expandedHeaderQuestions : ''} ${showGroupsHeaderActions ? styles.expandedHeaderGroups : ''}`}
+            >
+              {usePrimaryHeaderControls ? (
+                <div className={styles.expandedHeaderPrimaryControls}>
+                  {expandedHeaderLead}
+                  {expandedHeaderSession}
                 </div>
-              </div>
+              ) : (
+                <>
+                  {expandedHeaderLead}
+                  {!useCompactExpandedHeader && expandedHeaderSession}
+                </>
+              )}
 
-              <div className={styles.expandedHeaderActions}>
-                {showGroupsHeaderActions && (
-                  <>
-                    <a
-                      href={buildPublicRoute(sbtsListPath())}
-                      className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerActionLink}`}
-                    >
-                      <FontAwesomeIcon icon={faExpand} />
-                      View All
-                    </a>
-                    <button
-                      type="button"
-                      className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary}`}
-                      onClick={toggleEmbeddedCreateGroup}
-                      data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
-                    >
-                      <FontAwesomeIcon icon={faPlus} />
-                      {showEmbeddedCreateGroup ? 'Exit' : 'Create'}
-                    </button>
-                  </>
-                )}
-
-                {showDataHeaderActions && (
-                  <div className={styles.headerModeToggleGroup}>
-                    <button
-                      type="button"
-                      className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerModeButton} ${dataToolMode === 'add' ? styles.headerActionButtonActive : ''}`}
-                      onClick={() => setDataToolMode('add')}
-                      data-testid={E2E_TESTIDS.TOOL_EXPLORER_DATA_ADD}
-                    >
-                      <FontAwesomeIcon icon={faPlus} />
-                      Add
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerModeButton} ${dataToolMode === 'view' ? styles.headerActionButtonActive : ''}`}
-                      onClick={() => setDataToolMode('view')}
-                      data-testid={E2E_TESTIDS.TOOL_EXPLORER_DATA_VIEW}
-                    >
-                      <FontAwesomeIcon icon={faEye} />
-                      View
-                    </button>
-                    <div className={styles.headerSessionSelector} data-testid="ce-database-session-selector">
+              {!showQuestionsHeaderActions && (
+                <div
+                  className={styles.expandedHeaderActions}
+                  ref={showGroupsHeaderActions ? setGroupsActionsTarget : undefined}
+                >
+                  {showGroupsHeaderActions && (
+                    <>
+                      <a
+                        href={buildPublicRoute(sbtsListPath())}
+                        className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerActionLink}`}
+                      >
+                        <FontAwesomeIcon icon={faExpand} />
+                        View All
+                      </a>
                       <button
                         type="button"
-                        className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerIconButton} ${showDataSessionSelector ? styles.headerActionButtonActive : ''}`}
-                        onClick={() => setShowDataSessionSelector((value) => !value)}
-                        aria-label="Context session selector"
-                        data-testid="ce-database-session-selector-toggle"
+                        className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary}`}
+                        onClick={toggleEmbeddedCreateGroup}
+                        data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
                       >
-                        <FontAwesomeIcon icon={faCog} />
+                        <FontAwesomeIcon icon={faPlus} />
+                        {showEmbeddedCreateGroup ? 'Exit' : 'Create'}
                       </button>
-                      {showDataSessionSelector && (
-                        <div
-                          className={styles.headerSessionSelectorPanel}
-                          data-testid="ce-database-session-selector-panel"
-                        >
-                          <div className={styles.headerSessionSelectorHeader}>
-                            <div className={styles.headerSessionSelectorHint}>
-                              {dataSessionOverrideTouched
-                                ? 'Using a local AudioSurveyGenerator override.'
-                                : 'Using the global primary session by default.'}
-                            </div>
-                            {dataSessionOverrideTouched ? (
-                              <button
-                                type="button"
-                                className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerSessionResetButton}`}
-                                onClick={resetDataSessionSelection}
-                              >
-                                Use global default
-                              </button>
-                            ) : null}
-                          </div>
-                          <SessionChipSelector
-                            options={dataSessionSelectorOptions}
-                            onToggle={handleDataSessionSelect}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                    </>
+                  )}
 
-                {expandedComponent.data.name === 'Debate Map' && (
-                  <a
-                    href={buildPublicRoute('/atlas')}
-                    className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerActionLink}`}
-                    title="Open in Full Screen"
-                  >
-                    <FontAwesomeIcon icon={faExpand} />
-                    Full Screen
-                  </a>
-                )}
-              </div>
+                  {showDataHeaderActions && (
+                    <div className={styles.headerModeToggleGroup}>
+                      <button
+                        type="button"
+                        className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerModeButton} ${dataToolMode === 'add' ? styles.headerActionButtonActive : ''}`}
+                        onClick={() => setDataToolMode('add')}
+                        data-testid={E2E_TESTIDS.TOOL_EXPLORER_DATA_ADD}
+                      >
+                        <FontAwesomeIcon icon={faPlus} />
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerModeButton} ${dataToolMode === 'view' ? styles.headerActionButtonActive : ''}`}
+                        onClick={() => setDataToolMode('view')}
+                        data-testid={E2E_TESTIDS.TOOL_EXPLORER_DATA_VIEW}
+                      >
+                        <FontAwesomeIcon icon={faEye} />
+                        View
+                      </button>
+                    </div>
+                  )}
+
+                  {expandedComponent.data.name === 'Debate Map' && (
+                    <a
+                      href={buildPublicRoute('/atlas')}
+                      className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerActionLink}`}
+                      title="Open in Full Screen"
+                    >
+                      <FontAwesomeIcon icon={faExpand} />
+                      Full Screen
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
 
+            {showQuestionsHeaderActions && (
+              <div
+                className={`${styles.expandedHeaderActions} ${styles.expandedQuestionsToolbar}`}
+                ref={setQuestionsToolbarTarget}
+              />
+            )}
+
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="30vh" />}>
-              {React.createElement(expandedComponent.component, expandedChildProps)}
+              {(expandedToolName === 'Questions' && props.sessionLoadingView) ||
+                React.createElement(expandedComponent.component, {
+                  ...expandedChildProps,
+                  ...(showGroupsHeaderActions ? { key: activeSessionSlug } : {}),
+                })}
             </Suspense>
           </div>
         ) : (
@@ -475,4 +491,4 @@ const ToolExplorer = (props: ToolExplorerProps) => {
   );
 };
 
-export default ToolExplorer;
+export default connect(null, { updateGlobalSessionSelection })(ToolExplorer);

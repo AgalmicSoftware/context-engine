@@ -6,6 +6,7 @@ const runtimeGlobals = globalThis as Record<string, unknown>;
 const ENV_KEYS = [
   'REACT_APP_DEFAULT_AUTO_REQUEST_TESTNET_FUNDS',
   'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT',
+  'REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED',
   'REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK',
   'REACT_APP_CE_SESSION_SCAN_SCOPE',
   'REACT_APP_CE_SESSION_SCAN_SLUGS',
@@ -198,12 +199,25 @@ describe('appConfig env-backed config', () => {
     });
   });
 
+  it.each([
+    [undefined, true],
+    ['false', false],
+    ['true', true],
+    ['wat', true],
+  ])('reads REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED=%p as %p', (value, expected) => {
+    if (value === undefined) delete process.env.REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED;
+    else process.env.REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED = value;
+    jest.isolateModules(() => {
+      expect(require('./appConfig.js').DEFAULT_PILE_AUTO_ADVANCE_ENABLED).toBe(expected);
+    });
+  });
+
   it('keeps the repo-default session scan scope and slug list when env overrides are absent', () => {
     jest.isolateModules(() => {
       const config = require('./appConfig.js');
 
       expect(config.DEFAULT_CHAIN_ID).toBe(11155420);
-      expect(config.CE_SESSION_SCAN_SCOPE).toBe('list');
+      expect(config.CE_SESSION_SCAN_SCOPE).toBe('all');
       expect(config.CE_SESSION_SCAN_SLUGS).toEqual(['demo-sh']);
       expect(config.CE_DEMO_SESSION_SLUGS).toEqual(['demo-sh', 'demo-1', 'demo-3', 'demo-2', 'demo']);
       expect(config.POLIS_DEMO_DATA_AUTOLOAD_SLUGS).toEqual(['demo-sh', 'demo-1', 'demo-3', 'demo-2', 'demo']);

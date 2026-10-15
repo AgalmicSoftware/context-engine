@@ -114,7 +114,9 @@ type SurveyToolProps = {
   preventUrlChange?: boolean;
   miniMode?: boolean;
   hideEmbeddedDebugUi?: boolean;
+  toolbarTarget?: HTMLElement | null;
   isQuestionCacheReady?: boolean;
+  cacheInitializationError?: unknown;
   isResponsesCacheReady?: boolean;
   isSurveyCacheReady?: boolean;
   isSBTCacheReady?: boolean;
@@ -332,6 +334,7 @@ const renderSurveyToolContent = ({
             refreshQuestionMetadata={props.refreshQuestionMetadata}
             refreshQuestionResponses={props.refreshQuestionResponses}
             defaultFeaturedSBTs={props.defaultFeaturedSBTs}
+            cacheInitializationError={props.cacheInitializationError}
             isQuestionCacheReady={props.isQuestionCacheReady}
             isResponsesCacheReady={props.isResponsesCacheReady}
             isSurveyCacheReady={props.isSurveyCacheReady}
@@ -393,6 +396,7 @@ const renderSurveyToolContent = ({
         refreshQuestionResponses={props.refreshQuestionResponses}
         autoOpenResults={false}
         filterState={effectiveFilterState}
+        cacheInitializationError={props.cacheInitializationError}
         isQuestionCacheReady={props.isQuestionCacheReady}
         isResponsesCacheReady={props.isResponsesCacheReady}
         isSurveyCacheReady={props.isSurveyCacheReady}
@@ -413,6 +417,7 @@ const renderSurveyToolContent = ({
         ensureLightSbtUniverse={props.ensureLightSbtUniverse}
         hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
         embeddedSessionToolbar={Boolean(props.hideEmbeddedDebugUi && props.sessionSlugPinned)}
+        toolbarTarget={props.toolbarTarget}
       />
       <React.Suspense fallback={null}>
         <SurveyResults
@@ -435,6 +440,7 @@ const renderSurveyToolContent = ({
           defaultTags={props.defaultTags}
           sessionInfo={props.sessionInfo}
           sessionName={props.sessionName}
+          cacheInitializationError={props.cacheInitializationError}
           isQuestionCacheReady={props.isQuestionCacheReady}
           isResponsesCacheReady={props.isResponsesCacheReady}
           isSurveyCacheReady={props.isSurveyCacheReady}

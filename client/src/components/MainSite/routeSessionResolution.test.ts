@@ -574,3 +574,21 @@ describe('routeSessionResolution', () => {
     ).toBe('');
   });
 });
+
+it.each([false, true])(
+  'keeps explicit group scope ahead of another active session (cache ready: %s)',
+  (isCacheManagerReady) => {
+    expect(
+      resolveMainSiteRenderActiveSessionSlug({
+        path: '/group/shared-group',
+        search: '?sessionSlug=owner-session&sessionName=stale-session',
+        activeSessionSlug: 'other-session',
+        isCacheManagerReady,
+        getSessionConfigBySlug: () => null,
+        resolveDisplaySessionConfigBySlug: () => null,
+        resolveSessionConfigById: () => null,
+        resolveSessionSlugFromPathToken: () => '',
+      }),
+    ).toBe('owner-session');
+  },
+);

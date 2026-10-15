@@ -1,4 +1,10 @@
-import { getSessionAiSettings } from './aiSettings.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../session/sessionModeProfile';
+import {
+  getSessionAiSettings,
+  getEffectiveAiConfig,
+  getEffectiveTranscriptionConfig,
+  saveLocalAiSettings,
+} from './aiSettings.js';
 
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 
@@ -77,4 +83,45 @@ describe('aiSettings session resolution', () => {
     expect(resolved._sessionName).toBe('');
     expect(resolved._sessionConfigSource).toBe('missing');
   });
+});
+
+const workerConfig = {
+  slug: 'worker-session',
+  sessionName: 'Synthetic Worker session',
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  ai: {
+    models: {
+      fast: { provider: 'openai', model: 'worker-fast-model' },
+      thinking: { provider: 'openai', model: 'worker-thinking-model' },
+      transcription: { provider: 'openai', model: 'worker-transcription-model' },
+    },
+  },
+};
+
+it('keeps the selected Worker model defaults for text and transcription while leaving keys on the Worker', async () => {
+  const options = { sessionSlug: 'worker-session', sessionConfig: workerConfig, preferLocal: false };
+  expect(getSessionAiSettings('worker-session', workerConfig)._sessionConfigSource).toBe('worker');
+  expect(await getEffectiveAiConfig(options)).toMatchObject({
+    provider: 'openai',
+    model: 'worker-fast-model',
+    apiKey: '',
+  });
+  expect(await getEffectiveAiConfig({ ...options, thinking: true })).toMatchObject({ model: 'worker-thinking-model' });
+  expect(await getEffectiveTranscriptionConfig(options)).toMatchObject({
+    model: 'worker-transcription-model',
+    apiKey: '',
+  });
+  expect(getSessionAiSettings('another-session', workerConfig)._sessionName).not.toBe('Synthetic Worker session');
+});
+
+it('preserves explicit local AI overrides when a Worker config is supplied', async () => {
+  localStorage.clear();
+  try {
+    saveLocalAiSettings({ useLocal: true, mode: 'openai', models: { fast: 'local-fast-model' } });
+    expect(
+      await getEffectiveAiConfig({ sessionSlug: 'worker-session', sessionConfig: workerConfig, resolveSecrets: false }),
+    ).toMatchObject({ model: 'local-fast-model' });
+  } finally {
+    localStorage.clear();
+  }
 });

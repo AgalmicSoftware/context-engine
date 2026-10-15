@@ -25,6 +25,7 @@ const TelegramDebateMapPanel = React.lazy(() => import('./telegram/TelegramDebat
 type TelegramResultsMode = 'polis' | 'debateAtlas';
 
 export type OnePageSessionTelegramShellProps = {
+  resultsSectionRef?: React.Ref<HTMLElement>;
   account: unknown;
   blockLimits: unknown;
   contracts: unknown;
@@ -68,6 +69,7 @@ const normalizeResultsMode = (resultsViewMode: string): TelegramResultsMode =>
   resultsViewMode === 'debateAtlas' ? 'debateAtlas' : 'polis';
 
 const OnePageSessionTelegramShell = ({
+  resultsSectionRef,
   account,
   blockLimits,
   contracts,
@@ -195,7 +197,12 @@ const OnePageSessionTelegramShell = ({
             sessionSlug={displaySessionSlug}
             workerUrl={workerGroupWorkerUrl}
           />
-          <section className={styles.telegramListPanel} data-testid="ce-session-telegram-results">
+          <section
+            id="report"
+            ref={resultsSectionRef}
+            className={styles.telegramListPanel}
+            data-testid="ce-session-telegram-results"
+          >
             <div className={styles.telegramListHeader}>
               <span>Results</span>
               <div className={styles.telegramTabs}>

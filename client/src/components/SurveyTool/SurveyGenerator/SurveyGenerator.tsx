@@ -35,6 +35,8 @@ import { readCompactImageClipboard } from '../../Shared/compactImageClipboard.js
 import SBTSelector from '../../SBTs/SBTSelector';
 import DocumentLibraryPanel from '../../DocumentLibrary/DocumentLibraryPanel';
 import SessionChipSelector from '../../Shared/SessionChipSelector';
+import WorkerCanonicalSessionBootstrapBoundary from '../../Sessions/WorkerCanonicalSessionBootstrapBoundary';
+import { useContextSessionConfig } from './useContextSessionConfig';
 
 import { seedGenPrompt } from '../../../prompts/seedGenPrompt.js';
 import {
@@ -475,18 +477,22 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     sessionConfig,
     sessionOverrideSlug,
   ]);
+  const { sessionConfig: contextSessionConfig, bootstrapProps: contextBootstrapProps } = useContextSessionConfig(
+    normalizeSessionSlug(effectiveSessionSlugInput || ''),
+    effectiveSessionConfigInput,
+  );
   const resolvedSessionAliases = useMemo(
     () =>
       resolveSessionConfigAliases(
         {
           sessionSlug: effectiveSessionSlugInput,
-          sessionConfig: effectiveSessionConfigInput,
+          sessionConfig: contextSessionConfig,
         },
         {
           resolveBySlug: (slug: string) => getSessionConfigBySlug(slug),
         },
       ),
-    [effectiveSessionConfigInput, effectiveSessionSlugInput],
+    [contextSessionConfig, effectiveSessionSlugInput],
   );
   const resolvedSessionSlug = resolvedSessionAliases.sessionSlug;
   const resolvedSessionConfig = useMemo<SurveyGeneratorSessionConfig>(() => {
@@ -1624,6 +1630,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
           )}
         </div>
       )}
+      {contextBootstrapProps && <WorkerCanonicalSessionBootstrapBoundary {...contextBootstrapProps} />}
       {isExplorerViewMode ? (
         renderExplorerViewMode()
       ) : (
@@ -1644,7 +1651,11 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
               ) : null}
 
               <div className={styles.textInputGroup}>
+                {/* Keep dictation and rewrite on the same session as Context, including local overrides. */}
                 <AudioInput
+                  {...aiRequestOptions}
+                  dataTestId="ce-context-text-input"
+                  disabled={!!contextBootstrapProps}
                   placeholder={
                     transcriptMode ? 'Speak to capture transcript or Paste Text...' : 'Speak or type text here...'
                   }
@@ -2051,8 +2062,13 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                       onClick={() => toggleQuestionType('quadratic')}
                       aria-pressed={!!questionTypes.quadratic}
                     >
-                      <div className={styles.typeTitle}>Quadratic allocation</div>
-                      <div className={styles.typePreviewRow}>99 voice credits · ± votes</div>
+                      <div className={styles.typeTitle}>Quadratic</div>
+                      <div className={styles.quadraticPreview} aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                        <span />
+                      </div>
                     </button>
                     <div
                       className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.rating)}

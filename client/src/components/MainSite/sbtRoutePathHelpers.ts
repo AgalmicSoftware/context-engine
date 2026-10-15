@@ -1,3 +1,5 @@
+import { readWorkerGroupSessionSlugFromSearch } from '../../utilities/worker/workerGroupRoutes.js';
+
 type AddressValidator = (value: string) => boolean;
 type SessionSlugNormalizer = (value: unknown) => string;
 export type SbtDetailRouteStatePatch = {
@@ -41,16 +43,14 @@ export const getSbtListRouteSessionSlug = (
     .trim()
     .toLowerCase();
   if (root === 'group') {
-    const querySlug = new URLSearchParams(String(opts.search || '')).get('sessionName');
-    return querySlug == null ? '' : opts.normalizeSessionSlug(querySlug);
+    return opts.normalizeSessionSlug(readWorkerGroupSessionSlugFromSearch(opts.search));
   }
   if (root !== 'sbts' && root !== 'groups') return '';
   const slugOrMode = String(parts[1] || '').trim();
   if (slugOrMode) {
     return slugOrMode.toLowerCase() === 'new' ? '' : opts.normalizeSessionSlug(slugOrMode);
   }
-  const querySlug = new URLSearchParams(String(opts.search || '')).get('sessionName');
-  return querySlug == null ? '' : opts.normalizeSessionSlug(querySlug);
+  return opts.normalizeSessionSlug(readWorkerGroupSessionSlugFromSearch(opts.search));
 };
 
 export const getUserAddressFromPath = (path: string, opts: { isAddress: AddressValidator }): string | null => {

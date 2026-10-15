@@ -44,6 +44,8 @@ type MainAreaTabsProps = {
   network?: unknown;
   networkChainId?: unknown;
   sessionConfig?: unknown;
+  sessionLoadingView?: React.ReactNode;
+  cacheInitializationError?: unknown;
   account?: string;
   litHooks?: unknown;
   activeSessionSlug?: string;
@@ -165,6 +167,8 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                       account={this.props.account}
                       activeSessionSlug={this.props.activeSessionSlug}
                       sessionConfig={this.props.sessionConfig}
+                      sessionLoadingView={this.props.sessionLoadingView}
+                      cacheInitializationError={this.props.cacheInitializationError}
                       loginComplete={this.props.loginComplete}
                       loginInProgress={this.props.loginInProgress}
                       toggleLoginModal={(loginModalIsOpen: boolean) => this.props.toggleLoginModal(loginModalIsOpen)}
@@ -194,6 +198,8 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                       litHooks={this.props.litHooks}
                       activeSessionSlug={this.props.activeSessionSlug}
                       sessionConfig={this.props.sessionConfig}
+                      sessionLoadingView={this.props.sessionLoadingView}
+                      cacheInitializationError={this.props.cacheInitializationError}
                       network={this.props.network}
                       networkChainId={this.props.networkChainId}
                       loginComplete={this.props.loginComplete}

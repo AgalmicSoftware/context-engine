@@ -1822,6 +1822,37 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+#surveysRow.explorerToolbar {
+  position: static;
+  box-sizing: border-box;
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  max-width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: var(--ce-border-control-width) solid var(--ce-authoring-control-border);
+  background: var(--ce-authoring-section-bg);
+  backdrop-filter: none;
+
+  @media (max-width: 466px) {
+    justify-content: center;
+    padding: 8px;
+  }
+
+  #dropdownToggle,
+  #filterButton,
+  #showResultsButton,
+  #createSurveyButton {
+    min-width: 44px;
+    min-height: 44px;
+    margin: 0 !important;
+    padding: 10px;
+    font-size: 1rem;
+  }
+}
+
 /* Survey/Question Dropdown item styling */
 .dropdownItem {
   color: var(--ce-color-black) !important;
@@ -4484,6 +4515,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .pileInteractionUnit {
   --pile-desktop-submit-rail-offset: 42px;
   --pile-desktop-rail-gap: 24px;
+  --pile-desktop-rail-width: 84px;
+  --pile-card-top-offset: 30px;
   --pile-card-width: min(550px, 90vw);
   display: flex;
   flex-direction: column;
@@ -4507,7 +4540,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .pileCardInner {
   width: 100%;
   height: 400px;
-  margin-top: 30px;
+  margin-top: var(--pile-card-top-offset, 30px);
   /* Neumorphic 3D Depth */
   border-radius: var(--ce-radius-20);
   background: var(--ce-color-surface);
@@ -4585,23 +4618,24 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   pointer-events: none;
   width: 100%;
   overflow: visible;
+  display: grid;
+  grid-template-columns: 100% max-content;
+  grid-template-rows: max-content max-content;
+  grid-template-areas:
+    '. nav'
+    '. actions';
+  align-content: start;
+  column-gap: var(--pile-desktop-rail-gap);
+  row-gap: 20px;
+  padding-top: var(--pile-card-top-offset);
 }
 
 .pileControls > .pileActions,
 .pileControls > .pileNav {
-  position: absolute;
-  left: calc(100% + var(--pile-desktop-rail-gap));
-  width: max-content;
-}
-
-.pileControls > .pileActions {
-  top: 50%;
-  transform: translateY(0.625rem);
-}
-
-.pileControls > .pileNav {
-  top: 50%;
-  transform: translateY(calc(-100% - 0.625rem));
+  position: static;
+  width: 100%;
+  min-width: var(--pile-desktop-rail-width);
+  box-sizing: border-box;
 }
 
 /* --- Navigation Group (Arrows + Counter) --- */
@@ -4623,7 +4657,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   //   -7px -7px 14px var(--ce-status-info);
   border-radius: var(--ce-radius-50);
   /* Pill shape */
-  padding: 20px 10px;
+  padding: 0 10px;
   /* Padding to frame the arrows/counter */
   /* Ensure it doesn't get too wide */
   min-width: 60px;
@@ -4664,6 +4698,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .pileNavCounterText {
   display: inline-block;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
   color: var(--ce-color-white);
   font-size: 0.9rem;
   font-weight: 700;
@@ -5212,6 +5249,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     top: auto;
     left: auto;
     transform: none;
+    width: auto;
+    min-width: 0;
   }
 
   .pileWrapper {
@@ -5378,6 +5417,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileNav {
     flex-direction: row;
+    flex-shrink: 0;
     gap: 12px;
     order: 3;
     justify-self: end;
@@ -5449,6 +5489,45 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+@media (max-width: 640px) {
+  .pileControls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'footer nav'
+      'actions actions';
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  .pileControls > .pileActions {
+    justify-self: stretch;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .pileFooter {
+    grid-area: footer;
+    margin-right: 0;
+  }
+
+  .pileFooterHidden {
+    display: none;
+  }
+
+  .pileControls:has(.pileActionsMenuEligible) {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'footer footer'
+      'actions nav';
+  }
+
+  .pileControls > .pileActions.pileActionsMenuEligible {
+    justify-self: start;
+    width: auto;
+  }
+}
+
 /* Touch + tablet/hybrid devices: avoid hover-dependent dimming for active icons */
 @media (hover: none), (pointer: coarse) {
   .actionButton {
@@ -5485,6 +5564,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileInteractionUnit {
     --pile-card-width: min(760px, calc(100vw - 190px));
     --pile-desktop-rail-gap: 28px;
+    --pile-desktop-rail-width: 64px;
+    --pile-card-top-offset: 0px;
     width: var(--pile-card-width);
     max-width: calc(100vw - 190px);
   }
@@ -5606,8 +5687,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileControls > .pileActions,
   .pileControls > .pileNav {
-    left: calc(100% + var(--pile-desktop-rail-gap));
-    top: 44%;
     padding: 0;
     border: 0;
     background: transparent;
@@ -7222,5 +7301,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileCardFooter:has(.pileCommentsRow) .pileCardIcons .commentButton {
     opacity: 1;
+  }
+}
+
+@media (min-width: 641px) {
+  .pileNavCounterText {
+    font-size: 1.125rem;
   }
 }

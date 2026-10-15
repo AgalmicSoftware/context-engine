@@ -15,7 +15,7 @@
   color: var(--ce-panel-text);
   border-radius: var(--ce-radius-5);
   margin-bottom: 10px;
-  height: 500px;
+  height: auto;
   gap: 1px;
 
   .sectionTitle {
@@ -96,18 +96,27 @@
   }
 
   .statsHeader {
+    position: relative;
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
+    justify-content: center;
     gap: 12px;
   }
 
   .headerActionsRight {
+    position: absolute;
+    right: 0;
     display: flex;
     align-items: flex-start;
     justify-content: flex-end;
     gap: 10px;
     margin-left: auto;
+  }
+
+  .sessionSelector {
+    min-width: 0;
+    max-width: 100%;
+    margin: 0 auto 18px;
   }
 
   .statsHeaderSpinner {
@@ -288,6 +297,14 @@
     gap: 8px;
     align-content: center;
     height: 100%;
+
+    &:has(> .statItem:nth-child(4):last-child) {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+
+      @media (max-width: 420px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
   }
 
   .statItem {
@@ -449,11 +466,11 @@
   }
 }
 
-/* Classic 95 keeps the participant list and plot in a split pane below the
- * summary counts and their shared session heading. */
+/* Classic 95 frames the summary counts. Split-pane rules are retained for
+ * the temporarily hidden participant and chart panel. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
   .communityTab {
-    height: 500px;
+    height: auto;
     gap: 0;
     margin: 0;
     overflow: hidden;
@@ -757,30 +774,56 @@
   gap: 18px;
 }
 
-.questionsModalTopBar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+.modal .questionsModalHeader {
+  :global(.modal-title) {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  h5 {
+    font-size: 1em;
+  }
 }
 
-.questionsModalPlot {
-  padding: 18px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
-  border-radius: var(--ce-radius-12);
-  background:
-    radial-gradient(
-      circle at top left,
-      color-mix(in srgb, var(--ce-action-accent) 8%, transparent) 0%,
-      transparent 34%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--ce-overlay-surface) 94%, transparent) 0%,
-      color-mix(in srgb, var(--ce-overlay-base) 97%, transparent) 100%
-    );
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 8%, transparent),
-    0 16px 30px color-mix(in srgb, var(--ce-overlay-base) 24%, transparent);
+.questionsTable {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  color: var(--ce-overlay-text);
+
+  th,
+  td {
+    padding: 12px;
+    border-bottom: 1px solid var(--ce-document-border);
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+  }
+
+  th:first-child,
+  td:first-child {
+    width: 30%;
+  }
+
+  th {
+    font-weight: 700;
+  }
+
+  a {
+    color: var(--ce-link);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  a:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 3px;
+  }
 }
 
 .questionsModalLink {
@@ -793,6 +836,7 @@
   border-radius: var(--ce-radius-pill);
   background: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   color: var(--ce-color-white);
+  font-size: 1rem;
   font-weight: 700;
   text-decoration: none;
   transition:
@@ -807,6 +851,95 @@
     color: var(--ce-color-white);
     text-decoration: none;
     transform: translateY(-1px);
+  }
+}
+
+.usersControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+// Keep the toggle in the toolbar and expanded options across both columns.
+.modal .modalBody .usersFilter {
+  display: contents;
+
+  > button {
+    grid-column: 2;
+    margin: 0;
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 1rem;
+    justify-content: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  > div {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+}
+
+.modal .modalBody .usersSessionSelector {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+
+  > span {
+    color: var(--ce-panel-text);
+  }
+
+  // This toolbar fills its column; don't let the shared label measurement
+  // establish an intrinsic width beyond the space reserved for the link.
+  > span:nth-child(2) {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+
+    &::after {
+      display: none;
+    }
+  }
+
+  select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    color: var(--ce-control-text);
+    background: var(--ce-control-face);
+    border-color: var(--ce-input-border);
+  }
+
+  option {
+    color: var(--ce-control-text);
+    background: var(--ce-control-face);
+  }
+}
+
+@media (max-width: 480px) {
+  .modal .modalBody:has(.usersControls) {
+    padding: 16px 12px;
+  }
+
+  .usersControls {
+    gap: 8px;
+  }
+
+  .modal .modalBody .usersSessionSelector {
+    gap: 4px;
+    padding: 4px;
+
+    > span:first-child {
+      font-size: 0.65rem;
+      letter-spacing: 0.04em;
+    }
   }
 }
 
@@ -942,26 +1075,6 @@
   .questionsModalLink:hover,
   .questionsModalLink:focus {
     color: var(--ce-panel-text);
-  }
-
-  .questionsModalPlot {
-    background: var(--ce-data-viz-surface);
-    border-color: var(--ce-data-viz-border);
-    box-shadow: none;
-  }
-}
-
-@media (max-width: 768px) {
-  .questionsModalTopBar {
-    justify-content: stretch;
-  }
-
-  .questionsModalPlot {
-    padding: 14px;
-  }
-
-  .questionsModalLink {
-    width: 100%;
   }
 }
 

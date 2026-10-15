@@ -312,6 +312,156 @@ describe('OnePageSession results routing', () => {
     expect(subject.state.showResults).toBe(true);
   });
 
+  it.each(['edge', ''])('opens and scrolls to Report on initial %p session deep link', async (slug) => {
+    const priorUrl = window.location.href;
+    const originalScroll = window.HTMLElement.prototype.scrollIntoView;
+    const scroll = jest.fn();
+    window.HTMLElement.prototype.scrollIntoView = scroll;
+    window.history.replaceState({}, '', `/session${slug ? `/${slug}` : ''}#report`);
+    const props = buildProps();
+    const ref = React.createRef();
+    const view = render(
+      <OnePageSession {...props} ref={ref} slug={slug} sessionConfig={{ ...props.sessionConfig, slug }} />,
+    );
+    try {
+      expect(await screen.findByTestId('polis-report')).toBeVisible();
+      expect(ref.current.state).toMatchObject({ showResults: true, autoOpenResults: false, resultsViewMode: 'polis' });
+      expect(scroll).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+      expect(scroll.mock.instances).toContain(ref.current.resultsSectionRef.current);
+    } finally {
+      view.unmount();
+      window.HTMLElement.prototype.scrollIntoView = originalScroll;
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('handles same-page report hashes and routed session changes without reopening on ordinary renders', async () => {
+    const priorUrl = window.location.href;
+    const originalScroll = window.HTMLElement.prototype.scrollIntoView;
+    const scroll = jest.fn();
+    window.HTMLElement.prototype.scrollIntoView = scroll;
+    window.history.replaceState({}, '', '/session/edge');
+    const props = buildProps();
+    const ref = React.createRef();
+    const view = render(<OnePageSession {...props} ref={ref} slug="edge" />);
+    try {
+      act(() => ref.current.setState({ resultsViewMode: 'debateAtlas' }));
+      act(() => {
+        window.history.replaceState({}, '', '/session/edge#report');
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      });
+      expect(await screen.findByTestId('polis-report')).toBeVisible();
+      expect(ref.current.state.resultsViewMode).toBe('polis');
+      const firstScrollCount = scroll.mock.calls.length;
+      act(() => ref.current.setState({ showResults: false }));
+      expect(ref.current.state.showResults).toBe(false);
+      expect(scroll).toHaveBeenCalledTimes(firstScrollCount);
+      window.history.replaceState({}, '', '/session/second#report');
+      view.rerender(
+        <OnePageSession
+          {...props}
+          ref={ref}
+          slug="second"
+          sessionConfig={{ ...props.sessionConfig, slug: 'second' }}
+        />,
+      );
+      expect(await screen.findByTestId('polis-report')).toBeVisible();
+      expect(scroll.mock.calls.length).toBeGreaterThan(firstScrollCount);
+      const nextScrollCount = scroll.mock.calls.length;
+      view.unmount();
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      expect(scroll).toHaveBeenCalledTimes(nextScrollCount);
+    } finally {
+      view.unmount();
+      window.HTMLElement.prototype.scrollIntoView = originalScroll;
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it.each(['/session/edge#questions', '/session/second#report'])(
+    'cancels a queued Report action when batched navigation ends at %s',
+    (destination) => {
+      const priorUrl = window.location.href;
+      const originalScroll = window.HTMLElement.prototype.scrollIntoView;
+      const scroll = jest.fn();
+      window.HTMLElement.prototype.scrollIntoView = scroll;
+      window.history.replaceState({}, '', '/session/edge');
+      const props = buildProps();
+      const ref = React.createRef();
+      const view = render(<OnePageSession {...props} ref={ref} slug="edge" />);
+      try {
+        act(() => ref.current.setState({ showResults: false }));
+        scroll.mockClear();
+        act(() => {
+          window.history.replaceState({}, '', '/session/edge#report');
+          window.dispatchEvent(new HashChangeEvent('hashchange'));
+          window.history.replaceState({}, '', destination);
+          window.dispatchEvent(new HashChangeEvent('hashchange'));
+        });
+        expect(ref.current.state.showResults).toBe(false);
+        expect(scroll).not.toHaveBeenCalled();
+        if (destination === '/session/second#report') {
+          view.rerender(
+            <OnePageSession
+              {...props}
+              ref={ref}
+              slug="second"
+              sessionConfig={{ ...props.sessionConfig, slug: 'second' }}
+            />,
+          );
+          expect(ref.current.state.showResults).toBe(true);
+          expect(scroll).toHaveBeenCalledTimes(1);
+        }
+      } finally {
+        view.unmount();
+        window.HTMLElement.prototype.scrollIntoView = originalScroll;
+        window.history.replaceState({}, '', priorUrl);
+      }
+    },
+  );
+
+  it('checks the live route before scrolling a delayed Report ref', () => {
+    const priorUrl = window.location.href;
+    const subject = createSubject({ slug: 'edge' });
+    const scrollIntoView = jest.fn();
+    try {
+      window.history.replaceState({}, '', '/session/edge#report');
+      subject.handleReportNavigation();
+      window.history.replaceState({}, '', '/session/second#report');
+      // React attaches refs before componentDidUpdate can handle the new route.
+      subject.setResultsSectionRef({ scrollIntoView });
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('waits for the Report ref and cancels delayed scroll when its route is left', () => {
+    const priorUrl = window.location.href;
+    const subject = createSubject({ slug: 'edge' });
+    const scrollIntoView = jest.fn();
+    try {
+      window.history.replaceState({}, '', '/session/edge#report');
+      subject.handleReportNavigation();
+      expect(subject.state).toMatchObject({ showResults: true, resultsViewMode: 'polis', autoOpenResults: false });
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      subject.setResultsSectionRef({ scrollIntoView });
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      subject.setResultsSectionRef(null);
+      window.history.replaceState({}, '', '/session/edge');
+      subject.handleReportNavigation();
+      window.history.replaceState({}, '', '/session/edge#report');
+      subject.handleReportNavigation();
+      window.history.replaceState({}, '', '/session/edge#questions');
+      subject.handleReportNavigation();
+      subject.setResultsSectionRef({ scrollIntoView });
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
   const getAutoMintStorageKey = (account, sbtAddress, chainId = 84532) =>
     `autoMint:${String(account || '').toLowerCase()}:${chainId}:${String(sbtAddress || '').toLowerCase()}`;
 

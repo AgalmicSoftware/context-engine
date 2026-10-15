@@ -406,8 +406,9 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const onSbtsRoute = parts[0] === 'sbts' || parts[0] === 'groups' || onWorkerGroupDetailRoute;
     const detailSessionSlug = onWorkerGroupDetailRoute
       ? normalizeSessionSlug(
-          this.props.sessionSlug ||
-            (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('sessionName') || '' : ''),
+          (typeof window !== 'undefined'
+            ? workerGroupNavigationPort.readSessionSlugFromSearch(window.location.search)
+            : '') || this.props.sessionSlug,
         )
       : '';
     const urlSlugLike = onWorkerGroupDetailRoute
@@ -422,7 +423,8 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     let referrerSlug = '';
     try {
       const ref = (typeof document !== 'undefined' ? document.referrer : '') || '';
-      referrerSlug = resolveReferrerSessionSlug(ref);
+      const hasEmbeddedSession = this.props.embeddedWorkerGroups && typeof this.props.sessionSlug === 'string';
+      referrerSlug = hasEmbeddedSession ? '' : resolveReferrerSessionSlug(ref);
     } catch (e) {
       sbtLog.warn('SBTsPage: fallback', e);
     }
@@ -497,22 +499,35 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const canonicalSlug = canonicalSlugFromConfig || (explicitSourceMatched ? explicitSourceSlug : ''); // '' means general
     const urlHasNoSlug = onSbtsRoute && effectiveUrlSlug === undefined && !isCreateRoute;
 
-    // Canonicalize (silent) if we are on /sbts and have a non-empty slug to show
-    if (!isCreateRoute && urlHasNoSlug && canonicalSlug) {
+    const activeGroupCapabilities = resolveSessionCapabilityProjection(activeGroup);
+    const isWorkerCanonicalGroup = activeGroupCapabilities.profileValid && activeGroupCapabilities.isWorkerCanonical;
+    // Keep shared detail links scoped to their owning session, including legacy links.
+    const canonicalizeWorkerDetail =
+      onWorkerGroupDetailRoute && isWorkerCanonicalGroup && canonicalSlug === detailSessionSlug;
+    if (!isCreateRoute && canonicalSlug && (urlHasNoSlug || canonicalizeWorkerDetail)) {
       try {
-        const activeGroupCapabilities = resolveSessionCapabilityProjection(activeGroup);
-        const canonicalPath =
-          activeGroupCapabilities.profileValid && activeGroupCapabilities.isWorkerCanonical
-            ? workerGroupNavigationPort.buildPath({
-                groupId:
-                  typeof window !== 'undefined'
-                    ? workerGroupNavigationPort.readGroupIdFromHash(window.location.hash)
-                    : '',
-                rootPath: parts[0] === 'sbts' ? '/sbts' : '/groups',
-                sessionSlug: canonicalSlug,
-              })
-            : buildPublicRoute(`${sbtsListPath()}/${canonicalSlug}`);
-        window.history.replaceState(null, '', canonicalPath);
+        const canonicalPath = isWorkerCanonicalGroup
+          ? workerGroupNavigationPort.buildPath({
+              groupId:
+                workerGroupId ||
+                (typeof window !== 'undefined'
+                  ? workerGroupNavigationPort.readGroupIdFromHash(window.location.hash)
+                  : ''),
+              rootPath: parts[0] === 'sbts' ? '/sbts' : '/groups',
+              sessionSlug: canonicalSlug,
+            })
+          : buildPublicRoute(`${sbtsListPath()}/${canonicalSlug}`);
+        const currentUrl = new URL(window.location.href);
+        const canonicalUrl = new URL(canonicalPath, currentUrl.origin);
+        if (isWorkerCanonicalGroup) {
+          currentUrl.searchParams.forEach((value, key) => {
+            if (key !== 'sessionName' && key !== 'sessionSlug') canonicalUrl.searchParams.set(key, value);
+          });
+        }
+        const canonicalRoute = `${canonicalUrl.pathname}${canonicalUrl.search}${canonicalUrl.hash}`;
+        if (`${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}` !== canonicalRoute) {
+          window.history.replaceState(isWorkerCanonicalGroup ? window.history.state : null, '', canonicalRoute);
+        }
       } catch (e) {
         sbtLog.warn('SBTsPage: fallback', e);
       }
@@ -615,6 +630,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         selectedGroupId={routeWorkerGroupId}
         showCreate={showCreate}
         createOnly={createOnly}
+        refreshControlTarget={createOnly ? undefined : this.props.refreshControlTarget}
         toggleLoginModal={toggleLoginModal as ((open: boolean) => void) | undefined}
       />
     );

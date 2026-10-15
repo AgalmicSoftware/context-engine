@@ -1,3 +1,4 @@
+import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection';
 import type {
   SessionCapabilityProjection,
   resolveSessionCapabilityProjection,
@@ -46,6 +47,8 @@ type LoginSettingsOverviewHost = {
   };
   state: {
     sponsoredAccess?: SponsoredAccessRecord;
+    sponsoredAccessLoading?: boolean;
+    workerResourcePresence?: unknown;
     sessionScanSlugs: string[];
     sessionScanSlugsInput: string;
   };
@@ -105,6 +108,12 @@ export const getLoginSettingsOverviewContext = (host: LoginSettingsOverviewHost)
     capabilities.showNetworkControls && host.props.provider === 'wagmi' && !!walletNet && walletNet.id !== targetId;
   const activeSession = host.getSessionDescriptor(sessionSlug, sessionConfig);
   const sponsoredAccess = host.state.sponsoredAccess || {};
+  const checkStatus = host.state.sponsoredAccessLoading
+    ? 'checking'
+    : !host.state.workerResourcePresence &&
+        (claimsWorkerCanonicalAuthority(sessionConfig) || sessionConfig?.workerCanonicalCleanRoute)
+      ? 'unavailable'
+      : '';
   const sponsorSessions = host.getSponsoredSessionSources({ activeSlug: sessionSlug });
   const memoKey = JSON.stringify({
     activeSession,
@@ -116,6 +125,7 @@ export const getLoginSettingsOverviewContext = (host: LoginSettingsOverviewHost)
     sessionScanSlugs: host.state.sessionScanSlugs,
     sessionScanSlugsInput: host.state.sessionScanSlugsInput,
     sponsoredAccess,
+    checkStatus,
     sponsorSessions,
     capabilities,
     targetNetworkId: targetNetwork?.id,
@@ -136,6 +146,7 @@ export const getLoginSettingsOverviewContext = (host: LoginSettingsOverviewHost)
       sponsorSessions,
       resourceKeys: capabilities.settingsResourceKeys,
       gateKind: capabilities.gateKind,
+      checkStatus,
     }),
     sponsorSessions,
     targetNetworkName,

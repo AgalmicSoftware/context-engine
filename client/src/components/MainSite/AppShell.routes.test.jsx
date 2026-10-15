@@ -107,7 +107,7 @@ jest.mock('../UserPage/UserPage', () => {
     },
   };
 });
-jest.mock('../Shared/LazyFallback', () => () => null);
+jest.mock('../Shared/LazyFallback', () => ({ label }) => <>{label}</>);
 jest.mock('../E2E/DevE2eNav', () => () => null);
 jest.mock('../ErrorBoundary/RouteErrorBoundary', () => ({
   __esModule: true,
@@ -1697,6 +1697,7 @@ describe('AppShell route render smoke', () => {
   });
 
   it('preserves cached direct session loads and later refreshes', async () => {
+    localStorage.setItem('appCacheVersion', '2026-06-19-demo-session-and-sbt-cache-sync-v1');
     const subject = stubMainSiteMountSideEffects(
       createSubject({
         path: '/session/demo-1',
@@ -1714,6 +1715,8 @@ describe('AppShell route render smoke', () => {
     expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
     expect(window.location.pathname).toBe('/session/demo-1');
     expect(localStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem('appCacheVersion')).toBe('2026-10-13-civic-client-refresh-v1');
+    expect(subject.reloadWindowLocation).toHaveBeenCalledTimes(1);
     subject.componentWillUnmount();
 
     window.history.replaceState({}, '', '/session/demo-1');
@@ -1725,6 +1728,7 @@ describe('AppShell route render smoke', () => {
       }),
     );
     refreshedSubject.hasPersistedManagedCacheData = jest.fn(async () => true);
+    refreshedSubject.reloadWindowLocation = jest.fn();
 
     await act(async () => {
       await refreshedSubject.componentDidMount();
@@ -1732,6 +1736,7 @@ describe('AppShell route render smoke', () => {
 
     expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
     expect(window.location.pathname).toBe('/session/demo-1');
+    expect(refreshedSubject.reloadWindowLocation).not.toHaveBeenCalled();
     refreshedSubject.componentWillUnmount();
   });
 
@@ -3034,12 +3039,15 @@ describe('AppShell route render smoke', () => {
   });
 
   it.each([
-    ['/group/participants', false],
-    ['/groups', false],
-    ['/group/participants', true],
-    ['/groups', true],
-    ['/sbts/group-worker', true],
-  ])('discovers the exact Worker session on %s (cached hint: %s)', async (path, cachedHint) => {
+    ['/group/participants', false, 'sessionName'],
+    ['/groups', false, 'sessionName'],
+    ['/group/participants', true, 'sessionName'],
+    ['/groups', true, 'sessionName'],
+    ['/sbts/group-worker', true, 'sessionName'],
+    ['/group/participants', false, 'sessionSlug'],
+    ['/group/participants', true, 'sessionSlug'],
+    ['/groups', false, 'sessionSlug'],
+  ])('discovers the exact Worker session on %s (cached hint: %s, query: %s)', async (path, cachedHint, queryKey) => {
     const workerOrigin = 'https://group-worker.example.com';
     const workerConfig = {
       slug: 'group-worker',
@@ -3066,7 +3074,8 @@ describe('AppShell route render smoke', () => {
     );
     const subject = createSubject({
       path,
-      search: `?sessionName=${workerConfig.slug}${cachedHint ? '' : `&worker=${encodeURIComponent(workerOrigin)}`}`,
+      search: `?${queryKey}=${workerConfig.slug}${cachedHint ? '' : `&worker=${encodeURIComponent(workerOrigin)}`}`,
+      activeSessionSlug: 'other-session',
       sessionConfig: null,
     });
     const view = render(subject.render());

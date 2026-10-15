@@ -221,13 +221,14 @@ class App extends React.Component<AppProps> {
       typeof window !== 'undefined' && window.location
         ? {
             pathname: window.location.pathname || this.props.location?.pathname || '',
-            search: window.location.search || this.props.location?.search || '',
+            search: window.location.search,
           }
         : this.props.location || { pathname: '', search: '' };
 
     const urlPath = (location.pathname || '').toString();
     const siteProps = {
       urlPath,
+      search: location.search,
       firstVisit,
     };
 

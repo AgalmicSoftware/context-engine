@@ -358,7 +358,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
 
   const readPreloginSettingsControlLayout = async () =>
     page.getByTestId('ce-prelogin-settings-panel').evaluate((panel) => {
-      const session = document.querySelector('[aria-label^="Active session:"]');
+      const session = document.querySelector('[data-testid="ce-prelogin-session-select"]')?.parentElement;
       const config = panel.querySelector('[data-testid="ce-prelogin-config-toggle"]');
       const explainers = Array.from(panel.querySelectorAll('button')).find((button) =>
         button.getAttribute('aria-label')?.startsWith('Explainers '),
@@ -744,6 +744,59 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
 
   if (routeCase.requiresReadableDocs) {
+    const graphicToggle = page.getByTestId('ce-docs-graphic-toggle');
+    const graphicImage = page.getByTestId('ce-docs-graphic-image');
+    const quickstartToggle = page.getByRole('button', { name: 'Quickstart', exact: true });
+    await graphicToggle.waitFor({ state: 'visible' });
+    assert.equal(await graphicToggle.getAttribute('aria-expanded'), 'false', 'Graphic starts collapsed');
+    assert.equal(await graphicImage.count(), 0, 'The collapsed Graphic does not mount its image');
+    await graphicToggle.press('Enter');
+    await graphicImage.waitFor({ state: 'visible' });
+    await page.waitForFunction(() => {
+      const image = document.querySelector('[data-testid="ce-docs-graphic-image"]');
+      return image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0;
+    });
+    const graphicState = await graphicImage.evaluate((image) => {
+      const header = image.closest('header');
+      return {
+        inHeader: Boolean(header),
+        imageWidth: image.getBoundingClientRect().width,
+        headerWidth: header?.getBoundingClientRect().width ?? 0,
+      };
+    });
+    assert.equal(graphicState.inHeader, true, 'Graphic expands inside the Docs header');
+    assert(graphicState.imageWidth > 0 && graphicState.imageWidth <= graphicState.headerWidth, 'Graphic fits its header');
+    const graphicOpener = page.getByTestId('ce-docs-graphic-open');
+    const graphicModal = page.getByRole('dialog', { name: 'Deployment graphic', exact: true });
+    const closeGraphic = page.getByTestId('ce-docs-graphic-close');
+    await graphicOpener.press('Enter');
+    await graphicModal.waitFor({ state: 'visible' });
+    const enlargedImage = graphicModal.getByRole('img');
+    assert.equal(await enlargedImage.getAttribute('src'), await graphicImage.getAttribute('src'));
+    const enlargedBox = await enlargedImage.boundingBox();
+    assert(enlargedBox.width > graphicState.imageWidth, 'Modal graphic is larger than the inline image');
+    assert(enlargedBox.x >= 0 && enlargedBox.x + enlargedBox.width <= page.viewportSize().width, 'Modal fits viewport');
+    await closeGraphic.focus();
+    await closeGraphic.press('Tab');
+    assert(await closeGraphic.evaluate((button) => document.activeElement === button), 'Modal traps keyboard focus');
+    await closeGraphic.press('Escape');
+    await graphicModal.waitFor({ state: 'detached' });
+    assert(await graphicOpener.evaluate((button) => document.activeElement === button), 'Escape restores trigger focus');
+    await graphicOpener.click();
+    await closeGraphic.click();
+    await graphicModal.waitFor({ state: 'detached' });
+    await graphicOpener.click();
+    await page.mouse.click(2, 2);
+    await graphicModal.waitFor({ state: 'detached' });
+    assert.equal(await page.locator('#docs-section-graphic figcaption').count(), 0, 'Graphic has no caption');
+    assert.equal(await page.getByText('Full-size graphic', { exact: true }).count(), 0, 'Graphic has no full-size label');
+    await graphicToggle.press('Space');
+    assert.equal(await graphicToggle.getAttribute('aria-expanded'), 'false', 'Space closes Graphic');
+    assert.equal(await graphicImage.count(), 0);
+    assert.equal(await quickstartToggle.getAttribute('aria-expanded'), 'true', 'Graphic leaves Quickstart open');
+    await graphicToggle.press('Enter');
+    await graphicImage.waitFor({ state: 'visible' });
+    if (routeCase.graphicOnly) return;
     await page.getByTestId('ce-contract-viewer-card-surveys').waitFor({ state: 'visible' });
     await page.getByTestId('ce-contract-viewer-card-sbtFactory').waitFor({ state: 'visible' });
     await page.getByTestId('ce-contract-viewer-card-customSBT').waitFor({ state: 'visible' });
@@ -769,7 +822,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
 
   if (routeCase.requiresPreloginControlLayout) {
-    const sessionSummary = page.locator('[aria-label^="Active session:"]').first();
+    const sessionSummary = page.getByTestId('ce-prelogin-session-select');
     await sessionSummary.waitFor({ state: 'visible' });
     assert.equal(
       await page.getByTestId('ce-prelogin-settings-panel').count(),
@@ -792,18 +845,15 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
 
   if (routeCase.requiresReadableStats) {
-    await page.waitForFunction(() => document.querySelectorAll('.nav-tabs .nav-link').length >= 4, null, {
-      timeout: 15000,
-    });
-    await page.locator('.nav-tabs .nav-link').nth(1).click();
-    await page.getByTestId('ce-community-beeswarm-section').waitFor({ state: 'visible' });
-    await page.waitForFunction(
-      () => document.querySelectorAll('[data-testid^="ce-beeswarm-point-"]').length >= 20,
-      null,
-      { timeout: 15000 },
-    );
-    await page.getByTestId('ce-beeswarm-point-0').hover();
-    await page.getByTestId('ce-beeswarm-tooltip').waitFor({ state: 'visible' });
+    await page.getByTestId('ce-main-stats-tab').click();
+    assert.equal(await page.getByTestId('ce-community-session-section').count(), 0);
+    await page.getByTestId('ce-community-session-select').selectOption({ label: 'ALL' });
+    await page.getByTestId('ce-community-stat-sessions').waitFor({ state: 'visible' });
+    await page.getByTestId('ce-community-stat-questions').click();
+    await page.getByRole('dialog').waitFor({ state: 'visible' });
+    const table = page.getByTestId('ce-community-questions-table');
+    await table.waitFor({ state: 'visible' });
+    await table.getByRole('link').first().waitFor({ state: 'visible' });
   }
 
   if (routeCase.requiresReadableAuthoring) {
@@ -1231,6 +1281,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
             '[data-testid="ce-page-docs-root"] > header',
           ),
           sample('Docs GitHub link', '[data-testid="ce-docs-github-link"]'),
+          sample('Graphic title bar', '[data-testid="ce-docs-graphic-toggle"]'),
           sample('Quickstart title bar', 'button[aria-controls="docs-section-quickstart"]'),
           sample(
             'Quickstart card title',
@@ -1488,83 +1539,21 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           const style = window.getComputedStyle(element);
           return ratio(style[colorProperty], backgroundFor(element));
         };
-        const points = Array.from(document.querySelectorAll('[data-testid^="ce-beeswarm-point-"]'));
-        const pointXs = points.map((point) => Number(point.getAttribute('cx'))).filter(Number.isFinite);
-        const firstPointStyle = points[0] ? window.getComputedStyle(points[0]) : null;
-        const firstPointRect = points[0]?.getBoundingClientRect();
-        const beeswarmSection = document.querySelector('[data-testid="ce-community-beeswarm-section"]');
-        const beeswarmSectionRect = beeswarmSection?.getBoundingClientRect();
-        const svg = document.querySelector('[data-testid="ce-community-beeswarm-section"] svg');
-        const svgRect = svg?.getBoundingClientRect();
-        const tooltip = document.querySelector('[data-testid="ce-beeswarm-tooltip"]');
-        const tooltipText = tooltip?.textContent || '';
-        const tooltipRect = tooltip?.getBoundingClientRect();
-        const tooltipStyle = tooltip ? window.getComputedStyle(tooltip) : null;
-        const leaderboardName = document.querySelector('[class*="leaderboardItem"] [class*="name"]');
-        const leaderboardText = leaderboardName?.querySelector('a') || leaderboardName;
-        const leaderboardTextRect = leaderboardText?.getBoundingClientRect();
-        const tooltipPointGap =
-          tooltipRect && firstPointRect
-            ? tooltipRect.right <= firstPointRect.left
-              ? firstPointRect.left - tooltipRect.right
-              : firstPointRect.right <= tooltipRect.left
-                ? tooltipRect.left - firstPointRect.right
-                : tooltipRect.bottom <= firstPointRect.top
-                  ? firstPointRect.top - tooltipRect.bottom
-                  : firstPointRect.bottom <= tooltipRect.top
-                    ? tooltipRect.top - firstPointRect.bottom
-                    : -Math.min(
-                        tooltipRect.right - firstPointRect.left,
-                        firstPointRect.right - tooltipRect.left,
-                        tooltipRect.bottom - firstPointRect.top,
-                        firstPointRect.bottom - tooltipRect.top,
-                      )
-            : -1;
+        const table = document.querySelector('[data-testid="ce-community-questions-table"]');
+        const links = Array.from(table?.querySelectorAll('tbody a') || []);
+        const tableRect = table?.getBoundingClientRect();
+        const bodyRect = table?.closest('.modal-body')?.getBoundingClientRect();
         return {
-          pointCount: points.length,
-          pointSpread: pointXs.length ? Math.max(...pointXs) - Math.min(...pointXs) : 0,
-          beeswarmVerticalDelta:
-            beeswarmSectionRect && svgRect
-              ? Math.abs(
-                  (svgRect.top - beeswarmSectionRect.top) -
-                    (beeswarmSectionRect.bottom - svgRect.bottom),
-                )
-              : Number.POSITIVE_INFINITY,
-          hasCountedVotes: /Counted\s+[1-9]\d*/i.test(tooltipText),
+          questionCount: table?.querySelectorAll('tbody [data-ce-question-id]').length || 0,
+          reportLinksValid: links.length > 0 && links.every((link) => link.getAttribute('href')?.endsWith('#report')),
+          tableFitsModal: Boolean(tableRect && bodyRect && tableRect.width > 0 &&
+            tableRect.left >= bodyRect.left && tableRect.right <= bodyRect.right),
           statIconRatio: textRatio('[class*="statIcon"]'),
           statCountRatio: textRatio('[class*="statCount"]'),
           statLabelRatio: textRatio('[class*="statLabel"]'),
-          leaderboardRatio: leaderboardText
-            ? ratio(window.getComputedStyle(leaderboardText).color, backgroundFor(leaderboardText))
-            : 0,
-          leaderboardTextColor: leaderboardText ? window.getComputedStyle(leaderboardText).color : '',
-          leaderboardTextOpacity: leaderboardText
-            ? Number.parseFloat(window.getComputedStyle(leaderboardText).opacity)
-            : 0,
-          leaderboardTextWidth: leaderboardTextRect?.width || 0,
-          leaderboardTextHeight: leaderboardTextRect?.height || 0,
-          axisLabelRatio: textRatio('[data-testid="ce-community-beeswarm-section"] text', 'fill'),
-          pointRatio:
-            firstPointStyle && svg ? ratio(firstPointStyle.fill, window.getComputedStyle(svg).backgroundColor) : 0,
-          tooltipPromptRatio: textRatio('[data-testid="ce-beeswarm-tooltip"] p'),
-          tooltipAgreeRatio: textRatio('[data-testid="ce-beeswarm-tooltip-agree"]'),
-          tooltipUnsureRatio: textRatio('[data-testid="ce-beeswarm-tooltip-unsure"]'),
-          tooltipDisagreeRatio: textRatio('[data-testid="ce-beeswarm-tooltip-disagree"]'),
-          tooltipTotalRatio: textRatio('[data-testid="ce-beeswarm-tooltip-total"]'),
-          tooltipWidth: tooltipRect?.width || 0,
-          tooltipPointGap,
-          tooltipRect: tooltipRect
-            ? { left: tooltipRect.left, right: tooltipRect.right, top: tooltipRect.top, bottom: tooltipRect.bottom }
-            : null,
-          hoveredPointRect: firstPointRect
-            ? {
-                left: firstPointRect.left,
-                right: firstPointRect.right,
-                top: firstPointRect.top,
-                bottom: firstPointRect.bottom,
-              }
-            : null,
-          tooltipPointerEvents: tooltipStyle?.pointerEvents || '',
+          tableHeadingRatio: textRatio('[data-testid="ce-community-questions-table"] th'),
+          tableSessionRatio: textRatio('[data-testid="ce-community-questions-table"] td'),
+          tableLinkRatio: textRatio('[data-testid="ce-community-questions-table"] a'),
         };
       })
     : null;
@@ -2102,6 +2091,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
               window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
               window.localStorage.setItem('ce_onboarding_complete', 'true');
               window.localStorage.setItem('firstVisit', 'false');
+              window.localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
               window.localStorage.setItem('ce:theme', 'context-engine');
               window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
               window.localStorage.setItem('ce:selectedSessionScope', 'active');
@@ -2199,6 +2189,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
               window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
               window.localStorage.setItem('ce_onboarding_complete', 'true');
               window.localStorage.setItem('firstVisit', 'false');
+              window.localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
               window.localStorage.setItem('ce:theme', 'classic-95');
               window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
               window.localStorage.setItem('ce:selectedSessionScope', 'active');
@@ -3129,64 +3120,19 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
   }
   if (statsContrastState) {
-    assert.ok(statsContrastState.pointCount >= 20, 'Community Stats should render the default-session questions');
-    assert.ok(
-      statsContrastState.pointSpread >= 200,
-      `Community Stats should preserve the default-session consensus cluster; received ${statsContrastState.pointSpread.toFixed(2)}px spread`,
-    );
-    assert.ok(
-      statsContrastState.beeswarmVerticalDelta <= 8,
-      `Classic 95 Community Stats should vertically center the beeswarm plot; received ${statsContrastState.beeswarmVerticalDelta.toFixed(2)}px top/bottom gap delta`,
-    );
-    assert.equal(
-      statsContrastState.hasCountedVotes,
-      true,
-      'Community Stats hover details should use default-session votes',
-    );
-    assert.ok(
-      statsContrastState.tooltipWidth <= 320,
-      `Community Stats hover details should stay compact; received ${statsContrastState.tooltipWidth.toFixed(2)}px`,
-    );
-    assert.ok(
-      statsContrastState.tooltipPointGap >= 8,
-      `Community Stats hover details should leave the hovered dot visible; received ${statsContrastState.tooltipPointGap.toFixed(2)}px gap (${JSON.stringify({ tooltip: statsContrastState.tooltipRect, point: statsContrastState.hoveredPointRect })})`,
-    );
-    assert.equal(
-      statsContrastState.tooltipPointerEvents,
-      'none',
-      'Community Stats hover details should not block nearby points',
-    );
-    assert.equal(
-      statsContrastState.leaderboardTextColor,
-      'rgb(0, 0, 0)',
-      'Classic 95 participant addresses should use readable black text on light rows',
-    );
-    assert.equal(
-      statsContrastState.leaderboardTextOpacity,
-      1,
-      'Classic 95 participant addresses should be fully opaque',
-    );
-    assert.ok(
-      statsContrastState.leaderboardTextWidth > 0 && statsContrastState.leaderboardTextHeight > 0,
-      `Classic 95 participant addresses should occupy visible layout space; received ${statsContrastState.leaderboardTextWidth.toFixed(2)}x${statsContrastState.leaderboardTextHeight.toFixed(2)}px`,
-    );
+    assert.ok(statsContrastState.questionCount > 0, 'Questions Details lists scoped questions');
+    assert.equal(statsContrastState.reportLinksValid, true, 'Questions link to their session Report');
+    assert.equal(statsContrastState.tableFitsModal, true, 'Questions table fits its modal');
     [
       ['stat icon', statsContrastState.statIconRatio, 3],
       ['stat count', statsContrastState.statCountRatio, 4.5],
       ['stat label', statsContrastState.statLabelRatio, 4.5],
-      ['leaderboard row', statsContrastState.leaderboardRatio, 4.5],
-      ['axis label', statsContrastState.axisLabelRatio, 4.5],
-      ['question point', statsContrastState.pointRatio, 3],
-      ['tooltip prompt', statsContrastState.tooltipPromptRatio, 4.5],
-      ['tooltip Agree state', statsContrastState.tooltipAgreeRatio, 4.5],
-      ['tooltip Unsure state', statsContrastState.tooltipUnsureRatio, 4.5],
-      ['tooltip Disagree state', statsContrastState.tooltipDisagreeRatio, 4.5],
-      ['tooltip total', statsContrastState.tooltipTotalRatio, 4.5],
+      ['question table heading', statsContrastState.tableHeadingRatio, 4.5],
+      ['question table session', statsContrastState.tableSessionRatio, 4.5],
+      ['question table link', statsContrastState.tableLinkRatio, 4.5],
     ].forEach(([label, received, minimum]) => {
-      assert.ok(
-        received >= minimum,
-        `Classic 95 ${label} contrast should be at least ${minimum}:1; received ${received.toFixed(2)}:1`,
-      );
+      assert.ok(received >= minimum,
+        `Classic 95 ${label} contrast should be at least ${minimum}:1; received ${received.toFixed(2)}:1`);
     });
   }
   if (authoringContrastState) {
@@ -3745,6 +3691,7 @@ async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
       window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
       window.localStorage.setItem('ce_onboarding_complete', 'true');
       window.localStorage.setItem('firstVisit', 'false');
+      window.localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
       window.localStorage.setItem('ce:theme', selectedThemeId);
       window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
       window.localStorage.setItem('ce:selectedSessionScope', 'active');
@@ -3987,13 +3934,14 @@ async function main() {
   const sessionSetupOnly = process.argv.includes('--session-setup-only');
   const footerOnly = process.argv.includes('--footer-only');
   const aboutOnly = process.argv.includes('--about-only');
-  const docsOnly = process.argv.includes('--docs-only');
+  const graphicOnly = process.argv.includes('--docs-graphic-only');
+  const docsOnly = graphicOnly || process.argv.includes('--docs-only');
   const tagOnly = process.argv.includes('--tag-only');
   const toolCardsOnly = process.argv.includes('--tool-cards-only');
   const routeCases = aboutOnly
     ? ROUTE_CASES.filter((routeCase) => routeCase.requiresClassicAboutHeroControls)
     : docsOnly
-      ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableDocs)
+      ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableDocs).map((routeCase) => ({ ...routeCase, graphicOnly }))
     : tagOnly
       ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableTagRelatedChips)
     : homeTabsOnly
@@ -4042,22 +3990,34 @@ async function main() {
               : sessionSetupOnly
                 ? SESSION_SETUP_VIEWPORTS
                 : VIEWPORTS;
+  const initializeThemePage = (themeId) => {
+    window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
+    window.localStorage.setItem('ce_onboarding_complete', 'true');
+    window.localStorage.setItem('firstVisit', 'false');
+    window.localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
+    window.localStorage.setItem('ce:theme', themeId);
+    window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
+    window.localStorage.setItem('ce:selectedSessionScope', 'active');
+  };
   const browser = await chromium.launch({ headless: true });
 
   try {
     if (!welcomeFitOnly) {
       for (const viewport of viewports) {
         const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
-        await page.addInitScript(() => {
-          window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
-          window.localStorage.setItem('ce_onboarding_complete', 'true');
-          window.localStorage.setItem('firstVisit', 'false');
-          window.localStorage.setItem('ce:theme', 'classic-95');
-          window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
-          window.localStorage.setItem('ce:selectedSessionScope', 'active');
-        });
+        await page.addInitScript(initializeThemePage, 'classic-95');
         for (const routeCase of routeCases) {
-          await inspectRoute(page, baseUrl, routeCase, viewport.name);
+          if (graphicOnly) {
+            for (const themeId of themeRegistry.themes.map((theme) => theme.id)) {
+              const themedPage = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
+              await themedPage.addInitScript(initializeThemePage, themeId);
+              await inspectRoute(themedPage, baseUrl, routeCase, viewport.name);
+              assert.equal(await themedPage.evaluate(() => document.documentElement.dataset.ceTheme), themeId);
+              await themedPage.close();
+            }
+          } else {
+            await inspectRoute(page, baseUrl, routeCase, viewport.name);
+          }
         }
         await page.close();
       }
@@ -4087,6 +4047,8 @@ async function main() {
         ? `Welcome fit Playwright smoke passed (${WELCOME_FIT_THEME_IDS.length} themes × ${WELCOME_FIT_VIEWPORTS.length} viewports).`
         : aboutOnly
           ? `Classic 95 About hero Playwright smoke passed (${viewports.length} viewports).`
+        : graphicOnly
+          ? `Docs graphic modal smoke passed (${viewports.length} viewports × ${themeRegistry.themes.length} themes).`
         : docsOnly
           ? `Classic 95 Docs structure Playwright smoke passed (${viewports.length} viewports).`
         : tagOnly

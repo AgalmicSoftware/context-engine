@@ -119,6 +119,15 @@ describe('SurveyTool compatibility wiring', () => {
     expect(resultsNode?.props?.isOpen).toBe(false);
   });
 
+  it('forwards an optional Explorer toolbar target only to the selector', () => {
+    const toolbarTarget = document.createElement('div');
+    const shell = new SurveyTool({ network: { id: 11155420 }, toolbarTarget });
+    const tree = shell.render();
+
+    expect(findFirstNodeByType(tree, SurveySelector)?.props?.toolbarTarget).toBe(toolbarTarget);
+    expect(findLazySurveyResultsNode(tree)?.props?.toolbarTarget).toBeUndefined();
+  });
+
   it('forwards scoped Lit hooks from SurveyTool into single-question surfaces', () => {
     const litHooks = { getKey: jest.fn(), saveKey: jest.fn() };
     const lit = { getKey: jest.fn() };

@@ -78,6 +78,7 @@ describe('aiClientRequestOptions', () => {
 
   it('builds AI config requests from the typed option contract', () => {
     const context = { wallet: 'test-context' };
+    const sessionConfig = { slug: 'alpha-session', ai: { mode: 'openai' } };
 
     expect(
       buildAiConfigRequest(
@@ -87,6 +88,7 @@ describe('aiClientRequestOptions', () => {
           preferLocal: true,
           provider: 'openai',
           sessionSlug: 'alpha-session',
+          sessionConfig,
         },
         { thinking: 1 },
       ),
@@ -96,6 +98,7 @@ describe('aiClientRequestOptions', () => {
       preferLocal: true,
       provider: 'openai',
       sessionSlug: 'alpha-session',
+      sessionConfig,
       thinking: true,
     });
   });
@@ -110,6 +113,7 @@ describe('aiClientRequestOptions', () => {
         sessionSlug: 'alpha-session',
       }),
     ).toEqual({
+      sessionConfig: null,
       apiKey: 'test-key',
       context: undefined,
       model: 'whisper-1',
@@ -128,6 +132,7 @@ describe('aiClientRequestOptions', () => {
         sessionSlug: 'alpha-session',
       }),
     ).toEqual({
+      sessionConfig: null,
       context: undefined,
       model: undefined,
       preferLocal: undefined,

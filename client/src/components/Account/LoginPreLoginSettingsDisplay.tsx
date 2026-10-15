@@ -2,11 +2,7 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCog } from '@fortawesome/free-solid-svg-icons';
 import styles from './Account.module.scss';
-import AppThemeSelector from './AppThemeSelector';
-import ColorBlindModeControl from './ColorBlindModeControl';
-import { LoginSettingsSessionSummary } from './LoginSettingsControlRow';
-import { CE_THEME_SELECTOR_ENABLED } from '../../variables/appConfig.js';
-import { buildSettingsSessionHref } from './loginSettingsRouteHelpers';
+import LoginThemeQuickControl from './LoginThemeQuickControl';
 
 type LoginSettingsOverview = {
   activeSession: {
@@ -26,6 +22,7 @@ type LoginPreLoginSettingsDisplayProps = {
   overview: LoginSettingsOverview;
   preLoginConfigOpen: boolean;
   preLoginSettingsOpen: boolean;
+  sessionControl: React.ReactNode;
   renderInlineNetworkSummary: (args: Record<string, unknown>) => React.ReactNode;
   renderPreLoginConfigPanel: () => React.ReactNode;
   renderSettingsControlRow: (args: Record<string, unknown>) => React.ReactNode;
@@ -39,6 +36,7 @@ const LoginPreLoginSettingsDisplay = ({
   overview,
   preLoginConfigOpen,
   preLoginSettingsOpen,
+  sessionControl,
   renderInlineNetworkSummary,
   renderPreLoginConfigPanel,
   renderSettingsControlRow,
@@ -52,12 +50,7 @@ const LoginPreLoginSettingsDisplay = ({
   return (
     <div className={styles.preLoginSettingsShell}>
       <div className={styles.preLoginSettingsTopRow}>
-        <div className={styles.preLoginSessionSummary}>
-          <LoginSettingsSessionSummary
-            activeSession={activeSession}
-            sessionHref={buildSettingsSessionHref(activeSession.slug)}
-          />
-        </div>
+        <div className={styles.preLoginSessionSummary}>{sessionControl}</div>
         <button
           type="button"
           aria-label="Toggle pre-login settings"
@@ -102,16 +95,7 @@ const LoginPreLoginSettingsDisplay = ({
                       children: renderPreLoginConfigPanel(),
                     })
                   : null}
-                {renderStaticSettingsSection({
-                  title: 'Appearance & colors',
-                  summary: '',
-                  children: (
-                    <>
-                      {CE_THEME_SELECTOR_ENABLED && <AppThemeSelector />}
-                      <ColorBlindModeControl />
-                    </>
-                  ),
-                })}
+                <LoginThemeQuickControl />
               </>
             ),
           })}

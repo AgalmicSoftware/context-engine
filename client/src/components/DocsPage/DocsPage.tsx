@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { connect } from 'react-redux';
+import { Modal, ModalBody } from 'reactstrap';
 import {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
@@ -17,6 +18,7 @@ import { questionSelectionPrompt } from '../../prompts/questionSelectionPrompt.j
 import buildUserAnalysisPrompt from '../../prompts/userAnalysisPrompt.js';
 // CSS
 import styles from './DocsPage.module.scss';
+import deploymentModesGraphic from '../../../../docs/assets/readme-architecture-deployment-modes.jpg';
 //
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
@@ -63,6 +65,7 @@ type DocsSectionProps = {
   children: React.ReactNode;
   contentClassName?: string;
   defaultOpen?: boolean;
+  testId?: string;
   id: string;
   title: string;
 };
@@ -70,7 +73,7 @@ type DocsSectionProps = {
 const DOCS_GENERAL_SESSION_SELECT_VALUE = '__general__';
 const DOCS_GENERAL_SESSION_QUERY_VALUE = 'general';
 
-const DocsSection = ({ children, contentClassName = '', defaultOpen = false, id, title }: DocsSectionProps) => {
+const DocsSection = ({ children, contentClassName = '', defaultOpen = false, id, testId, title }: DocsSectionProps) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const contentId = `docs-section-${id}`;
 
@@ -79,6 +82,7 @@ const DocsSection = ({ children, contentClassName = '', defaultOpen = false, id,
       <button
         type="button"
         className={styles.docsSectionToggle}
+        data-testid={testId}
         onClick={() => setIsOpen((open) => !open)}
         aria-expanded={isOpen}
         aria-controls={contentId}
@@ -350,6 +354,7 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
 
   const [openPromptItems, setOpenPromptItems] = useState<Record<string, boolean>>({});
   const [copiedPromptKey, setCopiedPromptKey] = useState('');
+  const [graphicOpen, setGraphicOpen] = useState(false);
   const copyResetTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(
@@ -468,7 +473,62 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
           </nav>
         </div>
         <p>{DOCS_PAGE_COPY.introduction}</p>
+        <div className={styles.docsGraphicDisclosure}>
+          <DocsSection
+            id="graphic"
+            title="Graphic"
+            testId={E2E_TESTIDS.DOCS_GRAPHIC_TOGGLE}
+            contentClassName={styles.docsGraphicContent}
+          >
+            <figure className={styles.docsGraphicFigure}>
+              <button
+                type="button"
+                className={styles.docsGraphicImageButton}
+                data-ce-control-appearance="frameless"
+                onClick={() => setGraphicOpen(true)}
+                aria-label="Enlarge deployment graphic"
+                aria-haspopup="dialog"
+                data-testid={E2E_TESTIDS.DOCS_GRAPHIC_OPEN}
+              >
+                <img
+                  src={deploymentModesGraphic}
+                  alt="Context Engine deployment diagram showing Web App and AI Agent access to shared sessions across Hosted and Fast, Trustless and Slower, and planned Company-Operated infrastructure modes."
+                  data-testid={E2E_TESTIDS.DOCS_GRAPHIC_IMAGE}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </button>
+            </figure>
+          </DocsSection>
+        </div>
       </header>
+
+      <Modal
+        isOpen={graphicOpen}
+        toggle={() => setGraphicOpen(false)}
+        centered
+        trapFocus
+        fade={false}
+        className={styles.docsGraphicModal}
+        contentClassName={styles.docsGraphicModalContent}
+        labelledBy="docs-graphic-modal-title"
+        data-testid={E2E_TESTIDS.DOCS_GRAPHIC_MODAL}
+      >
+        <div className={styles.docsGraphicModalHeader}>
+          <h2 id="docs-graphic-modal-title">Deployment graphic</h2>
+          <button
+            type="button"
+            onClick={() => setGraphicOpen(false)}
+            aria-label="Close deployment graphic"
+            data-testid={E2E_TESTIDS.DOCS_GRAPHIC_CLOSE}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+        <ModalBody className={styles.docsGraphicModalBody}>
+          <img src={deploymentModesGraphic} alt="Context Engine deployment diagram, enlarged." />
+        </ModalBody>
+      </Modal>
 
       <DocsSection id="quickstart" title="Quickstart" defaultOpen>
         <ol className={styles.quickstartList}>

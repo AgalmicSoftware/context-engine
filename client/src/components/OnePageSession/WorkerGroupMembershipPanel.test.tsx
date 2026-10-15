@@ -87,6 +87,46 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.queryByText('No visible Groups are configured.')).not.toBeInTheDocument();
   });
 
+  it('places one working refresh control in an external actions row and restores the local fallback', async () => {
+    const refreshControlTarget = document.createElement('div');
+    document.body.appendChild(refreshControlTarget);
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            groups: [],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+    const props = {
+      allowAnonymousGroupDiscovery: true,
+      canReadGroups: true,
+      workerUrl: envelope.workerUrl,
+      sessionId: SESSION_ID,
+      sessionSlug: 'alpha',
+      fetchImpl: fetchImpl as typeof fetch,
+    };
+    const view = render(<WorkerGroupMembershipPanel {...props} refreshControlTarget={refreshControlTarget} />);
+    try {
+      await screen.findByText('No visible Groups are configured.');
+      expect(screen.getAllByRole('button', { name: 'Refresh groups' })).toHaveLength(1);
+      expect(refreshControlTarget).toContainElement(screen.getByRole('button', { name: 'Refresh groups' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh groups' }));
+      await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+      await screen.findByText('No visible Groups are configured.');
+      view.rerender(<WorkerGroupMembershipPanel {...props} />);
+      expect(refreshControlTarget).toBeEmptyDOMElement();
+      expect(view.container).toContainElement(screen.getByRole('button', { name: 'Refresh groups' }));
+    } finally {
+      view.unmount();
+      refreshControlTarget.remove();
+    }
+  });
+
   it('can suppress a duplicate loading notice while still loading local groups and showing errors', async () => {
     const response = createResponseDeferred();
     const fetchImpl = jest.fn(() => response.promise);
@@ -129,6 +169,51 @@ describe('WorkerGroupMembershipPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh groups' }));
     expect(await screen.findByText('Unable to load groups.')).toBeInTheDocument();
   });
+
+  it.each(['Alpha Session', ''])(
+    'identifies the owning session in member visibility (name: %s)',
+    async (sessionName) => {
+      const fetchImpl = jest.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              ok: true,
+              sessionId: SESSION_ID,
+              sessionSlug: 'alpha',
+              groups: [
+                {
+                  groupId: 'reviewers',
+                  sessionSlug: 'alpha',
+                  label: 'Reviewers',
+                  joinMode: 'open',
+                  memberVisibility: 'session',
+                },
+              ],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+      );
+      render(
+        <WorkerGroupMembershipPanel
+          allowAnonymousGroupDiscovery
+          canReadGroups
+          sessionId={SESSION_ID}
+          sessionSlug="alpha"
+          sessionName={sessionName}
+          workerUrl="https://session-worker.example"
+          selectedGroupId="reviewers"
+          fetchImpl={fetchImpl as typeof fetch}
+        />,
+      );
+      expect(await screen.findByTestId('ce-worker-group-member-visibility')).toHaveTextContent(
+        sessionName ? 'Member visibility:Session: Alpha Session (alpha)' : 'Member visibility:Session: alpha',
+      );
+      expect(screen.getByRole('link', { name: /Back to Groups/i })).toHaveAttribute(
+        'href',
+        '/groups?sessionSlug=alpha&worker=https%3A%2F%2Fsession-worker.example',
+      );
+    },
+  );
 
   it('formats active, expired, and unlimited join windows without depending on wall-clock time', () => {
     expect(resolveWorkerGroupJoinWindowDisplay({ nowMs: Date.parse('2026-01-01T00:00:00.000Z') })).toEqual({
@@ -219,7 +304,7 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(openGroupDetailsButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
     fireEvent.click(openGroupDetailsButton);
     expect(window.open).toHaveBeenCalledWith(
-      'http://localhost/group/open-reviewers?sessionName=alpha&worker=https%3A%2F%2Fsession-worker.example',
+      'http://localhost/group/open-reviewers?sessionSlug=alpha&worker=https%3A%2F%2Fsession-worker.example',
       '_blank',
       'noopener,noreferrer',
     );
@@ -387,7 +472,7 @@ describe('WorkerGroupMembershipPanel', () => {
     );
     expect(screen.getByRole('link', { name: /back to groups/i })).toHaveAttribute(
       'href',
-      '/groups?sessionName=alpha&worker=https%3A%2F%2Fsession-worker.example',
+      '/groups?sessionSlug=alpha&worker=https%3A%2F%2Fsession-worker.example',
     );
     expect(screen.getByRole('button', { name: 'Sign in to join Open reviewers' })).toHaveTextContent(/^Join$/);
     expect(screen.queryByRole('button', { name: 'View Open reviewers members' })).not.toBeInTheDocument();
@@ -957,9 +1042,9 @@ describe('WorkerGroupMembershipPanel', () => {
     const copiedGroupLink = new URL(String((navigator.clipboard.writeText as jest.Mock).mock.calls[0][0]));
     expect(copiedGroupLink.pathname).toBe('/group/invited-reviewers');
     expect(copiedGroupLink.hash).toBe('');
-    expect(copiedGroupLink.searchParams.get('sessionName')).toBe('alpha');
+    expect(copiedGroupLink.searchParams.get('sessionSlug')).toBe('alpha');
     expect(copiedGroupLink.searchParams.get('worker')).toBe('https://session-worker.example');
-    expect([...copiedGroupLink.searchParams.keys()]).toEqual(['sessionName', 'worker']);
+    expect([...copiedGroupLink.searchParams.keys()]).toEqual(['sessionSlug', 'worker']);
     expect(copiedGroupLink.searchParams.has('inv')).toBe(false);
     expect(copiedGroupLink.searchParams.has('agentToken')).toBe(false);
     expect(screen.getByText(/contains no invitation token or credential/i)).toBeInTheDocument();

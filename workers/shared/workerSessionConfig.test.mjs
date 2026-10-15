@@ -27,6 +27,7 @@ test('deploy config selection strips chain and SBT fields from pure Worker sessi
       links: [{ label: 'Official event page', url: 'https://example.org/event' }],
     },
     defaultGroupTags: 'facilitators',
+    pileAutoAdvanceEnabled: false,
     defaultSbtTags: 'token-holders',
     networkChainId: 11155420,
     contracts: {
@@ -43,6 +44,7 @@ test('deploy config selection strips chain and SBT fields from pure Worker sessi
     links: [{ label: 'Official event page', url: 'https://example.org/event' }],
   });
   assert.equal(selected.defaultGroupTags, 'facilitators');
+  assert.equal(selected.pileAutoAdvanceEnabled, false);
   assert.equal(Object.hasOwn(selected, 'defaultSbtTags'), false);
   assert.equal(Object.hasOwn(selected, 'networkChainId'), false);
   assert.equal(Object.hasOwn(selected, 'contracts'), false);

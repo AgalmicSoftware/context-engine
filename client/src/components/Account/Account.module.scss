@@ -2249,7 +2249,7 @@ h1 {
 
 .settingsThemeQuickControl {
   display: grid;
-  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   min-height: 56px;
@@ -2294,9 +2294,9 @@ h1 {
   min-width: 0;
 
   > div {
-    flex: 1 1 160px;
-    min-width: 0;
-    max-width: 220px;
+    flex: 0 1 170px;
+    min-width: 110px;
+    max-width: 170px;
   }
 
   > label {
@@ -2517,6 +2517,99 @@ h1 {
   flex: 0 0 auto;
 }
 
+.globalSessionSelector {
+  --ce-text: var(--ce-control-text);
+  --ce-input-bg: var(--ce-control-face);
+  --ce-settings-text: var(--ce-control-text);
+  --ce-settings-field-bg: var(--ce-control-face);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-control-face);
+
+  > span {
+    color: var(--ce-control-text);
+  }
+}
+
+.globalSessionSelectField {
+  display: inline-grid;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 28rem;
+  font-family: var(--ce-font-body);
+  font-size: 0.95rem;
+
+  // Measure only the selected label, rather than the longest option in the menu.
+  &::after {
+    content: attr(data-selected-label);
+    grid-area: 1 / 1;
+    visibility: hidden;
+    white-space: pre;
+    padding: 0 28px 0 6px;
+  }
+}
+
+.globalSessionSelector .globalSessionSelectField > select {
+  grid-area: 1 / 1;
+  width: 0;
+  min-width: 100%;
+  min-height: 44px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--ce-radius-6);
+  background: transparent;
+  color: var(--ce-control-text);
+  box-shadow: none;
+  font: inherit;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 0;
+  }
+
+  option {
+    background: var(--ce-document-surface);
+    color: var(--ce-document-text);
+  }
+}
+
+.globalSessionSelector .globalSessionLink {
+  display: inline-flex;
+  flex: 0 0 32px;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 44px;
+  padding: 0;
+  color: var(--ce-control-text);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: var(--ce-radius-6);
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    color: var(--ce-control-text);
+    background: var(--ce-surface-subtle);
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    color: var(--ce-panel-text-muted);
+    cursor: not-allowed;
+  }
+}
+
 .settingsSessionName {
   min-width: 0;
   overflow: hidden;
@@ -2606,6 +2699,7 @@ h1 {
   }
 
   .settingsQuickControlsGrid {
+    grid-template-columns: 1fr;
     gap: 8px;
   }
 
@@ -2632,9 +2726,21 @@ h1 {
   }
 
   .settingsThemeQuickControl {
-    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 8px;
     padding-left: 10px;
+  }
+
+  .settingsThemeQuickSelect {
+    display: contents;
+
+    > div {
+      min-width: 0;
+    }
+
+    > label {
+      grid-column: 1 / -1;
+    }
   }
 }
 
@@ -4026,6 +4132,41 @@ h1 {
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
+  #accountModalPanel {
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--ce-action-submit) 16%, var(--ce-color-white)),
+      color-mix(in srgb, var(--ce-action-submit) 22%, var(--ce-color-white))
+    );
+    color: var(--ce-panel-text);
+    border: 1px solid color-mix(in srgb, var(--ce-action-primary) 28%, var(--ce-color-white));
+
+    .accountModalProfileShell {
+      --ce-text-inverse: var(--ce-panel-text);
+      --ce-status-error: var(--ce-status-danger-text);
+    }
+
+    .walletButton,
+    .disconnectButton {
+      opacity: 1;
+    }
+
+    .disconnectButton {
+      color: var(--ce-action-primary-text);
+    }
+
+    .walletButton {
+      color: var(--ce-panel-text);
+      background: color-mix(in srgb, var(--ce-color-white) 65%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-action-primary) 28%, var(--ce-color-white));
+
+      &:hover,
+      &:focus-visible {
+        background: color-mix(in srgb, var(--ce-color-white) 90%, transparent);
+      }
+    }
+  }
+
   .navConnectContainer {
     display: flex;
     align-items: center;

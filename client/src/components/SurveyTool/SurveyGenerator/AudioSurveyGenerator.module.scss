@@ -1208,6 +1208,20 @@ $input-border: var(--ce-input-border);
     border-color: var(--ce-status-warning);
   }
 
+  .quadraticPreview {
+    display: grid;
+    grid-template-columns: repeat(2, 10px);
+    grid-template-rows: repeat(2, 10px);
+    gap: 3px;
+    align-self: center;
+    pointer-events: none;
+
+    span {
+      background: var(--ce-status-success);
+      border-radius: 2px;
+    }
+  }
+
   .ratingPreview {
     display: flex;
     align-items: center;

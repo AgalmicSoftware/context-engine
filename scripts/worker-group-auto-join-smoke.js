@@ -83,7 +83,13 @@ async function main() {
     await page.setViewportSize({ width: 390, height: 844 });
     assert.equal(await page.getByRole('button', { name: 'Copy auto-join link for Participants 2026', exact: true }).count(), 0);
     assert.equal(await page.getByRole('button', { name: 'Copy Participants 2026 group link', exact: true }).count(), 1);
-    const [detailPage] = await Promise.all([context.waitForEvent('page'), openDetails.click()]);
+    await page.getByRole('button', { name: 'Copy Participants 2026 group link', exact: true }).click();
+    const groupLink = await page.evaluate(() => navigator.clipboard.readText());
+    assert.equal(new URL(groupLink).searchParams.get('sessionSlug'), sessionSlug);
+    await openDetails.click();
+    await page.getByTestId('ce-worker-group-detail').waitFor();
+    const detailPage = await context.newPage();
+    await detailPage.goto(groupLink);
     try {
       await detailPage.getByTestId('ce-worker-group-detail').waitFor();
     } catch (error) {
@@ -91,12 +97,16 @@ async function main() {
       throw error;
     }
     assert.equal(new URL(detailPage.url()).pathname, `/group/${group.groupId}`);
+    assert.equal(new URL(detailPage.url()).searchParams.get('sessionSlug'), sessionSlug);
+    assert.match(await detailPage.getByTestId('ce-worker-group-member-visibility').innerText(), /Session: Auto-join smoke \(auto-join-smoke\)/);
     assert.equal(new URL(detailPage.url()).searchParams.get('worker'), 'https://auto-join-worker.example');
     assert.equal(await detailPage.getByText(/blocks left/i).count(), 0);
     // This uses the actual app shell, including fresh discovery from the
     // cached public origin when an older shared link has no Worker hint.
     await detailPage.goto(`${baseUrl}/group/${group.groupId}?sessionName=${sessionSlug}`);
     await detailPage.getByTestId('ce-worker-group-detail').waitFor();
+    assert.equal(new URL(detailPage.url()).searchParams.get('sessionSlug'), sessionSlug);
+    assert.equal(new URL(detailPage.url()).searchParams.has('sessionName'), false);
     assert.equal(await detailPage.getByText(/blocks left/i).count(), 0);
     await detailPage.reload();
     await detailPage.getByTestId('ce-worker-group-detail').waitFor();

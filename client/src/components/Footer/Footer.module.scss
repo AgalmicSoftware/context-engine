@@ -18,7 +18,7 @@
         flex-wrap: wrap;
         justify-content: center;
         align-items: center;
-        gap: 4px 8px;
+        gap: 4px;
         width: 100%;
         li {
           min-width: 0;
@@ -27,7 +27,7 @@
         li .footerLink {
           align-items: center;
           display: flex;
-          font-size: 1.125rem;
+          font-size: 0.875rem;
           font-weight: 700;
           line-height: 1.4;
           justify-content: center;
@@ -35,7 +35,7 @@
           margin-left: 0 !important;
           margin-right: 0 !important;
           min-height: 44px;
-          padding: 8px 12px;
+          padding: 8px 4px;
           text-align: center;
           white-space: nowrap;
           width: 100%;

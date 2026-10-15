@@ -70,6 +70,16 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
     });
   });
 
+  it('reports Worker sponsorship without pretending an on-chain gate was checked', () => {
+    expect(formatSponsoredStatusMeta({ status: 'worker-managed' }, true)).toMatchObject({
+      label: 'Sponsored',
+      detail: 'A sponsor key is configured. Access follows the session permissions.',
+    });
+    expect(formatSponsoredStatusMeta(null, false, 'session', 'checking').label).toBe('Checking');
+    expect(formatSponsoredStatusMeta(null, false, 'session', 'unavailable').label).toBe('Check unavailable');
+    expect(formatSponsoredStatusMeta(null, false).label).toBe('Not sponsored');
+  });
+
   it('builds sponsored resource card display models without reordering sessions', () => {
     const activeSession = { slug: 'active', label: 'Active session' };
     const activeSponsorSession = { slug: 'active', label: 'Active session', isActive: true };

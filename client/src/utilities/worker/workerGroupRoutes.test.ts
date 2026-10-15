@@ -1,28 +1,33 @@
-import { buildWorkerGroupsPath, readWorkerGroupIdFromHash, readWorkerGroupIdFromPath } from './workerGroupRoutes';
+import {
+  buildWorkerGroupsPath,
+  readWorkerGroupIdFromHash,
+  readWorkerGroupIdFromPath,
+  readWorkerGroupSessionSlugFromSearch,
+} from './workerGroupRoutes';
 
 describe('workerGroupRoutes', () => {
   const legacyAddressGroupId = '0x1234567890abcdef1234567890abcdef12345678';
 
   it('builds a query-scoped list route and a path-scoped detail route', () => {
-    expect(buildWorkerGroupsPath({ sessionSlug: ' Demo-SH ' })).toBe('/groups?sessionName=Demo-SH');
+    expect(buildWorkerGroupsPath({ sessionSlug: ' Demo-SH ' })).toBe('/groups?sessionSlug=Demo-SH');
     expect(
       buildWorkerGroupsPath({
         sessionSlug: 'demo-sh',
         groupId: 'reviewers / public',
       }),
-    ).toBe('/group/reviewers%20%2F%20public?sessionName=demo-sh');
+    ).toBe('/group/reviewers%20%2F%20public?sessionSlug=demo-sh');
   });
 
   it('preserves the supported list alias and PUBLIC_URL base path', () => {
     const originalPublicUrl = process.env.PUBLIC_URL;
     process.env.PUBLIC_URL = '/ce/';
     try {
-      expect(buildWorkerGroupsPath({ rootPath: '/sbts', sessionSlug: 'alpha' })).toBe('/ce/sbts?sessionName=alpha');
+      expect(buildWorkerGroupsPath({ rootPath: '/sbts', sessionSlug: 'alpha' })).toBe('/ce/sbts?sessionSlug=alpha');
       expect(buildWorkerGroupsPath({ groupId: 'reviewers', sessionSlug: 'alpha' })).toBe(
-        '/ce/group/reviewers?sessionName=alpha',
+        '/ce/group/reviewers?sessionSlug=alpha',
       );
       expect(buildWorkerGroupsPath({ groupId: legacyAddressGroupId, sessionSlug: 'alpha' })).toBe(
-        `/ce/groups?sessionName=alpha#group-${legacyAddressGroupId}`,
+        `/ce/groups?sessionSlug=alpha#group-${legacyAddressGroupId}`,
       );
       expect(readWorkerGroupIdFromPath('/ce/group/reviewers')).toBe('reviewers');
     } finally {
@@ -34,9 +39,9 @@ describe('workerGroupRoutes', () => {
   it('preserves validated public Worker discovery on group and list links', () => {
     expect(
       buildWorkerGroupsPath({ groupId: 'reviewers', sessionSlug: 'alpha', workerUrl: 'https://worker.example/' }),
-    ).toBe('/group/reviewers?sessionName=alpha&worker=https%3A%2F%2Fworker.example');
+    ).toBe('/group/reviewers?sessionSlug=alpha&worker=https%3A%2F%2Fworker.example');
     expect(buildWorkerGroupsPath({ sessionSlug: 'alpha', workerUrl: 'https://worker.example' })).toBe(
-      '/groups?sessionName=alpha&worker=https%3A%2F%2Fworker.example',
+      '/groups?sessionSlug=alpha&worker=https%3A%2F%2Fworker.example',
     );
     expect(() =>
       buildWorkerGroupsPath({ sessionSlug: 'alpha', workerUrl: ['https://secret', 'worker.example'].join('@') }),
@@ -48,13 +53,13 @@ describe('workerGroupRoutes', () => {
 
   it('keeps legacy address-shaped Worker group ids out of SBT detail paths', () => {
     expect(buildWorkerGroupsPath({ groupId: legacyAddressGroupId, sessionSlug: 'demo-sh' })).toBe(
-      `/groups?sessionName=demo-sh#group-${legacyAddressGroupId}`,
+      `/groups?sessionSlug=demo-sh#group-${legacyAddressGroupId}`,
     );
     expect(buildWorkerGroupsPath({ groupId: legacyAddressGroupId, sessionSlug: '' })).toBe(
       `/groups#group-${legacyAddressGroupId}`,
     );
     expect(buildWorkerGroupsPath({ groupId: legacyAddressGroupId, rootPath: '/sbts', sessionSlug: 'demo-sh' })).toBe(
-      `/sbts?sessionName=demo-sh#group-${legacyAddressGroupId}`,
+      `/sbts?sessionSlug=demo-sh#group-${legacyAddressGroupId}`,
     );
   });
 
@@ -65,9 +70,16 @@ describe('workerGroupRoutes', () => {
   });
 
   it('reads only canonical Worker Group detail paths', () => {
-    expect(readWorkerGroupIdFromPath('/group/reviewers%20%2F%20public?sessionName=demo-sh')).toBe('reviewers / public');
+    expect(readWorkerGroupIdFromPath('/group/reviewers%20%2F%20public?sessionSlug=demo-sh')).toBe('reviewers / public');
     expect(readWorkerGroupIdFromPath('/groups/reviewers')).toBe('');
     expect(readWorkerGroupIdFromPath('/group/reviewers/extra')).toBe('');
     expect(readWorkerGroupIdFromPath('/group/%E0%A4%A')).toBe('');
   });
+});
+
+it('prefers an explicit owning slug while accepting older sessionName links', () => {
+  expect(readWorkerGroupSessionSlugFromSearch('?sessionSlug=alpha&sessionName=other')).toBe('alpha');
+  expect(readWorkerGroupSessionSlugFromSearch('?sessionName=legacy-session')).toBe('legacy-session');
+  expect(readWorkerGroupSessionSlugFromSearch('?sessionSlug=&sessionName=other')).toBe('');
+  expect(readWorkerGroupSessionSlugFromSearch('?sessionSlug=community%20session')).toBe('community session');
 });

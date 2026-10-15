@@ -356,3 +356,11 @@ describe('sessionStateReducer', () => {
     expect(reducer(state, { type: 'UNKNOWN_ACTION', payload: true })).toBe(state);
   });
 });
+
+it('ignores the retired browser auto-advance preference during initialization and refresh', () => {
+  localStorage.setItem('ce:pileAutoAdvanceEnabled', 'false');
+  const initial = reducer(undefined, { type: '@@INIT' });
+  expect(initial).not.toHaveProperty('pileAutoAdvanceEnabled');
+  expect(reducer(initial, { type: FETCH_SESSION_STATE, payload: {} })).not.toHaveProperty('pileAutoAdvanceEnabled');
+  localStorage.clear();
+});

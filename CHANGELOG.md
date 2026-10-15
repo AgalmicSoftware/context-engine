@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.13] - 2026-10-13
+
+### Client — available when the site deploys
+
+- Align desktop question navigation with the top of the card and keep its counter
+  on one line when moving between questions. Keep mobile Submit controls clear
+  of the navigation arrows.
+
+- Show the Quadratic question type with a compact four-square graphic.
+
+- Keep the Users Details session selector and Filter on one row, with long session
+  titles contained beside the external-link icon.
+
+- Fit Appearance controls into a compact row, align question navigation with
+  the action buttons, and retain loaded results during background refreshes.
+
+- Switch the active session directly from the Groups page, with session-scoped
+  navigation and the selected session’s Worker discovery address.
+
+- Load Questions in Tools from the selected session’s verified Worker, keeping
+  unresolved counts in a loading state and failed reads distinct from confirmed zero.
+
+- Bring the group creation form into view when opening it below the visible list.
+
+- Center the session loading message with larger text and a spinner while keeping
+  the elapsed-seconds counter visible across themes.
+
+- Resolve Worker session sponsorship in Settings from verified session config and
+  live resource presence. Distinguish unavailable checks from missing sponsorship,
+  and retain selected-session model defaults for text AI and transcription.
+
+- Route Context dictation and AI rewrite through the selected session's Worker,
+  including local session changes and returning to the global default.
+- Keep Back and Session above one Groups action row containing View All, Create,
+  and Refresh.
+- Restore the Questions toolbar as a full-width bordered panel with evenly
+  distributed controls and centered wrapping on phones across all themes. Keep
+  it pinned near the viewport top while scrolling, including pending Submit controls.
+- Show the owning session name and slug for session-wide group member visibility.
+  Keep shared group links scoped with an explicit `sessionSlug`, including when
+  a different session is active, while supporting older links.
+- Advance the question pile after binary and single-choice answers by default.
+  Configure the deployment default in the client environment and override it
+  per session with `pileAutoAdvanceEnabled`. Keep manual navigation available.
+- Keep the active session selection consistent across Stats, account settings,
+  Questions, Groups, and Context. Add a session filter to user details and link
+  question rows directly to their session report.
+- Simplify Stats counters and distribute four visible totals evenly. Make
+  Explorer help work by click, tap, or keyboard even when automatic explainers
+  are disabled, and keep navigation controls together when space permits.
+- Refine the white theme with clearer account controls, readable wordmarks,
+  softer Welcome artwork, larger mobile tabs, and a compact footer. Refresh
+  returning clients to the updated default theme once.
+- Add a collapsible setup graphic to Docs and shorten Groups help. Keep the
+  standalone benchmark Results help popup within narrow screens.
+
 ## [0.6.9] - 2026-10-13
 
 ### Client — available when the site deploys

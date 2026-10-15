@@ -17,6 +17,7 @@ const presenceInflight = new Map<string, Promise<WorkerResourcePresence | null>>
 const normalizePresence = (value: unknown): WorkerResourcePresence | null => {
   if (!value || typeof value !== 'object') return null;
   const source = value as UnknownRecord;
+  if (RESOURCE_KEYS.some((key) => typeof source[key] !== 'boolean')) return null;
   return RESOURCE_KEYS.reduce(
     (acc, key) => {
       acc[key] = source[key] === true;
@@ -51,23 +52,28 @@ export const readWorkerResourcePresence = async ({
   if (inflight) return inflight;
 
   const run = (async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     try {
       const response = await fetchImpl(`${workerUrl}/resource-presence`, {
         method: 'GET',
         headers: { 'X-Session-Slug': slug || 'general' },
         cache: 'no-store',
+        signal: controller.signal,
       });
       if (!response.ok) return null;
       const data = (await response.json().catch(() => null)) as UnknownRecord | null;
       return normalizePresence(data?.resources);
     } catch {
       return null;
+    } finally {
+      clearTimeout(timeout);
     }
   })();
   presenceInflight.set(cacheKey, run);
   try {
     const value = await run;
-    presenceCache.set(cacheKey, { value, expiresAt: Date.now() + CACHE_TTL_MS });
+    if (value) presenceCache.set(cacheKey, { value, expiresAt: Date.now() + CACHE_TTL_MS });
     return value;
   } finally {
     if (presenceInflight.get(cacheKey) === run) presenceInflight.delete(cacheKey);

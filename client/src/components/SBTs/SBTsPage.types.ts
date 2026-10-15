@@ -81,6 +81,7 @@ export type SBTsPageProps = UnknownRecord & {
   showCreateGroupExternal?: boolean;
   hideMiniActionRow?: boolean;
   embeddedWorkerGroups?: boolean;
+  refreshControlTarget?: HTMLElement | null;
   showCreateGroupAboveFeatured?: boolean;
   preferCacheBackedFeaturedCards?: boolean;
   requireExplicitAutoFeatureSessionSlug?: boolean;

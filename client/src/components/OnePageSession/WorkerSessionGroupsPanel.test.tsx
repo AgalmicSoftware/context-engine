@@ -132,6 +132,55 @@ describe('WorkerSessionGroupsPanel', () => {
     jest.clearAllMocks();
   });
 
+  it.each([
+    [1200, true],
+    [-200, true],
+    [100, false],
+  ])('reveals an opened creation panel at y=%s only when needed', async (top, shouldScroll) => {
+    const scroll = jest.fn();
+    const originalScroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scroll;
+    const bounds = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      top,
+      bottom: top + 600,
+      height: 600,
+      left: 0,
+      right: 300,
+      width: 300,
+      x: 0,
+      y: top,
+      toJSON: () => ({}),
+    });
+    let callback: FrameRequestCallback | undefined;
+    const frame = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((next) => {
+      callback = next;
+      return 1;
+    });
+    try {
+      const props = {
+        account: ADMIN,
+        provider: 'wagmi',
+        networkChainId: 11155420,
+        sessionConfig,
+        sessionSlug: 'demo-sh',
+        scrollToCreate: true,
+      };
+      const view = render(<WorkerSessionGroupsPanel {...props} showCreate={false} />);
+      expect(frame).not.toHaveBeenCalled();
+      view.rerender(<WorkerSessionGroupsPanel {...props} showCreate={true} />);
+      await act(async () => {
+        callback?.(0);
+      });
+      expect(scroll).toHaveBeenCalledTimes(shouldScroll ? 1 : 0);
+      view.rerender(<WorkerSessionGroupsPanel {...props} showCreate={false} />);
+      expect(scroll).toHaveBeenCalledTimes(shouldScroll ? 1 : 0);
+    } finally {
+      frame.mockRestore();
+      bounds.mockRestore();
+      HTMLElement.prototype.scrollIntoView = originalScroll;
+    }
+  });
+
   it('loads the worker credential and creates through the real native admin component for the exact session', async () => {
     mockGetWorkerSessionToken.mockResolvedValue('worker-session-token');
 
@@ -199,6 +248,7 @@ describe('WorkerSessionGroupsPanel', () => {
   });
 
   it('forwards the session header refresh state to the membership list', async () => {
+    const refreshControlTarget = document.createElement('div');
     const publicSessionConfig = {
       ...sessionConfig,
       sessionModeProfile: publicSessionModeProfile,
@@ -212,6 +262,7 @@ describe('WorkerSessionGroupsPanel', () => {
         sessionSlug="demo-sh"
         showCreate={false}
         refreshNonce={4}
+        refreshControlTarget={refreshControlTarget}
         groupIdFilter="community"
         inlineDetails
         showEmptyState={false}
@@ -225,6 +276,7 @@ describe('WorkerSessionGroupsPanel', () => {
     expect(mockMembershipPanel).toHaveBeenLastCalledWith(
       expect.objectContaining({
         refreshNonce: 4,
+        refreshControlTarget,
         groupIdFilter: 'community',
         inlineDetails: true,
         showEmptyState: false,

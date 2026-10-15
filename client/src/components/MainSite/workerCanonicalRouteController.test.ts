@@ -49,6 +49,27 @@ describe('workerCanonicalRouteController', () => {
     expect(controller.getVerifiedConfig('other-session', bootstrap.workerOrigin)).toBeNull();
   });
 
+  it('uses only the selected verified Worker on home and resets stale question readiness', () => {
+    window.history.replaceState({}, '', '/');
+    const { host } = buildHost();
+    host.getSessionSlugFromState = jest.fn(() => 'eddy-fixture');
+    const controller = createWorkerCanonicalRouteController(host);
+    const config = { slug: 'eddy-fixture' };
+    expect(controller.isSessionSlug('eddy-fixture')).toBe(false);
+    controller.handleBootstrapResolved({
+      config,
+      sessionSlug: 'eddy-fixture',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      workerOrigin: 'https://worker.example.com',
+      configRevision: '1',
+    });
+    expect(controller.getActiveVerifiedConfig('eddy-fixture')).toBe(config);
+    const patch = host.setState.mock.calls.at(-1)[0]({ isQuestionCacheReady: true });
+    expect(patch).toMatchObject({ isQuestionCacheReady: false, isSurveyCacheReady: false });
+    host.getSessionSlugFromState.mockReturnValue('other-session');
+    expect(controller.getActiveVerifiedConfig('eddy-fixture')).toBeNull();
+  });
+
   it('replaces same-slug route state without leaking config across Worker origins', () => {
     const { host } = buildHost();
     const controller = createWorkerCanonicalRouteController(host);

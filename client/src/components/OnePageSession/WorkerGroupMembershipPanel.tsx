@@ -1,6 +1,7 @@
 import { clearWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { createPortal } from 'react-dom';
 import { faInfinity, faLink, faQuestionCircle, faSyncAlt, faUser } from '@fortawesome/free-solid-svg-icons';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
@@ -44,11 +45,13 @@ export type WorkerGroupMembershipPanelProps = {
   workerToken?: string;
   canReadGroups?: boolean;
   refreshNonce?: number;
+  refreshControlTarget?: HTMLElement | null;
   fetchImpl?: typeof fetch;
   participantAddress?: string;
   sessionConfig?: unknown;
   sessionId?: string;
   sessionSlug?: string;
+  sessionName?: string;
   allowAnonymousGroupDiscovery?: boolean;
   onSignIn?: (groupId?: string) => void;
   joinAfterSignInGroupId?: string;
@@ -141,6 +144,7 @@ type WorkerGroupDetailViewProps = {
   onOpenMembers: () => void;
   onBack?: () => void;
   sessionConfig: unknown;
+  sessionName: string;
   sessionSlug: string;
   workerToken: string;
   workerUrl: string;
@@ -159,11 +163,13 @@ const WorkerGroupDetailView = ({
   onLoadMoreMembers,
   onOpenMembers,
   onBack,
+  sessionName,
   sessionConfig,
   sessionSlug,
   workerToken,
   workerUrl,
 }: WorkerGroupDetailViewProps) => {
+  const sessionLabel = sessionName && sessionName !== sessionSlug ? `${sessionName} (${sessionSlug})` : sessionSlug;
   const moreInfoId = `worker-group-more-info-${React.useId().replace(/:/g, '')}`;
   const safeGroupId = group.groupId.replace(/[^a-zA-Z0-9_-]/g, '-');
   const titleId = `worker-group-detail-${safeGroupId}-title`;
@@ -307,9 +313,13 @@ const WorkerGroupDetailView = ({
                 <span className={sbtPageStyles.label}>Join policy:</span>
                 <span>{group.joinMode === 'open' ? 'Open to participants' : 'Admin adds members'}</span>
               </p>
-              <p>
+              <p className={styles.workerGroupVisibility} data-testid="ce-worker-group-member-visibility">
                 <span className={sbtPageStyles.label}>Member visibility:</span>
-                <span>{group.memberVisibility.replace(/_/g, ' ')}</span>
+                <span>
+                  {group.memberVisibility === 'session'
+                    ? `Session: ${sessionLabel}`
+                    : group.memberVisibility.replace(/_/g, ' ')}
+                </span>
               </p>
               {group.adminAddress ? (
                 <p>
@@ -394,11 +404,13 @@ const WorkerGroupMembershipPanel = ({
   workerToken: workerTokenProp,
   canReadGroups: canReadGroupsProp,
   refreshNonce = 0,
+  refreshControlTarget,
   participantAddress,
   fetchImpl = fetch,
   sessionConfig = null,
   sessionId: sessionIdProp = '',
   sessionSlug: sessionSlugProp = '',
+  sessionName = '',
   allowAnonymousGroupDiscovery = false,
   onSignIn,
   joinAfterSignInGroupId = '',
@@ -917,6 +929,7 @@ const WorkerGroupMembershipPanel = ({
             isActive={selectedGroup.joinMode === 'open' && !groupJoinHasEnded(selectedGroup)}
             memberListState={activeMemberListState}
             sessionConfig={sessionConfig}
+            sessionName={sessionName.trim()}
             sessionSlug={sessionSlug}
             workerToken={workerToken}
             workerUrl={workerUrl}
@@ -946,20 +959,26 @@ const WorkerGroupMembershipPanel = ({
     );
   }
 
+  const refreshControl = (
+    <button
+      type="button"
+      className={styles.telegramIconButton}
+      aria-label="Refresh groups"
+      title="Refresh groups"
+      onClick={() => void reload()}
+    >
+      <FontAwesomeIcon icon={faSyncAlt} />
+    </button>
+  );
+
   return (
     <section ref={panelRef} className={styles.workerGroupsListPanel} data-testid="ce-session-worker-groups">
       {showListHeader ? (
-        <div className={`${styles.telegramListHeader} ${styles.workerGroupsListActions}`}>
-          <button
-            type="button"
-            className={styles.telegramIconButton}
-            aria-label="Refresh groups"
-            title="Refresh groups"
-            onClick={() => void reload()}
-          >
-            <FontAwesomeIcon icon={faSyncAlt} />
-          </button>
-        </div>
+        refreshControlTarget ? (
+          createPortal(refreshControl, refreshControlTarget)
+        ) : (
+          <div className={`${styles.telegramListHeader} ${styles.workerGroupsListActions}`}>{refreshControl}</div>
+        )
       ) : null}
       {showLoadingState && status === 'loading' ? (
         <div className={`${styles.telegramListEmpty} ${styles.workerGroupsLoadingState}`}>Loading groups…</div>

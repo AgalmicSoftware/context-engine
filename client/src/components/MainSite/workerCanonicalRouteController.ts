@@ -5,7 +5,11 @@ import {
 } from '../../utilities/session/sessionWorkerDiscovery.js';
 import type { AppShell } from './AppShell';
 
-type WorkerCanonicalRouteControllerHost = Pick<AppShell, 'getCurrentPathname' | 'getSessionTokenFromPath' | 'setState'>;
+type WorkerCanonicalRouteControllerHost = Pick<
+  AppShell,
+  'getCurrentPathname' | 'getSessionTokenFromPath' | 'setState'
+> &
+  Partial<Pick<AppShell, 'getSessionSlugFromState'>>;
 const controllersByHost = new WeakMap<object, WorkerCanonicalRouteController>();
 
 export type WorkerCanonicalRouteController = {
@@ -35,11 +39,13 @@ export const createWorkerCanonicalRouteController = (
     // that exact route may use its live-verified config for cache hydration.
     const querySlugs = new URLSearchParams(search).getAll('session');
     const routeSlug = normalizeSessionSlug(
-      /^\/(?:compare(?:\/|$)|u\/)/.test(path)
-        ? querySlugs.length === 1
-          ? querySlugs[0]
-          : ''
-        : host.getSessionTokenFromPath(path) || '',
+      path === '/'
+        ? host.getSessionSlugFromState?.() || ''
+        : /^\/(?:compare(?:\/|$)|u\/)/.test(path)
+          ? querySlugs.length === 1
+            ? querySlugs[0]
+            : ''
+          : host.getSessionTokenFromPath(path) || '',
     );
     const matchesExplicitRoute = !!routeSlug && routeSlug === normalizedSlug;
     try {
@@ -84,8 +90,20 @@ export const createWorkerCanonicalRouteController = (
       verifiedOriginsBySlug.set(normalizedSlug, bootstrap.workerOrigin);
       verifiedRouteKeys.add(routeKey);
       verifiedConfigsByRoute.set(routeKey, bootstrap.config);
-      host.setState((previousState) => ({
+      host.setState<'sessionPathResolutionNonce'>((previousState) => ({
         sessionPathResolutionNonce: Number(previousState.sessionPathResolutionNonce || 0) + 1,
+        ...(host.getCurrentPathname() === '/' &&
+        normalizeSessionSlug(host.getSessionSlugFromState?.()) === normalizedSlug
+          ? {
+              isQuestionCacheReady: false,
+              isSurveyCacheReady: false,
+              isResponsesCacheReady: false,
+              isAllCachesReady: false,
+              cacheHasLoaded: false,
+              questionCacheInitializationError: false,
+              surveyCacheInitializationError: false,
+            }
+          : {}),
       }));
     },
 

@@ -386,6 +386,41 @@ writes (about 240), so set up caching there separately.
   Keep them in uncommitted `client/.env` for local diagnostics, not in a shared
   production client config if you need a true secret boundary.
 
+## Question pile navigation
+
+`REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED=true` controls the deployment default for
+advancing after a binary or single-select answer. It defaults to `true`; set it
+in `client/.env` and restart the dev server or rebuild the deployed client.
+Each session can override it with a top-level boolean in its session config:
+
+```json
+{ "pileAutoAdvanceEnabled": false }
+```
+
+An explicit session boolean takes precedence over the environment default.
+Omitting the field inherits that default. This is session configuration; there
+is no user Settings toggle, and the retired browser preference is ignored.
+Manual navigation remains available and submission remains explicit.
+
+## Worker questions in Tools
+
+The home Tools → Questions view verifies the selected Worker configuration before
+hydrating its questions. Switching sessions retains the open tool and loads the
+new session's data. The question selector omits an unknown zero while loading or
+after a cache error; a completed empty read displays zero.
+
+## Worker session AI defaults and sponsorship
+
+Settings resolves directory selections through the session Worker's verified
+configuration before checking `/resource-presence`. A confirmed AI key appears
+as Sponsored; failed or malformed checks appear as Check unavailable and can be
+retried by reopening Settings. Sponsorship describes key availability; the
+Worker still enforces the session's access permissions on requests.
+
+Text AI and transcription retain the selected Worker's configured model defaults.
+Explicit browser-local AI overrides still take precedence. Provider secrets stay
+on the Worker and are not returned by these configuration or presence reads.
+
 ## Current Migration Toggle
 
 - `REACT_APP_TERMINOLOGY_MODE=plain`
@@ -447,8 +482,9 @@ writes (about 240), so set up caching there separately.
 
 ## Profile Scan Fanout Toggles
 
-- `REACT_APP_CE_SESSION_SCAN_SCOPE=list`
+- `REACT_APP_CE_SESSION_SCAN_SCOPE=all`
   - Controls the default session scan mode (`active|general|list|all`).
+  - Fresh selections start at ALL; stored selections and explicit environment overrides take precedence. The public demo remains the default primary session for Tools and session links while ALL is selected.
 
 - `REACT_APP_CE_SESSION_SCAN_SLUGS=slug-a,slug-b`
   - Sets the default list-scope session slugs.

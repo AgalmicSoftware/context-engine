@@ -43,7 +43,7 @@ const HOSTING_PRESETS = [
     entryProvider: 'Ethereum + Arweave',
     entryDescription:
       'Session data is stored on Arweave, with session identity and question logic recorded in Ethereum smart contracts.',
-    entryRequirements: ['OpenAI API Key', 'Arweave wallet', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)'],
+    entryRequirements: ['OpenAI API Key', 'JWK', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)'],
   },
 ] as const;
 
