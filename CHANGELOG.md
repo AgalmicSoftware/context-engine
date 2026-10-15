@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.14] - 2026-10-14
+
+### Client — available when the site deploys
+
+- Show the question actions hamburger by default on mobile, alongside the
+  previous/next arrows. Stack the phone question counter in a narrow column
+  and keep pending Submit controls on their own row.
+
 ## [0.6.13] - 2026-10-13
 
 ### Client — available when the site deploys
