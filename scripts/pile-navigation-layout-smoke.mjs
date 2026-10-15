@@ -13,8 +13,8 @@ const questions = Array.from({ length: 50 }, (_, index) => ({
 }));
 const browser = await chromium.launch({ headless: true });
 try {
-  for (const theme of ['civic', 'classic-95', 'context-engine']) {
-    for (const width of [320, 335, 390, 640, 705, 768, 773, 937, 1280]) {
+  for (const theme of (process.env.SMOKE_THEMES || 'civic,classic-95,context-engine').split(',')) {
+    for (const width of (process.env.SMOKE_WIDTHS || '320,335,390,596,640,705,768,773,937,1280').split(',').map(Number)) {
       const page = await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width <= 768, reducedMotion: 'reduce' });
       await page.addInitScript(theme => {
         localStorage.setItem('ce:theme', theme);
@@ -77,6 +77,10 @@ try {
             nav: rect(nav), menu: rect(actions.querySelector('button')), next: rect(button), counter: rect(counter), card: rect(card), prev: rect(nav.querySelector('button')), actions: rect(actions),
             buttons: [...controls.querySelectorAll('button')].filter(button => button.getBoundingClientRect().width > 0 && getComputedStyle(button).visibility !== 'hidden').map(rect),
             text: counter.textContent.trim(), lineTops: [...new Set(textRects.map(r => Math.round(r.top)))],
+            submitLabelFits: [...controls.querySelectorAll('[class*="pileSubmitButtonLabel_"]')].every(label => {
+              const labelRect = label.getBoundingClientRect(), buttonRect = label.closest('button').getBoundingClientRect();
+              return labelRect.left >= buttonRect.left && labelRect.right <= buttonRect.right;
+            }),
             overflow: document.documentElement.scrollWidth > innerWidth + 1,
           };
         });
@@ -87,9 +91,10 @@ try {
           assert(layout.counter.width < 32, `Counter leaves room for the controls: ${detail}`);
         } else assert.equal(layout.lineTops.length, 1, `Wide counter stays on one line: ${detail}`);
         if (width <= 768) {
-          for (const control of [layout.menu, layout.prev, layout.next]) {
-            assert(Math.abs(control.cy - layout.nav.cy) <= 1, `Menu and arrows share a row: ${detail}`);
+          for (const control of layout.buttons) {
+            assert(Math.abs(control.cy - layout.nav.cy) <= 1, `Menu, Submit, clear, and arrows share a row: ${detail}`);
           }
+          assert(layout.submitLabelFits, `Submit label fits its button: ${detail}`);
         }
         assert(layout.counter.left >= layout.nav.left && layout.counter.right <= layout.nav.right, `Counter fits its rail: ${detail}`);
         assert(!layout.overflow, `No horizontal overflow: ${detail}`);
@@ -118,6 +123,14 @@ try {
       await inspect(21);
       assert(await page.getByRole('button', { name: /^Submit/ }).isVisible(), 'Pending draft keeps Submit visible');
       if (process.env.OUTPUT_DIR) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-pending.png` });
+      if (width === 320) {
+        for (let expected = 22; expected <= 31; expected += 1) {
+          await page.getByTestId('ce-pile-active-question').getByText('Agree', { exact: true }).click();
+          await inspect(expected);
+        }
+        assert(await page.getByRole('button', { name: 'Submit (11)', exact: true }).isVisible(), 'Two-digit pending count fits the row');
+        if (process.env.OUTPUT_DIR) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-pending-11.png` });
+      }
       console.log(`PASS pile navigation: ${theme} ${width}, 20 / 50, forward/back, and pending draft`);
       await page.close();
     }

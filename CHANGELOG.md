@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Show the question actions hamburger by default on mobile, alongside the
   previous/next arrows. Stack the phone question counter in a narrow column
-  and keep pending Submit controls on their own row.
+  and keep Submit, clear, the menu, and navigation together on one row.
 - Move the filtered question count beside the session's Questions heading when
   there are no surveys, freeing toolbar space on phones. Keep the selector when
   surveys are available, and show zero when no questions match the filters.

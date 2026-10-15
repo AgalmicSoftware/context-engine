@@ -5354,11 +5354,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 @media (max-width: 768px) {
   .pileControls {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'actions footer nav';
     align-items: center;
     width: 100%;
     margin-top: 35px;
     padding: 0 10px;
-    gap: 20px;
+    gap: 4px;
     max-height: none;
   }
 
@@ -5383,8 +5386,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileActionsMenuEligible .pileActionMenuToggle {
     display: flex;
-    width: 46px;
-    height: 46px;
+    width: 44px;
+    height: 44px;
     background: transparent;
     border: none;
     color: var(--ce-color-white);
@@ -5428,14 +5431,29 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .pileFooter {
+    grid-area: footer;
     order: 2;
     flex: 1 1 auto;
     min-width: 0;
     width: auto;
     max-width: none;
     min-height: 0;
-    margin-right: 8px;
-    gap: 12px;
+    margin-right: 0;
+    gap: 4px;
+  }
+
+  .pileFooterHidden {
+    display: none;
+  }
+
+  .pileFooter .pileIconButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 28px;
+    width: 28px;
+    height: 44px;
+    padding: 0;
   }
 
   .pileFooter .pileSubmitButton {
@@ -5452,15 +5470,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileNav {
     flex-direction: row;
     flex-shrink: 0;
-    gap: 12px;
+    gap: 2px;
     order: 3;
     justify-self: end;
-    padding: 6px 16px;
+    padding: 0;
     border-radius: var(--ce-radius-50);
     min-width: auto;
   }
 
   .pileNavArrow {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
     font-size: 1.6rem;
   }
 
@@ -5481,7 +5503,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 @media (max-width: 480px) {
   .pileControls {
-    gap: 10px;
+    gap: 4px;
     padding: 0 6px;
   }
 
@@ -5494,14 +5516,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .pileFooter {
-    flex: 1 1 190px;
-    gap: 8px;
+    gap: 4px;
     margin-right: 0;
   }
 
   .pileNav {
-    gap: 8px;
-    padding: 6px 4px;
+    gap: 2px;
+    padding: 0;
   }
 
   .pileNavArrow {
@@ -5524,28 +5545,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (max-width: 640px) {
-  .pileControls {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'footer footer'
-      'actions nav';
-    justify-content: stretch;
-    gap: 8px;
-  }
-
   .pileControls > .pileActions {
     justify-self: start;
     width: auto;
-  }
-
-  .pileFooter {
-    grid-area: footer;
-    margin-right: 0;
-  }
-
-  .pileFooterHidden {
-    display: none;
   }
 
   // Keep the counter in a narrow column between the arrows on phones.
@@ -5979,13 +5981,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     .pileControls {
       position: static;
       display: grid;
-      grid-template-columns: auto minmax(180px, 1fr) auto;
+      grid-template-columns: auto minmax(0, 1fr) auto;
       grid-template-areas: 'actions footer nav';
       align-items: center;
       width: 100%;
       margin-top: 14px;
       padding: 0;
-      gap: 8px;
+      gap: 4px;
       overflow: visible;
     }
 
@@ -5997,7 +5999,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       width: auto;
       transform: none;
       min-width: 0;
-      padding: 4px 6px;
+      padding: 0;
       border: 0;
       background: transparent;
       box-shadow: none;
@@ -6111,14 +6113,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     .pileControls {
       position: static;
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      grid-template-areas:
-        'footer footer'
-        'actions nav';
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas: 'actions footer nav';
       align-items: center;
       justify-content: stretch;
       width: 100%;
-      gap: 8px;
+      gap: 4px;
       margin-top: 8px;
     }
 
@@ -6502,9 +6502,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     --pile-submit-button-radius: var(--ce-radius-8);
     width: auto;
     max-width: 300px;
-    min-height: 0;
-    padding: 12px 24px;
-    font-size: 1rem;
+    min-width: 0;
+    min-height: 44px;
+    padding: 10px 6px;
+    font-size: clamp(0.75rem, 2.7vw, 1rem);
     border-radius: var(--ce-radius-8);
   }
 }
@@ -6514,10 +6515,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     --pile-submit-button-radius: var(--ce-radius-8);
     width: 100%;
     max-width: none;
-    min-width: 150px;
-    min-height: 0;
-    padding: 12px 18px;
-    font-size: 1rem;
+    min-width: 0;
+    min-height: 44px;
+    padding: 10px 6px;
+    font-size: clamp(0.75rem, 2.7vw, 1rem);
     border-radius: var(--ce-radius-8);
   }
 
