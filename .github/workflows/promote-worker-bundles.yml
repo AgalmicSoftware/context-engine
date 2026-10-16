@@ -29,6 +29,9 @@ jobs:
       - name: Checkout trusted promotion verifier
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Preserve trusted Latest policy for historical source checkouts
+        run: cp scripts/worker-latest-channel.mjs "${RUNNER_TEMP}/worker-latest-channel.mjs"
+
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -134,8 +137,15 @@ jobs:
           PROMOTION_CHANGED: ${{ steps.promotion.outputs.promotionChanged }}
           STABLE_COMMIT: ${{ steps.promotion.outputs.stableCommit }}
           PREVIOUS_COMMIT: ${{ steps.promotion.outputs.previousCommit }}
+          SOURCE_REF: ${{ steps.run.outputs.sourceRef }}
         run: |
           set -euo pipefail
+          node "${RUNNER_TEMP}/worker-latest-channel.mjs" \
+            --mode record-manual \
+            --repository "$GITHUB_REPOSITORY" \
+            --source-commit "$STABLE_COMMIT" \
+            --source-ref "$SOURCE_REF" \
+            --verified-dir "${RUNNER_TEMP}/worker-release"
           upsert_ref() {
             name="$1"
             sha="$2"
@@ -152,4 +162,9 @@ jobs:
             upsert_ref worker-bundles-previous "$PREVIOUS_COMMIT"
             upsert_ref worker-bundles-stable "$STABLE_COMMIT"
           fi
-          gh release edit "worker-bundles-${STABLE_COMMIT}" --latest
+          node "${RUNNER_TEMP}/worker-latest-channel.mjs" \
+            --mode manual \
+            --repository "$GITHUB_REPOSITORY" \
+            --source-commit "$STABLE_COMMIT" \
+            --source-ref "$SOURCE_REF" \
+            --verified-dir "${RUNNER_TEMP}/worker-release"

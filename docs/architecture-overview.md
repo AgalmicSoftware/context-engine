@@ -55,7 +55,8 @@ flowchart TD
   PublicRelease --> DeployHelper
   PublicRelease --> AgentBridge
   AggregateCI["successful aggregate CI<br/>tested Worker bytes + provenance"] --> ImmutableWorkerRelease["immutable SHA-keyed Worker release"]
-  ImmutableWorkerRelease --> ProtectedPromotion["manual protected stable/latest promotion"]
+  ImmutableWorkerRelease --> AutomaticLatest["automatic verified Latest<br/>current default-branch tip"]
+  ImmutableWorkerRelease --> ProtectedPromotion["manual protected stable/previous<br/>and Latest rollback"]
   ProtectedPromotion --> Hosted
 ```
 

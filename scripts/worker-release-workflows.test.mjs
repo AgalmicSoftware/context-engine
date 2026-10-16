@@ -126,3 +126,41 @@ test('promotion stops on GitHub API failures without treating the channel as abs
   assert.equal(result.output, '');
   assert.equal(result.calls.length, 1);
 });
+
+test('automatic Latest runs after publication and excludes historical manual republishes', () => {
+  const source = fs.readFileSync(new URL('../.github/workflows/publish-worker-bundles.yml', import.meta.url), 'utf8');
+  const publish = source.indexOf('- name: Publish or verify immutable release');
+  const automatic = source.indexOf('- name: Advance Latest after automatic publication');
+  assert.ok(automatic > publish);
+  const step = source.slice(automatic);
+  assert.match(step, /if: github\.event_name == 'workflow_run'/);
+  assert.match(step, /--mode automatic/);
+  assert.match(step, /SOURCE_COMMIT: \$\{\{ steps\.run\.outputs\.sourceCommit \}\}/);
+  assert.match(step, /SOURCE_REF: \$\{\{ steps\.run\.outputs\.sourceRef \}\}/);
+  assert.doesNotMatch(source.slice(publish, automatic), /gh release edit/);
+  assert.match(source.slice(publish, automatic), /--latest=false/);
+});
+
+test('automatic and manual Latest changes share serialization without moving automatic stable refs', () => {
+  const publish = fs.readFileSync(new URL('../.github/workflows/publish-worker-bundles.yml', import.meta.url), 'utf8');
+  const promote = fs.readFileSync(new URL('../.github/workflows/promote-worker-bundles.yml', import.meta.url), 'utf8');
+  for (const source of [publish, promote]) {
+    assert.match(source, /group: worker-bundle-stable-promotion\s+cancel-in-progress: false/);
+    assert.match(source, /permissions:\s+actions: read\s+contents: read/);
+  }
+  assert.doesNotMatch(publish, /upsert_ref/);
+  assert.match(promote, /environment: worker-release-promotion/);
+  const mutation = promote.slice(promote.indexOf('- name: Move protected stable channel and retain previous'));
+  assert.ok(mutation.indexOf('--mode record-manual') < mutation.indexOf('upsert_ref worker-bundles-previous'));
+  assert.ok(mutation.indexOf('--mode manual') > mutation.indexOf('upsert_ref worker-bundles-stable'));
+});
+
+test('Latest policy comes from the trusted checkout even for a historical manual rollback', () => {
+  for (const workflow of ['publish-worker-bundles.yml', 'promote-worker-bundles.yml']) {
+    const source = fs.readFileSync(new URL(`../.github/workflows/${workflow}`, import.meta.url), 'utf8');
+    const preserve = source.indexOf('cp scripts/worker-latest-channel.mjs');
+    const historicalCheckout = source.indexOf('- name: Checkout exact successful CI source');
+    assert.ok(preserve > 0 && preserve < historicalCheckout);
+    assert.match(source, /node "\$\{RUNNER_TEMP\}\/worker-latest-channel\.mjs"/);
+  }
+});
