@@ -119,8 +119,9 @@ jobs:
           SOURCE_COMMIT: ${{ steps.run.outputs.sourceCommit }}
         run: |
           set -euo pipefail
-          current="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/worker-bundles-stable" --jq '.object.sha' 2>/dev/null || true)"
-          previous="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/worker-bundles-previous" --jq '.object.sha' 2>/dev/null || true)"
+          # Missing channels return an empty list; API failures must still stop promotion.
+          current="$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/worker-bundles-stable" --jq '.[] | select(.ref == "refs/tags/worker-bundles-stable") | .object.sha')"
+          previous="$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/worker-bundles-previous" --jq '.[] | select(.ref == "refs/tags/worker-bundles-previous") | .object.sha')"
           node scripts/worker-release-artifacts.mjs plan-promotion \
             --target-commit "$SOURCE_COMMIT" \
             --current-commit "${current:-none}" \
