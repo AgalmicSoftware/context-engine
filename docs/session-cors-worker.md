@@ -90,10 +90,12 @@ services with different runtime responsibilities. They are not alternate
 Session Worker source trees.
 
 - Canonical CI publishes each successful public-branch bundle set as an
-  immutable, commit-addressed GitHub release without moving `latest`.
-  `.github/workflows/promote-worker-bundles.yml` separately verifies an
-  operator-selected release before advancing the protected stable and GitHub
-  `latest` channels for operator-selected promotion. Client and deploy-helper
+  immutable, commit-addressed GitHub release. Automatic publication advances
+  `latest` after downloaded-byte verification only for the current default-branch
+  tip. `.github/workflows/promote-worker-bundles.yml` remains the protected
+  manual stable/previous promotion and Latest rollback path. Its recorded
+  default-branch watermark prevents an automatic rerun from undoing a rollback;
+  a strictly newer eligible release may advance Latest. Client and deploy-helper
   defaults use the immutable commit-addressed release instead of those channels.
 
 ## Deployment modes
@@ -2718,10 +2720,14 @@ worker. Sponsored deploy grants are the separately documented legacy exception.
 - Rebuild ignored local fallback bundles with `nvm use 20 && npm run worker:bundle`; verify the tracked Cloudflare-native Session Worker package with `npm run verify:cloudflare-template`.
 - `dist/sessionCorsWorker.bundle.js` and `dist/deployHelper.bundle.js` are generated local/manual fallback bundles for worker upload flows; they are not tracked git artifacts anymore.
 - `.github/workflows/publish-worker-bundles.yml` publishes verified bundle
-  bytes as an immutable, commit-addressed release without moving `latest`.
-  After review, `.github/workflows/promote-worker-bundles.yml` re-verifies the
-  selected release, retains the previous rollback ref, and advances the
-  protected stable and GitHub `latest` channels for explicit operator promotion.
+  bytes as an immutable, commit-addressed release, then automatically advances
+  `latest` for the eligible current default-branch tip. Manual historical
+  publication does not advance Latest. The protected
+  `.github/workflows/promote-worker-bundles.yml` re-verifies an operator-selected
+  release, retains the previous rollback ref, and advances stable and Latest.
+  Both paths serialize changes and verify Latest and its downloads afterward;
+  automatic selection leaves stable/previous untouched and respects the manual
+  rollback watermark until a strictly newer eligible release is available.
   That process does not replace the commit-addressed URLs used by client and
   helper defaults. A weekly verifier also checks the public-branch release.
 - The worker currently pins `ethers@6.15.0` intentionally. The root app and client remain on `ethers@5.7.2` until the broader client migration is done, so this version split is expected.

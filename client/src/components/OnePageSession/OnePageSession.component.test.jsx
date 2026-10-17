@@ -1472,6 +1472,17 @@ describe('OnePageSession view gating', () => {
     expect(within(fullHeader).getByTestId(E2E_TESTIDS.SESSION_PILE_BACK)).toBeInTheDocument();
     expect(within(fullHeader).getByRole('heading', { name: questionsHeaderName })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { name: questionsHeaderName })).toHaveLength(1);
+    const fullProps = mockSurveyPage.mock.calls
+      .map(([props]) => props)
+      .filter((props) => !props.minifiedMode)
+      .at(-1);
+    expect(fullProps.questionCountTarget).toBeInstanceOf(HTMLElement);
+    expect(within(fullHeader).getByRole('heading', { name: questionsHeaderName })).toContainElement(
+      fullProps.questionCountTarget,
+    );
+    fireEvent.click(within(fullHeader).getByTestId(E2E_TESTIDS.SESSION_PILE_BACK));
+    await screen.findByTestId('survey-page-pile');
+    expect(fullProps.questionCountTarget.isConnected).toBe(false);
   });
 
   it('keeps the full-question back arrow fully opaque while the label remains muted', () => {

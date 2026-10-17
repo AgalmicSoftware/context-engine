@@ -15,7 +15,7 @@ on:
         type: string
 
 concurrency:
-  group: immutable-worker-release-${{ github.event.workflow_run.head_sha || inputs.run_id }}
+  group: worker-bundle-stable-promotion
   cancel-in-progress: false
 
 permissions:
@@ -36,6 +36,9 @@ jobs:
     steps:
       - name: Checkout trusted publication verifier
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Preserve trusted Latest policy for historical source checkouts
+        run: cp scripts/worker-latest-channel.mjs "${RUNNER_TEMP}/worker-latest-channel.mjs"
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -134,7 +137,7 @@ jobs:
             echo "Source ref: \`${SOURCE_REF}\`"
             echo "Provenance and SHA-256 checksums: \`worker-release-manifest.json\`"
             echo
-            echo "This release does not move the protected latest channel."
+            echo "Automatic default-branch publication may advance Latest after verification; protected stable refs remain operator-managed."
           } > "$notes"
           gh release create "$tag" \
             "$artifact_dir/sessionCorsWorker.bundle.js" \
@@ -145,3 +148,18 @@ jobs:
             --title "Context Engine ${app_version} Worker bundles ${SOURCE_COMMIT}" \
             --notes-file "$notes" \
             --latest=false
+
+      - name: Advance Latest after automatic publication
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ steps.run.outputs.sourceCommit }}
+          SOURCE_REF: ${{ steps.run.outputs.sourceRef }}
+        run: |
+          set -euo pipefail
+          node "${RUNNER_TEMP}/worker-latest-channel.mjs" \
+            --mode automatic \
+            --repository "$GITHUB_REPOSITORY" \
+            --source-commit "$SOURCE_COMMIT" \
+            --source-ref "$SOURCE_REF" \
+            --verified-dir "${RUNNER_TEMP}/worker-release"

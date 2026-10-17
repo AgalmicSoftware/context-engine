@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 export async function inspectSessionSelectorLayout(selector, alignment) {
+  await selector.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const layout = await selector.evaluate((select, alignment) => {
     const group = select.closest('[class*="globalSessionSelector_"]');
-    const row = alignment === 'center'
+    const row = alignment === 'settings'
+      ? group.closest('[class*="preLoginSettingsTopRow_"]')
+      : alignment === 'center'
       ? group.closest('[class*="statsHeader_"]')
       : group.closest('[class*="expandedHeaderPrimaryControls_"]') || group.closest('[class*="expandedHeaderRow_"]');
     const rect = group.getBoundingClientRect();
@@ -20,15 +24,19 @@ export async function inspectSessionSelectorLayout(selector, alignment) {
       width: rect.width,
       selectWidth: selectRect.width,
       labelWidth: context.measureText(select.selectedOptions[0].textContent).width,
-      alignmentError: alignment === 'center'
+      alignmentError: alignment === 'settings' ? 0 : alignment === 'center'
         ? Math.abs((rect.left + rect.right - rowRect.left - rowRect.right) / 2)
         : Math.abs(rect.right - rowContentRight),
       fits: rect.left >= rowRect.left - 1 && rect.right <= rowRect.right + 1,
+      selectInside: selectRect.left >= rect.left && selectRect.right <= link.left,
+      viewportFits: rect.left >= 0 && rect.right <= innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
       linkInside: link.left >= rect.left && link.right <= rect.right && link.top >= rect.top && link.bottom <= rect.bottom,
       border: parseFloat(getComputedStyle(group).borderLeftWidth),
     };
   }, alignment);
-  assert(layout.fits && layout.linkInside, 'Session label, selector, and link fit inside one unit');
+  assert(layout.fits && layout.linkInside && layout.selectInside && layout.viewportFits,
+    `Session label, native select and link fit inside the viewport without overlap: ${JSON.stringify(layout)}`);
   assert(layout.border > 0, 'Session controls have a shared visible boundary');
   assert(layout.alignmentError < 2, `Session unit is aligned ${alignment}: ${JSON.stringify(layout)}`);
   assert(layout.selectWidth > 24, 'The selected session and native dropdown remain visible');
@@ -197,6 +205,113 @@ export async function runSmoke() {
   }
 }
 
+// Deterministic geometry regression: only the source app and synthetic Worker reads.
+// No wallet connection, live network reads, or remote writes are required.
+export async function runOfflineLayoutSmoke({ themes = ['civic', 'classic-95', 'context-engine'], widths = [320, 390, 540, 705, 1280] } = {}) {
+  const { chromium } = await import('playwright');
+  const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3000';
+  const sessions = JSON.parse(readFileSync(new URL('../client/src/variables/demo/demo_sessions.json', import.meta.url)));
+  const config = {
+    ...sessions['demo-sh'], slug: 'layout-session',
+    sessionName: 'A long synthetic session title for narrow viewport regression checks',
+    corsWorkerUrl: 'https://layout-worker.example.test', configRevision: 'layout-v1',
+  };
+  const fixture = { general: sessions.general, 'layout-session': config };
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const theme of themes) {
+      for (const width of widths) {
+        const page = await browser.newPage({ viewport: { width, height: 853 }, reducedMotion: 'reduce' });
+        let finishRead;
+        const pendingRead = new Promise(resolve => { finishRead = resolve; });
+        await page.route('**/*', async route => {
+          const url = new URL(route.request().url());
+          if (url.origin === new URL(baseUrl).origin) return route.continue();
+          if (url.origin !== new URL(config.corsWorkerUrl).origin) return route.abort();
+          if (url.pathname === '/session-config') return route.fulfill({ json: { ok: true, sessionSlug: config.slug, config } });
+          if (url.pathname === '/storage/list') {
+            if (url.searchParams.get('resource') === 'questions') await pendingRead;
+            return route.fulfill({ json: { items: [], listComplete: true, cursor: null } });
+          }
+          if (url.pathname === '/resource-presence') return route.fulfill({ json: { resources: { ai: false, arweave: false, rpc: false, txGas: false } } });
+          // A malformed Groups reply exercises the real unbroken error reason on phones.
+          return route.fulfill({ json: { ok: true, groups: [], members: [] } });
+        });
+        await page.route('**/src/variables/demo/demo_sessions.json?import*', route => route.fulfill({
+          contentType: 'application/javascript', body: `export default ${JSON.stringify(fixture)};`,
+        }));
+        await page.addInitScript(({ theme, slug }) => {
+          localStorage.setItem('ce:theme', theme);
+          localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
+          localStorage.setItem('ce_onboarding_complete', 'true');
+          localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
+          localStorage.setItem('ce:primarySessionSlug', slug);
+          localStorage.setItem('ce:selectedSessionScope', 'active');
+        }, { theme, slug: config.slug });
+        await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('tab', { name: 'Stats', exact: true }).click();
+        const stats = page.getByTestId('ce-community-session-select');
+        await stats.waitFor({ state: 'visible' });
+        await page.evaluate(() => document.fonts.ready);
+        await inspectSessionSelectorLayout(stats, 'center');
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Stats fits the viewport');
+        const spinner = page.getByTestId('ce-community-stats-loading-spinner');
+        await spinner.waitFor({ state: 'visible' });
+        const linkRect = await page.getByTestId('ce-community-session-select-link').boundingBox();
+        const spinnerRect = await spinner.boundingBox();
+        assert(spinnerRect.x >= linkRect.x + linkRect.width || spinnerRect.y >= linkRect.y + linkRect.height ||
+          spinnerRect.y + spinnerRect.height <= linkRect.y,
+        `Stats loading spinner clears the link: ${theme} ${width}`);
+        finishRead();
+        await page.getByRole('tab', { name: 'Tools', exact: true }).click();
+        for (const tool of ['Questions', 'Groups', 'Context']) {
+          await page.getByText(tool, { exact: true }).filter({ visible: true }).click();
+          const selector = page.getByTestId('ce-tool-explorer-active-session');
+          await selector.waitFor({ state: 'visible' });
+          await inspectSessionSelectorLayout(selector, 'right');
+          if (tool === 'Groups') {
+            const panel = page.getByTestId('ce-session-worker-groups');
+            await panel.getByText('worker_group_response_session_slug_missing', { exact: true }).waitFor({ state: 'visible' });
+            assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Groups error state fits the viewport');
+          }
+          await page.getByRole('button', { name: '← Back', exact: true }).click();
+        }
+        await page.getByRole('tab', { name: 'Stats', exact: true }).click();
+        await page.getByRole('button', { name: /^LOG IN$/i }).click();
+        const settingsSelector = page.getByTestId('ce-prelogin-session-select');
+        await settingsSelector.waitFor({ state: 'visible' });
+        await inspectSessionSelectorLayout(settingsSelector, 'settings');
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Settings fits the viewport');
+        await page.getByRole('button', { name: 'Toggle pre-login settings' }).click();
+        const themeWidth = await page.locator('#ce-settings-theme-select').evaluate(select => select.getBoundingClientRect().width);
+        assert(themeWidth >= 110, `Appearance remains readable: ${theme} ${width}, ${themeWidth}px`);
+        await page.evaluate(() => {
+          localStorage.setItem('ce:primarySessionSlug', '');
+          localStorage.setItem('ce:selectedSessionScope', 'all');
+        });
+        const routePath = `/session/${config.slug}?worker=${encodeURIComponent(config.corsWorkerUrl)}`;
+        await page.goto(`${baseUrl}${routePath}`, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('button', { name: /^LOG IN$/i }).click();
+        const summary = page.getByLabel(`Active session: ${config.sessionName}`, { exact: true });
+        await summary.waitFor({ state: 'visible' });
+        assert.equal(await page.getByRole('combobox', { name: 'Session', exact: true }).count(), 0,
+          'Route Settings does not show an unrelated global scope selector');
+        assert.equal(await summary.getByRole('link').getAttribute('href'), routePath,
+          'Route Settings preserves its Worker discovery link');
+        assert(await summary.evaluate(el => {
+          const rect = el.getBoundingClientRect();
+          return rect.left >= 0 && rect.right <= innerWidth;
+        }), 'Route session summary fits the viewport');
+        await page.getByRole('button', { name: 'Toggle pre-login settings' }).click();
+        console.log(`PASS offline selector/settings layout: ${theme} ${width}`);
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  runSmoke().catch((error) => { console.error(error); process.exitCode = 1; });
+  (process.argv.includes('--offline') ? runOfflineLayoutSmoke() : runSmoke()).catch((error) => { console.error(error); process.exitCode = 1; });
 }

@@ -35,6 +35,12 @@ The session cache adapter passes all supported readable answer types into the re
 including nonbinary-only sessions. Polis clustering and participant graphs continue
 to use binary answers only.
 
+During refresh, the report retains the previous snapshot for the same session,
+viewer, and filters until the replacement settles. Worker sessions exceeding the
+public response-loading limit can publish refreshed partial snapshots without
+claiming a complete history. Their incomplete-results warning remains visible;
+responses or edits outside the loaded pages can still be absent.
+
 A section appears only when at least one of its questions has a valid readable
 answer after filtering. All Questions starts open with each type’s preview visible.
 Collapsing the parent hides every type; reopening it opens all type previews,

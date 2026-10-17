@@ -4,7 +4,6 @@ import PileHologramAssistant from './PileHologramAssistant';
 import {
   PILE_LOADING_ICON_WRAP_STYLE,
   PILE_SCAN_ERROR_DETAIL_STYLE,
-  buildPileActionsClassName,
   buildPileCardClassName,
   buildPileFilterButtonClassName,
   buildPileFooterClassName,
@@ -17,7 +16,6 @@ import {
   resolvePileLoadingProgressFillStyle,
   resolvePileMiniLoaderStyle,
   resolvePileNavCounterStyle,
-  shouldCollapsePileActionsIntoMenu,
   type PileInteractionSurfaceProps,
   type PileQuestionLike,
 } from './surveyPileInteractionSurface';
@@ -186,8 +184,6 @@ describe('surveyPileInteractionSurface', () => {
     expect(resolvePileFilterIconStyle(true)).toEqual({ color: 'var(--ce-status-success)' });
     expect(resolvePileFilterIconStyle(false)).toEqual({});
     expect(buildPileFilterButtonClassName(styles, true)).toBe(`${styles.actionButton} ${styles.actionButtonActive}`);
-    expect(buildPileActionsClassName(styles, true)).toBe(`${styles.pileActions} ${styles.pileActionsMenuEligible}`);
-    expect(buildPileActionsClassName(styles, false)).toBe(styles.pileActions);
     expect(buildPileFooterClassName(styles, false)).toBe(`${styles.pileFooter} ${styles.pileFooterHidden}`);
     expect(buildPileSubmitButtonClassName(styles, true, true)).toBe(
       `${styles.pileSubmitButton} ${styles.submitGlow} ${styles.pileSubmitButtonInactive}`,
@@ -219,24 +215,6 @@ describe('surveyPileInteractionSurface', () => {
     );
     expect(resolvePileMiniLoaderStyle(true)).toEqual({ opacity: 0.5 });
     expect(resolvePileMiniLoaderStyle(false)).toEqual({ opacity: 1 });
-    expect(
-      shouldCollapsePileActionsIntoMenu({
-        pileTopRailVisible: true,
-        showSubmitButton: true,
-        hasPendingPileChanges: true,
-        isSubmitting: false,
-        shouldHidePileSubmitButton: false,
-      }),
-    ).toBe(true);
-    expect(
-      shouldCollapsePileActionsIntoMenu({
-        pileTopRailVisible: true,
-        showSubmitButton: true,
-        hasPendingPileChanges: false,
-        isSubmitting: false,
-        shouldHidePileSubmitButton: true,
-      }),
-    ).toBe(false);
   });
 
   it('renders the gated empty panel before the generic empty copy when gating is active', () => {
@@ -375,6 +353,8 @@ describe('surveyPileInteractionSurface', () => {
     expect(findNodeByClassName(tree, 'pileWindowClose')).toBeNull();
     expect(treeTextIncludes(tree, 'Question 4 of 6')).toBe(false);
     expect(treeTextIncludes(tree, '4 / 6')).toBe(true);
+    const counter = findNodeByClassName(tree, 'pileNavCounterText');
+    expect(getElementChildren(counter).map(collectTreeText)).toEqual(['4', ' / ', '6']);
 
     const listeningToggle = findElement(
       tree,
@@ -412,7 +392,7 @@ describe('surveyPileInteractionSurface', () => {
     expect(framelessIconButtonCount).toBe(iconButtonCount);
   });
 
-  it('leaves pile actions inline when the submit rail is inactive', () => {
+  it('makes the mobile action menu available before there are pending answers', () => {
     const tree = renderPileInteractionSurface({
       ...buildBaseProps(),
       hasPendingPileChanges: false,
@@ -424,7 +404,7 @@ describe('surveyPileInteractionSurface', () => {
     const actionsNode = findNodeByClassName(tree, 'pileActions');
 
     expect(actionsNode).not.toBeNull();
-    expect(nodeHasClassName(actionsNode, 'pileActionsMenuEligible')).toBe(false);
+    expect(nodeHasClassName(actionsNode, 'pileActionsMenuEligible')).toBe(true);
     expect(findNodeByClassName(tree, 'pileActionMenuToggle')).not.toBeNull();
     expect(findNodeByClassName(tree, 'pileActionButtonGroup')).not.toBeNull();
   });

@@ -423,6 +423,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '/scripts/run-ci-gates.test.mjs @AgalmicSoftware',
         '/scripts/worker-release-artifacts.mjs @AgalmicSoftware',
         '/scripts/worker-release-artifacts.test.mjs @AgalmicSoftware',
+        '/scripts/worker-latest-channel.mjs @AgalmicSoftware',
+        '/scripts/worker-latest-channel.test.mjs @AgalmicSoftware',
         '/scripts/verify-public-release-pii.sh @AgalmicSoftware',
         '/scripts/verify-public-release-pii.test.js @AgalmicSoftware',
         '/scripts/lib/public-release-strip-patterns.sh @AgalmicSoftware',
@@ -450,6 +452,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
         'on:',
         '  workflow_run:',
         'concurrency:',
+        '  group: worker-bundle-stable-promotion',
         '  cancel-in-progress: false',
         'jobs:',
         '  publish:',
@@ -467,6 +470,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '          deployHelper.bundle.js',
         '          agentBridgeWorker.bundle.js',
         '          worker-release-manifest.json',
+        '      - run: node "${RUNNER_TEMP}/worker-latest-channel.mjs" --mode automatic',
       ].join('\n'),
     );
     writeFile(
@@ -486,7 +490,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '      - run: |',
         '          echo worker-bundles-previous',
         '          echo worker-bundles-stable',
-        '          gh release edit "worker-bundles-${STABLE_COMMIT}" --latest',
+        '          node "${RUNNER_TEMP}/worker-latest-channel.mjs" --mode record-manual',
+        '          node "${RUNNER_TEMP}/worker-latest-channel.mjs" --mode manual',
       ].join('\n'),
     );
     writeFile(
@@ -556,6 +561,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/run-ci-gates.test.mjs',
       'scripts/worker-release-artifacts.mjs',
       'scripts/worker-release-artifacts.test.mjs',
+      'scripts/worker-latest-channel.mjs',
+      'scripts/worker-latest-channel.test.mjs',
       'scripts/verify-abi-sync.mjs',
       'scripts/verify-abi-sync.test.mjs',
       'scripts/lib/audit-verdict.sh',

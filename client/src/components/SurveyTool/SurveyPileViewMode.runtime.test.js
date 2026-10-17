@@ -455,7 +455,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     fireEvent.click(screen.getByLabelText('Next Question'));
 
     expect(await screen.findByText('Second canonical question')).toBeInTheDocument();
-    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+    expect(screen.getByLabelText('Next Question').parentElement).toHaveTextContent('2 / 2');
   });
 
   it('renders triple trailing arrows inside the pile submit button', () => {

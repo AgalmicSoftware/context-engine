@@ -2604,13 +2604,27 @@ const renderPileResponseInput = (
     onAnswerChange ||
     ((value: unknown) => {
       const questionId = normalizeQuestionIdKey(question.id);
+      // A label forwards click detail=0; retain the physical press count so a
+      // double-click/tap cannot answer the card the first press just revealed.
+      const repeatedPress = engine._pileAnswerClickCount > 1;
+      engine._pileAnswerClickCount = 0;
+      if (repeatedPress && engine._pileAdvancedIntoQuestionId === questionId) return;
       const inputType = normalizePileQuestionInputType(question);
       const canAdvance =
         inputType === 'binary' ||
         (inputType === 'multichoice' && (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question)));
+      const arrowSelection = engine._pileAnswerArrowKeyDown === true;
       engine.handleAnswerPile(question.id, value, {
         afterUpdate: () => {
-          if (!canAdvance || !resolvePileAutoAdvanceEnabled(engine.getEffectivePileSessionConfig())) return;
+          // Radio arrows select within the group. An open comment editor may still
+          // be receiving dictation, so leave both on this card until explicit Next.
+          if (
+            !canAdvance ||
+            arrowSelection ||
+            engine.state.showComments?.[question.id] ||
+            !resolvePileAutoAdvanceEnabled(engine.getEffectivePileSessionConfig())
+          )
+            return;
           // Inspect the committed answer: clicking a selected binary option clears it.
           // Only direct card edits reach this callback; interview drafts and hydration do not.
           const savedValue = readPlainRecord(engine.state.surveysResponseState?.[0]?.answers?.[questionId]).value;
@@ -2636,6 +2650,7 @@ const renderPileResponseInput = (
             index >= visibleQuestions.length - 1
           )
             return;
+          engine._pileAdvancedIntoQuestionId = normalizeQuestionIdKey(visibleQuestions[index + 1]?.id);
           engine.handleNext(true);
         },
       });
@@ -3223,6 +3238,17 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
       className={styles.pileViewContainer}
       ref={(node) => {
         engine.pileContainer = node;
+      }}
+      onMouseDownCapture={(event) => {
+        engine._pileAnswerClickCount = event.detail;
+        engine._pileAnswerArrowKeyDown = false;
+      }}
+      onKeyDownCapture={(event) => {
+        engine._pileAnswerClickCount = 0;
+        engine._pileAnswerArrowKeyDown = event.key.startsWith('Arrow');
+      }}
+      onKeyUpCapture={() => {
+        engine._pileAnswerArrowKeyDown = false;
       }}
     >
       <div className={showListeningAside ? styles.pileListeningLayout : undefined}>

@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.14] - 2026-10-14
+
+### Client — available when the site deploys
+
+- Show the question actions hamburger by default on mobile, alongside the
+  previous/next arrows. Stack the phone question counter in a narrow column
+  and keep Submit, clear, the menu, and navigation together on one row.
+- Move the filtered question count beside the session's Questions heading when
+  there are no surveys, freeing toolbar space on phones. Keep the selector when
+  surveys are available, and show zero when no questions match the filters.
+- Keep long session names and their link icons inside phone layouts, reserve
+  space for the Stats loading indicator, and keep Appearance menus readable.
+  Wrap Worker group error details within narrow screens.
+- Let Settings sponsorship checks finish across equivalent parent renders,
+  retain General among other sponsor sessions, and show the route's session
+  context when Settings opens on a session page.
+- Count every question type shown in Stats, show loading indicators until the
+  selected scope is ready, and request Worker sign-in only for the active session.
+- Keep radio-key navigation and open comments on the current question; prevent
+  double-clicks and double-taps from answering the next card.
+- Match Context's AI prompt preview to the selected session's model settings.
+- Verify Home's configured Worker independently of explicit session links and
+  retain on-chain group reads for verified hybrid Worker sessions.
+- Refresh bounded partial results for large Worker sessions while retaining the
+  prior report during loading. The 10,000-record cap and incomplete-results
+  warning remain in place.
+
 ## [0.6.13] - 2026-10-13
 
 ### Client — available when the site deploys

@@ -44,6 +44,7 @@ type SurveyPageProps = {
   defaultFeaturedSBTs?: unknown[];
   onViewAllClick?: SurveyPageCallback;
   hideEmbeddedDebugUi?: boolean;
+  questionCountTarget?: HTMLElement | null;
   onResultsModalClose?: () => void;
   onFilterChange?: SurveyPageCallback;
   contracts?: unknown;

@@ -16,7 +16,7 @@ try {
   for (const theme of ['civic', 'classic-95', 'context-engine']) {
     for (const width of [390, 1280]) {
       for (const enabled of [true, false]) {
-        const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+        const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce', hasTouch: true, isMobile: width < 600 });
         // Override only this browser's config reads; never change the deployed session.
         // The enabled case omits the field and exercises the normal environment default.
         const config = { ...demoSessions['demo-sh'], ...(enabled ? {} : { pileAutoAdvanceEnabled: false }) };
@@ -67,6 +67,51 @@ try {
         await activeCard(page).getByText('Agree', { exact: true }).click();
         await waitForCard(page, 1);
         assert(!await activeCard(page).getByRole('radio', { name: 'Agree', exact: true }).isChecked());
+        if (enabled) {
+          // Exercise native label forwarding and physical click counts across the card transition.
+          await activeCard(page).getByRole('radio', { name: 'Agree', exact: true }).locator('..').dblclick();
+          await waitForCard(page, 2);
+          assert(!await activeCard(page).getByRole('radio', { name: 'Agree', exact: true }).isChecked(), 'Double-click must not answer the revealed card');
+          await activeCard(page).getByRole('radio', { name: 'Disagree', exact: true }).locator('..').click();
+          await waitForCard(page, 3);
+
+          await page.reload({ waitUntil: 'domcontentloaded' });
+          await waitForCard(page, 1);
+          await activeCard(page).getByRole('radio', { name: 'Agree', exact: true }).focus();
+          await page.keyboard.press('ArrowRight');
+          await waitForCard(page, 1);
+          assert(await activeCard(page).getByRole('radio', { name: 'Unsure', exact: true }).isChecked());
+          await page.keyboard.press('ArrowRight');
+          assert(await activeCard(page).getByRole('radio', { name: 'Disagree', exact: true }).isChecked());
+          await activeCard(page).getByRole('radio', { name: 'Agree', exact: true }).press('Space');
+          await waitForCard(page, 2);
+
+          await page.reload({ waitUntil: 'domcontentloaded' });
+          await waitForCard(page, 1);
+          await activeCard(page).getByTestId('ce-survey-additional-toggle').click();
+          const comment = activeCard(page).getByTestId('ce-survey-additional-input');
+          await comment.fill('Partial synthetic comment');
+          await activeCard(page).getByRole('radio', { name: 'Agree', exact: true }).locator('..').click();
+          await waitForCard(page, 1);
+          assert.equal(await comment.inputValue(), 'Partial synthetic comment');
+          await comment.fill('Partial synthetic comment with final words');
+          await page.getByRole('button', { name: 'Next Question', exact: true }).click();
+          await waitForCard(page, 2);
+          await page.getByRole('button', { name: 'Previous Question', exact: true }).click();
+          assert.equal(await comment.inputValue(), 'Partial synthetic comment with final words');
+
+          if (width < 600) {
+            await page.reload({ waitUntil: 'domcontentloaded' });
+            await waitForCard(page, 1);
+            const box = await activeCard(page).getByRole('radio', { name: 'Agree', exact: true }).locator('..').boundingBox();
+            const x = box.x + box.width / 2;
+            const y = box.y + box.height / 2;
+            await page.touchscreen.tap(x, y);
+            await page.touchscreen.tap(x, y);
+            await waitForCard(page, 2);
+            assert(!await activeCard(page).getByRole('radio', { name: 'Agree', exact: true }).isChecked(), 'Double-tap must not answer the revealed card');
+          }
+        }
         await page.getByRole('button', { name: /^LOG IN$/i }).click();
         await page.waitForFunction(() => [...document.querySelectorAll('[role=dialog]')].some((el) => getComputedStyle(el).opacity === '1'));
         await page.getByRole('button', { name: 'Toggle pre-login settings' }).click();
@@ -81,7 +126,7 @@ try {
         await waitForCard(page, enabled ? 2 : 1);
         if (!enabled) assert(await activeCard(page).getByRole('radio', { name: 'Disagree', exact: true }).isChecked());
         await page.close();
-        console.log(`PASS ${theme} ${width} auto-advance=${enabled}: config, answer, Back, deselect, reload, Settings`);
+        console.log(`PASS ${theme} ${width} auto-advance=${enabled}: config, answer, Back, deselect, reload, Settings${enabled ? ', double-click, arrows, comments' : ''}${enabled && width < 600 ? ', double-tap' : ''}`);
       }
     }
   }

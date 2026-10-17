@@ -33,7 +33,12 @@ import SessionChipSelector from '../Shared/SessionChipSelector';
 import GlobalSessionSelector from '../Shared/GlobalSessionSelector';
 import { LoginSettingsSupportedResourceCard } from './LoginSettingsResourceSummary';
 import { LoginSettingsInlineNetworkSummary, LoginSettingsPanelNetworkSummary } from './LoginSettingsNetworkSummary';
-import { LoginSettingsConfigToggleControl, LoginSettingsControlRow } from './LoginSettingsControlRow';
+import {
+  LoginSettingsConfigToggleControl,
+  LoginSettingsControlRow,
+  LoginSettingsSessionSummary,
+} from './LoginSettingsControlRow';
+import { getLoginSettingsSponsoredConfigKey } from './loginSettingsConfigIdentity';
 import LoginSettingsSectionCard from './LoginSettingsSectionCard';
 import LoginModalDisplayBody from './LoginModalDisplayBody';
 import LoginTooltipsToggleControl from './LoginTooltipsToggleControl';
@@ -455,7 +460,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   getDisplaySessionConfig = (slugIn: unknown = '', cfgIn: unknown = null) => {
     const slug = normalizeSettingsSessionSlug(slugIn);
     const resolved = this.state.sponsoredSessionConfig;
-    if (!cfgIn && resolved && normalizeSettingsSessionSlug(resolved.slug) === slug) return resolved;
+    // Only hydrated Worker configs replace the canonical display lookup; an
+    // empty result for another session must never masquerade as General.
+    if (
+      !cfgIn &&
+      resolved &&
+      normalizeSettingsSessionSlug(resolved.slug) === slug &&
+      resolveSessionCapabilityProjection(resolved).isWorkerCanonical
+    )
+      return resolved;
     return this._agentTokenActions.getDisplaySessionConfig(slugIn, cfgIn);
   };
   getAgentTokenLoginSessionContext = this._agentTokenActions.getAgentTokenLoginSessionContext;
@@ -877,7 +890,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.applyLoginModalFocus(this.props.loginModalFocus);
     }
     const needsSponsoredAccessRefresh =
-      accountChanged || activeSessionChanged || settingsOpened || this.props.sessionConfig !== prevProps.sessionConfig;
+      accountChanged ||
+      activeSessionChanged ||
+      settingsOpened ||
+      getLoginSettingsSponsoredConfigKey(this.props.sessionConfig) !==
+        getLoginSettingsSponsoredConfigKey(prevProps.sessionConfig);
     if (this.getWalletChainId() !== this.getWalletChainId(prevProps)) needsBalanceCheck = true;
     if (accountChanged) {
       needsBalanceCheck = true;
@@ -1647,14 +1664,26 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       themeControl,
     });
 
-  renderGlobalSessionSelector = ({ testId = 'ce-web3modal-session-select' }: { testId?: string } = {}) => (
-    <GlobalSessionSelector
-      selection={this.getGlobalSessionSelection()}
-      sessionConfig={this.props.sessionConfig}
-      onChange={this.handleGlobalSessionSelectionChange}
-      testId={testId}
-    />
-  );
+  renderGlobalSessionSelector = ({ testId = 'ce-web3modal-session-select' }: { testId?: string } = {}) => {
+    // Settings on a session route belong to that route, even when global scan
+    // scope selects another session or ALL. Preserve its Worker discovery URL.
+    if (typeof window !== 'undefined' && resolveSessionSlugFromPathname(window.location.pathname) !== null) {
+      return (
+        <LoginSettingsSessionSummary
+          label={this.getSessionDescriptor(this.getActiveSessionSlug()).label}
+          sessionHref={`${window.location.pathname}${window.location.search}`}
+        />
+      );
+    }
+    return (
+      <GlobalSessionSelector
+        selection={this.getGlobalSessionSelection()}
+        sessionConfig={this.props.sessionConfig}
+        onChange={this.handleGlobalSessionSelectionChange}
+        testId={testId}
+      />
+    );
+  };
 
   handleActiveSessionChange = (event: any) => {
     const nextSlug = normalizeSettingsSessionSlug(event?.target?.value || '');

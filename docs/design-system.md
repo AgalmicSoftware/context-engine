@@ -28,6 +28,14 @@ in this embedded Questions view; the underlying JSON UI remains available to oth
 surfaces. Run `node scripts/session-selector-layout-smoke.mjs` against the local
 server to check short and long selections at mobile, compact, and desktop widths.
 
+In a session's full question list, a confirmed empty survey list moves the live
+filtered count beside the Questions heading and removes the redundant selector
+from the toolbar. The count includes zero matches. Sessions with surveys retain
+the selector, as do unresolved or failed survey loads. Phone headers use compact
+Back controls to leave space for the heading and count. Run
+`node scripts/session-questions-heading-smoke.mjs` against the local server to
+check all themes, filtering, available surveys, and pending Submit controls.
+
 ## Runtime Resolution
 
 Session section headers show their action subtitles only while collapsed:
@@ -144,7 +152,11 @@ The Account button retains its own sizing. Narrow Classic 95 headers let the
 Account control wrap below the logo when needed.
 The profile presents session
 sections as a single column of compact rows, and removes decorative depth from
-question cards and account controls. The home Explorer offers Stats, Tools, and
+question cards and account controls. At widths up to 768px, question actions
+start in the hamburger menu. The menu, pending Submit and clear controls, and
+previous/next arrows share one row. Submit shrinks within the available space;
+at phone widths up to 640px, the question counter forms a narrow column between
+the arrows. The home Explorer offers Stats, Tools, and
 Welcome; Tools remains the default, including for a retained Latest-tab selection.
 Session title tooltips share the Results description cleanup for retired RxC instructions.
 Explorer tabs use blue selected/hover text

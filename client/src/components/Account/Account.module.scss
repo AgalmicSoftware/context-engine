@@ -2547,13 +2547,15 @@ h1 {
   font-family: var(--ce-font-body);
   font-size: 0.95rem;
 
-  // Measure only the selected label, rather than the longest option in the menu.
+  // Measure the selected label, but allow the measure to shrink with its column.
   &::after {
     content: attr(data-selected-label);
     grid-area: 1 / 1;
     visibility: hidden;
     white-space: pre;
     padding: 0 28px 0 6px;
+    min-width: 0;
+    overflow: hidden;
   }
 }
 
@@ -2726,7 +2728,7 @@ h1 {
   }
 
   .settingsThemeQuickControl {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
     padding-left: 10px;
   }

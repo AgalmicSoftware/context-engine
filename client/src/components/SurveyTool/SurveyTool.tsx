@@ -115,6 +115,7 @@ type SurveyToolProps = {
   miniMode?: boolean;
   hideEmbeddedDebugUi?: boolean;
   toolbarTarget?: HTMLElement | null;
+  questionCountTarget?: HTMLElement | null;
   isQuestionCacheReady?: boolean;
   cacheInitializationError?: unknown;
   isResponsesCacheReady?: boolean;
@@ -418,6 +419,7 @@ const renderSurveyToolContent = ({
         hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
         embeddedSessionToolbar={Boolean(props.hideEmbeddedDebugUi && props.sessionSlugPinned)}
         toolbarTarget={props.toolbarTarget}
+        questionCountTarget={props.questionCountTarget}
       />
       <React.Suspense fallback={null}>
         <SurveyResults

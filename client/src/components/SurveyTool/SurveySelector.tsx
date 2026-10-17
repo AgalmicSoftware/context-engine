@@ -980,14 +980,15 @@ export class SurveySelector extends Component<any, any> {
     this.setState(buildSurveySelectorFilterStatePatch(nextFilterState));
   };
 
-  handleFilteredQuestionCountUpdate = (count: unknown, encryptedCount: unknown): void => {
+  handleFilteredQuestionCountUpdate = (count: unknown, encryptedCount: unknown, isFilterResult = false): void => {
     // Keep UI stable while cache warms or if a transient 0 arrives.
     const hasFallbackQuestionPool = Array.isArray(this.props.questionPool) && this.props.questionPool.length > 0;
     const numericCount = Math.max(0, Number(count || 0));
     if (!this.props.isQuestionCacheReady && !hasFallbackQuestionPool && numericCount === 0) return;
     this.commitQuestionCountState(count, encryptedCount, {
       rememberStable: true,
-      ignoreTransientZero: true,
+      // A completed filter can match nothing; cache warmup counts remain provisional.
+      ignoreTransientZero: !isFilterResult,
     });
   };
 
@@ -1096,7 +1097,7 @@ export class SurveySelector extends Component<any, any> {
     return (
       <span className={styles.questionSelectorSummary}>
         <span className={styles.questionSelectorPrimary}>
-          <span>{prefixLabel}</span>
+          {prefixLabel && <span>{prefixLabel}</span>}
           {count > 0 || (!showSpinner && !showCacheError) ? (
             <span className={styles.questionSelectorCount}>({count})</span>
           ) : null}
@@ -1250,10 +1251,21 @@ export class SurveySelector extends Component<any, any> {
       !pendingSubmitStats.submittedSinceLastEdit &&
       (viewMode === 'questions' || !!selectedSurvey);
     const isEmbeddedSessionToolbar = Boolean(this.props.embeddedSessionToolbar);
+    // Keep the live filtered count in the session heading only after surveys are known to be empty.
+    const showQuestionCountInHeading = Boolean(
+      this.props.questionCountTarget &&
+      isEmbeddedSessionToolbar &&
+      viewMode === 'questions' &&
+      this.props.isSurveyCacheReady &&
+      !loading &&
+      !hasCacheError &&
+      surveys.length === 0,
+    );
     const toolbarClassName = [
       isEmbeddedSessionToolbar ? styles.embeddedSessionToolbar : '',
       this.props.toolbarTarget ? styles.explorerToolbar : '',
       isEmbeddedSessionToolbar && !showHeaderSubmitButton ? styles.toolbarWithoutSubmit : '',
+      showQuestionCountInHeading ? styles.toolbarWithoutSelector : '',
     ]
       .filter(Boolean)
       .join(' ');
@@ -1265,86 +1277,88 @@ export class SurveySelector extends Component<any, any> {
     // Keep the controls and their state in this selector when Explorer provides a header slot.
     const toolbar = (
       <div id={styles.surveysRow} className={toolbarClassName || undefined} data-testid={E2E_TESTIDS.SURVEY_TOOLBAR}>
-        <Dropdown id={styles.surveysDropdown} isOpen={selectorDropdownOpen} toggle={this.toggleSelectorDropdown}>
-          <DropdownToggle
-            id={styles.dropdownToggle}
-            data-testid={viewMode === 'questions' ? E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE : undefined}
-          >
-            {dropdownTitle}
-            {allowDropdownMenu && <FontAwesomeIcon icon={faCaretDown} id={styles.dropdownToggleCaret} />}
-          </DropdownToggle>
+        {!showQuestionCountInHeading && (
+          <Dropdown id={styles.surveysDropdown} isOpen={selectorDropdownOpen} toggle={this.toggleSelectorDropdown}>
+            <DropdownToggle
+              id={styles.dropdownToggle}
+              data-testid={viewMode === 'questions' ? E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE : undefined}
+            >
+              {dropdownTitle}
+              {allowDropdownMenu && <FontAwesomeIcon icon={faCaretDown} id={styles.dropdownToggleCaret} />}
+            </DropdownToggle>
 
-          {allowDropdownMenu && (
-            <DropdownMenu id={styles.dropdownMenu}>
-              <DropdownItem
-                className={buildSurveySelectorDropdownItemClassName(styles, 'questions')}
-                onClick={() => this.selectOption('questions')}
-                active={viewMode === 'questions'}
-              >
-                {this.renderQuestionSelectorLabel({
-                  count: questionSelectorCounts.count,
-                  encryptedCount: questionSelectorCounts.encryptedCount,
-                  showEncryptedCount: selectorDropdownOpen,
-                  showSpinner: questionSelectorLoading,
-                  encryptedCountTestId: selectorDropdownOpen ? E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT : '',
-                })}
-              </DropdownItem>
-
-              {this.props.isSurveyCacheReady ? (
-                <>
-                  {surveys.map((survey: SurveySelectorSurveySummary, index: number) => {
-                    const surveyQuestionsLoaded = this.areSurveySpecificQuestionsLoaded(
-                      survey,
-                      networkID,
-                      parsedQuestionsCache,
-                    );
-                    const surveyDocumentURLs = this.getSurveyDocumentUrls(survey);
-                    const hasDocUrls = surveyDocumentURLs.length > 0;
-                    return (
-                      <DropdownItem
-                        className={buildSurveySelectorDropdownItemClassName(styles, 'survey')}
-                        key={index}
-                        onClick={() => this.selectSurvey(index)}
-                        active={viewMode === 'survey' && selectedSurveyIndex === index}
-                      >
-                        <span className={styles.surveyItemRow}>
-                          <span className={styles.surveyItemTitle}>{survey.title as React.ReactNode}</span>
-                          <span className={styles.surveyItemMeta}>
-                            {viewMode === 'survey' && selectedSurveyIndex === index && !surveyQuestionsLoaded && (
-                              <FontAwesomeIcon icon={faSpinner} spin className={styles.surveyItemSpinner} />
-                            )}
-                            {hasDocUrls && (
-                              <a
-                                href={surveyDocumentURLs[0]}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={styles.surveyItemDocLink}
-                                onClick={(e: SurveySelectorStoppableEvent) => e.stopPropagation()}
-                                title={this.getSurveyDocumentLinkTitle(survey)}
-                              >
-                                <FontAwesomeIcon icon={faExternalLinkAlt} />
-                              </a>
-                            )}
-                          </span>
-                        </span>
-                      </DropdownItem>
-                    );
+            {allowDropdownMenu && (
+              <DropdownMenu id={styles.dropdownMenu}>
+                <DropdownItem
+                  className={buildSurveySelectorDropdownItemClassName(styles, 'questions')}
+                  onClick={() => this.selectOption('questions')}
+                  active={viewMode === 'questions'}
+                >
+                  {this.renderQuestionSelectorLabel({
+                    count: questionSelectorCounts.count,
+                    encryptedCount: questionSelectorCounts.encryptedCount,
+                    showEncryptedCount: selectorDropdownOpen,
+                    showSpinner: questionSelectorLoading,
+                    encryptedCountTestId: selectorDropdownOpen ? E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT : '',
                   })}
-
-                  {surveys.length === 0 && viewMode === 'survey' && (
-                    <DropdownItem disabled className={styles.dropdownItem}>
-                      No surveys found in cache.
-                    </DropdownItem>
-                  )}
-                </>
-              ) : (
-                <DropdownItem disabled className={styles.dropdownItem}>
-                  Surveys are still loading...
                 </DropdownItem>
-              )}
-            </DropdownMenu>
-          )}
-        </Dropdown>
+
+                {this.props.isSurveyCacheReady ? (
+                  <>
+                    {surveys.map((survey: SurveySelectorSurveySummary, index: number) => {
+                      const surveyQuestionsLoaded = this.areSurveySpecificQuestionsLoaded(
+                        survey,
+                        networkID,
+                        parsedQuestionsCache,
+                      );
+                      const surveyDocumentURLs = this.getSurveyDocumentUrls(survey);
+                      const hasDocUrls = surveyDocumentURLs.length > 0;
+                      return (
+                        <DropdownItem
+                          className={buildSurveySelectorDropdownItemClassName(styles, 'survey')}
+                          key={index}
+                          onClick={() => this.selectSurvey(index)}
+                          active={viewMode === 'survey' && selectedSurveyIndex === index}
+                        >
+                          <span className={styles.surveyItemRow}>
+                            <span className={styles.surveyItemTitle}>{survey.title as React.ReactNode}</span>
+                            <span className={styles.surveyItemMeta}>
+                              {viewMode === 'survey' && selectedSurveyIndex === index && !surveyQuestionsLoaded && (
+                                <FontAwesomeIcon icon={faSpinner} spin className={styles.surveyItemSpinner} />
+                              )}
+                              {hasDocUrls && (
+                                <a
+                                  href={surveyDocumentURLs[0]}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={styles.surveyItemDocLink}
+                                  onClick={(e: SurveySelectorStoppableEvent) => e.stopPropagation()}
+                                  title={this.getSurveyDocumentLinkTitle(survey)}
+                                >
+                                  <FontAwesomeIcon icon={faExternalLinkAlt} />
+                                </a>
+                              )}
+                            </span>
+                          </span>
+                        </DropdownItem>
+                      );
+                    })}
+
+                    {surveys.length === 0 && viewMode === 'survey' && (
+                      <DropdownItem disabled className={styles.dropdownItem}>
+                        No surveys found in cache.
+                      </DropdownItem>
+                    )}
+                  </>
+                ) : (
+                  <DropdownItem disabled className={styles.dropdownItem}>
+                    Surveys are still loading...
+                  </DropdownItem>
+                )}
+              </DropdownMenu>
+            )}
+          </Dropdown>
+        )}
 
         {viewMode === 'questions' && (
           <Button
@@ -1410,6 +1424,16 @@ export class SurveySelector extends Component<any, any> {
 
     return (
       <div>
+        {showQuestionCountInHeading &&
+          createPortal(
+            this.renderQuestionSelectorLabel({
+              prefixLabel: '',
+              count: questionSelectorCounts.count,
+              showEncryptedCount: false,
+              showSpinner: questionSelectorLoading,
+            }),
+            this.props.questionCountTarget,
+          )}
         {this.props.toolbarTarget ? createPortal(toolbar, this.props.toolbarTarget) : toolbar}
 
         {/* Create survey */}
@@ -1847,6 +1871,10 @@ export class QuestionsDashboard extends Component<any, any> {
     });
   };
 
+  handleFilterCountUpdate = (count: unknown, encryptedCount: unknown): void => {
+    this.props.onFilteredQuestionCountUpdate?.(count, encryptedCount, true);
+  };
+
   setFilterLoading = (loading: unknown): void => {
     this.setState(buildQuestionsDashboardFilterLoadingPatch(loading));
   };
@@ -1869,7 +1897,7 @@ export class QuestionsDashboard extends Component<any, any> {
           provider={this.props.provider}
           network={this.props.network}
           onFilter={this.handleFilteredQuestions}
-          onCountUpdate={this.props.onFilteredQuestionCountUpdate}
+          onCountUpdate={this.handleFilterCountUpdate}
           setFilterLoading={this.setFilterLoading}
           defaultFilterState={this.props.defaultFilterState}
           // Pass the active filterState so the component can initialize correctly from URL

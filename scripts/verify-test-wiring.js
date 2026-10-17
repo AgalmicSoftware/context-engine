@@ -163,6 +163,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/run-ci-gates.test.mjs');
   expectFile('scripts/worker-release-artifacts.mjs');
   expectFile('scripts/worker-release-artifacts.test.mjs');
+  expectFile('scripts/worker-latest-channel.mjs');
+  expectFile('scripts/worker-latest-channel.test.mjs');
   expectFile('.github/CODEOWNERS');
   expectFile('scripts/verify-abi-sync.mjs');
   expectFile('scripts/verify-abi-sync.test.mjs');
@@ -392,6 +394,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     '/scripts/run-ci-gates.test.mjs @AgalmicSoftware',
     '/scripts/worker-release-artifacts.mjs @AgalmicSoftware',
     '/scripts/worker-release-artifacts.test.mjs @AgalmicSoftware',
+    '/scripts/worker-latest-channel.mjs @AgalmicSoftware',
+    '/scripts/worker-latest-channel.test.mjs @AgalmicSoftware',
     '/scripts/verify-public-release-pii.sh @AgalmicSoftware',
     '/scripts/verify-public-release-pii.test.js @AgalmicSoftware',
     '/scripts/lib/public-release-strip-patterns.sh @AgalmicSoftware',
@@ -431,6 +435,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'deployHelper.bundle.js',
     'agentBridgeWorker.bundle.js',
     'worker-release-manifest.json',
+    '--mode automatic',
+    'group: worker-bundle-stable-promotion',
   ].forEach((required) => {
     if (!publishWorkflow.includes(required)) {
       failures.push(`publish-worker-bundles workflow must include "${required}"`);
@@ -444,7 +450,9 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'node scripts/worker-release-artifacts.mjs verify',
     'worker-bundles-previous',
     'worker-bundles-stable',
-    'gh release edit "worker-bundles-${STABLE_COMMIT}" --latest',
+    '--mode record-manual',
+    '--mode manual',
+    'node "${RUNNER_TEMP}/worker-latest-channel.mjs"',
   ].forEach((required) => {
     if (!promoteWorkflow.includes(required)) {
       failures.push(`promote-worker-bundles workflow must include "${required}"`);
