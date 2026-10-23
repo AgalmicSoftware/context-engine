@@ -1377,6 +1377,34 @@ test('worker group EVM principal normalization uses getAddress while matching lo
 	assert.equal(normalized.key, 'evm_address:0x0000000000000000000000000000000000000def');
 });
 
+test('obsolete transport hints cannot replace the authenticated EVM group principal', () => {
+	for (const authScopes of [
+		{ telegramPrincipal: 'historical-subject' },
+		{ integrationPrincipal: { telegram: 'historical-subject' } },
+		{ integrationPrincipal: { principalId: 'historical-subject' } },
+		{ telegramUserId: 'historical-user' },
+		{ integrationPrincipal: { telegram_user_id: 'historical-user' } },
+	]) {
+		assert.deepEqual(resolveWorkerGroupPrincipal({ requesterAddress: actor.address, authScopes }).principal,
+			{ kind: 'evm_address', address: actor.address });
+		assert.equal(resolveWorkerGroupPrincipal({ authScopes }).reason, 'missing_principal');
+	}
+});
+
+test('explicit historical transport principals still read their original membership keys', async () => {
+	const env = { CE_WORKER_GROUPS_KV: createMockKv() };
+	const principal = { kind: 'telegram', principalId: 'Historical-Subject' };
+	const group = await createWorkerGroup({ env, slug: 'session-a', actorPrincipal: actor,
+		input: { label: 'Historical group', joinMode: 'admin_add' }, deps: { randomUUID: () => 'historical-group' } });
+	assert.equal(group.ok, true);
+	assert.equal((await addWorkerGroupMember({ env, slug: 'session-a', groupId: 'historical-group', principal, actorPrincipal: actor })).ok, true);
+	const explicit = resolveWorkerGroupPrincipal({ authScopes: { principal } });
+	assert.equal(explicit.key, 'telegram:Historical-Subject');
+	const membership = await readWorkerGroupMembershipProjection({ env, slug: 'session-a', groupId: 'historical-group', principal: explicit.principal });
+	assert.equal(membership.ok, true);
+	assert.deepEqual(membership.principal, principal);
+});
+
 test('Worker Group routes reject missing or mismatched session ids before coordination or mutation', async () => {
 	let coordinatorCalls = 0;
 	let mutationCalls = 0;

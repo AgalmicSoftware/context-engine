@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveAdminSignatureAuthority } from './adminSignatureAuthority.js';
+import { resolveAdminSignatureAuthority as boundary } from './adminSignatureAuthority.js';
+
+const resolveAdminSignatureAuthority = (args) => boundary({
+  ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async () => ({ config: args.config, revision: 1 })) },
+});
 
 const createAuthorityDeps = (overrides = {}) => ({
   isAddress: () => true,

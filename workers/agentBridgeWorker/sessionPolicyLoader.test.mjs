@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadSessionPolicy } from './sessionPolicyLoader.mjs';
 import { evaluateSbtJoinPolicy, evaluateSponsoredResourceEligibility, resolveAgentHttpSessionInvocation,
-  resolveSessionInvocation, resolveMiniAppSessionInvocation } from './sessionPolicy.mjs';
+  resolveSessionInvocation } from './sessionPolicy.mjs';
 
 class MemoryKv {
   constructor(entries = []) {
@@ -86,8 +86,7 @@ test('registry discovery and stale cached capability flags grant only HTTP reads
     assert.equal(resolved.session.managedAccountSubmitAllowed, false);
     assert.equal(resolved.session.docLibraryEnabled, false);
     assert.equal(evaluateSbtJoinPolicy(resolved.session).ok, false);
-    assert.equal(resolveSessionInvocation(policy, 'alpha').ok, false);
-    assert.equal(resolveMiniAppSessionInvocation(policy, 'alpha').ok, false);
+    assert.equal(resolveSessionInvocation(policy, 'alpha').ok, true);
     for (const resource of ['ai', 'rpc', 'faucet']) {
       assert.equal(evaluateSponsoredResourceEligibility(resolved.session, { resource }).ok, false);
     }
@@ -102,14 +101,14 @@ test('registry discovery and stale cached capability flags grant only HTTP reads
   assert.equal(explicit.linkedSessions[0].managedAccountSubmitAllowed, true);
 });
 
-test('transport-neutral handoff imports policy authority from the policy domain', () => {
-  const source = readFileSync(fileURLToPath(new URL('./telegramAgentHandoff.mjs', import.meta.url)), 'utf8');
+test('Agent HTTP imports policy authority from the policy domain', () => {
+  const source = readFileSync(fileURLToPath(new URL('./agentHttp.mjs', import.meta.url)), 'utf8');
   const loaderSource = readFileSync(fileURLToPath(new URL('./sessionPolicyLoader.mjs', import.meta.url)), 'utf8');
 
   assert.match(source, /from ['"]\.\/sessionPolicyLoader\.mjs['"]/);
   assert.doesNotMatch(
     source,
-    /import\s*\{[\s\S]*?\bloadSessionPolicy\b[\s\S]*?\}\s*from\s*['"]\.\/telegramCommands\.mjs['"]/
+    /import\s*\{[\s\S]*?\bloadSessionPolicy\b[\s\S]*?\}\s*from\s*['"]\.\/agentSessionRuntime\.mjs['"]/
   );
   assert.doesNotMatch(loaderSource, /from ['"]\.\/telegram(?:Commands|MiniApp|AgentHandoff)\.mjs['"]/);
 });

@@ -82,6 +82,11 @@ export const buildSafeSponsoredReceiptBody = (incoming = {}, sensitiveValues = [
     'error',
     'workerName',
     'workerUrl',
+    'deploymentKind',
+    'accountId',
+    'sessionSlug',
+    'sessionWorkerOrigin',
+    'telegramConfigured',
     'resolvedSlug',
     'kvNamespaceId',
     'deploymentId',
@@ -151,6 +156,23 @@ export const buildSafeSponsoredReceiptBody = (incoming = {}, sensitiveValues = [
       }
     });
     if (Object.keys(bundleDiagnostics).length) body.bundleDiagnostics = bundleDiagnostics;
+  }
+  // Direct and sponsored deployments share this receipt filter. Keep the
+  // public Wrapped proof on initial responses and durable replay so callers can
+  // publish the verified capability without retaining deployment credentials.
+  for (const [field, keys] of Object.entries({
+    resources: ['kvNamespaceId', 'kvReused'],
+    health: ['ok', 'protocolVersion', 'authorityPinned', 'accessEnabled'],
+    agentSessionWrapped: ['version', 'enabled', 'origin', 'protocolVersion', 'revision', 'verifiedAt'],
+  })) {
+    if (!incoming?.[field] || typeof incoming[field] !== 'object' || Array.isArray(incoming[field])) continue;
+    const safe = {};
+    for (const key of keys) {
+      const value = incoming[field][key];
+      if (typeof value === 'string') safe[key] = redactSponsoredSensitiveText(value, sensitiveValues);
+      else if (typeof value === 'boolean' || Number.isFinite(value)) safe[key] = value;
+    }
+    if (Object.keys(safe).length) body[field] = safe;
   }
   return body;
 };

@@ -4,8 +4,14 @@ import {
   INTERVIEW_PROMPT_VERSION,
   __test__interviewBriefDispatch,
   buildInterviewBriefDocument,
-  dispatchInterviewBriefRequest,
+  dispatchInterviewBriefRequest as boundary,
 } from './interviewBriefDispatch.js';
+
+const dispatchInterviewBriefRequest = (args) => boundary({
+  ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async ({ env, slug }) => ({
+    config: await args.deps?.getSessionConfig?.(env, slug), revision: 1,
+  })) },
+});
 
 const { canonicalizeQuestions } = __test__interviewBriefDispatch;
 

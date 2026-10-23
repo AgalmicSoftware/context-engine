@@ -3,6 +3,7 @@ import { webcrypto } from 'crypto';
 import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
 import {
   createMemoryKv,
+  installSessionCoordinatorBinding,
   issueWorkerLoginToken,
 } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 
@@ -259,7 +260,7 @@ describe('sessionCorsWorker /health and request validation routes', () => {
         },
         body: JSON.stringify({ prompt: 'ping' }),
       }),
-      { GROUP_KV: createMemoryKv() },
+      installSessionCoordinatorBinding({ GROUP_KV: createMemoryKv() }),
       {}
     );
     const payload = await response.json();
@@ -288,7 +289,7 @@ describe('sessionCorsWorker /health and request validation routes', () => {
         },
         body: '{not-json',
       }),
-      env,
+      installSessionCoordinatorBinding(env),
       {}
     );
     const payload = await response.json();
@@ -318,7 +319,7 @@ describe('sessionCorsWorker /health and request validation routes', () => {
         },
         body: '{bad-json',
       }),
-      env,
+      installSessionCoordinatorBinding(env),
       {}
     );
     const payload = await response.json();
@@ -348,7 +349,7 @@ describe('sessionCorsWorker /health and request validation routes', () => {
         },
         body: 'prompt=ping',
       }),
-      env,
+      installSessionCoordinatorBinding(env),
       {}
     );
     const payload = await response.json();

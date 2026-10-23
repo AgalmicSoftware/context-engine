@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dispatchAnonymousRouteEntry } from './anonymousRouteEntry.js';
+import { dispatchAnonymousRouteEntry as boundary } from './anonymousRouteEntry.js';
+
+const dispatchAnonymousRouteEntry = (args) => boundary({
+  ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async ({ env, slug }) => ({
+    config: await args.deps?.getSessionConfig?.(env, slug), revision: 1,
+  })) },
+});
 import { createRateLimitFaucetSupportWithWorkerDeps } from './rateLimitFaucetSupportBinding.js';
 
 test('dispatchAnonymousRouteEntry preserves missing explicit slug failure', async () => {

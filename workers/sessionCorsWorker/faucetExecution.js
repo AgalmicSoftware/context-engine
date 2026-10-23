@@ -49,6 +49,8 @@ export const faucet = async ({
   slug,
   requesterAddress = '',
   tokenHasFaucetScope = false,
+  onSubmissionAttempt,
+  retryAfterSubmissionFailure = true,
   deps,
   constants,
   defaults,
@@ -321,6 +323,7 @@ export const faucet = async ({
     }
 
     try {
+      onSubmissionAttempt?.();
       const txHash = await rpcRequest({
         rpcUrl: rpc,
         method: 'eth_sendRawTransaction',
@@ -363,6 +366,9 @@ export const faucet = async ({
         ...(failure.code != null ? { code: failure.code } : {}),
         error: failure.error,
       });
+      // A hosted reservation covers one payout. An ambiguous send cannot safely
+      // retry with another RPC's pending nonce and create a second transfer.
+      if (!retryAfterSubmissionFailure) break;
     }
   }
 

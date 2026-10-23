@@ -315,10 +315,11 @@ export async function verifySessionWorkerMembership({
     const membershipUrl = sessionId
       ? `${sessionWorkerOrigin}/groups/my-memberships?sessionId=${encodeURIComponent(sessionId)}`
       : `${sessionWorkerOrigin}/groups/my-memberships`;
+    // Authenticated reads are never cached. No RequestInit.cache: Workers at
+    // compatibility date 2024-09-02 throw on it.
     response = await fetchImpl(membershipUrl, {
       method: 'GET',
       headers: { authorization: `Bearer ${suppliedCredential}` },
-      cache: 'no-store',
     });
     body = await response.json();
   } catch {

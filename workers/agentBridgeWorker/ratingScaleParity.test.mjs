@@ -3,10 +3,9 @@ import assert from 'node:assert/strict';
 
 import { __test__sessionQuestions } from './sessionQuestions.mjs';
 import {
-  buildTelegramQuestionAnswerSchema,
-  buildTelegramQuestionCard,
-  normalizeTelegramRatingScale,
-} from './questionUi.mjs';
+  buildAgentQuestionAnswerSchema,
+} from './agentAnswerSchema.mjs';
+import { normalizeAgentRatingScale } from './ratingScale.mjs';
 import { normalizeRatingScale as sharedCatalogScale } from '../../shared/interviewQuestionCatalog.mjs';
 import { formatValidAnalysisAnswer } from '../../workers/sessionCorsWorker/resultsAnalysisAnswerValidation.js';
 
@@ -19,16 +18,16 @@ const payload = {
   sessionSlug: 'eddy26',
 };
 
-test('bridge Telegram schema uses the stored 1..10 scale like the shared catalog', () => {
+test('bridge HTTP schema uses the stored 1..10 scale like the shared catalog', () => {
   const shared = sharedCatalogScale(payload);
   const bridgeQuestion = __test__sessionQuestions.normalizeQuestionPayload(payload, {
     questionId: id,
     pointerId: 'x'.repeat(43),
     sessionSlug: 'eddy26',
   });
-  const schema = buildTelegramQuestionAnswerSchema(bridgeQuestion).answerSchema;
-  const cardScale = buildTelegramQuestionCard(bridgeQuestion).ratingScale;
-  const directScale = normalizeTelegramRatingScale(payload);
+  const schema = buildAgentQuestionAnswerSchema(bridgeQuestion).answerSchema;
+  const cardScale = normalizeAgentRatingScale(bridgeQuestion);
+  const directScale = normalizeAgentRatingScale(payload);
   assert.deepEqual({ min: schema.min, max: schema.max }, { min: shared.min, max: shared.max });
   assert.deepEqual(cardScale, { min: 1, max: 10, step: 1 });
   assert.deepEqual(directScale, cardScale);

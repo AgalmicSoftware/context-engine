@@ -1,5 +1,5 @@
 import { safeString } from './runtimePrimitives.mjs';
-import { RISK_CEILINGS, RISK_RANK, TELEGRAM_BRIDGE_ACTIONS } from './constants.mjs';
+import { RISK_CEILINGS, RISK_RANK, AGENT_ACTIONS } from './constants.mjs';
 
 const SESSION_SLUG_RE = /^[a-z0-9_-]{1,128}$/i;
 const PUBLIC_SBT_JOIN_MODES = new Set(['public', 'open']);
@@ -128,6 +128,21 @@ function legacyTelegramOnlySession(session = {}) {
   );
 }
 
+export function sessionAuthorityMode(session = {}) {
+  const profile = sessionModeProfile(session);
+  const mode = safeString(profile?.authority?.mode).toLowerCase();
+  if (mode) return mode;
+  // Historical hosted sessions predate the explicit profile. A present profile
+  // takes precedence, so old transport flags cannot override current authority.
+  return !profile && legacyTelegramOnlySession(session) ? 'worker_canonical' : 'registry_canonical';
+}
+
+export function isHostedAgentHttpSession(session = {}) {
+  const surfaces = sessionModeProfileSurfaces(session);
+  const enabled = surfaces ? surfaces.agentHttp === true : session.agentHttpEnabled === true;
+  return sessionAuthorityMode(session) === 'worker_canonical' && enabled;
+}
+
 function sessionModeProfileTelegramEnabled(session = {}) {
   const surfaces = sessionModeProfileSurfaces(session);
   return surfaces ? surfaces.telegram === true : null;
@@ -156,7 +171,7 @@ function normalizeLightweightGroups(session = {}) {
     }));
 }
 
-function normalizeTelegramGroupChatIds(...values) {
+function normalizeLegacyGroupChatIds(...values) {
   const out = [];
   for (const value of values) {
     const source = Array.isArray(value) ? value : safeString(value).split(/[\s,;|]+/);
@@ -370,11 +385,12 @@ export function normalizeSessionPolicy(input = {}, {
       : session.miniAppEnabled === false
         ? false
         : telegramBridgeEnabled,
+    // A current explicit false must not be revived by an older enabled alias.
     agentHttpEnabled: sessionModeProfileSurfaces(session)
       ? sessionModeProfileSurfaces(session).agentHttp === true
       : session.agentHttpEnabled === undefined && session.agentHttp === undefined
         ? telegramBridgeEnabled
-        : normalizeBool(session.agentHttpEnabled || session.agentHttp),
+        : normalizeBool(session.agentHttpEnabled ?? session.agentHttp),
     telegramOnly: profileTelegramFirst === null ? legacyTelegramOnlySession(session) : profileTelegramFirst,
     sessionModeProfile: sessionModeProfile(session) ? { ...sessionModeProfile(session) } : null,
     managedAccountSubmitAllowed: session.managedAccountSubmitAllowed === true,
@@ -404,7 +420,7 @@ export function normalizeSessionPolicy(input = {}, {
       : (Array.isArray(input.telegramAuthoringGroupChatIds) ? input.telegramAuthoringGroupChatIds : []))
       .map(safeString)
       .filter(Boolean),
-    approvedTelegramGroupChatIds: normalizeTelegramGroupChatIds(
+    approvedTelegramGroupChatIds: normalizeLegacyGroupChatIds(
       session.approvedTelegramGroupChatIds,
       session.telegramApprovedGroupChatIds,
       session.allowedTelegramGroupChatIds,
@@ -552,9 +568,7 @@ function resolveLinkedSessionInvocation(policyInput = {}, sessionNameOrSlug = ''
 }
 
 export function resolveSessionInvocation(policyInput = {}, sessionNameOrSlug = '') {
-  const resolved = resolveLinkedSessionInvocation(policyInput, sessionNameOrSlug);
-  if (!resolved.ok || resolved.session.telegramBridgeEnabled === true) return resolved;
-  return { ok: false, reason: 'telegram_bridge_disabled', sessionSlug: resolved.session.sessionSlug };
+  return resolveAgentHttpSessionInvocation(policyInput, sessionNameOrSlug);
 }
 
 export function resolveAgentHttpSessionInvocation(policyInput = {}, sessionNameOrSlug = '') {
@@ -563,24 +577,12 @@ export function resolveAgentHttpSessionInvocation(policyInput = {}, sessionNameO
   return { ok: false, reason: 'agent_http_disabled', sessionSlug: resolved.session.sessionSlug };
 }
 
-export function resolveMiniAppSessionInvocation(policyInput = {}, sessionNameOrSlug = '') {
-  const resolved = resolveLinkedSessionInvocation(policyInput, sessionNameOrSlug);
-  if (!resolved.ok) return resolved;
-  if (resolved.session.telegramBridgeEnabled !== true) {
-    return { ok: false, reason: 'telegram_bridge_disabled', sessionSlug: resolved.session.sessionSlug };
-  }
-  if (resolved.session.miniAppEnabled !== true) {
-    return { ok: false, reason: 'mini_app_disabled', sessionSlug: resolved.session.sessionSlug };
-  }
-  return resolved;
-}
-
-export function evaluateTelegramGroupSessionAccess(session = {}, {
+export function evaluateLegacyGroupSessionAccess(session = {}, {
   chatId = '',
   normalized = {},
 } = {}) {
   const groupChatId = safeString(chatId || normalized.chat?.chatId || normalized.groupChatId);
-  const approved = normalizeTelegramGroupChatIds(session.approvedTelegramGroupChatIds);
+  const approved = normalizeLegacyGroupChatIds(session.approvedTelegramGroupChatIds);
   const openAccess = session.telegramGroupOpenAccess === true;
   const approvalRequired = !openAccess || session.telegramGroupApprovalRequired === true || approved.length > 0;
   if (openAccess) {
@@ -652,7 +654,7 @@ export function evaluateSessionSbtGateJoin(session = {}, {
       status: 'no_sbt_gate_required',
       requiredSbtGroups: [],
       allSatisfied: true,
-      nextStep: TELEGRAM_BRIDGE_ACTIONS.JOIN_SESSION,
+      nextStep: AGENT_ACTIONS.JOIN_SESSION,
     };
   }
   return {
@@ -661,7 +663,7 @@ export function evaluateSessionSbtGateJoin(session = {}, {
     requiredSbtGroups: groups,
     allSatisfied,
     nextStep: allSatisfied
-      ? TELEGRAM_BRIDGE_ACTIONS.RETRY_SESSION_JOIN
+      ? AGENT_ACTIONS.RETRY_SESSION_JOIN
       : 'join_required_sbt',
   };
 }
@@ -688,9 +690,9 @@ export function evaluateResponseActionPolicy({
   account = {},
   grant = {},
   session = {},
-  action = TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE,
+  action = AGENT_ACTIONS.DRAFT_RESPONSE,
 } = {}) {
-  if (action === TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE) {
+  if (action === AGENT_ACTIONS.DIRECT_SUBMIT_RESPONSE) {
     if (account.accountMode !== 'managed_telegram_demo') {
       return { ok: false, reason: 'direct_submit_managed_demo_only' };
     }
@@ -705,78 +707,14 @@ export function evaluateResponseActionPolicy({
     }
     return { ok: true, reason: 'direct_submit_allowed' };
   }
-  if (action === TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE) {
+  if (action === AGENT_ACTIONS.SUBMIT_RESPONSE) {
     return { ok: true, reason: 'submit_request_requires_policy_approval', requiresApproval: true };
   }
-  if (action === TELEGRAM_BRIDGE_ACTIONS.SUGGEST_RESPONSE) {
+  if (action === AGENT_ACTIONS.SUGGEST_RESPONSE) {
     return { ok: true, reason: 'suggest_response_ephemeral', persisted: false };
   }
-  if (action === TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE) {
+  if (action === AGENT_ACTIONS.DRAFT_RESPONSE) {
     return { ok: true, reason: 'draft_response_saved', persisted: true };
   }
   return { ok: false, reason: 'unknown_response_action' };
-}
-
-export function evaluateTelegramNormalSessionSubmit({
-  account = {},
-  grant = {},
-  session = {},
-  action = TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
-  joinedSbtIds = [],
-  fallbackWhenDirectDenied = true,
-} = {}) {
-  const gate = evaluateSessionSbtGateJoin(session, { joinedSbtIds });
-  if (!gate.ok) {
-    return {
-      ok: false,
-      reason: 'session_sbt_gate_required',
-      gate,
-      effectiveAction: null,
-    };
-  }
-
-  const direct = evaluateResponseActionPolicy({
-    account,
-    grant,
-    session,
-    action,
-  });
-  if (direct.ok) {
-    return {
-      ...direct,
-      ok: true,
-      mode: action === TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE ? 'direct_submit' : action,
-      effectiveAction: action,
-      directSubmitAllowed: action === TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
-      gate,
-    };
-  }
-
-  if (action !== TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE || fallbackWhenDirectDenied !== true) {
-    return { ...direct, gate, effectiveAction: null };
-  }
-
-  const allowedActions = Array.isArray(grant.allowedActions) ? grant.allowedActions : [];
-  const fallbackAction = allowedActions.includes(TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE)
-    ? TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE
-    : TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE;
-  const fallback = evaluateResponseActionPolicy({
-    account,
-    grant,
-    session,
-    action: fallbackAction,
-  });
-  return {
-    ...fallback,
-    ok: fallback.ok === true,
-    reason: fallbackAction === TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE
-      ? 'direct_submit_denied_submit_request_created'
-      : 'direct_submit_denied_draft_created',
-    deniedDirectSubmitReason: direct.reason,
-    directSubmitAllowed: false,
-    fallbackCreated: true,
-    effectiveAction: fallbackAction,
-    mode: fallbackAction === TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE ? 'submit_request' : 'draft',
-    gate,
-  };
 }

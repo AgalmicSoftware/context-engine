@@ -61,18 +61,18 @@ test('parseAgentBridgeEnvText treats template placeholders as literal values', (
     'AGENT_BRIDGE_PUBLIC_URL=https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev',
     'CE_SESSION_WORKER_BASE_URL=https://<session-worker>.<workers-subdomain>.workers.dev',
     'QUOTED_VALUE="value # not comment"',
-    'JSON_VALUE="{\\"defaultSessionSlug\\":\\"telegram-demo-4\\"}"',
+    'JSON_VALUE="{\\"defaultSessionSlug\\":\\"hosted-demo-4\\"}"',
     'PLAIN_VALUE=value # comment',
   ].join('\n'));
 
   assert.equal(parsed.AGENT_BRIDGE_PUBLIC_URL, 'https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev');
   assert.equal(parsed.CE_SESSION_WORKER_BASE_URL, 'https://<session-worker>.<workers-subdomain>.workers.dev');
   assert.equal(parsed.QUOTED_VALUE, 'value # not comment');
-  assert.deepEqual(JSON.parse(parsed.JSON_VALUE), { defaultSessionSlug: 'telegram-demo-4' });
+  assert.deepEqual(JSON.parse(parsed.JSON_VALUE), { defaultSessionSlug: 'hosted-demo-4' });
   assert.equal(parsed.PLAIN_VALUE, 'value');
 });
 
-test('deploy apply dry-run performs no Cloudflare or Telegram calls', async () => {
+test('deploy apply dry-run performs no network calls', async () => {
   const calls = [];
   const exportAdmin = `0x${'ab'.repeat(20)}`;
   const result = await executeAgentBridgeDeployApply({
@@ -115,7 +115,7 @@ test('deploy apply validation rejects placeholder session worker URLs before mut
   assert.equal(result.validation.missing.some((entry) => entry.includes('CE_SESSION_WORKER_BASE_URL')), true);
 });
 
-test('Telegram-disabled deploy writes no Telegram secrets and performs no bot action', async () => {
+test('retained deploy needs no bot secrets even when an old environment enables the retired transport', async () => {
   const calls = [];
   const fetchMock = async (url, options = {}) => {
     const method = options.method || 'GET';
@@ -141,7 +141,7 @@ test('Telegram-disabled deploy writes no Telegram secrets and performs no bot ac
   const result = await executeAgentBridgeDeployApply({
     flags: { apply: true, 'skip-health-check': true },
     env: completeEnv({
-      TELEGRAM_BRIDGE_ENABLED: '',
+      TELEGRAM_BRIDGE_ENABLED: 'true',
       TELEGRAM_BOT_TOKEN: '',
       TELEGRAM_BOT_USERNAME: '',
       TELEGRAM_WEBHOOK_SECRET: '',
@@ -153,8 +153,8 @@ test('Telegram-disabled deploy writes no Telegram secrets and performs no bot ac
     .filter((call) => call.url.endsWith('/workers/scripts/ce-agent-bridge-worker/secrets'))
     .map((call) => JSON.parse(call.options.body || '{}').name);
   assert.equal(result.ok, true);
-  assert.equal(result.webhookUrl, null);
-  assert.deepEqual(result.telegram, { ok: true, skipped: true, reason: 'telegram_disabled' });
+  assert.equal(Object.hasOwn(result, 'webhookUrl'), false);
+  assert.equal(Object.hasOwn(result, 'telegram'), false);
   assert.deepEqual(writtenSecrets.sort(), ['AGENT_BRIDGE_AGENT_API_TOKEN', 'DEMO_SIGNER_ROOT_SECRET']);
   assert.equal(calls.some((call) => call.url.startsWith('https://api.telegram.org/')), false);
 });
@@ -228,7 +228,11 @@ test('collectAgentBridgeWorkerModules includes the worker entrypoint and transit
   const names = modules.map((module) => module.name);
 
   assert.equal(names.includes('worker.js'), true);
-  assert.equal(names.includes('telegramCommands.mjs'), true);
+  assert.equal(names.includes('agentSessionRuntime.mjs'), true);
+  assert.equal(names.includes('agentHttp.mjs'), true);
+  for (const retired of ['telegramCommands.mjs', 'telegramMiniApp.mjs', 'telegramMiniAppBrowserAsset.mjs', 'telegramSender.mjs', 'telegramUpdates.mjs', 'questionUi.mjs', 'transportMock.mjs']) {
+    assert.equal(names.includes(retired), false, retired);
+  }
   assert.equal(names.includes('durableObjectSigner.mjs'), false);
   assert.equal(modules.every((module) => module.source.length > 0), true);
 });
@@ -287,7 +291,7 @@ test('uploadAgentBridgeWorker retries without an already-applied invite coordina
   assert.equal(metadata[1].bindings.some((binding) => binding.name === 'AGENT_INVITE_COORDINATOR'), true);
 });
 
-test('deploy apply creates smoke resources without requiring R2/D1, uploads modules, writes secrets, sets webhook, and checks health', async () => {
+test('deploy apply creates smoke resources without requiring R2/D1, uploads modules, writes retained secrets, and checks health', async () => {
   const calls = [];
   const fetchMock = async (url, options = {}) => {
     const method = options.method || 'GET';
@@ -313,31 +317,6 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
     if (String(url).endsWith('/workers/scripts/ce-agent-bridge-worker/subdomain') && method === 'POST') {
       return jsonResponse({ success: true, result: { enabled: true } });
     }
-    if (String(url).startsWith('https://api.telegram.org/bot123456:test-token/setWebhook')) {
-      return jsonResponse({ ok: true, result: true, description: 'Webhook was set' });
-    }
-    if (String(url).startsWith('https://api.telegram.org/bot123456:test-token/setMyName')) {
-      const body = JSON.parse(options.body || '{}');
-      assert.equal(body.name, 'Context Engine');
-      return jsonResponse({ ok: true, result: true, description: 'Name was set' });
-    }
-    if (String(url).startsWith('https://api.telegram.org/bot123456:test-token/setMyCommands')) {
-      const body = JSON.parse(options.body || '{}');
-      assert.equal(body.commands.some((command) => command.command === 'sessions'), true);
-      assert.equal(body.commands.some((command) => command.command === 'questions' && command.description === 'Questions'), true);
-      assert.equal(body.commands.some((command) => command.command === 'results' && command.description === 'Results'), true);
-      assert.equal(body.commands.some((command) => command.command === 'groups'), true);
-      assert.equal(body.commands.some((command) => command.command === 'add_question'), true);
-      assert.equal(body.commands.some((command) => command.command === 'me' && command.description === 'View account / get agent token'), true);
-      assert.equal(body.commands.some((command) => command.command === 'attachments'), false);
-      assert.equal(body.commands.some((command) => command.command === 'docs'), false);
-      assert.equal(body.commands.some((command) => command.command === 'q'), false);
-      assert.equal(body.commands.some((command) => command.command === 'actions'), false);
-      assert.equal(body.commands.some((command) => command.command === 'settings'), false);
-      assert.equal(body.commands.some((command) => command.command === 'join'), false);
-      assert.equal(body.commands.some((command) => command.command.startsWith('ce_')), false);
-      return jsonResponse({ ok: true, result: true, description: 'Commands were set' });
-    }
     if (String(url) === 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev/health') {
       return jsonResponse({ ok: true, worker: 'agentBridgeWorker', version: 'test-version' });
     }
@@ -358,32 +337,20 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
   assert.equal(result.dryRun, false);
   assert.equal(result.accountId, 'account-derived');
   assert.equal(result.publicUrl, 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev');
-  assert.equal(result.webhookUrl, 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev/telegram/webhook');
+  assert.equal(Object.hasOwn(result, 'webhookUrl'), false);
   assert.equal(result.resources.docStorageEnabled, false);
   assert.equal(result.resources.kvNamespaceId, 'kv-created');
   assert.equal(result.resources.r2Skipped, true);
   assert.equal(result.resources.d1Skipped, true);
   assert.equal(result.upload.mainModule, 'worker.js');
-  assert.equal(result.secrets.written.length, 4);
+  assert.equal(result.secrets.written.length, 2);
   assert.equal(result.health.version, 'test-version');
   assert.equal(calls.some((call) => call.url.endsWith('/workers/scripts/ce-agent-bridge-worker')), true);
   assert.equal(calls.some((call) => call.url.includes('/r2/buckets')), false);
   assert.equal(calls.some((call) => call.url.includes('/d1/database')), false);
-  assert.equal(calls.filter((call) => call.url.endsWith('/workers/scripts/ce-agent-bridge-worker/secrets')).length, 4);
-  assert.equal(calls.some((call) => call.url.startsWith('https://api.telegram.org/bot123456:test-token/setWebhook')), true);
-  assert.equal(calls.some((call) => call.url.startsWith('https://api.telegram.org/bot123456:test-token/setMyName')), true);
-  assert.equal(calls.some((call) => call.url.startsWith('https://api.telegram.org/bot123456:test-token/setMyCommands')), true);
-  assert.equal(result.telegram.name.name, 'Context Engine');
-  assert.equal(result.telegram.commands.count > 0, true);
-  assert.equal(result.telegram.commands.commands.includes('sessions'), true);
-  assert.equal(result.telegram.commands.commands.includes('groups'), true);
-  assert.equal(result.telegram.commands.commands.includes('add_question'), true);
-  assert.equal(result.telegram.commands.commands.includes('attachments'), false);
-  assert.equal(result.telegram.commands.commands.includes('docs'), false);
-  assert.equal(result.telegram.commands.commands.includes('q'), false);
-  assert.equal(result.telegram.commands.commands.includes('actions'), false);
-  assert.equal(result.telegram.commands.commands.includes('settings'), false);
-  assert.equal(result.telegram.commands.commands.includes('join'), false);
+  assert.equal(calls.filter((call) => call.url.endsWith('/workers/scripts/ce-agent-bridge-worker/secrets')).length, 2);
+  assert.equal(calls.some((call) => call.url.startsWith('https://api.telegram.org/')), false);
+  assert.equal(Object.hasOwn(result, 'telegram'), false);
   assert.equal(JSON.stringify(result).includes('123456:test-token'), false);
   assert.equal(JSON.stringify(result).includes('webhook-secret'), false);
   assert.equal(JSON.stringify(result).includes('demo-root-secret'), false);
@@ -416,7 +383,7 @@ test('deploy apply does not retry an upload through a stale Durable Object migra
   };
 
   const result = await executeAgentBridgeDeployApply({
-    flags: { apply: true, 'skip-telegram-webhook': true, 'skip-health-check': true },
+    flags: { apply: true, 'skip-health-check': true },
     env: completeEnv(),
     fetchImpl: fetchMock,
   });
@@ -465,7 +432,7 @@ test('deploy apply provisions R2/D1 only when doc storage is explicitly enabled'
   };
 
   const result = await executeAgentBridgeDeployApply({
-    flags: { apply: true, 'skip-telegram-webhook': true },
+    flags: { apply: true },
     env: completeEnv({ AGENT_BRIDGE_ENABLE_DOC_STORAGE: 'true' }),
     fetchImpl: fetchMock,
   });

@@ -248,7 +248,7 @@ test('fetchChipotleJson builds approved Chipotle URLs and rejects path escapes',
   assert.equal(calls[0][0], 'https://api.chipotle.litprotocol.com/core/v1/billing/balance');
   assert.equal(calls[0][1].headers['X-Api-Key'], 'lit-secret');
   assert.equal(calls[0][1].headers.Authorization, 'Bearer lit-secret');
-  assert.equal(calls[0][1].redirect, 'error');
+  assert.equal(calls[0][1].redirect, 'manual');
 
   await assert.rejects(
     fetchChipotleJson({
@@ -365,6 +365,21 @@ test('default Chipotle action rejects legacy bare-hex wrapped keys', async () =>
     })),
     /legacy wrapped keys are not supported/i,
   );
+});
+
+test('fetchChipotleJson rejects redirects without forwarding credentials or reading the redirect body', async () => {
+  for (const status of [301, 302, 303, 307, 308]) {
+    let calls = 0;
+    await assert.rejects(fetchChipotleJson({
+      apiKey: 'fixture-lit-secret', path: '/billing/balance',
+      fetchImpl: async (_url, init) => {
+        calls += 1;
+        assert.equal(init.redirect, 'manual');
+        return { status, ok: false, text: async () => { throw new Error('Redirect body must not be read.'); } };
+      },
+    }), /Chipotle redirects are not allowed/);
+    assert.equal(calls, 1);
+  }
 });
 
 test('resolveLitChipotleRuntime prefers request, then session secret, then worker env for the API key', () => {

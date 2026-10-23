@@ -1,8 +1,10 @@
+import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { parseSiweMessage, validateSiweResources } from './siweMessageValidation.js';
 import { getRouteBaseHeaders } from './routeBaseHeaders.js';
 
 export const dispatchBootstrapArweaveUpload = async ({
   request,
+  env,
   hasAuthorization,
   deps,
 } = {}) => {
@@ -48,7 +50,12 @@ export const dispatchBootstrapArweaveUpload = async ({
     };
   }
 
-  const config = await deps?.getSessionConfig?.(targetSlug);
+  let config;
+  try {
+    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: targetSlug }));
+  } catch (error) {
+    return { handled: true, response: deps?.json?.({ error: error.message }, 503, bootstrapHeaders) };
+  }
   const missingSessionConfig = !config;
   if (missingSessionConfig) {
     deps?.logBootstrapConfigMissing?.({ targetSlug, requestId });

@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveExistingSessionCors } from './existingSessionCorsResolution.js';
+import { resolveExistingSessionCors as boundary } from './existingSessionCorsResolution.js';
+
+const resolveExistingSessionCors = (args) => boundary({
+  ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async ({ env, slug }) => ({
+    config: await args.deps?.getSessionConfig?.(env, slug), revision: 1,
+  })) },
+});
 
 test('resolveExistingSessionCors normalizes the slug and returns base headers when config is missing', async () => {
   const calls = [];
@@ -32,6 +38,7 @@ test('resolveExistingSessionCors normalizes the slug and returns base headers wh
     ok: true,
     headers: baseHeaders,
     config: null,
+    revision: 1,
   });
   assert.deepEqual(calls, [
     ['normalize', 'General'],
@@ -63,6 +70,7 @@ test('resolveExistingSessionCors returns config plus CORS headers when the reque
     ok: true,
     headers: corsHeaders,
     config,
+    revision: 1,
   });
 });
 

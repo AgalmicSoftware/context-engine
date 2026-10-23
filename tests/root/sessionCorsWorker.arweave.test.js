@@ -344,7 +344,7 @@ describe('sessionCorsWorker arweave upload routes', () => {
     expect(payload?.error).toBe('Session secrets not configured.');
   });
 
-  it('rejects authenticated uploads when the session config disappears after token issuance', async () => {
+  it('uses durable policy when the KV projection disappears and fails closed without coordination', async () => {
     const sessionSlug = 'arweave-config-deleted';
     const env = createWorkerEnv({
       sessionSlug,
@@ -375,8 +375,15 @@ describe('sessionCorsWorker arweave upload routes', () => {
     );
     const payload = await response.json();
 
-    expect(response.status).toBe(404);
-    expect(payload?.error).toBe('Session config not found.');
+    expect(response.status).toBe(200);
+    expect(payload?.id).toBe('arweave-tx-123');
+    delete env.CE_SESSION_COORDINATOR;
+    const unavailable = await sessionCorsWorker.fetch(createUploadJsonRequest({
+      headers: { Authorization: `Bearer ${token}`, 'X-Session-Slug': sessionSlug },
+      body: { data: { prompt: 'must not upload' } },
+    }), env, {});
+    expect(unavailable.status).toBe(503);
+    expect(mockArweave.api.createTransaction).toHaveBeenCalledTimes(1);
   });
 
   it('rejects authenticated uploads on blocked origins and omits ACAO', async () => {

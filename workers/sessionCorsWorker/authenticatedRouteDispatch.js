@@ -11,6 +11,7 @@ export const dispatchAuthenticatedRoute = async ({
     headers,
     scopes,
     address,
+    expectedAuthority,
     limit,
   } = authenticatedContext || {};
 
@@ -21,6 +22,7 @@ export const dispatchAuthenticatedRoute = async ({
     config,
     slug,
     address,
+    expectedAuthority,
     limit,
     headers,
     scopes,

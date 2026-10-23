@@ -235,6 +235,69 @@ test('rejects unknown source refs relative to the AI input ids', () => {
 });
 
 
+for (const [label, refs] of [
+  ['disjoint participant and question', { participantIds: ['participant_001'], questionIds: ['q2'] }],
+  ['participant without a cited response', { participantIds: ['participant_001', 'participant_002'], questionIds: ['q1'] }],
+  ['question without a cited respondent', { participantIds: ['participant_001'], questionIds: ['q1', 'q2'] }],
+]) {
+  test(`rejects unsupported source attribution: ${label}`, () => {
+    assert.throws(() => normalize({
+      sections: ['argumentMap', 'atlas', 'breakdown', 'riskMatrix'],
+      value: {
+        argumentMap: { debates: [{ title: 'Readiness', claims: [{ label: 'A claim', ...refs }] }] },
+        atlas: { nodes: [{ id: 'readiness', label: 'Readiness', ...refs }] },
+        breakdown: { groups: [{ label: 'Readiness concerns', ...refs }] },
+        riskMatrix: { categories: [{ label: 'Readiness risk', likelihood: 'high', impact: 'high', ...refs }] },
+      },
+    }), /unsupported source attribution/i);
+  });
+}
+
+for (const [label, refs] of [
+  ['no citations', {}],
+  ['participant only', { participantIds: ['participant_001'] }],
+  ['question only', { questionIds: ['q1'] }],
+  ['empty citations', { participantIds: [], questionIds: [] }],
+]) {
+  test(`requires evidence for argument-map claims: ${label}`, () => {
+    const artifact = normalize({
+      sections: ['argumentMap', 'breakdown'],
+      value: {
+        argumentMap: { debates: [{ title: 'Readiness', claims: [{ label: 'An unsupported claim', ...refs }] }] },
+        breakdown: { summary: { overview: 'A separate synthesis remains available.' } },
+      },
+    });
+    assert.equal(artifact.sections.argumentMap.available, false);
+    assert.match(artifact.sections.argumentMap.reason, /claim requires participantIds and questionIds/i);
+    assert.equal(artifact.sections.breakdown.available, true);
+  });
+}
+
+test('keeps connected multi-response citations and single-participant dissent', () => {
+  const artifact = normalize({
+    sections: ['argumentMap'],
+    value: { argumentMap: { debates: [{ title: 'Readiness', claims: [
+      { label: 'Several concerns', participantIds: ['participant_001', 'participant_002'], questionIds: ['q1', 'q2'] },
+      { label: 'Minority concern', participantIds: ['participant_002'], questionIds: ['q2'] },
+    ] }] } },
+  });
+  assert.equal(artifact.sections.argumentMap.available, true);
+  assert.equal(artifact.sections.argumentMap.debates[0].claims.length, 2);
+});
+
+test('uses only relationships in the AI-visible responses even when both ids exist there', () => {
+  assert.throws(() => normalize({
+    source: {
+      ...source,
+      snapshot: { ...source.snapshot, responses: [...source.snapshot.responses, { participantId: 'participant_001', questionId: 'q2' }] },
+    },
+    sections: ['argumentMap'],
+    value: { argumentMap: { debates: [{ title: 'Readiness', claims: [
+      { label: 'A truncated response cannot support this claim', participantIds: ['participant_001'], questionIds: ['q2'] },
+    ] }] } },
+  }), /unsupported source attribution/i);
+});
+
 test('validates references against aiSnapshot ids when the broader source snapshot has extra ids', () => {
   assert.throws(() => normalizeResultsAnalysisArtifact({
     source: {

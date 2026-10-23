@@ -31,6 +31,7 @@ const createBaseDeps = () => ({
   now: 'now',
   readArweaveBootstrapUploadPayload: 'readArweaveBootstrapUploadPayload',
   getSessionConfig: 'getSessionConfig',
+  readCurrentSessionConfig: 'readCurrentSessionConfig',
   getCorsContext: 'getCorsContext',
   verifyAdminSignature: 'verifyAdminSignature',
   getSessionSecrets: 'getSessionSecrets',
@@ -243,7 +244,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves interview brief branch wiri
         assert.equal(value.baseHeaders, baseHeaders);
         assert.deepEqual(value.deps, {
           resolveRequestSlugWithoutToken: 'resolveRequestSlugWithoutToken',
-          getSessionConfig: 'getSessionConfig',
+          readCurrentSessionConfig: 'readCurrentSessionConfig',
           getCorsContext: 'getCorsContext',
           resolveAnonymousRateIdentity: 'resolveAnonymousRateIdentity',
           checkRateLimit: 'checkRateLimit',
@@ -561,7 +562,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves admin and anonymous branch 
           assert.equal(value.deps.resolveRequestSlugWithoutToken, 'resolveRequestSlugWithoutToken');
           assert.equal(value.deps.json, 'json');
           assert.equal(value.deps.MISSING_SLUG_ERROR, 'Missing sessionSlug.');
-          assert.equal(value.deps.getSessionConfig, 'getSessionConfig');
+          assert.equal(value.deps.readCurrentSessionConfig, 'readCurrentSessionConfig');
           assert.equal(value.deps.SESSION_CONFIG_NOT_FOUND_ERROR, 'Session config not found.');
           assert.equal(value.deps.getCorsContext, 'getCorsContext');
           assert.equal(value.deps.resolveAnonymousRateIdentity, 'resolveAnonymousRateIdentity');
@@ -627,7 +628,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves authenticated fallback afte
         assert.equal(value.request, request);
         assert.equal(value.env, env);
         assert.equal(value.baseHeaders, baseHeaders);
-        assert.equal(value.deps.getSessionConfig, 'getSessionConfig');
+        assert.equal(value.deps.readCurrentSessionConfig, 'readCurrentSessionConfig');
         assert.equal(value.deps.getCorsContext, 'getCorsContext');
         assert.equal(value.deps.json, 'json');
         assert.equal(value.deps.toStr, 'toStr');
@@ -834,6 +835,7 @@ test('artifact requests reject stale token epochs and require current storage sc
       json: (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers }),
       resolveRequestSlugWithoutToken: () => ({ ok: true, slug: 'session-a', explicitSlugProvided: true }),
       getSessionConfig: async () => ({ sessionId, authzEpoch: 2, sessionModeProfile: { authority: { mode: 'worker_canonical' } } }),
+      readCurrentSessionConfig: async () => ({ revision: 1, config: { sessionId, authzEpoch: 2, sessionModeProfile: { authority: { mode: 'worker_canonical' } } } }),
       getCorsContext: async () => ({ ok: true, headers: {} }),
       requireAuth: async () => ({ ok: true, slug: 'session-a', payload: {
         sub: '0x' + '2'.repeat(40), sessionId, authzEpoch: tokenEpoch, scopes: { storage: true },

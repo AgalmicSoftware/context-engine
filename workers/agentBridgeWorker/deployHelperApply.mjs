@@ -14,7 +14,7 @@ import {
   buildAgentBridgeWorkerUploadMetadata,
   OPTIONAL_AGENT_BRIDGE_SECRET_NAMES,
   REQUIRED_AGENT_BRIDGE_SECRET_NAMES,
-  REQUIRED_AGENT_BRIDGE_TELEGRAM_SECRET_NAMES,
+  assertNoRetiredAgentBridgeFlags,
   resolveAgentBridgeDeployConfigForLive,
   validateAgentBridgeDeployConfig,
 } from './deployHelperPlan.mjs';
@@ -23,19 +23,7 @@ const WORKER_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ENV_FILE = resolve(WORKER_DIR, '.dev.vars');
 const DEFAULT_ENTRYPOINT = 'worker.js';
 const SCRIPT_CONTENT_TYPE = 'application/javascript+module';
-const DEFAULT_TELEGRAM_BOT_NAME = 'Context Engine';
 const require = createRequire(import.meta.url);
-const TELEGRAM_BOT_COMMANDS = Object.freeze([
-  { command: 'start', description: 'Open the Context Engine bot' },
-  { command: 'sessions', description: 'List available sessions' },
-  { command: 'questions', description: 'Questions' },
-  { command: 'groups', description: 'Manage lightweight groups' },
-  { command: 'add_question', description: 'Add a session question' },
-  { command: 'results', description: 'Results' },
-  { command: 'me', description: 'View account / get agent token' },
-  { command: 'account', description: 'View your account' },
-]);
-
 function hasTemplatePlaceholder(value = '') {
   return /<[^>]+>/.test(safeString(value));
 }
@@ -115,19 +103,18 @@ export function parseAgentBridgeApplyArgs(argv = process.argv.slice(2)) {
     'apply',
     'dry-run',
     'enable-doc-storage',
-    'enable-telegram',
     'help',
     'include-workers-dev-subdomain-setup',
     'json',
     'live-account-lookup',
     'skip-health-check',
-    'skip-telegram-webhook',
   ]);
   for (let index = 0; index < argv.length; index += 1) {
     const token = safeString(argv[index]);
     if (!token) continue;
     if (!token.startsWith('--')) throw new Error(`Unexpected argument: ${token}`);
     const key = token.slice(2);
+    assertNoRetiredAgentBridgeFlags({ [key]: true });
     if (!key) throw new Error('Encountered an empty flag.');
     if (booleanFlags.has(key)) {
       flags[key] = true;
@@ -551,7 +538,6 @@ export async function writeAgentBridgeWorkerSecrets({
   apiToken = '',
   accountId = '',
   workerName = '',
-  config = {},
   env = {},
   fetchImpl = globalThis.fetch,
 } = {}) {
@@ -561,10 +547,7 @@ export async function writeAgentBridgeWorkerSecrets({
     AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY: safeString(env.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY),
   };
   const secrets = [
-    ...[
-      ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES,
-      ...(config.telegramEnabled ? REQUIRED_AGENT_BRIDGE_TELEGRAM_SECRET_NAMES : []),
-    ].map((name) => ({
+    ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES.map((name) => ({
       name,
       text: safeString(env[name]),
       required: true,
@@ -593,176 +576,6 @@ export async function writeAgentBridgeWorkerSecrets({
   return {
     ok: true,
     written,
-  };
-}
-
-export async function setAgentBridgeTelegramWebhook({
-  botToken = '',
-  webhookUrl = '',
-  webhookSecret = '',
-  fetchImpl = globalThis.fetch,
-} = {}) {
-  let response;
-  try {
-    response = await fetchImpl(`https://api.telegram.org/bot${safeString(botToken)}/setWebhook`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url: webhookUrl,
-        secret_token: webhookSecret,
-        allowed_updates: ['message', 'callback_query'],
-      }),
-    });
-  } catch (error) {
-    return {
-      ok: false,
-      step: 'telegram_set_webhook',
-      status: 502,
-      error: `Telegram setWebhook request failed: ${safeString(error?.message || error) || 'unknown error'}`,
-    };
-  }
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body?.ok !== true) {
-    return {
-      ok: false,
-      step: 'telegram_set_webhook',
-      status: response.status || 502,
-      error: safeString(body?.description) || `Telegram setWebhook failed (${response.status || 502})`,
-    };
-  }
-  return {
-    ok: true,
-    description: safeString(body?.description),
-  };
-}
-
-export async function setAgentBridgeTelegramBotCommands({
-  botToken = '',
-  commands = TELEGRAM_BOT_COMMANDS,
-  fetchImpl = globalThis.fetch,
-} = {}) {
-  let response;
-  try {
-    response = await fetchImpl(`https://api.telegram.org/bot${safeString(botToken)}/setMyCommands`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ commands }),
-    });
-  } catch (error) {
-    return {
-      ok: false,
-      step: 'telegram_set_commands',
-      status: 502,
-      error: `Telegram setMyCommands request failed: ${safeString(error?.message || error) || 'unknown error'}`,
-    };
-  }
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body?.ok !== true) {
-    return {
-      ok: false,
-      step: 'telegram_set_commands',
-      status: response.status || 502,
-      error: safeString(body?.description) || `Telegram setMyCommands failed (${response.status || 502})`,
-    };
-  }
-  return {
-    ok: true,
-    count: commands.length,
-    commands: commands.map((command) => command.command),
-  };
-}
-
-export async function setAgentBridgeTelegramBotName({
-  botToken = '',
-  name = DEFAULT_TELEGRAM_BOT_NAME,
-  fetchImpl = globalThis.fetch,
-} = {}) {
-  const displayName = safeString(name) || DEFAULT_TELEGRAM_BOT_NAME;
-  let response;
-  try {
-    response = await fetchImpl(`https://api.telegram.org/bot${safeString(botToken)}/setMyName`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: displayName }),
-    });
-  } catch (error) {
-    return {
-      ok: false,
-      step: 'telegram_set_name',
-      status: 502,
-      error: `Telegram setMyName request failed: ${safeString(error?.message || error) || 'unknown error'}`,
-    };
-  }
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body?.ok !== true) {
-    return {
-      ok: false,
-      step: 'telegram_set_name',
-      status: response.status || 502,
-      error: safeString(body?.description) || `Telegram setMyName failed (${response.status || 502})`,
-    };
-  }
-  return {
-    ok: true,
-    name: displayName,
-  };
-}
-
-function telegramProfilePhotoContentType(pathValue = '') {
-  const ext = extname(safeString(pathValue)).toLowerCase();
-  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
-  if (ext === '.png') return 'image/png';
-  return 'application/octet-stream';
-}
-
-export async function setAgentBridgeTelegramBotProfilePhoto({
-  botToken = '',
-  photoPath = '',
-  fetchImpl = globalThis.fetch,
-  readFileImpl = readFileSync,
-  existsImpl = existsSync,
-} = {}) {
-  const resolvedPath = safeString(photoPath) ? resolve(photoPath) : '';
-  if (!resolvedPath) return { ok: true, skipped: true, reason: 'telegram_profile_photo_not_configured' };
-  if (!existsImpl(resolvedPath)) {
-    return {
-      ok: false,
-      step: 'telegram_set_profile_photo',
-      status: 400,
-      error: `Telegram profile photo was not found: ${resolvedPath}`,
-    };
-  }
-  const bytes = readFileImpl(resolvedPath);
-  const form = new FormData();
-  form.append('photo', JSON.stringify({ type: 'static', photo: 'attach://photo_file' }));
-  form.append('photo_file', new Blob([bytes], { type: telegramProfilePhotoContentType(resolvedPath) }), resolvedPath.split(sep).pop() || 'profile.jpg');
-  let response;
-  try {
-    response = await fetchImpl(`https://api.telegram.org/bot${safeString(botToken)}/setMyProfilePhoto`, {
-      method: 'POST',
-      body: form,
-    });
-  } catch (error) {
-    return {
-      ok: false,
-      step: 'telegram_set_profile_photo',
-      status: 502,
-      error: `Telegram setMyProfilePhoto request failed: ${safeString(error?.message || error) || 'unknown error'}`,
-    };
-  }
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body?.ok !== true) {
-    return {
-      ok: false,
-      step: 'telegram_set_profile_photo',
-      status: response.status || 502,
-      error: safeString(body?.description) || `Telegram setMyProfilePhoto failed (${response.status || 502})`,
-    };
-  }
-  return {
-    ok: true,
-    path: resolvedPath,
-    description: safeString(body?.description),
   };
 }
 
@@ -817,7 +630,6 @@ function buildDryRunResult({ validation, plan, context }) {
       'create or reuse R2 and D1 resources only when AGENT_BRIDGE_ENABLE_DOC_STORAGE=true or --enable-doc-storage is set',
       'upload agentBridgeWorker modules',
       'write Worker secrets through Cloudflare API',
-      'set Telegram webhook with secret_token',
       'verify /health',
     ],
   };
@@ -915,7 +727,6 @@ export async function executeAgentBridgeDeployApply({
     apiToken,
     accountId,
     workerName,
-    config,
     env: resolvedEnv,
     fetchImpl,
   });
@@ -929,52 +740,6 @@ export async function executeAgentBridgeDeployApply({
     fetchImpl,
   });
   const publicUrl = safeString(workersDev.workerUrl).replace(/\/+$/, '') || plan.publicUrl;
-  const webhookUrl = config.telegramEnabled
-    ? `${publicUrl.replace(/\/+$/, '')}/telegram/webhook`
-    : null;
-
-  const telegram = !config.telegramEnabled
-    ? { ok: true, skipped: true, reason: 'telegram_disabled' }
-    : flags['skip-telegram-webhook'] === true
-      ? { ok: true, skipped: true, reason: 'telegram_actions_skipped' }
-    : await (async () => {
-      const webhook = await setAgentBridgeTelegramWebhook({
-        botToken: resolvedEnv.TELEGRAM_BOT_TOKEN,
-        webhookUrl,
-        webhookSecret: resolvedEnv.TELEGRAM_WEBHOOK_SECRET,
-        fetchImpl,
-      });
-      if (!webhook.ok) return webhook;
-      const name = await setAgentBridgeTelegramBotName({
-        botToken: resolvedEnv.TELEGRAM_BOT_TOKEN,
-        name: resolvedEnv.TELEGRAM_BOT_NAME || resolvedEnv.AGENT_BRIDGE_TELEGRAM_BOT_NAME || DEFAULT_TELEGRAM_BOT_NAME,
-        fetchImpl,
-      });
-      if (!name.ok) return name;
-      const commands = await setAgentBridgeTelegramBotCommands({
-        botToken: resolvedEnv.TELEGRAM_BOT_TOKEN,
-        fetchImpl,
-      });
-      if (!commands.ok) return commands;
-      const profilePhoto = await setAgentBridgeTelegramBotProfilePhoto({
-        botToken: resolvedEnv.TELEGRAM_BOT_TOKEN,
-        photoPath: resolvedEnv.TELEGRAM_BOT_PROFILE_PHOTO_PATH || resolvedEnv.AGENT_BRIDGE_TELEGRAM_BOT_PROFILE_PHOTO_PATH,
-        fetchImpl,
-        readFileImpl,
-        existsImpl,
-      });
-      if (!profilePhoto.ok) return profilePhoto;
-      return {
-        ok: true,
-        description: webhook.description,
-        webhook,
-        name,
-        commands,
-        profilePhoto,
-      };
-    })();
-  if (!telegram.ok) return telegram;
-
   const health = flags['skip-health-check'] === true
     ? { ok: true, skipped: true }
     : await verifyAgentBridgeHealth({ publicUrl, fetchImpl });
@@ -986,7 +751,6 @@ export async function executeAgentBridgeDeployApply({
     workerName,
     accountId,
     publicUrl,
-    webhookUrl,
     resources: {
       docStorageEnabled,
       kvNamespaceId: kv.id,
@@ -1013,7 +777,6 @@ export async function executeAgentBridgeDeployApply({
       subdomainError: workersDev.subdomainError,
       scriptSubdomainError: workersDev.scriptSubdomainError,
     },
-    telegram,
     health,
   };
 }
@@ -1024,18 +787,16 @@ function printUsage() {
     '  npm run deploy:apply',
     '  npm run deploy:apply -- --apply',
     '',
-    'Default behavior is a dry-run with no Cloudflare or Telegram mutations.',
+    'Default behavior is an offline dry-run with no mutations.',
     '',
     'Environment:',
     '  Reads workers/agentBridgeWorker/.dev.vars by default, then overlays process.env.',
-    '  Keep CLOUDFLARE_API_TOKEN, DEMO_SIGNER_ROOT_SECRET, AGENT_BRIDGE_AGENT_API_TOKEN, and any optional Telegram secrets out of git.',
+    '  Keep CLOUDFLARE_API_TOKEN, DEMO_SIGNER_ROOT_SECRET, AGENT_BRIDGE_AGENT_API_TOKEN, and optional provider keys out of git.',
     '',
     'Flags:',
-    '  --apply                         Execute live Cloudflare upload, Worker secret writes, optional Telegram setup, and health check',
+    '  --apply                         Execute live Cloudflare upload, Worker secret writes, and health check',
     '  --enable-doc-storage            Also provision and bind bridge-owned R2/D1 demo storage resources',
-    '  --enable-telegram               Configure the optional Telegram adapter and bot actions',
     '  --env-file <path>               Read a different dotenv-style env file',
-    '  --skip-telegram-webhook         Diagnose a Telegram-enabled deploy without bot actions',
     '  --skip-health-check             Deploy without verifying /health',
     '  --include-workers-dev-subdomain-setup',
     '                                  Allow account-level workers.dev subdomain create/change when needed',

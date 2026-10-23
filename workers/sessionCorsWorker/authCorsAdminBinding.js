@@ -32,7 +32,8 @@ export const createAuthCorsAdminAdaptersWithWorkerDeps = ({
       ...value,
       deps: {
         normalizeWorkerSessionSlug: deps?.normalizeWorkerSessionSlug,
-        getSessionConfig: deps?.getSessionConfig,
+        readCurrentSessionConfig: deps?.readCurrentSessionConfig,
+        json: deps?.json,
         getCorsContext,
         corsHeaders: deps?.corsHeaders,
         resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,

@@ -1376,7 +1376,7 @@ const createSessionConfigRequest = ({ path, candidateRecord, mutation, slug = 's
 			},
 		},
 		...(candidateRecord ? { candidateRecord } : {}),
-		...(mutation ? { mutation } : {}),
+		...(mutation ? { mutation, expectedAuthority: { actor: '0x0000000000000000000000000000000000000abc', revision: 1, authzEpoch: 0 } } : {}),
 	});
 
 test('SessionWriteCoordinator atomically chooses and projects one wrapped session-key candidate', async () => {
@@ -1537,7 +1537,7 @@ test('SessionWriteCoordinator preserves unchanged minimal legacy keys across con
 		const projections = [];
 		const coordinator = new SessionWriteCoordinator(
 			state,
-			{},
+			{ GROUP_KV: { get: async () => JSON.stringify(testCase.baseConfig || { slug: 'session-a', adminAddress: '0x0000000000000000000000000000000000000abc', storageEnvelope: { sessionKey: legacySessionKey } }) } },
 			{
 				putSessionConfig: async (_env, _slug, config) => {
 					projections.push(config);
@@ -1595,7 +1595,7 @@ test('SessionWriteCoordinator rejects generic mutation of uncoordinated session 
 		const projections = [];
 		const coordinator = new SessionWriteCoordinator(
 			state,
-			{},
+			{ GROUP_KV: { get: async () => JSON.stringify(testCase.baseConfig || { slug: 'session-a', adminAddress: '0x0000000000000000000000000000000000000abc', storageEnvelope: { sessionKey: legacySessionKey } }) } },
 			{
 				putSessionConfig: async (_env, _slug, config) => {
 					projections.push(config);
@@ -1615,7 +1615,8 @@ test('SessionWriteCoordinator rejects generic mutation of uncoordinated session 
 
 		assert.equal(response.status, 409, testCase.name);
 		assert.equal(projections.length, 0, testCase.name);
-		assert.equal(store.size, 0, testCase.name);
+		assert.equal(store.size, 1, testCase.name);
+		assert.deepEqual(store.get('session-config-authority').config, testCase.baseConfig);
 	}
 });
 
@@ -1665,7 +1666,7 @@ test('SessionWriteCoordinator repairs a pending key projection after restart wit
 	assert.equal([...store.values()][0].projectionPending, false);
 });
 
-test('SessionWriteCoordinator applies stale admin mutations to the authoritative key projection', async () => {
+test('SessionWriteCoordinator preserves the authoritative key when a current admin submits a stale base config', async () => {
 	const { state } = createTransactionalState();
 	const projections = [];
 	const coordinator = new SessionWriteCoordinator(
@@ -1961,6 +1962,42 @@ test('SessionWriteCoordinator reserves one faucet transfer and durably replays i
 	assert.equal(replayBody.receipt.body.txHash, `0x${'12'.repeat(32)}`);
 	assert.doesNotMatch(JSON.stringify([...store.values()]), /must-not-persist|privateKey/);
 });
+
+for (const route of ['/deploy-helper', '/sponsored-deploy']) {
+	for (const enabled of [true, false]) {
+		test(`SessionWriteCoordinator preserves Wrapped deployment proof through ${route} replay (enabled=${enabled})`, async () => {
+			const { state, store } = createTransactionalState();
+			let calls = 0;
+			const capability = { version: 1, enabled, origin: 'https://wrapped.example.test', protocolVersion: 1, revision: 'wrapped-fixture', verifiedAt: '2026-01-01T00:00:00.000Z' };
+			const proof = { ok: true, protocolVersion: 1, authorityPinned: true, accessEnabled: enabled };
+			const coordinator = new SessionWriteCoordinator(state, {}, {
+				lookupCloudflareAccount: async () => ({ ok: true, accountId: 'fixture-account' }),
+				executeDeployHelperRequest: async () => {
+					calls += 1;
+					return { ok: true, status: 200, body: {
+						ok: true, deploymentKind: 'agent_session_wrapped', workerName: 'fixture-wrapped',
+						resources: { kvNamespaceId: 'fixture-kv', kvReused: false, apiToken: 'fixture-secret' },
+						health: { ...proof, privateKey: 'fixture-secret' },
+						agentSessionWrapped: { ...capability, apiToken: 'fixture-secret' },
+						secrets: { generated: ['fixture-secret'] },
+					} };
+				},
+			});
+			const payload = { requestDigest: 'wrapped-digest', immutableIdentityDigest: 'wrapped-identity', deployBody: { apiToken: 'fixture-secret' }, sensitiveValues: ['fixture-secret'] };
+			for (let attempt = 0; attempt < 2; attempt += 1) {
+				const result = await readResponse(await coordinator.fetch(createCoordinatorRequest(route, payload)));
+				assert.equal(result.status, 200);
+				assert.equal(result.body.body.deploymentKind, 'agent_session_wrapped');
+				assert.deepEqual(result.body.body.agentSessionWrapped, capability);
+				assert.deepEqual(result.body.body.health, proof);
+				assert.deepEqual(result.body.body.resources, { kvNamespaceId: 'fixture-kv', kvReused: false });
+				assert.equal(result.body.body.secrets, undefined);
+			}
+			assert.equal(calls, 1);
+			assert.doesNotMatch(JSON.stringify([...store.values()]), /fixture-secret|apiToken|privateKey/);
+		});
+	}
+}
 
 test('SessionWriteCoordinator binds direct deployment recovery to account and immutable identity', async () => {
 	const { state, store } = createTransactionalState();
@@ -2404,6 +2441,27 @@ test('SessionWriteCoordinator keeps below-threshold automatic jobs for bounded d
 	assert.equal(alarms.length, 0);
 });
 
+test('SessionWriteCoordinator leaves ineligible automatic analysis retryable after later responses', async () => {
+	const { state, store } = createTransactionalState();
+	let eligible = false;
+	const coordinator = new SessionWriteCoordinator(state, {}, {
+		now: () => 1_000,
+		runResultsAnalysisAutoJob: async ({ deps }) => {
+			const status = await deps.readCoordinatedResultsAnalysisStatus();
+			assert.equal(status.state.lastFailure, null);
+			return eligible ? { ok: true } : { ok: false, status: 422, error: 'Not enough responses.' };
+		},
+	});
+	const job = { slug: 'session-a', requestId: 'auto-ineligible', committedResponses: [] };
+	await coordinator.enqueueResultsAnalysisAutoJob(job);
+	assert.equal((await coordinator.runQueuedResultsAnalysisAutoJob()).status, 422);
+	assert.equal(store.has('results-analysis-auto-job-v1'), false);
+	assert.equal((await coordinator.readResultsAnalysisStatus()).lastFailure, null);
+	eligible = true;
+	await coordinator.enqueueResultsAnalysisAutoJob({ ...job, requestId: 'auto-eligible' });
+	assert.equal((await coordinator.runQueuedResultsAnalysisAutoJob()).ok, true);
+});
+
 test('SessionWriteCoordinator clears failed automatic queues so status surfaces retry state', async () => {
 	const { state, store } = createTransactionalState();
 	const coordinator = new SessionWriteCoordinator(state, {}, {
@@ -2480,4 +2538,23 @@ test('SessionWriteCoordinator expires abandoned results-analysis leases and trea
 	});
 	assert.equal(failedReplay.kind, 'failed');
 	assert.equal(failedReplay.error, 'provider failed');
+});
+
+test('hosted faucet quota counts payouts, releases refusals, and caps concurrent reservations at three', async () => {
+	const { state } = createTransactionalState();
+	let now = Date.UTC(2030, 0, 1, 12);
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => now });
+	const reserve = async (requestId) => readResponse(await coordinator.fetch(createCoordinatorRequest('/hosted-faucet/reserve', { requestId })));
+	const finish = async (requestId, sent) => readResponse(await coordinator.fetch(createCoordinatorRequest('/hosted-faucet/finalize', { requestId, sent })));
+	const reserved = await Promise.all(['first', 'second', 'third', 'fourth'].map(reserve));
+	assert.equal(reserved.filter((result) => result.body.allowed === true).length, 3);
+	assert.equal(reserved[3].body.allowed, false);
+	assert.equal((await finish('first', false)).body.ok, true);
+	assert.equal((await reserve('replacement')).body.allowed, true);
+	for (const requestId of ['second', 'third', 'replacement']) await finish(requestId, true);
+	assert.equal((await reserve('capped')).body.allowed, false);
+	await finish('second', false);
+	assert.equal((await reserve('still-capped')).body.allowed, false);
+	now += 24 * 60 * 60 * 1000;
+	assert.equal((await reserve('next-day')).body.allowed, true);
 });

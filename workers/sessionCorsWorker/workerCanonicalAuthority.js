@@ -13,6 +13,7 @@ const ALLOWED_WORKER_SCOPE_KEYS = new Set([
   'groups',
   'arweave',
   'faucet',
+  'faucet_self',
   'fetch',
   'lit',
 ]);
@@ -124,7 +125,10 @@ export const resolveWorkerCanonicalLoginScopes = async ({
   // writes the participant contract explicitly, while config.scopes may only narrow it.
   const configuredScopes = normalizeScopeList(policy.participantScopes);
   const scopes = configuredScopes.reduce((acc, scope) => {
-    acc[scope] = config?.scopes?.[scope] !== false;
+    // Only Workers with bounded, self-only faucet dispatch recognize this grant.
+    // Keep the route token shape stable for existing clients and MCP sessions.
+    const routeScope = scope === 'faucet_self' ? 'faucet' : scope;
+    acc[routeScope] = config?.scopes?.[routeScope] !== false && config?.scopes?.[scope] !== false;
     return acc;
   }, {});
   if (isAdmin) scopes.admin = true;

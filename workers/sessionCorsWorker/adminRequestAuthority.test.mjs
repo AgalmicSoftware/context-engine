@@ -34,6 +34,7 @@ const createAuthorityDeps = (overrides = {}) => ({
     ok: true,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
     config: { adminAddress: '0xabc' },
+    revision: 1,
   }),
   buildAdminActionBodyHash: () => '0xbodyhash',
   validateAdminActionAudience: () => ({ ok: true, audience: 'https://contextengine.xyz' }),
@@ -242,6 +243,7 @@ test('resolveAdminRequestAuthority forwards the initializing allowOrigins for bo
         ok: true,
         headers: { 'Access-Control-Allow-Origin': 'https://custom.example' },
         config: null,
+        revision: 0,
       }),
       validateAdminActionAudience: (value) => {
         audienceArgs = value;
@@ -398,6 +400,7 @@ test('resolveAdminRequestAuthority preserves bootstrap set-config authorization 
         ok: true,
         headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
         config: null,
+        revision: 0,
       }),
       validateBootstrapAdmin: async (value) => {
         calls.push(['validateBootstrapAdmin', value.slug, value.address, value.body.config.sessionName]);
@@ -420,6 +423,7 @@ test('resolveAdminRequestAuthority preserves bootstrap set-config authorization 
     ok: true,
     address: '0xabc',
     existingConfig: null,
+    expectedAuthority: { actor: '0xabc', revision: 0, authzEpoch: 0 },
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
     targetSlug: 'session-a',
   });
@@ -434,6 +438,7 @@ test('resolveAdminRequestAuthority falls back from bootstrap auth to validateAdm
         ok: true,
         headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
         config: null,
+        revision: 0,
       }),
       validateBootstrapAdmin: async () => {
         calls.push('validateBootstrapAdmin');
@@ -454,6 +459,7 @@ test('resolveAdminRequestAuthority falls back from bootstrap auth to validateAdm
     ok: true,
     address: '0xabc',
     existingConfig: null,
+    expectedAuthority: { actor: '0xabc', revision: 0, authzEpoch: 0 },
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
     targetSlug: 'session-a',
   });

@@ -1,3 +1,4 @@
+import { assertExpectedSessionAuthority } from './sessionConfigAuthority.js';
 import {
   executeDeployHelperRequest,
   lookupCloudflareAccount,
@@ -6,17 +7,21 @@ import {
 } from '../shared/deployHelperCore.mjs';
 import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js';
 import { runQueuedAutomaticResultsAnalysisJob, valueLooksEncrypted } from './resultsAnalysisGeneration.js';
-import { scanLegacyStorageOwnerIds } from './storageRouteExecution.js';
+import { publishCloudflareOwnedStorageMetadata, scanLegacyStorageOwnerIds, setCloudflareStorageResourceHidden } from './storageRouteExecution.js';
 import {
   applySessionConfigMutation,
   resolveCanonicalWorkerSessionIdHex,
 } from './sessionConfigMutation.js';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
-import { putSessionConfig } from './sessionConfigSecretsStore.js';
+import {
+  getSessionConfig, getLegacySessionConfigForAuthority, putSessionConfig,
+  SESSION_CONFIG_MIGRATION_REQUIRED_REASON, legacySessionConfigMigrationError,
+} from './sessionConfigSecretsStore.js';
 import {
   executeLitAuthorizationSignerEnsure,
   executeLitAuthorizationFinalize,
   executeSessionSecretsAfterLitRepair,
+  hasPendingLitAuthorizationSetup,
   repairPendingLitAuthorizationSetup,
 } from './sessionLitAuthorizationCoordinator.js';
 import {
@@ -51,6 +56,7 @@ const SESSION_CONFIG_AUTHORITY_KEY = 'session-config-authority';
 const AUTH_NONCE_ACTIVE_KEY = 'auth-nonce-active';
 const AUTH_NONCE_USED_KEY = 'auth-nonce-used';
 const AUTH_RATE_RECORD_KEY = 'auth-rate-record';
+const HOSTED_FAUCET_QUOTA_KEY = 'hosted-faucet-quota-v1';
 const WORKER_GROUP_CAPACITY_META_KEY = 'worker-group-capacity-meta-v3';
 const WORKER_GROUP_CAPACITY_GROUP_PREFIX = 'worker-group-capacity-group-v3:';
 const WORKER_GROUP_CAPACITY_MEMBER_PREFIX = 'worker-group-capacity-member-v3:';
@@ -345,6 +351,7 @@ export class SessionWriteCoordinator {
     this.activeAttemptId = '';
     this.activeDirectAttemptId = '';
     this.sessionConfigTail = Promise.resolve();
+    this.storageVisibilityTail = Promise.resolve();
     this.workerGroupTail = Promise.resolve();
     this.resultsAnalysisTail = Promise.resolve();
     this.storageOwnerTail = Promise.resolve();
@@ -619,20 +626,24 @@ export class SessionWriteCoordinator {
     return { ok: true, status: 202, queued: true, scheduled };
   }
 
-  async recordResultsAnalysisQueueFailure(error) {
+  async recordResultsAnalysisQueueFailure(error, job) {
     const nowMs = Number(this.now()) || Date.now();
-    const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-    const record = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
-    record.lastFailure = {
-      ok: false,
-      error: error?.message || toTrimmedString(error) || 'Automatic results analysis job failed.',
-      status: 502,
-      requestId: toTrimmedString(queued?.requestId),
-      trigger: 'automatic',
-      failedAtMs: nowMs,
-    };
-    await this.state.storage.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-    await this.state.storage.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+    await this.state.storage.transaction(async (transaction) => {
+      const queued = await transaction.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+      const record = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+      record.lastFailure = {
+        ok: false,
+        error: error?.message || error?.error || toTrimmedString(error) || 'Automatic results analysis job failed.',
+        status: Number(error?.status) >= 400 && Number(error?.status) <= 599 ? Number(error.status) : 502,
+        requestId: toTrimmedString(job?.requestId ?? queued?.requestId),
+        trigger: 'automatic',
+        failedAtMs: nowMs,
+      };
+      if (!job || (queued?.queuedAtMs === job.queuedAtMs && queued?.requestId === job.requestId)) {
+        await transaction.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+      }
+      await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+    });
   }
 
   async runQueuedResultsAnalysisAutoJob() {
@@ -651,6 +662,13 @@ export class SessionWriteCoordinator {
     });
     if (result?.jobState === 'running') {
       await this.scheduleResultsAnalysisAlarm(RESULTS_ANALYSIS_RUNNING_LEASE_MS + 1_000);
+      return result;
+    }
+    // Capacity/read failures return before reserving a provider attempt. They
+    // still need durable failure status so later uploads do not rescan forever.
+    // Ineligible input is not a failure: later responses can make it eligible.
+    if (result?.ok === false && result.status !== 422) {
+      await this.recordResultsAnalysisQueueFailure(result, job);
       return result;
     }
     const current = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
@@ -1728,6 +1746,108 @@ export class SessionWriteCoordinator {
     });
   }
 
+  async readSessionConfigAuthority(slug) {
+    const existing = await this.state.storage.get(SESSION_CONFIG_AUTHORITY_KEY);
+    if (existing != null) {
+      if (existing.slug !== slug || !Number.isSafeInteger(existing.revision) || existing.revision < 1 ||
+        !normalizePublicSessionConfig(existing.config, slug)) {
+        throw Object.assign(new Error('Invalid authoritative session config.'), { status: 409 });
+      }
+      return existing;
+    }
+    // KV can initialize a legacy tenant once. After this durable record exists,
+    // neither a stale replica nor a caller's baseConfig may replace its policy.
+    const config = await getLegacySessionConfigForAuthority(this.env, normalizeWorkerSessionSlug(slug));
+    if (!config) return null;
+    const normalized = normalizePublicSessionConfig(config, slug);
+    if (!normalized) throw legacySessionConfigMigrationError();
+    const authority = { schemaVersion: 1, slug, revision: 1, config: normalized, projectionPending: false };
+    return this.state.storage.transaction(async (transaction) => {
+      const current = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
+      if (current != null) return current;
+      await transaction.put(SESSION_CONFIG_AUTHORITY_KEY, authority);
+      return authority;
+    });
+  }
+
+  async assertSessionAuthority(payload) {
+    const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+    const authority = slug ? await this.readSessionConfigAuthority(slug) : null;
+    assertExpectedSessionAuthority(authority, payload?.expectedAuthority, slug);
+    return authority;
+  }
+
+  async executeSessionConfigCurrent(payload) {
+    const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+    if (!slug) return jsonResponse({ error: 'Invalid session slug.' }, 400);
+    try {
+      // Reads may pass a long visibility scan, but never pending config/Lit
+      // projection repair. The transaction observes both journals together.
+      const current = await this.state.storage.transaction(async (transaction) => {
+        const authority = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
+        if (!authority || authority.projectionPending === true || await hasPendingLitAuthorizationSetup(transaction)) return null;
+        if (authority.slug !== slug || !Number.isSafeInteger(authority.revision) || authority.revision < 1 ||
+          !normalizePublicSessionConfig(authority.config, slug)) throw new Error('Invalid authoritative session config.');
+        return authority;
+      });
+      if (current) return jsonResponse({ ok: true, config: current.config, revision: current.revision });
+    } catch {
+      return jsonResponse({ error: 'Session config coordination is unavailable; retry.' }, 503);
+    }
+    return this.serializeSessionConfigOperation(async () => {
+      try {
+        await this.repairPendingSessionConfigProjection();
+        const authority = await this.readSessionConfigAuthority(slug);
+        return jsonResponse({ ok: true, config: authority?.config ?? null, revision: authority?.revision ?? 0 });
+      } catch (error) {
+        if (error?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON) {
+          const safeError = legacySessionConfigMigrationError();
+          return jsonResponse({ error: safeError.message, reason: safeError.reason }, 503);
+        }
+        return jsonResponse({ error: 'Session config coordination is unavailable; retry.' }, 503);
+      }
+    });
+  }
+
+  async executeStoragePublication(payload) {
+    return this.serializeSessionConfigOperation(async () => {
+      try {
+        const authority = await this.assertSessionAuthority(payload);
+        await this.repairPendingSessionConfigProjection();
+        await publishCloudflareOwnedStorageMetadata({ env: this.env, slug: normalizeWorkerSessionSlug(payload.slug),
+          config: authority?.config, actor: payload.expectedAuthority.actor,
+          metadata: payload.metadata, createOwner: payload.createOwner === true });
+        return jsonResponse({ ok: true });
+      } catch (error) {
+        return jsonResponse({ error: error.message || 'Storage publication failed.' }, error.status || 503);
+      }
+    });
+  }
+
+  async executeStorageVisibilityMutation(payload) {
+    // Keep hide/unhide operations ordered, while yielding the config queue
+    // between bounded pages. A later authority change cancels remaining writes.
+    const run = this.storageVisibilityTail.then(async () => {
+      try {
+        const runVisibilityMutation = (operation) => this.serializeSessionConfigOperation(async () => {
+          const authority = await this.assertSessionAuthority(payload);
+          await this.repairPendingSessionConfigProjection();
+          return operation(authority);
+        });
+        const authority = await runVisibilityMutation((current) => current);
+        const result = await setCloudflareStorageResourceHidden({
+          env: this.env, slug: normalizeWorkerSessionSlug(payload.slug), config: authority?.config,
+          body: payload.body, actor: payload.expectedAuthority.actor, deps: { now: this.now, runVisibilityMutation },
+        });
+        return jsonResponse(result.ok ? result.body : { error: result.error }, result.status || 500);
+      } catch (error) {
+        return jsonResponse({ error: error.message || 'Storage visibility update failed.' }, error.status || 503);
+      }
+    });
+    this.storageVisibilityTail = run.catch(() => undefined);
+    return run;
+  }
+
   async finalizeSessionConfigProjection(revision) {
     await this.state.storage.transaction(async (transaction) => {
       const current = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
@@ -1802,7 +1922,10 @@ export class SessionWriteCoordinator {
         const authority = {
           schemaVersion: 1,
           slug,
-          revision: Number(existing?.revision || 0) + 1,
+          // Installing the first wrapped key does not change authorization.
+          // Advancing this revision would invalidate the upload that requested
+          // the key; admin policy mutations still advance it independently.
+          revision: existing?.revision ?? 1,
           config: nextConfig,
           activeSessionKey: chosen,
           projectionPending: true,
@@ -1836,15 +1959,15 @@ export class SessionWriteCoordinator {
   async executeSessionConfigMutation(payload) {
     return this.serializeSessionConfigOperation(async () => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-      const baseConfig = slug ? normalizePublicSessionConfig(payload?.baseConfig, slug) : null;
-      if (!slug || !baseConfig || !isObjectRecord(payload?.mutation)) {
+      if (!slug || !isObjectRecord(payload?.mutation)) {
         return jsonResponse({ error: 'Invalid session config mutation.' }, 400);
       }
 
       try {
+        await this.assertSessionAuthority(payload);
         await this.repairPendingSessionConfigProjection();
-      } catch {
-        return jsonResponse({ error: 'Session config projection is pending; retry.' }, 503);
+      } catch (error) {
+        return jsonResponse({ error: error.message || 'Session config projection is pending; retry.' }, error.status || 503);
       }
 
       const reserved = await this.state.storage.transaction(async (transaction) => {
@@ -1854,7 +1977,7 @@ export class SessionWriteCoordinator {
         }
         const authorityConfig = existing?.config
           ? normalizePublicSessionConfig(existing.config, slug)
-          : baseConfig;
+          : {};
         if (!authorityConfig) {
           return { error: 'Invalid authoritative session config.', status: 409 };
         }
@@ -2033,6 +2156,33 @@ export class SessionWriteCoordinator {
         resetAtMs: effectiveResetAtMs,
       });
       return { ok: true, allowed: count <= limit, count, resetAtMs: effectiveResetAtMs };
+    });
+    return jsonResponse(result);
+  }
+
+  async executeHostedFaucetQuota(payload, finalize = false) {
+    const requestId = toTrimmedString(payload?.requestId);
+    if (!/^[a-zA-Z0-9-]{1,64}$/.test(requestId) || (finalize && typeof payload?.sent !== 'boolean')) {
+      return jsonResponse({ error: 'Invalid hosted faucet quota request.' }, 400);
+    }
+    const nowMs = Number(this.now()) || Date.now();
+    const cutoff = nowMs - 24 * 60 * 60 * 1000;
+    const result = await this.state.storage.transaction(async (transaction) => {
+      const existing = await transaction.get(HOSTED_FAUCET_QUOTA_KEY);
+      const sent = (Array.isArray(existing?.sent) ? existing.sent : []).filter((at) => at > cutoff);
+      const pending = Object.fromEntries(Object.entries(existing?.pending || {}).filter(([, at]) => at > cutoff));
+      if (finalize) {
+        if (!Object.hasOwn(pending, requestId)) return { ok: true, alreadyFinalized: true };
+        delete pending[requestId];
+        if (payload.sent) sent.push(nowMs);
+      } else {
+        if (Object.hasOwn(pending, requestId) || sent.length + Object.keys(pending).length >= 3) {
+          return { ok: true, allowed: false };
+        }
+        pending[requestId] = nowMs;
+      }
+      await transaction.put(HOSTED_FAUCET_QUOTA_KEY, { version: 1, sent, pending });
+      return { ok: true, ...(finalize ? {} : { allowed: true, requestId }) };
     });
     return jsonResponse(result);
   }
@@ -2343,9 +2493,12 @@ export class SessionWriteCoordinator {
     }
 
     const payload = await request.json().catch(() => null);
-    if (url.pathname.startsWith('/session-config/lit-authorization/') && url.hostname !== 'session-coordinator.internal') {
+    if (url.pathname.startsWith('/session-config/') && url.hostname !== 'session-coordinator.internal') {
       return jsonResponse({ error: 'Not found.' }, 404);
     }
+    if (url.pathname === '/session-config/current') return this.executeSessionConfigCurrent(payload);
+    if (url.pathname === '/session-config/storage/set-hidden') return this.executeStorageVisibilityMutation(payload);
+    if (url.pathname === '/session-config/storage/publish') return this.executeStoragePublication(payload);
     if (url.pathname === '/session-config/lit-authorization/ensure') {
       return this.serializeSessionConfigOperation(() => executeLitAuthorizationSignerEnsure(this, payload));
     }
@@ -2381,6 +2534,9 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname === '/auth-state/nonce/consume') {
       return this.executeAuthNonceConsume(payload);
+    }
+    if (url.pathname === '/hosted-faucet/reserve' || url.pathname === '/hosted-faucet/finalize') {
+      return this.executeHostedFaucetQuota(payload, url.pathname.endsWith('/finalize'));
     }
     if (url.pathname === '/auth-state/rate/check') {
       return this.executeAuthRateCheck(payload);
@@ -2627,6 +2783,18 @@ export const consumeCoordinatedAuthNonce = async ({
   });
 };
 
+const callHostedFaucetQuota = ({ env, slug, address, requestId, sent }, finalize) => callAuthStateCoordinator({
+  env,
+  identity: `hosted-faucet:${resolveCoordinatorSessionSlugStorageKey(slug)}:${toTrimmedString(address).toLowerCase()}`,
+  path: finalize ? '/hosted-faucet/finalize' : '/hosted-faucet/reserve',
+  payload: { requestId, ...(finalize ? { sent } : {}) },
+});
+
+export const reserveCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuota({
+  ...args, requestId: crypto.randomUUID(),
+}, false);
+export const finalizeCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuota(args, true);
+
 export const checkCoordinatedAuthRateLimit = async ({
   env,
   slug,
@@ -2695,6 +2863,7 @@ export const executeCoordinatedSessionConfigMutation = async ({
   slug,
   existingConfig,
   mutation,
+  expectedAuthority,
 } = {}) => {
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   const stub = normalizedSlug
@@ -2716,6 +2885,7 @@ export const executeCoordinatedSessionConfigMutation = async ({
         slug: normalizedSlug,
         baseConfig: existingConfig || {},
         mutation,
+        expectedAuthority,
       }),
     });
   } catch {

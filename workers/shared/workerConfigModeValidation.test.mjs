@@ -684,3 +684,14 @@ test('optional fields and linked group references survive validation without rel
     assert.equal(validate(encrypted).ok, false);
   }
 });
+
+
+test('registry storage accepts the null Cloudflare side written by the wizard', () => {
+  for (const validate of [validateWorkerConfigModeValues, validateDeploymentModeValues]) {
+    assert.deepEqual(validate({ sessionModeProfile: decentralizedProfile(), storageProfile: { backend: 'arweave', cloudflare: null } }), { ok: true });
+    for (const invalid of [false, '', [], 42]) {
+      assert.equal(validate({ storageProfile: { backend: 'arweave', cloudflare: invalid } }).ok, false);
+    }
+    assert.equal(validate({ storageProfile: { backend: 'cloudflare', cloudflare: null } }).ok, false);
+  }
+});

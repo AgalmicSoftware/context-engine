@@ -1,3 +1,4 @@
+import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 
 export const dispatchAnonymousRouteEntry = async ({
@@ -21,7 +22,12 @@ export const dispatchAnonymousRouteEntry = async ({
   }
 
   const slug = slugResolution?.slug;
-  const config = await deps?.getSessionConfig?.(env, slug);
+  let config;
+  try {
+    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug }));
+  } catch (error) {
+    return deps?.json?.({ error: error.message }, 503, baseHeaders);
+  }
   if (!config) {
     return deps?.json?.({ error: deps?.SESSION_CONFIG_NOT_FOUND_ERROR }, 404, baseHeaders);
   }

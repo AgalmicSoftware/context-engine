@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveInterviewStarter, dispatchInterviewStarterRequest } from './interviewStarter.js';
+import { resolveInterviewStarter, dispatchInterviewStarterRequest as boundary } from './interviewStarter.js';
+
+const dispatchInterviewStarterRequest = (args) => boundary({
+  ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async ({ env, slug }) => ({
+    config: await args.deps?.getSessionConfig?.(env, slug), revision: 1,
+  })) },
+});
 import {
   normalizeInterviewSettings,
   validInterviewSettings,

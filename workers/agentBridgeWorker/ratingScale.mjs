@@ -1,7 +1,7 @@
 import { normalizeRatingScale, hasRatingScaleMetadata } from '../../shared/questions/ratingScale.mjs';
 import { DEFAULT_RATING_SCALE } from './constants.mjs';
 
-export function normalizeTelegramRatingScale(question = {}) {
+export function normalizeAgentRatingScale(question = {}) {
   const record = question?.rating_scale && !question?.ratingScale
     ? { ...question, ratingScale: question.rating_scale } : question || {};
   const shared = normalizeRatingScale(record) || DEFAULT_RATING_SCALE;
@@ -15,10 +15,10 @@ export function normalizeTelegramRatingScale(question = {}) {
   return { min: shared.min, max: shared.max, step };
 }
 
-export function normalizeTelegramRatingAnswer(value, question = {}) {
+export function normalizeAgentRatingAnswer(value, question = {}) {
   if (value == null || String(value).trim() === '') return null;
   const numeric = Number(value);
-  const { min, max, step } = normalizeTelegramRatingScale(question);
+  const { min, max, step } = normalizeAgentRatingScale(question);
   const index = (numeric - min) / step;
   return Number.isFinite(numeric) && numeric >= min && numeric <= max && Math.abs(index - Math.round(index)) < 1e-8
     ? numeric : null;

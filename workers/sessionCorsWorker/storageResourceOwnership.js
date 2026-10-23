@@ -65,46 +65,56 @@ export const writeStorageResourceHidden = ({ index, slug, resource, resourceId, 
   }));
 };
 
-export const listHiddenStorageResourceIds = async ({ index, slug, resource }) => {
+export const listHiddenStorageResourceIds = async ({ index, slug, resource, budget }) => {
   const prefix = recordKey('hidden', { slug, resource });
   const ids = new Set();
   let cursor = '';
+  const seenCursors = new Set();
   do {
-    const listed = await index.list({ prefix, ...(cursor ? { cursor } : {}) });
+    budget?.operation();
+    const listed = await index.list({ prefix, ...(cursor ? { cursor } : {}), ...(budget ? { limit: 100 } : {}) });
     (Array.isArray(listed?.keys) ? listed.keys : []).forEach((entry) => {
+      budget?.rows();
+      if (budget) budget.metadata(entry);
       const id = trim(entry?.name || entry).slice(prefix.length);
       if (id) ids.add(id);
     });
     cursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
+    if (listed?.list_complete === false && (!cursor || seenCursors.has(cursor))) throw new Error('Cloudflare hidden-resource cursor is unavailable or did not advance.');
+    if (cursor) seenCursors.add(cursor);
   } while (cursor);
   return ids;
 };
 
+const compareStorageIds = (left, right) => left < right ? -1 : left > right ? 1 : 0;
 const compareVersionAge = (left, right) => (
   (Number(left.createdAtMs) || 0) - (Number(right.createdAtMs) || 0) ||
-  trim(left.storageRefId).localeCompare(trim(right.storageRefId))
+  compareStorageIds(trim(left.storageRefId), trim(right.storageRefId))
 );
 
-// The canonical version of an id: a session admin's newest upload, otherwise
-// the earliest upload. Later uploads by anyone else never replace it. The
-// client's hydration merge applies the same rule.
-export const isPreferredStorageVersion = (candidate, current, isAdmin) => {
+// Only the server's upload-time stamp grants admin precedence. Current roles
+// and old derived flags cannot promote an ordinary upload or withdraw a correction.
+export const isAdminStorageVersion = (candidate) => candidate.uploadAuthority === 'admin';
+
+// The newest authorized admin upload wins, otherwise the earliest upload.
+// The client's hydration merge applies the same precedence.
+export const isPreferredStorageVersion = (candidate, current) => {
   if (!current) return true;
-  const candidateAdmin = !!lower(candidate.uploader) && isAdmin(lower(candidate.uploader));
-  const currentAdmin = !!lower(current.uploader) && isAdmin(lower(current.uploader));
+  const candidateAdmin = isAdminStorageVersion(candidate);
+  const currentAdmin = isAdminStorageVersion(current);
   if (candidateAdmin !== currentAdmin) return candidateAdmin;
   const age = compareVersionAge(candidate, current);
   return candidateAdmin ? age > 0 : age < 0;
 };
 
-// candidates: [{ resourceId, createdAtMs, storageRefId, uploader, ... }].
+// candidates: [{ resourceId, createdAtMs, storageRefId, uploader, uploadAuthority, ... }].
 // Returns one candidate per id, oldest first.
-export const selectCanonicalStorageVersions = (candidates = [], { isAdmin = () => false } = {}) => {
+export const selectCanonicalStorageVersions = (candidates = []) => {
   const chosen = new Map();
   (Array.isArray(candidates) ? candidates : []).forEach((candidate) => {
     const id = lower(candidate?.resourceId);
     if (!id) return;
-    if (isPreferredStorageVersion(candidate, chosen.get(id), isAdmin)) chosen.set(id, candidate);
+    if (isPreferredStorageVersion(candidate, chosen.get(id))) chosen.set(id, candidate);
   });
   return [...chosen.values()].sort(compareVersionAge);
 };

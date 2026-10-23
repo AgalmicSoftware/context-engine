@@ -347,16 +347,8 @@ export const resolveWorkerGroupPrincipal = ({ requesterAddress, authScopes, prin
 	if (explicit) return normalizeWorkerGroupPrincipal(explicit, deps);
 	const grantId = trim(scopes.grantId || scopes.agentGrant?.grantId || scopes.agent_grant?.grantId || scopes.delegation?.grantId);
 	if (grantId) return normalizeWorkerGroupPrincipal({ kind: 'agent', grantId }, deps);
-	const telegramPrincipal =
-		scopes.telegramPrincipal ||
-		scopes.integrationPrincipal?.telegram ||
-		scopes.integrationPrincipal?.telegramPrincipal ||
-		scopes.integrationPrincipal?.principalId;
-	if (telegramPrincipal) return normalizeWorkerGroupPrincipal({ kind: 'telegram', principalId: telegramPrincipal }, deps);
-	const telegramId = trim(
-		scopes.telegramUserId || scopes.integrationPrincipal?.telegramUserId || scopes.integrationPrincipal?.telegram_user_id,
-	);
-	if (telegramId) return normalizeWorkerGroupPrincipal({ kind: 'telegram', principalId: `telegram:${telegramId}` }, deps);
+	// Retained HTTP clients authenticate with SIWE. Historical transport kinds
+	// remain readable only through an explicit principal and keep their old keys.
 	if (requesterAddress) return normalizeWorkerGroupPrincipal({ kind: 'evm_address', address: requesterAddress }, deps);
 	return { ok: false, reason: 'missing_principal' };
 };

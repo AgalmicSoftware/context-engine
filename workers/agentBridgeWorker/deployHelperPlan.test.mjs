@@ -57,8 +57,8 @@ test('resolveAgentBridgeDeployConfig builds the default workers.dev public URL a
   assert.equal(config.vars.BROADCAST_ENABLED, 'true');
   assert.equal(config.vars.AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED, 'true');
   assert.equal(config.vars.AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN, 'true');
-  assert.equal(config.secrets.TELEGRAM_BOT_TOKEN, '[set]');
-  assert.equal(config.secrets.TELEGRAM_WEBHOOK_SECRET, '[set]');
+  assert.equal(config.secrets.TELEGRAM_BOT_TOKEN, undefined);
+  assert.equal(config.secrets.TELEGRAM_WEBHOOK_SECRET, undefined);
   assert.equal(config.secrets.DEMO_SIGNER_ROOT_SECRET, '[set]');
   assert.equal(config.secrets.AGENT_BRIDGE_AGENT_API_TOKEN, '[set]');
   assert.equal(JSON.stringify(config).includes('123456:test-token'), false);
@@ -79,6 +79,29 @@ test('resolveAgentBridgeDeployConfig builds the default workers.dev public URL a
   assert.equal(staging.vars.AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS, '604800');
   assert.equal(staging.vars.AGENT_BRIDGE_AGENT_WRAPPED_STORY_DEFAULT, 'true');
   assert.equal(staging.vars.AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT, 'true');
+});
+
+test('retired transport configuration cannot provision bot secrets or Mini App settings', () => {
+  const config = resolveAgentBridgeDeployConfig({ env: completeEnv({
+    AGENT_BRIDGE_MINI_APP_URL: 'https://retired.example',
+    AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS: '3600',
+  }) });
+  assert.deepEqual(Object.keys(config.secrets).filter((name) => name.startsWith('TELEGRAM_')), []);
+  assert.deepEqual(Object.keys(config.vars).filter((name) => name.startsWith('TELEGRAM_') || name.startsWith('AGENT_BRIDGE_MINI_APP_')), []);
+  assert.equal(Object.hasOwn(config, 'telegramEnabled'), false);
+  const plan = buildAgentBridgeDeployPlan(config);
+  assert.equal(Object.hasOwn(plan, 'webhookUrl'), false);
+  assert.equal(JSON.stringify(plan).includes('api.telegram.org'), false);
+  assert.equal(Object.hasOwn(buildAgentBridgeGeneratedSecrets({ telegramEnabled: true }), 'TELEGRAM_WEBHOOK_SECRET'), false);
+});
+
+test('retired transport flags are rejected before live account lookup', async () => {
+  for (const flag of ['enable-telegram', 'skip-telegram-webhook', 'telegram-bot-username', 'telegram-bot-token', 'telegram-webhook-secret']) {
+    await assert.rejects(resolveAgentBridgeDeployConfigForLive({
+      flags: { [flag]: true, 'live-account-lookup': true }, env: completeEnv({ CLOUDFLARE_ACCOUNT_ID: '' }),
+      fetchImpl: async () => assert.fail('retired flags must fail before network access'),
+    }), /Retired transport flag/);
+  }
 });
 
 test('Wrapped poster OpenAI configuration is separately named and never inferred from another AI key', () => {
@@ -122,7 +145,7 @@ test('validateAgentBridgeDeployConfig requires only live deploy credentials, not
   assert.deepEqual(completeWithoutManualAccountId.missing, []);
 });
 
-test('Telegram-disabled deployment has no Telegram config, secrets, or plan actions', () => {
+test('retained deployment normalizes legacy cutoff aliases without transport provisioning', () => {
   const config = resolveAgentBridgeDeployConfig({
     env: completeEnv({
       TELEGRAM_BRIDGE_ENABLED: '',
@@ -135,11 +158,12 @@ test('Telegram-disabled deployment has no Telegram config, secrets, or plan acti
   const validation = validateAgentBridgeDeployConfig(config);
   const plan = buildAgentBridgeDeployPlan(config);
 
-  assert.equal(config.telegramEnabled, false);
+  assert.equal(config.telegramEnabled, undefined);
   assert.equal(validation.ok, true);
   assert.deepEqual(Object.keys(config.vars).filter((name) => name.includes('TELEGRAM')), []);
   assert.deepEqual(Object.keys(config.secrets).filter((name) => name.includes('TELEGRAM')), []);
-  assert.equal(plan.webhookUrl, null);
+  assert.equal(plan.webhookUrl, undefined);
+  assert.equal(config.vars.AGENT_BRIDGE_SESSION_CREATED_AFTER, '2026-05-20T00:00:00.000Z');
   assert.equal(JSON.stringify(plan).includes('TELEGRAM_'), false);
   assert.equal(JSON.stringify(plan).includes('api.telegram.org'), false);
 });
@@ -197,38 +221,40 @@ test('dedicated deployment requires one explicit agentHttp session pinned to its
   }
 });
 
-test('validateAgentBridgeDeployConfig rejects local-only Telegram preview vars', () => {
-  const base = resolveAgentBridgeDeployConfig({
-    env: completeEnv(),
-  });
-  const telegramPreview = validateAgentBridgeDeployConfig({
-    ...base,
-    vars: {
-      ...base.vars,
-      AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
-    },
-  });
-  const previewAuth = validateAgentBridgeDeployConfig({
-    ...base,
-    vars: {
-      ...base.vars,
-      AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: '1',
-    },
-  });
-  const disabledInitData = validateAgentBridgeDeployConfig({
-    ...base,
-    vars: {
-      ...base.vars,
-      AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA: 'false',
-    },
-  });
+test('upload metadata omits retired transport variables even in a caller-provided config', () => {
+  const base = resolveAgentBridgeDeployConfig({ env: completeEnv() });
+  const metadata = buildAgentBridgeWorkerUploadMetadata({ ...base, vars: {
+    ...base.vars,
+    TELEGRAM_BRIDGE_ENABLED: 'true', TELEGRAM_BOT_TOKEN: 'synthetic-retired-token',
+    AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true', AGENT_BRIDGE_MINI_APP_URL: 'https://retired.example',
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: '1', AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA: 'false',
+  } });
+  assert.equal(metadata.bindings.some(({ name }) => name.includes('TELEGRAM') || name.includes('MINI_APP')), false);
+  assert.equal(JSON.stringify(metadata).includes('synthetic-retired-token'), false);
+});
 
-  assert.equal(telegramPreview.ok, false);
-  assert.equal(telegramPreview.missing.includes('AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW is local-only and must not be deployed'), true);
-  assert.equal(previewAuth.ok, false);
-  assert.equal(previewAuth.missing.includes('AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH is local-only and must not be deployed'), true);
-  assert.equal(disabledInitData.ok, false);
-  assert.equal(disabledInitData.missing.includes('AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA=false is local-only and must not be deployed'), true);
+test('legacy origin and cutoff aliases map to neutral bindings with canonical values taking precedence', () => {
+  const legacy = { AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS: 'https://legacy.example', AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-01-01' };
+  const config = resolveAgentBridgeDeployConfig({ env: completeEnv(legacy) });
+  assert.equal(config.vars.AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS, 'https://legacy.example');
+  assert.equal(config.vars.AGENT_BRIDGE_SESSION_CREATED_AFTER, '2026-01-01');
+  assert.equal(config.vars.AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS, undefined);
+  assert.equal(config.vars.AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER, undefined);
+  const preferred = resolveAgentBridgeDeployConfig({ env: completeEnv({ ...legacy,
+    AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://current.example', AGENT_BRIDGE_SESSION_CREATED_AFTER: '2026-02-02',
+  }) });
+  assert.equal(preferred.vars.AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS, 'https://current.example');
+  assert.equal(preferred.vars.AGENT_BRIDGE_SESSION_CREATED_AFTER, '2026-02-02');
+  const cleared = resolveAgentBridgeDeployConfig({ env: completeEnv({ ...legacy,
+    AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: '', AGENT_BRIDGE_SESSION_CREATED_AFTER: '',
+  }) });
+  assert.equal(cleared.vars.AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS, '');
+  assert.equal(cleared.vars.AGENT_BRIDGE_SESSION_CREATED_AFTER, '');
+  const clearedBindings = buildAgentBridgeWorkerUploadMetadata(cleared).bindings;
+  assert.equal(clearedBindings.some(({ text }) => text === legacy.AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS || text === legacy.AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER), false);
+  for (const alias of ['AGENT_BRIDGE_TELEGRAM_SESSIONS_CREATED_AFTER', 'AGENT_BRIDGE_TELEGRAM_GROUP_CREATED_AFTER']) {
+    assert.equal(resolveAgentBridgeDeployConfig({ env: completeEnv({ [alias]: '2026-03-03' }) }).vars.AGENT_BRIDGE_SESSION_CREATED_AFTER, '2026-03-03');
+  }
 });
 
 test('deriveSingleCloudflareAccount resolves one account and blocks multiple visible accounts', () => {
@@ -317,12 +343,11 @@ test('live account lookup blocks multiple visible accounts without falling back 
 
 test('generated secrets are high entropy hex values and never appear in deploy plans', () => {
   const fakeRandomBytes = (length) => Buffer.from(Array.from({ length }, (_, index) => (index + 7) % 256));
-  const webhookSecret = generateAgentBridgeSecret({ randomBytesImpl: fakeRandomBytes });
+  const secret = generateAgentBridgeSecret({ randomBytesImpl: fakeRandomBytes });
   const generated = buildAgentBridgeGeneratedSecrets({ telegramEnabled: true, randomBytesImpl: fakeRandomBytes });
   const wrappedOnly = buildAgentBridgeGeneratedSecrets({ randomBytesImpl: fakeRandomBytes });
   const config = resolveAgentBridgeDeployConfig({
     env: completeEnv({
-      TELEGRAM_WEBHOOK_SECRET: generated.TELEGRAM_WEBHOOK_SECRET,
       DEMO_SIGNER_ROOT_SECRET: generated.DEMO_SIGNER_ROOT_SECRET,
       AGENT_BRIDGE_AGENT_API_TOKEN: generated.AGENT_BRIDGE_AGENT_API_TOKEN,
     }),
@@ -330,12 +355,11 @@ test('generated secrets are high entropy hex values and never appear in deploy p
   const plan = buildAgentBridgeDeployPlan(config);
   const serialized = JSON.stringify(plan);
 
-  assert.match(webhookSecret, /^[0-9a-f]{64}$/);
-  assert.match(generated.TELEGRAM_WEBHOOK_SECRET, /^[0-9a-f]{64}$/);
+  assert.match(secret, /^[0-9a-f]{64}$/);
+  assert.equal(Object.hasOwn(generated, 'TELEGRAM_WEBHOOK_SECRET'), false);
   assert.match(generated.DEMO_SIGNER_ROOT_SECRET, /^[0-9a-f]{64}$/);
   assert.match(generated.AGENT_BRIDGE_AGENT_API_TOKEN, /^[0-9a-f]{64}$/);
   assert.equal(Object.hasOwn(wrappedOnly, 'TELEGRAM_WEBHOOK_SECRET'), false);
-  assert.equal(serialized.includes(generated.TELEGRAM_WEBHOOK_SECRET), false);
   assert.equal(serialized.includes(generated.DEMO_SIGNER_ROOT_SECRET), false);
   assert.equal(serialized.includes(generated.AGENT_BRIDGE_AGENT_API_TOKEN), false);
 });
@@ -482,17 +506,15 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
     binding.name === 'AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW'
   )), false);
   assert.equal(metadata.bindings.some((binding) => (
-    binding.name === 'AGENT_BRIDGE_MINI_APP_URL' &&
-    binding.text === 'https://mini.example.test/telegram'
-  )), true);
+    binding.name === 'AGENT_BRIDGE_MINI_APP_URL'
+  )), false);
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS' &&
     binding.text === 'https://contextengine.example,https://www.contextengine.example'
   )), true);
   assert.equal(metadata.bindings.some((binding) => (
-    binding.name === 'AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS' &&
-    binding.text === 'https://mini.contextengine.example'
-  )), true);
+    binding.name === 'AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS'
+  )), false);
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH'
   )), false);
@@ -500,11 +522,10 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
     binding.name === 'AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA'
   )), false);
   assert.equal(metadata.bindings.some((binding) => (
-    binding.name === 'AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS' &&
-    binding.text === '3600'
-  )), true);
+    binding.name === 'AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS'
+  )), false);
   assert.equal(metadata.bindings.some((binding) => (
-    binding.name === 'AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER' &&
+    binding.name === 'AGENT_BRIDGE_SESSION_CREATED_AFTER' &&
     binding.text === '2026-05-20T00:00:00.000Z'
   )), true);
   assert.equal(metadata.bindings.some((binding) => (
@@ -573,7 +594,7 @@ test('buildAgentBridgeDeployPlan documents remaining direct Cloudflare API calls
   const plan = buildAgentBridgeDeployPlan(config);
 
   assert.equal(plan.publicUrl, 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev');
-  assert.equal(plan.webhookUrl, 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev/telegram/webhook');
+  assert.equal(Object.hasOwn(plan, 'webhookUrl'), false);
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/storage/kv/namespaces')), true);
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/r2/buckets')), false);
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/d1/database')), false);

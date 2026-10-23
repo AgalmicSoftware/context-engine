@@ -1,3 +1,4 @@
+import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ethers } from 'ethers';
@@ -286,6 +287,8 @@ const dispatchAdminConfigWriter = async ({ writer, env, snapshot, persist }) => 
     get: async (key) => secretsKv.get(key) || null,
     put: async (key, value) => { secretsKv.set(key, value); },
   };
+  secretsKv.set('session:session-a:config', JSON.stringify(snapshot));
+  const current = await readCurrentSessionConfig({ env, slug: 'session-a' });
   return dispatchAdminRequest({
     request: { json: async () => writer.body },
     env,
@@ -297,6 +300,7 @@ const dispatchAdminConfigWriter = async ({ writer, env, snapshot, persist }) => 
       resolveAdminRequestAuthority: async () => ({
         ok: true,
         address: ADMIN_ADDRESS,
+        expectedAuthority: { actor: ADMIN_ADDRESS, revision: current.revision, authzEpoch: current.config?.authzEpoch ?? 0 },
         existingConfig: snapshot,
         headers: {},
         targetSlug: 'session-a',

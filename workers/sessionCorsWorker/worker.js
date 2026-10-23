@@ -172,6 +172,7 @@ export const createWorkerRuntime = (env, overrides = {}) => {
       json: resolvedDeps.json,
       normalizeWorkerSessionSlug: resolvedDeps.normalizeWorkerSessionSlug,
       getSessionConfig: resolvedDeps.getSessionConfig,
+      readCurrentSessionConfig: resolvedDeps.readCurrentSessionConfig,
       verifyToken: resolvedDeps.verifyToken,
       validateAuthTokenRecord: resolvedDeps.validateAuthTokenRecord,
       resolveWorkerRequestSlugContext: resolvedDeps.resolveWorkerRequestSlugContext,

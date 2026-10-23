@@ -141,3 +141,16 @@ test('worker-canonical anonymous access uses the explicit anonymous scope policy
     { ok: false, reason: 'worker-canonical-anonymous-scope-denied', scope: 'ai' },
   );
 });
+
+for (const disabled of [false, true]) {
+  test(`the self-service faucet grant issues bounded route access with disabled=${disabled}`, async () => {
+    const scopes = await resolveWorkerCanonicalLoginScopes({
+      address: PARTICIPANT,
+      config: buildConfig({
+        workerAuthority: { version: 1, participantScopes: ['storage', 'faucet_self'], anonymousScopes: [] },
+        scopes: { faucet: !disabled },
+      }),
+    });
+    assert.deepEqual(scopes, { storage: true, faucet: !disabled });
+  });
+}

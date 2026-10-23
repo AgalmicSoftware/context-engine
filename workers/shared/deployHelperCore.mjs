@@ -23,6 +23,7 @@ import {
   normalizeWorkerBundleSha256,
 } from './workerReleaseManifest.mjs';
 import { normalizeWorkerSessionSlug } from '../sessionCorsWorker/sessionSlugResolution.js';
+import { buildDeploymentWorkerName } from './workerScriptName.mjs';
 
 const { getPathRpcUrl } = rpcDefaults;
 
@@ -105,6 +106,7 @@ const ALLOWED_WORKER_AUTHORITY_SCOPES = new Set([
   'groups',
   'arweave',
   'faucet',
+  'faucet_self',
   'fetch',
   'lit',
 ]);
@@ -516,15 +518,24 @@ const workerAuthorityPoliciesMatch = (expected, actual) => (
   JSON.stringify(expected || null) === JSON.stringify(actual || null)
 );
 
-const buildFreshDeploymentName = (requestedName, deploymentId) => {
-  const base = toStr(requestedName)
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 50) || 'ce-session-worker';
-  return `${base}-${toStr(deploymentId).slice(0, 12)}`;
-};
+const normalizeRequestedWorkerName = (requestedName) => toStr(requestedName)
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9-]+/g, '-')
+  .replace(/^-+|-+$/g, '');
+
+const buildFreshDeploymentName = (requestedName, deploymentId) => buildDeploymentWorkerName(
+  normalizeRequestedWorkerName(requestedName),
+  toStr(deploymentId),
+  'ce-session-worker',
+);
+
+// Earlier helpers kept up to 50 prefix characters, which Cloudflare rejects
+// while previews are on. A request journaled under such a name staged config
+// for that hostname, so it ends instead of resuming under a shorter name.
+const buildPreLimitDeploymentName = (requestedName, deploymentId) => (
+  `${normalizeRequestedWorkerName(requestedName).slice(0, 50) || 'ce-session-worker'}-${toStr(deploymentId).slice(0, 12)}`
+);
 
 const normalizeDeploymentRequestId = (value) => {
   const normalized = toStr(value).trim();
@@ -664,7 +675,7 @@ const buildSafeDeployJournalResult = (result = {}, credentials = []) => {
   }
   if (isObj(incomingBody.health)) {
     body.health = {};
-    ['ok', 'protocolVersion', 'authorityPinned'].forEach((key) => {
+    ['ok', 'protocolVersion', 'authorityPinned', 'accessEnabled'].forEach((key) => {
       const value = incomingBody.health[key];
       if (typeof value === 'string') body.health[key] = redactKnownCredentials(value, credentials);
       else if (typeof value === 'boolean' || Number.isFinite(value)) body.health[key] = value;
@@ -741,6 +752,7 @@ const buildDeploymentRequestContext = async ({ body, requestOrigin = '' } = {}) 
     deploymentId,
     requestMarker: deploymentId.slice(0, 16),
     workerName: buildFreshDeploymentName(body?.workerName, deploymentId),
+    preLimitWorkerName: buildPreLimitDeploymentName(body?.workerName, deploymentId),
     journalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}`,
     uploadJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:upload`,
     uploadRejectedJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:upload-rejected`,
@@ -869,11 +881,17 @@ const normalizePayloadAccessControl = (raw) => {
   const gate = normalizePayloadAccessGate(isObj(source) ? source.gate : undefined, fallbackGate);
   const encryption = normalizePayloadEncryptionMode(isObj(source) ? source.encryption : undefined, fallbackEncryption);
   const accessConditions = cloneAccessConditions(source);
+  // A group gate reads its groups from the stored profile; without them every
+  // upload and read is denied.
+  const groupIds = gate === PAYLOAD_ACCESS_GATES.GROUP_GATE
+    ? [...new Set([source?.groupIds, source?.groupId].flat().map((id) => toStr(id).trim().toLowerCase()).filter(Boolean))]
+    : [];
   return {
     gate,
     encryption,
     mode: deriveLegacyPayloadAccessMode({ gate, encryption }),
     ...(accessConditions ? { accessConditions } : {}),
+    ...(groupIds.length ? { groupIds } : {}),
   };
 };
 
@@ -948,6 +966,7 @@ export const normalizeDeployStorageProfile = (incoming) => {
       ...(isObj(raw.payloadAccessControl?.resources) ? raw.payloadAccessControl.resources : {}),
     },
     ...(accessControl.accessConditions ? { accessConditions: accessControl.accessConditions } : {}),
+    ...(accessControl.groupIds ? { groupIds: accessControl.groupIds } : {}),
   };
   profile.sbtGatedAccess = {
     ...profile.sbtGatedAccess,
@@ -2039,7 +2058,9 @@ const executeDeployHelperRequestCore = async ({
       new_sqlite_classes: [SESSION_COORDINATOR_CLASS_NAME],
     },
     compatibility_date: toStr(env?.WORKER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE),
-    compatibility_flags: ['nodejs_compat'],
+    // The embedded helper also probes sibling Workers; ordinary same-zone fetch
+    // otherwise fails with Cloudflare 1042 before reaching the target Worker.
+    compatibility_flags: ['nodejs_compat', 'global_fetch_strictly_public'],
   };
   const readWorkerSettingsAfterUpload = async () => {
     let settingsResp = null;
@@ -2619,6 +2640,7 @@ const executeDeployHelperRequestCore = async ({
         sessionSlug: displaySlug,
         sessionWorkerOrigin: workerUrl,
         sessionDeploymentIdentity: body?.agentSessionWrappedDeploymentIdentity,
+        sessionId: body?.sessionIdHex || body?.sessionId,
         authorityMode: body?.sessionModeProfile?.authority?.mode,
         bundleUrl: body?.agentBridgeBundleUrl,
         bundleManifestUrl: body?.agentBridgeBundleManifestUrl,
@@ -2932,6 +2954,11 @@ export const executeDeployHelperRequest = async (options = {}) => {
   }
   if (uploadRejectedRecord) {
     const rejectedBundleSha256 = toStr(uploadRejectedRecord.bundleSha256).trim().toLowerCase();
+    const rejectedWorkerName = toStr(uploadRejectedRecord.workerName).trim();
+    const rejectedUnderPreLimitName = (
+      rejectedWorkerName !== context.workerName &&
+      rejectedWorkerName === context.preLimitWorkerName
+    );
     if (toStr(uploadRejectedRecord.requestDigest).trim() !== context.requestDigest) {
       return buildRequestDigestConflict();
     }
@@ -2940,11 +2967,19 @@ export const executeDeployHelperRequest = async (options = {}) => {
       uploadRejectedRecord.state !== 'definitive_upload_rejected' ||
       !/^[0-9a-f]{64}$/.test(toStr(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase()) ||
       toStr(uploadRejectedRecord.deploymentId).trim() !== context.deploymentId ||
-      toStr(uploadRejectedRecord.workerName).trim() !== context.workerName ||
+      (rejectedWorkerName !== context.workerName && !rejectedUnderPreLimitName) ||
       toStr(uploadRejectedRecord.requestMarker).trim() !== context.requestMarker ||
       !/^[0-9a-f]{64}$/.test(rejectedBundleSha256)
     ) {
       return buildFailure(409, { error: 'Deployment request upload-rejection journal state is invalid.' });
+    }
+    if (rejectedUnderPreLimitName) {
+      // A terminal conflict lets the client start a new request with a new name.
+      return buildFailure(409, {
+        error: 'Cloudflare rejected this deployment because its Worker name was too long. Deploy again to start a new request.',
+        deploymentRequestConflict: true,
+        deploymentRequestTerminal: true,
+      });
     }
     if (
       toStr(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase() !==

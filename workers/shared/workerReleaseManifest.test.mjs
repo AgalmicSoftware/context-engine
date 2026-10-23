@@ -70,6 +70,11 @@ test('rejects incomplete provenance, duplicate artifacts, and invalid digests', 
   }).ok, false);
 });
 
+// Workers deployed at compatibility date 2024-09-02 reject RequestInit.cache.
+const rejectUnsupportedRequestInit = (init = {}) => {
+  if ('cache' in init) throw new TypeError("The 'cache' field on 'RequestInitializerDict' is not implemented.");
+};
+
 test('fetches and validates the explicit manifest asset', async () => {
   const calls = [];
   const result = await fetchExpectedWorkerBundleDigest({
@@ -78,11 +83,12 @@ test('fetches and validates the explicit manifest asset', async () => {
     artifactKind: 'session-cors-worker',
     fetchImpl: async (url, options) => {
       calls.push({ url, options });
+      rejectUnsupportedRequestInit(options);
       return new Response(JSON.stringify(manifest()));
     },
   });
   assert.deepEqual(result, { ok: true, digest: DIGEST });
-  assert.equal(calls[0].options.cache, 'no-store');
+  assert.equal(calls.length, 1);
 });
 
 test('fails closed when the manifest cannot be fetched or parsed', async () => {

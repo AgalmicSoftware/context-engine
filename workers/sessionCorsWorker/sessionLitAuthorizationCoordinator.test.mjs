@@ -6,6 +6,7 @@ import { ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, u
 import { getSessionConfig, getSessionSecrets, putSessionSecrets } from './sessionConfigSecretsStore.js';
 import { decryptSessionSecretsEnvelope, isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 import worker from './worker.js';
+import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 
 const KEY_A = `0x${'11'.repeat(32)}`;
 const KEY_B = `0x${'22'.repeat(32)}`;
@@ -16,7 +17,7 @@ const SETUP_RECORD = 'session-lit-authorization-pending-v1';
 const CONFIG_RECORD = 'session-config-authority';
 
 const createFixture = () => {
-  const kv = new Map();
+  const kv = new Map([['session:fixture:config', JSON.stringify(baseConfig)]]);
   const store = new Map();
   let tail = Promise.resolve();
   let failConfigPut = false;
@@ -58,17 +59,23 @@ const createFixture = () => {
     idFromName: (name) => { identities.push(name); return name; },
     get: () => ({ fetch: (url, init) => coordinator.fetch(new Request(url, init)) }),
   };
+  const expected = async (slug = 'fixture') => {
+    const snapshot = await readCurrentSessionConfig({ env, slug });
+    return { actor: baseConfig.adminAddress, revision: snapshot.revision, authzEpoch: snapshot.config?.authzEpoch ?? 0 };
+  };
   return {
-    env, kv, store, state, identities,
+    env, kv, store, state, identities, expected,
     restart: () => { coordinator = new SessionWriteCoordinator(state, env); },
     failConfig: (value) => { failConfigPut = value; },
     failSecrets: (value) => { failSecretsPut = value; },
     onConfigPut: (callback) => { beforeConfigPut = callback; },
-    updateSecrets: (incomingSecrets) => updateSessionSecretsAfterLitRepair({ env, slug: 'fixture', incomingSecrets }),
-    ensure: (proposedPrivateKey = KEY_A, config = baseConfig, slug = 'fixture') =>
-      ensureSessionLitAuthorizationSigner({ env, slug, proposedPrivateKey, baseConfig: config }),
-    finalize: (label, extra = {}) => finalizeSessionLitAuthorization({
-      env, slug: 'fixture', baseConfig,
+    updateSecrets: async (incomingSecrets) => updateSessionSecretsAfterLitRepair({ env, slug: 'fixture', incomingSecrets, expectedAuthority: env.CE_SESSION_COORDINATOR ? await expected() : null }),
+    ensure: async (proposedPrivateKey = KEY_A, config = baseConfig, slug = 'fixture') => {
+      if (!store.has(CONFIG_RECORD)) kv.set(`session:${slug === 'general' ? '' : slug}:config`, JSON.stringify(config));
+      return ensureSessionLitAuthorizationSigner({ env, slug, proposedPrivateKey, baseConfig: config, expectedAuthority: env.CE_SESSION_COORDINATOR ? await expected(slug) : null });
+    },
+    finalize: async (label, extra = {}) => finalizeSessionLitAuthorization({
+      env, slug: 'fixture', baseConfig, expectedAuthority: await expected(),
       litCredentials: {
         litAuthorizationVersion: 'worker-signed-v1', litAuthorizationSigner: SIGNER_A,
         litPkpId: `pkp-${label}`, litGroupId: `group-${label}`, litActionCid: `cid-${label}`,
@@ -111,8 +118,9 @@ test('concurrent signer creation chooses one encrypted durable winner without a 
 
 test('durable transaction chooses one winner even across independent coordinator instances', async () => {
   const fixture = createFixture();
+  const expectedAuthority = await fixture.expected();
   const request = (proposedPrivateKey) => new Request('https://session-coordinator.internal/session-config/lit-authorization/ensure', {
-    method: 'POST', body: JSON.stringify({ slug: 'fixture', baseConfig, proposedPrivateKey }),
+    method: 'POST', body: JSON.stringify({ slug: 'fixture', baseConfig, proposedPrivateKey, expectedAuthority }),
   });
   const responses = await Promise.all([KEY_A, KEY_B].map((key) =>
     new SessionWriteCoordinator(fixture.state, fixture.env).fetch(request(key))));
@@ -127,7 +135,7 @@ test('existing active signer seeds authority and conflicting or malformed state 
   await putSessionSecrets(fixture.env, 'fixture', { litAuthorizationPrivateKey: KEY_A });
   assert.equal(await fixture.ensure(KEY_B, active), KEY_A);
   const conflicting = { ...active, litCredentials: { ...active.litCredentials, litAuthorizationSigner: new ethers.Wallet(KEY_B).address } };
-  await assert.rejects(fixture.ensure(KEY_B, conflicting), /coordination failed/);
+  assert.equal(await fixture.ensure(KEY_B, conflicting), KEY_A, 'a stale caller cannot replace durable config');
   const prior = structuredClone(fixture.store.get(SIGNER_RECORD));
   fixture.store.set(SIGNER_RECORD, { ...prior, slug: 'another-session' });
   await assert.rejects(fixture.ensure(), /coordination failed/);
@@ -164,13 +172,13 @@ test('default slug aliases share one authority and missing storage bindings fail
   const fixture = createFixture();
   assert.equal(await fixture.ensure(KEY_A, {}, ''), KEY_A);
   assert.equal(await fixture.ensure(KEY_B, {}, 'general'), KEY_A);
-  assert.equal(fixture.identities[0], fixture.identities[1]);
+  assert.ok(fixture.identities.every((id) => id === fixture.identities[0]));
   delete fixture.env.CE_SESSION_COORDINATOR;
   await assert.rejects(fixture.ensure(), /coordination is unavailable/);
   const unavailable = createFixture();
   delete unavailable.env.CE_STORAGE_ENVELOPE_KEK;
   await assert.rejects(unavailable.ensure(), /coordination failed/);
-  assert.equal(unavailable.store.size, 0);
+  assert.equal(unavailable.store.has(SIGNER_RECORD), false);
 });
 
 test('coordinator signer operation is not reachable through the public Worker ingress', async () => {
@@ -190,7 +198,8 @@ test('concurrent successful finalizations leave matching Lit config and secrets 
   await putSessionSecrets(fixture.env, 'fixture', { openaiKey: 'synthetic-unrelated-secret' });
   await fixture.ensure();
   const results = await Promise.all([fixture.finalize('first'), fixture.finalize('second')]);
-  assert.deepEqual(results.map((result) => result.status), [200, 200]);
+  // Each request awaits current authority before finalizing; either can win.
+  assert.deepEqual(results.map((result) => result.status).sort(), [200, 409]);
   const config = await getSessionConfig(fixture.env, 'fixture');
   const secrets = await getSessionSecrets(fixture.env, 'fixture');
   const winner = ['first', 'second'].find((label) => config.litCredentials.litPkpId === `pkp-${label}`);
@@ -227,7 +236,7 @@ test('partial finalization persists encrypted retry state and repairs the pair b
   fixture.restart();
   fixture.failConfig(false);
   const mutation = await executeCoordinatedSessionConfigMutation({
-    env: fixture.env, slug: 'fixture', existingConfig: baseConfig,
+    env: fixture.env, slug: 'fixture', existingConfig: baseConfig, expectedAuthority: await fixture.expected(),
     mutation: { kind: 'set-config', incomingConfig: { name: 'After repair' } },
   });
   assert.equal(mutation.ok, true);
@@ -310,14 +319,19 @@ test('admin secret edits fail before writing while Lit repair is blocked, then s
   await fixture.ensure();
   fixture.failConfig(true);
   assert.equal((await fixture.finalize('pending')).status, 503);
-  assert.equal((await fixture.updateSecrets({ openaiKey: 'synthetic-new' })).status, 503);
+  await assert.rejects(fixture.updateSecrets({ openaiKey: 'synthetic-new' }), (error) => error.status === 503);
+  const authority = fixture.store.get(CONFIG_RECORD);
+  assert.equal((await updateSessionSecretsAfterLitRepair({ env: fixture.env, slug: 'fixture',
+    expectedAuthority: { actor: baseConfig.adminAddress, revision: authority.revision, authzEpoch: authority.config.authzEpoch ?? 0 },
+    incomingSecrets: { openaiKey: 'synthetic-new' },
+  })).status, 503);
   assert.equal((await getSessionSecrets(fixture.env, 'fixture')).openaiKey, 'synthetic-old');
   fixture.failConfig(false);
   fixture.restart();
   assert.equal((await fixture.updateSecrets({ openaiKey: 'synthetic-new' })).ok, true);
   fixture.restart();
   assert.equal((await executeCoordinatedSessionConfigMutation({
-    env: fixture.env, slug: 'fixture', existingConfig: baseConfig,
+    env: fixture.env, slug: 'fixture', existingConfig: baseConfig, expectedAuthority: await fixture.expected(),
     mutation: { kind: 'set-config', incomingConfig: { name: 'After repair' } },
   })).ok, true);
   assert.equal((await getSessionSecrets(fixture.env, 'fixture')).openaiKey, 'synthetic-new');

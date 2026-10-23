@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dispatchAdminResultsAnalysisStatusRequest } from './adminResultsAnalysisDispatch.js';
+import { dispatchAdminResultsAnalysisStatusRequest as boundary } from './adminResultsAnalysisDispatch.js';
+
+const dispatchAdminResultsAnalysisStatusRequest = (args) => boundary({
+  ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async ({ env, slug }) => ({
+    config: await args.deps?.getSessionConfig?.(env, slug), revision: 1,
+  })) },
+});
 
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers });
 const readJson = async (response) => JSON.parse(await response.text());

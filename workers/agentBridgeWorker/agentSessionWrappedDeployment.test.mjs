@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
+  __test__agentSessionWrappedDeployment,
   executeAgentSessionWrappedDeployment,
   persistAgentSessionWrappedCapability,
 } from '../shared/agentSessionWrappedDeployment.mjs';
 import { executeDeployHelperRequest } from '../shared/deployHelperCore.mjs';
+import { resolvePinnedSessionWorkerAuthority } from './sessionWorkerAuthority.mjs';
 
 const body = (overrides = {}) => ({
   deploymentKind: AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
@@ -13,6 +15,7 @@ const body = (overrides = {}) => ({
   sessionSlug: 'wrapped-alpha',
   sessionWorkerOrigin: 'https://session-worker.example.workers.dev',
   sessionDeploymentIdentity: 'session-deployment-alpha-1',
+  sessionId: `0x${'5a'.repeat(16)}`,
   authorityMode: 'worker_canonical',
   bundleText: 'export default { fetch() { return new Response("ok") } };',
   ...overrides,
@@ -26,10 +29,17 @@ const jsonResponse = (value, status = 200) => new Response(JSON.stringify(value)
 const cloudflareSuccess = (result = {}) => ({ ok: true, status: 200, data: { success: true, result } });
 const cloudflareMissing = () => ({ ok: false, status: 404, error: 'not found' });
 
+// Workers deployed at compatibility date 2024-09-02 reject RequestInit.cache.
+const rejectUnsupportedRequestInit = (init = {}) => {
+  if ('cache' in init) throw new TypeError("The 'cache' field on 'RequestInitializerDict' is not implemented.");
+};
+
 function successfulHarness({
   existing = false,
   healthOk = true,
   accessEnabled = true,
+  existingAccessEnabled = true,
+  legacyPolicy = false,
   commitSecretThenFail = '',
 } = {}) {
   const calls = [];
@@ -69,10 +79,11 @@ function successfulHarness({
             defaultSessionSlug: 'wrapped-alpha',
             sessions: [{
               sessionSlug: 'wrapped-alpha',
+              ...(legacyPolicy ? {} : { sessionIdHex: `0x${'5a'.repeat(16)}` }),
               sessionWorkerUrl: 'https://session-worker.example.workers.dev',
               telegramBridgeEnabled: false,
               sessionModeProfile: {
-                surfaces: { agentHttp: true, telegram: false },
+                surfaces: { agentHttp: existingAccessEnabled, telegram: false },
                 authority: { mode: 'worker_canonical' },
               },
             }],
@@ -84,9 +95,14 @@ function successfulHarness({
     }
     const uploadMatch = path.match(/\/workers\/scripts\/([^/]+)$/);
     if (uploadMatch && method === 'PUT') {
+      // Cloudflare's live response for a name past its version-preview limit.
+      if (uploadMatch[1].length > 54) {
+        return { ok: false, status: 400, error: 'Script name is too long to be used with previews enabled. Script names with previews enabled cannot be longer than 54 characters.' };
+      }
       workerName = uploadMatch[1];
       const metadataPart = init.body.get('metadata');
       uploadMetadata = JSON.parse(await metadataPart.text());
+      if (existing && !uploadMetadata.keep_bindings?.includes('secret_text')) secretNames.clear();
       return cloudflareSuccess({ id: workerName });
     }
     if (path.endsWith('/secrets') && method === 'GET') {
@@ -104,8 +120,9 @@ function successfulHarness({
     if (path.endsWith('/subdomain') && method === 'POST') return cloudflareSuccess({ enabled: true });
     throw new Error(`Unexpected Cloudflare request ${method} ${path}`);
   };
-  const fetchImpl = async (url) => {
+  const fetchImpl = async (url, init = {}) => {
     calls.push({ kind: 'public', url: String(url), method: 'GET' });
+    rejectUnsupportedRequestInit(init);
     if (String(url).endsWith('/release/agent-bridge.bundle.js')) {
       return new Response('export default { fetch() { return new Response("release") } };');
     }
@@ -254,7 +271,7 @@ test('dedicated Wrapped deployment inventories a secret after an ambiguous commi
 });
 
 test('dedicated Wrapped deployment disables access in place through the sole agentHttp bit', async () => {
-  const harness = successfulHarness({ accessEnabled: false });
+  const harness = successfulHarness({ existing: true, accessEnabled: false });
   const result = await executeAgentSessionWrappedDeployment({
     body: body({ agentHttpEnabled: false }),
     accountId: 'account-123',
@@ -271,6 +288,96 @@ test('dedicated Wrapped deployment disables access in place through the sole age
   const policyBinding = metadata.bindings.find((binding) => binding.name === 'AGENT_BRIDGE_SESSION_POLICY_JSON');
   const policy = JSON.parse(policyBinding.text);
   assert.equal(policy.sessions[0].sessionModeProfile.surfaces.agentHttp, false);
+  assert.deepEqual(result.body.secrets, { generated: [], preserved: REQUIRED_TEST_SECRET_NAMES });
+  assert.equal(harness.calls.some((call) => call.path?.endsWith('/secrets') && call.method === 'PUT'), false);
+});
+
+test('dedicated Wrapped deployment re-enables access without replacing its authority or secrets', async () => {
+  const harness = successfulHarness({ existing: true, existingAccessEnabled: false, accessEnabled: true });
+  const result = await executeAgentSessionWrappedDeployment({
+    body: body({ agentHttpEnabled: true }), accountId: 'account-123',
+    cfFetchImpl: harness.cfFetchImpl, fetchImpl: harness.fetchImpl,
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.body.agentSessionWrapped.enabled, true);
+  assert.equal(result.body.resources.kvReused, true);
+  assert.deepEqual(result.body.secrets, { generated: [], preserved: REQUIRED_TEST_SECRET_NAMES });
+  assert.equal(harness.calls.some((call) => call.path?.endsWith('/storage/kv/namespaces') && call.method === 'POST'), false);
+});
+
+test('legacy Wrapped policies can acquire their session ID while keeping authority and secrets', async () => {
+  for (const agentHttpEnabled of [true, false]) {
+    const harness = successfulHarness({ existing: true, legacyPolicy: true, accessEnabled: agentHttpEnabled });
+    const result = await executeAgentSessionWrappedDeployment({
+      body: body({ agentHttpEnabled }), accountId: 'account-123',
+      cfFetchImpl: harness.cfFetchImpl, fetchImpl: harness.fetchImpl,
+    });
+    assert.equal(result.status, 200, JSON.stringify(result));
+    assert.equal(result.body.resources.kvReused, true);
+    assert.deepEqual(result.body.secrets, { generated: [], preserved: REQUIRED_TEST_SECRET_NAMES });
+    const policy = JSON.parse(harness.getUploadMetadata().bindings
+      .find((binding) => binding.name === 'AGENT_BRIDGE_SESSION_POLICY_JSON').text);
+    assert.equal(policy.sessions[0].sessionIdHex, body().sessionId);
+    assert.equal(policy.sessions[0].sessionModeProfile.surfaces.agentHttp, agentHttpEnabled);
+    assert.equal(harness.calls.some((call) => call.path?.endsWith('/secrets') && call.method === 'PUT'), false);
+  }
+});
+
+test('adding a legacy Wrapped session ID cannot also change the pinned authority', async () => {
+  const harness = successfulHarness({ existing: true, legacyPolicy: true });
+  const result = await executeAgentSessionWrappedDeployment({
+    body: body({ authorityMode: 'evm_registry_canonical' }), accountId: 'account-123',
+    cfFetchImpl: harness.cfFetchImpl, fetchImpl: harness.fetchImpl,
+  });
+  assert.equal(result.status, 409);
+  assert.equal(harness.calls.some((call) => ['POST', 'PUT', 'DELETE'].includes(call.method)), false);
+});
+
+test('a hosted Wrapped deployment uploads a policy the Bridge itself accepts', async () => {
+  for (const agentHttpEnabled of [true, false]) {
+    const harness = successfulHarness({ accessEnabled: agentHttpEnabled });
+    const result = await executeAgentSessionWrappedDeployment({
+      body: body({ agentHttpEnabled }),
+      accountId: 'account-123',
+      cfFetchImpl: harness.cfFetchImpl,
+      fetchImpl: harness.fetchImpl,
+      now: () => new Date('2026-07-20T18:00:00.000Z'),
+    });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const policyJson = harness.getUploadMetadata().bindings
+      .find((binding) => binding.name === 'AGENT_BRIDGE_SESSION_POLICY_JSON').text;
+    // The deployed Bridge pins this exact policy; its own resolver must accept it.
+    const authority = resolvePinnedSessionWorkerAuthority({
+      policyJson,
+      sessionWorkerOrigin: 'https://session-worker.example.workers.dev',
+    });
+    assert.equal(authority.ok, true, authority.reason);
+    assert.equal(authority.accessEnabled, agentHttpEnabled);
+  }
+});
+
+test('a dedicated Wrapped Worker name fits Cloudflare version-preview hostnames', () => {
+  const { workerNameFor } = __test__agentSessionWrappedDeployment;
+  const deploymentId = 'd8a43d33e49253bd1deb6ce1ea7d43b6d8bce7fb1ee864804f93e0bd612a80bc';
+  // Names that already fit stay identical, so redeploys keep finding their Worker.
+  assert.equal(workerNameFor({ sessionSlug: 'wrapped-alpha', deploymentId }), 'ce-wrapped-wrapped-alpha-d8a43d33e492');
+  const longSlugName = workerNameFor({ sessionSlug: 'community-priorities-survey-2026', deploymentId });
+  assert.equal(longSlugName, 'ce-wrapped-community-priorities-survey-20-d8a43d33e492');
+  assert.equal(longSlugName.length, 54);
+});
+
+test('a hosted Wrapped deployment requires the session ID its Bridge must pin', async () => {
+  const harness = successfulHarness();
+  const result = await executeAgentSessionWrappedDeployment({
+    body: body({ sessionId: undefined }),
+    accountId: 'account-123',
+    cfFetchImpl: harness.cfFetchImpl,
+    fetchImpl: harness.fetchImpl,
+    now: () => new Date('2026-07-20T18:00:00.000Z'),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 400);
+  assert.equal(harness.calls.length, 0);
 });
 
 test('dedicated Wrapped retry reuses Worker, KV, and secrets without mutation when the bundle is unchanged', async () => {
@@ -292,6 +399,39 @@ test('dedicated Wrapped retry reuses Worker, KV, and secrets without mutation wh
   });
   assert.equal(harness.calls.some((call) => /\/workers\/scripts\/[^/]+$/.test(call.path || '') && call.method === 'PUT'), false);
   assert.equal(harness.calls.some((call) => call.path?.endsWith('/secrets') && call.method === 'PUT'), false);
+});
+
+test('dedicated Wrapped access changes cannot change pinned session authority', async () => {
+  for (const change of [{ sessionId: `0x${'6b'.repeat(16)}` }, { authorityMode: 'evm_registry_canonical' }]) {
+    const harness = successfulHarness({ existing: true, accessEnabled: false });
+    const result = await executeAgentSessionWrappedDeployment({
+      body: body({ agentHttpEnabled: false, ...change }), accountId: 'account-123',
+      cfFetchImpl: harness.cfFetchImpl, fetchImpl: harness.fetchImpl,
+    });
+    assert.equal(result.status, 409);
+    assert.equal(harness.calls.some((call) => ['POST', 'PUT', 'DELETE'].includes(call.method)), false);
+  }
+});
+
+test('dedicated Wrapped retry finds its namespace after the first inventory page', async () => {
+  const harness = successfulHarness({ existing: true });
+  const pages = [];
+  const result = await executeAgentSessionWrappedDeployment({
+    body: body(), accountId: 'account-123', fetchImpl: harness.fetchImpl,
+    cfFetchImpl: async (token, apiPath, init) => {
+      if (apiPath.includes('/storage/kv/namespaces?')) {
+        const page = Number(new URL(apiPath, 'https://api.example.test').searchParams.get('page'));
+        pages.push(page);
+        const result = page === 1 ? [] : [{ id: 'kv-wrapped-alpha', title: 'ContextEngineAgentSessionWrapped:wrapped-alpha:d8a43d33e492' }];
+        return { ok: true, data: { result, result_info: { total_pages: 2 } } };
+      }
+      return harness.cfFetchImpl(token, apiPath, init);
+    },
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(pages, [1, 2]);
+  assert.equal(result.body.resources.kvReused, true);
+  assert.equal(harness.calls.some((call) => call.path?.endsWith('/storage/kv/namespaces') && call.method === 'POST'), false);
 });
 
 test('dedicated Wrapped redeploy updates the same owned Worker while preserving KV and secrets', async () => {

@@ -9,7 +9,6 @@ const MAX_CLOUDFLARE_LIST_PAGES = 10;
 const MAX_SCAN_BLOCKS = 2_000_000;
 const RPC_CHUNK_SIZE = 100_000;
 import { normalizePublicInterviewQuestions, hasRestrictedPrompt, hasRatingScaleMetadata, normalizeRatingScale, normalizeQuestion } from '../../shared/interviewQuestionCatalog.mjs';
-import { resolveSessionAdminAddresses } from './storageRouteExecution.js';
 import { selectCanonicalStorageVersions } from './storageResourceOwnership.js';
 const trim = (value) => String(value == null ? '' : value).trim();
 const lower = (value) => trim(value).toLowerCase();
@@ -70,14 +69,13 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
       createdAtMs: Date.parse(trim(item?.metadata?.createdAt)) || 0,
       storageRefId: id,
       uploader: trim(item?.metadata?.uploader),
+      uploadAuthority: item?.metadata?.uploadAuthority,
       payload,
     });
   }
-  // Same rule as the client: the first upload of an id wins unless a session
-  // admin uploaded a newer one, so a re-upload cannot rewrite the catalog.
-  const admins = resolveSessionAdminAddresses(config);
+  // Only an upload-time admin stamp can replace the earliest ordinary version.
   return dedupeQuestions(
-    selectCanonicalStorageVersions(candidates, { isAdmin: (address) => admins.has(address) })
+    selectCanonicalStorageVersions(candidates)
       .map((candidate) => candidate.payload),
   );
 };
