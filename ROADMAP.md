@@ -11,8 +11,8 @@ Context Engine has its core deliberation, SBT, worker, encryption, and deploymen
 - **Protected SBT mint modes**: SBT contracts now expose explicit mint modes so protected password, group-signature, and invite-signature flows do not fall through to public `claim()` minting.
 - **Worker auth coordination and revocation**: the mandatory Session coordinator serializes nonce consumption and route counters across isolates, while server-managed authorization epochs and current-policy revalidation invalidate stale permissions after config or gate changes.
 - **Agent access foundation**: the optional Agent Bridge ships a scoped
-  `/api/agent/*` HTTP contract, credentials, action catalog, and Telegram bot /
-  Mini App adapters while delegating canonical session authority.
+  `/api/agent/*` HTTP contract, scoped credentials, agent token browser login,
+  and Session Wrapped while delegating canonical session authority.
 
 ## Current Engineering Priorities
 
@@ -22,15 +22,15 @@ Context Engine has its core deliberation, SBT, worker, encryption, and deploymen
 - **Frontend/toolchain modernization**: continue tightening the Vite/Jest/ESLint toolchain after the React 18 and TypeScript baselines, consolidate SCSS, and reduce remaining warning noise.
 - **Supply-chain maintenance**: resolve the blocked wallet-stack upgrade, group routine dependency updates, and keep the npm audit disposition ledger current.
 - **Worker auth operations**: continue expanding coordinator telemetry, compromise-response guidance, and concurrency regression coverage around the implemented nonce, rate-limit, authorization-epoch, and current-policy controls.
-- **At-rest secret hardening**: browser passkey wallet storage uses WebAuthn PRF-backed wrapping; worker KV secret-field encryption still needs explicit key-management and migration decisions before implementation.
+- **At-rest secret hardening**: browser passkey wallet storage uses WebAuthn PRF-backed wrapping, and Worker KV secret fields use a versioned AES-GCM envelope. Remaining work covers encryption-key continuity, recovery, and migration procedures.
 
 ## AI Agent Interface
 
 The Agent Bridge foundation is implemented and separately deployable. Remaining
-work is to complete the catalog entries that are still explicitly contract-only
-or bridge-local, expand canonical handoffs for settings, SBT, decrypt, and
-storage actions, and harden operator setup and lifecycle verification. The
-worker catalog and README distinguish implemented routes from planned ones.
+work is to expand canonical handoffs for settings, SBT, decrypt, and storage
+actions, and harden operator setup and lifecycle verification. The Bridge README
+and versioned runtime skill describe the retained HTTP routes; local contract
+models do not imply a deployed endpoint.
 
 ## Future Development
 

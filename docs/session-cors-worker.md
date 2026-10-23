@@ -22,7 +22,7 @@ canonical `/api/agent/*` routes:
   service `ceagt_` credential once and returns a short-TTL versioned envelope.
   That envelope contains a Bridge browser credential for Bridge reads and a
   distinct session-worker JWT for canonical worker routes. The current
-  Telegram-first client sends the Bridge credential only to Bridge routes and
+  agent token client sends the Bridge credential only to Bridge routes and
   retains the worker JWT separately for direct canonical worker consumers; it
   never sends the worker JWT to the Bridge. The client keeps the exchanged
   envelope only in page memory and requires a fresh exchange after reload. It
@@ -35,19 +35,21 @@ canonical `/api/agent/*` routes:
   The Bridge re-resolves current policy before authenticated route dispatch and
   rejects the credential before route reads or writes after a same-slug Worker
   identity/origin replacement. Registry-compatible browser credentials retain
-  their existing behavior. Telegram can mint a user credential, but Telegram is
-  not required: `POST /api/agent/invite/onboard` also creates an opaque user
-  from a one-time body-only invite. The Bridge root token is
+  their existing behavior. `POST /api/agent/invite/onboard` creates an opaque
+  user from a one-time body-only invite; caller-supplied transport identity
+  cannot claim a historical account. The Bridge root token is
   bootstrap/break-glass authority and can mint named scoped services through
   `POST /api/agent/credentials/service`.
-- Telegram-first session reads and submits use the shared browser components
-  after one page-boundary backend-mode decision. `/session/demo` keeps its
-  existing demo/off-chain behavior.
+- Hosted Agent HTTP session reads and submits use the shared browser components
+  after one page-boundary backend-mode decision. The profile must explicitly
+  enable `surfaces.agentHttp` with `authority.mode=worker_canonical`; explicit
+  HTTP-off overrides stale legacy flags. Profile-less legacy flags remain
+  accepted as HTTP enablement inputs. `/session/demo` keeps its existing demo/off-chain behavior.
 
 Hosted origin allowlists for the bridge live in deploy environment variables,
-not repo source: `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS` for browser token
-exchange/result cache reads and `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS` for Mini
-App origins. The current first-party set should include the canonical
+not repo source: `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS` controls browser
+token exchange/result cache reads. `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS` is a
+legacy origin alias only. The current first-party set should include the canonical
 `https://contextengine.sh`, `https://www.contextengine.sh` origins and the
 redirect-compatible `https://contextengine.xyz`, `https://www.contextengine.xyz`
 origins.
@@ -570,11 +572,14 @@ Legacy/default worker URL:
 - `client/src/utilities/session/sessionWorkerAvailability.ts` now also owns the shared "default session must ignore `demoSessions.general` as worker authority in on-chain mode" rule, so sync UI reads and async `corsProxy` resolution both fall back to `CLOUDFLARE_CORS_WORKER_URL` on the same contract.
 - `client/src/utilities/worker/corsProxy.ts` also now reuses the shared default/general fallback worker URL selector from `sessionWorkerAvailability.ts`, so the sync and async default-session worker URL paths stay on the same fallback contract.
 - Worker auth now defaults to no silent demo-session fallback in on-chain mode; explicit demo/off-chain callers must opt in when resolving worker URLs for login.
-- Browser transcription uploads use anonymous-only worker transport. They can
-  use worker-managed transcription credentials or an explicitly supplied
-  request key when the route policy allows it, but an anonymous denial is
-  returned to the recorder and never escalates into an interactive wallet or
-  passkey signature.
+- Browser transcription uploads try anonymous access first, using the session's
+  AI key or an explicitly supplied request key when the route policy allows it.
+  If anonymous access is denied, signed-in users authenticate with the Worker
+  and retry under the session's AI gate permissions. An existing session token
+  is reused; otherwise the wallet or passkey may request a sign-in signature.
+  Open-session anonymous transcription still requires no sign-in. Signed-out
+  users in gated sessions receive the original denial without a wallet-connect
+  prompt, and signed-in users without AI access remain denied.
 - **Stage-B fail-closed strictness (2026-03-12):** All security-sensitive callers — Arweave uploads (`arweaveClient.js`), AI requests (`aiClient.ts`), transcription (`useWhisper.ts`), faucet (`contractHelpers.ts`), image fetch (`imageFetchClient.ts`), session-config resolution (`contractScripts.impl.ts`, `resourceKeys.ts`, `aiSettings.ts`), and the canonical resolver (`canonicalSessionContext.ts`) — now require explicit `allowDemoFallback: true` opt-in to use demo session fixtures when the on-chain registry is active. The CORS proxy demo-fallback policy (`defaultCorsProxyAllowDemoFallback`) is also tightened to match auth defaults. `getSessionConfigBySlugOrDefault` returns `null` for unknown non-general slugs instead of silently mapping them to the general default config.
 - In on-chain registry mode, worker auth/cors proxy no longer treat `demoSessions.general`
   as an implicit worker authority for the default session; the shared fallback is used instead.
@@ -661,7 +666,12 @@ Admin test panel:
   browser snapshots, does not use `waitUntil` for provider work, and does not
   run for registry/Arweave profiles. If automatic generation fails,
   `automatic`-only sessions allow an explicit admin manual retry as recovery;
-  otherwise repeated submissions do not thrash provider calls.
+  otherwise repeated submissions do not thrash provider calls. Storage capacity
+  and read failures before provider admission also persist `lastFailure` and
+  pause automatic generation. An ineligible-input `422` does not persist a
+  failure; later responses can make the next automatic run eligible. The pause
+  check happens before scanning storage, so another submission does not repeat
+  a failing history scan.
 - Generated-results AI calls inherit the session's existing AI provider/model
   routing, especially the analysis/thinking assignment. They do not hardcode a
   separate provider or model. Inputs are submitted responses only; Circles is
@@ -685,6 +695,28 @@ Admin test panel:
   such as polls, as text. Invalid answers are excluded even when accompanied by
   a comment; genuinely unanswered comment-only rows remain supported. This does
   not change opaque storage admission or the historical admin-snapshot format.
+- Every generated argument-map claim requires nonempty `participantIds` and
+  `questionIds`. Whenever a generated record cites both arrays, every cited
+  participant must have an included response to a cited question, and every
+  cited question must have an included response from a cited participant.
+  Validation uses the AI-visible input, including its sampling limits. An
+  aggregate can cite different responses; a grounded single-participant dissent
+  remains valid. These checks establish traceability, not semantic agreement
+  between the generated wording and its evidence. Invalid sections are withheld;
+  an artifact with no valid requested section fails generation.
+- Worker-canonical analysis scans share a synchronous safety budget: 800 storage
+  operations, 1,000 metadata/hidden-marker/committed-response rows, 2 MiB of
+  metadata, and 8 MiB of readable payload data. R2 reads, KV fallback reads, and
+  supplied committed responses count against the same budget. Exceeding a budget
+  returns `503` before AI generation or publication and preserves the last good
+  artifact; the Worker never publishes an apparently complete truncated snapshot.
+  Missing, invalid, or unreadable listed metadata also returns `503`, rather
+  than silently selecting an older answer. Automatic threshold evaluation and
+  provider generation reuse the same complete snapshot and its single scan budget.
+  These application limits leave room for authentication and JSON processing;
+  they are not a claim about a universal platform request ceiling. Large histories
+  require a future bounded background snapshot/current-version index. This guard
+  covers Worker storage history, not the separate existing admin-snapshot contract.
 - Only each participant's latest readable row per question is analysed,
   ordered by Worker time and then storage id, as the client orders them. A
   newer answer that is locked field by field, cleared, or invalid therefore
@@ -762,18 +794,37 @@ Authenticated clients can use the worker as the session storage boundary:
     visibility does not authorize raw reads to compute a client-side summary;
     a combined summary needs an authorized server-generated aggregate.
   - For `questions` and `surveys`, the Worker records the authenticated
-    uploader as `uploader` and the payload id as `resourceId` in the index
-    metadata, and keeps a first-writer record per session, resource, and id.
+    uploader as `uploader`, the payload id as `resourceId`, and upload-time
+    `uploadAuthority` (`admin` or `author`) in index metadata. The Worker derives
+    authority from its authenticated uploader and current role configuration;
+    payload fields cannot supply it. A first-writer record is kept per session,
+    resource, and id.
+    After storing payload bytes, a short coordinator step checks the admitted
+    actor, config revision, and authorization epoch before writing the index and
+    initial owner record. A completed authority change during payload storage
+    returns `409` without publishing that version. The external payload write
+    does not hold the config queue. The failed attempt may leave an unlisted
+    orphan; a KV-only orphan can still be read by its opaque ID under the current
+    payload access rules, but cannot become a canonical version through listing.
+    Obtain fresh authorization before retrying. See the
+    [publication upgrade procedure](publication-upgrade.md) for older versions.
     Uploading an id that already exists returns `409` with
     `reason: "storage_resource_id_owned"` unless the uploader is that id's
     first author or a current session admin. Because KV is eventually
-    consistent, readers pick one canonical version per id using a session
-    admin's newest upload, otherwise the earliest upload. Client hydration also
-    prefers a plaintext non-admin question whose generated hash matches its id
-    over a mismatching plaintext version. The Worker interview catalog and
-    results analysis use the admin/age rule. Uploads stored before this release have no
-    uploader, so they never count as admin uploads, and their ids have no
-    first-writer record. When a non-admin uploads a question or survey id
+    consistent, readers pick one canonical version per id using the newest
+    upload recorded with admin authority, otherwise the earliest upload. Removing,
+    rotating, or promoting an administrator does not change the precedence of
+    uploads with recorded authority. Client hydration, the Worker interview
+    catalog, and results analysis use the same admin/age rule. Equal-time ties
+    compare storage IDs by code-unit order, independent of runtime locale:
+    ascending for ordinary uploads and descending for admin corrections.
+    Only the server-recorded
+    `uploadAuthority: "admin"` stamp grants admin precedence. Rows without that
+    stamp use ordinary deterministic author/age selection; current roles and
+    legacy `uploaderIsAdmin` flags never infer publication authority. Reads do
+    not migrate or delete stored rows. Client caches retain the explicit stamp
+    and refresh older cached references that contain only derived admin flags.
+    When a non-admin uploads a question or survey id
     that has no owner record, the session coordinator checks whether that id
     was stored before this release. It scans the resource's index in steps
     of 200 rows, keeping its progress and the ids it finds, so the scan
@@ -856,7 +907,7 @@ Authenticated clients can use the worker as the session storage boundary:
     `Content-Disposition: attachment`, so opening the URL downloads it instead
     of rendering it on the Worker origin. A malformed declared type is served
     as `application/octet-stream`.
-- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in batches of at most eight concurrent KV reads. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Question and survey rows include `metadata.uploader` and `metadata.resourceId` when they were recorded, and `metadata.uploaderIsAdmin`, which says whether that uploader is a session admin under the Worker's current role set (including role-map admins the public config does not name). A version of an id that an admin hid is listed only as a marker, `{ "hidden": true, "metadata": { "resource", "resourceId", "hidden": true } }`, with no storage reference, so clients can drop a copy they cached earlier. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
+- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in batches of at most eight concurrent KV reads. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Question and survey rows include `metadata.uploader` and `metadata.resourceId` when they were recorded, and `metadata.uploadAuthority` for new uploads. `metadata.uploaderIsAdmin` is derived strictly from `uploadAuthority === "admin"`. Clients use the explicit upload authority stamp for precedence and ignore legacy flags and current public admin configuration. A version of an id that an admin hid is listed only as a marker, `{ "hidden": true, "metadata": { "resource", "resourceId", "hidden": true } }`, with no storage reference, so clients can drop a copy they cached earlier. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
   - Worker-canonical question and survey authoring writes payloads to this
     session's Cloudflare storage and does not register them in the Surveys
     contract. Fresh clients paginate the `questions` and `surveys` indexes,
@@ -939,7 +990,7 @@ to `docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`,
   group IDs from `storageProfile.payloadAccessControl.groupId`/`groupIds`, or
   from payload metadata for per-payload group storage refs. Missing, deleted, or
   unreadable groups fail closed.
-- `gate: "none"` keeps canonical payloads in Cloudflare but serves read/list requests without wallet auth. Uploads still require authenticated session worker requests unless the caller is already on an anonymous read/list route. Use this for public question prompts or public response summaries that should render identically across Arweave, Cloudflare, Telegram, Mini App, and the CE client.
+- `gate: "none"` keeps canonical payloads in Cloudflare but serves read/list requests without wallet auth. Uploads still require authenticated session worker requests unless the caller is already on an anonymous read/list route. Use this for public question prompts or public response summaries that should render identically across Arweave, Cloudflare, Agent HTTP, interview mode, and the CE client.
 - `encryption: "lit"` keeps the existing Lit scaffold. Cloudflare stores only caller-supplied encrypted payload envelopes and Lit governs decrypt. The worker rejects plaintext Cloudflare uploads in this mode until the client/session path supplies `payloadEncrypted=true` with a Lit-encrypted envelope.
 - `encryption: "worker_envelope"` encrypts payload bytes at rest inside the session worker trust domain, then releases keys only after worker-evaluated conditions pass. The operator and Cloudflare runtime can decrypt. This mode protects against storage-layer dumps of the supported R2/KV payload stores, backups, or bucket/index misconfiguration; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime. Audience removal stops future key release, but cannot un-read plaintext already fetched.
 
@@ -1038,6 +1089,12 @@ Unwrap requires successful authorization and a durable key-release audit before
 returning a key with `Cache-Control: private, no-store`. The browser resolves the
 Worker from the active session config, never from a URL inside ciphertext.
 Worker-recipient plaintext is not reused from the cryptography decrypt cache.
+Session-audience field-key wraps and unwraps share the lazy private-RPC secret
+lookup and chain attestation used by storage reads/lists. Secret-store failures
+and failed membership checks still deny access; private RPC URLs are not added
+to public session configuration. The generated report artifact route uses that
+same private-RPC preparation when checking access to generated artifacts,
+questions, and responses.
 
 Changing an audience requires new field encryption; changing metadata cannot
 change existing ciphertext recipients. Disabling new encryption does not remove
@@ -1082,7 +1139,36 @@ Unavailable or mismatched sessions fail closed with a visible error.
 
 Admin-signed `POST /admin/export-storage-envelopes` returns an encrypted archival bundle for Cloudflare payloads. The response includes a manifest, ciphertext payload entries, per-payload envelope metadata, and wrapped session-key metadata. For `worker_envelope`, payload entries carry the wrapped DEK, IV, algorithm, key provider, and condition document reference. For Cloudflare `lit` payloads, the worker passes through the ciphertext as stored and does not attempt Lit decrypt.
 
-The export manifest includes `exportScope: "encrypted_envelopes_only"`, `storageBackend`, `encryptedPayloadCount`, `partial`, `readErrors`, `wrappedKeysIncluded`, `keyProvider`, and `deploymentKekContinuityRequired`. That continuity flag is true when the archive actually contains worker-secret-wrapped material and false for pure-Lit or empty exports. Manifest version 1 also retains `rewrapRequiredForNewDeployment` as a deprecated compatibility alias with the same value; it is a warning to preserve the original secret, not an available rewrap operation. Telegram response export honors the same scope by calling `/storage/export-envelopes?resource=responses` with a session export/admin principal; that route packages ciphertext and envelope metadata, omits session KEK material, and skips `/storage/read`.
+The export manifest includes `exportScope: "encrypted_envelopes_only"`, `storageBackend`, `encryptedPayloadCount`, `partial`, `readErrors`, `wrappedKeysIncluded`, `keyProvider`, and `deploymentKekContinuityRequired`. That continuity flag is true when the archive actually contains worker-secret-wrapped material and false for pure-Lit or empty exports. Manifest version 1 also retains `rewrapRequiredForNewDeployment` as a deprecated compatibility alias with the same value; it is a warning to preserve the original secret, not an available rewrap operation. Authorized HTTP callers can use `/storage/export-envelopes?resource=responses` with a session export/admin principal; that route packages ciphertext and envelope metadata, omits session KEK material, and skips `/storage/read`.
+
+Both export endpoints return one bounded page, with top-level `cursor` and
+`listComplete`. Pass `cursor` back as a GET query parameter or POST body field
+alongside the same `resource`; signed admin requests also accept the body field.
+Cursors bind the session ID, slug, and resource, and malformed or mismatched
+cursors return `400`. A page scans at most 100 metadata rows, retains at most
+2 MiB of metadata, and emits at most 4 MiB of serialized payload entries. Manifest
+`countScope: "page"` makes all counts local to that page. Follow every successful page's cursor and
+retain every page to assemble the export; `partial` stays true while another page
+or any skipped unreadable record remains. A terminal `listComplete: true` only
+means traversal finished: check `partial` and errors before treating the archive
+as complete. Concurrent storage changes remain subject to KV listing consistency.
+
+A failed list or metadata read returns `503`, `ok: false`, and
+`listComplete: false`, with the manifest marked partial. Already exported entries
+remain in that response and its cursor stops before the unread row. Retain those
+entries and retry the cursor with bounded backoff; stop and surface persistent
+failures instead of treating an unchanged cursor as another successful page.
+
+A single record that cannot fit these JSON-page limits returns `413`, its
+`storageRef` when available, and a cursor held before that record. It is not
+silently skipped. This includes otherwise valid uploads up to the upload limit;
+those records require a streaming export from the backing storage. The JSON
+export does not yet provide that streaming recovery path.
+
+Export callers must keep each page and its returned cursor, then request the
+next page through the same canonical HTTP route. Authorization is checked for
+every page. The retired bot export commands and receipt ZIP delivery are no
+longer available; encrypted-envelope export remains a Session Worker API.
 
 The export is non-mutating and does not change encryption keys. A worker-envelope
 archive remains tied to the original Worker's `CE_STORAGE_ENVELOPE_KEK`; the
@@ -1109,8 +1195,8 @@ an actionable status and never silently fall back to unfiltered answers. Member
 visibility still applies. Membership changes refresh the active filter; focus,
 manual refresh and a one-minute refresh also pick up changes from other clients.
 Passkey and EVM principals match response addresses; a selected Group containing
-Telegram/agent principals currently reports that those identities cannot yet be
-matched. Older Workers without the member-directory endpoint need an update.
+historical `telegram` or grant-based `agent` principals currently reports that
+those identities cannot yet be matched. Older Workers without the member-directory endpoint need an update.
 Clearing Group filters restores the unfiltered cohort while retaining other
 selected filters.
 
@@ -1185,7 +1271,8 @@ delay after either authority revokes access.
 The non-secret version-1 `agentSessionWrapped` session-config record contains
 only `enabled`, the verified dedicated origin, protocol/revision identifiers,
 and `verifiedAt`. `sessionModeProfile.surfaces.agentHttp` is its sole product
-enablement bit; Telegram remains independently optional. The record is written
+enablement bit. Reserved `telegram` and `miniApp` surface flags are false for
+new configs and cannot reactivate retired transports. The record is written
 only after the dedicated Bridge proves its exact session slug and pinned Worker
 origin. Failed deploy/redeploy attempts preserve the last verified record.
 
@@ -1426,8 +1513,11 @@ group metadata and member identities, while `session` lets any authenticated
 session principal see both. Self-membership visibility is always allowed, but
 does not grant an `admin_only` identity list. Anonymous discovery never returns
 member identities or counts. `passkey_account` and `evm_address` principals use
-normalized EVM addresses, `telegram` uses the bridge principal id string, and
-`agent` uses the grant id. Malformed principals fail closed.
+normalized EVM addresses, and `agent` uses the grant id. Retained Agent Bridge
+requests authenticate with SIWE and use their EVM address. Historical explicit
+`telegram` principals remain readable with their original case-sensitive
+principal IDs and storage keys; obsolete implicit transport scope hints no
+longer select a principal. Malformed principals fail closed.
 
 Upload policy `group_allowlist` may be supplied on Cloudflare storage uploads with `groupId`/`groupIds`; the uploader must be a member before payload bytes are persisted. Existing SBT upload behavior is unchanged.
 
@@ -1470,6 +1560,15 @@ R2 / Durable Objects:
   a failed or response-lost attempt may leave an invisible orphan or a readable
   duplicate. Supplying an upload `requestId` does not deduplicate those writes.
   There is no upload receipt journal or key-rotation state machine.
+  Every route that admits work using current session config requires this
+  binding, including public, ungated storage reads/lists, interview catalogs,
+  and result artifacts. `GET /session-config` remains a public KV projection;
+  its availability does not prove that content routes are ready. Missing or
+  unavailable coordination returns `503` with no stale-config fallback.
+  First-use legacy records that cannot be safely normalized instead return
+  `503` with `Stored legacy session config requires operator migration before
+  use.` Repeating the request cannot repair such a record. See
+  [legacy config preflight](publication-upgrade.md#legacy-config-preflight).
 - `CE_WORKER_GROUP_COORDINATOR` optionally binds an independently migrated
   `WorkerGroupWriteCoordinator` namespace. When present, Worker Group routes
   use it while authorization, deployment, and session-key coordination remain
@@ -1507,7 +1606,15 @@ For local `wrangler dev` placeholders, see `workers/sessionCorsWorker/.dev.vars.
 
 Runtime:
 
-- Enable Node.js compatibility when deploying from the dashboard.
+- Coordinated deployment responses and retries preserve the verified
+  `agentSessionWrapped` capability, public health proof and resource IDs while
+  excluding deployment credentials from saved receipts.
+- Enable `nodejs_compat` and `global_fetch_strictly_public` when deploying from
+  the dashboard. The latter routes calls to sibling Workers through their public
+  endpoint; without it, Wrapped health and authority checks on the same account
+  can fail with Cloudflare error 1042. The native template and API deployment
+  metadata include both flags. Existing deployments need these settings applied
+  on redeployment; updating source alone does not change a running Worker.
 - Add npm deps if using dashboard source: `ethers`, `arweave`.
 
 ## KV data layout
@@ -2048,9 +2155,22 @@ token):
   release have no `resourceId` in their index row, so the first hide reads
   those payloads once and records each row's id in the single write it makes
   to that row (KV takes one write per key per second); later hides and
-  unhides read only the index. In a session with several hundred such
+  unhides read only the index. Reads and writes run in internal pages of at most
+  50 rows. Visibility operations remain ordered, including overlapping hide and
+  unhide requests, but release the config mutation queue between pages. Current
+  durable config reads can finish during the scan when no config or Lit projection
+  repair is pending. Each write page checks the admitted authority again; a
+  completed authority change stops remaining writes with `409`. Earlier pages
+  and the hide marker can already have changed, so retry with current authority
+  to complete the desired state. A storage error returns a failure, not a completed
+  visibility result. The endpoint still returns one final response rather than
+  an external continuation cursor; total request work grows with history size.
+  In a session with several hundred legacy
   versions, the first hide can stop partway at the Worker's per-request
-  limit; repeat it, and each attempt gets further.
+  limit. A retry reuses the legacy IDs already recorded, but every attempt still
+  traverses the index. Histories whose metadata scan alone exceeds request limits
+  require a future resumable or background visibility operation; retries cannot
+  guarantee completion at that size.
 - Changing the same id again within about a second returns `429` ("This id
   changed less than a second ago. Try again in a moment."), because KV takes
   one write per key per second. The audit entry is already written;
@@ -2547,15 +2667,28 @@ transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
     `{ txHash, status: null }` success / `{ error, attempts }` failure response shapes.
   - For `request_test_eth`, you may include `amountEth` to request a smaller amount than the configured faucet
     amount (larger values are ignored).
+  - Hosted (`worker_canonical`) participant requests require a current `faucet`
+    token scope and must fund the signed-in wallet. Another recipient returns
+    `403 "Test ETH can only be sent to your own address."`. The fixed limit is
+    three payouts per wallet in 24 hours, independent of `limits.perWalletPerDay`.
+    A Durable Object reserves capacity before sending and counts successful
+    payouts; balance/key/scope refusals do not consume the allowance. Concurrent
+    requests share the same cap. An interrupted request or failed RPC submission
+    with an ambiguous send outcome retains its reservation for up to 24 hours.
+    Hosted requests stop after a submission failure rather than risking another
+    payout through a fallback RPC; failures before submission release capacity.
+    Missing coordination
+    fails closed. These rules do not apply to `POST /sponsored/redeem-faucet`.
+  - The following generic and proof-backed gate rules apply to registry sessions.
   - Authenticated callers that already have `scopes.faucet=true` may continue using the generic payload
     `{ action: "request_test_eth", address|to, amountEth? }`.
-  - Same-wallet generic funding requests (`address|to` matches the authenticated bearer wallet) may also proceed
+  - Registry same-wallet generic funding requests (`address|to` matches the authenticated bearer wallet) may also proceed
     without `scopes.faucet=true` when the worker can re-check the current on-chain `txGas` gate and confirm access.
   - For pre-claim funding before the wallet holds the gate SBT, include `sbtAddress`. Password-mint SBTs also
     require `hashedPassword`; group-password SBTs require `signature` for the group mint authorization
     message `(sbtAddress, recipientAddress)`. Public `groupPasswordHash` values are not accepted as faucet proof.
   - Proof-backed faucet requests must fund the authenticated wallet tied to the bearer token.
-  - `request_test_eth` is always token-required. Third-party generic transfers still require `scopes.faucet=true`;
+  - `request_test_eth` is always token-required. Registry third-party generic transfers still require `scopes.faucet=true`;
     same-wallet generic requests may re-check `txGas` access without that scope, and proof-backed pre-claim funding
     may proceed without that scope when the request includes `sbtAddress` plus the required proof.
 

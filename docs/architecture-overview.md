@@ -41,7 +41,7 @@ flowchart TD
   Hosted -.-> DeployHelper["legacy/sponsored deploy-helper fallback<br/>workers/deploy-helper"]
   DeployHelper -.-> HostedWorker
   HostedWorker --> CloudflareStorage["Cloudflare KV payload/index storage<br/>optional existing R2"]
-  AgentClient["Agent/tool client or Telegram"] --> AgentBridge["optional agentBridgeWorker<br/>scoped HTTP and adapter surface"]
+  AgentClient["Agent/tool client or agent token browser login"] --> AgentBridge["optional agentBridgeWorker<br/>scoped HTTP and Session Wrapped"]
   AgentBridge --> HostedWorker
   Trustless --> Contracts["Public EVM contracts<br/>SessionRegistry, Surveys, SBTFactory, CustomSBT"]
   Trustless --> Arweave["Arweave metadata and payloads"]
@@ -201,8 +201,8 @@ The worker surface is documented in `docs/session-cors-worker.md`.
   the target Worker and bindings; the default `/new` path instead opens the
   tracked native Cloudflare dashboard template without requesting an API token.
 - `workers/agentBridgeWorker/` is an optional, separately deployed sidecar. It
-  owns the scoped `/api/agent/*` contract plus optional Telegram bot and Mini App
-  adapters, while delegating session membership, gates, and canonical storage to
+  owns the scoped `/api/agent/*` contract, submission queue, and Session Wrapped,
+  while delegating session membership, gates, and canonical storage to
   the configured Session Worker when those authorities are required.
 - `workers/shared/` contains modules reused by worker packages; it is not an
   independently deployed Worker.

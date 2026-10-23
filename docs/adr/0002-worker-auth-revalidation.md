@@ -3,7 +3,8 @@
 ## Status
 
 Accepted; amended 2026-07-21 to fail closed on missing or empty `jti` and to
-revalidate route authorization against current policy.
+revalidate route authorization against current policy. Amended 2026-10-16 to
+read current configuration from durable authority and reject superseded writes.
 
 ## Context
 
@@ -37,6 +38,38 @@ Use KV claim tokens plus shorter login tokens and current-policy route checks:
   signed `set-config` writes increment it; rejected and idempotent writes do
   not. Authenticated routes reject a token whose epoch differs from current
   config before route dispatch.
+- Login, signed admin admission, authenticated routes, and every config-dependent
+  anonymous route read the current config snapshot from the session's
+  `CE_SESSION_COORDINATOR` Durable Object. This includes public, ungated storage
+  reads/lists, interview catalogs, and result artifacts, as well as session AI.
+  KV initializes a legacy session only when no durable config record exists;
+  subsequent KV reads and caller config snapshots cannot replace that record.
+  Missing or unreachable coordination fails closed, without a cached-policy
+  fallback. Public config discovery remains a KV projection and does not authorize
+  protected data access.
+  Invalid legacy records return a constant operator-migration diagnostic;
+  unavailable storage or coordination returns the transient retry diagnostic.
+  Neither case seeds authority or falls back to a stale config. Valid legacy
+  records need not contain newer optional AI policy fields.
+- Signed config, secret, Lit signer/setup, and storage visibility mutations carry
+  the verified actor plus the admitted config revision and authorization epoch.
+  The coordinator checks those values inside the same serialization boundary as
+  config changes, before any new mutation effects. A rotation completed while
+  signature validation or remote Lit provisioning is in flight rejects the
+  superseded completion. A new request must obtain fresh authority to retry.
+- Question/survey uploads preserve the admitted actor, revision, and epoch
+  through external payload storage, then publish metadata and initial ownership
+  inside a short config serialization step. A completed rotation rejects stale
+  publication with `409`; no index row or owner record is written. Payload bytes
+  may already exist as an orphan. Completed publication stamps remain permanent.
+- Reads already in flight may finish under their admitted current snapshot;
+  they do not reread eventually consistent KV as policy authority.
+- Current config reads use a consistent durable snapshot without waiting behind
+  visibility scans when neither config nor Lit projection repair is pending.
+  Initialization and pending repair still use the serialized mutation path and
+  fail closed on repair errors. Visibility operations preserve their ordering
+  but release the config queue between internal pages of at most 50 rows; each
+  page rechecks the admitted revision and epoch before writing.
 - Each protected route re-evaluates the current default gate and only the
   route-specific resource gate required by that scope. The signed scope and
   the current scope must both allow the route. Policy-read errors fail closed.
@@ -77,6 +110,12 @@ Worker tests cover:
   after login.
 - Effective config mutation increments the epoch exactly once, while rejected,
   idempotent, limit-only, and Lit-credential writes do not.
+- A stale KV replica cannot admit an old admin or validate a stale token after a
+  completed rotation. Current actors and current-epoch tokens still succeed.
+- A public-to-gated policy change denies anonymous storage and artifact reads
+  even if KV still exposes the previous public config.
+- Config, secret, Lit, and visibility writes cannot commit with an older
+  revision; concurrent first configuration cannot replace an initialized tenant.
 - Verification rejects missing or blank `jti` claims.
 - Every authenticated token requires a live KV marker.
 - Revoking or aging out the marker invalidates the token.

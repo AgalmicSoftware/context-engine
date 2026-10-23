@@ -79,11 +79,16 @@ For testing, run modes, and deeper setup:
 - Export deliberation snapshots and consensus statistics as evaluation / preference datasets for AI benchmarking and training
 - OpenAI, Anthropic, OpenRouter, and custom provider paths
 
-### Agent and Telegram Access
+### Agent Access
 
-- Optional Agent Bridge Worker with scoped `/api/agent/*` credentials and a
-  machine-readable action catalog
-- Optional Telegram bot and Mini App adapters over the same session boundaries
+- MCP server for AI agents that take part in hosted or unencrypted registry sessions as their own
+  participants, answering, adding statements and claiming session SBTs with
+  their own keys. Run the published package with `npx -y @agalmic/contextengine@0.1.0`
+  from an MCP host: [mcp/README.md](mcp/README.md). This installs a local tool
+  server; it does not deploy or upgrade the web app or Session Workers.
+- Optional Agent Bridge Worker with scoped `/api/agent/*` credentials and
+  versioned runtime instructions
+- Agent token login in the browser, one-time invites, and Session Wrapped over HTTPS
 - Delegated membership, gate, storage, and chain authority rather than a second
   copy of canonical session state
 - Setup and endpoint reference in
@@ -128,6 +133,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 - PATH / RPC behavior: [docs/path-rpc.md](docs/path-rpc.md)
 - Cloudflare worker docs: [docs/session-cors-worker.md](docs/session-cors-worker.md)
 - Agent Bridge worker docs: [workers/agentBridgeWorker/README.md](workers/agentBridgeWorker/README.md)
+- Agent participants (MCP server): [docs/agent-participants.md](docs/agent-participants.md)
 - Session registry and gate model: [docs/session-registry.md](docs/session-registry.md)
 - Scaling reference: [docs/scaling.md](docs/scaling.md)
 - Public roadmap: [ROADMAP.md](ROADMAP.md)

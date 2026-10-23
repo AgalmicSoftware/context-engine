@@ -51,7 +51,9 @@ Session, gates, and the Worker:
 - `docs/session-registry.md`: SessionRegistry migration and on-chain gate authority model.
 - `docs/session-cors-worker.md`: Cloudflare `sessionCorsWorker` behavior, endpoints, KV layouts, and wizard flow.
 - `../workers/agentBridgeWorker/README.md`: optional Agent Bridge HTTP API,
-  Telegram/Mini App adapters, credentials, and Session Worker delegation.
+  credentials, Session Wrapped, and Session Worker delegation.
+- `docs/agent-participants.md`: AI agents taking part in hosted or unencrypted registry sessions as
+  their own participants through the Context Engine MCP server (`../mcp/README.md`).
 - `docs/scaling.md`: Public scaling reference covering write-path settlement, indexed reads, private compute modes, and deployment profiles.
 
 Keys and RPCs:
