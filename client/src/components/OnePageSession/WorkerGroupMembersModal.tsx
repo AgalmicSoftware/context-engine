@@ -19,7 +19,7 @@ export const workerGroupPrincipalIdentity = (member: WorkerGroupMember): string 
 const workerGroupPrincipalKindLabel = (member: WorkerGroupMember): string => {
   const kind = member.principal?.kind;
   if (kind === 'passkey_account') return 'Passkey';
-  if (kind === 'telegram') return 'Telegram';
+  if (kind === 'telegram') return 'Agent';
   if (kind === 'agent') return 'Agent';
   return '';
 };

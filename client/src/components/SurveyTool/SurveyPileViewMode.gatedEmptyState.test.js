@@ -94,7 +94,7 @@ describe('SurveyPileViewMode gated empty states', () => {
   it('keeps hydrate loading active when only gate hints are known and no hidden questions are cached', async () => {
     mockQuestionsCache();
 
-    renderPile();
+    renderPile({ sessionConfig: createLegacyChainSessionConfig() });
 
     expect(await screen.findByText(/Loading Metadata/)).toBeInTheDocument();
     expect(screen.queryByText('No accessible questions. This session has gated content.')).toBeNull();

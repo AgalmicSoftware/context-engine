@@ -40,12 +40,14 @@ $muted-text: var(--ce-panel-text-muted);
 
   select option,
   select optgroup {
-    background: var(--ce-status-info-text);
-    color: var(--ce-overlay-base);
+    background: var(--ce-document-canvas);
+    color: var(--ce-document-text);
+    -webkit-text-fill-color: var(--ce-document-text);
   }
 
   select option:disabled {
     color: var(--ce-document-text-muted);
+    -webkit-text-fill-color: var(--ce-document-text-muted);
   }
 
   input:disabled,
@@ -324,14 +326,24 @@ $muted-text: var(--ce-panel-text-muted);
 }
 
 .normalModeCardCompact {
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   text-align: center;
 
   .normalModeCardNumber {
     position: static;
     inset: auto;
   }
+}
+
+// Inactive steps keep their names visible so the whole path is readable.
+.normalModeCardCompactTitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.15;
+  overflow-wrap: break-word;
 }
 
 .panel {
@@ -1266,6 +1278,10 @@ $muted-text: var(--ce-panel-text-muted);
   .normalModeCardTitle {
     font-size: 0.78rem;
     line-height: 1.12;
+  }
+
+  .normalModeCardCompactTitle {
+    font-size: 0.7rem;
   }
 
   .normalModeCardSummary {
@@ -3421,11 +3437,6 @@ $muted-text: var(--ce-panel-text-muted);
     -webkit-text-fill-color: var(--ce-panel-text);
   }
 
-  select option {
-    background: var(--ce-input-bg);
-    color: var(--ce-panel-text);
-  }
-
   input::placeholder,
   textarea::placeholder,
   :global(.form-control)::placeholder {
@@ -3578,9 +3589,7 @@ $muted-text: var(--ce-panel-text-muted);
     textarea:disabled,
     input[readonly],
     select[readonly],
-    textarea[readonly],
-    select option,
-    select optgroup {
+    textarea[readonly] {
       background: var(--ce-control-disabled-bg);
       color: var(--ce-control-disabled-text);
       -webkit-text-fill-color: var(--ce-control-disabled-text);

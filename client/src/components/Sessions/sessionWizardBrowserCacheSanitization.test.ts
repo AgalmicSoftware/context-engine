@@ -1,4 +1,7 @@
-import { sanitizeSessionWizardDraftForBrowserCache } from './sessionWizardBrowserCacheSanitization';
+import {
+  sanitizeSessionWizardDraftForBrowserCache,
+  serializeSessionWizardDraftForCopy,
+} from './sessionWizardBrowserCacheSanitization';
 
 describe('sanitizeSessionWizardDraftForBrowserCache', () => {
   it('keeps public configuration while stripping every draft credential path', () => {
@@ -81,5 +84,24 @@ describe('sanitizeSessionWizardDraftForBrowserCache', () => {
         theme: { id: 'classic-95', brand: { primary: '#ffffff' } },
       }),
     ).toEqual({ appearance: { colorSchemeId: 'context-engine' } });
+  });
+});
+
+describe('serializeSessionWizardDraftForCopy', () => {
+  it('copies public draft settings without the credentials a draft holds before deploy', () => {
+    const copied = serializeSessionWizardDraftForCopy({
+      slug: 'copy-session',
+      ai: { providers: { openai: { apiKey: 'openai-copy-secret' } } },
+      rpc: { providers: { path: { apiKey: 'rpc-copy-secret' } } },
+      arweave: { jwk: '{"d":"jwk-copy-secret"}' },
+      faucet: { amountEth: '0.0002', privateKey: '0xfaucet-copy-secret' },
+      workerSecrets: { openaiKey: 'worker-copy-secret' },
+      workerRequirementProof: { fingerprint: 'proof-copy-secret' },
+    });
+
+    expect(JSON.parse(copied)).toEqual(
+      expect.objectContaining({ slug: 'copy-session', faucet: { amountEth: '0.0002' } }),
+    );
+    expect(copied).not.toContain('copy-secret');
   });
 });

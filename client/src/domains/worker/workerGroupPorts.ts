@@ -371,6 +371,7 @@ const normalizeVisibleWorkerGroupPrincipal = (value: unknown): WorkerGroupPrinci
     const address = toStringValue(source.address);
     return /^0x[0-9a-fA-F]{40}$/.test(address) ? { kind, address: address.toLowerCase() } : null;
   }
+  // Read historical group members without changing their stored principal bytes.
   if (kind === 'telegram') {
     const principalId = toStringValue(source.principalId);
     return principalId && principalId.length <= 180 && /^[A-Za-z0-9:_@./=-]+$/.test(principalId)

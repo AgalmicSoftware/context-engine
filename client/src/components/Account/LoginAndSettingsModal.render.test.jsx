@@ -1830,6 +1830,7 @@ describe('LoginAndSettingsModal agent token login', () => {
           JSON.stringify({
             ok: true,
             sessionSlug: 'alpha',
+            sessionId: '0x00112233445566778899aabbccddeeff',
             accountAddress: '0x3333333333333333333333333333333333333333',
             workerUrl: 'https://session-worker.example',
             bridgeCredential: {
@@ -1855,40 +1856,66 @@ describe('LoginAndSettingsModal agent token login', () => {
     delete global.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__;
   });
 
-  it('shows agent-token login only for telegram-first sessions and clears raw token after exchange', async () => {
-    const props = buildProps({
-      activeSessionSlug: 'alpha',
-      sessionConfig: { slug: 'alpha', telegramOnly: true, sessionMode: 'telegram_only' },
-    });
-    render(<LoginAndSettingsModal {...props} />);
+  it.each(['legacy', 'hosted HTTP'])(
+    'supports %s agent-token login and clears raw tokens after exchange',
+    async (kind) => {
+      const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+      profile.surfaces.agentHttp = true;
+      const props = buildProps({
+        activeSessionSlug: 'alpha',
+        sessionConfig:
+          kind === 'legacy'
+            ? { slug: 'alpha', telegramOnly: true, sessionMode: 'telegram_only' }
+            : {
+                slug: 'alpha',
+                sessionId: '0x00112233445566778899aabbccddeeff',
+                corsWorkerUrl: 'https://session-worker.example',
+                sessionModeProfile: profile,
+              },
+      });
+      render(<LoginAndSettingsModal {...props} />);
 
-    fireEvent.click(screen.getByTestId('ce-agent-token-login-toggle'));
-    const input = screen.getByTestId('ce-agent-token-login-input');
-    fireEvent.change(input, { target: { value: RAW_AGENT_TOKEN } });
+      fireEvent.click(screen.getByTestId('ce-agent-token-login-toggle'));
+      const input = screen.getByTestId('ce-agent-token-login-input');
+      fireEvent.change(input, { target: { value: RAW_AGENT_TOKEN } });
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('ce-agent-token-login-submit'));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('ce-agent-token-login-submit'));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
 
-    await waitFor(() => {
-      expect(props.updateLoginInfo).toHaveBeenCalledWith(
-        expect.objectContaining({
-          loginComplete: true,
-          provider: 'telegram_agent',
-        }),
-      );
-    });
+      await waitFor(() => {
+        expect(props.updateLoginInfo).toHaveBeenCalledWith(
+          expect.objectContaining({
+            loginComplete: true,
+            provider: 'agent_token',
+          }),
+        );
+      });
 
-    expect(input).toHaveValue('');
-    expect(window.location.href).not.toContain(RAW_AGENT_TOKEN);
-    expect(JSON.stringify(window.localStorage)).not.toContain(RAW_AGENT_TOKEN);
-    expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_AGENT_TOKEN);
-    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('bridge-browser-token');
-    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('jwt-session-token');
-    expect(JSON.stringify(props.changeAccount.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
-    expect(JSON.stringify(props.updateLoginInfo.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
+      expect(input).toHaveValue('');
+      expect(window.location.href).not.toContain(RAW_AGENT_TOKEN);
+      expect(JSON.stringify(window.localStorage)).not.toContain(RAW_AGENT_TOKEN);
+      expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_AGENT_TOKEN);
+      expect(Object.values(window.sessionStorage).join('\n')).not.toContain('bridge-browser-token');
+      expect(Object.values(window.sessionStorage).join('\n')).not.toContain('jwt-session-token');
+      expect(JSON.stringify(props.changeAccount.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
+      expect(JSON.stringify(props.updateLoginInfo.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
+    },
+  );
+
+  it('keeps token login hidden when the hosted profile explicitly disables HTTP despite legacy flags', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    render(
+      <LoginAndSettingsModal
+        {...buildProps({
+          activeSessionSlug: 'alpha',
+          sessionConfig: { slug: 'alpha', sessionModeProfile: profile, telegramOnly: true },
+        })}
+      />,
+    );
+    expect(screen.queryByTestId('ce-agent-token-login-toggle')).not.toBeInTheDocument();
   });
 
   it('hides agent-token login for normal sessions', () => {

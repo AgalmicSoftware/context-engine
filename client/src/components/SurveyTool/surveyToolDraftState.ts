@@ -28,6 +28,7 @@ type PersistDraftAllowedIdsArgs = {
 };
 
 type SurveyDraftStorageKeyArgs = {
+  draftAuthorityKey?: string;
   sessionSlug?: unknown;
   networkIdStr?: unknown;
   account?: unknown;
@@ -55,6 +56,7 @@ type MergePersistedDraftPayloadsArgs = {
 };
 
 type PersistedDraftWritePlanArgs = {
+  draftAuthorityKey?: string;
   draftKey?: unknown;
   sessionSlug?: unknown;
   networkIdStr?: unknown;
@@ -670,6 +672,7 @@ export const buildSurveyDraftCompatScope = (surveyScope: unknown = 'questions'):
 };
 
 export const buildSurveyDraftStorageKey = ({
+  draftAuthorityKey = '',
   sessionSlug = '',
   networkIdStr = '__pending__',
   account = '',
@@ -679,7 +682,10 @@ export const buildSurveyDraftStorageKey = ({
   const networkSegment = String(networkIdStr || '__pending__');
   const accountOwner = String(account || '').toLowerCase() || 'anon';
   const scope = String(surveyScope || 'questions');
-  return `dg:surveyDraft:${slug}:${networkSegment}:${accountOwner}:${scope}`;
+  // Unscoped legacy Worker drafts cannot prove their source. All new load,
+  // migration, mirror, and purge keys stay inside this authority suffix.
+  const authoritySuffix = draftAuthorityKey ? `:authority:${encodeURIComponent(draftAuthorityKey)}` : '';
+  return `dg:surveyDraft:${slug}:${networkSegment}:${accountOwner}:${scope}${authoritySuffix}`;
 };
 
 /**
@@ -702,6 +708,7 @@ export const clearSurveyDraftsForAccount = (account: unknown): void => {
 };
 
 export const buildSurveyDraftStorageVariantKeys = ({
+  draftAuthorityKey = '',
   sessionSlug = '',
   networkIdStr = '',
   account = '',
@@ -723,6 +730,7 @@ export const buildSurveyDraftStorageVariantKeys = ({
         [...new Set([accountOwner, 'anon'])].flatMap((owner) =>
           [...new Set([normalizedScope, compatScope, ...(perQuestionScope ? [perQuestionScope] : [])])].map((scope) =>
             buildSurveyDraftStorageKey({
+              draftAuthorityKey,
               sessionSlug: normalizedSessionSlug,
               networkIdStr: net,
               account: owner,
@@ -740,30 +748,35 @@ export const buildSurveyDraftStorageVariantKeys = ({
     compatScope,
     perQuestionScope,
     primaryAccountKey: buildSurveyDraftStorageKey({
+      draftAuthorityKey,
       sessionSlug: normalizedSessionSlug,
       networkIdStr: baseNetworkIdStr,
       account: accountOwner,
       surveyScope: normalizedScope,
     }),
     primaryAnonKey: buildSurveyDraftStorageKey({
+      draftAuthorityKey,
       sessionSlug: normalizedSessionSlug,
       networkIdStr: baseNetworkIdStr,
       account: 'anon',
       surveyScope: normalizedScope,
     }),
     compatAccountKey: buildSurveyDraftStorageKey({
+      draftAuthorityKey,
       sessionSlug: normalizedSessionSlug,
       networkIdStr: baseNetworkIdStr,
       account: accountOwner,
       surveyScope: compatScope,
     }),
     compatAnonKey: buildSurveyDraftStorageKey({
+      draftAuthorityKey,
       sessionSlug: normalizedSessionSlug,
       networkIdStr: baseNetworkIdStr,
       account: 'anon',
       surveyScope: compatScope,
     }),
     pendingAccountKey: buildSurveyDraftStorageKey({
+      draftAuthorityKey,
       sessionSlug: normalizedSessionSlug,
       networkIdStr: '__pending__',
       account: accountOwner,
@@ -771,6 +784,7 @@ export const buildSurveyDraftStorageVariantKeys = ({
     }),
     perQuestionAccountKey: perQuestionScope
       ? buildSurveyDraftStorageKey({
+          draftAuthorityKey,
           sessionSlug: normalizedSessionSlug,
           networkIdStr: baseNetworkIdStr,
           account: accountOwner,
@@ -779,6 +793,7 @@ export const buildSurveyDraftStorageVariantKeys = ({
       : null,
     perQuestionAnonKey: perQuestionScope
       ? buildSurveyDraftStorageKey({
+          draftAuthorityKey,
           sessionSlug: normalizedSessionSlug,
           networkIdStr: baseNetworkIdStr,
           account: 'anon',
@@ -928,6 +943,7 @@ export const loadPreviousPersistedDraftSnapshot = (
 
 export const buildPersistedDraftWritePlan = ({
   draftKey = '',
+  draftAuthorityKey = '',
   sessionSlug = '',
   networkIdStr = '',
   account = '',
@@ -936,6 +952,7 @@ export const buildPersistedDraftWritePlan = ({
 }: PersistedDraftWritePlanArgs = {}) => {
   const normalizedDraftKey = String(draftKey || '').trim();
   const variants = buildSurveyDraftStorageVariantKeys({
+    draftAuthorityKey,
     sessionSlug,
     networkIdStr,
     account,
@@ -1214,6 +1231,9 @@ export const buildPersistedDraftPayload = ({
   now = Date.now(),
 }: PersistedDraftPayloadArgs = {}): SurveyDraftPayload => ({
   meta: {
+    ...(isRecord(draftContext) && draftContext.draftAuthorityKey
+      ? { draftAuthorityKey: draftContext.draftAuthorityKey }
+      : {}),
     networkId: isRecord(draftContext) ? draftContext.networkId : undefined,
     surveyId: singleQuestionMode ? questionId || 'questions' : surveyId || 'questions',
     ts: now,

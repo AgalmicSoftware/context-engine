@@ -10,6 +10,15 @@ import {
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('sessionWizardDraftState', () => {
+  it.each([false, true])('restores drafts with retired surfaces off and HTTP access %s unchanged', (agentHttp) => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.surfaces = { ...profile.surfaces, telegram: true, miniApp: true, agentHttp };
+    const next = normalizeSessionWizardDraftShape({ sessionModeProfile: profile });
+    expect(next.sessionModeProfile.surfaces).toMatchObject({ telegram: false, miniApp: false, agentHttp });
+    expect(profile.surfaces).toMatchObject({ telegram: true, miniApp: true, agentHttp });
+  });
+
   it('normalizes draft naming, ai fields, and fallback worker resources', () => {
     const normalized = normalizeSessionWizardDraftShape({
       sessionName: '  Draft Name  ',
@@ -148,9 +157,9 @@ describe('sessionWizardDraftState', () => {
     });
   });
 
-  it('normalizes cached legacy Telegram drafts into the profile without rewriting legacy fields', () => {
+  it('normalizes cached legacy adapter drafts into the profile without rewriting legacy fields', () => {
     const normalized = normalizeSessionWizardDraftShape({
-      sessionName: 'Legacy Telegram',
+      sessionName: 'Legacy Agent',
       telegramOnly: true,
       sessionMode: 'telegram_only',
       telegramBridgeEnabled: true,
@@ -164,8 +173,9 @@ describe('sessionWizardDraftState', () => {
         authority: { mode: 'worker_canonical' },
         storage: expect.objectContaining({ backend: 'cloudflare' }),
         surfaces: expect.objectContaining({
-          telegram: true,
-          miniApp: true,
+          telegram: false,
+          miniApp: false,
+          agentHttp: true,
           web: true,
         }),
       }),

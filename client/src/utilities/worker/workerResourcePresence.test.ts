@@ -1,5 +1,5 @@
 import { resolveCorsProxyUrl } from './corsProxy.js';
-import { readWorkerResourcePresence } from './workerResourcePresence';
+import { getCachedWorkerResourcePresence, readWorkerResourcePresence } from './workerResourcePresence';
 
 jest.mock('./corsProxy.js', () => ({
   resolveCorsProxyUrl: jest.fn(),
@@ -45,6 +45,20 @@ describe('workerResourcePresence', () => {
         headers: { 'X-Session-Slug': 'demo-1' },
       }),
     );
+    expect(getCachedWorkerResourcePresence({ sessionSlug: 'demo-1', workerUrl: `${workerUrl}/` })).toEqual({
+      ai: true,
+      arweave: true,
+      rpc: true,
+      txGas: true,
+    });
+    expect(getCachedWorkerResourcePresence({ sessionSlug: 'other', workerUrl })).toBeNull();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 31_000);
+    try {
+      expect(getCachedWorkerResourcePresence({ sessionSlug: 'demo-1', workerUrl })).toBeNull();
+    } finally {
+      jest.restoreAllMocks();
+    }
   });
 
   it('falls back silently when an older worker does not support presence reads', async () => {

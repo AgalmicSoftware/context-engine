@@ -1180,6 +1180,64 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(subject.state.autoSendTriggered).toBe(false);
   });
 
+  it('loads an offered hosted faucet while closed, then funds and displays Tx gas', async () => {
+    const config = {
+      ...buildPureWorkerConfig('hosted-sbt'),
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      configRevision: 'faucet-on',
+      workerAuthority: { participantScopes: ['faucet'] },
+    };
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: PASSKEY_ADDRESS,
+          activeSessionSlug: 'hosted-sbt',
+          sessionConfig: config,
+          loginComplete: true,
+          loginModalToggled: false,
+          provider: 'passkey_eoa',
+        }),
+      ),
+    );
+    subject.syncWalletBalance = jest.fn(async () => ({ balance: ethers.BigNumber.from(0), stale: false }));
+    subject.autoSendTestFunds = jest.fn();
+    await subject.checkAndSendTestFundsIfNeeded();
+    expect(subject.autoSendTestFunds).not.toHaveBeenCalled();
+    mockedReadWorkerResourcePresence.mockResolvedValueOnce({ txGas: true });
+    await subject.loadSponsoredAccess();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mockedReadWorkerResourcePresence).toHaveBeenCalledTimes(1);
+    expect(subject.autoSendTestFunds).toHaveBeenCalledTimes(1);
+    expect(subject.getSettingsOverviewContext().capabilities.settingsResourceKeys).toContain('txGas');
+    expect(subject.getTargetNetwork().id).toBe(11155420);
+    mockedContractScripts.sendTestnetFunds.mockResolvedValueOnce({ txHash: '0xfeed1234' });
+    await subject.requestTestFunds();
+    expect(mockedContractScripts.sendTestnetFunds).toHaveBeenCalledWith(
+      PASSKEY_ADDRESS,
+      config,
+      expect.objectContaining({ context: expect.objectContaining({ chainId: 11155420 }) }),
+    );
+    const disabledConfig = { ...config, configRevision: 'faucet-off', workerAuthority: {} };
+    subject.props = { ...subject.props, sessionConfig: disabledConfig };
+    expect(subject.getActiveSessionCapabilities().usesFunding).toBe(false);
+  });
+
+  it('does not probe a chainless hosted faucet while Settings is closed', async () => {
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: PASSKEY_ADDRESS,
+          sessionConfig: buildPureWorkerConfig('chainless'),
+          loginComplete: true,
+          loginModalToggled: false,
+        }),
+      ),
+    );
+    await subject.loadSponsoredAccess();
+    expect(mockedReadWorkerResourcePresence).not.toHaveBeenCalled();
+  });
+
   it('stores visible faucet success state for manual settings requests', async () => {
     mockedContractScripts.sendTestnetFunds.mockResolvedValueOnce({
       txHash: '0xfeed1234',

@@ -135,20 +135,23 @@ const lower = (value: unknown): string => trim(value).toLowerCase();
 
 const normalizeModeValue = (value: unknown): string => lower(value);
 
-export const hasLegacyTelegramFirstSessionFlags = (metadata: unknown): boolean => {
+// Compatibility-only fields from profiles written before direct agent HTTP access.
+export const hasLegacyHostedAgentFlags = (metadata: unknown): boolean => {
   const config = isRecord(metadata) ? metadata : {};
-  const telegramConfig = isRecord(config.telegram) ? config.telegram : {};
+  const agentConfig = isRecord(config.telegram) ? config.telegram : {};
   return (
+    config.sessionBackendKind === 'agent' ||
+    config.sessionBackendKind === 'telegram' ||
     config.telegramOnly === true ||
     config.telegram_only === true ||
     normalizeModeValue(config.sessionMode) === 'telegram_only' ||
     normalizeModeValue(config.telegramMode) === 'telegram_only' ||
-    telegramConfig.only === true ||
-    normalizeModeValue(telegramConfig.mode) === 'telegram_only'
+    agentConfig.only === true ||
+    normalizeModeValue(agentConfig.mode) === 'telegram_only'
   );
 };
 
-export const isSessionModeProfileTelegramFirst = (metadata: unknown): boolean => {
+export const isSessionModeProfileAgentHttpEnabled = (metadata: unknown): boolean => {
   const config = isRecord(metadata) ? metadata : {};
   const profile = isRecord(config.sessionModeProfile)
     ? config.sessionModeProfile
@@ -158,7 +161,7 @@ export const isSessionModeProfileTelegramFirst = (metadata: unknown): boolean =>
   if (!profile) return false;
   const authority = isRecord(profile.authority) ? profile.authority : {};
   const surfaces = isRecord(profile.surfaces) ? profile.surfaces : {};
-  return authority.mode === 'worker_canonical' && surfaces.telegram === true;
+  return authority.mode === 'worker_canonical' && surfaces.agentHttp === true;
 };
 
 const stableSessionModeValue = (value: unknown): unknown => {
@@ -515,7 +518,11 @@ export const validateSessionModeProfile = (
       addIssue('surfaces.web', 'web_surface_fixed_on', 'The web surface is fixed on in v1.');
     }
     if (surfaces.miniApp === true && surfaces.telegram !== true) {
-      addIssue('surfaces.miniApp', 'mini_app_requires_telegram', 'Telegram Mini App requires the Telegram channel.');
+      addIssue(
+        'surfaces.miniApp',
+        'mini_app_requires_telegram',
+        'Legacy Mini App profiles require their Telegram channel.',
+      );
     }
     ['mcp', 'ceCc'].forEach((surface) => {
       if (surfaces[surface] === true) {
@@ -781,7 +788,7 @@ export const validateSessionModeProfile = (
     addIssue(
       'authorization.mechanisms',
       'telegram_role_cannot_be_sole_admin_export_gate',
-      'Telegram account role cannot be the only admin or export gate.',
+      'Legacy Telegram account roles cannot be the only admin or export gate.',
     );
   }
 
@@ -835,6 +842,16 @@ export const classifySessionModeProfileSupport = (profile: unknown): SessionMode
   return { status: 'schema_only', validation };
 };
 
+// Retired surface keys remain readable in old profiles, but new client writes
+// must never reactivate removed adapters or override explicit HTTP access.
+export const normalizeSessionModeProfileForWrite = <T>(profile: T): T => {
+  if (!isRecord(profile)) return profile;
+  const next = deepClone(profile);
+  const record: UnknownRecord = next;
+  if (isRecord(record.surfaces)) record.surfaces = { ...record.surfaces, telegram: false, miniApp: false };
+  return next;
+};
+
 export const compileSessionModeProfile = (profile: SessionModeProfile): CompiledSessionModeProfile => {
   const support = classifySessionModeProfileSupport(profile);
   if (support.status !== 'reachable') {
@@ -874,8 +891,8 @@ export const compileSessionModeProfile = (profile: SessionModeProfile): Compiled
     payloadAccessControl,
     payloadAccessMode,
     authorityMode: profile.authority.mode,
-    telegramBridgeEnabled: profile.surfaces.telegram === true,
-    miniAppEnabled: profile.surfaces.miniApp === true,
+    telegramBridgeEnabled: false,
+    miniAppEnabled: false,
     agentHttpEnabled: profile.surfaces.agentHttp === true,
     resultsExposure: normalizeExposure(profile.results.exposure),
     exportScope: profile.export.scope,
@@ -896,11 +913,10 @@ export const profileFromLegacyConfig = (sessionConfig: unknown): SessionModeProf
       ? config.sessionStorageProfile
       : {};
   const normalizedBackend = normalizeStorageBackend(storageProfile.backend || config.storageBackend || config.storage);
-  if (hasLegacyTelegramFirstSessionFlags(config)) {
+  if (hasLegacyHostedAgentFlags(config)) {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    profile.surfaces.telegram = true;
-    profile.surfaces.miniApp = true;
+    profile.surfaces.agentHttp = (config.agentHttpEnabled ?? config.agentHttp) !== false;
     profile.surfaces.web = true;
     return profile;
   }

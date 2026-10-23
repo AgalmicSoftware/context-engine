@@ -19,3 +19,18 @@ it('exposes conservative generation defaults and an editable owner opening', () 
   });
   expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ steeringPrompt: 'Follow the responder first.' }));
 });
+
+it('explains a blank owner opening before publication', () => {
+  const { rerender } = render(
+    <InterviewSettingsFields value={{ openingMode: 'owner', openingPrompt: '   ' }} onChange={jest.fn()} />,
+  );
+  expect(screen.getByRole('alert')).toHaveTextContent(/enter an owner opening question/i);
+  expect(screen.getByLabelText('Owner opening question')).toHaveAttribute('aria-invalid', 'true');
+  rerender(
+    <InterviewSettingsFields
+      value={{ openingMode: 'owner', openingPrompt: 'What should change?' }}
+      onChange={jest.fn()}
+    />,
+  );
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});

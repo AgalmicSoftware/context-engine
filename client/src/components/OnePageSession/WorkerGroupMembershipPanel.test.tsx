@@ -49,7 +49,7 @@ describe('WorkerGroupMembershipPanel', () => {
 
     render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
 
-    expect(screen.getByText('Loading groups…')).toHaveClass('telegramListEmpty', 'workerGroupsLoadingState');
+    expect(screen.getByText('Loading groups…')).toHaveClass('agentListEmpty', 'workerGroupsLoadingState');
     expect(screen.queryByText('Loading access groups…')).not.toBeInTheDocument();
   });
 
@@ -287,8 +287,8 @@ describe('WorkerGroupMembershipPanel', () => {
     const groupCard = screen.getByRole('article', { name: 'Open reviewers' });
     const refreshButton = screen.getByRole('button', { name: 'Refresh groups' });
     expect(screen.queryByText(/^Groups$/)).not.toBeInTheDocument();
-    expect(refreshButton.parentElement).toHaveClass('telegramListHeader', 'workerGroupsListActions');
-    expect(refreshButton).toHaveClass('telegramIconButton');
+    expect(refreshButton.parentElement).toHaveClass('agentListHeader', 'workerGroupsListActions');
+    expect(refreshButton).toHaveClass('agentIconButton');
     expect(refreshButton).toHaveAttribute('title', 'Refresh groups');
     expect(refreshButton.querySelector('svg')).not.toBeNull();
     expect(groupTitle).toHaveClass('miniSbtName');
@@ -695,7 +695,7 @@ describe('WorkerGroupMembershipPanel', () => {
       'href',
       '/u/0x00000000000000000000000000000000000000aa',
     );
-    expect(screen.getByText('Telegram · telegram:12345')).toBeInTheDocument();
+    expect(screen.getByText('Agent · telegram:12345')).toBeInTheDocument();
     expect(screen.getByTitle('0x00000000000000000000000000000000000000bb')).toHaveTextContent(/^Passkey · /);
     expect(screen.getByText('Agent · agent-grant-1')).toBeInTheDocument();
     expect(screen.getByText('(4)')).toBeInTheDocument();

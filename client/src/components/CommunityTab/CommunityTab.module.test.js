@@ -55,7 +55,7 @@ describe('CommunityTab module styles', () => {
     );
   });
 
-  it('anchors the community groups modal close button in the top-right corner', () => {
+  it('anchors a fully readable community groups modal close button in the top-right corner', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
 
     expect(scss).toMatch(
@@ -65,7 +65,7 @@ describe('CommunityTab module styles', () => {
       /:global\(\.close\),[\s\S]*?:global\(\.btn-close\)\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*1rem;[\s\S]*?right:\s*1rem;/,
     );
     expect(scss).toMatch(
-      /:global\(\.close\),[\s\S]*?:global\(\.btn-close\)\s*{[\s\S]*?opacity:\s*0\.5;[\s\S]*?background:\s*transparent;/,
+      /:global\(\.close\),\s*:global\(\.btn-close\)\s*{[^}]*?opacity:\s*1;[^}]*?background:\s*transparent;/,
     );
     expect(scss).not.toMatch(/:global\(\.modal-header\)\s*{[\s\S]*?:global\(\.close\)/);
   });

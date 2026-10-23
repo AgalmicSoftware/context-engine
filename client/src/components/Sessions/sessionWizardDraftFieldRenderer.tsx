@@ -137,7 +137,7 @@ type SessionWizardDraftFieldRendererOptions = {
   setEncryptedFieldGates: StateUpdater<UnknownRecord>;
   setMetadataObjectCollapsed: (updater: (prev: MetadataObjectCollapsedState) => MetadataObjectCollapsedState) => void;
   setOpenLockKey: StateUpdater<string>;
-  setSessionHeaderFile: (file: File | null) => void;
+  setSessionHeaderFile: (file: File | null) => boolean;
   setSessionHeaderMode: StateUpdater<string>;
   setSessionHeaderPreviewModalOpen: (open: boolean) => void;
   setSessionHeaderStatus: (message: string) => void;
@@ -265,7 +265,8 @@ export const buildSessionWizardDraftFieldRenderer = ({
     const primaryGateColor = toStr(primaryGate?.color).trim();
     const locked = selectedGateIds.length > 0;
     const lockActive = isSlugField ? privateSlugMode : locked;
-    const defaultLockLabel = isNormalMode ? '' : t('sbt');
+    // Unprotected fields show no badge; the lock button explains how to add an access rule.
+    const defaultLockLabel = '';
     const lockBadgeLabel: ReactNode = isSlugField
       ? 'ID'
       : selectedGateIds.length === 0
@@ -704,8 +705,11 @@ export const buildSessionWizardDraftFieldRenderer = ({
                 }
               }}
               onCompactFileChange={(event) => {
+                if (!setSessionHeaderFile(event.target.files?.[0] || null)) {
+                  event.target.value = '';
+                  return;
+                }
                 setSessionHeaderMode('upload');
-                setSessionHeaderFile(event.target.files?.[0] || null);
                 setSessionHeaderStatus('');
               }}
               onClear={handleClearSessionHeaderPreview}
@@ -733,7 +737,9 @@ export const buildSessionWizardDraftFieldRenderer = ({
               setSessionHeaderMode('upload');
               setSessionHeaderStatus('');
             }}
-            onAdvancedFileChange={(e) => setSessionHeaderFile(e.target.files?.[0] || null)}
+            onAdvancedFileChange={(e) => {
+              if (!setSessionHeaderFile(e.target.files?.[0] || null)) e.target.value = '';
+            }}
             onClear={handleClearSessionHeaderPreview}
             onExpandPreview={() => setSessionHeaderPreviewModalOpen(true)}
           />

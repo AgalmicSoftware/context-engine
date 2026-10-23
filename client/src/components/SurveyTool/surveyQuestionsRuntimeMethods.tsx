@@ -460,6 +460,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     resolveSubmissionGroupContext,
   } = createSurveyQuestionsRenderedHydrationRuntime({
     ...context,
+    updateJsonPreview,
     getPendingEditStats: () => getPendingEditStats?.() || null,
     loadDraft: () => loadDraft(),
     // View all reloads saved answers through its own sync, which nothing can race.
@@ -481,6 +482,8 @@ export const createSurveyQuestionsRuntimeMethods = (
     valuesEqual,
   } = createSurveyQuestionsResponseStateRuntime({
     ...context,
+    buildEmptyResponseFieldState,
+    updateJsonPreview,
     buildLocalCacheHydrationSignature,
     clearDraft,
     ensurePriorResponsesForRenderedIds,
@@ -516,6 +519,7 @@ export const createSurveyQuestionsRuntimeMethods = (
   } = createSurveyQuestionsPromptMetadataRuntime({
     ...context,
     fetchSingleQuestionData: (opts: SurveyQuestionsLegacyValue = {}) => fetchSingleQuestionData(opts),
+    getQuestionFieldTaskKey,
     getQuestionPayloadDisplayState: (question: SurveyQuestionsLegacyValue) => getQuestionPayloadDisplayState(question),
     isQuestionFieldBusy,
     resolveSessionChainId,
@@ -594,6 +598,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     renderQuestionTagDropdown,
     renderQuestionTagDropdownRow,
     resolveEffectiveResponseGateConfig,
+    resolveGatedPromptGateNames,
     toggleAdditionalCommentsEncryption,
     toggleAnswerEncryption,
   });
@@ -800,19 +805,19 @@ export const createSurveyQuestionsRuntimeMethods = (
   };
 
   const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, prevState: SurveyQuestionsState) => {
-    if (prevProps.account !== propsRef.current.account) {
-      // Props already identify the next account. Never flush the previous form
-      // through its draft key, including callbacks scheduled before this switch.
+    const workerTargetChanged =
+      resolveWorkerTargetForProps(prevProps).key !== resolveWorkerTargetForProps(propsRef.current).key;
+    if (prevProps.account !== propsRef.current.account || workerTargetChanged) {
+      // Props already identify the next account/Worker. Never flush the previous
+      // form through its key; dirty-edit guards must not preserve it across authorities.
       if (inst._persistTimer) clearTimeout(inst._persistTimer);
       inst._persistTimer = null;
       if (inst._jsonPreviewTimer) clearTimeout(inst._jsonPreviewTimer);
       inst._jsonPreviewTimer = null;
       inst._draftDirtyQids?.clear();
-      setState({ jsonPreview: null });
+      setState({ jsonPreview: null, draftPersistenceError: '' });
     }
     const diffInputsChanged = didEditDiffInputsChange(prevProps, prevState);
-    const workerTargetChanged =
-      resolveWorkerTargetForProps(prevProps).key !== resolveWorkerTargetForProps(propsRef.current).key;
     if (diffInputsChanged) {
       const propsHydrationContextChanged =
         workerTargetChanged ||
@@ -995,7 +1000,7 @@ export const createSurveyQuestionsRuntimeMethods = (
         },
       });
 
-      if (identityChanged) {
+      if (identityChanged && !workerTargetChanged) {
         // Reset submissionComplete when switching questions so fetch logic isn't blocked
         setState(
           buildResponseLoadingResetState(
@@ -1003,7 +1008,10 @@ export const createSurveyQuestionsRuntimeMethods = (
           ),
         );
         await fetchSingleQuestionData(); // merge-safe
-      } else if (cacheTick || groupContextChanged || retryMaskedOnReadiness || shouldRetrySingleQuestionBootstrap) {
+      } else if (
+        !workerTargetChanged &&
+        (cacheTick || groupContextChanged || retryMaskedOnReadiness || shouldRetrySingleQuestionBootstrap)
+      ) {
         // Don’t rebuild while user has pending edits; keeps “Submit (X)” stable
         if (stateRef.current.isDirty || (stateRef.current.modifiedCount || 0) > 0) {
           bumpSurveyPerfCounter('noopSkipCount');
@@ -1016,40 +1024,43 @@ export const createSurveyQuestionsRuntimeMethods = (
         ); // merge-safe
       }
 
-      if (propsRef.current.account !== prevProps.account) {
+      if (propsRef.current.account !== prevProps.account || workerTargetChanged) {
         // Clear live form state before fetching for new account.
         // We use a callback to ensure rehydration happens on the reset (empty) state,
         // followed by the fetch which merges on-chain data into the draft.
-        resetFormStateForAccountChange(async () => {
-          setState({
-            ...buildResponseLoadingResetState(
-              updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
-            ),
-            parsedViewAddressAnswers: null,
-            viewAddressAnswers: '',
-          });
+        resetFormStateForAccountChange(
+          async () => {
+            setState({
+              ...buildResponseLoadingResetState(
+                updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
+              ),
+              parsedViewAddressAnswers: null,
+              viewAddressAnswers: '',
+            });
 
-          // 1. Apply Draft (Anon answers) onto Empty
-          rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
+            // 1. Apply Draft (Anon answers) onto Empty
+            rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
 
-          // 2. Fetch Chain (Merges Chain into Draft)
-          const pendingBootstrapRetryAttempt = propsRef.current.singleQuestionMode
-            ? getPendingSingleQuestionBootstrapRetryAttempt(propsRef.current.questionID)
-            : 0;
-          await fetchSingleQuestionData(
-            pendingBootstrapRetryAttempt > 0 ? { bootstrapRetryAttempt: pendingBootstrapRetryAttempt } : undefined,
-          );
+            // 2. Fetch Chain (Merges Chain into Draft)
+            const pendingBootstrapRetryAttempt = propsRef.current.singleQuestionMode
+              ? getPendingSingleQuestionBootstrapRetryAttempt(propsRef.current.questionID)
+              : 0;
+            await fetchSingleQuestionData(
+              pendingBootstrapRetryAttempt > 0 ? { bootstrapRetryAttempt: pendingBootstrapRetryAttempt } : undefined,
+            );
 
-          const isViewingOwnResponse =
-            propsRef.current.account &&
-            propsRef.current.responderAddress &&
-            propsRef.current.account.toLowerCase() === propsRef.current.responderAddress.toLowerCase();
-          const isViewingNoSpecificResponder = propsRef.current.account && !propsRef.current.responderAddress;
+            const isViewingOwnResponse =
+              propsRef.current.account &&
+              propsRef.current.responderAddress &&
+              propsRef.current.account.toLowerCase() === propsRef.current.responderAddress.toLowerCase();
+            const isViewingNoSpecificResponder = propsRef.current.account && !propsRef.current.responderAddress;
 
-          if (stateRef.current.userHasResponse && (isViewingOwnResponse || isViewingNoSpecificResponder)) {
-            setState(buildEditingResponseModeState());
-          }
-        }, propsRef.current.account === prevProps.account);
+            if (stateRef.current.userHasResponse && (isViewingOwnResponse || isViewingNoSpecificResponder)) {
+              setState(buildEditingResponseModeState());
+            }
+          },
+          !workerTargetChanged && propsRef.current.account === prevProps.account,
+        );
       }
 
       if (prevState.questionPool !== stateRef.current.questionPool) {
@@ -1081,7 +1092,7 @@ export const createSurveyQuestionsRuntimeMethods = (
         (propsRef.current.isResponsesCacheReady &&
           prevProps.questionResponsesNonce !== propsRef.current.questionResponsesNonce);
 
-      if (surveyChanged) {
+      if (surveyChanged && !workerTargetChanged) {
         setState(
           buildSurveyChangedResetState(updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset')),
         );
@@ -1090,7 +1101,7 @@ export const createSurveyQuestionsRuntimeMethods = (
           await fetchSurveyResponse();
           checkAndHandleStartFresh();
         });
-      } else if (cacheInvalidated) {
+      } else if (cacheInvalidated && !workerTargetChanged) {
         // Don’t rebuild while user has pending edits; keeps “Submit (X)” stable
         const hasPendingQuestionPoolHydration = getSurveyQuestionPoolLoadState().isIncomplete;
         if (
@@ -1119,36 +1130,45 @@ export const createSurveyQuestionsRuntimeMethods = (
         }
       }
 
-      if (propsRef.current.account !== prevProps.account || propsRef.current.viewAddress !== prevProps.viewAddress) {
+      if (
+        workerTargetChanged ||
+        propsRef.current.account !== prevProps.account ||
+        propsRef.current.viewAddress !== prevProps.viewAddress
+      ) {
         // Clear live form state before reacting to new account/viewAddress
-        resetFormStateForAccountChange(async () => {
-          setState({
-            ...buildSurveyAccountViewResetState({
-              parsedViewAddressAnswers: null,
-              noResponse: propsRef.current.viewAddress !== prevProps.viewAddress ? false : stateRef.current.noResponse,
-              submittedSinceLastEdit: updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
-            }),
-            viewAddressAnswers: '',
-          });
+        resetFormStateForAccountChange(
+          async () => {
+            setState({
+              ...buildSurveyAccountViewResetState({
+                parsedViewAddressAnswers: null,
+                noResponse:
+                  propsRef.current.viewAddress !== prevProps.viewAddress ? false : stateRef.current.noResponse,
+                submittedSinceLastEdit: updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
+              }),
+              viewAddressAnswers: '',
+            });
 
-          // 1. Rehydrate draft immediately so it exists before fetch returns
-          if (propsRef.current.account && propsRef.current.account !== prevProps.account) {
-            rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
-          }
+            // 1. Rehydrate draft immediately so it exists before fetch returns
+            if (workerTargetChanged || (propsRef.current.account && propsRef.current.account !== prevProps.account)) {
+              rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
+            }
 
-          // 2. Fetch Chain (Merges Chain into Draft)
-          await fetchSurveyResponse();
+            // Refresh the destination question metadata before its saved responses.
+            if (workerTargetChanged) await fetchQuestionPool();
+            await fetchSurveyResponse();
 
-          const isViewingOwnSurveyResponse =
-            propsRef.current.account &&
-            propsRef.current.viewAddress &&
-            propsRef.current.account.toLowerCase() === propsRef.current.viewAddress.toLowerCase();
-          const isViewingNoSpecificSurvey = propsRef.current.account && !propsRef.current.viewAddress;
+            const isViewingOwnSurveyResponse =
+              propsRef.current.account &&
+              propsRef.current.viewAddress &&
+              propsRef.current.account.toLowerCase() === propsRef.current.viewAddress.toLowerCase();
+            const isViewingNoSpecificSurvey = propsRef.current.account && !propsRef.current.viewAddress;
 
-          if (stateRef.current.userHasResponse && (isViewingOwnSurveyResponse || isViewingNoSpecificSurvey)) {
-            setState(buildEditingResponseModeState());
-          }
-        }, propsRef.current.account === prevProps.account);
+            if (stateRef.current.userHasResponse && (isViewingOwnSurveyResponse || isViewingNoSpecificSurvey)) {
+              setState(buildEditingResponseModeState());
+            }
+          },
+          !workerTargetChanged && propsRef.current.account === prevProps.account,
+        );
       }
     }
 
@@ -1156,7 +1176,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     else {
       if (prevProps.questionPool !== propsRef.current.questionPool) {
         // Save pending edits first: the merge drops the answers of questions that left the list.
-        if (inst._persistTimer || inst._draftDirtyQids?.size) {
+        if (!workerTargetChanged && (inst._persistTimer || inst._draftDirtyQids?.size)) {
           if (inst._persistTimer) clearTimeout(inst._persistTimer);
           inst._persistTimer = null;
           persistDraft();
@@ -1193,17 +1213,20 @@ export const createSurveyQuestionsRuntimeMethods = (
         (!prevProps.account && !!propsRef.current.account) ||
         (!prevProps.provider && !!propsRef.current.provider);
 
-      if (propsRef.current.account !== prevProps.account || standaloneAuthBecameReady) {
+      if (workerTargetChanged || propsRef.current.account !== prevProps.account || standaloneAuthBecameReady) {
         // Clear live form state before reacting to new account
-        resetFormStateForAccountChange(() => {
-          // Rerun cache/prior-response hydration once the reset form is in place.
-          setState(
-            buildStandaloneAuthResetState(
-              updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
-            ),
-            () => syncViewAllQuestions({ restoreAll: true }),
-          );
-        }, propsRef.current.account === prevProps.account);
+        resetFormStateForAccountChange(
+          () => {
+            // Rerun cache/prior-response hydration once the reset form is in place.
+            setState(
+              buildStandaloneAuthResetState(
+                updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
+              ),
+              () => syncViewAllQuestions({ restoreAll: true }),
+            );
+          },
+          !workerTargetChanged && propsRef.current.account === prevProps.account,
+        );
       }
     }
 

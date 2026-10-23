@@ -3,6 +3,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import { trimSessionSlug as normalizeSlug } from '../../utilities/session/sessionSlug';
 import styles from './SessionChipSelector.module.scss';
+import SessionTestEthBadge from './SessionTestEthBadge';
+import { getSessionConfigBySlug } from '../../utilities/web3/sessionConfigResolvers';
 
 type CSSVariableStyle = React.CSSProperties & {
   [key: `--${string}`]: string | number | undefined;
@@ -12,6 +14,8 @@ type SessionChipOption = {
   key?: React.Key;
   slug?: string | null;
   label: string;
+  sessionConfig?: unknown;
+  resourcePresence?: unknown;
   ariaLabel?: string;
   selected?: boolean;
   active?: boolean;
@@ -139,6 +143,11 @@ const SessionChipSelector = ({
                     </span>
                   )}
                   <span>{option.label}</span>
+                  <SessionTestEthBadge
+                    sessionSlug={slug}
+                    sessionConfig={option.sessionConfig ?? getSessionConfigBySlug(slug)}
+                    resourcePresence={option.resourcePresence}
+                  />
                 </span>
 
                 {option.primary ? <span className={styles.primaryBadge}>Primary</span> : null}

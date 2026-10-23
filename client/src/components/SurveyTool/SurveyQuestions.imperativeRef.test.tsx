@@ -10,6 +10,7 @@ describe('SurveyQuestions imperative ref', () => {
     render(
       <SurveyQuestions
         ref={ref}
+        networkChainId={11155420}
         runtimeStrategy={{
           render: () => <div data-testid="survey-questions-ref-smoke" />,
         }}

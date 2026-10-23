@@ -298,7 +298,10 @@ describe('sessionWizardWriteNormalization', () => {
       telegram: { only: true, mode: 'telegram_only' },
     });
 
-    expect(metadata.sessionModeProfile).toEqual(profile);
+    expect(metadata.sessionModeProfile).toEqual({
+      ...profile,
+      surfaces: { ...profile.surfaces, telegram: false, miniApp: false },
+    });
     expect(metadata.storageProfile).toEqual(
       expect.objectContaining({
         backend: 'cloudflare',
@@ -362,11 +365,33 @@ describe('sessionWizardWriteNormalization', () => {
     ).toThrow(/requires a reachable session mode profile/i);
   });
 
-  test('sanitizeSessionWizardMetadataPayload upgrades legacy Telegram flags to a profile without dual-write fields', () => {
+  test.each([false, true])('writes retired surfaces off while preserving explicit HTTP access %s', (agentHttp) => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.surfaces = { ...profile.surfaces, telegram: true, miniApp: true, agentHttp };
+    const metadata = sanitizeSessionWizardMetadataPayload({ slug: 'agent-session', sessionModeProfile: profile });
+    const worker = buildSessionWizardWorkerConfigPayload({
+      slug: 'agent-session',
+      draft: { sessionModeProfile: profile },
+    });
+    for (const payload of [metadata, worker]) {
+      expect(payload.sessionModeProfile.surfaces).toMatchObject({ telegram: false, miniApp: false, agentHttp });
+    }
+    expect(profile.surfaces).toMatchObject({ telegram: true, miniApp: true, agentHttp });
+  });
+
+  test.each([
+    { telegramOnly: true },
+    { telegram_only: true },
+    { sessionMode: 'telegram_only' },
+    { telegramMode: 'telegram_only' },
+    { telegram: { only: true } },
+    { telegram: { mode: 'telegram_only' } },
+  ])('upgrades legacy agent access %j without dual-write fields', (legacyFlags) => {
     const metadata = sanitizeSessionWizardMetadataPayload({
       slug: 'legacy-telegram',
-      sessionName: 'Legacy Telegram',
-      telegramOnly: true,
+      sessionName: 'Legacy Agent',
+      ...legacyFlags,
       storageProfile: { backend: 'cloudflare' },
     });
 
@@ -374,7 +399,7 @@ describe('sessionWizardWriteNormalization', () => {
       expect.objectContaining({
         preset: 'custom',
         authority: { mode: 'worker_canonical' },
-        surfaces: expect.objectContaining({ telegram: true, miniApp: true, web: true }),
+        surfaces: expect.objectContaining({ telegram: false, miniApp: false, agentHttp: true, web: true }),
       }),
     );
     expect(metadata.storageProfile).toEqual(
@@ -957,11 +982,11 @@ describe('sessionWizardWriteNormalization', () => {
     expect(workerPayload.litCredentials).toEqual({});
   });
 
-  test('legacy Telegram mode is published as profile-only session metadata', () => {
+  test('legacy adapter mode is published as profile-only session metadata', () => {
     const metadata = sanitizeSessionWizardMetadataPayload(
       {
         slug: 'telegram-native',
-        sessionName: 'Telegram Native',
+        sessionName: 'Agent Native',
         telegramOnly: true,
         storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public_read' } },
       },
@@ -974,7 +999,7 @@ describe('sessionWizardWriteNormalization', () => {
       expect.objectContaining({
         preset: 'custom',
         authority: { mode: 'worker_canonical' },
-        surfaces: expect.objectContaining({ telegram: true, miniApp: true, web: true }),
+        surfaces: expect.objectContaining({ telegram: false, miniApp: false, agentHttp: true, web: true }),
       }),
     );
     expect(metadata.telegramOnly).toBeUndefined();
@@ -996,7 +1021,7 @@ describe('sessionWizardWriteNormalization', () => {
       expect.objectContaining({
         preset: 'custom',
         authority: { mode: 'worker_canonical' },
-        surfaces: expect.objectContaining({ telegram: true, miniApp: true, web: true }),
+        surfaces: expect.objectContaining({ telegram: false, miniApp: false, agentHttp: true, web: true }),
       }),
     );
     expect(workerPayload.storageProfile).toEqual(
@@ -1009,4 +1034,10 @@ describe('sessionWizardWriteNormalization', () => {
     expect(workerPayload.sessionMode).toBeUndefined();
     expect(workerPayload.telegramBridgeEnabled).toBeUndefined();
   });
+});
+
+it('rejects a blank owner opening before either publication write', () => {
+  const draft = { interviewMode: { openingMode: 'owner', openingPrompt: ' ' } };
+  expect(() => sanitizeSessionWizardMetadataPayload(draft)).toThrow(/owner opening question/i);
+  expect(() => buildSessionWizardWorkerConfigPayload({ draft })).toThrow(/owner opening question/i);
 });

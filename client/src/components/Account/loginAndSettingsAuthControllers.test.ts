@@ -107,11 +107,11 @@ describe('loginAndSettings auth controllers', () => {
 
   it('formats agent-token errors with current user-facing copy', () => {
     expect(formatAgentTokenError(new Error('expired'))).toBe(
-      'This token is expired. Create a fresh agent token in Telegram and paste it again.',
+      'This token is expired. Request a fresh agent token from your session administrator and paste it again.',
     );
     expect(formatAgentTokenError('unsupported_format')).toBe('Paste the raw ceagt_ token, not a link.');
     expect(formatAgentTokenError('unknown')).toBe(
-      'Agent token login failed. Create a fresh token in Telegram and try again.',
+      'Agent token login failed. Request a fresh token from your session administrator and try again.',
     );
   });
 
@@ -130,7 +130,7 @@ describe('loginAndSettings auth controllers', () => {
         sponsoredKeys: { ai: true },
       }),
       getTargetNetwork: () => ({ id: 11155420 }),
-      isTelegramFirstSessionConfig: () => true,
+      isHostedAgentSessionConfig: () => true,
       normalizeSettingsSessionSlug: (slug) =>
         String(slug || '')
           .trim()
@@ -184,7 +184,7 @@ describe('loginAndSettings auth controllers', () => {
         agentBridgeUrl: 'https://registry-bridge.example',
       }),
       getTargetNetwork: () => ({ id: 11155420 }),
-      isTelegramFirstSessionConfig: () => true,
+      isHostedAgentSessionConfig: () => true,
       normalizeSettingsSessionSlug: (slug) =>
         String(slug || '')
           .trim()

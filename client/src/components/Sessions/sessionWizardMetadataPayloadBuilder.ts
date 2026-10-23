@@ -35,7 +35,7 @@ import {
 } from './sessionWizardMetadataPayload';
 import { normalizeSessionWizardGateIds as normalizeGateIds } from './sessionWizardResourceGateSupport';
 import { normalizeSbtSelection } from './sessionWizardSbtSelections';
-import { resolveSessionHeaderImageFormat } from './sessionWizardUiSupport';
+import { resolveSessionHeaderImageFormat, UNSUPPORTED_SESSION_HEADER_IMAGE_MESSAGE } from './sessionWizardUiSupport';
 import {
   applySessionWizardModeFieldPolicyToPayload,
   resolveSessionWizardModeFieldPolicy,
@@ -381,7 +381,7 @@ export const buildSessionWizardMetadataPayloadBuilder = ({
         setSessionHeaderStatus('Uploading header image…', 'loading');
         const format = resolveSessionHeaderImageFormat(sessionHeaderFile);
         if (!format) {
-          throw new Error('Unsupported header image format. Use png, jpg, jpeg, or gif.');
+          throw new Error(UNSUPPORTED_SESSION_HEADER_IMAGE_MESSAGE);
         }
         let arweaveJwk = toStr(getCurrentWorkerSecrets().arweaveJwk).trim();
         if (!arweaveJwk && !workerSecretsEnabled) {

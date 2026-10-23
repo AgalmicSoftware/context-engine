@@ -1,9 +1,9 @@
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import {
-  buildInitialTelegramState,
-  createOnePageSessionTelegramActions,
-  type OnePageSessionTelegramState,
-} from './onePageSessionTelegramActions';
+  buildInitialAgentState,
+  createOnePageSessionAgentActions,
+  type OnePageSessionAgentState,
+} from './onePageSessionAgentActions';
 
 const buildEnvelope = (sessionSlug: string): AgentClientLoginEnvelope => ({
   v: 2,
@@ -28,8 +28,8 @@ const deferred = <T>() => {
 
 const createHarness = () => {
   let slug = 'alpha';
-  let telegramMode = true;
-  let state: OnePageSessionTelegramState = buildInitialTelegramState('alpha', () => buildEnvelope('alpha'));
+  let agentMode = true;
+  let state: OnePageSessionAgentState = buildInitialAgentState('alpha', () => buildEnvelope('alpha'));
   const setState = jest.fn((patch, callback) => {
     const next = typeof patch === 'function' ? patch(state) : patch;
     state = { ...state, ...next };
@@ -37,9 +37,9 @@ const createHarness = () => {
   });
   const loadQuestions = jest.fn();
   const fetchImpl = jest.fn();
-  const actions = createOnePageSessionTelegramActions({
+  const actions = createOnePageSessionAgentActions({
     getState: () => state,
-    isTelegramBackendMode: () => telegramMode,
+    isAgentBackendMode: () => agentMode,
     ports: {
       clearStoredEnvelope: jest.fn(),
       envelopeAllowsSubmit: jest.fn(() => true),
@@ -63,11 +63,11 @@ const createHarness = () => {
     },
     resolveCurrentSessionConfig: () => ({
       slug,
-      sessionMode: telegramMode ? 'telegram_only' : 'standard',
+      sessionMode: agentMode ? 'telegram_only' : 'standard',
       agentBridgeUrl: 'https://bridge.example',
     }),
     resolveCurrentSessionSlug: () => slug,
-    resolveTelegramAgentBridgeUrl: () => 'https://bridge.example',
+    resolveSessionAgentBridgeUrl: () => 'https://bridge.example',
     setState,
   });
 
@@ -76,25 +76,47 @@ const createHarness = () => {
     fetchImpl,
     getState: () => state,
     loadQuestions,
-    setSlug: (nextSlug: string, nextTelegramMode = telegramMode) => {
+    setSlug: (nextSlug: string, nextAgentMode = agentMode) => {
       slug = nextSlug;
-      telegramMode = nextTelegramMode;
+      agentMode = nextAgentMode;
     },
     setState,
   };
 };
 
-describe('onePageSessionTelegramActions request lifecycle', () => {
+describe('onePageSessionAgentActions request lifecycle', () => {
+  it('loads submit readiness without binding native fetch to the ports object', async () => {
+    const harness = createHarness();
+    harness.fetchImpl.mockImplementation(function (this: unknown) {
+      if (this !== undefined) throw new TypeError('Illegal invocation');
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionSlug: 'alpha',
+            authorityMode: 'worker_canonical',
+            agentHttpEnabled: true,
+            clientSubmitReady: true,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    });
+    const metadata = await harness.actions.loadAgentSessionMeta();
+    expect(metadata?.clientSubmitReady).toBe(true);
+    expect(harness.getState().agentSessionMetaStatus).toBe('ready');
+  });
+
   it('ignores a deferred question response after the session identity changes', async () => {
     const harness = createHarness();
     const pending = deferred<any>();
     harness.loadQuestions.mockReturnValueOnce(pending.promise);
 
-    const request = harness.actions.loadTelegramAgentQuestions(true);
-    expect(harness.getState().telegramAgentQuestionsStatus).toBe('loading');
+    const request = harness.actions.loadAgentQuestions(true);
+    expect(harness.getState().agentQuestionsStatus).toBe('loading');
 
     harness.setSlug('beta', false);
-    harness.actions.handleTelegramComponentDidUpdate({ slugChanged: true, loginJustCompleted: false });
+    harness.actions.handleAgentComponentDidUpdate({ slugChanged: true, loginJustCompleted: false });
     pending.resolve({
       ok: true,
       questions: [{ questionId: 'alpha-question', prompt: 'Old session question' }],
@@ -102,8 +124,8 @@ describe('onePageSessionTelegramActions request lifecycle', () => {
     });
     await request;
 
-    expect(harness.getState().telegramAgentQuestionsStatus).toBe('idle');
-    expect(harness.getState().telegramAgentQuestions).toEqual([]);
+    expect(harness.getState().agentQuestionsStatus).toBe('idle');
+    expect(harness.getState().agentQuestions).toEqual([]);
   });
 
   it('lets only the newest overlapping question request settle loading and data', async () => {
@@ -112,8 +134,8 @@ describe('onePageSessionTelegramActions request lifecycle', () => {
     const second = deferred<any>();
     harness.loadQuestions.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
 
-    const firstRequest = harness.actions.loadTelegramAgentQuestions(true);
-    const secondRequest = harness.actions.loadTelegramAgentQuestions(true);
+    const firstRequest = harness.actions.loadAgentQuestions(true);
+    const secondRequest = harness.actions.loadAgentQuestions(true);
     first.resolve({
       ok: true,
       questions: [{ questionId: 'old-question', prompt: 'Old question' }],
@@ -121,8 +143,8 @@ describe('onePageSessionTelegramActions request lifecycle', () => {
     });
     await firstRequest;
 
-    expect(harness.getState().telegramAgentQuestionsStatus).toBe('loading');
-    expect(harness.getState().telegramAgentQuestions).toEqual([]);
+    expect(harness.getState().agentQuestionsStatus).toBe('loading');
+    expect(harness.getState().agentQuestions).toEqual([]);
 
     second.resolve({
       ok: true,
@@ -131,10 +153,8 @@ describe('onePageSessionTelegramActions request lifecycle', () => {
     });
     await secondRequest;
 
-    expect(harness.getState().telegramAgentQuestionsStatus).toBe('ready');
-    expect(harness.getState().telegramAgentQuestions).toEqual([
-      expect.objectContaining({ questionId: 'new-question' }),
-    ]);
+    expect(harness.getState().agentQuestionsStatus).toBe('ready');
+    expect(harness.getState().agentQuestions).toEqual([expect.objectContaining({ questionId: 'new-question' })]);
   });
 
   it('does not write session metadata after disposal during an await', async () => {
@@ -142,9 +162,9 @@ describe('onePageSessionTelegramActions request lifecycle', () => {
     const pending = deferred<Response>();
     harness.fetchImpl.mockReturnValueOnce(pending.promise);
 
-    const request = harness.actions.loadTelegramSessionMeta();
+    const request = harness.actions.loadAgentSessionMeta();
     const writesBeforeDispose = harness.setState.mock.calls.length;
-    harness.actions.disposeTelegramActions();
+    harness.actions.disposeAgentActions();
     pending.resolve(
       new Response(JSON.stringify({ ok: true, sessionSlug: 'alpha' }), {
         status: 200,
@@ -154,6 +174,6 @@ describe('onePageSessionTelegramActions request lifecycle', () => {
     await request;
 
     expect(harness.setState).toHaveBeenCalledTimes(writesBeforeDispose);
-    expect(harness.getState().telegramSessionMetaStatus).toBe('loading');
+    expect(harness.getState().agentSessionMetaStatus).toBe('loading');
   });
 });

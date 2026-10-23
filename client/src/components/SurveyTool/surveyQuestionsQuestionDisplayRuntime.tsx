@@ -598,8 +598,16 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
       wrapperStyle,
     });
 
+    // Same hooks as SingleQuestionResponse, so one locator finds a stored field in every view.
     const control = (
-      <QuestionDecryptControl {...displayState} onClick={() => handleDecryptQuestionAnswer(questionId, fieldKey)} />
+      <QuestionDecryptControl
+        {...displayState}
+        testId={fieldKey === 'additional' ? E2E_TESTIDS.DECRYPT_ADDITIONAL : E2E_TESTIDS.DECRYPT_ANSWER}
+        questionId={String(questionId || '')
+          .trim()
+          .toLowerCase()}
+        onClick={() => handleDecryptQuestionAnswer(questionId, fieldKey)}
+      />
     );
     // A restored draft could not keep this field's unlock: drafts never store a locked value's plaintext.
     const fields = fieldKey === 'additional' ? 'additionalComments' : 'answers';

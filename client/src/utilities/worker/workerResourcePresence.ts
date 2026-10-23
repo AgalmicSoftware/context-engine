@@ -14,6 +14,19 @@ const CACHE_TTL_MS = 30_000;
 const presenceCache = new Map<string, { expiresAt: number; value: WorkerResourcePresence | null }>();
 const presenceInflight = new Map<string, Promise<WorkerResourcePresence | null>>();
 
+export const getCachedWorkerResourcePresence = ({
+  sessionSlug = '',
+  workerUrl = '',
+}: {
+  sessionSlug?: unknown;
+  workerUrl?: unknown;
+}): WorkerResourcePresence | null => {
+  const url = String(workerUrl || '').trim();
+  const slug = String(sessionSlug || '').trim();
+  const cached = presenceCache.get(`${url.replace(/\/+$/, '')}|${slug}`);
+  return cached && cached.expiresAt > Date.now() ? cached.value : null;
+};
+
 const normalizePresence = (value: unknown): WorkerResourcePresence | null => {
   if (!value || typeof value !== 'object') return null;
   const source = value as UnknownRecord;

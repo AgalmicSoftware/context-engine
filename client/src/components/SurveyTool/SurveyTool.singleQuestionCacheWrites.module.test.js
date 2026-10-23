@@ -15,18 +15,12 @@ import {
   prepareViewedQuestionDecryptState,
   resolveQuestionDecryptHandlingMode,
 } from './surveyToolDecryptFlow';
-import {
-  ensureQuestionsNet,
-  ensureSurveysNet,
-  mergeSurveyToolCachePatchIntoSurveysCache,
-} from './surveyToolCacheState';
+import { ensureQuestionsNet, mergeSurveyToolCachePatchIntoSurveysCache } from './surveyToolCacheState';
 import {
   normalizeSessionSlugValue,
   resolveEnsureQuestionCachedContext,
-  resolveSurveyReadContext,
   resolveUpdateCacheContext,
 } from './surveyToolScope';
-import { buildSurveyToolSurveyListStatePatch } from './surveyToolTopLevelHelpers';
 import contractScripts, * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
@@ -108,49 +102,6 @@ const applySurveyToolCachePatch = ({
     effectiveSlug,
     netIdStr,
   };
-};
-
-const getSurveyDataThroughPorts = async ({
-  props = {},
-  surveyID = '',
-  readSurveysCacheAsync = async () => ({}),
-  writeSurveysCache = jest.fn(),
-  findSurveyInAllCaches = () => null,
-  getSurveyDataById = contractScripts.getSurveyDataById,
-} = {}) => {
-  if (props.singleQuestionMode) return null;
-  const slug = normalizeSessionSlugValue(props.sessionSlug || props.activeSessionSlug || '');
-  const surveyReadContext = resolveSurveyReadContext(props, slug);
-  const effectiveSlug = surveyReadContext.sessionSlug || slug;
-  const netIdStr = surveyReadContext.networkIdStr;
-  const loweredSurveyID = String(surveyID || '').toLowerCase();
-  if (!loweredSurveyID) return null;
-
-  let surveyData = null;
-  if (netIdStr) {
-    const surveysCache = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
-    surveyData = surveysCache[netIdStr]?.surveys?.[loweredSurveyID] || null;
-  }
-  if (!surveyData) {
-    const found = findSurveyInAllCaches(loweredSurveyID);
-    if (found) surveyData = found.data || null;
-  }
-  if (!surveyData && netIdStr) {
-    surveyData = await getSurveyDataById(props.provider, loweredSurveyID, effectiveSlug);
-    if (surveyData) {
-      surveyData = {
-        ...surveyData,
-        creator: surveyData.creator || '',
-        id: loweredSurveyID,
-        questionIDs: Array.isArray(surveyData.questionIDs) ? surveyData.questionIDs : [],
-        surveyID: loweredSurveyID,
-      };
-      const cacheToUpdate = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
-      cacheToUpdate[netIdStr].surveys[loweredSurveyID] = surveyData;
-      await writeSurveysCache(effectiveSlug, cacheToUpdate);
-    }
-  }
-  return surveyData;
 };
 
 describe('SurveyTool single-question cache writes and decrypts', () => {
@@ -881,182 +832,5 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
         parsedViewAddressAnswers: latest,
       }),
     );
-  });
-
-  it('persists fetched surveys through optimistic survey cache writes', async () => {
-    jest
-      .spyOn(contractScriptsModule, 'getSessionConfigBySlug')
-      .mockImplementation((slug) => (slug === 'edge' ? makeLegacySessionConfig(slug) : null));
-    jest
-      .spyOn(cacheScripts, 'readCache')
-      .mockImplementation(async (namespace) => (namespace === 'surveysCache' ? {} : null));
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCacheOptimistic').mockResolvedValue(true);
-    jest.spyOn(contractScripts, 'getSurveyDataById').mockResolvedValue({
-      title: 'Fetched survey',
-      questionIDs: ['q1'],
-      creator: '0xcreator',
-    });
-
-    const surveyData = await getSurveyDataThroughPorts({
-      props: {
-        provider: {},
-        network: { id: 84532 },
-        networkChainId: 84532,
-        activeSessionSlug: 'edge',
-        sessionSlug: 'edge',
-      },
-      surveyID: '0xSurvey',
-      readSurveysCacheAsync: (slug) => cacheScripts.readCache('surveysCache', slug),
-      writeSurveysCache: (slug, cache) => cacheScripts.writeCacheOptimistic('surveysCache', slug, cache),
-    });
-
-    expect(surveyData).toEqual(
-      expect.objectContaining({
-        id: '0xsurvey',
-        surveyID: '0xsurvey',
-        title: 'Fetched survey',
-      }),
-    );
-    expect(writeSpy).toHaveBeenCalledWith(
-      'surveysCache',
-      'edge',
-      expect.objectContaining({
-        84532: expect.objectContaining({
-          surveys: expect.objectContaining({
-            '0xsurvey': expect.objectContaining({
-              id: '0xsurvey',
-              surveyID: '0xsurvey',
-              title: 'Fetched survey',
-            }),
-          }),
-        }),
-      }),
-    );
-  });
-
-  it('uses an explicit SurveyTool session prop for fetched survey reads and cache writes', async () => {
-    jest
-      .spyOn(contractScriptsModule, 'getSessionConfigBySlug')
-      .mockImplementation((slug) => (slug === 'rxc' ? makeLegacySessionConfig(slug) : null));
-    jest
-      .spyOn(cacheScripts, 'readCache')
-      .mockImplementation(async (namespace) => (namespace === 'surveysCache' ? {} : null));
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCacheOptimistic').mockResolvedValue(true);
-    const getSurveySpy = jest.spyOn(contractScripts, 'getSurveyDataById').mockResolvedValue({
-      title: 'Fetched survey',
-      questionIDs: ['q1'],
-      creator: '0xcreator',
-    });
-
-    const surveyData = await getSurveyDataThroughPorts({
-      props: {
-        provider: {},
-        network: { id: 84532 },
-        networkChainId: 84532,
-        activeSessionSlug: 'edge',
-        sessionSlug: 'rxc',
-      },
-      surveyID: '0xSurvey',
-      readSurveysCacheAsync: (slug) => cacheScripts.readCache('surveysCache', slug),
-      writeSurveysCache: (slug, cache) => cacheScripts.writeCacheOptimistic('surveysCache', slug, cache),
-    });
-
-    expect(surveyData).toEqual(
-      expect.objectContaining({
-        id: '0xsurvey',
-        surveyID: '0xsurvey',
-        title: 'Fetched survey',
-      }),
-    );
-    expect(getSurveySpy).toHaveBeenCalledWith({}, '0xsurvey', 'rxc');
-    expect(writeSpy).toHaveBeenCalledWith(
-      'surveysCache',
-      'rxc',
-      expect.objectContaining({
-        84532: expect.objectContaining({
-          surveys: expect.objectContaining({
-            '0xsurvey': expect.objectContaining({
-              id: '0xsurvey',
-              surveyID: '0xsurvey',
-              title: 'Fetched survey',
-            }),
-          }),
-        }),
-      }),
-    );
-  });
-
-  it('does not read survey list/data from a borrowed general network when the slug is unresolved', async () => {
-    const generalCfg = {
-      slug: '',
-      networkChainId: 84532,
-    };
-    const strictLookup = (slug) =>
-      String(slug || '')
-        .trim()
-        .toLowerCase() === ''
-        ? generalCfg
-        : null;
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
-    jest
-      .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
-      .mockImplementation((slug) => strictLookup(slug) || generalCfg);
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace) => {
-      if (namespace === 'surveysCache') {
-        return {
-          84532: {
-            surveys: {
-              '0xsurvey': {
-                id: '0xsurvey',
-                surveyID: '0xsurvey',
-                title: 'Borrowed Survey',
-                questionIDs: ['q1'],
-              },
-            },
-          },
-        };
-      }
-      return null;
-    });
-    const getSurveyDataByIdSpy = jest.spyOn(contractScripts, 'getSurveyDataById').mockResolvedValue({
-      id: '0xsurvey',
-      surveyID: '0xsurvey',
-      title: 'Borrowed Survey',
-      questionIDs: ['q1'],
-    });
-    const findSurveyInAllCaches = jest.fn(() => null);
-    const props = {
-      provider: {},
-      sessionSlug: 'missing-session-slug',
-      activeSessionSlug: '',
-    };
-    const surveyReadContext = resolveSurveyReadContext(props, 'missing-session-slug');
-    const listPatch = buildSurveyToolSurveyListStatePatch();
-
-    readCacheSpy.mockClear();
-
-    expect(surveyReadContext.networkIdStr).toBe('');
-    expect(listPatch).toEqual(
-      expect.objectContaining({
-        surveys: [],
-        loading: false,
-      }),
-    );
-    expect(readCacheSpy).not.toHaveBeenCalled();
-
-    readCacheSpy.mockClear();
-
-    await expect(
-      getSurveyDataThroughPorts({
-        props,
-        surveyID: '0xSurvey',
-        readSurveysCacheAsync: (slug) => cacheScripts.readCache('surveysCache', slug),
-        findSurveyInAllCaches,
-      }),
-    ).resolves.toBeNull();
-    expect(findSurveyInAllCaches).toHaveBeenCalledWith('0xsurvey');
-    expect(readCacheSpy).not.toHaveBeenCalled();
-    expect(getSurveyDataByIdSpy).not.toHaveBeenCalled();
   });
 });

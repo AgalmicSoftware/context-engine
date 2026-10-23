@@ -200,6 +200,19 @@ const renderPile = (props = {}, options = {}) =>
     options,
   );
 
+const legacySessionConfig = (slug) => ({
+  slug,
+  networkChainId: 84532,
+  __registry: {
+    registryChainId: 84532,
+    sessionIdHex: '0x00112233445566778899aabbccddeeff',
+  },
+});
+
+// These mounted session flows run after the host resolves its configuration.
+const renderDemoPile = (props = {}, options = {}) =>
+  renderPile({ sessionSlug: 'demo', sessionConfig: legacySessionConfig('demo'), ...props }, options);
+
 const applyPatch = (state, patch) => ({ ...state, ...patch });
 
 describe('SurveyPileViewMode runtime surface', () => {
@@ -380,6 +393,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     const question = { id: 'rating-q1', type: 'rating', prompt: 'Rate the active session' };
     const harness = renderPile({
       sessionSlug: 'session-a',
+      sessionConfig: legacySessionConfig('session-a'),
       questionPool: [question],
       cacheHasLoaded: false,
       isQuestionCacheReady: true,
@@ -393,7 +407,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     fireEvent.change(slider, { target: { value: '7' } });
     await waitFor(() => expect(slider).toHaveValue('7'));
 
-    harness.rerenderSurveyQuestions({ sessionSlug: 'session-b' });
+    harness.rerenderSurveyQuestions({ sessionSlug: 'session-b', sessionConfig: legacySessionConfig('session-b') });
 
     await waitFor(() => expect(screen.getByRole('slider')).toHaveValue('0'));
   });
@@ -551,7 +565,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     Element.prototype.scrollIntoView = scrollIntoView;
 
     try {
-      renderPile(
+      renderDemoPile(
         {},
         {
           route: '/session/demo?foo=1&mode=listening#pile',
@@ -585,7 +599,7 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('mounts the voice-mode modal on first open and keeps it mounted after closing', async () => {
     mockVoiceModeProps = undefined;
-    renderPile({}, { route: '/session/demo' });
+    renderDemoPile({}, { route: '/session/demo' });
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE);
     await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
     // A closed modal is never rendered, so its code is not loaded on a plain visit.
@@ -602,19 +616,19 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('opens interview and group conversation directly from their mode query values', async () => {
-    const first = renderPile({}, { route: '/session/demo?foo=1&mode=interview' });
+    const first = renderDemoPile({}, { route: '/session/demo?foo=1&mode=interview' });
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
     expect(resolveSessionVoiceMode(window.location.search)).toBe('interview');
     first.unmount();
 
-    renderPile({}, { route: '/session/demo?mode=recordGroup' });
+    renderDemoPile({}, { route: '/session/demo?mode=recordGroup' });
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'recordGroup');
     expect(resolveSessionVoiceMode(window.location.search)).toBe('recordGroup');
   });
 
   it('returns embedded interviews to the session Results section without opening raw results', async () => {
     const onViewSessionResults = jest.fn();
-    renderPile(
+    renderDemoPile(
       { activeSessionSlug: 'demo', onViewSessionResults },
       {
         route: '/session/demo?mode=interview&worker=https%3A%2F%2Fworker.example',
@@ -632,7 +646,7 @@ describe('SurveyPileViewMode runtime surface', () => {
   it('lets the interview modal close and navigate to session results after submit success', async () => {
     const onPopState = jest.fn();
     window.addEventListener('popstate', onPopState);
-    renderPile({ activeSessionSlug: 'demo' }, { route: '/session/demo?mode=interview#drafts' });
+    renderDemoPile({ activeSessionSlug: 'demo' }, { route: '/session/demo?mode=interview#drafts' });
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
 
     try {
@@ -652,7 +666,7 @@ describe('SurveyPileViewMode runtime surface', () => {
   it('preserves explicit worker query and drops modal state when interview results navigation runs', async () => {
     const onPopState = jest.fn();
     window.addEventListener('popstate', onPopState);
-    renderPile(
+    renderDemoPile(
       { activeSessionSlug: 'demo' },
       { route: '/session/demo?mode=interview&worker=https%3A%2F%2Fworker.custom.example%2Fedge#drafts' },
     );
@@ -677,7 +691,7 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('renders newly discovered quadratic interview questions before the pile cache catches up', async () => {
-    renderPile({}, { route: '/session/demo?mode=interview' });
+    renderDemoPile({}, { route: '/session/demo?mode=interview' });
     await screen.findByTestId('mock-voice-mode-modal');
     const question = {
       id: 'live-quadratic',
@@ -695,7 +709,7 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('undoes interview quadratic edits to the drafted allocation the modal passes', async () => {
-    renderPile({}, { route: '/session/demo?mode=interview' });
+    renderDemoPile({}, { route: '/session/demo?mode=interview' });
     await screen.findByTestId('mock-voice-mode-modal');
     const question = {
       id: 'live-quadratic',
@@ -726,7 +740,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       responderContext: { summary: 'Synthetic live return context.' },
       responses: [{ questionId: 'q1', answer: 'Returned draft', confidence: 0.74 }],
     });
-    const rendered = renderPile(
+    const rendered = renderDemoPile(
       { activeSessionSlug: 'demo', questionsCacheNonce: 1 },
       { route: '/session/demo?mode=interview' },
     );
@@ -757,7 +771,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       responderContext: { summary: 'Repeat valid context.' },
       responses: [{ questionId: 'q1', answer: 'Repeat draft', confidence: 0.67 }],
     });
-    const rendered = renderPile(
+    const rendered = renderDemoPile(
       { activeSessionSlug: 'demo', questionsCacheNonce: 1 },
       { route: `/session/demo?mode=interview#prefill=${encoded}` },
     );
@@ -784,7 +798,7 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('recovers when a mounted session receives an invalid prefill before a fresh valid prefill', async () => {
-    const rendered = renderPile(
+    const rendered = renderDemoPile(
       { activeSessionSlug: 'demo', questionsCacheNonce: 1 },
       { route: '/session/demo?mode=interview' },
     );
@@ -844,7 +858,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     );
     expect(window.location.hash).toBe(`#prefill=${encoded}`);
 
-    const rendered = renderPile({}, { route });
+    const rendered = renderDemoPile({}, { route });
     const modal = await screen.findByTestId('mock-voice-mode-modal');
     expect(modal).toHaveAttribute('data-mode', 'interview');
     expect(modal).toHaveAttribute('data-prefill-model', 'claude-test');

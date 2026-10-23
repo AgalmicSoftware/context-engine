@@ -17,7 +17,7 @@ import {
   computeAggregatorQuestionMetadataSignature,
   computeAggregatorSourceSnapshotSignature,
 } from './onePageSessionAggregator';
-import { normalizeOnePageSessionSlug } from './onePageSessionTelegramController';
+import { normalizeOnePageSessionSlug } from './onePageSessionAgentController';
 
 type AggregatorResultRow = {
   responder: string;

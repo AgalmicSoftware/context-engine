@@ -38,7 +38,7 @@ export default function LinkedWorkerGroup({ reference, ...props }: Props) {
   }, [sessionSlug, sessionId, workerUrl, target, props.refreshNonce]);
   if (state?.target !== target) {
     return (
-      <div className={`${styles.telegramListEmpty} ${styles.workerGroupsLoadingState}`} role="status">
+      <div className={`${styles.agentListEmpty} ${styles.workerGroupsLoadingState}`} role="status">
         Loading groups…
       </div>
     );

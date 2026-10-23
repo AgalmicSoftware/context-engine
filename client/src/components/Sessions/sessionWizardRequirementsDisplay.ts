@@ -10,6 +10,7 @@ type ResolveSessionWizardNewSessionRequirementsDisplayStateArgs = {
   currentWorkerSecrets?: SessionWizardRecord | null;
   hasCompatibleWorkerRuntime?: unknown;
   hasPendingSbtDrafts?: unknown;
+  sessionConfig?: unknown;
   hasSponsoredBundleLink?: unknown;
   isNewSessionWizardRoute?: unknown;
   newSessionBannerDismissalContextKey?: unknown;
@@ -46,6 +47,7 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
   currentWorkerSecrets = null,
   hasCompatibleWorkerRuntime = false,
   hasPendingSbtDrafts = false,
+  sessionConfig,
   hasSponsoredBundleLink = false,
   isNewSessionWizardRoute = false,
   newSessionBannerDismissalContextKey = '',
@@ -58,7 +60,7 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
 }: ResolveSessionWizardNewSessionRequirementsDisplayStateArgs = {}): SessionWizardNewSessionRequirementsDisplayState => {
   const modeRequirements = resolveSessionWizardModeRequirements(
     sessionModeProfile && typeof sessionModeProfile === 'object' ? (sessionModeProfile as SessionModeProfile) : null,
-    { hasPendingSbtDrafts: !!hasPendingSbtDrafts },
+    { hasPendingSbtDrafts: !!hasPendingSbtDrafts, sessionConfig },
   );
   const sponsoredBundleStatusTone = toRequirementString(sponsoredBundleStatus?.tone).trim().toLowerCase();
   const hasAnyAiProviderKey = ['openaiKey', 'anthropicKey', 'openrouterKey'].some(

@@ -1,4 +1,8 @@
-import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
+import { normalizeHostedFaucetSelection } from './sessionWizardHostedFaucet';
+import {
+  normalizeSessionModeProfileForWrite,
+  type SessionModeProfile,
+} from '../../utilities/session/sessionModeProfile';
 import type { UnknownRecord } from '../../utilities/session/sessionTypes';
 import { deepClone } from './sessionWizardCoreUtils';
 import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
@@ -27,6 +31,7 @@ type DraftWithGroupCreationPolicy<Draft extends SessionWizardModeDraft> = Draft 
 type DraftWithSelectedModeProfile<Draft extends SessionWizardModeDraft> = DraftWithGroupCreationPolicy<Draft> & {
   sessionModeProfile: SessionModeProfile;
   storageProfile: UnknownRecord;
+  networkChainId?: number;
 };
 
 const isRecord = (value: unknown): value is UnknownRecord =>
@@ -50,7 +55,9 @@ export const applySessionModeProfileSelectionToDraft = <Draft extends SessionWiz
   compiled: { storageProfile: UnknownRecord },
 ): DraftWithSelectedModeProfile<Draft> => {
   const next = deepClone(prev) as DraftWithSelectedModeProfile<Draft>;
-  next.sessionModeProfile = deepClone(profile);
+  next.sessionModeProfile = normalizeSessionModeProfileForWrite(profile);
+  // Keep the header in step even while a newly added SBT rule is incomplete.
+  if (profile.evm.registryChainId) next.networkChainId = profile.evm.registryChainId;
   next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
   next.groupCreationPolicy = normalizeGroupCreationPolicy(
     next.groupCreationPolicy,
@@ -67,5 +74,5 @@ export const applySessionModeProfileSelectionToDraft = <Draft extends SessionWiz
     delete next.telegram.mode;
     if (!Object.keys(next.telegram).length) delete next.telegram;
   }
-  return next;
+  return normalizeHostedFaucetSelection(next, prev);
 };

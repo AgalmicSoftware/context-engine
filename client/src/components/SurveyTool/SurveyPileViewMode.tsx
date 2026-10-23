@@ -1233,9 +1233,12 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
     // If context changes, we must reset optimistic flags and reload immediately
     // We do engine regardless of edits because the context (wallet/chain) invalidates the current session
     engine.setState(
-      buildPileContextResetState({
-        submittedSinceLastEdit: engine.state.submittedSinceLastEdit,
-      }),
+      {
+        ...buildPileContextResetState({
+          submittedSinceLastEdit: engine.state.submittedSinceLastEdit,
+        }),
+        draftPersistenceError: '',
+      },
       () => {
         if (engine._loadAndSortDebounceTimer) {
           clearTimeout(engine._loadAndSortDebounceTimer);
@@ -3255,6 +3258,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
         <div className={styles.pileWrapper}>
           {renderPileInteractionSurface({
             submissionError: String(engine.state.submissionError || ''),
+            draftPersistenceError: String(engine.state.draftPersistenceError || ''),
             savedAnswersNotice: buildSavedAnswersNotice(engine, pileQuestions.length > 0),
             showHologramAssistant,
             toggleHologramAssistant: engine.toggleHologramAssistant,

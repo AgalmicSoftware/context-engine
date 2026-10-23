@@ -5,6 +5,28 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SurveyQuestionsAuthoringRouteSection from './SurveyQuestionsAuthoringRouteSection';
 
 describe('SurveyQuestionsAuthoringRouteSection', () => {
+  it.each([
+    ['header submit', false, false],
+    ['one footer', true, false],
+    ['two footers', true, true],
+  ])('keeps one persistent draft status with %s', (_label, showInlineSubmit, showTopInlineSubmit) => {
+    const props = { submitDisplayState: { showInlineSubmit, showTopInlineSubmit } };
+    const { rerender } = render(<SurveyQuestionsAuthoringRouteSection {...props} />);
+    const status = screen.getByRole('status');
+    expect(status).toBeEmptyDOMElement();
+    rerender(
+      <SurveyQuestionsAuthoringRouteSection
+        {...props}
+        submitFooterProps={{ draftPersistenceError: 'Draft changes are only in memory.' }}
+      />,
+    );
+    expect(screen.getAllByRole('status')).toEqual([status]);
+    expect(status).toHaveTextContent('Draft changes are only in memory.');
+    rerender(<SurveyQuestionsAuthoringRouteSection {...props} />);
+    expect(screen.getByRole('status')).toBe(status);
+    expect(status).toBeEmptyDOMElement();
+  });
+
   it('renders editable questions and forwards submit/footer callbacks', () => {
     const onPrimarySubmitClick = jest.fn();
     const onRevertPendingChanges = jest.fn();

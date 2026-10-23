@@ -723,6 +723,9 @@ export const createSurveyQuestionsSubmitRuntime = (
         afterStateApplied: async () => {
           try {
             if (!isSubmitContextCurrent(submitContext)) return;
+            if (stateRef.current.draftPersistenceError && getChangedQidsAndFields(surveyIndex).changedQids.size === 0) {
+              setState({ draftPersistenceError: '' });
+            }
             const cacheWriteResult: SurveyQuestionsLegacyValue = await writeSubmittedResponsesToLocalCaches(
               {
                 receipt,

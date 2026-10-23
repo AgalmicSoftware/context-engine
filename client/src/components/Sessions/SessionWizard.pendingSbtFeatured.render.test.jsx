@@ -30,7 +30,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     await expectSelectorAddresses('encryption-gate-gate-1', [mockPendingSbtAddress]);
   });
 
-  it('retains the auto-linked Gate A pending draft during same-tab remounts', async () => {
+  it('clears pending featured and Gate A selections when the wizard unmounts', async () => {
     const firstRender = renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -46,9 +46,10 @@ describe('SessionWizard pending featured SBT rendering', () => {
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     await openAdvancedMoreOptions();
 
-    await expectSelectorAddresses('default-featured-sbts', [mockPendingSbtAddress]);
+    await expectSelectorAddresses('default-featured-sbts', []);
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).not.toBeInTheDocument();
     await ensureGateASelectorVisible();
-    await expectSelectorAddresses('encryption-gate-gate-1', [mockPendingSbtAddress]);
+    await expectSelectorAddresses('encryption-gate-gate-1', []);
   });
 
   it('stops re-adding the auto-linked Gate A draft after the user removes it from Gate A', async () => {
@@ -75,7 +76,8 @@ describe('SessionWizard pending featured SBT rendering', () => {
     await ensureGateASelectorVisible();
 
     await expectSelectorAddresses('encryption-gate-gate-1', []);
-    await expectSelectorAddresses('default-featured-sbts', [mockPendingSbtAddress]);
+    await expectSelectorAddresses('default-featured-sbts', []);
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).not.toBeInTheDocument();
   });
 
   it('removing the featured pending draft from Step 1 also clears the auto-linked Gate A selector', async () => {
@@ -133,7 +135,8 @@ describe('SessionWizard pending featured SBT rendering', () => {
     await ensureGateASelectorVisible();
 
     await expectSelectorAddresses('encryption-gate-gate-1', [mockReplacementSbtAddress]);
-    await expectSelectorAddresses('default-featured-sbts', [mockPendingSbtAddress]);
+    await expectSelectorAddresses('default-featured-sbts', []);
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).not.toBeInTheDocument();
   });
 
   it('clears the pending featured draft, Gate A auto-link, and selectors when the pending draft is deleted', async () => {

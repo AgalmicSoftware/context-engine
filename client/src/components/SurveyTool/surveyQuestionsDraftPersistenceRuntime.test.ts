@@ -1,5 +1,8 @@
 import { createSurveyQuestionsDraftPersistenceRuntime } from './surveyQuestionsDraftPersistenceRuntime';
 import type { SurveyQuestionsLegacyRecord } from './surveyQuestionsTypes';
+import * as draftState from './surveyToolDraftState';
+import { resolveDraftStorageContext } from './surveyToolScope';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   buildPersistDraftAllowedQuestionIds: jest.fn(() => []),
@@ -38,6 +41,8 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
     purgeKeys: ['acct-key', 'anon-key', 'pending-acct'],
   })),
   getHydrationQuestionIds: jest.fn(() => []),
+  getChangedQidsAndFields: jest.fn(() => ({ changedMap: { q1: { answer: true } } })),
+  setState: jest.fn(),
   inst: {
     _applyDraftTrackingState: jest.fn(),
     _draftDirtyQids: new Set<string>(),
@@ -155,4 +160,193 @@ describe('surveyQuestionsDraftPersistenceRuntime', () => {
       drafts: [pendingPayload],
     });
   });
+});
+
+const makeWorkerConfig = (
+  corsWorkerUrl = 'https://a.example.com',
+  sessionId = '0x00112233445566778899aabbccddeeff',
+) => ({
+  slug: 'edge',
+  corsWorkerUrl,
+  sessionId,
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  storageProfile: { backend: 'cloudflare', resources: { questions: 'active', surveys: 'active' } },
+});
+
+const createRealDraftContext = (sessionConfig: Record<string, unknown> = makeWorkerConfig()) => {
+  const base = createContext({ ...draftState, resolveDraftStorageContext });
+  const context = {
+    ...base,
+    propsRef: { current: { ...base.propsRef.current, sessionConfig } },
+    stateRef: {
+      current: {
+        ...base.stateRef.current,
+        draftPersistenceError: '',
+        surveysResponseState: [
+          {
+            ...base.stateRef.current.surveysResponseState[0],
+            answers: { q1: { value: 'draft A', encrypted: false } },
+          },
+        ],
+      },
+    },
+  };
+  context.inst._draftDirtyQids.add('q1');
+  context.inst._applyDraftTrackingState.mockImplementation((tracking) => Object.assign(context.inst, tracking));
+  context.setState.mockImplementation((patch) => Object.assign(context.stateRef.current, patch));
+  return context;
+};
+
+describe('persisted drafts use the actual source authority', () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it.each([
+    makeWorkerConfig('https://b.example.com'),
+    makeWorkerConfig('https://a.example.com', '0xffeeddccbbaa99887766554433221100'),
+  ])('isolates the actual loader and scoped cleanup after a same-slug authority switch', (otherConfig) => {
+    const context = createRealDraftContext();
+    const runtime = createSurveyQuestionsDraftPersistenceRuntime(context);
+    runtime.persistDraft();
+    const keyA = runtime.getDraftKey();
+    const rawA = sessionStorage.getItem(keyA);
+    expect(runtime.loadDraft()?.answers.q1.value).toBe('draft A');
+
+    context.propsRef.current.sessionConfig = otherConfig;
+    expect(runtime.loadDraft()).toBeNull();
+    expect(runtime.getDraftKey()).not.toBe(keyA);
+    context.stateRef.current.surveysResponseState[0].answers.q1.value = 'draft B';
+    runtime.persistDraft();
+    expect(runtime.loadDraft()?.answers.q1.value).toBe('draft B');
+    runtime.clearDraftFor('q1');
+    runtime.clearDraft();
+    expect(sessionStorage.getItem(keyA)).toBe(rawA);
+    context.propsRef.current.sessionConfig = makeWorkerConfig();
+    expect(runtime.loadDraft()?.answers.q1.value).toBe('draft A');
+  });
+
+  it('keeps anonymous adoption and config revision changes within the same authority', () => {
+    const context = createRealDraftContext();
+    const runtime = createSurveyQuestionsDraftPersistenceRuntime(context);
+    context.propsRef.current.account = '';
+    runtime.persistDraft();
+    const anonKey = runtime.getDraftKey();
+    context.propsRef.current.account = '0xabc';
+    expect(runtime.loadDraft()?.answers.q1.value).toBe('draft A');
+    expect(sessionStorage.getItem(anonKey)).toBeNull();
+    const accountKey = runtime.getDraftKey();
+    context.propsRef.current.sessionConfig = { ...makeWorkerConfig(), configRevision: 42 };
+    expect(runtime.getDraftKey()).toBe(accountKey);
+    expect(runtime.loadDraft()?.answers.q1.value).toBe('draft A');
+  });
+
+  it('retains unscoped legacy Worker drafts without adopting, mirroring, or deleting them', () => {
+    const context = createRealDraftContext();
+    const runtime = createSurveyQuestionsDraftPersistenceRuntime(context);
+    const legacyKeys = draftState.buildSurveyDraftStorageVariantKeys({
+      sessionSlug: 'edge',
+      networkIdStr: 'worker',
+      account: '0xabc',
+      surveyScope: 'questions:q:q1',
+      questionId: 'q1',
+      includePerQuestionScope: true,
+    }).purgeKeys;
+    const legacyRaw = JSON.stringify({ answers: { q1: { value: 'unverified legacy draft' } } });
+    legacyKeys.forEach((key) => sessionStorage.setItem(key, legacyRaw));
+    expect(runtime.loadDraft()).toBeNull();
+    runtime.persistDraft();
+    runtime.clearDraftFor('q1');
+    runtime.clearDraft();
+    legacyKeys.forEach((key) => expect(sessionStorage.getItem(key)).toBe(legacyRaw));
+  });
+
+  it('fails closed when a Worker authority is incomplete and preserves registry keys', () => {
+    const context = createRealDraftContext({ ...makeWorkerConfig(), sessionId: '' });
+    const runtime = createSurveyQuestionsDraftPersistenceRuntime(context);
+    expect(runtime.getDraftKey()).toBeNull();
+    expect(runtime.loadDraft()).toBeNull();
+    runtime.persistDraft();
+    expect(sessionStorage.length).toBe(0);
+    context.propsRef.current.sessionConfig = {
+      slug: 'edge',
+      networkChainId: 84532,
+      __registry: { registryChainId: 84532, sessionIdHex: '0x00112233445566778899aabbccddeeff' },
+    };
+    expect(runtime.getDraftKey()).toBe('dg:surveyDraft:edge:84532:0xabc:questions:q:q1');
+  });
+
+  it('reports storage failure without losing the in-memory answer and clears it after a retry', () => {
+    const context = createRealDraftContext();
+    const runtime = createSurveyQuestionsDraftPersistenceRuntime(context);
+    const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+    runtime.persistDraft();
+    expect(context.stateRef.current.draftPersistenceError).toMatch(/only in memory/i);
+    expect(context.stateRef.current.surveysResponseState[0].answers.q1.value).toBe('draft A');
+    expect(context.inst._draftDirtyQids.has('q1')).toBe(true);
+    setItem.mockRestore();
+    runtime.persistDraft();
+    expect(runtime.loadDraft()?.answers.q1.value).toBe('draft A');
+    expect(context.stateRef.current.draftPersistenceError).toBe('');
+  });
+});
+
+it('does not run a debounced write after its source authority changes', () => {
+  jest.useFakeTimers();
+  try {
+    sessionStorage.clear();
+    const context = createRealDraftContext();
+    const runtime = createSurveyQuestionsDraftPersistenceRuntime(context);
+    runtime.persistDraftSafely();
+    context.propsRef.current.sessionConfig = makeWorkerConfig('https://b.example.com');
+    jest.advanceTimersByTime(200);
+    expect(sessionStorage.length).toBe(0);
+    expect(runtime.loadDraft()).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('retains source drafts when anonymous adoption cannot be persisted', () => {
+  sessionStorage.clear();
+  const context = createRealDraftContext();
+  const runtime = createSurveyQuestionsDraftPersistenceRuntime(context);
+  context.propsRef.current.account = '';
+  runtime.persistDraft();
+  const anonKey = runtime.getDraftKey();
+  const raw = sessionStorage.getItem(anonKey);
+  context.propsRef.current.account = '0xabc';
+  const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    throw new DOMException('quota', 'QuotaExceededError');
+  });
+  try {
+    expect(runtime.loadDraft()?.answers.q1.value).toBe('draft A');
+    expect(sessionStorage.getItem(anonKey)).toBe(raw);
+    expect(context.stateRef.current.draftPersistenceError).toMatch(/only in memory/i);
+  } finally {
+    setItem.mockRestore();
+  }
+});
+
+it('clears a stale memory-only warning after the user empties the draft', () => {
+  sessionStorage.clear();
+  const context = createRealDraftContext();
+  const runtime = createSurveyQuestionsDraftPersistenceRuntime(context);
+  const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    throw new DOMException('quota', 'QuotaExceededError');
+  });
+  try {
+    runtime.persistDraft();
+    expect(context.stateRef.current.draftPersistenceError).toMatch(/only in memory/i);
+  } finally {
+    setItem.mockRestore();
+  }
+  context.stateRef.current.surveysResponseState[0].answers.q1.value = '';
+  context.getChangedQidsAndFields.mockReturnValue({ changedMap: { q1: { answer: false } } });
+  runtime.persistDraft();
+  expect(context.stateRef.current.draftPersistenceError).toBe('');
+  expect(runtime.loadDraft()).toBeNull();
 });

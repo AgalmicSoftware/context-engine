@@ -38,26 +38,6 @@ type SurveyToolInitialCacheState = {
   questionResponses: Record<string, unknown>;
   arweaveContent: Record<string, unknown>;
 };
-type SurveyCacheLookupResult = {
-  data: unknown;
-  foundSlug: string;
-};
-type SurveyToolResultsModalStatePatch = {
-  showResultsModal: boolean;
-};
-type SurveyToolQuestionsCacheNoncePatch = {
-  questionsCacheNonce: number;
-};
-type SurveyToolLoadingStatePatch = {
-  loading: boolean;
-};
-type SurveyToolPubKeyStatePatch = {
-  pubKey: string;
-};
-type SurveyToolSurveyListStatePatch = {
-  surveys: unknown[];
-  loading: boolean;
-};
 type SurveyToolHydratedFilterState = {
   filterState: unknown;
   cleanUrl: string | null;
@@ -226,26 +206,6 @@ export const resolveSurveyToolResultsModalCloseState = ({
   };
 };
 
-type SurveyCacheEntryLike = {
-  slug?: unknown;
-  value?: unknown;
-};
-type SurveyCacheEntryReader = (namespace: string, options?: { cloneValues?: boolean }) => SurveyCacheEntryLike[];
-type SurveyToolQuestionsCacheNonceStateLike = {
-  questionsCacheNonce?: unknown;
-};
-type SurveyToolResultsModalStatePatchArgs = {
-  open?: unknown;
-};
-type SurveyToolLoadingStatePatchArgs = {
-  loading?: unknown;
-};
-type SurveyToolPubKeyStatePatchArgs = {
-  pubKey?: unknown;
-};
-type SurveyToolSurveyListStatePatchArgs = SurveyToolLoadingStatePatchArgs & {
-  surveys?: unknown;
-};
 type BuildSurveyToolHydratedFilterStateArgs = {
   props?: SurveyToolPropsLike;
   href?: unknown;
@@ -292,76 +252,11 @@ type SurveyToolResultsModalCloseState = {
   nextUrl: string;
   shouldCallExternalCloseHandler: boolean;
 };
-type SurveyCacheNetworkBucket = {
-  surveys?: Record<string, unknown>;
-};
-type SurveyCacheByNetwork = Record<string, SurveyCacheNetworkBucket | undefined>;
-
 const getNetworkIdFromPropsLike = (props: SurveyToolPropsLike = {}): unknown | undefined => {
   const network = props.network;
   if (!network || typeof network !== 'object') return undefined;
   return network.id;
 };
-
-export const findSurveyInSurveyCacheEntries = (
-  surveyID: unknown,
-  entries: SurveyCacheEntryLike[] = [],
-): SurveyCacheLookupResult | null => {
-  if (!surveyID) return null;
-  const sid = String(surveyID).toLowerCase();
-
-  for (const entry of entries) {
-    const slug = String(entry?.slug || '');
-    const cache = entry?.value && typeof entry.value === 'object' ? (entry.value as SurveyCacheByNetwork) : {};
-    for (const netKey in cache) {
-      const foundData = cache[netKey]?.surveys?.[sid];
-      if (foundData) {
-        return { data: foundData, foundSlug: slug };
-      }
-    }
-  }
-  return null;
-};
-
-export const findSurveyInAllSurveyCaches = (
-  surveyID: unknown,
-  listNamespaceEntries: SurveyCacheEntryReader,
-): SurveyCacheLookupResult | null => {
-  const entries = listNamespaceEntries('surveysCache', { cloneValues: false });
-  return findSurveyInSurveyCacheEntries(surveyID, Array.isArray(entries) ? entries : []);
-};
-
-export const buildSurveyToolResultsModalStatePatch = ({
-  open = false,
-}: SurveyToolResultsModalStatePatchArgs = {}): SurveyToolResultsModalStatePatch => ({
-  showResultsModal: open === true,
-});
-
-export const buildSurveyToolQuestionsCacheNoncePatch = (
-  prevState: SurveyToolQuestionsCacheNonceStateLike = {},
-): SurveyToolQuestionsCacheNoncePatch => ({
-  questionsCacheNonce: Number(prevState?.questionsCacheNonce || 0) + 1,
-});
-
-export const buildSurveyToolLoadingStatePatch = ({
-  loading = false,
-}: SurveyToolLoadingStatePatchArgs = {}): SurveyToolLoadingStatePatch => ({
-  loading: loading === true,
-});
-
-export const buildSurveyToolPubKeyStatePatch = ({
-  pubKey = '',
-}: SurveyToolPubKeyStatePatchArgs = {}): SurveyToolPubKeyStatePatch => ({
-  pubKey: String(pubKey ?? ''),
-});
-
-export const buildSurveyToolSurveyListStatePatch = ({
-  surveys = [],
-  loading = false,
-}: SurveyToolSurveyListStatePatchArgs = {}): SurveyToolSurveyListStatePatch => ({
-  surveys: Array.isArray(surveys) ? surveys : [],
-  loading: loading === true,
-});
 
 // Keep URL cleanup outside this helper; callers still need the hydrated filter if history mutation fails.
 export const buildSurveyToolHydratedFilterState = ({

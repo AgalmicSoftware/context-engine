@@ -1,3 +1,10 @@
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import {
+  resolveWorkerCanonicalCacheIdentity,
+  withWorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
+import * as cacheScripts from '../../utilities/cache/cacheScripts';
+import { surveyQuestionReadsPort } from '../../domains/surveys/surveyQuestionReadsPort';
 import { act, waitFor } from '@testing-library/react';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
@@ -192,6 +199,100 @@ describe('SurveyTool draft persistence', () => {
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
+
+  it.each(['single', 'standalone', 'survey'])(
+    'resets live edits across a same-slug Worker change (%s)',
+    async (mode) => {
+      const singleQuestionMode = mode === 'single';
+      const makeConfig = (corsWorkerUrl) => ({
+        slug: 'edge',
+        corsWorkerUrl,
+        sessionId: '0x00112233445566778899aabbccddeeff',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        storageProfile: { backend: 'cloudflare', resources: { questions: 'active', surveys: 'active' } },
+      });
+      let config = makeConfig('https://a.example.com');
+      const question = { id: 'q1', type: 'freeform', prompt: 'Shared question ID' };
+      const cache = () => ({
+        worker: withWorkerCanonicalCacheIdentity(
+          {
+            questions: { q1: question },
+            questionResponses: {},
+            pendingQuestionMetadata: {},
+            surveys: { 'survey-1': { id: 'survey-1', questionIDs: ['q1'] } },
+          },
+          resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: 'edge' }),
+        ),
+      });
+      jest
+        .spyOn(cacheScripts, 'readCache')
+        .mockImplementation(async (name) => (['questionsCache', 'surveysCache'].includes(name) ? cache() : {}));
+      jest
+        .spyOn(cacheScripts, 'peekCacheSync')
+        .mockImplementation((name) => (['questionsCache', 'surveysCache'].includes(name) ? cache() : {}));
+      jest.spyOn(surveyQuestionReadsPort, 'getQuestionData').mockResolvedValue(question);
+      jest.spyOn(surveyQuestionReadsPort, 'getResponse').mockResolvedValue(null);
+      jest.spyOn(surveyQuestionReadsPort, 'getSurveyResponse').mockResolvedValue(null);
+      let engine;
+      const view = renderSurveyQuestions({
+        account: '0x00000000000000000000000000000000000000a1',
+        loginComplete: true,
+        singleQuestionMode,
+        isStandalone: mode === 'standalone',
+        surveyId: mode === 'survey' ? 'survey-1' : undefined,
+        questionID: 'q1',
+        questionPool: [question],
+        sessionSlug: 'edge',
+        sessionSlugPinned: true,
+        sessionConfig: config,
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: true,
+        runtimeStrategy: {
+          render: (current) => {
+            engine = current;
+            return null;
+          },
+        },
+      });
+      await waitFor(() => expect(engine?.state?.surveysResponseState?.[0]?.answers?.q1).toBeDefined());
+      await act(async () => {
+        engine.handleAnswer(0, 'q1', 'A saved answer');
+      });
+      await act(async () => {
+        engine.persistDraft();
+      });
+      const keyA = engine.getDraftKey();
+      const rawA = sessionStorage.getItem(keyA);
+      await act(async () => {
+        engine.handleAnswer(0, 'q1', 'A-only answer');
+      });
+      expect(engine.state.surveysResponseState[0].answers.q1.value).toBe('A-only answer');
+      expect(engine._persistTimer).toBeTruthy();
+      config = makeConfig('https://b.example.com');
+      await act(async () => {
+        view.rerenderSurveyQuestions({ sessionConfig: config });
+      });
+      await waitFor(() => expect(engine.state.surveysResponseState[0].answers.q1.value).toBe(''));
+      expect(engine.getDraftKey()).toContain(encodeURIComponent('https://b.example.com'));
+      await act(async () => {
+        engine.handleAdditional(0, 'q1', 'B-only comment');
+      });
+      await act(async () => {
+        engine.persistDraft();
+      });
+      const persisted = JSON.parse(sessionStorage.getItem(engine.getDraftKey()));
+      expect(persisted.answers.q1.additional).toBe('B-only comment');
+      expect(JSON.stringify(persisted)).not.toContain('A-only answer');
+      expect(engine.getChangedQidsAndFields(0).changedMap.q1.answer).toBeFalsy();
+      expect(sessionStorage.getItem(keyA)).toBe(rawA);
+      config = makeConfig('https://a.example.com');
+      await act(async () => {
+        view.rerenderSurveyQuestions({ sessionConfig: config });
+      });
+      await waitFor(() => expect(engine.state.surveysResponseState[0].answers.q1.value).toBe('A saved answer'));
+      view.unmount();
+    },
+  );
 
   it('blocks submit click when submitted latch is active and no pending edits exist', () => {
     const plan = buildSurveyQuestionsPrimarySubmitPlan({

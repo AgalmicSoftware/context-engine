@@ -176,6 +176,7 @@ describe('SurveyTool pile session scope and progress', () => {
     mockQuestionCaches({ edge: { 84532: defaultCacheNode } });
 
     renderPile({
+      sessionConfig: makeLegacySessionConfig('edge'),
       isQuestionCacheReady: false,
       questionScanProgress: cappedScanProgress(),
     });
@@ -187,6 +188,7 @@ describe('SurveyTool pile session scope and progress', () => {
   it('tracks pile loading progress relative to the current refresh window', async () => {
     mockQuestionCaches({ edge: { 84532: defaultCacheNode } });
     const { rerenderSurveyQuestions } = renderPile({
+      sessionConfig: makeLegacySessionConfig('edge'),
       isQuestionCacheReady: false,
       questionScanProgress: cappedScanProgress(),
     });

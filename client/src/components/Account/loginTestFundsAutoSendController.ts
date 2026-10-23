@@ -15,6 +15,7 @@ type AutoSendState = {
 type AutoSendDeps = {
   autoSendTestFunds: () => void;
   getActiveSessionConfig: () => unknown;
+  getWorkerResourcePresence?: () => unknown;
   loginComplete: boolean;
   setState: (patch: Partial<AutoSendState>) => void;
   state: AutoSendState;
@@ -32,6 +33,7 @@ const clearAutoSendState = (state: AutoSendState, setState: AutoSendDeps['setSta
 export const runLoginTestFundsAutoSend = async ({
   autoSendTestFunds,
   getActiveSessionConfig,
+  getWorkerResourcePresence,
   loginComplete,
   setState,
   state,
@@ -42,13 +44,14 @@ export const runLoginTestFundsAutoSend = async ({
     clearAutoSendState(state, setState);
     return;
   }
-  if (!resolveSessionCapabilityProjection(getActiveSessionConfig()).usesFunding) {
+  if (!resolveSessionCapabilityProjection(getActiveSessionConfig(), getWorkerResourcePresence?.()).usesFunding) {
     clearAutoSendState(state, setState);
     return;
   }
 
   const { balance: currentBalance, stale } = await syncWalletBalance();
   if (stale) return;
+  if (!resolveSessionCapabilityProjection(getActiveSessionConfig(), getWorkerResourcePresence?.()).usesFunding) return;
   if (!state.autoRequestTestnetFundsEnabled) {
     if (state.autoSendTriggered) setState({ autoSendTriggered: false });
     return;

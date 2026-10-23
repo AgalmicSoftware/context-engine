@@ -348,6 +348,7 @@ export const createSurveyQuestionsRouteRuntime = (
           responseUrl: stateRef.current.responseUrl,
           submitButtonText,
           submissionError: stateRef.current.submissionError,
+          draftPersistenceError: stateRef.current.draftPersistenceError,
         }}
         jsonControlsProps={buildSurveyQuestionsRouteJsonControlsProps({
           bottomRef,

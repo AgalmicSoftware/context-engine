@@ -1,19 +1,20 @@
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
-import type { TelegramResultsDataset } from '../../utilities/session/telegramSessionBackend';
+import type { AgentResultsDataset } from '../../utilities/session/agentSessionBackend';
 import {
   buildCurrentSessionConfigRequest,
-  buildTelegramAuthFailureState,
+  buildAgentAuthFailureState,
   cacheAgentClientLoginEnvelope,
-  clearTelegramEnvelopeMemoryCache,
+  clearAgentEnvelopeMemoryCache,
   DEFAULT_AGENT_BRIDGE_URL,
   getAgentClientLoginEnvelopeMemoryKey,
   normalizeOnePageSessionSlug,
+  isOnePageAgentShellMode,
   resolveAgentClientLoginEnvelopeFromEvent,
   resolveCurrentSessionSlugForProps,
-  resolveTelegramAgentBridgeUrl,
-  resolveTelegramResultsAuthFailureReason,
+  resolveSessionAgentBridgeUrl,
+  resolveAgentResultsAuthFailureReason,
   type AgentClientLoginEnvelopeMemoryGlobal,
-} from './onePageSessionTelegramController';
+} from './onePageSessionAgentController';
 
 const buildEnvelope = (sessionSlug: string): AgentClientLoginEnvelope => ({
   v: 2,
@@ -28,7 +29,49 @@ const buildEnvelope = (sessionSlug: string): AgentClientLoginEnvelope => ({
   expiresAt: '2026-01-01T00:00:00.000Z',
 });
 
-describe('onePageSessionTelegramController', () => {
+describe('onePageSessionAgentController', () => {
+  it.each(['wagmi', 'passkey', ''])('keeps web participation for %s even with a cached agent envelope', (provider) => {
+    const envelope = { ...buildEnvelope('alpha'), expiresAt: '2099-01-01T00:00:00.000Z' };
+    expect(
+      isOnePageAgentShellMode({
+        sessionConfig: {
+          sessionModeProfile: { authority: { mode: 'worker_canonical' }, surfaces: { agentHttp: true } },
+        },
+        sessionSlug: 'alpha',
+        agentSessionMeta: null,
+        agentClientEnvelope: envelope,
+        provider,
+      }),
+    ).toBe(false);
+  });
+
+  it.each(['valid', 'expired', 'wrong session', 'wrong worker', 'HTTP disabled'])(
+    'selects the agent shell only for a valid current token: %s',
+    (kind) => {
+      const envelope = {
+        ...buildEnvelope('alpha'),
+        expiresAt: kind === 'expired' ? '2000-01-01T00:00:00.000Z' : '2099-01-01T00:00:00.000Z',
+      };
+      expect(
+        isOnePageAgentShellMode({
+          sessionConfig: {
+            sessionModeProfile: {
+              authority: { mode: 'worker_canonical' },
+              surfaces: { agentHttp: kind !== 'HTTP disabled' },
+            },
+            sessionId: envelope.sessionId,
+            corsWorkerUrl: kind === 'wrong worker' ? 'https://other-worker.example' : envelope.workerUrl,
+            agentBridgeUrl: envelope.agentBridgeUrl,
+          },
+          sessionSlug: kind === 'wrong session' ? 'beta' : 'alpha',
+          agentSessionMeta: null,
+          agentClientEnvelope: envelope,
+          provider: 'agent_token',
+        }),
+      ).toBe(kind === 'valid');
+    },
+  );
+
   it('normalizes session slugs and resolves the current slug from route props first', () => {
     expect(normalizeOnePageSessionSlug(' General ')).toBe('');
 
@@ -67,26 +110,26 @@ describe('onePageSessionTelegramController', () => {
 
   it('resolves agent bridge URL precedence and trims trailing slashes', () => {
     expect(
-      resolveTelegramAgentBridgeUrl({
+      resolveSessionAgentBridgeUrl({
         agentBridgeUrl: 'https://primary.example///',
         telegram: { workerUrl: 'https://telegram.example' },
       }),
     ).toBe('https://primary.example');
 
     expect(
-      resolveTelegramAgentBridgeUrl({
+      resolveSessionAgentBridgeUrl({
         telegram: { workerUrl: 'https://telegram.example/' },
       }),
     ).toBe('https://telegram.example');
 
-    expect(resolveTelegramAgentBridgeUrl({})).toBe(DEFAULT_AGENT_BRIDGE_URL);
+    expect(resolveSessionAgentBridgeUrl({})).toBe(DEFAULT_AGENT_BRIDGE_URL);
   });
 
   it('builds auth failure state with the current fallback message', () => {
-    expect(buildTelegramAuthFailureState('').telegramQuestionSubmitError).toBe(
-      'Telegram session expired. Paste a fresh agent token.',
+    expect(buildAgentAuthFailureState('').agentQuestionSubmitError).toBe(
+      'Agent session expired. Paste a fresh agent token.',
     );
-    expect(buildTelegramAuthFailureState('scope_denied').telegramQuestionSubmitError).toBe('scope_denied');
+    expect(buildAgentAuthFailureState('scope_denied').agentQuestionSubmitError).toBe('scope_denied');
   });
 
   it('uses normalized envelope cache keys for cache writes and clears', () => {
@@ -104,26 +147,36 @@ describe('onePageSessionTelegramController', () => {
     expect(betaKey).toContain('beta\n0x11111111111111111111111111111111');
     expect(globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__?.[betaKey]).toMatchObject({ sessionSlug: ' Beta ' });
 
-    clearTelegramEnvelopeMemoryCache(' Alpha ', globalTarget);
-    clearTelegramEnvelopeMemoryCache('', globalTarget);
+    clearAgentEnvelopeMemoryCache(' Alpha ', globalTarget);
+    clearAgentEnvelopeMemoryCache('', globalTarget);
 
     expect(globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__).toEqual({
       [betaKey]: expect.objectContaining({ sessionSlug: ' Beta ' }),
     });
   });
 
-  it('extracts auth failure reasons from Telegram results views', () => {
-    const dataset = {
+  it('extracts auth failure reasons from Agent results views', () => {
+    const dataset: AgentResultsDataset = {
       ok: true,
       views: {
-        public: { status: 'ready' },
-        private: { status: 'auth', reason: 'expired' },
+        polis: { status: 'ready' },
+        consensus: { status: 'auth', reason: 'expired' },
+        difference: { status: 'ready' },
+        groups: { status: 'disabled' },
+        topicMap: { status: 'ready' },
       },
-      polisDataset: { synthesized: false, aggregator: {} },
+      polisDataset: {
+        synthesized: false,
+        aggregator: {},
+        participantCount: 0,
+        questionCount: 0,
+        responseCount: 0,
+        hasData: false,
+      },
       approximate: false,
-    } as TelegramResultsDataset;
+    };
 
-    expect(resolveTelegramResultsAuthFailureReason(dataset)).toBe('expired');
+    expect(resolveAgentResultsAuthFailureReason(dataset)).toBe('expired');
   });
 
   it('accepts only matching agent-login envelopes from events', () => {

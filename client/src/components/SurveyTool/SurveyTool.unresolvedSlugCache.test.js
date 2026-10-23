@@ -111,7 +111,7 @@ describe('SurveyTool unresolved slug cache guards', () => {
 
     renderUnresolvedPile();
 
-    expect(screen.getByText(/Loading\.\.\./)).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.queryByText('Borrowed general prompt')).toBeNull();
     expect(readCacheSpy.mock.calls.filter(([namespace]) => namespace === 'questionsCache')).toEqual([]);
   });

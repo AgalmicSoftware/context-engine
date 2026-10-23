@@ -36,7 +36,7 @@ describe('SessionModeProfileField', () => {
       within(decentralizedRequirements)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
-    ).toEqual(['OpenAI API Key', 'JWK', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)']);
+    ).toEqual(['OpenAI API Key', 'Arweave wallet (JWK)', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)']);
     expect(screen.getByText('Session settings and responses are stored in Cloudflare.')).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -214,14 +214,21 @@ describe('SessionModeProfileField', () => {
     expect(onContinue).not.toHaveBeenCalled();
   });
 
-  it('supports arrow-key selection within the hosting radio group', () => {
+  it('moves between entry templates with arrow keys and chooses only on activation', () => {
     const onChange = jest.fn();
     const onContinue = jest.fn();
     render(
       <SessionModeProfileField registryChainId={11155420} onChange={onChange} onContinue={onContinue} entryOnly />,
     );
+    const decentralized = screen.getByTestId('ce-new-preset-trustless_public_decentralized');
 
     fireEvent.keyDown(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'), { key: 'ArrowRight' });
+
+    expect(decentralized).toHaveFocus();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onContinue).not.toHaveBeenCalled();
+
+    fireEvent.click(decentralized);
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ preset: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED }),
@@ -240,8 +247,16 @@ describe('SessionModeProfileField', () => {
 
     fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
 
-    expect(confirmSpy).toHaveBeenCalledWith('Switch preset and replace incompatible custom settings?');
+    expect(confirmSpy).toHaveBeenCalledWith('Replace all custom hosting settings with this template?');
     expect(onChange).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
+});
+
+it('keeps the Decentralized card selected for the same template on another network', () => {
+  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+  profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  profile.evm.registryChainId = 84532;
+  render(<SessionModeProfileField registryChainId={84532} value={profile} onChange={jest.fn()} />);
+  expect(screen.getByRole('radio', { name: 'Decentralized' })).toHaveAttribute('aria-checked', 'true');
 });

@@ -10,28 +10,28 @@ import CESlider from '../../Shared/CESlider';
 import { renderPileActiveQuestionCard } from '../../SurveyTool/surveyPileActiveQuestionCard';
 import surveyStyles from '../../SurveyTool/SurveyTool.module.scss';
 import styles from '../OnePageSession.module.scss';
-import type { TelegramAgentQuestion } from '../../../utilities/session/telegramAgentData';
-import type { TelegramAnswerInput } from '../../../utilities/session/telegramSessionBackend';
+import type { AgentQuestion } from '../../../utilities/session/agentSessionData';
+import type { AgentAnswerInput } from '../../../utilities/session/agentSessionBackend';
 
-type TelegramQuestionPileProps = {
+type AgentQuestionPileProps = {
   activeIndex: number;
   canSubmit: boolean;
   disabledReason?: string;
-  questions: TelegramAgentQuestion[];
+  questions: AgentQuestion[];
   status: string;
   submittedQuestionIds?: string[];
   submittingQuestionId?: string;
   submitError?: string;
   onActiveIndexChange: (nextIndex: number) => void;
-  onSubmitAnswer: (question: TelegramAgentQuestion, answer: TelegramAnswerInput) => void;
+  onSubmitAnswer: (question: AgentQuestion, answer: AgentAnswerInput) => void;
 };
 
-const normalizeQuestionType = (question: TelegramAgentQuestion): string =>
+const normalizeQuestionType = (question: AgentQuestion): string =>
   String(question.questionType || question.type || 'freeform')
     .trim()
     .toLowerCase();
 
-const questionContainerClassName = (question: TelegramAgentQuestion): string => {
+const questionContainerClassName = (question: AgentQuestion): string => {
   const type = normalizeQuestionType(question);
   if (type === 'binary') return surveyStyles.binaryQuestionContainer;
   if (type === 'multichoice') return surveyStyles.multichoiceQuestionContainer;
@@ -40,7 +40,7 @@ const questionContainerClassName = (question: TelegramAgentQuestion): string => 
   return surveyStyles.freeformQuestionContainer;
 };
 
-const buildInitialAnswer = (question: TelegramAgentQuestion): TelegramAnswerInput => {
+const buildInitialAnswer = (question: AgentQuestion): AgentAnswerInput => {
   const type = normalizeQuestionType(question);
   if (type === 'quadratic') return { value: question.options.map(() => 0) };
   if (type === 'rating') return { value: 5 };
@@ -48,10 +48,10 @@ const buildInitialAnswer = (question: TelegramAgentQuestion): TelegramAnswerInpu
   return { value: '' };
 };
 
-const selectedMultichoiceValues = (answer: TelegramAnswerInput): unknown[] =>
+const selectedMultichoiceValues = (answer: AgentAnswerInput): unknown[] =>
   Array.isArray(answer.values) ? answer.values : [];
 
-const TelegramQuestionPile = ({
+const AgentQuestionPile = ({
   activeIndex,
   canSubmit,
   disabledReason = '',
@@ -62,18 +62,18 @@ const TelegramQuestionPile = ({
   submitError = '',
   onActiveIndexChange,
   onSubmitAnswer,
-}: TelegramQuestionPileProps): React.ReactElement => {
+}: AgentQuestionPileProps): React.ReactElement => {
   const activeQuestion = questions[activeIndex] || null;
-  const [answers, setAnswers] = useState<Record<string, TelegramAnswerInput>>({});
+  const [answers, setAnswers] = useState<Record<string, AgentAnswerInput>>({});
   const submitted = useMemo(() => new Set(submittedQuestionIds), [submittedQuestionIds]);
 
-  const updateAnswer = (questionId: string, patch: TelegramAnswerInput) => {
+  const updateAnswer = (questionId: string, patch: AgentAnswerInput) => {
     setAnswers((prev) => ({ ...prev, [questionId]: { ...(prev[questionId] || {}), ...patch } }));
   };
 
   if (status === 'loading') {
     return (
-      <div className={styles.telegramListPanel} data-testid="ce-session-telegram-questions">
+      <div className={styles.agentListPanel} data-testid="ce-session-agent-questions">
         Loading questions...
       </div>
     );
@@ -81,8 +81,8 @@ const TelegramQuestionPile = ({
 
   if (!activeQuestion) {
     return (
-      <div className={styles.telegramListPanel} data-testid="ce-session-telegram-questions">
-        <div className={styles.telegramListEmpty}>No answerable questions are available for this session.</div>
+      <div className={styles.agentListPanel} data-testid="ce-session-agent-questions">
+        <div className={styles.agentListEmpty}>No answerable questions are available for this session.</div>
       </div>
     );
   }
@@ -105,7 +105,7 @@ const TelegramQuestionPile = ({
       <BinaryChoiceInput
         questionId={questionId}
         value={String(answer.value || '')}
-        inputNamePrefix="telegram-question"
+        inputNamePrefix="agent-question"
         onChange={(value) => updateAnswer(questionId, { value })}
         disabled={isSubmitting}
       />
@@ -158,42 +158,42 @@ const TelegramQuestionPile = ({
         forceGlow={false}
         disableEncryption={true}
         enableDownloads={false}
-        dataTestId="ce-session-telegram-question-freeform-textarea"
+        dataTestId="ce-session-agent-question-freeform-textarea"
       />
     );
   }
 
   return (
-    <section className={styles.telegramListPanel} data-testid="ce-session-telegram-questions">
-      <div className={styles.telegramListHeader}>
+    <section className={styles.agentListPanel} data-testid="ce-session-agent-questions">
+      <div className={styles.agentListHeader}>
         <span>
           Question {activeIndex + 1} of {questions.length}
         </span>
-        <div className={styles.telegramPileNav}>
+        <div className={styles.agentPileNav}>
           <button
             type="button"
-            className={styles.telegramIconButton}
-            data-testid="ce-session-telegram-question-prev"
+            className={styles.agentIconButton}
+            data-testid="ce-session-agent-question-prev"
             onClick={() => onActiveIndexChange(Math.max(0, activeIndex - 1))}
             disabled={activeIndex <= 0}
-            aria-label="Previous telegram question"
+            aria-label="Previous agent question"
           >
             <FontAwesomeIcon icon={faChevronLeft} />
           </button>
           <button
             type="button"
-            className={styles.telegramIconButton}
-            data-testid="ce-session-telegram-question-next"
+            className={styles.agentIconButton}
+            data-testid="ce-session-agent-question-next"
             onClick={() => onActiveIndexChange(Math.min(questions.length - 1, activeIndex + 1))}
             disabled={activeIndex >= questions.length - 1}
-            aria-label="Next telegram question"
+            aria-label="Next agent question"
           >
             <FontAwesomeIcon icon={faChevronRight} />
           </button>
         </div>
       </div>
 
-      <div className={styles.telegramPileFrame}>
+      <div className={styles.agentPileFrame}>
         {renderPileActiveQuestionCard({
           question: activeQuestion,
           promptMasked: false,
@@ -202,9 +202,9 @@ const TelegramQuestionPile = ({
             <div>
               <h3>{activeQuestion.prompt}</h3>
               {activeQuestion.tags.length ? (
-                <div className={styles.telegramChipRow}>
+                <div className={styles.agentChipRow}>
                   {activeQuestion.tags.map((tag) => (
-                    <span key={tag} className={styles.telegramChipDark}>
+                    <span key={tag} className={styles.agentChipDark}>
                       {tag}
                     </span>
                   ))}
@@ -215,11 +215,11 @@ const TelegramQuestionPile = ({
           questionComponent,
           questionContainerClass: questionContainerClassName(activeQuestion),
           footerSection: (
-            <div className={styles.telegramPileFooter}>
+            <div className={styles.agentPileFooter}>
               <button
                 type="button"
-                className={styles.telegramPrimaryButton}
-                data-testid="ce-session-telegram-question-submit"
+                className={styles.agentPrimaryButton}
+                data-testid="ce-session-agent-question-submit"
                 disabled={submitDisabled}
                 onClick={() => onSubmitAnswer(activeQuestion, answer)}
               >
@@ -227,16 +227,16 @@ const TelegramQuestionPile = ({
                 <span>{isSubmitting ? 'Submitting' : 'Submit'}</span>
               </button>
               {submitDisabled && submitDisabledReason ? (
-                <span className={styles.telegramSubmitDisabledReason}>{submitDisabledReason}</span>
+                <span className={styles.agentSubmitDisabledReason}>{submitDisabledReason}</span>
               ) : null}
             </div>
           ),
         })}
       </div>
 
-      {submitError ? <div className={styles.telegramListError}>{submitError}</div> : null}
+      {submitError ? <div className={styles.agentListError}>{submitError}</div> : null}
     </section>
   );
 };
 
-export default TelegramQuestionPile;
+export default AgentQuestionPile;

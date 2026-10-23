@@ -3,10 +3,10 @@ import React from 'react';
 import { SbtListStandardCard } from '../../SBTs/SbtListDisplayCards';
 import sbtStyles from '../../SBTs/SBTsList.module.scss';
 import styles from '../OnePageSession.module.scss';
-import type { TelegramBucketCard } from '../../../utilities/session/telegramAgentData';
+import type { AgentBucketCard } from '../../../utilities/session/agentSessionData';
 
-type TelegramBucketCardsProps = {
-  cards: TelegramBucketCard[] | null;
+type AgentBucketCardsProps = {
+  cards: AgentBucketCard[] | null;
   onReconnect?: () => void;
 };
 
@@ -14,15 +14,15 @@ const noopClick: React.MouseEventHandler<HTMLAnchorElement> = (event) => {
   event.preventDefault();
 };
 
-const TelegramBucketCards = ({ cards, onReconnect }: TelegramBucketCardsProps): React.ReactElement => {
+const AgentBucketCards = ({ cards, onReconnect }: AgentBucketCardsProps): React.ReactElement => {
   if (cards === null) {
     return (
-      <section className={styles.telegramListPanel} data-testid="ce-session-telegram-buckets">
-        <div className={styles.telegramListEmpty}>Reconnect to refresh groups.</div>
+      <section className={styles.agentListPanel} data-testid="ce-session-agent-buckets">
+        <div className={styles.agentListEmpty}>Reconnect to refresh groups.</div>
         <button
           type="button"
-          className={styles.telegramSecondaryButton}
-          data-testid="ce-session-telegram-buckets-reconnect"
+          className={styles.agentSecondaryButton}
+          data-testid="ce-session-agent-buckets-reconnect"
           onClick={onReconnect}
         >
           Reconnect
@@ -33,22 +33,22 @@ const TelegramBucketCards = ({ cards, onReconnect }: TelegramBucketCardsProps): 
 
   if (!cards.length) {
     return (
-      <section className={styles.telegramListPanel} data-testid="ce-session-telegram-buckets">
-        <div className={styles.telegramListEmpty}>No group buckets are available for this participant.</div>
+      <section className={styles.agentListPanel} data-testid="ce-session-agent-buckets">
+        <div className={styles.agentListEmpty}>No group buckets are available for this participant.</div>
       </section>
     );
   }
 
   return (
-    <section className={styles.telegramListPanel} data-testid="ce-session-telegram-buckets">
-      <div className={styles.telegramBucketGrid}>
+    <section className={styles.agentListPanel} data-testid="ce-session-agent-buckets">
+      <div className={styles.agentBucketGrid}>
         {cards.map((card) => {
           const selected = card.options.filter((option) => option.selected);
           const model = {
             key: card.categoryId,
             sbtAddress: card.categoryId,
             sbtAddressLower: card.categoryId.toLowerCase(),
-            sessionSlug: 'telegram',
+            sessionSlug: 'agent',
             name: card.categoryLabel,
             description: selected.length ? selected.map((option) => option.label).join(', ') : 'No bucket selected.',
             imageSrc: '',
@@ -57,17 +57,17 @@ const TelegramBucketCards = ({ cards, onReconnect }: TelegramBucketCardsProps): 
           return (
             <SbtListStandardCard
               key={card.categoryId}
-              href="#telegram-bucket"
+              href="#agent-bucket"
               model={model}
               onClick={noopClick}
               sbtLabel="Group"
               shellClassName={sbtStyles.standardCardShell}
               styles={sbtStyles}
               detailsPanel={
-                <label className={styles.telegramBucketSelect}>
+                <label className={styles.agentBucketSelect}>
                   <span>{card.categoryLabel}</span>
                   <select
-                    data-testid="ce-session-telegram-bucket-select"
+                    data-testid="ce-session-agent-bucket-select"
                     value={selected[0]?.optionId || ''}
                     onChange={() => undefined}
                   >
@@ -89,4 +89,4 @@ const TelegramBucketCards = ({ cards, onReconnect }: TelegramBucketCardsProps): 
   );
 };
 
-export default TelegramBucketCards;
+export default AgentBucketCards;

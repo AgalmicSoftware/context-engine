@@ -34,20 +34,36 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
     resolveDraftStorageContext,
     resolveFieldEncryptionAudience,
     resolveFieldEncryptionGateId,
+    setState,
     stateRef,
     surveyLog,
   } = context;
 
+  const setDraftPersistenceError = (message = '') => {
+    if (stateRef.current.draftPersistenceError === message) return;
+    setState?.({ draftPersistenceError: message });
+  };
+  const reportDraftPersistenceFailure = () =>
+    setDraftPersistenceError(
+      'Draft changes are only in memory. Keep this tab open and copy your answers before leaving.',
+    );
+
+  // A missing session may still resolve to a Worker. Never read, write, or
+  // purge an unscoped pending key while that authority is unknown.
+  const getReadyDraftContext = () => {
+    const draftContext = resolveDraftStorageContext(propsRef.current, inst._getEffectiveDraftSlug());
+    return draftContext?.networkIdStr && !draftContext.error ? draftContext : null;
+  };
+
   const getDraftKey = () => {
     try {
-      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(
-        propsRef.current,
-        inst._getEffectiveDraftSlug(),
-      );
+      const draftContext = getReadyDraftContext();
+      if (!draftContext) return null;
       const slug: SurveyQuestionsLegacyValue = draftContext.sessionSlug || '';
       const networkIdStr: SurveyQuestionsLegacyValue = draftContext.networkIdStr;
       const surveyScope: SurveyQuestionsLegacyValue = inst._getDraftScope();
       return buildSurveyDraftStorageKey({
+        draftAuthorityKey: draftContext.draftAuthorityKey,
         sessionSlug: slug,
         networkIdStr: networkIdStr || '__pending__',
         account: propsRef.current?.account,
@@ -60,10 +76,8 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
 
   const loadDraft = () => {
     try {
-      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(
-        propsRef.current,
-        inst._getEffectiveDraftSlug(),
-      );
+      const draftContext = getReadyDraftContext();
+      if (!draftContext) return null;
       const slug: SurveyQuestionsLegacyValue = draftContext.sessionSlug || '';
       const networkIdStr: SurveyQuestionsLegacyValue = draftContext.networkIdStr;
 
@@ -78,6 +92,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
         perQuestionAnonKey: anonPerQidKey,
         perQuestionAccountKey: acctPerQidKey,
       }: SurveyQuestionsLegacyValue = buildSurveyDraftStorageVariantKeys({
+        draftAuthorityKey: draftContext.draftAuthorityKey,
         sessionSlug: slug,
         networkIdStr,
         account: accountLower,
@@ -102,6 +117,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
           }
           return { raw: parsedResult.raw, obj: parsedResult.payload };
         } catch (e: unknown) {
+          reportDraftPersistenceFailure();
           return null;
         }
       };
@@ -155,6 +171,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
           sessionStorage.setItem(targetKey, mergedRaw);
           wroteTarget = true;
         } catch (e: unknown) {
+          reportDraftPersistenceFailure();
           surveyLog.warn('SurveyTool: fallback', e);
         }
       }
@@ -192,7 +209,14 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
 
   const persistDraftSafely = (delayMs: SurveyQuestionsLegacyValue = 150) => {
     if (inst._persistTimer) clearTimeout(inst._persistTimer);
-    inst._persistTimer = setTimeout(persistDraft, delayMs);
+    const scheduledKey = getDraftKey();
+    inst._persistTimer = setTimeout(() => {
+      inst._persistTimer = null;
+      // A pending edit belongs to the source that scheduled it, even if the
+      // component survives a same-slug Worker/account/survey switch.
+      if (getDraftKey() !== scheduledKey) return;
+      persistDraft();
+    }, delayMs);
   };
 
   const persistDraft = () =>
@@ -201,7 +225,10 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
         const key: SurveyQuestionsLegacyValue = getDraftKey();
 
         // Guard null key and clean up malformed JSON
-        if (!key) return;
+        if (!key) {
+          reportDraftPersistenceFailure();
+          return;
+        }
         const keyTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingOnKeyChange({
           nextDraftKey: key,
           lastDraftKey: inst._lastDraftKey,
@@ -300,12 +327,11 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
           return;
         }
 
-        const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(
-          propsRef.current,
-          inst._getEffectiveDraftSlug(),
-        );
+        const draftContext = getReadyDraftContext();
+        if (!draftContext) return;
         const slug: SurveyQuestionsLegacyValue = draftContext.sessionSlug || '';
         const persistWritePlan: SurveyQuestionsLegacyValue = buildPersistedDraftWritePlan({
+          draftAuthorityKey: draftContext.draftAuthorityKey,
           draftKey: key,
           sessionSlug: slug,
           networkIdStr: draftContext.networkIdStr,
@@ -336,9 +362,12 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
         try {
           sessionStorage.setItem(key, nextJson);
         } catch (e: unknown) {
+          reportDraftPersistenceFailure();
           surveyLog.warn('SurveyTool: draft persistence failed', e);
           return;
         }
+
+        setDraftPersistenceError();
 
         // SQM compat mirror under :questions (without :q:<qid>) for tooling/tests
         if (persistWritePlan.compatWriteKey) {
@@ -366,38 +395,41 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
           }
         });
       } catch (e: unknown) {
+        reportDraftPersistenceFailure();
         surveyLog.warn('SurveyTool: fallback', e);
       }
     });
 
   const clearDraft = () => {
     try {
-      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(
-        propsRef.current,
-        inst._getEffectiveDraftSlug(),
-      );
+      const draftContext = getReadyDraftContext();
+      if (!draftContext) return null;
       const slug: SurveyQuestionsLegacyValue = draftContext.sessionSlug || '';
       const networkIdStr: SurveyQuestionsLegacyValue = draftContext.networkIdStr;
 
       const surveyScope: SurveyQuestionsLegacyValue = inst._getDraftScope();
       const accountLower: SurveyQuestionsLegacyValue = (propsRef.current?.account || '').toLowerCase() || 'anon';
       const { purgeKeys }: SurveyQuestionsLegacyValue = buildSurveyDraftStorageVariantKeys({
+        draftAuthorityKey: draftContext.draftAuthorityKey,
         sessionSlug: slug,
         networkIdStr,
         account: accountLower,
         surveyScope,
       });
 
+      let cleared = true;
       purgeKeys.forEach((k: SurveyQuestionsLegacyValue) => {
         try {
           sessionStorage.removeItem(k);
         } catch (e: unknown) {
+          cleared = false;
           surveyLog.warn('SurveyTool: fallback', e);
         }
       });
 
       const clearedTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingClearedState();
       inst._applyDraftTrackingState(clearedTracking);
+      if (cleared) setDraftPersistenceError();
     } catch (e: unknown) {
       surveyLog.warn('SurveyTool: fallback', e);
     }
@@ -405,10 +437,8 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
 
   const clearDraftFor = (qid: SurveyQuestionsLegacyValue) => {
     try {
-      const draftContext: SurveyQuestionsLegacyValue = resolveDraftStorageContext(
-        propsRef.current,
-        inst._getEffectiveDraftSlug(),
-      );
+      const draftContext = getReadyDraftContext();
+      if (!draftContext) return null;
       const slug: SurveyQuestionsLegacyValue = draftContext.sessionSlug || '';
       const networkIdStr: SurveyQuestionsLegacyValue = draftContext.networkIdStr;
 
@@ -416,6 +446,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
       const accountLower: SurveyQuestionsLegacyValue = (propsRef.current?.account || '').toLowerCase() || 'anon';
       const qidLower: SurveyQuestionsLegacyValue = (qid || '').toLowerCase();
       const { purgeKeys }: SurveyQuestionsLegacyValue = buildSurveyDraftStorageVariantKeys({
+        draftAuthorityKey: draftContext.draftAuthorityKey,
         sessionSlug: slug,
         networkIdStr,
         account: accountLower,

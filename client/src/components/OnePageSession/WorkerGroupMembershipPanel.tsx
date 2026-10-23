@@ -901,8 +901,8 @@ const WorkerGroupMembershipPanel = ({
 
   if (!canReadGroups) {
     return (
-      <section className={styles.telegramListPanel} data-testid="ce-session-worker-groups">
-        <div className={styles.telegramListEmpty}>Groups are not included in this credential.</div>
+      <section className={styles.agentListPanel} data-testid="ce-session-worker-groups">
+        <div className={styles.agentListEmpty}>Groups are not included in this credential.</div>
       </section>
     );
   }
@@ -911,15 +911,15 @@ const WorkerGroupMembershipPanel = ({
     return (
       <section ref={panelRef} className={styles.workerGroupsListPanel} data-testid="ce-session-worker-groups">
         {status === 'loading' ? (
-          <div className={`${styles.telegramListEmpty} ${styles.workerGroupsLoadingState}`}>Loading group…</div>
+          <div className={`${styles.agentListEmpty} ${styles.workerGroupsLoadingState}`}>Loading group…</div>
         ) : null}
-        {error ? <div className={styles.telegramListEmpty}>{error}</div> : null}
+        {error ? <div className={styles.agentListEmpty}>{error}</div> : null}
         {membershipStatus ? (
-          <div className={styles.telegramReportApprox} role="status">
+          <div className={styles.agentReportApprox} role="status">
             {membershipStatus}
           </div>
         ) : null}
-        {shareStatus ? <div className={styles.telegramReportApprox}>{shareStatus}</div> : null}
+        {shareStatus ? <div className={styles.agentReportApprox}>{shareStatus}</div> : null}
         {selectedGroup ? (
           <WorkerGroupDetailView
             canViewMembers={canViewSelectedGroupMembers}
@@ -962,7 +962,7 @@ const WorkerGroupMembershipPanel = ({
   const refreshControl = (
     <button
       type="button"
-      className={styles.telegramIconButton}
+      className={styles.agentIconButton}
       aria-label="Refresh groups"
       title="Refresh groups"
       onClick={() => void reload()}
@@ -977,19 +977,19 @@ const WorkerGroupMembershipPanel = ({
         refreshControlTarget ? (
           createPortal(refreshControl, refreshControlTarget)
         ) : (
-          <div className={`${styles.telegramListHeader} ${styles.workerGroupsListActions}`}>{refreshControl}</div>
+          <div className={`${styles.agentListHeader} ${styles.workerGroupsListActions}`}>{refreshControl}</div>
         )
       ) : null}
       {showLoadingState && status === 'loading' ? (
-        <div className={`${styles.telegramListEmpty} ${styles.workerGroupsLoadingState}`}>Loading groups…</div>
+        <div className={`${styles.agentListEmpty} ${styles.workerGroupsLoadingState}`}>Loading groups…</div>
       ) : null}
-      {error ? <div className={styles.telegramListEmpty}>{error}</div> : null}
+      {error ? <div className={styles.agentListEmpty}>{error}</div> : null}
       {membershipStatus ? (
-        <div className={styles.telegramReportApprox} role="status">
+        <div className={styles.agentReportApprox} role="status">
           {membershipStatus}
         </div>
       ) : null}
-      {shareStatus ? <div className={styles.telegramReportApprox}>{shareStatus}</div> : null}
+      {shareStatus ? <div className={styles.agentReportApprox}>{shareStatus}</div> : null}
       {displayedMemberships.length || displayedAvailableGroups.length ? (
         <div className={`${sbtsPageStyles.sbtGrid} ${styles.workerGroupCardGrid}`}>
           {displayedMemberships.map((membership) => (
@@ -1029,7 +1029,7 @@ const WorkerGroupMembershipPanel = ({
         </div>
       ) : null}
       {showEmptyState && status === 'ready' && !displayedMemberships.length && !displayedAvailableGroups.length ? (
-        <div className={styles.telegramListEmpty}>
+        <div className={styles.agentListEmpty}>
           {groupIdFilter
             ? 'This group is not visible or no longer exists.'
             : membershipsOnly

@@ -2,13 +2,13 @@ import type { AgentClientLoginEnvelope } from './agentClientLogin';
 import { buildAgentBridgeAuthHeaders } from './agentClientLogin';
 
 type UnknownRecord = Record<string, unknown>;
-export type TelegramPolisRow = { responder: string; questionId: string; response: string };
-export type TelegramPolisAggregator = Record<string, TelegramPolisRow[]>;
-export type TelegramPolisDataset = {
+export type AgentPolisRow = { responder: string; questionId: string; response: string };
+export type AgentPolisAggregator = Record<string, AgentPolisRow[]>;
+export type AgentPolisDataset = {
   participantCount: number;
   questionCount: number;
   responseCount: number;
-  aggregator: TelegramPolisAggregator;
+  aggregator: AgentPolisAggregator;
   hasData: boolean;
   synthesized: boolean;
 };
@@ -22,7 +22,7 @@ const toNum = (value: unknown): number => {
   return Number.isFinite(num) ? num : 0;
 };
 
-const TELEGRAM_AGENT_AUTH_REASONS = [
+const AGENT_AUTH_REASONS = [
   'agent_token_not_found',
   'refresh_user_agent_token',
   'agent_token_scope_denied',
@@ -31,10 +31,10 @@ const TELEGRAM_AGENT_AUTH_REASONS = [
   'session_worker_token_expired',
 ];
 
-export const isTelegramAgentAuthFailure = ({ status, reason }: { status?: number; reason?: string } = {}): boolean =>
-  Number(status) === 401 || TELEGRAM_AGENT_AUTH_REASONS.some((marker) => toStr(reason).includes(marker));
+export const isAgentAuthFailure = ({ status, reason }: { status?: number; reason?: string } = {}): boolean =>
+  Number(status) === 401 || AGENT_AUTH_REASONS.some((marker) => toStr(reason).includes(marker));
 
-export type TelegramAgentQuestion = {
+export type AgentQuestion = {
   questionId: string;
   id: string;
   questionType: string;
@@ -48,7 +48,7 @@ export type TelegramAgentQuestion = {
   answerable: boolean;
 };
 
-export const normalizeTelegramAgentQuestion = (input: unknown): TelegramAgentQuestion => {
+export const normalizeAgentQuestion = (input: unknown): AgentQuestion => {
   const question = toRecord(input);
   const questionId = toStr(question.questionId || question.id);
   const questionType = toStr(question.questionType || question.type) || 'freeform';
@@ -68,18 +68,18 @@ export const normalizeTelegramAgentQuestion = (input: unknown): TelegramAgentQue
   };
 };
 
-export type TelegramAgentQuestionsResult = {
+export type AgentQuestionsResult = {
   ok: boolean;
   status?: number;
   reason?: string;
-  questions?: TelegramAgentQuestion[];
+  questions?: AgentQuestion[];
   answerState?: { answeredCount: number; unansweredCount: number; sort: string };
 };
 
 const resolveAgentBridgeUrl = (envelope: AgentClientLoginEnvelope | null, agentBridgeUrl?: unknown): string =>
   toStr(agentBridgeUrl || envelope?.agentBridgeUrl).replace(/\/+$/g, '');
 
-export const fetchTelegramAgentQuestions = async ({
+export const fetchAgentQuestions = async ({
   envelope,
   sessionSlug,
   agentBridgeUrl,
@@ -91,10 +91,10 @@ export const fetchTelegramAgentQuestions = async ({
   agentBridgeUrl?: unknown;
   limit?: number;
   fetchImpl?: typeof fetch;
-}): Promise<TelegramAgentQuestionsResult> => {
+}): Promise<AgentQuestionsResult> => {
   const base = resolveAgentBridgeUrl(envelope, agentBridgeUrl);
   if (!envelope?.bridgeCredential?.token || !base) {
-    return { ok: false, status: 0, reason: 'telegram_agent_credentials_missing' };
+    return { ok: false, status: 0, reason: 'agent_credentials_missing' };
   }
   const url = new URL(`${base}/api/agent/questions`);
   url.searchParams.set('sessionSlug', toStr(envelope.sessionSlug || sessionSlug));
@@ -110,14 +110,14 @@ export const fetchTelegramAgentQuestions = async ({
       return {
         ok: false,
         status: response.status,
-        reason: toStr(body.reason) || `telegram_questions_failed_${response.status}`,
+        reason: toStr(body.reason) || `agent_questions_failed_${response.status}`,
       };
     }
     const answerState = toRecord(body.answerState);
     return {
       ok: true,
       questions: (Array.isArray(body.questions) ? body.questions : [])
-        .map(normalizeTelegramAgentQuestion)
+        .map(normalizeAgentQuestion)
         .filter((question) => question.prompt),
       answerState: {
         answeredCount: toNum(answerState.answeredCount),
@@ -126,26 +126,26 @@ export const fetchTelegramAgentQuestions = async ({
       },
     };
   } catch (_) {
-    return { ok: false, status: 0, reason: 'telegram_questions_network_error' };
+    return { ok: false, status: 0, reason: 'agent_questions_network_error' };
   }
 };
 
-export type TelegramAgentResultViewState = {
+export type AgentResultViewState = {
   status: 'ready' | 'disabled' | 'error' | 'auth';
   reason?: string;
   data?: UnknownRecord;
 };
 
-export type TelegramAgentResultsResult = {
+export type AgentResultsResult = {
   ok: boolean;
   status?: number;
   reason?: string;
   views?: {
-    polis: TelegramAgentResultViewState;
-    consensus: TelegramAgentResultViewState;
-    difference: TelegramAgentResultViewState;
-    groups: TelegramAgentResultViewState;
-    topicMap: TelegramAgentResultViewState;
+    polis: AgentResultViewState;
+    consensus: AgentResultViewState;
+    difference: AgentResultViewState;
+    groups: AgentResultViewState;
+    topicMap: AgentResultViewState;
   };
 };
 
@@ -224,7 +224,7 @@ const POLIS_LABEL_TO_VALUE: Record<string, 'Agree' | 'Disagree' | 'Unsure'> = {
   unsure: 'Unsure',
 };
 
-const emptyPolisDataset = (synthesized = false): TelegramPolisDataset => ({
+const emptyPolisDataset = (synthesized = false): AgentPolisDataset => ({
   participantCount: 0,
   questionCount: 0,
   responseCount: 0,
@@ -243,7 +243,7 @@ const buildPolisResponse = (prompt: string, value: 'Agree' | 'Disagree' | 'Unsur
   JSON.stringify({ type: 'binary', prompt, answer: { value } });
 
 const appendPolisVote = (
-  aggregator: TelegramPolisAggregator,
+  aggregator: AgentPolisAggregator,
   questionId: string,
   prompt: string,
   responder: string,
@@ -320,10 +320,10 @@ const voteCountsFromCluster = (cluster: UnknownRecord, groupSize: number) => {
 };
 
 const summarizePolisAggregator = (
-  aggregator: TelegramPolisAggregator,
+  aggregator: AgentPolisAggregator,
   participantFallback = 0,
   synthesized = true,
-): TelegramPolisDataset => {
+): AgentPolisDataset => {
   const responders = new Set<string>();
   let responseCount = 0;
   Object.values(aggregator).forEach((rows) => {
@@ -350,7 +350,7 @@ const normalizePolisDataset = (body: UnknownRecord): UnknownRecord => {
     const prompt = toStr(record.prompt);
     if (questionId && prompt) promptByQuestionId.set(questionId, prompt);
   });
-  const aggregator: TelegramPolisAggregator = {};
+  const aggregator: AgentPolisAggregator = {};
   Object.entries(toRecord(body.responses)).forEach(([questionId, rows]) => {
     const prompt = promptByQuestionId.get(questionId);
     if (!prompt) return;
@@ -366,7 +366,7 @@ const normalizePolisDataset = (body: UnknownRecord): UnknownRecord => {
           response: buildPolisResponse(prompt, value as 'Agree' | 'Disagree' | 'Unsure'),
         };
       })
-      .filter(Boolean) as TelegramPolisRow[];
+      .filter(Boolean) as AgentPolisRow[];
     if (normalizedRows.length > 0) aggregator[questionId] = normalizedRows;
   });
   return {
@@ -378,7 +378,7 @@ const normalizePolisDataset = (body: UnknownRecord): UnknownRecord => {
   };
 };
 
-export const buildTelegramPolisDataset = (viewsInput: unknown): TelegramPolisDataset => {
+export const buildAgentPolisDataset = (viewsInput: unknown): AgentPolisDataset => {
   const views = toRecord(viewsInput);
   const polisView = toRecord(views.polis);
   const polisData = toRecord(polisView.data);
@@ -391,7 +391,7 @@ export const buildTelegramPolisDataset = (viewsInput: unknown): TelegramPolisDat
       participantCount: toNum(polisData.participantCount),
       questionCount: toNum(polisData.questionCount),
       responseCount: toNum(polisData.responseCount),
-      aggregator: toRecord(polisData.aggregator) as TelegramPolisAggregator,
+      aggregator: toRecord(polisData.aggregator) as AgentPolisAggregator,
       hasData: true,
       synthesized: false,
     };
@@ -402,7 +402,7 @@ export const buildTelegramPolisDataset = (viewsInput: unknown): TelegramPolisDat
   const groupsData = toRecord(groupsView.data);
   const groups = groupsView.status === 'ready' && Array.isArray(groupsData.groups) ? groupsData.groups : [];
   if (groups.length > 0) {
-    const aggregator: TelegramPolisAggregator = {};
+    const aggregator: AgentPolisAggregator = {};
     let participantFallback = 0;
     groups.forEach((groupInput, groupIndex) => {
       const group = toRecord(groupInput);
@@ -447,7 +447,7 @@ export const buildTelegramPolisDataset = (viewsInput: unknown): TelegramPolisDat
   const poolSize = Math.max(0, ...binaryRows.map(({ row }) => Math.max(toNum(row.participants), toNum(row.total))));
   if (poolSize <= 0) return emptyPolisDataset(true);
 
-  const aggregator: TelegramPolisAggregator = {};
+  const aggregator: AgentPolisAggregator = {};
   const responders = Array.from({ length: poolSize }, (_, index) => `P${index + 1}`);
   binaryRows.forEach(({ row, counts }, rowIndex) => {
     const questionId = toStr(row.questionId);
@@ -464,7 +464,7 @@ export const buildTelegramPolisDataset = (viewsInput: unknown): TelegramPolisDat
   return summarizePolisAggregator(aggregator, poolSize, true);
 };
 
-const TELEGRAM_RESULT_VIEW_REQUESTS: Array<{
+const AGENT_RESULT_VIEW_REQUESTS: Array<{
   key: 'consensus' | 'difference' | 'groups' | 'topicMap' | 'polis';
   view: string;
 }> = [
@@ -475,7 +475,7 @@ const TELEGRAM_RESULT_VIEW_REQUESTS: Array<{
   { key: 'topicMap', view: 'topic-map' },
 ];
 
-export const fetchTelegramAgentResults = async ({
+export const fetchAgentResults = async ({
   envelope,
   sessionSlug,
   agentBridgeUrl,
@@ -485,12 +485,12 @@ export const fetchTelegramAgentResults = async ({
   sessionSlug?: unknown;
   agentBridgeUrl?: unknown;
   fetchImpl?: typeof fetch;
-}): Promise<TelegramAgentResultsResult> => {
+}): Promise<AgentResultsResult> => {
   const base = resolveAgentBridgeUrl(envelope, agentBridgeUrl);
   if (!envelope?.bridgeCredential?.token || !base) {
-    return { ok: false, status: 0, reason: 'telegram_agent_credentials_missing' };
+    return { ok: false, status: 0, reason: 'agent_credentials_missing' };
   }
-  const fetchView = async ({ key, view }: { key: string; view: string }): Promise<TelegramAgentResultViewState> => {
+  const fetchView = async ({ key, view }: { key: string; view: string }): Promise<AgentResultViewState> => {
     const url = new URL(`${base}/api/agent/results`);
     url.searchParams.set('sessionSlug', toStr(envelope.sessionSlug || sessionSlug));
     url.searchParams.set('view', view);
@@ -507,27 +507,25 @@ export const fetchTelegramAgentResults = async ({
         if (key === 'topicMap') return { status: 'ready', data: normalizeTopicMap(body) };
         return { status: 'ready', data: normalizeAggregateRows(body) };
       }
-      const reason = toStr(body.reason) || `telegram_results_failed_${response.status}`;
-      if (isTelegramAgentAuthFailure({ status: response.status, reason })) return { status: 'auth', reason };
+      const reason = toStr(body.reason) || `agent_results_failed_${response.status}`;
+      if (isAgentAuthFailure({ status: response.status, reason })) return { status: 'auth', reason };
       if (response.status === 403) return { status: 'disabled', reason };
       return { status: 'error', reason };
     } catch (_) {
-      return { status: 'error', reason: 'telegram_results_network_error' };
+      return { status: 'error', reason: 'agent_results_network_error' };
     }
   };
-  const [polis, consensus, difference, groups, topicMap] = await Promise.all(
-    TELEGRAM_RESULT_VIEW_REQUESTS.map(fetchView),
-  );
+  const [polis, consensus, difference, groups, topicMap] = await Promise.all(AGENT_RESULT_VIEW_REQUESTS.map(fetchView));
   return { ok: true, views: { polis, consensus, difference, groups, topicMap } };
 };
 
-export type TelegramBucketCard = {
+export type AgentBucketCard = {
   categoryId: string;
   categoryLabel: string;
   options: Array<{ optionId: string; label: string; selected: boolean }>;
 };
 
-export const normalizeTelegramBucketCards = (buckets: unknown): TelegramBucketCard[] => {
+export const normalizeAgentBucketCards = (buckets: unknown): AgentBucketCard[] => {
   const record = toRecord(buckets);
   const selections = toRecord(record.selections);
   const categories = Array.isArray(record.categories) ? record.categories : [];

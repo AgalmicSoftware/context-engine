@@ -1,44 +1,41 @@
+import React from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
+import SurveyResults from './SurveyResults';
+import { SurveyQuestions } from './SurveyQuestions';
 import SurveyTool from './SurveyTool';
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import { SurveySelector } from './SurveySelector';
-import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
+import { createSurveyQuestionsTestStore, renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 import { resolveSurveyToolQuestionReadCacheContext } from './surveyToolSessionResolution';
 
-const REACT_LAZY_TYPE = Symbol.for('react.lazy');
+jest.mock('./SurveySelector', () => ({
+  SurveySelector: jest.fn(() => <div data-testid="mock-survey-selector" />),
+  QuestionsDashboard: jest.fn(() => <div data-testid="mock-questions-dashboard" />),
+}));
 
-const findFirstNode = (node, predicate) => {
-  if (node == null) return null;
-  if (Array.isArray(node)) {
-    for (const child of node) {
-      const found = findFirstNode(child, predicate);
-      if (found) return found;
-    }
-    return null;
-  }
-  if (typeof node !== 'object') return null;
-  if (predicate(node)) return node;
-  return findFirstNode(node?.props?.children, predicate);
-};
+jest.mock('./SurveyResults', () => ({
+  __esModule: true,
+  default: jest.fn(() => <div data-testid="mock-survey-results" />),
+}));
 
-const findFirstNodeByType = (node, targetType) => findFirstNode(node, (candidate) => candidate?.type === targetType);
+jest.mock('./SurveyQuestions', () => {
+  const actual = jest.requireActual('./SurveyQuestions');
+  return {
+    ...actual,
+    SurveyQuestions: jest.fn((props) => jest.requireActual('react').createElement(actual.SurveyQuestions, props)),
+  };
+});
 
-const findLazySurveyResultsNode = (node) =>
-  findFirstNode(
-    node,
-    (candidate) =>
-      candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-      Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen'),
-  );
-
-const findLazySurveyQuestionsNode = (node) =>
-  findFirstNode(
-    node,
-    (candidate) =>
-      candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-      Object.prototype.hasOwnProperty.call(candidate.props || {}, 'singleQuestionMode'),
-  );
+const latestProps = (component) => component.mock.calls[component.mock.calls.length - 1][0];
 
 describe('SurveyTool compatibility wiring', () => {
+  beforeEach(() => {
+    const ActualSurveyQuestions = jest.requireActual('./SurveyQuestions').SurveyQuestions;
+    SurveyQuestions.mockImplementation((props) => <ActualSurveyQuestions {...props} />);
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
@@ -84,54 +81,71 @@ describe('SurveyTool compatibility wiring', () => {
     // chain selector that preserves the same registryChainId-over-wallet rule.
   });
 
-  it('renders extracted PileViewMode through SurveyTool.tsx in pile mode', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      onFilterChange: jest.fn(),
-    });
+  it('renders extracted PileViewMode through SurveyTool.tsx in pile mode', async () => {
+    render(
+      <Provider store={createSurveyQuestionsTestStore()}>
+        <MemoryRouter>
+          <SurveyTool
+            minifiedMode="pile"
+            network={{ id: 84532 }}
+            networkChainId={84532}
+            isQuestionCacheReady={true}
+            onFilterChange={jest.fn()}
+          />
+        </MemoryRouter>
+      </Provider>,
+    );
 
-    const tree = shell.render();
-
-    expect(tree.type?.$$typeof).toBe(REACT_LAZY_TYPE);
-    expect(tree.props.minifiedMode).toBe('pile');
+    expect(await screen.findByTestId('ce-survey-filter-toggle')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-survey-create-toggle-pile')).toBeInTheDocument();
+    expect(latestProps(SurveyQuestions).minifiedMode).toBe('pile');
   });
 
-  it('forwards scoped Lit hooks from SurveyTool into normal survey surfaces', () => {
+  it('forwards scoped Lit hooks from SurveyTool into normal survey surfaces', async () => {
     const litHooks = { getKey: jest.fn(), saveKey: jest.fn() };
     const lit = { getKey: jest.fn() };
-    const shell = new SurveyTool({
-      network: { id: 11155420 },
-      networkChainId: 11155420,
-      lit,
-      litHooks,
-    });
+    render(
+      <SurveyTool
+        {...{
+          network: { id: 11155420 },
+          networkChainId: 11155420,
+          lit,
+          litHooks,
+          preventUrlChange: true,
+        }}
+      />,
+    );
 
-    const tree = shell.render();
-    const selectorNode = findFirstNodeByType(tree, SurveySelector);
-    const resultsNode = findLazySurveyResultsNode(tree);
+    await screen.findByTestId('mock-survey-results');
 
-    expect(selectorNode?.props?.lit).toBe(lit);
-    expect(selectorNode?.props?.litHooks).toBe(litHooks);
-    expect(resultsNode?.props?.lit).toBe(lit);
-    expect(resultsNode?.props?.litHooks).toBe(litHooks);
-    expect(resultsNode?.props?.isOpen).toBe(false);
+    expect(latestProps(SurveySelector).lit).toBe(lit);
+    expect(latestProps(SurveySelector).litHooks).toBe(litHooks);
+    expect(latestProps(SurveyResults).lit).toBe(lit);
+    expect(latestProps(SurveyResults).litHooks).toBe(litHooks);
+    expect(latestProps(SurveyResults).isOpen).toBe(false);
   });
 
-  it('forwards optional toolbar and question-count targets only to the selector', () => {
+  it('forwards optional toolbar and question-count targets only to the selector', async () => {
     const toolbarTarget = document.createElement('div');
     const questionCountTarget = document.createElement('span');
-    const shell = new SurveyTool({ network: { id: 11155420 }, toolbarTarget, questionCountTarget });
-    const tree = shell.render();
+    render(
+      <SurveyTool
+        network={{ id: 11155420 }}
+        toolbarTarget={toolbarTarget}
+        questionCountTarget={questionCountTarget}
+        preventUrlChange
+      />,
+    );
+    await screen.findByTestId('mock-survey-results');
 
-    expect(findFirstNodeByType(tree, SurveySelector)?.props?.toolbarTarget).toBe(toolbarTarget);
-    expect(findLazySurveyResultsNode(tree)?.props?.toolbarTarget).toBeUndefined();
-    expect(findFirstNodeByType(tree, SurveySelector)?.props?.questionCountTarget).toBe(questionCountTarget);
-    expect(findLazySurveyResultsNode(tree)?.props?.questionCountTarget).toBeUndefined();
+    expect(latestProps(SurveySelector).toolbarTarget).toBe(toolbarTarget);
+    expect(latestProps(SurveyResults).toolbarTarget).toBeUndefined();
+    expect(latestProps(SurveySelector).questionCountTarget).toBe(questionCountTarget);
+    expect(latestProps(SurveyResults).questionCountTarget).toBeUndefined();
   });
 
-  it('forwards scoped Lit hooks from SurveyTool into single-question surfaces', () => {
+  it('forwards scoped Lit hooks from SurveyTool into single-question surfaces', async () => {
+    SurveyQuestions.mockImplementation(() => <div data-testid="mock-survey-question" />);
     const litHooks = { getKey: jest.fn(), saveKey: jest.fn() };
     const lit = { getKey: jest.fn() };
     const sessionConfig = {
@@ -146,28 +160,32 @@ describe('SurveyTool compatibility wiring', () => {
         },
       },
     };
-    const shell = new SurveyTool({
-      singleQuestionMode: true,
-      questionID: '0xquestion',
-      network: { id: 11155420 },
-      networkChainId: 11155420,
-      sessionSlug: 'edge',
-      sessionConfig,
-      lit,
-      litHooks,
-    });
+    render(
+      <SurveyTool
+        {...{
+          singleQuestionMode: true,
+          questionID: '0xquestion',
+          network: { id: 11155420 },
+          networkChainId: 11155420,
+          sessionSlug: 'edge',
+          sessionConfig,
+          lit,
+          litHooks,
+          preventUrlChange: true,
+        }}
+      />,
+    );
 
-    const tree = shell.render();
-    const questionsNode = findLazySurveyQuestionsNode(tree);
+    await screen.findByTestId('mock-survey-question');
 
-    expect(questionsNode?.props?.lit).toBe(lit);
-    expect(questionsNode?.props?.litHooks).toBe(litHooks);
-    expect(questionsNode?.props?.sessionSlug).toBe('edge');
-    expect(questionsNode?.props?.sessionConfig).toBe(sessionConfig);
-    expect(questionsNode?.props?.networkChainId).toBe(11155420);
+    expect(latestProps(SurveyQuestions).lit).toBe(lit);
+    expect(latestProps(SurveyQuestions).litHooks).toBe(litHooks);
+    expect(latestProps(SurveyQuestions).sessionSlug).toBe('edge');
+    expect(latestProps(SurveyQuestions).sessionConfig).toBe(sessionConfig);
+    expect(latestProps(SurveyQuestions).networkChainId).toBe(11155420);
   });
 
-  it('keeps extracted PileViewMode wired to the SurveyQuestions base class', () => {
+  it('keeps extracted PileViewMode wired to the shared SurveyQuestions runtime', () => {
     const { getByTestId } = renderSurveyPileViewMode({
       minifiedMode: 'pile',
       network: { id: 84532 },
@@ -183,5 +201,48 @@ describe('SurveyTool compatibility wiring', () => {
     // hooks flip intentionally removes `extends SurveyQuestions`; this guard
     // now verifies the extracted pile surface still renders through its shared
     // runtime wiring instead of pinning the class prototype chain.
+  });
+
+  it('updates the public key through the rendered single-question callback', async () => {
+    SurveyQuestions.mockImplementation(({ pubKey, updatePubKey }) => (
+      <button onClick={() => updatePubKey('test-public-key')}>Public key: {pubKey || 'unset'}</button>
+    ));
+    render(<SurveyTool singleQuestionMode questionID="0xquestion" preventUrlChange />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Public key: unset' }));
+
+    expect(screen.getByRole('button', { name: 'Public key: test-public-key' })).toBeInTheDocument();
+  });
+
+  it('keeps selector and results cache nonces aligned through readiness, response, and network changes', async () => {
+    let props = {
+      preventUrlChange: true,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+      questionResponsesNonce: 0,
+      network: { id: 11155420 },
+    };
+    const { rerender } = render(<SurveyTool {...props} />);
+    await screen.findByTestId('mock-survey-results');
+
+    expect(latestProps(SurveySelector).questionsCacheNonce).toBe(0);
+    expect(latestProps(SurveyResults).questionsCacheNonce).toBe(0);
+
+    const updates = [
+      { isQuestionCacheReady: true },
+      { isResponsesCacheReady: true },
+      { questionResponsesNonce: 1 },
+      { network: { id: 84532 } },
+    ];
+    updates.forEach((update, index) => {
+      props = { ...props, ...update };
+      rerender(<SurveyTool {...props} />);
+      expect(latestProps(SurveySelector).questionsCacheNonce).toBe(index + 1);
+      expect(latestProps(SurveyResults).questionsCacheNonce).toBe(index + 1);
+    });
+
+    rerender(<SurveyTool {...props} isQuestionCacheReady={false} isResponsesCacheReady={false} />);
+    expect(latestProps(SurveySelector).questionsCacheNonce).toBe(4);
+    expect(latestProps(SurveyResults).questionsCacheNonce).toBe(4);
   });
 });

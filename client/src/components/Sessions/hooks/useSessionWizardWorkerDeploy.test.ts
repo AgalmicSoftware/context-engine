@@ -1,3 +1,5 @@
+import { ethers } from 'ethers';
+import { setHostedFaucetEnabled } from '../sessionWizardHostedFaucet';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { cryptoUtils } from '../../../utilities/crypto/cryptography.js';
 import { INVALID_SESSION_SLUG_FORMAT_ERROR } from '../sessionWizardSlugValidation';
@@ -106,7 +108,7 @@ const buildWorkerCanonicalLitProfile = () => {
 };
 
 const mockSuccessfulWorkerDeployFetch = () => {
-  const fetchMock = jest.fn(async (url: RequestInfo | URL) => {
+  const fetchMock = jest.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
     const normalizedUrl = String(url);
     if (normalizedUrl.endsWith('/deploy')) {
       return {
@@ -1606,6 +1608,56 @@ describe('useSessionWizardWorkerDeploy', () => {
       'Worker script upload was not confirmed. Cleanup incomplete: remove worker ce-session-ab12 and KV namespace kv-public-id in Cloudflare before retrying.';
     expect(deployResult).toEqual({ ok: false, error: message });
     expect(options.updateDeploymentState).toHaveBeenCalledWith({ deployStatus: message });
+  });
+
+  it('deploys and syncs the opted-in hosted SBT faucet with its key kept out of public config', async () => {
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const options = buildDeployHookOptions();
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = 'custom';
+    profile.evm.registryChainId = 11155420;
+    profile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: 11155420,
+          contract: ethers.Wallet.createRandom().address,
+          anyOrAll: 'any',
+        },
+      ],
+    };
+    const draft = setHostedFaucetEnabled(
+      {
+        slug: 'hosted-faucet',
+        networkChainId: 11155420,
+        sessionModeProfile: profile,
+      },
+      true,
+    );
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      registryChainId: 11155420,
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      draft,
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    const secrets = { openaiKey: 'fixture-ai', faucetPrivateKey: ethers.Wallet.createRandom().privateKey };
+    options.getCurrentWorkerSecrets.mockReturnValue(secrets);
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+    const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+    const payload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
+    expect(payload.secrets).toEqual(secrets);
+    expect(payload.workerAuthority.participantScopes).toContain('faucet_self');
+    expect(payload.networkChainId).toBe(11155420);
+    expect(payload.faucet).toBeUndefined();
+    const { secrets: _secrets, ...publicConfig } = payload;
+    expect(JSON.stringify(publicConfig)).not.toContain(secrets.faucetPrivateKey);
+    const sync = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
+    expect(JSON.parse(String(sync?.[1]?.body || '{}')).secrets).toEqual(secrets);
   });
 
   it('deploys the default worker-canonical profile without registry, RPC, faucet, or Arweave secrets', async () => {

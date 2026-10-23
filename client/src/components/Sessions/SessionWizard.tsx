@@ -1,3 +1,4 @@
+import { getSessionWizardInterviewValidationError } from './sessionWizardInterviewValidation';
 /** @file SessionWizard.tsx */
 import { useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ethers } from 'ethers';
@@ -23,6 +24,7 @@ import {
   resolveSessionWizardRegistryAddress,
 } from './sessionWizardContracts.js';
 import { resolveSessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
+import { serializeSessionWizardDraftForCopy } from './sessionWizardBrowserCacheSanitization';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
@@ -458,7 +460,7 @@ const SessionWizard = ({
   // Pending SBT drafts carry deploy secrets and claim codes, so keep them only
   // in this mounted tab. Reloading or leaving the wizard intentionally clears them.
   const { pendingSbtDrafts, setPendingSbtDrafts, normalizedPendingSbtDrafts, hasUndeployedPendingSbtDrafts } =
-    usePendingSbtDrafts();
+    usePendingSbtDrafts(account);
   const pendingSbtDraftsRef = useRef(pendingSbtDrafts);
   pendingSbtDraftsRef.current = pendingSbtDrafts;
   const [pendingWorkerGroupDrafts, setPendingWorkerGroupDrafts] = useState<PendingWorkerGroupDraft[]>(() =>
@@ -754,6 +756,7 @@ const SessionWizard = ({
   };
   const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile, {
     hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
+    sessionConfig: draft,
   });
   const modeFieldPolicy = useMemo(
     () => resolveSessionWizardModeFieldPolicy(sessionModeRequirements),
@@ -2028,6 +2031,11 @@ const SessionWizard = ({
         const currentWorkerSecrets = getCurrentWorkerSecrets();
         const liveRuntime = workerDeployRuntimeRef.current;
         const liveDraft = liveRuntime?.draft || draftRef.current;
+        const interviewError = getSessionWizardInterviewValidationError(liveDraft?.interviewMode);
+        if (interviewError) {
+          setStatus(interviewError);
+          return;
+        }
         const liveSessionModeProfile = liveDraft?.sessionModeProfile as SessionModeProfile | undefined;
         const liveSessionModeValidation = liveSessionModeProfile
           ? validateSessionModeProfile(liveSessionModeProfile)
@@ -2243,7 +2251,7 @@ const SessionWizard = ({
 
   const handleCopyDraftJson = () => {
     navigator.clipboard
-      .writeText(JSON.stringify(draft, null, 2))
+      .writeText(serializeSessionWizardDraftForCopy(draft))
       .then(() => {
         notify.success('Copied to clipboard');
         setJsonCopied(true);
@@ -2695,6 +2703,7 @@ const SessionWizard = ({
     publishStepElapsedMs,
     sbtsLabel: t('sbts'),
     sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
+    interviewMode: draft.interviewMode,
   });
   const normalizedAppliedSponsoredBundle = sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(
     sponsoredBundleAppliedBundleRef.current,
@@ -2710,6 +2719,7 @@ const SessionWizard = ({
     currentWorkerSecrets,
     hasCompatibleWorkerRuntime: publishUiPlan.publishReadiness.canUploadMetadataNow,
     hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
+    sessionConfig: draft,
     hasSponsoredBundleLink,
     isNewSessionWizardRoute,
     newSessionBannerDismissalContextKey,
@@ -2841,6 +2851,7 @@ const SessionWizard = ({
   const showSessionModeProfileEntryStep = isNewSessionWizardRoute && !effectiveSessionModeProfileStepComplete;
   const sessionModeProfileControls = useSessionWizardModeProfileControls({
     draft,
+    faucetPrivateKey: getCurrentWorkerSecrets().faucetPrivateKey,
     draftRef,
     entryOnly: showSessionModeProfileEntryStep,
     onContinue: () => setSessionModeProfileStepComplete(true),
@@ -2848,6 +2859,7 @@ const SessionWizard = ({
     onEnterNormalMode: handleEnterNormalMode,
     customizing: wizardMode === 'advanced',
     registryChainId,
+    onRegistryChainChange: setRegistryChainId,
     renderInfoTooltip: renderSessionWizardInfoTooltip,
     setCollapsedSections,
     setDraft,

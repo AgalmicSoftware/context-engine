@@ -153,7 +153,7 @@ describe('agentClientLogin', () => {
       message = error instanceof Error ? error.message : String(error);
     }
 
-    expect(message).toBe('telegram_client_login_failed_401');
+    expect(message).toBe('agent_client_login_failed_401');
     expect(message).not.toContain(RAW_TOKEN);
   });
 
@@ -216,7 +216,7 @@ describe('agentClientLogin', () => {
         workerUrl: WORKER_URL,
         fetchImpl,
       }),
-    ).rejects.toThrow('telegram_client_login_session_identity_missing');
+    ).rejects.toThrow('agent_client_login_session_identity_missing');
     expect(window.sessionStorage.length).toBe(0);
   });
 
@@ -309,7 +309,7 @@ describe('agentClientLogin', () => {
         tokenOrLink: RAW_TOKEN,
         fetchImpl,
       }),
-    ).rejects.toThrow('telegram_client_login_echoed_source_token');
+    ).rejects.toThrow('agent_client_login_echoed_source_token');
     expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_TOKEN);
   });
 
@@ -335,7 +335,7 @@ describe('agentClientLogin', () => {
         tokenOrLink: RAW_TOKEN,
         fetchImpl,
       }),
-    ).rejects.toThrow('telegram_client_login_echoed_source_token');
+    ).rejects.toThrow('agent_client_login_echoed_source_token');
     expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_TOKEN);
   });
 

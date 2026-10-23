@@ -3,17 +3,17 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy } from '@fortawesome/free-solid-svg-icons';
 
 import styles from '../OnePageSession.module.scss';
-import type { TelegramAgentQuestion, TelegramAgentResultsResult } from '../../../utilities/session/telegramAgentData';
+import type { AgentQuestion, AgentResultsResult } from '../../../utilities/session/agentSessionData';
 
-type TelegramDebateMapPanelProps = {
-  questions: TelegramAgentQuestion[];
-  results: TelegramAgentResultsResult | null;
+type AgentDebateMapPanelProps = {
+  questions: AgentQuestion[];
+  results: AgentResultsResult | null;
 };
 
-const buildPrompt = (questions: TelegramAgentQuestion[], results: TelegramAgentResultsResult | null): string => {
+const buildPrompt = (questions: AgentQuestion[], results: AgentResultsResult | null): string => {
   const topicCounts = results?.views?.topicMap?.data?.counts || {};
   const lines = [
-    'Create a Context Engine debate map from this Telegram-first session.',
+    'Create a Context Engine debate map from this hosted agent session.',
     '',
     'Questions:',
     ...questions.slice(0, 20).map((question, index) => `${index + 1}. ${question.prompt}`),
@@ -23,7 +23,7 @@ const buildPrompt = (questions: TelegramAgentQuestion[], results: TelegramAgentR
   return lines.join('\n');
 };
 
-const TelegramDebateMapPanel = ({ questions, results }: TelegramDebateMapPanelProps): React.ReactElement => {
+const AgentDebateMapPanel = ({ questions, results }: AgentDebateMapPanelProps): React.ReactElement => {
   const [copied, setCopied] = useState(false);
   const prompt = useMemo(() => buildPrompt(questions, results), [questions, results]);
   const topicCounts = results?.views?.topicMap?.data?.counts || {};
@@ -38,33 +38,33 @@ const TelegramDebateMapPanel = ({ questions, results }: TelegramDebateMapPanelPr
   };
 
   return (
-    <section className={styles.telegramListPanel} data-testid="ce-session-telegram-debate-map">
-      <div className={styles.telegramListHeader}>
+    <section className={styles.agentListPanel} data-testid="ce-session-agent-debate-map">
+      <div className={styles.agentListHeader}>
         <span>Debate Map Prompt</span>
         <button
           type="button"
-          className={styles.telegramSecondaryButton}
-          data-testid="ce-session-telegram-debate-map-copy"
+          className={styles.agentSecondaryButton}
+          data-testid="ce-session-agent-debate-map-copy"
           onClick={handleCopy}
         >
           <FontAwesomeIcon icon={faCopy} />
           <span>{copied ? 'Copied' : 'Copy'}</span>
         </button>
       </div>
-      <div className={styles.telegramTopicCounts}>
+      <div className={styles.agentTopicCounts}>
         {Object.keys(topicCounts).length ? (
           Object.entries(topicCounts).map(([key, value]) => (
-            <span key={key} className={styles.telegramChipDark}>
+            <span key={key} className={styles.agentChipDark}>
               {key}: {String(value)}
             </span>
           ))
         ) : (
-          <span className={styles.telegramListEmpty}>Topic-map counts are not available yet.</span>
+          <span className={styles.agentListEmpty}>Topic-map counts are not available yet.</span>
         )}
       </div>
-      <pre className={styles.telegramTopicPrompt}>{prompt}</pre>
+      <pre className={styles.agentTopicPrompt}>{prompt}</pre>
     </section>
   );
 };
 
-export default TelegramDebateMapPanel;
+export default AgentDebateMapPanel;

@@ -1,5 +1,6 @@
 /** @file WorkerResourceInputs.tsx */
 import React from 'react';
+import { faucetAddressFromKey } from './sessionWizardHostedFaucet';
 import { FormGroup, Input, Label } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -43,6 +44,7 @@ const WorkerResourceInputs = ({
 
   const renderGenericField = (field: ResourceSecretField) => {
     const value = toStr(workerSecrets[field.key]);
+    const faucetAddress = field.key === 'faucetPrivateKey' ? faucetAddressFromKey(value) : null;
     const label = `${field.label}${field.required ? ' *' : ''}`;
     const isTextarea = field.type === 'textarea';
     const placeholder =
@@ -64,6 +66,13 @@ const WorkerResourceInputs = ({
           readOnly={field.readOnly}
           data-testid={buildSecretFieldTestId(field.key)}
         />
+        {field.key === 'faucetPrivateKey' && value.trim() && (
+          <div className={styles.helperText} role="status">
+            {faucetAddress
+              ? `Faucet address: ${faucetAddress}`
+              : 'Faucet private key must be a valid 32-byte hexadecimal EVM key.'}
+          </div>
+        )}
         {!isNormalMode && field.key === 'faucetPrivateKey' && showSponsoredFaucetNotice && (
           <div className={styles.helperText}>
             Faucet funding is currently provided by the sponsored bundle. Enter a private key here to override it.

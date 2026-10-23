@@ -90,7 +90,9 @@ export const verifyNativeSessionWorker = async ({
   const slug = normalizeSlug(toStr(sessionSlug || currentDraft.slug).trim());
   const workerUrl = normalizeWorkerUrl(workerQueryValue);
   const initialDraftWorkerUrl = normalizeWorkerUrl(currentDraft.corsWorkerUrl);
-  const modeRequirements = resolveSessionWizardModeRequirements(currentDraft.sessionModeProfile);
+  const modeRequirements = resolveSessionWizardModeRequirements(currentDraft.sessionModeProfile, {
+    sessionConfig: currentDraft,
+  });
   if (!slug || slug !== normalizeSlug(currentDraft.slug)) {
     throw new Error('The Worker URL must be verified against the current session slug.');
   }
@@ -132,6 +134,7 @@ export const verifyNativeSessionWorker = async ({
   if (missing.length) throw new Error(`Missing required secrets before verification: ${missing.join(', ')}`);
   const allSecrets = buildWorkerSecretsPayload(currentWorkerSecrets);
   const { selectedSecrets: deploySecrets, requiredSecretFields } = resolveSessionWizardWorkerSecretSelection({
+    sessionConfig: currentDraft,
     sessionModeProfile: currentDraft.sessionModeProfile,
     sessionAi: currentDraft.ai,
     workerSecrets: allSecrets,
@@ -221,6 +224,7 @@ export const verifyNativeSessionWorker = async ({
       workerUrl: bootstrap.workerOrigin,
       sessionSlug: slug,
       sessionId: bootstrap.sessionId,
+      sessionConfig: currentDraft,
       sessionModeProfile: currentDraft.sessionModeProfile,
       sessionAi: currentDraft.ai,
       workerAllowOrigins: workerConfig.allowOrigins,
@@ -252,6 +256,7 @@ export const verifyNativeSessionWorker = async ({
       workerUrl: bootstrap.workerOrigin,
       sessionSlug: liveDraft.slug,
       sessionId: liveRuntime.sessionId || liveRuntime.sessionIdHex,
+      sessionConfig: liveDraft,
       sessionModeProfile: liveDraft.sessionModeProfile,
       sessionAi: liveDraft.ai,
       workerAllowOrigins: liveAllowOrigins,

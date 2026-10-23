@@ -8,7 +8,6 @@ import {
   persistSurveyToolCachePatchForCurrentTarget,
   resolveSurveyToolWorkerTargetSignature,
   shouldUseSurveyToolChainCacheMissFallback,
-  shouldUseSurveyToolCrossSessionCacheFallback,
 } from './surveyToolWorkerCacheIsolation';
 
 const makeConfig = (workerOrigin: string, sessionId: string) => ({
@@ -76,10 +75,10 @@ describe('surveyToolWorkerCacheIsolation', () => {
     ).toBe(chainNode);
   });
 
-  it('makes Worker cache misses terminal instead of borrowing or querying chain data', () => {
-    expect(shouldUseSurveyToolCrossSessionCacheFallback('worker')).toBe(false);
+  it('allows chain fallback only for a resolved chain cache scope', () => {
+    expect(shouldUseSurveyToolChainCacheMissFallback('')).toBe(false);
+    expect(shouldUseSurveyToolChainCacheMissFallback(undefined)).toBe(false);
     expect(shouldUseSurveyToolChainCacheMissFallback('worker')).toBe(false);
-    expect(shouldUseSurveyToolCrossSessionCacheFallback('11155420')).toBe(true);
     expect(shouldUseSurveyToolChainCacheMissFallback('11155420')).toBe(true);
   });
 

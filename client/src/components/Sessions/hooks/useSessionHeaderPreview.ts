@@ -3,6 +3,7 @@ import { normalizeArweaveUrl } from '../../../utilities/arweave/arweaveUrls.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
 import { readCompactImageClipboard } from '../../Shared/compactImageClipboard.js';
 import type { SessionHeaderFieldProps } from '../SessionHeaderField';
+import { resolveSessionHeaderImageFormat, UNSUPPORTED_SESSION_HEADER_IMAGE_MESSAGE } from '../sessionWizardUiSupport';
 
 export type SessionHeaderUploadStatusTone = NonNullable<SessionHeaderFieldProps['sessionHeaderUploadStatusTone']>;
 export type SessionHeaderFileState = File | Blob;
@@ -47,6 +48,21 @@ const useSessionHeaderPreview = ({
     setSessionHeaderUploadStatus(text);
     setSessionHeaderUploadStatusTone(text ? tone : 'default');
   }, []);
+
+  // A picker's accept list is only a hint, so every chosen or pasted file is
+  // checked here instead of failing later at publish.
+  const chooseSessionHeaderFile = useCallback(
+    (file: SessionHeaderFileState | null): boolean => {
+      if (file && !resolveSessionHeaderImageFormat(file)) {
+        setSessionHeaderFile(null);
+        setSessionHeaderStatus(UNSUPPORTED_SESSION_HEADER_IMAGE_MESSAGE, 'error');
+        return false;
+      }
+      setSessionHeaderFile(file);
+      return true;
+    },
+    [setSessionHeaderStatus],
+  );
 
   useEffect(() => {
     if (allowFileUpload) return;
@@ -100,9 +116,9 @@ const useSessionHeaderPreview = ({
         setSessionHeaderStatus('This hosting profile accepts a header image URL, not a local file.', 'error');
         return;
       }
+      if (!chooseSessionHeaderFile(clipboardResult.file)) return;
       setSessionHeaderMode('upload');
       setCompactSessionHeaderMode('idle');
-      setSessionHeaderFile(clipboardResult.file);
       setSessionHeaderStatus('');
       return;
     }
@@ -117,7 +133,7 @@ const useSessionHeaderPreview = ({
     }
 
     setSessionHeaderStatus(clipboardResult?.error || 'Clipboard does not contain a supported image or URL.', 'error');
-  }, [allowFileUpload, readClipboard, setSessionHeaderStatus, updateDraftSessionHeader]);
+  }, [allowFileUpload, chooseSessionHeaderFile, readClipboard, setSessionHeaderStatus, updateDraftSessionHeader]);
 
   const handleClearSessionHeaderPreview = useCallback(() => {
     setSessionHeaderPreviewModalOpen(false);
@@ -134,7 +150,7 @@ const useSessionHeaderPreview = ({
     compactSessionHeaderMode,
     setCompactSessionHeaderMode,
     sessionHeaderFile: allowFileUpload ? sessionHeaderFile : null,
-    setSessionHeaderFile,
+    setSessionHeaderFile: chooseSessionHeaderFile,
     sessionHeaderPreviewSrc,
     sessionHeaderPreviewModalOpen: allowFileUpload ? sessionHeaderPreviewModalOpen : false,
     setSessionHeaderPreviewModalOpen,

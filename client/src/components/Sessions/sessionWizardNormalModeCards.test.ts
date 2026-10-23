@@ -161,7 +161,8 @@ describe('sessionWizardNormalModeCards', () => {
 
       expect(workerCard).toEqual(
         expect.objectContaining({
-          summary: 'Worker URL saved; deploy or reverify it before publishing.',
+          summary:
+            'Worker URL saved. Verify it again before publishing; verification resets after a reload or a settings change.',
           tone: 'pending',
         }),
       );

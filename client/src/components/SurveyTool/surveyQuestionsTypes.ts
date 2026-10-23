@@ -533,6 +533,7 @@ export type SurveyQuestionsState = SurveyQuestionsLegacyRecord & {
   submittedSinceLastEdit: boolean;
   responseUrl: string;
   submissionError: string;
+  draftPersistenceError: string;
   currentStep: number;
   questionPool: unknown[];
   questionPoolExpectedIds: string[];
@@ -2269,6 +2270,7 @@ export const buildInitialSurveyQuestionsState = (props: SurveyQuestionsProps = {
   submittedSinceLastEdit: updateSubmittedSinceLastEdit(false, 'reset'),
   responseUrl: '',
   submissionError: '',
+  draftPersistenceError: '',
   currentStep: 0,
   questionPool: props.isStandalone || props.singleQuestionMode ? props.questionPool || [] : [],
   questionPoolExpectedIds: [],

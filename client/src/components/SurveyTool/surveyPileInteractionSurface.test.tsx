@@ -1,4 +1,5 @@
 import React from 'react';
+import { render, screen } from '@testing-library/react';
 
 import PileHologramAssistant from './PileHologramAssistant';
 import {
@@ -424,4 +425,20 @@ describe('surveyPileInteractionSurface', () => {
     expect(findNodeByClassName(tree, 'miniSpinnerWrapper')).toBeNull();
     expect(renderActiveQuestion).not.toHaveBeenCalled();
   });
+});
+
+it('announces a draft storage failure without hiding the submit error', () => {
+  const { rerender } = render(renderPileInteractionSurface(buildBaseProps()));
+  const status = screen.getByRole('status');
+  expect(status).toBeEmptyDOMElement();
+  rerender(
+    renderPileInteractionSurface({
+      ...buildBaseProps(),
+      draftPersistenceError: 'Draft changes are only in memory.',
+      submissionError: 'The response was not submitted.',
+    }),
+  );
+  expect(screen.getByRole('status')).toHaveTextContent('Draft changes are only in memory.');
+  expect(screen.getByRole('status')).toBe(status);
+  expect(screen.getByRole('alert')).toHaveTextContent('The response was not submitted.');
 });

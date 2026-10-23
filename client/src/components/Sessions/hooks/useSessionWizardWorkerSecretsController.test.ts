@@ -608,3 +608,26 @@ describe('useSessionWizardWorkerSecretsController', () => {
     expect(mockedSetGlobalLitHooks).toHaveBeenLastCalledWith(null);
   });
 });
+
+test('requires a valid faucet key only when the hosted SBT faucet is enabled', () => {
+  const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+  sessionModeProfile.preset = 'custom';
+  sessionModeProfile.evm.registryChainId = 11155420;
+  sessionModeProfile.encryption.accessConditions = {
+    match: 'any',
+    conditions: [
+      {
+        kind: 'sbt_onchain',
+        chainId: 11155420,
+        contract: '0x00000000000000000000000000000000000000bb',
+        anyOrAll: 'any',
+      },
+    ],
+  };
+  const workerAuthority = { participantScopes: ['storage', 'faucet'] };
+  const { result } = createControllerHarness({
+    draft: { sessionModeProfile, workerAuthority },
+    workerSecrets: baseWorkerSecrets({ openaiKey: 'fixture-key', faucetPrivateKey: 'invalid' }),
+  });
+  expect(result.current.getMissingWorkerSecretsForDeploy()).toContain('Valid faucet private key');
+});

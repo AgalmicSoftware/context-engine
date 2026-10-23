@@ -253,6 +253,7 @@ describe('SurveyQuestions runtime helpers', () => {
       networkChainId: 84532,
       questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
       sessionSlug: 'edge',
+      sessionConfig: LEGACY_EDGE_SESSION_CONFIG,
     };
 
     let firstRuntime = null;

@@ -42,6 +42,12 @@ describe('accountReducer', () => {
     expect(fetched.alerts).toEqual([]);
   });
 
+  it.each([LOGIN_ACCOUNT, FETCH_ACCOUNT])('reads the legacy agent provider during %s hydration', (type) => {
+    const state = reducer(undefined, { type, payload: buildAccountPayload({ provider: 'telegram_agent' }) });
+    expect(state.provider).toBe('agent_token');
+    expect(reducer({ ...state, provider: 'telegram_agent' }, { type: '@@INIT' }).provider).toBe('agent_token');
+  });
+
   it('merges fetched account fields without clearing untouched account data', () => {
     const state = reducer(undefined, {
       type: LOGIN_ACCOUNT,

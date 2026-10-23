@@ -374,8 +374,8 @@
 .modal {
   .modalHeader {
     position: relative;
-    background-color: color-mix(in srgb, var(--ce-status-info) 80%, transparent) !important;
-    color: var(--ce-color-white) !important;
+    background-color: var(--ce-overlay-surface) !important;
+    color: var(--ce-overlay-text) !important;
     border-bottom: 1px solid var(--ce-document-border);
     font-size: 1.25em;
     padding: 20px 4.25rem 20px 30px;
@@ -383,7 +383,7 @@
     h5,
     :global(.modal-title) {
       font-size: 1.25em;
-      color: var(--ce-color-white) !important;
+      color: var(--ce-overlay-text) !important;
       font-weight: 600;
       margin: 0;
     }
@@ -400,8 +400,8 @@
       height: 2rem;
       margin: 0;
       padding: 0;
-      color: var(--ce-color-white);
-      opacity: 0.5;
+      color: var(--ce-overlay-text);
+      opacity: 1;
       text-shadow: none;
       background: transparent;
       border: none;
@@ -415,17 +415,17 @@
     :global(.btn-close):hover,
     :global(.btn-close):focus {
       background: transparent;
-      opacity: 0.8;
+      opacity: 1;
     }
 
     :global(.close) span {
-      color: var(--ce-color-white);
+      color: var(--ce-overlay-text);
     }
   }
 
   .modalBody {
-    background-color: color-mix(in srgb, var(--ce-status-info) 80%, transparent) !important;
-    color: var(--ce-color-black) !important;
+    background-color: var(--ce-overlay-surface) !important;
+    color: var(--ce-overlay-text) !important;
   }
 }
 

@@ -1,12 +1,13 @@
-import { resolveSessionBackendKind, type TelegramSessionMeta } from '../../utilities/session/sessionBackendKind';
+import { resolveSessionBackendKind, type AgentSessionMeta } from '../../utilities/session/sessionBackendKind';
 import {
   agentClientLoginEnvelopeMatchesIdentity,
+  isAgentClientLoginEnvelopeExpired,
   type AgentClientLoginEnvelope,
   type AgentClientLoginIdentityTarget,
 } from '../../utilities/session/agentClientLogin';
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
-import type { TelegramResultsDataset } from '../../utilities/session/telegramSessionBackend';
+import type { AgentResultsDataset } from '../../utilities/session/agentSessionBackend';
 
 export const DEFAULT_AGENT_BRIDGE_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 
@@ -32,27 +33,27 @@ export type OnePageSessionConfigRequest = {
   slug: string;
 };
 
-export type OnePageSessionTelegramAuthFailureState = {
-  telegramAgentQuestions: [];
-  telegramAgentQuestionsStatus: 'idle';
-  telegramAgentResults: null;
-  telegramAgentResultsStatus: 'idle';
-  telegramClientEnvelope: null;
-  telegramPolisDataset: null;
-  telegramQuestionSubmitError: string;
+export type OnePageSessionAgentAuthFailureState = {
+  agentQuestions: [];
+  agentQuestionsStatus: 'idle';
+  agentResults: null;
+  agentResultsStatus: 'idle';
+  agentClientEnvelope: null;
+  agentPolisDataset: null;
+  agentQuestionSubmitError: string;
 };
 
-export type OnePageSessionTelegramDataResetState = {
-  telegramAgentAnswerState: null;
-  telegramAgentQuestions: [];
-  telegramAgentQuestionsStatus: 'idle';
-  telegramAgentResults: null;
-  telegramAgentResultsStatus: 'idle';
-  telegramPolisDataset: null;
-  telegramQuestionPileIndex: 0;
-  telegramQuestionSubmitError: '';
-  telegramSubmittedQuestionIds: [];
-  telegramSubmittingQuestionId: '';
+export type OnePageSessionAgentDataResetState = {
+  agentAnswerState: null;
+  agentQuestions: [];
+  agentQuestionsStatus: 'idle';
+  agentResults: null;
+  agentResultsStatus: 'idle';
+  agentPolisDataset: null;
+  agentQuestionPileIndex: 0;
+  agentQuestionSubmitError: '';
+  agentSubmittedQuestionIds: [];
+  agentSubmittingQuestionId: '';
 };
 
 export type AgentClientLoginEnvelopeMemoryGlobal = {
@@ -95,15 +96,16 @@ export const buildCurrentSessionConfigRequest = (
   contracts: propsIn.contracts,
 });
 
-export const resolveTelegramAgentBridgeUrl = (sessionConfig: unknown = null): string => {
+export const resolveSessionAgentBridgeUrl = (sessionConfig: unknown = null): string => {
   const cfg = toRecord(sessionConfig);
-  const telegram = toRecord(cfg.telegram);
+  // Old deployments published these bridge URL aliases. Preserve them on reads.
+  const legacySurfaceConfig = toRecord(cfg.telegram);
   return toTrimmedString(
     cfg.agentBridgeUrl ||
       cfg.agentBridgeWorkerUrl ||
       cfg.telegramAgentBridgeUrl ||
-      telegram.agentBridgeUrl ||
-      telegram.workerUrl ||
+      legacySurfaceConfig.agentBridgeUrl ||
+      legacySurfaceConfig.workerUrl ||
       DEFAULT_AGENT_BRIDGE_URL,
   ).replace(/\/+$/g, '');
 };
@@ -120,46 +122,74 @@ export const resolveAgentClientLoginIdentityTarget = ({
     sessionSlug: normalizeOnePageSessionSlug(sessionSlug || cfg.slug),
     sessionId: resolveWorkerCanonicalSessionIdHex(cfg),
     workerUrl: normalizeWorkerUrl(toTrimmedString(cfg.sessionWorkerUrl || cfg.workerUrl || cfg.corsWorkerUrl)),
-    agentBridgeUrl: resolveTelegramAgentBridgeUrl(cfg),
+    agentBridgeUrl: resolveSessionAgentBridgeUrl(cfg),
   };
 };
 
-export const isOnePageTelegramBackendMode = ({
+export const isOnePageAgentBackendMode = ({
   sessionConfig,
   sessionSlug,
-  telegramSessionMeta,
+  agentSessionMeta,
 }: {
   sessionConfig: unknown;
   sessionSlug: unknown;
-  telegramSessionMeta: TelegramSessionMeta | null;
+  agentSessionMeta: AgentSessionMeta | null;
 }): boolean =>
   resolveSessionBackendKind({
     sessionConfig,
-    probeResult: telegramSessionMeta,
+    probeResult: agentSessionMeta,
     sessionSlug: normalizeOnePageSessionSlug(sessionSlug),
-  }) === 'telegram';
+  }) === 'agent';
 
-export const buildTelegramAuthFailureState = (reason: unknown = ''): OnePageSessionTelegramAuthFailureState => ({
-  telegramClientEnvelope: null,
-  telegramAgentQuestionsStatus: 'idle',
-  telegramAgentQuestions: [],
-  telegramAgentResultsStatus: 'idle',
-  telegramAgentResults: null,
-  telegramPolisDataset: null,
-  telegramQuestionSubmitError: String(reason || 'Telegram session expired. Paste a fresh agent token.'),
+export const isOnePageAgentShellMode = ({
+  sessionConfig,
+  sessionSlug,
+  agentSessionMeta,
+  agentClientEnvelope,
+  provider,
+}: {
+  sessionConfig: unknown;
+  sessionSlug: unknown;
+  agentSessionMeta: AgentSessionMeta | null;
+  agentClientEnvelope: AgentClientLoginEnvelope | null;
+  provider: unknown;
+}): boolean => {
+  if (!isOnePageAgentBackendMode({ sessionConfig, sessionSlug, agentSessionMeta })) return false;
+  const config = toRecord(sessionConfig);
+  // HTTP enables another login method; only profile-less legacy sessions force the agent shell.
+  if (!Object.hasOwn(config, 'sessionModeProfile') && !Object.hasOwn(config, 'authority')) return true;
+  return (
+    provider === 'agent_token' &&
+    isAgentClientLoginEnvelope(agentClientEnvelope) &&
+    !isAgentClientLoginEnvelopeExpired(agentClientEnvelope) &&
+    agentClientLoginEnvelopeMatchesIdentity(
+      agentClientEnvelope,
+      resolveAgentClientLoginIdentityTarget({ sessionConfig, sessionSlug }),
+    )
+  );
+};
+
+export const buildAgentAuthFailureState = (reason: unknown = ''): OnePageSessionAgentAuthFailureState => ({
+  agentClientEnvelope: null,
+  agentQuestionsStatus: 'idle',
+  agentQuestions: [],
+  agentResultsStatus: 'idle',
+  agentResults: null,
+  agentPolisDataset: null,
+  agentQuestionSubmitError: String(reason || 'Agent session expired. Paste a fresh agent token.'),
 });
 
-export const buildTelegramDataResetState = (): OnePageSessionTelegramDataResetState => ({
-  telegramAgentQuestionsStatus: 'idle',
-  telegramAgentQuestions: [],
-  telegramAgentAnswerState: null,
-  telegramQuestionPileIndex: 0,
-  telegramSubmittingQuestionId: '',
-  telegramSubmittedQuestionIds: [],
-  telegramQuestionSubmitError: '',
-  telegramAgentResultsStatus: 'idle',
-  telegramAgentResults: null,
-  telegramPolisDataset: null,
+export const buildAgentDataResetState = (): OnePageSessionAgentDataResetState => ({
+  agentQuestionsStatus: 'idle',
+  agentQuestions: [],
+  agentAnswerState: null,
+  agentQuestionPileIndex: 0,
+  agentSubmittingQuestionId: '',
+  agentSubmittedQuestionIds: [],
+  agentQuestionSubmitError: '',
+  agentResultsStatus: 'idle',
+  agentResults: null,
+  agentPolisDataset: null,
 });
 
 export const getAgentClientLoginEnvelopeMemoryKey = (target: unknown | AgentClientLoginIdentityTarget): string => {
@@ -172,7 +202,7 @@ export const getAgentClientLoginEnvelopeMemoryKey = (target: unknown | AgentClie
   ].join('\n');
 };
 
-export const clearTelegramEnvelopeMemoryCache = (
+export const clearAgentEnvelopeMemoryCache = (
   sessionSlug: unknown,
   globalTarget: AgentClientLoginEnvelopeMemoryGlobal = globalThis as AgentClientLoginEnvelopeMemoryGlobal,
 ): void => {
@@ -209,7 +239,7 @@ export const cacheAgentClientLoginEnvelope = (
   return key;
 };
 
-export const resolveTelegramResultsAuthFailureReason = (result: TelegramResultsDataset): unknown | null => {
+export const resolveAgentResultsAuthFailureReason = (result: AgentResultsDataset): unknown | null => {
   const views = toRecord(result.views);
   for (const view of Object.values(views)) {
     const viewRecord = toRecord(view);

@@ -1,4 +1,18 @@
-import { useCallback, type Dispatch, type MutableRefObject, type ReactNode, type SetStateAction } from 'react';
+import SessionHostedFaucetControl from '../SessionHostedFaucetControl';
+import {
+  describeHostedFaucetSetup,
+  normalizeHostedFaucetSelection,
+  setHostedFaucetEnabled,
+} from '../sessionWizardHostedFaucet';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type Dispatch,
+  type MutableRefObject,
+  type ReactNode,
+  type SetStateAction,
+} from 'react';
 
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import type { SessionModeProfile } from '../../../utilities/session/sessionModeProfile';
@@ -15,6 +29,7 @@ type SessionModeDraft = UnknownRecord & {
 
 type SessionWizardModeProfileControlsProps<Draft extends SessionModeDraft, Sections extends { encryption: boolean }> = {
   draft: Draft;
+  faucetPrivateKey?: unknown;
   draftRef: MutableRefObject<Draft>;
   entryOnly: boolean;
   onContinue: () => void;
@@ -22,6 +37,7 @@ type SessionWizardModeProfileControlsProps<Draft extends SessionModeDraft, Secti
   onEnterNormalMode: () => void;
   customizing: boolean;
   registryChainId: number | null;
+  onRegistryChainChange?: (chainId: number) => void;
   renderInfoTooltip?: (options: SessionWizardTooltipRenderOptions) => ReactNode;
   setCollapsedSections: Dispatch<SetStateAction<Sections>>;
   setDraft: Dispatch<SetStateAction<Draft>>;
@@ -58,6 +74,7 @@ const focusSessionModeProfilePrivacy = <Sections extends { encryption: boolean }
 
 const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sections extends { encryption: boolean }>({
   draft,
+  faucetPrivateKey,
   draftRef,
   entryOnly,
   onContinue,
@@ -65,21 +82,38 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
   onEnterNormalMode,
   customizing,
   registryChainId,
+  onRegistryChainChange,
   renderInfoTooltip,
   setCollapsedSections,
   setDraft,
   showContinue,
   showPresetToggle = true,
 }: SessionWizardModeProfileControlsProps<Draft, Sections>): SessionWizardModeProfileControls => {
+  const previousDraft = useRef(draft);
+  const previousNetwork = useRef(registryChainId);
+  useEffect(() => {
+    let next = normalizeHostedFaucetSelection(draft, previousDraft.current);
+    if (previousNetwork.current !== registryChainId && describeHostedFaucetSetup(next).enabled) {
+      next = setHostedFaucetEnabled(next, false);
+    }
+    previousNetwork.current = registryChainId;
+    previousDraft.current = next;
+    if (next !== draft) {
+      draftRef.current = next;
+      setDraft(next);
+    }
+  }, [draft, draftRef, registryChainId, setDraft]);
+
   const handleChange = useCallback(
     (profile: SessionModeProfile, compiled: { storageProfile: UnknownRecord }) => {
+      if (profile.evm.registryChainId) onRegistryChainChange?.(profile.evm.registryChainId);
       setDraft((prev) => {
         const next = applySessionModeProfileSelectionToDraft(prev, profile, compiled);
         draftRef.current = next;
         return next;
       });
     },
-    [draftRef, setDraft],
+    [draftRef, onRegistryChainChange, setDraft],
   );
 
   const sharedSectionProps = {
@@ -121,7 +155,19 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
       </button>
     ) : null,
     privacy: <SessionModeProfileSections {...sharedSectionProps} section="privacy" />,
-    worker: <SessionModeProfileSections {...sharedSectionProps} section="worker" />,
+    worker: (
+      <>
+        <SessionModeProfileSections {...sharedSectionProps} section="worker" />
+        <SessionHostedFaucetControl
+          draft={{ ...draft, networkChainId: registryChainId || draft.networkChainId }}
+          faucetPrivateKey={faucetPrivateKey}
+          onChange={(next) => {
+            draftRef.current = next;
+            setDraft(next);
+          }}
+        />
+      </>
+    ),
     publish: <SessionModeProfileSections {...sharedSectionProps} section="publish" />,
   };
 };

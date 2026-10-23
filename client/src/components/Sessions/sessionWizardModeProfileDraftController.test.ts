@@ -56,6 +56,15 @@ describe('sessionWizardModeProfileDraftController', () => {
     expect(next.groupCreationPolicy).toBe('participants');
   });
 
+  it.each([false, true])('clears retired surfaces without changing explicit HTTP access %s', (agentHttp) => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.surfaces = { ...profile.surfaces, telegram: true, miniApp: true, agentHttp };
+    const next = applySessionModeProfileSelectionToDraft({}, profile, compileSessionModeProfile(profile));
+    expect(next.sessionModeProfile.surfaces).toMatchObject({ telegram: false, miniApp: false, agentHttp });
+    expect(profile.surfaces).toMatchObject({ telegram: true, miniApp: true, agentHttp });
+  });
+
   it('persists either group creation policy across Worker and registry profile selections', () => {
     const registryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     const restricted = { groupCreationPolicy: 'admin_only' };

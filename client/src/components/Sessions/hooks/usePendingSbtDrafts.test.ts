@@ -127,3 +127,23 @@ describe('usePendingSbtDrafts', () => {
     expect(result.current.hasUndeployedPendingSbtDrafts).toBe(false);
   });
 });
+
+it('forgets sensitive drafts after leaving the wizard', () => {
+  const first = renderHook(() => usePendingSbtDrafts());
+  act(() => first.result.current.setPendingSbtDrafts([buildDraft({ groupPassword: 'fixture-only' })]));
+  first.unmount();
+  expect(readSessionWizardPendingSbtDraftsCache()).toEqual([]);
+  const next = renderHook(() => usePendingSbtDrafts());
+  expect(next.result.current.pendingSbtDrafts).toEqual([]);
+});
+
+it('clears pending drafts on an account change but preserves case-only changes', () => {
+  const { result, rerender } = renderHook(({ account }) => usePendingSbtDrafts(account), {
+    initialProps: { account: '0xAA' },
+  });
+  act(() => result.current.setPendingSbtDrafts([buildDraft()]));
+  rerender({ account: '0xaa' });
+  expect(result.current.pendingSbtDrafts).toHaveLength(1);
+  rerender({ account: '0xbb' });
+  expect(result.current.pendingSbtDrafts).toEqual([]);
+});

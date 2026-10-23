@@ -47,7 +47,9 @@ const SessionWizardNormalModeRail = ({
               <span className={styles.normalModeCardTitle}>{card.title}</span>
               {showExpandedDetails && <span className={styles.normalModeCardSummary}>{card.summary}</span>}
             </span>
-          ) : null}
+          ) : (
+            <span className={styles.normalModeCardCompactTitle}>{card.title}</span>
+          )}
         </button>
       );
     })}

@@ -19,6 +19,7 @@ it('loads poseidon-lite only when the first commitment is hashed', async () => {
   render(
     <SurveyQuestions
       ref={ref}
+      networkChainId={11155420}
       runtimeStrategy={{
         render: () => <div data-testid="survey-questions-poseidon" />,
       }}

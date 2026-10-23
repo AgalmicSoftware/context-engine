@@ -2228,10 +2228,17 @@ const SurveyQuestionsInner = (
   }));
 
   const runtimeStrategy: SurveyQuestionsLegacyValue = getRuntimeStrategy();
-  if (typeof runtimeStrategy?.render === 'function') {
-    return runtimeStrategy.render(engine);
-  }
-  return renderDefaultSurveyQuestionsRoute();
+  const route =
+    typeof runtimeStrategy?.render === 'function'
+      ? runtimeStrategy.render(engine)
+      : renderDefaultSurveyQuestionsRoute();
+  // The route can mount before its session config arrives. Keep all editing
+  // surfaces (including pile strategies) behind the same draft identity check.
+  return !stateRef.current.displayAnswerMode && getDraftKey() === null ? (
+    <p role="status">Loading session...</p>
+  ) : (
+    route
+  );
 };
 
 export const SurveyQuestions = React.forwardRef(SurveyQuestionsInner);

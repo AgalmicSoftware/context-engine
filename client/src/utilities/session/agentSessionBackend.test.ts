@@ -1,10 +1,10 @@
 import {
-  buildTelegramPreferenceAnswer,
+  buildAgentPreferenceAnswer,
   envelopeAllowsSubmit,
   loadGroups,
   loadResultsDataset,
   submitAnswer,
-} from './telegramSessionBackend';
+} from './agentSessionBackend';
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
 
 const envelope: AgentClientLoginEnvelope = {
@@ -22,7 +22,7 @@ const envelope: AgentClientLoginEnvelope = {
   },
 };
 
-describe('telegramSessionBackend', () => {
+describe('agentSessionBackend', () => {
   it('gates submit on both envelope capability and session-meta readiness', () => {
     expect(envelopeAllowsSubmit(envelope, { clientSubmitReady: true })).toBe(true);
     expect(
@@ -33,7 +33,7 @@ describe('telegramSessionBackend', () => {
 
   it('normalizes answers by question type', () => {
     expect(
-      buildTelegramPreferenceAnswer(
+      buildAgentPreferenceAnswer(
         {
           questionId: 'q1',
           id: 'q1',
@@ -63,13 +63,13 @@ describe('telegramSessionBackend', () => {
   });
 
   it('submits answers with the exchanged envelope credential', async () => {
-    const fetchImpl = jest.fn(
+    const fetchImpl = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>(
       async () =>
         new Response(JSON.stringify({ ok: true, submittedCount: 1 }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         }),
-    ) as jest.Mock;
+    );
 
     const result = await submitAnswer({
       envelope,
@@ -100,8 +100,8 @@ describe('telegramSessionBackend', () => {
   });
 
   it('synthesizes deterministic Polis data from aggregate rows', async () => {
-    const fetchImpl = jest.fn(async (url: string) => {
-      const parsed = new URL(url);
+    const fetchImpl = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>(async (input) => {
+      const parsed = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
       const view = parsed.searchParams.get('view');
       if (view === 'consensus') {
         return new Response(
@@ -126,7 +126,7 @@ describe('telegramSessionBackend', () => {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
-    }) as jest.Mock;
+    });
 
     const first = await loadResultsDataset({ envelope, fetchImpl });
     const second = await loadResultsDataset({ envelope, fetchImpl });

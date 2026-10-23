@@ -176,7 +176,7 @@ const normalizeClientLoginFailureReason = (value: unknown, status: number): stri
     'not_enabled',
     'disabled',
   ].find((candidate) => reason.includes(candidate));
-  return knownReason ? `telegram_client_login_${knownReason}` : `telegram_client_login_failed_${status}`;
+  return knownReason ? `agent_client_login_${knownReason}` : `agent_client_login_failed_${status}`;
 };
 
 const normalizeExchangeEnvelope = ({
@@ -191,20 +191,20 @@ const normalizeExchangeEnvelope = ({
   agentBridgeUrl: string;
 }): AgentClientLoginEnvelope => {
   if (sourceToken && JSON.stringify(body).includes(sourceToken)) {
-    throw new Error('telegram_client_login_echoed_source_token');
+    throw new Error('agent_client_login_echoed_source_token');
   }
   const bridgeCredential = toRecord(body.bridgeCredential);
   const workerCredential = toRecord(body.workerCredential);
-  if (!toStr(bridgeCredential.token)) throw new Error('telegram_client_login_missing_bridge_credential');
-  if (!toStr(workerCredential.token)) throw new Error('telegram_client_login_missing_worker_credential');
+  if (!toStr(bridgeCredential.token)) throw new Error('agent_client_login_missing_bridge_credential');
+  if (!toStr(workerCredential.token)) throw new Error('agent_client_login_missing_worker_credential');
   const normalizedSlug = normalizeSessionSlug(body.sessionSlug || sessionSlug);
   if (normalizedSlug !== normalizeSessionSlug(sessionSlug)) {
-    throw new Error('telegram_client_login_session_mismatch');
+    throw new Error('agent_client_login_session_mismatch');
   }
   const capabilities = normalizeCapabilities(body.capabilities);
   const sessionId = normalizeWorkerCanonicalSessionIdHex(body.sessionId);
   if (capabilities.readGroups && !sessionId) {
-    throw new Error('telegram_client_login_session_identity_missing');
+    throw new Error('agent_client_login_session_identity_missing');
   }
   const expiresAt =
     toStr(body.expiresAt) || (Number(body.exp || 0) > 0 ? new Date(Number(body.exp) * 1000).toISOString() : '');
@@ -351,11 +351,11 @@ export const exchangeAgentClientLogin = async ({
   fetchImpl = fetch,
 }: ExchangeAgentClientLoginArgs): Promise<AgentClientLoginEnvelope> => {
   const bridge = normalizeWorkerUrl(agentBridgeUrl);
-  if (!bridge) throw new Error('telegram_client_login_bridge_missing');
+  if (!bridge) throw new Error('agent_client_login_bridge_missing');
   const slug = normalizeSessionSlug(sessionSlug);
-  if (!slug) throw new Error('telegram_client_login_session_required');
+  if (!slug) throw new Error('agent_client_login_session_required');
   const validation = extractAgentClientToken(tokenOrLink);
-  if (!validation.ok) throw new Error(`telegram_client_login_${validation.reason}`);
+  if (!validation.ok) throw new Error(`agent_client_login_${validation.reason}`);
 
   const response = await fetchImpl(`${bridge}/api/agent/client-login/exchange`, {
     method: 'POST',
@@ -379,10 +379,10 @@ export const exchangeAgentClientLogin = async ({
   const expectedSessionId = normalizeWorkerCanonicalSessionIdHex(expectedSessionIdRaw);
   const expectedWorkerUrl = normalizeWorkerUrl(toStr(expectedWorkerUrlRaw));
   if ((toStr(expectedSessionIdRaw) && !expectedSessionId) || (toStr(expectedWorkerUrlRaw) && !expectedWorkerUrl)) {
-    throw new Error('telegram_client_login_expected_identity_invalid');
+    throw new Error('agent_client_login_expected_identity_invalid');
   }
   if (envelope.capabilities.readGroups && (!expectedSessionId || !expectedWorkerUrl)) {
-    throw new Error('telegram_client_login_expected_identity_missing');
+    throw new Error('agent_client_login_expected_identity_missing');
   }
   if (
     !agentClientLoginEnvelopeMatchesIdentity(envelope, {
@@ -392,7 +392,7 @@ export const exchangeAgentClientLogin = async ({
       agentBridgeUrl: bridge,
     })
   ) {
-    throw new Error('telegram_client_login_session_identity_mismatch');
+    throw new Error('agent_client_login_session_identity_mismatch');
   }
   writeAgentClientLoginEnvelope(envelope);
   return envelope;

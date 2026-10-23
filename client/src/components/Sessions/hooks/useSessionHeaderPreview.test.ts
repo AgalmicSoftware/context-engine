@@ -107,6 +107,42 @@ describe('useSessionHeaderPreview', () => {
     expect(updateDraftSessionHeader).not.toHaveBeenCalled();
   });
 
+  it('refuses a picked or pasted header image that publishing cannot upload', async () => {
+    const webp = new File(['x'], 'header.webp', { type: 'image/webp' });
+    const { result } = renderHook(() =>
+      useSessionHeaderPreview({
+        draftSessionHeader: '',
+        updateDraftSessionHeader: jest.fn(),
+        readClipboard: jest.fn(async () => ({ kind: 'file', file: webp })),
+      }),
+    );
+
+    let accepted = true;
+    act(() => {
+      accepted = result.current.setSessionHeaderFile(webp);
+    });
+    expect(accepted).toBe(false);
+    expect(result.current.sessionHeaderFile).toBeNull();
+    expect(result.current.sessionHeaderUploadStatus).toBe(
+      'Unsupported header image format. Use png, jpg, jpeg, or gif.',
+    );
+    expect(result.current.sessionHeaderUploadStatusTone).toBe('error');
+
+    await act(async () => {
+      await result.current.handlePasteSessionHeaderFromClipboard();
+    });
+    expect(result.current.sessionHeaderFile).toBeNull();
+    expect(result.current.sessionHeaderMode).toBe('url');
+    expect(result.current.sessionHeaderUploadStatusTone).toBe('error');
+
+    const png = new File(['x'], 'header.png', { type: 'image/png' });
+    act(() => {
+      accepted = result.current.setSessionHeaderFile(png);
+    });
+    expect(accepted).toBe(true);
+    expect(result.current.sessionHeaderFile).toBe(png);
+  });
+
   it('handles pasted text as URL mode draft updates', async () => {
     const readClipboard = jest.fn().mockResolvedValue({
       kind: 'text',

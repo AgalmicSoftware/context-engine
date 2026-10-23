@@ -6,6 +6,7 @@ import {
   splitSessionWizardDraftEntries,
 } from './sessionWizardFieldDescriptors';
 import type { SessionWizardModeFieldPolicy } from './sessionWizardModeFieldPolicy';
+import { buildSessionWizardDefaultTemplate } from './sessionWizardDraftState';
 
 const pureWorkerPolicy: SessionWizardModeFieldPolicy = {
   showBlockLimits: false,
@@ -193,5 +194,22 @@ describe('sessionWizardFieldDescriptors', () => {
     );
 
     expect(ordered.map(([key]) => key)).toEqual(['sessionEndsAt', 'defaultGroupTags']);
+  });
+
+  it('gives every visible default draft field a readable label instead of its key', () => {
+    const everyOptionPolicy: SessionWizardModeFieldPolicy = {
+      ...pureWorkerPolicy,
+      showBlockLimits: true,
+      showFaucet: true,
+      showSbtDefaults: true,
+      showAgentSessionWrapped: true,
+    };
+    const rawLabels = Object.keys(buildSessionWizardDefaultTemplate())
+      .filter(
+        (key) => !shouldHideSessionWizardField({ key, wizardMode: 'advanced', modeFieldPolicy: everyOptionPolicy }),
+      )
+      .filter((key) => getSessionWizardFieldLabel(key, key) === key);
+
+    expect(rawLabels).toEqual([]);
   });
 });

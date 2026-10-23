@@ -6,6 +6,7 @@ import { faExpand, faTimes } from '@fortawesome/free-solid-svg-icons';
 import CompactImageChooser from '../Shared/CompactImageChooser';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import { SESSION_HEADER_IMAGE_ACCEPT } from './sessionWizardUiSupport';
 import styles from './SessionWizard.module.scss';
 
 type SessionHeaderMode = 'url' | 'upload' | string;
@@ -77,6 +78,7 @@ const SessionHeaderField = ({
         onPaste={onPaste}
         onUploadClick={onCompactUploadClick}
         onFileChange={onCompactFileChange}
+        accept={SESSION_HEADER_IMAGE_ACCEPT}
         fileInputRef={compactSessionHeaderInputRef}
         previewSrc={previewSrc}
         previewAlt="Session header preview"
@@ -118,7 +120,7 @@ const SessionHeaderField = ({
           data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
         />
       ) : (
-        <Input type="file" accept="image/*" onChange={onAdvancedFileChange} />
+        <Input type="file" accept={SESSION_HEADER_IMAGE_ACCEPT} onChange={onAdvancedFileChange} />
       )}
       {previewSrc ? (
         <div className={styles.sessionHeaderPreviewSurface}>

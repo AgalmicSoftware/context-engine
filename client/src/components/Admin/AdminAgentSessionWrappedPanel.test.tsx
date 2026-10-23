@@ -99,7 +99,7 @@ describe('AdminAgentSessionWrappedPanel', () => {
     expect(screen.getByText(/Wrapped access enabled and published/i)).toBeInTheDocument();
   });
 
-  it('shows health, disable-access, and redeploy controls without any Telegram requirement', () => {
+  it('shows health, disable-access, and redeploy controls for direct HTTP access', () => {
     render(
       <AdminAgentSessionWrappedPanel
         {...baseProps}
@@ -113,7 +113,7 @@ describe('AdminAgentSessionWrappedPanel', () => {
     expect(screen.getByRole('button', { name: 'Check health' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Disable access' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Redeploy' })).toBeInTheDocument();
-    expect(screen.getByText(/Telegram is optional and remains disabled/i)).toBeInTheDocument();
+    expect(screen.getByText(/Attaching a new registry Worker prompts an admin transaction/i)).toBeInTheDocument();
   });
 
   it('keeps health observable when a locked or non-admin session is read-only', () => {

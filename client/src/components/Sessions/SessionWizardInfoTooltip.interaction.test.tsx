@@ -16,28 +16,28 @@ describe('SessionWizardInfoTooltip interaction', () => {
       enabled: true,
       id: 'channel-help-test',
       ariaLabel: 'About agent access',
-      content: 'Authorized agents can participate without Telegram.',
+      content: 'Authorized agents can participate through scoped HTTP access.',
     };
     const { rerender } = render(<SessionWizardInfoTooltip {...props} />);
     const help = screen.getByRole('button', { name: 'About agent access' });
 
     fireEvent.focusIn(help);
     await act(async () => jest.advanceTimersByTimeAsync(0));
-    expect(screen.getByRole('tooltip')).toHaveTextContent(/without Telegram/);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/through scoped HTTP access/);
 
     fireEvent.click(help);
     await act(async () => jest.advanceTimersByTimeAsync(0));
     await act(async () => jest.advanceTimersByTimeAsync(500));
 
-    expect(screen.getByRole('tooltip')).toHaveTextContent(/without Telegram/);
-    expect(help).toHaveAccessibleDescription('Authorized agents can participate without Telegram.');
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/through scoped HTTP access/);
+    expect(help).toHaveAccessibleDescription('Authorized agents can participate through scoped HTTP access.');
     fireEvent.keyDown(help, { key: 'Escape' });
     await act(async () => jest.advanceTimersByTimeAsync(0));
     await act(async () => jest.advanceTimersByTimeAsync(500));
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
     fireEvent.click(help);
     await act(async () => jest.advanceTimersByTimeAsync(0));
-    expect(screen.getByRole('tooltip')).toHaveTextContent(/without Telegram/);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/through scoped HTTP access/);
 
     rerender(<SessionWizardInfoTooltip {...props} enabled={false} />);
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();

@@ -67,26 +67,24 @@ export const loadLoginSettingsSponsoredAccess = async ({
     }
   }
 
-  const resourceKeys = capabilities.settingsResourceKeys.filter(isSponsoredResourceKey);
   const canReadWorkerPresence =
     includeWorkerResourcePresence && (capabilities.profileValid || capabilities.source === 'legacy_registry');
-  const workerChainId = Number(capabilities.chainId || 0);
-  const [results, workerResourcePresence] = await Promise.all([
-    Promise.all(
-      resourceKeys.map((resourceKey) =>
-        capabilities.isWorkerCanonical
-          ? Promise.resolve({ resourceKey, status: 'worker-managed' })
-          : checkSponsoredAccess({ sessionConfig: cfg, sessionSlug: slug, account, resourceKey }),
-      ),
+  const workerResourcePresence = canReadWorkerPresence
+    ? await readWorkerResourcePresence({
+        sessionConfig: cfg,
+        sessionSlug: slug,
+        context: { account, providerLike: providerLike || null, chainId: capabilities.chainId },
+      })
+    : null;
+  capabilities = resolveSessionCapabilityProjection(cfg, workerResourcePresence);
+  const resourceKeys = capabilities.settingsResourceKeys.filter(isSponsoredResourceKey);
+  const results = await Promise.all(
+    resourceKeys.map((resourceKey) =>
+      capabilities.isWorkerCanonical
+        ? Promise.resolve({ resourceKey, status: 'worker-managed' })
+        : checkSponsoredAccess({ sessionConfig: cfg, sessionSlug: slug, account, resourceKey }),
     ),
-    canReadWorkerPresence
-      ? readWorkerResourcePresence({
-          sessionConfig: cfg,
-          sessionSlug: slug,
-          context: { account, providerLike: providerLike || null, chainId: workerChainId || null },
-        })
-      : Promise.resolve(null),
-  ]);
+  );
   const accessMap: LoginSettingsSponsoredAccessResult['accessMap'] = {
     ai: null,
     arweave: null,

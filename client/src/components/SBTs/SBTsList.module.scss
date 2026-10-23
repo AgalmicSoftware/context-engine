@@ -1445,9 +1445,9 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
 }
 
 .modalViewContainer {
-  /* This modifies how the .miniaturizedBase looks in the modal. */
+  /* The enclosing modal owns the surface; inverse text disappears on light themes. */
   background-color: $modal-background-color !important;
-  color: var(--ce-color-white) !important;
+  color: var(--ce-overlay-text) !important;
   padding: 20px;
   border-radius: var(--ce-radius-4);
   .sbtGrid {
@@ -1475,7 +1475,7 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
 
     .sbtInfo {
       .sbtName {
-        color: var(--ce-color-white) !important;
+        color: var(--ce-overlay-text) !important;
         font-size: 0.98rem;
       }
     }
@@ -1491,11 +1491,15 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
   }
 
   .sectionTitle {
-    color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent) !important;
-    border-bottom: 2px solid color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
+    color: var(--ce-overlay-text) !important;
+    border-bottom: 2px solid var(--ce-border);
   }
 
-  .filterContainer {
-    color: var(--ce-color-white);
+  .filterContainer,
+  .sessionUniverseHeader,
+  .sectionLoadingHint,
+  .sectionLoadingBlocks,
+  .sectionEmptyHint {
+    color: var(--ce-overlay-text);
   }
 }

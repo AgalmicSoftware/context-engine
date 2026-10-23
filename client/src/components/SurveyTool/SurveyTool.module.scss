@@ -7333,3 +7333,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     font-size: 1.125rem;
   }
 }
+.draftPersistenceStatus:empty {
+  margin: 0;
+}
