@@ -1532,6 +1532,45 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     expect(authedHeaders.get('Authorization')).toBe('Bearer token-1');
   });
 
+  it('returns the anonymous denial for a signed-out app even when the injected wallet is unlocked', async () => {
+    require('../../store.js').default.getState.mockReturnValue({
+      profile: { account: '', provider: 'wagmi' },
+      sessionState: {},
+    });
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResp(403, { error: 'Anonymous access denied: gated route requires authenticated worker token.' }),
+      );
+    const response = await fetchWorkerWithAuth(
+      'https://worker.example/transcribe',
+      { method: 'POST' },
+      { preferAnonymous: true, sessionSlug: 'alpha' },
+    );
+    expect(response.status).toBe(403);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mockProviderRequest).not.toHaveBeenCalled();
+  });
+
+  it('keeps a valid token after a terminal scope denial without asking for another signature', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }))
+      .mockResolvedValueOnce(jsonResp(403, { error: 'Token missing transcribe scope.' }));
+    const context = { account: TEST_ADDRESS, providerLike: 'wagmi', chainId: 84532 };
+    const response = await fetchWorkerWithAuth(
+      'https://worker.example/transcribe',
+      { method: 'POST' },
+      { sessionSlug: 'alpha', context },
+    );
+    expect(response.status).toBe(403);
+    expect(await getWorkerSessionToken({ workerUrl: 'https://worker.example', sessionSlug: 'alpha', context })).toBe(
+      'token-1',
+    );
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
   it('clears the active token cache entry and aborts auth retry when the store account switches', async () => {
     const mockStore = require('../../store.js').default;
     const cacheKey = `ce:workerToken:v1:${normalizeWorkerUrl('https://worker.example')}::${TEST_ADDRESS}`;
@@ -1634,10 +1673,20 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     expect(String(global.fetch.mock.calls[2][0])).toMatch(/\/auth\/login$/);
   });
 
-  it('falls back to authenticated flow when anonymous Cloudflare storage read is SBT-gated', async () => {
+  it.each([
+    [401, { error: 'Missing requester address for worker SBT gate.' }],
+    [403, { error: 'Access denied: Cloudflare storage conditions failed.', reason: 'missing_principal' }],
+    [
+      403,
+      {
+        error: 'Access denied: individual response access requires its author.',
+        reason: 'private_response_owner_required',
+      },
+    ],
+  ])('signs in for a Cloudflare storage denial that requires a principal (%s)', async (status, denial) => {
     global.fetch = jest
       .fn()
-      .mockResolvedValueOnce(jsonResp(401, { error: 'Missing requester address for worker SBT gate.' })) // anonymous storage read
+      .mockResolvedValueOnce(jsonResp(status, denial)) // anonymous storage read
       .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' })) // auth/nonce
       .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 })) // auth/login
       .mockResolvedValueOnce(jsonResp(200, { ok: true })); // authed fetch
@@ -1662,6 +1711,22 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     expect(String(global.fetch.mock.calls[1][0])).toMatch(/\/auth\/nonce$/);
     expect(String(global.fetch.mock.calls[2][0])).toMatch(/\/auth\/login$/);
     expect(new Headers(global.fetch.mock.calls[3][1].headers).get('Authorization')).toBe('Bearer token-1');
+  });
+
+  it('does not initiate sign-in for a storage condition failure with an existing principal', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce(
+      jsonResp(403, {
+        error: 'Access denied: Cloudflare storage conditions failed.',
+        reason: 'condition_failed',
+      }),
+    );
+    const response = await fetchWorkerWithAuth(
+      'https://worker.example/storage/list?resource=questions',
+      { method: 'GET' },
+      { sessionSlug: 'alpha', preferAnonymous: true },
+    );
+    expect(response.status).toBe(403);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to authenticated flow after anonymous 429 worker rate-limit denial', async () => {

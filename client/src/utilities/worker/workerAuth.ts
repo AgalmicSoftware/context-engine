@@ -928,6 +928,8 @@ export const fetchWorkerWithAuth = async (
   const workerUrl = normalizeWorkerUrl(opts.workerUrl || url);
   const bodyIsStream = isStreamBody(options?.body);
   const anonymousOnly = opts.anonymousOnly === true;
+  const startedSignedOut = !getCurrentWorkerAuthStoreAddress();
+  const startingAuthEpoch = workerAuthEpoch;
   const canAttemptAnonymous = (opts.preferAnonymous || anonymousOnly) && (!bodyIsStream || anonymousOnly);
   let anonymousResponse: Response | null = null;
   if (canAttemptAnonymous) {
@@ -952,8 +954,8 @@ export const fetchWorkerWithAuth = async (
       const fallbackAnonymousHeaders = stripAnonymousRateIdHeader(anonymousHeaders);
       anonymousResponse = await fetch(url, { ...options, headers: fallbackAnonymousHeaders });
     }
-    // Regression guard: user-initiated media capture must never turn a denied
-    // anonymous request into an unexpected wallet or passkey signing prompt.
+    // Explicitly anonymous-only callers (such as background suggestions) must
+    // never turn a denial into an interactive wallet or passkey signing prompt.
     if (anonymousOnly) return anonymousResponse;
     const shouldFallback = await shouldFallbackToAuthenticatedFlow(anonymousResponse, {
       requestApiKey,
@@ -962,6 +964,16 @@ export const fetchWorkerWithAuth = async (
     if (!shouldFallback) {
       return anonymousResponse;
     }
+  }
+  // An unlocked extension is not an app login. Keep the useful route denial
+  // when signed out; account changes during a request still use abort handling.
+  if (
+    anonymousResponse &&
+    startedSignedOut &&
+    !getCurrentWorkerAuthStoreAddress() &&
+    startingAuthEpoch === workerAuthEpoch
+  ) {
+    return anonymousResponse;
   }
   let authHeaders: Record<string, string> | null = null;
   let authRequestContext: WorkerTokenRequestContext | null = null;

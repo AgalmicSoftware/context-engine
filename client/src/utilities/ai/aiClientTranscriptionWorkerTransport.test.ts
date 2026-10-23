@@ -64,7 +64,6 @@ describe('aiClientTranscriptionWorkerTransport', () => {
     expect(authOptions).toEqual(
       expect.objectContaining({
         allowDemoFallback: false,
-        anonymousOnly: true,
         fallbackOnGateUnavailable: true,
         preferAnonymous: true,
         sessionConfig,
@@ -72,6 +71,7 @@ describe('aiClientTranscriptionWorkerTransport', () => {
         workerUrl: 'https://worker.example',
       }),
     );
+    expect(authOptions?.anonymousOnly).not.toBe(true);
 
     const form = requestInit?.body as FormData;
     expect(form.get('provider')).toBe('openai');
