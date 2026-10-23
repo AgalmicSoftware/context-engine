@@ -1,6 +1,8 @@
 import { buildReportFingerprint } from './provenance.mjs';
+import { withOpinionGroupAvailability } from './opinion-groups.mjs';
 
-export const buildContextEngineBenchmarkDataset = (report = {}) => {
+export const buildContextEngineBenchmarkDataset = (sourceReport = {}) => {
+  const report = withOpinionGroupAvailability(sourceReport);
   const participants = Array.isArray(report.participants) ? report.participants : [];
   const statements = Array.isArray(report.questions) ? report.questions : [];
   const matrix = report.polisReport?.byModelQuestion || {};
@@ -11,11 +13,12 @@ export const buildContextEngineBenchmarkDataset = (report = {}) => {
     sourceReport: {
       benchmarkId: report.benchmarkId || '',
       reportGeneratedAt: report.generatedAt || null,
-      reportFingerprint: buildReportFingerprint(report),
+      reportFingerprint: buildReportFingerprint(sourceReport),
       mode: report.mode || 'self',
       personaId: report.personaId || null,
       status: report.status || 'preview',
     },
+    summaryCorrection: report.summaryCorrection || null,
     stanceScale: {
       minimum: -1,
       midpoint: 0,
@@ -43,6 +46,8 @@ export const buildContextEngineBenchmarkDataset = (report = {}) => {
     }))),
     polisReport: {
       aggregationUnit: report.polisReport?.aggregationUnit || 'model-participant',
+      responseDistributionVersion: report.polisReport?.responseDistributionVersion || null,
+      uncertaintyRateSemantics: report.polisReport?.uncertaintyRateSemantics || null,
       byQuestion: report.polisReport?.byQuestion || {},
       similarityMatrix: report.polisReport?.similarityMatrix || {},
       similarityDetails: report.polisReport?.similarityDetails || {},
@@ -54,6 +59,6 @@ export const buildContextEngineBenchmarkDataset = (report = {}) => {
     debateAtlas: report.debateAtlas || {},
     riskMatrix: report.riskMatrix || {},
     integrity: report.integrity || {},
-    note: 'Lossless benchmark result contract for native Context Engine rendering. Unlike ce_polis_question_responses_export, repeated-response distributions are not discretized.',
+    note: 'Measured response distributions are preserved for native Context Engine rendering, not discretized as in ce_polis_question_responses_export. Unsupported opinion groups are withheld using participantGraph.opinionGroupAvailability.',
   };
 };

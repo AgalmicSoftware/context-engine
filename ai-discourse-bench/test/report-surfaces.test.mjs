@@ -622,7 +622,7 @@ test('Breakdown comparison beeswarm plots cohort difference against repeat consi
   assert.match(chart, /<text class="beeswarmAxisLabel" x="62" y="232">Similarity<\/text>/);
   assert.match(chart, /<text class="beeswarmAxisLabel" x="680" y="232" text-anchor="end">Difference<\/text>/);
   assert.doesNotMatch(chart, /<title>/);
-  assert.match(chart, /aria-label="[^"]+modeled responses; [^"]+repeat consistency\)"/);
+  assert.match(chart, /aria-label="[^"]+model participants; [^"]+repeat consistency\)"/);
 });
 
 test('All Questions gives each model one averaged vote and preserves invalid raw runs separately', async () => {
@@ -684,18 +684,18 @@ test('All Questions gives each model one averaged vote and preserves invalid raw
   assert.match(html, /<button\s+type="button"\s+class="atlasIssueModelCard"\s+data-ce-atlas-model-card="model-a"[^>]*aria-label="Highlight Model A answers and metrics; click to lock selection"\s+aria-pressed="false"/);
   assert.match(html, /data-ce-atlas-model-marker="model-a"/);
   assert.match(html, /data-ce-atlas-model-answer="Agree"/);
-  assert.match(html, /title="Model A: Agree"/);
+  assert.match(html, /title="Model A: Agree\. Mean stance 1\.00\. Observed answers: Agree 100%, Unsure 0%, Disagree 0%/);
   assert.doesNotMatch(html, /Answer coverage/);
   assert.match(html, /Response direction/);
   assert.match(html, /Average \+1\.00/);
-  assert.match(html, /-1 disagree \| 0 unsure \| \+1 agree/);
+  assert.match(html, /-1 disagree \| 0 mixed or unsure \| \+1 agree/);
   assert.match(html, /Model difference/);
   assert.match(html, /No comparison/);
   assert.doesNotMatch(html, /Mean of 1 model-question answer after repeat runs were combined/);
   assert.doesNotMatch(html, /This describes response direction, not correctness/);
 });
 
-test('Debate Map uses stable model colors and overlays each answer on its aggregate segment', async () => {
+test('Debate Map uses stable model colors on a separate mean-stance axis', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
     1
@@ -730,9 +730,9 @@ test('Debate Map uses stable model colors and overlays each answer on its aggreg
   assert.match(html, /data-ce-atlas-model-card="model-c"[^>]*style="--atlas-model-color:#2ca02c"/);
   assert.match(html, /data-ce-atlas-model-card="model-a"[^>]*data-ce-atlas-model-stance-value="Average \+1\.00"[^>]*data-ce-atlas-model-difference-value="Mean peer gap 1\.50"[^>]*data-ce-atlas-model-consistency-value="100%"/);
   assert.match(html, /data-ce-atlas-model-card="model-b"[^>]*data-ce-atlas-model-stance-value="Average 0\.00"[^>]*data-ce-atlas-model-difference-value="Mean peer gap 1\.00"[^>]*data-ce-atlas-model-consistency-value="100%"/);
-  assert.match(html, /data-ce-atlas-model-marker="model-a"[\s\S]*?data-ce-atlas-model-answer="Agree"[\s\S]*?data-ce-atlas-model-repeat-value="100%"[\s\S]*?data-ce-atlas-model-winning-responses="1"[\s\S]*?data-ce-atlas-model-attempted-runs="1"[\s\S]*?style="--atlas-model-color:#1f77b4;left:16\.67%"[\s\S]*?>1<\/span>/);
-  assert.match(html, /data-ce-atlas-model-marker="model-b"[\s\S]*?data-ce-atlas-model-answer="Unsure"[\s\S]*?style="--atlas-model-color:#ff7f0e;left:50\.00%"[\s\S]*?>2<\/span>/);
-  assert.match(html, /data-ce-atlas-model-marker="model-c"[\s\S]*?data-ce-atlas-model-answer="Disagree"[\s\S]*?style="--atlas-model-color:#2ca02c;left:83\.33%"[\s\S]*?>3<\/span>/);
+  assert.match(html, /data-ce-atlas-model-marker="model-a"[\s\S]*?data-ce-atlas-model-answer="Agree"[\s\S]*?data-ce-atlas-model-repeat-value="100%"[\s\S]*?data-ce-atlas-model-winning-responses="1"[\s\S]*?data-ce-atlas-model-attempted-runs="1"[\s\S]*?style="--atlas-model-color:#1f77b4;left:100\.00%;--stance-lane:0"[\s\S]*?>1<\/span>/);
+  assert.match(html, /data-ce-atlas-model-marker="model-b"[\s\S]*?data-ce-atlas-model-answer="Unsure"[\s\S]*?style="--atlas-model-color:#ff7f0e;left:50\.00%;--stance-lane:0"[\s\S]*?>2<\/span>/);
+  assert.match(html, /data-ce-atlas-model-marker="model-c"[\s\S]*?data-ce-atlas-model-answer="Disagree"[\s\S]*?style="--atlas-model-color:#2ca02c;left:0\.00%;--stance-lane:0"[\s\S]*?>3<\/span>/);
   assert.match(html, /aria-label="Model vote distribution: Agree 1, Unsure 1, Disagree 1\. Model answers: Model A: Agree, Model B: Unsure, Model C: Disagree"/);
   assert.match(html, /\.atlasIssueModalContent\[data-ce-atlas-model-highlight\] \.atlasIssueModelMarker \{ opacity: 0\.25; filter: brightness\(0\.72\) saturate\(0\.55\); \}/);
   assert.match(html, /\.atlasIssueModalContent\[data-ce-atlas-model-highlight\] \.atlasIssueModelMarker\.atlasIssueModelMarkerActive \{[^}]*opacity: 1;[^}]*filter: brightness\(1\.38\) saturate\(1\.25\);/);
@@ -869,7 +869,7 @@ test('Summary stats count averaged model/question responses without multiplying 
   assert.match(html, /<span class="statLabel">Responses\/Participant Avg<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1\.00<\/span>/);
   // Model B ran but never answered validly: the benchmark's Invalid, not the live No response.
   const voteSummaries = questionVoteSummaries(html);
-  assert.match(voteSummaries, /<strong>Agree:<\/strong> 1 \/\s*<strong>Unsure:<\/strong> 0 \/\s*<strong>Disagree:<\/strong> 0 \/\s*<strong>Responses:<\/strong> 1 \/\s*<strong>Invalid:<\/strong> 1\s*<\/span>/);
+  assert.match(voteSummaries, /<strong>Agree:<\/strong> 0\.5 \/\s*<strong>Unsure:<\/strong> 0\.5 \/\s*<strong>Disagree:<\/strong> 0 \/\s*<strong>Responses:<\/strong> 1 \/\s*<strong>Invalid:<\/strong> 1\s*<\/span>/);
   assert.doesNotMatch(voteSummaries, /<strong>No response:<\/strong>/);
   assert.doesNotMatch(html, /<span class="statLabel">Responses<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">3<\/span>/);
   assert.doesNotMatch(html, /<span class="statLabel">Responses\/Participant Avg<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1\.50<\/span>/);
@@ -1270,6 +1270,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /<p class="sessionInfo">Context Engine AI Discourse Benchmark Results Report<\/p>/);
   assert.match(html, /class="disclaimerBox"/);
   assert.match(html, /<strong>Note:<\/strong> Only non-encrypted, binary/);
+  assert.match(html, /<div class="disclaimerBox">[\s\S]*?<span data-ce-benchmark-distribution-note>Each answering model has equal weight, so answer counts can be fractional\. Unsure counts observed Unsure answers\.<\/span>\s*<span>Model means use a separate stance axis; a center mean can reflect mixed answers or Unsure\.<\/span>/);
   assert.match(html, /\(Agree\/Disagree\/Unsure\) responses have been considered in\s+this Polis-inspired report\./);
   assert.match(html, /\.heading \{ font-size: 1\.4rem; margin-bottom: 10px; color: var\(--ce-color-border\); \}/);
   assert.match(html, /\.polisReportModern \.heading \{ font-size: 1\.55rem; letter-spacing: 0\.2px; color: #1f2a44; \}/);
@@ -1716,7 +1717,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.ok(mainBeeswarm);
   assert.equal((mainBeeswarm.match(/data-question-has-votes="true"/g) || []).length, 1);
   assert.equal((mainBeeswarm.match(/data-question-has-votes="false"/g) || []).length, 0);
-  assert.match(html, /data-question-status="2 modeled responses"/);
+  assert.match(html, /data-question-status="2 model participants"/);
   assert.match(html, /data-question-extremity=/);
   assert.match(html, /data-question-difference=/);
   assert.match(html, /data-question-winning-response-consistency="1\.00"/);

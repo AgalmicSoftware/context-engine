@@ -1,15 +1,61 @@
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-const similarityFor = (matrix, leftId, rightId) => {
+export const similarityFor = (matrix, leftId, rightId) => {
   if (leftId === rightId) return 1;
-  const forward = Number(matrix?.[leftId]?.[rightId]);
-  const reverse = Number(matrix?.[rightId]?.[leftId]);
+  const forward = matrix?.[leftId]?.[rightId];
+  const reverse = matrix?.[rightId]?.[leftId];
   if (Number.isFinite(forward) && Number.isFinite(reverse)) {
     return clamp((forward + reverse) / 2, 0, 1);
   }
   if (Number.isFinite(forward)) return clamp(forward, 0, 1);
   if (Number.isFinite(reverse)) return clamp(reverse, 0, 1);
-  return 0;
+  return null;
+};
+
+export const hasCompleteSimilarity = (ids, matrix = {}) => ids.every((leftId) => (
+  ids.every((rightId) => Number.isFinite(similarityFor(matrix, leftId, rightId)))
+));
+
+export const opinionGroupAvailability = (ids = [], matrix = {}) => {
+  const eligibleIds = [...new Set(ids)].sort();
+  let missingPairCount = 0;
+  eligibleIds.forEach((leftId, index) => {
+    eligibleIds.slice(index + 1).forEach((rightId) => {
+      if (!Number.isFinite(similarityFor(matrix, leftId, rightId))) missingPairCount += 1;
+    });
+  });
+  return {
+    status: missingPairCount || eligibleIds.length < 2 ? 'unavailable' : 'available',
+    reason: missingPairCount ? 'incomplete-pairwise-similarity' : (eligibleIds.length < 2 ? 'insufficient-eligible-participants' : null),
+    interpretation: 'exploratory',
+    eligibleParticipantIds: eligibleIds,
+    missingPairCount,
+  };
+};
+
+// Saved reports may still contain groups built from disconnected observations.
+// Keep their measured edges, but never export those components as opinion groups.
+export const withOpinionGroupAvailability = (report = {}) => {
+  const participants = report.participants || [];
+  const availability = opinionGroupAvailability(
+    participants.filter((participant) => participant.coverage?.eligibleForSimilarity).map((participant) => participant.id),
+    report.polisReport?.similarityMatrix,
+  );
+  const eligibleIds = new Set(availability.eligibleParticipantIds);
+  const qualify = (participant) => ({
+    ...participant,
+    opinionGroup: availability.status === 'available' && eligibleIds.has(participant.id)
+      ? participant.opinionGroup ?? null : null,
+  });
+  return {
+    ...report,
+    participants: participants.map(qualify),
+    participantGraph: {
+      ...report.participantGraph,
+      opinionGroupAvailability: availability,
+      nodes: (report.participantGraph?.nodes || []).map(qualify),
+    },
+  };
 };
 
 const compareIds = (left, right) => {
@@ -25,6 +71,19 @@ export const clusterBySimilarity = ({ participantIds = [], similarityMatrix = {}
   if (!ids.length) {
     return {
       method: 'deterministic-k-medoids',
+      count: 0,
+      medoids: [],
+      assignments: {},
+    };
+  }
+
+  // Connected overlap alone is insufficient: K-medoids needs every pair distance.
+  // Missing evidence must never become maximal disagreement via Number(null).
+  if (!hasCompleteSimilarity(ids, similarityMatrix)) {
+    return {
+      method: 'deterministic-k-medoids',
+      status: 'unavailable',
+      reason: 'incomplete-pairwise-similarity',
       count: 0,
       medoids: [],
       assignments: {},

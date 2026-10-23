@@ -20,6 +20,7 @@
     "test": "node --test",
     "check:results-sync": "node ./scripts/check-context-engine-results-sync.mjs",
     "check:static-publication": "node ./scripts/verify-static-publication.mjs",
+    "check:report-browser": "node ./scripts/check-report-browser.mjs",
     "sync:results-snapshot": "node ./scripts/check-context-engine-results-sync.mjs --write",
     "run:mock": "node ./bin/ai-discourse-bench.mjs run --provider mock --questions ./data/question-bank.sample.json --models ./data/model-roster.sample.json --out ./runs/mock-self-runs.json --repeats 1",
     "run:mock:importance": "node ./bin/ai-discourse-bench.mjs run-importance --provider mock --questions ./data/question-bank.sample.json --models ./data/model-roster.sample.json --out ./runs/mock-importance-runs.json --budget 100 --repeats 1",

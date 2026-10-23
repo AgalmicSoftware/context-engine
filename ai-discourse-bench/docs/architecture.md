@@ -30,7 +30,9 @@ and generated diagrams together under `ai-discourse-bench/`.
      supplied evidence, custom profile instruction, or cutoff date.
    - `quadratic-importance`: a complementary whole-bank allocation pass where
      every model receives the same credit budget and vote cost is squared. It
-     is stored separately from self/persona stance runs.
+     is stored separately from self/persona stance runs. The default schema is
+     a capped top-ten rating task with at most three votes per question: its
+     maximum cost is 90 of 100 credits, so the budget does not bind.
 
 4. **Providers**
    - `mock`: deterministic no-network smoke tests.
@@ -53,6 +55,9 @@ and generated diagrams together under `ai-discourse-bench/`.
      topic/compass/risk-scenario overlays.
    - Reports include deterministic bootstrap intervals and explicit signed and
      absolute canonical/reversed wording sensitivity.
+   - One shared pairwise-availability rule withholds automatic group labels and
+     joint embedding when eligible pairs lack sufficient overlap. Measured
+     edges survive; available groups remain exploratory.
    - Optional importance repeats are averaged within each model before models
      are equally weighted. Topic rollups then control Debate Map prominence;
      reports without allocations fall back to question-count sizing.
@@ -65,8 +70,12 @@ and generated diagrams together under `ai-discourse-bench/`.
    - Reports can also be exported as Context Engine `PolisReport`
      `questionResponses`, with each model treated as a participant and each
      averaged model/question score converted to a binary response row.
-   - `export-ce-native` emits the lossless `ce_benchmark_results_dataset`
-     contract for future native rendering without discretizing distributions.
+   - `export-ce-native` emits `ce_benchmark_results_dataset` for future native
+     rendering without discretizing measured distributions. Unsupported derived
+     opinion-group labels are withheld consistently with the standalone report.
+   - Observed histograms and individual model means have separate visual axes.
+     Legacy displays derive observed shares from retained cell counts or show an
+     unavailable state; Raw Results preserve original aggregate evidence.
    - A source-hash gate and the `$ai-discourse-bench-results-sync` skill track
      drift from live Context Engine Results components until direct shared
      imports are practical.
@@ -79,6 +88,10 @@ and generated diagrams together under `ai-discourse-bench/`.
      settings. Release mode enforces coverage and provider gates.
    - Longitudinal snapshots preserve model/question stance and similarity data;
      snapshot comparisons report stance-direction and similarity drift.
+   - Saved-count corrections remain previews with `rawRunsRevalidated: false`.
+     Their `summaryCorrection` provenance travels through derived exports and
+     analysis fingerprints; old analysis fingerprints for corrected reports must
+     be regenerated. Release-content hashing is unchanged.
 
 ## Running
 

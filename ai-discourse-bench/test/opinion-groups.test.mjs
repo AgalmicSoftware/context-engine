@@ -30,10 +30,22 @@ test('manual group count is bounded and every participant remains assigned', () 
   assert.deepEqual(Object.keys(result.assignments).sort(), ['a', 'b', 'c']);
 });
 
-test('missing similarities remain deterministic instead of producing unassigned models', () => {
-  const result = clusterBySimilarity({ participantIds: ['c', 'a', 'b'], similarityMatrix: {}, count: 2 });
+test('missing similarities withhold manual grouping, including connected incomplete graphs', () => {
+  for (const similarityMatrix of [{}, { a: { b: 1, c: null }, b: { a: 1, c: 1 }, c: { a: null, b: 1 } }]) {
+    const result = clusterBySimilarity({ participantIds: ['c', 'a', 'b'], similarityMatrix, count: 2 });
+    assert.equal(result.count, 0);
+    assert.equal(result.status, 'unavailable');
+    assert.equal(result.reason, 'incomplete-pairwise-similarity');
+    assert.deepEqual(result.assignments, {});
+  }
+});
 
+test('measured zero similarity remains a valid distance rather than missing overlap', () => {
+  const result = clusterBySimilarity({
+    participantIds: ['a', 'b'],
+    similarityMatrix: { a: { b: 0 }, b: { a: 0 } },
+    count: 2,
+  });
   assert.equal(result.count, 2);
-  assert.deepEqual(Object.keys(result.assignments).sort(), ['a', 'b', 'c']);
-  assert.ok(Object.values(result.assignments).every((group) => group === 0 || group === 1));
+  assert.notEqual(result.assignments.a, result.assignments.b);
 });

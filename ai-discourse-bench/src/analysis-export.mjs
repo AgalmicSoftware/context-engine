@@ -1,3 +1,4 @@
+import { aggregateResponseDistributions } from './response-distributions.mjs';
 import { ANSWER_VALUES } from './config.mjs';
 import { buildReportFingerprint } from './provenance.mjs';
 import { validateAnalysisOverlay } from './schema.mjs';
@@ -93,10 +94,16 @@ const buildQuestionSummaries = (report = {}) => {
         stanceLabel: stanceLabel(summary.meanScore),
         counts: countsFromSummary(summary),
         validResponses: validVoteCount(summary),
+        validRuns: validVoteCount(summary),
+        countsUnit: 'raw-runs',
+        observedDistribution: aggregateResponseDistributions([summary]).observedDistribution,
         invalid: Number(summary.invalid || 0),
       };
     });
-    const aggregate = byQuestion[question.id] || {};
+    const aggregate = {
+      ...byQuestion[question.id],
+      ...aggregateResponseDistributions(participants.map((participant) => byModelQuestion[participant.id]?.[question.id])),
+    };
     return {
       id: question.id,
       prompt: question.prompt || question.id,
@@ -111,8 +118,15 @@ const buildQuestionSummaries = (report = {}) => {
       aggregate: {
         meanScore: Number.isFinite(aggregate.meanScore) ? aggregate.meanScore : null,
         stanceLabel: stanceLabel(aggregate.meanScore),
-        counts: countsFromSummary(aggregate),
-        validResponses: validVoteCount(aggregate),
+        counts: countsFromSummary(byQuestion[question.id]),
+        countsUnit: 'discretized-mean-stances',
+        observedDistribution: aggregate.observedDistribution,
+        uncertaintyRate: aggregate.uncertaintyRate,
+        runSummary: aggregate.runSummary,
+        meanStance: byQuestion[question.id]?.meanStance || null,
+        validResponses: aggregate.valid,
+        validModels: aggregate.valid,
+        totalModels: aggregate.total,
         invalid: Number(aggregate.invalid || 0),
         winningResponseConsistency: aggregate.winningResponseConsistency || null,
       },
@@ -162,12 +176,15 @@ export const buildSecondPassAnalysisInput = (report = {}) => {
     generatedAt: report.generatedAt || new Date().toISOString(),
     benchmarkId: report.benchmarkId || null,
     inputReportHash,
+    summaryCorrection: report.summaryCorrection || null,
     title: report.title || 'AI Discourse Benchmark',
     sourceReport: {
       generatedAt: report.generatedAt || null,
       mode: report.mode || 'self',
       personaId: report.personaId || null,
       counts: report.counts || {},
+      responseDistributionVersion: report.polisReport?.responseDistributionVersion || null,
+      uncertaintyRateSemantics: report.polisReport?.uncertaintyRateSemantics || null,
     },
     stanceScale: {
       '-1': 'net opposition to the statement',
@@ -184,7 +201,12 @@ export const buildSecondPassAnalysisInput = (report = {}) => {
         meanScore: Number.isFinite(participant.summary?.meanScore) ? participant.summary.meanScore : null,
         stanceLabel: stanceLabel(participant.summary?.meanScore),
         counts: countsFromSummary(participant.summary),
+        observedDistribution: participant.summary?.observedDistribution || null,
+        uncertaintyRate: participant.summary?.uncertaintyRate ?? null,
+        meanStance: participant.summary?.meanStance || null,
         validResponses: validVoteCount(participant.summary),
+        validQuestions: participant.summary?.valid ?? validVoteCount(participant.summary),
+        countsUnit: 'discretized-mean-stances',
         invalid: Number(participant.summary?.invalid || 0),
       },
     })),
@@ -318,6 +340,7 @@ export const attachAnalysisOverlay = (report = {}, overlay = {}) => {
   const expectedHash = buildReportFingerprint(report);
   if (overlay?.provenance?.inputReportHash && overlay.provenance.inputReportHash !== expectedHash) {
     errors.push(`provenance.inputReportHash does not match source report ${expectedHash}`);
+    if (report.summaryCorrection) errors.push('corrected reports bind summaryCorrection; regenerate the analysis input and overlay instead of rebinding an old fingerprint');
   }
   if (errors.length) {
     throw new Error(`analysis overlay validation failed:\n- ${errors.join('\n- ')}`);

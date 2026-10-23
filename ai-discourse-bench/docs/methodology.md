@@ -39,16 +39,28 @@ models' answer distributions on questions answered by both models. Similarity
 is reported only when the pair has sufficient question overlap. The report
 records the overlap count and rate with every edge.
 
-The participant graph uses classical multidimensional scaling over those
-pairwise distances. Opinion groups are connected components over a documented
-similarity threshold. Models without enough overlap are shown separately and
-are not assigned misleading similarity positions.
+The participant graph uses classical multidimensional scaling over measured
+pairwise distances. Automatic opinion groups use connected components over a
+documented similarity threshold. Both require at least two eligible models and
+sufficient overlap for every eligible pair. If any pair is unknown, report JSON
+and native exports withhold group assignments, and HTML withholds the joint
+graph. `participantGraph.opinionGroupAvailability` records the reason and missing
+pair count. The measured edges remain available; unknown cross-component
+similarity cannot establish a difference in opinion.
 
 The HTML report also supports manual opinion-group counts as an exploratory
 view. Those alternatives use deterministic K-medoids over the same similarity
 matrix and do not change the canonical connected-component assignments in the
-report data. Models without sufficient overlap remain unassigned in both
-modes.
+report data. The same missing-pair rule applies to both modes. Groups that can
+be shown are exploratory descriptions of this sample; no stability criterion
+or statistical validation of the grouping is claimed.
+
+Answer-share histograms show observed Agree, Unsure, and Disagree with equal
+weight per valid model/question cell. Individual means appear on a separate
+-1 to +1 stance axis, with coincident means separated vertically. A center mean
+can represent directional disagreement within one model or observed uncertainty;
+tooltips retain the observed shares, and majority-Unsure observations are named
+explicitly. Display rounding never changes raw counts or stored statistics.
 
 Question points include a winning-response consistency parameter. Within each
 model/question/polarity cell, the most frequent normalized response is the
@@ -86,6 +98,13 @@ must match when artifacts are merged. To prevent a fixed 200- or 500-question
 listing from favoring early items, every model and repeat receives a
 deterministic hash-shuffled question order. The order method and exact order
 hash are recorded with the artifact and run.
+
+At those defaults this is a capped top-ten rating task: at most ten ratings of
+three cost 90 credits, so the 100-credit budget never binds a schema-valid
+response. It is not an unconstrained quadratic allocation instrument. The
+historical `quadratic-importance` name, instruction versions, and collected
+results retain their original values; a redesigned instrument would require a
+separate measurement version.
 
 Allocation repeats are nested within a model. The report first averages each
 model's votes per question across its valid allocation runs, treating omitted
