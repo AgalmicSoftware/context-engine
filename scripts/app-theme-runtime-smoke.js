@@ -1841,7 +1841,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
             }
             const refresh = document.querySelector('button[aria-label="Refresh groups"]');
             return {
-              hasLegacyListHeading: Boolean(document.querySelector('[class*="telegramListHeader"] span')),
+              hasLegacyListHeading: Boolean(document.querySelector('[class*="agentListHeader"] span')),
               refreshHasIcon: Boolean(refresh?.querySelector('svg')),
               refreshText: refresh?.textContent?.trim() || '',
             };

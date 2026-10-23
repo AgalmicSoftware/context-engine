@@ -4,7 +4,7 @@ import { assertReadable } from './civic-theme-overlay-smoke.mjs';
 
 // Exercise the light surfaces that palette-only contrast tests cannot cover.
 // This workflow opens read-only views; it never creates, joins, or submits.
-export async function inspectCivicExplorerContent(page) {
+export async function inspectCivicExplorerContent(page, { groupLabel = 'e/acc' } = {}) {
   const body = page.locator('body');
   const back = page.getByRole('button', { name: '← Back', exact: true });
   const open = async (name) => {
@@ -47,26 +47,26 @@ export async function inspectCivicExplorerContent(page) {
       assert.equal(await action.count(), 1, `${name}: only one action toolbar is mounted`);
       const layout = await action.evaluate((element) => {
         const row = element.closest('[class*="expandedHeaderRow_"]');
-        const rowRect = row?.getBoundingClientRect();
-        const regions = row ? Array.from(row.children).filter((child) => child.getBoundingClientRect().width > 0) : [];
+        const sticky = element.closest('[class*="expandedQuestionsToolbar_"]');
+        const primary = (row || sticky?.parentElement)?.querySelector('[class*="expandedHeaderPrimaryControls_"]');
+        const region = row ? element.closest('[class*="expandedHeaderActions_"]') : sticky;
+        const primaryRect = primary?.getBoundingClientRect();
+        const actionRect = region?.getBoundingClientRect();
         return {
           inHeader: Boolean(row),
-          viewport: innerWidth,
-          fits: Boolean(rowRect) && regions.every((child) => {
-            const rect = child.getBoundingClientRect();
-            return rect.left >= rowRect.left - 1 && rect.right <= rowRect.right + 1;
-          }),
-          centers: regions.map((child) => {
-            const rect = child.getBoundingClientRect();
-            return rect.top + rect.height / 2;
+          sticky: sticky && getComputedStyle(sticky).position === 'sticky',
+          belowPrimary: Boolean(primaryRect && actionRect && actionRect.top >= primaryRect.bottom),
+          fits: Boolean(actionRect && actionRect.left >= 0 && actionRect.right <= innerWidth),
+          touchTargets: [...region.querySelectorAll('button')].every((button) => {
+            const rect = button.getBoundingClientRect();
+            return !rect.width || (rect.width >= 44 && rect.height >= 44);
           }),
         };
       });
-      assert(layout.inHeader, `${name}: actions share the Explorer header`);
-      assert(layout.fits, `${name}: wrapped header regions stay within the available width`);
-      if (name !== 'Questions' && layout.viewport >= 1100) {
-        assert(Math.max(...layout.centers) - Math.min(...layout.centers) < 2, `${name}: roomy desktop controls share one row`);
-      }
+      assert(layout.fits, `${name}: action toolbar stays within the available width`);
+      assert(layout.belowPrimary, `${name}: actions stay below the Back/help/session row`);
+      if (name === 'Questions') assert(layout.sticky && !layout.inHeader, 'Questions: sticky actions live beside the question body');
+      else assert(layout.inHeader && layout.touchTargets, 'Groups: header action row keeps usable touch targets');
     }
     const header = await control.evaluate((element) => {
       const wrapper = element.closest('[class*="expandedHeaderSession_"]');
@@ -115,7 +115,7 @@ export async function inspectCivicExplorerContent(page) {
   assert(sessionSelection.name, 'The active session name is visible');
   assert(sessionSelection.hasGeneral, 'General is available in the session chooser');
   await sessionSelector.press('Tab');
-  await page.getByText('e/acc', { exact: true }).waitFor({ state: 'visible', timeoutMs: 30000 });
+  await page.getByText(groupLabel, { exact: true }).waitFor({ state: 'visible', timeout: 30000 });
   await assertReadable(body);
   await back.click();
 
@@ -155,7 +155,7 @@ export async function inspectCivicExplorerContent(page) {
   await back.click();
 
   await open('Questions');
-  await page.getByRole('button', { name: 'View JSON', exact: true }).waitFor({ state: 'visible', timeoutMs: 30000 });
+  await page.getByRole('radio', { name: 'Agree', exact: true }).first().waitFor({ state: 'visible', timeout: 30000 });
   await assertReadable(body);
   await back.click();
 
@@ -164,6 +164,8 @@ export async function inspectCivicExplorerContent(page) {
   await assertReadable(body);
   await page.getByRole('button', { name: 'Top Debates', exact: true }).click();
   await assertReadable(body);
+  // On mobile the open overlay covers the packed nodes being tested next.
+  await page.getByRole('button', { name: 'Minimize active debates', exact: true }).click();
   const hoverNode = page.getByRole('button', { name: 'Safety Evaluations', exact: true });
   // Move the pointer without following the node's primary-click navigation.
   await hoverNode.click({ button: 'right' });

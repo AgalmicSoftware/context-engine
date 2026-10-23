@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
+import { installSessionCoordinatorBinding } from '../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { dispatchInterviewBriefRequest } from '../workers/sessionCorsWorker/interviewBriefDispatch.js';
 import { readKickoffVersions, verifyInterviewCatalogCompatibility } from './verify-interview-catalog-compat.mjs';
 
@@ -15,16 +16,20 @@ test('reads the kickoff requirement without treating legacy import versions as s
 test('checks a served client against the real local Worker catalog handler using GET only', async (t) => {
   let origin;
   let clientVersion = 'ce-interview-brief-v5';
+  const kv = new Map();
+  const env = installSessionCoordinatorBinding({ GROUP_KV: {
+    get: async (key) => kv.get(key) ?? null,
+    put: async (key, value) => kv.set(key, value),
+  } });
   const server = createServer(async (req, res) => {
     assert.equal(req.method, 'GET');
     if (req.url.startsWith('/session/')) { res.end('<script type="module" src="/assets/index.js"></script>'); return; }
     if (req.url === '/assets/index.js') { res.end('import("./SurveyPileViewMode.js")'); return; }
     if (req.url === '/assets/SurveyPileViewMode.js') { res.end(`const v="${clientVersion}";\`Require prefillPromptVersion "\${v}"; otherwise stop\``); return; }
     const result = await dispatchInterviewBriefRequest({
-      request: new Request(`${origin}${req.url}`), env: {}, baseHeaders: {},
+      request: new Request(`${origin}${req.url}`), env, baseHeaders: {},
       deps: {
         resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
-        getSessionConfig: async () => ({ slug: 'demo', allowOrigins: [origin] }),
         getCorsContext: async () => ({ ok: true, headers: {} }),
         loadPublicInterviewQuestions: async () => [{ id: 'q1', prompt: 'Example?', type: 'freeform' }],
         json: (body, status, headers) => new Response(JSON.stringify(body), { status, headers }),
@@ -36,6 +41,7 @@ test('checks a served client against the real local Worker catalog handler using
   await once(server, 'listening');
   t.after(() => { server.closeAllConnections(); server.close(); });
   origin = `http://127.0.0.1:${server.address().port}`;
+  await env.GROUP_KV.put('session:demo:config', JSON.stringify({ slug: 'demo', allowOrigins: [origin] }));
   const options = { sessionUrl: `${origin}/session/demo`, workerUrl: origin };
   assert.equal((await verifyInterviewCatalogCompatibility(options)).compatible, true);
   clientVersion = 'ce-interview-brief-v4';

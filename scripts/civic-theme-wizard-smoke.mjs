@@ -38,12 +38,11 @@ export async function inspectParticipationChannels(page) {
   const channels = page.getByRole('region', { name: 'Participation channels', exact: true });
   await channels.waitFor({ state: 'visible' });
   const checkboxes = channels.locator('input[type="checkbox"]');
+  assert.equal(await checkboxes.count(), 2, 'Only website and direct agent access are offered');
   const before = await checkboxes.evaluateAll((inputs) => inputs.map((input) => input.checked));
   for (const [id, explanation] of [
     ['ce-wizard-surface-web-info', /always enabled/i],
-    ['ce-wizard-surface-telegram-info', /also enables its Mini App/i],
-    ['ce-wizard-surface-mini-app-info', /requires Telegram/i],
-    ['ce-wizard-surface-agent-http-info', /without Telegram/i],
+    ['ce-wizard-surface-agent-http-info', /through a scoped credential/i],
   ]) {
     const help = channels.getByTestId(id);
     await help.click();
@@ -57,7 +56,7 @@ export async function inspectParticipationChannels(page) {
     before,
     'Opening channel help does not change participation settings',
   );
-  assert.match(await channels.getByRole('status').innerText(), /Telegram is not required/);
+  assert.match(await channels.getByRole('status').innerText(), /Access requires a scoped agent credential/);
   await assertReadable(channels);
 }
 
@@ -69,7 +68,17 @@ export async function inspectCivicWizard(page) {
     ['Centralized (Cloudflare)', 'Step 2: Session Access'],
     ['Decentralized (Ethereum + Arweave)', 'Step 2: Privacy'],
   ]) {
-    await page.getByRole('radio', { name: profile, exact: true }).click();
+    const confirmPreset = (dialog) => (
+      dialog.message() === 'Replace all custom hosting settings with this template?'
+        ? dialog.accept()
+        : dialog.dismiss()
+    );
+    page.on('dialog', confirmPreset);
+    try {
+      await page.getByRole('radio', { name: profile, exact: true }).click();
+    } finally {
+      page.off('dialog', confirmPreset);
+    }
     await page.getByRole('button', { name: 'Custom session settings', exact: true }).waitFor({ state: 'visible' });
 
     await page.getByRole('button', { name: 'Step 1: Session Details', exact: true }).click();

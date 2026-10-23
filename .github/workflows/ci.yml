@@ -61,6 +61,9 @@ jobs:
       - name: Audit Session Worker production dependencies
         run: npm --prefix workers/sessionCorsWorker audit --omit=dev --audit-level=high
 
+      - name: Audit Context Engine MCP bundled dependencies
+        run: npm --prefix mcp audit --audit-level=high
+
       - name: Resolve baseline growth approval
         id: baseline-growth-approval
         env:
@@ -333,6 +336,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             client/package-lock.json
+            mcp/package-lock.json
             workers/sessionCorsWorker/package-lock.json
 
       - name: Install root dependencies
@@ -343,6 +347,9 @@ jobs:
 
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
+
+      - name: Install Context Engine MCP dependencies
+        run: npm --prefix mcp ci
 
 
       - name: Resolve client growth baseline

@@ -205,6 +205,22 @@
             "run",
             "test:sbt:authorization-smoke"
           ]
+        },
+        {
+          "label": "Exercise agent SBT claims on local contracts",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:sbt:agent-claim-smoke"
+          ]
+        },
+        {
+          "label": "Exercise agent registry participation on local contracts",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:registry:agent-smoke"
+          ]
         }
       ]
     },
@@ -280,6 +296,22 @@
           "args": [
             "run",
             "test:node:tracked"
+          ]
+        },
+        {
+          "label": "Run Context Engine MCP tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:mcp"
+          ]
+        },
+        {
+          "label": "Verify the packed MCP executable",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:mcp:pack"
           ]
         },
         {
@@ -364,6 +396,22 @@
           "args": [
             "run",
             "test:node:tracked"
+          ]
+        },
+        {
+          "label": "Run Context Engine MCP release tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:mcp"
+          ]
+        },
+        {
+          "label": "Verify the packed MCP executable",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:mcp:pack"
           ]
         },
         {

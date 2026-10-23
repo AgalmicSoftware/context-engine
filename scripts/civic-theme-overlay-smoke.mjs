@@ -78,6 +78,7 @@ export const auditPanelContrast = (element, parentLevels = 0) => {
     });
     results.push({
       text: (text || placeholder || value || iconLabel).slice(0, 100),
+      element: `${node.tagName.toLowerCase()}.${typeof node.className === 'string' ? node.className : ''}`,
       ratio: Math.min(...ratios),
     });
   }

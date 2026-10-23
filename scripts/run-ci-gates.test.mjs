@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 
 import {
   checkProfileResults,
@@ -37,6 +38,20 @@ function fixtureManifest() {
     },
   };
 }
+
+test('CI installs the MCP lockfile dependencies before running its packed executable gate', () => {
+  const manifest = loadGateManifest();
+  const source = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  for (const [name, gate] of Object.entries(manifest.gates)) {
+    if (!gate.commands.some(({ args }) => args.includes('test:mcp:pack'))) continue;
+    const job = source.split(`\n  ${name}:\n`)[1]?.split(/\n  [\w-]+:\n/)[0];
+    if (!job) continue;
+    const install = job.indexOf('run: npm --prefix mcp ci');
+    assert.ok(install >= 0, `${name} must install the MCP lockfile dependencies`);
+    assert.ok(install < job.indexOf(`run: npm run ci:gate -- ${name}`));
+    assert.match(job, /mcp\/package-lock\.json/);
+  }
+});
 
 test('manifest validation accepts explicit local, hosted, and release profiles', () => {
   assert.deepEqual(validateGateManifest(fixtureManifest()), []);

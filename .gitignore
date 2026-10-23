@@ -218,3 +218,6 @@ Demo Integration Package/
 # AI discourse corpus — local untracked working files
 ai-discourse-corpus/bookmark-ingestion-procedure.md
 ai-discourse-corpus/corpuses/known-tweet-urls.txt
+
+# Generated standalone MCP package
+mcp/dist/
