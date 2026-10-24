@@ -47,6 +47,7 @@ Session, gates, and the Worker:
 - `docs/posts.md`: Public `/posts` route, root `posts/` Markdown authoring, and `ce-viz` exhibit blocks.
 - `docs/session-listening-mode.md`: session voice modes, including `?mode=interview`, `?mode=recordGroup`, the zero-install ChatGPT/Claude prefill handoff, and legacy `?mode=listening` compatibility.
 - [`docs/session-interview-research.md`](session-interview-research.md): optional interview research metadata, consent boundaries, redaction behavior, and the submitted `responses[].interviewProvenance` record. Diagrams live in [`docs/assets/interview-research/README.md`](assets/interview-research/README.md).
+- [`docs/agent-fidelity.md`](agent-fidelity.md): scoring how well AI drafts predict participants' answers (Mirror Score, calibration, baselines, unusual views, synthesis checks) with `scripts/agent-fidelity-report.mjs`.
 - `docs/standard-sponsored-links-fixture.md`: Temporary tracked fixture for publishing a small set of public sponsored setup links with minimal onboarding friction.
 - `docs/session-registry.md`: SessionRegistry migration and on-chain gate authority model.
 - `docs/session-cors-worker.md`: Cloudflare `sessionCorsWorker` behavior, endpoints, KV layouts, and wizard flow.

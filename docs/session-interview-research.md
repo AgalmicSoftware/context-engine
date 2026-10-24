@@ -105,7 +105,7 @@ converts local predictions back to 0–100 when continuing an AI interview.
 Existing stored responses are not migrated. Instead, readers map a stored
 rating above 10 and at most 100 onto 0–10 by dividing it by 10, then clamp the
 result to 0–10 (`readStoredRating` in `shared/questions/storedRating.mjs`, used
-by the client and the Worker results analysis). A
+by the client, the Worker results analysis and the agent fidelity report). A
 legacy rating of 10 or less cannot be told apart from a 0–10
 rating, so it reads as given. See [the interview contract](session-listening-mode.md).
 
@@ -255,6 +255,8 @@ The in-memory draft-review state is keyed by question id while the modal is open
 The record is compatible with an agent-mirror or model-quality evaluation only as ordinary raw response JSON that a downstream evaluator explicitly knows how to read. The useful fields for that evaluator are the selected draft snapshot, final submitted snapshot, saved draft revisions, selected/unselected status, confidence, self-reported platform/model provenance, redaction flags, and changed/touched field lists.
 
 It is not automatically in the Edge2026 agent-only export schema, and it does not by itself provide an explicit human confirm/edit event, semantic fingerprint, calibration bucket, edit timing, or agent run/request lifecycle. A downstream mirror eval must treat `changedFields` and `userEditedFields` as field-level review signals, not as a direct agree/disagree label.
+
+`scripts/agent-fidelity-report.mjs` is that evaluator. It compares `originalPrediction` with the submitted answer and can add Session Wrapped export rows; see [agent-fidelity.md](agent-fidelity.md).
 
 ## Comparison with Edge2026 agent-village agent-only research
 

@@ -225,6 +225,14 @@ All notable changes to this project will be documented in this file.
 - File questions without valid answers under "no data" in the report's tag
   filter instead of "mixed / unsure".
 
+### Research
+
+- Add an agent fidelity report: `scripts/agent-fidelity-report.mjs` scores
+  how well AI drafts predicted participants' answers from a Results JSON
+  export or Session Wrapped rows. It reports Mirror Score, correction rate,
+  calibration, lift over a majority guess, accuracy for unusual views, and
+  whether drafts flatten strong or varied views. See `docs/agent-fidelity.md`.
+
 ## [0.7.0] - 2026-10-21
 
 ### Agents and MCP
