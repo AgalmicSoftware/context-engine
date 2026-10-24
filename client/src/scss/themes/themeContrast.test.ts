@@ -174,7 +174,10 @@ describe('bundled app-theme contrast', () => {
     ['agree', 'unsure', 'disagree'].forEach((stance) => {
       assertContrast(values, `response-${stance}-text`, `response-${stance}-bg`, 4.5, 'surface');
       expect(
-        contrastRatio(parseColor('#000000'), parseColor(values[`binary-choice-${stance}-bg`])),
+        contrastRatio(
+          parseColor(stance === 'unsure' ? '#000000' : values[`binary-choice-${stance}-text`]),
+          parseColor(values[`binary-choice-${stance}-bg`]),
+        ),
       ).toBeGreaterThanOrEqual(4.5);
     });
     ['agree', 'disagree'].forEach((stance) => {

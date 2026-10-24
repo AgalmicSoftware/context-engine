@@ -83,7 +83,9 @@ registry and cannot load CSS, URLs, or arbitrary token maps.
 **Color-blind mode** is available in Settings → Theme, independently of the
 theme selector. It persists locally as `ce:color-vision`, restores before paint,
 and synchronizes across tabs. The shared palette uses blue for support/agree,
-orange for oppose/disagree, and gray for unsure. Response labels and signed
+orange for oppose/disagree, and gray for unsure. Quadratic allocation bars use
+brighter fill tokens independently of text colors, and Agree/Disagree buttons
+use dark text on the color-blind palette. Response labels and signed
 values remain present. Semantic response, status, and chart-series tokens update
 across all bundled themes; report text uses darker shades on white paper. Polis binary
 bars use the same `--ce-binary-choice-*` tokens as the pile inputs. Report SVG

@@ -1,5 +1,60 @@
 import assert from 'node:assert/strict';
 
+async function checkResponsePalettes(page) {
+  const colorBlind = page.getByRole('checkbox', { name: 'Color-blind mode', exact: true });
+  const values = await page.getByTestId('ce-quadratic-allocation').locator('input[type="range"]').evaluateAll(inputs => inputs.map(input => input.value));
+  for (const enabled of [false, true, false]) {
+    const selectedBefore = await page.locator('input[name="question-binary-smoke"]:checked').evaluateAll(inputs => inputs.map(input => input.value));
+    await colorBlind.setChecked(enabled);
+    assert.deepEqual(await page.locator('input[name="question-binary-smoke"]:checked').evaluateAll(inputs => inputs.map(input => input.value)), selectedBefore, 'Changing the palette preserves Agree/Disagree answers');
+    const palette = await page.evaluate(() => {
+      const luminance = color => {
+        const channels = color.match(/[\d.]+/g).slice(0, 3).map(value => {
+          const channel = Number(value) / 255;
+          return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+        });
+        return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+      };
+      const classic = document.documentElement.dataset.ceTheme === 'classic-95';
+      return {
+        segments: [...document.querySelectorAll('[data-testid="ce-quadratic-meter"] span')].map(segment => ({
+          direction: segment.dataset.direction, color: getComputedStyle(segment).backgroundColor,
+        })),
+        choices: [...document.querySelectorAll('input[name="question-binary-smoke"]')].map(input => {
+          const label = input.closest('label');
+          const style = getComputedStyle(label);
+          const foreground = luminance(style.color);
+          const background = luminance(style.backgroundColor);
+          return {
+            label: input.value,
+            color: classic ? getComputedStyle(label, '::before').backgroundColor : style.backgroundColor,
+            contrast: (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05),
+          };
+        }),
+      };
+    });
+    const positive = palette.segments.find(segment => segment.direction === 'positive').color;
+    const negative = palette.segments.find(segment => segment.direction === 'negative').color;
+    assert.notEqual(positive, negative, 'Opposing allocations have distinct fills');
+    if (enabled) {
+      assert.equal(positive, 'rgb(86, 180, 233)', 'Support uses the bright blue fill in color-blind mode');
+      assert.equal(negative, 'rgb(230, 159, 0)', 'Opposition uses the bright orange fill in color-blind mode');
+      assert.equal(palette.choices.find(choice => choice.label === 'Agree').color, positive);
+      assert.equal(palette.choices.find(choice => choice.label === 'Disagree').color, negative);
+    } else {
+      const support = positive.match(/\d+/g).map(Number);
+      const opposition = negative.match(/\d+/g).map(Number);
+      assert.ok(support[1] > support[0] && opposition[0] > opposition[1], 'Standard mode restores green/red fills');
+    }
+    for (const choice of palette.choices) {
+      assert.ok(choice.contrast >= 4.5, `${choice.label} text has at least 4.5:1 contrast`);
+      await page.getByRole('region', { name: 'Agree or disagree' }).getByText(choice.label, { exact: true }).click();
+      assert.equal(await page.getByRole('radio', { name: choice.label, exact: true }).isChecked(), true);
+    }
+    assert.deepEqual(await page.getByTestId('ce-quadratic-allocation').locator('input[type="range"]').evaluateAll(inputs => inputs.map(input => input.value)), values, 'Changing the palette preserves allocations');
+  }
+}
+
 async function checkStepperLayout(page) {
   const layout = await page.getByTestId('ce-quadratic-allocation').evaluate(field => {
     const luminance = color => {
@@ -87,6 +142,7 @@ export async function probeQuadraticAllocation(page) {
   assert.equal(await page.getByTestId('ce-quadratic-decrease-1').getAttribute('data-active'), 'true');
   assert.equal(await page.getByTestId('ce-quadratic-increase-0').isEnabled(), false);
   await checkStepperLayout(page);
+  await checkResponsePalettes(page);
   await page.getByRole('button', { name: 'How voice credits work' }).hover();
   await page.getByRole('tooltip').waitFor();
   assert.match(await page.getByRole('tooltip').textContent(), /Votes cost their square:.*49 credits/);
@@ -209,10 +265,10 @@ export async function probeQuadraticAllocation(page) {
   await parks.press('End');
   assert.equal(await parks.inputValue(), '1000');
   await checkStepperLayout(page);
-  return { ok: true, checks: ['keyboard sliders and focus', 'unsigned counts with direction highlight', 'aligned centered steppers', 'large readable labels', 'per-option costs', 'descriptive tooltip', 'signed values', 'budget enforcement', 'neutrality', 'draft restore', 'net and positive/negative totals', 'compact rows', 'fixed card height', 'half-label overflow cue', 'scroll to final option', 'scroll arrow', 'one header row', '999-credit meter and cost squares'] };
+  return { ok: true, checks: ['standard and color-blind allocation fills', 'readable Agree/Disagree in both palettes', 'keyboard sliders and focus', 'unsigned counts with direction highlight', 'aligned centered steppers', 'large readable labels', 'per-option costs', 'descriptive tooltip', 'signed values', 'budget enforcement', 'neutrality', 'draft restore', 'net and positive/negative totals', 'compact rows', 'fixed card height', 'half-label overflow cue', 'scroll to final option', 'scroll arrow', 'one header row', '999-credit meter and cost squares'] };
 }
 
-export async function runSmoke() {
+export async function runSmoke({ paletteOnly = false } = {}) {
   const { chromium } = await import('playwright');
   const browser = await chromium.launch({ headless: true });
   try {
@@ -221,7 +277,13 @@ export async function runSmoke() {
       for (const theme of ['context-engine', 'classic-95', 'civic']) {
         await page.goto(`${process.env.BASE_URL || 'http://127.0.0.1:3000'}/tests/fixtures/quadratic-allocation.html`);
         await page.getByRole('combobox', { name: 'Theme' }).selectOption(theme);
-        console.log(JSON.stringify({ viewport, theme, ...await probeQuadraticAllocation(page) }));
+        if (paletteOnly) {
+          await page.getByRole('button', { name: 'Show example allocation', exact: true }).click();
+          await checkResponsePalettes(page);
+          console.log(JSON.stringify({ viewport, theme, ok: true, checks: ['standard and color-blind allocation fills', 'readable Agree/Disagree in both palettes', 'palette changes preserve answers'] }));
+        } else {
+          console.log(JSON.stringify({ viewport, theme, ...await probeQuadraticAllocation(page) }));
+        }
       }
       await page.close();
     }

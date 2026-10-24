@@ -68,13 +68,13 @@
   span {
     flex: 0 0 auto;
     box-sizing: border-box;
-    background: var(--ce-response-agree-text);
+    background: var(--ce-response-agree-fill);
     transition: width 0.15s ease-out;
     & + span {
       box-shadow: inset 1px 0 var(--ce-panel-text);
     }
     &[data-direction='negative'] {
-      background: var(--ce-response-disagree-text);
+      background: var(--ce-response-disagree-fill);
     }
   }
   @media (prefers-reduced-motion: reduce) {
