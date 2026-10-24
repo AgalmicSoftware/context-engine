@@ -1,0 +1,118 @@
+# Developer fallback only. Product/operator setup should use deploy:apply, which
+# creates resources, uploads the Worker, and writes secrets through Cloudflare API.
+# Copy this file to wrangler.toml only for manual private demo debugging.
+
+name = "ce-agent-bridge-worker"
+main = "worker.js"
+compatibility_date = "2024-09-02"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+
+# account_id is intentionally omitted for product setup. The deploy helper
+# derives the account from CLOUDFLARE_API_TOKEN and blocks if multiple accounts
+# are visible. Developers may add account_id locally only as a Wrangler fallback.
+
+kv_namespaces = [
+  { binding = "AGENT_ACTION_KV", id = "YOUR_SHORT_LIVED_ACTION_KV_NAMESPACE_ID" },
+]
+
+[durable_objects]
+bindings = [
+  { name = "AGENT_INVITE_COORDINATOR", class_name = "AgentInviteRedemptionCoordinator" },
+]
+
+[[migrations]]
+tag = "agent-invite-redemption-v1"
+new_sqlite_classes = ["AgentInviteRedemptionCoordinator"]
+
+# Optional draft lifecycle research metrics (Workers Analytics Engine).
+# When bound, the worker writes one data point per draft_created / draft_edited /
+# draft_submitted / draft_discarded event: blobs = [event, sessionSlug,
+# questionId, source, originSource, controlType, principalFingerprint],
+# doubles = [editCount, draftToSubmitMs (-1 when unknown)], index = sessionSlug.
+# Leave unbound to disable; all writes are best-effort and never block the flow.
+# principalFingerprint is an HMAC-SHA256 pseudonym of the stored principal subject and
+# requires the AGENT_BRIDGE_ANALYTICS_SALT secret; without the salt the field
+# is empty (an unsalted hash of a small id space would be reversible):
+#   npx wrangler secret put AGENT_BRIDGE_ANALYTICS_SALT
+# [[analytics_engine_datasets]]
+# binding = "AGENT_BRIDGE_ANALYTICS"
+# dataset = "ce_agent_bridge_draft_events"
+
+# Optional burst buffer for 500-user smoke/production events. When enabled,
+# submit requests are accepted into KV and queued for background settlement.
+# Create the queue separately for manual Wrangler debugging.
+# [[queues.producers]]
+# binding = "AGENT_RESPONSE_QUEUE"
+# queue = "ce-agent-bridge-response-submit"
+#
+# [[queues.consumers]]
+# queue = "ce-agent-bridge-response-submit"
+# max_batch_size = 25
+# max_batch_timeout = 5
+# max_retries = 3
+# retry_delay = 60
+# dead_letter_queue = "ce-agent-bridge-response-submit-dlq"
+# Create the DLQ before enabling this consumer. Application MAX_ATTEMPTS below
+# must be <= max_retries + 1 (4 deliveries here). Recovery-only messages still
+# failing persistence at exhaustion reach this DLQ with their known identifiers.
+
+[vars]
+AGENT_BRIDGE_DEPLOYMENT_ID = "local-demo"
+AGENT_BRIDGE_PUBLIC_URL = "https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev"
+CE_SESSION_WORKER_BASE_URL = "https://<session-worker>.<workers-subdomain>.workers.dev"
+DEFAULT_CHAIN_ID = "11155420"
+DEFAULT_RPC_URL = "https://op-sepolia-testnet.api.pocket.network"
+# Optional additive fallback, not a replacement for DEFAULT_RPC_URL:
+# ADDITIONAL_RPC_URL = "https://your-op-sepolia-rpc.example"
+# Browser token-exchange origins (legacy origin aliases remain readable).
+# AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS = "https://contextengine.sh,https://contextengine.xyz"
+# Optional admin metrics visibility cutoff.
+# AGENT_BRIDGE_SESSION_CREATED_AFTER = "2026-01-01T00:00:00Z"
+# Optional root response/admin allowlist, using managed account addresses.
+# AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = "0x0000000000000000000000000000000000000000"
+# AGENT_BRIDGE_QUESTION_SOURCE = "fixture"
+# AGENT_BRIDGE_QUESTION_LIVE_FALLBACK_TIMEOUT_MS = "2500"
+# AGENT_BRIDGE_RPC_TIMEOUT_MS = "5000"
+# AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS = "2500"
+# AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS = "300"
+# AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY = "4"
+# AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS = "1"
+# Dedicated deployments require exactly one explicit session whose Worker URL
+# matches CE_SESSION_WORKER_BASE_URL and whose agentHttp surface is enabled.
+AGENT_BRIDGE_SESSION_POLICY_JSON = "{\"version\":1,\"defaultSessionSlug\":\"YOUR_SESSION_SLUG\",\"sessions\":[{\"sessionSlug\":\"YOUR_SESSION_SLUG\",\"sessionWorkerUrl\":\"https://<session-worker>.<workers-subdomain>.workers.dev\",\"sessionModeProfile\":{\"surfaces\":{\"agentHttp\":true,\"telegram\":false},\"authority\":{\"mode\":\"worker_canonical\"}}}]}"
+# Live question scans prefer metadata blockLimits, then SessionCreated for the slug.
+# AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK = "0"
+# AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK = ""
+# Emergency/debug only: allows recent-block fallback when no scoped bounds exist.
+# AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN = "1"
+AGENT_AI_PROVIDER = "ce_session_policy"
+BROADCAST_ENABLED = "true"
+AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED = "true"
+# Requires AGENT_RESPONSE_QUEUE binding. Leave false for simple smoke deploys.
+AGENT_BRIDGE_ASYNC_SUBMIT_ENABLED = "false"
+# Keep synchronized with queues.consumers.max_retries + 1 above. The application
+# stores a terminal safe failure on its last delivery, before queue exhaustion.
+AGENT_BRIDGE_SUBMIT_MAX_ATTEMPTS = "4"
+AGENT_BRIDGE_SUBMIT_RETRY_DELAY_SECONDS = "60"
+# Direct managed demo submits still require a live
+# CE_SESSION_WORKER_BASE_URL, Surveys address config from the linked session,
+# AGENT_BRIDGE_SURVEYS_ADDRESS, or the OP Sepolia default, plus
+# managedAccountSubmitAllowed=true in AGENT_BRIDGE_SESSION_POLICY_JSON.
+# Set either broadcast flag to "false" to force canonical submit-request records
+# instead of broadcasting.
+# Optional override for session worker auth. Defaults to AGENT_BRIDGE_PUBLIC_URL
+# when present, then http://localhost:7391 for local development.
+# AGENT_BRIDGE_WORKER_LOGIN_ORIGIN = "https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev"
+# AGENT_BRIDGE_SURVEYS_ADDRESS = "0x..."
+# Optional low-friction Geo/Hermes onboarding. Prefer SHA-256 hashes of invite
+# tokens; an authorized host exchanges the invite for an opaque principal.
+# AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES = "64_HEX_SHA256_OF_INVITE_TOKEN"
+# AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON = "[{\"tokenHash\":\"64_HEX_SHA256_OF_INVITE_TOKEN\",\"sessionSlug\":\"session-wrapped\",\"label\":\"Session Wrapped\",\"source\":\"geo:session-wrapped\"}]"
+
+# deploy:apply writes these secrets through Cloudflare API. If debugging a
+# manual Wrangler deployment, set secrets with Wrangler, never in this file:
+#   npx wrangler secret put DEMO_SIGNER_ROOT_SECRET
+#   npx wrangler secret put AGENT_BRIDGE_AGENT_API_TOKEN
+#   npx wrangler secret put AGENT_BRIDGE_OPENAI_API_KEY
+# Keep CLOUDFLARE_API_TOKEN out of deployed Worker secrets. Use it only from an
+# untracked local shell/.env/.dev.vars for deploy planning or apply automation.

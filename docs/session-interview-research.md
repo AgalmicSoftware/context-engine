@@ -104,8 +104,9 @@ The client converts them once into 0–10 review and stored response values, and
 converts local predictions back to 0–100 when continuing an AI interview.
 Existing stored responses are not migrated. Instead, readers map a stored
 rating above 10 and at most 100 onto 0–10 by dividing it by 10, then clamp the
-result to 0–10 (`readStoredRating` in the client; the Worker results analysis
-does the same). A legacy rating of 10 or less cannot be told apart from a 0–10
+result to 0–10 (`readStoredRating` in `shared/questions/storedRating.mjs`, used
+by the client and the Worker results analysis). A
+legacy rating of 10 or less cannot be told apart from a 0–10
 rating, so it reads as given. See [the interview contract](session-listening-mode.md).
 
 Voice context can omit whole question/history/background/review rows to fit the
