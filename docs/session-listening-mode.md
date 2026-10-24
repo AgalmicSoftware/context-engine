@@ -178,8 +178,10 @@ beside the footer/comment controls marks an untouched AI-proposed response; it
 stays through focus-only review and disappears after any real answer, comment,
 importance, or conviction edit. The responder selects which drafts to submit and
 must explicitly opt into replacing an existing local answer. Selected drafts have
-an **X** to exclude them; an excluded draft offers **Restore draft**, or
-**Replace with draft** when a local answer already exists. There is no redundant
+an **X** that removes the whole card from review and excludes its answer from
+submission. Removed cards stay hidden during continued interviews. Drafts that
+conflict with an existing local answer remain visible with **Replace with draft**
+until the responder explicitly selects them. There is no redundant
 selected-state button. **Submit responses** saves reviewed values and enters the
 normal submission flow, opening sign-in when necessary. Drafts survive sign-in,
 and the modal resumes the normal response upload after the authenticated

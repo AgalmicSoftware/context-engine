@@ -200,6 +200,8 @@ function SessionInterviewPanel({
     useState<SessionInterviewGroupRecommendationRequest | null>(null);
   const [drafts, setDrafts] = useState<InterviewDraftResponse[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  // Explicitly removed cards stay hidden; saved-answer conflicts still need review.
+  const [removedDraftIds, setRemovedDraftIds] = useState<Record<string, boolean>>({});
   const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>({});
   const isDirectUserContextPrefill = prefillPacket?.source?.modelId === 'direct-user-context';
   const hasAiPrefill = Boolean(prefillPacket?.source && !isDirectUserContextPrefill);
@@ -335,6 +337,7 @@ function SessionInterviewPanel({
     ...pendingInterviewProvenance,
   } as Record<string, UnknownRecord>;
   const selectedDrafts = drafts.filter((draft) => selected[draft.questionId]);
+  const visibleDrafts = drafts.filter((draft) => !removedDraftIds[draft.questionId]);
   const consentDrafts = selectedDrafts.length ? selectedDrafts : drafts;
   const aiChoice = summarizeConsentChoice(
     consentDrafts.map((draft) =>
@@ -1031,13 +1034,13 @@ function SessionInterviewPanel({
               <Button onClick={ownAnswers.retry}>Retry saved answers</Button>
             </div>
           ) : null}
-          {drafts.length && !isInterviewBusy && !mapping ? (
+          {visibleDrafts.length && !isInterviewBusy && !mapping ? (
             <SessionInterviewReviewSection
               title="Review proposed responses"
               summaryRef={reviewRef}
               testId={E2E_TESTIDS.SESSION_INTERVIEW_REVIEW}
             >
-              {drafts.map((draft) => (
+              {visibleDrafts.map((draft) => (
                 <SessionInterviewDraftCard
                   key={draft.questionId}
                   draft={draft}
@@ -1055,6 +1058,7 @@ function SessionInterviewPanel({
                       viewResultsRevealRef.current = null;
                     }
                     setSelected((current) => ({ ...current, [draft.questionId]: value }));
+                    setRemovedDraftIds((current) => ({ ...current, [draft.questionId]: !value }));
                   }}
                   onEdit={(patch) => {
                     setGroupRecommendationRequest(null);
