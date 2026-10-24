@@ -164,6 +164,15 @@ All notable changes to this project will be documented in this file.
   calculation when necessary, without relaxing inconsistent-statistics checks.
 - Keep the benchmark Results presentation and its publication artifact aligned.
 
+### Build and verification
+
+- Update the PDF export dependency DOMPurify to 3.4.17 to address its newly
+  reported sanitizer vulnerabilities.
+- Refresh the shared Zod dependency to 4.6.7 within its consumers' supported
+  ranges to address a validation memory-exhaustion advisory.
+- Pin the browser smoke job to Ubuntu 24.04, which supports the pinned
+  Playwright version, so runner image updates do not prevent Chromium setup.
+
 ### Contract source
 
 - Reject survey and question IDs that collide across the two types, preventing
