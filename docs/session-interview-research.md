@@ -22,6 +22,9 @@ when available, the optional responder-name checkbox. Expanding it does not
 change consent. Its muted green toggle shares one bordered, lighter-blue footer
 with **Submit responses**; the options open above that compact footer. The
 **Review proposed responses** heading uses bold weight to separate drafts clearly.
+Freeform answers and comments use a tinted, bordered surface in both reading
+and editing modes. Inactive conviction, comment, and encryption icons share the
+same neutral color and opacity; active controls remain more prominent.
 
 | Control | Initial default | Submitted effect |
 | --- | --- | --- |
