@@ -29,7 +29,18 @@ same neutral color and opacity; active controls remain more prominent.
 | Control | Initial default | Submitted effect |
 | --- | --- | --- |
 | Include platform/model provenance | On when AI prefill provenance is available | Adds `source`, `promptVersion`, `questionSetHash`, and available `source.researchCoverage` details to `interviewProvenance`. |
-| Share AI draft changes for research | Off | Adds draft-comparison fields such as `originalPrediction`, `predictionRevisions`, `finalSubmitted`, `changedFields`, `userEditedFields`, `redactedFields`, `predictionComparison`, and `unselectedPredictions`. |
+| Share AI draft changes for research | Session default; off when unset | Adds draft-comparison fields such as `originalPrediction`, `predictionRevisions`, `finalSubmitted`, `changedFields`, `userEditedFields`, `redactedFields`, `predictionComparison`, and `unselectedPredictions`. |
+
+Owners set **Share AI draft changes for research by default** under **Interview
+settings** in the session wizard or admin metadata editor. The boolean
+`interviewMode.shareDraftChangesByDefault` defaults to `false` and sets the
+initial checkbox for new responses, including imported and voice-generated
+drafts. Participants can change it before submitting. Saved per-question choices
+take precedence over this default; a session-config refresh does not overwrite
+an explicit choice made during review, including while logging in to submit.
+
+The disclosure panel stays within the interview footer width and wraps its text,
+including long model identifiers and question-set hashes.
 
 The draft-comparison checkbox does not control whether an AI provider processed the interview, transcript, or imported text to create drafts. It controls whether Context Engine saves the comparison metadata alongside the submitted response.
 

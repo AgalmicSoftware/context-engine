@@ -138,3 +138,109 @@ it('uses saved per-question choices and forwards only explicit consent changes',
   await waitFor(() => expect(record).toHaveBeenCalledTimes(1));
   expect(record.mock.calls[0][7]).toEqual({ includeResponderName: true });
 });
+
+const researchReviewProps = () => ({
+  isOpen: true,
+  mode: 'interview' as const,
+  onSelectMode: jest.fn(),
+  onClose: jest.fn(),
+  sessionSlug: 'demo',
+  account: '0x0000000000000000000000000000000000000001',
+  loginComplete: true,
+  workerUrl: 'https://worker.example',
+  questionPool: [{ id: 'q1', prompt: 'Proceed?', type: 'binary' }],
+  prefillPacket: {
+    version: 1 as const,
+    sessionSlug: 'demo',
+    questionSetHash: 'a'.repeat(64),
+    promptVersion: 'ce-interview-brief-v4',
+    source: { platform: 'claude' as const, modelId: 'fixture-model', verification: 'self_reported' as const },
+    responderContext: {},
+    responses: [{ questionId: 'q1', answer: 'Agree', confidence: 0.8 }],
+  },
+  onApplyAnswer: jest.fn(),
+  onApplyAdditional: jest.fn(),
+  onApplyImportance: jest.fn(),
+  onApplyConviction: jest.fn(),
+  onRecordProvenance: jest.fn(),
+  onSubmitResponses: jest.fn(async () => ({ status: 'submitted' as const })),
+});
+
+it.each([
+  [undefined, false],
+  [false, false],
+  [true, true],
+  ['true', false],
+])('uses the session research-sharing default %s for new responses', async (setting, expected) => {
+  const props = researchReviewProps();
+  render(
+    <SessionVoiceModeModal {...props} sessionConfig={{ interviewMode: { shareDraftChangesByDefault: setting } }} />,
+  );
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const comparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
+  expect(comparison).toHaveProperty('checked', expected);
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+  await waitFor(() => expect(props.onRecordProvenance).toHaveBeenCalledTimes(1));
+  expect(props.onRecordProvenance.mock.calls[0][4]).toBe(expected);
+  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({});
+});
+
+it('uses late-loaded defaults without overwriting an explicit participant choice', async () => {
+  const props = researchReviewProps();
+  const { rerender } = render(<SessionVoiceModeModal {...props} />);
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const comparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
+  expect(comparison).not.toBeChecked();
+  rerender(
+    <SessionVoiceModeModal {...props} sessionConfig={{ interviewMode: { shareDraftChangesByDefault: true } }} />,
+  );
+  expect(comparison).toBeChecked();
+  fireEvent.click(comparison);
+  expect(comparison).not.toBeChecked();
+  rerender(
+    <SessionVoiceModeModal
+      {...props}
+      sessionConfig={{ interviewMode: { shareDraftChangesByDefault: true }, sessionName: 'Updated' }}
+    />,
+  );
+  expect(comparison).not.toBeChecked();
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+  await waitFor(() => expect(props.onRecordProvenance).toHaveBeenCalledTimes(1));
+  expect(props.onRecordProvenance.mock.calls[0][4]).toBe(false);
+  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({ includePredictionComparison: false });
+});
+
+it.each([true, false])('preserves saved research consent %s over the opposite session default', async (saved) => {
+  const props = researchReviewProps();
+  render(
+    <SessionVoiceModeModal
+      {...props}
+      sessionConfig={{ interviewMode: { shareDraftChangesByDefault: !saved } }}
+      existingResponseSlice={{ interviewProvenance: { q1: { includePredictionComparison: saved } } }}
+    />,
+  );
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toHaveProperty(
+    'checked',
+    saved,
+  );
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+  await waitFor(() => expect(props.onRecordProvenance).toHaveBeenCalledTimes(1));
+  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({});
+});
+
+it('retains an explicit decline through login and uses the next session’s own default', async () => {
+  const props = researchReviewProps();
+  const sessionConfig = { interviewMode: { shareDraftChangesByDefault: true } };
+  const { rerender } = render(
+    <SessionVoiceModeModal {...props} account="" loginComplete={false} sessionConfig={sessionConfig} />,
+  );
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const comparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
+  expect(comparison).toBeChecked();
+  fireEvent.click(comparison);
+  rerender(<SessionVoiceModeModal {...props} sessionConfig={sessionConfig} />);
+  expect(comparison).not.toBeChecked();
+  rerender(<SessionVoiceModeModal {...props} sessionSlug="next-session" sessionConfig={sessionConfig} />);
+  expect(comparison).toBeChecked();
+});

@@ -34,3 +34,22 @@ it('explains a blank owner opening before publication', () => {
   );
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
+
+it('edits the research-sharing default while retaining other interview settings', () => {
+  const onChange = jest.fn();
+  const label = 'Share AI draft changes for research by default';
+  const { rerender } = render(
+    <InterviewSettingsFields value={{ steeringPrompt: 'Listen first.' }} onChange={onChange} />,
+  );
+  expect(screen.getByLabelText(label)).toHaveValue('false');
+  fireEvent.change(screen.getByLabelText(label), { target: { value: 'true' } });
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ shareDraftChangesByDefault: true, steeringPrompt: 'Listen first.' }),
+  );
+  rerender(<InterviewSettingsFields value={onChange.mock.calls[0][0]} onChange={onChange} />);
+  expect(screen.getByLabelText(label)).toHaveValue('true');
+  fireEvent.change(screen.getByLabelText(label), { target: { value: 'false' } });
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ shareDraftChangesByDefault: false }));
+  rerender(<InterviewSettingsFields value={{ shareDraftChangesByDefault: true }} onChange={onChange} disabled />);
+  expect(screen.getByLabelText(label)).toBeDisabled();
+});

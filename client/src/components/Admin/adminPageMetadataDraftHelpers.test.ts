@@ -13,6 +13,20 @@ import {
 } from '../../../../shared/resultsAnalysisSettings.mjs';
 
 describe('adminPageMetadataDraftHelpers', () => {
+  it.each([true, false])('round-trips the interview research-sharing default (%s)', (shareDraftChangesByDefault) => {
+    const metadata = { interviewMode: { shareDraftChangesByDefault } };
+    const draft = buildAdminMetadataDraft(metadata);
+    const applied = applyAdminMetadataDraft(metadata, draft);
+    const patch = buildWorkerCanonicalMetadataConfigPatch({
+      metadata: applied,
+      slug: 'research-default',
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+    });
+    expect(draft.interviewMode.shareDraftChangesByDefault).toBe(shareDraftChangesByDefault);
+    expect(applied.interviewMode.shareDraftChangesByDefault).toBe(shareDraftChangesByDefault);
+    expect(patch.interviewMode).toEqual(expect.objectContaining({ shareDraftChangesByDefault }));
+  });
+
   it('round-trips editable metadata and preserves contract chain fallback', () => {
     const draft = buildAdminMetadataDraft({
       networkChainId: 11155420,

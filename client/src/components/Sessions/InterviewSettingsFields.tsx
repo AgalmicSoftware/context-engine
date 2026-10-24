@@ -15,6 +15,21 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
   return (
     <fieldset disabled={disabled} style={{ minWidth: 0 }}>
       <legend>Interview settings</legend>
+      <Label for={`${id}-research-sharing`}>Share AI draft changes for research by default</Label>
+      <Input
+        id={`${id}-research-sharing`}
+        type="select"
+        value={String(settings.shareDraftChangesByDefault)}
+        onChange={(e) => change('shareDraftChangesByDefault', e.target.value === 'true')}
+        aria-describedby={`${id}-research-sharing-help`}
+      >
+        <option value="false">Off</option>
+        <option value="true">On</option>
+      </Input>
+      <p id={`${id}-research-sharing-help`}>
+        Sets the initial research-sharing checkbox for new responses. Participants can change it before submitting;
+        their saved choices are preserved.
+      </p>
       <Label for={`${id}-model`}>Interview voice model</Label>
       <Input
         id={`${id}-model`}

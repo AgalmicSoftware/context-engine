@@ -127,6 +127,9 @@ sessions. It also lets owners supply an opening question, add an optional
 Automatic regeneration and discovery of new questions during a call are off by
 default; when enabled their default addition threshold is 20%. Question
 suggestions are optional and off by default. Admin refresh is on by default.
+**Share AI draft changes for research by default** controls the initial review
+checkbox through `interviewMode.shareDraftChangesByDefault` (off when unset).
+Participants can change it before submitting, and their saved choices are retained.
 Generation waits for public questions and uses the session Worker's OpenAI key.
 See [Interview settings and lifecycle](session-listening-mode.md#interview).
 

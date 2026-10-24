@@ -7,6 +7,7 @@ export type InterviewSettings = {
   followNewQuestions: boolean;
   suggestQuestions: boolean;
   allowManualRefresh: boolean;
+  shareDraftChangesByDefault: boolean;
 };
 export const DEFAULT_INTERVIEW_SETTINGS: Readonly<InterviewSettings>;
 export function normalizeInterviewSettings(value?: unknown): InterviewSettings;

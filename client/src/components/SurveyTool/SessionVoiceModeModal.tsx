@@ -3,6 +3,7 @@ import { useInterviewSavedAnswers, type InterviewSavedAnswerLoader } from './use
 import { verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
+import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { appendInterviewTranscript, mergeInterviewReview } from './sessionInterviewReviewState';
 import { useInterviewReadiness } from './useInterviewReadiness';
 import { useInterviewQuestionUpdates } from './useInterviewQuestionUpdates';
@@ -207,7 +208,10 @@ function SessionInterviewPanel({
   const researchAvailable = hasAiPrefill || hasPredictionRevisions || hasAiGeneratedReview;
   const researchPacket = buildResearchPacket(prefillPacket, sessionSlug);
   const [includeProvenance, setIncludeProvenance] = useState(true);
-  const [includePredictionComparison, setIncludePredictionComparison] = useState(false);
+  const [researchSharingChoice, setResearchSharingChoice] = useState<{
+    contextToken: string;
+    included: boolean;
+  } | null>(null);
   const [includeResponderName, setIncludeResponderName] = useState(false);
   const [consentOverrides, setConsentOverrides] = useState<InterviewConsentOverrides>({});
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
@@ -282,6 +286,12 @@ function SessionInterviewPanel({
   const questions = updates.questions;
   const authenticatedForSubmit = Boolean(loginComplete && String(account || '').trim());
   const baseSubmitContextToken = submitContextToken || sessionSlug;
+  // Resolve late-loaded session defaults until the participant chooses. Keep that
+  // choice through login without carrying it into a different session's review.
+  const includePredictionComparison =
+    researchSharingChoice?.contextToken === baseSubmitContextToken
+      ? researchSharingChoice.included
+      : normalizeInterviewSettings(sessionConfig?.interviewMode).shareDraftChangesByDefault;
   const activeSubmitContextToken = [
     baseSubmitContextToken,
     String(account || '')
@@ -1128,7 +1138,7 @@ function SessionInterviewPanel({
                           setConsentOverrides((prev) => ({ ...prev, includeAiProvenance: included }));
                         }}
                         onComparisonChange={(included) => {
-                          setIncludePredictionComparison(included);
+                          setResearchSharingChoice({ contextToken: baseSubmitContextToken, included });
                           setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));
                         }}
                         coverageDetails={researchCoverageDetails}

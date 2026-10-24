@@ -7,6 +7,7 @@ export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   followNewQuestions: false,
   suggestQuestions: false,
   allowManualRefresh: true,
+  shareDraftChangesByDefault: false,
 });
 export const normalizeInterviewSettings = (value = {}) => {
   const source = value && typeof value === 'object' ? value : {};
@@ -25,6 +26,7 @@ export const normalizeInterviewSettings = (value = {}) => {
     followNewQuestions: source.followNewQuestions === true,
     suggestQuestions: source.suggestQuestions === true,
     allowManualRefresh: source.allowManualRefresh !== false,
+    shareDraftChangesByDefault: source.shareDraftChangesByDefault === true,
   };
 };
 export const validInterviewSettings = (value = {}) => {
@@ -47,7 +49,7 @@ export const validInterviewSettings = (value = {}) => {
       value.questionGrowthPercent > 100)
   )
     return false;
-  return ['autoRegenerate', 'followNewQuestions', 'suggestQuestions', 'allowManualRefresh'].every(
+  return ['autoRegenerate', 'followNewQuestions', 'suggestQuestions', 'allowManualRefresh', 'shareDraftChangesByDefault'].every(
     (key) => value[key] === undefined || typeof value[key] === 'boolean',
   );
 };

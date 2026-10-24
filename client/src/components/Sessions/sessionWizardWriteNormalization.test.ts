@@ -836,6 +836,20 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.resultsAnalysis).toEqual(resultsAnalysis);
   });
 
+  test.each([true, false])('publishes the interview research-sharing default (%s)', (shareDraftChangesByDefault) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'research-default',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { shareDraftChangesByDefault },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    expect(payload.interviewMode.shareDraftChangesByDefault).toBe(shareDraftChangesByDefault);
+  });
+
   test('write payload builders reject invalid results analysis settings', () => {
     const invalidResultsAnalysis = {
       version: 1,

@@ -25377,7 +25377,8 @@ var init_interviewSettings = __esm({
       questionGrowthPercent: 20,
       followNewQuestions: false,
       suggestQuestions: false,
-      allowManualRefresh: true
+      allowManualRefresh: true,
+      shareDraftChangesByDefault: false
     });
     normalizeInterviewSettings = (value = {}) => {
       const source = value && typeof value === "object" ? value : {};
@@ -25389,7 +25390,8 @@ var init_interviewSettings = __esm({
         questionGrowthPercent: Number.isFinite(source.questionGrowthPercent) ? Math.max(1, Math.min(100, source.questionGrowthPercent)) : 20,
         followNewQuestions: source.followNewQuestions === true,
         suggestQuestions: source.suggestQuestions === true,
-        allowManualRefresh: source.allowManualRefresh !== false
+        allowManualRefresh: source.allowManualRefresh !== false,
+        shareDraftChangesByDefault: source.shareDraftChangesByDefault === true
       };
     };
     validInterviewSettings = (value = {}) => {
@@ -25401,7 +25403,7 @@ var init_interviewSettings = __esm({
       if (value.openingMode === "owner" && !value.openingPrompt?.trim()) return false;
       if (value.questionGrowthPercent !== void 0 && (!Number.isFinite(value.questionGrowthPercent) || value.questionGrowthPercent < 1 || value.questionGrowthPercent > 100))
         return false;
-      return ["autoRegenerate", "followNewQuestions", "suggestQuestions", "allowManualRefresh"].every(
+      return ["autoRegenerate", "followNewQuestions", "suggestQuestions", "allowManualRefresh", "shareDraftChangesByDefault"].every(
         (key) => value[key] === void 0 || typeof value[key] === "boolean"
       );
     };

@@ -4436,7 +4436,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionInterviewConsentOptions {
-  position: relative;
   flex: 1 1 220px;
   min-width: 0;
   max-width: 620px;
@@ -4466,8 +4465,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionInterviewChoicesPanel {
   position: absolute;
   bottom: calc(100% + 8px);
-  left: 0;
-  width: min(620px, calc(100vw - 72px));
+  // Anchor to the whole footer so the disclosure fits inside the dialog.
+  left: 18px;
+  right: 18px;
+  max-width: 620px;
+  min-width: 0;
   max-height: min(45vh, 420px);
   overflow: auto;
   overscroll-behavior: contain;
