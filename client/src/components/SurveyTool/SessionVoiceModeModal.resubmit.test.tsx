@@ -156,7 +156,7 @@ describe('interview draft resubmission', () => {
 
     expect(await screen.findByLabelText('Agree')).toBeChecked();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-    await screen.findByRole('button', { name: 'Responses submitted', exact: true });
+    await screen.findByRole('button', { name: 'Responses submitted' });
     expect(answerOf('q-binary')).toBe('Agree');
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_REMOVE));
@@ -178,7 +178,7 @@ describe('interview draft resubmission', () => {
 
     expect(await screen.findAllByLabelText('Agree')).toHaveLength(2);
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-    await screen.findByRole('button', { name: 'Responses submitted', exact: true });
+    await screen.findByRole('button', { name: 'Responses submitted' });
     expect(answerOf('q-binary')).toBe('Agree');
     expect(answerOf('q-removed')).toBe('Agree');
 
