@@ -98,6 +98,7 @@ const createPileEngine = () => {
 const renderBinaryInterview = (
   engine: PileViewModeEngine,
   onSubmitResponses: React.ComponentProps<typeof SessionVoiceModeModal>['onSubmitResponses'],
+  questions = [{ id: 'q-binary', prompt: 'Proceed?', type: 'binary' }],
 ) =>
   render(
     <SessionVoiceModeModal
@@ -110,7 +111,7 @@ const renderBinaryInterview = (
       account="0x0000000000000000000000000000000000000001"
       loginComplete
       workerUrl="https://worker.example"
-      questionPool={[{ id: 'q-binary', prompt: 'Proceed?', type: 'binary' }]}
+      questionPool={questions}
       prefillPacket={{
         version: 1,
         sessionSlug: 'demo',
@@ -118,7 +119,7 @@ const renderBinaryInterview = (
         promptVersion: 'ce-interview-brief-v4',
         source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
         responderContext: {},
-        responses: [{ questionId: 'q-binary', answer: 'Agree', confidence: 0.65 }],
+        responses: questions.map(({ id }) => ({ questionId: id, answer: 'Agree', confidence: 0.65 })),
       }}
       onApplyAnswer={(questionId, answer) => applySessionInterviewAnswer(engine, questionId, answer)}
       onApplyAdditional={jest.fn()}
@@ -148,21 +149,48 @@ describe('interview draft resubmission', () => {
     expect(answerOf('q-binary')).toBe('Agree');
   });
 
-  it('keeps a binary draft that is removed, restored and submitted again', async () => {
+  it('keeps the submitted answer when the last draft card is removed', async () => {
     const { engine, answerOf } = createPileEngine();
     const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'submitted' });
     renderBinaryInterview(engine, onSubmitResponses);
 
     expect(await screen.findByLabelText('Agree')).toBeChecked();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+    await screen.findByRole('button', { name: 'Responses submitted', exact: true });
     expect(answerOf('q-binary')).toBe('Agree');
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_REMOVE));
-    fireEvent.click(screen.getByRole('button', { name: 'Restore draft' }));
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Restore draft' })).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    expect(onSubmitResponses).toHaveBeenCalledTimes(1);
+    expect(answerOf('q-binary')).toBe('Agree');
+  });
+
+  it('keeps a binary answer when another card is removed before resubmission', async () => {
+    const { engine, answerOf } = createPileEngine();
+    const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'submitted' });
+    renderBinaryInterview(engine, onSubmitResponses, [
+      { id: 'q-binary', prompt: 'Proceed?', type: 'binary' },
+      { id: 'q-removed', prompt: 'Wait?', type: 'binary' },
+    ]);
+
+    expect(await screen.findAllByLabelText('Agree')).toHaveLength(2);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await screen.findByRole('button', { name: 'Responses submitted', exact: true });
+    expect(answerOf('q-binary')).toBe('Agree');
+    expect(answerOf('q-removed')).toBe('Agree');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Wait?' }));
+    expect(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)).toHaveLength(1);
+    expect(screen.queryByText('Wait?')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Agree')).toBeChecked();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeEnabled();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(2));
     expect(answerOf('q-binary')).toBe('Agree');
+    expect(answerOf('q-removed')).toBe('Agree');
   });
 
   it('applies drafts idempotently while still applying changed values', async () => {
