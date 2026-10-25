@@ -74,7 +74,7 @@ export const loadWorkerResponses = async (
     // Continues a public listing where a capped run stopped.
     startCursor?: string | null;
     // Receives the cursor to continue from when the page cap stops the listing.
-    onPartial?: (resumeCursor: string) => void;
+    onPartial?: (resumeCursor?: string) => void;
     // Receives every listed storage ref, read or reused, once a listing that
     // began at the first page is complete.
     onListed?: (storageRefIds: ReadonlySet<string>) => void;

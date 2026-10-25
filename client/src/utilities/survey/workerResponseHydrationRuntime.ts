@@ -17,7 +17,7 @@ export type WorkerResponseHydrationLoader = (options: {
   sessionConfig: CacheRecord;
   cachedStorageRefIds?: ReadonlySet<string>;
   startCursor?: string | null;
-  onPartial?: (resumeCursor: string) => void;
+  onPartial?: (resumeCursor?: string) => void;
   onListed?: (storageRefIds: ReadonlySet<string>) => void;
 }) => Promise<WorkerCanonicalResponseRow[]>;
 
