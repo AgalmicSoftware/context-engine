@@ -60,6 +60,7 @@ export const loadWorkerResponses = async (
     sessionSlug,
     sessionConfig,
     cachedStorageRefIds,
+    startCursor,
     onPartial,
     onListed,
     ownResponses = false,
@@ -70,8 +71,12 @@ export const loadWorkerResponses = async (
     sessionSlug: string;
     sessionConfig: UnknownRecord;
     cachedStorageRefIds?: ReadonlySet<string>;
-    onPartial?: () => void;
-    // Receives every listed storage ref, read or reused, once the listing is complete.
+    // Continues a public listing where a capped run stopped.
+    startCursor?: string | null;
+    // Receives the cursor to continue from when the page cap stops the listing.
+    onPartial?: (resumeCursor: string) => void;
+    // Receives every listed storage ref, read or reused, once a listing that
+    // began at the first page is complete.
     onListed?: (storageRefIds: ReadonlySet<string>) => void;
     ownResponses?: boolean;
     signal?: AbortSignal;
@@ -88,7 +93,8 @@ export const loadWorkerResponses = async (
   const context = { account, providerLike };
   const items: UnknownRecord[] = [];
   const seenCursors = new Set<string>();
-  let cursor: string | null = null;
+  let cursor: string | null = (!ownResponses && readString(startCursor)) || null;
+  const fromStart = !cursor;
 
   for (let pageIndex = 0; ownResponses || pageIndex < MAX_RESPONSE_LIST_PAGES; pageIndex += 1) {
     signal?.throwIfAborted();
@@ -106,9 +112,11 @@ export const loadWorkerResponses = async (
     });
     items.push(...(Array.isArray(page.items) ? page.items.filter(isRecord) : []));
     if (page.listComplete) {
-      onListed?.(
-        new Set(items.map((item) => readString(isRecord(item.storageRef) ? item.storageRef.id : '')).filter(Boolean)),
-      );
+      if (fromStart) {
+        onListed?.(
+          new Set(items.map((item) => readString(isRecord(item.storageRef) ? item.storageRef.id : '')).filter(Boolean)),
+        );
+      }
       break;
     }
     const nextCursor = readString(page.cursor);
@@ -118,7 +126,7 @@ export const loadWorkerResponses = async (
     seenCursors.add(nextCursor);
     cursor = nextCursor;
     if (!ownResponses && pageIndex === MAX_RESPONSE_LIST_PAGES - 1) {
-      onPartial?.();
+      onPartial?.(nextCursor);
     }
   }
 

@@ -16,7 +16,8 @@ export type WorkerResponseHydrationLoader = (options: {
   sessionSlug: string;
   sessionConfig: CacheRecord;
   cachedStorageRefIds?: ReadonlySet<string>;
-  onPartial?: () => void;
+  startCursor?: string | null;
+  onPartial?: (resumeCursor: string) => void;
   onListed?: (storageRefIds: ReadonlySet<string>) => void;
 }) => Promise<WorkerCanonicalResponseRow[]>;
 
@@ -95,13 +96,20 @@ export const hydrateWorkerCanonicalResponses = async ({
 
   let cachedStorageRefIds = new Set<string>();
   let cachedRows: WorkerCanonicalResponseRow[] = [];
+  let startCursor = '';
   const initializedQuestions = await updateQuestionsCacheAtomic((current) => {
     const merged = targetIsCurrent()
       ? workerHydration.mergeWorkerQuestionResponses(current, [], sessionSlug, run.identity)
       : current || {};
     // Only reuse refs after the merge has checked the exact Worker/session identity.
     const worker = (merged as CacheRecord).worker as CacheRecord | undefined;
-    if (targetIsCurrent() && worker) worker.workerResponseHydrationStatus = 'loading';
+    if (targetIsCurrent() && worker) {
+      worker.workerResponseHydrationStatus = 'loading';
+      // Each run consumes the continuation a capped run saved, so a failed
+      // continuation (such as an expired cursor) restarts from the first page.
+      startCursor = typeof worker.workerResponseListCursor === 'string' ? worker.workerResponseListCursor : '';
+      delete worker.workerResponseListCursor;
+    }
     cachedStorageRefIds = new Set(Object.keys((worker?.workerResponseStorageRefs as CacheRecord) || {}));
     const responses = (worker?.questionResponses || {}) as Record<string, Record<string, CacheRecord>>;
     const metadata = (worker?.questionResponsesMeta || {}) as Record<string, Record<string, CacheRecord>>;
@@ -129,7 +137,8 @@ export const hydrateWorkerCanonicalResponses = async ({
   }
   if (shouldStop()) return;
 
-  let partial = false;
+  let capped = false;
+  let resumeCursor = '';
   let listedStorageRefIds = null as ReadonlySet<string> | null;
   const rows = await loadRows({
     account: getAccount(),
@@ -137,14 +146,18 @@ export const hydrateWorkerCanonicalResponses = async ({
     sessionSlug,
     sessionConfig,
     cachedStorageRefIds,
-    onPartial: () => {
-      partial = true;
+    startCursor: startCursor || null,
+    onPartial: (cursor) => {
+      capped = true;
+      resumeCursor = typeof cursor === 'string' ? cursor : '';
     },
     onListed: (storageRefIds) => {
       listedStorageRefIds = storageRefIds;
     },
   });
   if (shouldStop()) return;
+  // Only one run that lists from the first page to the last sees every row.
+  const partial = capped || !!startCursor;
   // A complete listing is authoritative for this reader.
   const listed = listedStorageRefIds;
   const staleRefIds = listed ? new Set([...cachedStorageRefIds].filter((refId) => !listed.has(refId))) : undefined;
@@ -154,7 +167,10 @@ export const hydrateWorkerCanonicalResponses = async ({
     const merged = workerHydration.mergeWorkerQuestionResponses(current, rows, sessionSlug, run.identity, staleRefIds);
     // A capped listing is a settled snapshot, not a complete history. Reports
     // may display its new rows while missing-answer checks still remain unready.
-    (merged.worker as CacheRecord).workerResponseHydrationStatus = partial ? 'partial' : 'complete';
+    const worker = merged.worker as CacheRecord;
+    worker.workerResponseHydrationStatus = partial ? 'partial' : 'complete';
+    // The next refresh continues from here instead of rereading the same prefix.
+    if (resumeCursor) worker.workerResponseListCursor = resumeCursor;
     return merged;
   });
   if (!questionsPersisted) {
