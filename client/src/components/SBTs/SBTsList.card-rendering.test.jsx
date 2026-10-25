@@ -823,6 +823,7 @@ describe('SBTsList card rendering and navigation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /open tag explorer for Governance/i }));
     expect(screen.getByTestId('mock-tag-modal')).toHaveTextContent('Governance');
+    expect(mockTagModal.mock.calls.at(-1)[0].sessionSlug).toBe('alpha');
 
     fireEvent.click(toggleButton);
 
@@ -899,6 +900,7 @@ describe('SBTsList card rendering and navigation', () => {
     fireEvent.click(featuredTagButton);
 
     expect(screen.getByTestId('mock-tag-modal')).toHaveTextContent('Governance');
+    expect(mockTagModal.mock.calls.at(-1)[0].sessionSlug).toBe('alpha');
   });
 
   it('renders modal featured cards as anchor cards instead of nested mini SBT pages', async () => {

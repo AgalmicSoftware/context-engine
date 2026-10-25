@@ -163,6 +163,7 @@ type TagPageViewProps = {
   onSelectedTagsChange?: ((nextTags: string[]) => void) | null;
   emptyQuestionsText?: string;
   embedded?: boolean;
+  initialSessionSlug?: string;
   demoCorpusMode?: boolean;
   demoCorpusRecords?: DemoCorpusEntry[];
   hideEmbeddedSessionSelector?: boolean;
@@ -743,6 +744,7 @@ export const TagPageView = ({
   onSelectedTagsChange = null,
   emptyQuestionsText = 'No questions found.',
   embedded = false,
+  initialSessionSlug,
   demoCorpusMode = false,
   demoCorpusRecords = [],
   hideEmbeddedSessionSelector = false,
@@ -756,8 +758,8 @@ export const TagPageView = ({
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [sessionSelectorOpen, setSessionSelectorOpen] = useState(false);
   const [expandedDemoEntryKeys, setExpandedDemoEntryKeys] = useState<Record<string, boolean>>({});
-  const [localSessionOverrideTouched, setLocalSessionOverrideTouched] = useState(false);
-  const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState<string | null>(null);
+  const [localSessionOverrideTouched, setLocalSessionOverrideTouched] = useState(initialSessionSlug !== undefined);
+  const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState<string | null>(initialSessionSlug ?? null);
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiElapsedMs, setAiElapsedMs] = useState(0);
@@ -807,7 +809,10 @@ export const TagPageView = ({
   );
   const isDemoCorpusContext = demoCorpusMode === true;
 
-  const queryPinnedScopeSlug = useMemo(() => parseQuestionSessionSlugFromSearch(location.search), [location.search]);
+  const queryPinnedScopeSlug = useMemo(
+    () => (embedded && initialSessionSlug !== undefined ? null : parseQuestionSessionSlugFromSearch(location.search)),
+    [embedded, initialSessionSlug, location.search],
+  );
   const routePinned = queryPinnedScopeSlug !== null;
   const globalSessionSelection = useMemo<SessionSelectionState>(
     () => normalizeGlobalSessionSelection(sessionState || {}) as SessionSelectionState,
@@ -1309,6 +1314,15 @@ export const TagPageView = ({
             ) : null}
           </div>
           <div className={styles.headerControls}>
+            {embedded && !isDemoCorpusContext && (
+              <a
+                className={styles.addTagButton}
+                href={`${buildTagPagePath(selectedTags)}${hasSingleSessionScope ? `?session=${encodeURIComponent(effectiveSingleScopeSlug || 'general')}` : ''}`}
+              >
+                <FontAwesomeIcon icon={faExternalLinkAlt} />
+                <span>Open tag page</span>
+              </a>
+            )}
             <div className={[styles.tagPicker, embedded ? styles.tagPickerEmbedded : ''].filter(Boolean).join(' ')}>
               <button
                 type="button"

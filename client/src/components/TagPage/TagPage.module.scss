@@ -494,6 +494,7 @@ $tag-route-accent-alt: var(--ce-compat-indigo);
 }
 
 .addTagButton {
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -516,6 +517,8 @@ $tag-route-accent-alt: var(--ce-compat-indigo);
   &:hover,
   &:focus {
     background: var(--ce-text-inverse);
+    color: var(--ce-document-text);
+    text-decoration: none;
     box-shadow: 0 10px 20px color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
     transform: translateY(-1px);
   }

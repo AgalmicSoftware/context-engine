@@ -374,6 +374,7 @@ const renderTagModal = ({
   isOpen = true,
   sessionState = {},
   entry = '/demo/corpus-viewer',
+  sessionSlug,
   demoCorpusMode = false,
   demoCorpusRecordsOverride = [],
   toggle = jest.fn(),
@@ -386,6 +387,7 @@ const renderTagModal = ({
             isOpen={isOpen}
             toggle={toggle}
             activeTag={activeTag}
+            sessionSlug={sessionSlug}
             demoCorpusMode={demoCorpusMode}
             demoCorpusRecords={demoCorpusRecordsOverride}
           />
@@ -1130,6 +1132,7 @@ describe('TagPage', () => {
 
 describe('TagModal', () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1155,6 +1158,52 @@ describe('TagModal', () => {
         }),
       ];
     });
+  });
+
+  it('preselects the originating session instead of the global selection and keeps it through comparisons', () => {
+    renderTagModal({ sessionSlug: 'edge', sessionState: { primarySessionSlug: 'alpha' } });
+    expect(screen.getByTestId('tag-page-session-scope')).toHaveTextContent('Session scope: edge');
+    expect(screen.getByText('What changed?')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute('href', '/tag/Google?session=edge');
+    fireEvent.click(screen.getAllByRole('button', { name: /add ai governance tag to comparison/i })[0]);
+    expect(screen.getByTestId('tag-page-session-scope')).toHaveTextContent('Session scope: edge');
+    expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute(
+      'href',
+      '/tag/Google+AI%20Governance?session=edge',
+    );
+  });
+
+  it('uses the session route for modal callers without an explicit session', () => {
+    renderTagModal({ entry: '/ce/session/edge', sessionState: { primarySessionSlug: 'alpha' } });
+    expect(screen.getByTestId('tag-page-session-scope')).toHaveTextContent('Session scope: edge');
+    expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute('href', '/tag/Google?session=edge');
+  });
+
+  it('preserves a changed session when comparing tags and opening the full page', () => {
+    renderTagModal({ sessionSlug: 'alpha' });
+    fireEvent.click(screen.getByRole('button', { name: 'Tag page session selector' }));
+    fireEvent.click(screen.getByTestId('ce-tag-page-session-chip-edge'));
+    fireEvent.click(screen.getAllByRole('button', { name: /add ai governance tag to comparison/i })[0]);
+    expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute(
+      'href',
+      '/tag/Google+AI%20Governance?session=edge',
+    );
+  });
+
+  it('preserves the General session and deployment base path in the full-page link', () => {
+    const previous = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce';
+    try {
+      renderTagModal({ sessionSlug: '', entry: '/session/alpha' });
+      expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute(
+        'href',
+        '/ce/tag/Google?session=general',
+      );
+      expect(screen.getByTestId('tag-page-session-scope')).toHaveTextContent('Session scope: General');
+    } finally {
+      if (previous === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previous;
+    }
   });
 
   it('uses dedicated tag-modal shell classes and keeps the demo info cog beside the modal close control', () => {

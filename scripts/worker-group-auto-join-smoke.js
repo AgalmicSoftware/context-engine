@@ -8,7 +8,7 @@ const { chromium } = require('playwright');
 const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3112';
 const sessionId = '0x11111111111111111111111111111111';
 const sessionSlug = 'auto-join-smoke';
-const group = { groupId: 'participants-2026', sessionSlug, label: 'Participants 2026', joinMode: 'open', memberVisibility: 'session' };
+const group = { groupId: 'participants-2026', sessionSlug, label: 'Participants 2026', tags: ['Research'], joinMode: 'open', memberVisibility: 'session' };
 const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script type="module">import RefreshRuntime from '/@react-refresh'; RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$ = () => {}; window.$RefreshSig$ = () => (type) => type; window.__vite_plugin_react_preamble_installed__ = true;</script></head><body><div id="root"></div><script type="module" src="/src/test-smoke/workerGroupAutoJoinSmokeEntry.tsx"></script></body></html>`;
 
 async function main() {
@@ -88,6 +88,37 @@ async function main() {
     assert.equal(new URL(groupLink).searchParams.get('sessionSlug'), sessionSlug);
     await openDetails.click();
     await page.getByTestId('ce-worker-group-detail').waitFor();
+    const tagLink = page.getByRole('link', { name: 'Research', exact: true });
+    assert.equal(await tagLink.getAttribute('href'), `/tag/Research?session=${sessionSlug}`);
+    const beforeTagUrl = page.url();
+    await tagLink.click();
+    await page.getByRole('button', { name: 'Close tag explorer', exact: true }).waitFor();
+    assert.equal(page.url(), beforeTagUrl);
+    await page.getByTestId('tag-page-session-scope').waitFor();
+    assert.match(await page.getByTestId('tag-page-session-scope').innerText(), /auto-join-smoke/);
+    assert.equal(await page.getByRole('link', { name: 'Open tag page', exact: true }).getAttribute('href'), `/tag/Research?session=${sessionSlug}`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
+    await page.getByRole('link', { name: 'Open tag page', exact: true }).click({ trial: true });
+    await page.waitForFunction(() => {
+      const modal = document.querySelector('.modal.show');
+      return modal && getComputedStyle(modal).opacity === '1';
+    });
+    const tagPageLinkBox = await page.getByRole('link', { name: 'Open tag page', exact: true }).boundingBox();
+    assert.ok(tagPageLinkBox.y >= 0 && tagPageLinkBox.y + tagPageLinkBox.height <= 844);
+    await page.screenshot({ path: path.join(os.tmpdir(), 'ce-session-tag-modal-mobile.png') });
+    const fullTagPage = await context.newPage();
+    await fullTagPage.goto(new URL(await page.getByRole('link', { name: 'Open tag page', exact: true }).getAttribute('href'), baseUrl).href);
+    await fullTagPage.getByRole('heading', { name: '#Research', exact: true }).waitFor();
+    assert.match(await fullTagPage.getByTestId('tag-page-session-scope').innerText(), /auto-join-smoke.*URL pin/);
+    await fullTagPage.close();
+    await page.getByRole('button', { name: 'Close tag explorer', exact: true }).click();
+    await page.getByRole('button', { name: 'Close tag explorer', exact: true }).waitFor({ state: 'hidden' });
+    assert.equal(page.url(), beforeTagUrl);
+    if (process.env.SMOKE_FOCUS === 'tag-modal') {
+      console.log('Session tag modal smoke passed: scoped modal, full page, dismissal, and mobile layout.');
+      return;
+    }
+
     const detailPage = await context.newPage();
     await detailPage.goto(groupLink);
     try {

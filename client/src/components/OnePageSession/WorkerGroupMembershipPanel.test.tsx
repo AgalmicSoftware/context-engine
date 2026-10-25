@@ -450,8 +450,8 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.getByRole('heading', { name: 'MORE' })).toBeInTheDocument();
     expect(screen.getByText('Document URLs:')).toBeInTheDocument();
     expect(screen.queryByText('Tags:')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'research' })).toHaveAttribute('href', '/tag/research');
-    expect(screen.getByRole('link', { name: 'reviewers' })).toHaveAttribute('href', '/tag/reviewers');
+    expect(screen.getByRole('link', { name: 'research' })).toHaveAttribute('href', '/tag/research?session=alpha');
+    expect(screen.getByRole('link', { name: 'reviewers' })).toHaveAttribute('href', '/tag/reviewers?session=alpha');
     expect(screen.getByText('25')).toBeInTheDocument();
     const adminLink = screen.getByRole('link', {
       name: 'View admin profile 0x00000000000000000000000000000000000000aa',

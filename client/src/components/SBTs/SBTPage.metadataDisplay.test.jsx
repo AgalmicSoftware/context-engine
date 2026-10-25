@@ -1,3 +1,4 @@
+import { render, screen } from '@testing-library/react';
 import { ethers } from 'ethers';
 
 import SBTPage from './SBTPage';
@@ -98,7 +99,7 @@ const renderStatsSectionTree = (tree) => {
 
 const renderRelevantInfoTree = (tree) => {
   const relevantInfo = findElementInTree(tree, (element) => element?.type === SbtPageRelevantInfo);
-  return relevantInfo ? SbtPageRelevantInfo(relevantInfo.props) : null;
+  return relevantInfo ? render(relevantInfo) : null;
 };
 
 describe('SBTPage metadata display', () => {
@@ -611,18 +612,12 @@ describe('SBTPage metadata display', () => {
           tags: ['AI Policy'],
         },
       };
-      const metadataTree = renderRelevantInfoTree(subject.renderRelevantInfo());
-      const docLink = findElementInTree(
-        metadataTree,
-        (element) => element?.type === 'a' && element?.props?.href?.includes('/doc/'),
+      renderRelevantInfoTree(subject.renderRelevantInfo());
+      expect(screen.getByRole('link', { name: 'doc hash' })).toHaveAttribute('href', '/ce/doc/doc%20hash');
+      expect(screen.getByRole('link', { name: 'AI Policy' })).toHaveAttribute(
+        'href',
+        '/ce/tag/AI%20Policy?session=general',
       );
-      const tagLink = findElementInTree(
-        metadataTree,
-        (element) => element?.type === 'a' && element?.props?.href?.includes('/tag/'),
-      );
-
-      expect(docLink?.props?.href).toBe('/ce/doc/doc%20hash');
-      expect(tagLink?.props?.href).toBe('/ce/tag/AI%20Policy');
     } finally {
       if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
       else process.env.PUBLIC_URL = previousPublicUrl;

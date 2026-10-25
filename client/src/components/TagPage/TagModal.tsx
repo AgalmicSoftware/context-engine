@@ -31,12 +31,14 @@ type TagModalProps = {
   isOpen: boolean;
   toggle: () => void;
   activeTag?: string | null;
+  sessionSlug?: string;
   demoCorpusMode?: boolean;
   demoCorpusRecords?: unknown[];
 };
 
 type EmbeddedTagPageProps = {
   embedded: boolean;
+  initialSessionSlug?: string;
   demoCorpusMode?: boolean;
   demoCorpusRecords?: unknown[];
   selectedTagsOverride?: string[];
@@ -146,8 +148,25 @@ const buildEmptyQuestionsText = (selectedTags: string[] = []) => {
   return 'No questions found for this tag comparison yet.';
 };
 
-const TagModal = ({ isOpen, toggle, activeTag, demoCorpusMode = false, demoCorpusRecords = [] }: TagModalProps) => {
+const TagModal = ({
+  isOpen,
+  toggle,
+  activeTag,
+  sessionSlug,
+  demoCorpusMode = false,
+  demoCorpusRecords = [],
+}: TagModalProps) => {
   const location = useLocation();
+  const routeSessionSlug = useMemo(() => {
+    const segment = location.pathname.match(/\/session\/([^/]+)/)?.[1];
+    if (!segment || segment === 'new') return undefined;
+    try {
+      return normalizeSessionSlug(decodeURIComponent(segment));
+    } catch {
+      return undefined;
+    }
+  }, [location.pathname]);
+  const initialSessionSlug = sessionSlug ?? routeSessionSlug;
   const reduxContext = useContext(ReactReduxContext);
   const sessionState = reduxContext?.store?.getState?.()?.sessionState;
   const normalizedActiveTag = String(activeTag || '').trim();
@@ -288,15 +307,12 @@ const TagModal = ({ isOpen, toggle, activeTag, demoCorpusMode = false, demoCorpu
         </div>
       </div>
       <ModalBody className={styles.tagModalBody}>
-        <div
-          key={selectedTagsKey || 'empty'}
-          ref={scrollContainerRef}
-          className={styles.tagModalScrollArea}
-          data-testid="tag-modal-scroll-area"
-        >
+        <div ref={scrollContainerRef} className={styles.tagModalScrollArea} data-testid="tag-modal-scroll-area">
           {isOpen && selectedTags.length ? (
             <TagPageComponent
+              key={initialSessionSlug}
               embedded={true}
+              initialSessionSlug={initialSessionSlug}
               demoCorpusMode={demoCorpusMode}
               demoCorpusRecords={demoCorpusRecords}
               selectedTagsOverride={selectedTags}

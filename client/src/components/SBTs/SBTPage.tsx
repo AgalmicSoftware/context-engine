@@ -3805,6 +3805,7 @@ class SBTPage extends Component<any, any> {
 
     return (
       <SbtPageRelevantInfo
+        sessionSlug={this.getEffectiveSessionSlug()}
         documentIDHashes={documentIDHashes}
         documentURLs={documentURLs}
         onOpenEncryptedDoc={this.openEncryptedDoc}

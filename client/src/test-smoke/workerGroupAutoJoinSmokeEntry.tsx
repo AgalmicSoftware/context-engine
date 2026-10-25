@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
@@ -116,10 +117,14 @@ function SmokeSession() {
   );
 }
 
+const queryClient = new QueryClient();
+
 createRoot(document.getElementById('root') as HTMLElement).render(
   <Provider store={store}>
-    <BrowserRouter>
-      <SmokeSession />
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <SmokeSession />
+      </BrowserRouter>
+    </QueryClientProvider>
   </Provider>,
 );
