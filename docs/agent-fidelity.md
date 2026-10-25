@@ -31,10 +31,11 @@ Each prediction is scored under one condition:
 
 The app does not write blind records yet. The scorer reads the planned fields:
 `interviewProvenance.predictionCondition: "blind"` with `blindAnswer`, the
-answer given before the draft was revealed. It also reads a planned
-`draftOrigin`; until records carry it, origin is inferred from the
-self-reported source (`chatgpt` or `claude` means chat-assistant prefill; the
-app's default model with platform `other` means a voice interview).
+answer given before the draft was revealed. Version 2 records carry
+`draftOrigin`; for older records, origin is inferred from the self-reported
+source (`chatgpt` or `claude` means chat-assistant prefill; the app's default
+model with platform `other` means a voice interview). At minimal research
+detail, freeform predictions are `null` and are not scored.
 
 ## Scores
 

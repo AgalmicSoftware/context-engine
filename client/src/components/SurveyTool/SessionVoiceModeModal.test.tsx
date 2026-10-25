@@ -439,6 +439,8 @@ describe('SessionVoiceModeModal', () => {
         mode="interview"
         onInterviewProgressChange={onInterviewProgressChange}
         prefillPacket={prefillPacket}
+        // Unselected drafts are kept only at full research detail.
+        sessionConfig={{ interviewMode: { researchDetail: 'full' } }}
         questionPool={[...baseProps.questionPool, { id: 'q2', prompt: 'Second question?', type: 'freeform' }]}
         renderFieldLock={(id, field) => <button type="button" aria-label={`Privacy ${id} ${field}`} />}
       />,
@@ -2354,11 +2356,9 @@ describe('SessionVoiceModeModal', () => {
     expect(metadata).toHaveTextContent('Platform');
     expect(metadata).toHaveTextContent('Claude');
     expect(metadata).toHaveTextContent('Question set');
-    expect(metadata).toHaveTextContent(
-      'Predictions, reviewed values, changed fields, and unselected drafts will not be included.',
-    );
+    expect(metadata).toHaveTextContent('Predictions and changed fields will not be included.');
     fireEvent.click(includeComparison);
-    expect(metadata).toHaveTextContent('1 selected draft and 0 unselected drafts');
+    expect(metadata).toHaveTextContent('1 selected draft:');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
     await waitFor(() =>

@@ -3,6 +3,7 @@ import {
   redactInterviewEncryptedRatings,
   buildSelectedInterviewResearch,
   buildUnselectedInterviewResearch,
+  resolveInterviewDraftOrigin,
 } from './sessionInterviewResearch';
 
 describe('selected interview research', () => {
@@ -165,4 +166,90 @@ it('redacts only ratings with final envelopes, including historical snapshots', 
     ],
   });
   expect(research.originalPrediction.importance).toBe(7);
+});
+
+describe('minimal interview research', () => {
+  const draft = {
+    questionId: 'q1',
+    answer: 'Agree',
+    additionalComments: 'My own note',
+    importance: 6,
+    conviction: 7,
+    original: {
+      answer: 'Disagree',
+      additionalComments: 'As a nurse in Boston I worry',
+      importance: 4,
+      conviction: 5,
+      confidence: 0.6,
+      evidence: 'From memory: works in a hospital',
+      revisions: [
+        {
+          revision: 1,
+          modelId: 'claude-test',
+          answer: 'Disagree',
+          additionalComments: 'Draft',
+          evidence: 'Basis',
+          confidence: 0.6,
+        },
+      ],
+    },
+  };
+
+  it('keeps predicted choices, ratings and confidence but no AI notes or drafted text', () => {
+    const result = buildSelectedInterviewResearch(draft, {}, { tier: 'minimal' });
+    expect(result).toEqual({
+      questionId: 'q1',
+      selection: 'selected',
+      originalPrediction: { answer: 'Disagree', importance: 4, conviction: 5, confidence: 0.6 },
+      predictionRevisions: [
+        {
+          revision: 1,
+          modelId: 'claude-test',
+          answer: 'Disagree',
+          importance: null,
+          conviction: null,
+          confidence: 0.6,
+        },
+      ],
+      finalSubmitted: { answer: 'Agree', importance: 6, conviction: 7 },
+      changedFields: ['answer', 'additionalComments', 'importance', 'conviction'],
+      userEditedFields: [],
+      redactedFields: [],
+    });
+    expect(JSON.stringify(result)).not.toMatch(/nurse|hospital|My own note|Draft|Basis/);
+  });
+
+  it('drops the drafted answer itself on freeform questions but keeps redaction markers', () => {
+    const freeform = buildSelectedInterviewResearch(draft, {}, { tier: 'minimal', textAnswer: true });
+    expect(freeform?.originalPrediction).toEqual({ answer: null, importance: 4, conviction: 5, confidence: 0.6 });
+    expect(freeform?.finalSubmitted).toEqual({ answer: null, importance: 6, conviction: 7 });
+    const encrypted = buildSelectedInterviewResearch(
+      draft,
+      { answers: { q1: { encrypted: true } } },
+      { tier: 'minimal', textAnswer: true },
+    );
+    expect(encrypted?.originalPrediction).toMatchObject({ answer: { redacted: true } });
+  });
+
+  it('uses supplied changed fields when the original text is no longer known', () => {
+    const result = buildSelectedInterviewResearch(draft, {}, { tier: 'minimal', changedFields: ['answer'] });
+    expect(result?.changedFields).toEqual(['answer']);
+  });
+
+  it('leaves the full record unchanged', () => {
+    expect(buildSelectedInterviewResearch(draft, {}, { tier: 'full' })).toEqual(buildSelectedInterviewResearch(draft));
+  });
+});
+
+describe('interview draft origin', () => {
+  const packet = { source: { modelId: 'claude-test' } };
+  it.each([
+    [{ revisions: [{ modelId: 'claude-test' }] }, packet, { modelId: 'claude-test' }, 'external_prefill'],
+    [{}, packet, null, 'external_prefill'],
+    [{ revisions: [{ modelId: 'gpt-realtime' }] }, packet, null, 'voice_interview'],
+    [{ revisions: [{ modelId: 'gpt-realtime' }] }, null, null, 'voice_interview'],
+    [{ revisions: [{ modelId: 'gpt-x' }] }, null, { modelId: 'direct-user-context' }, 'typed_context'],
+  ])('labels %j', (value, prefill, source, expected) => {
+    expect(resolveInterviewDraftOrigin(value, prefill, source)).toBe(expected);
+  });
 });

@@ -1,5 +1,5 @@
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
-import { withoutOffResearchSharingDefault } from '../../utilities/session/interviewModeWrite';
+import { withoutNewInterviewDefaults } from '../../utilities/session/interviewModeWrite';
 import {
   normalizeResultsAnalysisSettings,
   validResultsAnalysisSettings,
@@ -134,7 +134,7 @@ export const applyAdminMetadataDraft = (
 ) => {
   const next = deepClone(metadata && typeof metadata === 'object' ? metadata : {});
 
-  next.interviewMode = withoutOffResearchSharingDefault({
+  next.interviewMode = withoutNewInterviewDefaults({
     ...asInterviewRecord(draft.interviewMode),
     ...normalizeInterviewSettings(draft.interviewMode),
   });

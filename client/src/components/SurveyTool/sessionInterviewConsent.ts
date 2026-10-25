@@ -4,6 +4,8 @@ export type InterviewConsentOverrides = {
   includeAiProvenance?: boolean;
   includePredictionComparison?: boolean;
   includeResponderName?: boolean;
+  // The research detail shown when the participant chose; a later config can't widen it.
+  researchDetail?: 'minimal' | 'full';
 };
 
 export const summarizeConsentChoice = (values: boolean[], override?: boolean) => ({
@@ -100,6 +102,8 @@ const PREDICTION_RESEARCH_KEYS = [
   'unselectedDrafts',
   'submissionValueSnapshot',
   'predictionComparison',
+  'researchTier',
+  'draftOrigin',
 ];
 
 // Undoing or restoring edits never makes a response more disclosing: a name, AI attribution

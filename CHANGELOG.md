@@ -232,6 +232,12 @@ All notable changes to this project will be documented in this file.
   export or Session Wrapped rows. It reports Mirror Score, correction rate,
   calibration, lift over a majority guess, accuracy for unusual views, and
   whether drafts flatten strong or varied views. See `docs/agent-fidelity.md`.
+- Keep shared AI draft comparisons minimal by default: predicted answers, ratings,
+  confidence and changed fields, without the AI's notes, drafted text or drafts
+  for skipped questions. Owners can choose full detail with
+  `interviewMode.researchDetail`, which needs a Session Worker newer than 0.7.0.
+  Records now carry `version: 2`, `researchTier` and `draftOrigin`, and a line
+  beside Submit says when sharing is on.
 
 ## [0.7.0] - 2026-10-21
 

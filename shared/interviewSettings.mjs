@@ -8,6 +8,7 @@ export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   suggestQuestions: false,
   allowManualRefresh: true,
   shareDraftChangesByDefault: false,
+  researchDetail: 'minimal',
 });
 export const normalizeInterviewSettings = (value = {}) => {
   const source = value && typeof value === 'object' ? value : {};
@@ -27,6 +28,8 @@ export const normalizeInterviewSettings = (value = {}) => {
     suggestQuestions: source.suggestQuestions === true,
     allowManualRefresh: source.allowManualRefresh !== false,
     shareDraftChangesByDefault: source.shareDraftChangesByDefault === true,
+    // How much an AI draft comparison saves: 'minimal' keeps no AI notes or drafted text.
+    researchDetail: source.researchDetail === 'full' ? 'full' : 'minimal',
   };
 };
 export const validInterviewSettings = (value = {}) => {
@@ -49,6 +52,7 @@ export const validInterviewSettings = (value = {}) => {
       value.questionGrowthPercent > 100)
   )
     return false;
+  if (value.researchDetail !== undefined && !['minimal', 'full'].includes(value.researchDetail)) return false;
   return ['autoRegenerate', 'followNewQuestions', 'suggestQuestions', 'allowManualRefresh', 'shareDraftChangesByDefault'].every(
     (key) => value[key] === undefined || typeof value[key] === 'boolean',
   );

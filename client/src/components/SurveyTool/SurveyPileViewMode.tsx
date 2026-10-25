@@ -126,6 +126,8 @@ import {
   type InterviewPrefillPacket,
   type SessionVoiceMode,
 } from './sessionInterview';
+import { resolveInterviewDraftOrigin } from './sessionInterviewResearch';
+import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
 
 // Crypto and contract utilities
@@ -1540,6 +1542,12 @@ export const recordInterviewProvenance = (
   consentOverrides?: InterviewConsentOverrides,
 ) => {
   const normalizedSource = source || resolveRealtimeInterviewSource(engine.props?.sessionConfig);
+  const sessionResearchDetail = normalizeInterviewSettings(
+    (engine.props?.sessionConfig as { interviewMode?: unknown } | undefined)?.interviewMode,
+  ).researchDetail;
+  // Full detail only when the session asks for it and the participant was shown it.
+  const researchTier =
+    sessionResearchDetail === 'full' && consentOverrides?.researchDetail !== 'minimal' ? 'full' : 'minimal';
   const pendingQuestionIds = engine.getChangedQidsAndFields?.(0)?.changedQids;
   const researchAnchor = drafts.find((draft) => pendingQuestionIds?.has(draft.questionId)) || drafts[0];
   const normalizedResponderName = String(responderName || '')
@@ -1618,9 +1626,12 @@ export const recordInterviewProvenance = (
                   },
                   predictionRevisions: originalDraft.revisions || draft.revisions || [],
                   userEditedFields: reviewed.userEditedFields || [],
+                  researchTier,
+                  draftOrigin: resolveInterviewDraftOrigin(originalDraft, packet, normalizedSource),
                 }
               : {}),
-            ...(comparison && draft === researchAnchor
+            // Drafts for questions the person skipped are kept only at full research detail.
+            ...(comparison && researchTier === 'full' && draft === researchAnchor
               ? {
                   unselectedDrafts: review.filter((entry) => !entry.selected),
                 }

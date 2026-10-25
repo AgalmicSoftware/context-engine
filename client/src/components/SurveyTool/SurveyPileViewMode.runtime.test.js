@@ -1028,7 +1028,8 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('persists unselected research once on a changed selected answer and removes it on opt-out', async () => {
     const engine = {
-      props: { sessionConfig: {} },
+      // Drafts for skipped questions are kept only at full research detail.
+      props: { sessionConfig: { interviewMode: { researchDetail: 'full' } } },
       state: { surveysResponseState: [{ answers: { q1: { value: 'Agree' }, q2: { value: 'Edited answer' } } }] },
       getChangedQidsAndFields: () => ({ changedQids: new Set(['q2']) }),
       persistDraft: jest.fn(),

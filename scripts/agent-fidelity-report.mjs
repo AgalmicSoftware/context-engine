@@ -177,7 +177,7 @@ export const renderFidelityMarkdown = (report) => {
     '',
     `Method \`${report.method}\`. ${coverage.participants} people, ${coverage.predictions} scored predictions ` +
       `(${coverage.byCondition.shown} shown, ${coverage.byCondition.blind} hidden, ${coverage.byCondition.separate} separate). ` +
-      `${coverage.freeformPredictions} freeform predictions are not scored. ` +
+      `${coverage.freeformPredictions + (coverage.skippedRecords?.freeformWithoutText ?? 0)} freeform predictions are not scored. ` +
       `Intervals are 95% bootstrap intervals over people (${report.options.bootstrapSamples} samples, seed ${report.options.seed}); ` +
       `results from ${fewer} are withheld.`,
     '',

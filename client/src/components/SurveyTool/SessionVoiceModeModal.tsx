@@ -224,6 +224,13 @@ function SessionInterviewPanel({
   const [includeResponderName, setIncludeResponderName] = useState(false);
   const [consentOverrides, setConsentOverrides] = useState<InterviewConsentOverrides>({});
   const [submissionInfoOpen, setSubmissionInfoOpen] = useState(false);
+  const sessionResearchDetail = normalizeInterviewSettings(sessionConfig?.interviewMode).researchDetail;
+  // What the consent text described. It only ever narrows, so settings that load late can't widen
+  // what someone already agreed to share.
+  const [shownResearchDetail, setShownResearchDetail] = useState(sessionResearchDetail);
+  useEffect(() => {
+    if (sessionResearchDetail === 'minimal') setShownResearchDetail('minimal');
+  }, [sessionResearchDetail]);
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
@@ -755,7 +762,11 @@ function SessionInterviewPanel({
       includePredictionComparison,
       includeProvenance,
       includeResponderName,
-      consentOverrides,
+      // Forward the shown detail only when it is narrower than the session's current one.
+      consentOverrides:
+        shownResearchDetail === sessionResearchDetail
+          ? consentOverrides
+          : { ...consentOverrides, researchDetail: shownResearchDetail },
       isInterviewBusy,
       researchAvailable,
       responderContext,
@@ -801,6 +812,8 @@ function SessionInterviewPanel({
     includeProvenance,
     includeResponderName,
     consentOverrides,
+    shownResearchDetail,
+    sessionResearchDetail,
     isInterviewBusy,
     isSubmitContextCurrent,
     onApplyAdditional,
@@ -1161,60 +1174,73 @@ function SessionInterviewPanel({
           {drafts.length && !isInterviewBusy && !mapping ? (
             <div className={styles.sessionInterviewReviewActions} role="group" aria-label="Response submission">
               {researchAvailable || importedResponderName || hasSavedName || hasSavedAi ? (
-                <details
-                  className={styles.sessionInterviewConsentOptions}
-                  open={submissionInfoOpen}
-                  onToggle={(event) => setSubmissionInfoOpen(event.currentTarget.open)}
-                >
-                  <summary>AI submission info</summary>
-                  <div className={styles.sessionInterviewChoicesPanel}>
-                    {researchAvailable || hasSavedAi ? (
-                      <SessionInterviewResearchConsent
-                        packet={researchPacket}
-                        showProvenance={hasAiPrefill || hasSavedAi}
-                        revisionCount={drafts.reduce((count, draft) => count + (draft.revisions?.length || 0), 0)}
-                        includeProvenance={aiChoice.checked}
-                        includeComparison={comparisonChoice.checked}
-                        provenanceMixed={aiChoice.mixed}
-                        comparisonMixed={comparisonChoice.mixed}
-                        preserveSavedProvenance={hasSavedAi && consentOverrides.includeAiProvenance === undefined}
-                        onProvenanceChange={(included) => {
-                          setIncludeProvenance(included);
-                          setConsentOverrides((prev) => ({ ...prev, includeAiProvenance: included }));
-                        }}
-                        onComparisonChange={(included) => {
-                          setResearchSharingChoice({ contextToken: baseSubmitContextToken, included });
-                          setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));
-                        }}
-                        coverageDetails={researchCoverageDetails}
-                        selectedCount={drafts.filter((draft) => selected[draft.questionId]).length}
-                        unselectedCount={drafts.filter((draft) => !selected[draft.questionId]).length}
-                        disabled={applying}
-                      />
-                    ) : null}
-                    {importedResponderName || hasSavedName ? (
-                      <Label check className={styles.sessionInterviewProvenance}>
-                        <Input
-                          type="checkbox"
-                          checked={nameChoice.mixed ? false : nameChoice.checked}
-                          aria-checked={nameChoice.mixed ? 'mixed' : nameChoice.checked}
-                          innerRef={(element: HTMLInputElement | null) => {
-                            if (element) element.indeterminate = nameChoice.mixed;
+                <div className={styles.sessionInterviewConsentGroup}>
+                  <details
+                    className={styles.sessionInterviewConsentOptions}
+                    open={submissionInfoOpen}
+                    onToggle={(event) => setSubmissionInfoOpen(event.currentTarget.open)}
+                  >
+                    <summary>AI submission info</summary>
+                    <div className={styles.sessionInterviewChoicesPanel}>
+                      {researchAvailable || hasSavedAi ? (
+                        <SessionInterviewResearchConsent
+                          packet={researchPacket}
+                          showProvenance={hasAiPrefill || hasSavedAi}
+                          revisionCount={drafts.reduce((count, draft) => count + (draft.revisions?.length || 0), 0)}
+                          includeProvenance={aiChoice.checked}
+                          includeComparison={comparisonChoice.checked}
+                          provenanceMixed={aiChoice.mixed}
+                          comparisonMixed={comparisonChoice.mixed}
+                          preserveSavedProvenance={hasSavedAi && consentOverrides.includeAiProvenance === undefined}
+                          onProvenanceChange={(included) => {
+                            setIncludeProvenance(included);
+                            setConsentOverrides((prev) => ({ ...prev, includeAiProvenance: included }));
                           }}
+                          onComparisonChange={(included) => {
+                            setResearchSharingChoice({ contextToken: baseSubmitContextToken, included });
+                            setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));
+                          }}
+                          coverageDetails={researchCoverageDetails}
+                          selectedCount={drafts.filter((draft) => selected[draft.questionId]).length}
+                          unselectedCount={drafts.filter((draft) => !selected[draft.questionId]).length}
                           disabled={applying}
-                          onChange={(event) => {
-                            const included = event.target.checked;
-                            setIncludeResponderName(included);
-                            setConsentOverrides((prev) => ({ ...prev, includeResponderName: included }));
-                          }}
-                          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
-                        />{' '}
-                        {`Include ${displayedResponderNames.map((name) => `“${name}”`).join(', ')} as the responder ${displayedResponderNames.length > 1 ? 'names' : 'name'} with submitted responses`}
-                        {nameChoice.mixed ? ' (mixed saved choices)' : ''}
-                      </Label>
-                    ) : null}
-                  </div>
-                </details>
+                          researchDetail={shownResearchDetail}
+                        />
+                      ) : null}
+                      {importedResponderName || hasSavedName ? (
+                        <Label check className={styles.sessionInterviewProvenance}>
+                          <Input
+                            type="checkbox"
+                            checked={nameChoice.mixed ? false : nameChoice.checked}
+                            aria-checked={nameChoice.mixed ? 'mixed' : nameChoice.checked}
+                            innerRef={(element: HTMLInputElement | null) => {
+                              if (element) element.indeterminate = nameChoice.mixed;
+                            }}
+                            disabled={applying}
+                            onChange={(event) => {
+                              const included = event.target.checked;
+                              setIncludeResponderName(included);
+                              setConsentOverrides((prev) => ({ ...prev, includeResponderName: included }));
+                            }}
+                            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
+                          />{' '}
+                          {`Include ${displayedResponderNames.map((name) => `“${name}”`).join(', ')} as the responder ${displayedResponderNames.length > 1 ? 'names' : 'name'} with submitted responses`}
+                          {nameChoice.mixed ? ' (mixed saved choices)' : ''}
+                        </Label>
+                      ) : null}
+                    </div>
+                  </details>
+                  {/* Sharing can be on by default, so say so without opening the panel. */}
+                  {researchAvailable && (comparisonChoice.checked || comparisonChoice.mixed) ? (
+                    <small className={styles.sessionInterviewSharingStatus}>
+                      {comparisonChoice.mixed
+                        ? 'Sharing AI draft changes for research on some responses'
+                        : submitSucceeded
+                          ? 'Shared your AI’s predictions and your changes for research'
+                          : 'Sharing your AI’s predictions and your changes for research'}
+                    </small>
+                  ) : null}
+                </div>
               ) : null}
               <Button
                 color="primary"

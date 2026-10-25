@@ -40,7 +40,7 @@ const renderConsent = (props = {}) =>
 
 describe('SessionInterviewResearchConsent', () => {
   it('describes opt-in research metadata without claiming edits are agreement', () => {
-    renderConsent();
+    renderConsent({ researchDetail: 'full' });
     expect(screen.getByText(/Edits are not treated as agreement/i)).toBeInTheDocument();
     expect(screen.getByText(/full interview transcript and imported conversation history/i)).toBeInTheDocument();
     expect(
@@ -49,7 +49,7 @@ describe('SessionInterviewResearchConsent', () => {
   });
 
   it('links to the branch documentation and shows selected/unselected counts when opted in', () => {
-    renderConsent({ includeComparison: true, revisionCount: 3 });
+    renderConsent({ includeComparison: true, revisionCount: 3, researchDetail: 'full' });
     fireEvent.click(screen.getByRole('group', { name: 'AI prefill metadata' }).querySelector('summary')!);
     expect(screen.getByRole('group', { name: 'AI prefill metadata' }).querySelector('summary')).toHaveTextContent(
       'AI prefill metadata',
@@ -106,4 +106,29 @@ it('explains that current drafts use current attribution while preserving consen
   renderConsent({ preserveSavedProvenance: true });
   fireEvent.click(screen.getByText('AI prefill metadata', { selector: 'summary' }));
   expect(screen.getByText(/Selected AI drafts use this interview’s source metadata/i)).toBeInTheDocument();
+});
+
+describe('research detail wording', () => {
+  const base = {
+    packet,
+    includeProvenance: true,
+    includeComparison: true,
+    onProvenanceChange: () => undefined,
+    onComparisonChange: () => undefined,
+    coverageDetails: [],
+    selectedCount: 2,
+    unselectedCount: 1,
+    disabled: false,
+  };
+
+  it('describes the minimal record by default', () => {
+    render(<SessionInterviewResearchConsent {...base} />);
+    expect(screen.getByText(/drafts for questions you skipped are not included/)).toBeInTheDocument();
+    expect(screen.queryByText(/Unselected drafts, including original and edited values/)).not.toBeInTheDocument();
+  });
+
+  it('describes the full record when the session keeps full detail', () => {
+    render(<SessionInterviewResearchConsent {...base} researchDetail="full" />);
+    expect(screen.getByText(/Unselected drafts, including original and edited values/)).toBeInTheDocument();
+  });
 });

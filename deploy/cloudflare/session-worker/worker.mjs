@@ -25422,7 +25422,8 @@ var init_interviewSettings = __esm({
       followNewQuestions: false,
       suggestQuestions: false,
       allowManualRefresh: true,
-      shareDraftChangesByDefault: false
+      shareDraftChangesByDefault: false,
+      researchDetail: "minimal"
     });
     normalizeInterviewSettings = (value = {}) => {
       const source = value && typeof value === "object" ? value : {};
@@ -25435,7 +25436,9 @@ var init_interviewSettings = __esm({
         followNewQuestions: source.followNewQuestions === true,
         suggestQuestions: source.suggestQuestions === true,
         allowManualRefresh: source.allowManualRefresh !== false,
-        shareDraftChangesByDefault: source.shareDraftChangesByDefault === true
+        shareDraftChangesByDefault: source.shareDraftChangesByDefault === true,
+        // How much an AI draft comparison saves: 'minimal' keeps no AI notes or drafted text.
+        researchDetail: source.researchDetail === "full" ? "full" : "minimal"
       };
     };
     validInterviewSettings = (value = {}) => {
@@ -25447,6 +25450,7 @@ var init_interviewSettings = __esm({
       if (value.openingMode === "owner" && !value.openingPrompt?.trim()) return false;
       if (value.questionGrowthPercent !== void 0 && (!Number.isFinite(value.questionGrowthPercent) || value.questionGrowthPercent < 1 || value.questionGrowthPercent > 100))
         return false;
+      if (value.researchDetail !== void 0 && !["minimal", "full"].includes(value.researchDetail)) return false;
       return ["autoRegenerate", "followNewQuestions", "suggestQuestions", "allowManualRefresh", "shareDraftChangesByDefault"].every(
         (key) => value[key] === void 0 || typeof value[key] === "boolean"
       );

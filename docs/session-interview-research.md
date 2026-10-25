@@ -29,7 +29,7 @@ same neutral color and opacity; active controls remain more prominent.
 | Control | Initial default | Submitted effect |
 | --- | --- | --- |
 | Include platform/model provenance | On when AI prefill provenance is available | Adds `source`, `promptVersion`, `questionSetHash`, and available `source.researchCoverage` details to `interviewProvenance`. |
-| Share AI draft changes for research | Session default; off when unset | Adds draft-comparison fields such as `originalPrediction`, `predictionRevisions`, `finalSubmitted`, `changedFields`, `userEditedFields`, `redactedFields`, `predictionComparison`, and `unselectedPredictions`. |
+| Share AI draft changes for research | Session default; off when unset | Adds the draft comparison, at the session's research detail (below): `originalPrediction`, `predictionRevisions`, `finalSubmitted`, `changedFields`, `userEditedFields`, `redactedFields`, `predictionComparison`, and, at full detail only, `unselectedPredictions`. |
 
 Owners set **Share AI draft changes for research by default** under **Interview
 settings** in the session wizard or admin metadata editor. The boolean
@@ -43,6 +43,25 @@ an explicit choice made during review, including while logging in to submit.
 Settings save the key only while it is on: Session Workers before 0.7.0 reject
 interview keys they do not know, so they keep accepting interview settings with
 the default off, and turning it on needs a 0.7.0 or later Session Worker.
+
+Owners also choose the **AI draft research detail**, `interviewMode.researchDetail`:
+
+- `minimal` (the default) keeps the AI's predicted answers, importance,
+  conviction and confidence, its revisions, and which fields changed. It keeps
+  none of the AI's notes (`evidence`), drafted comments, drafted freeform
+  answers or drafts for questions the person skipped. A freeform prediction or
+  final value is recorded as `null`.
+- `full` keeps everything described in the field reference below.
+
+Settings save `researchDetail` only when it is `full`, for the same reason as
+the sharing default: choosing `full` needs a Session Worker newer than 0.7.0.
+
+Either way the record carries `version: 2`, `researchTier` and `draftOrigin`.
+Records submitted before research detail existed keep `version: 1` and their
+original shape. When a minimal record is resubmitted later, its drafted text is
+no longer known, so text fields keep the changed-or-not decision made at review.
+While sharing is on, a line beside the submit button says so without opening
+the panel.
 
 The disclosure panel stays within the interview footer width and wraps its text,
 including long model identifiers and question-set hashes.
@@ -66,14 +85,16 @@ Cloudflare encrypted-envelope export is a different route: `/storage/export-enve
 | Field | Included when | Meaning |
 | --- | --- | --- |
 | `recruitment.source` | A valid first `src` URL token was captured for the session before submission | Session recruitment source attached to the submitted response entry. It is separate from `interviewProvenance`, does not depend on AI research consent, and is normalized to a bounded token rather than a URL. |
-| `version` | AI provenance or draft-comparison sharing is included | Schema version for the submitted `interviewProvenance` object. The current value is `1`. |
+| `version` | AI provenance or draft-comparison sharing is included | Schema version for the submitted `interviewProvenance` object: `2` for draft comparisons that record `researchTier`, `1` otherwise and for older records. |
+| `researchTier` | Draft-comparison sharing is included (version 2) | `minimal` or `full`, from the session's `interviewMode.researchDetail` at review time. |
+| `draftOrigin` | Draft-comparison sharing is included (version 2) | Where the first prediction came from: `external_prefill` (a ChatGPT or Claude prefill packet), `voice_interview` or `typed_context`. |
 | `source.platform` | AI provenance is included | Self-reported platform label from the import or voice workflow, normalized to a short string such as `chatgpt`, `claude`, or `other`. |
 | `source.modelId` | AI provenance is included | Self-reported model identifier, capped before submission. |
 | `source.verification` | AI provenance is included | Always written as `self_reported`; the app does not independently verify provider/model identity. |
 | `source.researchCoverage` | AI provenance is included and coverage details exist | Optional counts for searched/used chat history, memory items, connected sources, and user statements. Counts are normalized and capped; an optional search-scope note is trimmed. |
 | `promptVersion` | AI provenance is included | Interview prompt/schema version supplied by the prefill packet. |
 | `questionSetHash` | AI provenance is included | Hash of the question set shown to the model, when available. |
-| `originalPrediction` | Draft-comparison sharing is included | Redacted-safe snapshot of the selected AI draft before review: answer, additional comments, importance, conviction, confidence, and evidence. |
+| `originalPrediction` | Draft-comparison sharing is included | Redacted-safe snapshot of the selected AI draft before review: answer, additional comments, importance, conviction, confidence, and evidence. At minimal detail, only the answer (or `null` for freeform), importance, conviction and confidence. |
 | `predictionRevisions` | Draft-comparison sharing is included and saved revisions exist | Up to 100 saved AI draft versions with revision number, model ID, answer/comment text when unencrypted, ratings, confidence, and evidence. This is record truncation for saved AI versions, not a complete history of every human edit. |
 | `finalSubmitted` | Draft-comparison sharing is included | Redacted-safe final values submitted for the selected question. |
 | `changedFields` | Draft-comparison sharing is included | Net fields whose final submitted value differs from the original AI prediction. Possible values are `answer`, `additionalComments`, `importance`, and `conviction`. |

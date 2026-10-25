@@ -7,6 +7,43 @@ const redacted = () => ({ redacted: true, reason: 'encrypted_field' });
 const hasOwn = (value: RecordValue, key: string) => Object.prototype.hasOwnProperty.call(value, key);
 const FIELD_KEYS = ['answer', 'additionalComments', 'importance', 'conviction'] as const;
 type ResearchField = (typeof FIELD_KEYS)[number];
+// How much a shared draft comparison keeps (interviewMode.researchDetail). Minimal keeps
+// predicted choices, ratings and confidence but no AI notes or drafted text.
+export type InterviewResearchTier = 'minimal' | 'full';
+export type InterviewDraftOrigin = 'external_prefill' | 'voice_interview' | 'typed_context';
+type ResearchOptions = { tier?: InterviewResearchTier | null; textAnswer?: boolean; changedFields?: string[] };
+
+// Drops drafted text: comments always, and the answer itself on freeform questions.
+const withoutText = (snapshot: RecordValue, textAnswer: boolean): RecordValue => {
+  const { additionalComments: _comments, evidence: _evidence, ...rest } = snapshot;
+  return textAnswer && !record(rest.answer).redacted ? { ...rest, answer: null } : rest;
+};
+
+const STRUCTURED_QUESTION_TYPES = new Set(['binary', 'multichoice', 'rating', 'quadratic']);
+/** Whether a question takes free text: the interview treats every other type that way. */
+export const isTextInterviewQuestion = (question: unknown): boolean => {
+  const value = record(question);
+  return !STRUCTURED_QUESTION_TYPES.has(
+    String(value.type || value.questionType || 'freeform')
+      .trim()
+      .toLowerCase(),
+  );
+};
+
+/** Where a draft's first prediction came from. */
+export const resolveInterviewDraftOrigin = (
+  draft: unknown,
+  packet: { source?: { modelId?: unknown } } | null,
+  source: { modelId?: unknown } | null,
+): InterviewDraftOrigin => {
+  if (String(source?.modelId || '') === 'direct-user-context') return 'typed_context';
+  const value = record(draft);
+  const first = Array.isArray(value.revisions) && value.revisions.length ? record(value.revisions[0]) : value;
+  const modelId = String(first.modelId || '');
+  return packet && (!modelId || modelId === String(packet.source?.modelId || ''))
+    ? 'external_prefill'
+    : 'voice_interview';
+};
 
 const resolveFieldProtection = (
   questionId: string,
@@ -61,10 +98,11 @@ export const buildInterviewRevisionResearch = (
   value: unknown,
   answerEncrypted: boolean,
   commentsEncrypted: boolean,
+  options: ResearchOptions = {},
 ): RecordValue[] =>
   (Array.isArray(value) ? value : []).slice(0, 100).map((entry) => {
     const revision = record(entry);
-    return {
+    const full = {
       revision: Number(revision.revision) || 1,
       modelId: String(revision.modelId || 'unknown').slice(0, 256),
       answer: answerEncrypted ? redacted() : (revision.answer ?? null),
@@ -74,11 +112,13 @@ export const buildInterviewRevisionResearch = (
       confidence: revision.confidence ?? null,
       evidence: answerEncrypted || commentsEncrypted ? '' : String(revision.evidence || ''),
     };
+    return options.tier === 'minimal' ? withoutText(full, options.textAnswer === true) : full;
   });
 
 export const buildSelectedInterviewResearch = (
   value: unknown,
   fields: { answers?: unknown; additionalComments?: unknown } = {},
+  options: ResearchOptions = {},
 ): RecordValue | null => {
   const draft = record(value);
   const questionId = String(draft.questionId || '');
@@ -88,21 +128,27 @@ export const buildSelectedInterviewResearch = (
       ? record(draft.original)
       : draft;
   const { encryptedAnswer, encryptedComments } = resolveFieldProtection(questionId, fields, draft);
+  const minimal = options.tier === 'minimal';
+  const textAnswer = options.textAnswer === true;
+  const originalPrediction = {
+    ...protectSnapshot(original, encryptedAnswer, encryptedComments),
+    confidence: original.confidence ?? null,
+    evidence: encryptedAnswer || encryptedComments ? '' : String(original.evidence || ''),
+  };
+  const finalSubmitted = protectSnapshot(draft, encryptedAnswer, encryptedComments);
   return {
     questionId,
     selection: 'selected',
-    originalPrediction: {
-      ...protectSnapshot(original, encryptedAnswer, encryptedComments),
-      confidence: original.confidence ?? null,
-      evidence: encryptedAnswer || encryptedComments ? '' : String(original.evidence || ''),
-    },
+    originalPrediction: minimal ? withoutText(originalPrediction, textAnswer) : originalPrediction,
     predictionRevisions: buildInterviewRevisionResearch(
       original.revisions || draft.revisions,
       encryptedAnswer,
       encryptedComments,
+      options,
     ),
-    finalSubmitted: protectSnapshot(draft, encryptedAnswer, encryptedComments),
-    changedFields: buildInterviewChangedFields(original, draft),
+    finalSubmitted: minimal ? withoutText(finalSubmitted, textAnswer) : finalSubmitted,
+    changedFields:
+      (options.changedFields as ResearchField[] | undefined) ?? buildInterviewChangedFields(original, draft),
     userEditedFields: buildInterviewUserEditedFields(draft),
     redactedFields: [
       ...(encryptedAnswer ? ['answer'] : []),

@@ -806,3 +806,101 @@ describe('ordinary saved-answer consent', () => {
     if (name) expect(result.responses![0].responderName).toBe(name);
   });
 });
+
+describe('research detail tiers', () => {
+  const provenance = (extra: Record<string, unknown> = {}) => ({
+    includePredictionComparison: true,
+    source: { platform: 'claude', modelId: 'claude-test' },
+    originalPrediction: {
+      answer: 'Disagree',
+      additionalComments: 'As a nurse in Boston I worry',
+      confidence: 0.6,
+      evidence: 'From memory: works in a hospital',
+    },
+    predictionRevisions: [{ revision: 1, modelId: 'claude-test', answer: 'Disagree', evidence: 'Basis' }],
+    unselectedDrafts: [{ questionId: 'q2', answer: 'Agree', original: { answer: 'Agree', evidence: 'Guess' } }],
+    draftOrigin: 'external_prefill',
+    ...extra,
+  });
+  const submit = (record: Record<string, unknown>, type: string | null = 'binary', answer = 'Agree') =>
+    buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', ...(type ? { type } : {}), prompt: 'Proceed?' }],
+        surveyResponseState: {
+          answers: { q1: { value: answer } },
+          additionalComments: { q1: { value: 'My own note' } },
+          importance: {},
+          conviction: {},
+          interviewProvenance: { q1: record },
+        },
+      }),
+    ).responses![0].interviewProvenance as Record<string, unknown>;
+
+  it('saves a minimal record with no AI notes, drafted text or skipped-question drafts', () => {
+    const record = submit(provenance({ researchTier: 'minimal' }));
+    expect(record).toMatchObject({
+      version: 2,
+      researchTier: 'minimal',
+      draftOrigin: 'external_prefill',
+      originalPrediction: { answer: 'Disagree', confidence: 0.6 },
+      changedFields: ['answer', 'additionalComments'],
+      predictionComparison: { version: 2, researchTier: 'minimal' },
+    });
+    expect(record.unselectedPredictions).toBeUndefined();
+    expect(JSON.stringify(record)).not.toMatch(/nurse|hospital|Basis|Guess|My own note/);
+  });
+
+  it('keeps the drafted answer out of minimal records on freeform questions', () => {
+    const record = submit(
+      provenance({ researchTier: 'minimal', originalPrediction: { answer: 'Draft text', confidence: 0.5 } }),
+      'freeform',
+      'Final text',
+    );
+    expect(record.originalPrediction).toEqual({ answer: null, importance: null, conviction: null, confidence: 0.5 });
+    expect(JSON.stringify(record)).not.toMatch(/Draft text|Final text/);
+  });
+
+  it('keeps the full record at full detail, marked as version 2', () => {
+    const record = submit(provenance({ researchTier: 'full' }));
+    expect(record).toMatchObject({
+      version: 2,
+      researchTier: 'full',
+      originalPrediction: { evidence: 'From memory: works in a hospital' },
+    });
+    expect(record.unselectedPredictions).toHaveLength(1);
+    expect(record.predictionComparison).toMatchObject({ version: 1 });
+  });
+
+  it('leaves records without a tier exactly as version 1', () => {
+    const record = submit(provenance());
+    expect(record.version).toBe(1);
+    expect(record.researchTier).toBeUndefined();
+    expect(record.draftOrigin).toBeUndefined();
+    expect(record.unselectedPredictions).toHaveLength(1);
+  });
+
+  it.each([null, 'text', 'Freeform'])('treats a %s question as free text in minimal records', (type) => {
+    const record = submit(
+      provenance({ researchTier: 'minimal', originalPrediction: { answer: 'As a nurse I worry', confidence: 0.5 } }),
+      type,
+      'My words',
+    );
+    expect(record.originalPrediction).toMatchObject({ answer: null });
+    expect(JSON.stringify(record)).not.toMatch(/nurse|My words/);
+  });
+
+  it('keeps the earlier text-field decision when resubmitting from a saved minimal record', () => {
+    // A saved minimal record has no drafted text to compare with, and consent is read
+    // from its predictionComparison, as for any stored response.
+    const { includePredictionComparison: _flag, ...stored } = provenance({ researchTier: 'minimal' });
+    const saved = {
+      ...stored,
+      predictionComparison: { version: 2, researchTier: 'minimal' },
+      originalPrediction: { answer: 'Disagree', importance: null, conviction: null, confidence: 0.6 },
+      changedFields: ['answer'],
+    };
+    expect(submit(saved).changedFields).toEqual(['answer']);
+    const freeformSaved = { ...saved, originalPrediction: { answer: null, confidence: 0.5 }, changedFields: [] };
+    expect(submit(freeformSaved, 'freeform', 'Edited later').changedFields).toEqual([]);
+  });
+});

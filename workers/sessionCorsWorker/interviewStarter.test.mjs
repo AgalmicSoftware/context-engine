@@ -78,6 +78,9 @@ test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings().shareDraftChangesByDefault, false);
   assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: true }).shareDraftChangesByDefault, true);
   assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: 'true' }).shareDraftChangesByDefault, false);
+  assert.equal(normalizeInterviewSettings().researchDetail, 'minimal');
+  assert.equal(normalizeInterviewSettings({ researchDetail: 'full' }).researchDetail, 'full');
+  assert.equal(normalizeInterviewSettings({ researchDetail: 'FULL' }).researchDetail, 'minimal');
   assert.equal(normalizeInterviewSettings().steeringPrompt, '');
   assert.equal(normalizeInterviewSettings({ steeringPrompt: '  Guide the interview.  ' }).steeringPrompt, 'Guide the interview.');
   assert.equal(
@@ -90,6 +93,7 @@ test('defaults are stable and settings reject invalid values', () => {
     { followNewQuestions: 'true' },
     { shareDraftChangesByDefault: 'true' },
     { shareDraftChangesByDefault: 1 },
+    { researchDetail: 'everything' },
     { questionGrowthPercent: 0 },
     { steeringPrompt: 42 },
     { steeringPrompt: 'x'.repeat(3001) },

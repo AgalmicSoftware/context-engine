@@ -8,6 +8,7 @@ export type InterviewSettings = {
   suggestQuestions: boolean;
   allowManualRefresh: boolean;
   shareDraftChangesByDefault: boolean;
+  researchDetail: 'minimal' | 'full';
 };
 export const DEFAULT_INTERVIEW_SETTINGS: Readonly<InterviewSettings>;
 export function normalizeInterviewSettings(value?: unknown): InterviewSettings;

@@ -6,7 +6,7 @@ import {
   parseChainIdInput,
   shouldShowInlineResourceSummary,
 } from './adminPageMetadataDraftHelpers';
-import { withoutOffResearchSharingDefault } from '../../utilities/session/interviewModeWrite';
+import { withoutNewInterviewDefaults } from '../../utilities/session/interviewModeWrite';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import {
   DEFAULT_RESULTS_ANALYSIS_SETTINGS,
@@ -50,6 +50,22 @@ describe('adminPageMetadataDraftHelpers', () => {
     draft.interviewMode = { ...draft.interviewMode, shareDraftChangesByDefault: false };
     const applied = applyAdminMetadataDraft({}, draft);
     expect(Object.keys(applied.interviewMode).filter((key) => !legacyKeys.includes(key))).toEqual([]);
+  });
+
+  it.each(['minimal', 'full'] as const)('round-trips the interview research detail (%s)', (researchDetail) => {
+    const metadata = { interviewMode: { researchDetail } };
+    const draft = buildAdminMetadataDraft(metadata);
+    const applied = applyAdminMetadataDraft(metadata, draft);
+    const patch = buildWorkerCanonicalMetadataConfigPatch({
+      metadata: applied,
+      slug: 'research-detail',
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+    });
+    expect(draft.interviewMode.researchDetail).toBe(researchDetail);
+    // Minimal is the default, left out so older Session Workers still accept the save.
+    expect((patch.interviewMode as Record<string, unknown>).researchDetail).toBe(
+      researchDetail === 'full' ? 'full' : undefined,
+    );
   });
 
   it('round-trips editable metadata and preserves contract chain fallback', () => {
@@ -397,6 +413,6 @@ it('persists Interview settings through the admin editor and Worker metadata pat
   const metadata = applyAdminMetadataDraft(source, draft);
   const patch = buildWorkerCanonicalMetadataConfigPatch({ metadata, slug: 'demo', adminAddress: '0xabc' });
   expect(patch.interviewMode).toEqual(
-    withoutOffResearchSharingDefault({ ...draft.interviewMode, autoRegenerate: false, allowManualRefresh: true }),
+    withoutNewInterviewDefaults({ ...draft.interviewMode, autoRegenerate: false, allowManualRefresh: true }),
   );
 });

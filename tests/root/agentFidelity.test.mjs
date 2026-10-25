@@ -44,6 +44,8 @@ test('answers are read from stored fields and unreadable ones are rejected', () 
   assert.equal(normalizeFidelityAnswer(q.qq, [1.5, 0, 0]), null);
   assert.equal(normalizeFidelityAnswer(q.qf, { text: '  Slow down.  ' }), 'Slow down.');
   assert.equal(normalizeFidelityQuestion({ id: 'x', type: 'multichoice', options: ['Only'] }), null);
+  for (const type of [undefined, 'text', 'Freeform']) assert.equal(normalizeFidelityQuestion({ id: 'x', type }).type, 'freeform');
+  assert.equal(normalizeFidelityQuestion({ id: 'x', questionType: 'Binary' }).type, 'binary');
 });
 
 test('similarity gives graded credit by question type', () => {
@@ -124,7 +126,7 @@ test('session records yield final answers and prediction pairs', () => {
   assert.equal(blind.actual, 'Disagree', 'the answer given before the reveal is scored');
   assert.equal(answers.find((answer) => answer.questionId === 'qb3').isAgent, true);
   assert.equal(answers.find((answer) => answer.questionId === 'qr').source, 'rxc');
-  assert.deepEqual(skipped, { unknownQuestion: 1, noParticipant: 0, unreadableAnswer: 1, unreadablePrediction: 0 });
+  assert.deepEqual(skipped, { unknownQuestion: 1, noParticipant: 0, unreadableAnswer: 1, unreadablePrediction: 0, freeformWithoutText: 0 });
 });
 
 test('Session Wrapped export rows become separate-condition pairs', () => {
@@ -425,4 +427,13 @@ test('a participant summary lists the most confident misses first', () => {
   assert.equal(summary.hiddenChoicePredictions, 1);
   assert.deepEqual(summary.confidentMisses.map((miss) => miss.questionId), ['qb3', 'qb2'], 'a near-miss rating is not a miss');
   assert.equal(summarizeParticipantFidelity({ questions, pairs: [] }), null);
+});
+
+test('minimal freeform predictions are counted as unscored, not unreadable', () => {
+  const { pairs, skipped } = collectSessionFidelityData({
+    questions,
+    payloads: [{ responder: '0xeee0000000000000000000000000000000000005', response: entry('qf', 'My answer', predicted(null, 0.5)) }],
+  });
+  assert.equal(pairs.length, 0);
+  assert.deepEqual([skipped.freeformWithoutText, skipped.unreadablePrediction], [1, 0]);
 });

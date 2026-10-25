@@ -130,6 +130,10 @@ suggestions are optional and off by default. Admin refresh is on by default.
 **Share AI draft changes for research by default** controls the initial review
 checkbox through `interviewMode.shareDraftChangesByDefault` (off when unset).
 Participants can change it before submitting, and their saved choices are retained.
+**AI draft research detail** (`interviewMode.researchDetail`) decides what a shared
+comparison keeps: `minimal` (the default) has no AI notes or drafted text; `full`
+adds them and drafts for skipped questions. See
+[session-interview-research.md](session-interview-research.md).
 Generation waits for public questions and uses the session Worker's OpenAI key.
 See [Interview settings and lifecycle](session-listening-mode.md#interview).
 

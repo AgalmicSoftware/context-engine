@@ -30,6 +30,21 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
         Sets the initial research-sharing checkbox for new responses. Participants can change it before submitting;
         their saved choices are preserved.
       </p>
+      <Label for={`${id}-research-detail`}>AI draft research detail</Label>
+      <Input
+        id={`${id}-research-detail`}
+        type="select"
+        value={settings.researchDetail}
+        onChange={(e) => change('researchDetail', e.target.value === 'full' ? 'full' : 'minimal')}
+        aria-describedby={`${id}-research-detail-help`}
+      >
+        <option value="minimal">Minimal: predicted answers, confidence and changes</option>
+        <option value="full">Full: also the AI&apos;s notes, drafted text and drafts for skipped questions</option>
+      </Input>
+      <p id={`${id}-research-detail-help`}>
+        What a shared draft comparison saves. Minimal keeps none of the AI&apos;s notes or drafted text, which suits
+        public sessions.
+      </p>
       <Label for={`${id}-model`}>Interview voice model</Label>
       <Input
         id={`${id}-model`}

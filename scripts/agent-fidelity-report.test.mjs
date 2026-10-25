@@ -111,7 +111,7 @@ test('the command writes JSON and Markdown reports from a Results export', () =>
     const report = JSON.parse(readFileSync(path.join(dir, 'agent-fidelity-report.json'), 'utf8'));
     assert.equal(report.coverage.byOrigin.external_prefill, 12);
     assert.equal(report.correctionRate.participants, 6);
-    assert.deepEqual(report.coverage.skippedRecords, { unknownQuestion: 0, noParticipant: 0, unreadableAnswer: 0, unreadablePrediction: 0 });
+    assert.deepEqual(report.coverage.skippedRecords, { unknownQuestion: 0, noParticipant: 0, unreadableAnswer: 0, unreadablePrediction: 0, freeformWithoutText: 0 });
     const markdown = readFileSync(path.join(dir, 'agent-fidelity-report.md'), 'utf8');
     assert.match(markdown, /^# Agent fidelity report/);
     assert.match(markdown, /\| Mirror Score, all predictions \| 0\.67 \|/);

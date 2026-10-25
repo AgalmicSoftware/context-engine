@@ -1,8 +1,8 @@
 import { DEFAULT_INTERVIEW_SETTINGS } from '../../../../shared/interviewSettings.mjs';
-import { withoutOffResearchSharingDefault } from '../../utilities/session/interviewModeWrite';
+import { withoutNewInterviewDefaults } from '../../utilities/session/interviewModeWrite';
 
-// Interview defaults as saved: the research-sharing default is left out while off.
-const SAVED_INTERVIEW_DEFAULTS = withoutOffResearchSharingDefault({ ...DEFAULT_INTERVIEW_SETTINGS });
+// Interview defaults as saved: newer keys are left out at their defaults.
+const SAVED_INTERVIEW_DEFAULTS = withoutNewInterviewDefaults({ ...DEFAULT_INTERVIEW_SETTINGS });
 import { DEFAULT_RESULTS_ANALYSIS_SETTINGS } from '../../../../shared/resultsAnalysisSettings.mjs';
 import { ethers } from 'ethers';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
@@ -854,6 +854,21 @@ describe('sessionWizardWriteNormalization', () => {
     // An off default is left out so Workers before 0.7.0, which reject unknown keys, still accept it.
     expect(Object.hasOwn(payload.interviewMode, 'shareDraftChangesByDefault')).toBe(shareDraftChangesByDefault);
     if (shareDraftChangesByDefault) expect(payload.interviewMode.shareDraftChangesByDefault).toBe(true);
+  });
+
+  test.each(['minimal', 'full'] as const)('publishes the interview research detail (%s)', (researchDetail) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'research-detail',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { researchDetail },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    // Minimal is the default, left out so older Session Workers still accept the save.
+    expect(payload.interviewMode.researchDetail).toBe(researchDetail === 'full' ? 'full' : undefined);
   });
 
   test('write payload builders reject invalid results analysis settings', () => {

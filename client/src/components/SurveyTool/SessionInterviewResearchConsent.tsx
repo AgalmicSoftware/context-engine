@@ -23,6 +23,8 @@ type Props = {
   selectedCount: number;
   unselectedCount: number;
   disabled: boolean;
+  // The session's interviewMode.researchDetail: what a shared comparison keeps.
+  researchDetail?: 'minimal' | 'full';
 };
 
 export default function SessionInterviewResearchConsent({
@@ -40,7 +42,9 @@ export default function SessionInterviewResearchConsent({
   selectedCount,
   unselectedCount,
   disabled,
+  researchDetail = 'minimal',
 }: Props) {
+  const minimal = researchDetail === 'minimal';
   const model = packet.source.modelId || 'Unknown model';
   const platform = { chatgpt: 'ChatGPT', claude: 'Claude', other: 'Other' }[packet.source.platform];
   return (
@@ -89,14 +93,14 @@ export default function SessionInterviewResearchConsent({
         </div>
       </div>
       <span id="ce-interview-research-description" className={styles.srOnly}>
-        Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields,
-        and drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits
-        are not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported
-        conversation history are excluded.
+        {minimal
+          ? 'Includes the AI’s predicted answers, ratings and confidence, its revision history, and which fields you changed. It excludes the AI’s notes and drafted text, drafts you did not select, encrypted answers, full interview transcripts, and imported conversation history. Edits are not treated as agreement.'
+          : 'Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields, and drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits are not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported conversation history are excluded.'}
       </span>
       <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus" autohide={false}>
-        Records draft provenance, revisions, selected status, and changed fields. It excludes encrypted answer text,
-        transcripts, and imported conversation history.{' '}
+        {minimal
+          ? 'Records the AI’s predicted answers and confidence and which ones you changed, not its notes or drafted text.'
+          : 'Records draft provenance, revisions, selected status, and changed fields. It excludes encrypted answer text, transcripts, and imported conversation history.'}{' '}
         <a href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
           How research data is handled
         </a>
@@ -137,7 +141,19 @@ export default function SessionInterviewResearchConsent({
           ) : showProvenance ? (
             <p>Source platform and coverage details will not be included.</p>
           ) : null}
-          {includeComparison ? (
+          {includeComparison && minimal ? (
+            <>
+              <p>
+                {selectedCount} selected {selectedCount === 1 ? 'draft' : 'drafts'}:
+              </p>
+              <ul>
+                <li>The AI’s predicted answers, importance, conviction, and confidence. Drafted text is not kept.</li>
+                <li>{revisionCount} saved prediction versions with model IDs, without drafted text or basis.</li>
+                <li>Which fields changed. Unchanged fields are labeled unchanged, not human agreement.</li>
+              </ul>
+              <p>The AI’s notes, drafted comments, and drafts for questions you skipped are not included.</p>
+            </>
+          ) : includeComparison ? (
             <>
               <p>
                 {selectedCount} selected {selectedCount === 1 ? 'draft' : 'drafts'} and {unselectedCount} unselected{' '}
@@ -164,7 +180,11 @@ export default function SessionInterviewResearchConsent({
               </p>
             </>
           ) : (
-            <p>Predictions, reviewed values, changed fields, and unselected drafts will not be included.</p>
+            <p>
+              {minimal
+                ? 'Predictions and changed fields will not be included.'
+                : 'Predictions, reviewed values, changed fields, and unselected drafts will not be included.'}
+            </p>
           )}
           {includeProvenance || includeComparison ? (
             <p>

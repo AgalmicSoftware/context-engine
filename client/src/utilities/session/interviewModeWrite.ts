@@ -1,9 +1,15 @@
-// Session Workers before 0.7.0 reject interviewMode keys they do not recognize.
-// Leave the research-sharing default out while it is off, which readers treat
-// the same as false, so other interview settings still save to those Workers.
-export const withoutOffResearchSharingDefault = (interviewMode: Record<string, unknown>): Record<string, unknown> => {
-  if (interviewMode.shareDraftChangesByDefault === true) return interviewMode;
+// Session Workers reject interviewMode keys they do not recognize, and these keys
+// are newer than some deployed Workers. Leave each out at its default, which readers
+// treat the same as a missing key, so other interview settings still save to them.
+const NEWER_INTERVIEW_DEFAULTS: Record<string, unknown> = {
+  shareDraftChangesByDefault: false,
+  researchDetail: 'minimal',
+};
+
+export const withoutNewInterviewDefaults = (interviewMode: Record<string, unknown>): Record<string, unknown> => {
   const settings = { ...interviewMode };
-  delete settings.shareDraftChangesByDefault;
+  for (const [key, value] of Object.entries(NEWER_INTERVIEW_DEFAULTS)) {
+    if (settings[key] === value) delete settings[key];
+  }
   return settings;
 };

@@ -1,5 +1,11 @@
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes';
-import { buildSelectedInterviewResearch, buildUnselectedInterviewResearch } from './sessionInterviewResearch';
+import {
+  buildInterviewChangedFields,
+  buildSelectedInterviewResearch,
+  buildUnselectedInterviewResearch,
+  isTextInterviewQuestion,
+  type InterviewResearchTier,
+} from './sessionInterviewResearch';
 import { resolveConsentFlags } from './sessionInterviewConsent';
 import { normalizeRecruitmentSource } from './sessionRecruitmentSource';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
@@ -317,20 +323,49 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       ...(answer.encrypted ? ['answer'] : []),
       ...(researchAdditionalEncrypted ? ['additionalComments'] : []),
     ];
+    // Records without a tier are v1 and keep their original shape.
+    const researchTier: InterviewResearchTier | null =
+      interviewProvenanceRecord.researchTier === 'minimal' || interviewProvenanceRecord.researchTier === 'full'
+        ? interviewProvenanceRecord.researchTier
+        : null;
+    const draftOrigin = ['external_prefill', 'voice_interview', 'typed_context'].includes(
+      String(interviewProvenanceRecord.draftOrigin),
+    )
+      ? String(interviewProvenanceRecord.draftOrigin)
+      : null;
+    const researchOriginal = {
+      ...originalComparisonValues,
+      confidence: hasOwn(originalPrediction, 'confidence') ? originalPrediction.confidence : null,
+      evidence: originalPrediction.evidence || '',
+      revisions: interviewProvenanceRecord.predictionRevisions,
+    };
+    // A saved minimal record keeps no drafted text, so a resubmission can't compare text
+    // fields with the AI's original; it keeps the decision made when the draft was reviewed.
+    const textQuestion = isTextInterviewQuestion(q);
+    const savedChangedFields = Array.isArray(interviewProvenanceRecord.changedFields)
+      ? interviewProvenanceRecord.changedFields.map(String)
+      : null;
+    const textUnknown = (field: (typeof comparisonFields)[number]) =>
+      field === 'additionalComments'
+        ? !hasOwn(originalPrediction, 'additionalComments')
+        : field === 'answer' && textQuestion && originalPrediction.answer === null;
+    const carriedFields = researchTier === 'minimal' && savedChangedFields ? comparisonFields.filter(textUnknown) : [];
+    const computedChangedFields = buildInterviewChangedFields(researchOriginal, submittedComparisonValues);
+    const researchChangedFields = carriedFields.length
+      ? comparisonFields.filter((field) =>
+          carriedFields.includes(field) ? savedChangedFields?.includes(field) : computedChangedFields.includes(field),
+        )
+      : undefined;
     const selectedInterviewResearch = includePredictionComparison
       ? buildSelectedInterviewResearch(
           {
             questionId: q.id,
             ...submittedComparisonValues,
             userEditedFields: interviewProvenanceRecord.userEditedFields,
-            original: {
-              ...originalComparisonValues,
-              confidence: hasOwn(originalPrediction, 'confidence') ? originalPrediction.confidence : null,
-              evidence: originalPrediction.evidence || '',
-              revisions: interviewProvenanceRecord.predictionRevisions,
-            },
+            original: researchOriginal,
           },
           surveyResponseState,
+          { tier: researchTier, textAnswer: textQuestion, changedFields: researchChangedFields },
         )
       : null;
     const safeOriginalPrediction = selectedInterviewResearch
@@ -351,7 +386,8 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       : redactedFields;
     const predictionComparison = includePredictionComparison
       ? {
-          version: 1,
+          version: researchTier === 'minimal' ? 2 : 1,
+          ...(researchTier === 'minimal' ? { researchTier } : {}),
           original: safeOriginalPrediction,
           ...(safePredictionRevisions.length ? { revisions: safePredictionRevisions } : {}),
           submitted: safeFinalSubmitted,
@@ -365,7 +401,9 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       rawInterviewProvenance &&
       typeof rawInterviewProvenance === 'object'
         ? {
-            version: 1,
+            version: includePredictionComparison && researchTier ? 2 : 1,
+            ...(includePredictionComparison && researchTier ? { researchTier } : {}),
+            ...(includePredictionComparison && researchTier && draftOrigin ? { draftOrigin } : {}),
             ...(includeAiProvenance
               ? {
                   source: {
@@ -385,7 +423,9 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
             ...(includePredictionComparison ? { userEditedFields: safeUserEditedFields } : {}),
             ...(includePredictionComparison ? { redactedFields: safeRedactedFields } : {}),
             ...(predictionComparison ? { predictionComparison } : {}),
-            ...(includePredictionComparison && Array.isArray(interviewProvenanceRecord.unselectedDrafts)
+            ...(includePredictionComparison &&
+            researchTier !== 'minimal' &&
+            Array.isArray(interviewProvenanceRecord.unselectedDrafts)
               ? {
                   unselectedPredictions: buildUnselectedInterviewResearch(
                     interviewProvenanceRecord.unselectedDrafts,

@@ -14,7 +14,7 @@ export const FIDELITY_METHOD_VERSION = 'ce-agent-fidelity-v1';
 // (Session Wrapped agents).
 const CONDITIONS = ['shown', 'blind', 'separate'];
 const BINARY_ANSWERS = ['Agree', 'Unsure', 'Disagree'];
-const QUESTION_TYPES = new Set(['binary', 'multichoice', 'rating', 'quadratic', 'freeform']);
+const STRUCTURED_TYPES = new Set(['binary', 'multichoice', 'rating', 'quadratic']);
 const TIMESTAMP_KEYS = ['timestamp', 'timeStamp', 'created_at', 'createdAt', 'submittedAt'];
 const DEFAULTS = Object.freeze({
   bootstrapSamples: 1000,
@@ -65,8 +65,10 @@ const isSingleSelect = (question) =>
 export const normalizeFidelityQuestion = (question) => {
   if (!isRecord(question)) return null;
   const id = lower(question.id ?? question.questionID ?? question.questionId);
-  const type = text(question.type);
-  if (!id || !QUESTION_TYPES.has(type)) return null;
+  if (!id) return null;
+  // Like the interview catalog: every type that isn't structured takes free text.
+  const declared = lower(question.type || question.questionType || 'freeform');
+  const type = STRUCTURED_TYPES.has(declared) ? declared : 'freeform';
   const normalized = { id, type };
   if (type === 'multichoice' || type === 'quadratic') {
     normalized.options = (Array.isArray(question.options) ? question.options : []).map(text).filter(Boolean);
@@ -290,7 +292,7 @@ const latestByKey = (records) => {
  */
 export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {}) => {
   const questionMap = mapQuestions(questions);
-  const skipped = { unknownQuestion: 0, noParticipant: 0, unreadableAnswer: 0, unreadablePrediction: 0 };
+  const skipped = { unknownQuestion: 0, noParticipant: 0, unreadableAnswer: 0, unreadablePrediction: 0, freeformWithoutText: 0 };
   const records = [];
   for (const item of payloads) {
     for (const { entry, payload, row } of entriesOf(item)) {
@@ -320,6 +322,11 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
     const provenance = isRecord(entry.interviewProvenance) ? entry.interviewProvenance : null;
     const original = provenance && (provenance.originalPrediction ?? provenance.predictionComparison?.original);
     if (!isRecord(original)) continue;
+    // Minimal research records keep no drafted text, so freeform predictions arrive empty.
+    if (question.type === 'freeform' && original.answer === null) {
+      skipped.freeformWithoutText += 1;
+      continue;
+    }
     const prediction = normalizeFidelityAnswer(question, original.answer);
     if (prediction === null) {
       skipped.unreadablePrediction += 1;
