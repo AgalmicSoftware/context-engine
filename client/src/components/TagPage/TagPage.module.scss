@@ -214,6 +214,7 @@ $tag-route-accent-alt: var(--ce-compat-indigo);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  gap: 12px;
   position: relative;
   z-index: 2;
 }
@@ -222,7 +223,40 @@ $tag-route-accent-alt: var(--ce-compat-indigo);
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.tagModalSessionControl {
+  min-width: 0;
+  max-width: min(320px, 42vw);
+}
+
+.sessionDropdown {
+  width: 100%;
+  max-width: 320px;
+  min-height: 44px;
+  padding: 8px 28px 8px 12px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-10);
+  background-color: var(--ce-surface-sunken);
+  color: var(--ce-panel-text);
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  text-overflow: ellipsis;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--ce-control-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-panel-text);
+    outline-offset: 2px;
+  }
 }
 
 .tagModalChromeControl {
@@ -259,6 +293,7 @@ $tag-route-accent-alt: var(--ce-compat-indigo);
 }
 
 .tagModalCloseButton {
+  flex-shrink: 0;
   font-size: 1.45rem;
 }
 

@@ -1202,7 +1202,7 @@ The wizard restores custom allowed origins from its tab-scoped draft after reloa
 
 Click a tag in a session’s SBT or worker-group details to open the tag explorer
 without leaving the session. The originating session is preselected; you can
-change it or compare additional tags in the modal. **Open tag page** opens the
+change it using the dropdown in the top-right of the modal, or compare additional tags. **Open tag page** opens the
 full explorer with the selected session included as `?session=<session-slug>`
 (`?session=general` for General). Ctrl/Cmd-click on a tag opens its session-scoped
 link directly.

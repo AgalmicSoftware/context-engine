@@ -94,8 +94,13 @@ async function main() {
     await tagLink.click();
     await page.getByRole('button', { name: 'Close tag explorer', exact: true }).waitFor();
     assert.equal(page.url(), beforeTagUrl);
-    await page.getByTestId('tag-page-session-scope').waitFor();
-    assert.match(await page.getByTestId('tag-page-session-scope').innerText(), /auto-join-smoke/);
+    const tagSessionSelect = page.getByTestId('tag-modal-top-bar').getByTestId('ce-tag-explorer-session-select');
+    assert.equal(await tagSessionSelect.inputValue(), `session:${sessionSlug}`);
+    assert.equal(await page.getByTestId('tag-page-session-scope').count(), 0);
+    await tagSessionSelect.selectOption('session:');
+    assert.equal(await page.getByRole('link', { name: 'Open tag page', exact: true }).getAttribute('href'), '/tag/Research?session=general');
+    await tagSessionSelect.selectOption(`session:${sessionSlug}`);
+    assert.equal(page.url(), beforeTagUrl);
     assert.equal(await page.getByRole('link', { name: 'Open tag page', exact: true }).getAttribute('href'), `/tag/Research?session=${sessionSlug}`);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
     await page.getByRole('link', { name: 'Open tag page', exact: true }).click({ trial: true });
@@ -103,6 +108,10 @@ async function main() {
       const modal = document.querySelector('.modal.show');
       return modal && getComputedStyle(modal).opacity === '1';
     });
+    const selectBox = await tagSessionSelect.boundingBox();
+    const closeBox = await page.getByRole('button', { name: 'Close tag explorer', exact: true }).boundingBox();
+    assert.ok(selectBox.x + selectBox.width <= closeBox.x, 'Session selector sits immediately left of the close control');
+    assert.ok(Math.abs(selectBox.y + selectBox.height / 2 - closeBox.y - closeBox.height / 2) <= 2, 'Session selector stays in the top header row');
     const tagPageLinkBox = await page.getByRole('link', { name: 'Open tag page', exact: true }).boundingBox();
     assert.ok(tagPageLinkBox.y >= 0 && tagPageLinkBox.y + tagPageLinkBox.height <= 844);
     await page.screenshot({ path: path.join(os.tmpdir(), 'ce-session-tag-modal-mobile.png') });

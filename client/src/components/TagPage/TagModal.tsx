@@ -39,6 +39,7 @@ type TagModalProps = {
 type EmbeddedTagPageProps = {
   embedded: boolean;
   initialSessionSlug?: string;
+  sessionSelectorTarget?: HTMLDivElement | null;
   demoCorpusMode?: boolean;
   demoCorpusRecords?: unknown[];
   selectedTagsOverride?: string[];
@@ -166,7 +167,9 @@ const TagModal = ({
       return undefined;
     }
   }, [location.pathname]);
-  const initialSessionSlug = sessionSlug ?? routeSessionSlug;
+  const initialSessionSlug =
+    sessionSlug ?? routeSessionSlug ?? parseQuestionSessionSlugFromSearch(location.search) ?? undefined;
+  const [sessionSelectorTarget, setSessionSelectorTarget] = useState<HTMLDivElement | null>(null);
   const reduxContext = useContext(ReactReduxContext);
   const sessionState = reduxContext?.store?.getState?.()?.sessionState;
   const normalizedActiveTag = String(activeTag || '').trim();
@@ -270,6 +273,7 @@ const TagModal = ({
       <div data-testid="tag-modal-top-bar" className={styles.tagModalHeaderBar}>
         <span>Tag explorer</span>
         <div className={styles.tagModalHeaderActions}>
+          {!demoCorpusMode && <div ref={setSessionSelectorTarget} className={styles.tagModalSessionControl} />}
           {demoCorpusMode ? (
             <div className={styles.tagModalChromeControl}>
               <button
@@ -313,6 +317,7 @@ const TagModal = ({
               key={initialSessionSlug}
               embedded={true}
               initialSessionSlug={initialSessionSlug}
+              sessionSelectorTarget={sessionSelectorTarget}
               demoCorpusMode={demoCorpusMode}
               demoCorpusRecords={demoCorpusRecords}
               selectedTagsOverride={selectedTags}

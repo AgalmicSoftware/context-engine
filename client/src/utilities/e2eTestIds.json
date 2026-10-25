@@ -370,6 +370,7 @@
   "SBT_SELECTOR_SELECTED": "ce-sbt-selector-selected",
   "SBT_SELECTOR_LOADING": "ce-sbt-selector-loading",
   "SBT_SELECTOR_LOADING_STATUS": "ce-sbt-selector-loading-status",
+  "TAG_EXPLORER_SESSION_SELECT": "ce-tag-explorer-session-select",
   "WORKER_GROUPS_SESSION_SELECT": "ce-worker-groups-session-select",
   "SBTS_CREATE_TOGGLE": "ce-sbts-create-toggle",
   "SBT_CREATE_NAME_INPUT": "ce-sbt-create-name-input",

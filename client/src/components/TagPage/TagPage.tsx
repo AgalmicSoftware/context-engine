@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { connect } from 'react-redux';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCog, faExternalLinkAlt, faPlus } from '@fortawesome/free-solid-svg-icons';
@@ -164,6 +165,7 @@ type TagPageViewProps = {
   emptyQuestionsText?: string;
   embedded?: boolean;
   initialSessionSlug?: string;
+  sessionSelectorTarget?: HTMLDivElement | null;
   demoCorpusMode?: boolean;
   demoCorpusRecords?: DemoCorpusEntry[];
   hideEmbeddedSessionSelector?: boolean;
@@ -374,6 +376,7 @@ const buildTagPageSessionSelectorOptions = ({
   };
 
   if (selectedSlug !== null) pushOption(selectedSlug);
+  pushOption('');
   pushOption(primarySlug);
   scopedSlugs.forEach(pushOption);
   registrySlugs.forEach(pushOption);
@@ -745,6 +748,7 @@ export const TagPageView = ({
   emptyQuestionsText = 'No questions found.',
   embedded = false,
   initialSessionSlug,
+  sessionSelectorTarget,
   demoCorpusMode = false,
   demoCorpusRecords = [],
   hideEmbeddedSessionSelector = false,
@@ -861,10 +865,11 @@ export const TagPageView = ({
     () =>
       dedupeSessionSlugs([
         globalSessionSelection.primarySessionSlug || '',
+        initialSessionSlug ?? '',
         ...effectiveScopeSlugs,
         selectedSessionSelectorSlug || '',
       ]),
-    [effectiveScopeSlugs, globalSessionSelection.primarySessionSlug, selectedSessionSelectorSlug],
+    [effectiveScopeSlugs, globalSessionSelection.primarySessionSlug, initialSessionSlug, selectedSessionSelectorSlug],
   );
   const registryChainId = network?.chainId ?? network?.id ?? null;
   const { snapshotQuery: sessionRegistrySnapshotQuery } = useSessionRegistryReads({
@@ -910,13 +915,17 @@ export const TagPageView = ({
             selectedSlug: selectedSessionSelectorSlug,
             primarySlug: globalSessionSelection.primarySessionSlug || '',
             scopedSlugs: effectiveScopeSlugs,
-            registrySlugs: sessionRegistrySnapshot.slugs,
+            registrySlugs:
+              initialSessionSlug === undefined
+                ? sessionRegistrySnapshot.slugs
+                : [...sessionRegistrySnapshot.slugs, initialSessionSlug],
             sessionConfigsBySlug: sessionRegistrySnapshot.configsBySlug,
           }),
     [
       effectiveScopeSlugs,
       globalSessionSelection.primarySessionSlug,
       isDemoCorpusContext,
+      initialSessionSlug,
       selectedSessionSelectorSlug,
       sessionRegistrySnapshot.configsBySlug,
       sessionRegistrySnapshot.slugs,
@@ -1216,6 +1225,28 @@ export const TagPageView = ({
     }));
   };
 
+  const embeddedSessionSelector = (
+    <select
+      className={styles.sessionDropdown}
+      aria-label="Tag explorer session"
+      data-testid={E2E_TESTIDS.TAG_EXPLORER_SESSION_SELECT}
+      value={hasSingleSessionScope ? `session:${effectiveSingleScopeSlug}` : 'global'}
+      title={scopeSummary.title}
+      onChange={(event) => {
+        const value = event.target.value;
+        if (value === 'global') resetSessionSelection();
+        else handleSessionSelect(value.slice('session:'.length));
+      }}
+    >
+      <option value="global">Global default</option>
+      {sessionSelectorOptions.map((option) => (
+        <option key={option.key} value={`session:${option.slug}`}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+
   return (
     <div className={[styles.page, embedded ? styles.pageEmbedded : ''].filter(Boolean).join(' ')}>
       <div className={[styles.shell, embedded ? styles.shellEmbedded : ''].filter(Boolean).join(' ')}>
@@ -1235,7 +1266,13 @@ export const TagPageView = ({
                 </h1>
               )}
             </div>
-            {!embedded || !hideEmbeddedSessionSelector ? (
+            {embedded && !isDemoCorpusContext && !hideEmbeddedSessionSelector ? (
+              sessionSelectorTarget ? (
+                createPortal(embeddedSessionSelector, sessionSelectorTarget)
+              ) : (
+                <div className={styles.headerMeta}>{embeddedSessionSelector}</div>
+              )
+            ) : !embedded || !hideEmbeddedSessionSelector ? (
               <div className={[styles.headerMeta, embedded ? styles.headerMetaEmbedded : ''].filter(Boolean).join(' ')}>
                 <div className={styles.scopeMeta}>
                   {!isDemoCorpusContext ? (
