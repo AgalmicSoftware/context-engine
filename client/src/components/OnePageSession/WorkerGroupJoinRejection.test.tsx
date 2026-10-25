@@ -135,7 +135,7 @@ it('G5 rejected sign-in, then the error notice Retry: is the earlier Join still 
   expect(joinWorkerGroup).not.toHaveBeenCalled();
 });
 
-it('G6 session panel: Join -> rejected sign-in -> account B -> back to A auto-signs in and joins without a click', async () => {
+it('G6 session panel: Join -> rejected sign-in -> account B -> back to A auto-signs in without replaying the Join', async () => {
   // Auth on render for A is rejected, so A sees "Sign in to join".
   jest
     .mocked(getWorkerSessionToken)
@@ -160,7 +160,9 @@ it('G6 session panel: Join -> rejected sign-in -> account B -> back to A auto-si
   await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(3), MOUNT_TIMEOUT);
   view.rerender(<WorkerSessionGroupsPanel {...props} account={A} />);
   await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(4), MOUNT_TIMEOUT);
-  // Leave time for any join the restored sign-in would start.
-  await tick(120);
+  // A is signed in again: wait for the panel to settle on its plain Join control
+  // before checking that the rejected Join was not replayed.
+  expect(await screen.findByRole('button', { name: 'Join Community' }, MOUNT_TIMEOUT)).toBeInTheDocument();
+  await tick(50);
   expect(joinWorkerGroup).not.toHaveBeenCalled();
 });
