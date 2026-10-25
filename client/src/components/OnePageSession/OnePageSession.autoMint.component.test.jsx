@@ -13,6 +13,7 @@ import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
+import * as workerAuth from '../../utilities/worker/workerAuth.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { SBT_GROUP_PASSWORD_MISMATCH_MESSAGE } from '../SBTs/sbtClaimUrlSafety';
@@ -208,6 +209,13 @@ describe('OnePageSession auto-mint queue', () => {
 
   const getAutoMintStorageKey = (account, sbtAddress, chainId = 84532) =>
     `autoMint:${String(account || '').toLowerCase()}:${chainId}:${String(sbtAddress || '').toLowerCase()}`;
+
+  it('notes an access change after a confirmed mint so earlier Worker tokens can gain its scopes', () => {
+    const accessChanged = jest.spyOn(workerAuth, 'noteWorkerAccessChanged');
+    const subject = createSubject({ account: '0x00000000000000000000000000000000000000b2', loginComplete: true });
+    subject.onSbtMintSuccess('0x00000000000000000000000000000000000000b1');
+    expect(accessChanged).toHaveBeenCalledTimes(1);
+  });
 
   it('uses getNativeBalance for auto-mint balance checks', async () => {
     const subject = createSubject({

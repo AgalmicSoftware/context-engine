@@ -133,3 +133,8 @@ export const shouldRetryAuthenticatedResponse = async (response?: WorkerAuthText
   if (!errorMessage) return false;
   return AUTHENTICATED_RETRY_DENIAL_PATTERNS.some((pattern) => pattern.test(errorMessage));
 };
+
+// Tokens carry the scopes granted at sign-in, so this denial is final only for
+// a token issued after access last changed; the caller decides which applies.
+export const isTokenScopeDenialResponse = async (response?: WorkerAuthTextResponse | null): Promise<boolean> =>
+  Number(response?.status || 0) === 403 && /token missing .* scope/i.test(await readResponseErrorMessage(response));

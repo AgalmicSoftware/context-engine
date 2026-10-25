@@ -13,7 +13,7 @@ import {
 import { sbtAdminOpsPort } from '../../domains/sbts/sbtAdminOpsPort.js';
 import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAuthorizationPort.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
-import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
+import { noteWorkerAccessChanged, sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
 import { sbtOwnershipReadsPort } from '../../domains/sbts/sbtOwnershipReadsPort.js';
 import { getChainBlockTimeMs } from '../../variables/chains.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
@@ -1173,6 +1173,9 @@ class SBTPage extends Component<any, any> {
     txHash?: unknown;
   } = {}): Promise<void> => {
     const txHashString = String(txHash || '');
+    // The SBT can satisfy a gate that an earlier Worker token was issued without,
+    // even when no session page is listening for the success event below.
+    noteWorkerAccessChanged();
     const isCurrentTarget = () =>
       this.isMintTargetContextCurrent({
         accountLower,

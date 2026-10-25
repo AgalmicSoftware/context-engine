@@ -1,6 +1,7 @@
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
+import { noteWorkerAccessChanged } from '../../utilities/worker/workerAuth.js';
 export { getWorkerSessionToken } from '../../utilities/worker/workerAuth.js';
 
 type UnknownRecord = Record<string, unknown>;
@@ -648,6 +649,8 @@ export const joinWorkerGroup = async ({
     // field on success. Validate it strictly whenever a Worker does provide it.
     const hasMemberCount = Object.prototype.hasOwnProperty.call(payload, 'memberCount');
     const memberCount = hasMemberCount ? normalizeWorkerGroupMemberCount(payload.memberCount) : undefined;
+    // Membership can satisfy a group gate that an earlier Worker token was issued without.
+    noteWorkerAccessChanged();
     return {
       ...payload,
       group: memberCount === undefined ? group : { ...group, memberCount },

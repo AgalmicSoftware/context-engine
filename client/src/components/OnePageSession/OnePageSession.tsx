@@ -17,7 +17,7 @@ import { getAllSessionSlugs } from '../../domains/sessions/sessionConfig.js';
 import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAuthorizationPort.js';
 import { isKnownOpenSbt, resolveSbtGroupPasswordFailureMessage } from '../SBTs/sbtClaimUrlSafety';
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
-import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
+import { noteWorkerAccessChanged, sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils';
 import { captureSessionRecruitmentSource } from '../SurveyTool/sessionRecruitmentSource';
@@ -1058,6 +1058,8 @@ class OnePageSession extends Component<any, any> {
     const successfulSbtKey = String(successfulSbtAddress || '')
       .trim()
       .toLowerCase();
+    // The SBT can satisfy a gate that an earlier Worker token was issued without.
+    noteWorkerAccessChanged();
 
     // Auto-close login modal and surface success state
     if (typeof this.props.toggleLoginModal === 'function') {

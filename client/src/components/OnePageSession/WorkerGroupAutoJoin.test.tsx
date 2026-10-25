@@ -11,7 +11,10 @@ jest.mock('../../utilities/session/sessionWorkerDiscovery', () => ({
 }));
 const bootstrap = jest.mocked(fetchWorkerCanonicalSessionBootstrap);
 
-jest.mock('../../utilities/worker/workerAuth', () => ({ getWorkerSessionToken: jest.fn() }));
+jest.mock('../../utilities/worker/workerAuth', () => ({
+  getWorkerSessionToken: jest.fn(),
+  noteWorkerAccessChanged: jest.fn(),
+}));
 const getToken = jest.mocked(getWorkerSessionToken);
 const sessionId = '0x11111111111111111111111111111111';
 const account = '0x0000000000000000000000000000000000000001';

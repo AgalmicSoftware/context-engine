@@ -8,6 +8,7 @@ import {
   getWorkerAuthHeaders,
   getWorkerSessionToken,
   normalizeWorkerUrl,
+  noteWorkerAccessChanged,
 } from './workerAuth.js';
 import { getCorsProxyUrlOrThrow } from './corsProxy.js';
 import {
@@ -1569,6 +1570,120 @@ describe('workerAuth fetchWorkerWithAuth', () => {
       'token-1',
     );
     expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  describe('scope denials after access changes', () => {
+    const context = { account: TEST_ADDRESS, providerLike: 'wagmi', chainId: 84532 };
+    const transcribe = () =>
+      fetchWorkerWithAuth(
+        'https://worker.example/transcribe',
+        { method: 'POST' },
+        { preferAnonymous: true, sessionSlug: 'alpha', context },
+      );
+    // The Worker evaluates gates at sign-in, so each token carries the scopes held then.
+    const gatedTranscriptionWorker = ({ holdsGate, afterSignIn = () => {} }) => {
+      const logins = [];
+      global.fetch = jest.fn(async (url, options = {}) => {
+        if (url.endsWith('/auth/nonce')) return jsonResp(200, { nonce: `nonce-${logins.length + 1}` });
+        if (url.endsWith('/auth/login')) {
+          const token = `token-${logins.length + 1}-${holdsGate() ? 'scoped' : 'unscoped'}`;
+          logins.push(token);
+          afterSignIn(logins.length);
+          return jsonResp(200, { token, exp: Math.floor(Date.now() / 1000) + 3600 });
+        }
+        const authorization = new Headers(options.headers).get('Authorization') || '';
+        if (!authorization) {
+          return jsonResp(403, { error: 'Anonymous access denied: gated route requires authenticated worker token.' });
+        }
+        return authorization.endsWith('-scoped')
+          ? jsonResp(200, { text: 'ok' })
+          : jsonResp(403, { error: 'Token missing transcribe scope.' });
+      });
+      return logins;
+    };
+
+    it('signs in once more after an in-app access change grants the scope', async () => {
+      let holds = false;
+      const logins = gatedTranscriptionWorker({ holdsGate: () => holds });
+      expect((await transcribe()).status).toBe(403);
+      expect((await transcribe()).status).toBe(403);
+      expect(logins).toEqual(['token-1-unscoped']);
+
+      holds = true; // e.g. the participant claims the session's gate SBT
+      noteWorkerAccessChanged();
+      expect((await transcribe()).status).toBe(200);
+      expect((await transcribe()).status).toBe(200);
+      expect(logins).toEqual(['token-1-unscoped', 'token-2-scoped']);
+    });
+
+    it('asks a still-ineligible participant for one signature once a change settles, not one per attempt', async () => {
+      const logins = gatedTranscriptionWorker({ holdsGate: () => false });
+      expect((await transcribe()).status).toBe(403);
+      noteWorkerAccessChanged(); // e.g. a group join that this gate does not use
+      const settled = Date.now() + 31 * 1000;
+      const clock = jest.spyOn(Date, 'now').mockImplementation(() => settled);
+      try {
+        expect((await transcribe()).status).toBe(403);
+        expect((await transcribe()).status).toBe(403);
+      } finally {
+        clock.mockRestore();
+      }
+      expect(logins).toEqual(['token-1-unscoped', 'token-2-unscoped']);
+    });
+
+    it('signs in again while the Worker may still trail a just-confirmed mint', async () => {
+      let workerSeesGate = false;
+      const logins = gatedTranscriptionWorker({ holdsGate: () => workerSeesGate });
+      expect((await transcribe()).status).toBe(403);
+      noteWorkerAccessChanged(); // the wallet's RPC confirmed the mint; the Worker's has not caught up
+      expect((await transcribe()).status).toBe(403);
+      workerSeesGate = true;
+      expect((await transcribe()).status).toBe(200);
+      expect(logins).toEqual(['token-1-unscoped', 'token-2-unscoped', 'token-3-scoped']);
+    });
+
+    it('lets concurrent requests share one fresh sign-in after an access change', async () => {
+      let holds = false;
+      const logins = gatedTranscriptionWorker({ holdsGate: () => holds });
+      expect((await transcribe()).status).toBe(403);
+      holds = true;
+      noteWorkerAccessChanged();
+      // Deliver the second stale-token denial only after the first request has signed in again.
+      const workerFetch = global.fetch;
+      let releaseHeldDenial;
+      const firstRetrySent = new Promise((resolve) => {
+        releaseHeldDenial = resolve;
+      });
+      let staleDenials = 0;
+      global.fetch = jest.fn(async (url, options = {}) => {
+        const response = await workerFetch(url, options);
+        const authorization = new Headers(options.headers).get('Authorization') || '';
+        if (url.endsWith('/transcribe') && authorization.endsWith('-scoped')) releaseHeldDenial();
+        if (url.endsWith('/transcribe') && authorization.endsWith('token-1-unscoped')) {
+          staleDenials += 1;
+          if (staleDenials === 2) await firstRetrySent;
+        }
+        return response;
+      });
+      const statuses = (await Promise.all([transcribe(), transcribe()])).map((response) => response.status);
+      expect(statuses).toEqual([200, 200]);
+      expect(logins).toEqual(['token-1-unscoped', 'token-2-scoped']);
+    });
+
+    it('does not treat a token whose sign-in overlapped an access change as current', async () => {
+      let holds = false;
+      const logins = gatedTranscriptionWorker({
+        holdsGate: () => holds,
+        afterSignIn: (count) => {
+          if (count !== 1) return;
+          // The claim confirms after the Worker issued this token's scopes.
+          holds = true;
+          noteWorkerAccessChanged();
+        },
+      });
+      expect((await transcribe()).status).toBe(200);
+      expect(logins).toEqual(['token-1-unscoped', 'token-2-scoped']);
+    });
   });
 
   it('clears the active token cache entry and aborts auth retry when the store account switches', async () => {

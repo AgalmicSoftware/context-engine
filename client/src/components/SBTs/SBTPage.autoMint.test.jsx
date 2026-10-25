@@ -2,6 +2,7 @@ import SBTPage from './SBTPage';
 import contractScripts from '../../utilities/web3/chainGateway.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { buildSbtPageAutoMintStorageKey } from './sbtPageAutoMintHelpers';
+import * as workerAuth from '../../utilities/worker/workerAuth.js';
 
 const createSubject = (props = {}) => {
   const subject = new SBTPage({
@@ -27,6 +28,18 @@ describe('SBTPage auto-mint routing', () => {
     jest.restoreAllMocks();
     localStorage.clear();
     window.sessionStorage.clear();
+  });
+
+  it('notes an access change as soon as a mint completes, before the SBT details reload', () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000115';
+    const accountLower = '0x0000000000000000000000000000000000000abc';
+    const accessChanged = jest.spyOn(workerAuth, 'noteWorkerAccessChanged');
+    const subject = createSubject({ SBTAddress: sbtAddress, account: accountLower });
+    subject.isMintTargetContextCurrent = jest.fn(() => true);
+    subject.loadSBTInfo = jest.fn(() => new Promise(() => {})); // a slow reload that has not finished
+    void subject.completeMintSuccessForTarget({ accountLower, chainId: 84532, sbtAddress });
+    expect(subject.loadSBTInfo).toHaveBeenCalled();
+    expect(accessChanged).toHaveBeenCalledTimes(1);
   });
 
   it('never derives a fresh slot from a reusable secret at claim time', async () => {
