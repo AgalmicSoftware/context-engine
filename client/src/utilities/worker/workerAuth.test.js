@@ -1670,6 +1670,15 @@ describe('workerAuth fetchWorkerWithAuth', () => {
       expect(logins).toEqual(['token-1-unscoped', 'token-2-scoped']);
     });
 
+    it('trusts new tokens at once after a sign-out clears earlier access changes', async () => {
+      const logins = gatedTranscriptionWorker({ holdsGate: () => false });
+      noteWorkerAccessChanged(); // a change noted for the previous sign-in
+      clearAllWorkerSessionTokens(); // sign-out or account switch
+      expect((await transcribe()).status).toBe(403);
+      expect((await transcribe()).status).toBe(403);
+      expect(logins).toEqual(['token-1-unscoped']);
+    });
+
     it('treats an access change noted in another tab as a change here', async () => {
       const channels = [];
       class FakeBroadcastChannel {
