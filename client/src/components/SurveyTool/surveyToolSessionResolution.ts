@@ -1,4 +1,4 @@
-import { resolveWorkerCanonicalCacheIdentity } from '../../utilities/survey/workerCanonicalCacheIdentity';
+import { resolveWorkerCanonicalSessionKey } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { resolveCanonicalSessionConfig } from '../../utilities/session/canonicalSessionContext.js';
 import {
   claimsWorkerCanonicalAuthority,
@@ -422,14 +422,14 @@ export const resolveSurveyToolDraftStorageContext = ({
     resolveBySlug,
   });
   if (!claimsWorkerCanonicalAuthority(context.sessionConfig)) return context;
-  // A slug can move between Workers or session IDs. Reuse the saved-answer
-  // identity, excluding config revisions, and reject incomplete Worker targets.
+  // A slug can move between Workers or session IDs. Key drafts by the exact
+  // Worker session, excluding config revisions, and reject incomplete targets.
   return {
     ...context,
-    draftAuthorityKey: resolveWorkerCanonicalCacheIdentity({
+    draftAuthorityKey: resolveWorkerCanonicalSessionKey({
       sessionConfig: context.sessionConfig,
       sessionSlug: context.sessionSlug,
-    }).key,
+    }),
   };
 };
 

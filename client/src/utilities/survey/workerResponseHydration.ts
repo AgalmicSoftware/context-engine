@@ -61,6 +61,7 @@ export const loadWorkerResponses = async (
     sessionConfig,
     cachedStorageRefIds,
     onPartial,
+    onListed,
     ownResponses = false,
     signal,
   }: {
@@ -70,6 +71,8 @@ export const loadWorkerResponses = async (
     sessionConfig: UnknownRecord;
     cachedStorageRefIds?: ReadonlySet<string>;
     onPartial?: () => void;
+    // Receives every listed storage ref, read or reused, once the listing is complete.
+    onListed?: (storageRefIds: ReadonlySet<string>) => void;
     ownResponses?: boolean;
     signal?: AbortSignal;
   },
@@ -102,7 +105,12 @@ export const loadWorkerResponses = async (
       limit: 100,
     });
     items.push(...(Array.isArray(page.items) ? page.items.filter(isRecord) : []));
-    if (page.listComplete) break;
+    if (page.listComplete) {
+      onListed?.(
+        new Set(items.map((item) => readString(isRecord(item.storageRef) ? item.storageRef.id : '')).filter(Boolean)),
+      );
+      break;
+    }
     const nextCursor = readString(page.cursor);
     if (!nextCursor || seenCursors.has(nextCursor)) {
       throw new Error('Worker response storage pagination returned an invalid cursor.');
@@ -196,11 +204,31 @@ const createWorkerQuestionCacheNode = (): UnknownRecord => ({
   workerResponseStorageRefs: {},
 });
 
+// Refs a previous listing returned that this reader's complete listing no longer
+// returns, such as answers whose access was revoked. Answers saved since the
+// last listing have refs no listing returned yet, so they are never stale.
+const dropStaleResponses = (
+  byQuestion: UnknownRecord,
+  staleRefIds: ReadonlySet<string>,
+  readRefId: (questionId: string, responder: string) => string,
+): UnknownRecord =>
+  Object.fromEntries(
+    Object.entries(byQuestion).map(([questionId, byResponder]) => [
+      questionId,
+      isRecord(byResponder)
+        ? Object.fromEntries(
+            Object.entries(byResponder).filter(([responder]) => !staleRefIds.has(readRefId(questionId, responder))),
+          )
+        : byResponder,
+    ]),
+  );
+
 export const mergeWorkerQuestionResponses = (
   current: unknown,
   rows: WorkerCanonicalResponseRow[],
   slug: string,
   identity: WorkerCanonicalCacheIdentity,
+  staleRefIds?: ReadonlySet<string>,
 ): UnknownRecord => {
   const next = isRecord(current) ? { ...current } : {};
   const cachedNetwork = isRecord(next[WORKER_CANONICAL_CACHE_SCOPE_KEY])
@@ -218,9 +246,21 @@ export const mergeWorkerQuestionResponses = (
   }
   network.workerResponseCacheVersion = WORKER_RESPONSE_CACHE_VERSION;
   const questions = isRecord(network.questions) ? { ...network.questions } : {};
-  const responses = isRecord(network.questionResponses) ? { ...network.questionResponses } : {};
-  const responseMeta = isRecord(network.questionResponsesMeta) ? { ...network.questionResponsesMeta } : {};
+  let responses = isRecord(network.questionResponses) ? { ...network.questionResponses } : {};
+  let responseMeta = isRecord(network.questionResponsesMeta) ? { ...network.questionResponsesMeta } : {};
   const seenRefs = isRecord(network.workerResponseStorageRefs) ? { ...network.workerResponseStorageRefs } : {};
+  if (staleRefIds?.size) {
+    const meta = responseMeta;
+    const refOf = (questionId: string, responder: string): string => {
+      const byResponder = meta[questionId];
+      return isRecord(byResponder) && isRecord(byResponder[responder])
+        ? readString(byResponder[responder].storageRefId)
+        : '';
+    };
+    responses = dropStaleResponses(responses, staleRefIds, refOf);
+    responseMeta = dropStaleResponses(meta, staleRefIds, refOf);
+    staleRefIds.forEach((refId) => delete seenRefs[refId]);
+  }
 
   rows.forEach((row) => {
     const storageRefId = readString(row.storageRefId);
@@ -283,6 +323,7 @@ export const mergeWorkerUserResponses = (
   current: unknown,
   rows: WorkerCanonicalResponseRow[],
   identity: WorkerCanonicalCacheIdentity,
+  staleRefIds?: ReadonlySet<string>,
 ): UnknownRecord => {
   const source = isRecord(current) ? current : {};
   const next: UnknownRecord = {};
@@ -299,6 +340,22 @@ export const mergeWorkerUserResponses = (
       delete byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY];
     }
     const worker = byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY];
+    if (
+      staleRefIds?.size &&
+      isRecord(worker) &&
+      isRecord(worker.data) &&
+      Array.isArray(worker.data.questionResponses)
+    ) {
+      byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY] = {
+        ...worker,
+        data: {
+          ...worker.data,
+          questionResponses: (worker.data.questionResponses as UnknownRecord[]).filter(
+            (entry) => !staleRefIds.has(readString(entry?.storageRefId)),
+          ),
+        },
+      };
+    }
     if (isRecord(worker) && worker.workerResponseCacheVersion !== WORKER_RESPONSE_CACHE_VERSION) {
       byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY] = {
         ...worker,

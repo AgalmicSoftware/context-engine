@@ -173,7 +173,7 @@ const syncWorkerMetadata = async (store) => {
   await hydrateWorkerCanonicalSurveyCache({ ...common, persist: persistTo('surveysCache'), onSuccess: () => {} });
 };
 const syncWorkerResponses = async (store) => {
-  const run = resolveWorkerResponseHydrationRun({ sessionConfig: SESSION_CONFIG, sessionSlug: SLUG });
+  const run = resolveWorkerResponseHydrationRun({ sessionConfig: SESSION_CONFIG, sessionSlug: SLUG, reader: OWNER });
   await hydrateWorkerCanonicalResponses({
     sessionSlug: SLUG,
     sessionConfig: SESSION_CONFIG,

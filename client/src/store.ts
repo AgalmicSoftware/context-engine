@@ -5,6 +5,7 @@ import thunk from 'redux-thunk';
 import rootReducer from './reducers';
 import type { RootState } from './reducers';
 import { composeWithOptionalDevTools } from './utilities/state/composeEnhancers.js';
+import { setWorkerCanonicalCacheReader } from './utilities/survey/workerCanonicalCacheReader';
 // import storage from 'redux-persist/lib/storage';
 
 // const persistConfig = {
@@ -26,5 +27,11 @@ const store = createStore(
     // window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__()
   ),
 );
+
+// Worker cache identities are reader-scoped; switch the reader at dispatch,
+// before any component renders for the new account.
+const syncWorkerCacheReader = () => setWorkerCanonicalCacheReader(store.getState().profile?.account);
+syncWorkerCacheReader();
+store.subscribe(syncWorkerCacheReader);
 
 export default store;

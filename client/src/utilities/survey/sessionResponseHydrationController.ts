@@ -571,6 +571,7 @@ export const createSessionResponseHydrationController = (
       const workerRun = resolveWorkerResponseHydrationRun({
         sessionConfig: getSessionCfg(slug),
         sessionSlug: slug,
+        reader: getAccount(),
       });
       return !!_responseInitInFlight?.[workerRun?.key || slug];
     } catch {
@@ -601,7 +602,7 @@ export const createSessionResponseHydrationController = (
     const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
     const notifyOnCompletion = !!(opts && opts.notifyOnCompletion === true);
     const sessionConfig = getSessionCfg(slug);
-    const workerRun = resolveWorkerResponseHydrationRun({ sessionConfig, sessionSlug: slug });
+    const workerRun = resolveWorkerResponseHydrationRun({ sessionConfig, sessionSlug: slug, reader: getAccount() });
     const initRunKey = workerRun?.key || slug;
     const rerunOpts: ResponseInitOptions = {
       ...(opts && typeof opts === 'object' ? opts : {}),
@@ -691,6 +692,7 @@ export const createSessionResponseHydrationController = (
             const currentRun = resolveWorkerResponseHydrationRun({
               sessionConfig: getSessionCfg(slug),
               sessionSlug: slug,
+              reader: getAccount(),
             });
             if (
               _destroyed ||
@@ -1581,7 +1583,9 @@ export const createSessionResponseHydrationController = (
     opts: RefreshQuestionResponsesOptions = {},
   ): Promise<void> => {
     const slug = normalizeSessionSlug((opts?.slug ?? getActiveSessionSlug()) || '');
-    if (resolveWorkerResponseHydrationRun({ sessionConfig: getSessionCfg(slug), sessionSlug: slug })) {
+    if (
+      resolveWorkerResponseHydrationRun({ sessionConfig: getSessionCfg(slug), sessionSlug: slug, reader: getAccount() })
+    ) {
       // Worker refreshes update responses only; there is no chain question scan to restart.
       await fetchQuestionResponsesChunkedForGroup(slug);
       return;

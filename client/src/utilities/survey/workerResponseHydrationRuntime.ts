@@ -17,6 +17,7 @@ export type WorkerResponseHydrationLoader = (options: {
   sessionConfig: CacheRecord;
   cachedStorageRefIds?: ReadonlySet<string>;
   onPartial?: () => void;
+  onListed?: (storageRefIds: ReadonlySet<string>) => void;
 }) => Promise<WorkerCanonicalResponseRow[]>;
 
 export type WorkerResponseHydrationRun = {
@@ -43,13 +44,19 @@ type WorkerResponseHydrationOptions = {
 export const resolveWorkerResponseHydrationRun = ({
   sessionConfig,
   sessionSlug,
+  reader,
 }: {
   sessionConfig: unknown;
   sessionSlug: string;
+  reader?: unknown;
 }): WorkerResponseHydrationRun | null => {
   const projection = resolveSessionCapabilityProjection(sessionConfig);
   if (!projection.profileValid || !projection.isWorkerCanonical) return null;
-  const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug });
+  const identity = resolveWorkerCanonicalCacheIdentity({
+    sessionConfig,
+    sessionSlug,
+    ...(reader === undefined ? {} : { reader }),
+  });
   return {
     identity,
     key: buildWorkerCanonicalCacheRunKey(identity),
@@ -71,11 +78,13 @@ export const hydrateWorkerCanonicalResponses = async ({
   updateUserCacheAtomic,
   createPersistenceError,
 }: WorkerResponseHydrationOptions): Promise<void> => {
+  // The listing is authorized as getAccount(), so its rows belong to that reader.
   const targetIsCurrent = (): boolean =>
     workerCanonicalSessionTargetMatches({
       expected: run.identity,
       sessionConfig: getCurrentSessionConfig(),
       sessionSlug,
+      reader: getAccount(),
     });
   const shouldStop = (): boolean => shouldAbort() || !targetIsCurrent();
 
@@ -121,6 +130,7 @@ export const hydrateWorkerCanonicalResponses = async ({
   if (shouldStop()) return;
 
   let partial = false;
+  let listedStorageRefIds = null as ReadonlySet<string> | null;
   const rows = await loadRows({
     account: getAccount(),
     providerLike: getProviderLike(),
@@ -130,12 +140,18 @@ export const hydrateWorkerCanonicalResponses = async ({
     onPartial: () => {
       partial = true;
     },
+    onListed: (storageRefIds) => {
+      listedStorageRefIds = storageRefIds;
+    },
   });
   if (shouldStop()) return;
+  // A complete listing is authoritative for this reader.
+  const listed = listedStorageRefIds;
+  const staleRefIds = listed ? new Set([...cachedStorageRefIds].filter((refId) => !listed.has(refId))) : undefined;
 
   const questionsPersisted = await updateQuestionsCacheAtomic((current) => {
     if (!targetIsCurrent()) return current || {};
-    const merged = workerHydration.mergeWorkerQuestionResponses(current, rows, sessionSlug, run.identity);
+    const merged = workerHydration.mergeWorkerQuestionResponses(current, rows, sessionSlug, run.identity, staleRefIds);
     // A capped listing is a settled snapshot, not a complete history. Reports
     // may display its new rows while missing-answer checks still remain unready.
     (merged.worker as CacheRecord).workerResponseHydrationStatus = partial ? 'partial' : 'complete';
@@ -147,7 +163,9 @@ export const hydrateWorkerCanonicalResponses = async ({
   if (shouldStop()) return;
 
   const usersPersisted = await updateUserCacheAtomic((current) =>
-    targetIsCurrent() ? workerHydration.mergeWorkerUserResponses(current, rows, run.identity) : current || {},
+    targetIsCurrent()
+      ? workerHydration.mergeWorkerUserResponses(current, rows, run.identity, staleRefIds)
+      : current || {},
   );
   if (!usersPersisted) {
     throw createPersistenceError(`Failed to persist Worker user cache for ${sessionSlug}`);
