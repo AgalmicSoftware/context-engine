@@ -655,6 +655,7 @@ export class SessionWriteCoordinator {
       job,
       deps: {
         now: this.now,
+        getSessionConfig: async () => (await this.readCurrentSessionConfig(job.slug)).config,
         readCoordinatedResultsAnalysisStatus: async () => ({ ok: true, state: await this.readResultsAnalysisStatus() }),
         reserveCoordinatedResultsAnalysis: async ({ reservation } = {}) => this.reserveResultsAnalysis(reservation || {}),
         finalizeCoordinatedResultsAnalysis: async ({ finalization } = {}) => this.finalizeResultsAnalysis(finalization || {}),
@@ -1777,36 +1778,38 @@ export class SessionWriteCoordinator {
     return authority;
   }
 
+  // The config HTTP routes enforce, also read in-process by work that already
+  // runs here: refetching this Durable Object from itself would queue behind it.
+  async readCurrentSessionConfig(slug) {
+    // Reads may pass a long visibility scan, but never pending config/Lit
+    // projection repair. The transaction observes both journals together.
+    const current = await this.state.storage.transaction(async (transaction) => {
+      const authority = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
+      if (!authority || authority.projectionPending === true || await hasPendingLitAuthorizationSetup(transaction)) return null;
+      if (authority.slug !== slug || !Number.isSafeInteger(authority.revision) || authority.revision < 1 ||
+        !normalizePublicSessionConfig(authority.config, slug)) throw new Error('Invalid authoritative session config.');
+      return authority;
+    });
+    if (current) return { config: current.config, revision: current.revision };
+    return this.serializeSessionConfigOperation(async () => {
+      await this.repairPendingSessionConfigProjection();
+      const authority = await this.readSessionConfigAuthority(slug);
+      return { config: authority?.config ?? null, revision: authority?.revision ?? 0 };
+    });
+  }
+
   async executeSessionConfigCurrent(payload) {
     const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     if (!slug) return jsonResponse({ error: 'Invalid session slug.' }, 400);
     try {
-      // Reads may pass a long visibility scan, but never pending config/Lit
-      // projection repair. The transaction observes both journals together.
-      const current = await this.state.storage.transaction(async (transaction) => {
-        const authority = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
-        if (!authority || authority.projectionPending === true || await hasPendingLitAuthorizationSetup(transaction)) return null;
-        if (authority.slug !== slug || !Number.isSafeInteger(authority.revision) || authority.revision < 1 ||
-          !normalizePublicSessionConfig(authority.config, slug)) throw new Error('Invalid authoritative session config.');
-        return authority;
-      });
-      if (current) return jsonResponse({ ok: true, config: current.config, revision: current.revision });
-    } catch {
+      return jsonResponse({ ok: true, ...(await this.readCurrentSessionConfig(slug)) });
+    } catch (error) {
+      if (error?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON) {
+        const safeError = legacySessionConfigMigrationError();
+        return jsonResponse({ error: safeError.message, reason: safeError.reason }, 503);
+      }
       return jsonResponse({ error: 'Session config coordination is unavailable; retry.' }, 503);
     }
-    return this.serializeSessionConfigOperation(async () => {
-      try {
-        await this.repairPendingSessionConfigProjection();
-        const authority = await this.readSessionConfigAuthority(slug);
-        return jsonResponse({ ok: true, config: authority?.config ?? null, revision: authority?.revision ?? 0 });
-      } catch (error) {
-        if (error?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON) {
-          const safeError = legacySessionConfigMigrationError();
-          return jsonResponse({ error: safeError.message, reason: safeError.reason }, 503);
-        }
-        return jsonResponse({ error: 'Session config coordination is unavailable; retry.' }, 503);
-      }
-    });
   }
 
   async executeStoragePublication(payload) {

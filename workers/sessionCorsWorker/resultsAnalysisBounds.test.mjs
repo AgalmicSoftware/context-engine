@@ -146,8 +146,8 @@ test('automatic capacity failure is recorded and later uploads do not rescan or 
   const env = {};
   let providerCalls = 0;
   const coordinator = new SessionWriteCoordinator({ storage }, env, {
-    runResultsAnalysisAutoJob: (args) => runQueuedAutomaticResultsAnalysisJob({ ...args, job: { ...args.job, config },
-      deps: { ...args.deps, generateAnalysisArtifact: async () => { providerCalls += 1; return { ok: true, value: {} }; } } }),
+    runResultsAnalysisAutoJob: (args) => runQueuedAutomaticResultsAnalysisJob({ ...args,
+      deps: { ...args.deps, getSessionConfig: async () => config, generateAnalysisArtifact: async () => { providerCalls += 1; return { ok: true, value: {} }; } } }),
   });
   env.CE_SESSION_COORDINATOR = { idFromName: (name) => name, get: () => ({ fetch: (url, init) => coordinator.fetch(new Request(url, init)) }) };
   const initial = await generateResultsAnalysisDraft({ env, slug: 'session-a', config,
@@ -192,4 +192,37 @@ test('unreadable latest answer metadata cannot silently select the participant o
     assert.equal(source.status, 503);
     assert.equal(source.snapshot, undefined);
   }
+});
+
+// The KV projection can lag the durable authority. After an admin disables AI,
+// a queued job must not reach the provider any more than a manual request can.
+test('queued and manual analysis both honor the authoritative AI policy over a stale KV projection', async () => {
+  const values = new Map();
+  const storage = { get: async (key) => structuredClone(values.get(key)), put: async (key, value) => values.set(key, structuredClone(value)),
+    delete: async (key) => values.delete(key), transaction: async (callback) => callback(storage), setAlarm: async () => {} };
+  const enabled = { ...config, slug: 'session-a' };
+  values.set('session-config-authority', { schemaVersion: 1, slug: 'session-a', revision: 2, config: { ...enabled, scopes: { ai: false } }, projectionPending: false });
+  const staleProjection = new Map([['session:session-a:config', JSON.stringify(enabled)]]);
+  // Readable answers, so only the policy can keep the job from the provider.
+  const env = { GROUP_KV: { get: async (key) => staleProjection.get(key) ?? null }, CE_STORAGE_INDEX_KV: readableHistory().index };
+  let providerCalls = 0;
+  const generateAnalysisArtifact = async () => { providerCalls += 1; return { ok: true, value: {} }; };
+  const coordinator = new SessionWriteCoordinator({ storage }, env, {
+    runResultsAnalysisAutoJob: (args) => runQueuedAutomaticResultsAnalysisJob({ ...args, deps: { ...args.deps, generateAnalysisArtifact } }),
+  });
+
+  const { config: authoritative } = await coordinator.readCurrentSessionConfig('session-a');
+  const manual = await generateResultsAnalysisDraft({ env, slug: 'session-a', config: authoritative, trigger: 'manual',
+    body: { requestId: 'manual', source: { kind: 'worker-canonical' } }, deps: { generateAnalysisArtifact } });
+  assert.equal(manual.ok, false);
+  await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'queued', committedResponses: [] });
+  const queued = await coordinator.runQueuedResultsAnalysisAutoJob();
+  assert.equal(queued.reason, 'ai_scope_disabled');
+  assert.equal(providerCalls, 0);
+});
+
+test('queued analysis fails closed without the coordinator config authority', async () => {
+  const result = await runQueuedAutomaticResultsAnalysisJob({ env: {}, slug: 'session-a', job: { slug: 'session-a' }, deps: {} });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 503);
 });

@@ -9,7 +9,7 @@ import {
   resolveCanonicalWorkerSessionIdHex,
 } from './sessionConfigMutation.js';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
-import { getSessionConfig as getStoredSessionConfig, getSessionSecrets as getStoredSessionSecrets } from './sessionConfigSecretsStore.js';
+import { getSessionSecrets as getStoredSessionSecrets } from './sessionConfigSecretsStore.js';
 import {
   normalizeWorkerSessionSlug,
 } from './sessionSlugResolution.js';
@@ -1163,9 +1163,17 @@ export const maybeTriggerAutomaticResultsAnalysis = async ({ env, slug, config, 
 };
 
 
+// Queued work is admitted against the coordinator's authoritative config, the
+// policy HTTP routes enforce; the KV projection can lag a disabled AI scope.
 export const runQueuedAutomaticResultsAnalysisJob = async ({ env, slug, job = {}, deps } = {}) => {
   const targetSlug = normalizeWorkerSessionSlug(slug || job.slug);
-  const config = job.config || await (deps?.getSessionConfig ? deps.getSessionConfig(env, targetSlug) : getStoredSessionConfig(env, targetSlug));
+  let config;
+  try {
+    if (typeof deps?.getSessionConfig !== 'function') throw new Error('missing authority');
+    config = await deps.getSessionConfig(env, targetSlug);
+  } catch {
+    return { ok: false, status: 503, jobState: 'failed', error: 'Session config authority is unavailable; retry.' };
+  }
   if (!config) return { ok: false, status: 404, jobState: 'failed', error: 'Session config not found.' };
   return maybeTriggerAutomaticResultsAnalysis({
     env,
