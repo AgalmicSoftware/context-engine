@@ -62,6 +62,8 @@ const configFor = (pub: boolean) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  localStorage.clear();
+  sessionStorage.clear();
   jest.mocked(getWorkerSessionToken).mockImplementation(async () => 'token');
   jest.mocked(loadPublicWorkerGroups).mockResolvedValue([GROUP] as never);
   jest.mocked(loadWorkerGroupOverview).mockResolvedValue({ groups: [GROUP], memberships: [] } as never);
@@ -89,10 +91,15 @@ const mountLinked = async (pub: boolean, account = A, toggleLoginModal = jest.fn
   return { view, toggleLoginModal };
 };
 const tick = (ms = 30) => act(async () => new Promise((r) => setTimeout(r, ms)));
+// The panel shows this button only after its session, groups and any render-time
+// sign-in settle, which can outlast the default wait while the full suite runs.
+const MOUNT_TIMEOUT = { timeout: 5000 };
+jest.setTimeout(20000);
+const findJoinButton = () => screen.findByRole('button', { name: 'Sign in to join Community' }, MOUNT_TIMEOUT);
 
 it('G3 double-click on "Sign in to join": one sign-in, one join', async () => {
   await mountLinked(true);
-  const join = await screen.findByRole('button', { name: 'Sign in to join Community' });
+  const join = await findJoinButton();
   // Two separate discrete events, as a real double-click delivers them.
   await act(async () => {
     fireEvent.click(join);
@@ -112,7 +119,7 @@ it('G4 public discovery, already a member: signing in from "Sign in to join" doe
     memberships: [{ group: GROUP, member: { address: A } }],
   } as never);
   await mountLinked(true);
-  await act(async () => fireEvent.click(await screen.findByRole('button', { name: 'Sign in to join Community' })));
+  await act(async () => fireEvent.click(await findJoinButton()));
   expect(await screen.findByRole('button', { name: 'Leave Community' })).toBeInTheDocument();
   await tick(50);
   expect(joinWorkerGroup).not.toHaveBeenCalled();
@@ -121,7 +128,7 @@ it('G4 public discovery, already a member: signing in from "Sign in to join" doe
 it('G5 rejected sign-in, then the error notice Retry: is the earlier Join still executed?', async () => {
   jest.mocked(getWorkerSessionToken).mockRejectedValueOnce(new Error('Sign-in rejected'));
   await mountLinked(true);
-  await act(async () => fireEvent.click(await screen.findByRole('button', { name: 'Sign in to join Community' })));
+  await act(async () => fireEvent.click(await findJoinButton()));
   expect(await screen.findByText('Sign-in rejected')).toBeInTheDocument();
   await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Retry' })));
   await tick(80);
@@ -144,12 +151,16 @@ it('G6 session panel: Join -> rejected sign-in -> account B -> back to A auto-si
     networkChainId: null,
   };
   const view = render(<WorkerSessionGroupsPanel {...props} account={A} />);
-  await tick(100);
-  await act(async () => fireEvent.click(await screen.findByRole('button', { name: 'Sign in to join Community' })));
+  // Let A's render-time sign-in fail first, so the Join click makes the second attempt.
+  expect(await screen.findByText('Auth on render rejected', undefined, MOUNT_TIMEOUT)).toBeInTheDocument();
+  expect(getWorkerSessionToken).toHaveBeenCalledTimes(1);
+  await act(async () => fireEvent.click(await findJoinButton()));
   expect(await screen.findByText('Sign-in rejected')).toBeInTheDocument();
   view.rerender(<WorkerSessionGroupsPanel {...props} account={B} />);
-  await tick(80);
+  await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(3), MOUNT_TIMEOUT);
   view.rerender(<WorkerSessionGroupsPanel {...props} account={A} />);
+  await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(4), MOUNT_TIMEOUT);
+  // Leave time for any join the restored sign-in would start.
   await tick(120);
   expect(joinWorkerGroup).not.toHaveBeenCalled();
 });
