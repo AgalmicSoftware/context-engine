@@ -11,6 +11,14 @@ describe('QuestionDecryptControl', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
+  it('carries the stable decrypt hooks onto its button', () => {
+    render(<QuestionDecryptControl actionLabel="Decrypt Comments" testId="ce-decrypt-additional" questionId="0xabc" />);
+
+    const button = screen.getByRole('button', { name: 'Decrypt Comments' });
+    expect(button).toHaveAttribute('data-testid', 'ce-decrypt-additional');
+    expect(button).toHaveAttribute('data-ce-question-id', '0xabc');
+  });
+
   it('keeps manual decrypt inert when disabled', () => {
     const onClick = jest.fn();
     render(

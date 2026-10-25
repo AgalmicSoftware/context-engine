@@ -200,6 +200,18 @@ test('Cloudflare catalog keeps the first or admin version of each question and s
   });
   const byId = new Map(questions.map((entry) => [entry.id, entry.prompt]));
   assert.equal(byId.get('q1'), 'Official prompt');
-  assert.equal(byId.get('q2'), 'Admin correction');
+  assert.equal(byId.get('q2'), 'Participant draft');
   assert.equal(byId.has('q3'), false);
+  for (const adminAddress of ['', attacker, author]) {
+    const ordinary = await loadPublicInterviewQuestions({ env: { CE_STORAGE_INDEX_KV: kv }, config: { ...config, adminAddress }, slug: 'session-a', storageRoute });
+    assert.equal(ordinary.find((entry) => entry.id === 'q1').prompt, 'Official prompt');
+    assert.equal(ordinary.find((entry) => entry.id === 'q2').prompt, 'Participant draft');
+  }
+  // Only a server-recorded admin stamp grants correction precedence.
+  await put('nn-admin-q2', '2026-10-03T00:00:00.000Z', { uploader: admin, resourceId: 'q2', uploadAuthority: 'admin' }, question('q2', 'Admin correction'));
+  for (const adminAddress of ['', attacker]) {
+    const rotated = await loadPublicInterviewQuestions({ env: { CE_STORAGE_INDEX_KV: kv }, config: { ...config, adminAddress }, slug: 'session-a', storageRoute });
+    assert.equal(rotated.find((entry) => entry.id === 'q2').prompt, 'Admin correction');
+  }
+
 });

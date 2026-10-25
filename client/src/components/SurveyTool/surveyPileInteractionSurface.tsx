@@ -100,6 +100,7 @@ type PileEmptyStateProps = {
 
 export type PileInteractionSurfaceProps = {
   submissionError?: string;
+  draftPersistenceError?: string;
   // Shown when the session's saved answers failed to load, so earlier answers may be missing.
   savedAnswersNotice?: { retrying: boolean; onRetry: VoidHandler } | null;
   showHologramAssistant: boolean;
@@ -532,6 +533,7 @@ const renderPileEmptyState = ({
 
 export const renderPileInteractionSurface = ({
   submissionError,
+  draftPersistenceError,
   savedAnswersNotice,
   showHologramAssistant,
   toggleHologramAssistant,
@@ -702,6 +704,9 @@ export const renderPileInteractionSurface = ({
         })}
       </div>
     )}
+    <p className={styles.draftPersistenceStatus} role="status" aria-atomic="true">
+      {draftPersistenceError || ''}
+    </p>
     {submissionError && (
       <p className={styles.pileSubmitError} role="alert">
         {submissionError}

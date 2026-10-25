@@ -4,6 +4,7 @@ import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
 import SurveyQuestionsSubmittedResponseView from './SurveyQuestionsSubmittedResponseView';
 import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
 import type { SurveyQuestionsAuthoringRouteSectionProps } from './surveyQuestionsRouteSurfaceTypes.js';
+import styles from './SurveyTool.module.scss';
 
 const noop = () => {};
 
@@ -41,16 +42,21 @@ const SurveyQuestionsAuthoringRouteSection = ({
   );
 
   return (
-    <SurveyQuestionsAuthoringPanel
-      displayState={authoringPanelProps.displayState}
-      lockedQuestionsBanner={authoringPanelProps.lockedQuestionsBanner}
-      onScrollToTop={authoringPanelProps.onScrollToTop || noop}
-      onShowJsonAtBottom={authoringPanelProps.onShowJsonAtBottom || noop}
-      renderedEditableQuestions={authoringPanelProps.renderedEditableQuestions}
-      submitDisplayState={submitDisplayState}
-      submittedResponseView={submittedResponseView}
-      submitResponseButton={submitResponseButton}
-    />
+    <>
+      <p className={styles.draftPersistenceStatus} role="status" aria-atomic="true">
+        {submitFooterProps.draftPersistenceError || ''}
+      </p>
+      <SurveyQuestionsAuthoringPanel
+        displayState={authoringPanelProps.displayState}
+        lockedQuestionsBanner={authoringPanelProps.lockedQuestionsBanner}
+        onScrollToTop={authoringPanelProps.onScrollToTop || noop}
+        onShowJsonAtBottom={authoringPanelProps.onShowJsonAtBottom || noop}
+        renderedEditableQuestions={authoringPanelProps.renderedEditableQuestions}
+        submitDisplayState={submitDisplayState}
+        submittedResponseView={submittedResponseView}
+        submitResponseButton={submitResponseButton}
+      />
+    </>
   );
 };
 

@@ -443,9 +443,15 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       createdAt: string,
       uploader = '',
       resource: 'questions' | 'surveys' = 'questions',
+      uploadAuthority?: string,
     ) => ({
       storageRef: { backend: 'cloudflare', id, resource },
-      metadata: { createdAt, resource, ...(uploader ? { uploader } : {}) },
+      metadata: {
+        createdAt,
+        resource,
+        ...(uploader ? { uploader } : {}),
+        ...(uploadAuthority ? { uploadAuthority } : {}),
+      },
     });
     const loadFrom = async (
       items: Array<Record<string, unknown>>,
@@ -487,6 +493,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       expect(cache.worker.questions[QUESTION_ID].options).toBeUndefined();
       expect(cache.worker.workerQuestionMetadataRefs[QUESTION_ID]).toEqual({
         admin: false,
+        uploadAuthority: null,
         createdAtMs: Date.parse('2026-10-01T00:00:00.000Z'),
         storageRefId: 'cf_official',
         verified: true,
@@ -497,7 +504,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       const { rows } = await loadFrom(
         [
           listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR),
-          listedItem('cf_admin', '2026-10-03T00:00:00.000Z', ADMIN),
+          listedItem('cf_admin', '2026-10-03T00:00:00.000Z', ADMIN, 'questions', 'admin'),
           listedItem('cf_attacker', '2026-10-04T00:00:00.000Z', ATTACKER),
         ],
         {
@@ -511,13 +518,13 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       expect(cache.worker.workerQuestionMetadataRefs[QUESTION_ID].storageRefId).toBe('cf_admin');
     });
 
-    it('prefers the version whose content hashes to its id over an earlier rewrite', async () => {
+    it('keeps the server-selected first ordinary upload regardless of content hash compatibility', async () => {
       const { rows } = await loadFrom(
         [listedItem('cf_front_run', '2026-10-01T00:00:00.000Z'), listedItem('cf_author', '2026-10-02T00:00:00.000Z')],
         { cf_front_run: question({ prompt: 'Spoofed text under a predicted id' }), cf_author: question() },
       );
       const cache = mergeWorkerCanonicalQuestionMetadata(null, rows, identity) as any;
-      expect(cache.worker.questions[QUESTION_ID].prompt).toBe(PROMPT);
+      expect(cache.worker.questions[QUESTION_ID].prompt).toBe('Spoofed text under a predicted id');
       // A lone legacy question whose id used another hash input still shows.
       const legacy = await loadFrom([listedItem('cf_legacy_poll', '2026-10-01T00:00:00.000Z')], {
         cf_legacy_poll: question({ id: '0xlegacypoll', type: 'multichoice', options: ['A', 'B'] }),
@@ -525,6 +532,63 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       const legacyCache = mergeWorkerCanonicalQuestionMetadata(null, legacy.rows, identity) as any;
       expect(legacyCache.worker.questions['0xlegacypoll'].prompt).toBe(PROMPT);
     });
+
+    it('selects the same version across every plaintext, locked, and legacy merge order', async () => {
+      const { rows } = await loadFrom(
+        [
+          listedItem('legacy', '2026-10-01T00:00:00.000Z'),
+          listedItem('locked', '2026-10-02T00:00:00.000Z'),
+          listedItem('matching', '2026-10-03T00:00:00.000Z'),
+        ],
+        {
+          legacy: question({ prompt: 'Legacy hash inputs' }),
+          locked: question({ prompt: '[encrypted]', promptEncrypted: { ciphertext: 'fixture' } }),
+          matching: question(),
+        },
+      );
+      for (const order of [
+        [0, 1, 2],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+      ]) {
+        let cache: unknown = null;
+        for (const index of order) cache = mergeWorkerCanonicalQuestionMetadata(cache, [rows[index]], identity);
+        expect(cache).toMatchObject({
+          worker: {
+            workerQuestionMetadataRefs: {
+              [QUESTION_ID]: { storageRefId: 'legacy' },
+            },
+          },
+        });
+      }
+    });
+
+    it.each([false, true])(
+      'uses code-unit ID ties for %s admin precedence without locale dependence',
+      async (admin) => {
+        const ids = ['fixture__', 'fixture_a', 'fixture_A', 'fixture_z'];
+        const { rows } = await loadFrom(
+          ids.map((id) => listedItem(id, '2026-10-01T00:00:00.000Z', '', 'questions', admin ? 'admin' : undefined)),
+          Object.fromEntries(ids.map((id) => [id, question({ tags: [id] })])),
+        );
+        expect(rows.map((row) => 'storageRefId' in row && row.storageRefId)).toEqual([
+          'fixture_A',
+          'fixture__',
+          'fixture_a',
+          'fixture_z',
+        ]);
+        for (const orderedRows of [rows, [...rows].reverse()]) {
+          expect(mergeWorkerCanonicalQuestionMetadata(null, orderedRows, identity)).toMatchObject({
+            worker: {
+              workerQuestionMetadataRefs: { [QUESTION_ID]: { storageRefId: admin ? 'fixture_z' : 'fixture_A' } },
+            },
+          });
+        }
+      },
+    );
 
     it('never lets a locked rewrite beat an earlier plaintext question it cannot be checked against', async () => {
       // Legacy demo question ids were hashed from other inputs, so the original
@@ -577,7 +641,10 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         [listedItem('cf_attacker', '2026-10-02T00:00:00.000Z'), listedItem('cf_official', '2026-10-01T00:00:00.000Z')],
         { cf_official: question(), cf_attacker: question({ prompt: 'ATTACKER rewrite' }) },
       );
-      expect(readSessionStorageBlob.mock.calls.map(([options]: any) => options.storageRef.id)).toEqual(['cf_official']);
+      expect(readSessionStorageBlob.mock.calls.map(([options]: any) => options.storageRef.id)).toEqual([
+        'cf_attacker',
+        'cf_official',
+      ]);
       const cache = mergeWorkerCanonicalQuestionMetadata(staleCache, rows, identity) as any;
       expect(cache.worker.questions[QUESTION_ID]).toEqual(expect.objectContaining({ prompt: PROMPT }));
       expect(cache.worker.questions[QUESTION_ID].voiceCredits).toBeUndefined();
@@ -664,7 +731,11 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       );
       const cachedCache = mergeWorkerCanonicalQuestionMetadata(null, [], identity) as any;
       cachedCache.worker.questions['0xq0'] = question({ id: '0xq0' });
-      cachedCache.worker.workerQuestionMetadataRefs['0xq0'] = { createdAtMs: 1, storageRefId: 'cf_q_0' };
+      cachedCache.worker.workerQuestionMetadataRefs['0xq0'] = {
+        createdAtMs: 1,
+        storageRefId: 'cf_q_0',
+        uploadAuthority: null,
+      };
       cachedCache.worker.workerQuestionMetadataRefs['0xorphan'] = { createdAtMs: 1, storageRefId: 'cf_q_1' };
       (peekCacheSync as jest.Mock).mockReturnValue(cachedCache);
 
@@ -746,46 +817,145 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       expect(surveys.rows.map((row: any) => row.storageRefId)).toEqual(['cf_survey']);
     });
 
-    it('marks rows from a listed session admin uploader', async () => {
-      const { rows } = await loadFrom(
-        [
-          listedItem('cf_admin', '2026-10-01T00:00:00.000Z', ADMIN),
-          listedItem('cf_author', '2026-10-01T00:00:01.000Z', AUTHOR),
-        ],
-        { cf_admin: question({ id: '0xadminq' }), cf_author: question() },
-      );
-      expect(rows.map((row: any) => [row.storageRefId, row.uploaderIsAdmin === true])).toEqual([
-        ['cf_admin', true],
-        ['cf_author', false],
-      ]);
-    });
+    it.each(['questions', 'surveys'] as const)(
+      'ignores current roles and legacy uploader flags for unstamped %s',
+      async (resource) => {
+        const payload = (label: string) =>
+          resource === 'questions'
+            ? question({ tags: [label] })
+            : { surveyID: 's1', title: label, sessionId: SESSION_ID, sessionSlug: 'worker-session' };
+        const items = [
+          listedItem('cf_original', '2026-10-01T00:00:00.000Z', AUTHOR, resource),
+          {
+            ...listedItem('cf_flagged', '2026-10-02T00:00:00.000Z', ATTACKER, resource),
+            metadata: {
+              ...listedItem('cf_flagged', '2026-10-02T00:00:00.000Z', ATTACKER, resource).metadata,
+              uploaderIsAdmin: true,
+            },
+          },
+          listedItem('cf_current_admin', '2026-10-03T00:00:00.000Z', ADMIN, resource),
+          listedItem('cf_invalid_stamp', '2026-10-04T00:00:00.000Z', ADMIN, resource, ' admin '),
+        ];
+        const payloads = {
+          cf_original: payload('Original'),
+          cf_flagged: payload('Flagged'),
+          cf_current_admin: payload('Current admin'),
+          cf_invalid_stamp: payload('Invalid stamp'),
+        };
+        const load = resource === 'questions' ? loadWorkerCanonicalQuestions : loadWorkerCanonicalSurveys;
+        const merge =
+          resource === 'questions' ? mergeWorkerCanonicalQuestionMetadata : mergeWorkerCanonicalSurveyMetadata;
+        for (const adminAddress of ['', ADMIN, AUTHOR, ATTACKER]) {
+          const rows = await load(
+            { sessionConfig: { ...sessionConfig, adminAddress }, sessionSlug: 'worker-session' },
+            {
+              listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
+              readSessionStorageBlob: jest.fn(
+                async ({ storageRef }: any) =>
+                  ({ json: async () => payloads[storageRef.id as keyof typeof payloads] }) as Response,
+              ),
+            },
+          );
+          const cache = merge(null, rows, identity) as any;
+          const refsField = resource === 'questions' ? 'workerQuestionMetadataRefs' : 'workerSurveyMetadataRefs';
+          const id = resource === 'questions' ? QUESTION_ID : 's1';
+          expect(cache.worker[refsField][id].storageRefId).toBe('cf_original');
+          expect(cache.worker[refsField][id].admin).toBe(false);
+        }
+      },
+    );
 
-    it("prefers the Worker's own admin flag over the session config admin list", async () => {
-      const flagged = (item: ReturnType<typeof listedItem>, uploaderIsAdmin: boolean) => ({
-        ...item,
-        metadata: { ...item.metadata, uploaderIsAdmin },
-      });
-      const { rows } = await loadFrom(
-        [
-          // A Worker role admin who is not named in the public session config.
-          flagged(listedItem('cf_role_admin', '2026-10-01T00:00:00.000Z', AUTHOR), true),
-          // A config-listed address the Worker no longer treats as an admin.
-          flagged(listedItem('cf_former_admin', '2026-10-01T00:00:01.000Z', ADMIN), false),
-          // Older Workers send no flag, so the config list still decides.
-          listedItem('cf_config_admin', '2026-10-01T00:00:02.000Z', ADMIN),
-        ],
-        {
-          cf_role_admin: question({ id: '0xrole' }),
-          cf_former_admin: question({ id: '0xformer' }),
-          cf_config_admin: question({ id: '0xconfig' }),
-        },
-      );
-      expect(rows.map((row: any) => [row.storageRefId, row.uploaderIsAdmin === true])).toEqual([
-        ['cf_role_admin', true],
-        ['cf_former_admin', false],
-        ['cf_config_admin', true],
-      ]);
-    });
+    it.each(['questions', 'surveys'] as const)(
+      'refreshes old cached %s authority and ignores derived admin flags',
+      async (resource) => {
+        const merge =
+          resource === 'questions' ? mergeWorkerCanonicalQuestionMetadata : mergeWorkerCanonicalSurveyMetadata;
+        const refsField = resource === 'questions' ? 'workerQuestionMetadataRefs' : 'workerSurveyMetadataRefs';
+        const id = resource === 'questions' ? QUESTION_ID : 's1';
+        const payload = (label: string) =>
+          resource === 'questions'
+            ? question({ tags: [label] })
+            : { surveyID: id, title: label, sessionId: SESSION_ID, sessionSlug: 'worker-session' };
+        for (const uploadAuthority of [undefined, 'admin']) {
+          const stale = merge(null, [], identity) as any;
+          stale.worker[resource][id] = payload('Old correction');
+          stale.worker[refsField][id] = {
+            admin: true,
+            createdAtMs: Date.parse('2026-10-02T00:00:00.000Z'),
+            storageRefId: 'cf_cached',
+            verified: true,
+          };
+          (peekCacheSync as jest.Mock).mockReturnValue(stale);
+          const { rows, readSessionStorageBlob } = await loadFrom(
+            [
+              listedItem('cf_original', '2026-10-01T00:00:00.000Z', AUTHOR, resource),
+              listedItem('cf_cached', '2026-10-02T00:00:00.000Z', ADMIN, resource, uploadAuthority),
+            ],
+            { cf_original: payload('Original'), cf_cached: payload('Old correction') },
+            resource,
+          );
+          expect(readSessionStorageBlob.mock.calls.map(([options]: any) => options.storageRef.id)).toEqual([
+            'cf_original',
+            'cf_cached',
+          ]);
+          const cache = merge(stale, rows, identity) as any;
+          expect(cache.worker[refsField][id]).toEqual(
+            expect.objectContaining({
+              storageRefId: uploadAuthority === 'admin' ? 'cf_cached' : 'cf_original',
+              admin: uploadAuthority === 'admin',
+              uploadAuthority: uploadAuthority ?? null,
+            }),
+          );
+        }
+      },
+    );
+
+    it.each(['questions', 'surveys'] as const)(
+      'uses upload-time authority for %s despite contradictory current roles',
+      async (resource) => {
+        const stamped = (
+          id: string,
+          date: string,
+          uploader: string,
+          uploadAuthority: string,
+          uploaderIsAdmin: boolean,
+        ) => ({
+          ...listedItem(id, date, uploader, resource),
+          metadata: { ...listedItem(id, date, uploader, resource).metadata, uploadAuthority, uploaderIsAdmin },
+        });
+        const items = [
+          stamped('cf_original', '2026-10-01T00:00:00.000Z', AUTHOR, 'author', false),
+          stamped('cf_correction', '2026-10-02T00:00:00.000Z', ATTACKER, 'admin', false),
+          stamped('cf_promoted_retry', '2026-10-03T00:00:00.000Z', ADMIN, 'author', true),
+        ];
+        const payload = (title: string) =>
+          resource === 'questions'
+            ? question({ tags: [title] })
+            : { surveyID: 's1', title, sessionId: SESSION_ID, sessionSlug: 'worker-session' };
+        const { rows } = await loadFrom(
+          items,
+          {
+            cf_original: payload('Original'),
+            cf_correction: payload('Correction'),
+            cf_promoted_retry: payload('Retry'),
+          },
+          resource,
+        );
+        const merge =
+          resource === 'questions' ? mergeWorkerCanonicalQuestionMetadata : mergeWorkerCanonicalSurveyMetadata;
+        const cache = merge(null, rows, identity);
+        const expected =
+          resource === 'questions'
+            ? { [QUESTION_ID]: expect.objectContaining({ tags: ['Correction'] }) }
+            : { s1: expect.objectContaining({ title: 'Correction' }) };
+        expect(cache.worker).toEqual(expect.objectContaining({ [resource]: expect.objectContaining(expected) }));
+        expect(rows.map((row) => 'uploadAuthority' in row && row.uploadAuthority === 'admin')).toEqual([
+          false,
+          true,
+          false,
+        ]);
+      },
+    );
 
     describe('published question matcher', () => {
       const loadMatcher = (items: Array<Record<string, unknown>>, payloads: Record<string, Record<string, unknown>>) =>

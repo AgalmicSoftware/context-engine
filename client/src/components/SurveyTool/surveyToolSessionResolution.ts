@@ -1,3 +1,4 @@
+import { resolveWorkerCanonicalCacheIdentity } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { resolveCanonicalSessionConfig } from '../../utilities/session/canonicalSessionContext.js';
 import {
   claimsWorkerCanonicalAuthority,
@@ -413,13 +414,24 @@ export const resolveSurveyToolDraftStorageContext = ({
   network,
   networkChainId,
   resolveBySlug,
-}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext =>
-  resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext & { draftAuthorityKey?: string } => {
+  const context = resolveSurveyToolNetworkScopedSessionContext({
     sessionSlug,
     network,
     networkChainId,
     resolveBySlug,
   });
+  if (!claimsWorkerCanonicalAuthority(context.sessionConfig)) return context;
+  // A slug can move between Workers or session IDs. Reuse the saved-answer
+  // identity, excluding config revisions, and reject incomplete Worker targets.
+  return {
+    ...context,
+    draftAuthorityKey: resolveWorkerCanonicalCacheIdentity({
+      sessionConfig: context.sessionConfig,
+      sessionSlug: context.sessionSlug,
+    }).key,
+  };
+};
 
 export const resolveSurveyToolResponseHydrationContext = ({
   sessionSlug,

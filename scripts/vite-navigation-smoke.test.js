@@ -142,6 +142,35 @@ test('both session setup aliases receive the pinned demo cache fixture in local 
   assert.equal(DEFAULT_ROUTE_PROBES['/session/new'], probeSessionModePresets);
 });
 
+test('local demo presence fixtures cover queryless reads and keep interview readiness scoped', async () => {
+  const origin = 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev';
+  const interviewRoute = `/session/demo?mode=interview&worker=${encodeURIComponent(origin)}`;
+  for (const route of ['/session/demo', '/session/demo?mode=recordGroup', '/session/demo-2', interviewRoute]) {
+    const handlers = [];
+    await installDemoWorkerFixtureRoutes({ route: async (pattern, handler) => handlers.push({ pattern, handler }) },
+      'http://127.0.0.1:4173', route);
+    const presence = handlers.find(({ pattern }) => typeof pattern === 'function' && pattern(new URL(`${origin}/resource-presence`)));
+    assert(presence, `${route} isolates the queryless resource-presence request`);
+    assert(presence.pattern(new URL(`${origin}/resource-presence?session=demo`)));
+    assert.equal(presence.pattern(new URL('https://other-worker.example/resource-presence')), false);
+    assert.equal(presence.pattern(new URL(`${origin}/resource-presence-private`)), false);
+    let response;
+    await presence.handler({
+      request: () => ({ method: () => 'GET' }),
+      fulfill: async (value) => { response = value; },
+      fallback: async () => assert.fail('the exact public presence read should use the fixture'),
+    });
+    assert.equal(JSON.parse(response.body).interview.ready, route === interviewRoute);
+    let fellBack = false;
+    await presence.handler({
+      request: () => ({ method: () => 'POST' }),
+      fulfill: async () => assert.fail('fixture must not intercept writes'),
+      fallback: async () => { fellBack = true; },
+    });
+    assert.equal(fellBack, true);
+  }
+});
+
 test('setup fixture preserves live Worker checks and unrelated session routes', async () => {
   const page = { route: async () => assert.fail('no fixture should be installed') };
   await installDemoWorkerFixtureRoutes(page, 'https://contextengine.sh', '/session/new');

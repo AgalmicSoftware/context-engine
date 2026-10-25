@@ -226,6 +226,7 @@ export function QuestionFilterTagsSection({
         </>
       }
       sectionKey="tags"
+      headerTestId={E2E_TESTIDS.QUESTION_FILTER_SECTION_TAGS}
       icon={faFilter}
       expandedSections={expandedSections}
       onToggleSection={onToggleSection}
@@ -245,6 +246,7 @@ export function QuestionFilterTagsSection({
                     className={buildQuestionFilterTagBubbleClassName(styles, isSelected)}
                     aria-pressed={isSelected}
                     onClick={() => onTagSelection(tag)}
+                    data-testid={E2E_TESTIDS.QUESTION_FILTER_TAG}
                   >
                     #{tag}
                   </button>
@@ -252,7 +254,12 @@ export function QuestionFilterTagsSection({
               })}
             </div>
             {allTagsCount > 10 && (
-              <Button color="link" onClick={onToggleShowAllTags} className={styles.showMoreTagsButton}>
+              <Button
+                color="link"
+                onClick={onToggleShowAllTags}
+                className={styles.showMoreTagsButton}
+                data-testid={E2E_TESTIDS.QUESTION_FILTER_TAGS_SHOW_MORE}
+              >
                 {showAllTags ? 'Show Less' : 'Show More'}
               </Button>
             )}

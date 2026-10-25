@@ -1,3 +1,5 @@
+import { readCurrentSessionConfig } from '../../workers/sessionCorsWorker/sessionConfigAuthority.js';
+import { executeCoordinatedSessionConfigMutation } from '../../workers/sessionCorsWorker/sessionWriteCoordinator.js';
 import { ethers } from 'ethers';
 import { webcrypto } from 'crypto';
 import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
@@ -159,7 +161,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
     expect(payload?.error).toBe('Token missing transcribe scope.');
   });
 
-  it('removes a signed ai scope when current session config disables it', async () => {
+  it('rejects a prior AI token after durable policy changes even when KV returns the old public scope', async () => {
     const sessionSlug = 'ai-current-scope-revoked';
     const config = buildSessionConfig({ scopes: { ai: true } });
     const env = createWorkerEnv({
@@ -175,10 +177,14 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
       rpcUrl: RPC_URL,
       registryAddress: REGISTRY_ADDRESS,
     });
-    await env.GROUP_KV.put(
-      SESSION_CONFIG_KEY(sessionSlug),
-      JSON.stringify({ ...config, scopes: { ai: false } }),
-    );
+    const current = await readCurrentSessionConfig({ env, slug: sessionSlug });
+    const changed = await executeCoordinatedSessionConfigMutation({
+      env, slug: sessionSlug,
+      expectedAuthority: { actor: wallet.address, revision: current.revision, authzEpoch: current.config.authzEpoch ?? 0 },
+      mutation: { kind: 'set-config', incomingConfig: { scopes: { ai: false } } },
+    });
+    expect(changed.ok).toBe(true);
+    await env.GROUP_KV.put(SESSION_CONFIG_KEY(sessionSlug), JSON.stringify(config));
 
     const response = await sessionCorsWorker.fetch(
       createJsonRequest({
@@ -191,8 +197,8 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
     );
     const payload = await response.json();
 
-    expect(response.status).toBe(403);
-    expect(payload?.error).toBe('Token missing ai scope.');
+    expect(response.status).toBe(401);
+    expect(payload?.error).toBe('Token authorization is stale.');
   });
 
   it('rate limits authenticated /ai requests before a second upstream proxy call', async () => {

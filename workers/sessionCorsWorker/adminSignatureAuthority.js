@@ -1,3 +1,5 @@
+import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
+
 export const resolveAdminSignatureAuthority = async ({
   env,
   body,
@@ -115,6 +117,12 @@ export const resolveAdminSignatureAuthority = async ({
       reason: 'nonce_invalid',
       logExtra: { error: nonceResult?.error },
     };
+  }
+
+  try {
+    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: targetSlug }));
+  } catch (error) {
+    return { ok: false, status: 503, error: error.message, reason: 'configuration_unavailable' };
   }
 
   if (!config && allowBootstrapWithoutConfig) {

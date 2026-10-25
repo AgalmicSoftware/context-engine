@@ -13,8 +13,10 @@ export const fetchArtifactText = async (url, {
   accept = 'application/javascript',
 } = {}) => {
   const { safeFetch } = createOutboundUrlSafetyHelpersWithWorkerDeps({ deps: { fetch: fetchImpl } });
+  // No RequestInit.cache: Workers at compatibility date 2024-09-02 throw on it.
+  // Release artifacts are immutable per URL, so caching cannot serve stale bytes.
   const response = await safeFetch(url, {
-    method: 'GET', headers: { Accept: accept }, cache: 'no-store',
+    method: 'GET', headers: { Accept: accept },
     outboundUrlPolicy: PUBLIC_HTTPS_ARTIFACT_POLICY,
   });
   if (!response.ok) {

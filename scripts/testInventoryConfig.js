@@ -1,6 +1,9 @@
 'use strict';
 
 const ROOT_NODE_TEST_FILES = Object.freeze([
+  'tests/root/agentParticipant.worker.test.mjs',
+  'tests/root/protectedResponses.worker.test.mjs',
+  'tests/root/testEthOffer.test.mjs',
   'tests/root/arweave-metadata-uri.test.js',
   'tests/root/client.package.test.js',
   'tests/root/deployHelperOrigins.test.mjs',
@@ -20,6 +23,8 @@ const ROOT_OPTIONAL_NODE_TEST_FILES = Object.freeze([
 ]);
 
 const ROOT_JEST_TEST_FILES = Object.freeze([
+  'tests/root/agentParticipant.hydration.test.js',
+  'tests/root/agentParticipant.registryHydration.test.js',
   'tests/root/deployHelper.worker.test.js',
   'tests/root/sessionCorsWorker.admin.test.js',
   'tests/root/sessionCorsWorker.arweave.test.js',

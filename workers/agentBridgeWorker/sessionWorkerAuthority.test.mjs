@@ -94,6 +94,11 @@ test('resolvePinnedSessionWorkerAuthority keeps disabled dedicated policy pinned
   });
 });
 
+// Workers deployed at compatibility date 2024-09-02 reject RequestInit.cache.
+const rejectUnsupportedRequestInit = (init = {}) => {
+  if ('cache' in init) throw new TypeError("The 'cache' field on 'RequestInitializerDict' is not implemented.");
+};
+
 test('verifySessionWorkerMembership accepts production-shaped two-segment Worker HMAC tokens', async () => {
   const calls = [];
   const credential = workerHmacToken({
@@ -109,6 +114,7 @@ test('verifySessionWorkerMembership accepts production-shaped two-segment Worker
     now: new Date('2030-01-01T00:00:00.000Z'),
     fetchImpl: async (url, init = {}) => {
       calls.push({ url: String(url), init });
+      rejectUnsupportedRequestInit(init);
       return new Response(
         JSON.stringify({
           ok: true,

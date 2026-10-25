@@ -131,6 +131,7 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
             json: 'json',
             normalizeWorkerSessionSlug: 'normalizeWorkerSessionSlug',
             getSessionConfig: 'getSessionConfig',
+      readCurrentSessionConfig: 'readCurrentSessionConfig',
             resolveTrustedAdminOrigins: 'resolveTrustedAdminOrigins',
             verifyToken: 'verifyToken',
             validateAuthTokenRecord: 'validateAuthTokenRecord',
@@ -268,6 +269,7 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
           now,
           readArweaveBootstrapUploadPayload: 'readArweaveBootstrapUploadPayload',
           getSessionConfig: 'getSessionConfig',
+      readCurrentSessionConfig: 'readCurrentSessionConfig',
           getCorsContext: 'getCorsContext',
           verifyAdminSignature: 'verifyAdminSignature',
           getSessionSecrets: 'getSessionSecrets',
@@ -355,6 +357,7 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
       json: 'json',
       normalizeWorkerSessionSlug: 'normalizeWorkerSessionSlug',
       getSessionConfig: 'getSessionConfig',
+      readCurrentSessionConfig: 'readCurrentSessionConfig',
       resolveTrustedAdminOrigins: 'resolveTrustedAdminOrigins',
       verifyToken: 'verifyToken',
       validateAuthTokenRecord: 'validateAuthTokenRecord',
@@ -538,6 +541,7 @@ const createResultsAnalysisRuntime = ({ authorizeOk = true, deniedResources = []
     corsHeaders: () => ({ 'Access-Control-Allow-Origin': 'https://viewer.example' }),
     resolveWorkerRequestSlugContext: ({ headerSlug }) => ({ ok: true, slug: headerSlug, explicitSlugProvided: !!headerSlug }),
     getSessionConfig: async () => config,
+    readCurrentSessionConfig: async () => ({ config, revision: 1 }),
     authorizeCloudflareStorageResourceRead: async (args) => {
       calls.authorize.push(args);
       const denied = authorizeOk !== true || deniedResources.includes(args.resource);

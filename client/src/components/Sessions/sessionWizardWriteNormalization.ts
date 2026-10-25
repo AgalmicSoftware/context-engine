@@ -1,4 +1,7 @@
+import { getSessionWizardInterviewValidationError } from './sessionWizardInterviewValidation';
+import { normalizeHostedFaucetSelection } from './sessionWizardHostedFaucet';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
+import { withoutOffResearchSharingDefault } from '../../utilities/session/interviewModeWrite';
 import {
   normalizeResultsAnalysisSettings,
   validResultsAnalysisSettings,
@@ -36,7 +39,8 @@ import {
 import {
   classifySessionModeProfileSupport,
   compileSessionModeProfile,
-  hasLegacyTelegramFirstSessionFlags,
+  hasLegacyHostedAgentFlags,
+  normalizeSessionModeProfileForWrite,
   mergeSessionModeProfileStorageAccess,
   profileFromLegacyConfig,
   type SessionModeProfile,
@@ -157,6 +161,8 @@ export const sanitizeSessionWizardMetadataPayload = (
 ): AnyRecord => {
   if (!isObj(metadata)) return metadata;
 
+  const interviewError = getSessionWizardInterviewValidationError(metadata.interviewMode);
+  if (interviewError) throw new Error(interviewError);
   let next = cloneValue(metadata) as AnyRecord;
   next = stripAuthoritativeSessionGateFields(next) as AnyRecord;
   next = stripWorkerOnlyMetadataFields(next) as AnyRecord;
@@ -164,10 +170,13 @@ export const sanitizeSessionWizardMetadataPayload = (
   next = normalizeSessionNaming(next) as AnyRecord;
   next.sessionName = trimString(next.sessionName);
   next.sessionInfo = trimString(next.sessionInfo);
-  delete next.telegram_only;
-  if (!next.sessionModeProfile && hasLegacyTelegramFirstSessionFlags(next)) {
+  if (!next.sessionModeProfile && hasLegacyHostedAgentFlags(next)) {
     next.sessionModeProfile = profileFromLegacyConfig(next);
   }
+  if (isObj(next.sessionModeProfile)) {
+    next.sessionModeProfile = normalizeSessionModeProfileForWrite(next.sessionModeProfile as SessionModeProfile);
+  }
+  delete next.telegram_only;
   delete next.telegramOnly;
   delete next.telegramMode;
   delete next.telegramBridgeEnabled;
@@ -306,11 +315,11 @@ export const resolveSessionWizardWorkerStorageProfilePayload = ({
   }
   const sessionModeProfile = isObj(resolvedDraft.sessionModeProfile)
     ? (resolvedDraft.sessionModeProfile as SessionModeProfile)
-    : hasLegacyTelegramFirstSessionFlags(resolvedDraft)
+    : hasLegacyHostedAgentFlags(resolvedDraft)
       ? profileFromLegacyConfig(resolvedDraft)
       : null;
   const effectiveSessionModeProfile = sessionModeProfile
-    ? mergeSessionModeProfileStorageAccess(sessionModeProfile, rawStorageProfile)
+    ? mergeSessionModeProfileStorageAccess(normalizeSessionModeProfileForWrite(sessionModeProfile), rawStorageProfile)
     : null;
   if (effectiveSessionModeProfile) {
     assertReachableSessionModeProfile(effectiveSessionModeProfile, 'Worker config publication');
@@ -358,6 +367,8 @@ export const buildSessionWizardWorkerConfigPayload = ({
 } = {}): AnyRecord => {
   const resolvedDraft = isObj(draft) ? draft : {};
   const resolvedDeployPayload = isObj(deployPayload) ? deployPayload : {};
+  const interviewError = getSessionWizardInterviewValidationError(resolvedDraft.interviewMode);
+  if (interviewError) throw new Error(interviewError);
   const chainId = Number(registryChainId || resolvedDraft.networkChainId || networkChainId || 0) || 0;
   const normalizedContracts: SessionContractsLike = {};
   const defaults = (getContractDefaults(chainId) || {}) as Record<string, SessionContractLike>;
@@ -383,7 +394,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
   const modeFieldPolicy = resolveSessionWizardModeFieldPolicy(modeRequirements);
   const isWorkerCanonical = modeRequirements.isWorkerCanonical;
   const usesOnChainSbt = isWorkerCanonical && modeRequirements.publish.deployPendingSbts;
-  const workerAuthority = isWorkerCanonical
+  const rawWorkerAuthority = isWorkerCanonical
     ? isObj(resolvedDraft.workerAuthority)
       ? cloneValue(resolvedDraft.workerAuthority)
       : isObj(resolvedDeployPayload.workerAuthority)
@@ -394,6 +405,12 @@ export const buildSessionWizardWorkerConfigPayload = ({
             anonymousScopes: [],
           }
     : undefined;
+  const workerAuthority = normalizeHostedFaucetSelection({
+    ...resolvedDraft,
+    sessionModeProfile: effectiveSessionModeProfile,
+    networkChainId: chainId,
+    workerAuthority: rawWorkerAuthority,
+  }).workerAuthority;
   const publishedAppearance = Object.prototype.hasOwnProperty.call(resolvedDraft, 'appearance')
     ? normalizeSessionAppearance(resolvedDraft.appearance)
     : null;
@@ -405,14 +422,14 @@ export const buildSessionWizardWorkerConfigPayload = ({
     sessionHeaderImg: trimString(resolvedDraft.sessionHeader || resolvedDraft.sessionHeaderImg),
     ...(publishedAppearance ? { appearance: publishedAppearance } : {}),
     interviewModeEnabled: resolvedDraft.interviewModeEnabled !== false,
-    interviewMode: {
+    interviewMode: withoutOffResearchSharingDefault({
       ...normalizeInterviewSettings(resolvedDraft.interviewMode),
       enabled: resolvedDraft.interviewModeEnabled !== false,
       provider: REALTIME_INTERVIEW_PROVIDER,
       realtimeModel: normalizeRealtimeInterviewModel(
         isObj(resolvedDraft.interviewMode) ? resolvedDraft.interviewMode.realtimeModel : undefined,
       ),
-    },
+    }),
     resultsAnalysis: (() => {
       const value = resolvedDraft.resultsAnalysis;
       assertValidResultsAnalysisSettings(value);

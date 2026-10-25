@@ -47,9 +47,8 @@ export type WorkerCanonicalMetadataRow = {
   payload: UnknownRecord;
   storageRef: StorageRef;
   storageRefId: string;
-  // The uploader the Worker recorded is a session admin. Older Workers record
-  // no uploader, so their rows never count as admin uploads.
-  uploaderIsAdmin?: boolean;
+  // Server-recorded upload authority; absent stamps have ordinary precedence.
+  uploadAuthority?: string | null;
 };
 
 // An admin hid this id on the Worker; merges drop any cached copy.
@@ -73,6 +72,7 @@ export type WorkerCanonicalMetadataHydrationPort = {
 
 type CachedVersion = {
   admin: boolean;
+  uploadAuthority: string | null;
   createdAtMs: number;
   storageRefId: string;
   // Whether a plaintext question hashes to its id; null when it cannot be checked.
@@ -106,17 +106,6 @@ const METADATA_REFS_FIELDS = {
   [STORAGE_RESOURCE_KEYS.SURVEYS]: 'workerSurveyMetadataRefs',
 } as const;
 
-const listAddresses = (value: unknown): string[] => {
-  if (Array.isArray(value)) return value.flatMap(listAddresses);
-  if (isRecord(value)) return listAddresses(value.addresses);
-  const address = readString(value).toLowerCase();
-  return /^0x[0-9a-f]{40}$/.test(address) ? [address] : [];
-};
-
-// The public session config names the admins the Worker trusts for uploads.
-const resolveSessionAdminAddresses = (sessionConfig: UnknownRecord): Set<string> =>
-  new Set([...listAddresses(sessionConfig.adminAddress), ...listAddresses(sessionConfig.adminAddresses)]);
-
 const isLockedQuestionPayload = (payload: UnknownRecord): boolean =>
   !!payload.promptEncrypted || isRecord(payload.encryption) || readString(payload.prompt) === '[encrypted]';
 
@@ -137,23 +126,21 @@ const questionPayloadMatchesId = (id: string, payload: UnknownRecord): boolean |
   }
 };
 
-// One version per id: a session admin's newest upload wins, otherwise the
-// earliest upload. Between two plaintext questions, one that matches its id
-// hash beats one that does not; a locked version cannot be checked, so then
-// age decides. The Worker's readers apply the same admin-then-earliest order.
+const compareStorageIds = (left: string, right: string): number => (left === right ? 0 : left < right ? -1 : 1);
+
+// Match Worker readers: newest immutable admin stamp, otherwise earliest upload.
+// Hash compatibility is diagnostic only: comparing it only for plaintext pairs
+// makes mixed plaintext/locked precedence nontransitive and order-dependent.
 const isPreferredVersion = (candidate: CachedVersion, current: CachedVersion | null): boolean => {
   if (!current || candidate.storageRefId === current.storageRefId) return true;
   if (candidate.admin !== current.admin) return candidate.admin;
-  const age = candidate.createdAtMs - current.createdAtMs || candidate.storageRefId.localeCompare(current.storageRefId);
-  if (candidate.admin) return age > 0;
-  if (candidate.verified !== null && current.verified !== null && candidate.verified !== current.verified) {
-    return candidate.verified;
-  }
-  return age < 0;
+  const age =
+    candidate.createdAtMs - current.createdAtMs || compareStorageIds(candidate.storageRefId, current.storageRefId);
+  return candidate.admin ? age > 0 : age < 0;
 };
 
-// Storage refs are immutable, so blobs already merged into the managed cache
-// never need another read. The hydration merge writes that same cache.
+// Storage refs are immutable. Cached refs that already retain the server's
+// authority stamp need no reread; older derived flags must be refreshed.
 const readCachedStorageRefIds = (
   resource: WorkerCanonicalMetadataResource,
   sessionSlug: unknown,
@@ -169,7 +156,10 @@ const readCachedStorageRefIds = (
   if (!isRecord(items) || !isRecord(refs)) return new Set();
   return new Set(
     Object.entries(refs)
-      .filter(([id, ref]) => isRecord(items[id]) && isRecord(ref))
+      .filter(
+        ([id, ref]) =>
+          isRecord(items[id]) && isRecord(ref) && Object.prototype.hasOwnProperty.call(ref, 'uploadAuthority'),
+      )
       .map(([, ref]) => readString((ref as UnknownRecord).storageRefId))
       .filter(Boolean),
   );
@@ -200,9 +190,7 @@ const readPayloadResourceId = (payload: UnknownRecord, resource: WorkerCanonical
 type ListedStorageRef = {
   createdAtMs: number;
   storageRef: StorageRef;
-  uploader: string;
-  // Newer Workers mark admin uploads from their full role set.
-  uploaderIsAdmin: boolean | null;
+  uploadAuthority: string | null;
 };
 
 const normalizeListedStorageRef = (
@@ -234,8 +222,7 @@ const normalizeListedStorageRef = (
   return {
     createdAtMs: Number.isFinite(createdAtMs) && createdAtMs > 0 ? createdAtMs : 0,
     storageRef,
-    uploader: readString(metadata.uploader).toLowerCase(),
-    uploaderIsAdmin: typeof metadata.uploaderIsAdmin === 'boolean' ? metadata.uploaderIsAdmin : null,
+    uploadAuthority: typeof metadata.uploadAuthority === 'string' ? metadata.uploadAuthority : null,
   };
 };
 
@@ -317,7 +304,6 @@ const loadWorkerCanonicalMetadata = async (
     input.sessionSlug,
     resolveWorkerCanonicalCacheIdentity({ sessionConfig: target.sessionConfig, sessionSlug: target.sessionSlug }),
   );
-  const admins = resolveSessionAdminAddresses(target.sessionConfig);
   const hiddenIds = new Set<string>();
   const uniqueItems: ListedStorageRef[] = [];
   const seenStorageRefs = new Set<string>();
@@ -337,8 +323,7 @@ const loadWorkerCanonicalMetadata = async (
   const readRow = async ({
     createdAtMs,
     storageRef,
-    uploader,
-    uploaderIsAdmin,
+    uploadAuthority,
   }: ListedStorageRef): Promise<WorkerCanonicalMetadataRow | null> => {
     const response = await readBlob({
       storageRef,
@@ -373,16 +358,13 @@ const loadWorkerCanonicalMetadata = async (
       },
       { resource },
     );
-    // Prefer the Worker's own admin flag; older Workers only list the uploader,
-    // so fall back to the admins named in the public session config.
-    const isAdminUpload = uploaderIsAdmin ?? (!!uploader && admins.has(uploader));
     return {
       createdAtMs,
       id,
       payload: compatiblePayload,
       storageRef,
       storageRefId: storageRef.id,
-      ...(isAdminUpload ? { uploaderIsAdmin: true } : {}),
+      uploadAuthority,
     };
   };
   const readRows = await mapWithConcurrency(uniqueItems, METADATA_READ_CONCURRENCY, readRow);
@@ -391,8 +373,8 @@ const loadWorkerCanonicalMetadata = async (
     .sort(
       (left, right) =>
         left.createdAtMs - right.createdAtMs ||
-        left.storageRefId.localeCompare(right.storageRefId) ||
-        left.id.localeCompare(right.id),
+        compareStorageIds(left.storageRefId, right.storageRefId) ||
+        compareStorageIds(left.id, right.id),
     );
   return [...[...hiddenIds].map((id): WorkerCanonicalHiddenMetadataRow => ({ hidden: true, id })), ...rows];
 };
@@ -423,7 +405,8 @@ const createWorkerSurveyCacheNode = (): UnknownRecord => ({
 const readCachedVersion = (ref: unknown, verifyCachedItem: () => boolean | null): CachedVersion | null => {
   if (!isRecord(ref)) return null;
   return {
-    admin: ref.admin === true,
+    admin: ref.uploadAuthority === 'admin',
+    uploadAuthority: typeof ref.uploadAuthority === 'string' ? ref.uploadAuthority : null,
     createdAtMs: Number(ref.createdAtMs || 0),
     storageRefId: readString(ref.storageRefId),
     // Always re-check the cached copy: older refs have no flag, or a flag that
@@ -458,7 +441,8 @@ const mergeMetadataEntries = ({
     const existing = isRecord(items[entry.id]) ? (items[entry.id] as UnknownRecord) : null;
     const current = readCachedVersion(refs[entry.id], () => (existing ? verify(entry.id, existing) : null));
     const candidate: CachedVersion = {
-      admin: entry.uploaderIsAdmin === true,
+      admin: entry.uploadAuthority === 'admin',
+      uploadAuthority: entry.uploadAuthority ?? null,
       createdAtMs: entry.createdAtMs,
       storageRefId: entry.storageRefId,
       verified: verify(entry.id, entry.payload),

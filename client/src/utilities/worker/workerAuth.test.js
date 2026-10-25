@@ -8,6 +8,7 @@ import {
   getWorkerAuthHeaders,
   getWorkerSessionToken,
   normalizeWorkerUrl,
+  noteWorkerAccessChanged,
 } from './workerAuth.js';
 import { getCorsProxyUrlOrThrow } from './corsProxy.js';
 import {
@@ -1532,6 +1533,210 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     expect(authedHeaders.get('Authorization')).toBe('Bearer token-1');
   });
 
+  it('returns the anonymous denial for a signed-out app even when the injected wallet is unlocked', async () => {
+    require('../../store.js').default.getState.mockReturnValue({
+      profile: { account: '', provider: 'wagmi' },
+      sessionState: {},
+    });
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResp(403, { error: 'Anonymous access denied: gated route requires authenticated worker token.' }),
+      );
+    const response = await fetchWorkerWithAuth(
+      'https://worker.example/transcribe',
+      { method: 'POST' },
+      { preferAnonymous: true, sessionSlug: 'alpha' },
+    );
+    expect(response.status).toBe(403);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mockProviderRequest).not.toHaveBeenCalled();
+  });
+
+  it('keeps a valid token after a terminal scope denial without asking for another signature', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }))
+      .mockResolvedValueOnce(jsonResp(403, { error: 'Token missing transcribe scope.' }));
+    const context = { account: TEST_ADDRESS, providerLike: 'wagmi', chainId: 84532 };
+    const response = await fetchWorkerWithAuth(
+      'https://worker.example/transcribe',
+      { method: 'POST' },
+      { sessionSlug: 'alpha', context },
+    );
+    expect(response.status).toBe(403);
+    expect(await getWorkerSessionToken({ workerUrl: 'https://worker.example', sessionSlug: 'alpha', context })).toBe(
+      'token-1',
+    );
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  describe('scope denials after access changes', () => {
+    const context = { account: TEST_ADDRESS, providerLike: 'wagmi', chainId: 84532 };
+    const transcribe = () =>
+      fetchWorkerWithAuth(
+        'https://worker.example/transcribe',
+        { method: 'POST' },
+        { preferAnonymous: true, sessionSlug: 'alpha', context },
+      );
+    // The Worker evaluates gates at sign-in, so each token carries the scopes held then.
+    const gatedTranscriptionWorker = ({ holdsGate, afterSignIn = () => {} }) => {
+      const logins = [];
+      global.fetch = jest.fn(async (url, options = {}) => {
+        if (url.endsWith('/auth/nonce')) return jsonResp(200, { nonce: `nonce-${logins.length + 1}` });
+        if (url.endsWith('/auth/login')) {
+          const token = `token-${logins.length + 1}-${holdsGate() ? 'scoped' : 'unscoped'}`;
+          logins.push(token);
+          afterSignIn(logins.length);
+          return jsonResp(200, { token, exp: Math.floor(Date.now() / 1000) + 3600 });
+        }
+        const authorization = new Headers(options.headers).get('Authorization') || '';
+        if (!authorization) {
+          return jsonResp(403, { error: 'Anonymous access denied: gated route requires authenticated worker token.' });
+        }
+        return authorization.endsWith('-scoped')
+          ? jsonResp(200, { text: 'ok' })
+          : jsonResp(403, { error: 'Token missing transcribe scope.' });
+      });
+      return logins;
+    };
+
+    it('signs in once more after an in-app access change grants the scope', async () => {
+      let holds = false;
+      const logins = gatedTranscriptionWorker({ holdsGate: () => holds });
+      expect((await transcribe()).status).toBe(403);
+      expect((await transcribe()).status).toBe(403);
+      expect(logins).toEqual(['token-1-unscoped']);
+
+      holds = true; // e.g. the participant claims the session's gate SBT
+      noteWorkerAccessChanged();
+      expect((await transcribe()).status).toBe(200);
+      expect((await transcribe()).status).toBe(200);
+      expect(logins).toEqual(['token-1-unscoped', 'token-2-scoped']);
+    });
+
+    it('asks a still-ineligible participant for one signature once a change settles, not one per attempt', async () => {
+      const logins = gatedTranscriptionWorker({ holdsGate: () => false });
+      expect((await transcribe()).status).toBe(403);
+      noteWorkerAccessChanged(); // e.g. a group join that this gate does not use
+      const settled = Date.now() + 31 * 1000;
+      const clock = jest.spyOn(Date, 'now').mockImplementation(() => settled);
+      try {
+        expect((await transcribe()).status).toBe(403);
+        expect((await transcribe()).status).toBe(403);
+      } finally {
+        clock.mockRestore();
+      }
+      expect(logins).toEqual(['token-1-unscoped', 'token-2-unscoped']);
+    });
+
+    it('signs in again while the Worker may still trail a just-confirmed mint', async () => {
+      let workerSeesGate = false;
+      const logins = gatedTranscriptionWorker({ holdsGate: () => workerSeesGate });
+      expect((await transcribe()).status).toBe(403);
+      noteWorkerAccessChanged(); // the wallet's RPC confirmed the mint; the Worker's has not caught up
+      expect((await transcribe()).status).toBe(403);
+      workerSeesGate = true;
+      expect((await transcribe()).status).toBe(200);
+      expect(logins).toEqual(['token-1-unscoped', 'token-2-unscoped', 'token-3-scoped']);
+    });
+
+    it('lets concurrent requests share one fresh sign-in after an access change', async () => {
+      let holds = false;
+      const logins = gatedTranscriptionWorker({ holdsGate: () => holds });
+      expect((await transcribe()).status).toBe(403);
+      holds = true;
+      noteWorkerAccessChanged();
+      // Deliver the second stale-token denial only after the first request has signed in again.
+      const workerFetch = global.fetch;
+      let releaseHeldDenial;
+      const firstRetrySent = new Promise((resolve) => {
+        releaseHeldDenial = resolve;
+      });
+      let staleDenials = 0;
+      global.fetch = jest.fn(async (url, options = {}) => {
+        const response = await workerFetch(url, options);
+        const authorization = new Headers(options.headers).get('Authorization') || '';
+        if (url.endsWith('/transcribe') && authorization.endsWith('-scoped')) releaseHeldDenial();
+        if (url.endsWith('/transcribe') && authorization.endsWith('token-1-unscoped')) {
+          staleDenials += 1;
+          if (staleDenials === 2) await firstRetrySent;
+        }
+        return response;
+      });
+      const statuses = (await Promise.all([transcribe(), transcribe()])).map((response) => response.status);
+      expect(statuses).toEqual([200, 200]);
+      expect(logins).toEqual(['token-1-unscoped', 'token-2-scoped']);
+    });
+
+    it('trusts new tokens at once after a sign-out clears earlier access changes', async () => {
+      const logins = gatedTranscriptionWorker({ holdsGate: () => false });
+      noteWorkerAccessChanged(); // a change noted for the previous sign-in
+      clearAllWorkerSessionTokens(); // sign-out or account switch
+      expect((await transcribe()).status).toBe(403);
+      expect((await transcribe()).status).toBe(403);
+      expect(logins).toEqual(['token-1-unscoped']);
+    });
+
+    it('treats an access change noted in another tab as a change here', async () => {
+      const channels = [];
+      class FakeBroadcastChannel {
+        constructor(name) {
+          this.name = name;
+          channels.push(this);
+        }
+
+        postMessage(data) {
+          channels
+            .filter((other) => other !== this && other.name === this.name)
+            .forEach((other) => other.onmessage?.({ data }));
+        }
+      }
+      let thisTab;
+      let otherTab;
+      global.BroadcastChannel = FakeBroadcastChannel;
+      try {
+        jest.isolateModules(() => {
+          thisTab = require('./workerAuth.js');
+        });
+        jest.isolateModules(() => {
+          otherTab = require('./workerAuth.js');
+        });
+      } finally {
+        delete global.BroadcastChannel;
+      }
+      let holds = false;
+      const logins = gatedTranscriptionWorker({ holdsGate: () => holds });
+      const transcribeHere = () =>
+        thisTab.fetchWorkerWithAuth(
+          'https://worker.example/transcribe',
+          { method: 'POST' },
+          { preferAnonymous: true, sessionSlug: 'alpha', context },
+        );
+      expect((await transcribeHere()).status).toBe(403);
+      holds = true;
+      otherTab.noteWorkerAccessChanged(); // e.g. the participant claims the gate SBT in another tab
+      expect((await transcribeHere()).status).toBe(200);
+      expect(logins).toEqual(['token-1-unscoped', 'token-2-scoped']);
+    });
+
+    it('does not treat a token whose sign-in overlapped an access change as current', async () => {
+      let holds = false;
+      const logins = gatedTranscriptionWorker({
+        holdsGate: () => holds,
+        afterSignIn: (count) => {
+          if (count !== 1) return;
+          // The claim confirms after the Worker issued this token's scopes.
+          holds = true;
+          noteWorkerAccessChanged();
+        },
+      });
+      expect((await transcribe()).status).toBe(200);
+      expect(logins).toEqual(['token-1-unscoped', 'token-2-scoped']);
+    });
+  });
+
   it('clears the active token cache entry and aborts auth retry when the store account switches', async () => {
     const mockStore = require('../../store.js').default;
     const cacheKey = `ce:workerToken:v1:${normalizeWorkerUrl('https://worker.example')}::${TEST_ADDRESS}`;
@@ -1634,10 +1839,20 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     expect(String(global.fetch.mock.calls[2][0])).toMatch(/\/auth\/login$/);
   });
 
-  it('falls back to authenticated flow when anonymous Cloudflare storage read is SBT-gated', async () => {
+  it.each([
+    [401, { error: 'Missing requester address for worker SBT gate.' }],
+    [403, { error: 'Access denied: Cloudflare storage conditions failed.', reason: 'missing_principal' }],
+    [
+      403,
+      {
+        error: 'Access denied: individual response access requires its author.',
+        reason: 'private_response_owner_required',
+      },
+    ],
+  ])('signs in for a Cloudflare storage denial that requires a principal (%s)', async (status, denial) => {
     global.fetch = jest
       .fn()
-      .mockResolvedValueOnce(jsonResp(401, { error: 'Missing requester address for worker SBT gate.' })) // anonymous storage read
+      .mockResolvedValueOnce(jsonResp(status, denial)) // anonymous storage read
       .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' })) // auth/nonce
       .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 })) // auth/login
       .mockResolvedValueOnce(jsonResp(200, { ok: true })); // authed fetch
@@ -1662,6 +1877,22 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     expect(String(global.fetch.mock.calls[1][0])).toMatch(/\/auth\/nonce$/);
     expect(String(global.fetch.mock.calls[2][0])).toMatch(/\/auth\/login$/);
     expect(new Headers(global.fetch.mock.calls[3][1].headers).get('Authorization')).toBe('Bearer token-1');
+  });
+
+  it('does not initiate sign-in for a storage condition failure with an existing principal', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce(
+      jsonResp(403, {
+        error: 'Access denied: Cloudflare storage conditions failed.',
+        reason: 'condition_failed',
+      }),
+    );
+    const response = await fetchWorkerWithAuth(
+      'https://worker.example/storage/list?resource=questions',
+      { method: 'GET' },
+      { sessionSlug: 'alpha', preferAnonymous: true },
+    );
+    expect(response.status).toBe(403);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to authenticated flow after anonymous 429 worker rate-limit denial', async () => {

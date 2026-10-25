@@ -1,3 +1,4 @@
+import { executeCoordinatedStorageVisibilityMutation } from './sessionConfigAuthority.js';
 import {
   ADMIN_SESSION_SECRET_KEYS as ALLOWED_SECRET_KEYS,
   ensureSessionLitAuthorizationSigner,
@@ -26,7 +27,6 @@ import {
 } from '../shared/deployHelperCore.mjs';
 import {
   exportCloudflareEncryptedPayloadEnvelopes,
-  setCloudflareStorageResourceHidden,
 } from './storageRouteExecution.js';
 import {
   dispatchAdminWorkerGroupRequest,
@@ -116,12 +116,13 @@ const executeDirectSessionConfigMutation = async ({
   env,
   slug,
   existingConfig,
+  expectedAuthority,
   mutation,
   deps,
 } = {}) => {
   const coordinate = deps?.executeCoordinatedSessionConfigMutation ||
     executeCoordinatedSessionConfigMutation;
-  return coordinate({ env, slug, existingConfig, mutation });
+  return coordinate({ env, slug, existingConfig, mutation, expectedAuthority });
 };
 
 export const dispatchAdminRequest = async ({
@@ -174,6 +175,7 @@ export const dispatchAdminRequest = async ({
     existingConfig,
     headers,
     targetSlug,
+    expectedAuthority,
   } = authorityResult;
 
   if (action?.startsWith?.('groups/')) {
@@ -223,15 +225,15 @@ export const dispatchAdminRequest = async ({
 
   if (action === 'storage/set-hidden') {
     try {
-      const result = await (deps?.setCloudflareStorageResourceHidden || setCloudflareStorageResourceHidden)({
+      const result = await (deps?.executeCoordinatedStorageVisibilityMutation || executeCoordinatedStorageVisibilityMutation)({
         env,
         config: existingConfig,
         slug: targetSlug,
         body,
-        actor: authorityResult.address,
+        expectedAuthority,
         deps: { now: deps?.now },
       });
-      return deps?.json?.(result?.ok ? result.body : { error: result?.error }, result?.status || 500, headers);
+      return deps?.json?.(result?.body || { error: result?.error }, result?.status || 500, headers);
     } catch (error) {
       return deps?.json?.({ error: error?.message || 'Storage visibility update failed.' }, 500, headers);
     }
@@ -267,6 +269,7 @@ export const dispatchAdminRequest = async ({
       env,
       slug: targetSlug,
       existingConfig,
+      expectedAuthority,
       mutation: { kind: 'set-config', incomingConfig: incoming },
       deps,
     });
@@ -288,7 +291,7 @@ export const dispatchAdminRequest = async ({
     // Repair any earlier Lit projection before accepting a later secret edit.
     // Otherwise replaying that journal could overwrite an acknowledged update.
     const updated = await (deps?.updateSessionSecretsAfterLitRepair || updateSessionSecretsAfterLitRepair)({
-      env, slug: targetSlug, incomingSecrets,
+      env, slug: targetSlug, incomingSecrets, expectedAuthority,
     });
     return deps?.json?.(
       updated?.body || { error: 'Session secret update could not be finalized; retry.' },
@@ -336,7 +339,7 @@ export const dispatchAdminRequest = async ({
         sessionSlug: targetSlug,
         persistAuthorizationSecret: async (proposedPrivateKey) => {
           const privateKey = await (deps?.ensureSessionLitAuthorizationSigner || ensureSessionLitAuthorizationSigner)({
-            env, slug: targetSlug, proposedPrivateKey, baseConfig: existingConfig,
+            env, slug: targetSlug, proposedPrivateKey, baseConfig: existingConfig, expectedAuthority,
           });
           existingSecrets.litAuthorizationPrivateKey = privateKey;
           return privateKey;
@@ -355,7 +358,7 @@ export const dispatchAdminRequest = async ({
       // Commit the secret and public descriptor as one coordinator authority update.
       // Separate KV writes can mix credentials from concurrent bootstrap completions.
       const finalized = await (deps?.finalizeSessionLitAuthorization || finalizeSessionLitAuthorization)({
-        env, slug: targetSlug, baseConfig: existingConfig,
+        env, slug: targetSlug, baseConfig: existingConfig, expectedAuthority,
         litCredentials: result?.litCredentials,
         secretOutputs: result?.secretOutputs,
       });
@@ -367,7 +370,7 @@ export const dispatchAdminRequest = async ({
       delete responseBody.litCredentials;
       return deps?.json?.(responseBody, 200, headers);
     } catch (error) {
-      return deps?.json?.({ error: error?.message || 'Failed to provision Lit authorization.' }, 502, headers);
+      return deps?.json?.({ error: error?.message || 'Failed to provision Lit authorization.' }, error?.status || 502, headers);
     }
   }
 
@@ -379,6 +382,7 @@ export const dispatchAdminRequest = async ({
       env,
       slug: targetSlug,
       existingConfig,
+      expectedAuthority,
       mutation: { kind: 'set-limits', incomingLimits: incoming },
       deps,
     });
@@ -396,13 +400,14 @@ export const dispatchAdminRequest = async ({
         slug: targetSlug,
         config: existingConfig,
         resource: toTrimmedString(body?.resource),
+        cursor: body?.cursor ?? '',
         includeSessionEnvelope: true,
         deps: {
           now: deps?.now,
         },
       });
       return deps?.json?.(
-        result?.ok ? result : { error: result?.error || 'Encrypted-envelope export failed.' },
+        result || { error: 'Encrypted-envelope export failed.' },
         result?.ok ? 200 : (result?.status || 500),
         headers,
       );

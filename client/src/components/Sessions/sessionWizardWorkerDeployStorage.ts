@@ -38,11 +38,14 @@ export const buildSessionWizardDeployStorageProfilePayload = (
   draft: AnyRecord,
   deployPayload: AnyRecord,
 ): AnyRecord | null => {
-  const { storageProfile } = resolveSessionWizardWorkerStorageProfilePayload({
+  const { storageProfile, sessionModeProfile } = resolveSessionWizardWorkerStorageProfilePayload({
     draft,
     deployPayload,
   });
-  if (toStr(storageProfile.backend).trim().toLowerCase() !== 'cloudflare') return null;
+  // A versioned profile must include its matching storage side for deploy validation.
+  if (toStr(storageProfile.backend).trim().toLowerCase() !== 'cloudflare') {
+    return sessionModeProfile ? storageProfile : null;
+  }
   const r2BucketName = resolveDeployOnlyR2BucketName(draft, deployPayload);
   if (!r2BucketName) return storageProfile;
   return {

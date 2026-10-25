@@ -55,6 +55,7 @@ type LoginSettingsOverviewHost = {
   _sessionCapabilityProjectionResolver: typeof resolveSessionCapabilityProjection | null;
   _settingsOverviewMemo: { key: string; value: LoginSettingsOverviewContext } | null;
   getActiveSessionSlug: () => string;
+  getActiveWorkerResourcePresence?: () => unknown;
   getDisplaySessionConfig: (slug: string) => any;
   getTargetNetwork: () => any;
   getSessionDescriptor: (slug: string, config: any) => SettingsSessionDescriptor;
@@ -93,7 +94,11 @@ const FAIL_CLOSED_SESSION_CAPABILITIES = Object.freeze({
 export const getLoginSettingsOverviewContext = (host: LoginSettingsOverviewHost): LoginSettingsOverviewContext => {
   const sessionSlug = host.getActiveSessionSlug();
   const sessionConfig = host.getDisplaySessionConfig(sessionSlug);
-  const capabilities = host._sessionCapabilityProjectionResolver?.(sessionConfig) || FAIL_CLOSED_SESSION_CAPABILITIES;
+  const presence = host.getActiveWorkerResourcePresence
+    ? host.getActiveWorkerResourcePresence()
+    : host.state.workerResourcePresence;
+  const capabilities =
+    host._sessionCapabilityProjectionResolver?.(sessionConfig, presence) || FAIL_CLOSED_SESSION_CAPABILITIES;
   const walletNet = host.props.provider === 'wagmi' ? host.props.wagmiNetwork : host.props.network;
   const targetNetwork = host.getTargetNetwork();
   const targetNetworkName = targetNetwork?.name || 'not configured';

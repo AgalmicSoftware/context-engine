@@ -192,6 +192,11 @@ const SPONSOR_RELEASE_NOT_CONFIGURED_PATTERN =
 // nothing but keeps the grant reserved for that exact request, so only the
 // same request can retry it; its wording tells the redeemer to pass a bundle.
 const OLDER_SPONSOR_WITHOUT_BUNDLE_PATTERN = /^Missing bundleText or bundleUrl\b/;
+// Deploy helpers older than 0.7.0, including the one self-hosted builds pin,
+// refuse the participant test-ETH grant before deploying anything. A sponsoring
+// Worker has already reserved its grant for that exact request by then.
+const OLDER_HELPER_PARTICIPANT_SCOPE_PATTERN =
+  /^Worker-canonical authority participantScopes contains an unsupported scope\.?$/;
 
 export const describeSessionWizardSponsoredDeployFailure = ({
   status,
@@ -209,6 +214,13 @@ export const describeSessionWizardSponsoredDeployFailure = ({
       'The sponsoring Worker has no Worker release to deploy, so nothing was deployed. The grant now only works for ' +
       'this exact request: retry this same draft here once the sponsor sets WORKER_BUNDLE_URL on that Worker. ' +
       'If the sponsor updates its Worker code instead, ask for a new deploy grant.'
+    );
+  }
+  if (status === 400 && OLDER_HELPER_PARTICIPANT_SCOPE_PATTERN.test(message)) {
+    return (
+      'The sponsoring Worker predates participant test ETH, so nothing was deployed. The grant now only works for ' +
+      'this exact request: retry this same draft once the sponsor updates that Worker to 0.7.0 or later. To deploy ' +
+      'without test ETH instead, ask for a new deploy grant.'
     );
   }
   return message || `Worker deploy failed (${status}).`;
@@ -279,6 +291,14 @@ export const normalizeSessionWizardDeployErrorMessage = ({
     const base = raw || responseError || 'This deployment attempt cannot be reused.';
     return withOrphanResources(
       `${base} Review the account and session details, then click Deploy worker again to start a fresh deployment attempt.`,
+    );
+  }
+  // Sponsored failures arrive already described; this advice fits direct deploys,
+  // whose next attempt is a fresh request.
+  if (OLDER_HELPER_PARTICIPANT_SCOPE_PATTERN.test(raw)) {
+    return withOrphanResources(
+      `${raw} This deploy helper predates participant test ETH. Turn off "Send participants test ETH ` +
+        'for gas", or deploy with a 0.7.0 or later deploy helper and Session Worker.',
     );
   }
   if (raw) return withOrphanResources(raw);

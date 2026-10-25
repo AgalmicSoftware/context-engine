@@ -103,6 +103,7 @@ export const verifyAdminSignature = async ({
       validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
       consumeNonce: deps?.consumeNonce,
       validateAdmin: deps?.validateAdmin,
+      readCurrentSessionConfig: deps?.readCurrentSessionConfig,
       MISSING_SLUG_ERROR: deps?.MISSING_SLUG_ERROR,
     },
   });

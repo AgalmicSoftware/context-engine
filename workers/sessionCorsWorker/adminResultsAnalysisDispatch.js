@@ -1,3 +1,4 @@
+import { resolveAuthenticatedRouteContext } from './authenticatedRouteContextResolution.js';
 import {
   ABUSE_COUNTER_TYPES,
   recordAbuseEvent,
@@ -72,12 +73,13 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
   if (!auth?.ok) return auth?.response;
 
   const targetSlug = auth.slug || slug;
-  const config = await deps?.getSessionConfig?.(env, targetSlug);
-  if (!config) return deps?.json?.({ error: 'Session config not found.' }, 404, baseHeaders);
-
-  const corsContext = await deps?.getCorsContext?.({ request, config, baseHeaders });
-  if (corsContext && !corsContext.ok) return corsContext.response;
-  const headers = withPrivateNoStoreHeaders(corsContext?.headers || baseHeaders);
+  const context = await resolveAuthenticatedRouteContext({
+    request, env, auth, baseHeaders,
+    deps: { ...deps, SESSION_CONFIG_NOT_FOUND_ERROR: 'Session config not found.' },
+  });
+  if (!context.ok) return context.response;
+  const config = context.config;
+  const headers = withPrivateNoStoreHeaders(context.headers);
 
   const address = toTrimmedString(auth.payload?.sub, deps).toLowerCase();
   const isAdmin = await deps?.validateAdmin?.({

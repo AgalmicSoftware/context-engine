@@ -55,6 +55,7 @@ type WhisperState = {
   errorMessage: string;
   startRecording: () => void;
   stopRecording: () => void;
+  cancelRecording: () => void;
   pauseRecording: () => void;
   resumeRecording: () => void;
   audioContextRef: MutableRef<AudioContextLike>;
@@ -109,6 +110,7 @@ const buildWhisperState = (overrides: Partial<WhisperState> = {}): WhisperState 
   errorMessage: '',
   startRecording: jest.fn(),
   stopRecording: jest.fn(),
+  cancelRecording: jest.fn(),
   pauseRecording: jest.fn(),
   resumeRecording: jest.fn(),
   audioContextRef: { current: null },
@@ -551,7 +553,7 @@ describe('AudioInput', () => {
     expect(updateSpy).toHaveBeenLastCalledWith('hello');
   });
 
-  it('coalesces burst typing into a single parent update per frame', () => {
+  it('publishes typed edits before the next frame', () => {
     const updateSpy = jest.fn();
     act(() => {
       root.render(<AudioInput updateFunction={updateSpy} value="" placeholder="Speak" />);
@@ -564,13 +566,9 @@ describe('AudioInput', () => {
       changeElementValue(textarea, 'ab');
       changeElementValue(textarea, 'abc');
     });
-    expect(updateSpy).not.toHaveBeenCalled();
-
-    act(() => {
-      flushRafQueue();
-    });
-    expect(updateSpy).toHaveBeenCalledTimes(1);
     expect(updateSpy).toHaveBeenLastCalledWith('abc');
+    act(() => flushRafQueue());
+    expect(updateSpy).toHaveBeenCalledTimes(3);
   });
 
   it('keeps AI waiting text out of parent updates during rerenders', () => {
@@ -627,7 +625,7 @@ describe('AudioInput', () => {
     expect(updateFns.reduce((count, fn) => count + fn.mock.calls.length, 0)).toBe(0);
   });
 
-  it('cancels queued parent updates on unmount', () => {
+  it('does not repeat a delivered edit after unmount', () => {
     const updateSpy = jest.fn();
     act(() => {
       root.render(<AudioInput updateFunction={updateSpy} value="" placeholder="Speak" />);
@@ -638,7 +636,7 @@ describe('AudioInput', () => {
     act(() => {
       changeElementValue(textarea, 'queued');
     });
-    expect(updateSpy).not.toHaveBeenCalled();
+    expect(updateSpy).toHaveBeenCalledTimes(1);
 
     act(() => {
       root.unmount();
@@ -647,7 +645,32 @@ describe('AudioInput', () => {
     act(() => {
       flushRafQueue();
     });
-    expect(updateSpy).not.toHaveBeenCalled();
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes record, rewrite and revert controls through stable test IDs', async () => {
+    mockRequestAiRewrite.mockResolvedValue('Polished version');
+
+    act(() => {
+      root.render(<AudioInput updateFunction={jest.fn()} value="Original version" placeholder="Speak" />);
+    });
+
+    expect(requireElement(container.querySelector('[data-testid="ce-audio-input-record"]'))).toHaveAttribute(
+      'aria-label',
+      'Start recording',
+    );
+    await act(async () => {
+      clickElement(requireElement(container.querySelector('[data-testid="ce-audio-input-ai-rewrite"]')));
+      await Promise.resolve();
+    });
+    act(() => {
+      flushRafQueue();
+    });
+    expect(container.querySelector('[data-testid="ce-audio-input-ai-rewrite"]')).toBeNull();
+    expect(requireElement(container.querySelector('[data-testid="ce-audio-input-ai-revert"]'))).toHaveAttribute(
+      'aria-label',
+      'Revert to original',
+    );
   });
 
   it('emits rewritten text and reverted text through the parent update callback', async () => {
@@ -758,5 +781,355 @@ describe('AudioInput', () => {
     expect((textarea as HTMLTextAreaElement).value).toBe('Second current draft');
     expect(updateSpy).toHaveBeenLastCalledWith('Second current draft');
     expect(updateSpy).not.toHaveBeenLastCalledWith('First original');
+  });
+
+  it('disables rewrite and revert controls while the editor is disabled', async () => {
+    const update = jest.fn();
+    act(() => root.render(<AudioInput value="Original" updateFunction={update} disabled />));
+    const rewrite = screen.getByRole('button', { name: 'AI rewrite' }) as HTMLButtonElement;
+    expect(rewrite.disabled).toBe(true);
+    act(() => clickElement(rewrite));
+    expect(mockRequestAiRewrite).not.toHaveBeenCalled();
+    act(() => root.render(<AudioInput value="Original" updateFunction={update} />));
+    await act(async () => {
+      clickElement(screen.getByRole('button', { name: 'AI rewrite' }));
+    });
+    act(() => flushRafQueue());
+    update.mockClear();
+    act(() => root.render(<AudioInput value="Original" updateFunction={update} disabled />));
+    const revert = screen.getByRole('button', { name: 'Revert to original' }) as HTMLButtonElement;
+    expect(revert.disabled).toBe(true);
+    act(() => {
+      clickElement(revert);
+      flushRafQueue();
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('starts only one rewrite when clicked twice before a render', () => {
+    mockRequestAiRewrite.mockReturnValue(new Promise(() => {}));
+    act(() => root.render(<AudioInput value="Original" />));
+    const rewrite = screen.getByRole('button', { name: 'AI rewrite' });
+    act(() => {
+      clickElement(rewrite);
+      clickElement(rewrite);
+    });
+    expect(mockRequestAiRewrite).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['value', { value: 'Different answer' }],
+    ['slug', { sessionSlug: 'new-session' }],
+    ['Worker URL', { workerUrl: 'https://new.worker.test' }],
+    ['session ID', { sessionConfig: { sessionId: 'new-session-id' } }],
+    ['configured Worker', { sessionConfig: { corsWorkerUrl: 'https://new.worker.test' } }],
+    ['account', { context: { account: '0x222' } }],
+    ['question', { dataCeQuestionId: 'new-question' }],
+  ] as const)('rejects pending rewrite success after the %s changes', async (_label, changes) => {
+    let finish!: (text: string) => void;
+    mockRequestAiRewrite.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const oldUpdate = jest.fn();
+    const newUpdate = jest.fn();
+    const props = {
+      value: 'Original',
+      sessionSlug: 'old-session',
+      workerUrl: 'https://old.worker.test',
+      sessionConfig: { sessionId: 'old-session-id', corsWorkerUrl: 'https://old.worker.test' },
+      context: { account: '0x111' },
+      dataCeQuestionId: 'old-question',
+    };
+    act(() => root.render(<AudioInput {...props} updateFunction={oldUpdate} />));
+    act(() => clickElement(screen.getByRole('button', { name: 'AI rewrite' })));
+    act(() => root.render(<AudioInput {...props} {...changes} updateFunction={newUpdate} />));
+    await act(async () => {
+      finish('Obsolete rewrite');
+    });
+    act(() => flushRafQueue());
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(
+      'value' in changes ? changes.value : 'Original',
+    );
+    expect(oldUpdate).not.toHaveBeenCalled();
+    expect(newUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Revert to original' })).toBeNull();
+  });
+
+  it('does not restore an obsolete draft when a pending rewrite fails after a value reset', async () => {
+    let fail!: (error: Error) => void;
+    mockRequestAiRewrite.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        fail = reject;
+      }),
+    );
+    const update = jest.fn();
+    act(() => root.render(<AudioInput value="Original" updateFunction={update} />));
+    act(() => clickElement(screen.getByRole('button', { name: 'AI rewrite' })));
+    act(() => root.render(<AudioInput value="Reset answer" updateFunction={update} />));
+    await act(async () => {
+      fail(new Error('late failure'));
+    });
+    act(() => flushRafQueue());
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Reset answer');
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('invalidates a pending rewrite when disabled and permits a fresh rewrite after enabling', async () => {
+    let finish!: (text: string) => void;
+    mockRequestAiRewrite.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const update = jest.fn();
+    act(() => root.render(<AudioInput value="Original" updateFunction={update} />));
+    act(() => clickElement(screen.getByRole('button', { name: 'AI rewrite' })));
+    act(() => root.render(<AudioInput value="Original" updateFunction={update} disabled />));
+    await act(async () => {
+      finish('Obsolete rewrite');
+    });
+    act(() => flushRafQueue());
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Original');
+    expect(update).not.toHaveBeenCalled();
+    act(() => root.render(<AudioInput value="Original" updateFunction={update} />));
+    await act(async () => {
+      clickElement(screen.getByRole('button', { name: 'AI rewrite' }));
+    });
+    act(() => flushRafQueue());
+    expect(update).toHaveBeenCalledWith('rewritten');
+  });
+
+  it('clears rewrite undo after an external value reset', async () => {
+    const update = jest.fn();
+    act(() => root.render(<AudioInput value="Original" updateFunction={update} />));
+    await act(async () => {
+      clickElement(screen.getByRole('button', { name: 'AI rewrite' }));
+    });
+    act(() => flushRafQueue());
+    act(() => root.render(<AudioInput value="Reset answer" updateFunction={update} />));
+    expect(screen.queryByRole('button', { name: 'Revert to original' })).toBeNull();
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Reset answer');
+  });
+
+  it('delivers a completed rewrite to its source before a later source change clears undo', async () => {
+    const oldUpdate = jest.fn();
+    const newUpdate = jest.fn();
+    act(() => root.render(<AudioInput value="Original" sessionSlug="old" updateFunction={oldUpdate} />));
+    await act(async () => {
+      clickElement(screen.getByRole('button', { name: 'AI rewrite' }));
+    });
+    act(() => root.render(<AudioInput value="Original" sessionSlug="new" updateFunction={newUpdate} />));
+    act(() => flushRafQueue());
+    expect(oldUpdate).toHaveBeenCalledWith('rewritten');
+    expect(newUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Revert to original' })).toBeNull();
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Original');
+  });
+
+  it('keeps rewrite and undo across equivalent source objects, callback changes, and controlled echoes', async () => {
+    let finish!: (text: string) => void;
+    mockRequestAiRewrite.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const oldUpdate = jest.fn();
+    const newUpdate = jest.fn();
+    const source = () => ({
+      sessionSlug: 'same',
+      sessionConfig: { sessionId: 'same-id' },
+      context: { account: '0x111' },
+    });
+    act(() => root.render(<AudioInput {...source()} value="Original" updateFunction={oldUpdate} />));
+    act(() => clickElement(screen.getByRole('button', { name: 'AI rewrite' })));
+    act(() => root.render(<AudioInput {...source()} value="Original" updateFunction={newUpdate} />));
+    await act(async () => {
+      finish('Polished');
+    });
+    act(() => flushRafQueue());
+    expect(oldUpdate).not.toHaveBeenCalled();
+    expect(newUpdate).toHaveBeenLastCalledWith('Polished');
+    act(() => root.render(<AudioInput {...source()} value="Polished" updateFunction={newUpdate} />));
+    act(() => {
+      clickElement(screen.getByRole('button', { name: 'Revert to original' }));
+      flushRafQueue();
+    });
+    expect(newUpdate).toHaveBeenLastCalledWith('Original');
+  });
+
+  it.each([
+    ['value', { value: 'Replacement answer' }],
+    ['source', { workerUrl: 'https://replacement.worker.test' }],
+    ['disabled', { disabled: true }],
+  ] as const)('discards old dictation and cancels recording when the %s changes', (_label, changes) => {
+    const update = jest.fn();
+    const whisper = buildWhisperState();
+    mockUseWhisper.mockReturnValue(whisper);
+    const props = { value: 'Original', workerUrl: 'https://original.worker.test', updateFunction: update };
+    act(() => root.render(<AudioInput {...props} />));
+    const oldCallbacks = mockUseWhisper.mock.calls.at(-1)?.[0] as { onTranscriptionComplete: (text: string) => void };
+    act(() => clickElement(screen.getByRole('button', { name: 'Start recording' })));
+    expect(whisper.startRecording).toHaveBeenCalledTimes(1);
+    act(() => root.render(<AudioInput {...props} {...changes} />));
+    act(() => {
+      oldCallbacks.onTranscriptionComplete('Obsolete dictation');
+      flushRafQueue();
+    });
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(
+      'value' in changes ? changes.value : 'Original',
+    );
+    expect(update).not.toHaveBeenCalled();
+    expect(whisper.cancelRecording).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not revive old dictation after switching away and back to the same source', () => {
+    const update = jest.fn();
+    act(() => root.render(<AudioInput value="Original" sessionSlug="a" updateFunction={update} />));
+    const oldCallbacks = mockUseWhisper.mock.calls.at(-1)?.[0] as { onTranscriptionComplete: (text: string) => void };
+    act(() => root.render(<AudioInput value="Original" sessionSlug="b" updateFunction={update} />));
+    act(() => root.render(<AudioInput value="Original" sessionSlug="a" updateFunction={update} />));
+    act(() => {
+      oldCallbacks.onTranscriptionComplete('Obsolete dictation');
+      flushRafQueue();
+    });
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Original');
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('appends current dictation after a controlled echo of the user’s own edit', () => {
+    const update = jest.fn();
+    act(() => root.render(<AudioInput value="Original" updateFunction={update} />));
+    const callbacks = mockUseWhisper.mock.calls.at(-1)?.[0] as { onTranscriptionComplete: (text: string) => void };
+    act(() => {
+      changeElementValue(screen.getByRole('textbox'), 'Typed draft');
+      flushRafQueue();
+    });
+    act(() => root.render(<AudioInput value="Typed draft" updateFunction={update} />));
+    act(() => {
+      callbacks.onTranscriptionComplete('Current dictation');
+      flushRafQueue();
+    });
+    expect(update).toHaveBeenLastCalledWith('Typed draft Current dictation');
+  });
+
+  it.each([
+    { status: RECORDING_STATUS.REQUESTING_PERMISSION },
+    { isRecording: true },
+    { isPaused: true },
+    { isProcessing: true },
+    { isStreaming: true },
+  ])('prevents rewrite during dictation activity %j', (activity) => {
+    mockUseWhisper.mockReturnValue(buildWhisperState(activity));
+    act(() => root.render(<AudioInput value="Original" />));
+    const rewrite = screen.getByRole('button', { name: 'AI rewrite' }) as HTMLButtonElement;
+    expect(rewrite.disabled).toBe(true);
+    act(() => clickElement(rewrite));
+    expect(mockRequestAiRewrite).not.toHaveBeenCalled();
+  });
+
+  it('guards rewrite immediately after requesting the microphone before a render', () => {
+    act(() => root.render(<AudioInput value="Original" />));
+    const rewrite = screen.getByRole('button', { name: 'AI rewrite' });
+    act(() => {
+      clickElement(screen.getByRole('button', { name: 'Start recording' }));
+      clickElement(rewrite);
+    });
+    expect(mockRequestAiRewrite).not.toHaveBeenCalled();
+  });
+
+  it('releases the microphone-start guard when its field is replaced', async () => {
+    mockUseWhisper.mockReturnValue(buildWhisperState({ startRecording: jest.fn(() => new Promise(() => {})) }));
+    act(() => root.render(<AudioInput value="Original" sessionSlug="a" />));
+    act(() => clickElement(screen.getByRole('button', { name: 'Start recording' })));
+    act(() => root.render(<AudioInput value="Replacement" sessionSlug="b" />));
+    await act(async () => clickElement(screen.getByRole('button', { name: 'AI rewrite' })));
+    expect(mockRequestAiRewrite).toHaveBeenCalledWith('Replacement', expect.objectContaining({ sessionSlug: 'b' }));
+  });
+
+  it('does not let an old microphone request clear a newer startup guard', async () => {
+    let finishFirst: () => void;
+    const startRecording = jest
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishFirst = resolve;
+          }),
+      )
+      .mockImplementationOnce(() => new Promise(() => {}));
+    mockUseWhisper.mockReturnValue(buildWhisperState({ startRecording }));
+    act(() => root.render(<AudioInput value="Original" sessionSlug="a" />));
+    act(() => clickElement(screen.getByRole('button', { name: 'Start recording' })));
+    act(() => root.render(<AudioInput value="Replacement" sessionSlug="b" />));
+    act(() => clickElement(screen.getByRole('button', { name: 'Start recording' })));
+    await act(async () => finishFirst());
+    act(() => clickElement(screen.getByRole('button', { name: 'AI rewrite' })));
+    expect(mockRequestAiRewrite).not.toHaveBeenCalled();
+  });
+
+  it('ignores another record click while microphone startup is pending', async () => {
+    const startRecording = jest
+      .fn()
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockResolvedValue(undefined);
+    mockUseWhisper.mockReturnValue(buildWhisperState({ startRecording }));
+    act(() => root.render(<AudioInput value="Original" />));
+    await act(async () => {
+      clickElement(screen.getByRole('button', { name: 'Start recording' }));
+      clickElement(screen.getByRole('button', { name: 'Start recording' }));
+    });
+    act(() => clickElement(screen.getByRole('button', { name: 'AI rewrite' })));
+    expect(startRecording).toHaveBeenCalledTimes(1);
+    expect(mockRequestAiRewrite).not.toHaveBeenCalled();
+  });
+
+  it.each(['rewrite', 'dictation', 'typing'] as const)(
+    'submits the completed %s before an animation frame',
+    async (kind) => {
+      const submit = jest.fn();
+      const Form = () => {
+        const [answer, setAnswer] = React.useState('Original');
+        const [disabled, setDisabled] = React.useState(false);
+        return (
+          <>
+            <AudioInput value={answer} updateFunction={setAnswer} disabled={disabled} />
+            <button
+              onClick={() => {
+                submit(answer);
+                setDisabled(true);
+              }}
+            >
+              Submit
+            </button>
+          </>
+        );
+      };
+      act(() => root.render(<Form />));
+      if (kind === 'rewrite') {
+        await act(async () => clickElement(screen.getByRole('button', { name: 'AI rewrite' })));
+      } else if (kind === 'typing') {
+        act(() => changeElementValue(screen.getByRole('textbox'), 'Typed'));
+      } else {
+        const callbacks = mockUseWhisper.mock.calls.at(-1)?.[0] as { onTranscriptionComplete: (text: string) => void };
+        act(() => callbacks.onTranscriptionComplete('dictated'));
+      }
+      act(() => clickElement(screen.getByRole('button', { name: 'Submit' })));
+      expect(submit).toHaveBeenCalledWith(
+        kind === 'rewrite' ? 'rewritten' : kind === 'typing' ? 'Typed' : 'Original dictated',
+      );
+      act(() => flushRafQueue());
+      expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(submit.mock.calls[0][0]);
+    },
+  );
+
+  it('preserves a completed typed update when the same input becomes disabled', () => {
+    const update = jest.fn();
+    act(() => root.render(<AudioInput value="Original" updateFunction={update} />));
+    act(() => changeElementValue(screen.getByRole('textbox'), 'Typed'));
+    act(() => root.render(<AudioInput value="Original" updateFunction={update} disabled />));
+    act(() => flushRafQueue());
+    expect(update).toHaveBeenLastCalledWith('Typed');
   });
 });

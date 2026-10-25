@@ -43,11 +43,6 @@ export const REQUIRED_AGENT_BRIDGE_SECRET_NAMES = Object.freeze([
   'AGENT_BRIDGE_AGENT_API_TOKEN',
 ]);
 
-export const REQUIRED_AGENT_BRIDGE_TELEGRAM_SECRET_NAMES = Object.freeze([
-  'TELEGRAM_BOT_TOKEN',
-  'TELEGRAM_WEBHOOK_SECRET',
-]);
-
 export const OPTIONAL_AGENT_BRIDGE_SECRET_NAMES = Object.freeze([
   'AGENT_BRIDGE_OPENAI_API_KEY',
   'AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY',
@@ -60,10 +55,6 @@ export const REQUIRED_AGENT_BRIDGE_VAR_NAMES = Object.freeze([
   'DEFAULT_RPC_URL',
 ]);
 
-export const REQUIRED_AGENT_BRIDGE_TELEGRAM_VAR_NAMES = Object.freeze([
-  'TELEGRAM_BOT_USERNAME',
-]);
-
 export const OPTIONAL_AGENT_BRIDGE_VAR_NAMES = Object.freeze([
   'ADDITIONAL_RPC_URL',
   'AGENT_BRIDGE_SESSION_POLICY_JSON',
@@ -73,10 +64,8 @@ export const OPTIONAL_AGENT_BRIDGE_VAR_NAMES = Object.freeze([
   'AGENT_BRIDGE_ALLOW_DEMO_QUESTION_FALLBACK',
   'AGENT_BRIDGE_ALLOW_AD_HOC_QUESTIONS',
   'AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN',
-  'AGENT_BRIDGE_MINI_APP_URL',
   'AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS',
-  'AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS',
-  'AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS',
+  'AGENT_BRIDGE_SESSION_CREATED_AFTER',
   'AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES',
   'AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS',
   'AGENT_BRIDGE_SESSION_WRAPPED_SKILL_URL',
@@ -84,7 +73,6 @@ export const OPTIONAL_AGENT_BRIDGE_VAR_NAMES = Object.freeze([
   'AGENT_BRIDGE_AGENT_WRAPPED_POSTER_DEFAULT',
   'AGENT_BRIDGE_AGENT_WRAPPED_STORY_DEFAULT',
   'AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT',
-  'AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER',
   'AGENT_BRIDGE_RPC_TIMEOUT_MS',
   'AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS',
   'AGENT_BRIDGE_QUESTION_SCAN_BLOCKS',
@@ -97,6 +85,21 @@ export const OPTIONAL_AGENT_BRIDGE_VAR_NAMES = Object.freeze([
   'AGENT_BRIDGE_MAX_REGISTRY_SESSIONS',
   'AGENT_BRIDGE_SESSION_REGISTRY_ADDRESS',
 ]);
+
+const RETIRED_TRANSPORT_FLAGS = new Set([
+  'enable-telegram', 'skip-telegram-webhook', 'telegram-bot-username',
+  'telegram-bot-token', 'telegram-webhook-secret',
+]);
+
+export function assertNoRetiredAgentBridgeFlags(flags = {}) {
+  for (const name of Object.keys(flags)) {
+    if (RETIRED_TRANSPORT_FLAGS.has(name)) throw new Error(`Retired transport flag --${name}; remove it before deploying Agent Bridge.`);
+  }
+}
+
+const isRetiredTransportVar = (name) => name.startsWith('TELEGRAM_') ||
+  name.startsWith('AGENT_BRIDGE_MINI_APP_') || name.startsWith('AGENT_BRIDGE_TELEGRAM_') ||
+  name === 'AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW' || name === 'AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS';
 
 function normalizeWorkerName(value = '') {
   const normalized = safeString(value || DEFAULT_WORKER_NAME)
@@ -144,9 +147,8 @@ export function generateAgentBridgeSecret({ byteLength = 32, randomBytesImpl = r
   return randomBytesImpl(length).toString('hex');
 }
 
-export function buildAgentBridgeGeneratedSecrets({ telegramEnabled = false, ...options } = {}) {
+export function buildAgentBridgeGeneratedSecrets(options = {}) {
   return {
-    ...(telegramEnabled ? { TELEGRAM_WEBHOOK_SECRET: generateAgentBridgeSecret(options) } : {}),
     DEMO_SIGNER_ROOT_SECRET: generateAgentBridgeSecret(options),
     AGENT_BRIDGE_AGENT_API_TOKEN: generateAgentBridgeSecret(options),
   };
@@ -197,7 +199,6 @@ function parseArgs(argv = process.argv.slice(2)) {
   const flags = {};
   const booleanFlags = new Set([
     'enable-doc-storage',
-    'enable-telegram',
     'help',
     'include-workers-dev-subdomain-setup',
     'json',
@@ -208,6 +209,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     if (!token) continue;
     if (!token.startsWith('--')) throw new Error(`Unexpected argument: ${token}`);
     const key = token.slice(2);
+    assertNoRetiredAgentBridgeFlags({ [key]: true });
     if (booleanFlags.has(key)) {
       flags[key] = true;
       continue;
@@ -226,11 +228,11 @@ export function resolveAgentBridgeDeployConfig({
   flags = {},
   env = process.env,
 } = {}) {
+  assertNoRetiredAgentBridgeFlags(flags);
   const workerName = normalizeWorkerName(flags['worker-name'] || env.AGENT_BRIDGE_WORKER_NAME || DEFAULT_WORKER_NAME);
   const workersSubdomain = normalizeWorkersSubdomain(flags['workers-subdomain'] || env.CLOUDFLARE_WORKERS_SUBDOMAIN);
   const defaultChainId = safeString(flags['default-chain-id'] || env.DEFAULT_CHAIN_ID || DEFAULT_CHAIN_ID);
   const enableDocStorage = flags['enable-doc-storage'] === true || envFlagEnabled(env.AGENT_BRIDGE_ENABLE_DOC_STORAGE);
-  const telegramEnabled = flags['enable-telegram'] === true || envFlagEnabled(env.TELEGRAM_BRIDGE_ENABLED);
   const agentBridgePublicUrl = safeString(
     flags['public-url'] ||
     env.AGENT_BRIDGE_PUBLIC_URL ||
@@ -241,6 +243,12 @@ export function resolveAgentBridgeDeployConfig({
     policyJson: env.AGENT_BRIDGE_SESSION_POLICY_JSON,
     sessionWorkerOrigin: flags['session-worker-url'] || env.CE_SESSION_WORKER_BASE_URL,
   });
+  // An explicitly cleared canonical value must not revive a legacy allowlist/cutoff.
+  const clientOrigins = Object.prototype.hasOwnProperty.call(env, 'AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS')
+    ? env.AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS : env.AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS;
+  const sessionCutoff = Object.prototype.hasOwnProperty.call(env, 'AGENT_BRIDGE_SESSION_CREATED_AFTER')
+    ? env.AGENT_BRIDGE_SESSION_CREATED_AFTER
+    : env.AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER || env.AGENT_BRIDGE_TELEGRAM_SESSIONS_CREATED_AFTER || env.AGENT_BRIDGE_TELEGRAM_GROUP_CREATED_AFTER;
   const config = {
     apiTokenPresent: tokenPresent(flags['api-token'] || env.CLOUDFLARE_API_TOKEN),
     accountId,
@@ -252,7 +260,6 @@ export function resolveAgentBridgeDeployConfig({
           blocker: 'Block setup if the Cloudflare token can see multiple accounts; account selection is not implemented yet.',
         },
     workerName,
-    telegramEnabled,
     dedicatedSession: dedicatedSessionPolicy.ok && dedicatedSessionPolicy.accessEnabled ? {
       sessionSlug: dedicatedSessionPolicy.sessionSlug,
       sessionWorkerOrigin: dedicatedSessionPolicy.sessionWorkerOrigin,
@@ -271,9 +278,6 @@ export function resolveAgentBridgeDeployConfig({
       d1DatabaseName: enableDocStorage ? safeString(flags['d1-database'] || env.AGENT_DOCS_D1_DATABASE || `${workerName}-events`) : '',
     },
     vars: {
-      ...(telegramEnabled ? {
-        TELEGRAM_BOT_USERNAME: safeString(flags['telegram-bot-username'] || env.TELEGRAM_BOT_USERNAME),
-      } : {}),
       AGENT_BRIDGE_PUBLIC_URL: agentBridgePublicUrl,
       CE_SESSION_WORKER_BASE_URL: safeString(flags['session-worker-url'] || env.CE_SESSION_WORKER_BASE_URL).replace(/\/+$/, ''),
       DEFAULT_CHAIN_ID: defaultChainId,
@@ -286,10 +290,9 @@ export function resolveAgentBridgeDeployConfig({
       AGENT_BRIDGE_ALLOW_DEMO_QUESTION_FALLBACK: safeString(env.AGENT_BRIDGE_ALLOW_DEMO_QUESTION_FALLBACK),
       AGENT_BRIDGE_ALLOW_AD_HOC_QUESTIONS: safeString(env.AGENT_BRIDGE_ALLOW_AD_HOC_QUESTIONS),
       AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN: safeString(env.AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN),
-      AGENT_BRIDGE_MINI_APP_URL: safeString(env.AGENT_BRIDGE_MINI_APP_URL),
-      AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: safeString(env.AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS),
-      AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS: safeString(env.AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS),
-      AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS: safeString(env.AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS),
+      // Legacy names are input aliases only; upload the neutral binding once.
+      AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: safeString(clientOrigins),
+      AGENT_BRIDGE_SESSION_CREATED_AFTER: safeString(sessionCutoff),
       AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: safeString(env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES),
       AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS: safeString(env.AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS),
       AGENT_BRIDGE_SESSION_WRAPPED_SKILL_URL: safeString(env.AGENT_BRIDGE_SESSION_WRAPPED_SKILL_URL),
@@ -310,20 +313,13 @@ export function resolveAgentBridgeDeployConfig({
       AGENT_BRIDGE_SURVEYS_ADDRESS: safeString(env.AGENT_BRIDGE_SURVEYS_ADDRESS || env.SURVEYS_CONTRACT_ADDRESS || env.SURVEYS_ADDRESS),
       AGENT_BRIDGE_MAX_REGISTRY_SESSIONS: safeString(env.AGENT_BRIDGE_MAX_REGISTRY_SESSIONS),
       AGENT_BRIDGE_SESSION_REGISTRY_ADDRESS: safeString(env.AGENT_BRIDGE_SESSION_REGISTRY_ADDRESS || env.SESSION_REGISTRY_ADDRESS || env.SESSION_REGISTRY),
-      ...(telegramEnabled ? {
-        TELEGRAM_BRIDGE_ENABLED: 'true',
-        AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: safeString(env.AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER),
-      } : {}),
       BROADCAST_ENABLED: safeString(env.BROADCAST_ENABLED || 'true'),
       AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED: safeString(env.AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED || 'true'),
       AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN: safeString(env.AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN || 'true'),
       AGENT_AI_PROVIDER: safeString(flags['agent-ai-provider'] || env.AGENT_AI_PROVIDER || 'ce_session_policy'),
     },
     secrets: Object.fromEntries([
-      ...[
-        ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES,
-        ...(telegramEnabled ? REQUIRED_AGENT_BRIDGE_TELEGRAM_SECRET_NAMES : []),
-      ].map((name) => [
+      ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES.map((name) => [
         name,
         redactPresence(flags[name.toLowerCase().replace(/_/g, '-')] || env[name]),
       ]),
@@ -451,14 +447,7 @@ export function validateAgentBridgeDeployConfig(config = {}) {
   for (const name of REQUIRED_AGENT_BRIDGE_VAR_NAMES) {
     if (!safeString(config.vars?.[name])) missing.push(name);
   }
-  for (const name of config.telegramEnabled ? REQUIRED_AGENT_BRIDGE_TELEGRAM_VAR_NAMES : []) {
-    if (!safeString(config.vars?.[name])) missing.push(name);
-  }
-  const requiredSecrets = [
-    ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES,
-    ...(config.telegramEnabled ? REQUIRED_AGENT_BRIDGE_TELEGRAM_SECRET_NAMES : []),
-  ];
-  for (const name of requiredSecrets) {
+  for (const name of REQUIRED_AGENT_BRIDGE_SECRET_NAMES) {
     if (config.secrets?.[name] !== '[set]') missing.push(name);
   }
   const publicUrl = safeString(config.vars?.AGENT_BRIDGE_PUBLIC_URL);
@@ -477,15 +466,6 @@ export function validateAgentBridgeDeployConfig(config = {}) {
   }
   if (sessionWorkerUrl && !isHttpsUrl(sessionWorkerUrl)) {
     missing.push('CE_SESSION_WORKER_BASE_URL must be an https URL');
-  }
-  if (safeString(config.vars?.AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW)) {
-    missing.push('AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW is local-only and must not be deployed');
-  }
-  if (safeString(config.vars?.AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH)) {
-    missing.push('AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH is local-only and must not be deployed');
-  }
-  if (safeString(config.vars?.AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA).toLowerCase() === 'false') {
-    missing.push('AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA=false is local-only and must not be deployed');
   }
   return {
     ok: missing.length === 0,
@@ -525,7 +505,7 @@ export function buildAgentBridgeCloudflareTokenPermissions(config = {}) {
 
 export function buildAgentBridgeWorkerUploadMetadata(config = {}) {
   const vars = Object.fromEntries(Object.entries(config.vars || {})
-    .filter(([name, text]) => !OPTIONAL_AGENT_BRIDGE_VAR_NAMES.includes(name) || !!safeString(text)));
+    .filter(([name, text]) => !isRetiredTransportVar(name) && (!OPTIONAL_AGENT_BRIDGE_VAR_NAMES.includes(name) || !!safeString(text))));
   const bindings = [
     { name: 'AGENT_ACTION_KV', type: 'kv_namespace', namespace_id: '<created-kv-namespace-id>' },
     {
@@ -600,10 +580,7 @@ export function buildAgentBridgeDeployPlan(config = {}) {
       path: `/accounts/${accountId}/workers/scripts/${workerName}`,
       multipartMetadata: metadata,
     },
-    ...[
-      ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES,
-      ...(config.telegramEnabled ? REQUIRED_AGENT_BRIDGE_TELEGRAM_SECRET_NAMES : []),
-    ].map((name) => ({
+    ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES.map((name) => ({
       purpose: `Write ${name} as a Worker secret`,
       method: 'PUT',
       path: `/accounts/${accountId}/workers/scripts/${workerName}/secrets`,
@@ -638,9 +615,6 @@ export function buildAgentBridgeDeployPlan(config = {}) {
     accountId,
     accountLookup: config.accountLookup || null,
     publicUrl: safeString(config.vars?.AGENT_BRIDGE_PUBLIC_URL || buildWorkersDevUrl(workerName, config.workersSubdomain)),
-    webhookUrl: config.telegramEnabled
-      ? `${safeString(config.vars?.AGENT_BRIDGE_PUBLIC_URL || buildWorkersDevUrl(workerName, config.workersSubdomain)).replace(/\/+$/, '')}/telegram/webhook`
-      : null,
     resources: config.resources,
     dedicatedSession: config.dedicatedSession,
     requiredTokenPermissions: buildAgentBridgeCloudflareTokenPermissions(config),
@@ -660,13 +634,11 @@ function printUsage() {
     '  CLOUDFLARE_API_TOKEN',
     '  DEMO_SIGNER_ROOT_SECRET, AGENT_BRIDGE_AGENT_API_TOKEN',
     '  CE_SESSION_WORKER_BASE_URL, DEFAULT_CHAIN_ID, DEFAULT_RPC_URL',
-    '  Optional Telegram adapter: TELEGRAM_BRIDGE_ENABLED=true plus TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, TELEGRAM_BOT_USERNAME',
     '  Optional: CLOUDFLARE_ACCOUNT_ID as a developer fallback, ADDITIONAL_RPC_URL',
     '  Optional: AGENT_BRIDGE_LIVE_ACCOUNT_LOOKUP=1 to make the Cloudflare account lookup call',
     '',
     'Flags:',
     '  --enable-doc-storage                    Also provision and bind bridge-owned R2/D1 demo storage resources',
-    '  --enable-telegram                       Configure the optional Telegram adapter and bot actions',
     '  --include-workers-dev-subdomain-setup  Include Account Settings: Edit as an optional token scope when creating/changing the workers.dev subdomain',
     '  --live-account-lookup                  Resolve CLOUDFLARE_ACCOUNT_ID from CLOUDFLARE_API_TOKEN now; off by default',
     '  --json                                  Print JSON only',

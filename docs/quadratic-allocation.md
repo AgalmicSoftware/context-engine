@@ -88,12 +88,9 @@ are excluded from arithmetic and counted separately.
 
 The type is supported by manual and AI authoring, full and pile response views,
 question filters, saved-response displays, aggregate results, exports, interview
-prefills, user comparison, Telegram Mini App forms, and the local companion.
-AI answer formats use the same signed array and budget checks. Telegram chat
-opens the Mini App for allocation entry; `/add_question quadratic: Prompt | A | B`
-authors a question with the default budget, while the Mini App exposes the budget
-field. Telegram aggregates respect the session's existing results exposure and
-participant-filter settings.
+prefills, user comparison, the hosted agent question pile, and the local companion.
+AI answer formats use the same signed array and budget checks. Agent aggregates
+respect the session's existing results exposure and participant-filter settings.
 
 AI-generated custom budgets remain editable in the authoring form.
 Interview prediction accepts budget-valid signed vote arrays, including neutral
@@ -108,7 +105,7 @@ budget in the voice context and review controls, even before the pile cache refr
 
 Tag generation includes the allocation's option labels. Listening-mode generation includes custom
 budgets in question identity. Tag previews, simulated profiles, and demo question
-and response adapters retain ordered options and custom budgets. Telegram draft
+and response adapters retain ordered options and custom budgets. Retained agent draft
 and submitted-answer history restore numeric allocations without converting them
 to text; edit provenance tracks which option votes changed. Question-only previews show those options
 and the budget without introducing answer controls inside the navigation card.
@@ -155,9 +152,8 @@ and submission remain in the pile's shared controls outside the question card.
 If signing or saving fails, the pile shows the error beneath the question
 and keeps the pending allocation available for retry.
 
-The main React client, including its Telegram pile, uses these steppers. The
-separate AgentBridge Telegram mini-app and companion browser retain their own
-slider UI. Both Cloudflare and smart-contract storage modes use the same ordered numeric arrays, definition validation,
+The main React client, including its agent pile, uses these steppers. The
+companion browser retains its own slider UI. Both Cloudflare and smart-contract storage modes use the same ordered numeric arrays, definition validation,
 per-question budget, encryption encoding, and signed vote analysis. No Solidity interface change
 is required: question metadata and response payloads carry the new type through existing storage.
 

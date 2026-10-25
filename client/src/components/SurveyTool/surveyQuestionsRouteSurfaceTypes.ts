@@ -77,6 +77,7 @@ export type SurveyQuestionsRouteSubmitFooterProps = {
   responseUrl?: string;
   submitButtonText?: React.ReactNode;
   submissionError?: string;
+  draftPersistenceError?: string;
 };
 
 export type SurveyQuestionsRouteJsonControlsProps = {

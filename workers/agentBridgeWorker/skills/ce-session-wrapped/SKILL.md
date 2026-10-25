@@ -1,12 +1,12 @@
 ---
 name: ce-session-wrapped
-description: 'Run a generic Context Engine session wrapped flow: onboard by invite, fetch session statements, predict answers, and return a shareable Mini App result.'
+description: 'Run a generic Context Engine session wrapped flow: onboard by invite, fetch session statements, predict answers, and return a shareable Wrapped image.'
 ---
 
 # Context Engine Session Wrapped Runtime
 
-**Skill version:** 2026-09-28 (session-wrapped-v1.2)
-**Protocol version:** Context Engine agent bridge v43
+**Skill version:** 2026-10-17 (session-wrapped-v1.3)
+**Protocol version:** Context Engine agent bridge v44
 
 Use this skill only to run a generic Context Engine session wrapped flow. Do
 not use the broader `context-engine` skill, local reference docs, setup
@@ -99,10 +99,8 @@ never in a URL. Use the returned `ceagt_` token privately for the rest of the
 run. This path works for worker-canonical and registry-canonical sessions and
 does not require Telegram or an agent-originated EVM transaction.
 
-Otherwise, if the forwarded message contains an invite-token line, use it. A
-Telegram/Hermes runtime may include its verified Telegram id, but Telegram is
-optional. A non-Telegram host omits that field and CE creates an opaque
-principal. POST once to:
+Otherwise, if the forwarded message contains an invite-token line, use it.
+CE creates an opaque principal without a transport identity. POST once to:
 
 ```text
 /api/agent/invite/onboard
@@ -113,14 +111,12 @@ with:
 ```json
 {
   "inviteToken": "<Session Wrapped Invite Token>",
-  "telegramUserId": "<optional verified Telegram id>",
   "mode": "agent_only",
   "skill": "ce-session-wrapped",
   "source": "session-wrapped-forwarded-prompt"
 }
 ```
 
-Omit `telegramUserId` entirely when the host has no verified Telegram identity.
 Use the returned `token` privately as the Bearer token for the rest of the run.
 Do not call invite onboarding without an invite token, do not reuse the
 one-time invite after redemption, and do not call it with any mode except
@@ -147,7 +143,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. Resolve the private credential.
-2. GET `/api/agent/skill-version`; silently verify protocol v43.
+2. GET `/api/agent/skill-version`; silently verify protocol v44.
 3. GET `/api/agent/agent-only/start` with the Bearer token.
 4. Create one fresh `run_id` for the whole run.
 5. Optional `token_usage`: before answer submission, make at most one quiet
@@ -235,5 +231,5 @@ QA tools. Do not describe or critique the poster.
 After the one image line, send only:
 
 ```text
-Your Session Wrapped result is ready. To inspect or change your agent's responses, open the configured Context Engine session interface (the Context Engine Mini App when provided). Want the optional comparison map too?
+Your Session Wrapped result is ready. Want the optional comparison map too?
 ```

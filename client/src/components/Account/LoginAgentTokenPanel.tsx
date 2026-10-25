@@ -36,13 +36,14 @@ const LoginAgentTokenPanel = ({
     </button>
     {cachedEnvelope ? (
       <div className={styles.agentTokenLoginHint}>
-        A Telegram client session is active in this page. Reloading requires login again.
+        An agent client session is active in this page. Reloading requires login again.
       </div>
     ) : null}
     {agentTokenLoginOpen ? (
       <form onSubmit={onSubmit}>
         <p className={styles.agentTokenLoginCopy}>
-          Only paste tokens from the Context Engine bot. Tokens grant limited access until they expire.
+          Only paste tokens issued by your trusted Context Engine session service. Tokens grant limited access until
+          they expire.
         </p>
         <label className={styles.agentTokenLoginLabel}>
           <span>Raw agent token</span>
@@ -55,7 +56,7 @@ const LoginAgentTokenPanel = ({
             data-testid="ce-agent-token-login-input"
           />
         </label>
-        <div className={styles.agentTokenLoginHint}>Telegram bot → /me → Create Agent Token</div>
+        <div className={styles.agentTokenLoginHint}>Request an agent token from your session administrator.</div>
         {agentTokenError ? (
           <div className={styles.agentTokenLoginError} role="alert" data-testid="ce-agent-token-login-error">
             {agentTokenError}

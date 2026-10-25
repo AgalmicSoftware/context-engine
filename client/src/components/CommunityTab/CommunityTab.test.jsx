@@ -27,6 +27,7 @@ import * as workerConfigCache from '../../utilities/session/sessionWorkerConfigC
 import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry';
 import * as workerGroupPorts from '../../domains/worker/workerGroupPorts';
 import * as workerAuth from '../../utilities/worker/workerAuth';
+import * as resourcePresence from '../../utilities/worker/workerResourcePresence';
 import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
 import {
   WORKER_CANONICAL_CACHE_SCOPE_KEY,
@@ -192,6 +193,25 @@ describe('CommunityTab helpers', () => {
   it('prefers activeSessionSlug over URL parsing', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'edge' });
     expect(instance._currentSlug()).toBe('edge');
+  });
+
+  it('shows a cached faucet offer for an already-loaded session without per-row requests', () => {
+    const config = {
+      slug: 'hosted-faucet',
+      networkChainId: 11155420,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      workerAuthority: { participantScopes: ['faucet'] },
+    };
+    jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockReturnValue(null);
+    jest.spyOn(resourcePresence, 'getCachedWorkerResourcePresence').mockReturnValue({ txGas: true });
+    const read = jest.spyOn(resourcePresence, 'readWorkerResourcePresence');
+    const instance = new CommunityTab({ sessionConfig: config });
+    instance.state.sessions = [
+      { slug: config.slug, name: 'Funded session', kind: 'centralized', href: '/session/hosted-faucet' },
+    ];
+    render(instance.renderSessionsModalContent());
+    expect(screen.getByTestId('ce-session-test-eth-badge')).toHaveTextContent('Test ETH');
+    expect(read).not.toHaveBeenCalled();
   });
 
   it('starts fresh global Stats selection at ALL', () => {

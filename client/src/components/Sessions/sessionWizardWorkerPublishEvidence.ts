@@ -137,6 +137,7 @@ export const resolveSessionWizardWorkerPublishEvidence = ({
       workerUrl,
       sessionSlug: draft.slug,
       sessionId: runtime.sessionIdHex || runtime.sessionId,
+      sessionConfig: draft,
       sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
       sessionAi: draft.ai,
       workerAllowOrigins: runtime.workerAllowOrigins,

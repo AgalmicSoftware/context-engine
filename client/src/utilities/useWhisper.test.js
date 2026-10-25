@@ -70,6 +70,7 @@ import { getEffectiveTranscriptionConfig } from './ai/aiSettings.js';
 import { getCorsProxyUrlOrThrow } from './worker/corsProxy.js';
 import { fetchWorkerWithAuth } from './worker/workerAuth.js';
 import { useWhisper, RECORDING_STATUS } from './useWhisper';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from './session/sessionModeProfile';
 
 const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -221,7 +222,7 @@ describe('useWhisper', () => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
   });
 
-  it('records and transcribes a session', async () => {
+  it('records and transcribes a session with authenticated fallback available', async () => {
     const onComplete = jest.fn();
     const onStop = jest.fn();
     const sessionConfig = {
@@ -273,17 +274,100 @@ describe('useWhisper', () => {
       expect.stringContaining('/transcribe'),
       expect.any(Object),
       expect.objectContaining({
-        anonymousOnly: true,
         preferAnonymous: true,
         sessionConfig,
         sessionSlug: 'demo-sh',
       }),
     );
+    expect(fetchWorkerWithAuth.mock.calls[0]?.[2]?.anonymousOnly).not.toBe(true);
     const requestInit = fetchWorkerWithAuth.mock.calls[0]?.[1] || {};
     const uploadedFile = requestInit.body?.get?.('file');
     expect(uploadedFile?.type).toBe('audio/wav');
     expect(String(uploadedFile?.name || '')).toMatch(/\.wav$/);
   });
+
+  it.each([
+    { label: 'Worker default', suppliedWorker: true, expectedModel: 'worker-transcription-model' },
+    {
+      label: 'explicit model',
+      suppliedWorker: true,
+      explicitModel: 'explicit-transcription-model',
+      expectedModel: 'explicit-transcription-model',
+    },
+    { label: 'local override', suppliedWorker: true, localOverride: true, expectedModel: 'local-transcription-model' },
+    {
+      label: 'explicit model over local override',
+      suppliedWorker: true,
+      localOverride: true,
+      explicitModel: 'explicit-transcription-model',
+      expectedModel: 'explicit-transcription-model',
+    },
+    { label: 'unconfigured default', suppliedWorker: false, expectedModel: 'whisper-1' },
+  ])(
+    'uploads dictation with the resolved $label',
+    async ({ suppliedWorker, localOverride, explicitModel, expectedModel }) => {
+      const actualSettings = jest.requireActual('./ai/aiSettings.js');
+      const sessionConfig = suppliedWorker
+        ? {
+            slug: 'dictation-session',
+            sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+            ai: { models: { transcription: { provider: 'openai', model: 'worker-transcription-model' } } },
+          }
+        : undefined;
+      localStorage.clear();
+      getEffectiveTranscriptionConfig.mockImplementation(actualSettings.getEffectiveTranscriptionConfig);
+      try {
+        if (localOverride) {
+          actualSettings.saveLocalAiSettings({
+            useLocal: true,
+            transcription: { provider: 'openai', model: 'local-transcription-model' },
+            providers: { openai: { apiKey: 'synthetic-transcription-key' } },
+          });
+        }
+        act(() => {
+          root.render(
+            <WhisperHarness
+              ref={ref}
+              options={{
+                silenceDetection: false,
+                timeSlice: 0,
+                sessionSlug: 'dictation-session',
+                sessionConfig,
+                workerUrl: 'https://dictation-worker.example.test',
+                ...(explicitModel ? { model: explicitModel } : {}),
+              }}
+            />,
+          );
+        });
+        await act(async () => {
+          await ref.current.startRecording();
+        });
+        ref.current.audioContextRef.current.state = 'closed';
+        setNow(2000);
+        await act(async () => {
+          await ref.current.stopRecording();
+          await flushPromises();
+          await flushPromises();
+        });
+        expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+        const [url, request, auth] = fetchWorkerWithAuth.mock.calls[0];
+        expect(url).toBe('https://dictation-worker.example.test/transcribe');
+        expect(request.body.get('model')).toBe(expectedModel);
+        expect(request.body.get('provider')).toBe('openai');
+        expect(request.body.get('apiKey')).toBe(localOverride ? 'synthetic-transcription-key' : null);
+        expect(auth).toMatchObject({
+          sessionSlug: 'dictation-session',
+          sessionConfig,
+          preferAnonymous: true,
+        });
+        expect(auth.anonymousOnly).not.toBe(true);
+        expect(ref.current.transcript.final).toBe('hello world');
+      } finally {
+        actualSettings.saveLocalAiSettings({ useLocal: false, providers: { openai: { apiKey: '' } } });
+        localStorage.clear();
+      }
+    },
+  );
 
   it('switches from a Continuity microphone to an available built-in computer microphone', async () => {
     const iphoneTrack = { label: 'iPhone Microphone', stop: jest.fn(), readyState: 'live' };
@@ -375,6 +459,68 @@ describe('useWhisper', () => {
     expect(onComplete).toHaveBeenCalledWith('yes yes yes');
   });
 
+  it('hands the final transcript to the parent once, outside render', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const onComplete = jest.fn();
+    let parentText = '';
+    // AudioInput stores the transcript in its parent; StrictMode replays impure state updaters.
+    const Parent = () => {
+      const [text, setText] = React.useState('');
+      parentText = text;
+      const options = React.useMemo(
+        () => ({
+          silenceDetection: false,
+          onTranscriptionComplete: (finalText) => {
+            onComplete(finalText);
+            setText(finalText);
+          },
+        }),
+        [],
+      );
+      return <WhisperHarness ref={ref} options={options} />;
+    };
+
+    try {
+      act(() => {
+        root.render(
+          <React.StrictMode>
+            <Parent />
+          </React.StrictMode>,
+        );
+      });
+
+      await act(async () => {
+        await ref.current.startRecording();
+      });
+
+      if (!ref.current.audioContextRef.current) {
+        ref.current.audioContextRef.current = new MockAudioContext();
+      }
+      ref.current.audioContextRef.current.state = 'closed';
+      setNow(2000);
+
+      await act(async () => {
+        await ref.current.stopRecording();
+      });
+
+      await act(async () => {
+        await flushPromises();
+        await flushPromises();
+        await flushPromises();
+        await flushPromises();
+      });
+
+      expect(onComplete).toHaveBeenCalledTimes(1);
+      expect(onComplete).toHaveBeenCalledWith('hello world');
+      expect(parentText).toBe('hello world');
+      expect(ref.current.transcript.final).toBe('hello world');
+      const errors = consoleError.mock.calls.map((args) => args.map(String).join(' ')).join('\n');
+      expect(errors).not.toMatch(/Cannot update a component/);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('skips very short recordings', async () => {
     const onComplete = jest.fn();
     const onStop = jest.fn();
@@ -404,5 +550,97 @@ describe('useWhisper', () => {
     expect(onComplete).not.toHaveBeenCalled();
     expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
     expect(ref.current.status).toBe(RECORDING_STATUS.IDLE);
+  });
+
+  it('cancels an active recording without finalizing or uploading it', async () => {
+    const onStop = jest.fn();
+    const onComplete = jest.fn();
+    act(() =>
+      root.render(
+        <WhisperHarness
+          ref={ref}
+          options={{ silenceDetection: false, onRecordingStop: onStop, onTranscriptionComplete: onComplete }}
+        />,
+      ),
+    );
+    await act(async () => {
+      await ref.current.startRecording();
+    });
+    setNow(2000);
+    act(() => {
+      ref.current.cancelRecording();
+    });
+    await act(async () => {
+      await flushPromises();
+    });
+    expect(ref.current.status).toBe(RECORDING_STATUS.IDLE);
+    expect(ref.current.mediaStreamRef.current).toBeNull();
+    expect(onStop).not.toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+  });
+
+  it('does not upload after cancellation while transcription settings are resolving', async () => {
+    let resolveSettings;
+    getEffectiveTranscriptionConfig.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSettings = resolve;
+      }),
+    );
+    const onComplete = jest.fn();
+    act(() =>
+      root.render(
+        <WhisperHarness
+          ref={ref}
+          options={{
+            silenceDetection: false,
+            workerUrl: 'https://original.worker.test',
+            onTranscriptionComplete: onComplete,
+          }}
+        />,
+      ),
+    );
+    await act(async () => {
+      await ref.current.startRecording();
+    });
+    ref.current.audioContextRef.current.state = 'closed';
+    setNow(2000);
+    await act(async () => {
+      await ref.current.stopRecording();
+    });
+    act(() => {
+      ref.current.cancelRecording();
+    });
+    act(() =>
+      root.render(
+        <WhisperHarness
+          ref={ref}
+          options={{
+            silenceDetection: false,
+            workerUrl: 'https://replacement.worker.test',
+            onTranscriptionComplete: onComplete,
+          }}
+        />,
+      ),
+    );
+    await act(async () => {
+      await ref.current.startRecording();
+    });
+    await act(async () => {
+      resolveSettings({ provider: 'openai', model: 'whisper-1' });
+      await flushPromises();
+    });
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(ref.current.status).toBe(RECORDING_STATUS.RECORDING);
+    ref.current.audioContextRef.current.state = 'closed';
+    setNow(3000);
+    await act(async () => {
+      await ref.current.stopRecording();
+      await flushPromises();
+    });
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    expect(fetchWorkerWithAuth.mock.calls[0][0]).toBe('https://replacement.worker.test/transcribe');
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 });

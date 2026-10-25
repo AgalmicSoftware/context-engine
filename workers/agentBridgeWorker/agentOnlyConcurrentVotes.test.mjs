@@ -8,8 +8,8 @@ import {
   materializeAgentOnlyWindow,
   saveAgentOnlyModeConfig,
   submitAgentOnlyTokenVotesBulk,
-} from './telegramAgentOnlyMode.mjs';
-import { persistTelegramProposedQuestion } from './telegramQuestionProposals.mjs';
+} from './agentOnlyMode.mjs';
+import { persistAgentProposedQuestion } from './agentQuestionProposals.mjs';
 
 class MemoryKv {
   constructor() {
@@ -57,14 +57,14 @@ function normalizedUser() {
 
 async function seedVoteWindow(testEnv) {
   const questions = await Promise.all([
-    persistTelegramProposedQuestion({
+    persistAgentProposedQuestion({
       env: testEnv,
       normalized: normalizedUser(),
       sessionSlug: SESSION_SLUG,
       prompt: 'Should the first concurrent proposal pass?',
       questionType: 'binary',
     }),
-    persistTelegramProposedQuestion({
+    persistAgentProposedQuestion({
       env: testEnv,
       normalized: normalizedUser(),
       sessionSlug: SESSION_SLUG,

@@ -1,3 +1,4 @@
+import { describeTestEthOffer } from '@ce-shared/sessions/testEthOffer.mjs';
 import {
   classifySessionModeProfileSupport,
   type SessionModeAccessConditionDocument,
@@ -129,6 +130,7 @@ const buildProjection = ({
   const isRegistryCanonical = authorityMode === 'evm_registry_canonical';
   const usesRpc =
     explicitUsesRpc ||
+    explicitUsesFunding ||
     isRegistryCanonical ||
     authorityMode === 'worker_with_public_anchor' ||
     usesLit ||
@@ -145,14 +147,14 @@ const buildProjection = ({
     'ai',
     ...(usesRpc ? (['rpc'] as const) : []),
     ...(usesArweave ? (['arweave'] as const) : []),
-    ...(usesFunding ? (['faucet'] as const) : []),
+    ...(isRegistryCanonical ? (['faucet'] as const) : []),
     ...(usesLit ? (['lit'] as const) : []),
   ];
   const adminTestKeys: SessionAdminTestKey[] = [
     'health',
     'ai',
     ...(usesArweave ? (['arweave'] as const) : []),
-    ...(usesFunding ? (['faucet'] as const) : []),
+    ...(isRegistryCanonical ? (['faucet'] as const) : []),
     ...(hasTranscription ? (['transcribe'] as const) : []),
     ...(usesLit ? (['lit'] as const) : []),
   ];
@@ -186,7 +188,10 @@ const buildProjection = ({
   };
 };
 
-export const resolveSessionCapabilityProjection = (value: unknown): SessionCapabilityProjection => {
+export const resolveSessionCapabilityProjection = (
+  value: unknown,
+  resourcePresence?: unknown,
+): SessionCapabilityProjection => {
   const config = asRecord(value);
   const profileCandidate = getProfileCandidate(value);
 
@@ -217,6 +222,9 @@ export const resolveSessionCapabilityProjection = (value: unknown): SessionCapab
       hasOnChainCondition(profile.encryption?.accessConditions) ||
       hasOnChainCondition(profile.storage?.payloadAccessControl?.accessConditions);
 
+    const hostedOffer = describeTestEthOffer({ config, resourcePresence });
+    const hostedFunding = profile.authority?.mode === 'worker_canonical' && hostedOffer.offered;
+
     return buildProjection({
       source: 'profile',
       supportStatus: support.status,
@@ -236,7 +244,8 @@ export const resolveSessionCapabilityProjection = (value: unknown): SessionCapab
       usesLit: profile.encryption?.mode === 'lit',
       usesOnChainSbt,
       hasTranscription: hasExplicitTranscription(config),
-      chainId: Number(profile.evm?.registryChainId || 0) || null,
+      explicitUsesFunding: hostedFunding,
+      chainId: hostedFunding ? hostedOffer.chainId : Number(profile.evm?.registryChainId || 0) || null,
     });
   }
 

@@ -12,6 +12,8 @@ type DecryptActionChipProps = {
   title?: string;
   actionLabel: string;
   busyLabel?: string;
+  testId?: string;
+  questionId?: string;
 };
 
 export const resolveDecryptActionChipSpinnerStyle = (): React.CSSProperties => ({
@@ -26,6 +28,8 @@ const DecryptActionChip = ({
   title,
   actionLabel,
   busyLabel = 'Decrypting...',
+  testId,
+  questionId,
 }: DecryptActionChipProps) => {
   if (spinnerOnly) {
     if (!busy) return null;
@@ -39,7 +43,14 @@ const DecryptActionChip = ({
 
   return (
     <div className={styles.decryptChip}>
-      <Button onClick={onClick} className={styles.decryptQuestionButton} disabled={disabled} title={title}>
+      <Button
+        onClick={onClick}
+        className={styles.decryptQuestionButton}
+        disabled={disabled}
+        title={title}
+        data-testid={testId}
+        data-ce-question-id={questionId}
+      >
         {busy ? busyLabel : actionLabel}
       </Button>
     </div>

@@ -14,8 +14,12 @@
 
   :root[data-ce-color-vision='color-blind'] {
     --ce-binary-choice-agree-bg: #56b4e9;
+    --ce-binary-choice-agree-text: #000000;
+    --ce-response-agree-fill: #56b4e9;
     --ce-binary-choice-unsure-bg: #b8bec7;
     --ce-binary-choice-disagree-bg: #e69f00;
+    --ce-binary-choice-disagree-text: #000000;
+    --ce-response-disagree-fill: #e69f00;
     --ce-response-agree-bg: rgba(86, 180, 233, 0.16);
     --ce-response-agree-border: #56b4e9;
     --ce-response-agree-text: #80ccff;

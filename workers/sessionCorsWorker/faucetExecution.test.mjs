@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Wallet } from 'ethers';
 
 import { faucet } from './faucetExecution.js';
+import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretActionRouteDispatch.js';
+import { installSessionCoordinatorBinding } from '../../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
 import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
 
@@ -15,6 +18,89 @@ const MASKED_SECONDARY_RPC = 'masked:https://rpc-2.example';
 const SECRET_RPC = 'https://TENANT_SECRET.rpc.example/v2/ALCHEMY_SECRET';
 
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
+
+test('hosted malformed faucet keys never exhaust quota or contact an RPC', async () => {
+  const env = installSessionCoordinatorBinding({});
+  let rpcCalls = 0;
+  const deps = createDeps({
+    json: (body, status, headers) => new Response(JSON.stringify(body), { status, headers }),
+    Wallet,
+    normalizeFaucetRequest: () => createNormalizedResult({ normalized: {
+      ...createNormalizedResult().normalized, privateKey: '0xabc123',
+    } }),
+    rpcRequest: async () => { rpcCalls += 1; throw new Error('Unexpected RPC request'); },
+  });
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await assert.rejects(dispatchAuthenticatedSecretActionRoute({
+      path: '/', action: 'request_test_eth', body: { to: RECIPIENT }, address: RECIPIENT, slug: 'example', env,
+      config: { sessionModeProfile: { authority: { mode: 'worker_canonical' } } }, scopes: { faucet: true },
+      deps: {
+        json: deps.json,
+        evaluateAuthenticatedRoutePreflight: async () => ({ ok: true, tokenHasScope: true }),
+        resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets: {} }),
+        faucet: (args) => runFaucet(deps, args),
+      },
+    }), /invalid private key/);
+  }
+  assert.equal(rpcCalls, 0);
+});
+
+test('hosted quotas retain ambiguous broadcasts and never submit a second payout through another RPC', async () => {
+  const env = installSessionCoordinatorBinding({});
+  let submissions = 0;
+  const deps = createDeps({
+    json: (body, status, headers) => new Response(JSON.stringify(body), { status, headers }),
+    normalizeFaucetRequest: () => createNormalizedResult({ normalized: {
+      ...createNormalizedResult().normalized, rpcUrls: [PRIMARY_RPC, SECONDARY_RPC],
+    } }),
+    rpcRequest: async ({ method }) => {
+      if (method === 'eth_sendRawTransaction') {
+        submissions += 1;
+        throw new Error('Connection closed after submitting');
+      }
+      return createDeps().rpcRequest({ method });
+    },
+  });
+  const statuses = [];
+  for (let i = 0; i < 5; i += 1) {
+    const result = await dispatchAuthenticatedSecretActionRoute({
+      path: '/', action: 'request_test_eth', body: { to: RECIPIENT }, address: RECIPIENT, slug: 'example', env,
+      config: { sessionModeProfile: { authority: { mode: 'worker_canonical' } } }, scopes: { faucet: true },
+      deps: {
+        json: deps.json,
+        evaluateAuthenticatedRoutePreflight: async () => ({ ok: true, tokenHasScope: true }),
+        resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets: {} }),
+        faucet: (args) => runFaucet(deps, args),
+      },
+    });
+    statuses.push(result.response.status);
+  }
+  assert.deepEqual(statuses, [502, 502, 502, 429, 429]);
+  assert.equal(submissions, 3);
+});
+
+test('hosted quotas release failures that occur before any transaction is submitted', async () => {
+  const env = installSessionCoordinatorBinding({});
+  let signingAttempts = 0;
+  const deps = createDeps({
+    json: (body, status, headers) => new Response(JSON.stringify(body), { status, headers }),
+    Wallet: createWalletCtor({ signTransaction: async () => { signingAttempts += 1; throw new Error('Cannot sign'); } }),
+  });
+  for (let i = 0; i < 5; i += 1) {
+    const result = await dispatchAuthenticatedSecretActionRoute({
+      path: '/', action: 'request_test_eth', body: { to: RECIPIENT }, address: RECIPIENT, slug: 'example', env,
+      config: { sessionModeProfile: { authority: { mode: 'worker_canonical' } } }, scopes: { faucet: true },
+      deps: {
+        json: deps.json,
+        evaluateAuthenticatedRoutePreflight: async () => ({ ok: true, tokenHasScope: true }),
+        resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets: {} }),
+        faucet: (args) => runFaucet(deps, args),
+      },
+    });
+    assert.equal(result.response.status, 502);
+  }
+  assert.equal(signingAttempts, 5);
+});
 
 const createNormalizedResult = (overrides = {}) => ({
   ok: true,

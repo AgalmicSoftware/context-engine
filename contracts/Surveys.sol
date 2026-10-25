@@ -19,6 +19,7 @@ pragma solidity ^0.8.24;
 /// @title Enhanced Survey and Question Management on Ethereum
 /// @author Context Engine (Beta)
 /// @notice This contract allows users to create surveys, standalone questions, and submit responses, with off-chain storage via Arweave.
+/// @dev Survey and question IDs must be distinct because response hashes share one ID-keyed mapping.
 contract Surveys {
     // Storage
     mapping(bytes32 => bytes32) public surveyHashes; // surveyId => contentHash
@@ -49,6 +50,7 @@ contract Surveys {
         require(surveyId != bytes32(0), "Survey ID cannot be zero");
         require(surveyContentHash != bytes32(0), "Survey content hash cannot be zero");
         require(!surveyExists[surveyId], "Survey with this ID already exists");
+        require(!questionExists[surveyId], "Survey ID already used by question");
         require(questionIds.length == questionContentHashes.length, "Array lengths must match");
 
         // Regression guard: validate the whole batch before reserving the survey ID;
@@ -89,6 +91,7 @@ contract Surveys {
             require(questionIds[i] != bytes32(0), "Question ID cannot be zero");
             require(contentHashes[i] != bytes32(0), "Question content hash cannot be zero");
             require(!questionExists[questionIds[i]], "Question with this ID already exists");
+            require(!surveyExists[questionIds[i]], "Question ID already used by survey");
             questionExists[questionIds[i]] = true;
             questionHashes[questionIds[i]] = contentHashes[i];
 

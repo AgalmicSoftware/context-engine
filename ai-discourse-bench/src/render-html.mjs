@@ -1,6 +1,8 @@
 import { buildSecondPassAnalysisInput } from './analysis-export.mjs';
 import { buildContextEnginePolisExport } from './ce-export.mjs';
-import { clusterBySimilarity } from './opinion-groups.mjs';
+import { aggregateResponseDistributions, summarizeWinningResponseConsistency } from './response-distributions.mjs';
+import { clusterBySimilarity, hasCompleteSimilarity, similarityFor, withOpinionGroupAvailability } from './opinion-groups.mjs';
+import { buildReportFingerprint } from './provenance.mjs';
 import {
   WORLD_MAP_GEOGRAPHIES,
   WORLD_MAP_GRATICULE_PATH,
@@ -157,6 +159,9 @@ const formatSignedScore = (value) => (
 const formatPercent = (value) => (
   Number.isFinite(value) ? `${Math.round(value * 100)}%` : '0%'
 );
+
+// Display model-equivalent weights without rounding the report's stored numbers.
+const formatCount = (value) => Number.isFinite(Number(value)) ? String(Number(Number(value).toFixed(4))) : 'unavailable';
 
 const formatDisplayLabel = (value) => {
   const raw = String(value || '').trim();
@@ -572,8 +577,30 @@ const getQuestions = (report) => {
   return Object.keys(report.polisReport?.byQuestion || {}).map((id) => ({ id, prompt: id, topic: 'uncategorized' }));
 };
 
+const withObservedDisplaySummaries = (report) => {
+  const participants = report.participants || [];
+  const questions = getQuestions(report);
+  const matrix = report.polisReport?.byModelQuestion || {};
+  const summarize = (summary, cells) => {
+    const observed = aggregateResponseDistributions(cells);
+    return { ...summary, observedDistribution: observed.observedDistribution, distributionUnavailable: observed.distributionUnavailable === true };
+  };
+  return {
+    ...report,
+    polisReport: {
+      ...report.polisReport,
+      byQuestion: Object.fromEntries(questions.map((question) => [question.id, summarize(
+        report.polisReport?.byQuestion?.[question.id],
+        participants.length ? participants.map((participant) => matrix[participant.id] ? matrix[participant.id][question.id] : null) : [null],
+      )])),
+    },
+  };
+};
+
+const unavailableDistribution = () => '<span class="ce-report-muted" data-ce-observed-distribution-unavailable>Observed answer distribution unavailable: retained model/question counts are incomplete.</span>';
+
 const answerTotals = (summary = {}) => {
-  const counts = summary.counts || {};
+  const counts = summary.distributionUnavailable ? {} : (summary.observedDistribution?.counts || summary.counts || {});
   const agree = counts.Agree || 0;
   const unsure = counts.Unsure || 0;
   const disagree = counts.Disagree || 0;
@@ -584,7 +611,7 @@ const answerTotals = (summary = {}) => {
 
 const validVoteCount = (summary = {}) => {
   const { agree, unsure, disagree } = answerTotals(summary);
-  return agree + unsure + disagree;
+  return summary.observedDistribution?.validUnits ?? (agree + unsure + disagree);
 };
 
 const answerFromMeanScore = (score) => {
@@ -646,20 +673,7 @@ const averageFiniteValues = (values = []) => {
   return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
 };
 
-const polarityRepeatTotalsForCell = (cell = {}) => (
-  ['canonical', 'reversedNormalized'].reduce((totals, polarity) => {
-    const form = cell?.polarity?.[polarity];
-    const attempts = Number(form?.total || 0);
-    if (!Number.isFinite(attempts) || attempts <= 0) return totals;
-    const answerCounts = ['Agree', 'Unsure', 'Disagree'].map((answer) => (
-      Number(form?.counts?.[answer] || 0)
-    ));
-    totals.winningResponses += Math.max(0, ...answerCounts);
-    totals.attemptedRuns += attempts;
-    totals.validRuns += answerCounts.reduce((sum, count) => sum + count, 0);
-    return totals;
-  }, { winningResponses: 0, attemptedRuns: 0, validRuns: 0 })
-);
+const polarityRepeatTotalsForCell = (cell = {}) => summarizeWinningResponseConsistency([cell]);
 
 const questionModelDifference = (report, questionId) => {
   const scores = Object.values(report.polisReport?.byModelQuestion || {})
@@ -686,10 +700,18 @@ const modelAnswersForQuestion = (report, questionId, participantVisuals = partic
     if (!answer) return null;
     const visual = participantVisuals.get(participant.id);
     const { attemptedRuns, winningResponses } = polarityRepeatTotalsForCell(modelSummary);
+    const observed = aggregateResponseDistributions([modelSummary]);
+    const unsureShare = observed.observedDistribution?.probabilities.Unsure;
+    const answerLabel = unsureShare > 0.5 ? (unsureShare === 1 ? 'Unsure' : 'Mostly Unsure')
+      : answer === 'Unsure' ? (observed.distributionUnavailable ? 'Mean near center' : 'Mixed (mean stance)') : answer;
+    const observedLabel = observed.distributionUnavailable ? 'Observed answer shares unavailable'
+      : ['Agree', 'Unsure', 'Disagree'].map((key) => `${key} ${formatPercent(observed.observedDistribution.probabilities[key])}`).join(', ');
     return {
       id: participant.id,
       label: participant.label || participant.id,
       answer,
+      answerLabel,
+      observedLabel,
       meanScore: modelSummary.meanScore,
       winningResponses,
       attemptedRuns,
@@ -749,10 +771,11 @@ const normalizeAnalysisIssueAreas = (report, topics = normalizeAnalysisTopicCirc
       return {
         ...question,
         voteSummary: {
+          distributionUnavailable: summary.distributionUnavailable === true,
           counts: {
-            Agree: Number(summary.counts?.Agree || 0),
-            Unsure: Number(summary.counts?.Unsure || 0),
-            Disagree: Number(summary.counts?.Disagree || 0),
+            Agree: Number((summary.observedDistribution?.counts || summary.counts)?.Agree || 0),
+            Unsure: Number((summary.observedDistribution?.counts || summary.counts)?.Unsure || 0),
+            Disagree: Number((summary.observedDistribution?.counts || summary.counts)?.Disagree || 0),
           },
           invalid: Number(summary.invalid || 0),
         },
@@ -887,6 +910,7 @@ const normalizeAnalysisCompasses = (report) => {
 };
 
 const renderPolisBoxPlot = (summary = {}) => {
+  if (summary.distributionUnavailable) return unavailableDistribution();
   const { agree, unsure, disagree } = answerTotals(summary);
   const totalConcrete = agree + unsure + disagree;
   const width = 200;
@@ -919,30 +943,12 @@ const questionSpread = (report, questionId) => {
   return Math.max(...values) - Math.min(...values);
 };
 
-const aggregateQuestionSummaryForModels = (report, questionId, participantIds = []) => {
-  const ids = new Set(participantIds);
-  const counts = { Agree: 0, Unsure: 0, Disagree: 0 };
-  let invalid = 0;
-  let total = 0;
-  (report.participants || []).forEach((participant) => {
-    if (ids.size && !ids.has(participant.id)) return;
-    const summary = report.polisReport?.byModelQuestion?.[participant.id]?.[questionId];
-    if (!summary) return;
-    counts.Agree += summary.counts?.Agree || 0;
-    counts.Unsure += summary.counts?.Unsure || 0;
-    counts.Disagree += summary.counts?.Disagree || 0;
-    invalid += summary.invalid || 0;
-    total += summary.total || 0;
-  });
-  const valid = counts.Agree + counts.Unsure + counts.Disagree;
-  return {
-    counts,
-    invalid,
-    total,
-    meanScore: valid > 0 ? (counts.Agree - counts.Disagree) / valid : null,
-    uncertaintyRate: valid > 0 ? counts.Unsure / valid : 0,
-    invalidRate: total > 0 ? invalid / total : 0,
-  };
+const aggregateQuestionSummaryForModels = (report, questionId, participantIds = null) => {
+  const ids = participantIds === null ? null : new Set(participantIds);
+  return aggregateResponseDistributions((report.participants || [])
+    .filter((participant) => !ids || ids.has(participant.id))
+    .map((participant) => report.polisReport?.byModelQuestion?.[participant.id]
+      ? report.polisReport.byModelQuestion[participant.id][questionId] : null));
 };
 
 const topDifferenceQuestions = (report, limit = 12) => getQuestions(report)
@@ -983,6 +989,7 @@ const answerDistributionRows = (summary = {}) => {
 };
 
 const renderAnalysisDistribution = (summary, groupName, segmentKey = groupName) => {
+  if (summary.distributionUnavailable) return unavailableDistribution();
   const rows = answerDistributionRows(summary);
   const valid = rows.reduce((sum, row) => sum + row.count, 0);
   const segments = rows.map((row) => `<span
@@ -997,7 +1004,7 @@ const renderAnalysisDistribution = (summary, groupName, segmentKey = groupName) 
   return `<div class="analysisDistributionDataset">
     <div class="analysisDistributionHeader">
       <span class="analysisDistributionTitle">${escapeHtml(groupName)}</span>
-      <span class="analysisDistributionMeta">${escapeHtml(valid)} modeled responses</span>
+      <span class="analysisDistributionMeta">${escapeHtml(formatCount(valid))} model participants</span>
     </div>
     <div
       class="analysisCandlestick"
@@ -1144,7 +1151,7 @@ const renderInteractiveQuestionBeeswarmPoint = ({
   const noRepeatData = hasVotes && consistencyRate === null;
   const pointClassName = `beeswarmPoint${hasVotes ? '' : ' beeswarmPointNoData'}${noRepeatData ? ' beeswarmPointNoRepeat' : ''}`;
   const circleClassName = `beeswarmCircle${hasVotes ? '' : ' beeswarmCircleNoData'}${noRepeatData ? ' beeswarmCircleNoRepeat' : ''}`;
-  const statusLabel = hasVotes ? `${validVoteCount(summary)} modeled responses` : 'No model responses yet';
+  const statusLabel = summary.distributionUnavailable ? 'Observed answer distribution unavailable' : hasVotes ? `${formatCount(validVoteCount(summary))} model participants` : 'No model responses yet';
   const questionId = question.id;
   const prompt = question.prompt || question.id;
   const topic = question.topic || 'uncategorized';
@@ -1159,16 +1166,17 @@ const renderInteractiveQuestionBeeswarmPoint = ({
     data-question-topic="${escapeHtml(topic)}"
     data-question-has-votes="${hasVotes ? 'true' : 'false'}"
     data-question-status="${escapeHtml(statusLabel)}"
-    data-question-agree="${escapeHtml(totals.agree)}"
-    data-question-disagree="${escapeHtml(totals.disagree)}"
-    data-question-unsure="${escapeHtml(totals.unsure)}"
+    data-question-distribution-unavailable="${summary.distributionUnavailable ? 'true' : 'false'}"
+    data-question-agree="${escapeHtml(formatCount(totals.agree))}"
+    data-question-disagree="${escapeHtml(formatCount(totals.disagree))}"
+    data-question-unsure="${escapeHtml(formatCount(totals.unsure))}"
     data-question-invalid="${escapeHtml(totals.invalid)}"
     data-question-mean="${escapeHtml(formatScore(summary.meanScore))}"
     data-question-spread="${escapeHtml(formatScore(spread))}"
     data-question-extremity="${escapeHtml(formatScore(extremity))}"
     data-question-difference="${escapeHtml(formatScore(difference))}"
     data-question-difference-label="${escapeHtml(differenceLabel)}"
-    data-question-votes="${escapeHtml(validVoteCount(summary))}"
+    data-question-votes="${escapeHtml(formatCount(validVoteCount(summary)))}"
     data-question-winning-response-consistency="${escapeHtml(formatScore(consistencyRate))}"
     data-question-winning-responses="${escapeHtml(winningResponseConsistency.winningResponses || 0)}"
     data-question-attempted-runs="${escapeHtml(winningResponseConsistency.attemptedRuns || 0)}"
@@ -1467,32 +1475,11 @@ const questionWinningResponseConsistency = (report, questionId, summary = {}, mo
     };
   }
 
-  let winningResponses = 0;
-  let attemptedRuns = 0;
-  let validRuns = 0;
-  let contributingModels = 0;
   const byModelQuestion = report.polisReport?.byModelQuestion || {};
   const questionsByModel = hasModelScope
     ? Array.from(new Set(modelIds)).map((modelId) => byModelQuestion[modelId])
     : Object.values(byModelQuestion);
-  questionsByModel.forEach((questionsById) => {
-    const cell = questionsById?.[questionId];
-    if (!cell) return;
-    const totals = polarityRepeatTotalsForCell(cell);
-    if (totals.attemptedRuns <= 0) return;
-    winningResponses += totals.winningResponses;
-    attemptedRuns += totals.attemptedRuns;
-    validRuns += totals.validRuns;
-    contributingModels += 1;
-  });
-  return {
-    method: 'pooled-within-model-polarity-modal-share',
-    rate: attemptedRuns ? clamp(winningResponses / attemptedRuns, 0, 1) : null,
-    winningResponses,
-    attemptedRuns,
-    validRuns,
-    contributingModels,
-  };
+  return summarizeWinningResponseConsistency(questionsByModel.map((questionsById) => questionsById?.[questionId]));
 };
 
 const buildQuestionBeeswarmPoints = (report) => {
@@ -1632,6 +1619,7 @@ const buildParticipantEmbedding = (report, width = 680, height = 430) => {
   const graphNodeById = new Map((report.participantGraph?.nodes || []).map((node) => [node.id, node]));
   const active = participants.filter((participant) => participant.coverage?.eligibleForSimilarity);
   const inactive = participants.filter((participant) => !participant.coverage?.eligibleForSimilarity);
+  if (!hasCompleteSimilarity(active.map((participant) => participant.id), report.polisReport?.similarityMatrix)) return [];
   const activeCoordinates = new Map();
 
   if (active.length === 1) {
@@ -1639,8 +1627,7 @@ const buildParticipantEmbedding = (report, width = 680, height = 430) => {
   } else if (active.length > 1) {
     const distances = active.map((left) => active.map((right) => {
       if (left.id === right.id) return 0;
-      const similarity = report.polisReport?.similarityMatrix?.[left.id]?.[right.id];
-      return Number.isFinite(similarity) ? clamp(1 - similarity, 0, 1) : 1;
+      return 1 - similarityFor(report.polisReport?.similarityMatrix, left.id, right.id);
     }));
     const squared = distances.map((row) => row.map((value) => value * value));
     const rowMeans = squared.map((row) => row.reduce((sum, value) => sum + value, 0) / row.length);
@@ -1932,6 +1919,7 @@ const renderIntegrityNotice = (report) => {
   return `<div class="aidb-preview-notice" role="status" data-ce-benchmark-preview>
     <strong>Development preview.</strong>
     <span>The measurements below are useful for testing the report and methodology, but this is not an official benchmark release.</span>
+    ${report.summaryCorrection?.method === 'recomputed-from-saved-model-question-counts-v1' ? '<span data-ce-benchmark-saved-correction>Answer summaries were corrected from the saved response counts. The original model runs were not rerun or revalidated.</span>' : ''}
     ${detailItems.length ? `<details><summary>Why this is a development preview</summary><ul>${detailItems.join('')}</ul></details>` : ''}
   </div>`;
 };
@@ -1946,6 +1934,16 @@ const renderConsensusAndDifference = (report) => {
 };
 
 const renderParticipantGraph = (report) => {
+  const availability = report.participantGraph?.opinionGroupAvailability;
+  if (availability?.status === 'unavailable') {
+    return renderCollapsibleSection({
+      id: 'participant-graph',
+      title: 'Participants Graph',
+      subtitle: 'Joint embedding unavailable',
+      anchorAliases: ['participants-graph'],
+      body: `<p role="status" data-ce-participant-embedding-unavailable>Joint participant embedding and automatic or manual opinion groups are unavailable because ${availability.reason === 'incomplete-pairwise-similarity' ? 'some participant pairs lack sufficient shared questions' : 'fewer than two participants have sufficient shared questions'}. Missing overlap is not disagreement. Answer distributions and measured pairwise similarities remain available in the report exports.</p>`,
+    });
+  }
   const width = 500;
   const height = 400;
   const staticEmbeddingControlTitle = 'Static benchmark exports preserve the generated participant embedding. Re-render the report after a new run to change this control.';
@@ -2074,7 +2072,7 @@ const renderParticipantGraph = (report) => {
     const { agree, unsure, disagree, invalid } = answerTotals(summary);
     return `<g class="graph-statement" data-ce-searchable hidden>
       <circle cx="${escapeHtml(graphX(x).toFixed(2))}" cy="${escapeHtml(graphY(y).toFixed(2))}" r="3" fill="#000" />
-      <title>${escapeHtml(`${question.id}: ${question.prompt || ''} Agree: ${agree}, Unsure: ${unsure}, Disagree: ${disagree}, Invalid: ${invalid}`)}</title>
+      <title>${escapeHtml(`${question.id}: ${question.prompt || ''} ${summary.distributionUnavailable ? 'Observed answer distribution unavailable' : `Agree: ${formatCount(agree)}, Unsure: ${formatCount(unsure)}, Disagree: ${formatCount(disagree)}, Invalid: ${formatCount(invalid)}`}`)}</title>
     </g>`;
   }).join('');
   const strongestEdges = [...edges]
@@ -2172,6 +2170,7 @@ const renderParticipantGraph = (report) => {
     bodyClassName: 'aidb-participant-graph-section',
     body: `
       <script type="application/json" id="ce-ai-discourse-bench-participant-clusters">${serializeJsonForHtmlScript(clusterControlPayload)}</script>
+      <p class="ce-report-muted" data-ce-opinion-group-caveat>Exploratory opinion groups describe this sample; their stability has not been established.</p>
       <div class="participantGraphControls">
         <div class="controlGroup">
           <label for="embedding-choice-select">Embedding:${renderTooltipReference(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT)}</label>
@@ -2270,12 +2269,13 @@ const renderBreakdown = (report) => {
     return map;
   }, {});
   const renderBreakdownCandlestick = (summary = {}) => {
+    if (summary.distributionUnavailable) return unavailableDistribution();
     const { agree, unsure, disagree } = answerTotals(summary);
     const valid = Math.max(1, agree + unsure + disagree);
     return `<div class="breakdownCandlestick" aria-label="response distribution">
-      <span class="breakdownCandleSegment breakdownCandleSegmentAgree" style="width:${escapeHtml(((agree / valid) * 100).toFixed(2))}%" title="Agree: ${escapeHtml(agree)}"></span>
-      <span class="breakdownCandleSegment breakdownCandleSegmentUnsure" style="width:${escapeHtml(((unsure / valid) * 100).toFixed(2))}%" title="Unsure: ${escapeHtml(unsure)}"></span>
-      <span class="breakdownCandleSegment breakdownCandleSegmentDisagree" style="width:${escapeHtml(((disagree / valid) * 100).toFixed(2))}%" title="Disagree: ${escapeHtml(disagree)}"></span>
+      <span class="breakdownCandleSegment breakdownCandleSegmentAgree" style="width:${escapeHtml(((agree / valid) * 100).toFixed(2))}%" title="Agree: ${escapeHtml(formatCount(agree))}"></span>
+      <span class="breakdownCandleSegment breakdownCandleSegmentUnsure" style="width:${escapeHtml(((unsure / valid) * 100).toFixed(2))}%" title="Unsure: ${escapeHtml(formatCount(unsure))}"></span>
+      <span class="breakdownCandleSegment breakdownCandleSegmentDisagree" style="width:${escapeHtml(((disagree / valid) * 100).toFixed(2))}%" title="Disagree: ${escapeHtml(formatCount(disagree))}"></span>
     </div>`;
   };
   const summaryForQuestion = (question) => (
@@ -2302,12 +2302,12 @@ const renderBreakdown = (report) => {
     const datasets = [
       {
         label: 'Overall',
-        meta: `${escapeHtml(validVoteCount(summary))} modeled responses`,
+        meta: summary.distributionUnavailable ? 'Retained counts incomplete' : `${formatCount(validVoteCount(summary))} model participants`,
         summary,
       },
       ...cohortEntriesForQuestion(question).map((entry) => ({
         label: `${formatDisplayLabel(entry.trait)}: ${formatDisplayLabel(entry.value)}`,
-        meta: `${validVoteCount(entry.summary)} modeled responses`,
+        meta: `${formatCount(validVoteCount(entry.summary))} model participants`,
         summary: entry.summary,
       })),
     ].filter((entry) => entry.summary);
@@ -2957,42 +2957,55 @@ const renderAtlasQuestionDistribution = (summary = {}, modelAnswers = [], option
     { label: 'Disagree', count: disagree, className: 'aidb-answer-disagree' },
     ...(invalid > 0 ? [{ label: 'Invalid', count: invalid, className: 'aidb-answer-invalid' }] : []),
   ];
-  let precedingCount = 0;
-  const markers = entries.flatMap((entry) => {
-    const matchingModels = modelAnswers.filter((modelAnswer) => modelAnswer.answer === entry.label);
-    const segmentStart = precedingCount / widthTotal;
-    const segmentWidth = entry.count / widthTotal;
-    precedingCount += entry.count;
-    return matchingModels.map((modelAnswer, index) => ({
-      ...modelAnswer,
-      left: (segmentStart + (segmentWidth * ((index + 1) / (matchingModels.length + 1)))) * 100,
-    }));
+  const lanes = [];
+  const markers = modelAnswers.filter((answer) => Number.isFinite(answer.meanScore)).map((answer) => {
+    const left = (clamp(answer.meanScore, -1, 1) + 1) * 50;
+    // Preserve the mean's exact x-coordinate. Separate near/coincident means
+    // vertically; 16% leaves room for 20px markers at the 140px minimum width.
+    let lane = lanes.findIndex((positions) => positions.every((position) => Math.abs(position - left) >= 16));
+    if (lane < 0) { lane = lanes.length; lanes.push([]); }
+    lanes[lane].push(left);
+    return { ...answer, left, lane };
   });
-  const modelAssignments = markers.map((marker) => `${marker.label}: ${marker.answer}`).join(', ');
-  const ariaLabel = `Model vote distribution: ${entries.map((entry) => `${entry.label} ${entry.count}`).join(', ')}${modelAssignments ? `. Model answers: ${modelAssignments}` : ''}`;
-  return `<div class="atlasIssueQuestionDistribution${className ? ` ${escapeHtml(className)}` : ''}" data-ce-atlas-question-distribution aria-label="${escapeHtml(ariaLabel)}">
-    <div class="atlasIssueQuestionBar" data-ce-atlas-question-vote-bar>
-      <span class="atlasIssueQuestionSegments" aria-hidden="true">
-        ${entries.map((entry) => `<i class="${escapeHtml(entry.className)}" style="width:${escapeHtml(((entry.count / widthTotal) * 100).toFixed(2))}%" title="${escapeHtml(`${entry.label}: ${entry.count} (${formatPercent(entry.count / widthTotal)})`)}"></i>`).join('')}
-      </span>
-      ${markers.map((marker) => `<span
+  const invalidModels = modelAnswers.filter((answer) => !Number.isFinite(answer.meanScore));
+  const modelAssignments = modelAnswers.map((marker) => `${marker.label}: ${marker.answerLabel || marker.answer}`).join(', ');
+  const ariaLabel = summary.distributionUnavailable ? 'Observed answer distribution unavailable'
+    : `Model vote distribution: ${entries.map((entry) => `${entry.label} ${formatCount(entry.count)}`).join(', ')}${modelAssignments ? `. Model answers: ${modelAssignments}` : ''}`;
+  const renderMarker = (marker) => {
+    const description = `${marker.label}: ${marker.answerLabel || marker.answer}. Mean stance ${formatScore(marker.meanScore)}. Observed answers: ${marker.observedLabel}. Repeat stability ${Number.isFinite(marker.repeatStability) ? formatPercent(marker.repeatStability) : 'unavailable'}.`;
+    return `<span
         class="atlasIssueModelMarker"
         data-ce-atlas-model-marker="${escapeHtml(marker.id)}"
-        data-ce-atlas-model-answer="${escapeHtml(marker.answer)}"
+        data-ce-atlas-model-answer="${escapeHtml(marker.answerLabel || marker.answer)}"
         data-ce-atlas-model-label="${escapeHtml(marker.label)}"
+        data-ce-atlas-model-mean="${escapeHtml(marker.meanScore)}"
         data-ce-atlas-model-repeat-value="${escapeHtml(Number.isFinite(marker.repeatStability) ? formatPercent(marker.repeatStability) : 'No repeat data')}"
         data-ce-atlas-model-winning-responses="${escapeHtml(marker.winningResponses || 0)}"
         data-ce-atlas-model-attempted-runs="${escapeHtml(marker.attemptedRuns || 0)}"
-        style="--atlas-model-color:${escapeHtml(marker.color)};left:${escapeHtml(marker.left.toFixed(2))}%"
-        title="${escapeHtml(`${marker.label}: ${marker.answer}`)}"
+        data-ce-model-stance-tooltip="${escapeHtml(description)}"
+        style="--atlas-model-color:${escapeHtml(marker.color)};${Number.isFinite(marker.left) ? `left:${escapeHtml(marker.left.toFixed(2))}%;--stance-lane:${marker.lane}` : 'position:static;transform:none'}"
+        title="${escapeHtml(description)}"
+        tabindex="0"
         role="img"
-        aria-label="${escapeHtml(`${marker.label}: ${marker.answer}`)}"
-      >${escapeHtml(marker.markerLabel)}</span>`).join('')}
-    </div>
-    ${showLegend ? `<div class="atlasIssueQuestionVoteLegend">
-      ${entries.map((entry) => `<span class="atlasIssueQuestionVoteItem" data-ce-atlas-question-vote-count="${escapeHtml(entry.label)}"><i class="${escapeHtml(entry.className)}"></i><span>${escapeHtml(entry.label)}</span><strong>${escapeHtml(entry.count)}</strong></span>`).join('')}
-      <span class="atlasIssueQuestionVoteTotal">${escapeHtml(total)} model vote${total === 1 ? '' : 's'}</span>
+        aria-label="${escapeHtml(description)}"
+      >${escapeHtml(marker.markerLabel)}</span>`;
+  };
+  return `<div class="atlasIssueQuestionDistribution${className ? ` ${escapeHtml(className)}` : ''}" data-ce-atlas-question-distribution aria-label="${escapeHtml(ariaLabel)}">
+    ${summary.distributionUnavailable ? unavailableDistribution() : `<div class="atlasIssueQuestionBar" data-ce-atlas-question-vote-bar>
+      <span class="atlasIssueQuestionSegments" aria-hidden="true">
+        ${entries.map((entry) => `<i class="${escapeHtml(entry.className)}" style="width:${escapeHtml(((entry.count / widthTotal) * 100).toFixed(2))}%" title="${escapeHtml(`${entry.label}: ${formatCount(entry.count)} model equivalents (${formatPercent(entry.count / widthTotal)})`)}"></i>`).join('')}
+      </span>
+    </div>`}
+    ${showLegend && !summary.distributionUnavailable ? `<div class="atlasIssueQuestionVoteLegend">
+      ${entries.map((entry) => `<span class="atlasIssueQuestionVoteItem" data-ce-atlas-question-vote-count="${escapeHtml(entry.label)}"><i class="${escapeHtml(entry.className)}"></i><span>${escapeHtml(entry.label)}</span><strong>${escapeHtml(formatCount(entry.count))}</strong></span>`).join('')}
+      <span class="atlasIssueQuestionVoteTotal">${escapeHtml(formatCount(total))} model equivalents</span>
     </div>` : ''}
+    ${markers.length ? `<div class="modelStanceAxis" data-ce-model-stance-axis aria-label="Individual model mean stance, separate from observed answer shares">
+      <span class="modelStanceTitle">Model mean stance <span title="A center mean can reflect mixed directional answers or observed Unsure. Focus a model marker for its answer shares.">(−1 to +1)</span></span>
+      <div class="modelStanceTrack" style="--stance-lanes:${lanes.length}">${markers.map(renderMarker).join('')}</div>
+      <div class="modelStanceLabels" aria-hidden="true"><span>−1 Disagree</span><span>0</span><span>+1 Agree</span></div>
+    </div>` : ''}
+    ${invalidModels.length ? `<div class="modelStanceInvalid">No valid mean: ${invalidModels.map(renderMarker).join('')}</div>` : ''}
   </div>`;
 };
 
@@ -3005,7 +3018,7 @@ const renderAtlasIssueTemplate = (issueArea, index) => {
     ? `Average ${formatSignedScore(issueArea.averageStance)}`
     : 'No model answers';
   const stanceDetail = hasModelAnswers && Number.isFinite(issueArea.averageStance)
-    ? '-1 disagree | 0 unsure | +1 agree'
+    ? '-1 disagree | 0 mixed or unsure | +1 agree'
     : 'Valid averaged answers required';
   const differenceValue = Number.isFinite(issueArea.averageModelDifference)
     ? `Mean gap ${formatScore(issueArea.averageModelDifference)}`
@@ -3348,13 +3361,13 @@ const renderQuestionExplorer = (report) => {
     >
       <div class="questionPromptLine"><span class="questionPromptLabel">${escapeHtml(label)}</span>: ${escapeHtml(question.prompt || '(No prompt)')}</div>
       <div class="questionVoteRow">
-        <span class="questionVoteSummary">
-          <strong>Agree:</strong> ${escapeHtml(agree)} /
-          <strong>Unsure:</strong> ${escapeHtml(unsure)} /
-          <strong>Disagree:</strong> ${escapeHtml(disagree)} /
-          <strong>Responses:</strong> ${escapeHtml(responses)}${invalid > 0 ? ` /
+        ${summary.distributionUnavailable ? unavailableDistribution() : `<span class="questionVoteSummary">
+          <strong>Agree:</strong> ${escapeHtml(formatCount(agree))} /
+          <strong>Unsure:</strong> ${escapeHtml(formatCount(unsure))} /
+          <strong>Disagree:</strong> ${escapeHtml(formatCount(disagree))} /
+          <strong>Responses:</strong> ${escapeHtml(formatCount(responses))}${invalid > 0 ? ` /
           <strong>Invalid:</strong> ${escapeHtml(invalid)}` : ''}
-        </span>
+        </span>`}
         ${renderAtlasQuestionDistribution(summary, modelAnswers, {
           className: 'questionModelDistribution',
           showLegend: false,
@@ -3365,7 +3378,7 @@ const renderQuestionExplorer = (report) => {
   return renderCollapsibleSection({
     id: 'all-questions',
     title: 'All Questions',
-    subtitle: 'Question prompts with aggregate agree, unsure, and disagree counts',
+    subtitle: 'Observed answers weighted equally per model; counts are model equivalents, not repeated runs',
     bodyClassName: 'graphSection aidb-question-section',
     body: `<div class="questionModelLegend" aria-label="Model marker legend">${modelLegend}</div><div class="questionList">${items}</div>`,
   });
@@ -3514,7 +3527,18 @@ const serializeJsonForHtmlScript = (value) => (
     .replace(/&/g, '\\u0026')
 );
 
-export const renderHtmlReport = (report) => `<!doctype html>
+export const renderHtmlReport = (inputReport) => {
+  const sourceReport = withOpinionGroupAvailability(inputReport);
+  const overlayHash = sourceReport.analysisOverlay?.provenance?.inputReportHash;
+  // Fingerprints bind the saved report, not this display normalization.
+  const inputReportHash = buildReportFingerprint(inputReport);
+  if (sourceReport.summaryCorrection && overlayHash && overlayHash !== inputReportHash) {
+    throw new Error('Corrected report analysis fingerprint is obsolete; regenerate the analysis input and overlay against the current report.');
+  }
+  // Rendering older files is a read-only view over retained cell counts. Keep
+  // original aggregates in Raw Results rather than silently rewriting history.
+  const report = withObservedDisplaySummaries(sourceReport);
+  return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -4248,6 +4272,14 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .atlasIssueQuestionSegments { position: absolute; inset: 0; display: flex; overflow: hidden; border-radius: inherit; }
     .atlasIssueQuestionSegments i { display: block; height: 100%; }
     .atlasIssueModelMarker { position: absolute; top: 50%; z-index: 1; width: 18px; height: 18px; opacity: 1; transform: translate(-50%, -50%); pointer-events: auto; transition: opacity 0.16s ease, filter 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease; }
+    .modelStanceAxis { color: inherit; padding: 3px 0; }
+    .modelStanceTitle { display: block; font-size: 0.72rem; line-height: 1.4; }
+    .modelStanceTitle > span { font-weight: normal; }
+    .modelStanceTrack { position: relative; min-width: 140px; height: calc(var(--stance-lanes, 1) * 28px); margin: 2px 12px; background: linear-gradient(to right, transparent calc(50% - 0.5px), currentColor 50%, transparent calc(50% + 0.5px)); border-bottom: 1px solid currentColor; }
+    .modelStanceTrack .atlasIssueModelMarker { top: calc(14px + var(--stance-lane, 0) * 28px); }
+    .modelStanceTrack .atlasIssueModelMarker:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+    .modelStanceLabels { display: flex; justify-content: space-between; gap: 6px; margin: 0 3px; font-size: 0.68rem; line-height: 1.4; }
+    .modelStanceInvalid { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 0.72rem; }
     .atlasIssueModalContent[data-ce-atlas-model-highlight] .atlasIssueModelMarker { opacity: 0.25; filter: brightness(0.72) saturate(0.55); }
     .atlasIssueModalContent[data-ce-atlas-model-highlight] .atlasIssueModelMarker.atlasIssueModelMarkerActive { z-index: 3; opacity: 1; filter: brightness(1.38) saturate(1.25); transform: translate(-50%, -50%) scale(1.18); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.96), 0 0 12px var(--atlas-model-color); }
     .atlasIssueQuestionVoteLegend { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; color: #94a3b8; font-size: 0.7rem; line-height: 1.2; }
@@ -4944,6 +4976,9 @@ export const renderHtmlReport = (report) => `<!doctype html>
               <strong>Note:</strong> Only non-encrypted, binary
               (Agree/Disagree/Unsure) responses have been considered in
               this Polis-inspired report.
+              <span data-ce-benchmark-distribution-note>Each answering model has equal weight, so answer counts can be fractional. Unsure counts observed Unsure answers.</span>
+              <span>Model means use a separate stance axis; a center mean can reflect mixed answers or Unsure.</span>
+              ${sourceReport.polisReport?.responseDistributionVersion === 1 ? '' : '<span data-ce-legacy-distribution-notice>This older report is displayed from retained model/question counts. Distributions without sufficient counts are unavailable. Raw Results preserve the original aggregates.</span>'}
             </div>
             ${renderSummaryStats(report)}
             ${renderAiAnalysis(report)}
@@ -4957,7 +4992,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
           ${renderDebateAtlas(report)}
           ${renderBreakdown(report)}
           ${renderRiskMatrix(report)}
-          ${renderSnapshotJson(report)}
+          ${renderSnapshotJson(sourceReport)}
         </div>
         </div>
       </div>
@@ -4994,9 +5029,9 @@ export const renderHtmlReport = (report) => `<!doctype html>
     </div>
   </div>
   <div class="beeTooltip" data-ce-beeswarm-tooltip role="tooltip" hidden></div>
-  <script type="application/json" id="ce-ai-discourse-bench-report">${serializeJsonForHtmlScript(report)}</script>
-  <script type="application/json" id="ce-ai-discourse-bench-polis-export">${serializeJsonForHtmlScript(buildContextEnginePolisExport(report))}</script>
-  <script type="application/json" id="ce-ai-discourse-bench-analysis-input">${serializeJsonForHtmlScript(buildSecondPassAnalysisInput(report))}</script>
+  <script type="application/json" id="ce-ai-discourse-bench-report">${serializeJsonForHtmlScript(sourceReport)}</script>
+  <script type="application/json" id="ce-ai-discourse-bench-polis-export">${serializeJsonForHtmlScript(buildContextEnginePolisExport(sourceReport))}</script>
+  <script type="application/json" id="ce-ai-discourse-bench-analysis-input">${serializeJsonForHtmlScript({ ...buildSecondPassAnalysisInput(sourceReport), inputReportHash })}</script>
   <script>
     (function () {
       var snapshotEl = document.getElementById('ce-ai-discourse-bench-report');
@@ -5931,7 +5966,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
         });
       }
       function tagQuestionCounts(summary) {
-        var counts = summary && summary.counts ? summary.counts : {};
+        var counts = summary && summary.observedDistribution ? summary.observedDistribution.counts : {};
         return {
           agree: Number(counts.Agree || 0),
           unsure: Number(counts.Unsure || 0),
@@ -5939,21 +5974,19 @@ export const renderHtmlReport = (report) => `<!doctype html>
         };
       }
       function renderTagQuestionCard(question) {
-        var summaries = reportSnapshot.polisReport && reportSnapshot.polisReport.byQuestion
-          ? reportSnapshot.polisReport.byQuestion
-          : {};
-        var summary = summaries[question.id] || {};
+        var summary = aggregateBreakdownQuestion(question.id, null);
+        if (summary.distributionUnavailable) return '<a class="tagExplorerQuestionCard" data-ce-tag-question-link href="#question-' + escapeText(question.id) + '"><p>' + escapeText(question.prompt || question.id) + '</p><span data-ce-observed-distribution-unavailable>Observed answer distribution unavailable: retained model/question counts are incomplete.</span></a>';
         var counts = tagQuestionCounts(summary);
         var total = counts.agree + counts.unsure + counts.disagree;
         return '<a class="tagExplorerQuestionCard" data-ce-tag-question-link href="#question-' + escapeText(question.id) + '">'
-          + '<div class="tagExplorerQuestionMeta"><span>' + escapeText(question.id) + '</span><span>' + escapeText(total) + ' model vote' + (total === 1 ? '' : 's') + '</span></div>'
+          + '<div class="tagExplorerQuestionMeta"><span>' + escapeText(question.id) + '</span><span>' + escapeText(formatCount(total)) + ' model equivalents</span></div>'
           + '<p class="tagExplorerQuestionPrompt">' + escapeText(question.prompt || question.id) + '</p>'
           + '<div class="tagExplorerQuestionBar" aria-hidden="true">'
           + '<i class="tagExplorerAgree" style="width:' + percent(counts.agree, total) + '%"></i>'
           + '<i class="tagExplorerUnsure" style="width:' + percent(counts.unsure, total) + '%"></i>'
           + '<i class="tagExplorerDisagree" style="width:' + percent(counts.disagree, total) + '%"></i>'
           + '</div>'
-          + '<div class="tagExplorerQuestionLegend"><span>Agree ' + escapeText(counts.agree) + '</span><span>Unsure ' + escapeText(counts.unsure) + '</span><span>Disagree ' + escapeText(counts.disagree) + '</span></div>'
+          + '<div class="tagExplorerQuestionLegend"><span>Agree ' + escapeText(formatCount(counts.agree)) + '</span><span>Unsure ' + escapeText(formatCount(counts.unsure)) + '</span><span>Disagree ' + escapeText(formatCount(counts.disagree)) + '</span></div>'
           + '</a>';
       }
       function renderTagModal(tag) {
@@ -5962,7 +5995,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
         if (tagModalCount) tagModalCount.textContent = String(questions.length);
         if (tagModalSummary) {
           tagModalSummary.textContent = questions.length
-            ? questions.length + ' benchmark question' + (questions.length === 1 ? '' : 's') + ' carry this tag. Each card shows one averaged vote per model.'
+            ? questions.length + ' benchmark question' + (questions.length === 1 ? '' : 's') + ' carry this tag. Each card shows observed answer shares with equal model weight.'
             : 'No benchmark questions carry this tag in the current report.';
         }
         if (tagModalQuestions) {
@@ -6074,6 +6107,11 @@ export const renderHtmlReport = (report) => `<!doctype html>
       }
       function renderBeeswarmTooltip(point) {
         if (!beeswarmTooltip || !point) return;
+        if (point.dataset.questionDistributionUnavailable === 'true') {
+          beeswarmTooltip.innerHTML = '<strong>' + escapeText(point.dataset.questionId) + ': ' + escapeText(point.dataset.questionPrompt) + '</strong><p>Observed answer distribution unavailable: retained model/question counts are incomplete.</p>';
+          beeswarmTooltip.hidden = false;
+          return;
+        }
         var votes = Number(point.dataset.questionVotes || 0);
         var invalid = Number(point.dataset.questionInvalid || 0);
         var total = votes + invalid;
@@ -6223,31 +6261,16 @@ export const renderHtmlReport = (report) => `<!doctype html>
           return String(question.id) === String(questionId || '');
         }) || null;
       }
+      var formatCount = ${formatCount.toString()};
+      var aggregateResponseDistributions = ${aggregateResponseDistributions.toString()};
       function aggregateBreakdownQuestion(questionId, participantIds) {
-        var selectedIds = new Set((participantIds || []).map(String));
-        var counts = { Agree: 0, Unsure: 0, Disagree: 0 };
-        var invalid = 0;
-        var total = 0;
-        Object.keys(reportSnapshot.polisReport && reportSnapshot.polisReport.byModelQuestion || {}).forEach(function (participantId) {
-          if (selectedIds.size && !selectedIds.has(String(participantId))) return;
-          var cell = reportSnapshot.polisReport.byModelQuestion[participantId]
-            ? reportSnapshot.polisReport.byModelQuestion[participantId][questionId]
-            : null;
-          if (!cell) return;
-          counts.Agree += Number(cell.counts && cell.counts.Agree || 0);
-          counts.Unsure += Number(cell.counts && cell.counts.Unsure || 0);
-          counts.Disagree += Number(cell.counts && cell.counts.Disagree || 0);
-          invalid += Number(cell.invalid || 0);
-          total += Number(cell.total || 0);
-        });
-        var valid = counts.Agree + counts.Unsure + counts.Disagree;
-        return {
-          counts: counts,
-          invalid: invalid,
-          total: total,
-          valid: valid,
-          meanScore: valid ? (counts.Agree - counts.Disagree) / valid : null
-        };
+        var selectedIds = participantIds == null ? null : new Set(participantIds.map(String));
+        return aggregateResponseDistributions((reportSnapshot.participants || []).filter(function (participant) {
+          return !selectedIds || selectedIds.has(String(participant.id));
+        }).map(function (participant) {
+          return reportSnapshot.polisReport && reportSnapshot.polisReport.byModelQuestion && reportSnapshot.polisReport.byModelQuestion[participant.id]
+            ? reportSnapshot.polisReport.byModelQuestion[participant.id][questionId] : null;
+        }));
       }
       function breakdownFilteredParticipantIds(groups) {
         var allIds = (reportSnapshot.participants || []).map(function (participant) { return String(participant.id); });
@@ -6342,41 +6365,20 @@ export const renderHtmlReport = (report) => `<!doctype html>
         }).join('');
         breakdownSuggestionButtons = Array.from(breakdownSuggestionsList.querySelectorAll('[data-ce-breakdown-suggestion]'));
       }
+      var summarizeWinningResponseConsistency = ${summarizeWinningResponseConsistency.toString()};
       function breakdownConsistency(questionId, participantIds) {
-        var selectedIds = new Set((participantIds || []).map(String));
-        var winningResponses = 0;
-        var attemptedRuns = 0;
-        var contributingModels = 0;
-        Object.keys(reportSnapshot.polisReport && reportSnapshot.polisReport.byModelQuestion || {}).forEach(function (participantId) {
-          if (selectedIds.size && !selectedIds.has(String(participantId))) return;
-          var cell = reportSnapshot.polisReport.byModelQuestion[participantId]
-            ? reportSnapshot.polisReport.byModelQuestion[participantId][questionId]
-            : null;
-          if (!cell) return;
-          var counts = [
-            Number(cell.counts && cell.counts.Agree || 0),
-            Number(cell.counts && cell.counts.Unsure || 0),
-            Number(cell.counts && cell.counts.Disagree || 0)
-          ];
-          var valid = counts.reduce(function (sum, count) { return sum + count; }, 0);
-          var attempts = Number.isFinite(Number(cell.total)) ? Number(cell.total) : valid + Number(cell.invalid || 0);
-          if (!attempts) return;
-          winningResponses += Math.max.apply(Math, counts);
-          attemptedRuns += attempts;
-          contributingModels += 1;
-        });
-        return {
-          rate: attemptedRuns ? winningResponses / attemptedRuns : null,
-          winningResponses: winningResponses,
-          attemptedRuns: attemptedRuns,
-          contributingModels: contributingModels
-        };
+        var selectedIds = participantIds == null ? null : new Set(participantIds.map(String));
+        var matrix = reportSnapshot.polisReport && reportSnapshot.polisReport.byModelQuestion || {};
+        return summarizeWinningResponseConsistency(Object.keys(matrix).filter(function (participantId) {
+          return !selectedIds || selectedIds.has(String(participantId));
+        }).map(function (participantId) { return matrix[participantId][questionId]; }));
       }
       function breakdownScore(value) {
         if (value === null || value === undefined || value === '') return 'n/a';
         return Number.isFinite(Number(value)) ? Number(value).toFixed(2) : 'n/a';
       }
       function breakdownRenderDistribution(summary, groupName, groupKey) {
+        if (summary && summary.distributionUnavailable) return '<div class="analysisDistributionDataset"><strong>' + escapeText(groupName) + '</strong><span data-ce-observed-distribution-unavailable>Observed answer distribution unavailable: retained model/question counts are incomplete.</span></div>';
         var counts = summary && summary.counts || {};
         var agree = Number(counts.Agree || 0);
         var unsure = Number(counts.Unsure || 0);
@@ -6386,7 +6388,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
         return '<div class="analysisDistributionDataset">' +
           '<div class="analysisDistributionHeader">' +
             '<span class="analysisDistributionTitle">' + escapeText(groupName) + '</span>' +
-            '<span class="analysisDistributionMeta">' + escapeText(valid) + ' modeled responses</span>' +
+            '<span class="analysisDistributionMeta">' + escapeText(formatCount(valid)) + ' model participants</span>' +
           '</div>' +
           '<div class="analysisCandlestick" data-testid="ce-demo-analysis-card-candlestick-' + escapeText(String(groupKey || '').replace(/[^a-z0-9]+/gi, '-').toLowerCase()) + '" aria-label="' + escapeText(groupName + ' response distribution: Agree ' + Math.round((agree / denominator) * 100) + '%, Unsure ' + Math.round((unsure / denominator) * 100) + '%, Disagree ' + Math.round((disagree / denominator) * 100) + '%.') + '">' +
             '<span class="analysisCandleSegment analysisCandleSegmentAgree" style="width:' + escapeText((agree / denominator) * 100) + '%"></span>' +
@@ -6408,6 +6410,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
           var groupSummaries = groups.map(function (group) {
             return { group: group, summary: aggregateBreakdownQuestion(question.id, group.ids) };
           });
+          if (groupSummaries.some(function (entry) { return entry.summary.distributionUnavailable; })) return null;
           var validGroups = groupSummaries.filter(function (entry) { return entry.summary.valid > 0; });
           if (validGroups.length < 2) return null;
           var means = validGroups.map(function (entry) { return Number(entry.summary.meanScore || 0); });
@@ -6449,11 +6452,11 @@ export const renderHtmlReport = (report) => `<!doctype html>
           var valid = Number(row.summary.valid || 0);
           return '<a href="#question-' + escapeText(row.question.id) + '" class="beeswarmPoint" data-ce-searchable data-ce-beeswarm-point data-ce-comparison-beeswarm-point ' +
             'data-question-id="' + escapeText(row.question.id) + '" data-question-prompt="' + escapeText(prompt) + '" data-question-topic="' + escapeText(row.question.topic || 'uncategorized') + '" ' +
-            'data-question-has-votes="' + (valid ? 'true' : 'false') + '" data-question-status="' + escapeText(valid + ' modeled responses') + '" ' +
-            'data-question-agree="' + escapeText(Number(counts.Agree || 0)) + '" data-question-unsure="' + escapeText(Number(counts.Unsure || 0)) + '" data-question-disagree="' + escapeText(Number(counts.Disagree || 0)) + '" data-question-invalid="' + escapeText(Number(row.summary.invalid || 0)) + '" ' +
+            'data-question-has-votes="' + (valid ? 'true' : 'false') + '" data-question-status="' + escapeText(valid + ' model participants') + '" ' +
+            'data-question-agree="' + escapeText(formatCount(counts.Agree || 0)) + '" data-question-unsure="' + escapeText(formatCount(counts.Unsure || 0)) + '" data-question-disagree="' + escapeText(formatCount(counts.Disagree || 0)) + '" data-question-invalid="' + escapeText(Number(row.summary.invalid || 0)) + '" ' +
             'data-question-mean="' + escapeText(breakdownScore(row.summary.meanScore)) + '" data-question-difference="' + escapeText(breakdownScore(xMetric)) + '" data-question-difference-label="Cohort difference" data-question-votes="' + escapeText(valid) + '" ' +
             'data-question-winning-response-consistency="' + escapeText(breakdownScore(row.consistency.rate)) + '" data-question-winning-responses="' + escapeText(row.consistency.winningResponses) + '" data-question-attempted-runs="' + escapeText(row.consistency.attemptedRuns) + '" data-question-contributing-models="' + escapeText(row.consistency.contributingModels) + '" ' +
-            'aria-label="' + escapeText(row.question.id + ': ' + prompt + ' (' + valid + ' modeled responses)') + '">' +
+            'aria-label="' + escapeText(row.question.id + ': ' + prompt + ' (' + valid + ' model participants)') + '">' +
               '<circle class="beeswarmCircle" cx="' + escapeText(x) + '" cy="' + escapeText(y) + '" r="5"></circle>' +
             '</a>';
         }).join('');
@@ -6513,9 +6516,10 @@ export const renderHtmlReport = (report) => `<!doctype html>
           return { label: group.name, key: group.key, summary: aggregateBreakdownQuestion(question.id, group.ids) };
         }));
         return datasets.map(function (dataset) {
+          if (dataset.summary.distributionUnavailable) return '<div class="breakdownDataset"><strong>' + escapeText(dataset.label) + '</strong><span data-ce-observed-distribution-unavailable>Observed answer distribution unavailable: retained model/question counts are incomplete.</span></div>';
           var counts = dataset.summary.counts || {};
           var valid = Math.max(1, Number(dataset.summary.valid || 0));
-          return '<div class="breakdownDataset" data-ce-searchable><div class="breakdownDatasetHeader"><span class="breakdownDatasetTitle">' + escapeText(dataset.label) + '</span><span class="breakdownDatasetMeta">' + escapeText(dataset.summary.valid || 0) + ' modeled responses</span></div>' +
+          return '<div class="breakdownDataset" data-ce-searchable><div class="breakdownDatasetHeader"><span class="breakdownDatasetTitle">' + escapeText(dataset.label) + '</span><span class="breakdownDatasetMeta">' + escapeText(dataset.summary.valid || 0) + ' model participants</span></div>' +
             '<div class="breakdownCandlestick" aria-label="response distribution"><span class="breakdownCandleSegment breakdownCandleSegmentAgree" style="width:' + escapeText((Number(counts.Agree || 0) / valid) * 100) + '%"></span><span class="breakdownCandleSegment breakdownCandleSegmentUnsure" style="width:' + escapeText((Number(counts.Unsure || 0) / valid) * 100) + '%"></span><span class="breakdownCandleSegment breakdownCandleSegmentDisagree" style="width:' + escapeText((Number(counts.Disagree || 0) / valid) * 100) + '%"></span></div>' +
             '<p class="breakdownQuestionText">' + escapeText(question.prompt || question.id) + '</p></div>';
         }).join('');
@@ -7276,6 +7280,22 @@ export const renderHtmlReport = (report) => `<!doctype html>
           setExportAreaOpen(exportArea ? exportArea.hidden : true);
         });
       });
+      ['mouseover', 'focusin'].forEach(function (eventName) {
+        document.addEventListener(eventName, function (event) {
+          var marker = event.target && event.target.closest ? event.target.closest('[data-ce-model-stance-tooltip]') : null;
+          if (!marker || !beeswarmTooltip) return;
+          beeswarmTooltip.textContent = marker.getAttribute('data-ce-model-stance-tooltip') || '';
+          beeswarmTooltip.hidden = false;
+          var rect = marker.getBoundingClientRect();
+          positionBeeswarmTooltip(eventName === 'mouseover' ? event.clientX : rect.left, eventName === 'mouseover' ? event.clientY : rect.bottom);
+        });
+      });
+      ['mouseout', 'focusout'].forEach(function (eventName) {
+        document.addEventListener(eventName, function (event) {
+          var marker = event.target && event.target.closest ? event.target.closest('[data-ce-model-stance-tooltip]') : null;
+          if (marker && (!event.relatedTarget || !marker.contains(event.relatedTarget))) hideBeeswarmTooltip();
+        });
+      });
       document.addEventListener('mouseover', function (event) {
         var point = event.target && event.target.closest ? event.target.closest('[data-ce-beeswarm-point]') : null;
         if (!point) return;
@@ -7594,8 +7614,8 @@ export const renderHtmlReport = (report) => `<!doctype html>
         }
         if (opinionGroupStatus) {
           opinionGroupStatus.textContent = isAuto
-            ? 'Showing ' + String(clusterCount) + ' automatically generated opinion groups.'
-            : 'Showing ' + String(clusterCount) + ' manual K-medoids opinion groups.';
+            ? 'Showing ' + String(clusterCount) + ' exploratory automatically generated opinion groups.'
+            : 'Showing ' + String(clusterCount) + ' exploratory manual K-medoids opinion groups.';
         }
       }
       function applyOpinionGroupAssignments(assignments, clusterCount, isAuto) {
@@ -7725,3 +7745,4 @@ export const renderHtmlReport = (report) => `<!doctype html>
 </body>
 </html>
 `;
+};

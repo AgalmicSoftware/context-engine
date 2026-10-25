@@ -313,7 +313,11 @@ Allocations are sparse by default: a model may prioritize at most 10 questions.
 The per-question vote maximum is derived from the budget and allocation cap
 (`3` votes for the default 100-credit/10-question method), so every
 schema-valid allocation is guaranteed to remain within the quadratic budget.
-This keeps the budget legible and the structured response bounded.
+At defaults, ten maximum ratings cost only `10 × 3² = 90` of 100 credits:
+the budget does not bind. This is a capped top-ten rating task, not an
+unconstrained quadratic allocation. Historical measurement names, instruction
+versions, and results remain unchanged; any redesigned instrument needs its own
+measurement version.
 Use `--max-allocations` to change that cap for a separately identified run.
 
 ## Generate a Report
@@ -401,7 +405,7 @@ cell uses the averaged benchmark score and discretizes it back to
 `Agree` / `Unsure` / `Disagree`, while preserving the source run counts and
 mean score in response metadata. It is intentionally lossy.
 
-For native integration, use the lossless benchmark contract:
+For native integration, use the distribution-preserving benchmark contract:
 
 ```bash
 node ./bin/ai-discourse-bench.mjs export-ce-native \
@@ -501,3 +505,100 @@ semantic port, tests, and screenshot checks before
 `npm run sync:results-snapshot` accepts a new source baseline. See
 [docs/results-sync.md](docs/results-sync.md). Direct shared component imports
 are the intended replacement once the package and client boundaries are merged.
+
+With the repository's Playwright and Chromium installed, run
+`npm run check:report-browser -- --out-dir /tmp/benchmark-browser` to verify
+desktop, mobile, and narrow-mobile marker geometry, keyboard/hover tooltips,
+group controls, and unavailable-data views. Screenshots and a JSON check report
+are saved there. Pass `--report /absolute/path/report.json` to also inspect a
+saved report; the missing-data fixtures always run. Font downloads are disabled
+in this offline check.
+
+### Observed answers and mean stances
+
+Reports with `polisReport.responseDistributionVersion: 1` preserve each valid
+model/question cell's full Agree / Unsure / Disagree distribution. Question,
+cohort, and opinion-group summaries average those normalized distributions with
+one weight per contributing model. Model summaries give each answered question
+one weight. Repeats and failed attempts cannot increase a model's weight; cells
+with no valid answers contribute to missing/invalid coverage instead. The
+standalone report uses the same aggregation function for initial views and
+interactive cohort filters.
+
+`observedDistribution.probabilities` contains the three observed shares;
+`observedDistribution.counts` contains fractional model (or question) equivalents,
+whose sum is `validUnits`. `totalUnits` includes cells without a valid answer.
+`runSummary` retains actual valid, invalid, and attempted run counts separately.
+Thus a model that answers Agree and Disagree equally has zero observed Unsure,
+while a model that always answers Unsure has an observed Unsure share of one,
+even though both have mean stance zero. The observed-share histogram is separate
+from each model's explicitly labeled -1 to +1 mean-stance axis. Nearby markers
+use separate vertical lanes without moving their means. Marker tooltips and
+keyboard focus expose observed shares; majority-Unsure observations are labeled
+"Mostly Unsure", and all-Unsure observations remain "Unsure". A central mean
+without majority uncertainty is labeled "Mixed (mean stance)". Displayed model
+equivalents are rounded to at most four decimal places; stored values and raw
+trial counts are unchanged. Within-polarity repeat consistency and wording
+sensitivity calculations are unchanged.
+
+This is a semantic revision within report schema v2 and native dataset v1,
+identified by `responseDistributionVersion: 1`; it is not wholly additive.
+Existing report/analysis aggregate `counts` and report `responseEntropy` retain their discretized mean
+stance semantics for compatibility; `countsUnit: 'discretized-mean-stances'` and
+`meanStance` make that interpretation explicit. Aggregate `uncertaintyRate` now
+means the equal-weight observed Unsure share among valid cells, as declared by
+`polisReport.uncertaintyRateSemantics`. Use the version/semantics fields when
+comparing new summaries with older saved reports. Rebuild reports from their run
+artifacts for full reproducibility. A schema-v2 preview with complete saved
+model/question and polarity counts can instead receive this narrow correction:
+
+```bash
+node scripts/correct-saved-report-distributions.mjs old-report.json corrected-report.json
+node bin/ai-discourse-bench.mjs render-report --report corrected-report.json --out corrected-report.html
+```
+
+The correction verifies legacy means against both the count-derived mean and
+its original calculation from rounded cell means. It retains the stored mean
+and interval; it does not widen the tolerance for arbitrary inconsistent values.
+
+The correction preserves original cells, run summaries, intervals, source hashes,
+model metadata, and preview status. It records the source report digest and the
+correction method in `summaryCorrection` and displays a notice that the original
+runs were not rerun or revalidated. Incomplete counts, changed means, analysis
+overlays, and release receipts require separate regeneration; the correction
+does not fabricate individual responses or rebind old analysis. No stored report
+is rewritten implicitly. The compatibility CE export still discretizes a mean into one answer;
+its `answerSemantics` flag and `averagedFrom.observedDistribution` distinguish that
+lossy answer from observed uncertainty. The analysis input includes observed
+shares, valid model counts, raw run counts, and the separate mean stance.
+
+When rendering an older report, visible distributions are derived from its
+retained model/question histograms, including interactive cohort and tag views.
+An omitted question in an existing model row denotes no attempts; a missing row
+or a present cell with incomplete counts makes that distribution unavailable.
+The legacy notice explains this read-only view. Original aggregates and cell
+evidence remain in Raw Results; legacy mean-stance buckets are never presented
+as observed Unsure.
+
+Native, compatibility, analysis-input, and longitudinal exports carry
+`summaryCorrection`. The analysis fingerprint includes that provenance whenever
+it is present. Uncorrected reports retain the historical fingerprint algorithm;
+older fingerprints for corrected reports must not be accepted or rebound.
+Regenerate the analysis input and its overlay against the corrected report.
+Rendering a corrected report also rejects an attached overlay with an obsolete
+fingerprint. The HTML analysis-input download stays bound to the original saved
+report, even when display normalization withholds legacy opinion groups. Attach
+its overlay to that original JSON; the normalized embedded Snapshot JSON is a
+derived display artifact and can have a different fingerprint.
+Release-content hashing already includes the correction record and is unchanged.
+
+Participant embedding and automatic or manual opinion groups require at least
+two eligible participants and measured similarity for every eligible pair.
+`participantGraph.opinionGroupAvailability` discloses this shared rule. Missing
+pairs withhold group labels in report JSON and native exports, including exports
+of older reports, and withhold the HTML graph and group controls. A connected
+overlap graph with a missing pair is also insufficient: a path through a third
+participant does not supply a measured distance. Measured edges and raw
+distributions remain available. Remaining groups are exploratory descriptions
+of this sample, with no established stability claim. Missing similarity is never
+filled with maximal disagreement.

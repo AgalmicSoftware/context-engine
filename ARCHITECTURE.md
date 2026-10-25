@@ -72,7 +72,7 @@ architecture.
 |-------|-------------|--------------|-----------------|
 | **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | Shared across implemented profiles | `client/src/` |
 | **Session Worker** | Auth, canonical config, AI proxy, transcription, storage routes, controlled URL/image fetch, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
-| **Agent Bridge Worker** | Agent HTTP compatibility plus Telegram webhook, command, queue, Mini App transport, and atomically coordinated one-time invite exchange | Transitional adapter; session authority is being consolidated into the Session Worker | `workers/agentBridgeWorker/` |
+| **Agent Bridge Worker** | Scoped Agent HTTP, submission queue, Session Wrapped, and atomically coordinated one-time invite exchange | Transitional adapter; session authority is being consolidated into the Session Worker | `workers/agentBridgeWorker/` |
 | **Cloudflare storage** | Worker KV config, secrets, encrypted payload envelopes/indexes, and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
 | **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
 | **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
@@ -152,11 +152,18 @@ Hosted & Fast default:
 Lit opt-in:
   Client encrypts content locally with a fresh content key
   Session Worker asks a registered Lit Action to wrap that key for the SBT gate
-  On read, the Lit Action checks the SBT gate and the Worker returns the key
-  The Worker sees the content key, and holders of the session's Lit API key
-  can request keys directly, so this is not end-to-end encryption
+  On read, the Worker signs the exact request; the Lit Action verifies it and
+  checks the SBT gate, then encrypts its reply to that Worker's ephemeral key
+  Scoped execution credentials alone cannot choose a requester or read the key
+  The Worker operator sees content keys; Lit account/permission managers can
+  authorize other Actions and remain trusted, so this is not end-to-end encryption
   Arweave or Cloudflare stores the resulting ciphertext according to the profile
 ```
+
+New Lit authorities use the Worker-signed protocol above. Legacy unsigned
+Actions and their existing ciphertext are not retroactively protected; fresh
+authority setup and content preservation follow
+[Worker authorization for Lit key release](docs/lit-worker-authorization.md).
 
 ## Corpus Data
 
@@ -173,7 +180,7 @@ Lit opt-in:
 | Home tab shell | `components/MainContent/MainAreaTabs.tsx`, `ToolExplorer.tsx`, `OnboardingWalkthrough.tsx` |
 | Account / login settings | `components/Account/LoginAndSettingsModal.tsx`, `LoginButton.tsx` |
 | Session wizard | `components/Sessions/SessionWizard.tsx` |
-| Session page shell | `components/OnePageSession/OnePageSession.tsx` |
+| Session page shell | `components/OnePageSession/OnePageSession.tsx`; hosted agent access uses `OnePageSessionAgentShell.tsx`, `onePageSessionAgentController.ts`, and `onePageSessionAgentActions.ts` |
 | Demo-only views | `components/DemoViews/DemosIndex.tsx`, `RiskMatrixDemo.tsx`, `CorpusViewer.tsx`, `components/DemoViews/DemoAnalysis/`, `components/DemoViews/DebateHUD/` |
 | Document library | `components/DocumentLibrary/SessionDocumentsPage.tsx`, `DocumentLibraryPanel.tsx` |
 | Admin | `components/Admin/AdminPage.tsx` |
@@ -187,7 +194,7 @@ Lit opt-in:
 | Wallet | `client/src/wallet/` passkey EOA wallet config, encrypted keystore, EIP-1193 provider, and soft-session worker |
 | Crypto / Lit | `shared/encryption/envelopeV1Core.mjs` owns the browser/CE-CC envelope-v1 primitives; `utilities/crypto/cryptography.ts`, `litProtocol.ts`, and `encryptedFields.ts` own browser providers, Lit integration, and response orchestration |
 | Arweave | `utilities/arweave/arweaveClient.js`, `arweaveUrls.ts` |
-| Session helpers | `utilities/session/sessionSlug.ts` owns identity/transport/storage slug conversions; `sessionNaming.ts`, `sessionMetadata.ts`, `resourceKeys.ts`, `sessionModeProfile.ts`, `groupCreationPolicy.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, and `telegramSessionBackend.ts` own higher-level session behavior |
+| Session helpers | `utilities/session/sessionSlug.ts` owns identity/transport/storage slug conversions; `sessionNaming.ts`, `sessionMetadata.ts`, `resourceKeys.ts`, `sessionModeProfile.ts`, `groupCreationPolicy.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `agentSessionData.ts`, and `agentSessionBackend.ts` own higher-level session behavior |
 | Worker auth | `utilities/worker/workerAuth.ts`, `corsProxy.ts` |
 | Cache | `utilities/cache/cacheScripts.ts` |
 | AI | `utilities/ai/aiClient.ts`, `aiSettings.ts` |
@@ -206,13 +213,20 @@ Lit opt-in:
 | `CustomSBT.sol` | Non-transferable ERC-721 (SBT) with ERC-5192 / ERC-5484-aligned lock + burn-auth surfaces, password/invite/signature mint paths, `SBTActivity` history events, and `getHistorySummary()` for count-only reads. Transfers, approvals, and `safeTransferFrom` revert with `Soulbound()`. |
 | `SBTFactory.sol` | Deploys new CustomSBT instances (optionally deterministic via CREATE2). Configured deterministic deployments require the transaction sender to be the configured SBT admin. |
 
+`Surveys.sol` reserves distinct IDs for surveys and questions, including questions
+in a survey's initial batch. This prevents the shared `userResponses[user][id]`
+mapping from aliasing a survey response and a question response. The guards apply
+only to future deployments built from this source; existing deployed contracts
+and configured addresses are unchanged. The response mapping and public ABI are
+unchanged.
+
 ### Workers (`workers/`)
 
 | Worker | Purpose |
 |--------|---------|
 | `sessionCorsWorker/worker.js` | Canonical config/auth/storage for Hosted & Fast, plus profile-enabled AI, Arweave, fetch, transcription, and faucet routes |
 | `deploy-helper/worker.js` | Explicit legacy/sponsored Worker-deployment fallback and Agent Wrapped provisioning; not the native `/new` default |
-| `agentBridgeWorker/worker.js` | Agent HTTP compatibility and optional Telegram/Mini App transport while session authority consolidates into the Session Worker |
+| `agentBridgeWorker/worker.js` | Scoped Agent HTTP and Session Wrapped; `agentHttp.mjs` routes to `agentSessionRuntime.mjs` and `agentOnlyMode.mjs` while the Session Worker owns canonical session authority |
 
 ### Verification
 

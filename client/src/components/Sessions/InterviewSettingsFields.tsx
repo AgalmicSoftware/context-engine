@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { getSessionWizardInterviewValidationError } from './sessionWizardInterviewValidation';
 import { Input, Label } from 'reactstrap';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';
@@ -9,10 +10,26 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
   const id = useId();
   const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   const settings = normalizeInterviewSettings(value);
+  const validationError = getSessionWizardInterviewValidationError(value);
   const change = (key: string, next: unknown) => onChange({ ...raw, ...settings, [key]: next });
   return (
     <fieldset disabled={disabled} style={{ minWidth: 0 }}>
       <legend>Interview settings</legend>
+      <Label for={`${id}-research-sharing`}>Share AI draft changes for research by default</Label>
+      <Input
+        id={`${id}-research-sharing`}
+        type="select"
+        value={String(settings.shareDraftChangesByDefault)}
+        onChange={(e) => change('shareDraftChangesByDefault', e.target.value === 'true')}
+        aria-describedby={`${id}-research-sharing-help`}
+      >
+        <option value="false">Off</option>
+        <option value="true">On</option>
+      </Input>
+      <p id={`${id}-research-sharing-help`}>
+        Sets the initial research-sharing checkbox for new responses. Participants can change it before submitting;
+        their saved choices are preserved.
+      </p>
       <Label for={`${id}-model`}>Interview voice model</Label>
       <Input
         id={`${id}-model`}
@@ -38,6 +55,8 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
             type="textarea"
             maxLength={1200}
             required
+            invalid={!!validationError}
+            aria-describedby={validationError ? `${id}-error` : undefined}
             value={settings.openingPrompt}
             onChange={(e) => change('openingPrompt', e.target.value)}
           />
@@ -45,6 +64,11 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
       ) : (
         <p>Generated when an interview first has accessible questions. Reused until refreshed.</p>
       )}
+      {validationError ? (
+        <p id={`${id}-error`} role="alert">
+          {validationError}
+        </p>
+      ) : null}
       <Label for={`${id}-steering`}>Interview steering prompt</Label>
       <Input
         id={`${id}-steering`}

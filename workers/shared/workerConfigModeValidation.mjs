@@ -275,7 +275,11 @@ const validateStorageProfile = (
     if (!result.ok) return result;
   }
 
-  const cloudflare = validateObjectField(profile, 'cloudflare', `${path}.cloudflare`);
+  // Registry storage serializes its unused Cloudflare side as null. Keep the
+  // object requirement for Cloudflare and reject other malformed containers.
+  const cloudflare = backend !== 'cloudflare' && profile.cloudflare === null
+    ? { ok: true, value: null }
+    : validateObjectField(profile, 'cloudflare', `${path}.cloudflare`);
   if (!cloudflare.ok) return cloudflare;
   if (cloudflare.value) {
     const result = validateEnumField(

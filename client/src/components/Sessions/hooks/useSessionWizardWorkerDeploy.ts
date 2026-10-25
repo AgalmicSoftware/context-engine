@@ -227,7 +227,9 @@ const useSessionWizardWorkerDeploy = ({
           throw new Error('Connect your wallet to set the admin address.');
         }
         const configuredWorkerUrlBeforeDeploy = normalizeWorkerUrl(toStr(currentDraft.corsWorkerUrl).trim());
-        const modeRequirements = resolveSessionWizardModeRequirements(currentDraft.sessionModeProfile);
+        const modeRequirements = resolveSessionWizardModeRequirements(currentDraft.sessionModeProfile, {
+          sessionConfig: currentDraft,
+        });
         if (currentDraft.sessionModeProfile != null && !modeRequirements.selected) {
           throw new Error('Session mode configuration is invalid. Review the selected mode before deployment.');
         }
@@ -300,6 +302,7 @@ const useSessionWizardWorkerDeploy = ({
         const allDeploySecrets = runtime.workerSecretsEnabled ? buildWorkerSecretsPayload(currentWorkerSecrets) : {};
         const { selectedSecrets: deploySecrets, requiredSecretFields: requiredWorkerSecretFields } =
           resolveSessionWizardWorkerSecretSelection({
+            sessionConfig: currentDraft,
             sessionModeProfile: currentDraft.sessionModeProfile,
             sessionAi: currentDraft.ai,
             workerSecrets: allDeploySecrets,
@@ -393,6 +396,7 @@ const useSessionWizardWorkerDeploy = ({
           'defaultFeaturedSBTs',
           'autoFeatureSBTsBySessionSlug',
           'sessionModeProfile',
+          'networkChainId',
           'workerAuthority',
           'groupCreationPolicy',
           'ai',
@@ -805,6 +809,7 @@ const useSessionWizardWorkerDeploy = ({
                 workerUrl: resolvedDeployWorkerUrl,
                 sessionSlug: slug,
                 sessionId: runtime.sessionId || runtime.sessionIdHex,
+                sessionConfig: currentDraft,
                 sessionModeProfile: currentDraft.sessionModeProfile,
                 sessionAi: currentDraft.ai,
                 workerAllowOrigins: workerConfigPayload?.allowOrigins,

@@ -11,6 +11,7 @@ import {
   SESSION_MODE_PRESET_IDS,
   cloneSessionModePreset,
   compileSessionModeProfile,
+  normalizeSessionModeProfileForWrite,
   validateSessionModeProfile,
   type SessionModeAccessConditionDocument,
   type SessionModeEncryptionMode,
@@ -42,16 +43,16 @@ const LIT_ENCRYPTION_TOOLTIP =
 const CLOUDFLARE_ENCRYPTION_TOOLTIP =
   'Cloudflare encryption protects data before storage with a key held by the session worker. The worker checks access before decrypting, but the operator and Cloudflare runtime can decrypt, so this is not end-to-end encryption.';
 const DEFAULT_CLOUDFLARE_ACCESS_RULES_TOOLTIP =
-  'Checked: use the default rules, allowing session admins and agents authorized for storage to access encrypted data. Unchecked: customize access below using session roles, authorized agents, or SBT holders, and choose whether any or all rules must match.';
+  'Checked: use the default rules, allowing session admins and accounts with storage permission, including participants and agents, to access encrypted data. Unchecked: customize access below using session roles, authorized accounts, or SBT holders, and choose whether any or all rules must match.';
 const HIDE_SMALL_GROUPS_TOOLTIP =
   'Checked: show anonymized group summaries only when a group meets the minimum size (at least 2 people). A minimum of 5 hides groups of 1–4. Unchecked: disable anonymized group summaries. Groups and responses are kept.';
 const EXPORT_POLICY_TOOLTIP =
-  'Choose what session admins can download. Raw results include individual responses; encrypted records keep their contents unreadable until decrypted. Complete-session exports include the session data available to the exporter. Exporting selected channels is not available yet. These options do not grant additional access.';
+  'This choice is saved as an export preference. The current exporter does not enforce it; downloads follow the existing session access permissions. Exporting selected channels is not available yet.';
 
 const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; label: string; available?: boolean }> = [
   { value: 'private_admin', label: 'Admins only (not available yet)', available: false },
-  { value: 'participant_aggregate', label: 'Participants can see the combined summary' },
-  { value: 'session_member_aggregate', label: 'Session members can see the combined summary' },
+  { value: 'participant_aggregate', label: 'Participants can read their own Cloudflare responses' },
+  { value: 'session_member_aggregate', label: 'Session members can read their own Cloudflare responses' },
   {
     value: 'public_redacted_snapshot',
     label: 'Anyone can see a redacted summary (not available yet)',
@@ -61,14 +62,14 @@ const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; la
 ];
 
 const EXPORT_SCOPE_OPTIONS: Array<{ value: SessionModeExportScope; label: string; available?: boolean }> = [
-  { value: 'admin_raw', label: 'Admins can export raw results' },
-  { value: 'all_session', label: 'Admins can export the complete session' },
+  { value: 'admin_raw', label: 'Raw results (saved preference)' },
+  { value: 'all_session', label: 'Complete session (saved preference)' },
   {
     value: 'selected_surfaces',
     label: 'Admins can export selected channels only (not available yet)',
     available: false,
   },
-  { value: 'encrypted_envelopes_only', label: 'Admins can export encrypted records only' },
+  { value: 'encrypted_envelopes_only', label: 'Encrypted records (saved preference)' },
 ];
 
 const SURFACE_LABELS: Array<{
@@ -86,24 +87,10 @@ const SURFACE_LABELS: Array<{
     tooltipId: E2E_TESTIDS.WIZARD_SURFACE_WEB_INFO,
   },
   {
-    value: 'telegram',
-    label: 'Telegram',
-    tooltip:
-      'Let participants use the session through a Telegram bot. Selecting Telegram also enables its Mini App; turning Telegram off disables the Mini App. Direct agent access is configured separately.',
-    tooltipId: E2E_TESTIDS.WIZARD_SURFACE_TELEGRAM_INFO,
-  },
-  {
-    value: 'miniApp',
-    label: 'Telegram Mini App',
-    tooltip:
-      'Open the session interface inside Telegram. This requires Telegram, so selecting the Mini App also enables Telegram. It does not enable direct agent access.',
-    tooltipId: E2E_TESTIDS.WIZARD_SURFACE_MINI_APP_INFO,
-  },
-  {
     value: 'agentHttp',
     label: 'Agents (HTTP API)',
     tooltip:
-      'Let authorized agents use this session’s HTTP API without Telegram. This option uses Agent Session Wrapped and deploys an additional per-session service. Session access rules and agent permissions still apply.',
+      'Let authorized agents use this session’s HTTP API through a scoped credential. This option uses Agent Session Wrapped and deploys an additional per-session service. Session access rules and agent permissions still apply.',
     tooltipId: E2E_TESTIDS.WIZARD_SURFACE_AGENT_HTTP_INFO,
   },
 ];
@@ -135,8 +122,6 @@ const isProfile = (value: unknown): value is SessionModeProfile =>
   !Array.isArray(value) &&
   (value as { profileVersion?: unknown }).profileVersion === 1;
 
-const cloneProfile = (profile: SessionModeProfile): SessionModeProfile => JSON.parse(JSON.stringify(profile));
-
 const cloneAccessConditions = (value?: SessionModeAccessConditionDocument): SessionModeAccessConditionDocument =>
   value ? JSON.parse(JSON.stringify(value)) : { match: 'any', conditions: [] };
 
@@ -152,8 +137,14 @@ const chainName = (chainId: number): string => {
 const setWorkerEnvelopeCondition = (profile: SessionModeProfile, conditions?: SessionModeAccessConditionDocument) => {
   profile.encryption = { ...profile.encryption };
   if (conditions?.conditions.length) profile.encryption.accessConditions = conditions;
-  else delete profile.encryption.accessConditions;
+  else {
+    delete profile.encryption.accessConditions;
+    profile.storage.payloadAccessControl = defaultCloudflarePayloadAccessFor(profile);
+  }
 };
+
+const effectiveEnvelopeConditions = (profile: SessionModeProfile): SessionModeAccessConditionDocument =>
+  cloneAccessConditions(profile.encryption.accessConditions || profile.storage.payloadAccessControl?.accessConditions);
 
 const hasSbtOnchainCondition = (profile: SessionModeProfile): boolean =>
   [profile.encryption.accessConditions, profile.storage.payloadAccessControl?.accessConditions].some(
@@ -161,12 +152,74 @@ const hasSbtOnchainCondition = (profile: SessionModeProfile): boolean =>
       Array.isArray(document?.conditions) && document.conditions.some((condition) => condition.kind === 'sbt_onchain'),
   );
 
-const supportsWizardPublicResults = (profile: SessionModeProfile): boolean =>
-  profile.storage.backend === 'arweave' && profile.encryption.mode === 'none';
+const PUBLIC_RESULTS: SessionModeResultsVisibility = 'public_full_if_storage_public';
 
-const coerceUnavailablePublicResults = (profile: SessionModeProfile): void => {
-  if (profile.results.visibility === 'public_full_if_storage_public' && !supportsWizardPublicResults(profile)) {
-    profile.results.visibility = 'participant_aggregate';
+const cloudflarePayloadEncryptionFor = (
+  profile: SessionModeProfile,
+): NonNullable<SessionModeProfile['storage']['payloadAccessControl']>['encryption'] =>
+  profile.encryption.mode === 'worker_envelope'
+    ? 'worker_envelope'
+    : profile.encryption.mode === 'lit'
+      ? 'lit'
+      : 'none';
+
+const defaultCloudflarePayloadAccessFor = (
+  profile: SessionModeProfile,
+): NonNullable<SessionModeProfile['storage']['payloadAccessControl']> => ({
+  ...defaultCloudflarePayloadAccessControl(),
+  encryption: cloudflarePayloadEncryptionFor(profile),
+});
+
+// Public results are offered whenever answers are stored unencrypted. On
+// Cloudflare, choosing them also makes the stored payloads public-read.
+const supportsWizardPublicResults = (profile: SessionModeProfile): boolean => profile.encryption.mode === 'none';
+
+const hasPublicReadStorage = (profile: SessionModeProfile): boolean =>
+  profile.storage.backend === 'arweave' ||
+  (profile.storage.payloadAccessControl?.gate === 'none' && !profile.storage.payloadAccessControl.accessConditions);
+
+const coerceUnavailablePublicResults = (profile: SessionModeProfile, previous: SessionModeProfile | null): void => {
+  const leavingPublic =
+    profile.results.visibility === PUBLIC_RESULTS &&
+    (!supportsWizardPublicResults(profile) || !hasPublicReadStorage(profile));
+  if (leavingPublic) profile.results.visibility = 'participant_aggregate';
+  // Public-read Cloudflare storage exists only to back public results. A Lit
+  // draft that was already Lit also compiles to gate none and keeps its own
+  // rules, unless public results were just turned off.
+  const access = profile.storage.payloadAccessControl;
+  const keepsLitRules = profile.encryption.mode === 'lit' && previous?.encryption.mode === 'lit';
+  if (
+    profile.storage.backend === 'cloudflare' &&
+    access?.gate === 'none' &&
+    profile.results.visibility !== PUBLIC_RESULTS &&
+    (leavingPublic || !keepsLitRules)
+  ) {
+    profile.storage.payloadAccessControl = {
+      ...defaultCloudflarePayloadAccessFor(profile),
+      ...(access.accessConditions ? { accessConditions: access.accessConditions } : {}),
+    };
+  }
+};
+
+// Hosted sessions keep a registry chain only for Lit or SBT rules.
+const clearUnusedRegistryChain = (profile: SessionModeProfile): void => {
+  if (
+    profile.authority.mode === 'worker_canonical' &&
+    profile.encryption.mode !== 'lit' &&
+    !hasSbtOnchainCondition(profile)
+  ) {
+    profile.evm.registryChainId = null;
+  }
+};
+
+const setResultsVisibility = (profile: SessionModeProfile, visibility: SessionModeResultsVisibility): void => {
+  profile.results.visibility = visibility;
+  if (
+    visibility === PUBLIC_RESULTS &&
+    profile.storage.backend === 'cloudflare' &&
+    supportsWizardPublicResults(profile)
+  ) {
+    profile.storage.payloadAccessControl = { gate: 'none', encryption: 'none' };
   }
 };
 
@@ -189,11 +242,13 @@ const SessionModeProfileSections = ({
 
   const updateProfile = (mutate: (draft: SessionModeProfile) => void) => {
     const base = profile
-      ? cloneProfile(profile)
+      ? normalizeSessionModeProfileForWrite(profile)
       : cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     base.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     mutate(base);
     base.surfaces.web = true;
+    coerceUnavailablePublicResults(base, profile);
+    clearUnusedRegistryChain(base);
     const compileSource = validateSessionModeProfile(base).valid
       ? base
       : profile && validateSessionModeProfile(profile).valid
@@ -230,9 +285,6 @@ const SessionModeProfileSections = ({
                   onChange={(event) =>
                     updateProfile((draft) => {
                       draft.surfaces[surface.value] = surface.fixed ? true : event.target.checked;
-                      if (surface.value === 'telegram' && event.target.checked) draft.surfaces.miniApp = true;
-                      if (surface.value === 'telegram' && !event.target.checked) draft.surfaces.miniApp = false;
-                      if (surface.value === 'miniApp' && event.target.checked) draft.surfaces.telegram = true;
                     })
                   }
                 />
@@ -255,7 +307,7 @@ const SessionModeProfileSections = ({
           {profile.surfaces.agentHttp
             ? 'Authorized agents can use this session through its HTTP API once the agent service is deployed and verified.'
             : 'Enable Agents (HTTP API) for direct access by authorized agents.'}{' '}
-          Telegram is not required.
+          Access requires a scoped agent credential.
         </p>
         <ValidationIssues issues={sectionValidationIssues} />
       </section>
@@ -267,7 +319,10 @@ const SessionModeProfileSections = ({
       <section className={styles.modeSection} aria-label="Export settings">
         <div className={styles.modeSectionHeading}>
           <h3>Export policy</h3>
-          <p>Choose what session administrators can download after deployment.</p>
+          <p>
+            Saved as a preference. The current exporter does not enforce this selection; downloads follow existing
+            session access permissions.
+          </p>
         </div>
         <div className={styles.modeCheckboxWithTooltip}>
           <Label className={styles.modeFieldLabel} htmlFor="ce-new-export-policy">
@@ -319,7 +374,10 @@ const SessionModeProfileSections = ({
     profile.storage.backend === 'cloudflare'
       ? ''
       : 'Cloudflare encryption requires Cloudflare storage. Choose Lit to encrypt Arweave data.';
-  const useDefaultCloudflareAccessRules = !profile.encryption.accessConditions?.conditions.length;
+  const useDefaultCloudflareAccessRules =
+    !profile.encryption.accessConditions?.conditions.length &&
+    JSON.stringify(effectiveEnvelopeConditions(profile)) ===
+      JSON.stringify(cloneAccessConditions(defaultCloudflarePayloadAccessControl().accessConditions));
 
   return (
     <section className={styles.modeSection} aria-label="Hosting and privacy settings">
@@ -355,26 +413,16 @@ const SessionModeProfileSections = ({
           ]}
           value={profile.storage.backend}
           renderInfoTooltip={renderInfoTooltip}
-          onChange={(backend) =>
+          onChange={(backend) => {
+            // Re-selecting the current storage keeps its settings.
+            if (backend === profile.storage.backend) return;
             updateProfile((draft) => {
               draft.storage.backend = backend as SessionModeProfile['storage']['backend'];
               if (backend === 'cloudflare') {
                 draft.authority.mode = 'worker_canonical';
                 draft.identity = { default: 'passkey', enabled: ['passkey'] };
                 draft.authorization = { mechanisms: ['worker_roles'] };
-                const defaultAccess = defaultCloudflarePayloadAccessControl();
-                draft.storage.payloadAccessControl = {
-                  ...defaultAccess,
-                  encryption:
-                    draft.encryption.mode === 'worker_envelope'
-                      ? 'worker_envelope'
-                      : draft.encryption.mode === 'lit'
-                        ? 'lit'
-                        : 'none',
-                };
-                if (draft.encryption.mode !== 'lit' && !hasSbtOnchainCondition(draft)) {
-                  draft.evm.registryChainId = null;
-                }
+                draft.storage.payloadAccessControl = defaultCloudflarePayloadAccessFor(draft);
               } else {
                 draft.authority.mode = 'evm_registry_canonical';
                 draft.identity = { default: 'wallet', enabled: ['wallet', 'passkey'] };
@@ -386,9 +434,8 @@ const SessionModeProfileSections = ({
                   draft.export.scope = 'admin_raw';
                 }
               }
-              coerceUnavailablePublicResults(draft);
-            })
-          }
+            });
+          }}
         />
       </FormRow>
 
@@ -434,21 +481,21 @@ const SessionModeProfileSections = ({
           ]}
           value={profile.encryption.mode}
           renderInfoTooltip={renderInfoTooltip}
-          onChange={(mode) =>
+          onChange={(mode) => {
+            // Re-selecting the current encryption keeps its rules.
+            if (mode === profile.encryption.mode) return;
             updateProfile((draft) => {
               draft.encryption = { mode: mode as SessionModeEncryptionMode };
               if (mode === 'lit') draft.evm.registryChainId = draft.evm.registryChainId || registryChainId || 11155420;
               if (mode === 'worker_envelope') draft.encryption.keyProvider = 'worker_secret';
               if (draft.storage.backend === 'cloudflare' && draft.storage.payloadAccessControl) {
-                draft.storage.payloadAccessControl.encryption =
-                  mode === 'worker_envelope' ? 'worker_envelope' : mode === 'lit' ? 'lit' : 'none';
+                draft.storage.payloadAccessControl.encryption = cloudflarePayloadEncryptionFor(draft);
               }
               if (mode === 'none' && draft.export.scope === 'encrypted_envelopes_only') {
                 draft.export.scope = 'admin_raw';
               }
-              coerceUnavailablePublicResults(draft);
-            })
-          }
+            });
+          }}
           dataTestIdPrefix="ce-new-encryption"
         />
         {litDisabledReason ? <div className={styles.helperText}>{litDisabledReason}</div> : null}
@@ -497,7 +544,8 @@ const SessionModeProfileSections = ({
             </div>
             {useDefaultCloudflareAccessRules ? (
               <p className={styles.helperText}>
-                The worker grants storage access to configured admins and agents granted the storage scope.
+                The worker grants storage access to configured admins and accounts with storage permission, including
+                participants and agents.
               </p>
             ) : (
               <>
@@ -506,6 +554,9 @@ const SessionModeProfileSections = ({
                   requires a wallet and testnet gas. Lit encryption additionally requires a Lit credential and the
                   Advanced manual bootstrap flow.
                 </div>
+                <p className={styles.helperText}>
+                  These rules also control answer uploads. Participants who match no rule cannot submit answers.
+                </p>
                 <WorkerEnvelopeOptions
                   profile={profile}
                   registryChainId={registryChainId || null}
@@ -527,7 +578,7 @@ const SessionModeProfileSections = ({
           value={profile.results.visibility}
           onChange={(event) =>
             updateProfile((draft) => {
-              draft.results.visibility = event.target.value as SessionModeResultsVisibility;
+              setResultsVisibility(draft, event.target.value as SessionModeResultsVisibility);
             })
           }
         >
@@ -536,14 +587,29 @@ const SessionModeProfileSections = ({
               key={option.value}
               value={option.value}
               disabled={
-                option.available === false ||
-                (option.value === 'public_full_if_storage_public' && !supportsWizardPublicResults(profile))
+                option.available === false || (option.value === PUBLIC_RESULTS && !supportsWizardPublicResults(profile))
               }
             >
               {option.label}
             </option>
           ))}
         </Input>
+        {profile.results.visibility === PUBLIC_RESULTS && profile.storage.backend === 'cloudflare' ? (
+          <p className={styles.helperText}>
+            Answers, comments, and groups are stored unencrypted, and anyone can read them without signing in.
+          </p>
+        ) : null}
+        {profile.results.visibility !== PUBLIC_RESULTS && profile.storage.backend === 'cloudflare' ? (
+          <p className={styles.helperText}>
+            Participants can read their own responses. Admins and authorized agents can access session-wide responses.
+            Participant summaries are not available yet.
+          </p>
+        ) : null}
+        {profile.storage.backend === 'arweave' ? (
+          <p className={styles.helperText}>
+            Unencrypted Arweave data is public. For encrypted data, Lit access rules control who can decrypt it.
+          </p>
+        ) : null}
         <div className={styles.modeCheckboxRow}>
           <div className={styles.modeCheckboxWithTooltip}>
             <Label check className={styles.modeCheckboxLabel}>
@@ -727,7 +793,7 @@ type WorkerEnvelopeOptionsProps = {
 const RULE_LABELS: Record<SessionModeAccessConditionDocument['conditions'][number]['kind'], string> = {
   worker_role: 'Session role',
   sbt_onchain: 'SBT holders',
-  agent_grant_scope: 'Authorized agents',
+  agent_grant_scope: 'Authorized accounts',
 };
 
 const WorkerEnvelopeOptions = ({
@@ -735,14 +801,14 @@ const WorkerEnvelopeOptions = ({
   registryChainId,
   updateProfile,
 }: WorkerEnvelopeOptionsProps): React.ReactElement => {
-  const conditions = cloneAccessConditions(profile.encryption.accessConditions);
+  const conditions = effectiveEnvelopeConditions(profile);
 
   const commitConditions = (next: SessionModeAccessConditionDocument) => {
     updateProfile((draft) => setWorkerEnvelopeCondition(draft, next));
   };
 
   const addCondition = (kind: SessionModeAccessConditionDocument['conditions'][number]['kind']) => {
-    const next = cloneAccessConditions(profile.encryption.accessConditions);
+    const next = effectiveEnvelopeConditions(profile);
     if (kind === 'worker_role') next.conditions.push({ kind, role: 'admin' });
     if (kind === 'agent_grant_scope') next.conditions.push({ kind, scope: 'storage' });
     if (kind === 'sbt_onchain') {
@@ -763,7 +829,7 @@ const WorkerEnvelopeOptions = ({
       condition: SessionModeAccessConditionDocument['conditions'][number],
     ) => SessionModeAccessConditionDocument['conditions'][number],
   ) => {
-    const next = cloneAccessConditions(profile.encryption.accessConditions);
+    const next = effectiveEnvelopeConditions(profile);
     const current = next.conditions[index];
     if (!current) return;
     next.conditions[index] = mutate(current);
@@ -772,7 +838,7 @@ const WorkerEnvelopeOptions = ({
 
   const updateSbtConditionChain = (chainId: number) => {
     if (!Number.isSafeInteger(chainId) || chainId <= 0) return;
-    const next = cloneAccessConditions(profile.encryption.accessConditions);
+    const next = effectiveEnvelopeConditions(profile);
     next.conditions = next.conditions.map((condition) =>
       condition.kind === 'sbt_onchain' ? { ...condition, chainId } : condition,
     );
@@ -798,7 +864,7 @@ const WorkerEnvelopeOptions = ({
         type="select"
         value={conditions.match}
         onChange={(event) => {
-          const next = cloneAccessConditions(profile.encryption.accessConditions);
+          const next = effectiveEnvelopeConditions(profile);
           next.match = event.target.value === 'all' ? 'all' : 'any';
           commitConditions(next);
         }}
@@ -829,7 +895,7 @@ const WorkerEnvelopeOptions = ({
           onClick={() => addCondition('agent_grant_scope')}
           data-testid="ce-new-envelope-add-agent-scope"
         >
-          Add authorized agents
+          Add authorized accounts
         </Button>
       </div>
       {conditions.conditions.map((condition, index) => (
@@ -842,7 +908,7 @@ const WorkerEnvelopeOptions = ({
               aria-label={`Remove ${RULE_LABELS[condition.kind]} rule`}
               data-ce-control-appearance="frameless"
               onClick={() => {
-                const next = cloneAccessConditions(profile.encryption.accessConditions);
+                const next = effectiveEnvelopeConditions(profile);
                 next.conditions.splice(index, 1);
                 commitConditions(next);
               }}
@@ -871,7 +937,7 @@ const WorkerEnvelopeOptions = ({
           {condition.kind === 'sbt_onchain' ? (
             <div className={styles.modeSbtRuleFields}>
               <Label className={styles.modeFieldLabel}>
-                Network
+                Session network
                 <Input
                   type="select"
                   aria-label="SBT network"
@@ -888,6 +954,10 @@ const WorkerEnvelopeOptions = ({
                     ))}
                 </Input>
               </Label>
+              <p className={styles.helperText}>
+                Changing this network updates the session and every SBT rule. Check each contract address on the
+                selected network.
+              </p>
               <Label className={styles.modeFieldLabel}>
                 SBT contract
                 <Input

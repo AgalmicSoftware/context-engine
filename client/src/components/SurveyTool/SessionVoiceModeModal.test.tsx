@@ -435,6 +435,11 @@ describe('SessionVoiceModeModal', () => {
     await editReadableDraftText('Additional comments for What matters?', 'Edited explanation');
     await editReadableDraftText('Draft answer for Second question?', 'Edited two');
     fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Second question?' }));
+    expect(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)).toHaveLength(1);
+    expect(screen.queryByText('Second question?')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: editableButtonName('Draft answer for Second question?') }),
+    ).not.toBeInTheDocument();
     expect(metadata).toHaveTextContent('1 selected draft and 1 unselected draft');
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Submit responses' }));
@@ -2190,7 +2195,7 @@ describe('SessionVoiceModeModal', () => {
     );
   });
 
-  it('removes and restores a proposed draft with compact card controls', async () => {
+  it('removes the entire card and hides the empty review after removing the last draft', async () => {
     const prefillPacket = {
       version: 1 as const,
       sessionSlug: 'demo',
@@ -2205,16 +2210,14 @@ describe('SessionVoiceModeModal', () => {
     const remove = await screen.findByRole('button', { name: 'Remove draft for What matters?' });
     expect(remove).toBeEnabled();
     fireEvent.click(remove);
-    expect(screen.queryByText('0 of 1 selected')).not.toBeInTheDocument();
+    expect(remove).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument();
+    expect(screen.queryByText('What matters?')).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
-
-    const restore = screen.getByRole('button', { name: 'Restore draft' });
-    expect(restore).toBeEnabled();
-    fireEvent.click(restore);
-    expect(screen.queryByText('1 of 1 selected')).not.toBeInTheDocument();
-    expect(remove).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Restore draft' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Draft selected' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
   });
 
   it('explains when the evidence is insufficient and does not offer a futile retry', async () => {
@@ -2631,7 +2634,7 @@ describe('Interview cancellation and recovery', () => {
     expect(mockedHashInterviewQuestions).toHaveBeenCalledTimes(1);
   });
 
-  it('continues the transcript across interviews and preserves edits, removed drafts, and unmatched answers', async () => {
+  it('continues the transcript and preserves edits while keeping removed cards hidden after new predictions', async () => {
     const rounds: Parameters<typeof startSessionRealtimeInterview>[0][] = [];
     mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
       rounds.push(options);
@@ -2653,6 +2656,7 @@ describe('Interview cancellation and recovery', () => {
       ])
       .mockResolvedValueOnce([
         { questionId: 'q1', answer: 'Refined AI answer', confidence: 0.9 },
+        { questionId: 'q2', answer: 'Refined removed answer', confidence: 0.9 },
         { questionId: 'q3', answer: 'Additional match', confidence: 0.8 },
       ]);
     render(
@@ -2671,6 +2675,7 @@ describe('Interview cancellation and recovery', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
     await editReadableDraftText('Draft answer for What matters?', 'My edit');
     fireEvent.click(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_REMOVE)[1]);
+    expect(screen.queryByText('Second question?')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     await screen.findByLabelText('Pause interview');
     expect(rounds[1].instructions).toContain('Responder: Round 1.');
@@ -2688,8 +2693,14 @@ describe('Interview cancellation and recovery', () => {
       ]),
     );
     await expectReadableDraftText('Draft answer for What matters?', 'My edit');
-    await expectReadableDraftText('Draft answer for Second question?', 'Keep this');
-    expect(screen.getByRole('button', { name: 'Restore draft' })).toBeInTheDocument();
+    expect(screen.queryByText('Second question?')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Restore draft' })).not.toBeInTheDocument();
+    expect(mockedMapInterviewEvidenceToResponses.mock.calls.at(-1)?.[0].previousResponses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ prediction: expect.objectContaining({ questionId: 'q2' }), selected: false }),
+      ]),
+    );
     expect(mockedMapInterviewEvidenceToResponses).toHaveBeenLastCalledWith(
       expect.objectContaining({ transcript: 'Responder: Round 1.\n\nResponder: Round 2.' }),
     );

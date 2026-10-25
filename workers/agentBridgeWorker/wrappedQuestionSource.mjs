@@ -1,6 +1,6 @@
 import { safeString } from './runtimePrimitives.mjs';
 import { listCachedSessionQuestionsForBridge } from './sessionQuestions.mjs';
-import { listTelegramProposedQuestionsForSession } from './telegramQuestionProposals.mjs';
+import { listAgentProposedQuestionsForSession } from './agentQuestionProposals.mjs';
 
 export const WRAPPED_QUESTION_SOURCE_MODES = Object.freeze({
   CANONICAL_SESSION: 'canonical_session',
@@ -46,7 +46,7 @@ export async function loadWrappedQuestionSource({
   sessionSlug = '',
   loadedConfig = {},
   loadCanonicalQuestions = listCachedSessionQuestionsForBridge,
-  loadProposalQuestions = listTelegramProposedQuestionsForSession,
+  loadProposalQuestions = listAgentProposedQuestionsForSession,
 } = {}) {
   const mode = resolveWrappedQuestionSourceMode(loadedConfig);
   if (mode === WRAPPED_QUESTION_SOURCE_MODES.AGENT_ONLY_PROPOSALS) {

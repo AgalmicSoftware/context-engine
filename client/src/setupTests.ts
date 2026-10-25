@@ -71,6 +71,7 @@ jest.mock('./utilities/useWhisper.js', () => ({
     errorMessage: '',
     startRecording: jest.fn(),
     stopRecording: jest.fn(),
+    cancelRecording: jest.fn(),
     pauseRecording: jest.fn(),
     resumeRecording: jest.fn(),
     audioContextRef: { current: null },

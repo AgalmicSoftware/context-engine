@@ -10,6 +10,8 @@ type QuestionDecryptControlProps = {
   actionLabel: string;
   onClick?: (() => void) | null;
   wrapperStyle?: CSSProperties;
+  testId?: string;
+  questionId?: string;
 };
 
 const QuestionDecryptControl = ({
@@ -21,6 +23,8 @@ const QuestionDecryptControl = ({
   actionLabel,
   onClick = null,
   wrapperStyle,
+  testId,
+  questionId,
 }: QuestionDecryptControlProps) => {
   let content = null;
 
@@ -35,6 +39,8 @@ const QuestionDecryptControl = ({
         title={title}
         actionLabel={actionLabel}
         busy={busy}
+        testId={testId}
+        questionId={questionId}
       />
     );
   }

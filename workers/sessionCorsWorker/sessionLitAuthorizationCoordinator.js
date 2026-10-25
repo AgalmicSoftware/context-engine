@@ -8,6 +8,7 @@ import { normalizeWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey } f
 
 const SIGNER_RECORD = 'session-lit-authorization-signer-v1';
 const SETUP_RECORD = 'session-lit-authorization-pending-v1';
+export const hasPendingLitAuthorizationSetup = async (storage) => (await storage.get(SETUP_RECORD)) != null;
 const CONFIG_RECORD = 'session-config-authority';
 const PRIVATE_KEY = 'litAuthorizationPrivateKey';
 const SECRET_KEYS = [PRIVATE_KEY, 'litAccountApiKey', 'litUsageApiKey'];
@@ -59,6 +60,7 @@ export const executeLitAuthorizationSignerEnsure = async (coordinator, payload) 
   if (!slug || !isRecord(payload?.baseConfig)) return json({ error: COORDINATION_ERROR }, 400);
   try {
     const proposed = walletFor(payload.proposedPrivateKey);
+    await coordinator.assertSessionAuthority(payload);
     await coordinator.repairPendingSessionConfigProjection();
     const privateKey = await coordinator.state.storage.transaction(async (transaction) => {
       const record = await transaction.get(SIGNER_RECORD);
@@ -110,6 +112,7 @@ export const executeLitAuthorizationFinalize = async (coordinator, payload) => {
     return json({ error: COORDINATION_ERROR }, 400);
   }
   try {
+    await coordinator.assertSessionAuthority(payload);
     await coordinator.repairPendingSessionConfigProjection();
     await coordinator.state.storage.transaction(async (transaction) => {
       const record = await transaction.get(SIGNER_RECORD);
@@ -168,6 +171,7 @@ export const executeSessionSecretsAfterLitRepair = async (coordinator, payload) 
   try {
     // A successful edit must follow pending setup repair. Otherwise replaying
     // that older full-secret journal could silently undo the accepted edit.
+    await coordinator.assertSessionAuthority(payload);
     await coordinator.repairPendingSessionConfigProjection();
     const existing = (await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug))) || {};
     const litPatch = Object.fromEntries(Object.entries(patch).filter(([key]) => SECRET_KEYS.includes(key)));
@@ -186,8 +190,8 @@ export const executeSessionSecretsAfterLitRepair = async (coordinator, payload) 
       });
     }
     return json({ ok: true });
-  } catch {
-    return json({ error: 'Session secrets update is pending; retry after setup repair.' }, 503);
+  } catch (error) {
+    return json({ error: error.status === 409 ? error.message : 'Session secrets update is pending; retry after setup repair.' }, error.status || 503);
   }
 };
 
@@ -212,7 +216,7 @@ const callCoordinator = async ({ env, slug, path, ...payload }) => {
 
 export const ensureSessionLitAuthorizationSigner = async (args) => {
   const result = await callCoordinator({ ...args, path: 'ensure' });
-  if (!result.ok) throw new Error(result.body?.error || COORDINATION_ERROR);
+  if (!result.ok) throw Object.assign(new Error(result.body?.error || COORDINATION_ERROR), { status: result.status });
   return walletFor(result.body.privateKey).privateKey;
 };
 

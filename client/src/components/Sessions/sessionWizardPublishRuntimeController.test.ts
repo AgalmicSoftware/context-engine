@@ -310,7 +310,7 @@ describe('sessionWizardPublishRuntimeController', () => {
         signerAccountOverride: ADMIN_ADDRESS,
         runTrackedPublishEffect: harness.runTrackedPublishEffect,
       }),
-    ).rejects.toThrow('Worker deployment requirements changed');
+    ).rejects.toThrow('Worker verification is out of date');
     expect(harness.persistWorkerConfig).not.toHaveBeenCalled();
   });
 
@@ -354,7 +354,7 @@ describe('sessionWizardPublishRuntimeController', () => {
     });
     resolvePendingSbts?.([]);
 
-    await expect(preparation).rejects.toThrow('Worker deployment requirements changed');
+    await expect(preparation).rejects.toThrow('Worker verification is out of date');
     expect(harness.persistWorkerConfig).not.toHaveBeenCalled();
   });
 

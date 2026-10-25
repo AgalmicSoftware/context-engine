@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client';
 import '../../src/assets/css/contextEngine.scss';
 import { renderPileActiveQuestionCard } from '../../src/components/SurveyTool/surveyPileActiveQuestionCard';
 import pileStyles from '../../src/components/SurveyTool/SurveyTool.module.scss';
+import BinaryChoiceInput from '../../src/components/SurveyTool/BinaryChoiceInput';
+import ColorBlindModeControl from '../../src/components/Account/ColorBlindModeControl';
 import QuadraticAllocationInput from '../../src/components/SurveyTool/QuadraticAllocationInput';
 import QuadraticAllocationResults from '../../src/components/SurveyTool/QuadraticAllocationResults';
 import SingleQuestionResponse from '../../src/components/SurveyTool/SingleQuestionResponse';
@@ -15,6 +17,7 @@ function Fixture() {
   const [voiceCredits, setVoiceCredits] = useState(99);
   const question = { ...baseQuestion, voiceCredits, options: manyOptions ? ['Parks', 'Transit', 'Housing', 'Community spaces and neighbourhood amenities', 'Libraries', 'Schools', 'Waste reduction', 'Energy efficiency'] : baseQuestion.options };
   const [value, setValue] = useState<number[]>([0, 0, 0]);
+  const [binaryValue, setBinaryValue] = useState('');
   const [theme, setTheme] = useState('context-engine');
   const [deferDragUpdates, setDeferDragUpdates] = useState(false);
   const [answerUpdates, setAnswerUpdates] = useState(0);
@@ -25,6 +28,7 @@ function Fixture() {
     <main style={{ maxWidth: 640, margin: '2rem auto', fontFamily: 'var(--ce-font-body)', lineHeight: 1.5, color: 'var(--ce-panel-text)' }}>
       <style>{'body { background: var(--ce-color-canvas); }'}</style>
       <label>Theme <select value={theme} onChange={event => setTheme(event.target.value)}><option value="context-engine">Context Engine</option><option value="classic-95">Classic 95</option><option value="civic">Minimal</option></select></label>
+      <ColorBlindModeControl />
       <label>Voice credits <select value={voiceCredits} onChange={event => { setVoiceCredits(Number(event.target.value)); setValue(question.options.map(() => 0)); }}><option value="99">99</option><option value="999">999</option><option value="1000000">1000000 (legacy)</option></select></label>
       <label style={{ display: 'block' }}><input type="checkbox" checked={deferDragUpdates} onChange={event => setDeferDragUpdates(event.target.checked)} /> Deferred drag compatibility</label>
       <label><input type="checkbox" checked={manyOptions} onChange={event => { setManyOptions(event.target.checked); setValue(Array(event.target.checked ? 8 : 3).fill(0)); }} /> Many options</label>
@@ -53,6 +57,7 @@ function Fixture() {
       </button>
       <output data-testid="ce-quadratic-saved">{saved}</output>
       <QuadraticAllocationResults question={question} responses={responses} />
+      <section aria-label="Agree or disagree"><h2>Support this proposal?</h2><BinaryChoiceInput questionId="binary-smoke" value={binaryValue} onChange={setBinaryValue} showIcons /></section>
       <details>
         <summary>Read-only question preview</summary>
         <SingleQuestionResponse mode="fullscreen" questionOnly question={{ ...question, prompt: 'Where should we invest?' }} />

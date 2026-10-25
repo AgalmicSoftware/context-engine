@@ -62,6 +62,41 @@ describe('sessionCapabilityProjection', () => {
     });
   });
 
+  it('offers hosted funding only after presence confirms the scoped testnet faucet', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.evm.registryChainId = 11155420;
+    profile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: 11155420,
+          contract: '0x1111111111111111111111111111111111111111',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+    const config = {
+      sessionModeProfile: profile,
+      networkChainId: 11155420,
+      workerAuthority: { participantScopes: ['faucet'] },
+    };
+    expect(resolveSessionCapabilityProjection(config).usesFunding).toBe(false);
+    const funded = resolveSessionCapabilityProjection(config, { txGas: true });
+    expect(funded).toMatchObject({ usesFunding: true, chainId: 11155420 });
+    expect(funded.settingsResourceKeys).toContain('txGas');
+    expect(funded.adminSecretCardKeys).not.toContain('faucet');
+    expect(funded.adminTestKeys).not.toContain('faucet');
+    expect(resolveSessionCapabilityProjection(config, { txGas: false }).usesFunding).toBe(false);
+    const chainless = { ...config, networkChainId: undefined };
+    expect(resolveSessionCapabilityProjection(chainless, { txGas: true }).usesFunding).toBe(false);
+    const mainnet = { ...config, networkChainId: 1 };
+    expect(resolveSessionCapabilityProjection(mainnet, { txGas: true }).usesFunding).toBe(false);
+    const unscoped = { ...config, workerAuthority: {} };
+    expect(resolveSessionCapabilityProjection(unscoped, { txGas: true }).usesFunding).toBe(false);
+  });
+
   it('keeps a reachable Worker Lit profile Worker-canonical while exposing its chain', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;

@@ -27,6 +27,30 @@ contract SurveysFuzzTest is TestUtils {
         fuzz_submitResponses_anyUser(user);
     }
 
+    function testFuzz_IdsCannotCrossResourceKinds(bytes32 id, bool questionFirst) public {
+        if (id == bytes32(0)) id = bytes32(uint256(1));
+        bytes32[] memory empty = new bytes32[](0);
+        bytes32[] memory ids = new bytes32[](1);
+        bytes32[] memory hashes = new bytes32[](1);
+        bytes32[] memory surveyIds = new bytes32[](1);
+        ids[0] = id;
+        hashes[0] = bytes32(uint256(10));
+
+        if (questionFirst) {
+            surveys.addQuestions(ids, hashes, surveyIds);
+            vm.expectRevert(abi.encodeWithSignature("Error(string)", "Survey ID already used by question"));
+            surveys.addSurvey(id, hashes[0], empty, empty);
+            assertEq(surveys.getQuestionHash(id), hashes[0], "existing question changed");
+            assertEq(surveys.surveyHashes(id), bytes32(0), "question ID became a survey");
+        } else {
+            surveys.addSurvey(id, hashes[0], empty, empty);
+            vm.expectRevert(abi.encodeWithSignature("Error(string)", "Question ID already used by survey"));
+            surveys.addQuestions(ids, hashes, surveyIds);
+            assertEq(surveys.getSurveyHash(id), hashes[0], "existing survey changed");
+            assertEq(surveys.questionHashes(id), bytes32(0), "survey ID became a question");
+        }
+    }
+
     function fuzz_addSurvey_noDuplicate(bytes32 id) internal {
         bytes32 surveyHash = keccak256(abi.encodePacked("survey-hash", id));
         bytes32[] memory empty = new bytes32[](0);

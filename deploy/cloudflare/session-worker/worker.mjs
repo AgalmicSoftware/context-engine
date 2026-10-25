@@ -10321,8 +10321,8 @@ var init_typed_data = __esm({
             uniqueNames.add(field.name);
             const baseType = splitArray(field.type).base;
             assertArgument(baseType !== name, `circular type reference to ${JSON.stringify(baseType)}`, "types", _types2);
-            const encoder5 = getBaseEncoder(baseType);
-            if (encoder5) {
+            const encoder6 = getBaseEncoder(baseType);
+            if (encoder6) {
               continue;
             }
             assertArgument(parents.has(baseType), `unknown type ${JSON.stringify(baseType)}`, "types", _types2);
@@ -10365,12 +10365,12 @@ var init_typed_data = __esm({
        *  Returnthe encoder for the specific %%type%%.
        */
       getEncoder(type) {
-        let encoder5 = __privateGet(this, _encoderCache).get(type);
-        if (!encoder5) {
-          encoder5 = __privateMethod(this, _TypedDataEncoder_instances, getEncoder_fn).call(this, type);
-          __privateGet(this, _encoderCache).set(type, encoder5);
+        let encoder6 = __privateGet(this, _encoderCache).get(type);
+        if (!encoder6) {
+          encoder6 = __privateMethod(this, _TypedDataEncoder_instances, getEncoder_fn).call(this, type);
+          __privateGet(this, _encoderCache).set(type, encoder6);
         }
-        return encoder5;
+        return encoder6;
       }
       /**
        *  Return the full type for %%name%%.
@@ -10409,8 +10409,8 @@ var init_typed_data = __esm({
        */
       _visit(type, value, callback) {
         {
-          const encoder5 = getBaseEncoder(type);
-          if (encoder5) {
+          const encoder6 = getBaseEncoder(type);
+          if (encoder6) {
             return callback(type, value);
           }
         }
@@ -10506,8 +10506,8 @@ var init_typed_data = __esm({
         if (domain.verifyingContract && !isHexString(domain.verifyingContract, 20)) {
           ensCache[domain.verifyingContract] = "0x";
         }
-        const encoder5 = _TypedDataEncoder.from(types);
-        encoder5.visit(value, (type, value2) => {
+        const encoder6 = _TypedDataEncoder.from(types);
+        encoder6.visit(value, (type, value2) => {
           if (type === "address" && !isHexString(value2, 20)) {
             ensCache[value2] = "0x";
           }
@@ -10519,7 +10519,7 @@ var init_typed_data = __esm({
         if (domain.verifyingContract && ensCache[domain.verifyingContract]) {
           domain.verifyingContract = ensCache[domain.verifyingContract];
         }
-        value = encoder5.visit(value, (type, value2) => {
+        value = encoder6.visit(value, (type, value2) => {
           if (type === "address" && ensCache[value2]) {
             return ensCache[value2];
           }
@@ -10543,17 +10543,17 @@ var init_typed_data = __esm({
           domainValues[name] = domainChecks[name](value2);
           domainTypes.push({ name, type: domainFieldTypes[name] });
         });
-        const encoder5 = _TypedDataEncoder.from(types);
-        types = encoder5.types;
+        const encoder6 = _TypedDataEncoder.from(types);
+        types = encoder6.types;
         const typesWithDomain = Object.assign({}, types);
         assertArgument(typesWithDomain.EIP712Domain == null, "types must not contain EIP712Domain type", "types.EIP712Domain", types);
         typesWithDomain.EIP712Domain = domainTypes;
-        encoder5.encode(value);
+        encoder6.encode(value);
         return {
           types: typesWithDomain,
           domain: domainValues,
-          primaryType: encoder5.primaryType,
-          message: encoder5.visit(value, (type, value2) => {
+          primaryType: encoder6.primaryType,
+          message: encoder6.visit(value, (type, value2) => {
             if (type.match(/^bytes(\d*)/)) {
               return hexlify(getBytes(value2));
             }
@@ -10580,9 +10580,9 @@ var init_typed_data = __esm({
     _TypedDataEncoder_instances = new WeakSet();
     getEncoder_fn = function(type) {
       {
-        const encoder5 = getBaseEncoder(type);
-        if (encoder5) {
-          return encoder5;
+        const encoder6 = getBaseEncoder(type);
+        if (encoder6) {
+          return encoder6;
         }
       }
       const array = splitArray(type).array;
@@ -25377,7 +25377,8 @@ var init_interviewSettings = __esm({
       questionGrowthPercent: 20,
       followNewQuestions: false,
       suggestQuestions: false,
-      allowManualRefresh: true
+      allowManualRefresh: true,
+      shareDraftChangesByDefault: false
     });
     normalizeInterviewSettings = (value = {}) => {
       const source = value && typeof value === "object" ? value : {};
@@ -25389,7 +25390,8 @@ var init_interviewSettings = __esm({
         questionGrowthPercent: Number.isFinite(source.questionGrowthPercent) ? Math.max(1, Math.min(100, source.questionGrowthPercent)) : 20,
         followNewQuestions: source.followNewQuestions === true,
         suggestQuestions: source.suggestQuestions === true,
-        allowManualRefresh: source.allowManualRefresh !== false
+        allowManualRefresh: source.allowManualRefresh !== false,
+        shareDraftChangesByDefault: source.shareDraftChangesByDefault === true
       };
     };
     validInterviewSettings = (value = {}) => {
@@ -25401,7 +25403,7 @@ var init_interviewSettings = __esm({
       if (value.openingMode === "owner" && !value.openingPrompt?.trim()) return false;
       if (value.questionGrowthPercent !== void 0 && (!Number.isFinite(value.questionGrowthPercent) || value.questionGrowthPercent < 1 || value.questionGrowthPercent > 100))
         return false;
-      return ["autoRegenerate", "followNewQuestions", "suggestQuestions", "allowManualRefresh"].every(
+      return ["autoRegenerate", "followNewQuestions", "suggestQuestions", "allowManualRefresh", "shareDraftChangesByDefault"].every(
         (key) => value[key] === void 0 || typeof value[key] === "boolean"
       );
     };
@@ -25476,7 +25478,6 @@ var init_artifactFetch = __esm({
       const response3 = await safeFetch(url, {
         method: "GET",
         headers: { Accept: accept },
-        cache: "no-store",
         outboundUrlPolicy: PUBLIC_HTTPS_ARTIFACT_POLICY
       });
       if (!response3.ok) {
@@ -25854,6 +25855,19 @@ var init_workerReleaseManifest = __esm({
   }
 });
 
+// workers/shared/workerScriptName.mjs
+var MAX_WORKER_SCRIPT_NAME_LENGTH, DEPLOYMENT_SUFFIX_LENGTH, buildDeploymentWorkerName;
+var init_workerScriptName = __esm({
+  "workers/shared/workerScriptName.mjs"() {
+    MAX_WORKER_SCRIPT_NAME_LENGTH = 54;
+    DEPLOYMENT_SUFFIX_LENGTH = 12;
+    buildDeploymentWorkerName = (prefix, deploymentId, fallbackPrefix) => {
+      const readable = String(prefix || "").slice(0, MAX_WORKER_SCRIPT_NAME_LENGTH - DEPLOYMENT_SUFFIX_LENGTH - 1).replace(/-+$/, "");
+      return `${readable || fallbackPrefix}-${String(deploymentId || "").slice(0, DEPLOYMENT_SUFFIX_LENGTH)}`;
+    };
+  }
+});
+
 // workers/shared/agentSessionWrappedDeployment.mjs
 async function persistAgentSessionWrappedCapability({
   apiToken = "",
@@ -25937,6 +25951,10 @@ async function executeAgentSessionWrappedDeployment({
   if (!apiToken || !resolvedAccountId || !sessionSlug || !sessionWorkerOrigin || !sessionDeploymentIdentity || !authorityMode || typeof agentHttpEnabled !== "boolean") {
     return fail2(400, "validate", "Dedicated Wrapped deployment requires token, account, session identity, authority mode, and HTTPS session Worker origin.");
   }
+  const sessionId = normalizeSessionId(body.sessionId || body.sessionIdHex);
+  if (authorityMode === "worker_canonical" && !sessionId) {
+    return fail2(400, "validate", "Dedicated Wrapped deployment for a hosted session requires its session ID.");
+  }
   if (typeof cfFetchImpl !== "function") return fail2(500, "validate", "Cloudflare deployment client is unavailable.");
   if (body.telegramEnabled === true || toStr8(body.telegramBotToken || body.telegramWebhookSecret)) {
     return fail2(400, "validate", "Telegram configuration is not part of the default dedicated Wrapped deployment.");
@@ -25979,7 +25997,7 @@ async function executeAgentSessionWrappedDeployment({
     return fail2(502, "workers_dev_subdomain", accountSubdomain.error || "Cloudflare workers.dev subdomain is unavailable.");
   }
   const workerUrl = `https://${workerName}.${subdomain}.workers.dev`;
-  const policyJson = JSON.stringify(policyFor({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled }));
+  const policyJson = JSON.stringify(policyFor({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled, sessionId }));
   const plainBindings = [
     { name: "AGENT_BRIDGE_DEPLOYMENT_ID", type: "plain_text", text: deploymentId },
     { name: "AGENT_BRIDGE_BUNDLE_SHA256", type: "plain_text", text: bundleSha256 },
@@ -26024,12 +26042,16 @@ async function executeAgentSessionWrappedDeployment({
     settings: beforeSettings,
     expectedBindings: plainBindings,
     kvNamespaceId: kvId,
-    verifyBundle: false
+    verifyBundle: false,
+    allowAccessChange: true
   })) {
     return fail2(409, "worker_preflight", "Existing Worker does not match this Wrapped deployment identity.");
   }
-  const beforeBindingMap = bindingMap(beforeSettings.data?.result?.bindings);
-  const bundleAlreadyUploaded = exists2 && toStr8(beforeBindingMap.get("AGENT_BRIDGE_BUNDLE_SHA256")?.text) === bundleSha256;
+  const bundleAlreadyUploaded = exists2 && settingsOwnDeployment({
+    settings: beforeSettings,
+    expectedBindings: plainBindings,
+    kvNamespaceId: kvId
+  });
   let uploadMetadata = null;
   if (!bundleAlreadyUploaded) {
     await beforeMutation();
@@ -26095,7 +26117,7 @@ async function executeAgentSessionWrappedDeployment({
   let healthResponse;
   let health;
   try {
-    healthResponse = await fetchImpl(`${workerUrl}/health`, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
+    healthResponse = await fetchImpl(`${workerUrl}/health`, { method: "GET", headers: { Accept: "application/json" } });
     health = await healthResponse.json();
   } catch (error) {
     return fail2(503, "authority_health_probe", toStr8(error?.message || error) || "Wrapped health request failed.");
@@ -26134,11 +26156,12 @@ async function executeAgentSessionWrappedDeployment({
     }
   });
 }
-var AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND, AGENT_SESSION_WRAPPED_PROTOCOL_VERSION, COMPATIBILITY_DATE, REQUIRED_SECRET_NAMES, toStr8, safeSlug, safeDeploymentIdentity, normalizeHttpsOrigin, normalizeHttpsUrl, normalizeAuthorityMode, encode, bytesToHex2, sha256Hex, randomSecret, response, failure, isAmbiguousMutationFailure, policyFor, workerNameFor, bindingMap, settingsOwnDeployment, buildUploadForm, readBundle, listMatchingKvNamespaces, normalizeCapability;
+var AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND, AGENT_SESSION_WRAPPED_PROTOCOL_VERSION, COMPATIBILITY_DATE, REQUIRED_SECRET_NAMES, toStr8, safeSlug, safeDeploymentIdentity, normalizeHttpsOrigin, normalizeHttpsUrl, normalizeAuthorityMode, normalizeSessionId, encode, bytesToHex2, sha256Hex, randomSecret, response, failure, isAmbiguousMutationFailure, policyFor, workerNameFor, bindingMap, settingsOwnDeployment, buildUploadForm, readBundle, listMatchingKvNamespaces, normalizeCapability;
 var init_agentSessionWrappedDeployment = __esm({
   "workers/shared/agentSessionWrappedDeployment.mjs"() {
     init_artifactFetch();
     init_workerReleaseManifest();
+    init_workerScriptName();
     AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND = "agent_session_wrapped";
     AGENT_SESSION_WRAPPED_PROTOCOL_VERSION = "agent-session-wrapped-v1";
     COMPATIBILITY_DATE = "2024-09-02";
@@ -26178,6 +26201,10 @@ var init_agentSessionWrappedDeployment = __esm({
       const mode = toStr8(value).toLowerCase();
       return ["worker_canonical", "evm_registry_canonical", "registry_canonical"].includes(mode) ? mode : "";
     };
+    normalizeSessionId = (value) => {
+      const hex = toStr8(value).toLowerCase().replace(/^0x/, "").replace(/-/g, "");
+      return /^[0-9a-f]{32}$/.test(hex) && !/^0+$/.test(hex) ? `0x${hex}` : "";
+    };
     encode = (value) => new TextEncoder().encode(String(value || ""));
     bytesToHex2 = (bytes3) => Array.from(bytes3, (byte) => byte.toString(16).padStart(2, "0")).join("");
     sha256Hex = async (value) => bytesToHex2(new Uint8Array(await crypto.subtle.digest("SHA-256", encode(value))));
@@ -26192,11 +26219,12 @@ var init_agentSessionWrappedDeployment = __esm({
       const status = Number(result?.status || 0);
       return !status || status >= 500 || [408, 409, 412, 425, 429, 499].includes(status);
     };
-    policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled = true }) => ({
+    policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled = true, sessionId = "" }) => ({
       version: 1,
       defaultSessionSlug: sessionSlug,
       sessions: [{
         sessionSlug,
+        ...sessionId ? { sessionIdHex: sessionId } : {},
         sessionWorkerUrl: sessionWorkerOrigin,
         telegramBridgeEnabled: false,
         sessionModeProfile: {
@@ -26205,14 +26233,15 @@ var init_agentSessionWrappedDeployment = __esm({
         }
       }]
     });
-    workerNameFor = ({ sessionSlug, deploymentId }) => {
-      const prefix = `ce-wrapped-${sessionSlug}`.replace(/_/g, "-").replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
-      return `${prefix || "ce-wrapped-session"}-${deploymentId.slice(0, 12)}`;
-    };
+    workerNameFor = ({ sessionSlug, deploymentId }) => buildDeploymentWorkerName(
+      `ce-wrapped-${sessionSlug}`.replace(/_/g, "-").replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""),
+      deploymentId,
+      "ce-wrapped-session"
+    );
     bindingMap = (bindings = []) => new Map(
       (Array.isArray(bindings) ? bindings : []).map((binding) => [toStr8(binding?.name), binding])
     );
-    settingsOwnDeployment = ({ settings, expectedBindings, kvNamespaceId, verifyBundle = true }) => {
+    settingsOwnDeployment = ({ settings, expectedBindings, kvNamespaceId, verifyBundle = true, allowAccessChange = false }) => {
       if (!settings?.ok) return false;
       const result = settings.data?.result || {};
       if (toStr8(result.main_module) && toStr8(result.main_module) !== "worker.mjs") return false;
@@ -26221,7 +26250,24 @@ var init_agentSessionWrappedDeployment = __esm({
       if (toStr8(kv?.type) !== "kv_namespace" || toStr8(kv?.namespace_id) !== kvNamespaceId) return false;
       return expectedBindings.filter((binding) => binding.type === "plain_text").filter((binding) => verifyBundle || binding.name !== "AGENT_BRIDGE_BUNDLE_SHA256").every((binding) => {
         const observed = actual.get(binding.name);
-        return toStr8(observed?.type) === "plain_text" && toStr8(observed?.text) === binding.text;
+        if (toStr8(observed?.type) !== "plain_text") return false;
+        if (toStr8(observed?.text) === binding.text) return true;
+        if (!allowAccessChange || binding.name !== "AGENT_BRIDGE_SESSION_POLICY_JSON") return false;
+        try {
+          const policy = JSON.parse(observed.text);
+          const expected = JSON.parse(binding.text);
+          const session = policy.sessions?.[0];
+          const surfaces = session?.sessionModeProfile?.surfaces;
+          if (typeof surfaces?.agentHttp !== "boolean") return false;
+          surfaces.agentHttp = expected.sessions[0].sessionModeProfile.surfaces.agentHttp;
+          const expectedId = expected.sessions[0].sessionIdHex;
+          if (expectedId && session.sessionIdHex === void 0) {
+            policy.sessions[0] = { sessionSlug: session.sessionSlug, sessionIdHex: expectedId, ...session };
+          }
+          return JSON.stringify(policy) === binding.text;
+        } catch {
+          return false;
+        }
       });
     };
     buildUploadForm = ({ bundleSource, bindings }) => {
@@ -26229,6 +26275,7 @@ var init_agentSessionWrappedDeployment = __esm({
         main_module: "worker.mjs",
         compatibility_date: COMPATIBILITY_DATE,
         compatibility_flags: ["nodejs_compat", "global_fetch_strictly_public"],
+        keep_bindings: ["secret_text"],
         bindings
       };
       const form = new FormData();
@@ -26249,15 +26296,23 @@ var init_agentSessionWrappedDeployment = __esm({
       }
     };
     listMatchingKvNamespaces = async ({ apiToken, accountId, title, cfFetchImpl }) => {
-      const listed = await cfFetchImpl(
-        apiToken,
-        `/accounts/${accountId}/storage/kv/namespaces?per_page=100&page=1`,
-        { method: "GET" }
-      );
-      if (!listed.ok) return { ok: false, error: listed.error || "Failed to list KV namespaces." };
-      const matches = (Array.isArray(listed.data?.result) ? listed.data.result : []).filter((entry) => toStr8(entry?.title) === title && toStr8(entry?.id));
-      if (matches.length > 1) return { ok: false, status: 409, error: "Multiple KV namespaces match this Wrapped deployment identity." };
-      return { ok: true, match: matches[0] || null };
+      const matches = [];
+      for (let page = 1; page <= 100; page += 1) {
+        const listed = await cfFetchImpl(
+          apiToken,
+          `/accounts/${accountId}/storage/kv/namespaces?per_page=100&page=${page}`,
+          { method: "GET" }
+        );
+        if (!listed.ok) return { ok: false, error: listed.error || "Failed to list KV namespaces." };
+        const entries = Array.isArray(listed.data?.result) ? listed.data.result : [];
+        matches.push(...entries.filter((entry) => toStr8(entry?.title) === title && toStr8(entry?.id)));
+        if (matches.length > 1) return { ok: false, status: 409, error: "Multiple KV namespaces match this Wrapped deployment identity." };
+        const totalPages = Number(listed.data?.result_info?.total_pages);
+        if (totalPages > 0 ? page >= totalPages : entries.length < 100) {
+          return { ok: true, match: matches[0] || null };
+        }
+      }
+      return { ok: false, error: "Wrapped KV inventory exceeded the lookup limit; no namespace was created." };
     };
     normalizeCapability = (value) => {
       if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -26897,7 +26952,7 @@ var init_workerConfigModeValidation = __esm({
         const result = validatePayloadAccessControl(payloadAccess.value, `${path}.payloadAccessControl`);
         if (!result.ok) return result;
       }
-      const cloudflare = validateObjectField(profile, "cloudflare", `${path}.cloudflare`);
+      const cloudflare = backend !== "cloudflare" && profile.cloudflare === null ? { ok: true, value: null } : validateObjectField(profile, "cloudflare", `${path}.cloudflare`);
       if (!cloudflare.ok) return cloudflare;
       if (cloudflare.value) {
         const result = validateEnumField(
@@ -27312,7 +27367,7 @@ var init_workerConfigModeValidation = __esm({
 });
 
 // workers/shared/deployHelperCore.mjs
-var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_URL, DEFAULT_FAUCET_AMOUNT_ETH, DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH, DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED, DEFAULT_ALLOWED_ORIGINS, DEPLOYMENT_JOURNAL_PREFIX, DEPLOYMENT_JOURNAL_VERSION, DEPLOYMENT_JOURNAL_TTL_SECONDS, DEPLOYMENT_REQUEST_ID_RE, KV_NAMESPACE_TITLE_MAX_LENGTH, SESSION_SLUG_MAX_LENGTH, TRUE_STRINGS, FALSE_STRINGS, STORAGE_RESOURCE_STAGES, DEFAULT_STORAGE_RESOURCES, DEFAULT_PAYLOAD_ACCESS_RESOURCES, DEFAULT_CLOUDFLARE_PRIMITIVES, PAYLOAD_ACCESS_MODES2, PAYLOAD_ACCESS_GATES2, PAYLOAD_ENCRYPTION_MODES2, STORAGE_ENVELOPE_KEK_SECRET_NAME, DEPLOYMENT_ID_BINDING_NAME, DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, BUNDLE_SHA256_BINDING_NAME, SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME, SESSION_COORDINATOR_MIGRATION_TAG, R2_BUCKET_NAME_RE, ALLOWED_WORKER_AUTHORITY_SCOPES, DEFAULT_WORKER_CANONICAL_AUTHORITY, toStr10, isObj4, hasScheme, ensureHttpUrl, normalizeOrigin, normalizeOriginList, normalizeAllowList, validateInboundSlug, readJsonOrText, cfFetch, NEW_KV_NAMESPACE_RETRY_DELAYS_MS, NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS, FINAL_CONFIG_READBACK_RETRY_DELAYS_MS, isNewKvNamespacePropagationFailure, putFreshKvNamespaceValue, lookupCloudflareAccount, randomSecret2, sha256Hex2, canonicalizeJsonValue, stableCanonicalSerialize, buildBundleDiagnostics, formatBundleDiagnostics, normalizeSecretValue, sanitizeSecrets, sanitizeBlockLimits, normalizeWorkerAuthorityScopes, normalizeWorkerAuthorityLoginGate, resolveWorkerCanonicalAuthorityForDeploy, workerAuthorityPoliciesMatch, buildFreshDeploymentName, normalizeDeploymentRequestId, collectKnownRequestCredentials, redactKnownCredentials, buildSafeDeployJournalResult, resolveDeployJournalBinding, buildDeploymentRequestContext, readDeployJournalRecord, writeDeployJournalRecord, writeDurableDeployJournalRecord, normalizeResourceStage, normalizePayloadAccessMode, normalizePayloadAccessGate, normalizePayloadEncryptionMode, deriveLegacyPayloadAccessMode, cloneAccessConditions, normalizePayloadAccessControl, normalizeStorageProfileInput, normalizeDeployStorageProfile, firstTrimmed, resolveRequestedR2BucketName, truthyR2Marker, hasExplicitR2Request, resolveDeployStorageBindingPlan, normalizeEmbeddedDeployHelperEnabled, buildFailure, buildSuccess, shouldAllowFallbackForCloudflareFailure, isAmbiguousCloudflareMutationFailure, isDefinitiveWorkerUploadRejection, ensureWorkersDevAccountSubdomain, ensureWorkersDevSubdomain, resolveDeploymentAccountId, validateDeployHelperPublicConfigInputs, normalizeAgentBridgeBundleUrl, executeDeployHelperRequestCore, resolveDeploymentBundleProvenance, validateDeployHelperLocalInputs, executeDeployHelperRequest;
+var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_URL, DEFAULT_FAUCET_AMOUNT_ETH, DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH, DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED, DEFAULT_ALLOWED_ORIGINS, DEPLOYMENT_JOURNAL_PREFIX, DEPLOYMENT_JOURNAL_VERSION, DEPLOYMENT_JOURNAL_TTL_SECONDS, DEPLOYMENT_REQUEST_ID_RE, KV_NAMESPACE_TITLE_MAX_LENGTH, SESSION_SLUG_MAX_LENGTH, TRUE_STRINGS, FALSE_STRINGS, STORAGE_RESOURCE_STAGES, DEFAULT_STORAGE_RESOURCES, DEFAULT_PAYLOAD_ACCESS_RESOURCES, DEFAULT_CLOUDFLARE_PRIMITIVES, PAYLOAD_ACCESS_MODES2, PAYLOAD_ACCESS_GATES2, PAYLOAD_ENCRYPTION_MODES2, STORAGE_ENVELOPE_KEK_SECRET_NAME, DEPLOYMENT_ID_BINDING_NAME, DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, BUNDLE_SHA256_BINDING_NAME, SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME, SESSION_COORDINATOR_MIGRATION_TAG, R2_BUCKET_NAME_RE, ALLOWED_WORKER_AUTHORITY_SCOPES, DEFAULT_WORKER_CANONICAL_AUTHORITY, toStr10, isObj4, hasScheme, ensureHttpUrl, normalizeOrigin, normalizeOriginList, normalizeAllowList, validateInboundSlug, readJsonOrText, cfFetch, NEW_KV_NAMESPACE_RETRY_DELAYS_MS, NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS, FINAL_CONFIG_READBACK_RETRY_DELAYS_MS, isNewKvNamespacePropagationFailure, putFreshKvNamespaceValue, lookupCloudflareAccount, randomSecret2, sha256Hex2, canonicalizeJsonValue, stableCanonicalSerialize, buildBundleDiagnostics, formatBundleDiagnostics, normalizeSecretValue, sanitizeSecrets, sanitizeBlockLimits, normalizeWorkerAuthorityScopes, normalizeWorkerAuthorityLoginGate, resolveWorkerCanonicalAuthorityForDeploy, workerAuthorityPoliciesMatch, normalizeRequestedWorkerName, buildFreshDeploymentName, buildPreLimitDeploymentName, normalizeDeploymentRequestId, collectKnownRequestCredentials, redactKnownCredentials, buildSafeDeployJournalResult, resolveDeployJournalBinding, buildDeploymentRequestContext, readDeployJournalRecord, writeDeployJournalRecord, writeDurableDeployJournalRecord, normalizeResourceStage, normalizePayloadAccessMode, normalizePayloadAccessGate, normalizePayloadEncryptionMode, deriveLegacyPayloadAccessMode, cloneAccessConditions, normalizePayloadAccessControl, normalizeStorageProfileInput, normalizeDeployStorageProfile, firstTrimmed, resolveRequestedR2BucketName, truthyR2Marker, hasExplicitR2Request, resolveDeployStorageBindingPlan, normalizeEmbeddedDeployHelperEnabled, buildFailure, buildSuccess, shouldAllowFallbackForCloudflareFailure, isAmbiguousCloudflareMutationFailure, isDefinitiveWorkerUploadRejection, ensureWorkersDevAccountSubdomain, ensureWorkersDevSubdomain, resolveDeploymentAccountId, validateDeployHelperPublicConfigInputs, normalizeAgentBridgeBundleUrl, executeDeployHelperRequestCore, resolveDeploymentBundleProvenance, validateDeployHelperLocalInputs, executeDeployHelperRequest;
 var init_deployHelperCore = __esm({
   "workers/shared/deployHelperCore.mjs"() {
     init_artifactFetch();
@@ -27325,6 +27380,7 @@ var init_deployHelperCore = __esm({
     init_workerConfigModeValidation();
     init_workerReleaseManifest();
     init_sessionSlugResolution();
+    init_workerScriptName();
     ({ getPathRpcUrl } = import_rpcDefaults3.default);
     DEFAULT_COMPAT_DATE = "2024-09-02";
     DEFAULT_FAUCET_RPC_URL = getPathRpcUrl(11155420) || "";
@@ -27400,6 +27456,7 @@ var init_deployHelperCore = __esm({
       "groups",
       "arweave",
       "faucet",
+      "faucet_self",
       "fetch",
       "lit"
     ]);
@@ -27753,10 +27810,13 @@ var init_deployHelperCore = __esm({
       };
     };
     workerAuthorityPoliciesMatch = (expected, actual) => JSON.stringify(expected || null) === JSON.stringify(actual || null);
-    buildFreshDeploymentName = (requestedName, deploymentId) => {
-      const base = toStr10(requestedName).trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "ce-session-worker";
-      return `${base}-${toStr10(deploymentId).slice(0, 12)}`;
-    };
+    normalizeRequestedWorkerName = (requestedName) => toStr10(requestedName).trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+    buildFreshDeploymentName = (requestedName, deploymentId) => buildDeploymentWorkerName(
+      normalizeRequestedWorkerName(requestedName),
+      toStr10(deploymentId),
+      "ce-session-worker"
+    );
+    buildPreLimitDeploymentName = (requestedName, deploymentId) => `${normalizeRequestedWorkerName(requestedName).slice(0, 50) || "ce-session-worker"}-${toStr10(deploymentId).slice(0, 12)}`;
     normalizeDeploymentRequestId = (value) => {
       const normalized = toStr10(value).trim();
       return DEPLOYMENT_REQUEST_ID_RE.test(normalized) ? normalized : "";
@@ -27890,7 +27950,7 @@ var init_deployHelperCore = __esm({
       }
       if (isObj4(incomingBody.health)) {
         body.health = {};
-        ["ok", "protocolVersion", "authorityPinned"].forEach((key) => {
+        ["ok", "protocolVersion", "authorityPinned", "accessEnabled"].forEach((key) => {
           const value = incomingBody.health[key];
           if (typeof value === "string") body.health[key] = redactKnownCredentials(value, credentials);
           else if (typeof value === "boolean" || Number.isFinite(value)) body.health[key] = value;
@@ -27965,6 +28025,7 @@ var init_deployHelperCore = __esm({
         deploymentId,
         requestMarker: deploymentId.slice(0, 16),
         workerName: buildFreshDeploymentName(body?.workerName, deploymentId),
+        preLimitWorkerName: buildPreLimitDeploymentName(body?.workerName, deploymentId),
         journalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}`,
         uploadJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:upload`,
         uploadRejectedJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:upload-rejected`,
@@ -28060,11 +28121,13 @@ var init_deployHelperCore = __esm({
       const gate = normalizePayloadAccessGate(isObj4(source) ? source.gate : void 0, fallbackGate);
       const encryption = normalizePayloadEncryptionMode(isObj4(source) ? source.encryption : void 0, fallbackEncryption);
       const accessConditions = cloneAccessConditions(source);
+      const groupIds = gate === PAYLOAD_ACCESS_GATES2.GROUP_GATE ? [...new Set([source?.groupIds, source?.groupId].flat().map((id2) => toStr10(id2).trim().toLowerCase()).filter(Boolean))] : [];
       return {
         gate,
         encryption,
         mode: deriveLegacyPayloadAccessMode({ gate, encryption }),
-        ...accessConditions ? { accessConditions } : {}
+        ...accessConditions ? { accessConditions } : {},
+        ...groupIds.length ? { groupIds } : {}
       };
     };
     normalizeStorageProfileInput = (incoming) => {
@@ -28125,7 +28188,8 @@ var init_deployHelperCore = __esm({
           ...DEFAULT_PAYLOAD_ACCESS_RESOURCES,
           ...isObj4(raw.payloadAccessControl?.resources) ? raw.payloadAccessControl.resources : {}
         },
-        ...accessControl.accessConditions ? { accessConditions: accessControl.accessConditions } : {}
+        ...accessControl.accessConditions ? { accessConditions: accessControl.accessConditions } : {},
+        ...accessControl.groupIds ? { groupIds: accessControl.groupIds } : {}
       };
       profile.sbtGatedAccess = {
         ...profile.sbtGatedAccess,
@@ -28975,7 +29039,9 @@ var init_deployHelperCore = __esm({
           new_sqlite_classes: [SESSION_COORDINATOR_CLASS_NAME]
         },
         compatibility_date: toStr10(env?.WORKER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE),
-        compatibility_flags: ["nodejs_compat"]
+        // The embedded helper also probes sibling Workers; ordinary same-zone fetch
+        // otherwise fails with Cloudflare 1042 before reaching the target Worker.
+        compatibility_flags: ["nodejs_compat", "global_fetch_strictly_public"]
       };
       const readWorkerSettingsAfterUpload = async () => {
         let settingsResp = null;
@@ -29455,6 +29521,7 @@ var init_deployHelperCore = __esm({
             sessionSlug: displaySlug,
             sessionWorkerOrigin: workerUrl,
             sessionDeploymentIdentity: body?.agentSessionWrappedDeploymentIdentity,
+            sessionId: body?.sessionIdHex || body?.sessionId,
             authorityMode: body?.sessionModeProfile?.authority?.mode,
             bundleUrl: body?.agentBridgeBundleUrl,
             bundleManifestUrl: body?.agentBridgeBundleManifestUrl,
@@ -29742,11 +29809,20 @@ var init_deployHelperCore = __esm({
       }
       if (uploadRejectedRecord) {
         const rejectedBundleSha256 = toStr10(uploadRejectedRecord.bundleSha256).trim().toLowerCase();
+        const rejectedWorkerName = toStr10(uploadRejectedRecord.workerName).trim();
+        const rejectedUnderPreLimitName = rejectedWorkerName !== context.workerName && rejectedWorkerName === context.preLimitWorkerName;
         if (toStr10(uploadRejectedRecord.requestDigest).trim() !== context.requestDigest) {
           return buildRequestDigestConflict();
         }
-        if (Number(uploadRejectedRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || uploadRejectedRecord.state !== "definitive_upload_rejected" || !/^[0-9a-f]{64}$/.test(toStr10(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase()) || toStr10(uploadRejectedRecord.deploymentId).trim() !== context.deploymentId || toStr10(uploadRejectedRecord.workerName).trim() !== context.workerName || toStr10(uploadRejectedRecord.requestMarker).trim() !== context.requestMarker || !/^[0-9a-f]{64}$/.test(rejectedBundleSha256)) {
+        if (Number(uploadRejectedRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || uploadRejectedRecord.state !== "definitive_upload_rejected" || !/^[0-9a-f]{64}$/.test(toStr10(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase()) || toStr10(uploadRejectedRecord.deploymentId).trim() !== context.deploymentId || rejectedWorkerName !== context.workerName && !rejectedUnderPreLimitName || toStr10(uploadRejectedRecord.requestMarker).trim() !== context.requestMarker || !/^[0-9a-f]{64}$/.test(rejectedBundleSha256)) {
           return buildFailure(409, { error: "Deployment request upload-rejection journal state is invalid." });
+        }
+        if (rejectedUnderPreLimitName) {
+          return buildFailure(409, {
+            error: "Cloudflare rejected this deployment because its Worker name was too long. Deploy again to start a new request.",
+            deploymentRequestConflict: true,
+            deploymentRequestTerminal: true
+          });
         }
         if (toStr10(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase() !== context.bundleCorrectionDigest) {
           return buildFailure(409, {
@@ -30965,12 +31041,6 @@ var init_workerGroups = __esm({
       if (explicit) return normalizeWorkerGroupPrincipal(explicit, deps);
       const grantId = trim2(scopes.grantId || scopes.agentGrant?.grantId || scopes.agent_grant?.grantId || scopes.delegation?.grantId);
       if (grantId) return normalizeWorkerGroupPrincipal({ kind: "agent", grantId }, deps);
-      const telegramPrincipal = scopes.telegramPrincipal || scopes.integrationPrincipal?.telegram || scopes.integrationPrincipal?.telegramPrincipal || scopes.integrationPrincipal?.principalId;
-      if (telegramPrincipal) return normalizeWorkerGroupPrincipal({ kind: "telegram", principalId: telegramPrincipal }, deps);
-      const telegramId = trim2(
-        scopes.telegramUserId || scopes.integrationPrincipal?.telegramUserId || scopes.integrationPrincipal?.telegram_user_id
-      );
-      if (telegramId) return normalizeWorkerGroupPrincipal({ kind: "telegram", principalId: `telegram:${telegramId}` }, deps);
       if (requesterAddress) return normalizeWorkerGroupPrincipal({ kind: "evm_address", address: requesterAddress }, deps);
       return { ok: false, reason: "missing_principal" };
     };
@@ -32811,6 +32881,151 @@ ${row.principalKey}`, row);
       }
       return jsonResponse(deps, { error: "Not found." }, 404, baseHeaders);
     };
+  }
+});
+
+// workers/sessionCorsWorker/responseKvHelpers.js
+var json, getKvJson, putKvJson;
+var init_responseKvHelpers = __esm({
+  "workers/sessionCorsWorker/responseKvHelpers.js"() {
+    json = (data, status, baseHeaders) => {
+      const headers = new Headers(baseHeaders);
+      headers.set("Content-Type", "application/json");
+      return new Response(JSON.stringify(data), { status, headers });
+    };
+    getKvJson = async (env, key) => {
+      const raw = await env.GROUP_KV.get(key);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    };
+    putKvJson = async (env, key, value, ttlSeconds) => {
+      const opts = ttlSeconds ? { expirationTtl: ttlSeconds } : {};
+      await env.GROUP_KV.put(key, JSON.stringify(value), opts);
+    };
+  }
+});
+
+// workers/sessionCorsWorker/sessionConfigSecretsStore.js
+var SESSION_KV_PREFIX, buildSessionConfigKvKey, buildSessionSecretsKvKey, SESSION_CONFIG_MIGRATION_REQUIRED_REASON, SESSION_CONFIG_MIGRATION_REQUIRED_ERROR, legacySessionConfigMigrationError, getLegacySessionConfigForAuthority, getSessionConfig, getSessionSecrets, putSessionConfig, putSessionSecrets;
+var init_sessionConfigSecretsStore = __esm({
+  "workers/sessionCorsWorker/sessionConfigSecretsStore.js"() {
+    init_responseKvHelpers();
+    init_sessionConfigNormalization();
+    init_sessionSecretsEnvelope();
+    init_workerSessionConfig();
+    SESSION_KV_PREFIX = "session";
+    buildSessionConfigKvKey = (slug) => `${SESSION_KV_PREFIX}:${slug}:config`;
+    buildSessionSecretsKvKey = (slug) => `${SESSION_KV_PREFIX}:${slug}:secrets`;
+    SESSION_CONFIG_MIGRATION_REQUIRED_REASON = "session_config_migration_required";
+    SESSION_CONFIG_MIGRATION_REQUIRED_ERROR = "Stored legacy session config requires operator migration before use.";
+    legacySessionConfigMigrationError = () => Object.assign(
+      new Error(SESSION_CONFIG_MIGRATION_REQUIRED_ERROR),
+      { reason: SESSION_CONFIG_MIGRATION_REQUIRED_REASON, status: 503 }
+    );
+    getLegacySessionConfigForAuthority = async (env, slug) => {
+      const raw = await env.GROUP_KV.get(buildSessionConfigKvKey(slug));
+      if (raw == null) return null;
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        throw legacySessionConfigMigrationError();
+      }
+      const config = normalizeWorkerConfigRecord(parsed, { slug });
+      if (!config) throw legacySessionConfigMigrationError();
+      return config;
+    };
+    getSessionConfig = async (env, slug, deps) => {
+      const getKvJsonFn = typeof deps?.getKvJson === "function" ? deps.getKvJson : getKvJson;
+      const normalizeConfig = typeof deps?.normalizeWorkerConfigRecord === "function" ? deps.normalizeWorkerConfigRecord : normalizeWorkerConfigRecord;
+      const raw = await getKvJsonFn(env, buildSessionConfigKvKey(slug));
+      return normalizeConfig(raw, { slug });
+    };
+    getSessionSecrets = async (env, slug, deps) => {
+      const getKvJsonFn = typeof deps?.getKvJson === "function" ? deps.getKvJson : getKvJson;
+      const raw = await getKvJsonFn(env, buildSessionSecretsKvKey(slug));
+      if (isEncryptedSessionSecretsEnvelope(raw)) {
+        return decryptSessionSecretsEnvelope(raw, { env, slug, ...deps });
+      }
+      return unwrapSessionSecretsEnvelope(raw);
+    };
+    putSessionConfig = async (env, slug, value, deps) => {
+      const normalizeConfig = typeof deps?.normalizeWorkerConfigRecord === "function" ? deps.normalizeWorkerConfigRecord : normalizeWorkerConfigRecord;
+      const putKvJsonFn = typeof deps?.putKvJson === "function" ? deps.putKvJson : putKvJson;
+      const normalized = normalizeConfig(value, { slug });
+      if (!normalized) throw new Error("Invalid session config.");
+      if (findForbiddenCloudflareDeploymentTokenPath(normalized)) {
+        throw new Error("Cloudflare deployment tokens are not allowed in session config.");
+      }
+      if (findForbiddenWorkerConfigSecretPath(normalized)) {
+        throw new Error("Secret-like values are not allowed in public session config fields.");
+      }
+      await putKvJsonFn(env, buildSessionConfigKvKey(slug), normalized);
+    };
+    putSessionSecrets = async (env, slug, value, deps) => {
+      const putKvJsonFn = typeof deps?.putKvJson === "function" ? deps.putKvJson : putKvJson;
+      const buildEnvelope = typeof deps?.buildEncryptedSessionSecretsEnvelope === "function" ? deps.buildEncryptedSessionSecretsEnvelope : buildEncryptedSessionSecretsEnvelope;
+      const envelope = await buildEnvelope(value, {
+        env,
+        slug,
+        now: deps?.now,
+        crypto: deps?.crypto,
+        randomBytes: deps?.randomBytes,
+        getRandomValues: deps?.getRandomValues,
+        getSessionSecretsKek: deps?.getSessionSecretsKek
+      });
+      await putKvJsonFn(env, buildSessionSecretsKvKey(slug), envelope);
+    };
+  }
+});
+
+// workers/sessionCorsWorker/sessionConfigAuthority.js
+var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, callSessionConfigCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication;
+var init_sessionConfigAuthority = __esm({
+  "workers/sessionCorsWorker/sessionConfigAuthority.js"() {
+    init_deployHelperCore();
+    init_sessionSlugResolution();
+    init_authorizationScopeFreshness();
+    init_sessionConfigSecretsStore();
+    SESSION_CONFIG_COORDINATION_ERROR = "Session config coordination is unavailable; retry.";
+    SUPERSEDED_AUTHORITY_ERROR = "Session authorization changed; retry with current authority.";
+    assertExpectedSessionAuthority = (authority, expected, slug) => {
+      if (!slug || !expected || !/^0x[0-9a-f]{40}$/i.test(expected.actor || "") || !Number.isSafeInteger(expected.revision) || expected.revision < 0 || !Number.isSafeInteger(expected.authzEpoch) || expected.authzEpoch < 0 || authority != null && authority.slug !== slug || expected.revision !== (authority?.revision ?? 0) || expected.authzEpoch !== readAuthorizationEpoch(authority?.config)) {
+        throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
+      }
+    };
+    callSessionConfigCoordinator = async ({ env, slug, path, ...payload }) => {
+      const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+      const binding = env?.CE_SESSION_COORDINATOR;
+      try {
+        if (!normalizedSlug || !binding?.idFromName || !binding?.get) throw new Error();
+        const name = await sha256Hex2(`session-config:${normalizedSlug}`);
+        const response3 = await binding.get(binding.idFromName(name)).fetch(
+          `https://session-coordinator.internal/session-config/${path}`,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: normalizedSlug, ...payload }) }
+        );
+        const body = await response3.json();
+        return { ok: response3.ok && body?.ok === true, status: response3.status, body };
+      } catch {
+        return { ok: false, status: 503, body: { error: SESSION_CONFIG_COORDINATION_ERROR } };
+      }
+    };
+    readCurrentSessionConfig = async ({ env, slug }) => {
+      const result = await callSessionConfigCoordinator({ env, slug, path: "current" });
+      if (!result.ok && result.status === 503 && result.body?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON) {
+        throw legacySessionConfigMigrationError();
+      }
+      if (!result.ok || !Number.isSafeInteger(result.body.revision) || result.body.revision < 0 || (result.body.config === null ? result.body.revision !== 0 : !result.body.config || typeof result.body.config !== "object" || Array.isArray(result.body.config) || result.body.revision === 0)) {
+        throw Object.assign(new Error(SESSION_CONFIG_COORDINATION_ERROR), { status: 503 });
+      }
+      return { config: result.body.config, revision: result.body.revision };
+    };
+    executeCoordinatedStorageVisibilityMutation = (args) => callSessionConfigCoordinator({ ...args, path: "storage/set-hidden" });
+    executeCoordinatedStoragePublication = (args) => callSessionConfigCoordinator({ ...args, path: "storage/publish" });
   }
 });
 
@@ -44956,8 +45171,8 @@ var require_typed_data = __commonJS({
             uniqueNames.add(field.name);
             const baseType = splitArray2(field.type).base;
             (0, index_js_4.assertArgument)(baseType !== name, `circular type reference to ${JSON.stringify(baseType)}`, "types", _types3);
-            const encoder5 = getBaseEncoder2(baseType);
-            if (encoder5) {
+            const encoder6 = getBaseEncoder2(baseType);
+            if (encoder6) {
               continue;
             }
             (0, index_js_4.assertArgument)(parents.has(baseType), `unknown type ${JSON.stringify(baseType)}`, "types", _types3);
@@ -45000,12 +45215,12 @@ var require_typed_data = __commonJS({
        *  Returnthe encoder for the specific %%type%%.
        */
       getEncoder(type) {
-        let encoder5 = __privateGet(this, _encoderCache2).get(type);
-        if (!encoder5) {
-          encoder5 = __privateMethod(this, _TypedDataEncoder_instances2, getEncoder_fn2).call(this, type);
-          __privateGet(this, _encoderCache2).set(type, encoder5);
+        let encoder6 = __privateGet(this, _encoderCache2).get(type);
+        if (!encoder6) {
+          encoder6 = __privateMethod(this, _TypedDataEncoder_instances2, getEncoder_fn2).call(this, type);
+          __privateGet(this, _encoderCache2).set(type, encoder6);
         }
-        return encoder5;
+        return encoder6;
       }
       /**
        *  Return the full type for %%name%%.
@@ -45044,8 +45259,8 @@ var require_typed_data = __commonJS({
        */
       _visit(type, value, callback) {
         {
-          const encoder5 = getBaseEncoder2(type);
-          if (encoder5) {
+          const encoder6 = getBaseEncoder2(type);
+          if (encoder6) {
             return callback(type, value);
           }
         }
@@ -45141,8 +45356,8 @@ var require_typed_data = __commonJS({
         if (domain.verifyingContract && !(0, index_js_4.isHexString)(domain.verifyingContract, 20)) {
           ensCache[domain.verifyingContract] = "0x";
         }
-        const encoder5 = _TypedDataEncoder2.from(types);
-        encoder5.visit(value, (type, value2) => {
+        const encoder6 = _TypedDataEncoder2.from(types);
+        encoder6.visit(value, (type, value2) => {
           if (type === "address" && !(0, index_js_4.isHexString)(value2, 20)) {
             ensCache[value2] = "0x";
           }
@@ -45154,7 +45369,7 @@ var require_typed_data = __commonJS({
         if (domain.verifyingContract && ensCache[domain.verifyingContract]) {
           domain.verifyingContract = ensCache[domain.verifyingContract];
         }
-        value = encoder5.visit(value, (type, value2) => {
+        value = encoder6.visit(value, (type, value2) => {
           if (type === "address" && ensCache[value2]) {
             return ensCache[value2];
           }
@@ -45178,17 +45393,17 @@ var require_typed_data = __commonJS({
           domainValues[name] = domainChecks2[name](value2);
           domainTypes.push({ name, type: domainFieldTypes2[name] });
         });
-        const encoder5 = _TypedDataEncoder2.from(types);
-        types = encoder5.types;
+        const encoder6 = _TypedDataEncoder2.from(types);
+        types = encoder6.types;
         const typesWithDomain = Object.assign({}, types);
         (0, index_js_4.assertArgument)(typesWithDomain.EIP712Domain == null, "types must not contain EIP712Domain type", "types.EIP712Domain", types);
         typesWithDomain.EIP712Domain = domainTypes;
-        encoder5.encode(value);
+        encoder6.encode(value);
         return {
           types: typesWithDomain,
           domain: domainValues,
-          primaryType: encoder5.primaryType,
-          message: encoder5.visit(value, (type, value2) => {
+          primaryType: encoder6.primaryType,
+          message: encoder6.visit(value, (type, value2) => {
             if (type.match(/^bytes(\d*)/)) {
               return (0, index_js_4.hexlify)((0, index_js_4.getBytes)(value2));
             }
@@ -45215,9 +45430,9 @@ var require_typed_data = __commonJS({
     _TypedDataEncoder_instances2 = new WeakSet();
     getEncoder_fn2 = function(type) {
       {
-        const encoder5 = getBaseEncoder2(type);
-        if (encoder5) {
-          return encoder5;
+        const encoder6 = getBaseEncoder2(type);
+        if (encoder6) {
+          return encoder6;
         }
       }
       const array = splitArray2(type).array;
@@ -60442,31 +60657,6 @@ var require_lib2 = __commonJS({
   }
 });
 
-// workers/sessionCorsWorker/responseKvHelpers.js
-var json, getKvJson, putKvJson;
-var init_responseKvHelpers = __esm({
-  "workers/sessionCorsWorker/responseKvHelpers.js"() {
-    json = (data, status, baseHeaders) => {
-      const headers = new Headers(baseHeaders);
-      headers.set("Content-Type", "application/json");
-      return new Response(JSON.stringify(data), { status, headers });
-    };
-    getKvJson = async (env, key) => {
-      const raw = await env.GROUP_KV.get(key);
-      if (!raw) return null;
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    };
-    putKvJson = async (env, key, value, ttlSeconds) => {
-      const opts = ttlSeconds ? { expirationTtl: ttlSeconds } : {};
-      await env.GROUP_KV.put(key, JSON.stringify(value), opts);
-    };
-  }
-});
-
 // workers/sessionCorsWorker/sponsoredBootstrapGrantStore.js
 var DEFAULT_TOKEN_BYTE_LENGTH, toTrimmedString8, SPONSORED_GRANT_TYPES, buildSponsoredGrantKvKey, buildSponsoredGrantToken, computeSponsoredGrantExpirationTtl, readSponsoredGrantRecord, writeSponsoredGrantRecord, deleteSponsoredGrantRecord, normalizeSensitiveValues, redactSponsoredSensitiveText, buildSafeSponsoredReceiptBody, buildSponsoredGrantContinuationRecord, writeSponsoredGrantReceipt;
 var init_sponsoredBootstrapGrantStore = __esm({
@@ -60529,6 +60719,11 @@ var init_sponsoredBootstrapGrantStore = __esm({
         "error",
         "workerName",
         "workerUrl",
+        "deploymentKind",
+        "accountId",
+        "sessionSlug",
+        "sessionWorkerOrigin",
+        "telegramConfigured",
         "resolvedSlug",
         "kvNamespaceId",
         "deploymentId",
@@ -60596,6 +60791,20 @@ var init_sponsoredBootstrapGrantStore = __esm({
           }
         });
         if (Object.keys(bundleDiagnostics).length) body.bundleDiagnostics = bundleDiagnostics;
+      }
+      for (const [field, keys] of Object.entries({
+        resources: ["kvNamespaceId", "kvReused"],
+        health: ["ok", "protocolVersion", "authorityPinned", "accessEnabled"],
+        agentSessionWrapped: ["version", "enabled", "origin", "protocolVersion", "revision", "verifiedAt"]
+      })) {
+        if (!incoming?.[field] || typeof incoming[field] !== "object" || Array.isArray(incoming[field])) continue;
+        const safe = {};
+        for (const key of keys) {
+          const value = incoming[field][key];
+          if (typeof value === "string") safe[key] = redactSponsoredSensitiveText(value, sensitiveValues);
+          else if (typeof value === "boolean" || Number.isFinite(value)) safe[key] = value;
+        }
+        if (Object.keys(safe).length) body[field] = safe;
       }
       return body;
     };
@@ -60743,7 +60952,17 @@ var init_resultsAnalysisArtifactValidation = __esm({
       ];
       const questions = aiSnapshotPresent ? aiQuestions : snapshotQuestions;
       const participants = aiSnapshotPresent ? aiParticipants : snapshotParticipants;
+      const responses = aiSnapshotPresent ? aiParticipants : toArray(source?.snapshot?.responses);
+      const questionsByParticipant = /* @__PURE__ */ new Map();
+      responses.forEach((response3) => {
+        const participantId = cleanId(response3?.syntheticId || response3?.participantId);
+        const questionId = cleanId(response3?.questionId || response3?.questionID);
+        if (!participantId || !questionId) return;
+        if (!questionsByParticipant.has(participantId)) questionsByParticipant.set(participantId, /* @__PURE__ */ new Set());
+        questionsByParticipant.get(participantId).add(questionId);
+      });
       return {
+        questionsByParticipant,
         questions: new Set(questions.map((entry) => cleanId(entry?.id || entry?.questionId || entry?.questionID)).filter(Boolean)),
         participants: new Set(participants.map((entry) => cleanId(entry?.syntheticId || entry?.participantId)).filter(Boolean))
       };
@@ -60762,6 +60981,18 @@ var init_resultsAnalysisArtifactValidation = __esm({
     normalizeSourceFields = (record, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
       const participantIds = normalizeIdRefs({ value: record.participantIds, allowed: allowed.participants, label: "participantId", errors, limit: participantLimit });
       const questionIds = normalizeIdRefs({ value: record.questionIds, allowed: allowed.questions, label: "questionId", errors });
+      if (participantIds.length && questionIds.length) {
+        for (const participantId of participantIds) {
+          if (!questionIds.some((questionId) => allowed.questionsByParticipant.get(participantId)?.has(questionId))) {
+            errors.push(`unsupported source attribution: participantId ${participantId} has no response to the cited questions`);
+          }
+        }
+        for (const questionId of questionIds) {
+          if (!participantIds.some((participantId) => allowed.questionsByParticipant.get(participantId)?.has(questionId))) {
+            errors.push(`unsupported source attribution: questionId ${questionId} has no response from the cited participants`);
+          }
+        }
+      }
       return {
         ...participantIds.length ? { participantIds } : {},
         ...questionIds.length ? { questionIds } : {}
@@ -60799,12 +61030,16 @@ var init_resultsAnalysisArtifactValidation = __esm({
           if (!label) return null;
           const summary2 = cleanText(claim.summary || claim.description || claim.evidence);
           const stance = cleanText(claim.stance, 24).toLowerCase();
+          const sourceFields = normalizeSourceFields(claim, allowed, errors);
+          if (!sourceFields.participantIds?.length || !sourceFields.questionIds?.length) {
+            errors.push("claim requires participantIds and questionIds");
+          }
           return {
             id: slugId(claim.id || label, `claim_${debateIndex + 1}_${claimIndex + 1}`),
             label,
             ...summary2 ? { summary: summary2 } : {},
             ...["support", "oppose", "mixed"].includes(stance) ? { stance } : {},
-            ...normalizeSourceFields(claim, allowed, errors)
+            ...sourceFields
           };
         }).filter(Boolean);
         const summary = cleanText(debate.summary || debate.description);
@@ -60816,7 +61051,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
           ...claims.length ? { claims } : { claims: [] }
         };
       }).filter(Boolean);
-      if (errors.length) return defaultSection("argumentMap", `AI generation referenced unknown source ids in argument map: ${errors.slice(0, 4).join(", ")}.`);
+      if (errors.length) return defaultSection("argumentMap", `AI generation referenced unknown source ids or unsupported source attribution in argument map: ${errors.slice(0, 4).join(", ")}.`);
       if (!debates.length) return defaultSection("argumentMap", "AI generation did not return renderable argument-map debates.");
       return { available: true, debates };
     };
@@ -60918,7 +61153,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
           ...normalizeSourceFields(group, allowed, errors, allowed.participants.size)
         };
       }).filter(Boolean);
-      if (errors.length) return defaultSection("breakdown", `AI generation referenced unknown source ids in breakdown: ${errors.slice(0, 4).join(", ")}.`);
+      if (errors.length) return defaultSection("breakdown", `AI generation referenced unknown source ids or unsupported source attribution in breakdown: ${errors.slice(0, 4).join(", ")}.`);
       if (!Object.keys(summary).length && !dimensions.length && !groups.length) {
         return defaultSection("breakdown", "AI generation did not return renderable breakdown content.");
       }
@@ -61147,61 +61382,6 @@ var init_resultsAnalysisArtifactValidation = __esm({
         }
       }
       return { ...artifact, sections: projected };
-    };
-  }
-});
-
-// workers/sessionCorsWorker/sessionConfigSecretsStore.js
-var SESSION_KV_PREFIX, buildSessionConfigKvKey, buildSessionSecretsKvKey, getSessionConfig, getSessionSecrets, putSessionConfig, putSessionSecrets;
-var init_sessionConfigSecretsStore = __esm({
-  "workers/sessionCorsWorker/sessionConfigSecretsStore.js"() {
-    init_responseKvHelpers();
-    init_sessionConfigNormalization();
-    init_sessionSecretsEnvelope();
-    init_workerSessionConfig();
-    SESSION_KV_PREFIX = "session";
-    buildSessionConfigKvKey = (slug) => `${SESSION_KV_PREFIX}:${slug}:config`;
-    buildSessionSecretsKvKey = (slug) => `${SESSION_KV_PREFIX}:${slug}:secrets`;
-    getSessionConfig = async (env, slug, deps) => {
-      const getKvJsonFn = typeof deps?.getKvJson === "function" ? deps.getKvJson : getKvJson;
-      const normalizeConfig = typeof deps?.normalizeWorkerConfigRecord === "function" ? deps.normalizeWorkerConfigRecord : normalizeWorkerConfigRecord;
-      const raw = await getKvJsonFn(env, buildSessionConfigKvKey(slug));
-      return normalizeConfig(raw, { slug });
-    };
-    getSessionSecrets = async (env, slug, deps) => {
-      const getKvJsonFn = typeof deps?.getKvJson === "function" ? deps.getKvJson : getKvJson;
-      const raw = await getKvJsonFn(env, buildSessionSecretsKvKey(slug));
-      if (isEncryptedSessionSecretsEnvelope(raw)) {
-        return decryptSessionSecretsEnvelope(raw, { env, slug, ...deps });
-      }
-      return unwrapSessionSecretsEnvelope(raw);
-    };
-    putSessionConfig = async (env, slug, value, deps) => {
-      const normalizeConfig = typeof deps?.normalizeWorkerConfigRecord === "function" ? deps.normalizeWorkerConfigRecord : normalizeWorkerConfigRecord;
-      const putKvJsonFn = typeof deps?.putKvJson === "function" ? deps.putKvJson : putKvJson;
-      const normalized = normalizeConfig(value, { slug });
-      if (!normalized) throw new Error("Invalid session config.");
-      if (findForbiddenCloudflareDeploymentTokenPath(normalized)) {
-        throw new Error("Cloudflare deployment tokens are not allowed in session config.");
-      }
-      if (findForbiddenWorkerConfigSecretPath(normalized)) {
-        throw new Error("Secret-like values are not allowed in public session config fields.");
-      }
-      await putKvJsonFn(env, buildSessionConfigKvKey(slug), normalized);
-    };
-    putSessionSecrets = async (env, slug, value, deps) => {
-      const putKvJsonFn = typeof deps?.putKvJson === "function" ? deps.putKvJson : putKvJson;
-      const buildEnvelope = typeof deps?.buildEncryptedSessionSecretsEnvelope === "function" ? deps.buildEncryptedSessionSecretsEnvelope : buildEncryptedSessionSecretsEnvelope;
-      const envelope = await buildEnvelope(value, {
-        env,
-        slug,
-        now: deps?.now,
-        crypto: deps?.crypto,
-        randomBytes: deps?.randomBytes,
-        getRandomValues: deps?.getRandomValues,
-        getSessionSecretsKek: deps?.getSessionSecretsKek
-      });
-      await putKvJsonFn(env, buildSessionSecretsKvKey(slug), envelope);
     };
   }
 });
@@ -61822,7 +62002,7 @@ var init_storageUploadValidation = __esm({
 });
 
 // workers/sessionCorsWorker/storageResourceOwnership.js
-var OWNED_STORAGE_RESOURCES, trim6, lower3, isObj13, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, listHiddenStorageResourceIds, compareVersionAge, isPreferredStorageVersion, selectCanonicalStorageVersions;
+var OWNED_STORAGE_RESOURCES, trim6, lower3, isObj13, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, listHiddenStorageResourceIds, compareStorageIds, compareVersionAge, isAdminStorageVersion, isPreferredStorageVersion, selectCanonicalStorageVersions;
 var init_storageResourceOwnership = __esm({
   "workers/sessionCorsWorker/storageResourceOwnership.js"() {
     init_sessionSlugResolution();
@@ -61866,35 +62046,43 @@ var init_storageResourceOwnership = __esm({
         updatedAt: trim6(updatedAt)
       }));
     };
-    listHiddenStorageResourceIds = async ({ index, slug, resource }) => {
+    listHiddenStorageResourceIds = async ({ index, slug, resource, budget }) => {
       const prefix = recordKey("hidden", { slug, resource });
       const ids = /* @__PURE__ */ new Set();
       let cursor = "";
+      const seenCursors = /* @__PURE__ */ new Set();
       do {
-        const listed = await index.list({ prefix, ...cursor ? { cursor } : {} });
+        budget?.operation();
+        const listed = await index.list({ prefix, ...cursor ? { cursor } : {}, ...budget ? { limit: 100 } : {} });
         (Array.isArray(listed?.keys) ? listed.keys : []).forEach((entry) => {
+          budget?.rows();
+          if (budget) budget.metadata(entry);
           const id2 = trim6(entry?.name || entry).slice(prefix.length);
           if (id2) ids.add(id2);
         });
         cursor = listed?.list_complete === false ? trim6(listed?.cursor) : "";
+        if (listed?.list_complete === false && (!cursor || seenCursors.has(cursor))) throw new Error("Cloudflare hidden-resource cursor is unavailable or did not advance.");
+        if (cursor) seenCursors.add(cursor);
       } while (cursor);
       return ids;
     };
-    compareVersionAge = (left, right) => (Number(left.createdAtMs) || 0) - (Number(right.createdAtMs) || 0) || trim6(left.storageRefId).localeCompare(trim6(right.storageRefId));
-    isPreferredStorageVersion = (candidate, current, isAdmin) => {
+    compareStorageIds = (left, right) => left < right ? -1 : left > right ? 1 : 0;
+    compareVersionAge = (left, right) => (Number(left.createdAtMs) || 0) - (Number(right.createdAtMs) || 0) || compareStorageIds(trim6(left.storageRefId), trim6(right.storageRefId));
+    isAdminStorageVersion = (candidate) => candidate.uploadAuthority === "admin";
+    isPreferredStorageVersion = (candidate, current) => {
       if (!current) return true;
-      const candidateAdmin = !!lower3(candidate.uploader) && isAdmin(lower3(candidate.uploader));
-      const currentAdmin = !!lower3(current.uploader) && isAdmin(lower3(current.uploader));
+      const candidateAdmin = isAdminStorageVersion(candidate);
+      const currentAdmin = isAdminStorageVersion(current);
       if (candidateAdmin !== currentAdmin) return candidateAdmin;
       const age = compareVersionAge(candidate, current);
       return candidateAdmin ? age > 0 : age < 0;
     };
-    selectCanonicalStorageVersions = (candidates = [], { isAdmin = () => false } = {}) => {
+    selectCanonicalStorageVersions = (candidates = []) => {
       const chosen = /* @__PURE__ */ new Map();
       (Array.isArray(candidates) ? candidates : []).forEach((candidate) => {
         const id2 = lower3(candidate?.resourceId);
         if (!id2) return;
-        if (isPreferredStorageVersion(candidate, chosen.get(id2), isAdmin)) chosen.set(id2, candidate);
+        if (isPreferredStorageVersion(candidate, chosen.get(id2))) chosen.set(id2, candidate);
       });
       return [...chosen.values()].sort(compareVersionAge);
     };
@@ -62007,8 +62195,109 @@ var init_responseFieldKeyRoute = __esm({
   }
 });
 
+// workers/sessionCorsWorker/storageScanBudget.js
+var encoder3, decoder3, RESULTS_ANALYSIS_SCAN_LIMITS, STORAGE_EXPORT_PAGE_LIMITS, StorageReadLimitError, isStorageReadLimitError, jsonByteLength, createResultsAnalysisScanBudget, readStorageBytesBounded, encodeCursor, storageExportCursor, parseStorageExportCursor;
+var init_storageScanBudget = __esm({
+  "workers/sessionCorsWorker/storageScanBudget.js"() {
+    encoder3 = new TextEncoder();
+    decoder3 = new TextDecoder();
+    RESULTS_ANALYSIS_SCAN_LIMITS = Object.freeze({
+      operations: 800,
+      rows: 1e3,
+      metadataBytes: 2 * 1024 * 1024,
+      payloadBytes: 8 * 1024 * 1024
+    });
+    STORAGE_EXPORT_PAGE_LIMITS = Object.freeze({
+      rows: 100,
+      metadataBytes: 2 * 1024 * 1024,
+      encodedBytes: 4 * 1024 * 1024
+    });
+    StorageReadLimitError = class extends Error {
+      constructor(kind) {
+        super(`Storage ${kind} exceeds the synchronous read limit.`);
+        this.code = "storage_read_limit";
+        this.kind = kind;
+      }
+    };
+    isStorageReadLimitError = (error) => error?.code === "storage_read_limit";
+    jsonByteLength = (value) => encoder3.encode(typeof value === "string" ? value : JSON.stringify(value)).byteLength;
+    createResultsAnalysisScanBudget = () => {
+      const used = { operations: 0, rows: 0, metadataBytes: 0, payloadBytes: 0 };
+      const consume = (kind, amount = 1) => {
+        if (used[kind] + amount > RESULTS_ANALYSIS_SCAN_LIMITS[kind]) throw new StorageReadLimitError(kind);
+        used[kind] += amount;
+      };
+      return {
+        operation: () => consume("operations"),
+        rows: (count = 1) => consume("rows", count),
+        metadata: (value) => consume("metadataBytes", jsonByteLength(value)),
+        payload: (count) => consume("payloadBytes", count),
+        get remainingPayloadBytes() {
+          return RESULTS_ANALYSIS_SCAN_LIMITS.payloadBytes - used.payloadBytes;
+        }
+      };
+    };
+    readStorageBytesBounded = async (value, maxBytes = Infinity) => {
+      const size = Number(value?.size);
+      if (Number.isFinite(size) && size > maxBytes) {
+        await value?.body?.cancel?.().catch(() => {
+        });
+        throw new StorageReadLimitError("payloadBytes");
+      }
+      const stream = value?.body?.getReader ? value.body : value?.getReader ? value : null;
+      if (stream && Number.isFinite(maxBytes)) {
+        const reader = stream.getReader();
+        const chunks = [];
+        let total = 0;
+        try {
+          for (; ; ) {
+            const { done, value: chunk } = await reader.read();
+            if (done) break;
+            total += chunk.byteLength;
+            if (total > maxBytes) throw new StorageReadLimitError("payloadBytes");
+            chunks.push(chunk);
+          }
+        } catch (error) {
+          await reader.cancel().catch(() => {
+          });
+          throw error;
+        } finally {
+          reader.releaseLock();
+        }
+        const bytes4 = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+          bytes4.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+        return bytes4;
+      }
+      const bytes3 = value instanceof Uint8Array ? value : value instanceof ArrayBuffer ? new Uint8Array(value) : ArrayBuffer.isView(value) ? new Uint8Array(value.buffer, value.byteOffset, value.byteLength) : typeof value?.arrayBuffer === "function" ? new Uint8Array(await value.arrayBuffer()) : typeof value === "string" ? encoder3.encode(value) : new Uint8Array(value || []);
+      if (bytes3.byteLength > maxBytes) throw new StorageReadLimitError("payloadBytes");
+      return bytes3;
+    };
+    encodeCursor = (value) => {
+      const bytes3 = encoder3.encode(JSON.stringify(value));
+      return btoa(String.fromCharCode(...bytes3)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    };
+    storageExportCursor = ({ prefix, sessionId = "", pageCursor = "", lastKey = "", hadErrors = false }) => encodeCursor({ version: 1, prefix, sessionId, pageCursor, lastKey, hadErrors });
+    parseStorageExportCursor = ({ cursor, prefix, sessionId = "" }) => {
+      if (cursor == null || cursor === "") return { pageCursor: "", lastKey: "", hadErrors: false };
+      try {
+        if (typeof cursor !== "string" || cursor.length > 8192 || !/^[A-Za-z0-9_-]+$/.test(cursor)) throw new Error();
+        const base64 = cursor.replace(/-/g, "+").replace(/_/g, "/");
+        const parsed = JSON.parse(decoder3.decode(Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))));
+        if (parsed?.version !== 1 || parsed.prefix !== prefix || parsed.sessionId !== sessionId || typeof parsed.pageCursor !== "string" || parsed.pageCursor.length > 4096 || typeof parsed.lastKey !== "string" || parsed.lastKey.length > 512 || parsed.lastKey && !parsed.lastKey.startsWith(prefix) || parsed.hadErrors !== void 0 && typeof parsed.hadErrors !== "boolean") throw new Error();
+        return { pageCursor: parsed.pageCursor, lastKey: parsed.lastKey, hadErrors: parsed.hadErrors === true };
+      } catch {
+        throw new Error("Invalid export cursor for this session and resource.");
+      }
+    };
+  }
+});
+
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder3, decoder3, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim7, isObj14, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
+var encoder4, decoder4, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim7, isObj14, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_storageRefNormalization();
@@ -62022,11 +62311,13 @@ var init_storageRouteExecution = __esm({
     init_storageUploadValidation();
     init_storageResourceOwnership();
     init_sessionWriteCoordinator();
+    init_sessionConfigAuthority();
     init_sessionSlugResolution();
     init_responseFieldKeyRoute();
     init_stringCoercion();
-    encoder3 = new TextEncoder();
-    decoder3 = new TextDecoder();
+    init_storageScanBudget();
+    encoder4 = new TextEncoder();
+    decoder4 = new TextDecoder();
     RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol("resolve-storage-gate-runtime-config");
     STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol("storage-rpc-chain-attestation-cache");
     trim7 = (value) => toStr6(value).trim();
@@ -62094,7 +62385,7 @@ var init_storageRouteExecution = __esm({
       const source = Array.isArray(raw) ? raw : [raw];
       return Array.from(new Set(source.map(safeGroupId).filter(Boolean)));
     };
-    readKvPayloadEnvelope = async ({ index, slug, id: id2, strict = false }) => {
+    readKvPayloadEnvelope = async ({ index, slug, id: id2, strict = false, maxBytes = Infinity }) => {
       if (!index || typeof index.get !== "function") return null;
       let raw;
       try {
@@ -62102,6 +62393,9 @@ var init_storageRouteExecution = __esm({
       } catch (error) {
         if (strict) throw error;
         return null;
+      }
+      if (Number.isFinite(maxBytes) && jsonByteLength(raw || "") > Math.ceil(maxBytes * 4 / 3) + STORAGE_EXPORT_PAGE_LIMITS.metadataBytes) {
+        throw new StorageReadLimitError("payloadBytes");
       }
       try {
         const envelope = JSON.parse(raw || "null");
@@ -62311,7 +62605,7 @@ var init_storageRouteExecution = __esm({
       const data = Object.prototype.hasOwnProperty.call(raw, "data") ? raw.data : "";
       const contentType = trim7(raw.contentType) || (typeof data === "string" ? "text/plain" : "application/json");
       const serialized = isJsonContentType(contentType) && typeof data !== "string" ? JSON.stringify(data) : toStr6(data);
-      const bytes3 = encoder3.encode(serialized);
+      const bytes3 = encoder4.encode(serialized);
       const tooLarge2 = rejectBytesOverLimit({ bytes: bytes3, maxUploadBytes });
       if (tooLarge2) return tooLarge2;
       const policy = readUploadPolicyFields(raw);
@@ -63047,7 +63341,7 @@ var init_storageRouteExecution = __esm({
       authScopes,
       metadata: { resource },
       baseHeaders,
-      deps
+      deps: createStorageRouteGateDeps({ config, env, slug, deps })
     });
     enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, requesterAddress, authScopes, baseHeaders, deps }) => {
       const policy = payload?.uploadPolicy;
@@ -63207,7 +63501,32 @@ var init_storageRouteExecution = __esm({
         ...compatible
       }, 200, baseHeaders);
     };
-    handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, payload, resourceId = "", baseHeaders, deps }) => {
+    publishCloudflareOwnedStorageMetadata = async ({ env, config, slug, actor, metadata, createOwner }) => {
+      const uploader = normalizeAddress(actor);
+      const resource = metadata?.resource;
+      if (!isOwnedStorageResource(resource) || !isStorageResourceId(metadata?.resourceId) || !isSafeCloudflareStorageRefId(metadata?.id) || !uploader || metadata.uploader !== uploader || metadata.uploadAuthority !== (resolveSessionAdminAddresses(config).has(uploader) ? "admin" : "author")) {
+        throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
+      }
+      const index = getStorageIndexBinding(env);
+      if (typeof index?.get !== "function" || typeof index?.put !== "function") throw new Error("Cloudflare storage index binding not configured.");
+      const owner = await readStorageResourceOwner({ index, slug, resource, resourceId: metadata.resourceId });
+      if (owner && normalizeAddress(owner.uploader) !== uploader && metadata.uploadAuthority !== "admin") {
+        throw Object.assign(new Error("This id already belongs to another author."), { status: 409 });
+      }
+      await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata));
+      if (createOwner && !owner) {
+        await writeStorageResourceOwner({
+          index,
+          slug,
+          resource,
+          resourceId: metadata.resourceId,
+          uploader,
+          storageRefId: metadata.id,
+          createdAt: metadata.createdAt
+        });
+      }
+    };
+    handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, resourceId = "", baseHeaders, deps }) => {
       const r2 = getStorageR2Binding(env);
       const index = getStorageIndexBinding(env);
       const canWriteR2 = !!r2 && typeof r2.put === "function";
@@ -63250,6 +63569,7 @@ var init_storageRouteExecution = __esm({
       const resource = trim7(payload.resource) || "docsContext";
       const uploader = normalizeAddress(uploaderAddress);
       const owned = isOwnedStorageResource(resource);
+      const uploaderIsAdmin = owned && resolveSessionAdminAddresses(config).has(uploader);
       let owner = null;
       let hidden = false;
       if (owned) {
@@ -63259,7 +63579,6 @@ var init_storageRouteExecution = __esm({
         if (typeof index?.get !== "function") {
           return responseJson(deps, { error: "Cloudflare storage index binding not configured." }, 501, baseHeaders);
         }
-        const uploaderIsAdmin = resolveSessionAdminAddresses(config).has(uploader);
         owner = await readStorageResourceOwner({ index, slug, resource, resourceId });
         if (!owner && !uploaderIsAdmin) {
           const legacy = await resolveLegacyStorageOwner({ env, config, slug, resource, resourceId, deps });
@@ -63274,7 +63593,7 @@ var init_storageRouteExecution = __esm({
           }, 409, baseHeaders);
         }
         hidden = await isStorageResourceHidden({ index, slug, resource, resourceId });
-        if (hidden && !resolveSessionAdminAddresses(config).has(uploader)) {
+        if (hidden && !uploaderIsAdmin) {
           return responseJson(deps, {
             error: `A session admin hid this ${resource === "questions" ? "question" : "survey"} id, so it cannot be uploaded again.`,
             reason: "storage_resource_id_hidden"
@@ -63341,8 +63660,9 @@ var init_storageRouteExecution = __esm({
         size: bytesToStore?.length || 0,
         createdAt,
         ...resource === "responses" && trim7(uploaderAddress) ? { responder: trim7(uploaderAddress).toLowerCase() } : {},
-        // Trusted authorship for questions and surveys, like responder above.
-        ...owned ? { resourceId, ...uploader ? { uploader } : {}, ...hidden ? { hidden: true } : {} } : {},
+        // Authorship and precedence are server-authored; payload fields cannot grant
+        // admin correction authority, and later role changes cannot withdraw it.
+        ...owned ? { resourceId, uploadAuthority: uploaderIsAdmin ? "admin" : "author", ...uploader ? { uploader } : {}, ...hidden ? { hidden: true } : {} } : {},
         payloadAccessMode: payloadAccess.mode,
         payloadAccessControl: {
           gate: payloadAccess.gate,
@@ -63387,11 +63707,12 @@ var init_storageRouteExecution = __esm({
       } else {
         await index.put(buildPayloadKey({ slug, id: id2 }), serializedKvPayload);
       }
-      if (index && typeof index.put === "function") {
+      if (owned) {
+        const publish = deps?.executeCoordinatedStoragePublication || executeCoordinatedStoragePublication;
+        const result = await publish({ env, slug, expectedAuthority, metadata, createOwner: !owner && !!uploader });
+        if (!result.ok) return responseJson(deps, { error: result.body?.error || "Storage publication is unavailable; retry." }, result.status || 503, baseHeaders);
+      } else if (index && typeof index.put === "function") {
         await index.put(buildIndexKey({ slug, resource, id: id2 }), serializedMetadata);
-      }
-      if (owned && !owner && uploader) {
-        await writeStorageResourceOwner({ index, slug, resource, resourceId, uploader, storageRefId: id2, createdAt });
       }
       const storageRef = normalizeStorageRef(metadata);
       if (resource === "responses") {
@@ -63399,7 +63720,7 @@ var init_storageRouteExecution = __esm({
         if (typeof enqueueAutomatic === "function") {
           let committedPayload = null;
           try {
-            committedPayload = JSON.parse(decoder3.decode(bytesToStore || new Uint8Array()));
+            committedPayload = JSON.parse(decoder4.decode(bytesToStore || new Uint8Array()));
           } catch {
             committedPayload = null;
           }
@@ -63665,7 +63986,6 @@ var init_storageRouteExecution = __esm({
         return responseJson(deps, { error: "Cloudflare storage index metadata is unavailable." }, 503, baseHeaders);
       }
       const items = [];
-      const admins = isOwnedStorageResource(resource) ? resolveSessionAdminAddresses(config) : null;
       for (const { name, raw } of rows) {
         if (!name) continue;
         let metadata;
@@ -63720,7 +64040,10 @@ var init_storageRouteExecution = __esm({
             ...storageRef.resource === "responses" && trim7(metadata?.responder) ? { responder: trim7(metadata.responder).toLowerCase() } : {},
             ...resourceId ? { resourceId } : {},
             ...owned && trim7(metadata?.uploader) ? { uploader: normalizeAddress(metadata.uploader) } : {},
-            ...owned ? { uploaderIsAdmin: !!admins?.has(normalizeAddress(metadata?.uploader)) } : {},
+            ...owned ? {
+              ...metadata?.uploadAuthority != null ? { uploadAuthority: metadata.uploadAuthority } : {},
+              uploaderIsAdmin: isAdminStorageVersion(metadata)
+            } : {},
             payloadAccessControl: {
               gate: metadataAccess.gate,
               encryption: metadataAccess.encryption
@@ -63736,45 +64059,67 @@ var init_storageRouteExecution = __esm({
         ...mine ? { responder, sessionId: resolveCanonicalWorkerSessionIdHex(config) } : {}
       }, 200, mine || hasPrivateResponsePolicy({ config, resource }) ? { ...Object.fromEntries(new Headers(baseHeaders || {})), "Cache-Control": "private, no-store" } : baseHeaders);
     };
-    listCloudflareMetadataRows = async ({ index, slug, resource = "" }) => {
+    listCloudflareMetadataRows = async ({ index, slug, resource = "", budget, strict = false }) => {
       const rows = [];
       const prefix = trim7(resource) ? buildIndexPrefix({ slug, resource }) : buildSessionIndexPrefix({ slug });
       let cursor = "";
+      const seenCursors = /* @__PURE__ */ new Set();
       do {
+        budget?.operation();
         const listed = await index.list({
           prefix,
-          ...cursor ? { cursor } : {}
+          ...cursor ? { cursor } : {},
+          ...budget ? { limit: 100 } : {}
         });
         const keys = Array.isArray(listed?.keys) ? listed.keys : [];
         for (const keyEntry of keys) {
           const key = trim7(keyEntry?.name || keyEntry);
           if (!key || typeof index.get !== "function") continue;
+          budget?.rows();
+          budget?.operation();
           try {
             const raw = await index.get(key);
+            if (raw != null) budget?.metadata(raw);
             const metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
             if (isObj14(metadata) && trim7(metadata.id)) rows.push({ key, metadata });
-          } catch {
+            else if (strict) throw new Error("Storage metadata is missing or invalid.");
+          } catch (error) {
+            if (strict || isStorageReadLimitError(error)) throw error;
             rows.push({ key, metadata: null, error: "invalid_metadata" });
           }
         }
         cursor = listed?.list_complete === false ? trim7(listed?.cursor) : "";
+        if (listed?.list_complete === false && (!cursor || seenCursors.has(cursor))) throw new Error("Cloudflare storage list cursor is unavailable or did not advance.");
+        if (cursor) seenCursors.add(cursor);
       } while (cursor);
       return rows;
     };
-    readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata, strict = false }) => {
+    readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata, strict = false, budget, maxBytes = Infinity }) => {
       const id2 = trim7(metadata?.id);
       if (!id2) return null;
+      const limit = Math.min(maxBytes, budget?.remainingPayloadBytes ?? Infinity);
+      if (Number(metadata?.size) > limit) throw new StorageReadLimitError("payloadBytes");
       const r2 = getStorageR2Binding(env);
       if (r2 && typeof r2.get === "function") {
+        budget?.operation();
         const object2 = await r2.get(buildObjectKey({ slug, id: id2 }));
-        if (object2) return toUint8Array(object2);
+        if (object2) {
+          const bytes3 = await readStorageBytesBounded(object2, limit);
+          budget?.payload(bytes3.length);
+          return bytes3;
+        }
       }
-      const envelope = await readKvPayloadEnvelope({ index, slug, id: id2, strict });
+      budget?.operation();
+      const envelope = await readKvPayloadEnvelope({ index, slug, id: id2, strict, maxBytes: limit });
       if (!envelope?.payloadBase64url) return null;
-      if (!strict) return base64urlToBytes2(envelope.payloadBase64url);
+      if (Math.floor(envelope.payloadBase64url.length * 3 / 4) > limit) throw new StorageReadLimitError("payloadBytes");
       try {
-        return base64urlToBytes2(envelope.payloadBase64url);
-      } catch {
+        const bytes3 = base64urlToBytes2(envelope.payloadBase64url);
+        if (bytes3.length > limit) throw new StorageReadLimitError("payloadBytes");
+        budget?.payload(bytes3.length);
+        return bytes3;
+      } catch (error) {
+        if (isStorageReadLimitError(error) || !strict) throw error;
         return null;
       }
     };
@@ -63793,7 +64138,7 @@ var init_storageRouteExecution = __esm({
             deps
           });
         }
-        const payload = JSON.parse(decoder3.decode(await toUint8Array(bytes3)));
+        const payload = JSON.parse(decoder4.decode(await toUint8Array(bytes3)));
         return isObj14(payload) ? payload : null;
       } catch {
         return null;
@@ -63825,7 +64170,7 @@ var init_storageRouteExecution = __esm({
             deps
           });
         }
-        const payload = JSON.parse(decoder3.decode(await toUint8Array(bytes3)));
+        const payload = JSON.parse(decoder4.decode(await toUint8Array(bytes3)));
         const resourceId = isObj14(payload) ? readStoragePayloadResourceId(resource, payload) : "";
         return isStorageResourceId(resourceId) ? resourceId : "";
       } catch {
@@ -63889,6 +64234,34 @@ var init_storageRouteExecution = __esm({
         return { ok: false, status: 503, error: "Recording the owners of existing questions and surveys failed; retry." };
       }
     };
+    VISIBILITY_SCAN_PAGE_ROWS = 50;
+    readVisibilityMetadataPages = async function* ({ index, slug, resource }) {
+      const prefix = buildIndexPrefix({ slug, resource });
+      let cursor = "";
+      const seen = /* @__PURE__ */ new Set();
+      do {
+        const listed = await index.list({ prefix, ...cursor ? { cursor } : {}, limit: VISIBILITY_SCAN_PAGE_ROWS });
+        const keys = Array.isArray(listed?.keys) ? listed.keys : [];
+        for (let offset = 0; offset < keys.length; offset += VISIBILITY_SCAN_PAGE_ROWS) {
+          const rows = [];
+          for (const entry of keys.slice(offset, offset + VISIBILITY_SCAN_PAGE_ROWS)) {
+            const key = trim7(entry?.name || entry);
+            const raw = await index.get(key);
+            let metadata;
+            try {
+              metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
+            } catch {
+              metadata = null;
+            }
+            rows.push({ key, metadata: isObj14(metadata) && trim7(metadata.id) ? metadata : null });
+          }
+          yield rows;
+        }
+        cursor = listed?.list_complete === false ? trim7(listed?.cursor) : "";
+        if (listed?.list_complete === false && (!cursor || seen.has(cursor))) throw new Error("Cloudflare storage list cursor is unavailable or did not advance.");
+        if (cursor) seen.add(cursor);
+      } while (cursor);
+    };
     setCloudflareStorageResourceHidden = async ({ env, config, slug, body, actor = "", deps = {} } = {}) => {
       const resource = trim7(body?.resource);
       const resourceId = normalizeAddress(body?.id);
@@ -63902,43 +64275,56 @@ var init_storageRouteExecution = __esm({
         return { ok: false, status: 501, error: "Cloudflare storage index binding not configured." };
       }
       const { hidden } = body;
+      const runMutation = deps.runVisibilityMutation || ((operation) => operation());
       try {
-        await writeStorageVisibilityAudit({ env, slug, resource, resourceId, hidden, principal: actor, deps });
+        await runMutation(async () => {
+          await writeStorageVisibilityAudit({ env, slug, resource, resourceId, hidden, principal: actor, deps });
+          await writeStorageResourceHidden({
+            index,
+            slug,
+            resource,
+            resourceId,
+            hidden,
+            actor,
+            updatedAt: new Date(deps?.now?.() || Date.now()).toISOString()
+          });
+        });
       } catch (error) {
+        if (error?.status === 409) throw error;
+        if (/\b429\b|too many requests/i.test(toStr6(error?.message))) {
+          return { ok: false, status: 429, error: "This id changed less than a second ago. Try again in a moment." };
+        }
         return { ok: false, status: 503, error: error?.message || "Storage audit store is unavailable." };
       }
       let matchedRows = 0;
       let unreadableRows = 0;
       try {
-        await writeStorageResourceHidden({
-          index,
-          slug,
-          resource,
-          resourceId,
-          hidden,
-          actor,
-          updatedAt: new Date(deps?.now?.() || Date.now()).toISOString()
-        });
-        for (const row of await listCloudflareMetadataRows({ index, slug, resource })) {
-          if (!row.metadata) {
-            unreadableRows += 1;
-            continue;
+        for await (const rows of readVisibilityMetadataPages({ index, slug, resource })) {
+          const updates = [];
+          for (const row of rows) {
+            if (!row.metadata) {
+              unreadableRows += 1;
+              continue;
+            }
+            const rowResourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
+            if (rowResourceId === null) {
+              unreadableRows += 1;
+              continue;
+            }
+            const matched = rowResourceId === resourceId;
+            const recordsId = !!rowResourceId && !normalizeAddress(row.metadata.resourceId);
+            if (!matched && !recordsId) continue;
+            const next = { ...row.metadata, resourceId: rowResourceId };
+            if (matched) {
+              matchedRows += 1;
+              if (hidden) next.hidden = true;
+              else delete next.hidden;
+            }
+            updates.push([row.key, JSON.stringify(next)]);
           }
-          const rowResourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
-          if (rowResourceId === null) {
-            unreadableRows += 1;
-            continue;
-          }
-          const matched = rowResourceId === resourceId;
-          const recordsId = !!rowResourceId && !normalizeAddress(row.metadata.resourceId);
-          if (!matched && !recordsId) continue;
-          const next = { ...row.metadata, resourceId: rowResourceId };
-          if (matched) {
-            matchedRows += 1;
-            if (hidden) next.hidden = true;
-            else delete next.hidden;
-          }
-          await index.put(row.key, JSON.stringify(next));
+          await runMutation(async () => {
+            for (const [key, value] of updates) await index.put(key, value);
+          });
         }
       } catch (error) {
         if (/\b429\b|too many requests/i.test(toStr6(error?.message))) {
@@ -63947,6 +64333,7 @@ var init_storageRouteExecution = __esm({
         throw error;
       }
       const hiddenIds = [...await listHiddenStorageResourceIds({ index, slug, resource })].sort();
+      await runMutation(() => void 0);
       return {
         ok: true,
         status: 200,
@@ -63978,77 +64365,136 @@ var init_storageRouteExecution = __esm({
       config,
       slug,
       resource = "",
+      cursor = "",
       includeSessionEnvelope = true,
       deps = {}
     } = {}) => {
-      const configuredBackend = resolveConfiguredStorageBackend({ config });
-      if (configuredBackend !== STORAGE_BACKENDS.CLOUDFLARE) {
-        return {
-          ok: false,
-          status: 400,
-          error: "Encrypted-envelope export is only available for Cloudflare storage."
-        };
+      if (resolveConfiguredStorageBackend({ config }) !== STORAGE_BACKENDS.CLOUDFLARE) {
+        return { ok: false, status: 400, error: "Encrypted-envelope export is only available for Cloudflare storage." };
       }
       const index = getStorageIndexBinding(env);
       if (!index || typeof index.list !== "function" || typeof index.get !== "function") {
-        return {
-          ok: false,
-          status: 501,
-          error: "Cloudflare storage index binding not configured."
-        };
+        return { ok: false, status: 501, error: "Cloudflare storage index binding not configured." };
       }
-      const generatedAt = new Date(deps?.now?.() || Date.now()).toISOString();
-      let rows = [];
-      let storageListError = null;
+      const prefix = trim7(resource) ? buildIndexPrefix({ slug, resource }) : buildSessionIndexPrefix({ slug });
+      const sessionId = trim7(resolveCanonicalWorkerSessionIdHex(config));
+      let position;
       try {
-        rows = await listCloudflareMetadataRows({ index, slug, resource });
+        position = parseStorageExportCursor({ cursor, prefix, sessionId });
       } catch (error) {
-        storageListError = { reason: error?.message || "storage_list_failed" };
+        return { ok: false, status: 400, error: error.message };
       }
       const payloads = [];
       const readErrors = [];
       let encryptedPayloadCount = 0;
-      for (const row of rows) {
-        if (!row.metadata) {
-          readErrors.push({ key: row.key, error: row.error || "invalid_metadata" });
-          continue;
-        }
-        const metadataAccess = normalizePayloadAccessControl2(
-          row.metadata.payloadAccessControl || row.metadata.payloadAccessMode || resolvePayloadAccessControl(config)
-        );
-        if (metadataAccess.encryption === PAYLOAD_ENCRYPTION_MODES3.NONE) continue;
-        encryptedPayloadCount += 1;
-        try {
-          const ciphertextBytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata: row.metadata });
-          if (!ciphertextBytes) {
-            readErrors.push({ id: trim7(row.metadata.id), error: "payload_bytes_missing" });
-            continue;
+      let scannedRowCount = 0;
+      let metadataBytes = 0;
+      let encodedBytes = 2;
+      let nextCursor = null;
+      let storageListError = null;
+      const resume = (pageCursor, lastKey) => storageExportCursor({ prefix, sessionId, pageCursor, lastKey, hadErrors: position.hadErrors || readErrors.length > 0 });
+      const tooLarge2 = (metadata, resumeCursor) => ({
+        ok: false,
+        status: 413,
+        listComplete: false,
+        cursor: resumeCursor,
+        ...metadata?.id ? { storageRef: normalizeStorageRef(metadata) } : {},
+        error: "This record exceeds the bounded export page size. No record was skipped. Use a streaming export from the backing storage for this record and the remaining range; this cursor has not advanced."
+      });
+      try {
+        const listed = await index.list({ prefix, ...position.pageCursor ? { cursor: position.pageCursor } : {}, limit: STORAGE_EXPORT_PAGE_LIMITS.rows });
+        const nativeNextCursor = listed?.list_complete === false ? trim7(listed?.cursor) : "";
+        if (listed?.list_complete === false && (!nativeNextCursor || nativeNextCursor === position.pageCursor)) throw new Error("Cloudflare storage list cursor is unavailable or did not advance.");
+        const names2 = (Array.isArray(listed?.keys) ? listed.keys : []).map((entry) => trim7(entry?.name || entry)).filter((name) => name && name > position.lastKey).sort();
+        nextCursor = nativeNextCursor ? resume(nativeNextCursor, "") : null;
+        let lastKey = position.lastKey;
+        for (let i = 0; i < names2.length; i += 1) {
+          const key = names2[i];
+          const before = resume(position.pageCursor, lastKey);
+          if (scannedRowCount >= STORAGE_EXPORT_PAGE_LIMITS.rows) {
+            nextCursor = before;
+            break;
           }
-          const keyProvider2 = resolveEnvelopeExportKeyProvider({ metadataAccess, metadata: row.metadata, config });
-          payloads.push({
-            storageRef: normalizeStorageRef(row.metadata),
-            metadata: {
-              id: trim7(row.metadata.id),
-              resource: trim7(row.metadata.resource),
-              contentType: trim7(row.metadata.contentType) || "application/octet-stream",
-              encrypted: row.metadata.encrypted === true,
-              createdAt: trim7(row.metadata.createdAt),
-              size: Number(row.metadata.size || ciphertextBytes.length || 0) || 0,
-              payloadAccessControl: {
-                gate: metadataAccess.gate,
-                encryption: metadataAccess.encryption
-              },
-              payloadAccessMode: deriveLegacyPayloadAccessMode2(metadataAccess),
-              ...row.metadata.accessConditions ? { accessConditions: row.metadata.accessConditions } : {}
-            },
-            envelope: isObj14(row.metadata.envelope) ? row.metadata.envelope : null,
-            ciphertextBase64url: bytesToBase64url2(ciphertextBytes),
-            keyProvider: keyProvider2,
-            wrappedKeysIncluded: !!trim7(row.metadata.envelope?.dek?.wrappedKey)
-          });
-        } catch (error) {
-          readErrors.push({ id: trim7(row.metadata.id), error: error?.message || "payload_read_failed" });
+          nextCursor = before;
+          const raw = await index.get(key);
+          const size = raw == null ? 0 : jsonByteLength(raw);
+          if (metadataBytes + size > STORAGE_EXPORT_PAGE_LIMITS.metadataBytes) {
+            if (!scannedRowCount) return tooLarge2(null, before);
+            nextCursor = before;
+            break;
+          }
+          metadataBytes += size;
+          let metadata;
+          try {
+            metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
+          } catch {
+            metadata = null;
+          }
+          let deferred = false;
+          if (!isObj14(metadata) || !trim7(metadata.id)) {
+            readErrors.push({ key, error: "invalid_metadata" });
+          } else {
+            const metadataAccess = normalizePayloadAccessControl2(metadata.payloadAccessControl || metadata.payloadAccessMode || resolvePayloadAccessControl(config));
+            if (metadataAccess.encryption !== PAYLOAD_ENCRYPTION_MODES3.NONE) {
+              try {
+                const ciphertextBytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, maxBytes: Math.floor(STORAGE_EXPORT_PAGE_LIMITS.encodedBytes * 3 / 4) });
+                if (!ciphertextBytes) {
+                  encryptedPayloadCount += 1;
+                  readErrors.push({ id: trim7(metadata.id), error: "payload_bytes_missing" });
+                } else {
+                  const keyProvider2 = resolveEnvelopeExportKeyProvider({ metadataAccess, metadata, config });
+                  const entry = {
+                    storageRef: normalizeStorageRef(metadata),
+                    metadata: {
+                      id: trim7(metadata.id),
+                      resource: trim7(metadata.resource),
+                      contentType: trim7(metadata.contentType) || "application/octet-stream",
+                      encrypted: metadata.encrypted === true,
+                      createdAt: trim7(metadata.createdAt),
+                      size: Number(metadata.size || ciphertextBytes.length || 0) || 0,
+                      payloadAccessControl: {
+                        gate: metadataAccess.gate,
+                        encryption: metadataAccess.encryption
+                      },
+                      payloadAccessMode: deriveLegacyPayloadAccessMode2(metadataAccess),
+                      ...metadata.accessConditions ? { accessConditions: metadata.accessConditions } : {}
+                    },
+                    envelope: isObj14(metadata.envelope) ? metadata.envelope : null,
+                    ciphertextBase64url: bytesToBase64url2(ciphertextBytes),
+                    keyProvider: keyProvider2,
+                    wrappedKeysIncluded: !!trim7(metadata.envelope?.dek?.wrappedKey)
+                  };
+                  const entryBytes = jsonByteLength(entry) + (payloads.length ? 1 : 0);
+                  if (encodedBytes + entryBytes > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes) {
+                    if (!scannedRowCount) return tooLarge2(metadata, before);
+                    nextCursor = before;
+                    deferred = true;
+                  } else {
+                    payloads.push(entry);
+                    encodedBytes += entryBytes;
+                    encryptedPayloadCount += 1;
+                  }
+                }
+              } catch (error) {
+                if (isStorageReadLimitError(error)) {
+                  if (!scannedRowCount) return tooLarge2(metadata, before);
+                  nextCursor = before;
+                  deferred = true;
+                } else {
+                  encryptedPayloadCount += 1;
+                  readErrors.push({ id: trim7(metadata.id), error: trim7(error?.message || "payload_read_failed").slice(0, 500) });
+                }
+              }
+            }
+          }
+          if (deferred) break;
+          scannedRowCount += 1;
+          lastKey = key;
+          nextCursor = i + 1 < names2.length ? resume(position.pageCursor, lastKey) : nativeNextCursor ? resume(nativeNextCursor, "") : null;
         }
+      } catch (error) {
+        storageListError = { reason: trim7(error?.message || "storage_list_failed").slice(0, 500) };
+        nextCursor || (nextCursor = resume(position.pageCursor, position.lastKey));
       }
       const sessionEnvelope = includeSessionEnvelope && isObj14(config?.storageEnvelope) ? JSON.parse(JSON.stringify(config.storageEnvelope)) : null;
       const keyProvider = resolveEnvelopeExportManifestKeyProvider({ sessionEnvelope, payloads });
@@ -64060,33 +64506,35 @@ var init_storageRouteExecution = __esm({
         storageBackend: STORAGE_BACKENDS.CLOUDFLARE,
         sessionSlug: sessionSlugStorageKey(slug),
         resource: trim7(resource) || "all",
-        exportedAt: generatedAt,
+        exportedAt: new Date(deps?.now?.() || Date.now()).toISOString(),
+        countScope: "page",
+        scannedRowCount,
         exportedPayloadCount: payloads.length,
         encryptedPayloadCount,
-        partial: !!storageListError || readErrors.length > 0,
+        partial: !!nextCursor || !!storageListError || readErrors.length > 0 || position.hadErrors,
         storageListError,
         readErrors,
         gatewayErrors: [],
-        errors: [
-          ...storageListError ? [storageListError] : [],
-          ...readErrors
-        ],
+        errors: [...storageListError ? [storageListError] : [], ...readErrors],
         wrappedKeysIncluded: !!sessionEnvelope?.sessionKey?.wrappedKey || payloads.some((entry) => entry.wrappedKeysIncluded),
         keyProvider,
         deploymentKekContinuityRequired,
-        // Version-1 consumers still read this name. It is now a continuity warning,
-        // not an instruction to call a key-changing worker action.
+        // Version-1 consumers still read this continuity warning under its old name.
         rewrapRequiredForNewDeployment: deploymentKekContinuityRequired
       };
       return {
-        ok: true,
+        ok: !storageListError,
+        ...storageListError ? { status: 503, error: "Export page is incomplete because storage could not be read. Retry this cursor with bounded backoff; stop and report the failure if it persists." } : {},
+        cursor: nextCursor,
+        listComplete: !nextCursor && !storageListError,
         manifest,
         ...sessionEnvelope ? { sessionEnvelope } : {},
         payloads
       };
     };
-    storageRoute = async ({ path, method, request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps } = {}) => {
+    storageRoute = async ({ path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, deps } = {}) => {
       if (method === "POST" && ["/storage/response-field-key/wrap", "/storage/response-field-key/unwrap"].includes(path)) {
+        const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
         return responseFieldKeyRoute({
           path,
           request,
@@ -64096,7 +64544,7 @@ var init_storageRouteExecution = __esm({
           uploaderAddress,
           authScopes,
           baseHeaders,
-          deps,
+          deps: routeDeps,
           isAdmin: (principal) => resolveRoleAddressSet2({ config, role: "admin" }).has(principal),
           authorizeSession: () => authorizeCloudflareStorageGate({
             env,
@@ -64106,7 +64554,7 @@ var init_storageRouteExecution = __esm({
             requesterAddress: uploaderAddress,
             authScopes,
             baseHeaders,
-            deps
+            deps: routeDeps
           })
         });
       }
@@ -64137,6 +64585,7 @@ var init_storageRouteExecution = __esm({
           slug,
           uploaderAddress,
           authScopes,
+          expectedAuthority,
           payload,
           resourceId: checked.resourceId,
           baseHeaders,
@@ -64161,12 +64610,14 @@ var init_storageRouteExecution = __esm({
         }
         const url = new URL(request.url);
         let resource = trim7(url.searchParams.get("resource"));
-        if (!resource && method === "POST") {
+        let cursor = url.searchParams.get("cursor") || "";
+        if (method === "POST") {
           try {
             const body = await request.clone().json();
-            resource = trim7(body?.resource);
+            resource || (resource = trim7(body?.resource));
+            if (!cursor) cursor = body?.cursor ?? "";
           } catch {
-            resource = "";
+            return responseJson(deps, { error: "Invalid export request." }, 400, baseHeaders);
           }
         }
         const result = await exportCloudflareEncryptedPayloadEnvelopes({
@@ -64174,10 +64625,11 @@ var init_storageRouteExecution = __esm({
           config,
           slug,
           resource,
+          cursor,
           includeSessionEnvelope: false,
           deps
         });
-        return responseJson(deps, result.ok ? result : { error: result.error }, result.ok ? 200 : result.status || 500, baseHeaders);
+        return responseJson(deps, result, result.ok ? 200 : result.status || 500, baseHeaders);
       }
       return responseJson(deps, { error: "Not found." }, 404, baseHeaders);
     };
@@ -64798,7 +65250,7 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder4, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj15, hasOwn6, trim8, lower4, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder5, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj15, hasOwn6, trim8, lower4, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_stringCoercion();
@@ -64816,10 +65268,11 @@ var init_resultsAnalysisGeneration = __esm({
     init_responseKvHelpers();
     init_payloadAccessControl();
     init_resultsAnalysisAnswerValidation();
+    init_storageScanBudget();
     readCoordinatedResultsAnalysisStatusDefault = async (args = {}) => (await Promise.resolve().then(() => (init_sessionWriteCoordinator(), sessionWriteCoordinator_exports))).readCoordinatedResultsAnalysisStatus(args);
     reserveCoordinatedResultsAnalysisDefault = async (args = {}) => (await Promise.resolve().then(() => (init_sessionWriteCoordinator(), sessionWriteCoordinator_exports))).reserveCoordinatedResultsAnalysis(args);
     finalizeCoordinatedResultsAnalysisDefault = async (args = {}) => (await Promise.resolve().then(() => (init_sessionWriteCoordinator(), sessionWriteCoordinator_exports))).finalizeCoordinatedResultsAnalysis(args);
-    decoder4 = new TextDecoder();
+    decoder5 = new TextDecoder();
     AI_RESPONSE_CAP = 420;
     AI_QUESTION_CAP = 80;
     AI_LIMITS = Object.freeze({
@@ -64869,7 +65322,7 @@ var init_resultsAnalysisGeneration = __esm({
     };
     parseJsonBytes = (bytes3) => {
       try {
-        return JSON.parse(decoder4.decode(bytes3 || new Uint8Array()));
+        return JSON.parse(decoder5.decode(bytes3 || new Uint8Array()));
       } catch {
         return null;
       }
@@ -65276,18 +65729,18 @@ var init_resultsAnalysisGeneration = __esm({
         participantDigests: sortedParticipantDigests
       };
     };
-    loadWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, committedResponses = [] } = {}) => {
+    readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, committedResponses = [], budget }) => {
       const index = getStorageIndexBinding(env);
       if (!index || typeof index.list !== "function" || typeof index.get !== "function") {
         return { ok: false, status: 501, error: "Cloudflare storage index binding not configured." };
       }
-      const questionRows = await listCloudflareMetadataRows({ index, slug, resource: "questions" });
-      const hiddenQuestionIds = await listHiddenStorageResourceIds({ index, slug, resource: "questions" });
+      const questionRows = await listCloudflareMetadataRows({ index, slug, resource: "questions", budget, strict: true });
+      const hiddenQuestionIds = await listHiddenStorageResourceIds({ index, slug, resource: "questions", budget });
       const candidates = [];
       for (const row of questionRows) {
         const metadata = row?.metadata;
         if (!isObj15(metadata) || metadata.hidden === true || metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) continue;
-        const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata }));
+        const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget }));
         if (!isObj15(payload)) continue;
         if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
         const payloadId = trim8(payload.id || payload.questionId || payload.questionID);
@@ -65302,16 +65755,18 @@ var init_resultsAnalysisGeneration = __esm({
           createdAtMs: Date.parse(trim8(metadata.createdAt)) || 0,
           storageRefId: trim8(metadata.id),
           uploader: trim8(metadata.uploader),
+          uploadAuthority: metadata.uploadAuthority,
           question: normalized2
         });
       }
-      const admins = resolveSessionAdminAddresses(config);
-      const questions = selectCanonicalStorageVersions(candidates, { isAdmin: (address2) => admins.has(address2) }).map((candidate) => candidate.question);
-      const rows = await listCloudflareMetadataRows({ index, slug, resource: "responses" });
+      const questions = selectCanonicalStorageVersions(candidates).map((candidate) => candidate.question);
+      const rows = await listCloudflareMetadataRows({ index, slug, resource: "responses", budget, strict: true });
       const responseRows = [];
       let excludedCount = 0;
       let lockedCount = 0;
       for (const committed of Array.isArray(committedResponses) ? committedResponses : []) {
+        budget.rows();
+        budget.payload(jsonByteLength(committed));
         const metadata = committed?.metadata;
         const payload = committed?.payload;
         if (!isObj15(metadata) || !isObj15(payload) || !trim8(metadata.responder)) {
@@ -65357,7 +65812,7 @@ var init_resultsAnalysisGeneration = __esm({
           lockedCount += 1;
           continue;
         }
-        const bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata });
+        const bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
         const payload = parseJsonBytes(bytes3);
         if (!isObj15(payload)) {
           excludedCount += 1;
@@ -65384,6 +65839,24 @@ var init_resultsAnalysisGeneration = __esm({
           lockedCount: normalized.counts.lockedCount + lockedCount
         }
       };
+    };
+    loadWorkerCanonicalResultsAnalysisSource = async (args = {}) => {
+      try {
+        return await readWorkerCanonicalResultsAnalysisSource({ ...args, budget: createResultsAnalysisScanBudget() });
+      } catch (error) {
+        if (!isStorageReadLimitError(error)) return {
+          ok: false,
+          status: 503,
+          reason: "results_analysis_snapshot_unavailable",
+          error: "The complete results snapshot could not be read. No report was generated; the last successful report is unchanged. Retry after storage is available."
+        };
+        return {
+          ok: false,
+          status: 503,
+          reason: "results_analysis_snapshot_limit",
+          error: "The complete results snapshot exceeds the synchronous analysis limit. No report was generated; the last successful report is unchanged. A bounded background snapshot is required for this session."
+        };
+      }
     };
     loadAdminSnapshotResultsAnalysisSource = async ({ body, slug, config } = {}) => {
       const snapshot = body?.source?.snapshot;
@@ -65427,6 +65900,8 @@ Privacy and grounding rules:
 - The input uses synthetic participant IDs only. Never invent, request, or output wallet addresses.
 - Keep participant references as synthetic IDs such as participant_001 and question references as included question ids.
 - Work only from included questions, responses, and segmentDimensions. Do not cite unknown questionIds or participantIds.
+- Every argumentMap claim must include nonempty participantIds and questionIds citing the included responses that support it. Omit claims without supporting responses; keep grounded minority views even when only one participant supports them.
+- When citing both participantIds and questionIds, every cited participant must have an included response to at least one cited question, and every cited question must have an included response from at least one cited participant. Multiple citations can summarize different responses; do not attribute an answer to a participant who did not provide it.
 - Paraphrase freeform responses instead of quoting identifiable text.
 - If the visible sample is thin because of input limits, mention uncertainty in summaries.
 - Generate RiskMatrix axes from this session's subject matter. Do not use fixed likelihood/impact axes unless those are the best subject-specific axes for the session.
@@ -65605,7 +66080,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       const coordinatorState = await readStatus({ env, slug });
       return buildResultsAnalysisStatusBody({ slug, config, coordinatorState, includeDraft });
     };
-    generateResultsAnalysisDraft = async ({ env, slug, config, body = {}, headers, trigger = "manual", deps } = {}) => {
+    generateResultsAnalysisDraft = async ({ env, slug, config, body = {}, headers, trigger = "manual", loadedSource, deps } = {}) => {
       const settings = getResultsAnalysisSettings(config);
       const capability = resolveResultsAnalysisCapability({ config });
       const sourceKind = sourceKindFromBody(body);
@@ -65629,7 +66104,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       if (sourceKind === "worker-canonical" && trigger === "automatic" && !capability.automatic.supported) {
         return { ok: false, status: 409, jobState: "unsupported", error: capability.automatic.reason, capability };
       }
-      const source = await resolveResultsAnalysisSource({ env, slug, config, body, trigger });
+      const source = loadedSource || await resolveResultsAnalysisSource({ env, slug, config, body, trigger });
       if (!source.ok) return { ok: false, status: source.status || 400, jobState: "failed", error: source.error, capability };
       const eligibility = analysisEligibility(source);
       if (!eligibility.eligible) return { ok: false, status: 422, jobState: "failed", error: "Results analysis input is not eligible.", reasons: eligibility.reasons, capability };
@@ -65755,13 +66230,14 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       if (!["automatic", "both"].includes(settings.generationMode)) return { ok: true, skipped: true, reason: "automatic_disabled" };
       const capability = resolveResultsAnalysisCapability({ config });
       if (!capability.automatic.supported) return { ok: true, skipped: true, reason: capability.automatic.reason };
-      const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config, committedResponses });
-      if (!source.ok) return source;
       const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
       const status = await readStatus({ env, slug });
+      if (!status?.ok) return { ok: false, status: status?.status || 503, jobState: "failed", error: status?.error || "Results analysis status is unavailable; retry." };
       if (status?.state?.lastFailure?.trigger === "automatic") {
         return { ok: true, skipped: true, reason: "automatic_paused_after_failure" };
       }
+      const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config, committedResponses });
+      if (!source.ok) return source;
       const watermark = new Set(Array.isArray(status?.state?.lastGood?.participantWatermark) ? status.state.lastGood.participantWatermark : []);
       const newDistinctCount = source.participantDigests.filter((digest) => !watermark.has(digest)).length;
       if (newDistinctCount < settings.autoAfter.threshold) {
@@ -65779,6 +66255,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
           committedResponses
         },
         trigger: "automatic",
+        loadedSource: source,
         deps
       });
     };
@@ -66223,7 +66700,7 @@ async function main(params) {
 });
 
 // workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js
-var SIGNER_RECORD, SETUP_RECORD, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json2, fail, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair;
+var SIGNER_RECORD, SETUP_RECORD, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json2, fail, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair;
 var init_sessionLitAuthorizationCoordinator = __esm({
   "workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js"() {
     init_lib2();
@@ -66235,6 +66712,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     init_sessionSlugResolution();
     SIGNER_RECORD = "session-lit-authorization-signer-v1";
     SETUP_RECORD = "session-lit-authorization-pending-v1";
+    hasPendingLitAuthorizationSetup = async (storage) => await storage.get(SETUP_RECORD) != null;
     CONFIG_RECORD = "session-config-authority";
     PRIVATE_KEY = "litAuthorizationPrivateKey";
     SECRET_KEYS = [PRIVATE_KEY, "litAccountApiKey", "litUsageApiKey"];
@@ -66294,6 +66772,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       if (!slug || !isRecord3(payload?.baseConfig)) return json2({ error: COORDINATION_ERROR }, 400);
       try {
         const proposed = walletFor(payload.proposedPrivateKey);
+        await coordinator.assertSessionAuthority(payload);
         await coordinator.repairPendingSessionConfigProjection();
         const privateKey = await coordinator.state.storage.transaction(async (transaction) => {
           const record = await transaction.get(SIGNER_RECORD);
@@ -66334,6 +66813,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         return json2({ error: COORDINATION_ERROR }, 400);
       }
       try {
+        await coordinator.assertSessionAuthority(payload);
         await coordinator.repairPendingSessionConfigProjection();
         await coordinator.state.storage.transaction(async (transaction) => {
           const record = await transaction.get(SIGNER_RECORD);
@@ -66390,6 +66870,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         return json2({ error: "Invalid session secrets update." }, 400);
       }
       try {
+        await coordinator.assertSessionAuthority(payload);
         await coordinator.repairPendingSessionConfigProjection();
         const existing = await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug)) || {};
         const litPatch = Object.fromEntries(Object.entries(patch).filter(([key]) => SECRET_KEYS.includes(key)));
@@ -66405,8 +66886,8 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           });
         }
         return json2({ ok: true });
-      } catch {
-        return json2({ error: "Session secrets update is pending; retry after setup repair." }, 503);
+      } catch (error) {
+        return json2({ error: error.status === 409 ? error.message : "Session secrets update is pending; retry after setup repair." }, error.status || 503);
       }
     };
     callCoordinator = async ({ env, slug, path, ...payload }) => {
@@ -66429,7 +66910,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     };
     ensureSessionLitAuthorizationSigner = async (args) => {
       const result = await callCoordinator({ ...args, path: "ensure" });
-      if (!result.ok) throw new Error(result.body?.error || COORDINATION_ERROR);
+      if (!result.ok) throw Object.assign(new Error(result.body?.error || COORDINATION_ERROR), { status: result.status });
       return walletFor(result.body.privateKey).privateKey;
     };
     finalizeSessionLitAuthorization = async (args) => {
@@ -66454,17 +66935,20 @@ __export(sessionWriteCoordinator_exports, {
   enqueueCoordinatedResultsAnalysisAutoJob: () => enqueueCoordinatedResultsAnalysisAutoJob,
   executeCoordinatedSessionConfigMutation: () => executeCoordinatedSessionConfigMutation,
   executeCoordinatedSponsoredDeploy: () => executeCoordinatedSponsoredDeploy,
+  finalizeCoordinatedHostedFaucet: () => finalizeCoordinatedHostedFaucet,
   finalizeCoordinatedResultsAnalysis: () => finalizeCoordinatedResultsAnalysis,
   finalizeCoordinatedSponsoredFaucet: () => finalizeCoordinatedSponsoredFaucet,
   getOrCreateCoordinatedStorageEnvelopeSessionKey: () => getOrCreateCoordinatedStorageEnvelopeSessionKey,
   issueCoordinatedAuthNonce: () => issueCoordinatedAuthNonce,
   readCoordinatedResultsAnalysisStatus: () => readCoordinatedResultsAnalysisStatus,
+  reserveCoordinatedHostedFaucet: () => reserveCoordinatedHostedFaucet,
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
+    init_sessionConfigAuthority();
     init_deployHelperCore();
     init_sponsoredBootstrapGrantStore();
     init_resultsAnalysisGeneration();
@@ -66489,6 +66973,7 @@ var init_sessionWriteCoordinator = __esm({
     AUTH_NONCE_ACTIVE_KEY = "auth-nonce-active";
     AUTH_NONCE_USED_KEY = "auth-nonce-used";
     AUTH_RATE_RECORD_KEY = "auth-rate-record";
+    HOSTED_FAUCET_QUOTA_KEY = "hosted-faucet-quota-v1";
     WORKER_GROUP_CAPACITY_META_KEY = "worker-group-capacity-meta-v3";
     WORKER_GROUP_CAPACITY_GROUP_PREFIX = "worker-group-capacity-group-v3:";
     WORKER_GROUP_CAPACITY_MEMBER_PREFIX = "worker-group-capacity-member-v3:";
@@ -66713,6 +67198,7 @@ ${expiry}`);
         this.activeAttemptId = "";
         this.activeDirectAttemptId = "";
         this.sessionConfigTail = Promise.resolve();
+        this.storageVisibilityTail = Promise.resolve();
         this.workerGroupTail = Promise.resolve();
         this.resultsAnalysisTail = Promise.resolve();
         this.storageOwnerTail = Promise.resolve();
@@ -66961,20 +67447,24 @@ ${expiry}`);
         const scheduled = await this.scheduleResultsAnalysisAlarm(1e3);
         return { ok: true, status: 202, queued: true, scheduled };
       }
-      async recordResultsAnalysisQueueFailure(error) {
+      async recordResultsAnalysisQueueFailure(error, job) {
         const nowMs = Number(this.now()) || Date.now();
-        const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-        const record = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
-        record.lastFailure = {
-          ok: false,
-          error: error?.message || toTrimmedString9(error) || "Automatic results analysis job failed.",
-          status: 502,
-          requestId: toTrimmedString9(queued?.requestId),
-          trigger: "automatic",
-          failedAtMs: nowMs
-        };
-        await this.state.storage.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-        await this.state.storage.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+        await this.state.storage.transaction(async (transaction) => {
+          const queued = await transaction.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+          const record = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          record.lastFailure = {
+            ok: false,
+            error: error?.message || error?.error || toTrimmedString9(error) || "Automatic results analysis job failed.",
+            status: Number(error?.status) >= 400 && Number(error?.status) <= 599 ? Number(error.status) : 502,
+            requestId: toTrimmedString9(job?.requestId ?? queued?.requestId),
+            trigger: "automatic",
+            failedAtMs: nowMs
+          };
+          if (!job || queued?.queuedAtMs === job.queuedAtMs && queued?.requestId === job.requestId) {
+            await transaction.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+          }
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+        });
       }
       async runQueuedResultsAnalysisAutoJob() {
         const job = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
@@ -66992,6 +67482,10 @@ ${expiry}`);
         });
         if (result?.jobState === "running") {
           await this.scheduleResultsAnalysisAlarm(RESULTS_ANALYSIS_RUNNING_LEASE_MS + 1e3);
+          return result;
+        }
+        if (result?.ok === false && result.status !== 422) {
+          await this.recordResultsAnalysisQueueFailure(result, job);
           return result;
         }
         const current = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
@@ -67950,6 +68444,104 @@ ${expiry}`);
           return jsonResponse2(result, 200);
         });
       }
+      async readSessionConfigAuthority(slug) {
+        const existing = await this.state.storage.get(SESSION_CONFIG_AUTHORITY_KEY);
+        if (existing != null) {
+          if (existing.slug !== slug || !Number.isSafeInteger(existing.revision) || existing.revision < 1 || !normalizePublicSessionConfig(existing.config, slug)) {
+            throw Object.assign(new Error("Invalid authoritative session config."), { status: 409 });
+          }
+          return existing;
+        }
+        const config = await getLegacySessionConfigForAuthority(this.env, normalizeWorkerSessionSlug(slug));
+        if (!config) return null;
+        const normalized = normalizePublicSessionConfig(config, slug);
+        if (!normalized) throw legacySessionConfigMigrationError();
+        const authority = { schemaVersion: 1, slug, revision: 1, config: normalized, projectionPending: false };
+        return this.state.storage.transaction(async (transaction) => {
+          const current = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
+          if (current != null) return current;
+          await transaction.put(SESSION_CONFIG_AUTHORITY_KEY, authority);
+          return authority;
+        });
+      }
+      async assertSessionAuthority(payload) {
+        const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+        const authority = slug ? await this.readSessionConfigAuthority(slug) : null;
+        assertExpectedSessionAuthority(authority, payload?.expectedAuthority, slug);
+        return authority;
+      }
+      async executeSessionConfigCurrent(payload) {
+        const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+        if (!slug) return jsonResponse2({ error: "Invalid session slug." }, 400);
+        try {
+          const current = await this.state.storage.transaction(async (transaction) => {
+            const authority = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
+            if (!authority || authority.projectionPending === true || await hasPendingLitAuthorizationSetup(transaction)) return null;
+            if (authority.slug !== slug || !Number.isSafeInteger(authority.revision) || authority.revision < 1 || !normalizePublicSessionConfig(authority.config, slug)) throw new Error("Invalid authoritative session config.");
+            return authority;
+          });
+          if (current) return jsonResponse2({ ok: true, config: current.config, revision: current.revision });
+        } catch {
+          return jsonResponse2({ error: "Session config coordination is unavailable; retry." }, 503);
+        }
+        return this.serializeSessionConfigOperation(async () => {
+          try {
+            await this.repairPendingSessionConfigProjection();
+            const authority = await this.readSessionConfigAuthority(slug);
+            return jsonResponse2({ ok: true, config: authority?.config ?? null, revision: authority?.revision ?? 0 });
+          } catch (error) {
+            if (error?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON) {
+              const safeError = legacySessionConfigMigrationError();
+              return jsonResponse2({ error: safeError.message, reason: safeError.reason }, 503);
+            }
+            return jsonResponse2({ error: "Session config coordination is unavailable; retry." }, 503);
+          }
+        });
+      }
+      async executeStoragePublication(payload) {
+        return this.serializeSessionConfigOperation(async () => {
+          try {
+            const authority = await this.assertSessionAuthority(payload);
+            await this.repairPendingSessionConfigProjection();
+            await publishCloudflareOwnedStorageMetadata({
+              env: this.env,
+              slug: normalizeWorkerSessionSlug(payload.slug),
+              config: authority?.config,
+              actor: payload.expectedAuthority.actor,
+              metadata: payload.metadata,
+              createOwner: payload.createOwner === true
+            });
+            return jsonResponse2({ ok: true });
+          } catch (error) {
+            return jsonResponse2({ error: error.message || "Storage publication failed." }, error.status || 503);
+          }
+        });
+      }
+      async executeStorageVisibilityMutation(payload) {
+        const run = this.storageVisibilityTail.then(async () => {
+          try {
+            const runVisibilityMutation = (operation) => this.serializeSessionConfigOperation(async () => {
+              const authority2 = await this.assertSessionAuthority(payload);
+              await this.repairPendingSessionConfigProjection();
+              return operation(authority2);
+            });
+            const authority = await runVisibilityMutation((current) => current);
+            const result = await setCloudflareStorageResourceHidden({
+              env: this.env,
+              slug: normalizeWorkerSessionSlug(payload.slug),
+              config: authority?.config,
+              body: payload.body,
+              actor: payload.expectedAuthority.actor,
+              deps: { now: this.now, runVisibilityMutation }
+            });
+            return jsonResponse2(result.ok ? result.body : { error: result.error }, result.status || 500);
+          } catch (error) {
+            return jsonResponse2({ error: error.message || "Storage visibility update failed." }, error.status || 503);
+          }
+        });
+        this.storageVisibilityTail = run.catch(() => void 0);
+        return run;
+      }
       async finalizeSessionConfigProjection(revision) {
         await this.state.storage.transaction(async (transaction) => {
           const current = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
@@ -68015,7 +68607,10 @@ ${expiry}`);
             const authority = {
               schemaVersion: 1,
               slug,
-              revision: Number(existing?.revision || 0) + 1,
+              // Installing the first wrapped key does not change authorization.
+              // Advancing this revision would invalidate the upload that requested
+              // the key; admin policy mutations still advance it independently.
+              revision: existing?.revision ?? 1,
               config: nextConfig,
               activeSessionKey: chosen,
               projectionPending: true
@@ -68048,21 +68643,21 @@ ${expiry}`);
       async executeSessionConfigMutation(payload) {
         return this.serializeSessionConfigOperation(async () => {
           const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-          const baseConfig = slug ? normalizePublicSessionConfig(payload?.baseConfig, slug) : null;
-          if (!slug || !baseConfig || !isObjectRecord(payload?.mutation)) {
+          if (!slug || !isObjectRecord(payload?.mutation)) {
             return jsonResponse2({ error: "Invalid session config mutation." }, 400);
           }
           try {
+            await this.assertSessionAuthority(payload);
             await this.repairPendingSessionConfigProjection();
-          } catch {
-            return jsonResponse2({ error: "Session config projection is pending; retry." }, 503);
+          } catch (error) {
+            return jsonResponse2({ error: error.message || "Session config projection is pending; retry." }, error.status || 503);
           }
           const reserved = await this.state.storage.transaction(async (transaction) => {
             const existing = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
             if (existing && resolveCoordinatorSessionSlugStorageKey(existing.slug) !== slug) {
               return { error: "Session config authority identity conflict.", status: 409 };
             }
-            const authorityConfig2 = existing?.config ? normalizePublicSessionConfig(existing.config, slug) : baseConfig;
+            const authorityConfig2 = existing?.config ? normalizePublicSessionConfig(existing.config, slug) : {};
             if (!authorityConfig2) {
               return { error: "Invalid authoritative session config.", status: 409 };
             }
@@ -68215,6 +68810,32 @@ ${expiry}`);
             resetAtMs: effectiveResetAtMs
           });
           return { ok: true, allowed: count <= limit, count, resetAtMs: effectiveResetAtMs };
+        });
+        return jsonResponse2(result);
+      }
+      async executeHostedFaucetQuota(payload, finalize = false) {
+        const requestId = toTrimmedString9(payload?.requestId);
+        if (!/^[a-zA-Z0-9-]{1,64}$/.test(requestId) || finalize && typeof payload?.sent !== "boolean") {
+          return jsonResponse2({ error: "Invalid hosted faucet quota request." }, 400);
+        }
+        const nowMs = Number(this.now()) || Date.now();
+        const cutoff = nowMs - 24 * 60 * 60 * 1e3;
+        const result = await this.state.storage.transaction(async (transaction) => {
+          const existing = await transaction.get(HOSTED_FAUCET_QUOTA_KEY);
+          const sent = (Array.isArray(existing?.sent) ? existing.sent : []).filter((at) => at > cutoff);
+          const pending = Object.fromEntries(Object.entries(existing?.pending || {}).filter(([, at]) => at > cutoff));
+          if (finalize) {
+            if (!Object.hasOwn(pending, requestId)) return { ok: true, alreadyFinalized: true };
+            delete pending[requestId];
+            if (payload.sent) sent.push(nowMs);
+          } else {
+            if (Object.hasOwn(pending, requestId) || sent.length + Object.keys(pending).length >= 3) {
+              return { ok: true, allowed: false };
+            }
+            pending[requestId] = nowMs;
+          }
+          await transaction.put(HOSTED_FAUCET_QUOTA_KEY, { version: 1, sent, pending });
+          return { ok: true, ...finalize ? {} : { allowed: true, requestId } };
         });
         return jsonResponse2(result);
       }
@@ -68479,9 +69100,12 @@ ${expiry}`);
           return jsonResponse2({ error: "Not found." }, 404);
         }
         const payload = await request.json().catch(() => null);
-        if (url.pathname.startsWith("/session-config/lit-authorization/") && url.hostname !== "session-coordinator.internal") {
+        if (url.pathname.startsWith("/session-config/") && url.hostname !== "session-coordinator.internal") {
           return jsonResponse2({ error: "Not found." }, 404);
         }
+        if (url.pathname === "/session-config/current") return this.executeSessionConfigCurrent(payload);
+        if (url.pathname === "/session-config/storage/set-hidden") return this.executeStorageVisibilityMutation(payload);
+        if (url.pathname === "/session-config/storage/publish") return this.executeStoragePublication(payload);
         if (url.pathname === "/session-config/lit-authorization/ensure") {
           return this.serializeSessionConfigOperation(() => executeLitAuthorizationSignerEnsure(this, payload));
         }
@@ -68517,6 +69141,9 @@ ${expiry}`);
         }
         if (url.pathname === "/auth-state/nonce/consume") {
           return this.executeAuthNonceConsume(payload);
+        }
+        if (url.pathname === "/hosted-faucet/reserve" || url.pathname === "/hosted-faucet/finalize") {
+          return this.executeHostedFaucetQuota(payload, url.pathname.endsWith("/finalize"));
         }
         if (url.pathname === "/auth-state/rate/check") {
           return this.executeAuthRateCheck(payload);
@@ -68745,6 +69372,17 @@ ${expiry}`);
         }
       });
     };
+    callHostedFaucetQuota = ({ env, slug, address: address2, requestId, sent }, finalize) => callAuthStateCoordinator({
+      env,
+      identity: `hosted-faucet:${resolveCoordinatorSessionSlugStorageKey(slug)}:${toTrimmedString9(address2).toLowerCase()}`,
+      path: finalize ? "/hosted-faucet/finalize" : "/hosted-faucet/reserve",
+      payload: { requestId, ...finalize ? { sent } : {} }
+    });
+    reserveCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuota({
+      ...args,
+      requestId: crypto.randomUUID()
+    }, false);
+    finalizeCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuota(args, true);
     checkCoordinatedAuthRateLimit = async ({
       env,
       slug,
@@ -68806,7 +69444,8 @@ ${expiry}`);
       env,
       slug,
       existingConfig,
-      mutation
+      mutation,
+      expectedAuthority
     } = {}) => {
       const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
@@ -68825,7 +69464,8 @@ ${expiry}`);
           body: JSON.stringify({
             slug: normalizedSlug,
             baseConfig: existingConfig || {},
-            mutation
+            mutation,
+            expectedAuthority
           })
         });
       } catch {
@@ -73331,6 +73971,7 @@ var ALLOWED_WORKER_SCOPE_KEYS = /* @__PURE__ */ new Set([
   "groups",
   "arweave",
   "faucet",
+  "faucet_self",
   "fetch",
   "lit"
 ]);
@@ -73417,7 +74058,8 @@ var resolveWorkerCanonicalLoginScopes = async ({
   }
   const configuredScopes = normalizeScopeList(policy.participantScopes);
   const scopes = configuredScopes.reduce((acc, scope) => {
-    acc[scope] = config?.scopes?.[scope] !== false;
+    const routeScope = scope === "faucet_self" ? "faucet" : scope;
+    acc[routeScope] = config?.scopes?.[routeScope] !== false && config?.scopes?.[scope] !== false;
     return acc;
   }, {});
   if (isAdmin) scopes.admin = true;
@@ -74057,6 +74699,9 @@ var getCorsContext = ({
   };
 };
 
+// workers/sessionCorsWorker/existingSessionCorsResolution.js
+init_sessionConfigAuthority();
+
 // workers/sessionCorsWorker/siweMessageValidation.js
 init_sessionConfigMutation();
 
@@ -74515,9 +75160,19 @@ var resolveExistingSessionCors = async ({
   allowTrustedAdminAuthOrigin = false
 } = {}) => {
   const normalizedSlug = deps?.normalizeWorkerSessionSlug?.(slug);
-  const config = await deps?.getSessionConfig?.(env, normalizedSlug);
+  let snapshot;
+  try {
+    snapshot = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: normalizedSlug });
+  } catch (error) {
+    return { ok: false, response: (deps?.json || ((body, status, headers) => new Response(JSON.stringify(body), { status, headers })))(
+      { error: error.message },
+      503,
+      baseHeaders
+    ) };
+  }
+  const { config, revision } = snapshot;
   if (!config) {
-    return { ok: true, headers: baseHeaders, config: null };
+    return { ok: true, headers: baseHeaders, config: null, revision };
   }
   const corsContext = await deps?.getCorsContext?.({ request, config });
   if (!corsContext?.ok) {
@@ -74531,7 +75186,8 @@ var resolveExistingSessionCors = async ({
       return {
         ok: true,
         headers: trustedAdminHeaders,
-        config
+        config,
+        revision
       };
     }
     return { ok: false, response: corsContext?.response, config };
@@ -74539,7 +75195,8 @@ var resolveExistingSessionCors = async ({
   return {
     ok: true,
     headers: corsContext.headers,
-    config
+    config,
+    revision
   };
 };
 
@@ -74561,7 +75218,8 @@ var createAuthCorsAdminAdaptersWithWorkerDeps = ({
     ...value,
     deps: {
       normalizeWorkerSessionSlug: deps?.normalizeWorkerSessionSlug,
-      getSessionConfig: deps?.getSessionConfig,
+      readCurrentSessionConfig: deps?.readCurrentSessionConfig,
+      json: deps?.json,
       getCorsContext: getCorsContext2,
       corsHeaders: deps?.corsHeaders,
       resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins
@@ -76126,7 +76784,7 @@ var resolveArweaveUploadJwk = ({ providedJwk = null, secrets = {} } = {}) => {
 // workers/sessionCorsWorker/arweaveUploadRequestNormalization.js
 init_uploadSizeLimits();
 var hasOwn8 = Object.prototype.hasOwnProperty;
-var encoder4 = new TextEncoder();
+var encoder5 = new TextEncoder();
 var normalizeArweaveUploadJsonPayload = (raw, { maxUploadBytes } = {}) => {
   const source = raw && typeof raw === "object" ? raw : {};
   if (!hasOwn8.call(source, "data")) {
@@ -76137,7 +76795,7 @@ var normalizeArweaveUploadJsonPayload = (raw, { maxUploadBytes } = {}) => {
     };
   }
   const rawData = typeof source.data === "string" ? source.data : JSON.stringify(source.data);
-  const bytes3 = encoder4.encode(rawData);
+  const bytes3 = encoder5.encode(rawData);
   const tooLarge2 = rejectBytesOverLimit({ bytes: bytes3, maxUploadBytes });
   if (tooLarge2) return tooLarge2;
   return {
@@ -76878,6 +77536,8 @@ var faucet = async ({
   slug,
   requesterAddress = "",
   tokenHasFaucetScope = false,
+  onSubmissionAttempt,
+  retryAfterSubmissionFailure = true,
   deps,
   constants,
   defaults
@@ -77127,6 +77787,7 @@ var faucet = async ({
       continue;
     }
     try {
+      onSubmissionAttempt?.();
       const txHash = await rpcRequest({
         rpcUrl: rpc2,
         method: "eth_sendRawTransaction",
@@ -77169,6 +77830,7 @@ var faucet = async ({
         ...failure2.code != null ? { code: failure2.code } : {},
         error: failure2.error
       });
+      if (!retryAfterSubmissionFailure) break;
     }
   }
   return json3(
@@ -77337,6 +77999,7 @@ var fetchUrl = async ({
 };
 
 // workers/sessionCorsWorker/adminSignatureAuthority.js
+init_sessionConfigAuthority();
 var resolveAdminSignatureAuthority = async ({
   env,
   body,
@@ -77434,6 +78097,11 @@ var resolveAdminSignatureAuthority = async ({
       reason: "nonce_invalid",
       logExtra: { error: nonceResult?.error }
     };
+  }
+  try {
+    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: targetSlug }));
+  } catch (error) {
+    return { ok: false, status: 503, error: error.message, reason: "configuration_unavailable" };
   }
   if (!config && allowBootstrapWithoutConfig) {
     return {
@@ -77558,6 +78226,7 @@ var verifyAdminSignature = async ({
       validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
       consumeNonce: deps?.consumeNonce,
       validateAdmin: deps?.validateAdmin,
+      readCurrentSessionConfig: deps?.readCurrentSessionConfig,
       MISSING_SLUG_ERROR: deps?.MISSING_SLUG_ERROR
     }
   });
@@ -77963,6 +78632,9 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
   };
 };
 
+// workers/sessionCorsWorker/workerRouteShellBinding.js
+init_sessionConfigAuthority();
+
 // workers/sessionCorsWorker/authenticatedRoutePreflight.js
 var evaluateAuthenticatedRoutePreflight = async ({
   scopes,
@@ -78031,6 +78703,9 @@ var evaluateAuthenticatedRoutePreflight = async ({
     tokenHasScope
   };
 };
+
+// workers/sessionCorsWorker/interviewStarter.js
+init_sessionConfigAuthority();
 
 // workers/sessionCorsWorker/anonymousRateLimitPolicy.js
 var isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -78148,7 +78823,6 @@ var normalizePublicInterviewQuestions = (input = [], limit = Infinity) => {
 };
 
 // workers/sessionCorsWorker/interviewQuestionCatalog.js
-init_storageRouteExecution();
 init_storageResourceOwnership();
 var QUESTIONS_ADDED_TOPIC0 = "0x3b584fb360a325f39352e75bd13458807d8e31735ef4dadaeff99fc3e59b517a";
 var GET_QUESTION_HASH_SELECTOR = "0x24b9f713";
@@ -78209,12 +78883,12 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
       createdAtMs: Date.parse(trim11(item?.metadata?.createdAt)) || 0,
       storageRefId: id2,
       uploader: trim11(item?.metadata?.uploader),
+      uploadAuthority: item?.metadata?.uploadAuthority,
       payload
     });
   }
-  const admins = resolveSessionAdminAddresses(config);
   return dedupeQuestions(
-    selectCanonicalStorageVersions(candidates, { isAdmin: (address2) => admins.has(address2) }).map((candidate) => candidate.payload)
+    selectCanonicalStorageVersions(candidates).map((candidate) => candidate.payload)
   );
 };
 var pickContractAddress = (config = {}) => {
@@ -78452,7 +79126,12 @@ var dispatchInterviewStarterRequest = async ({ request, env, slugHint, baseHeade
   if (!resolved.ok || !resolved.explicitSlugProvided)
     return deps.json({ error: resolved.error || constants.missingSlugError }, 400, baseHeaders);
   const slug = resolved.slug;
-  const config = await deps.getSessionConfig(env, slug);
+  let config;
+  try {
+    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug }));
+  } catch (error) {
+    return deps?.json?.({ error: error.message }, 503, baseHeaders);
+  }
   if (!config) return deps.json({ error: constants.sessionConfigNotFoundError }, 404, baseHeaders);
   const cors = await deps.getCorsContext({ request, config });
   if (!cors.ok) return cors.response;
@@ -78487,6 +79166,7 @@ init_bodyByteLimit();
 init_uploadSizeLimits();
 
 // workers/sessionCorsWorker/anonymousRouteEntry.js
+init_sessionConfigAuthority();
 var dispatchAnonymousRouteEntry = async ({
   path,
   anonymousRoute,
@@ -78507,7 +79187,12 @@ var dispatchAnonymousRouteEntry = async ({
     return deps?.json?.({ error: deps?.MISSING_SLUG_ERROR }, 400, baseHeaders);
   }
   const slug = slugResolution?.slug;
-  const config = await deps?.getSessionConfig?.(env, slug);
+  let config;
+  try {
+    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug }));
+  } catch (error) {
+    return deps?.json?.({ error: error.message }, 503, baseHeaders);
+  }
   if (!config) {
     return deps?.json?.({ error: deps?.SESSION_CONFIG_NOT_FOUND_ERROR }, 404, baseHeaders);
   }
@@ -78904,6 +79589,7 @@ var dispatchAuthenticatedRoute = async ({
     headers,
     scopes,
     address: address2,
+    expectedAuthority,
     limit
   } = authenticatedContext || {};
   const secretPathRoute = await deps?.dispatchAuthenticatedSecretPathRoute?.({
@@ -78913,6 +79599,7 @@ var dispatchAuthenticatedRoute = async ({
     config,
     slug,
     address: address2,
+    expectedAuthority,
     limit,
     headers,
     scopes
@@ -78959,6 +79646,7 @@ var dispatchAuthenticatedRoute = async ({
 };
 
 // workers/sessionCorsWorker/authenticatedRouteContextResolution.js
+init_sessionConfigAuthority();
 init_authorizationScopeFreshness();
 init_sessionConfigMutation();
 var isWorkerGroupsRequest = (request) => {
@@ -78976,7 +79664,13 @@ var resolveAuthenticatedRouteContext = async ({
   deps
 } = {}) => {
   const slug = auth?.slug;
-  const config = await deps?.getSessionConfig?.(env, slug);
+  let config;
+  let revision;
+  try {
+    ({ config, revision } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug }));
+  } catch (error) {
+    return { ok: false, response: deps?.json?.({ error: error.message }, 503, baseHeaders) };
+  }
   if (!config) {
     return {
       ok: false,
@@ -79017,14 +79711,17 @@ var resolveAuthenticatedRouteContext = async ({
     headers: corsContext.headers,
     scopes: payload.scopes || {},
     address: address2,
+    expectedAuthority: { actor: address2, revision, authzEpoch: currentEpoch },
     limit: config?.limits?.perWalletPerDay || 0
   };
 };
 
 // workers/sessionCorsWorker/adminRequestDispatch.js
+init_sessionConfigAuthority();
 init_sessionLitAuthorizationCoordinator();
 
 // workers/sessionCorsWorker/adminRequestAuthority.js
+init_authorizationScopeFreshness();
 init_lib2();
 var toTrimmedString14 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var resolveEthersCompat2 = (loadedModule) => loadedModule?.ethers || loadedModule?.default?.ethers || loadedModule?.default || loadedModule || null;
@@ -79033,11 +79730,11 @@ var getEthersFn3 = (...candidates) => candidates.find((fn) => typeof fn === "fun
 var getEthersUtils3 = () => ethers2?.utils || lib_exports?.utils || lib_exports?.ethers?.utils || lib_exports?.default?.utils || lib_exports?.default?.ethers?.utils || null;
 var getTypedDataEncoder = () => ethers2?.TypedDataEncoder || lib_exports?.TypedDataEncoder || lib_exports?.ethers?.TypedDataEncoder || lib_exports?.default?.TypedDataEncoder || lib_exports?.default?.ethers?.TypedDataEncoder || getEthersUtils3()?._TypedDataEncoder || null;
 var hashTypedData = (domain, types, message) => {
-  const encoder5 = getTypedDataEncoder();
-  if (typeof encoder5?.hash !== "function") {
+  const encoder6 = getTypedDataEncoder();
+  if (typeof encoder6?.hash !== "function") {
     throw new Error("TypedDataEncoder.hash unavailable.");
   }
-  return encoder5.hash(domain, types, message);
+  return encoder6.hash(domain, types, message);
 };
 var recoverAddressCompat = (...args) => {
   const recoverFn = getEthersFn3(
@@ -79291,7 +79988,8 @@ var resolveAdminRequestAuthority = async ({
     address: address2,
     existingConfig,
     headers,
-    targetSlug
+    targetSlug,
+    expectedAuthority: { actor: address2.toLowerCase(), revision: corsState.revision, authzEpoch: readAuthorizationEpoch(existingConfig) }
   };
 };
 
@@ -79712,11 +80410,16 @@ var fetchChipotleJson = async ({
     response3 = await fetchImpl(requestUrl, {
       method,
       headers,
-      redirect: "error",
+      // The deployed Workers runtime supports manual/follow, but rejects error.
+      // Never follow redirects with the attached Lit account credentials.
+      redirect: "manual",
       ...body !== void 0 ? { body: JSON.stringify(body) } : {}
     });
   } catch (error) {
     throw new Error(toTrimmedString15(error?.message || error) || "Chipotle request failed.");
+  }
+  if (response3.status >= 300 && response3.status < 400) {
+    throw new Error("Chipotle redirects are not allowed.");
   }
   const text = await response3.text().catch(() => "");
   const parsed = parseJsonIfPossible(text);
@@ -80930,11 +81633,12 @@ var executeDirectSessionConfigMutation = async ({
   env,
   slug,
   existingConfig,
+  expectedAuthority,
   mutation,
   deps
 } = {}) => {
   const coordinate = deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutation;
-  return coordinate({ env, slug, existingConfig, mutation });
+  return coordinate({ env, slug, existingConfig, mutation, expectedAuthority });
 };
 var dispatchAdminRequest = async ({
   request,
@@ -80981,7 +81685,8 @@ var dispatchAdminRequest = async ({
   const {
     existingConfig,
     headers,
-    targetSlug
+    targetSlug,
+    expectedAuthority
   } = authorityResult;
   if (action?.startsWith?.("groups/")) {
     const response3 = await (deps?.dispatchAdminWorkerGroupRequest || dispatchAdminWorkerGroupRequest)({
@@ -81028,15 +81733,15 @@ var dispatchAdminRequest = async ({
   }
   if (action === "storage/set-hidden") {
     try {
-      const result = await (deps?.setCloudflareStorageResourceHidden || setCloudflareStorageResourceHidden)({
+      const result = await (deps?.executeCoordinatedStorageVisibilityMutation || executeCoordinatedStorageVisibilityMutation)({
         env,
         config: existingConfig,
         slug: targetSlug,
         body,
-        actor: authorityResult.address,
+        expectedAuthority,
         deps: { now: deps?.now }
       });
-      return deps?.json?.(result?.ok ? result.body : { error: result?.error }, result?.status || 500, headers);
+      return deps?.json?.(result?.body || { error: result?.error }, result?.status || 500, headers);
     } catch (error) {
       return deps?.json?.({ error: error?.message || "Storage visibility update failed." }, 500, headers);
     }
@@ -81069,6 +81774,7 @@ var dispatchAdminRequest = async ({
       env,
       slug: targetSlug,
       existingConfig,
+      expectedAuthority,
       mutation: { kind: "set-config", incomingConfig: incoming },
       deps
     });
@@ -81088,7 +81794,8 @@ var dispatchAdminRequest = async ({
     const updated = await (deps?.updateSessionSecretsAfterLitRepair || updateSessionSecretsAfterLitRepair)({
       env,
       slug: targetSlug,
-      incomingSecrets
+      incomingSecrets,
+      expectedAuthority
     });
     return deps?.json?.(
       updated?.body || { error: "Session secret update could not be finalized; retry." },
@@ -81136,7 +81843,8 @@ var dispatchAdminRequest = async ({
             env,
             slug: targetSlug,
             proposedPrivateKey,
-            baseConfig: existingConfig
+            baseConfig: existingConfig,
+            expectedAuthority
           });
           existingSecrets.litAuthorizationPrivateKey = privateKey;
           return privateKey;
@@ -81159,6 +81867,7 @@ var dispatchAdminRequest = async ({
         env,
         slug: targetSlug,
         baseConfig: existingConfig,
+        expectedAuthority,
         litCredentials: result?.litCredentials,
         secretOutputs: result?.secretOutputs
       });
@@ -81170,7 +81879,7 @@ var dispatchAdminRequest = async ({
       delete responseBody.litCredentials;
       return deps?.json?.(responseBody, 200, headers);
     } catch (error) {
-      return deps?.json?.({ error: error?.message || "Failed to provision Lit authorization." }, 502, headers);
+      return deps?.json?.({ error: error?.message || "Failed to provision Lit authorization." }, error?.status || 502, headers);
     }
   }
   if (action === "set-limits") {
@@ -81180,6 +81889,7 @@ var dispatchAdminRequest = async ({
       env,
       slug: targetSlug,
       existingConfig,
+      expectedAuthority,
       mutation: { kind: "set-limits", incomingLimits: incoming },
       deps
     });
@@ -81196,13 +81906,14 @@ var dispatchAdminRequest = async ({
         slug: targetSlug,
         config: existingConfig,
         resource: toTrimmedString16(body?.resource),
+        cursor: body?.cursor ?? "",
         includeSessionEnvelope: true,
         deps: {
           now: deps?.now
         }
       });
       return deps?.json?.(
-        result?.ok ? result : { error: result?.error || "Encrypted-envelope export failed." },
+        result || { error: "Encrypted-envelope export failed." },
         result?.ok ? 200 : result?.status || 500,
         headers
       );
@@ -81354,17 +82065,16 @@ var dispatchAdminAbuseSummaryRequest = async ({
   });
   if (!auth?.ok) return auth?.response;
   const targetSlug = auth.slug || slug;
-  const config = await deps?.getSessionConfig?.(env, targetSlug);
-  if (!config) {
-    return deps?.json?.({ error: "Session config not found." }, 404, baseHeaders);
-  }
-  const corsContext = await deps?.getCorsContext?.({
+  const context = await resolveAuthenticatedRouteContext({
     request,
-    config,
-    baseHeaders
+    env,
+    auth,
+    baseHeaders,
+    deps: { ...deps, SESSION_CONFIG_NOT_FOUND_ERROR: "Session config not found." }
   });
-  if (corsContext && !corsContext.ok) return corsContext.response;
-  const headers = corsContext?.headers || baseHeaders;
+  if (!context.ok) return context.response;
+  const config = context.config;
+  const headers = context.headers;
   const address2 = toTrimmedString17(auth.payload?.sub, deps).toLowerCase();
   const isAdmin = await deps?.validateAdmin?.({
     env,
@@ -81449,11 +82159,16 @@ var dispatchAdminResultsAnalysisStatusRequest = async ({
   });
   if (!auth?.ok) return auth?.response;
   const targetSlug = auth.slug || slug;
-  const config = await deps?.getSessionConfig?.(env, targetSlug);
-  if (!config) return deps?.json?.({ error: "Session config not found." }, 404, baseHeaders);
-  const corsContext = await deps?.getCorsContext?.({ request, config, baseHeaders });
-  if (corsContext && !corsContext.ok) return corsContext.response;
-  const headers = withPrivateNoStoreHeaders2(corsContext?.headers || baseHeaders);
+  const context = await resolveAuthenticatedRouteContext({
+    request,
+    env,
+    auth,
+    baseHeaders,
+    deps: { ...deps, SESSION_CONFIG_NOT_FOUND_ERROR: "Session config not found." }
+  });
+  if (!context.ok) return context.response;
+  const config = context.config;
+  const headers = withPrivateNoStoreHeaders2(context.headers);
   const address2 = toTrimmedString18(auth.payload?.sub, deps).toLowerCase();
   const isAdmin = await deps?.validateAdmin?.({
     env,
@@ -82116,6 +82831,9 @@ var checkNonceRateLimit = async ({
   return { ok: true };
 };
 
+// workers/sessionCorsWorker/bootstrapArweaveUploadDispatch.js
+init_sessionConfigAuthority();
+
 // workers/sessionCorsWorker/routeBaseHeaders.js
 var getRouteBaseHeaders = ({
   request,
@@ -82128,6 +82846,7 @@ var getRouteBaseHeaders = ({
 // workers/sessionCorsWorker/bootstrapArweaveUploadDispatch.js
 var dispatchBootstrapArweaveUpload = async ({
   request,
+  env,
   hasAuthorization,
   deps
 } = {}) => {
@@ -82168,7 +82887,12 @@ var dispatchBootstrapArweaveUpload = async ({
       response: deps?.json?.({ error: deps?.MISSING_SLUG_ERROR }, 400, bootstrapHeaders)
     };
   }
-  const config = await deps?.getSessionConfig?.(targetSlug);
+  let config;
+  try {
+    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: targetSlug }));
+  } catch (error) {
+    return { handled: true, response: deps?.json?.({ error: error.message }, 503, bootstrapHeaders) };
+  }
   const missingSessionConfig = !config;
   if (missingSessionConfig) {
     deps?.logBootstrapConfigMissing?.({ targetSlug, requestId });
@@ -82765,6 +83489,7 @@ var dispatchSessionConfigBootstrapRequest = async ({
 };
 
 // workers/sessionCorsWorker/interviewBriefDispatch.js
+init_sessionConfigAuthority();
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v5";
 var trim13 = (value) => String(value == null ? "" : value).trim();
 var isObj22 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -82887,7 +83612,12 @@ var dispatchInterviewBriefRequest = async ({
     return deps?.json?.({ error: slugResolution.error || constants?.missingSlugError }, 400, baseHeaders);
   }
   const slug = slugResolution.slug;
-  const config = await deps?.getSessionConfig?.(env, slug);
+  let config;
+  try {
+    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug }));
+  } catch (error) {
+    return deps?.json?.({ error: error.message }, 503, baseHeaders);
+  }
   if (!config) return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, baseHeaders);
   const corsContext = await deps?.getCorsContext?.({ request, config });
   if (!corsContext?.ok) return corsContext?.response;
@@ -83115,7 +83845,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
           baseHeaders: routeBaseHeaders,
           deps: {
             resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
-            getSessionConfig: deps?.getSessionConfig,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
             getCorsContext: deps?.getCorsContext,
             ...routeSelection.kind === "interview-starter" ? {
               getSessionSecrets: deps?.getSessionSecrets,
@@ -83250,6 +83980,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
         });
         const bootstrapUpload = await dispatchBootstrapArweaveUpload2({
           request,
+          env,
           hasAuthorization: routeSelection.hasAuthorizationHeader,
           deps: {
             corsHeaders: deps?.corsHeaders,
@@ -83257,7 +83988,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             resolveWorkerBodySlugContext: ({ body }) => deps?.resolveWorkerBodySlugContext?.({ body, env }),
             json: deps?.json,
             MISSING_SLUG_ERROR: constants?.missingSlugError,
-            getSessionConfig: (slug) => deps?.getSessionConfig?.(env, slug),
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
             BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR: constants?.bootstrapSessionConfigRequiredError,
             getCorsContext: deps?.getCorsContext,
             verifyAdminSignature: (value) => deps?.verifyAdminSignature?.({ ...value, env }),
@@ -83309,6 +84040,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             json: deps?.json,
             requireAuth: deps?.requireAuth,
             getSessionConfig: deps?.getSessionConfig,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
             getCorsContext: deps?.getCorsContext,
             validateAdmin: deps?.validateAdmin,
             ...deps?.readAbuseCounterSummary ? { readAbuseCounterSummary: deps.readAbuseCounterSummary } : {},
@@ -83328,6 +84060,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             json: deps?.json,
             requireAuth: deps?.requireAuth,
             getSessionConfig: deps?.getSessionConfig,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
             getCorsContext: deps?.getCorsContext,
             validateAdmin: deps?.validateAdmin,
             readResultsAnalysisAdminStatus: deps?.readResultsAnalysisAdminStatus,
@@ -83411,7 +84144,12 @@ var createWorkerRouteShellWithWorkerDeps = ({
           return deps?.json?.({ error: slugResolution?.error || constants?.missingSlugError }, 400, routeBaseHeaders);
         }
         const targetSlug = slugResolution.slug;
-        const config = await deps?.getSessionConfig?.(env, targetSlug);
+        let config;
+        try {
+          ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: targetSlug }));
+        } catch (error) {
+          return deps?.json?.({ error: error.message }, 503, routeBaseHeaders);
+        }
         if (!config) return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, routeBaseHeaders);
         const corsContext = await deps?.getCorsContext?.({ request: withQuerySlugHeader, config, baseHeaders: routeBaseHeaders });
         if (corsContext && !corsContext.ok) return corsContext.response;
@@ -83427,7 +84165,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             auth,
             baseHeaders: corsContext?.headers || routeBaseHeaders,
             deps: {
-              getSessionConfig: async () => config,
+              readCurrentSessionConfig: async () => ({ config }),
               getCorsContext: deps?.getCorsContext,
               json: deps?.json,
               toStr: deps?.toStr,
@@ -83444,6 +84182,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             deps: { computeScopesForLogin: deps?.computeScopesForLogin, checkRateLimit: deps?.checkRateLimit, json: deps?.json }
           });
           if (!preflight?.ok) return preflight?.response;
+          config = context.config;
           address2 = context.address;
           scopes = context.scopes;
         }
@@ -83461,6 +84200,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             readPublishedResultsAnalysisArtifact: deps?.readPublishedResultsAnalysisArtifact,
             readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
             evaluateResultsAnalysisViewerEligibility: deps?.evaluateResultsAnalysisViewerEligibility,
+            getSessionSecrets: deps?.getSessionSecrets,
             readResourceGateOnChain: deps?.readResourceGateOnChain,
             resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
             toRegistrySessionSlug: deps?.toRegistrySessionSlug,
@@ -83481,7 +84221,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
             json: deps?.json,
             MISSING_SLUG_ERROR: constants?.missingSlugError,
-            getSessionConfig: deps?.getSessionConfig,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
             SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
             getCorsContext: deps?.getCorsContext,
             resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
@@ -83520,7 +84260,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
           resolveAuthenticatedRouteContext: (value) => resolveAuthenticatedRouteContext2({
             ...value,
             deps: {
-              getSessionConfig: deps?.getSessionConfig,
+              readCurrentSessionConfig: deps?.readCurrentSessionConfig,
               getCorsContext: deps?.getCorsContext,
               json: deps?.json,
               toStr: deps?.toStr,
@@ -83712,6 +84452,7 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
       json: deps?.json,
       normalizeWorkerSessionSlug: deps?.normalizeWorkerSessionSlug,
       getSessionConfig: deps?.getSessionConfig,
+      readCurrentSessionConfig: deps?.readCurrentSessionConfig,
       resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
       verifyToken: deps?.verifyToken,
       validateAuthTokenRecord: deps?.validateAuthTokenRecord,
@@ -83831,6 +84572,7 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
       now: deps?.now,
       readArweaveBootstrapUploadPayload: deps?.readArweaveBootstrapUploadPayload,
       getSessionConfig: deps?.getSessionConfig,
+      readCurrentSessionConfig: deps?.readCurrentSessionConfig,
       getCorsContext: authCorsAdminAdapters.getCorsContext,
       verifyAdminSignature: executionServices.verifyAdminSignature,
       getSessionSecrets: deps?.getSessionSecrets,
@@ -83906,6 +84648,7 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
 };
 
 // workers/sessionCorsWorker/workerRuntimeDepResolution.js
+init_sessionConfigAuthority();
 init_aiRequestNormalization();
 
 // workers/sessionCorsWorker/authenticatedRouteSecretsResolution.js
@@ -83941,6 +84684,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
   config,
   slug,
   address: address2,
+  expectedAuthority,
   env,
   limit,
   headers,
@@ -84032,6 +84776,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
         config,
         slug,
         uploaderAddress: address2,
+        expectedAuthority,
         authScopes: scopes,
         baseHeaders: headers
       })
@@ -84125,6 +84870,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
 };
 
 // workers/sessionCorsWorker/authenticatedSecretActionRouteDispatch.js
+init_sessionWriteCoordinator();
 init_aiDefaults();
 init_aiRequestNormalization();
 init_sessionLifecycle();
@@ -84178,19 +84924,23 @@ var dispatchAuthenticatedSecretActionRoute = async ({
     const requestedRecipient = toStr12(body?.to || body?.recipient || body?.address).trim().toLowerCase();
     const normalizedAddress = toStr12(address2).trim().toLowerCase();
     const isSelfFundingRequest = !!requestedRecipient && requestedRecipient === normalizedAddress;
+    const hosted = config?.sessionModeProfile?.authority?.mode === "worker_canonical";
+    if (hosted && !isSelfFundingRequest) {
+      return { handled: true, response: deps?.json?.({ error: "Test ETH can only be sent to your own address." }, 403, headers) };
+    }
     const preflight2 = await deps?.evaluateAuthenticatedRoutePreflight?.({
       scopes,
       scope: "faucet",
       route: "faucet",
       config,
-      allowWithoutScope: hasProofBackedFaucetRequest || isSelfFundingRequest,
+      allowWithoutScope: !hosted && (hasProofBackedFaucetRequest || isSelfFundingRequest),
       env,
       slug,
       address: address2,
       limit,
       headers,
       deps: {
-        checkRateLimit: deps?.checkRateLimit,
+        checkRateLimit: hosted ? async () => true : deps?.checkRateLimit,
         computeScopesForLogin: deps?.computeScopesForLogin,
         json: deps?.json
       }
@@ -84216,18 +84966,45 @@ var dispatchAuthenticatedSecretActionRoute = async ({
         response: secretContext2?.response
       };
     }
-    return {
-      handled: true,
-      response: await deps?.faucet?.({
+    const reserve = deps?.reserveCoordinatedHostedFaucet || reserveCoordinatedHostedFaucet;
+    const finalize = deps?.finalizeCoordinatedHostedFaucet || finalizeCoordinatedHostedFaucet;
+    const reservation = hosted ? await reserve({ env, slug, address: address2 }) : null;
+    if (hosted && reservation?.ok !== true) {
+      return { handled: true, response: deps?.json?.({ error: "Faucet coordination is unavailable; try later." }, 503, headers) };
+    }
+    if (hosted && !reservation.allowed) {
+      return { handled: true, response: deps?.json?.({ error: "Today's test-ETH limit for this address is used up." }, 429, headers) };
+    }
+    let submissionAttempted = false;
+    let response3;
+    try {
+      response3 = await deps?.faucet?.({
         payload: body,
         secrets: secretContext2.secrets,
         config,
         baseHeaders: headers,
         slug,
         requesterAddress: address2,
-        tokenHasFaucetScope: preflight2.tokenHasScope
-      })
-    };
+        tokenHasFaucetScope: preflight2.tokenHasScope,
+        ...hosted ? {
+          onSubmissionAttempt: () => {
+            submissionAttempted = true;
+          },
+          retryAfterSubmissionFailure: false
+        } : {}
+      });
+    } catch (error) {
+      if (hosted && !submissionAttempted) {
+        await finalize({ env, slug, address: address2, requestId: reservation.requestId, sent: false });
+      }
+      throw error;
+    }
+    if (hosted) {
+      if (!submissionAttempted || response3?.status === 200) {
+        await finalize({ env, slug, address: address2, requestId: reservation.requestId, sent: response3?.status === 200 });
+      }
+    }
+    return { handled: true, response: response3 };
   }
   if (isAiAction) {
     const preflight2 = await deps?.evaluateAuthenticatedRoutePreflight?.({
@@ -84673,6 +85450,7 @@ var resolveWorkerRuntimeDeps = ({
       corsHeaders: resolveDep("corsHeaders", corsHeaders),
       json: resolveDep("json", json),
       getSessionConfig: resolveDep("getSessionConfig", getSessionConfig),
+      readCurrentSessionConfig: resolveDep("readCurrentSessionConfig", readCurrentSessionConfig),
       verifyToken: resolveDep("verifyToken", verifyToken),
       validateAuthTokenRecord: resolveDep("validateAuthTokenRecord", validateAuthTokenRecord),
       resolveWorkerRequestSlugContext: resolveDep("resolveWorkerRequestSlugContext", resolveWorkerRequestSlugContext),
@@ -84894,6 +85672,7 @@ var createWorkerRuntime = (env, overrides = {}) => {
       json: resolvedDeps.json,
       normalizeWorkerSessionSlug: resolvedDeps.normalizeWorkerSessionSlug,
       getSessionConfig: resolvedDeps.getSessionConfig,
+      readCurrentSessionConfig: resolvedDeps.readCurrentSessionConfig,
       verifyToken: resolvedDeps.verifyToken,
       validateAuthTokenRecord: resolvedDeps.validateAuthTokenRecord,
       resolveWorkerRequestSlugContext: resolvedDeps.resolveWorkerRequestSlugContext,

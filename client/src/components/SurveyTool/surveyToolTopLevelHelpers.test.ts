@@ -1,14 +1,7 @@
 import {
   buildSurveyToolHydratedFilterState,
-  buildSurveyToolLoadingStatePatch,
-  buildSurveyToolPubKeyStatePatch,
-  buildSurveyToolQuestionsCacheNoncePatch,
   buildSurveyToolFilterStateUrlPath,
-  buildSurveyToolResultsModalStatePatch,
-  buildSurveyToolSurveyListStatePatch,
   buildSurveyToolSurveyListFromBag,
-  findSurveyInAllSurveyCaches,
-  findSurveyInSurveyCacheEntries,
   getInitialCacheState,
   getNormalizedSurveyIdFromPropsValue,
   getResolvedSurveyToolPropsFromProps,
@@ -37,46 +30,6 @@ describe('surveyToolTopLevelHelpers', () => {
     });
     expect(first).not.toBe(second);
     expect(first.surveyIDs).not.toBe(second.surveyIDs);
-  });
-
-  it('builds top-level modal and question-cache nonce state patches', () => {
-    expect(buildSurveyToolResultsModalStatePatch({ open: true })).toEqual({
-      showResultsModal: true,
-    });
-    expect(buildSurveyToolResultsModalStatePatch({ open: 1 })).toEqual({
-      showResultsModal: false,
-    });
-    expect(buildSurveyToolQuestionsCacheNoncePatch({ questionsCacheNonce: 4 })).toEqual({
-      questionsCacheNonce: 5,
-    });
-    expect(buildSurveyToolQuestionsCacheNoncePatch({ questionsCacheNonce: null })).toEqual({
-      questionsCacheNonce: 1,
-    });
-  });
-
-  it('builds top-level loading and survey-list state patches', () => {
-    const surveys = [{ id: '0xsurvey' }];
-
-    expect(buildSurveyToolLoadingStatePatch({ loading: true })).toEqual({
-      loading: true,
-    });
-    expect(buildSurveyToolLoadingStatePatch({ loading: 'true' })).toEqual({
-      loading: false,
-    });
-    expect(buildSurveyToolPubKeyStatePatch({ pubKey: '0xpub' })).toEqual({
-      pubKey: '0xpub',
-    });
-    expect(buildSurveyToolPubKeyStatePatch({ pubKey: null })).toEqual({
-      pubKey: '',
-    });
-    expect(buildSurveyToolSurveyListStatePatch({ surveys })).toEqual({
-      surveys,
-      loading: false,
-    });
-    expect(buildSurveyToolSurveyListStatePatch({ surveys: null, loading: true })).toEqual({
-      surveys: [],
-      loading: true,
-    });
   });
 
   it('builds URL filter hydration state without mutating browser history', () => {
@@ -507,67 +460,6 @@ describe('surveyToolTopLevelHelpers', () => {
       nextUrl: '/session/edge/questions/results',
       shouldCallExternalCloseHandler: true,
     });
-  });
-
-  it('finds a survey in namespaced cache entries case-insensitively', () => {
-    const survey = { id: '0xabc', title: 'Stored survey' };
-    const result = findSurveyInSurveyCacheEntries('0xABC', [
-      {
-        slug: 'first-session',
-        value: {
-          '11155420': {
-            surveys: {},
-          },
-        },
-      },
-      {
-        slug: 'second-session',
-        value: {
-          '11155420': {
-            surveys: {
-              '0xabc': survey,
-            },
-          },
-        },
-      },
-    ]);
-
-    expect(result).toEqual({
-      data: survey,
-      foundSlug: 'second-session',
-    });
-  });
-
-  it('finds surveys across all survey cache entries through an injected cache reader', () => {
-    const survey = { id: '0xabc', title: 'Stored survey' };
-    const listNamespaceEntries = jest.fn((_namespace?: string, _options?: { cloneValues?: boolean }) => [
-      {
-        slug: 'cached-session',
-        value: {
-          '11155420': {
-            surveys: {
-              '0xabc': survey,
-            },
-          },
-        },
-      },
-    ]);
-
-    expect(findSurveyInAllSurveyCaches('0xABC', listNamespaceEntries)).toEqual({
-      data: survey,
-      foundSlug: 'cached-session',
-    });
-    expect(listNamespaceEntries).toHaveBeenCalledWith('surveysCache', { cloneValues: false });
-  });
-
-  it('ignores invalid cache entries and returns null for missing surveys', () => {
-    expect(findSurveyInSurveyCacheEntries(null, [])).toBeNull();
-    expect(
-      findSurveyInSurveyCacheEntries('0xabc', [
-        { slug: 'bad-session', value: null },
-        { slug: 'empty-session', value: { '11155420': { surveys: {} } } },
-      ]),
-    ).toBeNull();
   });
 
   it('builds survey list entries from a cache bag while preserving first-seen ids', () => {

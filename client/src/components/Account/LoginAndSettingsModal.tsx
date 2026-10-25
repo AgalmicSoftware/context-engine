@@ -91,7 +91,7 @@ import {
   readStoredGlobalSessionSelection,
   type GlobalSessionSelection,
 } from '../../utilities/session/globalSessionState.js';
-import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
+import { isHostedAgentSessionConfig } from '../../utilities/session/sessionBackendKind';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
   exchangeAgentClientLogin,
@@ -436,7 +436,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     getPropSessionConfig: () => this.props.sessionConfig,
     getSessionConfigBySlugOrDefault,
     getTargetNetwork: () => this.getTargetNetwork(),
-    isTelegramFirstSessionConfig,
+    isHostedAgentSessionConfig,
     normalizeSettingsSessionSlug,
     setState: (patch) => {
       if (typeof patch === 'function') {
@@ -460,11 +460,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   getDisplaySessionConfig = (slugIn: unknown = '', cfgIn: unknown = null) => {
     const slug = normalizeSettingsSessionSlug(slugIn);
     const resolved = this.state.sponsoredSessionConfig;
+    const propKey = getLoginSettingsSponsoredConfigKey(this.props.sessionConfig);
+    const matchesCurrentProp = !propKey || propKey === getLoginSettingsSponsoredConfigKey(resolved);
     // Only hydrated Worker configs replace the canonical display lookup; an
     // empty result for another session must never masquerade as General.
     if (
       !cfgIn &&
       resolved &&
+      matchesCurrentProp &&
       normalizeSettingsSessionSlug(resolved.slug) === slug &&
       resolveSessionCapabilityProjection(resolved).isWorkerCanonical
     )
@@ -529,9 +532,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return this.getActiveSessionSlug();
   };
 
+  getActiveWorkerResourcePresence = () => {
+    const config = this.getDisplaySessionConfig(this.getActiveSessionSlug());
+    return config === this.state.sponsoredSessionConfig ? this.state.workerResourcePresence : null;
+  };
+
   getActiveSessionCapabilities = () => {
     const slug = this.getActiveSessionSlug();
-    return this._sessionCapabilityProjectionResolver(this.getDisplaySessionConfig(slug));
+    return this._sessionCapabilityProjectionResolver(
+      this.getDisplaySessionConfig(slug),
+      this.getActiveWorkerResourcePresence(),
+    );
   };
 
   buildTargetNetworkDescriptor = (chainId: number): LoginTargetNetwork => ({
@@ -685,7 +696,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   getTestFundsRequestContextKey = (
     props: LoginAndSettingsModalProps = this.props,
     state: Partial<LoginAndSettingsModalState> = this.state,
-  ) => `${this.getWalletBalanceContextKey(props)}|${this.getActiveSessionSlug(props, state)}`;
+  ) =>
+    `${this.getWalletBalanceContextKey(props)}|${this.getActiveSessionSlug(props, state)}|${getLoginSettingsSponsoredConfigKey(props.sessionConfig)}`;
 
   normalizeWalletBalance = (rawBalance: unknown) => {
     if (rawBalance == null) return null;
@@ -794,7 +806,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         testFundsStatusMessage: '',
         testFundsStatusTone: '',
       });
-      const result = await contractScripts.sendTestnetFunds(walletAccount, this.getActiveSessionSlug(), {
+      const sessionConfig = this.getDisplaySessionConfig(this.getActiveSessionSlug());
+      const fundingSession = resolveSessionCapabilityProjection(sessionConfig).isWorkerCanonical
+        ? sessionConfig
+        : this.getActiveSessionSlug();
+      const result = await contractScripts.sendTestnetFunds(walletAccount, fundingSession, {
         context: this.getWalletRequestContext(),
       });
       const txHash = toStr(result?.txHash || result?.hash).trim();
@@ -890,6 +906,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.applyLoginModalFocus(this.props.loginModalFocus);
     }
     const needsSponsoredAccessRefresh =
+      (this.props.loginComplete && !prevProps.loginComplete) ||
       accountChanged ||
       activeSessionChanged ||
       settingsOpened ||
@@ -979,6 +996,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     await runLoginTestFundsAutoSend({
       autoSendTestFunds: this.autoSendTestFunds,
       getActiveSessionConfig: () => this.getDisplaySessionConfig(this.getActiveSessionSlug()),
+      getWorkerResourcePresence: this.getActiveWorkerResourcePresence,
       loginComplete: this.props.loginComplete,
       setState: (patch) => this.setStateIfMounted(patch),
       state: this.state,
@@ -1247,6 +1265,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       expectedSlug: slug,
       normalizeSessionSlug: normalizeSettingsSessionSlug,
     });
+    const initialConfig = verifiedWorkerConfig || getSessionConfigBySlugOrDefault(slug) || {};
+    const potentialFunding = resolveSessionCapabilityProjection(initialConfig, { txGas: true });
+    const checkHostedFunding =
+      this.props.loginComplete && potentialFunding.isWorkerCanonical && potentialFunding.usesFunding;
     const reqId = (this._sponsoredReqId = (this._sponsoredReqId || 0) + 1);
     this.setStateIfMounted({
       sponsoredAccessLoading: true,
@@ -1258,21 +1280,26 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       const { loadLoginSettingsSponsoredAccess } = await import('./loginSettingsSponsoredAccessRuntime');
       const { accessMap, workerResourcePresence, sessionConfig } = await loadLoginSettingsSponsoredAccess({
         slug,
-        sessionConfig: verifiedWorkerConfig || getSessionConfigBySlugOrDefault(slug) || {},
+        sessionConfig: initialConfig,
         account: this.props.account || '',
         providerLike: this.props.provider || null,
-        // Regression guard: old workers may reject resource-presence. Only probe
-        // when the settings UI that consumes the result is actually visible.
-        includeWorkerResourcePresence: !!this.props.loginModalToggled,
+        // Closed settings probe only a scoped hosted testnet faucet. Chainless
+        // sessions and old Workers retain the existing on-open presence check.
+        includeWorkerResourcePresence: !!this.props.loginModalToggled || checkHostedFunding,
       });
       if (reqId !== this._sponsoredReqId) return;
-      this.setStateIfMounted({
-        sponsoredAccess: accessMap,
-        sponsoredAccessLoading: false,
-        workerResourcePresence,
-        sponsoredSessionConfig: sessionConfig,
-        aiGroupSettings: getSessionAiSettings(slug, sessionConfig),
-      });
+      this.setStateIfMounted(
+        {
+          sponsoredAccess: accessMap,
+          sponsoredAccessLoading: false,
+          workerResourcePresence,
+          sponsoredSessionConfig: sessionConfig,
+          aiGroupSettings: getSessionAiSettings(slug, sessionConfig),
+        },
+        () => {
+          if (reqId === this._sponsoredReqId) void this.checkAndSendTestFundsIfNeeded();
+        },
+      );
     } catch (_) {
       if (reqId !== this._sponsoredReqId) return;
       this.setStateIfMounted({ sponsoredAccessLoading: false, workerResourcePresence: null });

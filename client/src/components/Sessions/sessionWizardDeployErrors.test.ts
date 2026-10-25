@@ -227,6 +227,30 @@ describe('sessionWizardDeployErrors', () => {
     expect(describeSessionWizardSponsoredDeployFailure({ status: 502 })).toBe('Worker deploy failed (502).');
   });
 
+  it('explains how to proceed when an older deploy helper refuses participant test ETH', () => {
+    const helperError = 'Worker-canonical authority participantScopes contains an unsupported scope.';
+    // A direct deploy's next attempt is a fresh request, so turning the setting off works.
+    const direct = Object.assign(new Error(helperError), { statusCode: 400, responseError: helperError });
+    expect(normalizeSessionWizardDeployErrorMessage({ err: direct })).toBe(
+      `${helperError} This deploy helper predates participant test ETH. Turn off "Send participants test ETH ` +
+        'for gas", or deploy with a 0.7.0 or later deploy helper and Session Worker.',
+    );
+    // An older sponsor has reserved the grant for this exact request, so a changed draft would conflict.
+    const sponsoredGuidance =
+      'The sponsoring Worker predates participant test ETH, so nothing was deployed. The grant now only works for ' +
+      'this exact request: retry this same draft once the sponsor updates that Worker to 0.7.0 or later. To deploy ' +
+      'without test ETH instead, ask for a new deploy grant.';
+    expect(describeSessionWizardSponsoredDeployFailure({ status: 400, error: helperError })).toBe(sponsoredGuidance);
+    const sponsored = Object.assign(new Error(sponsoredGuidance), { statusCode: 400, responseError: helperError });
+    expect(normalizeSessionWizardDeployErrorMessage({ err: sponsored })).toBe(sponsoredGuidance);
+    const otherField = 'Worker-canonical authority anonymousScopes contains an unsupported scope.';
+    expect(
+      normalizeSessionWizardDeployErrorMessage({
+        err: Object.assign(new Error(otherField), { statusCode: 400, responseError: otherField }),
+      }),
+    ).toBe(otherField);
+  });
+
   it('keeps session Worker verification failures out of deploy-helper hints', async () => {
     const verificationError = await completeSessionWizardWorkerPublicDeployment({
       workerUrl: 'https://worker.example.test',

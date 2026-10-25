@@ -1,5 +1,5 @@
 /** @file usePendingSbtDrafts.js */
-import { useCallback, useMemo, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
 import { ethers } from 'ethers';
 import { toStr } from '../../../utilities/shared/primitives.js';
 import type { AnyRecord } from '../../shellTypes';
@@ -143,7 +143,15 @@ export const clearSessionWizardPendingSbtDraftsCache = ({
   return purgeResult;
 };
 
-const usePendingSbtDrafts = () => {
+const usePendingSbtDrafts = (account = '') => {
+  const owner = account.trim().toLowerCase();
+  // Claim codes and deployment secrets belong only to this mounted author.
+  useEffect(
+    () => () => {
+      clearSessionWizardPendingSbtDraftsCache();
+    },
+    [owner],
+  );
   purgeLegacySessionWizardPendingSbtDrafts();
   const pendingSbtDrafts = useSyncExternalStore(
     subscribeToPendingSbtDrafts,

@@ -180,8 +180,7 @@ const AdminAgentSessionWrappedPanel = ({
             />
             <FormText>
               Request-only: this token is sent only to the deploy helper for this operation and is never stored.
-              Attaching a new registry Worker prompts an admin transaction; agent answers do not. Telegram is optional
-              and remains disabled.
+              Attaching a new registry Worker prompts an admin transaction; agent answers do not.
             </FormText>
           </FormGroup>
           <div className={styles.formRow}>

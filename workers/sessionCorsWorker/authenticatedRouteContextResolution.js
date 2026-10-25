@@ -1,3 +1,4 @@
+import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import {
   normalizeAuthorizationEpoch,
   readAuthorizationEpoch,
@@ -20,7 +21,13 @@ export const resolveAuthenticatedRouteContext = async ({
   deps,
 } = {}) => {
   const slug = auth?.slug;
-  const config = await deps?.getSessionConfig?.(env, slug);
+  let config;
+  let revision;
+  try {
+    ({ config, revision } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug }));
+  } catch (error) {
+    return { ok: false, response: deps?.json?.({ error: error.message }, 503, baseHeaders) };
+  }
   if (!config) {
     return {
       ok: false,
@@ -69,6 +76,7 @@ export const resolveAuthenticatedRouteContext = async ({
     headers: corsContext.headers,
     scopes: payload.scopes || {},
     address,
+    expectedAuthority: { actor: address, revision, authzEpoch: currentEpoch },
     limit: config?.limits?.perWalletPerDay || 0,
   };
 };

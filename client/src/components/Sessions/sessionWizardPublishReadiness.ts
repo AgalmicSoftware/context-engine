@@ -1,3 +1,4 @@
+import { getSessionWizardInterviewValidationError } from './sessionWizardInterviewValidation';
 import { normalizeSessionWizardArweaveUri, parseSessionWizardArweaveTxId } from './sessionWizardUrlSupport';
 import {
   buildSessionWizardPublishExecutionPlan,
@@ -17,6 +18,7 @@ export type SessionWizardPublishReadinessInput = {
   manualMetadataUrl: string;
   metadataUrl: string;
   sessionModeProfile?: SessionModeProfile | null;
+  interviewMode?: unknown;
 };
 
 export type SessionWizardPublishReadinessDescriptor = {
@@ -120,7 +122,9 @@ export function resolveSessionWizardPublishReadiness({
   manualMetadataUrl,
   metadataUrl,
   sessionModeProfile = null,
+  interviewMode,
 }: SessionWizardPublishReadinessInput): SessionWizardPublishReadinessDescriptor {
+  const validationError = getSessionWizardInterviewValidationError(interviewMode);
   const modeRequirements = resolveSessionWizardModeRequirements(sessionModeProfile);
   const hasCompatibleWorkerRuntime =
     !!resolvedWorkerBaseUrl &&
@@ -168,13 +172,13 @@ export function resolveSessionWizardPublishReadiness({
     (modeRequirements.usesWorkerRuntime || (!hasManualMetadata && !hasUploadedMetadata));
 
   return {
-    canUploadMetadataNow,
-    uploadBlockedReason,
+    canUploadMetadataNow: !validationError && canUploadMetadataNow,
+    uploadBlockedReason: validationError || uploadBlockedReason,
     hasManualMetadata,
     hasUploadedMetadata,
-    canPublishNow,
-    readinessKind,
-    showUploadBlockedReason,
+    canPublishNow: !validationError && canPublishNow,
+    readinessKind: validationError ? 'blocked' : readinessKind,
+    showUploadBlockedReason: !!validationError || showUploadBlockedReason,
   };
 }
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ethers } from 'ethers';
-import { ACCOUNT_MODES, RISK_CEILINGS, TELEGRAM_BRIDGE_ACTIONS } from './constants.mjs';
+import { ACCOUNT_MODES, RISK_CEILINGS, AGENT_ACTIONS } from './constants.mjs';
 import {
   assertManagedDemoAccountMode,
   buildDemoKeyExportRecord,
@@ -102,11 +102,11 @@ test('managed demo grant checks bound signing to the granted session, action, an
     grant: {
       status: 'active',
       sessions: ['alpha'],
-      allowedActions: [TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE],
+      allowedActions: [AGENT_ACTIONS.DIRECT_SUBMIT_RESPONSE],
       riskCeiling: RISK_CEILINGS.SUBMIT,
     },
     sessionSlug: 'alpha',
-    action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+    action: AGENT_ACTIONS.DIRECT_SUBMIT_RESPONSE,
     requestedRisk: RISK_CEILINGS.SUBMIT,
   });
 
@@ -115,11 +115,11 @@ test('managed demo grant checks bound signing to the granted session, action, an
     grant: {
       status: 'active',
       sessions: ['alpha'],
-      allowedActions: [TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE],
+      allowedActions: [AGENT_ACTIONS.DIRECT_SUBMIT_RESPONSE],
       riskCeiling: RISK_CEILINGS.DRAFT,
     },
     sessionSlug: 'alpha',
-    action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+    action: AGENT_ACTIONS.DIRECT_SUBMIT_RESPONSE,
     requestedRisk: RISK_CEILINGS.SUBMIT,
   });
   assert.equal(allowed.ok, true);

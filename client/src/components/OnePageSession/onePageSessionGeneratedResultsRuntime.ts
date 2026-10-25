@@ -15,7 +15,7 @@ import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorker
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
 import type { ResultsAnalysisBrowserSnapshotResult } from '../../domains/sessionResults/sessionResultsAnalysisBrowserSnapshot';
 import type { GeneratedResultsControllerState } from '../../domains/sessionResults/sessionResultsAnalysisController';
-import { normalizeOnePageSessionSlug, type OnePageSessionPropsLike } from './onePageSessionTelegramController';
+import { normalizeOnePageSessionSlug, type OnePageSessionPropsLike } from './onePageSessionAgentController';
 import { resolveOnePageSessionSurveySlug } from './onePageSessionAggregatorCacheRuntime';
 import { resolveOnePageSessionAggregatorCacheScope } from './onePageSessionRouteRuntime';
 

@@ -42,6 +42,18 @@ npm run sync:results-snapshot
 The snapshot records the source commit and per-file hashes. It is a drift
 detector, not proof of visual parity by itself.
 
+The latest shell review covers the conditional test-ETH offer beside the
+session title in `OnePageSessionStandardShell.tsx`. It does not change Results
+structure, controls, or styles. Benchmark reports have no session faucet, so
+they do not render that offer. Report tests and desktop/mobile interaction
+checks confirmed that the existing Results presentation remains aligned.
+
+The accompanying `OnePageSession.tsx` review preserves the canonical Worker
+session identity when a demo route uses a display alias. This changes answer
+draft scoping, without changing Results structure or presentation. Fresh report
+tests and browser checks at 1280px, 390px, and 320px confirmed the existing
+standalone rendering, including beeswarm and participant hover states.
+
 ## Intended Migration
 
 When repository boundaries permit it, replace the copied renderer vocabulary

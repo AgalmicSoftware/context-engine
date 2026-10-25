@@ -110,6 +110,22 @@ async function installDemoWorkerFixtureRoutes(page, baseUrl, route) {
     });
   });
 
+  if (String(route || '').startsWith('/session/demo')) {
+    // Presence reads omit the query when the Worker already owns the session.
+    // Match the exact path in both forms without touching writes or other Workers.
+    await page.route(
+      (url) => url.origin === DEMO_READY_WORKER_ORIGIN && url.pathname === '/resource-presence',
+      (requestRoute) => {
+        if (requestRoute.request().method() !== 'GET') return requestRoute.fallback();
+        return requestRoute.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true, interview: { ready: isDemoReadyInterviewRoute(route) } }),
+        });
+      },
+    );
+  }
+
   if (!isDemoReadyInterviewRoute(route)) return;
 
   const config = buildDemoReadyInterviewConfig();
@@ -123,13 +139,6 @@ async function installDemoWorkerFixtureRoutes(page, baseUrl, route) {
         config,
         configRevision: String(config.configRevision || 'demo-sh-v1'),
       }),
-    }),
-  );
-  await page.route(`${DEMO_READY_WORKER_ORIGIN}/resource-presence?*`, (requestRoute) =>
-    requestRoute.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ ok: true, interview: { ready: true } }),
     }),
   );
   await page.route(`${DEMO_READY_WORKER_ORIGIN}/interview/starter?*`, (requestRoute) =>

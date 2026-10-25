@@ -5,11 +5,12 @@ import {
 	exportCloudflareEncryptedPayloadEnvelopes,
 	readStorageUploadRequestPayload,
 	setCloudflareStorageResourceHidden,
-	storageRoute,
+	publishCloudflareOwnedStorageMetadata,
+	storageRoute as storageRouteBoundary,
 } from './storageRouteExecution.js';
 import { dispatchAuthenticatedSecretPathRoute } from './authenticatedSecretPathRouteDispatch.js';
 import { getSessionSecrets } from './sessionConfigSecretsStore.js';
-import { writeStorageEnvelopeKeyReleaseAudit } from './storageEnvelopeEncryption.js';
+import { wrapResponseFieldKey, writeStorageEnvelopeKeyReleaseAudit } from './storageEnvelopeEncryption.js';
 import { createWorkerExecutionServicesWithWorkerDeps } from './workerExecutionServiceBinding.js';
 import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
 import { createEthersInterfaceProviderGateHelpersWithWorkerDeps } from './ethersInterfaceProviderGateBinding.js';
@@ -81,6 +82,19 @@ const json = (body, status = 200, headers = {}) =>
 	});
 
 const readJson = async (response) => JSON.parse(await response.text());
+
+// These route-unit cases isolate storage behavior from the authority service.
+// sessionConfigCurrentness covers the real admission/dispatch/coordinator path.
+const storageRoute = (args) => storageRouteBoundary({
+	...args,
+	deps: {
+		executeCoordinatedStoragePublication: async (publication) => {
+			await publishCloudflareOwnedStorageMetadata({ ...publication, config: args.config, actor: args.uploaderAddress });
+			return { ok: true, status: 200, body: { ok: true } };
+		},
+		...args.deps,
+	},
+});
 
 const createMockR2 = () => {
 	const store = new Map();
@@ -2316,6 +2330,93 @@ test('storageRoute consumes the session-secret RPC for worker-canonical SBT gate
 	assert.equal(JSON.stringify(config).includes(secretRpcUrl), false);
 });
 
+for (const accessKind of ['registry gate', 'explicit condition']) {
+  for (const action of ['wrap', 'unwrap']) {
+    test(`field-key ${action} shares secret-only RPC authorization with storage list/read: ${accessKind}`, async () => {
+      const env = {
+        CE_STORAGE_R2: createMockR2(), CE_STORAGE_INDEX_KV: createMockKv(),
+        CE_STORAGE_ENVELOPE_KEK: 'nonsecret-test-key-material', CE_STORAGE_AUDIT_KV: createMockKv(),
+      };
+      const principal = `0x${'11'.repeat(20)}`;
+      const sbtAddress = `0x${'aa'.repeat(20)}`;
+      const secretRpcUrl = 'https://private-rpc.example.test/eth';
+      const gate = { sbtAddresses: [sbtAddress], chainId: 31337, mode: 'all' };
+      const config = {
+        sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', networkChainId: 31337,
+        sessionModeProfile: { authority: { mode: 'worker_canonical' }, storage: { backend: 'cloudflare' }, encryption: { mode: 'none' } },
+        responseFieldEncryption: { version: 1, mode: 'optional' },
+        storageProfile: { backend: 'cloudflare', payloadAccessControl: {
+          encryption: 'none',
+          ...(accessKind === 'registry gate' ? { gate: 'sbt_gate' } : {
+            gate: 'none', accessConditions: { match: 'all', conditions: [{ kind: 'sbt_onchain', contract: sbtAddress, chainId: 31337 }] },
+          }),
+        } },
+        __registry: { gatesByResource: { docUploads: gate, questionResponses: gate } },
+      };
+      let secretReads = 0;
+      const gateChecks = [];
+      const deps = {
+        json, randomBytes: fixedRandomBytes,
+        getSessionSecrets: async (receivedEnv, receivedSlug) => {
+          assert.equal(receivedEnv, env);
+          assert.equal(receivedSlug, 'session-a');
+          secretReads += 1;
+          return { customRpcUrl: secretRpcUrl };
+        },
+        resolveRpcUrlListForGate: (runtimeConfig, gateChainId) => resolveRpcUrlListForGate({ config: runtimeConfig, gateChainId }),
+        checkSbtGate: async (args) => {
+          gateChecks.push(args);
+          assert.equal(args.rpcUrl, secretRpcUrl);
+          assert.equal(args.rpcUrlIsPrivate, true);
+          assert.ok(args.chainAttestationCache instanceof Map);
+          return true;
+        },
+      };
+      const call = (path, body, routeDeps = deps) => storageRoute({
+        path, method: body ? 'POST' : 'GET',
+        request: new Request(`https://worker.example${path}`, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+        env, config, slug: 'session-a', uploaderAddress: principal, authScopes: { storage: true }, baseHeaders: {}, deps: routeDeps,
+      });
+      const uploaded = await call('/storage/upload', { data: 'gated content', contentType: 'text/plain', resource: 'docsContext' });
+      assert.equal(uploaded.status, 200, await uploaded.clone().text());
+      const id = (await uploaded.json()).storageRef.id;
+      const listed = await call('/storage/list', { resource: 'docsContext' });
+      assert.equal(listed.status, 200);
+      assert.equal((await listed.json()).items.length, 1);
+      const read = await call('/storage/read', { id });
+      assert.equal(read.status, 200);
+      assert.equal(await read.text(), 'gated content');
+      const context = `0x${'bb'.repeat(32)}`;
+      const keyBytes = new Uint8Array(32).fill(19);
+      const key = Buffer.from(keyBytes).toString('base64url');
+      const policy = { sessionSlug: 'session-a', sessionId: config.sessionId, owner: principal, audience: 'session', context };
+      const recipient = { type: 'worker-response-field-v1', policy, wrapped: await wrapResponseFieldKey({ env, keyBytes, policy, deps }) };
+      const body = action === 'wrap' ? { key, audience: 'session', context } : { recipient, context };
+      const priorReads = secretReads;
+      const priorChecks = gateChecks.length;
+      const response = await call(`/storage/response-field-key/${action}`, body);
+      assert.equal(response.status, 200, await response.clone().text());
+      assert.equal(secretReads, priorReads + 1);
+      assert.equal(gateChecks.length, priorChecks + 1);
+      const result = await response.json();
+      if (action === 'unwrap') assert.equal(result.key, key);
+      else assert.equal(result.recipient.policy.audience, 'session');
+      assert.equal(JSON.stringify(config).includes(secretRpcUrl), false);
+      assert.equal(JSON.stringify(result).includes(secretRpcUrl), false);
+
+      const secretFailure = await call(`/storage/response-field-key/${action}`, body, {
+        ...deps, getSessionSecrets: async () => { throw new Error('secret store unavailable'); },
+      });
+      assert.equal(secretFailure.status, 403);
+      assert.equal(gateChecks.length, priorChecks + 1, 'secret failure must prevent any SBT read');
+      assert.equal((await secretFailure.text()).includes(key), false);
+      const denied = await call(`/storage/response-field-key/${action}`, body, { ...deps, checkSbtGate: async () => false });
+      assert.equal(denied.status, 403, 'membership is checked on every wrap and release');
+      assert.equal((await denied.text()).includes(key), false);
+    });
+  }
+}
+
 test('storageRoute fails closed when an SBT gate cannot load worker-canonical RPC secrets', async () => {
 	const r2 = createMockR2();
 	const kv = createMockKv();
@@ -4390,19 +4491,42 @@ test('question and survey uploads record their authenticated uploader and id', a
 	assert.equal(survey.metadata.resourceId, '0xs1');
 });
 
-test('lists say whether each question or survey uploader is a session admin now', async () => {
-	const { common, upload, list } = createOwnershipHarness();
-	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('By the author', '0xq1'))).status, 200);
-	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('By a role admin', '0xq2'))).status, 200);
-	assert.equal((await upload(OWNERSHIP_OTHER, { surveyID: '0xs1', title: 'Survey' }, 'surveys')).status, 200);
-	// A Worker role admin that the public adminAddress fields do not name.
-	common.config.workerRoles = { admin: [OWNERSHIP_OTHER] };
-	const flags = (items) => items.map((item) => [item.metadata.resourceId, item.metadata.uploaderIsAdmin]).sort();
-	assert.deepEqual(flags((await list()).items), [['0xq1', false], ['0xq2', true]]);
-	assert.deepEqual(flags((await list('surveys')).items), [['0xs1', true]]);
-	// The flag follows the current role set, not the one at upload time.
-	common.config.workerRoles = {};
-	assert.deepEqual(flags((await list()).items), [['0xq1', false], ['0xq2', false]]);
+test('lists preserve server-recorded upload authority through admin rotation for questions and surveys', async () => {
+	const { common, kv, upload, list } = createOwnershipHarness();
+	const flags = (items) => items.map((item) => [item.metadata.resourceId, item.metadata.uploadAuthority, item.metadata.uploaderIsAdmin]).sort();
+	for (const resource of ['questions', 'surveys']) {
+		const payload = resource === 'questions' ? ownedQuestion('Original', 'id1') : { surveyID: 'id1', title: 'Original' };
+		// Neither payload-authored precedence nor uploader fields are trusted.
+		assert.equal((await upload(OWNERSHIP_AUTHOR, { ...payload, uploadAuthority: 'admin', uploaderIsAdmin: true, uploader: OWNERSHIP_ADMIN }, resource)).status, 200);
+		common.config.workerRoles = { admin: [OWNERSHIP_OTHER] };
+		assert.equal((await upload(OWNERSHIP_OTHER, { ...payload, uploadAuthority: 'author', uploaderIsAdmin: false }, resource)).status, 200);
+		common.config.workerRoles = { admin: [OWNERSHIP_AUTHOR] };
+		common.config.adminAddress = '';
+		assert.deepEqual(flags((await list(resource)).items), [['id1', 'admin', true], ['id1', 'author', false]]);
+		common.config.workerRoles = {};
+		assert.deepEqual(flags((await list(resource)).items), [['id1', 'admin', true], ['id1', 'author', false]]);
+	}
+	const metadata = [...kv.store.entries()].filter(([key]) => key.startsWith('ce-storage:')).map(([, value]) => JSON.parse(value));
+	assert.equal(metadata.filter((row) => row.uploadAuthority === 'admin').length, 2);
+	assert.equal(metadata.filter((row) => row.uploadAuthority === 'author').length, 2);
+});
+
+test('lists do not infer upload authority for unstamped rows from current roles or old flags', async () => {
+	const { common, kv, list } = createOwnershipHarness({ enforceKvWriteRate: false });
+	for (const resource of ['questions', 'surveys']) {
+		await kv.put(`ce-storage:session-a:${resource}:unstamped`, JSON.stringify({
+			id: 'unstamped', backend: 'cloudflare', resource, resourceId: 'id1',
+			uploader: OWNERSHIP_ADMIN, uploaderIsAdmin: true,
+			createdAt: '2026-10-01T00:00:00.000Z',
+			payloadAccessControl: { gate: 'none', encryption: 'none' },
+		}));
+		for (const adminAddress of [OWNERSHIP_ADMIN, OWNERSHIP_OTHER, '']) {
+			common.config.adminAddress = adminAddress;
+			const [item] = (await list(resource)).items;
+			assert.equal(item.metadata.uploaderIsAdmin, false);
+			assert.equal(Object.hasOwn(item.metadata, 'uploadAuthority'), false);
+		}
+	}
 });
 
 test('only the first author or a session admin can upload an existing question or survey id again', async () => {

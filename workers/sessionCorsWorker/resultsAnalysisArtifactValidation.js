@@ -109,7 +109,17 @@ const buildAllowedSourceIds = (source = {}) => {
   ];
   const questions = aiSnapshotPresent ? aiQuestions : snapshotQuestions;
   const participants = aiSnapshotPresent ? aiParticipants : snapshotParticipants;
+  const responses = aiSnapshotPresent ? aiParticipants : toArray(source?.snapshot?.responses);
+  const questionsByParticipant = new Map();
+  responses.forEach((response) => {
+    const participantId = cleanId(response?.syntheticId || response?.participantId);
+    const questionId = cleanId(response?.questionId || response?.questionID);
+    if (!participantId || !questionId) return;
+    if (!questionsByParticipant.has(participantId)) questionsByParticipant.set(participantId, new Set());
+    questionsByParticipant.get(participantId).add(questionId);
+  });
   return {
+    questionsByParticipant,
     questions: new Set(questions.map((entry) => cleanId(entry?.id || entry?.questionId || entry?.questionID)).filter(Boolean)),
     participants: new Set(participants.map((entry) => cleanId(entry?.syntheticId || entry?.participantId)).filter(Boolean)),
   };
@@ -133,6 +143,21 @@ const normalizeIdRefs = ({ value, allowed, label, errors, limit = LIMITS.sourceR
 const normalizeSourceFields = (record, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
   const participantIds = normalizeIdRefs({ value: record.participantIds, allowed: allowed.participants, label: 'participantId', errors, limit: participantLimit });
   const questionIds = normalizeIdRefs({ value: record.questionIds, allowed: allowed.questions, label: 'questionId', errors });
+  if (participantIds.length && questionIds.length) {
+    // Citation arrays can summarize several different responses, so they do not
+    // imply every participant answered every question. Each cited id must still
+    // connect to an actual response inside the AI-visible input, not the full snapshot.
+    for (const participantId of participantIds) {
+      if (!questionIds.some((questionId) => allowed.questionsByParticipant.get(participantId)?.has(questionId))) {
+        errors.push(`unsupported source attribution: participantId ${participantId} has no response to the cited questions`);
+      }
+    }
+    for (const questionId of questionIds) {
+      if (!participantIds.some((participantId) => allowed.questionsByParticipant.get(participantId)?.has(questionId))) {
+        errors.push(`unsupported source attribution: questionId ${questionId} has no response from the cited participants`);
+      }
+    }
+  }
   return {
     ...(participantIds.length ? { participantIds } : {}),
     ...(questionIds.length ? { questionIds } : {}),
@@ -175,12 +200,16 @@ const normalizeArgumentMap = (rawSection, allowed) => {
       if (!label) return null;
       const summary = cleanText(claim.summary || claim.description || claim.evidence);
       const stance = cleanText(claim.stance, 24).toLowerCase();
+      const sourceFields = normalizeSourceFields(claim, allowed, errors);
+      if (!sourceFields.participantIds?.length || !sourceFields.questionIds?.length) {
+        errors.push('claim requires participantIds and questionIds');
+      }
       return {
         id: slugId(claim.id || label, `claim_${debateIndex + 1}_${claimIndex + 1}`),
         label,
         ...(summary ? { summary } : {}),
         ...(['support', 'oppose', 'mixed'].includes(stance) ? { stance } : {}),
-        ...normalizeSourceFields(claim, allowed, errors),
+        ...sourceFields,
       };
     }).filter(Boolean);
     const summary = cleanText(debate.summary || debate.description);
@@ -192,7 +221,7 @@ const normalizeArgumentMap = (rawSection, allowed) => {
       ...(claims.length ? { claims } : { claims: [] }),
     };
   }).filter(Boolean);
-  if (errors.length) return defaultSection('argumentMap', `AI generation referenced unknown source ids in argument map: ${errors.slice(0, 4).join(', ')}.`);
+  if (errors.length) return defaultSection('argumentMap', `AI generation referenced unknown source ids or unsupported source attribution in argument map: ${errors.slice(0, 4).join(', ')}.`);
   if (!debates.length) return defaultSection('argumentMap', 'AI generation did not return renderable argument-map debates.');
   return { available: true, debates };
 };
@@ -297,7 +326,7 @@ const normalizeBreakdown = (rawSection, allowed) => {
       ...normalizeSourceFields(group, allowed, errors, allowed.participants.size),
     };
   }).filter(Boolean);
-  if (errors.length) return defaultSection('breakdown', `AI generation referenced unknown source ids in breakdown: ${errors.slice(0, 4).join(', ')}.`);
+  if (errors.length) return defaultSection('breakdown', `AI generation referenced unknown source ids or unsupported source attribution in breakdown: ${errors.slice(0, 4).join(', ')}.`);
   if (!Object.keys(summary).length && !dimensions.length && !groups.length) {
     return defaultSection('breakdown', 'AI generation did not return renderable breakdown content.');
   }

@@ -104,7 +104,7 @@ test('generated and stored artifacts enforce current group thresholds and disabl
       { id: 'uncited', label: 'Unproven cohort' },
     ] },
     argumentMap: { debates: [{ id: 'topic', title: 'Topic', claims: [
-      { id: 'small', label: 'Suppressed singleton', participantIds: one }, { id: 'all', label: 'Common claim', participantIds: all },
+      { id: 'small', label: 'Grounded minority claim', participantIds: one, questionIds: ['q1'] }, { id: 'all', label: 'Common claim', participantIds: all, questionIds: ['q1'] },
     ] }] },
     atlas: { nodes: [{ id: 'small', label: 'Suppressed singleton', participantIds: one }, { id: 'all', label: 'Common node', participantIds: all }],
       edges: [{ source: 'small', target: 'all' }] },
@@ -121,6 +121,8 @@ test('generated and stored artifacts enforce current group thresholds and disabl
   assert.equal(generated.ok, true, JSON.stringify(generated));
   const sections = generated.draft.artifact.sections;
   assert.deepEqual(sections.breakdown.groups.map((group) => group.id), ['pair', 'all']);
+  assert.equal(sections.argumentMap.available, true);
+  assert.deepEqual(sections.argumentMap.debates[0].claims.map((claim) => claim.id), ['small', 'all']);
   const originalSections = normalizeGeneratedArtifact({ value: generatedValue,
     source: { participants: generated.draft.artifact.participants, aiSnapshot: { questions: [{ id: 'q1' }], responses: all.map((participantId) => ({ participantId, questionId: 'q1' })) } },
     sections: ['argumentMap', 'atlas', 'breakdown', 'riskMatrix'],
@@ -443,9 +445,21 @@ test('worker-canonical source keeps the first or admin version of each question 
   assert.equal(source.ok, true);
   assert.deepEqual(source.snapshot.questions.map((entry) => [entry.id, entry.prompt]), [
     ['q1', 'Official prompt'],
-    ['q2', 'Admin correction'],
+    ['q2', 'Participant draft'],
   ]);
   assert.deepEqual(source.snapshot.responses.map((entry) => entry.questionId).sort(), ['q1', 'q2']);
+  for (const adminAddress of ['', attacker, author]) {
+    const ordinary = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config: { ...config, adminAddress } });
+    assert.equal(ordinary.snapshot.questions.find((entry) => entry.id === 'q1').prompt, 'Official prompt');
+    assert.equal(ordinary.snapshot.questions.find((entry) => entry.id === 'q2').prompt, 'Participant draft');
+  }
+  // Only a server-recorded admin stamp grants correction precedence.
+  await putQuestion('nn-admin', '2026-09-18T00:00:00.000Z', { uploader: admin, resourceId: 'q2', uploadAuthority: 'admin' }, question('q2', 'Admin correction'));
+  for (const adminAddress of ['', attacker]) {
+    const rotated = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config: { ...config, adminAddress } });
+    assert.equal(rotated.snapshot.questions.find((entry) => entry.id === 'q2').prompt, 'Admin correction');
+  }
+
 });
 
 test('worker-canonical source keys questions on the id the upload route trusted', async () => {

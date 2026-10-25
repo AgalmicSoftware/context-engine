@@ -1,6 +1,6 @@
 /** @file AudioInput.tsx */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { Input, InputGroupText } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -22,6 +22,7 @@ import CETooltip from '../CETooltip';
 import { requestAiRewrite } from '../../../utilities/ai/aiClient.js';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper.js';
 import { createLogger } from '../../../utilities/logging.js';
+import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { readThemeToken, subscribeThemeChanges } from '../../../utilities/ui/themeRuntime';
 
 const surveyLog = createLogger('surveys');
@@ -48,6 +49,7 @@ type UseWhisperResult = {
   errorMessage: string;
   startRecording: () => void;
   stopRecording: () => void;
+  cancelRecording: () => void;
   pauseRecording: () => void;
   resumeRecording: () => void;
   audioContextRef?: React.MutableRefObject<AudioContext | null>;
@@ -107,6 +109,8 @@ type PlaceholderStyle = React.CSSProperties & {
 const useWhisperHook = useWhisper as UseWhisperHook;
 
 const describeError = (err: unknown) => (err instanceof Error ? err.message : err);
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
 const AudioInput = ({
   placeholder,
@@ -140,6 +144,12 @@ const AudioInput = ({
   const rewriteRef = useRef<HTMLButtonElement | null>(null);
   const [encryptBoxChecked, setEncryptBoxChecked] = useState<boolean | undefined>(encrypted);
   const [userText, setUserText] = useState('');
+  const userTextRef = useRef('');
+  const updateUserText = useCallback((text: string) => {
+    userTextRef.current = text;
+    setUserText(text);
+  }, []);
+  const recordingRequestedRef = useRef<object | null>(null);
   const [originalText, setOriginalText] = useState('');
   const [rewrittenText, setRewrittenText] = useState('');
   const [aiRewriteActive, setAiRewriteActive] = useState(false);
@@ -149,9 +159,18 @@ const AudioInput = ({
   const waitTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Live mirror to avoid stale closure in waiting timer effect
   const waitingForAIRef = useRef(false);
-  useEffect(() => {
-    waitingForAIRef.current = waitingForAI;
-  }, [waitingForAI]);
+  const rewriteAttemptRef = useRef(0);
+  const pendingRewriteRef = useRef<{ text: string } | null>(null);
+  const invalidateRewrite = useCallback(() => {
+    rewriteAttemptRef.current += 1;
+    pendingRewriteRef.current = null;
+    waitingForAIRef.current = false;
+    setWaitingForAI(false);
+    setWaitingSeconds(0);
+    setOriginalText('');
+    setRewrittenText('');
+    setAiRewriteActive(false);
+  }, []);
 
   // Elapsed timer for long-form sessions (seconds)
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -188,78 +207,67 @@ const AudioInput = ({
 
   const effectiveSessionSlug = sessionSlug;
   const effectiveSessionConfig = sessionConfig;
+  const rewriteContext = asRecord(context);
+  const registry = asRecord(sessionConfig?.__registry);
+  // Parent callbacks and config objects are commonly recreated on every render.
+  // Only source identity changes invalidate an in-flight edit or its undo text.
+  const rewriteSourceKey = JSON.stringify(
+    [
+      sessionSlug,
+      workerUrl,
+      dataCeQuestionId,
+      dataTestId,
+      sessionConfig?.sessionSlug,
+      sessionConfig?.slug,
+      sessionConfig?.sessionId,
+      sessionConfig?.sessionIdHex,
+      sessionConfig?.corsWorkerUrl,
+      sessionConfig?.chainId,
+      registry.sessionId,
+      registry.sessionIdHex,
+      registry.address,
+      registry.chainId,
+      rewriteContext.account,
+      rewriteContext.chainId,
+    ].map((part) => (part == null ? '' : String(part))),
+  );
+  const rewriteProvider = rewriteContext.providerLike || rewriteContext.provider;
+  const inputGenerationRef = useRef(0);
+  const callbackScope = useMemo(
+    () => ({ sourceKey: rewriteSourceKey, provider: rewriteProvider, value, placeholder, disabled, generation: -1 }),
+    [rewriteSourceKey, rewriteProvider, value, placeholder, disabled],
+  );
+  const committedInputRef = useRef<typeof callbackScope | null>(null);
 
   // Guard against state updates after unmount / async completion
   const abortedRef = useRef(false);
-  const parentUpdateRafRef = useRef<number | null>(null);
-  const parentUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const queuedParentTextRef = useRef<string | undefined>(undefined);
   const lastEmittedTextRef = useRef('');
   const hasEmittedTextRef = useRef(false);
   const updateFunctionRef = useRef<AudioInputProps['updateFunction']>(updateFunction);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     updateFunctionRef.current = updateFunction;
   }, [updateFunction]);
 
-  const cancelPendingParentUpdate = useCallback(() => {
-    if (
-      parentUpdateRafRef.current !== null &&
-      typeof window !== 'undefined' &&
-      typeof window.cancelAnimationFrame === 'function'
-    ) {
-      window.cancelAnimationFrame(parentUpdateRafRef.current);
-    }
-    if (parentUpdateTimeoutRef.current !== null) {
-      clearTimeout(parentUpdateTimeoutRef.current);
-    }
-    parentUpdateRafRef.current = null;
-    parentUpdateTimeoutRef.current = null;
-  }, []);
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     abortedRef.current = false;
     return () => {
       abortedRef.current = true;
-      cancelPendingParentUpdate();
+      inputGenerationRef.current += 1;
+      rewriteAttemptRef.current += 1;
+      pendingRewriteRef.current = null;
     };
-  }, [cancelPendingParentUpdate]);
-
-  const flushQueuedParentUpdate = useCallback(() => {
-    parentUpdateRafRef.current = null;
-    parentUpdateTimeoutRef.current = null;
-    if (abortedRef.current || typeof updateFunctionRef.current !== 'function') return;
-    const nextText = queuedParentTextRef.current;
-    queuedParentTextRef.current = undefined;
-    if (nextText === undefined) return;
-    if (hasEmittedTextRef.current && nextText === lastEmittedTextRef.current) return;
-    lastEmittedTextRef.current = nextText;
-    hasEmittedTextRef.current = true;
-    updateFunctionRef.current(nextText);
   }, []);
 
-  // Defer and coalesce parent updates; avoid re-emitting identical text
-  const callParentUpdate = useCallback(
-    (text: string) => {
-      if (typeof updateFunctionRef.current !== 'function' || abortedRef.current) return;
-      if (queuedParentTextRef.current === text) return;
-      if (
-        queuedParentTextRef.current === undefined &&
-        hasEmittedTextRef.current &&
-        text === lastEmittedTextRef.current
-      ) {
-        return;
-      }
-      queuedParentTextRef.current = text;
-      if (parentUpdateRafRef.current !== null || parentUpdateTimeoutRef.current !== null) return;
-      if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-        parentUpdateRafRef.current = window.requestAnimationFrame(flushQueuedParentUpdate);
-      } else {
-        parentUpdateTimeoutRef.current = setTimeout(flushQueuedParentUpdate, 0);
-      }
-    },
-    [flushQueuedParentUpdate],
-  );
+  // Publish completed edits outside state updaters, before a following submit
+  // can snapshot the parent answer. A frame queue loses edits on fast submits.
+  const callParentUpdate = useCallback((text: string) => {
+    if (abortedRef.current || typeof updateFunctionRef.current !== 'function') return;
+    if (hasEmittedTextRef.current && text === lastEmittedTextRef.current) return;
+    lastEmittedTextRef.current = text;
+    hasEmittedTextRef.current = true;
+    updateFunctionRef.current(text);
+  }, []);
 
   // Record-completed flag for strict dock gating (in addition to lastRecordingBlobRef)
   const hasRecordedRef = useRef(false);
@@ -274,6 +282,7 @@ const AudioInput = ({
     errorMessage,
     startRecording,
     stopRecording,
+    cancelRecording,
     pauseRecording,
     resumeRecording,
     audioContextRef,
@@ -290,22 +299,21 @@ const AudioInput = ({
     workerUrl,
     // Live words are distracting - do not inject into textarea while recording
     onTranscriptionUpdate: () => {},
-    // Final text: append to existing content (defer parent update to avoid setState-in-render warnings)
+    // Final text appends to the latest edit without invoking parent callbacks during render.
     onTranscriptionComplete: (finalText: string) => {
+      if (disabled || abortedRef.current || callbackScope.generation !== inputGenerationRef.current) return;
       const cleaned = (finalText || '').trim();
       if (!cleaned) return;
-      setUserText((prev) => {
-        const base = (prev || '').trimEnd();
-        const spacer = base.length ? (/\s$/.test(base) ? '' : ' ') : '';
-        const next = `${base}${spacer}${cleaned}`;
-        callParentUpdate(next);
-        return next;
-      });
+      const base = userTextRef.current.trimEnd();
+      const next = `${base}${base ? ' ' : ''}${cleaned}`;
+      updateUserText(next);
+      callParentUpdate(next);
     },
     onError: (err: unknown) => {
       surveyLog.error('[AudioInput] Transcription error:', describeError(err));
     },
     onRecordingStop: () => {
+      if (disabled || abortedRef.current || callbackScope.generation !== inputGenerationRef.current) return;
       hasRecordedRef.current = true;
     },
   }) as UseWhisperResult;
@@ -320,25 +328,51 @@ const AudioInput = ({
     isPausedRef.current = isPaused;
   }, [isPaused]);
 
-  // Sync external value
-  useEffect(() => {
-    let syncedText: string;
-    if (value && value !== placeholder) {
-      syncedText = String(value);
-      setUserText(syncedText);
-    } else if (!value) {
-      syncedText = '';
-      setUserText('');
-    } else {
-      return;
+  // Invalidate on commit before a pending promise can write to
+  // the replacement field. Echoes of our own controlled updates retain undo.
+  useLayoutEffect(() => {
+    const previous = committedInputRef.current;
+    const sourceChanged =
+      !!previous && (previous.sourceKey !== rewriteSourceKey || previous.provider !== rewriteProvider);
+    const valueChanged = !previous || previous.value !== value || previous.placeholder !== placeholder;
+    const becameDisabled = disabled && !previous?.disabled;
+    committedInputRef.current = callbackScope;
+    const syncedText = value && value !== placeholder ? String(value) : '';
+    const isEcho = hasEmittedTextRef.current && syncedText === lastEmittedTextRef.current;
+    const reset = sourceChanged || (valueChanged && !isEcho);
+    if (reset || becameDisabled) {
+      inputGenerationRef.current += 1;
+      recordingRequestedRef.current = null;
+      if (previous) {
+        cancelRecording();
+        hasRecordedRef.current = false;
+      }
     }
-
-    // Keep dedupe/coalescing refs aligned with externally-controlled text.
-    cancelPendingParentUpdate();
-    queuedParentTextRef.current = undefined;
-    lastEmittedTextRef.current = syncedText;
-    hasEmittedTextRef.current = true;
-  }, [value, placeholder, cancelPendingParentUpdate]);
+    // Callback objects retain their generation across controlled echoes, but an
+    // external reset never revives callbacks captured for an earlier field.
+    callbackScope.generation = inputGenerationRef.current;
+    const pendingText = pendingRewriteRef.current?.text;
+    if (reset || (disabled && pendingRewriteRef.current)) {
+      invalidateRewrite();
+    }
+    if (sourceChanged || valueChanged) {
+      updateUserText(syncedText);
+      lastEmittedTextRef.current = syncedText;
+      hasEmittedTextRef.current = true;
+    } else if (disabled && pendingText !== undefined) {
+      updateUserText(pendingText);
+    }
+  }, [
+    value,
+    placeholder,
+    rewriteSourceKey,
+    rewriteProvider,
+    disabled,
+    callbackScope,
+    cancelRecording,
+    updateUserText,
+    invalidateRewrite,
+  ]);
 
   // Sync encryption checkbox
   useEffect(() => {
@@ -361,13 +395,6 @@ const AudioInput = ({
       }
     };
   }, [waitingForAI]);
-
-  // Keep "Waiting for AI" message local so it never becomes a persisted answer.
-  useEffect(() => {
-    if (!waitingForAIRef.current) return;
-    const msg = `Waiting for AI... ${waitingSeconds}s`;
-    setUserText(msg);
-  }, [waitingSeconds]);
 
   // Recording elapsed timer lifecycle
   const longFormEnabled = !!longFormMode;
@@ -681,6 +708,7 @@ const AudioInput = ({
   // Handlers
   const handleRecordClick = (e?: React.MouseEvent<HTMLButtonElement>) => {
     if (e) e.preventDefault();
+    if (disabled) return;
     if (isRecorderDisabled) {
       setRecorderNotice(LIVE_CONVERSATION_RECORDER_DISABLED_REASON);
       return;
@@ -689,13 +717,16 @@ const AudioInput = ({
       // Single control toggles stop while live
       stopRecording();
     } else {
+      if (recordingRequestedRef.current) return;
       // Each cycle appends on completion
-      setRewrittenText('');
-      setOriginalText('');
-      setAiRewriteActive(false);
-      setWaitingForAI(false);
-      setWaitingSeconds(0);
-      startRecording();
+      const pendingText = pendingRewriteRef.current?.text;
+      invalidateRewrite();
+      if (pendingText !== undefined) updateUserText(pendingText);
+      const request = {};
+      recordingRequestedRef.current = request;
+      Promise.resolve(startRecording()).finally(() => {
+        if (recordingRequestedRef.current === request) recordingRequestedRef.current = null;
+      });
     }
   };
 
@@ -703,7 +734,7 @@ const AudioInput = ({
     if (!waitingForAI) {
       const next = e.target.value;
       if (recorderNotice) setRecorderNotice('');
-      setUserText(next);
+      updateUserText(next);
       callParentUpdate(next);
     }
   };
@@ -714,8 +745,21 @@ const AudioInput = ({
     if (typeof toggleEncryption === 'function') toggleEncryption(next);
   };
 
+  const dictationActive =
+    isRecording ||
+    isPaused ||
+    isProcessing ||
+    isStreaming ||
+    status === RECORDING_STATUS.REQUESTING_PERMISSION ||
+    status === RECORDING_STATUS.PROCESSING;
   const handleAiRewrite = async () => {
+    if (disabled || dictationActive || recordingRequestedRef.current || abortedRef.current || pendingRewriteRef.current)
+      return;
     const currentRewriteText = userText;
+    const attempt = ++rewriteAttemptRef.current;
+    pendingRewriteRef.current = { text: currentRewriteText };
+    waitingForAIRef.current = true;
+    const isCurrent = () => !abortedRef.current && rewriteAttemptRef.current === attempt;
     try {
       setOriginalText(currentRewriteText);
       setRewrittenText('');
@@ -730,36 +774,41 @@ const AudioInput = ({
           workerUrl,
         }),
       );
-      if (abortedRef.current) return;
+      if (!isCurrent()) return;
+      pendingRewriteRef.current = null;
+      waitingForAIRef.current = false;
       setWaitingForAI(false);
       setWaitingSeconds(0);
       setRewrittenText(cleaned);
       setAiRewriteActive(true);
-      setUserText(cleaned);
+      updateUserText(cleaned);
       callParentUpdate(cleaned);
     } catch (err) {
+      if (!isCurrent()) return;
       surveyLog.error('[AudioInput] AI rewrite error:', err);
-      if (abortedRef.current) return;
+      pendingRewriteRef.current = null;
+      waitingForAIRef.current = false;
       setWaitingForAI(false);
       setWaitingSeconds(0);
       setRewrittenText('');
       setAiRewriteActive(false);
-      setUserText(currentRewriteText);
+      updateUserText(currentRewriteText);
       callParentUpdate(currentRewriteText);
     }
   };
 
   const handleRevertText = () => {
+    if (disabled || abortedRef.current || pendingRewriteRef.current || !aiRewriteActive) return;
     setAiRewriteActive(false);
     setRewrittenText('');
-    setUserText(originalText);
+    updateUserText(originalText);
     callParentUpdate(originalText);
   };
 
   const getPlaceholder = () => (userText ? '' : placeholder || '');
 
   // UI state
-  const visibleText = userText;
+  const visibleText = waitingForAI ? `Waiting for AI... ${waitingSeconds}s` : userText;
   const isActiveRecording = isRecording && !isPaused;
   const isProcessingUI = status === RECORDING_STATUS.PROCESSING || !!isProcessing;
 
@@ -877,10 +926,12 @@ const AudioInput = ({
           <button
             ref={rewriteRef}
             onClick={handleAiRewrite}
+            disabled={disabled || dictationActive}
             title="AI rewrite"
             aria-label="AI rewrite"
             className={styles.aiRewriteButton}
             type="button"
+            data-testid={E2E_TESTIDS.AUDIO_INPUT_AI_REWRITE}
           >
             <FontAwesomeIcon icon={faHandSparkles} />
           </button>
@@ -890,10 +941,12 @@ const AudioInput = ({
           <button
             ref={rewriteRef}
             onClick={handleRevertText}
+            disabled={disabled}
             title="Revert to original"
             aria-label="Revert to original"
             className={styles.backArrowButton}
             type="button"
+            data-testid={E2E_TESTIDS.AUDIO_INPUT_AI_REVERT}
           >
             <FontAwesomeIcon icon={faArrowLeft} />
           </button>
@@ -1212,6 +1265,7 @@ const AudioInput = ({
           }
           aria-pressed={isActiveRecording}
           disabled={disabled}
+          data-testid={E2E_TESTIDS.AUDIO_INPUT_RECORD}
         >
           {isActiveRecording ? <FontAwesomeIcon icon={faCircle} /> : <FontAwesomeIcon icon={faMicrophone} />}
         </button>

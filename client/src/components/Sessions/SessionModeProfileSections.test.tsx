@@ -6,6 +6,8 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   SESSION_MODE_PRESET_IDS,
   cloneSessionModePreset,
+  compileSessionModeProfile,
+  mergeSessionModeProfileStorageAccess,
   type SessionModeProfile,
   validateSessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
@@ -40,7 +42,22 @@ const renderSection = (
   return { onChange };
 };
 
+type SectionChange = [SessionModeProfile, { storageProfile: Record<string, any> }];
+
+const lastChange = (onChange: jest.Mock): SectionChange => {
+  const call = onChange.mock.calls[onChange.mock.calls.length - 1];
+  if (!call) throw new Error('Expected a profile change.');
+  return call as SectionChange;
+};
+
 describe('SessionModeProfileSections', () => {
+  it('offers the retained web and agent channels without retired adapter controls', () => {
+    renderSection('worker');
+    expect(screen.queryByRole('checkbox', { name: /^Telegram/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-new-surface-miniApp')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Agents (HTTP API)' })).toBeInTheDocument();
+  });
+
   it('places storage, encryption, access, and result controls in Privacy', () => {
     renderSection('privacy');
 
@@ -111,7 +128,7 @@ describe('SessionModeProfileSections', () => {
 
     const useDefaultRules = screen.getByRole('checkbox', { name: 'Use default Cloudflare access rules' });
     expect(useDefaultRules).toBeChecked();
-    expect(screen.getByText(/configured admins and agents granted the storage scope/i)).toBeInTheDocument();
+    expect(screen.getByText(/configured admins and accounts with storage permission/i)).toBeInTheDocument();
     expect(screen.queryByLabelText('Grant access when')).not.toBeInTheDocument();
 
     const defaultRulesInfo = screen.getByTestId('ce-new-default-cloudflare-access-rules-info');
@@ -124,7 +141,7 @@ describe('SessionModeProfileSections', () => {
 
     expect(screen.getByLabelText('Grant access when')).toBeInTheDocument();
     expect(screen.getByText('Session role')).toBeInTheDocument();
-    expect(screen.getByText('Authorized agents')).toBeInTheDocument();
+    expect(screen.getByText('Authorized accounts')).toBeInTheDocument();
     expect(screen.queryByText('worker role')).not.toBeInTheDocument();
     expect(screen.queryByText('agent grant scope')).not.toBeInTheDocument();
     expect(onChange).toHaveBeenLastCalledWith(
@@ -290,43 +307,28 @@ describe('SessionModeProfileSections', () => {
     );
   });
 
-  it('places optional participation channels in Worker and keeps the Telegram Mini App dependent on Telegram', () => {
+  it('toggles HTTP access while keeping the retired adapters disabled', () => {
     const { onChange } = renderSection('worker');
-
     expect(screen.getByRole('region', { name: 'Participation channels' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Website' })).toBeChecked();
     expect(
       within(screen.getByRole('group', { name: 'Session participation channels' })).getAllByRole('checkbox'),
-    ).toHaveLength(4);
-    for (const label of ['Website', 'Telegram', 'Telegram Mini App', 'Agents (HTTP API)']) {
-      expect(screen.getByRole('checkbox', { name: label })).toHaveAccessibleName(label);
-    }
-    const wrapped = screen.getByRole('checkbox', { name: 'Agents (HTTP API)' });
-    expect(wrapped).not.toBeChecked();
+    ).toHaveLength(2);
+    const agents = screen.getByRole('checkbox', { name: 'Agents (HTTP API)' });
+    expect(agents).not.toBeChecked();
     expect(screen.getByRole('status')).toHaveTextContent('Agent API access: Off');
-    expect(screen.getByRole('status')).toHaveTextContent('Telegram is not required');
-    fireEvent.click(wrapped);
+    fireEvent.click(agents);
     expect(screen.getByRole('status')).toHaveTextContent('Agent API access: On after deployment');
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        preset: 'custom',
-        surfaces: expect.objectContaining({ agentHttp: true, telegram: false }),
+        surfaces: expect.objectContaining({ web: true, agentHttp: true, telegram: false, miniApp: false }),
       }),
       expect.any(Object),
     );
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Telegram Mini App' }));
-
+    fireEvent.click(agents);
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        preset: 'custom',
-        surfaces: expect.objectContaining({ web: true, telegram: true, miniApp: true }),
-      }),
-      expect.any(Object),
-    );
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Telegram' }));
-    expect(onChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        surfaces: expect.objectContaining({ telegram: false, miniApp: false }),
+        surfaces: expect.objectContaining({ web: true, agentHttp: false, telegram: false, miniApp: false }),
       }),
       expect.any(Object),
     );
@@ -341,9 +343,7 @@ describe('SessionModeProfileSections', () => {
 
     for (const [name, explanation] of [
       ['Website', /always enabled/i],
-      ['Telegram', /also enables its Mini App/i],
-      ['Telegram Mini App', /requires Telegram/i],
-      ['Agents (HTTP API)', /without Telegram/i],
+      ['Agents (HTTP API)', /through a scoped credential/i],
     ] as const) {
       const help = screen.getByRole('button', { name: `About ${name}` });
       expect(help).toHaveTextContent(explanation);
@@ -360,7 +360,7 @@ describe('SessionModeProfileSections', () => {
   });
 
   it.each([SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE, SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED])(
-    'reports direct agent access separately from Telegram for %s',
+    'reports direct HTTP access for %s',
     (preset) => {
       const { onChange } = renderSection('worker', cloneSessionModePreset(preset));
       const agents = screen.getByRole('checkbox', { name: 'Agents (HTTP API)' });
@@ -369,8 +369,7 @@ describe('SessionModeProfileSections', () => {
       expect(screen.getByRole('status')).toHaveTextContent('Agent API access: On after deployment');
       expect(screen.getByRole('status')).toHaveTextContent(/authorized agents.*HTTP API/i);
       expect(screen.getByRole('status')).toHaveTextContent(/deployed and verified/i);
-      expect(screen.getByRole('checkbox', { name: 'Telegram' })).not.toBeChecked();
-      expect(screen.getByRole('checkbox', { name: 'Telegram Mini App' })).not.toBeChecked();
+      expect(screen.queryByRole('checkbox', { name: /^Telegram/ })).not.toBeInTheDocument();
 
       fireEvent.click(agents);
       expect(screen.getByRole('status')).toHaveTextContent('Agent API access: Off');
@@ -403,7 +402,192 @@ describe('SessionModeProfileSections', () => {
     expect(within(visibility).getByRole('option', { name: /public stored results/i })).toBeDisabled();
   });
 
-  it('offers public results only for unencrypted Arweave storage and coerces them when encryption is enabled', () => {
+  it('makes unencrypted Cloudflare storage public-read only while public results are selected', () => {
+    const { onChange } = renderSection('privacy');
+    const visibility = screen.getByRole('combobox', { name: 'Who can see results' });
+    const publicOption = within(visibility).getByRole('option', { name: /public stored results/i });
+
+    fireEvent.click(screen.getByTestId('ce-new-encryption-none'));
+    expect(publicOption).toBeEnabled();
+
+    fireEvent.change(visibility, { target: { value: 'public_full_if_storage_public' } });
+    const [publicProfile, publicCompiled] = lastChange(onChange);
+    expect(publicProfile).toEqual(
+      expect.objectContaining({
+        storage: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+        encryption: { mode: 'none' },
+        results: expect.objectContaining({ visibility: 'public_full_if_storage_public' }),
+      }),
+    );
+    expect(validateSessionModeProfile(publicProfile).valid).toBe(true);
+    expect(publicCompiled.storageProfile.payloadAccessControl).toEqual(
+      expect.objectContaining({ gate: 'none', encryption: 'none' }),
+    );
+    expect(publicCompiled.storageProfile.payloadAccessControl).not.toHaveProperty('accessConditions');
+    expect(screen.getByText(/anyone can read them without signing in/i)).toBeInTheDocument();
+
+    fireEvent.change(visibility, { target: { value: 'participant_aggregate' } });
+    const [privateProfile] = lastChange(onChange);
+    expect(privateProfile.storage.payloadAccessControl).toEqual(
+      expect.objectContaining({
+        gate: 'role_gate',
+        encryption: 'none',
+        accessConditions: expect.objectContaining({ match: 'any' }),
+      }),
+    );
+    expect(validateSessionModeProfile(privateProfile).valid).toBe(true);
+    expect(screen.queryByText(/anyone can read them without signing in/i)).not.toBeInTheDocument();
+  });
+
+  it('restores gated Cloudflare storage when encryption is enabled on a public session', () => {
+    const { onChange } = renderSection('privacy');
+    const visibility = screen.getByRole('combobox', { name: 'Who can see results' });
+
+    fireEvent.click(screen.getByTestId('ce-new-encryption-none'));
+    fireEvent.change(visibility, { target: { value: 'public_full_if_storage_public' } });
+    fireEvent.click(screen.getByTestId('ce-new-encryption-worker_envelope'));
+
+    const [profile] = lastChange(onChange);
+    expect(profile.results.visibility).toBe('participant_aggregate');
+    expect(profile.storage.payloadAccessControl).toEqual(
+      expect.objectContaining({ gate: 'role_gate', encryption: 'worker_envelope' }),
+    );
+    expect(validateSessionModeProfile(profile).valid).toBe(true);
+    expect(within(visibility).getByRole('option', { name: /public stored results/i })).toBeDisabled();
+  });
+
+  it('clears a Lit registry chain when encryption returns to None so public results stay valid', () => {
+    const { onChange } = renderSection('privacy');
+    const visibility = screen.getByRole('combobox', { name: 'Who can see results' });
+
+    fireEvent.click(screen.getByTestId('ce-new-encryption-lit'));
+    expect(lastChange(onChange)[0].evm.registryChainId).toBe(11155420);
+    fireEvent.click(screen.getByTestId('ce-new-encryption-none'));
+    fireEvent.change(visibility, { target: { value: 'public_full_if_storage_public' } });
+
+    const [profile, compiled] = lastChange(onChange);
+    expect(profile.evm.registryChainId).toBeNull();
+    expect(validateSessionModeProfile(profile).valid).toBe(true);
+    expect(compiled.storageProfile.payloadAccessControl).toEqual(
+      expect.objectContaining({ gate: 'none', encryption: 'none' }),
+    );
+  });
+
+  it('keeps public results when the current storage is selected again and resets them on a real switch', () => {
+    const { onChange } = renderSection('privacy');
+    const visibility = screen.getByRole('combobox', { name: 'Who can see results' });
+    const storage = screen.getByRole('radiogroup', { name: 'Data storage' });
+
+    fireEvent.click(screen.getByTestId('ce-new-encryption-none'));
+    fireEvent.change(visibility, { target: { value: 'public_full_if_storage_public' } });
+    const changesBefore = onChange.mock.calls.length;
+    fireEvent.click(within(storage).getByRole('radio', { name: 'Cloudflare' }));
+    expect(onChange.mock.calls.length).toBe(changesBefore);
+    expect(visibility).toHaveValue('public_full_if_storage_public');
+
+    fireEvent.click(within(storage).getByRole('radio', { name: 'Arweave' }));
+    expect(lastChange(onChange)[0].results.visibility).toBe('public_full_if_storage_public');
+    fireEvent.click(within(storage).getByRole('radio', { name: 'Cloudflare' }));
+    const [profile] = lastChange(onChange);
+    expect(profile.results.visibility).toBe('participant_aggregate');
+    expect(profile.storage.payloadAccessControl).toEqual(expect.objectContaining({ gate: 'role_gate' }));
+    expect(validateSessionModeProfile(profile).valid).toBe(true);
+  });
+
+  it('restores gated Cloudflare storage when a public session switches to Lit', () => {
+    const { onChange } = renderSection('privacy');
+
+    fireEvent.click(screen.getByTestId('ce-new-encryption-none'));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Who can see results' }), {
+      target: { value: 'public_full_if_storage_public' },
+    });
+    fireEvent.click(screen.getByTestId('ce-new-encryption-lit'));
+
+    const [profile, compiled] = lastChange(onChange);
+    expect(profile.results.visibility).toBe('participant_aggregate');
+    expect(profile.storage.payloadAccessControl).toEqual(
+      expect.objectContaining({ gate: 'role_gate', encryption: 'lit', accessConditions: expect.any(Object) }),
+    );
+    expect(compiled.storageProfile.payloadAccessControl.accessConditions.conditions.length).toBeGreaterThan(0);
+    expect(validateSessionModeProfile(profile).valid).toBe(true);
+  });
+
+  it('clears a registry chain left by SBT storage rules when public results replace them', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.evm.registryChainId = 11155420;
+    profile.encryption = { mode: 'none' };
+    profile.storage.payloadAccessControl = {
+      gate: 'role_gate',
+      encryption: 'none',
+      accessConditions: {
+        match: 'any',
+        conditions: [{ kind: 'sbt_onchain', chainId: 11155420, contract: VALID_SBT_CONTRACT, anyOrAll: 'any' }],
+      },
+    };
+    const { onChange } = renderSection('privacy', profile);
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Who can see results' }), {
+      target: { value: 'public_full_if_storage_public' },
+    });
+    const [next] = lastChange(onChange);
+    expect(next.evm.registryChainId).toBeNull();
+    expect(next.storage.payloadAccessControl).toEqual({ gate: 'none', encryption: 'none' });
+    expect(validateSessionModeProfile(next).valid).toBe(true);
+  });
+
+  it('keeps custom Cloudflare encryption rules when the current encryption is selected again', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.encryption.accessConditions = { match: 'any', conditions: [{ kind: 'worker_role', role: 'moderator' }] };
+    const { onChange } = renderSection('privacy', profile);
+
+    fireEvent.click(screen.getByTestId('ce-new-encryption-worker_envelope'));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('closes a loaded public-read draft when it switches to Lit', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.encryption = { mode: 'none' };
+    profile.storage.payloadAccessControl = { gate: 'none', encryption: 'none' };
+    const { onChange } = renderSection('privacy', profile);
+
+    fireEvent.click(screen.getByTestId('ce-new-encryption-lit'));
+    expect(lastChange(onChange)[0].storage.payloadAccessControl).toEqual(
+      expect.objectContaining({ gate: 'role_gate', encryption: 'lit', accessConditions: expect.any(Object) }),
+    );
+  });
+
+  it('keeps custom storage rules when a reloaded Lit draft returns to no encryption', () => {
+    const rules = { match: 'any' as const, conditions: [{ kind: 'worker_role' as const, role: 'moderator' }] };
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.evm.registryChainId = 11155420;
+    profile.encryption = { mode: 'lit' };
+    profile.storage.payloadAccessControl = { gate: 'none', encryption: 'lit', accessConditions: rules };
+    const { onChange } = renderSection('privacy', profile);
+
+    fireEvent.click(screen.getByTestId('ce-new-encryption-none'));
+    const [next] = lastChange(onChange);
+    expect(next.storage.payloadAccessControl).toEqual({
+      gate: 'role_gate',
+      encryption: 'none',
+      accessConditions: rules,
+    });
+    expect(next.evm.registryChainId).toBeNull();
+  });
+
+  it('leaves Lit storage rules untouched when results visibility changes', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.evm.registryChainId = 11155420;
+    profile.encryption = { mode: 'lit' };
+    profile.storage.payloadAccessControl = { gate: 'none', encryption: 'lit' };
+    const { onChange } = renderSection('privacy', profile);
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Who can see results' }), {
+      target: { value: 'session_member_aggregate' },
+    });
+    expect(lastChange(onChange)[0].storage.payloadAccessControl).toEqual({ gate: 'none', encryption: 'lit' });
+  });
+
+  it('offers public results for unencrypted Arweave storage and coerces them when encryption is enabled', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     const { onChange } = renderSection('privacy', profile);
     const visibility = screen.getByRole('combobox', { name: 'Who can see results' });
@@ -448,5 +632,25 @@ describe('SessionModeProfileSections', () => {
       }),
       expect.any(Object),
     );
+  });
+});
+
+it('shows and edits custom storage rules after a saved profile reload', () => {
+  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+  profile.preset = 'custom';
+  profile.encryption.accessConditions = { match: 'any', conditions: [{ kind: 'worker_role', role: 'reviewer' }] };
+  const reloaded = mergeSessionModeProfileStorageAccess(profile, compileSessionModeProfile(profile).storageProfile);
+  const { onChange } = renderSection('privacy', reloaded);
+  const checkbox = screen.getByRole('checkbox', { name: 'Use default Cloudflare access rules' });
+  expect(checkbox).not.toBeChecked();
+  fireEvent.change(screen.getByRole('textbox', { name: 'Session role' }), { target: { value: 'moderator' } });
+  expect(lastChange(onChange)[1].storageProfile).toMatchObject({
+    payloadAccessControl: { accessConditions: { conditions: [{ kind: 'worker_role', role: 'moderator' }] } },
+  });
+  fireEvent.click(checkbox);
+  expect(checkbox).toBeChecked();
+  const defaults = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+  expect(lastChange(onChange)[1].storageProfile).toMatchObject({
+    payloadAccessControl: defaults.storage.payloadAccessControl,
   });
 });

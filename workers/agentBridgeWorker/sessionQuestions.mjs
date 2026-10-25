@@ -1,4 +1,4 @@
-import { normalizeTelegramRatingScale } from './ratingScale.mjs';
+import { normalizeAgentRatingScale } from './ratingScale.mjs';
 import { normalizeRatingScale } from '../../shared/questions/ratingScale.mjs';
 import { safeString, lower, envFlagEnabled } from './runtimePrimitives.mjs';
 import { resolveRegistryRpcUrls, resolveSessionRegistryAddress } from './registrySessions.mjs';
@@ -894,7 +894,7 @@ function normalizeQuestionPayload(payload = {}, {
     : '';
   const type = normalizeQuestionType(root);
   const sharedScale = type === 'rating' ? normalizeRatingScale(root) : null;
-  const scale = sharedScale ? { ...sharedScale, step: normalizeTelegramRatingScale(root).step } : null;
+  const scale = sharedScale ? { ...sharedScale, step: normalizeAgentRatingScale(root).step } : null;
   const normalized = {
     questionId: id,
     id,

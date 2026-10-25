@@ -574,6 +574,13 @@ describe('answer size budget', () => {
     expect(context.setState).toHaveBeenCalledWith({ submissionError: context.inst._heldBackSubmitMessage });
     // The held-back answer keeps its draft; only the uploaded one is cleared.
     expect(context.clearDraftFor.mock.calls).toEqual([['q1']]);
+    context.stateRef.current.draftPersistenceError = 'Draft changes are only in memory.';
+    context.getChangedQidsAndFields.mockReturnValue({
+      changedQids: new Set(['q2']),
+      changedMap: { q2: { answer: 1 } },
+    });
+    await context.runSurveyQuestionsSubmitSuccessController.mock.calls[0][0].afterStateApplied();
+    expect(context.setState).not.toHaveBeenCalledWith({ draftPersistenceError: '' });
   });
 
   it('keeps a held-back answer out of the saved answers it reports', async () => {

@@ -83,7 +83,7 @@ export async function writeResultsExposureOverride({
     ...next,
     updatedAt: createdAt || nowIso(),
   };
-  assertNoSecretShape(record, 'Telegram results exposure overrides must not serialize secrets.');
+  assertNoSecretShape(record, "Agent results exposure overrides must not serialize secrets.");
   await kv.put(key, JSON.stringify(record));
   return { ok: true, resultsExposure: next };
 }
@@ -135,7 +135,7 @@ export async function writeAdminDefaultSessionOverride({
     updatedBy: accountAddress ? shortAddress(accountAddress) : '',
     updatedAt: createdAt || nowIso(),
   };
-  assertNoSecretShape(record, 'Telegram admin default-session override must not serialize secrets.');
+  assertNoSecretShape(record, "Agent admin default-session override must not serialize secrets.");
   await kv.put(ADMIN_DEFAULT_SESSION_KV_KEY, JSON.stringify(record));
   return { ok: true, sessionSlug: slug };
 }

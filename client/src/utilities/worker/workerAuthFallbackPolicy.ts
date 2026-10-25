@@ -13,7 +13,6 @@ const AUTH_OR_GATE_DENIAL_PATTERNS = [
 
 const AUTHENTICATED_RETRY_DENIAL_PATTERNS = [
   /missing authorization header/i,
-  /token missing .* scope/i,
   /token does not match requested session slug/i,
   /token expired/i,
   /invalid token/i,
@@ -114,6 +113,12 @@ export const shouldFallbackToAuthenticatedFlow = async (
     return true;
   }
   if (status !== 401 && status !== 403) return false;
+  // Private storage's structured denial needs a signed principal before its
+  // rules can be evaluated. Other rule failures must not prompt another login.
+  try {
+    const body = JSON.parse(toStr(await response?.clone?.().text?.()));
+    if (body?.reason === 'missing_principal' || body?.reason === 'private_response_owner_required') return true;
+  } catch (_) {}
   if (shouldFallbackForAnonymousDeny(normalizedError)) {
     return true;
   }
@@ -128,3 +133,8 @@ export const shouldRetryAuthenticatedResponse = async (response?: WorkerAuthText
   if (!errorMessage) return false;
   return AUTHENTICATED_RETRY_DENIAL_PATTERNS.some((pattern) => pattern.test(errorMessage));
 };
+
+// Tokens carry the scopes granted at sign-in, so this denial is final only for
+// a token issued after access last changed; the caller decides which applies.
+export const isTokenScopeDenialResponse = async (response?: WorkerAuthTextResponse | null): Promise<boolean> =>
+  Number(response?.status || 0) === 403 && /token missing .* scope/i.test(await readResponseErrorMessage(response));

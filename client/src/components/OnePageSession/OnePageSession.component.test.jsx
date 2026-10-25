@@ -258,28 +258,43 @@ describe('OnePageSession view gating', () => {
     expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
   });
 
-  it('shows a transport-neutral agent sign-in prompt instead of the web session UI when unauthenticated', async () => {
-    render(
-      <OnePageSession
-        {...buildProps()}
-        sessionConfig={{
-          ...buildProps().sessionConfig,
-          telegramOnly: true,
-          sessionMode: 'telegram_only',
-        }}
-      />,
-    );
+  it('preserves the agent sign-in shell for profile-less legacy sessions', async () => {
+    const sessionConfig = { ...buildProps().sessionConfig, telegramOnly: true };
+    delete sessionConfig.sessionModeProfile;
+    render(<OnePageSession {...buildProps()} sessionConfig={sessionConfig} />);
 
-    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE)).toHaveTextContent(
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_AGENT_SIGN_IN_NOTICE)).toHaveTextContent(
       /Agent-enabled session/i,
     );
-    expect(screen.getByTestId('ce-session-telegram-login-open')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-session-agent-login-open')).toBeInTheDocument();
     expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
     expect(mockSurveyPage).not.toHaveBeenCalled();
   });
 
-  it('renders telegram parity surfaces from an exchanged envelope', async () => {
+  it.each([
+    ['signed out', false, ''],
+    ['wallet', true, 'wagmi'],
+    ['passkey', true, 'passkey'],
+  ])('keeps the normal web page for %s visitors when Agent HTTP is enabled', async (_, loginComplete, provider) => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.surfaces.agentHttp = true;
+    render(
+      <OnePageSession
+        {...buildProps()}
+        loginComplete={loginComplete}
+        provider={provider}
+        sessionConfig={{ ...buildProps().sessionConfig, sessionModeProfile: profile, telegramOnly: true }}
+      />,
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_AGENT_SIGN_IN_NOTICE)).not.toBeInTheDocument();
+  });
+
+  it('renders agent surfaces after token login and restores the web page after logout', async () => {
     const sessionId = '0x1234567890abcdef1234567890abcdef';
+    const agentProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    agentProfile.surfaces.agentHttp = true;
     writeAgentClientLoginEnvelope({
       v: 2,
       sessionId,
@@ -363,7 +378,7 @@ describe('OnePageSession view gating', () => {
                 {
                   questionId: 'q1',
                   questionType: 'binary',
-                  prompt: 'Should the client render Telegram questions?',
+                  prompt: 'Should the client render Agent questions?',
                   options: [],
                   tags: ['client'],
                   answeredByUser: false,
@@ -384,7 +399,7 @@ describe('OnePageSession view gating', () => {
                 questions: [
                   {
                     questionId: 'q1',
-                    prompt: 'Should the client render Telegram questions?',
+                    prompt: 'Should the client render Agent questions?',
                     participants: 3,
                     counts: [
                       { label: 'Agree', count: 2 },
@@ -412,25 +427,28 @@ describe('OnePageSession view gating', () => {
       <OnePageSession
         {...buildProps()}
         loginComplete={true}
+        provider="agent_token"
         sessionConfig={{
           ...buildProps().sessionConfig,
           sessionId,
           corsWorkerUrl: 'https://worker.example',
           agentBridgeUrl: 'https://bridge.example',
-          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-          telegramOnly: true,
-          sessionMode: 'telegram_only',
+          sessionModeProfile: agentProfile,
         }}
       />,
     );
 
-    expect(await screen.findByTestId('ce-session-telegram-questions')).toHaveTextContent(
-      /Should the client render Telegram questions/i,
+    expect(await screen.findByTestId('ce-session-agent-questions')).toHaveTextContent(
+      /Should the client render Agent questions/i,
     );
-    expect(await screen.findByTestId('ce-session-telegram-report-approx')).toHaveTextContent(/Approximate report/i);
+    expect(await screen.findByTestId('ce-session-agent-report-approx')).toHaveTextContent(/Approximate report/i);
     expect(await screen.findByTestId('ce-session-worker-groups')).toHaveTextContent(/Worker members/i);
     expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
     expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('ce-session-agent-logout'));
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-agent-questions')).not.toBeInTheDocument();
   });
 
   it('keeps /session/demo in the normal shell when stale telegram session-meta belongs to another slug', () => {
@@ -442,7 +460,7 @@ describe('OnePageSession view gating', () => {
         sessionMode: 'standard',
       },
     });
-    subject.state.telegramSessionMeta = {
+    subject.state.agentSessionMeta = {
       ok: true,
       sessionSlug: 'edge',
       telegramOnly: true,
@@ -450,10 +468,10 @@ describe('OnePageSession view gating', () => {
       clientSubmitReady: true,
     };
 
-    expect(subject.isTelegramBackendMode(subject.resolveCurrentSessionConfig(), 'demo')).toBe(false);
+    expect(subject.isAgentBackendMode(subject.resolveCurrentSessionConfig(), 'demo')).toBe(false);
   });
 
-  it('clears prior Telegram state before a route-state early return on slug change', () => {
+  it('clears prior Agent state before a route-state early return on slug change', () => {
     const alphaConfig = {
       ...buildProps().sessionConfig,
       slug: 'alpha',
@@ -467,8 +485,8 @@ describe('OnePageSession view gating', () => {
     });
     subject.state = {
       ...subject.state,
-      telegramAgentQuestionsStatus: 'ready',
-      telegramAgentQuestions: [{ questionId: 'alpha-question', prompt: 'Old session question' }],
+      agentQuestionsStatus: 'ready',
+      agentQuestions: [{ questionId: 'alpha-question', prompt: 'Old session question' }],
     };
     const prevProps = subject.props;
     const prevState = { ...subject.state };
@@ -486,8 +504,8 @@ describe('OnePageSession view gating', () => {
 
     subject.componentDidUpdate(prevProps, prevState);
 
-    expect(subject.state.telegramAgentQuestionsStatus).toBe('idle');
-    expect(subject.state.telegramAgentQuestions).toEqual([]);
+    expect(subject.state.agentQuestionsStatus).toBe('idle');
+    expect(subject.state.agentQuestions).toEqual([]);
     expect(subject.state.showQuestions).toBe(true);
   });
 
@@ -1938,58 +1956,65 @@ describe('OnePageSession view gating', () => {
     }
   });
 
-  it('passes the canonical Polis demo questions to both /session/demo question surfaces', async () => {
-    const demoSessionConfig = {
-      ...buildProps().sessionConfig,
-      slug: '',
-      sessionName: 'Context Engine',
-      networkChainId: 11155420,
-      autoFeatureSBTsBySessionSlug: false,
-    };
+  it.each(['registry', 'worker_canonical'])(
+    'passes demo questions with the correct %s draft identity to both surfaces',
+    async (authorityMode) => {
+      const questionSlug = authorityMode === 'worker_canonical' ? 'demo-sh' : 'demo';
+      const demoSessionConfig = {
+        ...buildProps().sessionConfig,
+        slug: authorityMode === 'worker_canonical' ? 'demo-sh' : '',
+        ...(authorityMode === 'worker_canonical'
+          ? { sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE) }
+          : {}),
+        sessionName: 'Context Engine',
+        networkChainId: 11155420,
+        autoFeatureSBTsBySessionSlug: false,
+      };
 
-    const { rerender } = render(
-      <OnePageSession {...buildProps()} slug="demo" questionSessionSlug="" sessionConfig={demoSessionConfig} />,
-    );
+      const { rerender } = render(
+        <OnePageSession {...buildProps()} slug="demo" questionSessionSlug="" sessionConfig={demoSessionConfig} />,
+      );
 
-    await waitFor(() => {
-      expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
-    });
+      await waitFor(() => {
+        expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+      });
 
-    const pileProps = mockSurveyPage.mock.calls
-      .map((args) => args[0])
-      .filter((props) => props?.minifiedMode === 'pile')
-      .pop();
-    expect(pileProps?.sessionSlug).toBe('demo');
-    expect(pileProps?.questionPool).toHaveLength(42);
-    expect(pileProps?.questionPool?.[0]).toEqual(
-      expect.objectContaining({
-        source: 'demo-polis-data',
-        sessionSlug: 'demo',
-        sessionSlugExplicit: true,
-      }),
-    );
+      const pileProps = mockSurveyPage.mock.calls
+        .map((args) => args[0])
+        .filter((props) => props?.minifiedMode === 'pile')
+        .pop();
+      expect(pileProps?.sessionSlug).toBe(questionSlug);
+      expect(pileProps?.questionPool).toHaveLength(42);
+      expect(pileProps?.questionPool?.[0]).toEqual(
+        expect.objectContaining({
+          source: 'demo-polis-data',
+          sessionSlug: questionSlug,
+          sessionSlugExplicit: true,
+        }),
+      );
 
-    rerender(
-      <OnePageSession
-        {...buildProps()}
-        slug="demo"
-        questionSessionSlug=""
-        routeQuestionsOpen={true}
-        sessionConfig={demoSessionConfig}
-      />,
-    );
+      rerender(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug=""
+          routeQuestionsOpen={true}
+          sessionConfig={demoSessionConfig}
+        />,
+      );
 
-    await waitFor(() => {
-      expect(screen.getByTestId('survey-page-full')).toBeInTheDocument();
-    });
+      await waitFor(() => {
+        expect(screen.getByTestId('survey-page-full')).toBeInTheDocument();
+      });
 
-    const fullProps = mockSurveyPage.mock.calls
-      .map((args) => args[0])
-      .filter((props) => props?.miniMode === true)
-      .pop();
-    expect(fullProps?.sessionSlug).toBe('demo');
-    expect(fullProps?.questionPool).toHaveLength(42);
-  });
+      const fullProps = mockSurveyPage.mock.calls
+        .map((args) => args[0])
+        .filter((props) => props?.miniMode === true)
+        .pop();
+      expect(fullProps?.sessionSlug).toBe(questionSlug);
+      expect(fullProps?.questionPool).toHaveLength(42);
+    },
+  );
 
   it('uses the display slug for embedded groups on the built-in demo route', async () => {
     const demoSessionConfig = {

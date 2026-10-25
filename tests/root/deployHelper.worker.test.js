@@ -75,6 +75,8 @@ const makeWorkerModeDeployFields = (options = {}) => {
   return {
     sessionModeProfile,
     storageProfile: makeWorkerStorageProfile(sessionModeProfile),
+    // The wizard always sends its session ID; a hosted Agent Bridge pins it.
+    ...(options.agentHttp === true ? { sessionId: `0x${'4b'.repeat(16)}` } : {}),
   };
 };
 
@@ -246,6 +248,9 @@ const makeDeploymentRequestFetchSequence = (responses = []) => {
   return fetchMock;
 };
 
+const PREVIEW_NAME_LIMIT_ERROR = 'Script name is too long to be used with previews enabled. '
+  + 'Script names with previews enabled cannot be longer than 54 characters.';
+
 const makeResumableDeploymentFetch = () => {
   const namespaces = [];
   const kvValues = new Map();
@@ -355,6 +360,8 @@ const makeResumableDeploymentFetch = () => {
       scriptUploads += 1;
       const metadata = JSON.parse(await new Response(init.body.get('metadata')).text());
       scriptUploadMetadata.push(metadata);
+      // Cloudflare's live response for a name past its version-preview limit.
+      if (scriptUploadMatch[1].length > 54) return cfFailure(400, PREVIEW_NAME_LIMIT_ERROR);
       const response = Array.isArray(fetchMock.scriptUploadResponses) && fetchMock.scriptUploadResponses.length
         ? fetchMock.scriptUploadResponses.shift()
         : cfSuccess({ id: 'worker-uploaded' });
@@ -715,6 +722,8 @@ describe('deploy-helper worker', () => {
       const uploadForm = scriptUpload[1].body;
       const uploadMetadata = await readScriptUploadMetadata(scriptUpload);
       expect(uploadMetadata.main_module).toBe('worker.mjs');
+      // Embedded deployment also probes sibling Workers over their public URL.
+      expect(uploadMetadata.compatibility_flags).toContain('global_fetch_strictly_public');
       expect(uploadMetadata.bindings).toContainEqual({
         name: 'CE_SESSION_COORDINATOR',
         type: 'durable_object_namespace',
@@ -760,7 +769,8 @@ describe('deploy-helper worker', () => {
       expect(secretsEnvelope.secrets).toBeUndefined();
       const serializedSecretsEnvelope = JSON.stringify(secretsEnvelope);
       expect(serializedSecretsEnvelope).not.toContain('sk-openai');
-      expect(serializedSecretsEnvelope).not.toContain('RSA');
+      // A short token like RSA can occur by chance in random base64 ciphertext.
+      expect(serializedSecretsEnvelope).not.toContain('"kty":"RSA"');
       expect(serializedSecretsEnvelope).not.toContain('12345');
       expect(serializedSecretsEnvelope).not.toContain('lit-account-secret');
       expect(serializedSecretsEnvelope).not.toContain('lit-usage-secret');
@@ -1362,7 +1372,7 @@ describe('deploy-helper worker', () => {
     }
   });
 
-  it('seeds reload-safe worker-canonical config without persisting deployment or AI keys', async () => {
+  it.each([false, true])('seeds reload-safe hosted config and optional faucet secrets (faucet=%s)', async (offerFaucet) => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
       new Response('export default { fetch() {} };', { status: 200 }),
@@ -1377,12 +1387,17 @@ describe('deploy-helper worker', () => {
       cfSuccess({}),
     ]);
     global.fetch = fetchMock;
+    const faucetKey = require('ethers').Wallet.createRandom().privateKey;
+    const participantScopes = ['ai', 'transcribe', 'storage', 'groups', 'fetch', ...(offerFaucet ? ['faucet_self'] : [])];
     const accessConditions = {
       match: 'all',
-      conditions: [{ kind: 'worker_role', role: 'admin' }],
+      conditions: offerFaucet
+        ? [{ kind: 'sbt_onchain', chainId: 11155420, contract: '0x00000000000000000000000000000000000000bb', anyOrAll: 'any' }]
+        : [{ kind: 'worker_role', role: 'admin' }],
     };
     const sessionModeProfile = makeWorkerSessionModeProfile();
     sessionModeProfile.storage.payloadAccessControl.accessConditions = accessConditions;
+    if (offerFaucet) sessionModeProfile.evm.registryChainId = 11155420;
 
     try {
       const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
@@ -1392,6 +1407,10 @@ describe('deploy-helper worker', () => {
         sessionSlug: 'alpha-session',
         sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         configRevision: 'revision-a',
+        ...(offerFaucet ? {
+          networkChainId: 11155420, rpcUrl: 'https://rpc.example.test', faucet: { amountEth: '1' },
+          workerAuthority: { version: 1, participantScopes, anonymousScopes: [] },
+        } : {}),
         sessionName: 'Alpha Session',
         sessionInfo: 'Worker-canonical session',
         groupCreationPolicy: 'participants',
@@ -1415,7 +1434,7 @@ describe('deploy-helper worker', () => {
             accessConditions,
           },
         },
-        secrets: { openaiKey: 'sk-never-store' },
+        secrets: { openaiKey: 'sk-never-store', ...(offerFaucet ? { faucetPrivateKey: faucetKey } : {}) },
       }), {}, {});
       const payload = await response.json();
 
@@ -1431,7 +1450,7 @@ describe('deploy-helper worker', () => {
         sessionModeProfile: expect.objectContaining({ authority: { mode: 'worker_canonical' } }),
         workerAuthority: {
           version: 1,
-          participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
+          participantScopes,
           anonymousScopes: [],
         },
         groupCreationPolicy: 'participants',
@@ -1454,6 +1473,7 @@ describe('deploy-helper worker', () => {
       expect(configWrite.rpcUrl).toBeUndefined();
       expect(configWrite.rpcUrlsByChainId).toBeUndefined();
       expect(configWrite.faucet).toBeUndefined();
+      expect(configWrite.networkChainId).toBe(offerFaucet ? 11155420 : undefined);
       expect(configWrite.blockLimits).toBeUndefined();
 
       const scriptUploadMetadata = await readScriptUploadMetadata(findScriptUploadCall(fetchMock));
@@ -1481,6 +1501,17 @@ describe('deploy-helper worker', () => {
       const workerSecretWriteIndices = fetchMock.calls
         .map(([url], index) => (String(url).endsWith('/secrets') ? index : -1))
         .filter((index) => index >= 0);
+      const runtimeSecrets = fetchMock.calls
+        .filter(([url]) => String(url).endsWith(`/workers/scripts/${payload.workerName}/secrets`))
+        .map(([, init]) => JSON.parse(init.body));
+      const kek = runtimeSecrets.find((secret) => secret.name === 'CE_STORAGE_ENVELOPE_KEK').text;
+      const envelope = JSON.parse(fetchMock.calls[sessionSecretsIndex][1].body);
+      const { decryptSessionSecretsEnvelope } = require('../../workers/shared/sessionSecretsEnvelope.mjs');
+      const decrypted = await decryptSessionSecretsEnvelope(envelope, {
+        slug: 'alpha-session', env: { CE_STORAGE_ENVELOPE_KEK: kek },
+      });
+      expect(decrypted.faucetPrivateKey).toBe(offerFaucet ? faucetKey : undefined);
+      expect(serialized).not.toContain(faucetKey);
       expect(sessionSecretsIndex).toBeGreaterThanOrEqual(0);
       expect(sessionSecretsIndex).toBeLessThan(scriptUploadIndex);
       expect(workerSecretWriteIndices).not.toHaveLength(0);
@@ -1788,6 +1819,46 @@ describe('deploy-helper worker', () => {
       const configRewrite = JSON.parse(finalConfigWrite[1].body);
       expect(configRewrite.storageProfile.payloadAccessControl.mode).toBe('public_read');
       expect(configRewrite.corsWorkerUrl).toBe(`https://${payload.workerName}.tenant-subdomain.workers.dev`);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('persists the groups a Cloudflare group gate reads', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' }),
+      cfSuccess({ enabled: true }),
+      cfSuccess({}),
+    ]);
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { gate: 'group_gate', encryption: 'none', groupId: ' Reviewers ' },
+        },
+      }), {}, {});
+
+      expect(response.status).toBe(200);
+      // The Worker's group gate denies everyone when the stored profile names no group.
+      const configWrite = JSON.parse(findConfigWriteCall(fetchMock)[1].body);
+      expect(configWrite.storageProfile.payloadAccessControl).toEqual(expect.objectContaining({
+        gate: 'group_gate',
+        groupIds: ['reviewers'],
+      }));
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -2908,6 +2979,98 @@ describe('deploy-helper worker', () => {
         (/\/workers\/scripts\//.test(String(url)) || /\/storage\/kv\/namespaces\//.test(String(url)))
       ))).toBe(false);
       expect([...journalKv.store.values()].map((value) => JSON.parse(value).state)).toContain('terminal');
+    } finally {
+      consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('deploys a long requested worker name within Cloudflare\'s preview name limit', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    global.fetch = fetchMock;
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
+
+    try {
+      // The wizard's longest generated name: a 32-character session prefix,
+      // "-worker-", and a 6-digit date stamp.
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-long-worker-name-token',
+        deploymentRequestId: 'request-long-worker-name-0001',
+        workerName: 'community-priorities-survey-2026-worker-201426',
+        sessionSlug: 'long-worker-name-session',
+        bundleText: 'export default { fetch() {} };',
+      }), env, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload.workerName).toMatch(/^community-priorities-survey-2026-worker-2-[0-9a-f]{12}$/);
+      expect(payload.workerName).toHaveLength(54);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+    } finally {
+      consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('ends a request rejected under its pre-limit worker name so the client starts a new one', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    fetchMock.scriptUploadResponses.push(cfFailure(400, PREVIEW_NAME_LIMIT_ERROR));
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
+    const body = {
+      apiToken: 'cf-pre-limit-name-token',
+      deploymentRequestId: 'request-pre-limit-worker-name-0001',
+      workerName: 'community-priorities-survey-2026-worker-201426',
+      sessionSlug: 'pre-limit-name-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+    // Helpers without the limit journaled the rejected 59-character name.
+    const journalRejectionUnder = (workerName) => {
+      for (const [key, value] of journalKv.store.entries()) {
+        const record = JSON.parse(value);
+        if (record.state === 'definitive_upload_rejected') {
+          journalKv.store.set(key, JSON.stringify({ ...record, workerName }));
+        }
+      }
+    };
+
+    try {
+      const rejectedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      const { orphanResources } = await rejectedResponse.json();
+      expect(rejectedResponse.status).toBe(502);
+      const preLimitName = `${body.workerName}-${orphanResources.workerName.slice(-12)}`;
+      expect(preLimitName).toHaveLength(59);
+
+      journalRejectionUnder('unrelated-worker-a1b2c3d4e5f6');
+      const tamperedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(tamperedResponse.status).toBe(409);
+      expect((await tamperedResponse.json()).error).toBe('Deployment request upload-rejection journal state is invalid.');
+
+      // Its staged config names the long hostname, so it must not resume.
+      journalRejectionUnder(preLimitName);
+      const endedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      const endedPayload = await endedResponse.json();
+      expect(endedResponse.status).toBe(409);
+      expect(endedPayload).toEqual(expect.objectContaining({
+        deploymentRequestConflict: true,
+        deploymentRequestTerminal: true,
+      }));
+      expect(endedPayload.deploymentRequestPending).toBeUndefined();
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+
+      const freshResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        deploymentRequestId: 'request-pre-limit-worker-name-0002',
+      }), env, {});
+      const freshPayload = await freshResponse.json();
+      expect(freshResponse.status).toBe(200);
+      expect(freshPayload.workerName).toMatch(/^community-priorities-survey-2026-worker-2-[0-9a-f]{12}$/);
     } finally {
       consoleErrorSpy.mockRestore();
       consoleLogSpy.mockRestore();

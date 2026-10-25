@@ -128,4 +128,14 @@ describe('SessionHeaderField', () => {
     expect(screen.queryByRole('button', { name: 'Upload image' })).not.toBeInTheDocument();
     expect(compact.container.querySelector('input[type="file"]')).toBeNull();
   });
+
+  it('offers only header image types that publishing can upload in both pickers', () => {
+    const accepted = 'image/png,image/jpeg,image/jpg,image/gif';
+    const compact = renderSessionHeaderField({ compact: true, sessionHeaderMode: 'upload' });
+    expect(compact.container.querySelector('input[type="file"]')).toHaveAttribute('accept', accepted);
+    compact.unmount();
+
+    const advanced = renderSessionHeaderField({ sessionHeaderMode: 'upload' });
+    expect(advanced.container.querySelector('input[type="file"]')).toHaveAttribute('accept', accepted);
+  });
 });

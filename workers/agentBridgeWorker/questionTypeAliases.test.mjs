@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { __test__sessionQuestions } from './sessionQuestions.mjs';
-import { __test__telegramQuestionQueue as queue } from './telegramQuestionQueue.mjs';
+import { __test__agentQuestionQueue as queue } from './agentQuestionQueue.mjs';
 
 const id = `0x${'cd'.repeat(32)}`;
 const aliases = [

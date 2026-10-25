@@ -716,3 +716,57 @@ test('group-password faucet proofs accept a valid group mint signature', async (
     });
   }
 });
+
+test('hosted participant faucet pays only the caller and permits three successes without charging refusals', async () => {
+  const originalFetch = global.fetch;
+  const originalCrypto = global.crypto;
+  Object.defineProperty(global, 'crypto', { configurable: true, value: webcrypto });
+  const sessionSlug = 'hosted-faucet-quota';
+  const wallet = ethers.Wallet.createRandom();
+  const faucetWallet = ethers.Wallet.createRandom();
+  const secretRpcUrl = 'https://hosted-faucet-rpc.example.test';
+  const env = installSessionCoordinatorBinding({
+    GROUP_KV: createMemoryKv({
+      [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify({
+        slug: sessionSlug, sessionId: WORKER_CANONICAL_SESSION_ID, networkChainId: 84532,
+        allowOrigins: [LOGIN_ORIGIN], ...buildWorkerCanonicalLitModeConfig(),
+        workerAuthority: { version: 1, participantScopes: ['faucet'], anonymousScopes: [] },
+        limits: { perWalletPerDay: 1 },
+      }),
+      [SESSION_SECRETS_KEY(sessionSlug)]: JSON.stringify({ faucetPrivateKey: faucetWallet.privateKey, customRpcUrl: secretRpcUrl }),
+    }), TOKEN_HMAC_SECRET: 'test-secret',
+  });
+  try {
+    const rpc = buildWorkerRpcFetch({ rpcUrl: secretRpcUrl, chainId: 84532 });
+    let highBalance = true;
+    global.fetch = async (url, options = {}) => {
+      const body = JSON.parse(options.body || '{}');
+      if (body.method === 'eth_getBalance' && highBalance) {
+        return buildJsonRpcTextResponse({ jsonrpc: '2.0', id: body.id, result: ethers.utils.parseEther('0.002').toHexString() });
+      }
+      return rpc(url, options);
+    };
+    const token = await issueWorkerLoginToken({ env, wallet, sessionSlug, sessionId: WORKER_CANONICAL_SESSION_ID });
+    const request = (to = wallet.address) => sessionCorsWorker.fetch(makeActionRequest({ token, sessionSlug, body: { action: 'request_test_eth', to } }), env, {});
+    const other = await request(ethers.Wallet.createRandom().address);
+    assert.equal(other.status, 403);
+    assert.equal((await other.json()).error, 'Test ETH can only be sent to your own address.');
+    for (let index = 0; index < 4; index += 1) {
+      const refusal = await request();
+      assert.equal(refusal.status, 403);
+      assert.match((await refusal.json()).error, /Balance above threshold/);
+    }
+    highBalance = false;
+    for (let index = 0; index < 3; index += 1) assert.equal((await request()).status, 200);
+    assert.equal((await request()).status, 429);
+    const sends = rpc.calls.filter(([, options]) => JSON.parse(options.body || '{}').method === 'eth_sendRawTransaction');
+    assert.equal(sends.length, 3);
+    for (const [, options] of sends) {
+      const transaction = ethers.utils.parseTransaction(JSON.parse(options.body).params[0]);
+      assert.equal(transaction.to.toLowerCase(), wallet.address.toLowerCase());
+    }
+  } finally {
+    global.fetch = originalFetch;
+    Object.defineProperty(global, 'crypto', { configurable: true, value: originalCrypto });
+  }
+});

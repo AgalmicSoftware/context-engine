@@ -2,6 +2,217 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+## [0.7.0] - 2026-10-21
+
+### Agents and MCP
+
+- Prepare MCP 0.1.1 with sanitized registry RPC errors and retained transaction
+  hashes for uncertain submissions. Keep successful answers successful when
+  their local history cannot be saved, returning a separate warning.
+- Prevent overlapping MCP state updates from losing remembered sessions; fail
+  safely when a writer lock remains after a stopped process.
+
+- Pin a hosted session's ID in the dedicated Agent Session Wrapped policy.
+  Hosted Wrapped deployments previously produced a policy their own Bridge
+  rejected, so deployment could not verify.
+
+- Release hosted test-ETH quota after setup failures before submission, while
+  keeping quota reserved for uncertain transaction broadcasts.
+
+- Read recent registry answers first and resume older history across calls, so
+  long-running sessions keep showing new responses within bounded scans.
+- Preserve faucet transaction hashes and refusal reasons during SBT claims and
+  registry writes, including pending funding and failed balance checks.
+
+- Let MCP agents join unencrypted OP Sepolia registry sessions from normal
+  session links, read public questions and results, and submit answers and
+  statements with their own test-ETH gas and the session Worker's uploads.
+
+- Show confirmed test-ETH offers in session headers, cached session lists and
+  MCP session details. Add `request_test_eth` for agents to request funding
+  for their own address, shared with SBT claim funding.
+
+- Package the MCP server as `@agalmic/contextengine`, with a standalone executable
+  and bundled license notices. Agents install with `npx -y @agalmic/contextengine`;
+  host configs can pin `@agalmic/contextengine@0.1.0`.
+
+- Add a Context Engine MCP server (`mcp/`) that lets an AI agent join hosted
+  sessions as its own participant. The agent signs in with its own key, reads
+  the session context, answers, adds statements, joins open groups, claims
+  session SBTs with the same codes people use, and reads public results. Its
+  records match the web app's, so they appear in the same Results, with a
+  self-declared agent marker and optional display name.
+
+### Client — available when the site deploys
+
+- Let eligible signed-in participants record or upload audio using the session
+  AI key, while keeping anonymous transcription available where permitted.
+- Hand a finished dictation to its answer field once, outside React rendering,
+  and preserve edits when Submit follows typing, dictation or rewrite immediately.
+- Cancel obsolete recordings and AI edits when the account, session, Worker or
+  field changes. Keep queued drafts scoped to the authority that created them.
+- Show the configured gate names on masked questions and restore the missing
+  runtime helpers used by prompt decryption, response resets and JSON previews.
+- Show the Worker denial for signed-out dictation even when an injected wallet
+  is unlocked; retain valid tokens after terminal scope denials.
+- Sign in once more after a scope denial when an SBT claim or Worker Group join
+  in any open tab may have granted that scope since the last sign-in, so newly
+  eligible participants can dictate or use AI without waiting for token expiry.
+
+- Keep provider keys, wallet keys and faucet keys out of copied setup JSON.
+- Refuse header images that publishing cannot upload, such as WebP or SVG, as
+  soon as they are chosen or pasted instead of failing at publish.
+- Name every setup step, use plain labels for advanced fields, show an access
+  badge only on protected fields, and explain why Worker verification must be
+  repeated after a reload or settings change.
+- Let arrow keys move between hosting templates without choosing one; Enter or
+  Space chooses, so keyboard users can compare templates first.
+- Keep session-network and SBT rules consistent through edits and reloads;
+  preserve custom encrypted-storage rules and explicit HTTP-agent opt-outs.
+- Accept valid Arweave Worker setup payloads, validate owner-written Interview
+  openings before publication, and clear draft Group secrets when the wizard
+  closes or the account changes.
+- Keep interview settings saving to Session Workers before 0.7.0 by leaving the
+  research-sharing default out while it is off; turning it on needs a 0.7.0 Worker.
+- Let owners make sharing AI draft changes for research the default. When it
+  starts on, the interview review opens its submission info so participants
+  see the choice, which covers drafts they removed, before submitting.
+- Describe current response-read permissions and saved export preferences
+  accurately in setup; distinguish unavailable dropdown choices visually.
+- Let a fresh encrypted session publish its first question without treating
+  initial storage-key creation as a change in authorization.
+- Request sign-in for private Worker reads that require a participant identity,
+  and preserve canonical draft ownership on aliased demo session routes.
+
+- Keep Stats group-dialog labels and profile survey previews readable in light
+  and dark themes, with desktop/mobile browser contrast coverage.
+
+- Offer an optional test-ETH faucet for hosted sessions with SBT rules on their
+  test network. Validate and privately deploy its key, and show the funding address.
+- Limit hosted participant faucets to the caller's wallet and three successful
+  payouts in 24 hours; balance and other refusals do not consume the allowance.
+- Keep a hosted faucet's quota reservation after an uncertain RPC submission,
+  and avoid sending another payout through a fallback RPC in the same request.
+- Explain how to continue when an older deploy helper or sponsoring Worker
+  refuses participant test ETH; a sponsored grant stays reserved for that draft.
+
+- Offer "Anyone can see the public stored results" for unencrypted hosted
+  sessions in `/new`. Choosing it makes stored answers public-read; leaving it
+  or enabling encryption restores the default access rules.
+- Keep `/new` session settings valid after switching encryption back from Lit
+  or removing SBT rules, and keep settings when the selected storage or
+  encryption is clicked again.
+
+- Preserve ordinary wallet/passkey web participation when Agent HTTP is enabled.
+  Agent-token login opens the agent view, and agent logout restores the web page.
+- Rename the retained hosted agent surface and utilities around Agent HTTP. Keep
+  agent token login, questions, local drafts, explicit Submit, Worker Groups,
+  and aggregate results; remove retired bot/Mini App wizard controls.
+
+### Workers — requires redeployment
+
+- Allow existing Wrapped policies without a session ID to gain that ID during
+  updates while requiring every other authority field to remain unchanged.
+- Keep automatic analysis eligible after an ineligible trigger instead of
+  treating it as a permanent generation failure.
+- Re-enqueue pending agent answers after queue publication failures using the
+  same request generation; preserve uncertain and completed transaction outcomes.
+  Mark the failed submission `retryable` so agents send the same answer again.
+- Keep normalized faucet settings stable so enabling the wizard switch does not
+  trigger repeated render updates.
+- Grant new hosted faucets through `faucet_self`, which older Workers ignore.
+  Updated Workers map it to the existing faucet route with recipient and daily limits.
+- Update `follow-redirects` to 1.16.1 to fix credential-header handling on redirects.
+
+- Enable public Worker-to-Worker routing so same-account Wrapped health checks
+  can run. Preserve verified capabilities and health proof through deploy retries.
+- Allow dedicated Wrapped HTTP access to be turned off or back on in place while
+  preserving pinned authority and signing secrets; search every KV inventory page
+  before creating a deployment namespace.
+- Use Cloudflare-compatible redirect handling for Lit requests while rejecting
+  redirects before credentials can reach another host.
+- Recheck session authority before publishing metadata, preserve upload-time
+  ownership, and make canonical version selection deterministic.
+- Bound encrypted exports and analysis scans, and validate generated analysis
+  claims against the responses they cite.
+- Recover queued agent submissions without repeating uncertain broadcasts.
+- Keep explicit Agent HTTP disablement authoritative over an older enabled
+  alias in profile-less Bridge policies.
+
+- Retire Agent Bridge bot webhooks, commands, callbacks, and Mini App routes.
+  Keep scoped HTTP credentials, one-time invites, browser login exchange,
+  submission queues, and Session Wrapped. Explicit Agent HTTP disablement wins
+  over legacy flags; existing account keys, credentials, queue identifiers,
+  legacy HTTP/skill aliases, and historical review evidence stay compatible.
+- Remove bot secret provisioning and webhook/menu/name/photo requests from the
+  local Bridge deployment helper. Existing deployments require separate operator
+  webhook/menu and secret cleanup; no live cleanup is performed by this change.
+- Keep caller `humanApproved` submission authorization distinct from historical
+  verified human confirmation/edit evidence. Current HTTP routes cannot create
+  those historical review records.
+- Regenerate the native Cloudflare deployment package with the current Session
+  Worker authority and storage fixes.
+
+- Keep generated session Worker and Agent Bridge names within Cloudflare's
+  54-character limit for Workers with version previews. Hosted deploys for
+  sessions with long names were rejected; existing names are unchanged, and a
+  deploy already rejected for a long name asks to be started again.
+- Keep the group list of a `group_gate` storage profile when the deploy helper
+  stores session config. Without it, the Worker denied every group-gated upload.
+- Stop sending the `cache` fetch option, which Workers at the deployed
+  compatibility date reject. Deploy helpers could not read release manifests,
+  hosted Wrapped deployments never passed their health check, and Wrapped
+  Bridges could not confirm session membership.
+
+### Benchmark reports
+
+- Preserve observed response distributions, uncertainty and source provenance
+  across saved reports, HTML reports and Context Engine exports.
+- Keep legacy analysis fingerprints bound to the saved report while normalizing
+  display content. Correct saved distributions using the original cell-rounding
+  calculation when necessary, without relaxing inconsistent-statistics checks.
+- Keep the benchmark Results presentation and its publication artifact aligned.
+
+### Build and verification
+
+- Update the PDF export dependency DOMPurify to 3.4.17 to address its newly
+  reported sanitizer vulnerabilities.
+- Refresh the shared Zod dependency to 4.6.7 within its consumers' supported
+  ranges to address a validation memory-exhaustion advisory.
+- Pin the browser smoke job to Ubuntu 24.04, which supports the pinned
+  Playwright version, so runner image updates do not prevent Chromium setup.
+
+### Contract source
+
+- Reject survey and question IDs that collide across the two types, preventing
+  them from sharing a response-hash slot. The public ABI is unchanged. This guard
+  applies to newly deployed contracts; existing deployed contracts are unchanged.
+
+### Upgrade notes
+
+- Follow the [publication upgrade guide](docs/publication-upgrade.md) before
+  the site deploys. The client now gives admin precedence only to versions an
+  upgraded Worker stamped at upload, so older admin corrections to questions
+  and surveys stop winning until an admin republishes them. Upgrade affected
+  Workers and republish intended corrections before the new client is live.
+- Builds without a Netlify `COMMIT_REF` deploy the Workers pinned to 0.6.14,
+  which never write that stamp; admin corrections in sessions they create keep
+  ordinary precedence until those Workers come from 0.7.0 or later.
+- Existing Agent Bridges keep their Telegram webhook, menu and bot secrets until
+  an operator removes them; this release performs no live cleanup.
+- Update the project deploy helper and the relevant session Workers and Agent
+  Bridges to use the Worker-side changes; a site deployment alone does not
+  update existing Workers. See the [Worker documentation](docs/session-cors-worker.md)
+  for deployment and compatibility requirements.
+- New hosted faucet setup requires the updated deploy helper and Session Worker.
+  Older helpers reject `faucet_self`, and older Workers do not grant it. Do not
+  substitute the broad `faucet` scope to work around an old deployment.
+- The application is version 0.7.0. MCP source is prepared as the independent
+  package version 0.1.1; publishing the application does not publish it to npm.
+  The existing `@agalmic/contextengine@0.1.0` package lacks these error-handling fixes.
+
 ## [0.6.14] - 2026-10-14
 
 ### Client — available when the site deploys

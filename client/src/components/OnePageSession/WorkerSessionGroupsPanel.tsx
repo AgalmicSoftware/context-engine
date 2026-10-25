@@ -410,7 +410,7 @@ const WorkerSessionGroupsPanel = ({
         <span>{authError || 'Join to sign in and view this linked group.'}</span>
         <button
           type="button"
-          className={styles.telegramPrimaryButton}
+          className={styles.agentPrimaryButton}
           disabled={authStatus === 'loading'}
           onClick={() => requestJoinAuthentication(groupIdFilter)}
         >
@@ -425,7 +425,7 @@ const WorkerSessionGroupsPanel = ({
     return (
       <div className={styles.workerGroupNotice} data-testid="ce-session-worker-groups-login">
         <span>Sign in to view or join this session’s groups.</span>
-        <button type="button" className={styles.telegramPrimaryButton} onClick={requestActionAuthentication}>
+        <button type="button" className={styles.agentPrimaryButton} onClick={requestActionAuthentication}>
           Sign in
         </button>
       </div>
@@ -441,7 +441,7 @@ const WorkerSessionGroupsPanel = ({
         {authError ? (
           <div className={styles.workerGroupNotice}>
             <span>{authError}</span>
-            <button type="button" className={styles.telegramSecondaryButton} onClick={() => void authenticate()}>
+            <button type="button" className={styles.agentSecondaryButton} onClick={() => void authenticate()}>
               Retry
             </button>
           </div>
@@ -459,7 +459,7 @@ const WorkerSessionGroupsPanel = ({
       {authError ? (
         <div className={styles.workerGroupNotice}>
           <span>{authError}</span>
-          <button type="button" className={styles.telegramSecondaryButton} onClick={() => void authenticate()}>
+          <button type="button" className={styles.agentSecondaryButton} onClick={() => void authenticate()}>
             Retry
           </button>
         </div>

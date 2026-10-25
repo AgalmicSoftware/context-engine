@@ -1,3 +1,4 @@
+import { reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet } from './sessionWriteCoordinator.js';
 import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
 import { isModelAllowed } from './aiRequestNormalization.js';
 import { executeSessionLitChipotleAction } from './chipotleClient.js';
@@ -60,19 +61,23 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
     const requestedRecipient = toStr(body?.to || body?.recipient || body?.address).trim().toLowerCase();
     const normalizedAddress = toStr(address).trim().toLowerCase();
     const isSelfFundingRequest = !!requestedRecipient && requestedRecipient === normalizedAddress;
+    const hosted = config?.sessionModeProfile?.authority?.mode === 'worker_canonical';
+    if (hosted && !isSelfFundingRequest) {
+      return { handled: true, response: deps?.json?.({ error: 'Test ETH can only be sent to your own address.' }, 403, headers) };
+    }
     const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
       scopes,
       scope: 'faucet',
       route: 'faucet',
       config,
-      allowWithoutScope: hasProofBackedFaucetRequest || isSelfFundingRequest,
+      allowWithoutScope: !hosted && (hasProofBackedFaucetRequest || isSelfFundingRequest),
       env,
       slug,
       address,
       limit,
       headers,
       deps: {
-        checkRateLimit: deps?.checkRateLimit,
+        checkRateLimit: hosted ? async () => true : deps?.checkRateLimit,
         computeScopesForLogin: deps?.computeScopesForLogin,
         json: deps?.json,
       },
@@ -100,9 +105,19 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
       };
     }
 
-    return {
-      handled: true,
-      response: await deps?.faucet?.({
+    const reserve = deps?.reserveCoordinatedHostedFaucet || reserveCoordinatedHostedFaucet;
+    const finalize = deps?.finalizeCoordinatedHostedFaucet || finalizeCoordinatedHostedFaucet;
+    const reservation = hosted ? await reserve({ env, slug, address }) : null;
+    if (hosted && reservation?.ok !== true) {
+      return { handled: true, response: deps?.json?.({ error: 'Faucet coordination is unavailable; try later.' }, 503, headers) };
+    }
+    if (hosted && !reservation.allowed) {
+      return { handled: true, response: deps?.json?.({ error: "Today's test-ETH limit for this address is used up." }, 429, headers) };
+    }
+    let submissionAttempted = false;
+    let response;
+    try {
+      response = await deps?.faucet?.({
         payload: body,
         secrets: secretContext.secrets,
         config,
@@ -110,8 +125,26 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
         slug,
         requesterAddress: address,
         tokenHasFaucetScope: preflight.tokenHasScope,
-      }),
-    };
+        ...(hosted ? {
+          onSubmissionAttempt: () => { submissionAttempted = true; },
+          retryAfterSubmissionFailure: false,
+        } : {}),
+      });
+    } catch (error) {
+      // A failure before submission, such as a malformed key, must not hold a slot.
+      if (hosted && !submissionAttempted) {
+        await finalize({ env, slug, address, requestId: reservation.requestId, sent: false });
+      }
+      throw error;
+    }
+    if (hosted) {
+      // HTTP errors do not prove a transfer was rejected. Only release a failed
+      // request when no submission was attempted; ambiguous sends expire normally.
+      if (!submissionAttempted || response?.status === 200) {
+        await finalize({ env, slug, address, requestId: reservation.requestId, sent: response?.status === 200 });
+      }
+    }
+    return { handled: true, response };
   }
 
   if (isAiAction) {

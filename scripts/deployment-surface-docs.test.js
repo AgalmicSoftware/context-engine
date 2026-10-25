@@ -145,7 +145,9 @@ test('architecture docs inventory Agent Bridge and encrypted-envelope export bou
   }
 
   assert.match(spec, /\/api\/agent\/\*/);
-  assert.match(spec, /\/telegram\/webhook/);
+  assert.match(spec, /Bot webhook, command, and Mini App routes are retired/);
+  assert.match(spec, /\/telegram\/agent\/api\/\*/);
+  assert.match(spec, /ce-agent-access\/SKILL\.md/);
   assert.match(spec, /\/admin\/abuse-summary/);
   assert.match(overview, /AgentBridge -.->\|policy-enabled direct submit\| Contracts/);
   assert.match(overview, /Surveys contract[\s\S]{0,120}remain canonical/);
@@ -156,7 +158,7 @@ test('public Agent Bridge docs keep the current storage-profile split', () => {
 
   assert.match(bridgeReadme, /workers\/agentBridgeWorker\//);
   assert.match(bridgeReadme, /separate from `workers\/sessionCorsWorker\//);
-  assert.match(bridgeReadme, /ships as part of the public\s+worker surface/);
+  assert.match(bridgeReadme, /ships as part of\s+the public\s+worker surface/);
   assert.match(bridgeReadme, /Hosted &\s+Fast[\s\S]{0,180}default\/recommended[\s\S]{0,180}Cloudflare/i);
   assert.match(bridgeReadme, /Trustless &\s+Slower[\s\S]{0,180}Arweave/i);
   assert.match(bridgeReadme, /legacy\/custom drafts[\s\S]{0,180}Arweave\s+fallback/i);
@@ -206,5 +208,36 @@ test('session publication docs keep Worker-canonical and chain-backed effects se
     assert.match(wizardMap, /selected default\/recommended Hosted profile compiles to Cloudflare/);
     assert.match(wizardMap, /pending on-chain SBT metadata\/deploy\/finalize, independent of the session authority profile/);
     assert.match(wizardMap, /deferred draft held in tab memory[\s\S]{0,120}does not survive reload/);
+  }
+});
+
+test('active agent docs preserve HTTP access and distinguish historical review evidence', () => {
+  const contract = readIfPresent('docs/agent-native-contract.md');
+  const workerDoc = read('docs/session-cors-worker.md');
+  const architecture = read('ARCHITECTURE.md');
+  const readme = read('README.md');
+  const research = readIfPresent('docs/session-interview-research.md');
+
+  assert.match(readme, /Agent token login in the browser/);
+  assert.doesNotMatch(readme, /Optional Telegram bot and Mini App adapters/);
+  assert.match(architecture, /OnePageSessionAgentShell\.tsx/);
+  assert.match(architecture, /agentSessionBackend\.ts/);
+  assert.doesNotMatch(architecture, /telegramAgentData\.ts|telegramSessionBackend\.ts/);
+  assert.match(workerDoc, /HTTP-off overrides stale legacy flags/);
+  assert.match(workerDoc, /historical `telegram`|Historical explicit\s+`telegram`/);
+  assert.match(workerDoc, /retired bot export commands/);
+  assert.doesNotMatch(workerDoc, /Telegram-first|Telegram remains independently optional/);
+  if (contract) {
+    assert.match(contract, /agentSessionRuntime\.mjs/);
+    assert.match(contract, /agentOnlyMode\.mjs/);
+    assert.match(contract, /humanApproved[\s\S]{0,200}not verified evidence of human review/);
+    assert.match(contract, /Historical verified Mini App confirmation\/edit records/);
+    assert.match(contract, /later explicit operational\s+actions/);
+    assert.match(contract, /not an exactly-once execution guarantee/);
+    assert.doesNotMatch(contract, /telegramAgentOnlyMode\.mjs|implements the bot-first Telegram flow/);
+  }
+  if (research) {
+    assert.match(research, /agentOnlyMode\.mjs/);
+    assert.match(research, /Current HTTP routes cannot create those review records/);
   }
 });

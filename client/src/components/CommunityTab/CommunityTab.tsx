@@ -19,6 +19,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './CommunityTab.module.scss';
 import { renderCommunitySessionFilters } from './renderCommunitySessionFilters';
+import SessionTestEthBadge from '../Shared/SessionTestEthBadge';
 import historicalFigures from '../../variables/demo/historical_figure_users.json';
 import { Modal, ModalHeader, ModalBody, Collapse } from 'reactstrap';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
@@ -341,13 +342,19 @@ export class CommunityTab extends Component<any, any> {
     return slug || 'General';
   };
 
-  _sessionName = (slugIn: unknown): string => {
+  _sessionConfig = (slugIn: unknown) => {
     const slug = normalizeSessionSlug(slugIn || '');
     const propConfig = this.props.sessionConfig;
     const exactPropConfig =
       typeof propConfig?.slug === 'string' && normalizeSessionSlug(propConfig.slug) === slug ? propConfig : null;
-    const config =
-      exactPropConfig || getSessionConfigBySlug(slug) || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true });
+    return (
+      exactPropConfig || getSessionConfigBySlug(slug) || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })
+    );
+  };
+
+  _sessionName = (slugIn: unknown): string => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const config = this._sessionConfig(slug);
     const name = String(config?.sessionName || '').trim();
     return name || slug || 'General';
   };
@@ -2467,6 +2474,10 @@ export class CommunityTab extends Component<any, any> {
                   <a href={session.href} className={styles.sessionLink}>
                     <span className={styles.sessionIdentity}>
                       <strong>{session.name}</strong>
+                      <SessionTestEthBadge
+                        sessionSlug={session.slug}
+                        sessionConfig={this._sessionConfig(session.slug)}
+                      />
                       <span>
                         {session.slug || 'general'}
                         {isCommunitySessionDateUnavailable(session, this.state.sessionFilters) && ' · date unavailable'}

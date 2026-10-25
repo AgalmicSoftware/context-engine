@@ -1,3 +1,4 @@
+import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { normalizeInterviewSettings, hasInterviewQuestionGrowth } from '../../shared/interviewSettings.mjs';
 import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
@@ -94,7 +95,12 @@ export const dispatchInterviewStarterRequest = async ({ request, env, slugHint, 
   if (!resolved.ok || !resolved.explicitSlugProvided)
     return deps.json({ error: resolved.error || constants.missingSlugError }, 400, baseHeaders);
   const slug = resolved.slug;
-  const config = await deps.getSessionConfig(env, slug);
+  let config;
+  try {
+    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug }));
+  } catch (error) {
+    return deps?.json?.({ error: error.message }, 503, baseHeaders);
+  }
   if (!config) return deps.json({ error: constants.sessionConfigNotFoundError }, 404, baseHeaders);
   const cors = await deps.getCorsContext({ request, config });
   if (!cors.ok) return cors.response;

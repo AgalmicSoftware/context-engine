@@ -10,6 +10,17 @@
     "kind": { "const": "ce_benchmark_results_dataset" },
     "generatedAt": { "type": "string" },
     "sourceReport": { "type": "object" },
+    "summaryCorrection": {
+      "type": ["object", "null"],
+      "description": "Saved-count correction provenance, retained verbatim from the source report; this does not validate the original model runs.",
+      "properties": {
+        "method": { "type": "string" },
+        "sourceReportContentHash": { "type": "string" },
+        "sourceCellContentHash": { "type": "string" },
+        "correctedAt": { "type": "string" },
+        "rawRunsRevalidated": { "type": "boolean" }
+      }
+    },
     "stanceScale": { "type": "object" },
     "statistics": { "type": "object" },
     "participants": { "type": "array", "items": { "type": "object" } },
@@ -27,7 +38,22 @@
       }
     },
     "polisReport": { "type": "object" },
-    "participantGraph": { "type": "object" },
+    "participantGraph": {
+      "type": "object",
+      "properties": {
+        "opinionGroupAvailability": {
+          "type": "object",
+          "required": ["status", "reason", "interpretation", "eligibleParticipantIds", "missingPairCount"],
+          "properties": {
+            "status": { "enum": ["available", "unavailable"] },
+            "reason": { "enum": [null, "incomplete-pairwise-similarity", "insufficient-eligible-participants"] },
+            "interpretation": { "const": "exploratory" },
+            "eligibleParticipantIds": { "type": "array", "items": { "type": "string" } },
+            "missingPairCount": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
     "breakdown": { "type": "object" },
     "importance": { "type": "object" },
     "debateAtlas": { "type": "object" },

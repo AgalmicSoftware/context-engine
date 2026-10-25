@@ -3,6 +3,7 @@ import { useInterviewSavedAnswers, type InterviewSavedAnswerLoader } from './use
 import { verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
+import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { appendInterviewTranscript, mergeInterviewReview } from './sessionInterviewReviewState';
 import { useInterviewReadiness } from './useInterviewReadiness';
 import { useInterviewQuestionUpdates } from './useInterviewQuestionUpdates';
@@ -199,6 +200,8 @@ function SessionInterviewPanel({
     useState<SessionInterviewGroupRecommendationRequest | null>(null);
   const [drafts, setDrafts] = useState<InterviewDraftResponse[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  // Explicitly removed cards stay hidden; saved-answer conflicts still need review.
+  const [removedDraftIds, setRemovedDraftIds] = useState<Record<string, boolean>>({});
   const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>({});
   const isDirectUserContextPrefill = prefillPacket?.source?.modelId === 'direct-user-context';
   const hasAiPrefill = Boolean(prefillPacket?.source && !isDirectUserContextPrefill);
@@ -207,9 +210,13 @@ function SessionInterviewPanel({
   const researchAvailable = hasAiPrefill || hasPredictionRevisions || hasAiGeneratedReview;
   const researchPacket = buildResearchPacket(prefillPacket, sessionSlug);
   const [includeProvenance, setIncludeProvenance] = useState(true);
-  const [includePredictionComparison, setIncludePredictionComparison] = useState(false);
+  const [researchSharingChoice, setResearchSharingChoice] = useState<{
+    contextToken: string;
+    included: boolean;
+  } | null>(null);
   const [includeResponderName, setIncludeResponderName] = useState(false);
   const [consentOverrides, setConsentOverrides] = useState<InterviewConsentOverrides>({});
+  const [submissionInfoOpen, setSubmissionInfoOpen] = useState(false);
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
@@ -282,6 +289,12 @@ function SessionInterviewPanel({
   const questions = updates.questions;
   const authenticatedForSubmit = Boolean(loginComplete && String(account || '').trim());
   const baseSubmitContextToken = submitContextToken || sessionSlug;
+  // Resolve late-loaded session defaults until the participant chooses. Keep that
+  // choice through login without carrying it into a different session's review.
+  const includePredictionComparison =
+    researchSharingChoice?.contextToken === baseSubmitContextToken
+      ? researchSharingChoice.included
+      : normalizeInterviewSettings(sessionConfig?.interviewMode).shareDraftChangesByDefault;
   const activeSubmitContextToken = [
     baseSubmitContextToken,
     String(account || '')
@@ -325,6 +338,7 @@ function SessionInterviewPanel({
     ...pendingInterviewProvenance,
   } as Record<string, UnknownRecord>;
   const selectedDrafts = drafts.filter((draft) => selected[draft.questionId]);
+  const visibleDrafts = drafts.filter((draft) => !removedDraftIds[draft.questionId]);
   const consentDrafts = selectedDrafts.length ? selectedDrafts : drafts;
   const aiChoice = summarizeConsentChoice(
     consentDrafts.map((draft) =>
@@ -352,6 +366,15 @@ function SessionInterviewPanel({
   const hasSavedAi = consentDrafts.some(
     (draft) => resolveConsentFlags(savedConsent[draft.questionId]).includeAiProvenance,
   );
+  // Research sharing that starts on, such as from the session default, must be
+  // seen before submitting, so open the submission info until the participant chooses.
+  const researchSharingStartsOn =
+    (researchAvailable || hasSavedAi) &&
+    consentOverrides.includePredictionComparison === undefined &&
+    (comparisonChoice.checked || comparisonChoice.mixed);
+  useEffect(() => {
+    if (researchSharingStartsOn) setSubmissionInfoOpen(true);
+  }, [researchSharingStartsOn]);
 
   const existingResponsesRef = useRef(existingResponseSlice);
   existingResponsesRef.current = existingResponseSlice;
@@ -1021,13 +1044,13 @@ function SessionInterviewPanel({
               <Button onClick={ownAnswers.retry}>Retry saved answers</Button>
             </div>
           ) : null}
-          {drafts.length && !isInterviewBusy && !mapping ? (
+          {visibleDrafts.length && !isInterviewBusy && !mapping ? (
             <SessionInterviewReviewSection
               title="Review proposed responses"
               summaryRef={reviewRef}
               testId={E2E_TESTIDS.SESSION_INTERVIEW_REVIEW}
             >
-              {drafts.map((draft) => (
+              {visibleDrafts.map((draft) => (
                 <SessionInterviewDraftCard
                   key={draft.questionId}
                   draft={draft}
@@ -1045,6 +1068,7 @@ function SessionInterviewPanel({
                       viewResultsRevealRef.current = null;
                     }
                     setSelected((current) => ({ ...current, [draft.questionId]: value }));
+                    setRemovedDraftIds((current) => ({ ...current, [draft.questionId]: !value }));
                   }}
                   onEdit={(patch) => {
                     setGroupRecommendationRequest(null);
@@ -1110,7 +1134,11 @@ function SessionInterviewPanel({
           {drafts.length && !isInterviewBusy && !mapping ? (
             <div className={styles.sessionInterviewReviewActions} role="group" aria-label="Response submission">
               {researchAvailable || importedResponderName || hasSavedName || hasSavedAi ? (
-                <details className={styles.sessionInterviewConsentOptions}>
+                <details
+                  className={styles.sessionInterviewConsentOptions}
+                  open={submissionInfoOpen}
+                  onToggle={(event) => setSubmissionInfoOpen(event.currentTarget.open)}
+                >
                   <summary>AI submission info</summary>
                   <div className={styles.sessionInterviewChoicesPanel}>
                     {researchAvailable || hasSavedAi ? (
@@ -1128,7 +1156,7 @@ function SessionInterviewPanel({
                           setConsentOverrides((prev) => ({ ...prev, includeAiProvenance: included }));
                         }}
                         onComparisonChange={(included) => {
-                          setIncludePredictionComparison(included);
+                          setResearchSharingChoice({ contextToken: baseSubmitContextToken, included });
                           setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));
                         }}
                         coverageDetails={researchCoverageDetails}

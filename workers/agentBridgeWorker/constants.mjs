@@ -28,7 +28,7 @@ export const AGENT_BRIDGE_EVENT_TYPES = Object.freeze({
   FAILED: 'failed',
 });
 
-export const TELEGRAM_CHAT_LANES = Object.freeze({
+export const LEGACY_TRANSPORT_LANES = Object.freeze({
   GROUP_LOBBY: 'telegram_group_lobby',
   PRIVATE_ACCOUNT: 'telegram_private_account',
   MINI_APP: 'telegram_mini_app',
@@ -52,7 +52,7 @@ export const RISK_RANK = Object.freeze({
   [RISK_CEILINGS.ADMIN]: 5,
 });
 
-export const TELEGRAM_BRIDGE_ACTIONS = Object.freeze({
+export const AGENT_ACTIONS = Object.freeze({
   VIEW_QUESTIONS: 'view_questions',
   VIEW_RESULTS: 'view_results',
   ABOUT_CONTEXT_ENGINE: 'about_context_engine',

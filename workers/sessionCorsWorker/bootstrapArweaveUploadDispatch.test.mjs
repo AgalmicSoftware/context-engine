@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dispatchBootstrapArweaveUpload } from './bootstrapArweaveUploadDispatch.js';
+import { dispatchBootstrapArweaveUpload as boundary } from './bootstrapArweaveUploadDispatch.js';
+
+const dispatchBootstrapArweaveUpload = (args) => boundary({
+  ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async ({ slug }) => ({
+    config: await args.deps?.getSessionConfig?.(slug), revision: 1,
+  })) },
+});
 
 const UPLOAD_URL = 'https://worker.example/arweave/upload';
 // A bootstrap admin message bound to this Worker and session, as the client signs it.

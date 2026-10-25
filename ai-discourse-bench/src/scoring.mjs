@@ -1,3 +1,5 @@
+import { aggregateResponseDistributions, summarizeWinningResponseConsistency } from './response-distributions.mjs';
+import { opinionGroupAvailability } from './opinion-groups.mjs';
 import { ANSWER_SCORE, ANSWER_VALUES } from './config.mjs';
 import { assertSafeUniqueIdentifiers } from './identifiers.mjs';
 import { summarizeImportanceRuns } from './importance.mjs';
@@ -117,38 +119,8 @@ const summarizeModelQuestionRuns = (runs, seed) => ({
   polarity: summarizePolarity(runs, seed),
 });
 
-const summarizeWinningResponseConsistency = (cells = []) => {
-  let winningResponses = 0;
-  let attemptedRuns = 0;
-  let validRuns = 0;
-  let contributingModels = 0;
-
-  cells.forEach((cell) => {
-    let modelContributed = false;
-    for (const polarity of ['canonical', 'reversedNormalized']) {
-      const form = cell?.polarity?.[polarity];
-      const attempts = Number(form?.total || 0);
-      if (!Number.isFinite(attempts) || attempts <= 0) continue;
-      const answerCounts = ANSWER_VALUES.map((answer) => Number(form?.counts?.[answer] || 0));
-      winningResponses += Math.max(0, ...answerCounts);
-      validRuns += answerCounts.reduce((sum, count) => sum + count, 0);
-      attemptedRuns += attempts;
-      modelContributed = true;
-    }
-    if (modelContributed) contributingModels += 1;
-  });
-
-  return {
-    method: 'pooled-within-model-polarity-modal-share',
-    rate: attemptedRuns ? round(winningResponses / attemptedRuns) : null,
-    winningResponses,
-    attemptedRuns,
-    validRuns,
-    contributingModels,
-  };
-};
-
 const summarizeCellForm = (cells, formKey, seed) => {
+  const observed = aggregateResponseDistributions(cells.map((cell) => cell?.polarity?.[formKey]));
   const counts = emptyCounts();
   const values = [];
   let invalid = 0;
@@ -167,15 +139,19 @@ const summarizeCellForm = (cells, formKey, seed) => {
     invalid,
     total: cells.length,
     valid: values.length,
-    meanScore: round(mean(values)),
+    meanScore: round(observed.meanScore),
     meanScoreInterval: bootstrapMeanInterval(values, { seed }),
-    uncertaintyRate: cells.length ? round(counts.Unsure / cells.length) : null,
+    countsUnit: 'discretized-mean-stances',
+    observedDistribution: observed.observedDistribution,
+    meanStance: { counts, mixedOrUnsureRate: values.length ? round(counts.Unsure / values.length) : null },
+    uncertaintyRate: round(observed.uncertaintyRate),
     invalidRate: cells.length ? round(invalid / cells.length) : null,
     responseEntropy: entropy(counts),
   };
 };
 
 const summarizeCells = (cells, rawRuns, seed) => {
+  const observed = aggregateResponseDistributions(cells);
   const counts = emptyCounts();
   const values = [];
   let invalid = 0;
@@ -201,9 +177,12 @@ const summarizeCells = (cells, rawRuns, seed) => {
     invalid,
     total: cells.length,
     valid: values.length,
-    meanScore: round(mean(values)),
+    meanScore: round(observed.meanScore),
     meanScoreInterval: bootstrapMeanInterval(values, { seed: `${seed}:cells` }),
-    uncertaintyRate: cells.length ? round(counts.Unsure / cells.length) : null,
+    countsUnit: 'discretized-mean-stances',
+    observedDistribution: observed.observedDistribution,
+    meanStance: { counts, mixedOrUnsureRate: values.length ? round(counts.Unsure / values.length) : null },
+    uncertaintyRate: round(observed.uncertaintyRate),
     invalidRate: cells.length ? round(invalid / cells.length) : null,
     responseEntropy: entropy(counts),
     runSummary: summarizeRuns(rawRuns, `${seed}:runs`),
@@ -369,6 +348,7 @@ const buildOpinionGroups = (models, similarityMatrix, coverage, threshold = 0.72
   const eligibleIds = models
     .map((model) => model.id)
     .filter((id) => coverage[id]?.eligibleForSimilarity);
+  if (opinionGroupAvailability(eligibleIds, similarityMatrix).status !== 'available') return {};
   const unvisited = new Set(eligibleIds);
   const groupById = {};
   let groupIndex = 0;
@@ -631,6 +611,8 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile, import
     })),
     polisReport: {
       aggregationUnit: 'model-participant',
+      responseDistributionVersion: 1,
+      uncertaintyRateSemantics: 'equal-weight-observed-unsure-among-valid-cells',
       repeatedRunsAreNestedObservations: true,
       byModel,
       byQuestion,
@@ -641,6 +623,10 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile, import
       method: 'distributional-distance-mds',
       opinionGroupMethod: 'similarity-connected-components',
       opinionGroupThreshold: 0.72,
+      opinionGroupAvailability: opinionGroupAvailability(
+        models.filter((model) => coverage[model.id]?.eligibleForSimilarity).map((model) => model.id),
+        similarity.similarityMatrix,
+      ),
       nodes: models.map((model) => ({
         id: model.id,
         label: model.label,

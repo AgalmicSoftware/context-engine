@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import * as NEW from './sessionQuestions.mjs';
-import { buildTelegramQuestionCard } from './questionUi.mjs';
+import { normalizeAgentRatingScale } from './ratingScale.mjs';
 
 class MemoryKv {
   constructor() { this.store = new Map(); }
@@ -40,7 +40,7 @@ const baseEnv = () => ({
 
 test('refresh ignores legacy v5 records missing the stored rating scale', async () => {
   const fresh = await NEW.listCachedSessionQuestionsForBridge({ env: baseEnv(), sessionSlug: 'demo', fetchImpl });
-  assert.deepEqual(buildTelegramQuestionCard(fresh.questions[0]).ratingScale, { min: 1, max: 10, step: 1 });
+  assert.deepEqual(normalizeAgentRatingScale(fresh.questions[0]), { min: 1, max: 10, step: 1 });
 
   NEW.__test__sessionQuestions.clearCaches();
   const env = baseEnv();
@@ -51,7 +51,7 @@ test('refresh ignores legacy v5 records missing the stored rating scale', async 
   await env.AGENT_ACTION_KV.put('telegram:questions:v5:demo', JSON.stringify(legacy));
   NEW.__test__sessionQuestions.clearCaches();
   const reused = await NEW.listCachedSessionQuestionsForBridge({ env, sessionSlug: 'demo', fetchImpl, forceRefresh: true });
-  const card = buildTelegramQuestionCard(reused.questions[0]).ratingScale;
+  const card = normalizeAgentRatingScale(reused.questions[0]);
   assert.deepEqual(card, { min: 1, max: 10, step: 1 });
 });
 

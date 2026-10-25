@@ -62,13 +62,13 @@
   overflow: visible;
 }
 
-.telegramOnlyShell {
+.agentOnlyShell {
   max-width: 780px;
   margin: 0 auto;
   padding: 40px 16px;
 }
 
-.telegramOnlyNotice {
+.agentOnlyNotice {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -80,7 +80,7 @@
   line-height: 1.5;
 }
 
-.telegramShell {
+.agentShell {
   width: min(1180px, 100%);
   margin: 0 auto;
   padding: 24px 0 48px;
@@ -89,7 +89,7 @@
   gap: 16px;
 }
 
-.telegramHeader {
+.agentHeader {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -100,26 +100,26 @@
   background: var(--ce-session-chrome);
 }
 
-.telegramHeaderText {
+.agentHeaderText {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.telegramHeaderTitle {
+.agentHeaderTitle {
   margin: 0;
   font-size: 1.7rem;
   font-weight: 700;
   color: var(--ce-session-chrome-contrast);
 }
 
-.telegramHeaderSubtitle {
+.agentHeaderSubtitle {
   color: color-mix(in srgb, var(--ce-session-chrome-contrast) 78%, transparent);
   margin: 0;
   max-width: 720px;
 }
 
-.telegramAuthBar {
+.agentAuthBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -132,22 +132,22 @@
   padding: 10px 12px;
 }
 
-.telegramAuthIndicator {
+.agentAuthIndicator {
   font-size: 0.92rem;
   color: var(--ce-document-border);
 }
 
-.telegramTabs {
+.agentTabs {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.telegramTabButton,
-.telegramPrimaryButton,
-.telegramSecondaryButton,
-.telegramLogoutButton,
-.telegramIconButton {
+.agentTabButton,
+.agentPrimaryButton,
+.agentSecondaryButton,
+.agentLogoutButton,
+.agentIconButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -163,7 +163,7 @@
   cursor: pointer;
 }
 
-.telegramPrimaryButton {
+.agentPrimaryButton {
   background: var(--ce-session-accent);
   border-color: var(--ce-session-accent);
   color: var(--ce-session-accent-contrast);
@@ -181,24 +181,24 @@
   }
 }
 
-.telegramSecondaryButton,
-.telegramLogoutButton {
+.agentSecondaryButton,
+.agentLogoutButton {
   background: color-mix(in srgb, var(--ce-overlay-surface) 88%, transparent);
 }
 
-.telegramTabButtonActive {
+.agentTabButtonActive {
   background: var(--ce-document-surface);
   color: var(--ce-document-text);
 }
 
-.telegramPrimaryButton:disabled,
-.telegramSecondaryButton:disabled,
-.telegramIconButton:disabled {
+.agentPrimaryButton:disabled,
+.agentSecondaryButton:disabled,
+.agentIconButton:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.telegramListPanel {
+.agentListPanel {
   border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
   border-radius: var(--ce-radius-8);
   background: color-mix(in srgb, var(--ce-document-text) 66%, transparent);
@@ -206,7 +206,7 @@
   padding: 16px;
 }
 
-.telegramListHeader {
+.agentListHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -220,8 +220,8 @@
   justify-content: flex-end;
 }
 
-.telegramListEmpty,
-.telegramListError {
+.agentListEmpty,
+.agentListError {
   color: var(--ce-document-border);
   font-size: 0.95rem;
 }
@@ -235,28 +235,28 @@
   line-height: 1.4;
 }
 
-.telegramListError {
+.agentListError {
   color: var(--ce-status-danger-text);
   margin-top: 10px;
 }
 
-.telegramGrid {
+.agentGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
-.telegramPileNav {
+.agentPileNav {
   display: flex;
   gap: 8px;
 }
 
-.telegramIconButton {
+.agentIconButton {
   width: 36px;
   padding: 0;
 }
 
-.telegramPileFrame {
+.agentPileFrame {
   display: grid;
   gap: 8px;
 
@@ -304,7 +304,7 @@
   background: transparent;
   color: var(--ce-document-surface);
 
-  .telegramListEmpty {
+  .agentListEmpty {
     overflow-wrap: anywhere;
   }
 }
@@ -699,7 +699,7 @@
     max-width: 100%;
   }
 
-  .telegramSecondaryButton {
+  .agentSecondaryButton {
     min-height: 40px;
     margin: 0;
     font-size: 0.9rem;
@@ -779,7 +779,7 @@
   }
 }
 
-.telegramPileFooter {
+.agentPileFooter {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -788,20 +788,20 @@
   margin-top: 16px;
 }
 
-.telegramSubmitDisabledReason {
+.agentSubmitDisabledReason {
   color: var(--ce-document-border);
   font-size: 0.88rem;
 }
 
-.telegramChipRow,
-.telegramTopicCounts {
+.agentChipRow,
+.agentTopicCounts {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.telegramChipDark {
+.agentChipDark {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
@@ -812,13 +812,13 @@
   font-size: 0.78rem;
 }
 
-.telegramBucketGrid {
+.agentBucketGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 12px;
 }
 
-.telegramBucketSelect {
+.agentBucketSelect {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -827,20 +827,20 @@
   font-size: 0.88rem;
 }
 
-.telegramBucketSelect select {
+.agentBucketSelect select {
   min-height: 34px;
   border: 1px solid color-mix(in srgb, var(--ce-document-text) 22%, transparent);
   border-radius: var(--ce-radius-6);
   padding: 4px 8px;
 }
 
-.telegramReportApprox {
+.agentReportApprox {
   margin: 0 0 12px;
   color: var(--ce-document-border);
   font-size: 0.9rem;
 }
 
-.telegramTopicPrompt {
+.agentTopicPrompt {
   white-space: pre-wrap;
   overflow-x: auto;
   border-radius: var(--ce-radius-6);
@@ -2570,7 +2570,7 @@
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
-  .telegramListEmpty:not(.workerGroupsLoadingState) {
+  .agentListEmpty:not(.workerGroupsLoadingState) {
     color: var(--ce-panel-text-muted);
   }
 }

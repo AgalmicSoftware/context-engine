@@ -54,9 +54,10 @@ describe('SessionWizardNormalModeRail', () => {
     expect(deployButton).toHaveClass('normalModeCardCompact');
     expect(within(sessionDetailsButton).getByText('1')).toBeInTheDocument();
     expect(within(deployButton).getByText('3')).toBeInTheDocument();
-    expect(screen.queryByText('Session Details')).not.toBeInTheDocument();
-    expect(screen.getByText('Privacy')).toBeInTheDocument();
-    expect(screen.queryByText('Deploy Session')).not.toBeInTheDocument();
+    // Inactive steps keep their names visible so creators can see what comes next.
+    expect(within(sessionDetailsButton).getByText('Session Details')).toHaveClass('normalModeCardCompactTitle');
+    expect(within(privacyButton).getByText('Privacy')).toHaveClass('normalModeCardTitle');
+    expect(within(deployButton).getByText('Deploy Session')).toHaveClass('normalModeCardCompactTitle');
     expect(screen.queryByText('Demo session')).not.toBeInTheDocument();
     expect(screen.getByText('Open link by default')).toBeInTheDocument();
     expect(screen.queryByText('Set a worker URL before uploading metadata.')).not.toBeInTheDocument();

@@ -1,3 +1,4 @@
+import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import {
   normalizeAiRequestPayload as normalizeAiRequestPayloadBoundary,
   readAiRequestPayload as readAiRequestPayloadBoundary,
@@ -126,6 +127,7 @@ export const resolveWorkerRuntimeDeps = ({
       corsHeaders: resolveDep('corsHeaders', corsHeadersBoundary),
       json: resolveDep('json', jsonBoundary),
       getSessionConfig: resolveDep('getSessionConfig', getSessionConfigBoundary),
+      readCurrentSessionConfig: resolveDep('readCurrentSessionConfig', readCurrentSessionConfig),
       verifyToken: resolveDep('verifyToken', verifyTokenBoundary),
       validateAuthTokenRecord: resolveDep('validateAuthTokenRecord', validateAuthTokenRecordBoundary),
       resolveWorkerRequestSlugContext: resolveDep('resolveWorkerRequestSlugContext', resolveWorkerRequestSlugContextBoundary),

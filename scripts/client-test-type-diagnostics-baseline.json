@@ -79,10 +79,6 @@
       "count": 1
     },
     {
-      "signature": "src/components/OnePageSession/onePageSessionTelegramController.test.ts|TS2352|Conversion of type '{ ok: true; views: { public: { status: string; }; private: { status: string; reason: string; }; }; polisDataset: { synthesized: false; aggregator: {}; }; approximate: false; }' to type 'TelegramResultsDataset' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.",
-      "count": 1
-    },
-    {
       "signature": "src/components/SBTs/CreateSBTGroup.testUtils.tsx|TS2698|Spread types may only be created from object types.",
       "count": 1
     },
@@ -301,14 +297,6 @@
     {
       "signature": "src/components/Sessions/hooks/useSessionWizardWorkerDeploy.test.ts|TS2339|Property 'body' does not exist on type '{}'.",
       "count": 3
-    },
-    {
-      "signature": "src/components/Sessions/hooks/useSessionWizardWorkerDeploy.test.ts|TS2339|Property 'body' does not exist on type 'never'.",
-      "count": 8
-    },
-    {
-      "signature": "src/components/Sessions/hooks/useSessionWizardWorkerDeploy.test.ts|TS2493|Tuple type '[url: URL | RequestInfo]' of length '1' has no element at index '1'.",
-      "count": 8
     },
     {
       "signature": "src/components/Sessions/hooks/useSessionWizardWorkerDeploy.test.ts|TS2554|Expected 0 arguments, but got 1.",
@@ -1805,10 +1793,6 @@
     {
       "signature": "src/utilities/session/metadataSessionBinding.test.ts|TS2698|Spread types may only be created from object types.",
       "count": 1
-    },
-    {
-      "signature": "src/utilities/session/telegramSessionBackend.test.ts|TS2322|Type 'Mock<unknown, unknown[]>' is not assignable to type '{ (input: URL | RequestInfo, init?: RequestInit | undefined): Promise<Response>; (input: string | URL | Request, init?: RequestInit | undefined): Promise<...>; }'.",
-      "count": 3
     },
     {
       "signature": "src/utilities/sessionResultsExport/sessionResultsExport.test.ts|TS2353|Object literal may only specify known properties, and 'responder' does not exist in type 'SessionResultsReportQuestion'.",

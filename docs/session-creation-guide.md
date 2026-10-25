@@ -39,6 +39,21 @@ stay in the current browser tab during setup. The AI key is written only to the
 worker's session-secrets store. The legacy deploy-helper and sponsored
 deploy-grant paths remain explicit fallbacks.
 
+Custom hosting settings survive save and reload, including encrypted-storage
+access rules. Changing the session network updates every SBT rule; check each
+contract address on the newly selected network. Switching to a different
+template replaces custom hosting settings, including optional HTTP agent access.
+Draft Group secrets are cleared when the wizard closes or the signed-in account
+changes. An owner-written Interview opening must contain a question before
+the session can be published.
+
+For private Cloudflare storage, participants can read their own submitted
+responses; admins and authorized agents can read session-wide responses when
+storage rules allow it. Participant aggregate summaries are not implemented.
+Unencrypted Arweave data is public, while Lit rules govern decryption of encrypted
+Arweave data. The export-policy selection is a saved preference; the current
+exporter follows existing access permissions and does not enforce that preference.
+
 Use this matrix when choosing a non-default profile:
 
 | Input                                                      | Why it is needed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Required?                                                                    | Can a sponsored bundle cover it?                                      |
@@ -58,8 +73,24 @@ Important:
 - The default worker-canonical path does not require an Arweave JWK, Lit key,
   user-supplied RPC URL/key, wallet connector, faucet key, publish funding, or
   transaction gas.
-- The faucet private key remains optional for profiles that deliberately sponsor
-  testnet gas; it is not part of the default path.
+- Hosted profiles with on-chain SBT rules can enable **Send participants test ETH
+  for gas**. It starts off and requires every SBT rule to use the session network
+  (OP Sepolia, or best-effort Base Sepolia). Enabling it shows the Faucet private
+  key field and its derived address. Supply a valid key and fund that address
+  with test ETH on the displayed network. The key is deployed and synced as a
+  private Worker secret; turning the switch off excludes it from those writes.
+  Removing the SBT rules or changing the backend or network turns the switch off.
+- This toggle uses the `faucet_self` participant grant. Use the updated deploy
+  helper and Session Worker: older helpers reject the grant and older Workers
+  ignore it, so they cannot issue unrestricted participant faucet tokens.
+  Do not substitute `faucet` to bypass that compatibility check.
+- Hosted payouts send 0.0002 ETH when the recipient balance is at most 0.001 ETH,
+  only to the signed-in wallet, up to three payouts in 24 hours. Refused requests
+  do not consume a payout. The admin faucet test remains registry-only.
+- For participants, Settings shows **Tx gas** after the Worker confirms a faucet.
+  The existing low-balance auto-funding preference applies to these hosted
+  sessions even while Settings is closed. Chainless hosted sessions do not
+  request funds or probe for a faucet in the background.
 - Selecting Lit keeps the existing Lit credential and chain/RPC requirements.
   Selecting the decentralized preset keeps the existing Arweave, registry,
   wallet-transaction, gas, and compatible Session Worker requirements.
@@ -96,6 +127,9 @@ sessions. It also lets owners supply an opening question, add an optional
 Automatic regeneration and discovery of new questions during a call are off by
 default; when enabled their default addition threshold is 20%. Question
 suggestions are optional and off by default. Admin refresh is on by default.
+**Share AI draft changes for research by default** controls the initial review
+checkbox through `interviewMode.shareDraftChangesByDefault` (off when unset).
+Participants can change it before submitting, and their saved choices are retained.
 Generation waits for public questions and uses the session Worker's OpenAI key.
 See [Interview settings and lifecycle](session-listening-mode.md#interview).
 
@@ -361,8 +395,7 @@ which capabilities are reachable:
 | Custom Cloudflare + Lit                    | Session Worker + Cloudflare; `encryption: "lit"`             | Passkey + **Native Worker Groups**                                                                 | Positive chain ID, RPC, and Lit credential; this does not make the registry canonical |
 | Decentralized or custom Arweave            | Ethereum registry + Arweave; Session Worker-assisted web runtime; `encryption: "none"` or `"lit"` | Wallet with passkey support + on-chain SBT Groups                                 | Compatible Session Worker, chain/RPC, registry transactions, gas, and Arweave; Lit also needs its credential |
 
-Telegram, Mini App, Agent Session Wrapped, result-visibility, and export choices
-do not change that ownership split. Mini App requires Telegram. Profiles marked
+Agent Session Wrapped, result-visibility, and export choices do not change that ownership split. Profiles marked
 schema-only or unavailable, and malformed or cross-lineage profiles, do not
 receive partial capabilities: publication and downstream projection fail
 closed. A stored config with no version-1 profile may use the bounded legacy
@@ -381,15 +414,13 @@ custom settings in the draft. Profile settings follow the existing stages:
   explicit role gate; switching back removes Cloudflare-only access fields.
   Admin-only and public-redacted result modes remain visible as unavailable
   until their complete read paths are enforced.
-- Worker owns optional participation channels such as Telegram, Telegram Mini App, and
-  **Agents (HTTP API)** (Agent Session Wrapped). Each channel has a question-mark
-  tooltip explaining its purpose and dependencies. The website remains enabled. Agent access is off by
-  default, deploys one additional dedicated per-session Bridge, and does not
-  require or implicitly enable Telegram. The **Agent API access** status distinguishes
+- Worker offers the website and **Agents (HTTP API)** (Agent Session Wrapped).
+  Each channel has a question-mark tooltip explaining its purpose. The website
+  remains enabled. Agent access is off by default and deploys one additional
+  dedicated per-session Bridge. The **Agent API access** status distinguishes
   **Off** from **On after deployment**: authorized agents can use the HTTP API
   once the service is deployed and verified, subject to session access rules.
-  Telegram Mini App is independently selectable but
-  requires Telegram; disabling Telegram also disables its Mini App.
+  Removed bot and Mini App adapters have no setup controls.
 - **Require users to pay for usage** appears only in the custom Worker settings
   for decentralized (Ethereum registry + Arweave) sessions. Centralized Cloudflare
   sessions, including those using Lit, do not show this option. The choice
@@ -421,8 +452,13 @@ where they are edited. Mode values are exact enums at every write boundary:
 explicit blanks, friendly aliases, unknown values, and reserved key providers
 are rejected rather than normalized to a less-protective default. Legacy aliases
 remain readable only for stored compatibility.
-Legacy `telegramOnly` fields are read only as a migration fallback and are not
-written by new sessions.
+Legacy `telegramOnly` fields are read only as a migration fallback when no
+explicit profile exists; they migrate to hosted HTTP access. An explicit
+`surfaces.agentHttp: false` remains authoritative even if stale legacy flags
+remain. Enabling Agent HTTP adds token login alongside ordinary wallet/passkey
+web participation; it does not replace the web session page. New client writes
+keep the reserved `surfaces.telegram` and
+`surfaces.miniApp` booleans false.
 
 The normal-mode wizard is effectively four stages:
 
@@ -735,8 +771,7 @@ origin. Setup does not publish its version-1 `agentSessionWrapped` capability or
 report success until upload, secrets, bindings, activation, health, protocol,
 authority probing, and the durable session-config write have all succeeded.
 Failure preserves the prior verified capability, if any, and leaves the
-session config intact. Telegram is a separate optional surface and remains off
-unless selected.
+session config intact. New configuration keeps retired adapter fields false.
 
 Compatibility is determined by the paired session Worker:
 
@@ -903,7 +938,7 @@ Minimal setup:
    name = "my-session-worker"
    main = "worker.js"
    compatibility_date = "2025-01-01"
-   compatibility_flags = ["nodejs_compat"]
+   compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 
    [[kv_namespaces]]
    binding = "GROUP_KV"
@@ -975,7 +1010,7 @@ Dashboard checklist:
 
 1. Create a new Worker in Cloudflare
 2. Paste or upload the bundled worker source
-3. Enable Node.js compatibility
+3. Enable `nodejs_compat` and `global_fetch_strictly_public` compatibility flags
 4. Add the `GROUP_KV` binding
 5. Add the required vars/secrets, especially `TOKEN_HMAC_SECRET`
 6. Deploy the worker

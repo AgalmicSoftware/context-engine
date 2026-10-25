@@ -43,10 +43,13 @@ const mergeAccountPayload = (state: AccountState, payload: unknown): AccountStat
       (nextState as Record<keyof AccountPayload, unknown>)[key] = payload[key];
     }
   });
+  // Persisted login state may still contain the retired provider label.
+  if (nextState.provider === 'telegram_agent') nextState.provider = 'agent_token';
   return nextState as AccountState;
 };
 
 export default function accountReducer(state: AccountState = initialState, action: AccountReducerAction): AccountState {
+  if (state.provider === 'telegram_agent') state = { ...state, provider: 'agent_token' };
   switch (action.type) {
     case LOGIN_ACCOUNT:
       if (isEmptyObject(action.payload)) {

@@ -90,9 +90,56 @@ const ensureDir = (dirPath) => {
   return dirPath;
 };
 
+// Reports outlive a run and get shared, so credentials are removed where
+// reports are written; sanitizing stdout alone left them in JSON artifacts.
+const SENSITIVE_ENV_NAME_RE = /TOKEN|SECRET|PASSWORD|PRIVATE|API_?KEY|_KEY$|JWK|MNEMONIC|PASSKEY|RPC.*URL/i;
+// Names that only locate or label a credential hold no secret, and their values (such as
+// "localhost") would otherwise be scrubbed from every report.
+const NON_SECRET_ENV_NAME_RE = /_(?:PATH|FILE|PROFILE|ID|HOST|ORIGIN)$/i;
+const SENSITIVE_FIELD_RE =
+  /^(?:[a-z][a-z0-9]*)?(?:token|jwt|signature|secret|password|mnemonic|authorization|cookie|private_?key|api_?key|jwk|auth_?sig|session_?sigs|prf_?output)$|^x-api-key$/i;
+const KEYED_RPC_URL_RE = /(\b(?:infura\.io\/(?:ws\/)?v3|alchemy\.com\/v2|quiknode\.pro)\/)[A-Za-z0-9_-]{16,}/g;
+const JWT_RE = /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g;
+
+// A redacted URL keeps its origin so reports still show which service was used.
+const redactedFormOf = (secret) => {
+  try {
+    const url = new URL(secret);
+    if (url.protocol === 'http:' || url.protocol === 'https:') return `${url.origin}/[REDACTED]`;
+  } catch (_) {}
+  return '[REDACTED]';
+};
+
+const sanitizeReportValue = (value, { env = process.env } = {}) => {
+  const secrets = Object.entries(env || {})
+    .filter(([name, secret]) => (
+      SENSITIVE_ENV_NAME_RE.test(name) && !NON_SECRET_ENV_NAME_RE.test(name) && toStr(secret).length >= 8
+    ))
+    .map(([, secret]) => toStr(secret))
+    .sort((a, b) => b.length - a.length);
+  const scrubText = (text) => secrets
+    .reduce((out, secret) => out.split(secret).join(redactedFormOf(secret)), text)
+    .replace(KEYED_RPC_URL_RE, '$1[REDACTED]')
+    .replace(JWT_RE, '[REDACTED_JWT]');
+  const visit = (node, key = '') => {
+    if (SENSITIVE_FIELD_RE.test(key) && node != null && typeof node !== 'boolean' && typeof node !== 'number') {
+      return '[REDACTED]';
+    }
+    // Match JSON.stringify, which writes a Date as its ISO string.
+    if (node && typeof node.toJSON === 'function') return visit(node.toJSON(), key);
+    if (typeof node === 'string') return scrubText(node);
+    if (Array.isArray(node)) return node.map((item) => visit(item));
+    if (node && typeof node === 'object') {
+      return Object.fromEntries(Object.entries(node).map(([childKey, child]) => [childKey, visit(child, childKey)]));
+    }
+    return node;
+  };
+  return visit(value);
+};
+
 const writeJson = (filePath, value) => {
   ensureDir(path.dirname(filePath));
-  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  fs.writeFileSync(filePath, `${JSON.stringify(sanitizeReportValue(value), null, 2)}\n`, 'utf8');
 };
 
 const readJson = (filePath, fallback = null) => {
@@ -156,6 +203,7 @@ module.exports = {
   relRoot,
   resolveArtifacts,
   resolveRunTag,
+  sanitizeReportValue,
   slugify,
   toBool,
   toInt,

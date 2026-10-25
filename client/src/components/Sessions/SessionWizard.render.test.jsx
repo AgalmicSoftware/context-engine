@@ -681,6 +681,17 @@ describe('SessionWizard rendered validation', () => {
     expect(await screen.findByDisplayValue('group, event, idea, demographic, location')).toBeInTheDocument();
   });
 
+  it('labels only protected advanced fields with an access badge', async () => {
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    enableAdvancedMode();
+
+    const badges = Array.from(document.querySelectorAll('.lockBadge'), (badge) => badge.textContent);
+    // The slug keeps its private-URL badge; fields without an access rule show none.
+    expect(badges).toEqual(['ID']);
+  });
+
   it('keeps block limits inside optional details in normal mode when the draft contains them', async () => {
     sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',

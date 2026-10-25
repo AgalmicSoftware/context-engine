@@ -3,6 +3,7 @@ import {
   fetchExpectedWorkerBundleDigest,
   normalizeWorkerBundleSha256,
 } from './workerReleaseManifest.mjs';
+import { buildDeploymentWorkerName } from './workerScriptName.mjs';
 
 export const AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND = 'agent_session_wrapped';
 export const AGENT_SESSION_WRAPPED_PROTOCOL_VERSION = 'agent-session-wrapped-v1';
@@ -45,6 +46,11 @@ const normalizeAuthorityMode = (value) => {
   const mode = toStr(value).toLowerCase();
   return ['worker_canonical', 'evm_registry_canonical', 'registry_canonical'].includes(mode) ? mode : '';
 };
+// Same bytes16 session ID form the Bridge's pinned-authority check accepts.
+const normalizeSessionId = (value) => {
+  const hex = toStr(value).toLowerCase().replace(/^0x/, '').replace(/-/g, '');
+  return /^[0-9a-f]{32}$/.test(hex) && !/^0+$/.test(hex) ? `0x${hex}` : '';
+};
 const encode = (value) => new TextEncoder().encode(String(value || ''));
 const bytesToHex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 const sha256Hex = async (value) => bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256', encode(value))));
@@ -60,11 +66,12 @@ const isAmbiguousMutationFailure = (result = {}) => {
   return !status || status >= 500 || [408, 409, 412, 425, 429, 499].includes(status);
 };
 
-const policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled = true }) => ({
+const policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled = true, sessionId = '' }) => ({
   version: 1,
   defaultSessionSlug: sessionSlug,
   sessions: [{
     sessionSlug,
+    ...(sessionId ? { sessionIdHex: sessionId } : {}),
     sessionWorkerUrl: sessionWorkerOrigin,
     telegramBridgeEnabled: false,
     sessionModeProfile: {
@@ -74,21 +81,21 @@ const policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpE
   }],
 });
 
-const workerNameFor = ({ sessionSlug, deploymentId }) => {
-  const prefix = `ce-wrapped-${sessionSlug}`
+const workerNameFor = ({ sessionSlug, deploymentId }) => buildDeploymentWorkerName(
+  `ce-wrapped-${sessionSlug}`
     .replace(/_/g, '-')
     .replace(/[^a-z0-9-]/g, '-')
     .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 50);
-  return `${prefix || 'ce-wrapped-session'}-${deploymentId.slice(0, 12)}`;
-};
+    .replace(/^-|-$/g, ''),
+  deploymentId,
+  'ce-wrapped-session',
+);
 
 const bindingMap = (bindings = []) => new Map(
   (Array.isArray(bindings) ? bindings : []).map((binding) => [toStr(binding?.name), binding]),
 );
 
-const settingsOwnDeployment = ({ settings, expectedBindings, kvNamespaceId, verifyBundle = true }) => {
+const settingsOwnDeployment = ({ settings, expectedBindings, kvNamespaceId, verifyBundle = true, allowAccessChange = false }) => {
   if (!settings?.ok) return false;
   const result = settings.data?.result || {};
   if (toStr(result.main_module) && toStr(result.main_module) !== 'worker.mjs') return false;
@@ -100,7 +107,27 @@ const settingsOwnDeployment = ({ settings, expectedBindings, kvNamespaceId, veri
     .filter((binding) => verifyBundle || binding.name !== 'AGENT_BRIDGE_BUNDLE_SHA256')
     .every((binding) => {
       const observed = actual.get(binding.name);
-      return toStr(observed?.type) === 'plain_text' && toStr(observed?.text) === binding.text;
+      if (toStr(observed?.type) !== 'plain_text') return false;
+      if (toStr(observed?.text) === binding.text) return true;
+      if (!allowAccessChange || binding.name !== 'AGENT_BRIDGE_SESSION_POLICY_JSON') return false;
+      try {
+        // The access toggle is mutable, and a policy written before session IDs
+        // were pinned may gain this session's ID; every other authority field
+        // must still match before an existing Worker can be updated in place.
+        const policy = JSON.parse(observed.text);
+        const expected = JSON.parse(binding.text);
+        const session = policy.sessions?.[0];
+        const surfaces = session?.sessionModeProfile?.surfaces;
+        if (typeof surfaces?.agentHttp !== 'boolean') return false;
+        surfaces.agentHttp = expected.sessions[0].sessionModeProfile.surfaces.agentHttp;
+        const expectedId = expected.sessions[0].sessionIdHex;
+        if (expectedId && session.sessionIdHex === undefined) {
+          policy.sessions[0] = { sessionSlug: session.sessionSlug, sessionIdHex: expectedId, ...session };
+        }
+        return JSON.stringify(policy) === binding.text;
+      } catch {
+        return false;
+      }
     });
 };
 
@@ -109,6 +136,7 @@ const buildUploadForm = ({ bundleSource, bindings }) => {
     main_module: 'worker.mjs',
     compatibility_date: COMPATIBILITY_DATE,
     compatibility_flags: ['nodejs_compat', 'global_fetch_strictly_public'],
+    keep_bindings: ['secret_text'],
     bindings,
   };
   const form = new FormData();
@@ -131,16 +159,25 @@ const readBundle = async ({ body, env, fetchImpl }) => {
 };
 
 const listMatchingKvNamespaces = async ({ apiToken, accountId, title, cfFetchImpl }) => {
-  const listed = await cfFetchImpl(
-    apiToken,
-    `/accounts/${accountId}/storage/kv/namespaces?per_page=100&page=1`,
-    { method: 'GET' },
-  );
-  if (!listed.ok) return { ok: false, error: listed.error || 'Failed to list KV namespaces.' };
-  const matches = (Array.isArray(listed.data?.result) ? listed.data.result : [])
-    .filter((entry) => toStr(entry?.title) === title && toStr(entry?.id));
-  if (matches.length > 1) return { ok: false, status: 409, error: 'Multiple KV namespaces match this Wrapped deployment identity.' };
-  return { ok: true, match: matches[0] || null };
+  const matches = [];
+  // The deployment namespace may be on a later page in an established account.
+  // Creating before the complete lookup turns a safe retry into a title clash.
+  for (let page = 1; page <= 100; page += 1) {
+    const listed = await cfFetchImpl(
+      apiToken,
+      `/accounts/${accountId}/storage/kv/namespaces?per_page=100&page=${page}`,
+      { method: 'GET' },
+    );
+    if (!listed.ok) return { ok: false, error: listed.error || 'Failed to list KV namespaces.' };
+    const entries = Array.isArray(listed.data?.result) ? listed.data.result : [];
+    matches.push(...entries.filter((entry) => toStr(entry?.title) === title && toStr(entry?.id)));
+    if (matches.length > 1) return { ok: false, status: 409, error: 'Multiple KV namespaces match this Wrapped deployment identity.' };
+    const totalPages = Number(listed.data?.result_info?.total_pages);
+    if (totalPages > 0 ? page >= totalPages : entries.length < 100) {
+      return { ok: true, match: matches[0] || null };
+    }
+  }
+  return { ok: false, error: 'Wrapped KV inventory exceeded the lookup limit; no namespace was created.' };
 };
 
 const normalizeCapability = (value) => {
@@ -251,6 +288,11 @@ export async function executeAgentSessionWrappedDeployment({
   if (!apiToken || !resolvedAccountId || !sessionSlug || !sessionWorkerOrigin || !sessionDeploymentIdentity || !authorityMode || typeof agentHttpEnabled !== 'boolean') {
     return fail(400, 'validate', 'Dedicated Wrapped deployment requires token, account, session identity, authority mode, and HTTPS session Worker origin.');
   }
+  // A hosted session's Bridge pins its canonical session ID and refuses a policy without one.
+  const sessionId = normalizeSessionId(body.sessionId || body.sessionIdHex);
+  if (authorityMode === 'worker_canonical' && !sessionId) {
+    return fail(400, 'validate', 'Dedicated Wrapped deployment for a hosted session requires its session ID.');
+  }
   if (typeof cfFetchImpl !== 'function') return fail(500, 'validate', 'Cloudflare deployment client is unavailable.');
   if (body.telegramEnabled === true || toStr(body.telegramBotToken || body.telegramWebhookSecret)) {
     return fail(400, 'validate', 'Telegram configuration is not part of the default dedicated Wrapped deployment.');
@@ -296,7 +338,7 @@ export async function executeAgentSessionWrappedDeployment({
     return fail(502, 'workers_dev_subdomain', accountSubdomain.error || 'Cloudflare workers.dev subdomain is unavailable.');
   }
   const workerUrl = `https://${workerName}.${subdomain}.workers.dev`;
-  const policyJson = JSON.stringify(policyFor({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled }));
+  const policyJson = JSON.stringify(policyFor({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled, sessionId }));
   const plainBindings = [
     { name: 'AGENT_BRIDGE_DEPLOYMENT_ID', type: 'plain_text', text: deploymentId },
     { name: 'AGENT_BRIDGE_BUNDLE_SHA256', type: 'plain_text', text: bundleSha256 },
@@ -343,11 +385,13 @@ export async function executeAgentSessionWrappedDeployment({
     expectedBindings: plainBindings,
     kvNamespaceId: kvId,
     verifyBundle: false,
+    allowAccessChange: true,
   })) {
     return fail(409, 'worker_preflight', 'Existing Worker does not match this Wrapped deployment identity.');
   }
-  const beforeBindingMap = bindingMap(beforeSettings.data?.result?.bindings);
-  const bundleAlreadyUploaded = exists && toStr(beforeBindingMap.get('AGENT_BRIDGE_BUNDLE_SHA256')?.text) === bundleSha256;
+  const bundleAlreadyUploaded = exists && settingsOwnDeployment({
+    settings: beforeSettings, expectedBindings: plainBindings, kvNamespaceId: kvId,
+  });
   let uploadMetadata = null;
   if (!bundleAlreadyUploaded) {
     await beforeMutation();
@@ -421,7 +465,8 @@ export async function executeAgentSessionWrappedDeployment({
   let healthResponse;
   let health;
   try {
-    healthResponse = await fetchImpl(`${workerUrl}/health`, { method: 'GET', headers: { Accept: 'application/json' }, cache: 'no-store' });
+    // No RequestInit.cache: Workers at compatibility date 2024-09-02 throw on it.
+    healthResponse = await fetchImpl(`${workerUrl}/health`, { method: 'GET', headers: { Accept: 'application/json' } });
     health = await healthResponse.json();
   } catch (error) {
     return fail(503, 'authority_health_probe', toStr(error?.message || error) || 'Wrapped health request failed.');

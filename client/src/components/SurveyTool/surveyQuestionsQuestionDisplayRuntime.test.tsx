@@ -2,7 +2,7 @@ import { createSurveyQuestionsQuestionDisplayRuntime } from './surveyQuestionsQu
 import type { SurveyQuestionsLegacyRecord } from './surveyQuestionsTypes';
 
 const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
-  E2E_TESTIDS: {},
+  E2E_TESTIDS: { DECRYPT_ANSWER: 'ce-decrypt-answer', DECRYPT_ADDITIONAL: 'ce-decrypt-additional' },
   ENABLE_IMPORTANCE_SLIDER_TOGGLE: true,
   FullQuestionFooterIcons: () => null,
   GatedPromptNotice: () => null,
@@ -154,6 +154,22 @@ describe('surveyQuestionsQuestionDisplayRuntime', () => {
         }),
       }),
     );
+  });
+
+  it('gives full-question decrypt controls the stable hooks of single responses', () => {
+    const runtime = createSurveyQuestionsQuestionDisplayRuntime(createContext());
+
+    for (const [fieldKey, testId] of [
+      ['answer', 'ce-decrypt-answer'],
+      ['additional', 'ce-decrypt-additional'],
+    ]) {
+      const control = runtime.renderQuestionFieldDecryptControl({
+        questionId: '0xABC',
+        fieldKey,
+        actionLabel: 'Decrypt',
+      });
+      expect(control.props).toEqual(expect.objectContaining({ testId, questionId: '0xabc' }));
+    }
   });
 
   it('flags an answer the session Worker would refuse as too long', () => {

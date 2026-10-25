@@ -1,6 +1,7 @@
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
+import { noteWorkerAccessChanged } from '../../utilities/worker/workerAuth.js';
 export { getWorkerSessionToken } from '../../utilities/worker/workerAuth.js';
 
 type UnknownRecord = Record<string, unknown>;
@@ -371,6 +372,7 @@ const normalizeVisibleWorkerGroupPrincipal = (value: unknown): WorkerGroupPrinci
     const address = toStringValue(source.address);
     return /^0x[0-9a-fA-F]{40}$/.test(address) ? { kind, address: address.toLowerCase() } : null;
   }
+  // Read historical group members without changing their stored principal bytes.
   if (kind === 'telegram') {
     const principalId = toStringValue(source.principalId);
     return principalId && principalId.length <= 180 && /^[A-Za-z0-9:_@./=-]+$/.test(principalId)
@@ -647,6 +649,8 @@ export const joinWorkerGroup = async ({
     // field on success. Validate it strictly whenever a Worker does provide it.
     const hasMemberCount = Object.prototype.hasOwnProperty.call(payload, 'memberCount');
     const memberCount = hasMemberCount ? normalizeWorkerGroupMemberCount(payload.memberCount) : undefined;
+    // Membership can satisfy a group gate that an earlier Worker token was issued without.
+    noteWorkerAccessChanged();
     return {
       ...payload,
       group: memberCount === undefined ? group : { ...group, memberCount },

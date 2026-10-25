@@ -317,7 +317,8 @@ export const buildDeployHelperUploadMetadata = ({
       new_sqlite_classes: [DEPLOY_HELPER_SESSION_COORDINATOR_CLASS],
     },
     compatibility_date: toStr(compatibilityDate).trim() || DEFAULT_COMPAT_DATE,
-    compatibility_flags: ['nodejs_compat'],
+    // Wrapped health probes must reach sibling Workers through their public route.
+    compatibility_flags: ['nodejs_compat', 'global_fetch_strictly_public'],
   };
 };
 

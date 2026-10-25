@@ -113,6 +113,7 @@ const createAdminDeps = (overrides = {}) => {
     resolveAdminRequestAuthority: async () => ({
       ok: true,
       address: '0xabc',
+      expectedAuthority: { actor: '0xabc', revision: 1, authzEpoch: 0 },
       existingConfig: { adminAddress: '0xabc' },
       headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
       targetSlug: 'session-a',
@@ -987,7 +988,7 @@ test('set-secrets sends only the normalized patch and propagates pending repair 
       },
     }),
   });
-  assert.deepEqual(calls, [{ env: {}, slug: 'session-a', incomingSecrets: { openaiKey: 'fixture-provider-key', litAccountApiKey: '' } }]);
+  assert.deepEqual(calls, [{ env: {}, slug: 'session-a', expectedAuthority: { actor: '0xabc', revision: 1, authzEpoch: 0 }, incomingSecrets: { openaiKey: 'fixture-provider-key', litAccountApiKey: '' } }]);
   assert.equal(result.status, 503);
   assert.match(result.body.error, /projection is pending/);
 });
@@ -1657,7 +1658,7 @@ test('dispatchAdminRequest hides a question id for the signed session admin', as
     action: 'storage/set-hidden',
     deps: createAdminDeps({
       now: () => 123,
-      setCloudflareStorageResourceHidden: async (value) => {
+      executeCoordinatedStorageVisibilityMutation: async (value) => {
         calls.push(value);
         return { ok: true, status: 200, body: { ok: true, resource: 'questions', id: '0xq1', hidden: true, hiddenIds: ['0xq1'] } };
       },
@@ -1666,7 +1667,7 @@ test('dispatchAdminRequest hides a question id for the signed session admin', as
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].slug, 'session-a');
-  assert.equal(calls[0].actor, '0xabc');
+  assert.deepEqual(calls[0].expectedAuthority, { actor: '0xabc', revision: 1, authzEpoch: 0 });
   assert.deepEqual(calls[0].config, { adminAddress: '0xabc' });
   assert.equal(calls[0].body.id, '0xq1');
   assert.equal(calls[0].deps.now(), 123);
@@ -1691,7 +1692,7 @@ test('dispatchAdminRequest refuses storage hides without admin authority', async
         response: { body: { error: 'Admin authorization failed.' }, status: 403 },
       }),
       recordAbuseEvent: async () => {},
-      setCloudflareStorageResourceHidden: async () => {
+      executeCoordinatedStorageVisibilityMutation: async () => {
         called = true;
         return { ok: true, status: 200, body: {} };
       },
@@ -1705,7 +1706,7 @@ test('dispatchAdminRequest exports encrypted storage envelopes through the admin
   const calls = [];
   const result = await dispatchAdminRequest({
     request: {
-      json: async () => createSignedBody({ resource: 'responses' }),
+      json: async () => createSignedBody({ resource: 'responses', cursor: 'resume-token' }),
     },
     env: { CE_STORAGE_INDEX_KV: {} },
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
@@ -1735,6 +1736,7 @@ test('dispatchAdminRequest exports encrypted storage envelopes through the admin
   assert.equal(calls.length, 1);
   assert.equal(calls[0].slug, 'session-a');
   assert.equal(calls[0].resource, 'responses');
+  assert.equal(calls[0].cursor, 'resume-token');
   assert.equal(calls[0].includeSessionEnvelope, true);
   assert.deepEqual(result, {
     body: {

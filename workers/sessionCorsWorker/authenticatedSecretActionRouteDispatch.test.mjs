@@ -467,3 +467,67 @@ test('dispatchAuthenticatedSecretActionRoute allows same-wallet faucet requests 
   assert.equal(result.handled, true);
   assert.equal(result.response, downstreamResponse);
 });
+
+test('hosted faucet rejects another recipient and charges only successful payouts', async () => {
+  const address = '0x' + 'a'.repeat(40);
+  const finalized = [];
+  let requests = 0;
+  let status = 403;
+  const args = {
+    path: '/', action: 'request_test_eth', address, slug: 'example', limit: 0,
+    config: { sessionModeProfile: { authority: { mode: 'worker_canonical' } } },
+    scopes: { faucet: true },
+    deps: {
+      json: (body, status) => new Response(JSON.stringify(body), { status }),
+      evaluateAuthenticatedRoutePreflight: async (value) => {
+        assert.equal(value.allowWithoutScope, false);
+        assert.equal(await value.deps.checkRateLimit({}), true);
+        return { ok: true, tokenHasScope: true };
+      },
+      resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets: {} }),
+      checkRateLimit: async () => { throw new Error('Hosted payouts do not count refusal attempts'); },
+      reserveCoordinatedHostedFaucet: async () => ({ ok: true, allowed: true, requestId: 'reservation' }),
+      finalizeCoordinatedHostedFaucet: async (value) => { finalized.push(value); return { ok: true }; },
+      faucet: async () => { requests += 1; return new Response('{}', { status }); },
+    },
+  };
+  const forbidden = await dispatchAuthenticatedSecretActionRoute({ ...args, body: { to: '0x' + 'b'.repeat(40) } });
+  assert.equal(forbidden.response.status, 403);
+  assert.equal((await forbidden.response.json()).error, 'Test ETH can only be sent to your own address.');
+  assert.equal(requests, 0);
+  await dispatchAuthenticatedSecretActionRoute({ ...args, body: { to: address } });
+  assert.equal(finalized[0].sent, false);
+  status = 200;
+  await dispatchAuthenticatedSecretActionRoute({ ...args, body: { to: address } });
+  assert.equal(finalized[1].sent, true);
+  const capped = await dispatchAuthenticatedSecretActionRoute({ ...args, body: { to: address }, deps: {
+    ...args.deps, reserveCoordinatedHostedFaucet: async () => ({ ok: true, allowed: false }),
+  } });
+  assert.equal(capped.response.status, 429);
+  assert.equal(requests, 2);
+});
+
+test('hosted faucet releases a slot only when it throws before submission', async () => {
+  const address = '0x' + 'a'.repeat(40);
+  const finalized = [];
+  const run = (faucet) => dispatchAuthenticatedSecretActionRoute({
+    path: '/', action: 'request_test_eth', address, slug: 'example', limit: 0, body: { to: address },
+    config: { sessionModeProfile: { authority: { mode: 'worker_canonical' } } },
+    scopes: { faucet: true },
+    deps: {
+      json: (body, status) => new Response(JSON.stringify(body), { status }),
+      evaluateAuthenticatedRoutePreflight: async () => ({ ok: true, tokenHasScope: true }),
+      resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets: {} }),
+      reserveCoordinatedHostedFaucet: async () => ({ ok: true, allowed: true, requestId: 'reservation' }),
+      finalizeCoordinatedHostedFaucet: async (value) => { finalized.push(value); return { ok: true }; },
+      faucet,
+    },
+  });
+  await assert.rejects(run(async () => { throw new Error('invalid private key'); }), /invalid private key/);
+  assert.deepEqual(finalized.map((value) => value.sent), [false]);
+  await assert.rejects(run(async ({ onSubmissionAttempt }) => {
+    onSubmissionAttempt();
+    throw new Error('connection reset');
+  }), /connection reset/);
+  assert.equal(finalized.length, 1);
+});

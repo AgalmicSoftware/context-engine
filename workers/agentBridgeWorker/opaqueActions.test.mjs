@@ -1,19 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSubmitIdempotencyKey, buildOpaqueActionId, buildTelegramCallbackId, buildTelegramStartId, parseOpaqueActionId } from './opaqueActions.mjs';
+import { buildSubmitIdempotencyKey, buildOpaqueActionId } from './opaqueActions.mjs';
 
-test('opaque ids separate a known FNV collision and fit Telegram payload limits', () => {
-  for (const build of [buildOpaqueActionId, buildTelegramCallbackId, buildTelegramStartId]) {
+test('opaque ids separate a known FNV collision and keep their persisted shape', () => {
+  for (const build of [buildOpaqueActionId]) {
     const first = build('kXVPDPqPrkue');
     assert.notEqual(first, build('aY0ReOIYlWwO'));
     assert.equal(first, build('kXVPDPqPrkue'));
     assert.ok(first.length <= 64);
-    assert.equal(parseOpaqueActionId(first).ok, true);
+    assert.match(first, /^ceab_[a-z0-9]{50}$/);
   }
 });
 
 test('submit ids bind the principal, complete question id, and complete answer', () => {
-  const input = { transport: 'telegram_mini_submit', principal: '42', sessionSlug: 'alpha',
+  const input = { transport: 'telegram_bot_submit', principal: '42', sessionSlug: 'alpha',
     questionId: `0x${'1'.repeat(64)}`, answer: { value: 'first', comments: 'note' } };
   const id = buildOpaqueActionId(buildSubmitIdempotencyKey(input));
   assert.equal(id, buildOpaqueActionId(buildSubmitIdempotencyKey({ ...input, answer: { comments: 'note', value: 'first' } })));

@@ -29,7 +29,8 @@ import { normalizeSessionAppearance } from '../../utilities/ui/sessionColorSchem
 import {
   classifySessionModeProfileSupport,
   compileSessionModeProfile,
-  hasLegacyTelegramFirstSessionFlags,
+  hasLegacyHostedAgentFlags,
+  normalizeSessionModeProfileForWrite,
   mergeSessionModeProfileStorageAccess,
   profileFromLegacyConfig,
   type SessionModeProfile,
@@ -126,8 +127,11 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
     delete draft.telegram.mode;
     if (!Object.keys(draft.telegram).length) delete draft.telegram;
   }
-  if (!draft.sessionModeProfile && hasLegacyTelegramFirstSessionFlags(draftIn)) {
+  if (!draft.sessionModeProfile && hasLegacyHostedAgentFlags(draftIn)) {
     draft.sessionModeProfile = profileFromLegacyConfig(draftIn);
+  }
+  if (draft.sessionModeProfile && typeof draft.sessionModeProfile === 'object') {
+    draft.sessionModeProfile = normalizeSessionModeProfileForWrite(draft.sessionModeProfile);
   }
   if (!draft.sessionInfoEncrypted) {
     delete draft.sessionInfoEncrypted;
@@ -409,6 +413,9 @@ export const applySessionWizardRegistryChainDraftDefaults = ({
             if (condition.kind === 'sbt_onchain') condition.chainId = resolvedChainId;
           });
         });
+        // Writes and reloads merge this compiled side back into the profile.
+        // Rebuild it atomically so old rule chains cannot overwrite this edit.
+        next.storageProfile = normalizeSessionStorageProfileConfig(compileSessionModeProfile(profile).storageProfile);
       }
     }
   }

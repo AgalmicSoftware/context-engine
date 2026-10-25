@@ -1,3 +1,5 @@
+import { describeHostedFaucetSetup } from './sessionWizardHostedFaucet';
+
 import {
   validateSessionModeProfile,
   type SessionModeProfile,
@@ -49,6 +51,7 @@ export type SessionWizardModeRequirements = {
 
 type ResolveSessionWizardModeRequirementsOptions = {
   hasPendingSbtDrafts?: boolean;
+  sessionConfig?: unknown;
 };
 
 const emptyRequirements = (): SessionWizardModeRequirements => ({
@@ -94,7 +97,7 @@ const hasActiveResource = (profile: SessionModeProfile, resource: SessionModeRes
 
 export const resolveSessionWizardModeRequirements = (
   profile: SessionModeProfile | null | undefined,
-  { hasPendingSbtDrafts = false }: ResolveSessionWizardModeRequirementsOptions = {},
+  { hasPendingSbtDrafts = false, sessionConfig }: ResolveSessionWizardModeRequirementsOptions = {},
 ): SessionWizardModeRequirements => {
   if (!profile || typeof profile !== 'object' || !validateSessionModeProfile(profile).valid) return emptyRequirements();
 
@@ -117,7 +120,8 @@ export const resolveSessionWizardModeRequirements = (
   // Publishing a pending SBT is itself an EVM transaction even when the
   // session authority and canonical config remain worker-owned. Existing
   // on-chain SBT conditions still need RPC reads, but not transaction inputs.
-  const requiresFunding = requiresRegistry || willDeployPendingSbts;
+  const hostedFaucet = describeHostedFaucetSetup(sessionConfig).enabled;
+  const requiresFunding = requiresRegistry || willDeployPendingSbts || hostedFaucet;
   const requiresWallet = requiresRegistry || willDeployPendingSbts;
 
   const requiredRequirementIds: SessionWizardRequirementId[] = [];
@@ -137,6 +141,7 @@ export const resolveSessionWizardModeRequirements = (
   if (requiresLit) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.LIT);
 
   const requiredWorkerSecretFields = ['openaiKey'];
+  if (hostedFaucet) requiredWorkerSecretFields.push('faucetPrivateKey');
   if (requiresArweave) requiredWorkerSecretFields.push('arweaveJwk');
   if (requiresLit) requiredWorkerSecretFields.push('litAccountApiKey');
 

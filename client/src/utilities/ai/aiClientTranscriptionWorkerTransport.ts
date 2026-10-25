@@ -86,7 +86,8 @@ export const uploadAudioForTranscription = async (
       sessionConfig: transport.sessionConfig,
       context: transport.context,
       workerUrl: transport.baseUrl,
-      anonymousOnly: true,
+      // Keep open-session dictation anonymous, but let signed-in users authenticate
+      // for the session's AI key when its gates reject anonymous access.
       preferAnonymous: true,
       fallbackOnGateUnavailable: true,
       allowDemoFallback: defaultStrictAllowDemoFallback(),

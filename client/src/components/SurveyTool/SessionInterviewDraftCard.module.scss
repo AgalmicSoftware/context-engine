@@ -69,10 +69,7 @@
   width: 100%;
   min-height: 56px;
   padding: 12px 14px;
-  border: 1px solid var(--ce-card-border);
   border-radius: 12px;
-  background: var(--ce-card-bg);
-  color: var(--ce-panel-text);
   font: inherit;
   font-size: 0.98rem;
   font-weight: 650;
@@ -82,11 +79,32 @@
   cursor: text;
 }
 
-.readableTextButton:hover:not(:disabled),
-.readableTextButton:focus-visible {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 78%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
-  outline: 0;
+// Keep the answer surface visible above the interview panel's button reset,
+// including while the readable answer is replaced by either text editor.
+.draftCard .readableTextButton,
+.draftCard .autosizeTextArea,
+.draftCard .injectedEditorShell textarea {
+  background: color-mix(in srgb, var(--ce-action-accent) 10%, var(--ce-input-bg)) !important;
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 48%, var(--ce-border-strong)) !important;
+  border-radius: 12px !important;
+  color: var(--ce-panel-text) !important;
+  caret-color: var(--ce-panel-text);
+
+  &::placeholder {
+    color: var(--ce-panel-text-muted) !important;
+    opacity: 1;
+  }
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    border-color: var(--ce-action-accent) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-action-accent) 16%, transparent) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring) !important;
+    outline-offset: 2px;
+  }
 }
 
 .readableTextButton:disabled {
@@ -105,21 +123,11 @@
   width: 100%;
   overflow: hidden;
   resize: none;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent) !important;
-  border-radius: 12px !important;
-  background: color-mix(in srgb, var(--ce-overlay-base) 92%, transparent) !important;
-  color: var(--ce-text-inverse) !important;
-  caret-color: var(--ce-text-inverse);
   font-family: var(--ce-font-body, inherit);
   font-size: 1rem;
   font-weight: 650;
   line-height: 1.5;
   opacity: 1;
-}
-
-.autosizeTextArea:focus {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 85%, transparent) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-action-accent) 18%, transparent) !important;
 }
 
 .injectedEditorShell {
@@ -294,7 +302,7 @@
   height: 32px;
   padding: 0;
   font-size: 1.25rem;
-  opacity: 0.35 !important;
+  opacity: 0.65 !important;
 
   svg {
     width: 1em;
@@ -306,19 +314,25 @@
     opacity: 1 !important;
   }
 
-  &:has(svg[data-icon='unlock']):not(:disabled) {
-    color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent) !important;
+  &:not([class*='iconButtonActive']):not(:has(svg[data-icon='lock'])),
+  &:has(svg[data-icon='unlock']) {
+    color: var(--ce-panel-text) !important;
 
     svg {
       color: currentColor !important;
       filter: none;
     }
   }
+
+  &:hover:not(:disabled),
+  &:focus-visible:not(:disabled) {
+    opacity: 1 !important;
+  }
 }
 
 .controlsRow > :global([class*='importanceSlider']) {
   margin-bottom: 0;
-  opacity: 0.5;
+  opacity: 1;
 }
 
 @media (max-width: 700px) {
@@ -361,47 +375,21 @@
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
-  .readableTextButton,
-  .autosizeTextArea,
-  .injectedEditorShell textarea {
-    background: var(--ce-input-bg) !important;
-    border: 1px solid var(--ce-border-strong) !important;
-    color: var(--ce-panel-text) !important;
-    caret-color: var(--ce-panel-text);
-
-    &::placeholder {
-      color: var(--ce-panel-text-muted) !important;
-      opacity: 1;
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--ce-focus-ring) !important;
-      outline-offset: 2px;
-    }
-  }
-
   .emptyReadableText {
     color: var(--ce-panel-text-muted);
-  }
-
-  .controlsRow > :global([class*='importanceSlider']) {
-    opacity: 1;
   }
 
   .draftCard :global(button[class*='iconButton']),
   .draftCard :global(button[class*='convictionToggleButton']) {
     color: var(--ce-control-text) !important;
-    opacity: 0.45 !important;
+    opacity: 0.65 !important;
 
     &[class*='iconButtonActive']:not(:has(svg[data-icon='unlock'])):not(:disabled),
     &[class*='convictionToggleButtonActive']:not(:disabled),
-    &:has(svg[data-icon='lock']):not(:disabled) {
+    &:has(svg[data-icon='lock']):not(:disabled),
+    &:hover:not(:disabled),
+    &:focus-visible:not(:disabled) {
       opacity: 1 !important;
-    }
-
-    &:has(svg[data-icon='unlock']):not(:disabled) {
-      color: var(--ce-control-text) !important;
-      opacity: 0.35 !important;
     }
 
     &[class*='pileLockButtonMenuOpen'] {

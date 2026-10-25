@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dispatchAdminAbuseSummaryRequest } from './adminAbuseSummaryDispatch.js';
+import { dispatchAdminAbuseSummaryRequest as boundary } from './adminAbuseSummaryDispatch.js';
+
+const dispatchAdminAbuseSummaryRequest = (args) => boundary({
+  ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async ({ env, slug }) => ({
+    config: await args.deps?.getSessionConfig?.(env, slug), revision: 1,
+  })) },
+});
 
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 

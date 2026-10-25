@@ -118,6 +118,9 @@ export const buildReportFingerprint = (report = {}) => hashJson({
   riskMatrix: report.riskMatrix || {},
   rawMaterial: report.rawMaterial || {},
   integrity: report.integrity || {},
+  // Preserve historical fingerprints for uncorrected reports. Corrected reports
+  // must bind the saved-count derivation; old analysis must be regenerated.
+  ...(report.summaryCorrection ? { summaryCorrection: report.summaryCorrection } : {}),
 });
 
 export const hashReleaseReportContent = (report = {}) => {

@@ -1,7 +1,7 @@
 import { hasCachedCreateSbtForm as hasCachedCreateSbtFormCache } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { resolveEffectiveSlug } from '../SurveyTool/surveyToolUtils';
-import { buildCurrentSessionConfigRequest, type OnePageSessionPropsLike } from './onePageSessionTelegramController';
+import { buildCurrentSessionConfigRequest, type OnePageSessionPropsLike } from './onePageSessionAgentController';
 
 type OnePageSessionSbtRuntimeHost = {
   getResolvedSessionConfig: (request: unknown) => unknown;

@@ -1,3 +1,4 @@
+import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { evaluateAuthenticatedRoutePreflight as evaluateAuthenticatedRoutePreflightBoundary } from './authenticatedRoutePreflight.js';
 import { dispatchInterviewStarterRequest } from './interviewStarter.js';
 import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
@@ -177,7 +178,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           baseHeaders: routeBaseHeaders,
           deps: {
             resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
-            getSessionConfig: deps?.getSessionConfig,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
             getCorsContext: deps?.getCorsContext,
             ...(routeSelection.kind === 'interview-starter' ? {
               getSessionSecrets: deps?.getSessionSecrets,
@@ -324,6 +325,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
 
         const bootstrapUpload = await dispatchBootstrapArweaveUpload({
           request,
+          env,
           hasAuthorization: routeSelection.hasAuthorizationHeader,
           deps: {
             corsHeaders: deps?.corsHeaders,
@@ -333,7 +335,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             ),
             json: deps?.json,
             MISSING_SLUG_ERROR: constants?.missingSlugError,
-            getSessionConfig: (slug) => deps?.getSessionConfig?.(env, slug),
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
             BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR: constants?.bootstrapSessionConfigRequiredError,
             getCorsContext: deps?.getCorsContext,
             verifyAdminSignature: (value) => deps?.verifyAdminSignature?.({ ...value, env }),
@@ -391,6 +393,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           json: deps?.json,
           requireAuth: deps?.requireAuth,
           getSessionConfig: deps?.getSessionConfig,
+          readCurrentSessionConfig: deps?.readCurrentSessionConfig,
           getCorsContext: deps?.getCorsContext,
           validateAdmin: deps?.validateAdmin,
           ...(deps?.readAbuseCounterSummary ? { readAbuseCounterSummary: deps.readAbuseCounterSummary } : {}),
@@ -411,6 +414,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             json: deps?.json,
             requireAuth: deps?.requireAuth,
             getSessionConfig: deps?.getSessionConfig,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
             getCorsContext: deps?.getCorsContext,
             validateAdmin: deps?.validateAdmin,
             readResultsAnalysisAdminStatus: deps?.readResultsAnalysisAdminStatus,
@@ -497,7 +501,12 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           return deps?.json?.({ error: slugResolution?.error || constants?.missingSlugError }, 400, routeBaseHeaders);
         }
         const targetSlug = slugResolution.slug;
-        const config = await deps?.getSessionConfig?.(env, targetSlug);
+        let config;
+        try {
+          ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: targetSlug }));
+        } catch (error) {
+          return deps?.json?.({ error: error.message }, 503, routeBaseHeaders);
+        }
         if (!config) return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, routeBaseHeaders);
         const corsContext = await deps?.getCorsContext?.({ request: withQuerySlugHeader, config, baseHeaders: routeBaseHeaders });
         if (corsContext && !corsContext.ok) return corsContext.response;
@@ -510,7 +519,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           const context = await resolveAuthenticatedRouteContext({
             request: withQuerySlugHeader, env, auth, baseHeaders: corsContext?.headers || routeBaseHeaders,
             deps: {
-              getSessionConfig: async () => config,
+              readCurrentSessionConfig: async () => ({ config }),
               getCorsContext: deps?.getCorsContext,
               json: deps?.json, toStr: deps?.toStr,
               SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
@@ -523,6 +532,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             deps: { computeScopesForLogin: deps?.computeScopesForLogin, checkRateLimit: deps?.checkRateLimit, json: deps?.json },
           });
           if (!preflight?.ok) return preflight?.response;
+          config = context.config;
           address = context.address;
           scopes = context.scopes;
         }
@@ -540,6 +550,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             readPublishedResultsAnalysisArtifact: deps?.readPublishedResultsAnalysisArtifact,
             readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
             evaluateResultsAnalysisViewerEligibility: deps?.evaluateResultsAnalysisViewerEligibility,
+            getSessionSecrets: deps?.getSessionSecrets,
             readResourceGateOnChain: deps?.readResourceGateOnChain,
             resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
             toRegistrySessionSlug: deps?.toRegistrySessionSlug,
@@ -561,7 +572,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
             json: deps?.json,
             MISSING_SLUG_ERROR: constants?.missingSlugError,
-            getSessionConfig: deps?.getSessionConfig,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
             SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
             getCorsContext: deps?.getCorsContext,
             resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
@@ -601,7 +612,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           resolveAuthenticatedRouteContext: (value) => resolveAuthenticatedRouteContext({
             ...value,
             deps: {
-              getSessionConfig: deps?.getSessionConfig,
+              readCurrentSessionConfig: deps?.readCurrentSessionConfig,
               getCorsContext: deps?.getCorsContext,
               json: deps?.json,
               toStr: deps?.toStr,

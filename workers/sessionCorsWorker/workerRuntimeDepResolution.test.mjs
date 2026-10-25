@@ -24,6 +24,7 @@ test('resolveWorkerRuntimeDeps preserves worker-local and imported dependency wi
     corsHeaders: 'corsHeaders',
     json: 'json',
     getSessionConfig: 'getSessionConfig',
+      readCurrentSessionConfig: 'readCurrentSessionConfig',
     verifyToken: 'verifyToken',
     validateAuthTokenRecord: 'validateAuthTokenRecord',
     resolveWorkerRequestSlugContext: 'resolveWorkerRequestSlugContext',

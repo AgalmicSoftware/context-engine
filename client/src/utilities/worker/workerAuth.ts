@@ -41,6 +41,7 @@ import {
   stripAnonymousRateIdHeader,
 } from './workerAuthAnonymousHeaders.js';
 import {
+  isTokenScopeDenialResponse,
   readRequestApiKey,
   shouldFallbackToAuthenticatedFlow,
   shouldRetryAuthenticatedResponse,
@@ -194,6 +195,46 @@ const getWalletContext = (overrideIn: unknown = {}) => {
 
 const inFlightTokenRequests = new Map<string, InFlightTokenRequest>();
 let workerAuthEpoch = 0;
+// A token carries the scopes its sign-in granted. Tokens issued since access
+// last changed reflect current access, so their scope denials are final; a
+// token issued before the change gets one fresh sign-in on a scope denial.
+// The Worker reads gates through its own RPC, which can trail the chain view
+// that confirmed a mint, so tokens issued soon after a change are not trusted.
+const ACCESS_CHANGE_SETTLE_MS = 30 * 1000;
+let workerAccessEpoch = 0;
+let workerAccessChangedAtMs = 0;
+const tokensIssuedForCurrentAccess = new Set<string>();
+
+const markWorkerAccessChanged = () => {
+  workerAccessEpoch += 1;
+  workerAccessChangedAtMs = Date.now();
+  tokensIssuedForCurrentAccess.clear();
+};
+
+// A claim or join in another tab of this browser changes access here too.
+const accessChangeChannel = (() => {
+  try {
+    if (typeof BroadcastChannel !== 'function') return null;
+    const channel = new BroadcastChannel('ce:worker-access-changed:v1');
+    channel.onmessage = markWorkerAccessChanged;
+    // Node's channel would otherwise keep a non-browser process alive.
+    const unref = Reflect.get(channel, 'unref');
+    if (typeof unref === 'function') unref.call(channel);
+    return channel;
+  } catch (_) {
+    return null;
+  }
+})();
+
+// Call after an in-app action that can grant access, such as an SBT claim or a
+// Worker Group join, so a token issued before it does not hide the new scopes.
+export const noteWorkerAccessChanged = () => {
+  markWorkerAccessChanged();
+  try {
+    accessChangeChannel?.postMessage('changed');
+  } catch (_) {}
+};
+
 const getCurrentWorkerAuthStoreAddress = () => {
   try {
     return normalizeAddress(store?.getState?.()?.profile?.account);
@@ -240,6 +281,9 @@ const invalidateWorkerAuthState = ({ nextAddress = '' } = {}) => {
   workerAuthEpoch += 1;
   abortInFlightTokenRequests();
   clearAllTokenCaches();
+  // Access noted for the previous sign-in says nothing about the next one's tokens.
+  workerAccessChangedAtMs = 0;
+  tokensIssuedForCurrentAccess.clear();
   trackedWorkerAuthAddress = normalizeAddress(nextAddress);
   return workerAuthEpoch;
 };
@@ -643,6 +687,22 @@ export const buildSignedBootstrapAdminAuth = async ({
   };
 };
 
+const readCachedWorkerSessionToken = ({
+  storageKey,
+  resolvedWorkerUrl,
+  sessionId,
+  slug,
+  address,
+}: WorkerTokenRequestContext): string => {
+  const cached = readScopedTokenCache(storageKey, {
+    workerUrl: resolvedWorkerUrl,
+    sessionId,
+    sessionSlug: slug,
+    address,
+  });
+  return cached?.ok && cached.token ? cached.token : '';
+};
+
 export const getWorkerSessionToken = async ({
   sessionSlug,
   sessionConfig,
@@ -679,14 +739,9 @@ export const getWorkerSessionToken = async ({
   if (typeof window !== 'undefined') {
     accountLog.log('[workerAuth] resolved worker URL', { slug, resolvedWorkerUrl });
   }
-  const cached = readScopedTokenCache(storageKey, {
-    workerUrl: resolvedWorkerUrl,
-    sessionId,
-    sessionSlug: slug,
-    address,
-  });
-  if (cached?.ok && cached.token) {
-    return cached.token;
+  const cachedToken = readCachedWorkerSessionToken(resolvedRequest);
+  if (cachedToken) {
+    return cachedToken;
   }
 
   const existingRequest = inFlightTokenRequests.get(storageKey);
@@ -698,6 +753,7 @@ export const getWorkerSessionToken = async ({
     typeof AbortController === 'function' ? new AbortController() : { abort: () => {}, signal: null };
   const requestToken = async () => {
     const signal = abortController.signal;
+    const requestAccessEpoch = workerAccessEpoch;
     const chainId = wallet.chainId || 1;
     const providerLike = resolvedSigner?.provider || wallet.providerLike;
 
@@ -813,6 +869,10 @@ export const getWorkerSessionToken = async ({
         address,
       }),
     );
+    // An access change during sign-in may postdate the scopes this token holds.
+    if (requestAccessEpoch === workerAccessEpoch && Date.now() - workerAccessChangedAtMs >= ACCESS_CHANGE_SETTLE_MS) {
+      tokensIssuedForCurrentAccess.add(loginData.token);
+    }
 
     return loginData.token;
   };
@@ -893,7 +953,7 @@ const getWorkerAuthHeadersWithMeta = async ({
     requestContext: resolvedRequest,
   });
   const headers = buildWorkerAuthHeadersForToken({ token, slug: resolvedRequest.slug });
-  return { headers, requestContext: resolvedRequest };
+  return { headers, requestContext: resolvedRequest, token };
 };
 
 export const getWorkerAuthHeaders = async ({
@@ -928,6 +988,8 @@ export const fetchWorkerWithAuth = async (
   const workerUrl = normalizeWorkerUrl(opts.workerUrl || url);
   const bodyIsStream = isStreamBody(options?.body);
   const anonymousOnly = opts.anonymousOnly === true;
+  const startedSignedOut = !getCurrentWorkerAuthStoreAddress();
+  const startingAuthEpoch = workerAuthEpoch;
   const canAttemptAnonymous = (opts.preferAnonymous || anonymousOnly) && (!bodyIsStream || anonymousOnly);
   let anonymousResponse: Response | null = null;
   if (canAttemptAnonymous) {
@@ -952,8 +1014,8 @@ export const fetchWorkerWithAuth = async (
       const fallbackAnonymousHeaders = stripAnonymousRateIdHeader(anonymousHeaders);
       anonymousResponse = await fetch(url, { ...options, headers: fallbackAnonymousHeaders });
     }
-    // Regression guard: user-initiated media capture must never turn a denied
-    // anonymous request into an unexpected wallet or passkey signing prompt.
+    // Explicitly anonymous-only callers (such as background suggestions) must
+    // never turn a denial into an interactive wallet or passkey signing prompt.
     if (anonymousOnly) return anonymousResponse;
     const shouldFallback = await shouldFallbackToAuthenticatedFlow(anonymousResponse, {
       requestApiKey,
@@ -963,8 +1025,19 @@ export const fetchWorkerWithAuth = async (
       return anonymousResponse;
     }
   }
+  // An unlocked extension is not an app login. Keep the useful route denial
+  // when signed out; account changes during a request still use abort handling.
+  if (
+    anonymousResponse &&
+    startedSignedOut &&
+    !getCurrentWorkerAuthStoreAddress() &&
+    startingAuthEpoch === workerAuthEpoch
+  ) {
+    return anonymousResponse;
+  }
   let authHeaders: Record<string, string> | null = null;
   let authRequestContext: WorkerTokenRequestContext | null = null;
+  let authToken = '';
   try {
     const authResult = await getWorkerAuthHeadersWithMeta({
       sessionSlug: slug,
@@ -975,6 +1048,7 @@ export const fetchWorkerWithAuth = async (
     });
     authHeaders = authResult.headers;
     authRequestContext = authResult.requestContext;
+    authToken = toStr(authResult.token);
   } catch (err) {
     // When anonymous-first is enabled and no wallet is connected, surface
     // the original anonymous worker denial instead of a wallet-auth error.
@@ -988,16 +1062,20 @@ export const fetchWorkerWithAuth = async (
   if (
     (response.status === 401 || response.status === 403) &&
     opts.retry !== false &&
-    (await shouldRetryAuthenticatedResponse(response))
+    ((await shouldRetryAuthenticatedResponse(response)) ||
+      (!tokensIssuedForCurrentAccess.has(authToken) && (await isTokenScopeDenialResponse(response))))
   ) {
-    await clearWorkerSessionToken({
-      requestContext: authRequestContext,
-      sessionSlug: slug,
-      sessionConfig: resolvedSession.sessionConfig,
-      context: opts.context,
-      workerUrl,
-      allowDemoFallback: opts.allowDemoFallback,
-    });
+    // A concurrent retry may already have replaced this token; reuse its replacement.
+    if (!authRequestContext || readCachedWorkerSessionToken(authRequestContext) === authToken) {
+      await clearWorkerSessionToken({
+        requestContext: authRequestContext,
+        sessionSlug: slug,
+        sessionConfig: resolvedSession.sessionConfig,
+        context: opts.context,
+        workerUrl,
+        allowDemoFallback: opts.allowDemoFallback,
+      });
+    }
     const retryToken = await getWorkerSessionToken({
       requestContext: authRequestContext,
     });

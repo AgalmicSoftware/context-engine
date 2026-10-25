@@ -16,6 +16,24 @@ const SESSION_KV_PREFIX = 'session';
 const buildSessionConfigKvKey = (slug) => `${SESSION_KV_PREFIX}:${slug}:config`;
 const buildSessionSecretsKvKey = (slug) => `${SESSION_KV_PREFIX}:${slug}:secrets`;
 
+export const SESSION_CONFIG_MIGRATION_REQUIRED_REASON = 'session_config_migration_required';
+export const SESSION_CONFIG_MIGRATION_REQUIRED_ERROR = 'Stored legacy session config requires operator migration before use.';
+export const legacySessionConfigMigrationError = () => Object.assign(
+  new Error(SESSION_CONFIG_MIGRATION_REQUIRED_ERROR), { reason: SESSION_CONFIG_MIGRATION_REQUIRED_REASON, status: 503 },
+);
+
+// An absent legacy record permits bootstrap; malformed stored data does not.
+// Keep the diagnostic constant so a public route cannot echo credential values.
+export const getLegacySessionConfigForAuthority = async (env, slug) => {
+  const raw = await env.GROUP_KV.get(buildSessionConfigKvKey(slug));
+  if (raw == null) return null;
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { throw legacySessionConfigMigrationError(); }
+  const config = normalizeWorkerConfigRecord(parsed, { slug });
+  if (!config) throw legacySessionConfigMigrationError();
+  return config;
+};
+
 export const getSessionConfig = async (env, slug, deps) => {
   const getKvJsonFn = typeof deps?.getKvJson === 'function' ? deps.getKvJson : getKvJson;
   const normalizeConfig = typeof deps?.normalizeWorkerConfigRecord === 'function'

@@ -1,3 +1,4 @@
+import { readAuthorizationEpoch } from './authorizationScopeFreshness.js';
 import * as ethersModule from 'ethers';
 
 import {
@@ -357,5 +358,6 @@ export const resolveAdminRequestAuthority = async ({
     existingConfig,
     headers,
     targetSlug,
+    expectedAuthority: { actor: address.toLowerCase(), revision: corsState.revision, authzEpoch: readAuthorizationEpoch(existingConfig) },
   };
 };

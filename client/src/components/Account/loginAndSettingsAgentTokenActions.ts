@@ -3,8 +3,8 @@ import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClie
 import {
   cacheAgentClientLoginEnvelope,
   resolveAgentClientLoginIdentityTarget,
-  resolveTelegramAgentBridgeUrl,
-} from '../OnePageSession/onePageSessionTelegramController';
+  resolveSessionAgentBridgeUrl,
+} from '../OnePageSession/onePageSessionAgentController';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 
 type UnknownRecord = Record<string, unknown>;
@@ -48,7 +48,7 @@ export type LoginAgentActionsDeps = {
   getPropSessionConfig: () => unknown;
   getSessionConfigBySlugOrDefault: (slug: string) => unknown;
   getTargetNetwork: () => unknown;
-  isTelegramFirstSessionConfig: (sessionConfig: unknown) => boolean;
+  isHostedAgentSessionConfig: (sessionConfig: unknown) => boolean;
   normalizeSettingsSessionSlug: (slug: unknown) => string;
   setState: (patch: AgentTokenStatePatch | ((prev: { agentTokenLoginOpen: boolean }) => AgentTokenStatePatch)) => void;
   setStateIfMounted: (patch: { agentTokenError?: string; agentTokenInput?: string; agentTokenStatus?: string }) => void;
@@ -107,7 +107,7 @@ const toStr = (value: unknown): string => String(value ?? '').trim();
 export const formatAgentTokenError = (error: unknown): string => {
   const reason = toStr(isRecord(error) && 'message' in error ? error.message : error);
   if (reason.includes('expired'))
-    return 'This token is expired. Create a fresh agent token in Telegram and paste it again.';
+    return 'This token is expired. Request a fresh agent token from your session administrator and paste it again.';
   if (reason.includes('session_mismatch')) return 'This token is for a different session.';
   if (reason.includes('session_identity'))
     return 'This session’s exact Worker identity is unavailable. Reload its canonical session configuration and try again.';
@@ -119,7 +119,7 @@ export const formatAgentTokenError = (error: unknown): string => {
   if (reason.includes('empty')) return 'Paste a Context Engine agent token first.';
   if (reason.includes('multiline')) return 'Paste one raw token on a single line.';
   if (reason.includes('unsupported_format')) return 'Paste the raw ceagt_ token, not a link.';
-  return 'Agent token login failed. Create a fresh token in Telegram and try again.';
+  return 'Agent token login failed. Request a fresh token from your session administrator and try again.';
 };
 
 export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgentActions => {
@@ -151,7 +151,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     );
   };
 
-  const resolveAgentBridgeUrl = (sessionConfig: unknown = null): string => resolveTelegramAgentBridgeUrl(sessionConfig);
+  const resolveAgentBridgeUrl = (sessionConfig: unknown = null): string => resolveSessionAgentBridgeUrl(sessionConfig);
 
   const getAgentTokenLoginSessionContext = (): LoginAgentSessionContext => {
     const sessionSlug = deps.getActiveSessionSlug();
@@ -171,7 +171,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
   const shouldShowAgentTokenLogin = (): boolean => {
     const { sessionSlug, sessionConfig } = getAgentTokenLoginSessionContext();
     if (!sessionSlug) return false;
-    return deps.isTelegramFirstSessionConfig(sessionConfig);
+    return deps.isHostedAgentSessionConfig(sessionConfig);
   };
 
   const toggleAgentTokenLogin = (): void => {
@@ -198,7 +198,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     } catch (_) {}
     deps.changeAccount({
       account: envelope.address,
-      provider: 'telegram_agent',
+      provider: 'agent_token',
       network: targetNetwork,
       userImageURL: undefined,
       agentClientSession: {
@@ -210,7 +210,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     deps.updateLoginInfo({
       loginInProgress: false,
       loginComplete: true,
-      provider: 'telegram_agent',
+      provider: 'agent_token',
     });
   };
 
@@ -238,7 +238,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     deps.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
-      provider: 'telegram_agent',
+      provider: 'agent_token',
     });
 
     try {

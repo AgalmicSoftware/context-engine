@@ -499,7 +499,7 @@ describe('SessionWizard publish boundary rendering', () => {
 
       fireEvent.change(openAiKeyInput, { target: { value: 'sk-remotely-verified' } });
       await waitFor(() => expect(publishButton).not.toBeDisabled());
-      fireEvent.click(screen.getByRole('button', { name: 'ai expand' }));
+      fireEvent.click(screen.getByRole('button', { name: 'AI providers and models expand' }));
       const fastModelGroup = screen.getByText('fast').parentElement?.parentElement;
       const fastProviderSelect = within(fastModelGroup).getAllByRole('combobox')[1];
       fireEvent.change(fastProviderSelect, { target: { value: 'anthropic' } });

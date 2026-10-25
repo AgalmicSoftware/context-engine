@@ -99,6 +99,7 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   SESSION_REGISTRY_CACHE_UPDATED_EVENT: 'ce:session-registry-cache-updated',
   sessionRegistryStore: {
     getAllSessionEntries: (...args) => mockSessionRegistryGetAllSessionEntries(...args),
+    getSessionConfig: (...args) => mockGetSessionConfigBySlug(...args),
     readCache: (...args) => mockSessionRegistryReadCache(...args),
   },
 }));

@@ -39,7 +39,7 @@ deliberation and coordination, centered on:
 - A per-session Cloudflare Worker for canonical Hosted & Fast sessions and for
   profile-enabled AI, transcription, storage, fetch, and chain/Arweave helpers.
 - An optional Agent Bridge Worker that exposes scoped `/api/agent/*` requests
-  and Telegram/Mini App adapters without replacing session authority.
+  and Session Wrapped without replacing session authority.
 
 Primary storage and authority split:
 - Hosted & Fast: the creator-owned Session Worker is canonical for config,
@@ -309,9 +309,9 @@ What integrations can do:
 - Use scoped credentials with the canonical `/api/agent/*` HTTP contract for
   implemented account, session, question, response, preference, and agent-only
   flows.
-- Use optional Telegram bot and Mini App adapters, including the live
-  `/telegram/webhook` route, without changing the underlying Context Engine
-  authority model.
+- Log in to the browser with an agent token for Hosted & Fast sessions with
+  `authority.mode=worker_canonical` and `surfaces.agentHttp=true`. Explicit
+  Agent HTTP disablement overrides legacy enablement flags.
 - Exchange an authorized Session Worker identity for a bridge credential on the
   implemented wrapped-member handoff.
 
@@ -319,8 +319,7 @@ What the system does:
 - Deploys `workers/agentBridgeWorker/` separately from each Session Worker.
 - Delegates canonical membership, gates, storage, and chain operations to the
   configured Session Worker or contract boundary when required. Bridge-local
-  indexes and contract-only catalog entries are not presented as canonical
-  session state.
+  indexes are not presented as canonical session state.
 - Keeps reusable worker modules under `workers/shared/`; that directory is not a
   deployable Worker.
 
@@ -448,8 +447,8 @@ Optional legacy/sponsored helper:
   default Hosted & Fast path uses the native Cloudflare dashboard handoff.
 
 Optional agent sidecar:
-- `workers/agentBridgeWorker/`: Scoped Agent HTTP API and optional Telegram bot
-  and Mini App adapters. It delegates canonical session authority rather than
+- `workers/agentBridgeWorker/`: Scoped Agent HTTP API, submission queue, and
+  Session Wrapped. It delegates canonical session authority rather than
   duplicating it.
 - `workers/shared/`: Reusable modules bundled into worker packages; not a
   deployable Worker.
@@ -508,10 +507,14 @@ Worker API (selected endpoints):
 - `POST /`: Authenticated action-style requests using an `action` field: `request_test_eth` (testnet faucet), `fetch_url`, `fetch_image`.
 
 Agent Bridge API families (selected):
-- `/api/agent/*`: Canonical scoped agent contract; implemented and
-  contract-only entries are identified in the Agent Bridge catalog.
-- `/telegram/webhook` and `/telegram/mini-app*`: Optional Telegram adapter and
-  Mini App surfaces.
+- `/api/agent/*`: Canonical scoped agent contract; supported routes and
+  credential requirements are listed in the Agent Bridge reference.
+- `/api/agent/skill`: Current runtime instructions from
+  `workers/agentBridgeWorker/skills/ce-agent-access/SKILL.md`. The old
+  `/telegram/agent/api/*` prefix remains an HTTP compatibility alias.
+- Bot webhook, command, and Mini App routes are retired. Legacy persisted
+  principal keys and historical review evidence remain readable; they do not
+  enable a chat transport.
 
 ### Storage and Data
 

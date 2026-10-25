@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import CETooltip from '../Shared/CETooltip';
+import SessionTestEthBadge from '../Shared/SessionTestEthBadge';
 import ReverseAlignmentTopicMap, { hasReverseAlignmentTopicPreview } from './ReverseAlignmentTopicMap';
 import { hasReverseAlignmentContext } from './reverseAlignmentTopics';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -487,6 +488,7 @@ export default function OnePageSessionStandardShell({
       <div className={brandingSectionClassName}>
         <div className={titleContainerClassName}>
           <h2 className={styles.brandingSectionTitle}>{titleText}</h2>
+          <SessionTestEthBadge sessionConfig={resolvedSessionConfig} sessionSlug={effectiveSlug} loadPresence />
           <button
             type="button"
             id={sessionInfoTooltipId}

@@ -22,6 +22,7 @@ export const buildReportSnapshot = (report = {}, { label = '' } = {}) => {
     kind: 'ai_discourse_bench_longitudinal_snapshot',
     label: label || report.generatedAt || reportFingerprint.slice(0, 12),
     capturedAt: new Date().toISOString(),
+    summaryCorrection: report.summaryCorrection || null,
     source: {
       benchmarkId: report.benchmarkId || '',
       generatedAt: report.generatedAt || null,

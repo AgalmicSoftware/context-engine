@@ -165,6 +165,9 @@ export const buildAdminAgentSessionWrappedConfigPatch = ({
       preset: 'custom',
       surfaces: {
         ...surfaces,
+        // Preserve legacy reads, but never publish removed adapter access.
+        telegram: false,
+        miniApp: false,
         agentHttp: capability.enabled,
       },
     },
@@ -214,6 +217,12 @@ export const ensureAdminAgentSessionWrappedWorkerAttached = async ({
   return { attached: true };
 };
 
+const sessionIdFrom = (sessionConfig: unknown): string => {
+  const config = asRecord(sessionConfig);
+  const registry = registryFrom(config);
+  return toStr(registry.sessionIdHex || registry.sessionId || config.sessionId).trim();
+};
+
 const deploymentIdentityFrom = ({
   sessionConfig,
   sessionSlug,
@@ -224,8 +233,7 @@ const deploymentIdentityFrom = ({
   const config = asRecord(sessionConfig);
   const registry = registryFrom(config);
   const chainIdentity = Number(registry.registryChainId || registry.chainId || config.networkChainId || 0) || 'worker';
-  const sessionIdentity = toStr(registry.sessionIdHex || registry.sessionId || config.sessionId).trim() || 'pending';
-  return ['session', chainIdentity, sessionIdentity, sessionSlug].join(':');
+  return ['session', chainIdentity, sessionIdFrom(sessionConfig) || 'pending', sessionSlug].join(':');
 };
 
 const redactToken = (message: unknown, token: string): string => {
@@ -281,6 +289,7 @@ export const applyAdminAgentSessionWrappedChange = async ({
         sessionSlug: slug,
         sessionWorkerOrigin: workerOrigin,
         sessionDeploymentIdentity: deploymentIdentityFrom({ sessionConfig, sessionSlug: slug }),
+        sessionId: sessionIdFrom(sessionConfig),
         authorityMode,
         agentHttpEnabled: accessEnabled,
         bundleUrl: AGENT_BRIDGE_WORKER_BUNDLE_URL,

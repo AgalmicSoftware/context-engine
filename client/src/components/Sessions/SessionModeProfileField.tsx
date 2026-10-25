@@ -43,7 +43,7 @@ const HOSTING_PRESETS = [
     entryProvider: 'Ethereum + Arweave',
     entryDescription:
       'Session data is stored on Arweave, with session identity and question logic recorded in Ethereum smart contracts.',
-    entryRequirements: ['OpenAI API Key', 'JWK', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)'],
+    entryRequirements: ['OpenAI API Key', 'Arweave wallet (JWK)', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)'],
   },
 ] as const;
 
@@ -83,7 +83,11 @@ const SessionModeProfileField = ({
   showPresetToggle = true,
 }: SessionModeProfileFieldProps): React.ReactElement => {
   const profile = isProfile(value) ? value : null;
-  const selectedPreset = profile?.preset && profile.preset !== SESSION_MODE_PRESET_IDS.CUSTOM ? profile.preset : '';
+  const selectedPreset =
+    HOSTING_PRESETS.find(
+      ({ id }) =>
+        profile && !profilesDiffer(profile, presetForChain(id, registryChainId || profile.evm.registryChainId)),
+    )?.id || '';
 
   const selectPreset = (
     presetId: Exclude<(typeof SESSION_MODE_PRESET_IDS)[keyof typeof SESSION_MODE_PRESET_IDS], 'custom'>,
@@ -94,7 +98,7 @@ const SessionModeProfileField = ({
       profilesDiffer(profile, nextProfile) &&
       typeof window !== 'undefined' &&
       typeof window.confirm === 'function' &&
-      !window.confirm('Switch preset and replace incompatible custom settings?')
+      !window.confirm('Replace all custom hosting settings with this template?')
     ) {
       return;
     }
@@ -107,7 +111,11 @@ const SessionModeProfileField = ({
     }
   };
 
-  const handlePresetKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+  const handlePresetKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+    entryCard: boolean,
+  ) => {
     const direction = ['ArrowRight', 'ArrowDown'].includes(event.key)
       ? 1
       : ['ArrowLeft', 'ArrowUp'].includes(event.key)
@@ -121,7 +129,8 @@ const SessionModeProfileField = ({
       '[role="radio"]:not(:disabled)',
     );
     enabledRadios?.[nextIndex]?.focus();
-    selectPreset(nextPreset.id);
+    // Choosing an entry card opens that setup path, so arrows only move focus there.
+    if (!entryCard) selectPreset(nextPreset.id);
   };
 
   const renderPreset = (preset: (typeof HOSTING_PRESETS)[number], index: number, entryCard: boolean) => {
@@ -142,7 +151,7 @@ const SessionModeProfileField = ({
         data-ce-control-appearance={entryCard ? undefined : 'frameless'}
         tabIndex={selected || (!selectedPreset && index === 0) ? 0 : -1}
         onClick={() => selectPreset(preset.id)}
-        onKeyDown={(event) => handlePresetKeyDown(event, index)}
+        onKeyDown={(event) => handlePresetKeyDown(event, index, entryCard)}
       >
         {entryCard ? (
           <>

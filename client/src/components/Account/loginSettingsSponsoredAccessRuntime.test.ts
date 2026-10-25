@@ -78,6 +78,22 @@ describe('loadLoginSettingsSponsoredAccess', () => {
     expect(mockedCheckSponsoredAccess).not.toHaveBeenCalled();
   });
 
+  it('includes hosted Tx gas after loading confirmed faucet presence', async () => {
+    mockedReadWorkerResourcePresence.mockResolvedValueOnce({ ai: false, arweave: false, rpc: false, txGas: true });
+    const result = await loadLoginSettingsSponsoredAccess({
+      slug: 'hosted-sbt',
+      sessionConfig: {
+        slug: 'hosted-sbt',
+        networkChainId: 11155420,
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        workerAuthority: { participantScopes: ['faucet'] },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+    });
+    expect(result.accessMap.txGas).toEqual({ resourceKey: 'txGas', status: 'worker-managed' });
+    expect(mockedCheckSponsoredAccess).not.toHaveBeenCalled();
+  });
+
   it('refreshes registry-backed sessions and checks every projected registry resource', async () => {
     const sessionConfig = {
       slug: 'registry-session',

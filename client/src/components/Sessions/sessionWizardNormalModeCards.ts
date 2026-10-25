@@ -106,7 +106,7 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
           summary: normalModeRequiresCustomWorker
             ? resolvedWorkerBaseUrl
               ? !deployVerifiedInUi
-                ? 'Worker URL saved; deploy or reverify it before publishing.'
+                ? 'Worker URL saved. Verify it again before publishing; verification resets after a reload or a settings change.'
                 : isWorkerCanonical
                   ? 'Worker URL configured; verify canonical config and browser access.'
                   : usesWorkerRuntime

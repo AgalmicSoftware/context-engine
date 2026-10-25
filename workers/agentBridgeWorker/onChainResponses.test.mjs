@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { ethers } from 'ethers';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import {
   __test__onChainResponses,
@@ -7,10 +8,11 @@ import {
   base64urlToHex,
   directSubmitFeatureEnabled,
   requestManagedAccountFaucetOnJoin,
+  requestSessionWorkerFaucet,
   resolveSurveysAddress,
-  submitTelegramResponseOnChain,
+  submitAgentResponseOnChain,
 } from './onChainResponses.mjs';
-import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
+import { normalizeLegacyManagedPrincipal } from './legacyCompatibility.mjs';
 import { parseSiweMessage, validateSiweResources } from '../sessionCorsWorker/siweMessageValidation.js';
 
 const bytes32QuestionId = `0x${'12'.repeat(32)}`;
@@ -30,7 +32,7 @@ test('worker-login fallback candidates include the canonical .sh site before the
 });
 
 async function makeAccount() {
-  const principal = normalizeTelegramPrincipal({ telegramUserId: '42', username: 'participant' });
+  const principal = normalizeLegacyManagedPrincipal({ telegramUserId: '42', username: 'participant' });
   const account = await deriveManagedDemoAccount({
     principal,
     deploymentId: 'deploy-a',
@@ -73,7 +75,7 @@ function makeWorkerFetch(calls = [], {
 }
 
 test('preview identities cannot obtain a session Worker credential', async () => {
-  const principal = normalizeTelegramPrincipal({ telegramUserId: 'preview-user' });
+  const principal = normalizeLegacyManagedPrincipal({ telegramUserId: 'preview-user' });
   const account = await deriveManagedDemoAccount({ principal, deploymentId: 'deploy-a', rootSecret: 'root-a' });
   const calls = [];
   const result = await authenticateSessionWorker({
@@ -475,7 +477,7 @@ test('direct submit uploads response and calls Surveys.submitResponses with mana
   const calls = [];
   const txId = arweaveId(9);
   const submitted = {};
-  const result = await submitTelegramResponseOnChain({
+  const result = await submitAgentResponseOnChain({
     env: {
       DEMO_SIGNER_ROOT_SECRET: 'root-a',
       AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
@@ -549,7 +551,7 @@ test('direct submit accepts Cloudflare storage refs as bytes32 response pointers
   const calls = [];
   const storageId = arweaveId(10);
   const submitted = {};
-  const result = await submitTelegramResponseOnChain({
+  const result = await submitAgentResponseOnChain({
     env: {
       DEMO_SIGNER_ROOT_SECRET: 'root-a',
       AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
@@ -660,7 +662,7 @@ test('direct submit waits for sponsored faucet balance before raw RPC broadcast'
     return workerFetch(url, init);
   };
 
-  const result = await submitTelegramResponseOnChain({
+  const result = await submitAgentResponseOnChain({
     env: {
       DEMO_SIGNER_ROOT_SECRET: 'root-a',
       AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
@@ -738,7 +740,7 @@ test('direct submit falls back to additive RPC when the default RPC cannot detec
     }
     return workerFetch(url, init);
   };
-  const result = await submitTelegramResponseOnChain({
+  const result = await submitAgentResponseOnChain({
     env: {
       DEMO_SIGNER_ROOT_SECRET: 'root-a',
       AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
@@ -777,4 +779,52 @@ test('direct submit falls back to additive RPC when the default RPC cannot detec
     ['https://good-rpc.example', 'eth_sendRawTransaction'],
   ]);
   assert.equal(typeof result.storageRef, 'object');
+});
+
+
+test('faucet authentication uses execution time rather than old account creation time', async () => {
+  const { principal, account } = await makeAccount();
+  const calls = [];
+  const now = new Date('2026-10-17T01:30:00.000Z');
+  const result = await requestSessionWorkerFaucet({
+    env: { DEMO_SIGNER_ROOT_SECRET: 'root-a', AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a' },
+    session: { sessionSlug: 'alpha', sessionWorkerUrl: 'https://session.example' },
+    principal, account, createdAt: '2026-01-01T00:00:00.000Z', now,
+    fetchImpl: makeWorkerFetch(calls),
+  });
+  assert.equal(result.ok, true);
+  const login = JSON.parse(calls.find(({ url }) => url.endsWith('/auth/login')).init.body);
+  assert.ok(login.message.includes(`Issued At: ${now.toISOString()}`));
+});
+
+test('an uncertain raw broadcast preserves its transaction hash without retry or signer material', async () => {
+  const { principal, account } = await makeAccount();
+  const workerFetch = makeWorkerFetch([], { txId: arweaveId(13) });
+  let rawTransaction;
+  const result = await submitAgentResponseOnChain({
+    env: {
+      DEMO_SIGNER_ROOT_SECRET: 'root-a', AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
+      DEFAULT_CHAIN_ID: '11155420', DEFAULT_RPC_URL: 'https://rpc.example',
+    },
+    session: { sessionSlug: 'alpha', sessionWorkerUrl: 'https://session.example', surveysAddress, managedAccountSubmitAllowed: true },
+    principal, account, questionRef: { sessionSlug: 'alpha', questionId: bytes32QuestionId },
+    answer: { questionType: 'freeform', value: 'Approved answer' },
+    fetchImpl: async (url, init) => {
+      if (url !== 'https://rpc.example') return workerFetch(url, init);
+      const { method, params } = JSON.parse(init.body);
+      if (method === 'eth_sendRawTransaction') {
+        [rawTransaction] = params;
+        throw new TypeError('broadcast connection lost');
+      }
+      const rpcResults = { eth_chainId: '0xaa37dc', eth_getTransactionCount: '0x0', eth_gasPrice: '0x3b9aca00', eth_estimateGas: '0x186a0' };
+      return Response.json({ jsonrpc: '2.0', id: 1, result: rpcResults[method] });
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.retryable, false);
+  assert.equal(result.reconciliationRequired, true);
+  assert.equal(result.txHash, ethers.utils.keccak256(rawTransaction));
+  assert.equal(result.storageId, arweaveId(13));
+  assert.equal(JSON.stringify(result).includes(rawTransaction), false);
+  assert.equal(JSON.stringify(result).includes('root-a'), false);
 });

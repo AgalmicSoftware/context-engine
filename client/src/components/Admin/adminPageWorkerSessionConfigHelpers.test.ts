@@ -389,3 +389,18 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
     expect(payload).not.toHaveProperty('rpcUrlsByChainId');
   });
 });
+
+it('clears retired surfaces when Admin saves hosted Worker config', () => {
+  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+  profile.surfaces.telegram = true;
+  profile.surfaces.miniApp = true;
+  const payload = buildWorkerSessionConfigPayload({
+    sessionConfig: { slug: 'alpha', sessionModeProfile: profile },
+    account: ACCOUNT,
+  });
+  expect(payload.sessionModeProfile).toMatchObject({
+    surfaces: { agentHttp: false, telegram: false, miniApp: false },
+  });
+  expect(profile.surfaces.telegram).toBe(true);
+  expect(profile.surfaces.miniApp).toBe(true);
+});

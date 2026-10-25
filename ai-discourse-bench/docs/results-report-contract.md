@@ -216,13 +216,19 @@ scatterplot. The post-graph cluster actions keep the live `pdfIgnore` wrapper
 and inline button margins (`Collapse Clusters`, `Expand Clusters`, and
 `Analyze clusters`) rather than a benchmark-specific flex helper class.
 The embedding selector remains disabled because a self-contained artifact has
-one generated MDS embedding. Opinion-group controls are functional: entering a
+one generated MDS embedding. The graph and all opinion groups require at least
+two eligible participants and a measured similarity for every eligible pair.
+Otherwise the graph and controls are replaced by a visible unavailable notice;
+report JSON and native export group labels are also null. The shared
+`participantGraph.opinionGroupAvailability` records the reason. Measured edges
+remain available. When those requirements are met, opinion-group controls are functional: entering a
 count or using the stepper applies deterministic K-medoids assignments over the
 embedded report similarity matrix, updates participant colors and outlines,
 and shows model membership for the preview groups. `Auto` restores the
 canonical connected-component groups and their generated representative
 statements. Manual grouping changes only the visualization and never rewrites
-the embedded benchmark aggregates. Group outlines use the same straight-edged
+the embedded benchmark aggregates. Available automatic and manual groups are
+explicitly exploratory, without an established stability claim. Group outlines use the same straight-edged
 convex hull as the live client for three or more participants. A two-participant
 group receives a single colored connector; a singleton has no outline.
 
@@ -231,9 +237,9 @@ each question is positioned horizontally by model-to-model answer spread,
 mapped to a fixed zero-to-one scale, with low-spread consensus on the left and
 maximum model disagreement on the live-style `Difference` edge. The vertical
 axis shows winning-response consistency from 0% to 100%. For each
-model/question cell, the winner is that model's most frequent normalized
-`Agree`, `Unsure`, or `Disagree` answer; question-level consistency is the
-number of repeated runs matching those within-model winners divided by all
+model/question/polarity cell, the winner is that model's most frequent normalized
+`Agree`, `Unsure`, or `Disagree` answer within that wording; question-level consistency is the
+number of repeated runs matching those within-polarity winners divided by all
 attempted runs. Invalid attempts remain in the denominator. This is a
 descriptive repeat-stability parameter, not a calibrated confidence
 probability or population confidence interval. Stance polarity remains
@@ -267,10 +273,23 @@ provider calls. Where the live row adds `No response`, the benchmark row adds
 `Invalid` when it is nonzero: model participants without a valid averaged
 answer, including models with no run for that question in a partial run set.
 It is the question summary's `invalid` count, which the vote bar and the Debate
-Map legend also label Invalid. The vote bar is the Debate Map question
-distribution: model-level Agree, Unsure, Disagree, and Invalid segments with
-numbered markers for the models that ran. Attempt and validity totals remain in
-the report integrity data.
+Map legend also label Invalid. The vote bar shows equal-model observed Agree,
+Unsure, and Disagree weights, plus Invalid for models with no valid answer.
+Counts are normalized model equivalents, displayed with at most four decimal
+places; underlying values and raw trial counts remain unchanged. Numbered
+markers use a separate labeled -1 to +1 mean-stance axis. Nearby means occupy
+separate vertical lanes without moving their horizontal coordinates. Keyboard
+focus and hover show observed shares and repeat stability. Majority-Unsure
+observations are labeled "Mostly Unsure"; pure Unsure and mixed directional
+answers remain distinct. Models that ran but have no valid mean appear outside
+the axis. Attempt and validity totals remain in report integrity data.
+
+Legacy rendering derives observed distributions from retained model/question
+counts on every surface, including interactive tags and cohort filters. A
+missing question in an existing sparse model row means no attempts; a missing
+row or incomplete present histogram produces an explicit unavailable state.
+The legacy notice explains the derived display, while Raw Results preserve
+original aggregate and cell evidence. This is a view, not raw-run revalidation.
 Benchmark question ids and topics are not rendered as a visible second row in
 Report mode; they stay available through stable `#question-<id>` anchors,
 `data-question-*` attributes, Raw Results, and CE export payloads for deep links
@@ -301,13 +320,25 @@ lossy because model/question means are discretized.
 declared and observed provenance, statements, complete model/question summary
 distributions, uncertainty intervals, wording sensitivity, similarity details,
 coverage, graph inputs, breakdowns, quadratic importance, Debate Map inputs,
-Risk Matrix inputs, and integrity state. This lossless contract
+Risk Matrix inputs, and integrity state. This distribution-preserving contract
 is the preferred substrate for eventual native Context Engine rendering.
+Unsupported derived opinion-group labels are withheld using the shared
+availability rule rather than retained as if established by measured similarity.
 
 `snapshot-report` creates a content-addressed longitudinal snapshot from the
 same report. `compare-snapshots` compares compatible benchmark/mode/persona
 snapshots and reports model stance shift, direction changes, and participant
 similarity drift over common questions and models.
+
+`summaryCorrection` is preserved in native, compatibility, analysis-input, and
+longitudinal exports. Corrected-report fingerprints bind this record; old
+fingerprints that omitted it require regeneration of the analysis input and
+overlay, never automatic rebinding. Uncorrected report fingerprints remain
+compatible. Release-content hashing already covers the correction record and
+is unchanged. The `responseDistributionVersion: 1`/`uncertaintyRateSemantics`
+fields identify the semantic revision of aggregate `uncertaintyRate` to observed
+Unsure; retaining report schema v2/native dataset v1 does not make that meaning
+change additive.
 
 ## Participant Graph
 
@@ -320,8 +351,10 @@ similarity drift over common questions and models.
 The rendering target is a network view where nearby models have similar answer
 profiles. The standalone renderer applies classical multidimensional scaling
 to Jensen-Shannon distances over shared-question answer distributions. Opinion
-groups are connected components over the report threshold, and participants
-without sufficient overlap are placed separately. Its report-mode shell uses the live Polis graph class
+groups are connected components over the report threshold when every eligible
+pair is measured. Missing pairs withhold the joint embedding and all group
+labels, even when the overlap graph is connected. Otherwise, individual
+participants without sufficient overlap remain unassigned. Its report-mode shell uses the live Polis graph class
 hooks (`participantGraphControls`, `graphSection`, `graphItem`, and
 `participantSvg`) plus Collapse/Expand cluster controls so the standalone
 surface tracks the client Results report layout. The static host wrapper around

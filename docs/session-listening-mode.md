@@ -121,6 +121,7 @@ Session `interviewMode` settings are available in the wizard and admin metadata 
 | `followNewQuestions` | `false` | Check the public question catalog every 30 seconds during active recording and append qualifying additions to the interviewer's context. |
 | `suggestQuestions` | `false` | Propose up to three new respondent-grounded question drafts when preparing responses. Drafts may be freeform, rating, binary, or multichoice; multichoice drafts include suggested options for review. |
 | `allowManualRefresh` | `true` | Enable **Regenerate interview opening** for session admins. |
+| `shareDraftChangesByDefault` | `false` | Initially check **Share AI draft changes for research** for new responses. Participants can change the checkbox before submission; saved per-question choices take precedence. |
 
 Auto mode generates on the first Interview opening with available public questions and permitted session AI access. No separate admin setup step is needed for an open AI-enabled session. An empty bank waits until questions exist. The Worker uses its OpenAI key and caches the result at `session:<slug>:interview-opening`, with the generation time and baseline question count, separately from owner configuration. The default reuses this opening even as the bank grows; enabling regeneration checks the threshold on the next Interview opening. For example, 42 questions require nine additions at 20%. A failed refresh retains the previous opening. Initial failure visibly falls back to an existing session question.
 
@@ -177,8 +178,10 @@ beside the footer/comment controls marks an untouched AI-proposed response; it
 stays through focus-only review and disappears after any real answer, comment,
 importance, or conviction edit. The responder selects which drafts to submit and
 must explicitly opt into replacing an existing local answer. Selected drafts have
-an **X** to exclude them; an excluded draft offers **Restore draft**, or
-**Replace with draft** when a local answer already exists. There is no redundant
+an **X** that removes the whole card from review and excludes its answer from
+submission. Removed cards stay hidden during continued interviews. Drafts that
+conflict with an existing local answer remain visible with **Replace with draft**
+until the responder explicitly selects them. There is no redundant
 selected-state button. **Submit responses** saves reviewed values and enters the
 normal submission flow, opening sign-in when necessary. Drafts survive sign-in,
 and the modal resumes the normal response upload after the authenticated

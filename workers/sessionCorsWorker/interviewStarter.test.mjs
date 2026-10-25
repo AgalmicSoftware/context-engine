@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveInterviewStarter, dispatchInterviewStarterRequest } from './interviewStarter.js';
+import { resolveInterviewStarter, dispatchInterviewStarterRequest as boundary } from './interviewStarter.js';
+
+const dispatchInterviewStarterRequest = (args) => boundary({
+  ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async ({ env, slug }) => ({
+    config: await args.deps?.getSessionConfig?.(env, slug), revision: 1,
+  })) },
+});
 import {
   normalizeInterviewSettings,
   validInterviewSettings,
@@ -43,6 +49,9 @@ test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings().followNewQuestions, false);
   assert.equal(normalizeInterviewSettings().questionGrowthPercent, 20);
   assert.equal(normalizeInterviewSettings().allowManualRefresh, true);
+  assert.equal(normalizeInterviewSettings().shareDraftChangesByDefault, false);
+  assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: true }).shareDraftChangesByDefault, true);
+  assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: 'true' }).shareDraftChangesByDefault, false);
   assert.equal(normalizeInterviewSettings().steeringPrompt, '');
   assert.equal(normalizeInterviewSettings({ steeringPrompt: '  Guide the interview.  ' }).steeringPrompt, 'Guide the interview.');
   assert.equal(
@@ -53,6 +62,8 @@ test('defaults are stable and settings reject invalid values', () => {
     { openingMode: 'invalid' },
     { openingMode: 'owner', openingPrompt: ' ' },
     { followNewQuestions: 'true' },
+    { shareDraftChangesByDefault: 'true' },
+    { shareDraftChangesByDefault: 1 },
     { questionGrowthPercent: 0 },
     { steeringPrompt: 42 },
     { steeringPrompt: 'x'.repeat(3001) },

@@ -234,7 +234,7 @@ export const createSessionWizardPublishRuntimeController = ({
               const evidence = getWorkerPublishEvidence({ workerUrlOverride });
               if (!evidence?.verified) {
                 throw new Error(
-                  'Worker deployment requirements changed. Reverify the selected worker before publishing.',
+                  'Worker verification is out of date: session settings changed or the page was reloaded. Verify the Worker again before publishing.',
                 );
               }
               const runtime = evidence.runtime;
@@ -242,7 +242,9 @@ export const createSessionWizardPublishRuntimeController = ({
               const workerUrl =
                 workerAuthPublishAdapter.normalizeWorkerUrl(toStr(workerUrlOverride).trim()) || evidence.workerUrl;
               if (!workerUrl || workerUrl !== workerAuthPublishAdapter.normalizeWorkerUrl(evidence.workerUrl)) {
-                throw new Error('Worker deployment identity changed. Reverify the selected worker before publishing.');
+                throw new Error(
+                  'The Worker URL changed after verification. Verify the Worker again before publishing.',
+                );
               }
               const sessionId = toStr(runtime.sessionId).trim();
               const config = buildConfigForEvidence({ evidence, signerAccount, workerUrl });

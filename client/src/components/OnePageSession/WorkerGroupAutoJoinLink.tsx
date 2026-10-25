@@ -31,7 +31,7 @@ export default function WorkerGroupAutoJoinLink({
     <span>
       <button
         type="button"
-        className={styles.telegramSecondaryButton}
+        className={styles.agentSecondaryButton}
         onClick={() => void copy()}
         aria-label={`Copy auto-join link for ${group.label}`}
       >

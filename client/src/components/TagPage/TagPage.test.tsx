@@ -55,6 +55,9 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   __esModule: true,
   SESSION_REGISTRY_CACHE_UPDATED_EVENT: 'ce:session-registry-cache-updated',
+  sessionRegistryStore: {
+    getSessionConfig: jest.fn(() => null),
+  },
 }));
 
 jest.mock('../../domains/sessions/registry/sessionRegistryReadPorts.js', () => ({

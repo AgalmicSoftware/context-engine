@@ -17,7 +17,6 @@ import {
   getStorageIndexBinding,
   listCloudflareMetadataRows,
   readStoredCloudflarePayloadBytes,
-  resolveSessionAdminAddresses,
 } from './storageRouteExecution.js';
 import { listHiddenStorageResourceIds, selectCanonicalStorageVersions } from './storageResourceOwnership.js';
 import {
@@ -33,6 +32,7 @@ import {
 import { json as jsonResponse } from './responseKvHelpers.js';
 import { normalizePayloadAccessControl } from './payloadAccessControl.js';
 import { formatValidAnalysisAnswer, readStoredRating } from './resultsAnalysisAnswerValidation.js';
+import { createResultsAnalysisScanBudget, isStorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
 
 
 const readCoordinatedResultsAnalysisStatusDefault = async (args = {}) => (
@@ -584,18 +584,18 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
   };
 };
 
-export const loadWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, committedResponses = [] } = {}) => {
+const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, committedResponses = [], budget }) => {
   const index = getStorageIndexBinding(env);
   if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') {
     return { ok: false, status: 501, error: 'Cloudflare storage index binding not configured.' };
   }
-  const questionRows = await listCloudflareMetadataRows({ index, slug, resource: 'questions' });
-  const hiddenQuestionIds = await listHiddenStorageResourceIds({ index, slug, resource: 'questions' });
+  const questionRows = await listCloudflareMetadataRows({ index, slug, resource: 'questions', budget, strict: true });
+  const hiddenQuestionIds = await listHiddenStorageResourceIds({ index, slug, resource: 'questions', budget });
   const candidates = [];
   for (const row of questionRows) {
     const metadata = row?.metadata;
     if (!isObj(metadata) || metadata.hidden === true || metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) continue;
-    const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata }));
+    const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget }));
     if (!isObj(payload)) continue;
     if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
     // Key on the id the upload route checked for ownership (stored lower case).
@@ -613,20 +613,21 @@ export const loadWorkerCanonicalResultsAnalysisSource = async ({ env, slug, conf
       createdAtMs: Date.parse(trim(metadata.createdAt)) || 0,
       storageRefId: trim(metadata.id),
       uploader: trim(metadata.uploader),
+      uploadAuthority: metadata.uploadAuthority,
       question: normalized,
     });
   }
-  // A re-upload of an id by someone else never replaces the question people
-  // answered: keep the first upload unless a session admin uploaded a newer one.
-  const admins = resolveSessionAdminAddresses(config);
-  const questions = selectCanonicalStorageVersions(candidates, { isAdmin: (address) => admins.has(address) })
+  // Only an upload-time admin stamp can replace the earliest ordinary version.
+  const questions = selectCanonicalStorageVersions(candidates)
     .map((candidate) => candidate.question);
 
-  const rows = await listCloudflareMetadataRows({ index, slug, resource: 'responses' });
+  const rows = await listCloudflareMetadataRows({ index, slug, resource: 'responses', budget, strict: true });
   const responseRows = [];
   let excludedCount = 0;
   let lockedCount = 0;
   for (const committed of Array.isArray(committedResponses) ? committedResponses : []) {
+    budget.rows();
+    budget.payload(jsonByteLength(committed));
     const metadata = committed?.metadata;
     const payload = committed?.payload;
     if (!isObj(metadata) || !isObj(payload) || !trim(metadata.responder)) {
@@ -672,7 +673,7 @@ export const loadWorkerCanonicalResultsAnalysisSource = async ({ env, slug, conf
       lockedCount += 1;
       continue;
     }
-    const bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata });
+    const bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
     const payload = parseJsonBytes(bytes);
     if (!isObj(payload)) {
       excludedCount += 1;
@@ -699,6 +700,21 @@ export const loadWorkerCanonicalResultsAnalysisSource = async ({ env, slug, conf
       lockedCount: normalized.counts.lockedCount + lockedCount,
     },
   };
+};
+
+export const loadWorkerCanonicalResultsAnalysisSource = async (args = {}) => {
+  try {
+    return await readWorkerCanonicalResultsAnalysisSource({ ...args, budget: createResultsAnalysisScanBudget() });
+  } catch (error) {
+    if (!isStorageReadLimitError(error)) return {
+      ok: false, status: 503, reason: 'results_analysis_snapshot_unavailable',
+      error: 'The complete results snapshot could not be read. No report was generated; the last successful report is unchanged. Retry after storage is available.',
+    };
+    return {
+      ok: false, status: 503, reason: 'results_analysis_snapshot_limit',
+      error: 'The complete results snapshot exceeds the synchronous analysis limit. No report was generated; the last successful report is unchanged. A bounded background snapshot is required for this session.',
+    };
+  }
 };
 
 export const loadAdminSnapshotResultsAnalysisSource = async ({ body, slug, config } = {}) => {
@@ -747,6 +763,8 @@ Privacy and grounding rules:
 - The input uses synthetic participant IDs only. Never invent, request, or output wallet addresses.
 - Keep participant references as synthetic IDs such as participant_001 and question references as included question ids.
 - Work only from included questions, responses, and segmentDimensions. Do not cite unknown questionIds or participantIds.
+- Every argumentMap claim must include nonempty participantIds and questionIds citing the included responses that support it. Omit claims without supporting responses; keep grounded minority views even when only one participant supports them.
+- When citing both participantIds and questionIds, every cited participant must have an included response to at least one cited question, and every cited question must have an included response from at least one cited participant. Multiple citations can summarize different responses; do not attribute an answer to a participant who did not provide it.
 - Paraphrase freeform responses instead of quoting identifiable text.
 - If the visible sample is thin because of input limits, mention uncertainty in summaries.
 - Generate RiskMatrix axes from this session's subject matter. Do not use fixed likelihood/impact axes unless those are the best subject-specific axes for the session.
@@ -957,7 +975,7 @@ export const readResultsAnalysisAdminStatus = async ({ env, slug, config, includ
   return buildResultsAnalysisStatusBody({ slug, config, coordinatorState, includeDraft });
 };
 
-export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {}, headers, trigger = 'manual', deps } = {}) => {
+export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {}, headers, trigger = 'manual', loadedSource, deps } = {}) => {
   const settings = getResultsAnalysisSettings(config);
   const capability = resolveResultsAnalysisCapability({ config });
   const sourceKind = sourceKindFromBody(body);
@@ -981,7 +999,10 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
   if (sourceKind === 'worker-canonical' && trigger === 'automatic' && !capability.automatic.supported) {
     return { ok: false, status: 409, jobState: 'unsupported', error: capability.automatic.reason, capability };
   }
-  const source = await resolveResultsAnalysisSource({ env, slug, config, body, trigger });
+  // An automatic trigger already loaded the complete bounded snapshot to check
+  // its participant watermark. Reuse it so generation cannot scan a second,
+  // different snapshot under a fresh budget. This is never read from the body.
+  const source = loadedSource || await resolveResultsAnalysisSource({ env, slug, config, body, trigger });
   if (!source.ok) return { ok: false, status: source.status || 400, jobState: 'failed', error: source.error, capability };
   const eligibility = analysisEligibility(source);
   if (!eligibility.eligible) return { ok: false, status: 422, jobState: 'failed', error: 'Results analysis input is not eligible.', reasons: eligibility.reasons, capability };
@@ -1111,13 +1132,14 @@ export const maybeTriggerAutomaticResultsAnalysis = async ({ env, slug, config, 
   if (!['automatic', 'both'].includes(settings.generationMode)) return { ok: true, skipped: true, reason: 'automatic_disabled' };
   const capability = resolveResultsAnalysisCapability({ config });
   if (!capability.automatic.supported) return { ok: true, skipped: true, reason: capability.automatic.reason };
-  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config, committedResponses });
-  if (!source.ok) return source;
   const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
   const status = await readStatus({ env, slug });
+  if (!status?.ok) return { ok: false, status: status?.status || 503, jobState: 'failed', error: status?.error || 'Results analysis status is unavailable; retry.' };
   if (status?.state?.lastFailure?.trigger === 'automatic') {
     return { ok: true, skipped: true, reason: 'automatic_paused_after_failure' };
   }
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config, committedResponses });
+  if (!source.ok) return source;
   const watermark = new Set(Array.isArray(status?.state?.lastGood?.participantWatermark) ? status.state.lastGood.participantWatermark : []);
   const newDistinctCount = source.participantDigests.filter((digest) => !watermark.has(digest)).length;
   if (newDistinctCount < settings.autoAfter.threshold) {
@@ -1135,6 +1157,7 @@ export const maybeTriggerAutomaticResultsAnalysis = async ({ env, slug, config, 
       committedResponses,
     },
     trigger: 'automatic',
+    loadedSource: source,
     deps,
   });
 };

@@ -49,12 +49,18 @@ publish exactly this versioned record in the canonical session config:
 
 The client accepts an HTTPS origin with no credentials, path, query, or
 fragment and safe bounded protocol/revision identifiers. The record contains
-no Cloudflare token, worker secret, member credential, Telegram credential, or
+no Cloudflare token, worker secret, member credential, agent credential, or
 provider key. `sessionModeProfile.surfaces.agentHttp` is the only enablement
-bit; it must mirror `agentSessionWrapped.enabled`. `surfaces.telegram` is a
-separate optional adapter bit. Deploy and redeploy code preserves the last
+bit; it must mirror `agentSessionWrapped.enabled`. `surfaces.telegram` and `surfaces.miniApp` are retired compatibility fields; new client writes keep both false. Deploy and redeploy code preserves the last
 verified record until the replacement Worker has passed activation, health,
 protocol, pinned-authority, and durable-config checks.
+
+Agent-token web login and the agent session shell require hosted
+(`worker_canonical`) authority with `surfaces.agentHttp: true`. An explicit
+profile with HTTP access off stays off even if legacy Telegram flags or cached
+session metadata remain. Configurations without a profile can migrate their
+legacy Telegram mode into hosted HTTP access; this fallback never overrides an
+explicit profile.
 
 ## How to Configure
 

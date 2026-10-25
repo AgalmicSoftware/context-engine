@@ -1,3 +1,4 @@
+import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import {
   resolveTrustedAdminOrigins as resolveTrustedAdminOriginsBoundary,
 } from './siweMessageValidation.js';
@@ -58,9 +59,17 @@ export const resolveExistingSessionCors = async ({
   allowTrustedAdminAuthOrigin = false,
 } = {}) => {
   const normalizedSlug = deps?.normalizeWorkerSessionSlug?.(slug);
-  const config = await deps?.getSessionConfig?.(env, normalizedSlug);
+  let snapshot;
+  try {
+    snapshot = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: normalizedSlug });
+  } catch (error) {
+    return { ok: false, response: (deps?.json || ((body, status, headers) => new Response(JSON.stringify(body), { status, headers })))(
+      { error: error.message }, 503, baseHeaders,
+    ) };
+  }
+  const { config, revision } = snapshot;
   if (!config) {
-    return { ok: true, headers: baseHeaders, config: null };
+    return { ok: true, headers: baseHeaders, config: null, revision };
   }
 
   const corsContext = await deps?.getCorsContext?.({ request, config });
@@ -76,6 +85,7 @@ export const resolveExistingSessionCors = async ({
         ok: true,
         headers: trustedAdminHeaders,
         config,
+        revision,
       };
     }
     return { ok: false, response: corsContext?.response, config };
@@ -85,5 +95,6 @@ export const resolveExistingSessionCors = async ({
     ok: true,
     headers: corsContext.headers,
     config,
+    revision,
   };
 };

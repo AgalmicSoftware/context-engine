@@ -1,3 +1,5 @@
+import { aggregateResponseDistributions } from './response-distributions.mjs';
+
 const answerFromMeanScore = (score) => {
   if (!Number.isFinite(score)) return null;
   if (score > 0.25) return 'Agree';
@@ -7,6 +9,9 @@ const answerFromMeanScore = (score) => {
 
 const compactSummary = (summary = {}) => ({
   counts: summary.counts || {},
+  countsUnit: summary.countsUnit || 'raw-runs',
+  observedDistribution: summary.observedDistribution || aggregateResponseDistributions([summary]).observedDistribution,
+  meanStance: summary.meanStance || null,
   invalid: summary.invalid || 0,
   total: summary.total || 0,
   meanScore: Number.isFinite(summary.meanScore) ? summary.meanScore : null,
@@ -51,6 +56,7 @@ export const buildContextEnginePolisExport = (report) => {
               modelId: participant.id,
               modelLabel: participant.label || participant.id,
               modelTraits: participant.traits || {},
+              answerSemantics: 'discretized-mean-stance',
               averagedFrom: compactSummary(summary),
             },
           }),
@@ -68,7 +74,8 @@ export const buildContextEnginePolisExport = (report) => {
     title: report.title || 'AI Discourse Bench Report',
     mode: report.mode || 'self',
     personaId: report.personaId || null,
-    note: 'Import questionResponses and displayNamesMap into Context Engine PolisReport to render benchmark models as participants. Averaged model/question scores are discretized to Agree, Unsure, or Disagree.',
+    summaryCorrection: report.summaryCorrection || null,
+    note: 'Import questionResponses and displayNamesMap into Context Engine PolisReport to render benchmark models as participants. Averaged model/question scores are discretized to Agree, Unsure, or Disagree. The Unsure compatibility bucket includes mixed directional answers; use averagedFrom.observedDistribution for observed answers.',
     counts: {
       questions: Object.keys(questionResponses).length,
       participants: participants.length,

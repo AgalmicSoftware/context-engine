@@ -1,3 +1,4 @@
+import { describeHostedFaucetSetup, faucetAddressFromKey } from './sessionWizardHostedFaucet';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { normalizeOriginList } from '../../utilities/urlUtils.js';
 import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
@@ -27,6 +28,7 @@ export type SessionWizardWorkerRequirementProof = {
 };
 
 type RequirementContext = {
+  sessionConfig?: unknown;
   sessionModeProfile?: SessionModeProfile | null;
   sessionAi?: unknown;
   workerAllowOrigins?: unknown;
@@ -155,11 +157,12 @@ const normalizeAiModelAssignments = (value: unknown): Record<string, { provider:
 };
 
 const buildRequirementsFingerprint = ({
+  sessionConfig,
   sessionModeProfile,
   sessionAi,
   workerAllowOrigins,
 }: RequirementContext): string => {
-  const requirements = resolveSessionWizardModeRequirements(sessionModeProfile);
+  const requirements = resolveSessionWizardModeRequirements(sessionModeProfile, { sessionConfig });
   const selectedAiSecretFields = resolveSessionWizardResourceSecretFields('ai', sessionAi).map((field) => field.key);
   return fingerprintSessionWizardJson('context-engine:worker-requirements:v1', {
     authorityMode: requirements.authorityMode,
@@ -168,6 +171,7 @@ const buildRequirementsFingerprint = ({
     requiresArweave: requirements.requiresArweave,
     requiresLit: requirements.requiresLit,
     requiresRpc: requirements.requiresRpc,
+    ...(describeHostedFaucetSetup(sessionConfig).enabled ? { hostedFaucet: true } : {}),
     selectedAiSecretFields: normalizeFieldList(selectedAiSecretFields),
     workerAllowOrigins: normalizeWorkerAllowOrigins(workerAllowOrigins),
     // Bind the complete canonical profile and effective provider/model choices.
@@ -181,19 +185,28 @@ const pickPresentFields = (fields: readonly string[], secrets: AnyRecord): strin
   fields.filter((field) => !!toStr(secrets[field]).trim());
 
 export const resolveSessionWizardWorkerSecretSelection = ({
+  sessionConfig,
   sessionModeProfile,
   sessionAi,
   workerAllowOrigins,
   workerSecrets = {},
   fallbackRequiredSecretFields = [],
 }: SecretSelectionInput = {}) => {
-  const requirements = resolveSessionWizardModeRequirements(sessionModeProfile);
+  const requirements = resolveSessionWizardModeRequirements(sessionModeProfile, { sessionConfig });
   const secrets = workerSecrets && typeof workerSecrets === 'object' ? (workerSecrets as AnyRecord) : {};
   const fallbackFields = new Set(normalizeFieldList(fallbackRequiredSecretFields));
   const selectedAiSecretFields = resolveSessionWizardResourceSecretFields('ai', sessionAi).map((field) => field.key);
   const includeFaucetPrivateKey =
-    requirements.requiresFunding &&
-    (!!toStr(secrets.faucetPrivateKey).trim() || fallbackFields.has('faucetPrivateKey'));
+    describeHostedFaucetSetup(sessionConfig).enabled ||
+    (requirements.requiresFunding &&
+      (!!toStr(secrets.faucetPrivateKey).trim() || fallbackFields.has('faucetPrivateKey')));
+  if (
+    describeHostedFaucetSetup(sessionConfig).enabled &&
+    toStr(secrets.faucetPrivateKey).trim() &&
+    !faucetAddressFromKey(secrets.faucetPrivateKey)
+  ) {
+    throw new Error('Faucet private key must be a valid 32-byte hexadecimal EVM key.');
+  }
   const requiredSecretFields = requirements.usesWorkerRuntime
     ? uniqueFieldList([
         ...selectedAiSecretFields,
@@ -227,7 +240,12 @@ export const resolveSessionWizardWorkerSecretSelection = ({
       }, {});
   return {
     requirements,
-    requirementsFingerprint: buildRequirementsFingerprint({ sessionModeProfile, sessionAi, workerAllowOrigins }),
+    requirementsFingerprint: buildRequirementsFingerprint({
+      sessionConfig,
+      sessionModeProfile,
+      sessionAi,
+      workerAllowOrigins,
+    }),
     requiredSecretFields,
     selectedSecrets,
   };
@@ -278,6 +296,7 @@ export const buildSessionWizardWorkerRequirementProof = ({
   workerUrl,
   sessionSlug,
   sessionId,
+  sessionConfig,
   sessionModeProfile,
   sessionAi,
   workerAllowOrigins,
@@ -291,6 +310,7 @@ export const buildSessionWizardWorkerRequirementProof = ({
   const secretFingerprintSalt = createSecretFingerprintSalt();
   if (!workerIdentityFingerprint || !secretFingerprintSalt) return null;
   const selection = resolveSessionWizardWorkerSecretSelection({
+    sessionConfig,
     sessionModeProfile,
     sessionAi,
     workerAllowOrigins,
@@ -336,6 +356,7 @@ export const resolveSessionWizardWorkerRequirementReadiness = ({
   workerUrl,
   sessionSlug,
   sessionId,
+  sessionConfig,
   sessionModeProfile,
   sessionAi,
   workerAllowOrigins,
@@ -352,6 +373,7 @@ export const resolveSessionWizardWorkerRequirementReadiness = ({
     return { verified: false, reason: 'worker-identity-changed' };
   }
   const selection = resolveSessionWizardWorkerSecretSelection({
+    sessionConfig,
     sessionModeProfile,
     sessionAi,
     workerAllowOrigins,

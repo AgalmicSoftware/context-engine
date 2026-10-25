@@ -1,6 +1,12 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import SessionChipSelector from './SessionChipSelector';
+import { readWorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
+
+jest.mock('../../utilities/worker/workerResourcePresence', () => ({
+  readWorkerResourcePresence: jest.fn(),
+  getCachedWorkerResourcePresence: jest.fn(() => ({ txGas: true })),
+}));
 
 const buildOptions = (labels: string[] = []) =>
   labels.map((label) => ({
@@ -10,6 +16,29 @@ const buildOptions = (labels: string[] = []) =>
   }));
 
 describe('SessionChipSelector', () => {
+  it('shows offers from loaded session config and cached presence without fetching per row', () => {
+    const hostedConfig = {
+      networkChainId: 11155420,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      workerAuthority: { participantScopes: ['faucet'] },
+    };
+    render(
+      <SessionChipSelector
+        options={[
+          { slug: 'funded', label: 'Funded session', sessionConfig: hostedConfig },
+          {
+            slug: 'no-faucet',
+            label: 'No faucet',
+            sessionConfig: { ...hostedConfig, workerAuthority: { participantScopes: [] } },
+          },
+          { slug: 'unloaded', label: 'Unloaded session' },
+        ]}
+      />,
+    );
+    expect(screen.getAllByTestId('ce-session-test-eth-badge')).toHaveLength(1);
+    expect(readWorkerResourcePresence).not.toHaveBeenCalled();
+  });
+
   it('collapses long lists behind a see-more toggle and expands on demand', () => {
     render(
       <SessionChipSelector options={buildOptions(['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'])} collapsedLimit={3} />,

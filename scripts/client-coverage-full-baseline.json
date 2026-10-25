@@ -9,7 +9,7 @@
     "client/src/components/Account/LoginSettingsAiConfigContent.tsx",
     "client/src/components/DemoViews/DemosIndex.tsx",
     "client/src/components/DemoViews/RiskMatrixDemo.tsx",
-    "client/src/components/OnePageSession/telegram/TelegramDebateMapPanel.tsx",
+    "client/src/components/OnePageSession/agent/AgentDebateMapPanel.tsx",
     "client/src/test-smoke/generatedResultsSmokeEntry.tsx",
     "client/src/test-smoke/workerGroupAutoJoinSmokeEntry.tsx",
     "client/src/utilities/e2eTestIds.ts",

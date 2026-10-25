@@ -760,3 +760,12 @@ describe('resolveSessionWizardPublishRequestDescriptor', () => {
     );
   });
 });
+
+it('blocks publish with invalid interview settings even when deployment is ready', () => {
+  const result = resolveSessionWizardPublishReadiness({
+    ...baseInput,
+    interviewMode: { openingMode: 'owner', openingPrompt: ' ' },
+  });
+  expect(result.canPublishNow).toBe(false);
+  expect(result.uploadBlockedReason).toMatch(/owner opening question/i);
+});

@@ -14,6 +14,7 @@ import {
   removeWorkerGroupMember,
   updateWorkerGroup,
 } from './workerGroupPorts';
+import * as workerAuth from '../../utilities/worker/workerAuth.js';
 
 const WORKER_URL = 'https://session-worker.example';
 const WORKER_TOKEN = 'worker-jwt-only';
@@ -669,6 +670,43 @@ describe('worker group ports', () => {
     );
     expect(result).not.toHaveProperty('memberCount');
     expect(result.group).not.toHaveProperty('memberCount');
+  });
+
+  it('notes an access change only after the Worker confirms the join', async () => {
+    const accessChanged = jest.spyOn(workerAuth, 'noteWorkerAccessChanged');
+    const joinResponse = (groupId: string) => async () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: SESSION_SLUG,
+          group: {
+            groupId,
+            sessionSlug: SESSION_SLUG,
+            label: 'Reviewers',
+            joinMode: 'open',
+            memberVisibility: 'session',
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    const join = (fetchImpl: typeof fetch) =>
+      joinWorkerGroup({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        groupId: 'reviewers',
+        fetchImpl,
+      });
+    try {
+      await expect(join(jest.fn(joinResponse('other')))).rejects.toThrow('worker_group_response_group_invalid');
+      expect(accessChanged).not.toHaveBeenCalled();
+      await join(jest.fn(joinResponse('reviewers')));
+      expect(accessChanged).toHaveBeenCalledTimes(1);
+    } finally {
+      accessChanged.mockRestore();
+    }
   });
 
   it.each([

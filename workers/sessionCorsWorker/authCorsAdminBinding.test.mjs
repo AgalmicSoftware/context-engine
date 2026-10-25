@@ -45,7 +45,7 @@ test('createAuthCorsAdminAdaptersWithWorkerDeps preserves worker-specific auth/C
         assert.equal(value.slug, 'session-a');
         assert.equal(value.baseHeaders, baseHeaders);
         assert.equal(value.deps.normalizeWorkerSessionSlug, 'normalizeWorkerSessionSlug');
-        assert.equal(value.deps.getSessionConfig, 'getSessionConfig');
+        assert.equal(value.deps.readCurrentSessionConfig, 'readCurrentSessionConfig');
         assert.equal(value.deps.corsHeaders, 'corsHeaders');
         assert.equal(value.deps.resolveTrustedAdminOrigins, 'resolveTrustedAdminOrigins');
         assert.equal(
@@ -92,7 +92,7 @@ test('createAuthCorsAdminAdaptersWithWorkerDeps preserves worker-specific auth/C
       corsHeaders: 'corsHeaders',
       json: 'json',
       normalizeWorkerSessionSlug: 'normalizeWorkerSessionSlug',
-      getSessionConfig: 'getSessionConfig',
+      readCurrentSessionConfig: 'readCurrentSessionConfig',
       resolveTrustedAdminOrigins: 'resolveTrustedAdminOrigins',
       verifyToken: 'verifyToken',
       validateAuthTokenRecord: 'validateAuthTokenRecord',

@@ -161,6 +161,12 @@ const FIELD_LABELS: Record<string, string> = {
   sponsoredSbtAddress: `Sponsored ${t('sbt')} Address`,
   contracts: 'Smart Contracts',
   blockLimits: 'Time Limits',
+  ai: 'AI providers and models',
+  faucet: 'Test ETH faucet',
+  questionsGenPrompt: 'Question generation prompt',
+  defaultSbtTags: `Default ${t('sbt')} Tags`,
+  defaultFilterState: 'Default question filters',
+  embeddedDeployHelperEnabled: 'Built-in deploy helper',
 };
 
 // Admin-only lists should move to a post-create admin UI (keep hidden in /new).

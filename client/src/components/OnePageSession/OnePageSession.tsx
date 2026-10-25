@@ -17,7 +17,7 @@ import { getAllSessionSlugs } from '../../domains/sessions/sessionConfig.js';
 import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAuthorizationPort.js';
 import { isKnownOpenSbt, resolveSbtGroupPasswordFailureMessage } from '../SBTs/sbtClaimUrlSafety';
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
-import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
+import { noteWorkerAccessChanged, sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils';
 import { captureSessionRecruitmentSource } from '../SurveyTool/sessionRecruitmentSource';
@@ -42,32 +42,33 @@ import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import { clearAgentClientLoginEnvelope, readAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import {
   envelopeAllowsSubmit,
-  loadQuestions as loadTelegramQuestions,
-  loadResultsDataset as loadTelegramResultsDataset,
-  submitAnswer as submitTelegramAnswer,
-} from '../../utilities/session/telegramSessionBackend';
-import { isTelegramAgentAuthFailure } from '../../utilities/session/telegramAgentData';
+  loadQuestions as loadAgentQuestions,
+  loadResultsDataset as loadAgentResultsDataset,
+  submitAnswer as submitAgentAnswer,
+} from '../../utilities/session/agentSessionBackend';
+import { isAgentAuthFailure } from '../../utilities/session/agentSessionData';
 import {
   buildAggregatorFromLocalCache,
   computeAggregatorDataSignature,
   computeAggregatorSourceSnapshotSignature,
 } from './onePageSessionAggregator';
-import OnePageSessionTelegramShell from './OnePageSessionTelegramShell';
+import OnePageSessionAgentShell from './OnePageSessionAgentShell';
 import {
   buildCurrentSessionConfigRequest,
   getAgentClientLoginEnvelopeMemoryKey,
-  isOnePageTelegramBackendMode,
+  isOnePageAgentBackendMode,
+  isOnePageAgentShellMode,
   normalizeOnePageSessionSlug,
   resolveAgentClientLoginIdentityTarget,
   resolveCurrentSessionSlugForProps,
-  resolveTelegramAgentBridgeUrl as resolveTelegramAgentBridgeUrlForSession,
+  resolveSessionAgentBridgeUrl as resolveSessionAgentBridgeUrlForSession,
   type OnePageSessionPropsLike,
-} from './onePageSessionTelegramController';
+} from './onePageSessionAgentController';
 import {
-  buildInitialTelegramState,
-  createOnePageSessionTelegramActions,
-  type OnePageSessionTelegramState,
-} from './onePageSessionTelegramActions';
+  buildInitialAgentState,
+  createOnePageSessionAgentActions,
+  type OnePageSessionAgentState,
+} from './onePageSessionAgentActions';
 import OnePageSessionStandardShell, { DEFAULT_CORPUS_VIEWER_LOAD_STATE } from './OnePageSessionStandardShell';
 import {
   buildInitialGeneratedResultsControllerState,
@@ -279,7 +280,7 @@ class OnePageSession extends Component<any, any> {
       autoMintCountdown: null, // null = not counting, number = seconds remaining
       dismissedStatusItems: {},
 
-      ...buildInitialTelegramState(initialAgentLoginTarget, readAgentClientLoginEnvelope),
+      ...buildInitialAgentState(initialAgentLoginTarget, readAgentClientLoginEnvelope),
     };
 
     // Ensure idempotent auto-open of Groups on mount (do not fight user toggles)
@@ -363,25 +364,25 @@ class OnePageSession extends Component<any, any> {
     // view-all handler
     this.handleViewAllQuestionsClick = this.handleViewAllQuestionsClick.bind(this);
 
-    const telegramActions = createOnePageSessionTelegramActions({
-      getState: () => this.state as OnePageSessionTelegramState,
-      isTelegramBackendMode: (sessionConfig) => this.isTelegramBackendMode(sessionConfig),
+    const agentActions = createOnePageSessionAgentActions({
+      getState: () => this.state as OnePageSessionAgentState,
+      isAgentBackendMode: (sessionConfig) => this.isAgentBackendMode(sessionConfig),
       ports: {
         clearStoredEnvelope: clearAgentClientLoginEnvelope,
         envelopeAllowsSubmit,
         fetchImpl: fetch,
-        isAuthFailure: isTelegramAgentAuthFailure,
-        loadQuestions: loadTelegramQuestions,
-        loadResultsDataset: loadTelegramResultsDataset,
+        isAuthFailure: isAgentAuthFailure,
+        loadQuestions: loadAgentQuestions,
+        loadResultsDataset: loadAgentResultsDataset,
         readStoredEnvelope: readAgentClientLoginEnvelope,
-        submitAnswer: submitTelegramAnswer,
+        submitAnswer: submitAgentAnswer,
       },
       resolveCurrentSessionConfig: () => this.resolveCurrentSessionConfig(),
       resolveCurrentSessionSlug: () => this.resolveCurrentSessionSlug(),
-      resolveTelegramAgentBridgeUrl: (sessionConfig) => this.resolveTelegramAgentBridgeUrl(sessionConfig),
+      resolveSessionAgentBridgeUrl: (sessionConfig) => this.resolveSessionAgentBridgeUrl(sessionConfig),
       setState: (patch, callback) => this.setState(patch, callback),
     });
-    Object.assign(this, telegramActions);
+    Object.assign(this, agentActions);
   }
 
   kickoffLightSbtUniverseScan(propsIn: any = this.props) {
@@ -439,7 +440,7 @@ class OnePageSession extends Component<any, any> {
     this._aggregatorInputSig = this.buildAggregatorInputSignature(this.props, this.state);
     this.scheduleGeneratedResultsViewerRefresh();
 
-    this.bootstrapTelegramSession();
+    this.bootstrapAgentSession();
     this.ensureDemoSessionFixtures();
     this.handleReportNavigation();
   }
@@ -474,7 +475,7 @@ class OnePageSession extends Component<any, any> {
     window.removeEventListener('popstate', this.handleReportNavigation);
     this._pendingReportScroll = false;
     this._demoFixturesDisposed = true;
-    this.disposeTelegramActions();
+    this.disposeAgentActions();
     this._autoMintLegacyCredentialQuery = '';
     window.removeEventListener('ce-agent-client-login', this.handleAgentClientLoginEvent as EventListener);
     if (this._autoOpenResultsTimer) {
@@ -548,7 +549,10 @@ class OnePageSession extends Component<any, any> {
       autoFeatureSBTsBySessionSlug !== undefined ? autoFeatureSBTsBySessionSlug : autoFeatureSBTsWithFeaturedSbtTags;
     const resolvedAutoFeature =
       propAutoFeature !== undefined ? propAutoFeature : resolveAutoFeatureBySessionSlug(baseSessionConfig);
-    const resolvedSlug = slug || baseSessionConfig.slug || '';
+    const resolvedSlug =
+      baseSessionConfig.sessionModeProfile?.authority?.mode === 'worker_canonical'
+        ? baseSessionConfig.slug || slug || ''
+        : slug || baseSessionConfig.slug || '';
     const resolved = {
       ...baseSessionConfig,
       slug: resolvedSlug,
@@ -609,17 +613,17 @@ class OnePageSession extends Component<any, any> {
     return this.getResolvedSessionConfig(buildCurrentSessionConfigRequest(propsIn, resolveEffectiveSlug));
   }
 
-  resolveTelegramAgentBridgeUrl(sessionConfig: unknown = this.resolveCurrentSessionConfig()) {
-    return resolveTelegramAgentBridgeUrlForSession(sessionConfig);
+  resolveSessionAgentBridgeUrl(sessionConfig: unknown = this.resolveCurrentSessionConfig()) {
+    return resolveSessionAgentBridgeUrlForSession(sessionConfig);
   }
 
-  isTelegramBackendMode(
+  isAgentBackendMode(
     sessionConfig: unknown = this.resolveCurrentSessionConfig(),
     sessionSlug: unknown = this.resolveCurrentSessionSlug(),
   ) {
-    return isOnePageTelegramBackendMode({
+    return isOnePageAgentBackendMode({
       sessionConfig,
-      telegramSessionMeta: this.state.telegramSessionMeta,
+      agentSessionMeta: this.state.agentSessionMeta,
       sessionSlug,
     });
   }
@@ -696,7 +700,7 @@ class OnePageSession extends Component<any, any> {
       captureSessionRecruitmentSource(resolveEffectiveSlug(this.props));
       this.ensureDemoSessionFixtures();
     }
-    const telegramTargetChanged =
+    const agentTargetChanged =
       getAgentClientLoginEnvelopeMemoryKey(
         resolveAgentClientLoginIdentityTarget({
           sessionConfig: this.resolveCurrentSessionConfig(prevProps),
@@ -709,7 +713,7 @@ class OnePageSession extends Component<any, any> {
           sessionSlug: nextSlug,
         }),
       );
-    const telegramIdentityChanged = slugChanged || telegramTargetChanged;
+    const agentIdentityChanged = slugChanged || agentTargetChanged;
     const currentSessionConfig = this.resolveCurrentSessionConfig(this.props);
     const previousSessionConfig = this.resolveCurrentSessionConfig(prevProps);
     const currentGeneratedRuntime = resolveGeneratedResultsRuntime(this, {
@@ -739,8 +743,8 @@ class OnePageSession extends Component<any, any> {
       this.clearGeneratedResultsViewerRefresh();
       this.resetGeneratedResultsAnalysis();
     }
-    if (telegramIdentityChanged) {
-      this.handleTelegramComponentDidUpdate({
+    if (agentIdentityChanged) {
+      this.handleAgentComponentDidUpdate({
         slugChanged: true,
         loginJustCompleted: !prevProps.loginComplete && this.props.loginComplete,
       });
@@ -882,8 +886,8 @@ class OnePageSession extends Component<any, any> {
       }
     }
 
-    if (!telegramIdentityChanged) {
-      this.handleTelegramComponentDidUpdate({
+    if (!agentIdentityChanged) {
+      this.handleAgentComponentDidUpdate({
         slugChanged: false,
         loginJustCompleted: !prevProps.loginComplete && this.props.loginComplete,
       });
@@ -1054,6 +1058,8 @@ class OnePageSession extends Component<any, any> {
     const successfulSbtKey = String(successfulSbtAddress || '')
       .trim()
       .toLowerCase();
+    // The SBT can satisfy a gate that an earlier Worker token was issued without.
+    noteWorkerAccessChanged();
 
     // Auto-close login modal and surface success state
     if (typeof this.props.toggleLoginModal === 'function') {
@@ -2361,16 +2367,22 @@ class OnePageSession extends Component<any, any> {
       displaySlug: displaySessionSlug,
       sourceSlug: surveySessionSlug,
     });
+    // Draft ownership follows the Worker identity even when the route uses a demo alias.
+    const embeddedQuestionSessionSlug =
+      resolvedSessionConfig?.sessionModeProfile?.authority?.mode === 'worker_canonical'
+        ? normalizeOnePageSessionSlug(resolvedSessionConfig.slug) || surveySessionSlug
+        : demoQuestionPool.length > 0
+          ? displaySessionSlug
+          : surveySessionSlug;
     const scopedDemoQuestionPool =
       demoQuestionPool.length > 0
         ? demoQuestionPool.map((entry: any) => ({
             ...entry,
-            sessionSlug: displaySessionSlug,
+            sessionSlug: embeddedQuestionSessionSlug,
             sessionSlugExplicit: true,
           }))
         : [];
     const sharedQuestionPool = scopedDemoQuestionPool.length > 0 ? scopedDemoQuestionPool : undefined;
-    const embeddedQuestionSessionSlug = sharedQuestionPool ? displaySessionSlug : surveySessionSlug;
     const embeddedGroupsSessionSlug = displaySessionSlug || surveySessionSlug;
     const embeddedGroupsSessionConfig = isDemoSlug
       ? {
@@ -2381,19 +2393,21 @@ class OnePageSession extends Component<any, any> {
     const fallbackSessionLabel = slug && String(slug).trim() ? String(slug).trim() : 'Session';
     const titleText = sessionName ? `${sessionName}` : fallbackSessionLabel;
     const corpusViewerLoadState = this.state.corpusViewerLoadState || DEFAULT_CORPUS_VIEWER_LOAD_STATE;
-    const isTelegramSession = isOnePageTelegramBackendMode({
+    const isAgentSession = isOnePageAgentShellMode({
       sessionConfig: resolvedSessionConfig,
-      telegramSessionMeta: this.state.telegramSessionMeta,
+      agentSessionMeta: this.state.agentSessionMeta,
       sessionSlug: displaySessionSlug,
+      agentClientEnvelope: this.state.agentClientEnvelope,
+      provider: this.props.provider,
     });
-    const telegramLoginTarget = resolveAgentClientLoginIdentityTarget({
+    const agentLoginTarget = resolveAgentClientLoginIdentityTarget({
       sessionConfig: resolvedSessionConfig,
       sessionSlug: displaySessionSlug,
     });
 
-    if (isTelegramSession) {
+    if (isAgentSession) {
       return (
-        <OnePageSessionTelegramShell
+        <OnePageSessionAgentShell
           resultsSectionRef={this.setResultsSectionRef}
           account={this.props.account}
           blockLimits={blockLimits}
@@ -2412,28 +2426,26 @@ class OnePageSession extends Component<any, any> {
           sessionHeader={sessionHeader}
           sessionInfo={sessionInfo}
           sessionName={sessionName}
-          telegramAgentQuestions={this.state.telegramAgentQuestions || []}
-          telegramAgentQuestionsStatus={this.state.telegramAgentQuestionsStatus}
-          telegramAgentResults={this.state.telegramAgentResults}
-          telegramAgentResultsStatus={this.state.telegramAgentResultsStatus}
-          telegramClientEnvelope={this.state.telegramClientEnvelope}
-          telegramPolisDataset={this.state.telegramPolisDataset}
-          telegramQuestionPileIndex={this.state.telegramQuestionPileIndex}
-          telegramQuestionSubmitError={this.state.telegramQuestionSubmitError}
-          telegramSessionMeta={this.state.telegramSessionMeta}
-          telegramSubmittedQuestionIds={this.state.telegramSubmittedQuestionIds}
-          telegramSubmittingQuestionId={this.state.telegramSubmittingQuestionId}
-          workerGroupSessionId={String(telegramLoginTarget.sessionId || '')}
-          workerGroupWorkerUrl={String(telegramLoginTarget.workerUrl || '')}
+          agentQuestions={this.state.agentQuestions || []}
+          agentQuestionsStatus={this.state.agentQuestionsStatus}
+          agentResults={this.state.agentResults}
+          agentResultsStatus={this.state.agentResultsStatus}
+          agentClientEnvelope={this.state.agentClientEnvelope}
+          agentPolisDataset={this.state.agentPolisDataset}
+          agentQuestionPileIndex={this.state.agentQuestionPileIndex}
+          agentQuestionSubmitError={this.state.agentQuestionSubmitError}
+          agentSessionMeta={this.state.agentSessionMeta}
+          agentSubmittedQuestionIds={this.state.agentSubmittedQuestionIds}
+          agentSubmittingQuestionId={this.state.agentSubmittingQuestionId}
+          workerGroupSessionId={String(agentLoginTarget.sessionId || '')}
+          workerGroupWorkerUrl={String(agentLoginTarget.workerUrl || '')}
           titleText={titleText}
-          onLogout={this.handleTelegramLogout}
+          onLogout={this.handleAgentLogout}
           onOpenLoginModal={() => this.props.toggleLoginModal?.(true)}
-          onQuestionPileIndexChange={(telegramQuestionPileIndex: number) =>
-            this.setState({ telegramQuestionPileIndex })
-          }
-          onRefresh={() => this.loadTelegramAgentData(true)}
+          onQuestionPileIndexChange={(agentQuestionPileIndex: number) => this.setState({ agentQuestionPileIndex })}
+          onRefresh={() => this.loadAgentData(true)}
           onResultsModeChange={(resultsViewMode) => this.setState({ resultsViewMode })}
-          onSubmitAnswer={this.handleTelegramQuestionSubmit}
+          onSubmitAnswer={this.handleAgentQuestionSubmit}
         />
       );
     }

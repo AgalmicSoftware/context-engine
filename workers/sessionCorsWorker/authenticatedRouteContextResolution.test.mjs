@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveAuthenticatedRouteContext } from './authenticatedRouteContextResolution.js';
+import { resolveAuthenticatedRouteContext as boundary } from './authenticatedRouteContextResolution.js';
+
+const resolveAuthenticatedRouteContext = (args) => boundary({
+  ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async ({ env, slug }) => ({
+    config: await args.deps?.getSessionConfig?.(env, slug), revision: 1,
+  })) },
+});
 
 const workerSessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const replacementWorkerSessionId = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -138,6 +144,7 @@ test('resolveAuthenticatedRouteContext returns common authenticated route contex
     headers,
     scopes: { ai: true, fetch: false, groups: true },
     address: '0xabc123',
+    expectedAuthority: { actor: '0xabc123', revision: 1, authzEpoch: 3 },
     limit: 7,
   });
 });
@@ -290,6 +297,7 @@ test('resolveAuthenticatedRouteContext accepts a registry Worker Groups token fo
     headers,
     scopes: { groups: true },
     address: '0xabc123',
+    expectedAuthority: { actor: '0xabc123', revision: 1, authzEpoch: 3 },
     limit: 0,
   });
 });
@@ -338,6 +346,7 @@ test('resolveAuthenticatedRouteContext preserves legacy non-Groups auth without 
     headers,
     scopes: { ai: true },
     address: '0xabc123',
+    expectedAuthority: { actor: '0xabc123', revision: 1, authzEpoch: 3 },
     limit: 7,
   });
 });

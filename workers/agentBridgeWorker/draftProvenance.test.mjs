@@ -9,11 +9,11 @@ import {
   deleteAnswerDraft,
   markAnswerDraftViewed,
   persistAnswerDraft,
-  persistTelegramSubmitRequest,
+  persistAgentSubmitRequest,
   readAnswerDraft,
   readAnswerDraftFirstViewedAt,
   writeDraftLifecycleEvent,
-} from './telegramCommands.mjs';
+} from './agentSessionRuntime.mjs';
 
 class MemoryKv {
   constructor() {
@@ -479,7 +479,7 @@ test('submit records persist draftProvenance and emit draft_submitted once', asy
     selectedQuestionId: 'q-binary',
   });
 
-  const submitted = await persistTelegramSubmitRequest({
+  const submitted = await persistAgentSubmitRequest({
     env,
     normalized: NORMALIZED,
     draft,
@@ -511,7 +511,7 @@ test('submit records persist draftProvenance and emit draft_submitted once', asy
   assert.equal(submittedEvents[0].doubles[1], 10 * 60 * 1000);
 
   // Idempotent replay must not double-count the submission.
-  const replayed = await persistTelegramSubmitRequest({
+  const replayed = await persistAgentSubmitRequest({
     env,
     normalized: NORMALIZED,
     draft,
@@ -564,7 +564,7 @@ test('draft records reject token-shaped metadata values', async () => {
       agentMetadata: { agentName: `ceagt_${'A'.repeat(43)}` },
       createdAt: '2026-06-11T10:00:00.000Z',
     }),
-    /Telegram answer drafts must not serialize secrets/,
+    /Agent answer drafts must not serialize secrets/,
   );
 
   await assert.rejects(
@@ -579,7 +579,7 @@ test('draft records reject token-shaped metadata values', async () => {
       metadata: { source: 'agent_handoff', clientSource: `sk-${'B'.repeat(24)}` },
       createdAt: '2026-06-11T10:00:00.000Z',
     }),
-    /Telegram answer drafts must not serialize secrets/,
+    /Agent answer drafts must not serialize secrets/,
   );
 });
 

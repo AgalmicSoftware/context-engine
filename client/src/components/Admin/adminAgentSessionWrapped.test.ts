@@ -164,6 +164,16 @@ describe('adminAgentSessionWrapped', () => {
     );
   });
 
+  it.each([false, true])('keeps retired adapter fields off when publishing HTTP access %s', (enabled) => {
+    const sessionConfig = registrySession();
+    sessionConfig.sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionConfig.sessionModeProfile.surfaces.telegram = true;
+    sessionConfig.sessionModeProfile.surfaces.miniApp = true;
+    const patch = buildAdminAgentSessionWrappedConfigPatch({ sessionConfig, capability: { ...capability, enabled } });
+    expect(patch.sessionModeProfile?.surfaces).toMatchObject({ agentHttp: enabled, telegram: false, miniApp: false });
+    expect(sessionConfig.sessionModeProfile.surfaces).toMatchObject({ telegram: true, miniApp: true });
+  });
+
   it('does not synthesize an invalid partial profile for a legacy registry session', () => {
     const legacySession = registrySession();
     delete (legacySession as { sessionModeProfile?: unknown }).sessionModeProfile;
@@ -185,6 +195,7 @@ describe('adminAgentSessionWrapped', () => {
           deploymentRequestId: 'wrapped-admin-request-1',
           agentHttpEnabled: true,
           sessionSlug: 'alpha',
+          sessionId: '0x01',
           sessionWorkerOrigin: 'https://session-worker.example.workers.dev',
           authorityMode: 'evm_registry_canonical',
         }),
@@ -362,4 +373,21 @@ describe('adminAgentSessionWrapped', () => {
       }),
     ).rejects.toThrow('pinned authority');
   });
+});
+
+it('clears retired surfaces when Admin updates Wrapped access', () => {
+  const profile = registryModeProfile(true);
+  profile.surfaces.telegram = true;
+  profile.surfaces.miniApp = true;
+  const patch = buildAdminAgentSessionWrappedConfigPatch({
+    sessionConfig: registrySession({ sessionModeProfile: profile }),
+    capability,
+  });
+  expect(patch.sessionModeProfile?.surfaces).toMatchObject({
+    agentHttp: true,
+    telegram: false,
+    miniApp: false,
+  });
+  expect(profile.surfaces.telegram).toBe(true);
+  expect(profile.surfaces.miniApp).toBe(true);
 });

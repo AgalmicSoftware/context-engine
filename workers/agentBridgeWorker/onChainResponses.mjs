@@ -1,4 +1,4 @@
-import { normalizeTelegramRatingAnswer } from './questionUi.mjs';
+import { normalizeAgentRatingAnswer } from './ratingScale.mjs';
 import { validateQuadraticAllocation } from '../../shared/questions/quadraticAllocation.mjs';
 import { isPreviewPrincipal } from './agentPrincipal.mjs';
 import {
@@ -9,7 +9,7 @@ import {
 } from './runtimePrimitives.mjs';
 import { ethers } from 'ethers';
 import {
-  TELEGRAM_BRIDGE_ACTIONS,
+  AGENT_ACTIONS,
 } from './constants.mjs';
 import {
   deriveDemoPrivateKeyMaterial,
@@ -172,7 +172,12 @@ export function resolveSurveysAddress(env = {}, session = {}) {
     env.SURVEYS_ADDRESS ||
     SURVEYS_BY_CHAIN[String(normalizeChainId(env, session))]
   );
-  return ADDRESS_RE.test(address) ? ethers.utils.getAddress(address) : '';
+  if (!ADDRESS_RE.test(address)) return '';
+  try {
+    return ethers.utils.getAddress(address);
+  } catch {
+    return '';
+  }
 }
 
 function splitRpcUrls(value = '') {
@@ -348,7 +353,17 @@ async function broadcastSubmitResponsesWithRpc({
     gasLimit,
     gasPrice,
   });
-  const txHash = await rpcJsonFetch(fetchImpl, rpcUrl, 'eth_sendRawTransaction', [rawTx]);
+  let txHash;
+  try {
+    txHash = await rpcJsonFetch(fetchImpl, rpcUrl, 'eth_sendRawTransaction', [rawTx]);
+    if (!BYTES32_RE.test(safeString(txHash))) throw new Error('eth_sendRawTransaction_result_unavailable');
+  } catch (error) {
+    // A lost RPC response does not prove that the signed transaction was rejected.
+    // Preserve its public identifier for reconciliation without persisting signer material.
+    const failure = error instanceof Error ? error : new Error(safeString(error));
+    failure.txHash = ethersLib.utils.keccak256(rawTx);
+    throw failure;
+  }
   return {
     txHash: safeString(txHash),
     rpcUrl,
@@ -366,21 +381,29 @@ async function parseJsonResponse(response) {
   }
 }
 
-async function parseTextResponse(response) {
-  if (!response || typeof response.text !== 'function') return '';
-  try {
-    return safeString(await response.text()).replace(/\s+/g, ' ').slice(0, 240);
-  } catch {
-    return '';
-  }
-}
-
 async function parseResponseBody(response) {
   if (!response) return { json: {}, text: '' };
-  const clone = typeof response.clone === 'function' ? response.clone() : null;
-  const json = await parseJsonResponse(response);
-  const text = Object.keys(json).length ? '' : await parseTextResponse(clone || response);
-  return { json, text };
+  // Auth body transport failures are retryable before submission. Keep malformed
+  // JSON distinct by parsing only after the body has been completely received.
+  let raw;
+  try {
+    raw = typeof response.text === 'function' ? await response.text() : JSON.stringify(await response.json());
+  } catch (error) {
+    const failure = error instanceof Error ? error : new Error(safeString(error));
+    const status = Number(response.status) || 0;
+    failure.status = status;
+    failure.retryAfterSeconds = retryAfterSeconds(response);
+    failure.retryable = error?.name !== 'SyntaxError' &&
+      (response.ok || status === 408 || status === 429 || (status >= 500 && status < 600));
+    throw failure;
+  }
+  let json = {};
+  let parsed = false;
+  try {
+    json = JSON.parse(raw);
+    parsed = true;
+  } catch { /* The caller rejects missing auth fields on malformed JSON. */ }
+  return { json, text: parsed ? '' : safeString(raw).replace(/\s+/g, ' ').slice(0, 240) };
 }
 
 function publicFetchTarget(url = '') {
@@ -393,11 +416,25 @@ function publicFetchTarget(url = '') {
   }
 }
 
+function retryAfterSeconds(response) {
+  const value = safeString(response?.headers?.get?.('Retry-After'));
+  if (!value) return 0;
+  const seconds = /^\d+$/.test(value) ? Number(value) : Math.ceil((Date.parse(value) - Date.now()) / 1000);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.min(86400, Math.ceil(seconds)) : 0;
+}
+
 async function checkedJsonFetch(fetchImpl, url, init = {}, {
   tokenField = '',
   errorPrefix = 'request_failed',
 } = {}) {
-  const response = await fetchImpl(url, init);
+  let response;
+  try {
+    response = await fetchImpl(url, init);
+  } catch (error) {
+    const failure = error instanceof Error ? error : new Error(safeString(error));
+    failure.retryable = true;
+    throw failure;
+  }
   const { json: body, text } = await parseResponseBody(response);
   if (!response?.ok || (tokenField && !body?.[tokenField])) {
     const upstream = safeString(body?.error || body?.reason || body?.message || text);
@@ -405,7 +442,13 @@ async function checkedJsonFetch(fetchImpl, url, init = {}, {
     const detail = upstream
       ? (status && upstream !== status ? `${upstream} (${status})` : upstream)
       : (status || 'upstream_error');
-    throw new Error(`${errorPrefix}: ${detail} at ${publicFetchTarget(url)}`);
+    const error = new Error(`${errorPrefix}: ${detail} at ${publicFetchTarget(url)}`);
+    error.status = Number(response?.status) || 0;
+    // Only nonce/login transport and explicit transient HTTP failures are safe
+    // to retry here. A malformed successful auth response is a terminal defect.
+    error.retryable = error.status === 408 || error.status === 429 || (error.status >= 500 && error.status < 600);
+    error.retryAfterSeconds = retryAfterSeconds(response);
+    throw error;
   }
   return { response, body };
 }
@@ -557,7 +600,7 @@ export async function authenticateSessionWorker({
     }
   }
 
-  throw new Error(safeString(lastAuthError?.message || lastAuthError) || 'worker_auth_failed');
+  throw lastAuthError || new Error('worker_auth_failed');
 }
 
 export async function requestManagedAccountFaucetOnJoin({
@@ -565,7 +608,7 @@ export async function requestManagedAccountFaucetOnJoin({
   session = {},
   account = {},
   principal = {},
-  createdAt = null,
+  now = new Date(),
   fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch,
   ethersLib = ethers,
 } = {}) {
@@ -580,7 +623,7 @@ export async function requestManagedAccountFaucetOnJoin({
     session,
     account,
     principal,
-    createdAt,
+    now,
     fetchImpl,
     ethersLib,
   });
@@ -591,7 +634,7 @@ export async function requestSessionWorkerFaucet({
   session = {},
   account = {},
   principal = {},
-  createdAt = null,
+  now = new Date(),
   fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch,
   ethersLib = ethers,
   auth = null,
@@ -603,7 +646,7 @@ export async function requestSessionWorkerFaucet({
     principal,
     fetchImpl,
     ethersLib,
-    now: createdAt ? new Date(createdAt) : new Date(),
+    now,
   });
   if (!login.ok) return login;
 
@@ -665,7 +708,7 @@ function normalizeAnswerForPayload(answer = {}, questionRef = {}) {
   const type = lower(questionRef.questionType || answer.questionType || answer.controlType || 'freeform');
   if (type === 'quadratic') return { questionType: 'quadratic', value: answer.value };
   if (type === 'rating' || type === 'rating_button') {
-    const value = normalizeTelegramRatingAnswer(answer.value ?? answer.rating ?? answer.answer ?? answer.label, questionRef);
+    const value = normalizeAgentRatingAnswer(answer.value ?? answer.rating ?? answer.answer ?? answer.label, questionRef);
     if (value === null) throw new Error('rating_answer_invalid');
     return { questionType: 'rating', value };
   }
@@ -690,7 +733,7 @@ function normalizeAnswerForPayload(answer = {}, questionRef = {}) {
   };
 }
 
-export function buildTelegramResponsePayload({
+export function buildAgentResponsePayload({
   sessionSlug = '',
   questionRef = {},
   answer = {},
@@ -735,7 +778,7 @@ export function buildTelegramResponsePayload({
     responder: safeString(accountAddress),
     encryptionRequested: false,
   };
-  assertNoSecretShape(payload, 'Telegram on-chain response payloads must not serialize secrets.');
+  assertNoSecretShape(payload, "Agent on-chain response payloads must not serialize secrets.");
   return payload;
 }
 
@@ -759,7 +802,16 @@ async function uploadResponsePayload({
   });
   const body = await parseJsonResponse(response);
   if (!response?.ok) {
-    throw new Error(`storage_upload_failed: ${safeString(body?.error || response?.status)}`);
+    const error = new Error(`storage_upload_failed: ${safeString(body?.error || response?.status)}`);
+    error.status = Number(response?.status) || 0;
+    const knownId = safeString(body?.storageRef?.id || body?.id || body?.txId || body?.transactionId);
+    if (knownId) error.storageUpload = { id: knownId, storageRef: body?.storageRef || null, backend: safeString(body?.storageRef?.backend || body?.backend) };
+    // These admission/validation responses reject before storing the payload.
+    // Timeouts, transport errors, and 5xx can follow storage and remain uncertain.
+    error.uploadRejected = !knownId && [400, 401, 403, 404, 405, 413, 415, 422, 429].includes(error.status);
+    error.retryable = error.status === 429;
+    error.retryAfterSeconds = retryAfterSeconds(response);
+    throw error;
   }
   const id = safeString(body?.storageRef?.id || body?.id || body?.txId || body?.transactionId);
   if (!id) throw new Error('storage_upload_missing_id');
@@ -770,7 +822,7 @@ async function uploadResponsePayload({
   };
 }
 
-export async function submitTelegramResponseOnChain({
+export async function submitAgentResponseOnChain({
   env = {},
   session = {},
   account = {},
@@ -779,29 +831,31 @@ export async function submitTelegramResponseOnChain({
   answer = {},
   idempotencyKey = '',
   createdAt = null,
+  now = new Date(),
   fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch,
   ethersLib = ethers,
   contractFactory = null,
+  beforeUpload = null,
 } = {}) {
   if (!directSubmitFeatureEnabled(env)) {
-    return { ok: false, skipped: true, reason: 'direct_submit_disabled' };
+    return { ok: false, skipped: true, retryable: false, safeToRetry: true, reason: 'direct_submit_disabled' };
   }
   if (session.managedAccountSubmitAllowed !== true) {
-    return { ok: false, skipped: true, reason: 'session_direct_submit_not_allowed' };
+    return { ok: false, skipped: true, retryable: false, safeToRetry: true, reason: 'session_direct_submit_not_allowed' };
   }
 
   const sessionSlug = safeString(session.sessionSlug || questionRef.sessionSlug);
   const qid = safeString(questionRef.questionId);
   if (!sessionSlug || !BYTES32_RE.test(qid)) {
-    return { ok: false, skipped: true, reason: 'direct_submit_requires_bytes32_question_id' };
+    return { ok: false, skipped: true, retryable: false, safeToRetry: true, reason: 'direct_submit_requires_bytes32_question_id' };
   }
 
   const workerUrl = resolveSessionWorkerUrl(env, session);
-  if (!workerUrl) return { ok: false, skipped: true, reason: 'session_worker_url_missing' };
+  if (!workerUrl) return { ok: false, skipped: true, retryable: false, safeToRetry: true, reason: 'session_worker_url_missing' };
   const surveysAddress = resolveSurveysAddress(env, session);
-  if (!surveysAddress) return { ok: false, skipped: true, reason: 'surveys_address_missing' };
+  if (!surveysAddress) return { ok: false, skipped: true, retryable: false, safeToRetry: true, reason: 'surveys_address_missing' };
   const rpcUrls = resolveRpcUrls(env, session);
-  if (!rpcUrls.length && !contractFactory) return { ok: false, skipped: true, reason: 'rpc_url_missing' };
+  if (!rpcUrls.length && !contractFactory) return { ok: false, skipped: true, retryable: false, safeToRetry: true, reason: 'rpc_url_missing' };
 
   let auth;
   try {
@@ -813,12 +867,29 @@ export async function submitTelegramResponseOnChain({
       workerUrl,
       fetchImpl,
       ethersLib,
-      now: createdAt ? new Date(createdAt) : new Date(),
+      now,
     });
   } catch (error) {
-    return { ok: false, reason: 'worker_auth_failed', error: safeString(error?.message || error) };
+    return {
+      ok: false,
+      reason: 'worker_auth_failed',
+      error: safeString(error?.message || error),
+      retryable: error?.retryable === true,
+      safeToRetry: true,
+      retryAfterSeconds: Number(error?.retryAfterSeconds) || 0,
+      ...(error?.status ? { status: error.status } : {}),
+    };
   }
-  if (!auth.ok) return { ...auth, reason: auth.reason || 'worker_auth_failed' };
+  if (!auth.ok) return { ...auth, retryable: false, safeToRetry: true, reason: auth.reason || 'worker_auth_failed' };
+
+  if (typeof beforeUpload === 'function') {
+    try {
+      const replay = await beforeUpload();
+      if (replay) return replay;
+    } catch (error) {
+      return { ok: false, reason: 'submission_admission_failed', error: safeString(error?.message || error), retryable: true, safeToRetry: true };
+    }
+  }
 
   let faucet = session.sponsoredFaucetAllowed === true
     ? await requestSessionWorkerFaucet({
@@ -826,7 +897,7 @@ export async function submitTelegramResponseOnChain({
       session,
       account,
       principal,
-      createdAt,
+      now,
       fetchImpl,
       ethersLib,
       auth,
@@ -834,6 +905,11 @@ export async function submitTelegramResponseOnChain({
     : { ok: false, skipped: true, reason: 'session_faucet_not_allowed' };
 
   let privateKey;
+  let storageUpload = null;
+  let responseHash = '';
+  let tx = null;
+  let receipt = null;
+  let stage = 'payload';
   try {
     ({ privateKey } = await deriveManagedWallet({ env, principal, account, ethersLib }));
   } catch (error) {
@@ -841,24 +917,24 @@ export async function submitTelegramResponseOnChain({
   }
 
   try {
-    const payload = buildTelegramResponsePayload({
+    const payload = buildAgentResponsePayload({
       sessionSlug,
       questionRef,
       answer,
       accountAddress: auth.accountAddress,
       createdAt,
     });
-    const storageUpload = await uploadResponsePayload({
+    stage = 'upload';
+    storageUpload = await uploadResponsePayload({
       fetchImpl,
       workerUrl,
       token: auth.token,
       payload,
     });
-    const responseHash = base64urlToHex(storageUpload.id);
+    responseHash = base64urlToHex(storageUpload.id);
     const storageBackend = lower(storageUpload.backend || storageUpload.storageRef?.backend);
     const chainId = normalizeChainId(env, session);
-    let tx = null;
-    let receipt = null;
+    stage = 'broadcast';
     if (typeof contractFactory === 'function') {
       const provider = rpcUrls[0]
         ? new ethersLib.providers.JsonRpcProvider(rpcConnection(rpcUrls[0], fetchImpl), chainId)
@@ -866,6 +942,7 @@ export async function submitTelegramResponseOnChain({
       const signer = provider ? new ethersLib.Wallet(privateKey, provider) : new ethersLib.Wallet(privateKey);
       const contract = contractFactory({ surveysAddress, abi: SUBMIT_RESPONSES_ABI, signer, ethersLib });
       tx = await contract.submitResponses([qid], [responseHash], HASH_ZERO, HASH_ZERO);
+      stage = 'confirmation';
       receipt = typeof tx?.wait === 'function' ? await tx.wait() : null;
     } else {
       if (faucet?.ok === true && faucet.skipped !== true) {
@@ -899,7 +976,7 @@ export async function submitTelegramResponseOnChain({
     }
     return {
       ok: true,
-      action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+      action: AGENT_ACTIONS.DIRECT_SUBMIT_RESPONSE,
       status: 'direct_submitted',
       idempotencyKey: safeString(idempotencyKey),
       sessionSlug,
@@ -916,10 +993,20 @@ export async function submitTelegramResponseOnChain({
       faucet,
     };
   } catch (error) {
+    if (stage === 'upload' && error?.storageUpload) storageUpload = error.storageUpload;
     return {
       ok: false,
       reason: 'direct_submit_failed',
       error: safeString(error?.message || error) || 'direct_submit_failed',
+      retryable: stage === 'upload' && error?.uploadRejected === true && error?.retryable === true,
+      safeToRetry: stage === 'payload' || (stage === 'upload' && error?.uploadRejected === true),
+      retryAfterSeconds: Number(error?.retryAfterSeconds) || 0,
+      reconciliationRequired: stage !== 'payload' && !(stage === 'upload' && error?.uploadRejected === true),
+      stage,
+      txHash: tx?.hash || tx?.txHash || receipt?.transactionHash || error?.txHash || null,
+      storageRef: storageUpload?.storageRef || null,
+      storageId: storageUpload?.id || null,
+      responseHash: responseHash || null,
       sessionSlug,
       questionId: qid,
       accountAddress: auth.accountAddress,

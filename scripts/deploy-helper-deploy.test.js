@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
@@ -153,6 +154,23 @@ test('buildDeployHelperUploadMetadata writes the expected bindings', async () =>
     new_sqlite_classes: ['SessionWriteCoordinator'],
   });
   assert.equal(metadata.compatibility_date, '2025-01-01');
+  // The helper probes the Wrapped Bridge on this account's workers.dev zone.
+  // Without this runtime flag Cloudflare returns 1042 before the probe arrives.
+  assert.ok(metadata.compatibility_flags.includes('global_fetch_strictly_public'));
+});
+
+test('manual Worker deployment configs permit public same-account Worker calls', () => {
+  for (const relativePath of [
+    '../workers/deploy-helper/wrangler.example.toml',
+    '../workers/agentBridgeWorker/wrangler.example.toml',
+    '../deploy/cloudflare/session-worker/wrangler.jsonc',
+  ]) {
+    const source = fs.readFileSync(path.join(__dirname, relativePath), 'utf8');
+    const flags = relativePath.endsWith('.jsonc')
+      ? JSON.parse(source).compatibility_flags
+      : JSON.parse(source.match(/^compatibility_flags\s*=\s*(\[[^\n]+\])/m)[1]);
+    assert.ok(flags.includes('global_fetch_strictly_public'), relativePath);
+  }
 });
 
 test('deployDeployHelperWorker retries an already-applied coordinator migration without dropping its binding', async () => {

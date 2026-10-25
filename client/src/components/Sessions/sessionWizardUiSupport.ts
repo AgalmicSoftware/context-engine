@@ -8,6 +8,9 @@ const SESSION_HEADER_IMAGE_MIME_TO_EXT = Object.freeze({
   'image/gif': 'gif',
 });
 
+export const SESSION_HEADER_IMAGE_ACCEPT = Object.keys(SESSION_HEADER_IMAGE_MIME_TO_EXT).join(',');
+export const UNSUPPORTED_SESSION_HEADER_IMAGE_MESSAGE = 'Unsupported header image format. Use png, jpg, jpeg, or gif.';
+
 type SessionWizardUiRecord = Record<string, unknown>;
 
 type SessionWizardReduxStoreLike = SessionWizardUiRecord & {

@@ -1,3 +1,4 @@
+import { describeHostedFaucetSetup, faucetAddressFromKey } from '../sessionWizardHostedFaucet';
 import { useCallback, useEffect, useMemo, type MutableRefObject } from 'react';
 import {
   createLitHooks,
@@ -194,8 +195,13 @@ const useSessionWizardWorkerSecretsController = ({
 
   const getMissingWorkerSecretsForDeploy = useCallback(
     (secretsSnapshot = getCurrentWorkerSecrets()) => {
-      const modeRequirements = resolveSessionWizardModeRequirements(draft?.sessionModeProfile);
+      const modeRequirements = resolveSessionWizardModeRequirements(draft?.sessionModeProfile, {
+        sessionConfig: draft,
+      });
       const missing = [];
+      if (describeHostedFaucetSetup(draft).enabled && !faucetAddressFromKey(secretsSnapshot.faucetPrivateKey)) {
+        missing.push('Valid faucet private key');
+      }
       if (modeRequirements.selected) {
         resolveSessionWizardResourceSecretFields('ai', draft?.ai).forEach((field) => {
           if (!toStr(secretsSnapshot?.[field.key]).trim()) missing.push(field.label);
@@ -240,7 +246,7 @@ const useSessionWizardWorkerSecretsController = ({
       }
       return missing;
     },
-    [draft?.ai, draft?.sessionModeProfile, getCurrentWorkerSecrets, resolveWorkerRpcUrl],
+    [draft, getCurrentWorkerSecrets, resolveWorkerRpcUrl],
   );
 
   const chipotleHookWorkerSecrets = useMemo<WorkerSecretsLike>(
@@ -374,7 +380,9 @@ const useSessionWizardWorkerSecretsController = ({
       sessionSlug = '',
       authAccount = '',
     }: PublishArweaveUploadOptionsInput = {}) => {
-      const modeRequirements = resolveSessionWizardModeRequirements(draft?.sessionModeProfile);
+      const modeRequirements = resolveSessionWizardModeRequirements(draft?.sessionModeProfile, {
+        sessionConfig: draft,
+      });
       const requiresDirectRegistryUpload =
         modeRequirements.selected &&
         modeRequirements.publish.registerSession &&
@@ -398,7 +406,7 @@ const useSessionWizardWorkerSecretsController = ({
           }),
       });
     },
-    [draft?.sessionModeProfile, signBootstrapAdminAction],
+    [draft, signBootstrapAdminAction],
   );
 
   const signTypedAdminAction = useCallback(

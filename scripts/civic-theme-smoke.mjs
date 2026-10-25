@@ -1,11 +1,12 @@
-// Run against a local server with demo surfaces enabled. Answers stay in the
-// isolated browser context and are cleared; this smoke never submits responses.
+// Run against local Vite with demo surfaces enabled. Synthetic registry/Worker
+// reads and checked-in demo data stay local; this smoke never submits.
 import assert from 'node:assert/strict';
 import { inspectSessionSelectorLayout } from './session-selector-layout-smoke.mjs';
 import { assertReadable, auditPanelContrast, clickQuestionAction, inspectCivicOverlays } from './civic-theme-overlay-smoke.mjs';
 import { inspectCivicExplorerContent } from './civic-theme-explorer-smoke.mjs';
 import { inspectCivicWizard } from './civic-theme-wizard-smoke.mjs';
 import { inspectCivicAuthoring } from './civic-theme-authoring-smoke.mjs';
+import { installCivicThemeFixtures, CIVIC_FIXTURE_GROUP_LABEL } from './civic-theme-fixtures.mjs';
 
 export const readControl = (element) => {
   const style = getComputedStyle(element);
@@ -68,15 +69,19 @@ export async function inspectCivicWelcome(page) {
   const back = pane.locator('[class*="sidebarOpen_"] > [class*="takeSurveyButton_"]');
   for (let step = 0; step < 5 && (await back.count()) > 0; step += 1) await back.click();
   for (let index = 0; index < 6; index += 1) {
-    const artwork = await pane.getByRole('img').evaluate((element) => {
+    const artworkImage = pane.getByRole('img');
+    await artworkImage.waitFor({ state: 'visible' });
+    const artwork = await artworkImage.evaluate((element) => {
       const style = getComputedStyle(element);
       return { opacity: style.opacity, filter: style.filter, content: style.content, width: element.getBoundingClientRect().width };
     });
-    assert.equal(artwork.opacity, '1', 'Welcome artwork is not washed out');
+    const softenedArtwork = [3, 4].includes(index);
+    assert.equal(artwork.opacity, softenedArtwork ? '0.82' : '1', 'Welcome artwork keeps its intended light-theme treatment');
     assert(artwork.width > 0, 'Welcome artwork has visible dimensions');
     if (index === 3) assert(artwork.content.includes('seedsman_civic'), 'Civic uses the transparent robot artwork');
     if ([0, 2, 5].includes(index)) assert(artwork.filter.includes('invert(1)'), 'White artwork is adapted to the light canvas');
-    else assert.equal(artwork.filter, 'none', 'Color illustrations retain their original colors');
+    else if (softenedArtwork) assert.equal(artwork.filter, 'saturate(0.55) brightness(1.05) contrast(0.9)', 'Audience and motivation artwork retain their softened treatment');
+    else assert.equal(artwork.filter, 'none', 'Toolkit artwork retains its original colors');
     const result = await pane.evaluate(auditPanelContrast);
     assert.equal(result.failures.length, 0, `Welcome slide ${index}: ${JSON.stringify(result.failures)}`);
     if (index < 5) await page.locator('[class*="onboardingControls_"] > button').click();
@@ -349,7 +354,10 @@ export async function inspectCivicSession(page) {
   });
   assert(Math.abs(titleGeometry.center - titleGeometry.viewport / 2) < 20, 'Session title stays centered');
 
-  await page.getByRole('radio', { name: 'Agree', exact: true }).check();
+  const pileAgree = page.getByRole('radio', { name: 'Agree', exact: true });
+  await pileAgree.press('Space');
+  // Pile answers advance immediately; the current radio belongs to the next question.
+  await page.getByRole('button', { name: 'Submit (1)', exact: true }).waitFor({ state: 'visible' });
   const clear = page.getByRole('button', { name: 'Clear pending changes', exact: true });
   await clear.waitFor({ state: 'visible' });
   const clearStyle = await clear.evaluate(readControl);
@@ -362,7 +370,9 @@ export async function inspectCivicSession(page) {
   await clear.waitFor({ state: 'hidden' });
 
   await clickQuestionAction(page, 'View All Questions');
-  await page.getByRole('radio', { name: 'Agree', exact: true }).first().check();
+  const fullAgree = page.getByRole('radio', { name: 'Agree', exact: true }).first();
+  await fullAgree.press('Space');
+  assert(await fullAgree.isChecked(), 'Keyboard selection checks the full-view answer');
   const fullClear = page.getByRole('button', { name: 'Clear pending changes', exact: true });
   await fullClear.waitFor({ state: 'visible' });
   const fullClearStyle = await fullClear.evaluate(readControl);
@@ -370,16 +380,18 @@ export async function inspectCivicSession(page) {
   await assertReadable(fullClear);
   await fullClear.click();
   await assertReadable(page.locator('body'));
-  const option = page.getByText('An elected legislature', { exact: true });
-  await option.waitFor({ state: 'visible' });
-  const choiceLabel = option.locator('xpath=ancestor::label[1]');
+  // The multichoice control renders its visible label around a CSS-hidden input.
+  const choiceLabel = page.locator('label').filter({
+    has: page.locator('input[type="checkbox"][value="An elected legislature"]'),
+  });
+  await choiceLabel.waitFor({ state: 'visible' });
+  const choiceInput = choiceLabel.locator('input');
   for (const selected of [false, true]) {
-    if (selected) await option.click();
-    assert.equal(await choiceLabel.evaluate((label) => label.querySelector('input').checked), selected);
-    // Multi-choice labels remain readable in both states.
+    if (selected) await choiceLabel.click();
+    assert.equal(await choiceInput.isChecked(), selected);
     await assertReadable(choiceLabel);
   }
-  await option.click();
+  await choiceLabel.click();
   await page.getByRole('button', { name: 'Back to pile view', exact: true }).click();
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'No horizontal overflow');
 
@@ -402,7 +414,10 @@ export async function runSmoke() {
       { width: 1280, height: 900 },
       { width: 390, height: 844 },
     ]) {
-      const page = await browser.newPage({ viewport });
+      console.log(`Civic smoke: ${viewport.width}×${viewport.height}`);
+      const context = await browser.newContext({ viewport });
+      await installCivicThemeFixtures(context, baseUrl);
+      const page = await context.newPage();
       await page.addInitScript(() => {
         if (!localStorage.getItem('ce:theme')) localStorage.setItem('ce:theme', 'civic');
         localStorage.setItem('ce_onboarding_complete', 'true');
@@ -416,7 +431,7 @@ export async function runSmoke() {
       await inspectMinimalProfile(page);
       await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
       await inspectCivicWelcome(page);
-      await inspectCivicExplorerContent(page);
+      await inspectCivicExplorerContent(page, { groupLabel: CIVIC_FIXTURE_GROUP_LABEL });
       await page.goto(`${baseUrl}/about`, { waitUntil: 'domcontentloaded' });
       await inspectCivicAbout(page);
       await page.goto(`${baseUrl}/posts/agent-village-wrapped-2026`, { waitUntil: 'domcontentloaded' });
@@ -435,9 +450,21 @@ export async function runSmoke() {
       for (const property of ['width', 'height', 'fontSize', 'headingSize']) {
         assert.equal(civic[property], original[property], `Login ${property} matches the existing theme`);
       }
-      await page.close();
+      for (const theme of ['context-engine', 'classic-95']) {
+        await page.evaluate((value) => localStorage.setItem('ce:theme', value), theme);
+        await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('tab', { name: 'Stats', exact: true }).click();
+        await page.getByTestId('ce-community-session-select').selectOption({ label: 'ALL' });
+        await page.getByTestId('ce-community-stat-groups').click();
+        const dialog = page.getByRole('dialog');
+        await dialog.getByRole('heading', { name: 'Featured Groups', exact: true }).waitFor({ state: 'visible' });
+        await assertReadable(dialog);
+        await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+      }
+      await context.close();
+      console.log(`Civic smoke passed: ${viewport.width}×${viewport.height}`);
     }
-    console.log('Civic theme smoke passed at desktop and mobile sizes.');
+    console.log('Civic theme smoke passed at desktop and mobile sizes; Groups dialog passed in all three themes.');
   } finally {
     await browser.close();
   }

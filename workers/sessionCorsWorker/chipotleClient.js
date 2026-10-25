@@ -267,13 +267,18 @@ export const fetchChipotleJson = async ({
     response = await fetchImpl(requestUrl, {
       method,
       headers,
-      redirect: 'error',
+      // The deployed Workers runtime supports manual/follow, but rejects error.
+      // Never follow redirects with the attached Lit account credentials.
+      redirect: 'manual',
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
   } catch (error) {
     throw new Error(toTrimmedString(error?.message || error) || 'Chipotle request failed.');
   }
 
+  if (response.status >= 300 && response.status < 400) {
+    throw new Error('Chipotle redirects are not allowed.');
+  }
   const text = await response.text().catch(() => '');
   const parsed = parseJsonIfPossible(text);
   if (!response.ok) {

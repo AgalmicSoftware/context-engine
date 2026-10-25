@@ -3,7 +3,8 @@
   "main": "worker.mjs",
   "compatibility_date": "2026-07-21",
   "compatibility_flags": [
-    "nodejs_compat"
+    "nodejs_compat",
+    "global_fetch_strictly_public"
   ],
   "workers_dev": true,
   "kv_namespaces": [
@@ -33,6 +34,6 @@
     "CE_WORKER_GROUPS_BOOTSTRAP": "fresh-template-v2",
     "DEPLOY_HELPER_ENABLED": "0",
     "WORKER_DEBUG_LOGS": "0",
-    "CE_BUNDLE_SHA256": "b1195cf02a044301ed5c44395313d1ee792e72fcdabed6a0218a76d981719c82"
+    "CE_BUNDLE_SHA256": "80e19456bbfb37b466fc9ff57ecf094bbaf59ca980f9eda1ef698a18786fc465"
   }
 }

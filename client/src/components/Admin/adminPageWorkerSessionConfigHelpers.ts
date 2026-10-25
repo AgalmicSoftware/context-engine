@@ -1,5 +1,6 @@
 import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
+import { normalizeSessionModeProfileForWrite } from '../../utilities/session/sessionModeProfile.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { normalizeSlug } from './adminPageHelpers';
@@ -268,7 +269,9 @@ export const buildWorkerSessionConfigPayload = ({
     }
     workerCanonicalKeys.forEach((key) => {
       if (Object.prototype.hasOwnProperty.call(cfg, key)) {
-        out[key] = cloneConfigValue(cfg[key]);
+        out[key] = cloneConfigValue(
+          key === 'sessionModeProfile' ? normalizeSessionModeProfileForWrite(cfg[key]) : cfg[key],
+        );
       }
     });
     if (allowOrigins.length) out.allowOrigins = allowOrigins;
