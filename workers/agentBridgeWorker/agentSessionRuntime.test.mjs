@@ -457,3 +457,43 @@ test('Worker-stored question loads stop at the page cap and report incomplete', 
   assert.equal(loaded.questionCount, 10);
   assert.equal(listQueries.length, 10);
 });
+
+test('Worker-stored questions present one current version per question', async () => {
+  const rows = {
+    'row-q1-original': { createdAt: '2026-10-01T00:00:00.000Z', payload: { id: 'q1', type: 'binary', prompt: 'Original prompt?' } },
+    'row-q1-reupload': { createdAt: '2026-10-02T00:00:00.000Z', payload: { id: 'q1', type: 'binary', prompt: 'Re-uploaded prompt?' } },
+    'row-q1-admin': { createdAt: '2026-10-03T00:00:00.000Z', uploadAuthority: 'admin', payload: { id: 'q1', type: 'binary', prompt: 'Admin correction?' } },
+    // Stored before resourceId was recorded, so it names its question only in the payload.
+    'row-legacy': { createdAt: '2026-09-01T00:00:00.000Z', legacy: true, payload: { id: 'q-legacy', type: 'binary', prompt: 'Legacy question?' } },
+  };
+  const env = workerSessionEnv(async (url) => {
+    const { pathname, searchParams } = new URL(url);
+    const body = pathname === '/auth/nonce' ? { nonce: 'unit-nonce' }
+      : pathname === '/auth/login' ? { token: 'unit-token' }
+        : pathname === '/storage/list'
+          ? {
+              items: Object.entries(rows).map(([id, row]) => ({
+                storageRef: { backend: 'cloudflare', id, resource: 'questions' },
+                metadata: {
+                  resource: 'questions',
+                  createdAt: row.createdAt,
+                  ...(row.legacy ? {} : { resourceId: row.payload.id }),
+                  ...(row.uploadAuthority ? { uploadAuthority: row.uploadAuthority } : {}),
+                },
+              })),
+              cursor: null,
+              listComplete: true,
+            }
+          : rows[searchParams.get('id')]?.payload;
+    return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+  });
+
+  const loaded = await loadQuestionsForSession(env, 'alpha');
+
+  assert.deepEqual(loaded.questions.map((question) => [question.questionId, question.prompt]).sort(), [
+    ['q-legacy', 'Legacy question?'],
+    ['q1', 'Admin correction?'],
+  ]);
+  assert.equal(loaded.discoveredCount, 2);
+  assert.equal(loaded.complete, true);
+});

@@ -1,4 +1,5 @@
 import { safeString, lower, stableFingerprint, envFlagEnabled, nowIso, safeEnvJsonParse as safeJsonParse, sanitizeSessionSlug } from './runtimePrimitives.mjs';
+import { selectCanonicalStorageVersions } from '../../shared/storage/canonicalStorageVersions.mjs';
 
 import { listKvRecordsByPrefix } from './kvReadHelpers.mjs';
 
@@ -766,7 +767,21 @@ async function loadWorkerCloudflareQuestions({
     }
     seenCursors.add(cursor);
   }
-  const selectedItems = selectWorkerCloudflareQuestionItems(items, {
+  // Every upload of a question shares its id; present only the version each
+  // reader chooses. Rows stored before resourceId was recorded pass through.
+  const versionOf = (item) => ({
+    resourceId: safeString(item?.metadata?.resourceId),
+    createdAtMs: Date.parse(safeString(item?.metadata?.createdAt)) || 0,
+    storageRefId: safeString(item?.storageRef?.id),
+    uploadAuthority: item?.metadata?.uploadAuthority,
+  });
+  const listedVersions = items.filter((item) => item?.hidden !== true).map(versionOf);
+  const currentRefs = new Set(selectCanonicalStorageVersions(listedVersions).map((version) => version.storageRefId));
+  const currentItems = items.filter((item) => {
+    const version = versionOf(item);
+    return item?.hidden !== true && (!version.resourceId || currentRefs.has(version.storageRefId));
+  });
+  const selectedItems = selectWorkerCloudflareQuestionItems(currentItems, {
     questionLimit,
     preferredQuestionIds,
   });
@@ -828,9 +843,9 @@ async function loadWorkerCloudflareQuestions({
     source: 'telegram_only_cloudflare_storage',
     questions,
     questionCount: questions.length,
-    complete: listComplete && selectedItems.length >= items.length && readErrors.length === 0,
+    complete: listComplete && selectedItems.length >= currentItems.length && readErrors.length === 0,
     loadedCount: questions.length,
-    discoveredCount: items.length,
+    discoveredCount: currentItems.length,
     payloadFailureCount: readErrors.length,
     readErrors,
   };
