@@ -1593,9 +1593,12 @@ async function persistAgentSubmitRequest({
         createdAt,
       },
     });
+    // Sending the same answer again resends the saved request under its queue
+    // generation (or saves it, if that write failed), so callers may retry it.
     const queued = await queueAgentSubmitRecord({ env, kvKey, record }).catch((error) => ({
       ok: false,
       reason: 'telegram_submit_queue_failed',
+      retryable: true,
       error: safeString(error?.message || error),
     }));
     if (queued.ok === true) {

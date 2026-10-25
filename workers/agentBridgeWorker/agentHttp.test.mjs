@@ -5867,6 +5867,53 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.deepEqual(emptySubmit.skipped, [{ questionId: '', reason: 'preference_entries_missing' }]);
 });
 
+test('agent preferences report a failed queue send as retryable and resume it for the same answer', async () => {
+  let queueAvailable = false;
+  const sent = [];
+  const env = baseEnv({
+    AGENT_BRIDGE_ASYNC_SUBMIT_ENABLED: 'true',
+    AGENT_RESPONSE_QUEUE: {
+      send: async (body) => {
+        if (!queueAvailable) throw new Error('queue unavailable');
+        sent.push(body);
+      },
+    },
+  });
+  await seedLegacySessionBinding(env);
+  const submitAnswer = async () => {
+    const response = await handleAgentHttpRequest({
+      request: agentRequest('/telegram/agent/api/preferences', {
+        method: 'POST',
+        body: {
+          telegramUserId: '42',
+          groupChatId: '-100123',
+          sessionSlug: 'alpha',
+          submit: true,
+          humanApproved: true,
+          preferences: { answersByQuestionId: { 'q-binary': { value: 'agree' } } },
+        },
+      }),
+      env,
+    });
+    return { status: response.status, body: await jsonBody(response) };
+  };
+
+  const failed = await submitAnswer();
+  assert.equal(failed.status, 422);
+  assert.equal(failed.body.reason, 'direct_submit_incomplete');
+  assert.deepEqual(failed.body.skipped, [
+    { questionId: 'q-binary', reason: 'telegram_submit_queue_failed', retryable: true },
+  ]);
+
+  queueAvailable = true;
+  const resumed = await submitAnswer();
+  assert.equal(resumed.status, 200);
+  assert.equal(resumed.body.submitted[0].questionId, 'q-binary');
+  assert.equal(resumed.body.submitted[0].queued, true);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].requestId, resumed.body.submitted[0].requestId);
+});
+
 test('Telegram agent can read and render topic-map results without raw response records', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([

@@ -360,6 +360,7 @@ for (const accepted of [false, true]) {
     };
     const failed = await persistAgentSubmitRequest(input);
     assert.equal(failed.ok, false);
+    assert.equal(failed.retryable, true);
     const before = JSON.parse(await h.kv.get(submitRequestKvKey(failed.requestId)));
     h.env.AGENT_RESPONSE_QUEUE.send = send;
     const retried = await persistAgentSubmitRequest(input);

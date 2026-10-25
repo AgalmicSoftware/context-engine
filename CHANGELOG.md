@@ -112,6 +112,7 @@ All notable changes to this project will be documented in this file.
   treating it as a permanent generation failure.
 - Re-enqueue pending agent answers after queue publication failures using the
   same request generation; preserve uncertain and completed transaction outcomes.
+  Mark the failed submission `retryable` so agents send the same answer again.
 - Keep normalized faucet settings stable so enabling the wizard switch does not
   trigger repeated render updates.
 - Grant new hosted faucets through `faucet_self`, which older Workers ignore.

@@ -5554,6 +5554,8 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
         skipped.push({
           questionId,
           reason: submit.reason || 'submit_request_failed',
+          // Submitting the same answer again resumes a retryable request.
+          ...(submit.retryable === true ? { retryable: true } : {}),
         });
         continue;
       }

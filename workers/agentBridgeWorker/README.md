@@ -161,7 +161,8 @@ profile. Legacy profile-less queue records remain readable. Exact same-answer
 replays reuse the request ID. A terminal failure explicitly marked
 `safeToRetry` can be resubmitted after repair with its original answer timestamp.
 Unknown or uncertain outcomes require reconciliation. If queue publication fails,
-an explicit same-answer retry re-enqueues the saved pending record with the same
+the response marks that skipped submission `retryable: true`, and an explicit
+same-answer retry re-enqueues the saved pending record with the same
 queue generation and timestamp. It does not rewrite a concurrent consumer's
 intent or outcome, and it never falls through to a direct chain submission.
 A second publication failure remains an error; completed or uncertain records
