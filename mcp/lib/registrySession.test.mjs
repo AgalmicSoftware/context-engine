@@ -5,6 +5,8 @@ import { createRegistrySession } from './registrySession.mjs';
 import { createParticipant } from './participant.mjs';
 import { readConfig } from './config.mjs';
 import { registryQuestionMatchesSession } from './registryIdentity.mjs';
+import { createMcpServer } from './mcpServer.mjs';
+import { buildTools } from './tools.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -85,7 +87,7 @@ const fixture = (overrides = {}) => {
     const event = surveys.interface.encodeEventLog(surveys.interface.getEvent('ResponsesSubmitted'), [wallet.address, [id], ethers.constants.HashZero]);
     logs.push({ ...event, blockNumber, transactionIndex: 0, logIndex: logs.length });
   };
-  return { open, addQuestion, addResponse, hashes, uploaded, writes, faults, client, fetchImpl,
+  return { open, addQuestion, addResponse, hashes, uploaded, writes, faults, client, fetchImpl, registry,
     options: { provider, addresses: { sessionRegistry: registryAddress, surveys: surveysAddress }, createContract: factory },
     setChain: (value) => { chain = value; }, setGasPrice: (value) => { gasPrice = value; }, setBalance: (value) => { balance = value; } };
 };
@@ -379,4 +381,90 @@ test('preflight RPC failures are sanitized before any upload or transaction', as
   });
   assert.equal(f.uploaded.length, 0);
   assert.equal(f.writes.length, 0);
+});
+
+const SECRET_RPC = 'https://rpc.example.invalid/v2/SYNTHETIC_RPC_SECRET_123';
+const CALLDATA = '0xfeedfacecafe0001';
+const RPC_DETAILS = /SYNTHETIC_RPC_SECRET_123|rpc\.example\.invalid|feedfacecafe|requestBody/;
+// ethers' own formatter, so each message quotes the URL and request like a live RPC failure.
+const rpcFailure = (reason, code, method, params = [], fields = {}) => Object.assign(ethers.logger.makeError(reason, code, {
+  requestBody: JSON.stringify({ method, params, id: 42, jsonrpc: '2.0' }), requestMethod: 'POST', url: SECRET_RPC,
+}), fields);
+const retry = (detail) => `The chain request failed (${detail}). Check the RPC connection and retry.`;
+
+const serveRegistry = async (t, f) => {
+  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-registry-rpc-'));
+  t.after(() => fs.rm(stateDir, { recursive: true, force: true }));
+  const fetchImpl = async (url, init) => {
+    if (new URL(url).hostname !== 'w.example.dev') return f.fetchImpl(url, init);
+    const pathname = new URL(url).pathname;
+    if (pathname === '/resource-presence') return Response.json({ resources: {} });
+    if (pathname === '/auth/nonce') return Response.json({ nonce: 'nonce123456' });
+    if (pathname === '/auth/login') return Response.json({ token: 'e30.sig', exp: 9999999999 });
+    if (pathname === '/arweave/upload') return Response.json({ id: Buffer.alloc(32, 2).toString('base64url') });
+    throw new Error(`Unexpected route ${pathname}`);
+  };
+  const logs = [];
+  const participant = createParticipant({ config: readConfig({ CE_MCP_STATE_DIR: stateDir }), wallet, registry: f.options, fetchImpl });
+  const server = createMcpServer({ serverInfo: { name: 'test', version: '1' }, tools: buildTools(participant), log: (line) => logs.push(line) });
+  let id = 0;
+  const call = async (name, args = {}) =>
+    JSON.parse(await server.handleLine(JSON.stringify({ jsonrpc: '2.0', id: (id += 1), method: 'tools/call', params: { name, arguments: args } }))).result;
+  return { call, logs, exposed: (result) => `${JSON.stringify(result)}\n${logs.join('\n')}` };
+};
+
+const link = 'https://contextengine.sh/session/town';
+for (const [stage, inject, message, overrides] of [
+  ['chain detection', (f) => { f.options.provider.send = async () => { throw rpcFailure('missing response', 'SERVER_ERROR', 'eth_chainId'); }; },
+    retry('SERVER_ERROR: missing response')],
+  ['registry lookup', (f) => { f.registry.getSessionBySlug = async () => { throw rpcFailure('processing response error', 'SERVER_ERROR', 'eth_call', [{ data: CALLDATA }, 'latest']); }; },
+    retry('SERVER_ERROR: processing response error')],
+  ['a missing session', (f) => { f.registry.getSessionBySlug = async () => { throw Object.assign(ethers.logger.makeError('call revert exception', 'CALL_EXCEPTION', {
+    method: 'getSessionBySlug(string)', errorArgs: ['session not found'], errorName: 'Error', reason: 'session not found' }), { transaction: { data: CALLDATA } }); }; },
+    'The contract rejected the request (CALL_EXCEPTION: session not found).'],
+  ['the head block lookup', (f) => { f.options.provider.getBlockNumber = async () => { throw rpcFailure('timeout', 'TIMEOUT', 'eth_blockNumber'); }; },
+    retry('TIMEOUT: timeout')],
+  ['the start block search', (f) => { f.options.provider.getBlock = async () => { throw rpcFailure('bad response', 'SERVER_ERROR', 'eth_getBlockByNumber', ['0x5', false]); }; },
+    retry('SERVER_ERROR: bad response'), { blockLimits: undefined }],
+]) {
+  test(`join_session keeps RPC details out of tool output and logs when ${stage} fails`, async (t) => {
+    const f = fixture(overrides);
+    inject(f);
+    const { call, logs, exposed } = await serveRegistry(t, f);
+    const result = await call('join_session', { link });
+    assert.equal(result.isError, true);
+    assert.equal(result.content[0].text, message);
+    assert.equal(logs.length, 1);
+    assert.doesNotMatch(exposed(result), RPC_DETAILS);
+  });
+}
+
+test('registry log scans and transactions keep RPC details out of tool output and logs', async (t) => {
+  const f = fixture();
+  const { call, logs, exposed } = await serveRegistry(t, f);
+  assert.equal((await call('join_session', { link })).isError, undefined);
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'One', type: 'binary' });
+  const transactionHash = ethers.utils.id('uncertain-submission');
+  f.faults.send = rpcFailure('processing response error', 'SERVER_ERROR', 'eth_sendRawTransaction', [`${CALLDATA}02`], { transactionHash, transaction: { data: CALLDATA } });
+  const answered = await call('answer', { answers: [{ questionId: qid, value: 'Agree' }] });
+  assert.equal(answered.structuredContent.reconciliationRequired, true);
+  assert.equal(answered.structuredContent.txHash, transactionHash);
+  assert.match(answered.structuredContent.results[0].error, new RegExp(`^Transaction ${transactionHash} may have been submitted.*\\(SERVER_ERROR: processing response error\\)`));
+  assert.doesNotMatch(exposed(answered), RPC_DETAILS);
+  const added = await call('add_statement', { prompt: 'A statement agents should see' });
+  assert.equal(added.isError, true);
+  assert.match(added.content[0].text, new RegExp(`^Transaction ${transactionHash} may have been submitted`));
+  assert.doesNotMatch(exposed(added), RPC_DETAILS);
+  f.options.provider.getLogs = async () => { throw rpcFailure('bad response', 'SERVER_ERROR', 'eth_getLogs', [{ fromBlock: '0x0', toBlock: '0xa' }]); };
+  const listed = await call('list_questions');
+  assert.equal(listed.content[0].text, retry('SERVER_ERROR: bad response'));
+  assert.doesNotMatch(exposed(listed), RPC_DETAILS);
+  assert.equal(logs.length, 2);
+});
+
+test('deliberate join errors reach the agent unchanged', async (t) => {
+  const { call, logs } = await serveRegistry(t, fixture());
+  const message = 'Session link must be a full URL, such as https://contextengine.sh/session/<slug>?worker=<origin>.';
+  assert.deepEqual(await call('join_session', { link: 'town' }), { content: [{ type: 'text', text: message }], isError: true });
+  assert.deepEqual(logs, [`tool join_session failed: ${message}`]);
 });

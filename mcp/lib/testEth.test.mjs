@@ -126,3 +126,17 @@ test('never requests mainnet funds and permits a local chain only with explicit 
   const result = await fixture({ configuredChain: 31337, rpcChain: 31337, allowLocalWorkers: true, body: { txHash: hash, amountEth: '0.0002', chainId: 31337 } }).request();
   assert.equal(result.chainId, 31337);
 });
+
+test('reports RPC failures without the RPC URL and sends no faucet request', async () => {
+  const failure = (method) => ethers.logger.makeError('missing response', ethers.errors.SERVER_ERROR, {
+    requestBody: JSON.stringify({ method, params: [], id: 42, jsonrpc: '2.0' }), requestMethod: 'POST', url: 'https://rpc.example.invalid/v2/SYNTHETIC_RPC_SECRET_123',
+  });
+  for (const provider of [
+    { send: async () => { throw failure('eth_chainId'); }, getBalance: async () => ethers.constants.Zero },
+    { send: async () => chainId, getBalance: async () => { throw failure('eth_getBalance'); } },
+  ]) {
+    const f = fixture();
+    await assert.rejects(f.request({ provider }), { message: 'The chain request failed (SERVER_ERROR: missing response). Check the RPC connection and retry.' });
+    assert.equal(f.calls.length, 0);
+  }
+});

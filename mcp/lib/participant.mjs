@@ -2,6 +2,7 @@ import { createTestEthRequester } from './testEth.mjs';
 import { createRegistrySession } from './registrySession.mjs';
 import { compareChainOrder } from './registryChain.mjs';
 import { normalizeLabel } from './config.mjs';
+import { describeError } from './mcpServer.mjs';
 import { readAgentState, updateAgentState } from './agentState.mjs';
 import { buildQuestionRecord, buildResponseRecord, generateQuestionId, isLockedQuestion, isSingleSelect, ratingScaleFor } from './records.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
@@ -608,7 +609,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
               }),
             );
           } catch (error) {
-            outcome.sbtClaims.push({ sbt: claim.sbt, status: 'failed', error: error.message });
+            outcome.sbtClaims.push({ sbt: claim.sbt, status: 'failed', error: describeError(error) });
           }
         }
         // Refresh the token so access that depends on the new token applies.
@@ -617,7 +618,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       outcome.testEth = await ctx.client.describeTestEth();
       outcome.signedIn = !loginError;
       if (loginError) {
-        outcome.readOnlyReason = loginError.message;
+        outcome.readOnlyReason = describeError(loginError);
         outcome.note = 'Joined read-only: public questions and results are available, but uploads, answers, statements, and faucet requests need Worker access.';
       }
       const scopes = isRecord(tokenClaims?.scopes) ? tokenClaims.scopes : {};
@@ -629,7 +630,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           await ctx.client.joinGroup(parsed.joinGroupId);
           outcome.joinedGroup = parsed.joinGroupId;
         } catch (error) {
-          outcome.groupJoinError = error.message;
+          outcome.groupJoinError = describeError(error);
         }
       }
       outcome.description = text(sessionConfig.sessionInfo).slice(0, MAX_CONTEXT_LENGTH);
@@ -743,7 +744,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           answered.push({ questionId, record: built.record, answeredAt: text(storageRef?.createdAt) || new Date(now()).toISOString() });
           results.push({ questionId, ok: true, answer: built.record.answer.value });
         } catch (error) {
-          results.push({ questionId, ok: false, error: error.message });
+          results.push({ questionId, ok: false, error: describeError(error) });
         }
       }
       if (pendingAnswers.length) {
@@ -761,7 +762,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         } catch (error) {
           if (typeof error.txHash === 'string' && /^0x[0-9a-f]{64}$/i.test(error.txHash)) txHash = error.txHash;
           reconciliationRequired = error.reconciliationRequired === true;
-          pendingAnswers.forEach(({ questionId }) => results.push({ questionId, ok: false, error: error.message }));
+          pendingAnswers.forEach(({ questionId }) => results.push({ questionId, ok: false, error: describeError(error) }));
         }
       }
       let warning;

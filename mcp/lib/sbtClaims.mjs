@@ -1,5 +1,6 @@
 import { createTestEthRequester } from './testEth.mjs';
 import { ethers } from 'ethers';
+import { safeErrorCode, safeErrorReason } from './chainErrors.mjs';
 import groupPasswordDerivation from '../../client/src/utilities/crypto/groupPasswordDerivation.cjs';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 
@@ -144,19 +145,11 @@ const defaultCreateProvider = (rpcOverride) => (chainId) => {
 /** An error whose message is safe to show: it never carries call data or secrets. */
 class ClaimError extends Error {}
 
-const SAFE_REASON_RE = /^[A-Za-z][\w .,'()-]{0,119}$/;
-
 // ethers errors quote transactions and call data, which can hold a claim
 // password or an invite signature, so only short contract reasons and error
 // codes are passed on.
-const safeMessage = (error, fallback) => {
-  if (error instanceof ClaimError) return error.message;
-  const reason = [error?.reason, error?.errorName, error?.error?.reason]
-    .map((value) => (typeof value === 'string' ? value.replace(/^execution reverted:?\s*/i, '').trim() : ''))
-    .find((value) => SAFE_REASON_RE.test(value));
-  const code = typeof error?.code === 'string' && /^[A-Z_]{3,40}$/.test(error.code) ? error.code : '';
-  return [fallback, reason || code].filter(Boolean).join(': ');
-};
+const safeMessage = (error, fallback) =>
+  error instanceof ClaimError ? error.message : [fallback, safeErrorReason(error) || safeErrorCode(error)].filter(Boolean).join(': ');
 
 export const createSbtClaimer = ({
   config = {},

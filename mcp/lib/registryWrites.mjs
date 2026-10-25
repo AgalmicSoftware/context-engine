@@ -1,30 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { ethers } from 'ethers';
+import { chainRequest } from './chainErrors.mjs';
 import { checkRegistryChain } from './registryChain.mjs';
 import { arweaveIdToHex } from './registryPayloads.mjs';
 
 const MAX_COST = ethers.utils.parseEther('0.005');
 const stopped = (signal) => { if (signal?.aborted) throw new Error('Stopped before the chain transaction was sent.'); };
 
-const transactionHashOf = (error) => [error?.transactionHash, error?.transaction?.hash, error?.receipt?.transactionHash]
-  .find((value) => typeof value === 'string' && /^0x[0-9a-f]{64}$/i.test(value));
-
-const chainRequest = async (request, { submission = false } = {}) => {
-  try { return await request(); }
-  catch (error) {
-    // ethers messages can include a keyed RPC URL, signed transaction, or call
-    // data. Preserve only the error code and a validated public transaction hash.
-    const txHash = transactionHashOf(error);
-    const code = typeof error?.code === 'string' && /^[A-Z_]{3,40}$/.test(error.code) ? ` (${error.code})` : '';
-    const message = submission
-      ? `${txHash ? `Transaction ${txHash}` : 'The transaction'} may have been submitted but its outcome is unknown${code}. Check the chain before retrying.`
-      : `The chain request failed${code}. Check the RPC connection and retry.`;
-    throw Object.assign(new Error(message), submission ? { reconciliationRequired: true, ...(txHash ? { txHash } : {}) } : {});
-  }
-};
-
 export const createRegistryWriter = ({ provider, chainId, wallet, surveys, slug, remember }) => {
-  const checkChain = () => checkRegistryChain({ send: (...args) => chainRequest(() => provider.send(...args)) }, chainId);
+  const checkChain = () => checkRegistryChain(provider, chainId);
   const prepare = async ({ client, gasLimit, fund, signal }) => {
     stopped(signal);
     await checkChain();

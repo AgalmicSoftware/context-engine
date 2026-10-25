@@ -5,6 +5,7 @@ import surveysAbi from '../../client/src/contractsABI/SURVEYS_ABI.json' with { t
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import { normalizeWorkerOrigin } from './sessionLinks.mjs';
 import { text, normalizeSessionIdHex } from './workerClient.mjs';
+import { chainRequest } from './chainErrors.mjs';
 import { checkRegistryChain, findStartBlock, scanRegistryLogs, compareChainOrder } from './registryChain.mjs';
 import { readRegistryMetadata, fetchArweaveJson, hexToArweaveId } from './registryPayloads.mjs';
 import { createRegistryWriter } from './registryWrites.mjs';
@@ -59,14 +60,14 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
   const loadConfig = async () => {
     await checkRegistryChain(provider, chainId);
     const slug = info.slug === 'general' ? '' : info.slug;
-    const row = await registry.getSessionBySlug(slug);
+    const row = await chainRequest(() => registry.getSessionBySlug(slug));
     if (normalized(row[0]) !== slug) throw new Error('The registry returned a different session.');
     if (text(row[3])) throw new Error('Encrypted registry metadata is unsupported; use an unencrypted session.');
     if (Number(row[1]) !== chainId) throw new Error('The session uses a different chain from this registry.');
     const metadata = await readRegistryMetadata(row[2], { fetchImpl });
     checkMetadata(metadata);
     // Deliberately never request or use the registry's rpcUrl field.
-    const fields = await registry.getSessionFields(slug, ['corsWorkerUrl']);
+    const fields = await chainRequest(() => registry.getSessionFields(slug, ['corsWorkerUrl']));
     const workerUrl = text(fields[0]) || text(metadata.corsWorkerUrl);
     if (/^\s*(?:\{|enc:|lit:)/i.test(workerUrl)) throw new Error('Encrypted Worker URLs are unsupported; use an unencrypted registry session.');
     const nextOrigin = normalizeWorkerOrigin(workerUrl, { allowLocalWorkers: config.allowLocalWorkers });
@@ -83,7 +84,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
       contracts: { ...metadata.contracts, surveys: { address, chainId } } };
     if (startBlock === undefined) {
       const configured = Number(metadata.blockLimits?.start);
-      const head = await provider.getBlockNumber();
+      const head = await chainRequest(() => provider.getBlockNumber());
       startBlock = metadata.blockLimits?.start !== undefined && Number.isSafeInteger(configured) && configured >= 0
         ? configured : await findStartBlock(provider, Number(row[5]), head);
       questionCursor = { block: startBlock, offset: 0 };
@@ -109,7 +110,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     let complete = true;
     if (pending.size < MAX_CACHE && questions.size < MAX_QUESTIONS) {
       const scanned = await scanRegistryLogs({ provider, filter: filter('QuestionsAdded'), cursor: questionCursor,
-        toBlock: await provider.getBlockNumber(), maxLogs: 1000, deadline, now, signal });
+        toBlock: await chainRequest(() => provider.getBlockNumber()), maxLogs: 1000, deadline, now, signal });
       questionCursor = scanned.cursor;
       complete = scanned.complete;
       for (const log of scanned.logs) {
@@ -125,7 +126,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
       while (next < work.length && now() < deadline && !signal?.aborted && questions.size < MAX_QUESTIONS) {
         const [id, log] = work[next++];
         try {
-          const pointer = await surveys.getQuestionHash(id);
+          const pointer = await chainRequest(() => surveys.getQuestionHash(id));
           const payload = await readPayload(pointer);
           const matches = registryQuestionMatchesSession(payload, sessionConfig);
           if (matches) questions.set(id, { id, payload: { ...payload, id }, createdAt: String(log.blockNumber).padStart(16, '0'), ...log });
@@ -146,7 +147,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     const deadline = now() + 90000;
     const responseFilter = filter('ResponsesSubmitted');
     if (mine) responseFilter.topics.push(ethers.utils.hexZeroPad(wallet.address, 32));
-    const head = await provider.getBlockNumber();
+    const head = await chainRequest(() => provider.getBlockNumber());
     const scope = [...known].sort().join(',');
     let state = answerScans.get(mine);
     if (!state || state.scope !== scope || head < state.head) {
@@ -222,11 +223,11 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
         if (now() >= deadline || signal?.aborted) { complete = false; break; }
         const entry = selected[next++];
         try {
-          const pointer = entry.local ? entry.storageId : await surveys.getResponse(entry.responder, entry.questionId);
+          const pointer = entry.local ? entry.storageId : await chainRequest(() => surveys.getResponse(entry.responder, entry.questionId));
           const payload = await readPayload(pointer);
           if (!registryResponseMatchesSession(payload, sessionConfig) || payload.answer?.encrypted === true) continue;
           if (normalized(payload.questionID || payload.questionId) !== entry.questionId) continue;
-          if (!blockTimes.has(entry.blockNumber)) blockTimes.set(entry.blockNumber, provider.getBlock(entry.blockNumber));
+          if (!blockTimes.has(entry.blockNumber)) blockTimes.set(entry.blockNumber, chainRequest(() => provider.getBlock(entry.blockNumber)));
           const block = await blockTimes.get(entry.blockNumber);
           const createdAt = block?.timestamp ? new Date(Number(block.timestamp) * 1000).toISOString() : '';
           entries.push({ ...entry, storageId: pointer, createdAt, payload });
