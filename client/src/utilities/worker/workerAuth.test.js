@@ -1670,6 +1670,48 @@ describe('workerAuth fetchWorkerWithAuth', () => {
       expect(logins).toEqual(['token-1-unscoped', 'token-2-scoped']);
     });
 
+    it('treats an access change noted in another tab as a change here', async () => {
+      const channels = [];
+      class FakeBroadcastChannel {
+        constructor(name) {
+          this.name = name;
+          channels.push(this);
+        }
+
+        postMessage(data) {
+          channels
+            .filter((other) => other !== this && other.name === this.name)
+            .forEach((other) => other.onmessage?.({ data }));
+        }
+      }
+      let thisTab;
+      let otherTab;
+      global.BroadcastChannel = FakeBroadcastChannel;
+      try {
+        jest.isolateModules(() => {
+          thisTab = require('./workerAuth.js');
+        });
+        jest.isolateModules(() => {
+          otherTab = require('./workerAuth.js');
+        });
+      } finally {
+        delete global.BroadcastChannel;
+      }
+      let holds = false;
+      const logins = gatedTranscriptionWorker({ holdsGate: () => holds });
+      const transcribeHere = () =>
+        thisTab.fetchWorkerWithAuth(
+          'https://worker.example/transcribe',
+          { method: 'POST' },
+          { preferAnonymous: true, sessionSlug: 'alpha', context },
+        );
+      expect((await transcribeHere()).status).toBe(403);
+      holds = true;
+      otherTab.noteWorkerAccessChanged(); // e.g. the participant claims the gate SBT in another tab
+      expect((await transcribeHere()).status).toBe(200);
+      expect(logins).toEqual(['token-1-unscoped', 'token-2-scoped']);
+    });
+
     it('does not treat a token whose sign-in overlapped an access change as current', async () => {
       let holds = false;
       const logins = gatedTranscriptionWorker({

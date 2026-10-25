@@ -205,12 +205,34 @@ let workerAccessEpoch = 0;
 let workerAccessChangedAtMs = 0;
 const tokensIssuedForCurrentAccess = new Set<string>();
 
-// Call after an in-app action that can grant access, such as an SBT claim or a
-// Worker Group join, so a token issued before it does not hide the new scopes.
-export const noteWorkerAccessChanged = () => {
+const markWorkerAccessChanged = () => {
   workerAccessEpoch += 1;
   workerAccessChangedAtMs = Date.now();
   tokensIssuedForCurrentAccess.clear();
+};
+
+// A claim or join in another tab of this browser changes access here too.
+const accessChangeChannel = (() => {
+  try {
+    if (typeof BroadcastChannel !== 'function') return null;
+    const channel = new BroadcastChannel('ce:worker-access-changed:v1');
+    channel.onmessage = markWorkerAccessChanged;
+    // Node's channel would otherwise keep a non-browser process alive.
+    const unref = Reflect.get(channel, 'unref');
+    if (typeof unref === 'function') unref.call(channel);
+    return channel;
+  } catch (_) {
+    return null;
+  }
+})();
+
+// Call after an in-app action that can grant access, such as an SBT claim or a
+// Worker Group join, so a token issued before it does not hide the new scopes.
+export const noteWorkerAccessChanged = () => {
+  markWorkerAccessChanged();
+  try {
+    accessChangeChannel?.postMessage('changed');
+  } catch (_) {}
 };
 
 const getCurrentWorkerAuthStoreAddress = () => {

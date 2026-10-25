@@ -58,8 +58,8 @@ All notable changes to this project will be documented in this file.
 - Show the Worker denial for signed-out dictation even when an injected wallet
   is unlocked; retain valid tokens after terminal scope denials.
 - Sign in once more after a scope denial when an SBT claim or Worker Group join
-  since the last sign-in may have granted that scope, so newly eligible
-  participants can dictate or use AI without waiting for their token to expire.
+  in any open tab may have granted that scope since the last sign-in, so newly
+  eligible participants can dictate or use AI without waiting for token expiry.
 
 - Keep provider keys, wallet keys and faucet keys out of copied setup JSON.
 - Refuse header images that publishing cannot upload, such as WebP or SVG, as
