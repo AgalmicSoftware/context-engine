@@ -43,6 +43,11 @@ const isRecord = (value: unknown): value is UnknownRecord =>
 // broken toString throws, so only strings count as text here.
 const readString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
+// A survey submission stores one container beside the individual answers it
+// repeats; answer readers use the individual records and skip the container.
+const isSurveyResponseContainer = (payload: UnknownRecord): boolean =>
+  Array.isArray(payload.responses) && !!readString(payload.surveyID || payload.surveyId);
+
 export const isWorkerCanonicalSessionConfig = (value: unknown): boolean => {
   const projection = resolveSessionCapabilityProjection(value);
   return projection.profileValid && projection.isWorkerCanonical;
@@ -151,7 +156,8 @@ export const loadWorkerResponses = async (
         }
         const questionId = readString(payload.questionID || payload.questionId).toLowerCase();
         if (!questionId) {
-          if (ownResponses) throw new Error('A saved answer has no question identity.');
+          if (ownResponses && !isSurveyResponseContainer(payload))
+            throw new Error('A saved answer has no question identity.');
           return null;
         }
         // The Worker derives this value from the authenticated uploader. Payload claims
