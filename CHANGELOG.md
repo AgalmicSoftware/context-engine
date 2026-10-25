@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Agents and MCP
+
+- Route every MCP registry chain call, including reads, log scans and test-ETH
+  checks, through one error sanitizer, and redact URLs and ethers diagnostics
+  from tool errors and logs, so a keyed RPC URL cannot reach a transcript.
+
+### Client — available when the site deploys
+
+- Scope cached Worker questions and answers to the signed-in reader. Account
+  switches and logouts purge Worker cache nodes, a load started under another
+  account is discarded, and a complete listing drops answers the reader can no
+  longer read.
+- Load Interview saved answers after a full survey submission, whose stored
+  survey container previously failed the whole load.
+- Resume capped response listings on the next refresh, so sessions above
+  10,000 answers eventually load every row.
+- Give multichoice questions that the old delimiter encoding conflated, such as
+  options containing `,` or `:`, a versioned id. Every other id is unchanged,
+  and either form verifies in the web client, MCP and CE-CC.
+
+### Workers — requires redeployment
+
+- Settle Worker Group mutations stranded by a KV failure: the next operation on
+  that group or member replays the recorded intent instead of answering
+  not-found, and memberships no longer fail for every member.
+- Admit queued automatic analysis against the coordinator's authoritative
+  config, so disabling AI also stops jobs already queued.
+- Walk every question page in the interview catalog and the Agent Bridge before
+  choosing versions, and present one current version per question in the Bridge.
+
+### Benchmark reports
+
+- File questions without valid answers under "no data" in the report's tag
+  filter instead of "mixed / unsure".
+
 ## [0.7.0] - 2026-10-21
 
 ### Agents and MCP
