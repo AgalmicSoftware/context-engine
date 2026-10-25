@@ -185,6 +185,21 @@ it.each([
   expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({});
 });
 
+it('opens the submission info when research sharing starts on, so participants see it before submitting', async () => {
+  const props = researchReviewProps();
+  const { rerender } = render(<SessionVoiceModeModal {...props} />);
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const panel = screen.getByText('AI submission info').closest('details');
+  expect(panel).toHaveProperty('open', false);
+  rerender(
+    <SessionVoiceModeModal {...props} sessionConfig={{ interviewMode: { shareDraftChangesByDefault: true } }} />,
+  );
+  await waitFor(() => expect(panel).toHaveProperty('open', true));
+  // The participant's own choice leaves the panel where it is.
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
+  expect(panel).toHaveProperty('open', true);
+});
+
 it('uses late-loaded defaults without overwriting an explicit participant choice', async () => {
   const props = researchReviewProps();
   const { rerender } = render(<SessionVoiceModeModal {...props} />);

@@ -76,6 +76,9 @@ All notable changes to this project will be documented in this file.
   closes or the account changes.
 - Keep interview settings saving to Session Workers before 0.7.0 by leaving the
   research-sharing default out while it is off; turning it on needs a 0.7.0 Worker.
+- Let owners make sharing AI draft changes for research the default. When it
+  starts on, the interview review opens its submission info so participants
+  see the choice, which covers drafts they removed, before submitting.
 - Describe current response-read permissions and saved export preferences
   accurately in setup; distinguish unavailable dropdown choices visually.
 - Let a fresh encrypted session publish its first question without treating

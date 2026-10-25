@@ -216,6 +216,7 @@ function SessionInterviewPanel({
   } | null>(null);
   const [includeResponderName, setIncludeResponderName] = useState(false);
   const [consentOverrides, setConsentOverrides] = useState<InterviewConsentOverrides>({});
+  const [submissionInfoOpen, setSubmissionInfoOpen] = useState(false);
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
@@ -365,6 +366,15 @@ function SessionInterviewPanel({
   const hasSavedAi = consentDrafts.some(
     (draft) => resolveConsentFlags(savedConsent[draft.questionId]).includeAiProvenance,
   );
+  // Research sharing that starts on, such as from the session default, must be
+  // seen before submitting, so open the submission info until the participant chooses.
+  const researchSharingStartsOn =
+    (researchAvailable || hasSavedAi) &&
+    consentOverrides.includePredictionComparison === undefined &&
+    (comparisonChoice.checked || comparisonChoice.mixed);
+  useEffect(() => {
+    if (researchSharingStartsOn) setSubmissionInfoOpen(true);
+  }, [researchSharingStartsOn]);
 
   const existingResponsesRef = useRef(existingResponseSlice);
   existingResponsesRef.current = existingResponseSlice;
@@ -1124,7 +1134,11 @@ function SessionInterviewPanel({
           {drafts.length && !isInterviewBusy && !mapping ? (
             <div className={styles.sessionInterviewReviewActions} role="group" aria-label="Response submission">
               {researchAvailable || importedResponderName || hasSavedName || hasSavedAi ? (
-                <details className={styles.sessionInterviewConsentOptions}>
+                <details
+                  className={styles.sessionInterviewConsentOptions}
+                  open={submissionInfoOpen}
+                  onToggle={(event) => setSubmissionInfoOpen(event.currentTarget.open)}
+                >
                   <summary>AI submission info</summary>
                   <div className={styles.sessionInterviewChoicesPanel}>
                     {researchAvailable || hasSavedAi ? (

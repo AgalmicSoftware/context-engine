@@ -35,7 +35,9 @@ Owners set **Share AI draft changes for research by default** under **Interview
 settings** in the session wizard or admin metadata editor. The boolean
 `interviewMode.shareDraftChangesByDefault` defaults to `false` and sets the
 initial checkbox for new responses, including imported and voice-generated
-drafts. Participants can change it before submitting. Saved per-question choices
+drafts. Participants can change it before submitting. When sharing starts on,
+the review opens **AI submission info** so the choice is visible before
+submitting; participants can still collapse it. Saved per-question choices
 take precedence over this default; a session-config refresh does not overwrite
 an explicit choice made during review, including while logging in to submit.
 Settings save the key only while it is on: Session Workers before 0.7.0 reject
