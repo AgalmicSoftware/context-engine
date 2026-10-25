@@ -90,6 +90,8 @@ All notable changes to this project will be documented in this file.
   payouts in 24 hours; balance and other refusals do not consume the allowance.
 - Keep a hosted faucet's quota reservation after an uncertain RPC submission,
   and avoid sending another payout through a fallback RPC in the same request.
+- Explain how to continue when an older deploy helper or sponsoring Worker
+  refuses participant test ETH; a sponsored grant stays reserved for that draft.
 
 - Offer "Anyone can see the public stored results" for unencrypted hosted
   sessions in `/new`. Choosing it makes stored answers public-read; leaving it
