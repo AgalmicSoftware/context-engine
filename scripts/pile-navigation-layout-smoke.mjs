@@ -37,12 +37,23 @@ try {
       const prev = page.getByRole('button', { name: 'Previous Question', exact: true });
       const menu = page.getByRole('button', { name: 'Question actions', exact: true });
       const filter = page.getByTestId('ce-survey-filter-toggle');
+      const voice = page.getByTestId('ce-session-listening-toggle');
+      assert(await voice.isVisible(), 'Voice mode is directly visible before opening any menu');
+      assert.equal(await voice.count(), 1, 'Voice mode has one toolbar control');
       if (width <= 768) {
         assert(await menu.isVisible(), 'Mobile hamburger is available before answering');
         assert(!await filter.isVisible(), 'Mobile actions start collapsed');
+        const voiceBox = await voice.boundingBox(), menuBox = await menu.boundingBox();
+        assert(voiceBox.x >= menuBox.x + menuBox.width && Math.abs(voiceBox.y + voiceBox.height / 2 - menuBox.y - menuBox.height / 2) <= 1, 'Microphone sits beside the hamburger');
+        await voice.click();
+        await page.getByTestId('ce-session-voice-mode-chooser').waitFor();
+        await page.getByRole('button', { name: 'Close', exact: true }).click();
+        await page.getByRole('dialog').waitFor({ state: 'hidden' });
+        await next.focus();
+        await filter.waitFor({ state: 'hidden' });
         await menu.tap();
         await filter.waitFor({ state: 'visible' });
-        for (const name of ['Create New Question', 'Open voice mode', 'View All Questions']) {
+        for (const name of ['Create New Question', 'View All Questions']) {
           assert(await page.getByRole('button', { name, exact: true }).isVisible(), `${name} is available in the menu`);
         }
         if (process.env.OUTPUT_DIR) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-menu.png` });
@@ -75,7 +86,7 @@ try {
           const rect = element => { const r = element.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, cx: r.left + r.width / 2, cy: r.top + r.height / 2, width: r.width }; };
           return {
             nav: rect(nav), menu: rect(actions.querySelector('button')), next: rect(button), counter: rect(counter), card: rect(card), prev: rect(nav.querySelector('button')), actions: rect(actions),
-            buttons: [...controls.querySelectorAll('button')].filter(button => button.getBoundingClientRect().width > 0 && getComputedStyle(button).visibility !== 'hidden').map(rect),
+            buttons: [...controls.querySelectorAll('button')].filter(button => button.getBoundingClientRect().width > 0 && getComputedStyle(button).visibility !== 'hidden').map(button => ({ ...rect(button), inFooter: !!button.closest('[class*="pileFooter_"]') })),
             text: counter.textContent.trim(), lineTops: [...new Set(textRects.map(r => Math.round(r.top)))],
             submitLabelFits: [...controls.querySelectorAll('[class*="pileSubmitButtonLabel_"]')].every(label => {
               const labelRect = label.getBoundingClientRect(), buttonRect = label.closest('button').getBoundingClientRect();
@@ -92,7 +103,11 @@ try {
         } else assert.equal(layout.lineTops.length, 1, `Wide counter stays on one line: ${detail}`);
         if (width <= 768) {
           for (const control of layout.buttons) {
-            assert(Math.abs(control.cy - layout.nav.cy) <= 1, `Menu, Submit, clear, and arrows share a row: ${detail}`);
+            if (width <= 480 && control.inFooter) {
+              assert(control.top >= layout.nav.bottom, `Submit and clear have their own row on narrow phones: ${detail}`);
+            } else {
+              assert(Math.abs(control.cy - layout.nav.cy) <= 1, `Microphone, menu, and arrows share a row: ${detail}`);
+            }
           }
           assert(layout.submitLabelFits, `Submit label fits its button: ${detail}`);
         }

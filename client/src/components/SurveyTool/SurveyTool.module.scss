@@ -4760,6 +4760,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   padding: 10px;
 }
 
+.pileActionMenu {
+  display: contents;
+}
+
+.pileActions .pileVoiceModeToggle {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  color: var(--ce-control-text);
+  opacity: 1;
+}
+
 .actionButton.pileActionMenuToggle {
   display: none;
 }
@@ -5380,6 +5392,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     gap: 16px;
   }
 
+  .pileActionMenu {
+    display: flex;
+    position: relative;
+  }
+
   .pileActionsMenuEligible {
     position: relative;
     flex: 0 0 auto;
@@ -5421,8 +5438,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       inset 0 0 0 1px color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
   }
 
-  .pileActionsMenuEligible:focus-within .pileActionButtonGroup,
-  .pileActionsMenuEligible:hover .pileActionButtonGroup {
+  .pileActionMenu:focus-within .pileActionButtonGroup,
+  .pileActionMenu:hover .pileActionButtonGroup {
     display: flex;
   }
 
@@ -5504,6 +5521,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (max-width: 480px) {
+  // Keep the always-visible microphone and navigation on one row without
+  // squeezing the pending-answer Submit label between them.
+  .pileControls:has(.pileVoiceModeToggle) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'actions nav'
+      'footer footer';
+  }
+
   .pileControls {
     gap: 4px;
     padding: 0 6px;

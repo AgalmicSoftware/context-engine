@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import PileHologramAssistant from './PileHologramAssistant';
 import {
@@ -366,6 +366,25 @@ describe('surveyPileInteractionSurface', () => {
     expect(nodeHasClassName(listeningToggle, 'actionButtonActive')).toBe(true);
     (listeningToggle?.props.onClick as () => void)();
     expect(toggleVoiceModeModal).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps voice mode beside the question menu, with one reachable control and the existing handler', () => {
+    const toggleVoiceModeModal = jest.fn();
+    const { rerender } = render(
+      renderPileInteractionSurface({ ...buildBaseProps(), showVoiceModeControl: true, toggleVoiceModeModal }),
+    );
+    const voice = screen.getByRole('button', { name: 'Open voice mode' });
+    const menu = screen.getByRole('button', { name: 'Question actions' }).parentElement;
+    expect(menu?.parentElement).toBe(voice.parentElement);
+    expect(within(menu!).queryByTestId('ce-session-listening-toggle')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('ce-session-listening-toggle')).toHaveLength(1);
+    expect(voice).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(voice);
+    expect(toggleVoiceModeModal).toHaveBeenCalledTimes(1);
+
+    rerender(renderPileInteractionSurface({ ...buildBaseProps(), showVoiceModeControl: false }));
+    expect(screen.queryByTestId('ce-session-listening-toggle')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Question actions' })).toBeInTheDocument();
   });
 
   it('marks every icon-only pile toolbar button as frameless across app themes', () => {

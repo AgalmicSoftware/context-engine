@@ -1206,3 +1206,8 @@ change it using the dropdown in the top-right of the modal, or compare additiona
 full explorer with the selected session included as `?session=<session-slug>`
 (`?session=general` for General). Ctrl/Cmd-click on a tag opens its session-scoped
 link directly.
+
+The question pile’s microphone button sits beside the question-actions menu on
+small screens and remains directly visible in the desktop toolbar. It opens the
+voice-mode chooser when the session supports voice features. On narrow phones,
+pending-answer submission controls use a separate row so their labels remain readable.
