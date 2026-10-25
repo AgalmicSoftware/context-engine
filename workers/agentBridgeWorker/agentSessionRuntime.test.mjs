@@ -332,8 +332,8 @@ test('loadQuestionsForSession skips malformed live and proposed records', async 
   assert.equal(loaded.skippedMalformed, 5);
 });
 
-test('telegram_only storage auth failures still surface proposed questions', async () => {
-  const env = baseEnv({
+function workerSessionEnv(questionFetch) {
+  return baseEnv({
     AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
     AGENT_BRIDGE_QUESTION_SOURCE: 'live',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
@@ -351,9 +351,36 @@ test('telegram_only storage auth failures still surface proposed questions', asy
         storageProfile: { backend: 'cloudflare' },
       }],
     }),
-    QUESTION_FETCH: async () => {
-      throw new Error('session auth unavailable');
-    },
+    QUESTION_FETCH: questionFetch,
+  });
+}
+
+// A session Worker that signs the bridge in, serves question reads, and
+// answers each list request with listPage(cursor).
+function workerQuestionEnv(listPage) {
+  const listQueries = [];
+  const env = workerSessionEnv(async (url) => {
+    const { pathname, searchParams } = new URL(url);
+    if (pathname === '/storage/list') listQueries.push(Object.fromEntries(searchParams));
+    const questionId = (searchParams.get('id') || '').replace(/^row-/, '');
+    const body = pathname === '/auth/nonce' ? { nonce: 'unit-nonce' }
+      : pathname === '/auth/login' ? { token: 'unit-token' }
+        : pathname === '/storage/list' ? listPage(searchParams.get('cursor') || '')
+          : { id: questionId, type: 'binary', prompt: `Question ${questionId}?` };
+    return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+  });
+  return { env, listQueries };
+}
+
+const listedQuestion = (questionId) => ({
+  storageRef: { backend: 'cloudflare', id: `row-${questionId}`, resource: 'questions' },
+  metadata: { resource: 'questions', resourceId: questionId },
+});
+const questionIds = (loaded) => loaded.questions.map((question) => question.questionId);
+
+test('telegram_only storage auth failures still surface proposed questions', async () => {
+  const env = workerSessionEnv(async () => {
+    throw new Error('session auth unavailable');
   });
   await env.AGENT_ACTION_KV.put('telegram:proposed-question:alpha:q-proposed-ok', JSON.stringify({
     version: 1,
@@ -372,4 +399,61 @@ test('telegram_only storage auth failures still surface proposed questions', asy
   assert.equal(loaded.authReason, 'session_worker_auth_failed');
   assert.equal(loaded.questionCount, 1);
   assert.deepEqual(loaded.questions.map((question) => question.questionId), ['q-proposed-ok']);
+});
+
+test('Worker-stored questions follow list cursors past the first page', async () => {
+  const ids = Array.from({ length: 101 }, (_, index) => `q-${String(index + 1).padStart(3, '0')}`);
+  const { env, listQueries } = workerQuestionEnv((cursor) => (cursor
+    ? { items: ids.slice(100).map(listedQuestion), cursor: null, listComplete: true }
+    : { items: ids.slice(0, 100).map(listedQuestion), cursor: 'page-2', listComplete: false }));
+
+  const loaded = await loadQuestionsForSession(env, 'alpha');
+
+  assert.equal(loaded.questionCount, 101);
+  assert.equal(loaded.discoveredCount, 101);
+  assert.equal(loaded.complete, true);
+  assert.deepEqual(listQueries, [
+    { resource: 'questions', limit: '100' },
+    { resource: 'questions', limit: '100', cursor: 'page-2' },
+  ]);
+  // Selection sees every page: a preferred id from page two fills a one-question limit.
+  const preferred = await loadQuestionsForSession(env, 'alpha', { questionLimit: 1, preferredQuestionIds: ['q-101'] });
+  assert.deepEqual(questionIds(preferred), ['q-101']);
+  assert.equal(preferred.complete, false);
+});
+
+test('Worker-stored question lists continue past empty pages and reject broken cursors', async () => {
+  const load = (listPage) => loadQuestionsForSession(workerQuestionEnv(listPage).env, 'alpha');
+  const afterEmpty = await load((cursor) => (cursor
+    ? { items: [listedQuestion('q-after-empty')], cursor: null, listComplete: true }
+    : { items: [], cursor: 'page-2', listComplete: false }));
+  assert.deepEqual(questionIds(afterEmpty), ['q-after-empty']);
+  assert.equal(afterEmpty.complete, true);
+  // Workers that predate pagination list everything in one response.
+  const unpaged = await load(() => ({ items: [listedQuestion('q-unpaged')] }));
+  assert.deepEqual(questionIds(unpaged), ['q-unpaged']);
+  assert.equal(unpaged.complete, true);
+  for (const listPage of [
+    () => ({ items: [listedQuestion('q-1')], cursor: null, listComplete: false }),
+    () => ({ items: [listedQuestion('q-1')], cursor: 'same', listComplete: false }),
+  ]) {
+    const broken = await load(listPage);
+    assert.equal(broken.ok, false);
+    assert.equal(broken.reason, 'telegram_only_cloudflare_questions_list_failed');
+    assert.deepEqual(broken.questions, []);
+  }
+});
+
+test('Worker-stored question loads stop at the page cap and report incomplete', async () => {
+  const { env, listQueries } = workerQuestionEnv((cursor) => {
+    const page = Number(cursor || 0) + 1;
+    return { items: [listedQuestion(`q-${page}`)], cursor: String(page), listComplete: false };
+  });
+
+  const loaded = await loadQuestionsForSession(env, 'alpha');
+
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.complete, false);
+  assert.equal(loaded.questionCount, 10);
+  assert.equal(listQueries.length, 10);
 });

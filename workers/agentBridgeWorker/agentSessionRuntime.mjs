@@ -52,6 +52,10 @@ const DEFAULT_LIVE_QUESTION_FALLBACK_TIMEOUT_MS = 2500;
 
 const DEFAULT_WORKER_STORAGE_TIMEOUT_MS = 5000;
 
+// Every listed row costs a payload read (a subrequest), so a load lists at
+// most 10 pages (1,000 rows) and reports itself incomplete beyond that.
+const MAX_WORKER_QUESTION_LIST_PAGES = 10;
+
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 const DEFAULT_QUESTION = Object.freeze({
@@ -319,6 +323,7 @@ function cloudflareQuestionItemIds(item = {}) {
   return [
     storageRef.id,
     storageRef.questionId,
+    item?.metadata?.resourceId,
     item?.id,
     item?.questionId,
     item?.key,
@@ -725,22 +730,42 @@ async function loadWorkerCloudflareQuestions({
       questions: [],
     };
   }
-  const listed = await fetchWorkerCloudflareJson({
-    auth,
-    path: '/storage/list?resource=questions',
-    env,
-    fetchImpl,
-  });
-  if (!listed.ok) {
-    return {
-      ok: false,
-      reason: 'telegram_only_cloudflare_questions_list_failed',
-      error: listed.error,
-      status: listed.status || 0,
-      questions: [],
-    };
+  const items = [];
+  const seenCursors = new Set();
+  let cursor = '';
+  let listComplete = false;
+  for (let page = 0; page < MAX_WORKER_QUESTION_LIST_PAGES && !listComplete; page += 1) {
+    const query = new URLSearchParams({ resource: 'questions', limit: '100', ...(cursor ? { cursor } : {}) });
+    const listed = await fetchWorkerCloudflareJson({
+      auth,
+      path: `/storage/list?${query}`,
+      env,
+      fetchImpl,
+    });
+    if (!listed.ok) {
+      return {
+        ok: false,
+        reason: 'telegram_only_cloudflare_questions_list_failed',
+        error: listed.error,
+        status: listed.status || 0,
+        questions: [],
+      };
+    }
+    if (Array.isArray(listed.body?.items)) items.push(...listed.body.items);
+    cursor = safeString(listed.body?.cursor);
+    // A filtered page can be empty and still continue. Workers that predate
+    // pagination send neither field and list everything at once.
+    listComplete = listed.body?.listComplete === true || (listed.body?.listComplete === undefined && !cursor);
+    if (!listComplete && (!cursor || seenCursors.has(cursor))) {
+      return {
+        ok: false,
+        reason: 'telegram_only_cloudflare_questions_list_failed',
+        error: 'Worker question list cursor is missing or repeated.',
+        questions: [],
+      };
+    }
+    seenCursors.add(cursor);
   }
-  const items = Array.isArray(listed.body?.items) ? listed.body.items : [];
   const selectedItems = selectWorkerCloudflareQuestionItems(items, {
     questionLimit,
     preferredQuestionIds,
@@ -803,7 +828,7 @@ async function loadWorkerCloudflareQuestions({
     source: 'telegram_only_cloudflare_storage',
     questions,
     questionCount: questions.length,
-    complete: selectedItems.length >= items.length && readErrors.length === 0,
+    complete: listComplete && selectedItems.length >= items.length && readErrors.length === 0,
     loadedCount: questions.length,
     discoveredCount: items.length,
     payloadFailureCount: readErrors.length,
