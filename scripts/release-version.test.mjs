@@ -501,6 +501,7 @@ test('the Worker source pathspec covers every local input of the release bundles
   for (const nonInput of [
     'shared/encryption/envelopeV1Core.mjs',
     'shared/encryption/envelopeWriterFixtures.mjs',
+    'shared/questions/questionId.mjs',
     'workers/agentBridgeWorker/agentOnlyLoadTest.mjs',
     'workers/agentBridgeWorker/deployHelperApply.mjs',
     'workers/agentBridgeWorker/deployHelperPlan.mjs',

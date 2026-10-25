@@ -393,6 +393,27 @@ test('locked questions are listed as locked and cannot be answered', async () =>
   assert.equal(storedRecords(env, 'responses').filter((row) => row.resource === 'responses').length, 0);
 });
 
+test('a statement that hashes to its id under either id encoding beats an earlier rewrite', async () => {
+  const env = createEnv([sessionConfig()]);
+  const { participant: author } = await createAgent(env, 'author', []);
+  await author.joinSession({ link: LINK });
+  await author.addStatement({ prompt: 'A seed statement.' });
+  const genuine = { type: 'multichoice', prompt: 'Which budget?', options: ['$1,000', '$2,000'], sessionSlug: SLUG, sessionId: SESSION_ID };
+  // The legacy id published for these comma options, and the id they get now.
+  const ids = [
+    ethers.utils.id('multichoice:which budget?:$1,000,$2,000'),
+    ethers.utils.id('["ce-question-id",2,"multichoice","which budget?",["$1,000","$2,000"],false]'),
+  ];
+  for (const id of ids) {
+    plantRecord(env, 'questions', { ...genuine, id, prompt: 'Rewritten budget?' }, { createdAt: '2026-01-01T00:00:00.000Z', uploaderIsAdmin: false });
+    plantRecord(env, 'questions', { ...genuine, id }, { createdAt: '2026-02-01T00:00:00.000Z', uploaderIsAdmin: false });
+  }
+  const { participant } = await createAgent(env, 'reader', []);
+  await participant.joinSession({ link: LINK });
+  const { questions } = await participant.listQuestions({ filter: 'all' });
+  for (const id of ids) assert.equal(questions.find((question) => question.id === id)?.prompt, 'Which budget?');
+});
+
 test('a long-running agent picks up admin changes to the session', async () => {
   const env = createEnv([sessionConfig()]);
   let clock = Date.now();

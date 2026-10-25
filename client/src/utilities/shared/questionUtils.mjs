@@ -8,6 +8,8 @@
 // Depends on: ethers (v5)
 
 import * as ethersModule from 'ethers';
+// Relative, not the @ce-shared alias, so Node consumers resolve it too.
+import { createQuestionIdDerivation } from '../../../../shared/questions/questionId.mjs';
 
 const resolveEthersCompat = (loadedModule) => {
   const direct = loadedModule?.ethers || loadedModule?.default?.ethers || loadedModule?.default || loadedModule;
@@ -24,25 +26,8 @@ const resolveEthersCompat = (loadedModule) => {
 const ethers = resolveEthersCompat(ethersModule);
 
 // --- Question ID generation ---
-// Canonical implementation. Matches CreateQuestionsAndSurveys.tsx and SurveyGenerator.tsx.
-// Existing types retain their original hash format. Quadratic includes ordered options and voiceCredits.
-
-export function generateQuestionId(type, prompt, options = [], singleSelect = false, voiceCredits = 99) {
-  let dataToHash = `${type}:${(prompt || '').trim().toLowerCase()}`;
-  const validOpts = Array.isArray(options) ? options.filter((o) => o && o.trim() !== '') : [];
-  if (type === 'multichoice') {
-    if (validOpts.length > 0)
-      dataToHash += `:${validOpts
-        .map((o) => o.trim())
-        .join(',')
-        .toLowerCase()}`;
-    if (singleSelect) dataToHash += ':single';
-  }
-  if (type === 'quadratic') {
-    dataToHash += `:${JSON.stringify(validOpts.map((option) => option.trim().toLowerCase()))}:${voiceCredits}`;
-  }
-  return ethers.utils.id(dataToHash);
-}
+// Canonical in shared/questions/questionId.mjs, bound to this module's ethers.
+export const { generateQuestionId, questionIdMatchesContent } = createQuestionIdDerivation(ethers);
 
 // --- Hex ↔ Base64url conversion ---
 // Canonical implementation. Matches arweaveClient.js.

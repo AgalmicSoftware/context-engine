@@ -1,5 +1,5 @@
 import { peekCacheSync } from '../../utilities/cache/cacheScripts';
-import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
+import { questionIdMatchesContent } from '../../utilities/shared/questionUtils.mjs';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
 import { listSessionStorageRefsPage, readSessionStorageBlob } from '../../utilities/storage/storageClient';
@@ -110,17 +110,19 @@ const isLockedQuestionPayload = (payload: UnknownRecord): boolean =>
   !!payload.promptEncrypted || isRecord(payload.encryption) || readString(payload.prompt) === '[encrypted]';
 
 // Plaintext question ids are hashes of their authoring inputs, so a version
-// whose content does not hash to its id is a rewrite. Locked questions keep
-// their plaintext private, so their check is unknown (null), never a pass.
+// whose content does not hash to its id (under any id encoding) is a rewrite.
+// Locked questions keep their plaintext private, so their check is unknown
+// (null), never a pass.
 const questionPayloadMatchesId = (id: string, payload: UnknownRecord): boolean | null => {
   if (isLockedQuestionPayload(payload)) return null;
   try {
-    const options = Array.isArray(payload.options) ? payload.options : [];
-    const voiceCredits = Number(payload.voiceCredits ?? 99);
-    const singleSelect = !!(payload.singleSelect || payload.oneSelectionOnly);
-    return (
-      String(generateQuestionId(payload.type, payload.prompt, options, singleSelect, voiceCredits)).toLowerCase() === id
-    );
+    return questionIdMatchesContent(id, {
+      type: payload.type,
+      prompt: payload.prompt,
+      options: Array.isArray(payload.options) ? payload.options : [],
+      singleSelect: !!(payload.singleSelect || payload.oneSelectionOnly),
+      voiceCredits: Number(payload.voiceCredits ?? 99),
+    });
   } catch {
     return false;
   }

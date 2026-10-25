@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ethers } from 'ethers';
+import { questionIdFixtures } from '../../tests/helpers/questionIdFixtures.mjs';
 import { buildQuestionRecord, buildResponseRecord, generateQuestionId, normalizeAnswerValue } from './records.mjs';
 
 const RESPONDER = '0x00000000000000000000000000000000000000aa';
@@ -17,6 +18,9 @@ test('question ids match the web client derivation for every type', () => {
     ethers.utils.id('quadratic:fund:["a","b"]:50'),
   );
   assert.equal(generateQuestionId('rating', 'Trust?'), ethers.utils.id('rating:trust?'));
+  for (const { args, preimage } of questionIdFixtures) {
+    assert.equal(generateQuestionId(...args), ethers.utils.id(preimage), preimage);
+  }
 });
 
 test('answers are validated and normalized per question type', () => {

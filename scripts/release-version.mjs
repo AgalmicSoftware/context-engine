@@ -267,6 +267,7 @@ export const WORKER_RELEASE_SOURCE_PATHSPEC = Object.freeze([
   // Not imported by any bundle.
   ':(exclude)shared/encryption/envelopeV1Core.mjs',
   ':(exclude)shared/encryption/envelopeWriterFixtures.mjs',
+  ':(exclude)shared/questions/questionId.mjs',
   ':(exclude)workers/agentBridgeWorker/agentOnlyLoadTest.mjs',
   ':(exclude)workers/agentBridgeWorker/deployHelperApply.mjs',
   ':(exclude)workers/agentBridgeWorker/deployHelperPlan.mjs',

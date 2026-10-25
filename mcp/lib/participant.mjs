@@ -4,7 +4,7 @@ import { compareChainOrder } from './registryChain.mjs';
 import { normalizeLabel } from './config.mjs';
 import { describeError } from './mcpServer.mjs';
 import { readAgentState, updateAgentState } from './agentState.mjs';
-import { buildQuestionRecord, buildResponseRecord, generateQuestionId, isLockedQuestion, isSingleSelect, ratingScaleFor } from './records.mjs';
+import { buildQuestionRecord, buildResponseRecord, isLockedQuestion, isSingleSelect, questionIdMatchesContent, ratingScaleFor } from './records.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
 import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
@@ -112,8 +112,14 @@ const sanitizeQuestion = (payload, id) => {
   return question;
 };
 
-const contentId = (question) =>
-  generateQuestionId(question.type, question.prompt, stringOptions(question), isSingleSelect(question), question.voiceCredits ?? 99);
+const contentMatchesId = (question, id) =>
+  questionIdMatchesContent(id, {
+    type: question.type,
+    prompt: question.prompt,
+    options: stringOptions(question),
+    singleSelect: isSingleSelect(question),
+    voiceCredits: question.voiceCredits ?? 99,
+  });
 
 /** Picks the canonical version per question id like the web client does. */
 const chooseQuestionVersion = (versions) => {
@@ -396,7 +402,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           payload: question,
           createdAt: text(item.metadata?.createdAt),
           uploaderIsAdmin: item.metadata?.uploaderIsAdmin === true,
-          contentMatches: question.locked ? null : contentId(question) === id,
+          contentMatches: question.locked ? null : contentMatchesId(question, id),
         });
         versions.set(id, list);
       } catch {

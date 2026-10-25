@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import { getVoiceCredits, validateQuadraticAllocation, validateQuadraticQuestion } from '../../shared/questions/quadraticAllocation.mjs';
+import { createQuestionIdDerivation } from '../../shared/questions/questionId.mjs';
 import { normalizeRatingScale } from '../../shared/questions/ratingScale.mjs';
 
 // Builds the same stored records the web client writes for a passkey
@@ -22,21 +23,8 @@ const trim = (value) => (typeof value === 'string' ? value.trim() : typeof value
 const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const fail = (error) => ({ ok: false, error });
 
-/** Same derivation as client/src/utilities/shared/questionUtils.mjs generateQuestionId. */
-export const generateQuestionId = (type, prompt, options = [], singleSelect = false, voiceCredits = 99) => {
-  let dataToHash = `${type}:${(prompt || '').trim().toLowerCase()}`;
-  const validOptions = Array.isArray(options)
-    ? options.filter((option) => typeof option === 'string' && option.trim() !== '')
-    : [];
-  if (type === 'multichoice') {
-    if (validOptions.length > 0) dataToHash += `:${validOptions.map((option) => option.trim()).join(',').toLowerCase()}`;
-    if (singleSelect) dataToHash += ':single';
-  }
-  if (type === 'quadratic') {
-    dataToHash += `:${JSON.stringify(validOptions.map((option) => option.trim().toLowerCase()))}:${voiceCredits}`;
-  }
-  return ethers.utils.id(dataToHash);
-};
+// Shared with the web client, so agent ids match web-authored ones.
+export const { generateQuestionId, questionIdMatchesContent } = createQuestionIdDerivation(ethers);
 
 export const ratingScaleFor = (question = {}) => normalizeRatingScale(question) || { min: 0, max: 10, minLabel: '0', maxLabel: '10' };
 
