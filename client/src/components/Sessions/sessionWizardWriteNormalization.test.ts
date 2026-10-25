@@ -1,4 +1,8 @@
 import { DEFAULT_INTERVIEW_SETTINGS } from '../../../../shared/interviewSettings.mjs';
+import { withoutOffResearchSharingDefault } from '../../utilities/session/interviewModeWrite';
+
+// Interview defaults as saved: the research-sharing default is left out while off.
+const SAVED_INTERVIEW_DEFAULTS = withoutOffResearchSharingDefault({ ...DEFAULT_INTERVIEW_SETTINGS });
 import { DEFAULT_RESULTS_ANALYSIS_SETTINGS } from '../../../../shared/resultsAnalysisSettings.mjs';
 import { ethers } from 'ethers';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
@@ -805,7 +809,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.groupCreationPolicy).toBe('admin_only');
     expect(payload.interviewModeEnabled).toBe(true);
     expect(payload.interviewMode).toEqual({
-      ...DEFAULT_INTERVIEW_SETTINGS,
+      ...SAVED_INTERVIEW_DEFAULTS,
       enabled: true,
       provider: 'openai',
       realtimeModel: 'gpt-live-1',
@@ -847,7 +851,9 @@ describe('sessionWizardWriteNormalization', () => {
       sessionId: '123e4567-e89b-12d3-a456-426614174000',
       workerUrl: 'https://worker.example',
     });
-    expect(payload.interviewMode.shareDraftChangesByDefault).toBe(shareDraftChangesByDefault);
+    // An off default is left out so Workers before 0.7.0, which reject unknown keys, still accept it.
+    expect(Object.hasOwn(payload.interviewMode, 'shareDraftChangesByDefault')).toBe(shareDraftChangesByDefault);
+    if (shareDraftChangesByDefault) expect(payload.interviewMode.shareDraftChangesByDefault).toBe(true);
   });
 
   test('write payload builders reject invalid results analysis settings', () => {
@@ -894,7 +900,7 @@ describe('sessionWizardWriteNormalization', () => {
 
     expect(payload.interviewModeEnabled).toBe(false);
     expect(payload.interviewMode).toEqual({
-      ...DEFAULT_INTERVIEW_SETTINGS,
+      ...SAVED_INTERVIEW_DEFAULTS,
       enabled: false,
       provider: 'openai',
       realtimeModel: 'gpt-realtime-2',

@@ -38,6 +38,9 @@ initial checkbox for new responses, including imported and voice-generated
 drafts. Participants can change it before submitting. Saved per-question choices
 take precedence over this default; a session-config refresh does not overwrite
 an explicit choice made during review, including while logging in to submit.
+Settings save the key only while it is on: Session Workers before 0.7.0 reject
+interview keys they do not know, so they keep accepting interview settings with
+the default off, and turning it on needs a 0.7.0 or later Session Worker.
 
 The disclosure panel stays within the interview footer width and wraps its text,
 including long model identifiers and question-set hashes.

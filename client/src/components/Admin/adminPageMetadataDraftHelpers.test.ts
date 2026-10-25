@@ -6,6 +6,7 @@ import {
   parseChainIdInput,
   shouldShowInlineResourceSummary,
 } from './adminPageMetadataDraftHelpers';
+import { withoutOffResearchSharingDefault } from '../../utilities/session/interviewModeWrite';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import {
   DEFAULT_RESULTS_ANALYSIS_SETTINGS,
@@ -23,8 +24,32 @@ describe('adminPageMetadataDraftHelpers', () => {
       adminAddress: '0x00000000000000000000000000000000000000aa',
     });
     expect(draft.interviewMode.shareDraftChangesByDefault).toBe(shareDraftChangesByDefault);
-    expect(applied.interviewMode.shareDraftChangesByDefault).toBe(shareDraftChangesByDefault);
-    expect(patch.interviewMode).toEqual(expect.objectContaining({ shareDraftChangesByDefault }));
+    // An off default is left out so Workers before 0.7.0, which reject unknown keys, still accept the save.
+    expect(Object.hasOwn(applied.interviewMode, 'shareDraftChangesByDefault')).toBe(shareDraftChangesByDefault);
+    expect(Object.hasOwn(patch.interviewMode as object, 'shareDraftChangesByDefault')).toBe(shareDraftChangesByDefault);
+    if (shareDraftChangesByDefault)
+      expect(patch.interviewMode).toEqual(expect.objectContaining({ shareDraftChangesByDefault }));
+  });
+
+  it('saves only interview keys that Workers before 0.7.0 accept while research sharing is off', () => {
+    // The 0.6.14 Session Worker allowlist for interviewMode keys.
+    const legacyKeys = [
+      'enabled',
+      'provider',
+      'realtimeModel',
+      'openingMode',
+      'openingPrompt',
+      'steeringPrompt',
+      'autoRegenerate',
+      'questionGrowthPercent',
+      'followNewQuestions',
+      'suggestQuestions',
+      'allowManualRefresh',
+    ];
+    const draft = buildAdminMetadataDraft({ interviewMode: { enabled: true, openingMode: 'auto' } });
+    draft.interviewMode = { ...draft.interviewMode, shareDraftChangesByDefault: false };
+    const applied = applyAdminMetadataDraft({}, draft);
+    expect(Object.keys(applied.interviewMode).filter((key) => !legacyKeys.includes(key))).toEqual([]);
   });
 
   it('round-trips editable metadata and preserves contract chain fallback', () => {
@@ -371,5 +396,7 @@ it('persists Interview settings through the admin editor and Worker metadata pat
   };
   const metadata = applyAdminMetadataDraft(source, draft);
   const patch = buildWorkerCanonicalMetadataConfigPatch({ metadata, slug: 'demo', adminAddress: '0xabc' });
-  expect(patch.interviewMode).toEqual({ ...draft.interviewMode, autoRegenerate: false, allowManualRefresh: true });
+  expect(patch.interviewMode).toEqual(
+    withoutOffResearchSharingDefault({ ...draft.interviewMode, autoRegenerate: false, allowManualRefresh: true }),
+  );
 });

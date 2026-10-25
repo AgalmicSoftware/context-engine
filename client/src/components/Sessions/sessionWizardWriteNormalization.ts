@@ -1,6 +1,7 @@
 import { getSessionWizardInterviewValidationError } from './sessionWizardInterviewValidation';
 import { normalizeHostedFaucetSelection } from './sessionWizardHostedFaucet';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
+import { withoutOffResearchSharingDefault } from '../../utilities/session/interviewModeWrite';
 import {
   normalizeResultsAnalysisSettings,
   validResultsAnalysisSettings,
@@ -421,14 +422,14 @@ export const buildSessionWizardWorkerConfigPayload = ({
     sessionHeaderImg: trimString(resolvedDraft.sessionHeader || resolvedDraft.sessionHeaderImg),
     ...(publishedAppearance ? { appearance: publishedAppearance } : {}),
     interviewModeEnabled: resolvedDraft.interviewModeEnabled !== false,
-    interviewMode: {
+    interviewMode: withoutOffResearchSharingDefault({
       ...normalizeInterviewSettings(resolvedDraft.interviewMode),
       enabled: resolvedDraft.interviewModeEnabled !== false,
       provider: REALTIME_INTERVIEW_PROVIDER,
       realtimeModel: normalizeRealtimeInterviewModel(
         isObj(resolvedDraft.interviewMode) ? resolvedDraft.interviewMode.realtimeModel : undefined,
       ),
-    },
+    }),
     resultsAnalysis: (() => {
       const value = resolvedDraft.resultsAnalysis;
       assertValidResultsAnalysisSettings(value);

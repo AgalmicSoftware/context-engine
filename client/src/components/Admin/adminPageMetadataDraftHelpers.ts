@@ -1,4 +1,5 @@
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
+import { withoutOffResearchSharingDefault } from '../../utilities/session/interviewModeWrite';
 import {
   normalizeResultsAnalysisSettings,
   validResultsAnalysisSettings,
@@ -133,10 +134,10 @@ export const applyAdminMetadataDraft = (
 ) => {
   const next = deepClone(metadata && typeof metadata === 'object' ? metadata : {});
 
-  next.interviewMode = {
+  next.interviewMode = withoutOffResearchSharingDefault({
     ...asInterviewRecord(draft.interviewMode),
     ...normalizeInterviewSettings(draft.interviewMode),
-  };
+  });
   if (!validResultsAnalysisSettings(draft.resultsAnalysis)) {
     throw new Error('Session results analysis settings are invalid.');
   }
