@@ -1,6 +1,6 @@
 import { buildSecondPassAnalysisInput } from './analysis-export.mjs';
 import { buildContextEnginePolisExport } from './ce-export.mjs';
-import { aggregateResponseDistributions, summarizeWinningResponseConsistency } from './response-distributions.mjs';
+import { aggregateResponseDistributions, stanceLabel, summarizeWinningResponseConsistency } from './response-distributions.mjs';
 import { clusterBySimilarity, hasCompleteSimilarity, similarityFor, withOpinionGroupAvailability } from './opinion-groups.mjs';
 import { buildReportFingerprint } from './provenance.mjs';
 import {
@@ -139,13 +139,6 @@ const stanceColor = (score) => {
   const t = normalized < 0.5 ? normalized * 2 : (normalized - 0.5) * 2;
   const rgb = from.map((channel, index) => Math.round(channel + (to[index] - channel) * t));
   return `rgb(${rgb.join(', ')})`;
-};
-
-const scoreLabel = (summary) => {
-  if (!summary || summary.meanScore === null || summary.meanScore === undefined) return 'no data';
-  if (summary.meanScore > 0.25) return 'net support';
-  if (summary.meanScore < -0.25) return 'net opposition';
-  return 'mixed / unsure';
 };
 
 const formatScore = (value) => (
@@ -3199,8 +3192,8 @@ const renderDebateAtlas = (report) => {
       data-ce-atlas-scale="${escapeHtml(scale.toFixed(4))}"
       data-ce-node-layout="packed"
       style="z-index:${20 + index}; --atlas-left:${escapeHtml(node.x.toFixed(2))}%; --atlas-top:${escapeHtml(node.y.toFixed(2))}%; --atlas-mobile-left:${escapeHtml(node.mobileX.toFixed(2))}%; --atlas-mobile-top:${escapeHtml(node.mobileY.toFixed(2))}%; --topic-color:${escapeHtml(stanceColor(topic.averageStance))}; --topic-scale:${escapeHtml(scale.toFixed(2))}; --topic-diameter:${escapeHtml(node.diameterPx.toFixed(1))}px; --topic-mobile-diameter:${escapeHtml(node.mobileDiameterPx.toFixed(1))}px; --topic-mobile-font-size:${escapeHtml(mobileFontSize.toFixed(1))}px;"
-      aria-label="${escapeHtml(`${label}: ${topic.questionCount || 0} questions, ${scoreLabel({ meanScore: topic.averageStance })}${importanceAvailable ? `, ${formatPercent(Number(topic.importanceShare || 0))} of allocated importance` : ''}`)}"
-      title="${escapeHtml(`${label}: ${topic.questionCount || 0} questions, ${scoreLabel({ meanScore: topic.averageStance })}${importanceAvailable ? `, ${formatPercent(Number(topic.importanceShare || 0))} of allocated importance` : ''}`)}"
+      aria-label="${escapeHtml(`${label}: ${topic.questionCount || 0} questions, ${stanceLabel(topic.averageStance)}${importanceAvailable ? `, ${formatPercent(Number(topic.importanceShare || 0))} of allocated importance` : ''}`)}"
+      title="${escapeHtml(`${label}: ${topic.questionCount || 0} questions, ${stanceLabel(topic.averageStance)}${importanceAvailable ? `, ${formatPercent(Number(topic.importanceShare || 0))} of allocated importance` : ''}`)}"
     >
       <div class="nodeDot packedNodeDot">
         <div class="nodeLabel packedNodeLabel alwaysVisible" style="font-size:${escapeHtml(fontSize.toFixed(1))}px;">
@@ -5940,18 +5933,12 @@ export const renderHtmlReport = (inputReport) => {
         if (raw.indexOf(prefix) !== 0) return '';
         try { return decodeURIComponent(raw.slice(prefix.length)); } catch (error) { return raw.slice(prefix.length); }
       }
-      function tagResponseDirection(summary) {
-        var score = Number(summary && summary.meanScore);
-        if (!Number.isFinite(score)) return 'no data';
-        if (score > 0.25) return 'net support';
-        if (score < -0.25) return 'net opposition';
-        return 'mixed / unsure';
-      }
+      ${stanceLabel.toString()}
       function tagsForQuestion(question, summary) {
         return [question && question.topic]
           .concat(Array.isArray(question && question.subtopics) ? question.subtopics : [])
           .concat(Array.isArray(question && question.riskFacets) ? question.riskFacets : [])
-          .concat([tagResponseDirection(summary)])
+          .concat([stanceLabel(summary && summary.meanScore)])
           .map(normalizeTagValue)
           .filter(Boolean);
       }
