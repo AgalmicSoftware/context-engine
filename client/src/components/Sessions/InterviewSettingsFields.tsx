@@ -5,6 +5,13 @@ import { normalizeInterviewSettings } from '../../../../shared/interviewSettings
 import { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
+const HIDDEN_DRAFT_SHARES = [0, 1 / 10, 1 / 5, 1 / 4, 1 / 3, 1 / 2];
+const hiddenDraftShareLabel = (share: number) => {
+  if (!share) return 'Off';
+  const oneIn = Math.round(1 / share);
+  return Math.abs(1 / oneIn - share) < 1e-9 ? `1 in ${oneIn}` : `${Math.round(share * 100)}%`;
+};
+
 type Props = { value: unknown; onChange: (value: Record<string, unknown>) => void; disabled?: boolean };
 export default function InterviewSettingsFields({ value, onChange, disabled = false }: Props) {
   const id = useId();
@@ -44,6 +51,24 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
       <p id={`${id}-research-detail-help`}>
         What a shared draft comparison saves. Minimal keeps none of the AI&apos;s notes or drafted text, which suits
         public sessions.
+      </p>
+      <Label for={`${id}-hidden-drafts`}>Hidden AI drafts</Label>
+      <Input
+        id={`${id}-hidden-drafts`}
+        type="select"
+        value={String(settings.hiddenDraftShare)}
+        onChange={(e) => change('hiddenDraftShare', Number(e.target.value))}
+        aria-describedby={`${id}-hidden-drafts-help`}
+      >
+        {[...new Set([...HIDDEN_DRAFT_SHARES, settings.hiddenDraftShare])].map((share) => (
+          <option key={share} value={String(share)}>
+            {hiddenDraftShareLabel(share)}
+          </option>
+        ))}
+      </Input>
+      <p id={`${id}-hidden-drafts-help`}>
+        Hides this share of each participant&apos;s AI prefill drafts until they answer, to measure how much seeing a
+        draft sways answers. Only for participants sharing draft changes for research.
       </p>
       <Label for={`${id}-model`}>Interview voice model</Label>
       <Input

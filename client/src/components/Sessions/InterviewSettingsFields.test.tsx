@@ -68,3 +68,21 @@ it('edits the research detail, defaulting to minimal', () => {
   rerender(<InterviewSettingsFields value={onChange.mock.calls[0][0]} onChange={onChange} />);
   expect(screen.getByLabelText(label)).toHaveValue('full');
 });
+
+it('edits the share of hidden AI drafts, defaulting to off', () => {
+  const onChange = jest.fn();
+  const label = 'Hidden AI drafts';
+  const { rerender } = render(
+    <InterviewSettingsFields value={{ steeringPrompt: 'Listen first.' }} onChange={onChange} />,
+  );
+  expect(screen.getByLabelText(label)).toHaveDisplayValue('Off');
+  fireEvent.change(screen.getByLabelText(label), { target: { value: '0.2' } });
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ hiddenDraftShare: 0.2, steeringPrompt: 'Listen first.' }),
+  );
+  rerender(<InterviewSettingsFields value={onChange.mock.calls[0][0]} onChange={onChange} />);
+  expect(screen.getByLabelText(label)).toHaveDisplayValue('1 in 5');
+  // A share set elsewhere still shows as what it is.
+  rerender(<InterviewSettingsFields value={{ hiddenDraftShare: 0.3 }} onChange={onChange} />);
+  expect(screen.getByLabelText(label)).toHaveDisplayValue('30%');
+});

@@ -94,6 +94,10 @@ export type InterviewDraftResponse = {
   conviction?: number;
   evidence?: string;
   confidence?: number;
+  // Hidden drafts: the answer given before the AI's guess was shown, set when submitted.
+  predictionCondition?: 'shown' | 'blind';
+  blindAnswer?: unknown;
+  revealedAt?: number;
 };
 
 type UnknownRecord = Record<string, unknown>;

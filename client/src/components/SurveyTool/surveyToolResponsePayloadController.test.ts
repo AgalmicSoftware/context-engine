@@ -871,6 +871,44 @@ describe('research detail tiers', () => {
     expect(record.predictionComparison).toMatchObject({ version: 1 });
   });
 
+  it('says whether the draft was shown, and keeps a hidden draft answer from before the reveal', () => {
+    const shown = submit(provenance({ researchTier: 'minimal' }));
+    expect(shown.predictionCondition).toBe('shown');
+    expect(shown).not.toHaveProperty('blindAnswer');
+    const hidden = submit(
+      provenance({ researchTier: 'minimal', predictionCondition: 'blind', blindAnswer: 'Unsure', revealedAt: 1234 }),
+    );
+    expect(hidden).toMatchObject({ predictionCondition: 'blind', blindAnswer: 'Unsure', revealedAt: 1234 });
+    // Version 1 records keep their original shape.
+    const legacy = submit(provenance({ predictionCondition: 'blind', blindAnswer: 'Unsure', revealedAt: 1234 }));
+    expect(legacy).not.toHaveProperty('predictionCondition');
+    expect(legacy).not.toHaveProperty('blindAnswer');
+  });
+
+  it("redacts a hidden draft's earlier answer when the answer is encrypted", () => {
+    const record = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'binary', prompt: 'Proceed?' }],
+        surveyResponseState: {
+          answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'answer-envelope' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+          interviewProvenance: {
+            q1: provenance({
+              researchTier: 'minimal',
+              predictionCondition: 'blind',
+              blindAnswer: 'Unsure',
+              revealedAt: 1,
+            }),
+          },
+        } as never,
+      }),
+    ).responses![0].interviewProvenance as Record<string, unknown>;
+    expect(record.blindAnswer).toEqual({ redacted: true, reason: 'encrypted_field' });
+    expect(JSON.stringify(record)).not.toContain('Unsure');
+  });
+
   it('leaves records without a tier exactly as version 1', () => {
     const record = submit(provenance());
     expect(record.version).toBe(1);

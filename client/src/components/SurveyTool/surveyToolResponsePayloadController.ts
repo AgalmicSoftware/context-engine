@@ -333,6 +333,15 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     )
       ? String(interviewProvenanceRecord.draftOrigin)
       : null;
+    // Whether the AI's draft was shown in review or hidden until the person answered.
+    const predictionCondition = interviewProvenanceRecord.predictionCondition === 'blind' ? 'blind' : 'shown';
+    const blindFields =
+      predictionCondition === 'blind' && hasOwn(interviewProvenanceRecord, 'blindAnswer')
+        ? {
+            blindAnswer: interviewProvenanceRecord.blindAnswer,
+            revealedAt: Number(interviewProvenanceRecord.revealedAt) || null,
+          }
+        : null;
     const researchOriginal = {
       ...originalComparisonValues,
       confidence: hasOwn(originalPrediction, 'confidence') ? originalPrediction.confidence : null,
@@ -363,6 +372,7 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
             ...submittedComparisonValues,
             userEditedFields: interviewProvenanceRecord.userEditedFields,
             original: researchOriginal,
+            ...(blindFields ? { blindAnswer: blindFields.blindAnswer } : {}),
           },
           surveyResponseState,
           { tier: researchTier, textAnswer: textQuestion, changedFields: researchChangedFields },
@@ -404,6 +414,10 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
             version: includePredictionComparison && researchTier ? 2 : 1,
             ...(includePredictionComparison && researchTier ? { researchTier } : {}),
             ...(includePredictionComparison && researchTier && draftOrigin ? { draftOrigin } : {}),
+            ...(includePredictionComparison && researchTier ? { predictionCondition } : {}),
+            ...(includePredictionComparison && researchTier && blindFields && selectedInterviewResearch
+              ? { blindAnswer: selectedInterviewResearch.blindAnswer, revealedAt: blindFields.revealedAt }
+              : {}),
             ...(includeAiProvenance
               ? {
                   source: {

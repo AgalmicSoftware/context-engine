@@ -1628,12 +1628,18 @@ export const recordInterviewProvenance = (
                   userEditedFields: reviewed.userEditedFields || [],
                   researchTier,
                   draftOrigin: resolveInterviewDraftOrigin(originalDraft, packet, normalizedSource),
+                  predictionCondition: reviewed.predictionCondition === 'blind' ? 'blind' : 'shown',
+                  // A hidden draft keeps the answer given before its guess was shown.
+                  ...(reviewed.predictionCondition === 'blind' && reviewed.revealedAt !== undefined
+                    ? { blindAnswer: reviewed.blindAnswer ?? null, revealedAt: reviewed.revealedAt }
+                    : {}),
                 }
               : {}),
             // Drafts for questions the person skipped are kept only at full research detail.
+            // Hidden drafts are left out: one never answered was never shown to skip.
             ...(comparison && researchTier === 'full' && draft === researchAnchor
               ? {
-                  unselectedDrafts: review.filter((entry) => !entry.selected),
+                  unselectedDrafts: review.filter((entry) => !entry.selected && entry.predictionCondition !== 'blind'),
                 }
               : {}),
             ...(name ? { responderName: name } : {}),

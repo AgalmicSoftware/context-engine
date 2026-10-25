@@ -455,6 +455,7 @@ test('set-config rejects malformed or unsupported interview mode config', () => 
     { interviewMode: { followNewQuestions: 'true' } },
     { interviewMode: { shareDraftChangesByDefault: 'true' } },
     { interviewMode: { researchDetail: 'everything' } },
+    { interviewMode: { hiddenDraftShare: 0.75 } },
     { interviewMode: { questionGrowthPercent: 0 } },
     { interviewMode: { steeringPrompt: 42 } },
     { interviewMode: { steeringPrompt: 'x'.repeat(3001) } },
@@ -780,6 +781,7 @@ test('set-config preserves owner opening and optional interview features', () =>
     allowManualRefresh: false,
     shareDraftChangesByDefault: true,
     researchDetail: 'full',
+    hiddenDraftShare: 0.2,
   };
   const result = applySessionConfigMutation({
     existingConfig: cloneJson(profileBearingConfig),

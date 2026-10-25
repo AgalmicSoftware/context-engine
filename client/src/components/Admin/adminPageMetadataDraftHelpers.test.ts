@@ -68,6 +68,18 @@ describe('adminPageMetadataDraftHelpers', () => {
     );
   });
 
+  it('round-trips the share of hidden AI drafts', () => {
+    const metadata = { interviewMode: { hiddenDraftShare: 0.2 } };
+    const draft = buildAdminMetadataDraft(metadata);
+    const patch = buildWorkerCanonicalMetadataConfigPatch({
+      metadata: applyAdminMetadataDraft(metadata, draft),
+      slug: 'hidden-drafts',
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+    });
+    expect(draft.interviewMode.hiddenDraftShare).toBe(0.2);
+    expect(patch.interviewMode).toEqual(expect.objectContaining({ hiddenDraftShare: 0.2 }));
+  });
+
   it('round-trips editable metadata and preserves contract chain fallback', () => {
     const draft = buildAdminMetadataDraft({
       networkChainId: 11155420,

@@ -4,6 +4,7 @@
 const NEWER_INTERVIEW_DEFAULTS: Record<string, unknown> = {
   shareDraftChangesByDefault: false,
   researchDetail: 'minimal',
+  hiddenDraftShare: 0,
 };
 
 export const withoutNewInterviewDefaults = (interviewMode: Record<string, unknown>): Record<string, unknown> => {

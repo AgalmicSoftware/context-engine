@@ -54,6 +54,14 @@
   line-height: 1.38;
 }
 
+// A hidden draft's status, tucked under the prompt and muted like the evidence text.
+.blindNote {
+  margin: -8px 0 0;
+  color: color-mix(in srgb, var(--ce-panel-text) 78%, transparent);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .editorStack {
   display: grid;
   gap: 10px;

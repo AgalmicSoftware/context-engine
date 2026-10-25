@@ -136,9 +136,12 @@ export const buildSelectedInterviewResearch = (
     evidence: encryptedAnswer || encryptedComments ? '' : String(original.evidence || ''),
   };
   const finalSubmitted = protectSnapshot(draft, encryptedAnswer, encryptedComments);
+  // A hidden draft's answer from before the AI's guess was shown, protected like the final one.
+  const blindAnswer = encryptedAnswer ? redacted() : minimal && textAnswer ? null : (draft.blindAnswer ?? null);
   return {
     questionId,
     selection: 'selected',
+    ...(hasOwn(draft, 'blindAnswer') ? { blindAnswer } : {}),
     originalPrediction: minimal ? withoutText(originalPrediction, textAnswer) : originalPrediction,
     predictionRevisions: buildInterviewRevisionResearch(
       original.revisions || draft.revisions,

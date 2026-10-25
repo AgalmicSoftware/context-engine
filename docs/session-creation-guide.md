@@ -132,7 +132,10 @@ checkbox through `interviewMode.shareDraftChangesByDefault` (off when unset).
 Participants can change it before submitting, and their saved choices are retained.
 **AI draft research detail** (`interviewMode.researchDetail`) decides what a shared
 comparison keeps: `minimal` (the default) has no AI notes or drafted text; `full`
-adds them and drafts for skipped questions. See
+adds them and drafts for skipped questions. **Hidden AI drafts**
+(`interviewMode.hiddenDraftShare`, off by default) hides a share of each
+participant's AI-prefill drafts until they answer, to measure how much seeing
+a draft sways answers; it applies only while they share draft changes. See
 [session-interview-research.md](session-interview-research.md).
 Generation waits for public questions and uses the session Worker's OpenAI key.
 See [Interview settings and lifecycle](session-listening-mode.md#interview).

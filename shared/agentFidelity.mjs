@@ -779,12 +779,14 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
   const byType = (type) => (pair) => pair.question.type === type;
   const shown = (personPairs) => personPairs.filter((pair) => pair.condition === 'shown');
   // Within each person: agreement when drafts were shown minus when they were
-  // hidden. Above zero means showing a draft pulled answers toward it.
+  // hidden. Above zero means showing a draft pulled answers toward it. Only
+  // drafts from the hidden ones' source compare, since only those could be hidden.
   const anchoring = (valueOf, filter = () => true) =>
     estimate(
       people.map((person) => {
-        const visible = shown(person.pairs).filter(filter);
         const hidden = person.pairs.filter((pair) => pair.condition === 'blind' && filter(pair));
+        const origins = new Set(hidden.map((pair) => pair.origin));
+        const visible = shown(person.pairs).filter((pair) => filter(pair) && origins.has(pair.origin));
         return visible.length && hidden.length ? valueOf(visible) - valueOf(hidden) : null;
       }),
       settings,

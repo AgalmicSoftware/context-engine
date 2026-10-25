@@ -212,6 +212,22 @@ test('hidden drafts measure how much showing a draft changes answers', () => {
   assert.equal(report.mirrorScore.byCondition.shown.value, 1);
 });
 
+test('hidden drafts are compared only with shown drafts from the same source', () => {
+  // Voice drafts summarize what the person just said, so they would make shown
+  // drafts look closer than prefill guesses are. Here they all miss instead.
+  const pairs = pairsFor(
+    () => 'Agree',
+    (person, questionId) =>
+      questionId === 'qb4'
+        ? { condition: 'blind', actual: person.view }
+        : questionId === 'qb1'
+          ? { origin: 'voice_interview', prediction: 'Disagree', actual: 'Agree' }
+          : { actual: 'Agree' },
+  );
+  const report = scoreAgentFidelity({ questions, pairs, answers: answersFor(), options: fast });
+  assert.ok(Math.abs(report.anchoring.exactMatchShift.value - 0.4) < 1e-12);
+});
+
 test('group baselines, small-cell suppression, exclusions and agents', () => {
   const groups = Object.fromEntries(people.map((person) => [person.id, person.group]));
   groups[people[9].id] = ['tiny'];

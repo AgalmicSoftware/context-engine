@@ -238,6 +238,12 @@ All notable changes to this project will be documented in this file.
   `interviewMode.researchDetail`, which needs a Session Worker newer than 0.7.0.
   Records now carry `version: 2`, `researchTier` and `draftOrigin`, and a line
   beside Submit says when sharing is on.
+- Hide a share of AI-prefill drafts until people answer, to measure how much
+  seeing a draft sways answers: `interviewMode.hiddenDraftShare`, which needs a
+  Session Worker newer than 0.7.0. Each hidden question shows the AI's guess
+  after the answer, and research records keep `predictionCondition`, the answer
+  from before the reveal and when it was shown. Anchoring now compares hidden
+  drafts only with shown drafts from the same source.
 
 ## [0.7.0] - 2026-10-21
 

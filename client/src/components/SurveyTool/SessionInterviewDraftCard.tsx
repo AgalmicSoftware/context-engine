@@ -38,6 +38,8 @@ type Props = InterviewQuestionControls & {
   existing: boolean;
   // The responder's saved comment, which review shows when the AI proposed none.
   savedComment?: string;
+  // A hidden draft's status line. The card then holds only the responder's own answer.
+  blindNote?: string;
   disabled: boolean;
   onSelect: (selected: boolean) => void;
   onEdit: (patch: Partial<InterviewDraftResponse>) => void;
@@ -226,6 +228,7 @@ function SessionInterviewDraftCardContent({
   selected,
   existing,
   savedComment = '',
+  blindNote,
   disabled,
   onSelect,
   onEdit,
@@ -284,6 +287,11 @@ function SessionInterviewDraftCardContent({
         <FontAwesomeIcon icon={faTimes} />
       </button>
       <div className={styles.questionText}>{prompt}</div>
+      {blindNote ? (
+        <p className={styles.blindNote} role="status">
+          {blindNote}
+        </p>
+      ) : null}
       <div className={styles.editorStack}>
         {useNativeAnswer && renderAnswerInput ? (
           renderAnswerInput(draft.questionId, answerValue, onAnswerChange, question, draft.answer)
@@ -351,7 +359,7 @@ function SessionInterviewDraftCardContent({
             />
             <QuadraticScrollControlsSlot />
             <div className={styles.footerIconCluster}>
-              {!hasHumanEditedDraft ? (
+              {!hasHumanEditedDraft && !blindNote ? (
                 <span className={styles.agentCommentMarker} aria-label="AI-proposed response">
                   <FontAwesomeIcon icon={faRobot} />
                 </span>

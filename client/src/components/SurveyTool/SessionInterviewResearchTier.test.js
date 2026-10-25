@@ -46,6 +46,22 @@ it('keeps drafts for skipped questions at full detail', async () => {
   expect(record.unselectedDrafts).toEqual([expect.objectContaining({ questionId: 'q2' })]);
 });
 
+it('leaves hidden drafts the person never answered out of the skipped-question drafts', async () => {
+  const engine = fakeEngine({ slug: 'demo', interviewMode: { researchDetail: 'full' } });
+  const hidden = {
+    questionId: 'q3',
+    answer: undefined,
+    selected: false,
+    original: { questionId: 'q3', answer: 'Agree' },
+  };
+  await recordInterviewProvenance(engine, drafts, SOURCE, PACKET, true, true, '', [
+    ...review,
+    { ...hidden, predictionCondition: 'blind' },
+  ]);
+  const { unselectedDrafts } = engine.state.surveysResponseState[0].interviewProvenance.q1;
+  expect(unselectedDrafts.map((entry) => entry.questionId)).toEqual(['q2']);
+});
+
 it('labels voice drafts that did not come from a prefill packet', async () => {
   const engine = fakeEngine({ slug: 'demo' });
   const voiceDrafts = [
@@ -65,6 +81,32 @@ it('records minimal detail when that is what the participant was shown, even if 
   expect(record.unselectedDrafts).toBeUndefined();
 });
 
+it('records whether the AI draft was shown or hidden, with the answer given before the reveal', async () => {
+  const engine = fakeEngine({ slug: 'demo' });
+  const both = [
+    ...drafts,
+    { questionId: 'q3', answer: 'Agree', revisions: [{ revision: 1, modelId: 'claude-example', answer: 'Agree' }] },
+  ];
+  const reviewed = [
+    { ...both[0], selected: true, original: both[0] },
+    {
+      questionId: 'q3',
+      answer: 'Unsure',
+      selected: true,
+      original: both[1],
+      predictionCondition: 'blind',
+      blindAnswer: 'Disagree',
+      revealedAt: 1234,
+    },
+  ];
+  await recordInterviewProvenance(engine, both, SOURCE, PACKET, true, true, '', reviewed);
+  const { q1, q3 } = engine.state.surveysResponseState[0].interviewProvenance;
+  expect(q1.predictionCondition).toBe('shown');
+  expect(q1).not.toHaveProperty('blindAnswer');
+  expect(q3).toMatchObject({ predictionCondition: 'blind', blindAnswer: 'Disagree', revealedAt: 1234 });
+  expect(q3.originalPrediction.answer).toBe('Agree');
+});
+
 it('withdrawing research consent removes the tier and origin with the rest of the research', () => {
   const kept = keepConsentWithdrawals(
     {
@@ -73,11 +115,15 @@ it('withdrawing research consent removes the tier and origin with the rest of th
       originalPrediction: { answer: 'Agree' },
       researchTier: 'minimal',
       draftOrigin: 'external_prefill',
+      predictionCondition: 'blind',
+      blindAnswer: 'Disagree',
+      revealedAt: 1234,
     },
     { includePredictionComparison: false },
   );
   expect(kept).toMatchObject({ includePredictionComparison: false });
   expect(kept).not.toHaveProperty('researchTier');
   expect(kept).not.toHaveProperty('draftOrigin');
+  for (const key of ['predictionCondition', 'blindAnswer', 'revealedAt']) expect(kept).not.toHaveProperty(key);
   expect(kept).not.toHaveProperty('predictionComparison');
 });

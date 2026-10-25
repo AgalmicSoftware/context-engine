@@ -871,6 +871,20 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.interviewMode.researchDetail).toBe(researchDetail === 'full' ? 'full' : undefined);
   });
 
+  test('publishes the share of hidden AI drafts', () => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'hidden-drafts',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { hiddenDraftShare: 0.2 },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    expect(payload.interviewMode.hiddenDraftShare).toBe(0.2);
+  });
+
   test('write payload builders reject invalid results analysis settings', () => {
     const invalidResultsAnalysis = {
       version: 1,

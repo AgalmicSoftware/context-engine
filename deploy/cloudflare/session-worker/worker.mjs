@@ -25410,7 +25410,7 @@ var init_sessionAgentConfig = __esm({
 });
 
 // shared/interviewSettings.mjs
-var DEFAULT_INTERVIEW_SETTINGS, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
+var DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
 var init_interviewSettings = __esm({
   "shared/interviewSettings.mjs"() {
     DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
@@ -25423,8 +25423,10 @@ var init_interviewSettings = __esm({
       suggestQuestions: false,
       allowManualRefresh: true,
       shareDraftChangesByDefault: false,
-      researchDetail: "minimal"
+      researchDetail: "minimal",
+      hiddenDraftShare: 0
     });
+    MAX_HIDDEN_DRAFT_SHARE = 0.5;
     normalizeInterviewSettings = (value = {}) => {
       const source = value && typeof value === "object" ? value : {};
       return {
@@ -25438,7 +25440,9 @@ var init_interviewSettings = __esm({
         allowManualRefresh: source.allowManualRefresh !== false,
         shareDraftChangesByDefault: source.shareDraftChangesByDefault === true,
         // How much an AI draft comparison saves: 'minimal' keeps no AI notes or drafted text.
-        researchDetail: source.researchDetail === "full" ? "full" : "minimal"
+        researchDetail: source.researchDetail === "full" ? "full" : "minimal",
+        // Share of a person's AI prefill drafts hidden until they answer, which measures anchoring.
+        hiddenDraftShare: Number.isFinite(source.hiddenDraftShare) ? Math.max(0, Math.min(MAX_HIDDEN_DRAFT_SHARE, source.hiddenDraftShare)) : 0
       };
     };
     validInterviewSettings = (value = {}) => {
@@ -25451,6 +25455,8 @@ var init_interviewSettings = __esm({
       if (value.questionGrowthPercent !== void 0 && (!Number.isFinite(value.questionGrowthPercent) || value.questionGrowthPercent < 1 || value.questionGrowthPercent > 100))
         return false;
       if (value.researchDetail !== void 0 && !["minimal", "full"].includes(value.researchDetail)) return false;
+      if (value.hiddenDraftShare !== void 0 && (!Number.isFinite(value.hiddenDraftShare) || value.hiddenDraftShare < 0 || value.hiddenDraftShare > MAX_HIDDEN_DRAFT_SHARE))
+        return false;
       return ["autoRegenerate", "followNewQuestions", "suggestQuestions", "allowManualRefresh", "shareDraftChangesByDefault"].every(
         (key) => value[key] === void 0 || typeof value[key] === "boolean"
       );

@@ -63,6 +63,38 @@ no longer known, so text fields keep the changed-or-not decision made at review.
 While sharing is on, a line beside the submit button says so without opening
 the panel.
 
+### Hidden drafts
+
+`interviewMode.hiddenDraftShare` (0 to 0.5; 0, off, by default) hides that
+share of each person's AI-prefill drafts, so a session can measure how much
+seeing a draft sways answers. Settings save it only above 0, which needs a
+Session Worker newer than 0.7.0. Only drafts from a ChatGPT or Claude prefill
+packet can be hidden, on agree/disagree, choice, rating and quadratic
+questions the person hasn't already answered. Voice and typed-context drafts,
+freeform questions and anything shown with research sharing off are never
+hidden.
+
+- **Choice.** When review starts with research sharing on, the drafts are
+  ranked by a hash of `sessionSlug|participant|questionId` and the first
+  `round(count × share)` are hidden, at least one of three or more.
+  Participant is the signed-in account, or this browser's local id before
+  login, so a reload hides the same drafts.
+- **Hidden.** The card starts blank and says "Your AI's answer is hidden until
+  you answer." It shows none of the AI's answer, comment, ratings or notes.
+- **Reveal.** Agree/disagree and single-choice questions show "Your AI guessed:
+  Agree · 70% sure" right after the answer. Ratings, multi-select and
+  quadratic questions show it once the person edits another card or submits,
+  so a slider isn't revealed mid-drag. The answer at that moment is the blind
+  answer; later changes are submitted but not scored.
+- **Opting out.** Unticking research sharing reveals every answered guess and
+  turns unanswered hidden drafts back into ordinary drafts. They are never
+  hidden again.
+- **Unanswered.** A hidden draft the person leaves blank isn't submitted, and
+  full-detail records don't list it among skipped-question drafts.
+- **Elsewhere.** Until its guess is shown, a hidden draft is left out of what
+  the voice interviewer and the drafting request see. If a saved answer for
+  its question loads after review starts, it becomes an ordinary draft.
+
 The disclosure panel stays within the interview footer width and wraps its text,
 including long model identifiers and question-set hashes.
 
@@ -88,6 +120,9 @@ Cloudflare encrypted-envelope export is a different route: `/storage/export-enve
 | `version` | AI provenance or draft-comparison sharing is included | Schema version for the submitted `interviewProvenance` object: `2` for draft comparisons that record `researchTier`, `1` otherwise and for older records. |
 | `researchTier` | Draft-comparison sharing is included (version 2) | `minimal` or `full`, from the session's `interviewMode.researchDetail` at review time. |
 | `draftOrigin` | Draft-comparison sharing is included (version 2) | Where the first prediction came from: `external_prefill` (a ChatGPT or Claude prefill packet), `voice_interview` or `typed_context`. |
+| `predictionCondition` | Draft-comparison sharing is included (version 2) | `shown` when the AI's draft was in review, `blind` when it was hidden until the person answered ([Hidden drafts](#hidden-drafts)). |
+| `blindAnswer` | A hidden draft was answered (version 2) | The answer given before the AI's guess was shown; redacted like the answer when the answer is encrypted. |
+| `revealedAt` | A hidden draft was answered (version 2) | When the AI's guess was shown, in milliseconds since 1970. |
 | `source.platform` | AI provenance is included | Self-reported platform label from the import or voice workflow, normalized to a short string such as `chatgpt`, `claude`, or `other`. |
 | `source.modelId` | AI provenance is included | Self-reported model identifier, capped before submission. |
 | `source.verification` | AI provenance is included | Always written as `self_reported`; the app does not independently verify provider/model identity. |

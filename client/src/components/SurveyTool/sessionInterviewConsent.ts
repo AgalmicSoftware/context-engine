@@ -104,6 +104,9 @@ const PREDICTION_RESEARCH_KEYS = [
   'predictionComparison',
   'researchTier',
   'draftOrigin',
+  'predictionCondition',
+  'blindAnswer',
+  'revealedAt',
 ];
 
 // Undoing or restoring edits never makes a response more disclosing: a name, AI attribution

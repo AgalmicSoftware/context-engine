@@ -31,6 +31,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { ImportedResponderContextEditor, SessionInterviewVoiceControls } from './SessionInterviewVoiceControls';
 import { buildInterviewReturnSessionUrl } from './sessionInterviewReturnUrl';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
+import { getAnonymousRateId } from '../../utilities/worker/workerAuthAnonymousHeaders.js';
 import {
   buildExternalInterviewKickoff,
   buildRealtimeInterviewInstructions,
@@ -52,6 +53,11 @@ import {
   shouldHideSuggestedQuestionSection,
 } from './sessionInterviewQuestionAuthoringPolicy';
 import { runInterviewDraftSubmit, type InterviewSubmitResult } from './sessionInterviewDraftSubmit';
+import {
+  hideableInterviewDraftIds,
+  pickHiddenInterviewDrafts,
+  useInterviewHiddenDrafts,
+} from './sessionInterviewHiddenDrafts';
 import {
   buildResearchPacket,
   describeResearchCoverage,
@@ -357,6 +363,19 @@ function SessionInterviewPanel({
   });
   // Review starts from the form, unsaved edits included; the own-answer read merges saved answers into it.
   const existingResponseSlice = formResponseSlice || ownAnswers.slice;
+  const hiddenDrafts = useInterviewHiddenDrafts({
+    questions,
+    editedDrafts,
+    savedResponses: existingResponseSlice,
+    researchOn: includePredictionComparison,
+  });
+  const {
+    assign: assignHiddenDrafts,
+    isConcealed: isDraftConcealed,
+    reviewedValues: reviewedDraftValues,
+    prepareSubmit: prepareHiddenDraftSubmit,
+  } = hiddenDrafts;
+  const submittableSelection = hiddenDrafts.submittable(selected);
   useEffect(() => {
     setConsentOverrides({});
   }, [activeSubmitContextToken]);
@@ -551,19 +570,22 @@ function SessionInterviewPanel({
             sessionSlug,
             sessionConfig,
             workerUrl: url,
-            previousResponses: drafts.map(({ revisions: _revisions, ...prediction }) => ({
-              // The mapping prompt rates importance/conviction 0-100.
-              prediction: {
-                ...prediction,
-                ...(prediction.importance !== undefined ? { importance: prediction.importance * 10 } : {}),
-                ...(prediction.conviction !== undefined ? { conviction: prediction.conviction * 10 } : {}),
-              },
-              reviewed: {
-                answer: editedDrafts[prediction.questionId]?.answer,
-                additionalComments: editedDrafts[prediction.questionId]?.additionalComments,
-              },
-              selected: selected[prediction.questionId],
-            })),
+            // A hidden draft isn't part of the review until its guess is shown.
+            previousResponses: drafts
+              .filter((draft) => !isDraftConcealed(draft.questionId))
+              .map(({ revisions: _revisions, ...prediction }) => ({
+                // The mapping prompt rates importance/conviction 0-100.
+                prediction: {
+                  ...prediction,
+                  ...(prediction.importance !== undefined ? { importance: prediction.importance * 10 } : {}),
+                  ...(prediction.conviction !== undefined ? { conviction: prediction.conviction * 10 } : {}),
+                },
+                reviewed: {
+                  answer: reviewedDraftValues(prediction.questionId)?.answer,
+                  additionalComments: reviewedDraftValues(prediction.questionId)?.additionalComments,
+                },
+                selected: selected[prediction.questionId],
+              })),
             onSuggestedQuestions: (next) => {
               proposedQuestions = next;
             },
@@ -599,6 +621,22 @@ function SessionInterviewPanel({
         setDrafts(review.drafts);
         setEditedDrafts(review.edited);
         setSelected(review.selected);
+        if (review.drafts.length) {
+          // Chosen once per review, and only while research sharing is on.
+          const share = normalizeInterviewSettings(sessionConfig?.interviewMode).hiddenDraftShare;
+          const participant = authenticatedForSubmit ? String(account).trim().toLowerCase() : getAnonymousRateId();
+          assignHiddenDrafts(
+            includePredictionComparison && share > 0
+              ? pickHiddenInterviewDrafts(
+                  hideableInterviewDraftIds(review.drafts, questions, prefillPacket, (id) =>
+                    hasDraftValue(responseFieldValue(existingResponsesRef.current, 'answers', id)),
+                  ),
+                  share,
+                  `${sessionSlug}|${participant}`,
+                )
+              : [],
+          );
+        }
         setMappedTranscript(nextTranscript);
         if (review.drafts.length) {
           setGroupRecommendationRequest({
@@ -632,8 +670,14 @@ function SessionInterviewPanel({
       }
     },
     [
+      account,
+      assignHiddenDrafts,
+      authenticatedForSubmit,
       drafts,
       editedDrafts,
+      includePredictionComparison,
+      isDraftConcealed,
+      reviewedDraftValues,
       selected,
       suggestedQuestions,
       mappingModelId,
@@ -701,8 +745,13 @@ function SessionInterviewPanel({
             responderContext,
           )
         : null;
+    // The interviewer never hears a hidden draft's guess.
+    const shown = (draft: InterviewDraftResponse) => !isDraftConcealed(draft.questionId);
     const importedDrafts = validatedPrefillPacket
-      ? readImportedInterviewDraftResponses(validatedPrefillPacket, validatedPrefillQuestionsRef.current || questions)
+      ? readImportedInterviewDraftResponses(
+          validatedPrefillPacket,
+          validatedPrefillQuestionsRef.current || questions,
+        )?.filter(shown) || null
       : null;
     try {
       const instructions = buildRealtimeInterviewInstructions({
@@ -714,9 +763,9 @@ function SessionInterviewPanel({
         prefillPacket: validatedPrefillPacket,
         importedDrafts,
         onContextLimited: setMappingNotice,
-        reviewedResponses: drafts.map((draft) => ({
+        reviewedResponses: drafts.filter(shown).map((draft) => ({
           prediction: draft,
-          reviewed: editedDrafts[draft.questionId],
+          reviewed: reviewedDraftValues(draft.questionId),
         })),
       });
       void recorder.start(instructions);
@@ -752,12 +801,14 @@ function SessionInterviewPanel({
   };
 
   const applyDrafts = useCallback(async () => {
+    // Hidden drafts submit only the person's own answer, with the one given before the reveal.
+    const review = prepareHiddenDraftSubmit(selected);
     await runInterviewDraftSubmit({
       activeSubmitContextToken,
       authenticatedForSubmit,
       baseSubmitContextToken,
       drafts,
-      editedDrafts,
+      editedDrafts: review.editedDrafts,
       hasAiPrefill,
       includePredictionComparison,
       includeProvenance,
@@ -771,7 +822,7 @@ function SessionInterviewPanel({
       researchAvailable,
       responderContext,
       responseStateReadyForSubmit,
-      selected,
+      selected: review.selected,
       transcript,
       applyingRef,
       disposedRef,
@@ -806,7 +857,6 @@ function SessionInterviewPanel({
     authenticatedForSubmit,
     baseSubmitContextToken,
     drafts,
-    editedDrafts,
     hasAiPrefill,
     includePredictionComparison,
     includeProvenance,
@@ -824,6 +874,7 @@ function SessionInterviewPanel({
     onRecordProvenance,
     onSubmitResponses,
     prefillPacket,
+    prepareHiddenDraftSubmit,
     researchAvailable,
     responderContext,
     responseStateReadyForSubmit,
@@ -1090,44 +1141,49 @@ function SessionInterviewPanel({
               summaryRef={reviewRef}
               testId={E2E_TESTIDS.SESSION_INTERVIEW_REVIEW}
             >
-              {visibleDrafts.map((draft) => (
-                <SessionInterviewDraftCard
-                  key={draft.questionId}
-                  draft={draft}
-                  edited={editedDrafts[draft.questionId] || draft}
-                  question={questions.find((question) => question.id === draft.questionId)}
-                  selected={Boolean(selected[draft.questionId])}
-                  existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
-                  savedComment={responseCommentValue(existingResponseSlice, draft.questionId)}
-                  disabled={applying}
-                  onSelect={(value) => {
-                    setSubmitSucceeded(false);
-                    setShowViewResults(false);
-                    if (viewResultsRevealRef.current) {
-                      clearTimeout(viewResultsRevealRef.current);
-                      viewResultsRevealRef.current = null;
-                    }
-                    setSelected((current) => ({ ...current, [draft.questionId]: value }));
-                    setRemovedDraftIds((current) => ({ ...current, [draft.questionId]: !value }));
-                  }}
-                  onEdit={(patch) => {
-                    setGroupRecommendationRequest(null);
-                    setEditedDrafts((current) => ({
-                      ...current,
-                      [draft.questionId]: { ...current[draft.questionId], ...patch },
-                    }));
-                    setSubmitSucceeded(false);
-                    setShowViewResults(false);
-                    if (viewResultsRevealRef.current) {
-                      clearTimeout(viewResultsRevealRef.current);
-                      viewResultsRevealRef.current = null;
-                    }
-                  }}
-                  renderAnswerInput={renderAnswerInput}
-                  renderAdditionalInput={renderAdditionalInput}
-                  renderFieldLock={renderFieldLock}
-                />
-              ))}
+              {visibleDrafts.map((draft) => {
+                const hiddenView = hiddenDrafts.view(draft);
+                return (
+                  <SessionInterviewDraftCard
+                    key={draft.questionId}
+                    draft={hiddenView?.draft || draft}
+                    edited={hiddenView?.edited || editedDrafts[draft.questionId] || draft}
+                    blindNote={hiddenView?.note}
+                    question={questions.find((question) => question.id === draft.questionId)}
+                    selected={Boolean(selected[draft.questionId])}
+                    existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
+                    savedComment={responseCommentValue(existingResponseSlice, draft.questionId)}
+                    disabled={applying}
+                    onSelect={(value) => {
+                      setSubmitSucceeded(false);
+                      setShowViewResults(false);
+                      if (viewResultsRevealRef.current) {
+                        clearTimeout(viewResultsRevealRef.current);
+                        viewResultsRevealRef.current = null;
+                      }
+                      setSelected((current) => ({ ...current, [draft.questionId]: value }));
+                      setRemovedDraftIds((current) => ({ ...current, [draft.questionId]: !value }));
+                    }}
+                    onEdit={(patch) => {
+                      hiddenDrafts.noteEdit(draft.questionId, patch);
+                      setGroupRecommendationRequest(null);
+                      setEditedDrafts((current) => ({
+                        ...current,
+                        [draft.questionId]: { ...current[draft.questionId], ...patch },
+                      }));
+                      setSubmitSucceeded(false);
+                      setShowViewResults(false);
+                      if (viewResultsRevealRef.current) {
+                        clearTimeout(viewResultsRevealRef.current);
+                        viewResultsRevealRef.current = null;
+                      }
+                    }}
+                    renderAnswerInput={renderAnswerInput}
+                    renderAdditionalInput={renderAdditionalInput}
+                    renderFieldLock={renderFieldLock}
+                  />
+                );
+              })}
             </SessionInterviewReviewSection>
           ) : null}
           {suggestedQuestions.length > 0 ? (
@@ -1201,8 +1257,8 @@ function SessionInterviewPanel({
                             setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));
                           }}
                           coverageDetails={researchCoverageDetails}
-                          selectedCount={drafts.filter((draft) => selected[draft.questionId]).length}
-                          unselectedCount={drafts.filter((draft) => !selected[draft.questionId]).length}
+                          selectedCount={drafts.filter((draft) => submittableSelection[draft.questionId]).length}
+                          unselectedCount={drafts.filter((draft) => !submittableSelection[draft.questionId]).length}
                           disabled={applying}
                           researchDetail={shownResearchDetail}
                         />
@@ -1256,7 +1312,7 @@ function SessionInterviewPanel({
                   mapping ||
                   isInterviewBusy ||
                   (submitSucceeded && (!showViewResults || !onViewResults)) ||
-                  !drafts.some((draft) => selected[draft.questionId])
+                  !drafts.some((draft) => submittableSelection[draft.questionId])
                 }
                 className={styles.sessionInterviewSubmitButton}
                 data-testid={

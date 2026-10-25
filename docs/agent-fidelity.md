@@ -29,10 +29,11 @@ Each prediction is scored under one condition:
 | `blind` | The draft stayed hidden until the person answered. |
 | `separate` | The prediction was made elsewhere and not shown in review (Session Wrapped). |
 
-The app does not write blind records yet. The scorer reads the planned fields:
+Sessions write blind records when `interviewMode.hiddenDraftShare` is set
+(see [session-interview-research.md](session-interview-research.md#hidden-drafts)):
 `interviewProvenance.predictionCondition: "blind"` with `blindAnswer`, the
-answer given before the draft was revealed. Version 2 records carry
-`draftOrigin`; for older records, origin is inferred from the self-reported
+answer given before the draft was revealed, and `revealedAt`. Other version 2
+records say `"shown"`. Version 2 records also carry `draftOrigin`; for older records, origin is inferred from the self-reported
 source (`chatgpt` or `claude` means chat-assistant prefill; the app's default
 model with platform `other` means a voice interview). At minimal research
 detail, freeform predictions are `null` and are not scored.
@@ -62,7 +63,8 @@ Similarity between a prediction and an answer runs from 0 to 1:
 - **Anchoring:** for people with both conditions, agreement on shown drafts
   minus agreement on hidden ones. Above zero means showing a draft pulled
   answers toward it, so shown-draft scores overstate fidelity by about that
-  much.
+  much. Shown drafts count only from the hidden ones' source, since only
+  AI-prefill drafts are hidden; voice drafts would otherwise inflate it.
 - **Baselines and lift:** the same predictions scored against the most common
   answer among everyone else, and among the person's own group when at least
   three others are in it. The most common answer is the mode for choices, the

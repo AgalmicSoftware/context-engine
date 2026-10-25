@@ -9,6 +9,7 @@ export type InterviewSettings = {
   allowManualRefresh: boolean;
   shareDraftChangesByDefault: boolean;
   researchDetail: 'minimal' | 'full';
+  hiddenDraftShare: number;
 };
 export const DEFAULT_INTERVIEW_SETTINGS: Readonly<InterviewSettings>;
 export function normalizeInterviewSettings(value?: unknown): InterviewSettings;
