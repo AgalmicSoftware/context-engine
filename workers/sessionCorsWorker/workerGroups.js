@@ -1143,7 +1143,7 @@ const normalizeWorkerGroupMembershipFailure = (result) => ({
 	reason: result?.reason || 'worker_group_coordination_unavailable',
 });
 
-export const createWorkerGroup = async ({ env, slug, sessionId, input, actorPrincipal, capacityAuthorized = false, deps = {} } = {}) => {
+export const createWorkerGroup = async ({ env, slug, sessionId, input, actorPrincipal, capacityAuthorized = false, resume = false, deps = {} } = {}) => {
 	const store = resolveWorkerGroupStore(env);
 	if (!store) return { ok: false, status: 501, reason: 'worker_group_store_not_configured' };
 	const canonicalSlug = canonicalWorkerGroupSessionSlug(slug);
@@ -1154,6 +1154,16 @@ export const createWorkerGroup = async ({ env, slug, sessionId, input, actorPrin
 	const requestedGroupId = trim(input?.groupId);
 	if (requestedGroupId && isAddressShapedWorkerGroupId(requestedGroupId)) {
 		return { ok: false, status: 400, reason: 'invalid_worker_group_id' };
+	}
+	if (resume && normalizeWorkerGroupId(requestedGroupId)) {
+		// A replayed create whose earlier attempt already wrote the record adopts it.
+		const written = await readGroupRecord({
+			store,
+			slug: canonicalSlug,
+			sessionId: canonicalSessionId,
+			groupId: normalizeWorkerGroupId(requestedGroupId),
+		});
+		if (written && !written.deletedAt) return { ok: true, store: store.kind, group: written, created: false };
 	}
 	if (!capacityAuthorized) {
 		const caps = resolveWorkerGroupCaps(env);
@@ -1211,14 +1221,18 @@ export const updateWorkerGroup = async ({ env, slug, sessionId, groupId, input, 
 	return { ok: true, store: store.kind, group };
 };
 
-export const deleteWorkerGroup = async ({ env, slug, sessionId, groupId, actorPrincipal, deps = {} } = {}) => {
+export const deleteWorkerGroup = async ({ env, slug, sessionId, groupId, actorPrincipal, resume = false, deps = {} } = {}) => {
 	const store = resolveWorkerGroupStore(env);
 	if (!store) return { ok: false, status: 501, reason: 'worker_group_store_not_configured' };
 	const existing = await readGroupRecord({ store, slug, sessionId, groupId });
-	if (!existing || existing.deletedAt) return { ok: false, status: 404, reason: 'worker_group_not_found' };
-	const deletedAt = nowIso(deps);
-	const group = { ...existing, deletedAt, deletedBy: actorPrincipal, updatedAt: deletedAt };
-	await writeGroupRecord({ store, slug, sessionId, group });
+	// A replayed delete whose tombstone already landed only finishes the index removal.
+	const tombstoned = resume && !!existing?.deletedAt;
+	if (!tombstoned && (!existing || existing.deletedAt)) return { ok: false, status: 404, reason: 'worker_group_not_found' };
+	if (!tombstoned) {
+		const deletedAt = nowIso(deps);
+		const group = { ...existing, deletedAt, deletedBy: actorPrincipal, updatedAt: deletedAt };
+		await writeGroupRecord({ store, slug, sessionId, group });
+	}
 	if (typeof store.store.delete !== 'function') {
 		throw new Error('Worker group KV deletion is unavailable.');
 	}
@@ -1292,7 +1306,7 @@ export const addWorkerGroupMember = async ({
 	};
 };
 
-export const removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, actorPrincipal, deps = {} } = {}) => {
+export const removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, actorPrincipal, resume = false, deps = {} } = {}) => {
 	const store = resolveWorkerGroupStore(env);
 	if (!store) return { ok: false, status: 501, reason: 'worker_group_store_not_configured' };
 	const group = await readGroupRecord({ store, slug, sessionId, groupId });
@@ -1306,10 +1320,14 @@ export const removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, p
 		groupId,
 		principalKey: normalized.key,
 	});
-	if (!existing || existing.removedAt) return { ok: false, status: 404, reason: 'worker_group_member_not_found' };
-	const removedAt = nowIso(deps);
-	const member = { ...existing, removedAt, removedBy: actorPrincipal };
-	await writeMembershipRecord({ store, slug, sessionId, groupId, member });
+	// A replayed removal whose record already landed only finishes the index removal.
+	const removed = resume && !!existing?.removedAt;
+	if (!removed && (!existing || existing.removedAt)) return { ok: false, status: 404, reason: 'worker_group_member_not_found' };
+	if (!removed) {
+		const removedAt = nowIso(deps);
+		const member = { ...existing, removedAt, removedBy: actorPrincipal };
+		await writeMembershipRecord({ store, slug, sessionId, groupId, member });
+	}
 	if (typeof store.store.delete !== 'function') {
 		throw new Error('Worker group KV deletion is unavailable.');
 	}
@@ -1691,6 +1709,7 @@ export const executeWorkerGroupMutation = async ({
 	principal,
 	actorPrincipal,
 	capacityAuthorized = false,
+	resume = false,
 	deps = {},
 } = {}) => {
 	if (operation === 'create') {
@@ -1701,6 +1720,7 @@ export const executeWorkerGroupMutation = async ({
 			input,
 			actorPrincipal,
 			capacityAuthorized,
+			resume,
 			deps,
 		});
 	}
@@ -1708,7 +1728,7 @@ export const executeWorkerGroupMutation = async ({
 		return updateWorkerGroup({ env, slug, sessionId, groupId, input, actorPrincipal, deps });
 	}
 	if (operation === 'delete') {
-		return deleteWorkerGroup({ env, slug, sessionId, groupId, actorPrincipal, deps });
+		return deleteWorkerGroup({ env, slug, sessionId, groupId, actorPrincipal, resume, deps });
 	}
 	if (operation === 'add-member') {
 		return addWorkerGroupMember({
@@ -1731,6 +1751,7 @@ export const executeWorkerGroupMutation = async ({
 			principal,
 			actorPrincipal,
 			capacityAuthorized,
+			resume,
 			deps,
 		});
 	}

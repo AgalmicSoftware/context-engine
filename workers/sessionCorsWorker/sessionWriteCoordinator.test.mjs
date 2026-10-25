@@ -2558,3 +2558,135 @@ test('hosted faucet quota counts payouts, releases refusals, and caps concurrent
 	now += 24 * 60 * 60 * 1000;
 	assert.equal((await reserve('next-day')).body.allowed, true);
 });
+
+// A thrown KV call during a group mutation is ambiguous; once KV recovers, the
+// next operation on that group or member must settle it, never strand it.
+const createGroupRecoveryHarness = () => {
+	const failures = [];
+	const failNext = (kind, match) => failures.push({ kind, match });
+	const consume = (kind, key) => {
+		const index = failures.findIndex((failure) => failure.kind === kind && failure.match(key));
+		if (index < 0) return false;
+		failures.splice(index, 1);
+		return true;
+	};
+	const kv = createWorkerGroupKv({
+		blockGet: async (key) => { if (consume('get', key)) throw new Error('KV read unavailable'); },
+		blockPut: async (key) => { if (consume('put', key)) throw new Error('KV write unavailable'); },
+	});
+	const put = kv.put.bind(kv);
+	kv.put = async (key, value) => {
+		await put(key, value);
+		if (consume('put-lost', key)) throw new Error('KV write response lost');
+	};
+	const remove = kv.delete.bind(kv);
+	kv.delete = async (key) => {
+		if (consume('delete', key)) throw new Error('KV delete unavailable');
+		await remove(key);
+	};
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, { CE_WORKER_GROUPS_KV: kv, CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2' });
+	const admin = { kind: 'evm_address', address: '0x0000000000000000000000000000000000000abc' };
+	const member = { kind: 'evm_address', address: '0x0000000000000000000000000000000000000def' };
+	const call = async (path, payload) => {
+		const response = await coordinator.fetch(createCoordinatorRequest(path, { slug: 'session-a', ...payload }));
+		return { status: response.status, body: await response.json() };
+	};
+	const mutate = (operation, payload = {}) => call('/worker-groups/mutate', { operation, actorPrincipal: admin, groupId: 'group-alpha', ...payload });
+	const create = () => mutate('create', { input: { groupId: 'group-alpha', label: 'Alpha', joinMode: 'admin_add', memberVisibility: 'members' } });
+	const authorize = () => call('/worker-groups/authorize', { groupId: 'group-alpha', principal: member });
+	const groupPhase = () => store.get('worker-group-capacity-group-v3:group-alpha')?.phase;
+	return { kv, store, failNext, mutate, create, authorize, call, member, groupPhase };
+};
+
+test('SessionWriteCoordinator settles a group update stranded by a transient KV read failure', async () => {
+	const h = createGroupRecoveryHarness();
+	assert.equal((await h.create()).status, 200);
+	assert.equal((await h.mutate('add-member', { principal: h.member })).status, 200);
+
+	h.failNext('get', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	const first = await h.mutate('update', { input: { label: 'Renamed' } });
+	assert.equal(first.status, 503);
+	assert.equal(first.body.reason, 'worker_group_mutation_ambiguous');
+
+	const retry = await h.mutate('update', { input: { label: 'Renamed again' } });
+	assert.equal(retry.status, 200, JSON.stringify(retry.body));
+	assert.equal(retry.body.group.label, 'Renamed again');
+	assert.equal((await h.authorize()).status, 200);
+	assert.equal(h.groupPhase(), 'active');
+	const memberships = await h.call('/worker-groups/memberships', { principal: h.member });
+	assert.equal(memberships.status, 200, JSON.stringify(memberships.body));
+	assert.deepEqual(memberships.body.groups.map((group) => group.groupId), ['group-alpha']);
+});
+
+test('SessionWriteCoordinator keeps an unrecovered group pending and reports it as ambiguous, not missing', async () => {
+	const h = createGroupRecoveryHarness();
+	assert.equal((await h.create()).status, 200);
+	h.failNext('put', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	h.failNext('put', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	assert.equal((await h.mutate('update', { input: { label: 'Renamed' } })).status, 503);
+	const stillDown = await h.authorize();
+	assert.equal(stillDown.status, 503);
+	assert.equal(stillDown.body.reason, 'worker_group_mutation_ambiguous');
+	assert.equal(h.groupPhase(), 'updating');
+	assert.equal((await h.authorize()).status, 403);
+	assert.equal(h.groupPhase(), 'active');
+});
+
+test('SessionWriteCoordinator settles creates, deletes, and member changes whose KV effect may have landed', async () => {
+	const lostCreate = createGroupRecoveryHarness();
+	lostCreate.failNext('put-lost', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	assert.equal((await lostCreate.create()).status, 503);
+	// The retry learns its own create landed, rather than that the group already exists.
+	const sameCreate = await lostCreate.create();
+	assert.equal(sameCreate.status, 200, JSON.stringify(sameCreate.body));
+	assert.equal(sameCreate.body.group.groupId, 'group-alpha');
+	assert.equal(lostCreate.groupPhase(), 'active');
+	assert.equal(lostCreate.store.get('worker-group-capacity-meta-v3').groupCount, 1);
+	assert.equal((await lostCreate.mutate('update', { input: { label: 'Renamed' } })).status, 200);
+
+	const neverCreated = createGroupRecoveryHarness();
+	neverCreated.failNext('put', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	assert.equal((await neverCreated.create()).status, 503);
+	assert.equal((await neverCreated.create()).status, 200);
+	assert.equal(neverCreated.store.get('worker-group-capacity-meta-v3').groupCount, 1);
+
+	const addition = createGroupRecoveryHarness();
+	assert.equal((await addition.create()).status, 200);
+	addition.failNext('put', (key) => key.startsWith('ce-worker-group-member:'));
+	assert.equal((await addition.mutate('add-member', { principal: addition.member })).status, 503);
+	assert.equal((await addition.authorize()).status, 200);
+	assert.equal(addition.store.get('worker-group-capacity-group-v3:group-alpha').memberCount, 1);
+
+	const removal = createGroupRecoveryHarness();
+	assert.equal((await removal.create()).status, 200);
+	assert.equal((await removal.mutate('add-member', { principal: removal.member })).status, 200);
+	removal.failNext('delete', (key) => key.startsWith('ce-worker-group-principal:'));
+	assert.equal((await removal.mutate('remove-member', { principal: removal.member })).status, 503);
+	const removalRetry = await removal.mutate('remove-member', { principal: removal.member });
+	assert.equal(removalRetry.status, 200, JSON.stringify(removalRetry.body));
+	assert.equal(removalRetry.body.memberCount, 0);
+	assert.equal((await removal.authorize()).status, 403);
+	assert.equal(removal.store.get('worker-group-capacity-group-v3:group-alpha').memberCount, 0);
+	assert.equal([...removal.kv.values.keys()].some((key) => key.startsWith('ce-worker-group-principal:')), false);
+
+	const deletion = createGroupRecoveryHarness();
+	assert.equal((await deletion.create()).status, 200);
+	deletion.failNext('delete', (key) => key.startsWith('ce-worker-group-index:'));
+	assert.equal((await deletion.mutate('delete')).status, 503);
+	assert.equal((await deletion.mutate('delete')).status, 200);
+	assert.equal((await deletion.authorize()).status, 404);
+	assert.equal(deletion.groupPhase(), 'deleted');
+	assert.equal(deletion.store.get('worker-group-capacity-meta-v3').groupCount, 0);
+	assert.equal([...deletion.kv.values.keys()].some((key) => key.startsWith('ce-worker-group-index:')), false);
+});
+
+test('SessionWriteCoordinator settles a group update stranded before intents were recorded', async () => {
+	const h = createGroupRecoveryHarness();
+	assert.equal((await h.create()).status, 200);
+	assert.equal((await h.mutate('add-member', { principal: h.member })).status, 200);
+	const key = 'worker-group-capacity-group-v3:group-alpha';
+	h.store.set(key, { ...h.store.get(key), phase: 'updating', joinMode: 'admin_add' });
+	assert.equal((await h.authorize()).status, 200);
+	assert.equal(h.groupPhase(), 'active');
+});

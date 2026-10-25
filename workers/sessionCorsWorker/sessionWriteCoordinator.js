@@ -269,6 +269,36 @@ const WORKER_GROUP_MUTATIONS = new Set([
   'join',
 ]);
 
+// Phases a thrown KV mutation can leave behind, and the mutation each replays.
+const PENDING_WORKER_GROUP_OPERATIONS = Object.freeze({ creating: 'create', updating: 'update', deleting: 'delete' });
+const PENDING_WORKER_GROUP_MEMBER_OPERATIONS = Object.freeze({ reserved: 'add-member', removing: 'remove-member' });
+
+const DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES = new Set([
+  'invalid_join_mode',
+  'join_mode_not_implemented',
+  'invalid_member_visibility',
+  'invalid_group_label',
+  'invalid_group_description',
+  'invalid_group_image_url',
+  'invalid_group_tags',
+  'invalid_group_document_urls',
+  'invalid_group_member_limit',
+  'invalid_group_join_end',
+  'invalid_group_admin_address',
+  'invalid_worker_group_id',
+]);
+
+const sameWorkerGroupInput = (left, right) => {
+  const canonical = (value) => JSON.stringify(value, Object.keys(isObjectRecord(value) ? value : {}).sort());
+  return canonical(left) === canonical(right);
+};
+
+const withoutPendingMutation = (state) => {
+  const next = { ...state };
+  delete next.pending;
+  return next;
+};
+
 const normalizeWorkerGroupMutation = (payload) => {
   const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
   const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
@@ -1004,7 +1034,7 @@ export class SessionWriteCoordinator {
     });
   }
 
-  async reserveWorkerGroupSlot({ slug, sessionId, groupId, maxGroupsPerSession }) {
+  async reserveWorkerGroupSlot({ slug, sessionId, groupId, maxGroupsPerSession, intent }) {
     return this.state.storage.transaction(async (transaction) => {
       const meta = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
       if (
@@ -1038,6 +1068,7 @@ export class SessionWriteCoordinator {
         generation: 1,
         memberCount: 0,
         joinMode: 'admin_add',
+        pending: intent,
       });
       return { ok: true, reserved: true, generation: 1 };
     });
@@ -1072,7 +1103,7 @@ export class SessionWriteCoordinator {
         throw new Error('Worker group creation reservation is unavailable.');
       }
       await transaction.put(key, {
-        ...prior,
+        ...withoutPendingMutation(prior),
         version: 2,
         phase: 'active',
         active: true,
@@ -1092,7 +1123,7 @@ export class SessionWriteCoordinator {
     return { ok: true, state };
   }
 
-  async beginWorkerGroupUpdate(groupId) {
+  async beginWorkerGroupUpdate(groupId, intent) {
     return this.state.storage.transaction(async (transaction) => {
       const key = workerGroupCapacityGroupKey(groupId);
       const state = await transaction.get(key);
@@ -1105,6 +1136,7 @@ export class SessionWriteCoordinator {
         // Closed is the conservative join posture while the KV projection is
         // ambiguous or a restrictive update is propagating.
         joinMode: 'admin_add',
+        pending: { ...intent, prior: state },
       });
       return { ok: true, prior: state };
     });
@@ -1116,7 +1148,7 @@ export class SessionWriteCoordinator {
       const state = await transaction.get(key);
       if (state?.phase !== 'updating') return;
       await transaction.put(key, {
-        ...state,
+        ...withoutPendingMutation(state),
         phase: 'active',
         active: true,
         joinMode: toTrimmedString(group?.joinMode).toLowerCase() || 'admin_add',
@@ -1135,7 +1167,7 @@ export class SessionWriteCoordinator {
     });
   }
 
-  async beginWorkerGroupDelete(groupId) {
+  async beginWorkerGroupDelete(groupId, intent) {
     return this.state.storage.transaction(async (transaction) => {
       const key = workerGroupCapacityGroupKey(groupId);
       const state = await transaction.get(key);
@@ -1147,6 +1179,7 @@ export class SessionWriteCoordinator {
         phase: 'deleting',
         active: false,
         joinMode: 'admin_add',
+        pending: { ...intent, prior: state },
       });
       return { ok: true, prior: state };
     });
@@ -1164,6 +1197,7 @@ export class SessionWriteCoordinator {
     groupId,
     principalDigest,
     maxMembersPerGroup,
+    intent,
   }) {
     return this.state.storage.transaction(async (transaction) => {
       const groupKey = workerGroupCapacityGroupKey(groupId);
@@ -1202,6 +1236,7 @@ export class SessionWriteCoordinator {
       await transaction.put(memberKey, {
         version: 2,
         state: 'reserved',
+        pending: intent,
       });
       return { ok: true, reserved: true, generation, memberKey };
     });
@@ -1236,7 +1271,7 @@ export class SessionWriteCoordinator {
     });
   }
 
-  async beginWorkerGroupMemberRemoval({ groupId, principalDigest }) {
+  async beginWorkerGroupMemberRemoval({ groupId, principalDigest, intent }) {
     return this.state.storage.transaction(async (transaction) => {
       const groupKey = workerGroupCapacityGroupKey(groupId);
       const groupState = await transaction.get(groupKey);
@@ -1264,6 +1299,7 @@ export class SessionWriteCoordinator {
       await transaction.put(memberKey, {
         version: 2,
         state: 'removing',
+        pending: intent,
       });
       return { ok: true, memberKey };
     });
@@ -1314,12 +1350,118 @@ export class SessionWriteCoordinator {
         groupCount: Math.max(0, Number(meta.groupCount || 0) - 1),
       });
       await transaction.put(key, {
-        ...groupState,
+        ...withoutPendingMutation(groupState),
         phase: 'deleted',
         active: false,
         memberCount: 0,
       });
     });
+  }
+
+  // Settles the reservation a KV mutation returned on: finalize on success,
+  // release on a definite failure. A thrown mutation leaves it pending.
+  async completeWorkerGroupReservation(mutation, result, reservation, { replay = false } = {}) {
+    const { slug, sessionId, groupId, operation } = mutation;
+    if (!result.ok) {
+      if (operation === 'create') {
+        // A live create keeps its slot unless the failure preceded any write;
+        // a replay already counts an earlier attempt's write as done.
+        if (replay || DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES.has(result.reason)) {
+          await this.rollbackWorkerGroupSlot({ slug, sessionId, groupId });
+        }
+      } else if (operation === 'update') {
+        await this.rollbackWorkerGroupUpdate({ groupId, prior: reservation.prior });
+      } else if (operation === 'delete') {
+        await this.rollbackWorkerGroupDelete({ groupId, prior: reservation.prior });
+      } else if (operation === 'remove-member') {
+        await this.rollbackWorkerGroupMemberRemoval({ memberKey: reservation.memberKey });
+      } else if (reservation?.reserved) {
+        await this.rollbackWorkerGroupMemberSlot({ groupId, memberKey: reservation.memberKey });
+      }
+      return;
+    }
+    if (operation === 'create') {
+      await this.activateWorkerGroupCapacity(result.group);
+    } else if (operation === 'update') {
+      await this.finalizeWorkerGroupUpdate({ groupId, group: result.group });
+    } else if (operation === 'delete') {
+      await this.releaseWorkerGroupCapacity({ slug, sessionId, groupId });
+    } else if (operation === 'remove-member') {
+      await this.releaseWorkerGroupMemberSlot({ groupId, memberKey: reservation.memberKey });
+    } else if (reservation?.reserved) {
+      await this.finalizeWorkerGroupMemberSlot(reservation.memberKey);
+    }
+  }
+
+  async replayWorkerGroupMutation({ slug, sessionId, groupId, operation, intent }, reservation) {
+    const mutation = {
+      slug,
+      sessionId,
+      groupId,
+      operation,
+      input: operation === 'create'
+        ? { ...(isObjectRecord(intent.input) ? intent.input : {}), groupId }
+        : (isObjectRecord(intent.input) ? intent.input : {}),
+      principal: intent.principal,
+      actorPrincipal: intent.actorPrincipal ?? null,
+    };
+    let result;
+    try {
+      result = await executeWorkerGroupMutation({ env: this.env, ...mutation, capacityAuthorized: true, resume: true });
+    } catch {
+      return { ok: false, status: 503, reason: 'worker_group_mutation_ambiguous' };
+    }
+    await this.completeWorkerGroupReservation(mutation, result, reservation, { replay: true });
+    return { ok: true, replayed: { operation, input: mutation.input, result } };
+  }
+
+  // A thrown KV mutation may or may not have been applied, so its reservation
+  // stays pending with its intent. Before anything else reads or changes that
+  // group or member, replay the intent: re-applying is convergent, and an effect
+  // an earlier attempt already made counts as done. Reservations recorded before
+  // intents existed replay with an empty input.
+  async settleWorkerGroupReservations({ slug, sessionId, groupIds, principal = null }) {
+    const principalDigest = principal ? await sha256Hex(`worker-group-member:${principal.key}`) : '';
+    const replayed = [];
+    for (const groupId of groupIds) {
+      const groupKey = workerGroupCapacityGroupKey(groupId);
+      let state = await this.state.storage.get(groupKey);
+      const operation = PENDING_WORKER_GROUP_OPERATIONS[state?.phase];
+      if (operation) {
+        const intent = isObjectRecord(state.pending) ? state.pending : {};
+        // An unrecorded prior state restores the group with joins still closed.
+        const prior = intent.prior || { ...withoutPendingMutation(state), phase: 'active', active: true };
+        const settled = await this.replayWorkerGroupMutation(
+          { slug, sessionId, groupId, operation, intent },
+          operation === 'create' ? { reserved: true } : { ok: true, prior },
+        );
+        if (!settled.ok) return settled;
+        replayed.push(settled.replayed);
+        state = await this.state.storage.get(groupKey);
+      }
+      if (!principalDigest || state?.phase !== 'active') continue;
+      const memberKey = workerGroupCapacityMemberKey({
+        groupId,
+        generation: Math.max(1, Number(state.generation || 0)),
+        principalDigest,
+      });
+      const member = await this.state.storage.get(memberKey);
+      const memberOperation = PENDING_WORKER_GROUP_MEMBER_OPERATIONS[member?.state];
+      if (!memberOperation) continue;
+      const settled = await this.replayWorkerGroupMutation(
+        {
+          slug,
+          sessionId,
+          groupId,
+          operation: memberOperation,
+          intent: isObjectRecord(member.pending) ? member.pending : { principal: principal.principal },
+        },
+        memberOperation === 'add-member' ? { reserved: true, memberKey } : { ok: true, memberKey },
+      );
+      if (!settled.ok) return settled;
+      replayed.push({ ...settled.replayed, principalKey: principal.key });
+    }
+    return { ok: true, replayed };
   }
 
   async executeWorkerGroupReady(payload) {
@@ -1369,6 +1511,8 @@ export class SessionWriteCoordinator {
       if (!initialized.ok) {
         return jsonResponse(initialized, initialized.status || 503);
       }
+      const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: [groupId], principal });
+      if (!settled.ok) return jsonResponse(settled, settled.status || 503);
       const group = await this.getActiveWorkerGroupCapacity(groupId);
       if (!group.ok) return jsonResponse(group, group.status || 404);
       const principalDigest = await sha256Hex(`worker-group-member:${principal.key}`);
@@ -1433,6 +1577,8 @@ export class SessionWriteCoordinator {
       if (!initialized.ok) {
         return jsonResponse(initialized, initialized.status || 503);
       }
+      const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: uniqueGroupIds, principal });
+      if (!settled.ok) return jsonResponse(settled, settled.status || 503);
       const principalDigest = principal
         ? await sha256Hex(`worker-group-member:${principal.key}`)
         : '';
@@ -1477,7 +1623,21 @@ export class SessionWriteCoordinator {
       }
       const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
       if (!initialized.ok) return jsonResponse(initialized, initialized.status || 503);
-      const entries = await this.state.storage.list({ prefix: WORKER_GROUP_CAPACITY_GROUP_PREFIX });
+      const listGroupStates = () => this.state.storage.list({ prefix: WORKER_GROUP_CAPACITY_GROUP_PREFIX });
+      const pending = await listGroupStates();
+      if (pending instanceof Map) {
+        const groupIds = [...pending.keys()].map((key) => {
+          try {
+            return normalizeWorkerGroupId(decodeURIComponent(String(key).slice(WORKER_GROUP_CAPACITY_GROUP_PREFIX.length)));
+          } catch {
+            return '';
+          }
+        }).filter(Boolean);
+        const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds, principal });
+        if (!settled.ok) return jsonResponse(settled, settled.status || 503);
+      }
+      // Re-read settled state; capacity totals below must agree with it.
+      const entries = await listGroupStates();
       if (!(entries instanceof Map)) {
         return jsonResponse({ ok: false, status: 503, reason: 'worker_group_capacity_state_unavailable' }, 503);
       }
@@ -1497,7 +1657,8 @@ export class SessionWriteCoordinator {
           activeGroups.push({ groupId, state });
         }
       }
-      if (activeGroups.length !== Number(initialized.meta?.groupCount)) {
+      const meta = await this.state.storage.get(WORKER_GROUP_CAPACITY_META_KEY);
+      if (activeGroups.length !== Number(meta?.groupCount)) {
         return jsonResponse({ ok: false, status: 503, reason: 'worker_group_capacity_state_unavailable' }, 503);
       }
       const principalDigest = await sha256Hex(`worker-group-member:${principal.key}`);
@@ -1556,12 +1717,35 @@ export class SessionWriteCoordinator {
       let removalReservation = null;
       let principalDigest = '';
       let activeGroup = null;
+      const intent = {
+        ...(mutation.operation === 'delete' ? {} : { input: mutation.input }),
+        ...(mutation.principal ? { principal: mutation.principal } : {}),
+        actorPrincipal: mutation.actorPrincipal,
+      };
+      {
+        // A retried create meets its own pending reservation here too.
+        const settled = await this.settleWorkerGroupReservations({
+          slug: mutation.slug,
+          sessionId: mutation.sessionId,
+          groupIds: [mutation.groupId],
+          principal: mutation.principal ? { principal: mutation.principal, key: mutation.principalKey } : null,
+        });
+        if (!settled.ok) return jsonResponse(settled, settled.status || 503);
+        // A retry of the request the settle just finished gets that outcome, not
+        // already-exists or not-found for its own effect. Updates still apply.
+        const finished = settled.replayed.find((entry) => entry.result.ok && entry.operation === mutation.operation &&
+          (mutation.operation === 'delete' ||
+            (mutation.operation === 'remove-member' && entry.principalKey === mutation.principalKey) ||
+            (mutation.operation === 'create' && sameWorkerGroupInput(entry.input, mutation.input))));
+        if (finished) return this.respondToWorkerGroupMutation(mutation, finished.result);
+      }
       if (mutation.operation === 'create') {
         groupReservation = await this.reserveWorkerGroupSlot({
           slug: mutation.slug,
           sessionId: mutation.sessionId,
           groupId: mutation.groupId,
           maxGroupsPerSession: caps.maxGroupsPerSession,
+          intent,
         });
         if (!groupReservation.ok) {
           return jsonResponse(groupReservation, groupReservation.status || 409);
@@ -1606,12 +1790,12 @@ export class SessionWriteCoordinator {
               }, 409);
             }
           }
-          updateReservation = await this.beginWorkerGroupUpdate(mutation.groupId);
+          updateReservation = await this.beginWorkerGroupUpdate(mutation.groupId, intent);
           if (!updateReservation.ok) {
             return jsonResponse(updateReservation, updateReservation.status || 404);
           }
         } else if (mutation.operation === 'delete') {
-          deleteReservation = await this.beginWorkerGroupDelete(mutation.groupId);
+          deleteReservation = await this.beginWorkerGroupDelete(mutation.groupId, intent);
           if (!deleteReservation.ok) return jsonResponse(deleteReservation, deleteReservation.status || 404);
         }
       }
@@ -1621,6 +1805,7 @@ export class SessionWriteCoordinator {
           groupId: mutation.groupId,
           principalDigest,
           maxMembersPerGroup: caps.maxMembersPerGroup,
+          intent,
         });
         if (!memberReservation.ok) {
           return jsonResponse(memberReservation, memberReservation.status || 409);
@@ -1630,6 +1815,7 @@ export class SessionWriteCoordinator {
         removalReservation = await this.beginWorkerGroupMemberRemoval({
           groupId: mutation.groupId,
           principalDigest,
+          intent,
         });
         if (!removalReservation.ok) {
           return jsonResponse(removalReservation, removalReservation.status || 404);
@@ -1644,8 +1830,8 @@ export class SessionWriteCoordinator {
           capacityAuthorized: true,
         });
       } catch {
-        // KV may have accepted a write before surfacing an error. Retain any
-        // reservation so an ambiguous projection cannot create free capacity.
+        // KV may have accepted a write before surfacing an error. Retain the
+        // reservation, with its intent, until a later operation replays it.
         return jsonResponse({
           ok: false,
           status: 503,
@@ -1653,98 +1839,35 @@ export class SessionWriteCoordinator {
         }, 503);
       }
 
-      if (!result.ok) {
-        if (groupReservation?.reserved) {
-          const definitelyPrewrite = new Set([
-            'invalid_join_mode',
-            'join_mode_not_implemented',
-            'invalid_member_visibility',
-            'invalid_group_label',
-            'invalid_group_description',
-            'invalid_group_image_url',
-            'invalid_group_tags',
-            'invalid_group_document_urls',
-            'invalid_group_member_limit',
-            'invalid_group_join_end',
-            'invalid_group_admin_address',
-            'invalid_worker_group_id',
-          ]);
-          if (definitelyPrewrite.has(result.reason)) {
-            await this.rollbackWorkerGroupSlot({
-              slug: mutation.slug,
-              sessionId: mutation.sessionId,
-              groupId: mutation.groupId,
-            });
-          }
-        }
-        if (updateReservation?.ok) {
-          await this.rollbackWorkerGroupUpdate({
-            groupId: mutation.groupId,
-            prior: updateReservation.prior,
-          });
-        }
-        if (deleteReservation?.ok) {
-          await this.rollbackWorkerGroupDelete({
-            groupId: mutation.groupId,
-            prior: deleteReservation.prior,
-          });
-        }
-        if (memberReservation?.reserved) {
-          await this.rollbackWorkerGroupMemberSlot({
-            groupId: mutation.groupId,
-            memberKey: memberReservation.memberKey,
-          });
-        }
-        if (removalReservation?.ok) {
-          await this.rollbackWorkerGroupMemberRemoval({
-            memberKey: removalReservation.memberKey,
-          });
-        }
-        return jsonResponse(result, result.status || 400);
-      }
-
-      if (mutation.operation === 'create') {
-        await this.activateWorkerGroupCapacity(result.group);
-      } else if (mutation.operation === 'update') {
-        await this.finalizeWorkerGroupUpdate({
-          groupId: mutation.groupId,
-          group: result.group,
-        });
-      } else if (mutation.operation === 'add-member' || mutation.operation === 'join') {
-        if (memberReservation?.reserved) {
-          await this.finalizeWorkerGroupMemberSlot(memberReservation.memberKey);
-        }
-      } else if (mutation.operation === 'remove-member') {
-        await this.releaseWorkerGroupMemberSlot({
-          groupId: mutation.groupId,
-          memberKey: removalReservation.memberKey,
-        });
-      } else if (mutation.operation === 'delete') {
-        await this.releaseWorkerGroupCapacity({
-          slug: mutation.slug,
-          sessionId: mutation.sessionId,
-          groupId: mutation.groupId,
-        });
-      }
-      if (mutation.operation === 'add-member' || mutation.operation === 'join' || mutation.operation === 'remove-member') {
-        const postMutationGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
-        const memberCount = Number(postMutationGroup?.state?.memberCount);
-        if (!postMutationGroup.ok || !Number.isSafeInteger(memberCount) || memberCount < 0) {
-          return jsonResponse({ ok: false, status: 503, reason: 'worker_group_capacity_state_unavailable' }, 503);
-        }
-        result = {
-          ...result,
-          group: {
-            ...(result.group || {}),
-            groupId: mutation.groupId,
-            joinMode: postMutationGroup.state.joinMode,
-            memberVisibility: postMutationGroup.state.memberVisibility,
-          },
-          memberCount,
-        };
-      }
-      return jsonResponse(result, 200);
+      await this.completeWorkerGroupReservation(
+        mutation,
+        result,
+        groupReservation || updateReservation || deleteReservation || memberReservation || removalReservation,
+      );
+      if (!result.ok) return jsonResponse(result, result.status || 400);
+      return this.respondToWorkerGroupMutation(mutation, result);
     });
+  }
+
+  async respondToWorkerGroupMutation(mutation, result) {
+    if (mutation.operation === 'add-member' || mutation.operation === 'join' || mutation.operation === 'remove-member') {
+      const postMutationGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
+      const memberCount = Number(postMutationGroup?.state?.memberCount);
+      if (!postMutationGroup.ok || !Number.isSafeInteger(memberCount) || memberCount < 0) {
+        return jsonResponse({ ok: false, status: 503, reason: 'worker_group_capacity_state_unavailable' }, 503);
+      }
+      result = {
+        ...result,
+        group: {
+          ...(result.group || {}),
+          groupId: mutation.groupId,
+          joinMode: postMutationGroup.state.joinMode,
+          memberVisibility: postMutationGroup.state.memberVisibility,
+        },
+        memberCount,
+      };
+    }
+    return jsonResponse(result, 200);
   }
 
   async readSessionConfigAuthority(slug) {
