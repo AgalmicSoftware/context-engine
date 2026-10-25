@@ -1,58 +1,113 @@
 import { isWorkerCanonicalSessionConfig } from '../../utilities/survey/workerResponseHydration';
 import { responseValuesEqual } from './responseValueEquality';
-import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import type {
+  SurveyQuestionsInstanceFields,
+  SurveyQuestionsSetStateCallback,
+} from './surveyQuestionsInstanceFields.js';
+import type { SurveyQuestionsStateUpdate } from './surveyQuestionsState.js';
+import type { SurveyQuestionsLegacyValue, SurveyQuestionsProps, SurveyQuestionsState } from './surveyQuestionsTypes.js';
+import {
+  buildSurveyLocalCacheSlice,
+  executeSurveyLocalCacheRehydrate,
+  executeSurveyResponsePrefill,
+} from './surveyToolHydrationController';
 import {
   buildDraftHydrationState,
   buildLocalCacheRehydrationState,
   isSavedAnswerRefreshHeld,
 } from './surveyToolHydrationFlow';
+import { executeSurveyFormStateReset, executeSurveyPendingRevert } from './surveyToolResponseResetController';
+import { resolveSurveyBaselineSourceSlice } from './surveyToolResponseSourceController';
+import {
+  DEBUG_PREFILL,
+  areEnvelopesEquivalent,
+  buildDraftAnswersByQuestionId,
+  buildDraftAwareCacheHydrationState,
+  buildHydratedResponseSlice,
+  bumpSurveyPerfCounter,
+  getExtraQuestionReadSlugs,
+  mergeQuestionResponses,
+  normalizeQuestionIdKey,
+  normalizeSessionSlugValue,
+  readQuestionsCache,
+  resolveResponseHydrationContext,
+  surveyLog,
+  updateSubmittedSinceLastEdit,
+} from './surveyToolUtils';
 
-export type SurveyQuestionsResponseStateRuntime = SurveyQuestionsLegacyRecord;
+type SetSurveyQuestionsState = (update: SurveyQuestionsStateUpdate, callback?: SurveyQuestionsSetStateCallback) => void;
 
-export const createSurveyQuestionsResponseStateRuntime = (
-  context: SurveyQuestionsLegacyRecord,
-): SurveyQuestionsResponseStateRuntime => {
-  const {
-    DEBUG_PREFILL,
-    areEnvelopesEquivalent,
-    buildDraftAnswersByQuestionId,
-    buildDraftAwareCacheHydrationState,
-    buildEmptyResponseFieldState,
-    buildHydratedResponseSlice,
-    buildLocalCacheHydrationSignature,
-    buildSurveyLocalCacheSlice,
-    bumpSurveyPerfCounter,
-    clearDraft,
-    engine,
-    ensurePriorResponsesForRenderedIds,
-    executeSurveyFormStateReset,
-    executeSurveyLocalCacheRehydrate,
-    executeSurveyPendingRevert,
-    executeSurveyResponsePrefill,
-    getCurrentRenderedQuestionIds,
-    getEditTrackingQuestionIds,
-    getExtraQuestionReadSlugs,
-    getHydrationQuestionIds,
-    initializeSurveyResponseState,
-    inst,
-    loadDraft,
-    mergeQuestionResponses,
-    normalizeQuestionIdKey,
-    normalizeSessionSlugValue,
-    persistDraft,
-    propsRef,
-    readQuestionsCache,
-    recalculateEditStats,
-    resolveResponseHydrationContext,
-    resolveSurveyBaselineSourceSlice,
-    setResponseHydrationState,
-    setState,
-    stateRef,
-    surveyLog,
-    updateJsonPreview,
-    updateSubmittedSinceLastEdit,
-  } = context;
+// The saved-answer lifecycle (prefill, cache rehydrate, revert, view-all sync,
+// account reset): the instance fields it owns or reads and the effects it needs
+// from sibling runtimes. Pure helpers are imported, not threaded through here.
+export type SurveyQuestionsResponseStateDeps = {
+  inst: Pick<
+    SurveyQuestionsInstanceFields,
+    | '_applyCachedResponseEntryToSlice'
+    | '_applyDraftHydrationEntryToSlice'
+    | '_applyLocalCacheHydrationEntryToSlice'
+    | '_applyResponseHydrationListToSlice'
+    | '_getEffectiveDraftSlug'
+    | '_hasMounted'
+    | '_isMounted'
+    | '_localCacheRehydrateRunId'
+    | '_localCacheSliceMemo'
+    | '_persistTimer'
+    | '_rehydrateLocalCacheLastSig'
+    | '_savedAnswersLoadedQids'
+    | '_userAnswersSliceCache'
+    | '_viewAllSync'
+  >;
+  propsRef: { current: SurveyQuestionsProps };
+  stateRef: { current: SurveyQuestionsState };
+  setState: SetSurveyQuestionsState;
+  setResponseHydrationState: SetSurveyQuestionsState;
+  drafts: { load: () => SurveyQuestionsLegacyValue; persist: () => void; clear: () => void };
+  questionIds: { rendered: () => string[]; editTracking: () => Set<string>; hydration: () => string[] };
+  buildEmptyResponseFieldState: (questionId?: string, fieldKey?: string) => unknown;
+  buildLocalCacheHydrationSignature: (surveyIndex: number, questionIds: string[]) => string;
+  ensurePriorResponsesForRenderedIds: () => Promise<unknown>;
+  initializeSurveyResponseState: () => unknown[];
+  recalculateEditStats: () => unknown;
+  updateJsonPreview: () => unknown;
+};
 
+export type SurveyQuestionsResponseStateRuntime = {
+  buildSliceFromLocalCache: (questionIds?: string[] | null) => SurveyQuestionsLegacyValue;
+  buildSliceFromUserAnswers: (userAnswers: unknown, prevSlice?: unknown) => SurveyQuestionsLegacyValue;
+  computeModifiedQuestionsCount: (baselineSlice: unknown, currentSlice: unknown) => number;
+  deepClone: <T>(value: T) => T;
+  handleRevertPendingChanges: () => void;
+  prefillSurveyResponses: (userAnswers: unknown, options?: { responseHydrationOwned?: boolean }) => void;
+  rehydrateLocalCacheAnswersForRenderedIds: (
+    callback?: SurveyQuestionsLegacyValue,
+    options?: { responseHydrationOwned?: boolean },
+  ) => Promise<void>;
+  resetFormStateForAccountChange: (callback: SurveyQuestionsLegacyValue, persistCurrentIdentity?: boolean) => void;
+  resolveDiffBaselineSlice: (allowLocalCache?: boolean) => SurveyQuestionsLegacyValue;
+  syncViewAllQuestions: (options?: { restoreAll?: boolean }) => void;
+  valuesEqual: (a: unknown, b: unknown) => boolean;
+};
+
+export const createSurveyQuestionsResponseStateRuntime = ({
+  inst,
+  propsRef,
+  stateRef,
+  setState,
+  setResponseHydrationState,
+  drafts: { load: loadDraft, persist: persistDraft, clear: clearDraft },
+  questionIds: {
+    rendered: getCurrentRenderedQuestionIds,
+    editTracking: getEditTrackingQuestionIds,
+    hydration: getHydrationQuestionIds,
+  },
+  buildEmptyResponseFieldState,
+  buildLocalCacheHydrationSignature,
+  ensurePriorResponsesForRenderedIds,
+  initializeSurveyResponseState,
+  recalculateEditStats,
+  updateJsonPreview,
+}: SurveyQuestionsResponseStateDeps): SurveyQuestionsResponseStateRuntime => {
   const resetFormStateForAccountChange = (callback: SurveyQuestionsLegacyValue, persistCurrentIdentity = true) => {
     // The reset form holds no saved answers, so every question loads its saved answers again.
     inst._savedAnswersLoadedQids.clear();
@@ -68,7 +123,7 @@ export const createSurveyQuestionsResponseStateRuntime = (
       },
       initializeSurveyResponseState: initializeSurveyResponseState,
       cloneValue: deepClone,
-      setState: setState.bind(engine),
+      setState,
       callback,
       updateSubmittedSinceLastEdit,
       onPersistError: (error: SurveyQuestionsLegacyValue) => {
@@ -179,7 +234,7 @@ export const createSurveyQuestionsResponseStateRuntime = (
       getRenderedQuestionIds: getCurrentRenderedQuestionIds,
       cloneFieldState: deepClone,
       buildEmptyResponseFieldState: buildEmptyResponseFieldState,
-      setState: setState.bind(engine),
+      setState,
       clearDraft: clearDraft,
       persistDraft: persistDraft,
       recalculateEditStats: recalculateEditStats,
@@ -230,8 +285,8 @@ export const createSurveyQuestionsResponseStateRuntime = (
     const surveyIndex: SurveyQuestionsLegacyValue =
       propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex || 0;
     const setStateForPrefill: SurveyQuestionsLegacyValue = options?.responseHydrationOwned
-      ? setResponseHydrationState.bind(engine)
-      : setState.bind(engine);
+      ? setResponseHydrationState
+      : setState;
 
     executeSurveyResponsePrefill({
       state: stateRef.current,
@@ -294,8 +349,8 @@ export const createSurveyQuestionsResponseStateRuntime = (
       finalCallback = null;
     }
     const setStateForLocalCache: SurveyQuestionsLegacyValue = finalOptions?.responseHydrationOwned
-      ? setResponseHydrationState.bind(engine)
-      : setState.bind(engine);
+      ? setResponseHydrationState
+      : setState;
     const runId: SurveyQuestionsLegacyValue = (Number(inst._localCacheRehydrateRunId) || 0) + 1;
     inst._localCacheRehydrateRunId = runId;
     const isStaleRun: SurveyQuestionsLegacyValue = () =>
@@ -423,7 +478,11 @@ export const createSurveyQuestionsResponseStateRuntime = (
           cloneBaseline: deepClone,
           buildDraftAwareCacheHydrationState: (args: SurveyQuestionsLegacyValue) =>
             buildDraftAwareCacheHydrationState({ ...args, areEnvelopesEquivalent }),
-          applyLocalCacheHydrationEntryToSlice: inst._applyLocalCacheHydrationEntryToSlice,
+          // The flow types cached fields as unknown; the instance applier expects
+          // the field-state records a local-cache slice holds.
+          applyLocalCacheHydrationEntryToSlice: inst._applyLocalCacheHydrationEntryToSlice as (
+            args: Record<string, unknown>,
+          ) => boolean,
         });
         const restored = buildDraftHydrationState({
           renderedQuestionIds: restoreIds.filter(present),
