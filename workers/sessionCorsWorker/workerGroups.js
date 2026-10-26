@@ -1831,8 +1831,8 @@ const callWorkerGroupCoordinator = async ({ env, slug, sessionId, path, payload 
 	}
 };
 
-export const coordinateWorkerGroupBackup = ({ env, slug, sessionId, operation, snapshot, snapshotId, cursor, operations, checkOnly } = {}) =>
-  callWorkerGroupCoordinator({ env, slug, sessionId, path: `/worker-groups/backup/${operation}`, payload: { snapshot, snapshotId, cursor, operations, checkOnly } });
+export const coordinateWorkerGroupBackup = ({ env, slug, sessionId, operation, archiveId, snapshot, snapshotId, cursor, operations, checkOnly } = {}) =>
+  callWorkerGroupCoordinator({ env, slug, sessionId, path: `/worker-groups/backup/${operation}`, payload: { archiveId, snapshot, snapshotId, cursor, operations, checkOnly } });
 
 export const checkCoordinatedWorkerGroupReady = async ({ env, slug, sessionId } = {}) =>
 	callWorkerGroupCoordinator({

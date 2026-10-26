@@ -265,11 +265,13 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
         const result = record(await request('abandon-session-backup', { archiveId: activeRestore?.archiveId }));
         if (result.ok !== true) throw new Error('The Worker did not confirm abandonment. Check restore status.');
         if (result.complete === true) break;
-        setStatus('Removing restore staging…');
+        setStatus('Removing imported data…');
       }
       setActiveRestore(null);
       setRestorePosition(0);
-      setStatus('Restore abandoned. Existing records were kept. Choose a complete backup to start again.');
+      setStatus(
+        'Restore abandoned. All data written by this restore was removed. Choose a complete backup to start again.',
+      );
     });
   const importBackup = () =>
     run(async () => {
@@ -297,7 +299,7 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
       if (Number(counts.conflicts) > 0) {
         setConflicts(Array.isArray(result.conflicts) ? result.conflicts.map(String) : []);
         throw new Error(
-          `Restore finished with ${Number(counts.conflicts)} conflict(s). Existing records were kept. Restore into a fresh target to resolve these conflicts.`,
+          `Restore stopped with ${Number(counts.conflicts)} conflict(s). Abandon this restore to remove its imported data, then start again with an empty target.`,
         );
       }
       if (result.complete !== true) {
@@ -313,6 +315,9 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
   return (
     <section className={styles.panel} data-testid="ce-admin-session-backup">
       <h3 className={styles.panelTitle}>Backup &amp; restore</h3>
+      <p className={styles.statusNote}>
+        Restore requires an empty target session. Abandoning an unfinished restore removes all data it imported.
+      </p>
       {recoveryDisplay && <RecoveryKeyDialog value={recoveryDisplay} onContinue={() => setRecoveryDisplay(null)} />}
       {capabilities?.features.includes('recovery_key_export') && (
         <button

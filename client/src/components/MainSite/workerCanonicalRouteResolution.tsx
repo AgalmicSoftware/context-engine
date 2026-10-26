@@ -357,12 +357,14 @@ export const renderWorkerCanonicalRouteError = (route: WorkerCanonicalRouteState
 export const renderWorkerCanonicalRouteBootstrap = (
   route: WorkerCanonicalRouteState,
   controller: WorkerCanonicalRouteController,
+  missingConfigFallback?: React.ReactNode,
 ): React.ReactElement | null =>
   route.kind === 'bootstrap' ? (
     <WorkerCanonicalSessionBootstrapBoundary
       sessionSlug={route.workerSessionSlug}
       workerQueryValue={route.workerOrigin}
       onResolved={controller.handleBootstrapResolved}
+      missingConfigFallback={missingConfigFallback}
     />
   ) : null;
 

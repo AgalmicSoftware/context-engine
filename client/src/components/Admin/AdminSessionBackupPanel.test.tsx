@@ -106,6 +106,7 @@ test('imports every page with identity adoption and reports conflicts', async ()
   expect(post.mock.calls[0][0].body.adoptSessionId).toBe(true);
   expect(post.mock.calls[0][0].body.sessionId).toBe(page(0).manifest.sessionId);
   expect(await screen.findByRole('alert')).toHaveTextContent('1 conflict');
+  expect(screen.getByRole('alert')).toHaveTextContent('Abandon this restore to remove its imported data');
   expect(screen.queryByText('Restore complete.')).not.toBeInTheDocument();
 });
 
@@ -192,6 +193,8 @@ test('offers abandonment after the Worker reports an unfinished restore', async 
   fireEvent.click(await screen.findByRole('button', { name: 'Check restore status' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Abandon restore' }));
   await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Restore abandoned'));
+  expect(screen.getByRole('status')).toHaveTextContent('All data written by this restore was removed');
+  expect(screen.getByText(/Restore requires an empty target session/)).toBeVisible();
   expect(post.mock.calls[1][0].action).toBe('abandon-session-backup');
   expect(post.mock.calls[1][0].body.archiveId).toBe('unfinished');
   expect(screen.queryByRole('button', { name: 'Abandon restore' })).not.toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStagePrefix, readActiveBackupImport } from './sessionBackupLifecycle.js';
+import { BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStagePrefix, backupImportJournalKey, journalBackupImportWrite, readActiveBackupImport } from './sessionBackupLifecycle.js';
 import { verifyBackupPage } from './sessionBackupAuthentication.js';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
@@ -21,6 +21,31 @@ const digest = async (bytes) => [...new Uint8Array(await crypto.subtle.digest('S
 const hashPattern = /^[a-f0-9]{64}$/;
 const resources = new Set(['docsContext', 'questions', 'surveys', 'responses', 'generatedArtifacts', 'media', 'images']);
 const temporary = { expirationTtl: 7 * 86400 };
+
+const assertEmptyTarget = async ({ coordinator, current, slug, page, index, budget }) => {
+  const nonempty = () => fail('Restore requires an empty target session. Abandon any unfinished restore before starting again.', 409, 'backup_target_not_empty');
+  if (current || await coordinator.state.storage.get('session-lit-authorization-signer-v1')) nonempty();
+  const groupKv = budget.wrap(coordinator.env.GROUP_KV);
+  for (const suffix of ['config', 'secrets']) {
+    if (await groupKv.get(`session:${normalizeWorkerSessionSlug(slug)}:${suffix}`) != null) nonempty();
+  }
+  for (const kind of ['ce-storage', 'ce-storage-payload', 'ce-storage-owner', 'ce-storage-hidden']) {
+    const rows = await index.list({ prefix: `${kind}:${slug}:`, limit: 1 });
+    if (!Array.isArray(rows.keys)) fail('Restore storage could not be checked.', 503);
+    if (rows.keys.length || rows.list_complete === false) nonempty();
+  }
+  const r2 = getStorageR2Binding(coordinator.env);
+  if (r2) {
+    if (!r2.list || !r2.delete) fail('Restore requires an R2 binding that supports listing and cleanup.', 503);
+    const rows = await r2.list({ prefix: `sessions/${slug}/storage/`, limit: 1 });
+    if (!Array.isArray(rows.objects)) fail('Restore object storage could not be checked.', 503);
+    if (rows.objects.length || rows.truncated) nonempty();
+  }
+  const groups = await coordinateWorkerGroupBackup({ env: coordinator.env, slug, sessionId: page.manifest.sessionId,
+    operation: 'begin', archiveId: page.archiveId, checkOnly: true });
+  if (!groups.ok) fail(groups.error || 'Group restore storage could not be checked.', groups.status || 503, groups.reason);
+  budget.consume(groups.operations || 0);
+};
 
 const validateSnapshot = ({ snapshot, manifest, normalizeConfig, normalizeSessionKey }) => {
   const authority = snapshot?.configAuthority;
@@ -90,14 +115,14 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const missing = required.filter((fingerprint) => !fingerprints.includes(fingerprint));
   if (missing.length) fail(`The target is missing backup recovery keys: ${missing.join(', ')}.`, 409, 'recovery_key_mismatch');
   if (!await verifyBackupPage(page, env)) fail('Backup page authentication failed. Use the original unmodified archive.', 403, 'backup_authentication_failed');
-  const current = await coordinator.assertSessionAuthority(payload);
+  const current = await coordinator.assertSessionAuthority(payload, { allowRestore: true });
   const targetId = resolveCanonicalWorkerSessionIdHex(current?.config || {});
   if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail('The backup session identity does not match this target.', 409, 'backup_session_mismatch');
   if (page.archiveId !== await sha256Hex(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail('Invalid backup archive identity.');
   const budget = createStorageExportBudget();
   const rawIndex = getStorageIndexBinding(env);
   const index = rawIndex ? budget.wrap(rawIndex) : null;
-  if (!index?.get || !index?.put || !index?.delete) fail('Restore storage is unavailable.', 503);
+  if (!index?.get || !index?.put || !index?.delete || !index?.list) fail('Restore storage is unavailable.', 503);
   const stateKey = `session-backup-import:${page.archiveId}`;
   const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
   const active = await readActiveBackupImport(coordinator, slug, true, budget);
@@ -110,39 +135,60 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     return Response.json({ ...receipt.result, replayed: true });
   }
   const root = backupImportStagePrefix(slug, page.archiveId);
+  const stage = async (key, value) => {
+    await journalBackupImportWrite(storage, page.archiveId, 'index', key);
+    await index.put(key, value, temporary);
+  };
   const descriptorKey = (id, target = '') => `${stateKey}:payload:${target || 'storage'}:${id}`;
   const recordKey = (id) => `${stateKey}:record:${id}`;
   const chunkKey = (id, n, target = '') => `${root}chunk:${target || 'storage'}:${id}:${n}`;
   let progress = await storage.get(stateKey);
   if (!progress) {
     if (page.pageNumber !== 0 || !page.coordinator) fail('Import must begin with the first backup page.', 409);
+    await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
     progress = { actor: expectedAuthority.actor, pageNumber: 0, nextEntry: 0, pageHash, manifest: { ...manifest, counts: undefined, complete: undefined },
       counts: { written: 0, skipped: 0, conflicts: 0 }, conflicts: [], observed: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 },
-      expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS, configPublished: false, liveTarget: !!current,
+      expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS, configPublished: false,
       pendingPayloads: 0, pendingRecords: 0, snapshotReady: false, finished: false };
     if (page.coordinator.chunked !== true) {
       validateSnapshot({ snapshot: page.coordinator, manifest, ...validators });
       if (await sha256Hex(JSON.stringify(page.coordinator)) !== page.snapshotDigest) fail('The coordinator snapshot checksum does not match.');
-      await index.put(`${root}coordinator`, JSON.stringify(page.coordinator), temporary);
-      progress.snapshotReady = true;
     } else if (page.coordinator.sha256 !== page.snapshotDigest) fail('Invalid coordinator snapshot descriptor.');
-    await storage.put(activeKey, page.archiveId);
-    await storage.put(stateKey, progress);
+    // Reserve the archive before staging or cross-coordinator writes. Even a
+    // failure immediately after a put leaves enough durable state to abandon it.
+    await storage.transaction(async (transaction) => {
+      await transaction.put(activeKey, page.archiveId);
+      await transaction.put(stateKey, progress);
+    });
   }
   if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.finished ||
       (progress.nextEntry > 0 && progress.pageHash !== pageHash) ||
       !same(progress.manifest, { ...manifest, counts: undefined, complete: undefined })) fail('Backup pages must be imported unchanged and in order.', 409);
   progress.pageHash = pageHash;
+  if (!progress.groupsStarted) {
+    const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: 'begin', archiveId: page.archiveId });
+    if (!groups.ok) fail(groups.error || 'Group restore is unavailable.', groups.status || 503, groups.reason);
+    budget.consume(groups.operations || 0);
+    progress.groupsStarted = true;
+    await storage.put(stateKey, progress);
+  }
+  if (!progress.snapshotReady && page.pageNumber === 0 && page.coordinator?.chunked !== true) {
+    await stage(`${root}coordinator`, JSON.stringify(page.coordinator));
+    progress.snapshotReady = true;
+    await storage.put(stateKey, progress);
+  }
   const conflict = (key) => { progress.counts.conflicts += 1; if (progress.conflicts.length < 50) progress.conflicts.push(key); };
-  const write = async (store, key, value, json = false) => {
+  const write = async (store, key, value, json = false, kind = 'index') => {
     const existing = await store.get(key);
     if (existing != null) {
       let identical = existing === value;
       if (!identical && json) { try { identical = same(JSON.parse(existing), JSON.parse(value)); } catch { /* malformed existing rows conflict */ } }
+      identical = identical && !!await storage.get(backupImportJournalKey(page.archiveId, kind, key));
       if (identical) progress.counts.skipped += 1;
       else conflict(key);
       return identical;
     }
+    await journalBackupImportWrite(storage, page.archiveId, kind, key);
     await store.put(key, value);
     progress.counts.written += 1;
     return true;
@@ -174,10 +220,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     if (budget.remaining < cost + 16) return pending();
     const updates = [];
     if (entry.kind === 'owner' || entry.kind === 'hidden') {
-      // Absence on a live target can be a later unhide. Restores cannot infer
-      // its time from a deleted marker, so preserve visibility and report it.
-      if (entry.kind === 'hidden' && progress.liveTarget && await index.get(entry.key) == null) conflict(entry.key);
-      else await write(index, entry.key, entry.value, true);
+      await write(index, entry.key, entry.value, true);
       progress.observed[entry.kind === 'owner' ? 'owners' : 'hidden'] += 1;
     } else if (entry.kind === 'record') {
       if (await storage.get(recordKey(entry.id))) fail('Duplicate backup metadata id.');
@@ -186,7 +229,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
         if (header.payloadOk !== false) await write(index, entry.key, JSON.stringify(entry.metadata), true);
         updates.push([recordKey(entry.id), { applied: true }]);
       } else {
-        await index.put(`${root}record:${entry.id}`, JSON.stringify(entry), temporary);
+        await stage(`${root}record:${entry.id}`, JSON.stringify(entry));
         updates.push([recordKey(entry.id), { pending: true }]);
         progress.pendingRecords += 1;
       }
@@ -197,14 +240,14 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       if (entry.size > resolveMaxUploadBytes({ env })) fail('The backup payload exceeds this target’s configured upload limit.', 413);
       const { metadata } = entry;
       const header = { id: entry.id, size: entry.size, sha256: entry.sha256, chunkCount: entry.chunkCount, ...(entry.target ? { target: entry.target } : {}) };
-      if (metadata) await index.put(`${root}metadata:${entry.id}`, JSON.stringify(metadata), temporary);
+      if (metadata) await stage(`${root}metadata:${entry.id}`, JSON.stringify(metadata));
       updates.push([descriptorKey(entry.id, entry.target), { ...header, nextChunk: 0, done: false }]);
       progress.pendingPayloads += 1;
     } else {
       const header = await storage.get(descriptorKey(entry.id, entry.target));
       if (!header || header.done || header.nextChunk !== entry.index || entry.index >= header.chunkCount) fail('Backup chunks must follow their payload header in order.');
       if (bytesToBase64url(base64urlToBytes(entry.base64url)) !== entry.base64url) fail('Invalid backup chunk encoding.');
-      await index.put(chunkKey(entry.id, entry.index, entry.target), entry.base64url, temporary);
+      await stage(chunkKey(entry.id, entry.index, entry.target), entry.base64url);
       header.nextChunk += 1;
       if (header.nextChunk === header.chunkCount) {
         const bytes = await assemble(header);
@@ -221,26 +264,32 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
           let payloadOk = true;
           const rawExisting = await index.get(buildPayloadKey({ slug, id: entry.id }));
           if (existing || rawExisting != null) {
-            payloadOk = !!existing && existing.length === bytes.length && await digest(existing) === header.sha256;
+            const kind = rawExisting != null ? 'index' : 'r2';
+            const key = kind === 'index' ? buildPayloadKey({ slug, id: entry.id }) : buildObjectKey({ slug, id: entry.id });
+            payloadOk = !!await storage.get(backupImportJournalKey(page.archiveId, kind, key)) &&
+              !!existing && existing.length === bytes.length && await digest(existing) === header.sha256;
             if (payloadOk) progress.counts.skipped += 1;
             else conflict(buildPayloadKey({ slug, id: entry.id }));
           } else {
             const r2 = getStorageR2Binding(env);
-            if (r2?.put) await r2.put(buildObjectKey({ slug, id: entry.id }), bytes, {
-              httpMetadata: { contentType: metadata.contentType || 'application/octet-stream' },
-              customMetadata: {
-                id: entry.id,
-                resource: metadata.resource,
-                encrypted: metadata.encrypted ? 'true' : 'false',
-                payloadAccessMode: metadata.payloadAccessMode || '',
-                payloadAccessControl: JSON.stringify(metadata.payloadAccessControl || {}),
-                groupIds: metadata.groupIds?.length ? JSON.stringify(metadata.groupIds) : '',
-              },
-            });
-            else {
+            if (r2?.put) {
+              await journalBackupImportWrite(storage, page.archiveId, 'r2', buildObjectKey({ slug, id: entry.id }));
+              await r2.put(buildObjectKey({ slug, id: entry.id }), bytes, {
+                httpMetadata: { contentType: metadata.contentType || 'application/octet-stream' },
+                customMetadata: {
+                  id: entry.id,
+                  resource: metadata.resource,
+                  encrypted: metadata.encrypted ? 'true' : 'false',
+                  payloadAccessMode: metadata.payloadAccessMode || '',
+                  payloadAccessControl: JSON.stringify(metadata.payloadAccessControl || {}),
+                  groupIds: metadata.groupIds?.length ? JSON.stringify(metadata.groupIds) : '',
+                },
+              });
+            } else {
               const value = JSON.stringify({ metadata, payloadBase64url: bytesToBase64url(bytes) });
               const tooLarge = rejectKvValueOverLimit({ serializedValue: value });
               if (tooLarge) fail('This payload needs an R2 binding on the restore target.', 413);
+              await journalBackupImportWrite(storage, page.archiveId, 'index', buildPayloadKey({ slug, id: entry.id }));
               await index.put(buildPayloadKey({ slug, id: entry.id }), value);
             }
             progress.counts.written += 1;
@@ -291,14 +340,11 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       : JSON.parse(await index.get(`${root}coordinator`) || 'null');
     validateSnapshot({ snapshot, manifest, ...validators });
     const authority = snapshot.configAuthority;
-    // Revision numbers alone do not prove lineage. An existing target must
-    // already have the same public authority; v1 never rolls it backwards.
-    if (current && !same(current, authority)) conflict('session-config-authority');
     if (!progress.counts.conflicts) {
       if (!progress.groupsComplete) {
         if (budget.remaining < 32) return pending();
         const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: 'import',
-          snapshot: snapshot.workerGroups, cursor: progress.groupCursor, operations: budget.remaining - 16 });
+          archiveId: page.archiveId, snapshot: snapshot.workerGroups, cursor: progress.groupCursor, operations: budget.remaining - 16 });
         if (!groups.ok) fail(groups.error || 'Group restore is unavailable.', groups.status || 503);
         budget.consume(groups.operations || 0);
         progress.counts.written += groups.counts.written;
@@ -309,15 +355,18 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
         await storage.put(stateKey, progress);
         if (groups.nextCursor) return pending();
       }
-      if (snapshot.secrets) await write(env.GROUP_KV, `session:${normalizeWorkerSessionSlug(slug)}:secrets`, JSON.stringify(snapshot.secrets), true);
+      if (snapshot.secrets) await write(budget.wrap(env.GROUP_KV), `session:${normalizeWorkerSessionSlug(slug)}:secrets`, JSON.stringify(snapshot.secrets), true, 'group');
       const signer = snapshot.wrappedSessionKeys.litAuthorizationSigner;
       if (signer) {
         const existing = await storage.get('session-lit-authorization-signer-v1');
-        if (existing && !same(existing, signer)) conflict('session-lit-authorization-signer-v1');
+        if (existing && (!await storage.get(backupImportJournalKey(page.archiveId, 'durable', 'session-lit-authorization-signer-v1')) || !same(existing, signer))) conflict('session-lit-authorization-signer-v1');
         else if (existing) progress.counts.skipped += 1;
-        else { await storage.put('session-lit-authorization-signer-v1', signer); progress.counts.written += 1; }
+        else {
+          await journalBackupImportWrite(storage, page.archiveId, 'durable', 'session-lit-authorization-signer-v1');
+          await storage.put('session-lit-authorization-signer-v1', signer); progress.counts.written += 1;
+        }
       }
-      if (!progress.counts.conflicts && !current) {
+      if (!progress.counts.conflicts && !progress.configPublished) {
         progress.configPublished = true;
         await storage.transaction(async (transaction) => {
           await transaction.put('session-config-authority', { ...authority, projectionPending: true, projectionPendingSinceMs: coordinator.now() });
@@ -326,8 +375,13 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
         await coordinator.projectSessionConfigAuthority(authority);
         progress.counts.written += 1;
       }
+      if (progress.configPublished) {
+        await coordinator.repairPendingSessionConfigProjection();
+        const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: 'finish', archiveId: page.archiveId });
+        if (!groups.ok) fail(groups.error || 'Group restore completion is unavailable.', groups.status || 503);
+      }
     }
-    progress.finished = true;
+    progress.finished = progress.configPublished && !progress.counts.conflicts;
   }
   const result = { ok: true, archiveId: page.archiveId, pageNumber: page.pageNumber, counts: progress.counts,
     conflicts: progress.conflicts, complete: progress.finished && !progress.counts.conflicts,

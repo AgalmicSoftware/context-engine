@@ -1180,36 +1180,41 @@ recovery key; a fingerprint cannot decrypt it.
 
 Backup restore reads JSONL as a UTF-8 stream, validating the complete file before
 signing and holding only one page while importing. Resuming reopens the selected
-file and skips completed pages. On a live target, an archived hidden marker
-conflicts if no marker exists now: the question may have been unhidden since
-export. Restore keeps the current visibility; a fresh target can restore the
-archived marker normally.
+file and skips completed pages. Restore requires an empty target session: no
+published config, records, payloads, visibility/ownership markers, groups or
+session keys. It never merges an archive into a live session. Rows already
+written by the same in-progress archive are identified by its durable journal
+and may be replayed when resuming.
 
 Restore with admin-signed `POST /admin/import-session-backup`, passing each
 saved response as `page` in its original order. The target must hold the source
 KEK as its current key or `CE_STORAGE_ENVELOPE_PREVIOUS_KEK`. The slug and session
 ID must match. A fresh deployment may pass `adoptSessionId: true`; only its
 trusted bootstrap admin can do this. Config authority is published after the
-last verified page. An existing target must have identical config authority
-and revision; a revision number alone does not establish common history.
+last verified page. Config, key and group mutations are held while a restore is
+in progress, so the target cannot become a live session halfway through import.
+On `/admin?sessionSlug=<slug>&worker=<origin>`, a missing canonical config shows
+the restore panel so the bootstrap admin can restore before the session exists.
+After restoration, retry session loading to open the restored Admin page.
 
 Restore uses original payload IDs, verifies chunk sizes and SHA-256, writes to
-R2 when bound (otherwise KV), and then publishes metadata. Identical existing
-records are skipped; different records produce conflicts and are never
+R2 when bound (otherwise KV), and then publishes metadata. Identical writes from
+this same archive are skipped; unexpected rows produce conflicts and are never
 overwritten. The response reports cumulative `written`, `skipped`, and
 `conflicts` counts and `complete`. Repeat an unchanged interrupted page to
 resume, or repeat an acknowledged page to receive its saved receipt. A reply
 with `pageComplete: false` requests the same page again to continue bounded
 entry processing, chunk cleanup or group publication; advance only after the
 page is acknowledged. The admin panel follows these continuations automatically. Only one
-archive may be in progress for a session. Conflicted restores finish with
-`complete: false`; use a fresh target to resolve conflicts. Temporary staging
-expires after seven days; the next restore or status request releases expired
-progress in bounded cleanup batches. Assembled payload chunks are removed immediately.
+archive may be in progress for a session. Conflicted restores remain unfinished
+with `complete: false`; abandon them before starting again. Temporary staging
+expires after seven days; the next restore or status request removes expired
+imports in bounded cleanup batches. Assembled payload chunks are removed immediately.
 Signed `POST /admin/session-backup-status` reports an unfinished restore. Signed
-`POST /admin/abandon-session-backup` with its `archiveId` removes staging and
-progress before that restore publishes config. Repeat until `complete: true`;
-existing records are kept. The deployment bootstrap admin can perform these
+`POST /admin/abandon-session-backup` with its `archiveId` removes every row that
+restore wrote, including KV/R2 payloads, records, groups, keys and temporary
+staging, using a write-ahead journal. Repeat until `complete: true`; the restore
+lock is released only after cleanup leaves the target empty. The deployment bootstrap admin can perform these
 actions on a fresh target. A completed or config-published restore cannot be
 abandoned.
 The target upload limit still applies, and payloads exceeding KV's encoded

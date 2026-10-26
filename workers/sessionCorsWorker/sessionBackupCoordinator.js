@@ -4,6 +4,7 @@ import { resolveWorkerGroupsKv, workerGroupBackupPrefixes } from './workerGroups
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { normalizeWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
 import { isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
+import { backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJournal } from './sessionBackupLifecycle.js';
 
 const json = (body, status = 200) => Response.json(body, { status });
 const fail = (message, status = 503) => { throw Object.assign(new Error(message), { status }); };
@@ -11,6 +12,7 @@ const object = (value) => !!value && typeof value === 'object' && !Array.isArray
 const parse = (raw) => typeof raw === 'string' ? JSON.parse(raw) : raw;
 
 const groupPrefixes = (slug) => ['ce-worker-group', 'ce-worker-group-index', 'ce-worker-group-member', 'ce-worker-group-principal'].map((kind) => `${kind}:${slug}:`);
+export const BACKUP_GROUP_IMPORT_ACTIVE_KEY = 'worker-group-backup-import-active';
 const scopedGroupRecords = (records, slug, sessionId) => {
   const canonical = workerGroupBackupPrefixes({ slug, sessionId });
   const allowed = new Set(records.filter(([key]) => canonical.some((prefix) => key.startsWith(prefix))).map(([key]) => key));
@@ -76,11 +78,43 @@ export const exportWorkerGroupBackup = async (coordinator, payload) => {
   }));
 };
 
+export const controlWorkerGroupBackupImport = async (coordinator, payload, operation) => {
+  const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+  const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+  const { archiveId } = payload;
+  if (!slug || !sessionId || !/^[a-f0-9]{64}$/.test(archiveId || '')) fail('Invalid group restore identity.', 400);
+  const { storage } = coordinator.state;
+  const active = await storage.get(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
+  if (active && active !== archiveId) fail('Another group restore is in progress.', 409);
+  const kv = resolveWorkerGroupsKv(coordinator.env);
+  if (!kv?.list || !kv?.delete) fail('Group restore storage is unavailable.');
+  if (operation === 'begin') {
+    if (active) return json({ ok: true, operations: 0 });
+    const nonempty = () => { throw Object.assign(new Error('Restore requires an empty target session.'), { status: 409, reason: 'backup_target_not_empty' }); };
+    if ((await storage.list({ prefix: 'worker-group-capacity-', limit: 1 })).size) nonempty();
+    for (const prefix of groupPrefixes(slug)) {
+      const rows = await kv.list({ prefix, limit: 1 });
+      if (!Array.isArray(rows.keys)) fail('Group restore storage could not be checked.');
+      if (rows.keys.length || rows.list_complete === false) nonempty();
+    }
+    if (!payload.checkOnly) await storage.put(BACKUP_GROUP_IMPORT_ACTIVE_KEY, archiveId);
+    return json({ ok: true, operations: 5 });
+  }
+  if (operation === 'abandon') {
+    const result = await cleanupBackupImportJournal(storage, archiveId, { group: kv, durable: storage });
+    if (result.complete) await storage.delete(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
+    return json({ ok: true, ...result });
+  }
+  await storage.delete(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
+  return json({ ok: true });
+};
+
 export const importWorkerGroupBackup = async (coordinator, payload) => {
   const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
   const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
   const snapshot = payload?.snapshot;
   if (!slug || !sessionId || !Array.isArray(snapshot?.durable) || !Array.isArray(snapshot?.records)) fail('Invalid group backup.', 400);
+  if (!payload.archiveId || await coordinator.state.storage.get(BACKUP_GROUP_IMPORT_ACTIVE_KEY) !== payload.archiveId) fail('The group restore has not reserved an empty target.', 409);
   const scoped = scopedGroupRecords(snapshot.records, slug, sessionId);
   if (scoped.length !== snapshot.records.length) fail('Invalid group backup scope.', 400);
   const seen = new Set();
@@ -97,8 +131,8 @@ export const importWorkerGroupBackup = async (coordinator, payload) => {
   if (!kv?.get || !kv?.put) fail('Group restore storage is unavailable.');
   const counts = { written: 0, skipped: 0 };
   const conflicts = [];
-  // A bounded preflight checks existing rows before publication. The apply
-  // pass rechecks each row, preserving changes made between signed pages.
+  // Only this archive may have rows here. Rechecking identical writes makes
+  // retry after a lost reply safe; journal before every first write for rollback.
   let phase = payload.cursor?.phase || 'check';
   let offset = payload.cursor?.offset || 0;
   if (!['check', 'apply'].includes(phase) || !Number.isSafeInteger(offset) || offset < 0) fail('Invalid group restore cursor.', 400);
@@ -111,12 +145,17 @@ export const importWorkerGroupBackup = async (coordinator, payload) => {
       if (operations + 2 > limit) return json({ ok: true, counts, conflicts, operations, nextCursor: { phase, offset } });
       const [key, value] = rows[offset];
       const store = key.startsWith('worker-group-capacity-') ? coordinator.state.storage : kv;
+      const kind = store === kv ? 'group' : 'durable';
       const existing = await store.get(key);
       operations += 1;
-      if (existing != null && JSON.stringify(existing) !== JSON.stringify(value)) conflicts.push(key);
+      if (existing != null && (!await coordinator.state.storage.get(backupImportJournalKey(payload.archiveId, kind, key)) ||
+          JSON.stringify(existing) !== JSON.stringify(value))) conflicts.push(key);
       else if (phase === 'apply') {
         if (existing != null) counts.skipped += 1;
-        else { await store.put(key, value); operations += 1; counts.written += 1; }
+        else {
+          await journalBackupImportWrite(coordinator.state.storage, payload.archiveId, kind, key);
+          await store.put(key, value); operations += 1; counts.written += 1;
+        }
       }
     }
     if (phase === 'apply' || conflicts.length) return json({ ok: true, counts, conflicts, operations, nextCursor: null });

@@ -1,10 +1,10 @@
-import { controlCoordinatorBackupImport } from './sessionBackupLifecycle.js';
+import { controlCoordinatorBackupImport, assertNoActiveBackupImport } from './sessionBackupLifecycle.js';
 import { registerUploadReceiptStore, dispatchUploadReceiptIndex, sweepUploadReceiptIndex } from './sessionDiagnostics.js';
 import { bumpStorageBackupRevision } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
 import { assertExpectedSessionAuthority } from './sessionConfigAuthority.js';
-import { exportCoordinatorBackup, exportWorkerGroupBackup, importWorkerGroupBackup } from './sessionBackupCoordinator.js';
+import { exportCoordinatorBackup, exportWorkerGroupBackup, importWorkerGroupBackup, controlWorkerGroupBackupImport, BACKUP_GROUP_IMPORT_ACTIVE_KEY } from './sessionBackupCoordinator.js';
 import { importCoordinatorBackupPage } from './sessionBackupImport.js';
 import { normalizeStorageRef } from './storageRefNormalization.js';
 import {
@@ -1120,6 +1120,9 @@ export class SessionWriteCoordinator {
   }
 
   async initializeWorkerGroupCapacity(slug, sessionId) {
+    if (await this.state.storage.get(BACKUP_GROUP_IMPORT_ACTIVE_KEY)) return {
+      ok: false, status: 409, reason: 'backup_restore_in_progress',
+    };
     const existing = await this.state.storage.get(WORKER_GROUP_CAPACITY_META_KEY);
     const initialized = resolveInitializedWorkerGroupCapacity(existing, slug, sessionId);
     if (initialized) return initialized;
@@ -2088,10 +2091,11 @@ export class SessionWriteCoordinator {
     });
   }
 
-  async assertSessionAuthority(payload) {
+  async assertSessionAuthority(payload, { allowRestore = false } = {}) {
     const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     const authority = slug ? await this.readSessionConfigAuthority(slug) : null;
     assertExpectedSessionAuthority(authority, payload?.expectedAuthority, slug);
+    if (!allowRestore) await assertNoActiveBackupImport(this);
     return authority;
   }
 
@@ -2226,6 +2230,8 @@ export class SessionWriteCoordinator {
 
   async executeStorageEnvelopeKeyGetOrCreate(payload) {
     return this.serializeSessionConfigOperation(async () => {
+      try { await assertNoActiveBackupImport(this); }
+      catch (error) { return jsonResponse({ error: error.message, reason: error.reason }, error.status || 503); }
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const baseConfig = slug ? normalizePublicSessionConfig(payload?.baseConfig, slug) : null;
       const candidate = normalizeWrappedSessionKeyRecord(payload?.candidateRecord, slug);
@@ -2879,11 +2885,15 @@ export class SessionWriteCoordinator {
         catch (error) { return jsonResponse({ error: error.message, ...(error.reason ? { reason: error.reason } : {}) }, error.status || 503); }
       });
     }
-    if (url.pathname === '/worker-groups/backup/export' || url.pathname === '/worker-groups/backup/import') {
+    if (['export', 'import', 'begin', 'abandon', 'finish'].some((operation) => url.pathname === `/worker-groups/backup/${operation}`)) {
       if (url.hostname !== 'session-coordinator.internal') return jsonResponse({ error: 'Not found.' }, 404);
       return this.serializeWorkerGroupOperation(async () => {
-        try { return await (url.pathname.endsWith('/import') ? importWorkerGroupBackup : exportWorkerGroupBackup)(this, payload); }
-        catch (error) { return jsonResponse({ error: error.message }, error.status || 503); }
+        try {
+          const operation = url.pathname.split('/').at(-1);
+          if (operation === 'export') return await exportWorkerGroupBackup(this, payload);
+          if (operation === 'import') return await importWorkerGroupBackup(this, payload);
+          return await controlWorkerGroupBackupImport(this, payload, operation);
+        } catch (error) { return jsonResponse({ error: error.message, ...(error.reason ? { reason: error.reason } : {}) }, error.status || 503); }
       });
     }
     if (url.pathname === '/session-config/storage/set-hidden') return this.executeStorageVisibilityMutation(payload);

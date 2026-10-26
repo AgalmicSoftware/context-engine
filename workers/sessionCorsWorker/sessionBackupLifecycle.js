@@ -1,5 +1,6 @@
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
-import { getStorageIndexBinding } from './storageRouteExecution.js';
+import { getStorageIndexBinding, getStorageR2Binding } from './storageRouteExecution.js';
+import { coordinateWorkerGroupBackup } from './workerGroups.js';
 
 export const BACKUP_IMPORT_TTL_MS = 7 * 86400 * 1000;
 export const BACKUP_IMPORT_ACTIVE_KEY = 'session-backup-import-active';
@@ -7,9 +8,32 @@ export const backupImportStateKey = (archiveId) => `session-backup-import:${arch
 export const backupImportStagePrefix = (slug, archiveId) => `ce-import-stage:${sessionSlugStorageKey(slug)}:${archiveId}:`;
 const fail = (message) => { throw Object.assign(new Error(message), { status: 409 }); };
 
-// Abandonment removes temporary chunks and progress, never existing records.
-// A large staging area is cleaned in bounded requests; the lock stays held
-// until cleanup finishes, so no second archive can reuse its state.
+export const backupImportJournalKey = (archiveId, kind, key) => `${backupImportStateKey(archiveId)}:journal:${kind}:${encodeURIComponent(key)}`;
+export const journalBackupImportWrite = (storage, archiveId, kind, key) =>
+  storage.put(backupImportJournalKey(archiveId, kind, key), { kind, key });
+
+export const cleanupBackupImportJournal = async (storage, archiveId, stores) => {
+  const rows = await storage.list({ prefix: `${backupImportStateKey(archiveId)}:journal:`, limit: 100 });
+  for (const [name, { kind, key }] of rows) {
+    if (!stores[kind]?.delete) throw new Error('Restore cleanup storage is unavailable.');
+    // Delete the journal entry last: a lost reply can only repeat a deletion.
+    await stores[kind].delete(key);
+    await storage.delete(name);
+  }
+  return { complete: rows.size < 100, operations: rows.size * 2 + 1 };
+};
+
+export const assertNoActiveBackupImport = async (coordinator) => {
+  const { storage } = coordinator.state;
+  const archiveId = await storage.get(BACKUP_IMPORT_ACTIVE_KEY);
+  const progress = archiveId && await storage.get(backupImportStateKey(archiveId));
+  if (progress && !progress.finished) throw Object.assign(new Error('A backup restore is in progress. Resume or abandon it first.'),
+    { status: 409, reason: 'backup_restore_in_progress' });
+};
+
+// The target was empty before this archive. Its write-ahead journals include
+// rows whose write completed just before an interruption or expired staging.
+// Keep the lock until every imported row and temporary chunk has been removed.
 const cleanup = async (coordinator, slug, archiveId, progress, budget) => {
   const { storage } = coordinator.state;
   const key = backupImportStateKey(archiveId);
@@ -17,6 +41,16 @@ const cleanup = async (coordinator, slug, archiveId, progress, budget) => {
   await storage.put(key, progress);
   const rawIndex = getStorageIndexBinding(coordinator.env);
   const index = budget ? budget.wrap(rawIndex) : rawIndex;
+  const groups = await coordinateWorkerGroupBackup({ env: coordinator.env, slug, sessionId: progress.manifest.sessionId,
+    operation: 'abandon', archiveId });
+  if (!groups.ok) throw Object.assign(new Error(groups.error || 'Group restore cleanup is unavailable.'), { status: groups.status || 503 });
+  budget?.consume(groups.operations || 0);
+  if (!groups.complete) return false;
+  const groupKv = budget ? budget.wrap(coordinator.env.GROUP_KV) : coordinator.env.GROUP_KV;
+  const journal = await cleanupBackupImportJournal(storage, archiveId, {
+    index, group: groupKv, durable: storage, r2: getStorageR2Binding(coordinator.env),
+  });
+  if (!journal.complete) return false;
   const staged = await index.list({ prefix: backupImportStagePrefix(slug, archiveId), limit: 200 });
   for (const { name } of staged.keys || []) await index.delete(name);
   if (staged.list_complete === false) return false;
@@ -42,7 +76,7 @@ export const readActiveBackupImport = async (coordinator, slug, cleanExpired = t
 };
 
 export const controlCoordinatorBackupImport = async (coordinator, payload, abandon = false) => {
-  await coordinator.assertSessionAuthority(payload);
+  await coordinator.assertSessionAuthority(payload, { allowRestore: true });
   const active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
   if (abandon) {
     if (!active || active.archiveId !== payload.archiveId || active.progress.configPublished) {

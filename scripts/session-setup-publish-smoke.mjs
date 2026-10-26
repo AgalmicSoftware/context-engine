@@ -52,7 +52,7 @@ const browser = await chromium.launch({
   args: [`--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE ${new URL(baseUrl).hostname}`],
 });
 const calls = [];
-const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, loseResponseUploadAt = 0, deferLostResponseListingUntilReplay = false, unavailableSubmit = false, responseUploads = [] } = {}) => {
+const fixtureContext = async ({ seed }, { workerEnv = env, failResponseUploadAt = 0, loseResponseUploadAt = 0, deferLostResponseListingUntilReplay = false, unavailableSubmit = false, responseUploads = [] } = {}) => {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     serviceWorkers: 'block',
@@ -99,7 +99,7 @@ const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, loseResponse
         headers: request.headers(),
         body: request.postDataBuffer() || undefined,
       }),
-      env,
+      workerEnv,
       { waitUntil: () => {} },
     );
     if (!failUpload && request.headers().origin) {
@@ -515,8 +515,28 @@ try {
   await page.getByTestId('ce-admin-backup-file').setInputFiles(backupPath);
   await page.getByRole('status').filter({ hasText: 'Ready to restore' }).waitFor();
   await page.getByTestId('ce-admin-backup-restore').click();
+  await page.getByRole('alert').filter({ hasText: 'Restore requires an empty target session' }).waitFor();
+  const sourceAdminPage = page;
+  const restoreEnv = installSessionCoordinatorBinding({
+    GROUP_KV: kv(), CE_STORAGE_INDEX_KV: kv(), DEFAULT_SESSION_SLUG: slug,
+    BOOTSTRAP_ADMIN_ADDRESS: admin.address, LOGIN_TRUSTED_ORIGINS: baseUrl, ADMIN_TRUSTED_ORIGINS: baseUrl,
+    TOKEN_HMAC_SECRET: 'synthetic-fresh-restore-token-key', CE_STORAGE_ENVELOPE_KEK: env.CE_STORAGE_ENVELOPE_KEK,
+  });
+  const restoreContext = await fixtureContext(adminFixture, { workerEnv: restoreEnv });
+  page = await restoreContext.newPage();
+  await page.goto(adminUrl.href, { waitUntil: 'domcontentloaded' });
+  await login(page, admin);
+  await page.getByTestId('ce-admin-session-backup').waitFor();
+  await page.getByTestId('ce-admin-backup-file').setInputFiles(backupPath);
+  await page.getByRole('status').filter({ hasText: 'Ready to restore' }).waitFor();
+  await page.getByLabel('Adopt the backup session ID on a fresh deployment').check();
+  await page.getByTestId('ce-admin-backup-restore').click();
   await page.getByRole('status').filter({ hasText: 'Restore complete.' }).waitFor({ timeout: 120000 });
+  assert.deepEqual([...restoreEnv.CE_STORAGE_INDEX_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(),
+    [...env.CE_STORAGE_INDEX_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(), 'Fresh restore preserves every metadata record');
   await page.getByTestId('ce-admin-session-backup').screenshot({ path: `${outputDir}/admin-backup-restore.png`, timeout: 10000 });
+  await restoreContext.close();
+  page = sourceAdminPage;
   const originalTheme = await page.evaluate(() => document.documentElement.getAttribute('data-ce-theme'));
   for (const theme of ['context-engine', 'classic-95', 'civic']) {
     await page.evaluate((value) => document.documentElement.setAttribute('data-ce-theme', value), theme);
@@ -524,7 +544,7 @@ try {
     await diagnostics.screenshot({ path: `${outputDir}/admin-diagnostics-${theme}.png` });
   }
   await page.evaluate((value) => value ? document.documentElement.setAttribute('data-ce-theme', value) : document.documentElement.removeAttribute('data-ce-theme'), originalTheme);
-  console.log('Admin downloaded a complete JSONL backup and restored it idempotently through signed requests.');
+  console.log('Admin downloaded a complete JSONL backup, refused a live target, and restored a fresh target through signed requests.');
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByTestId('ce-admin-recovery-key-show').click();
   await page.getByRole('heading', { name: 'Save your recovery key' }).waitFor();
@@ -573,7 +593,7 @@ try {
           'failed upload then reload keeps the unsaved draft and uploads it once',
           'three concurrent two-tab bookmark pairs survive reload',
           'explicit submit readiness refusal retains the draft without uploading',
-          'admin JSONL download and idempotent signed restore',
+          'admin JSONL download, live-target refusal and signed restore into an empty target',
           'admin diagnostics across five participant receipt stores',
           'confirmed masked recovery-key download without browser persistence',
           'backup and recovery-key screenshots in all three themes',

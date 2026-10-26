@@ -85,6 +85,26 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     window.sessionStorage.clear();
   });
 
+  it.each(['missing_config', 'identity_mismatch', 'cors'] as const)(
+    'offers empty-deployment recovery only for a missing config (%s)',
+    async (code) => {
+      mockFetchBootstrap.mockRejectedValueOnce(new WorkerSessionBootstrapRequestError('Unavailable', { code }));
+      const onResolved = jest.fn();
+      render(
+        <WorkerCanonicalSessionBootstrapBoundary
+          sessionSlug="worker-session"
+          workerQueryValue={WORKER_ORIGIN}
+          onResolved={onResolved}
+          missingConfigFallback={<div>Restore an empty deployment</div>}
+        />,
+      );
+      await screen.findByRole('alert');
+      expect(Boolean(screen.queryByText('Restore an empty deployment'))).toBe(code === 'missing_config');
+      expect(onResolved).not.toHaveBeenCalled();
+      expect(mockMarkBootstrapVerified).not.toHaveBeenCalled();
+    },
+  );
+
   it('renders loading state, resolves through discovery, caches without repinning, and reports the bootstrap', async () => {
     const fetchImpl = jest.fn() as unknown as typeof fetch;
     const onResolved = jest.fn();

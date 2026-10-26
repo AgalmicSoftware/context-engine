@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import LazyFallback from '../Shared/LazyFallback';
@@ -25,6 +25,7 @@ type WorkerCanonicalSessionBootstrapBoundaryProps = {
   fetchImpl?: typeof fetch;
   confirmRepin?: ((message: string) => boolean | Promise<boolean>) | null;
   retryDelaysMs?: readonly number[];
+  missingConfigFallback?: ReactNode;
 };
 
 type BootstrapViewState = {
@@ -82,6 +83,7 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
   fetchImpl,
   confirmRepin,
   retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
+  missingConfigFallback,
 }: WorkerCanonicalSessionBootstrapBoundaryProps) => {
   const [retryNonce, setRetryNonce] = useState(0);
   const [viewState, setViewState] = useState<BootstrapViewState>({
@@ -210,6 +212,7 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
             <a href={buildPublicRoute('/new')}>Return to session selection</a>
           </div>
         </div>
+        {viewState.errorKind === 'missing_config' && missingConfigFallback}
         <BootRecoveryReady />
       </>
     );

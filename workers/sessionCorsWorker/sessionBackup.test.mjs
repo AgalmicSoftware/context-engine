@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { installSessionCoordinatorBinding, createSignedSiweBody, makeJsonRequest } from '../../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { createWorkerRuntime } from './worker.js';
+import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 import { storageRoute } from './storageRouteExecution.js';
 import { exportSessionBackup as exportPage } from './sessionBackup.js';
 import { STORAGE_EXPORT_PAGE_LIMITS } from './storageScanBudget.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
-import { workerGroupBackupPrefixes } from './workerGroups.js';
+import { workerGroupBackupPrefixes, coordinateWorkerGroupBackup } from './workerGroups.js';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
@@ -49,6 +50,7 @@ const memoryR2 = () => {
         httpMetadata: item.httpMetadata, arrayBuffer: async () => item.bytes.slice().buffer } : null;
     },
     put: async (key, bytes, options = {}) => objects.set(key, { bytes: new Uint8Array(bytes), ...options }),
+    delete: async (key) => objects.delete(key),
     list: async ({ prefix = '', cursor = '', limit = 1000 } = {}) => {
       const names = [...objects.keys()].filter((key) => key.startsWith(prefix) && key > cursor).sort();
       const page = names.slice(0, limit);
@@ -57,11 +59,11 @@ const memoryR2 = () => {
     },
   };
 };
-const fixture = () => {
+const fixture = (CoordinatorClass) => {
   const kv = memoryKv();
   const env = installSessionCoordinatorBinding({ GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv,
     CE_STORAGE_ENVELOPE_KEK: 'a'.repeat(64), TOKEN_HMAC_SECRET: 'synthetic-hmac',
-  });
+  }, CoordinatorClass);
   kv.values.set(`session:${slug}:config`, JSON.stringify({ slug, sessionId, adminAddress: admin,
     chainId: 11155420, registryChainId: 11155420, storageProfile: { mode: 'pure', metadata: 'cloudflare', answers: 'cloudflare',
       payloadAccessControl: { gate: 'public', encryption: 'none' } } }));
@@ -221,7 +223,7 @@ test('backup export refuses modified, unsigned, or foreign-session cursors befor
   assert.equal(stale.reason, 'backup_session_changed', 'A valid cursor cannot conceal concurrent writes');
 });
 
-test('restore validates recovery keys, skips page replays, and never overwrites a conflicting row', async () => {
+test('restore validates recovery keys, skips page replays, and refuses a nonempty target', async () => {
   const source = fixture();
   const metadata = { id: 'cf_restore_answer', resource: 'responses', responder: admin, size: 5, storageLayer: 'kv' };
   const indexKey = `ce-storage:${slug}:responses:${metadata.id}`;
@@ -240,12 +242,16 @@ test('restore validates recovery keys, skips page replays, and never overwrites 
       assert.equal(result.status, 409);
       assert.equal(result.body.reason, 'recovery_key_mismatch');
       assert.equal(target.kv.values.size, 0);
+    } else if (mode === 'conflict') {
+      assert.equal(result.status, 409);
+      assert.equal(result.body.reason, 'backup_target_not_empty');
+      assert.deepEqual([...target.kv.values], [[indexKey, '{"different":true}']]);
     } else {
       assert.equal(result.ok, true, JSON.stringify(result));
-      assert.equal(result.body.complete, mode !== 'conflict');
-      assert.equal(result.body.counts.conflicts, mode === 'conflict' ? 1 : 0);
-      assert.equal(await target.kv.get(indexKey), mode === 'conflict' ? '{"different":true}' : JSON.stringify(metadata));
-      const replay = await importPage(target.env, page, mode === 'conflict' ? 0 : 1);
+      assert.equal(result.body.complete, true);
+      assert.equal(result.body.counts.conflicts, 0);
+      assert.equal(await target.kv.get(indexKey), JSON.stringify(metadata));
+      const replay = await importPage(target.env, page, 1);
       assert.equal(replay.body.replayed, true);
       assert.deepEqual(replay.body.counts, result.body.counts);
     }
@@ -554,6 +560,148 @@ const largeArchiveSource = () => {
 const restoreControl = (env, operation, archiveId, revision = 0) => callSessionConfigCoordinator({ env, slug,
   path: `backup/${operation}`, expectedAuthority: { ...expectedAuthority, revision }, archiveId });
 
+test('restore refuses targets containing config, rows, payloads, groups, or keys', async () => {
+  const [page] = await allPages(fixture().env);
+  for (const kind of ['config', 'record', 'payload', 'owner', 'hidden', 'r2', 'group', 'group-durable', 'secret', 'signer']) {
+    const target = fixture();
+    if (kind !== 'config') target.kv.values.delete(`session:${slug}:config`);
+    const keys = {
+      record: `ce-storage:${slug}:responses:cf_existing`, payload: `ce-storage-payload:${slug}:cf_existing`,
+      owner: `ce-storage-owner:${slug}:questions:0xabc`, hidden: `ce-storage-hidden:${slug}:questions:0xabc`,
+      group: `${workerGroupBackupPrefixes({ slug, sessionId })[0]}existing`, secret: `session:${slug}:secrets`,
+    };
+    if (keys[kind]) target.kv.values.set(keys[kind], '{}');
+    if (kind === 'r2') {
+      target.env.CE_STORAGE_R2 = memoryR2();
+      await target.env.CE_STORAGE_R2.put(`sessions/${slug}/storage/cf_existing`, Buffer.from('existing'));
+    }
+    if (kind === 'group-durable') {
+      await coordinateWorkerGroupBackup({ env: target.env, slug, sessionId, operation: 'export' });
+      const store = [...target.env.__coordinatorInstances.values()].find(({ store }) => [...store.keys()].some((key) => key.startsWith('worker-group-backup-meta:'))).store;
+      store.set('worker-group-capacity-meta-v3', { slug, sessionId, groupCount: 1 });
+    }
+    if (kind === 'signer') {
+      await callSessionConfigCoordinator({ env: target.env, slug, path: 'current' });
+      [...target.env.__coordinatorInstances.values()][0].store.set('session-lit-authorization-signer-v1', { version: 1 });
+    }
+    const before = [...target.kv.values];
+    const result = await importPage(target.env, page, kind === 'config' ? 1 : 0);
+    assert.equal(result.status, 409, `${kind}: ${JSON.stringify(result)}`);
+    assert.equal(result.body.reason, 'backup_target_not_empty', kind);
+    assert.deepEqual([...target.kv.values], before, 'Refused import must not write or delete session rows');
+  }
+});
+
+test('abandonment removes imported visibility and payload rows before a different archive can start', async () => {
+  const source = fixture();
+  const hiddenKey = `ce-storage-hidden:${slug}:questions:0xabc`;
+  source.kv.values.set(hiddenKey, '{"hidden":true}');
+  for (let n = 0; n < 120; n += 1) {
+    const id = `cf_a${String(n).padStart(3, '0')}`;
+    const metadata = { id, resource: 'responses', size: 6 };
+    source.kv.values.set(`ce-storage:${slug}:responses:${id}`, JSON.stringify(metadata));
+    source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('answer').toString('base64url') }));
+  }
+  const older = await allPages(source.env);
+  assert.ok(older.length > 1);
+  source.kv.values.delete(hiddenKey);
+  const newer = await allPages(source.env);
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  for (const page of older.slice(0, -1)) assert.equal((await importPage(target.env, page)).ok, true);
+  assert.ok(await target.kv.get(hiddenKey));
+  assert.equal((await importPage(target.env, newer[0])).body.reason, 'backup_restore_in_progress');
+  let batches = 0;
+  for (;;) {
+    const result = await restoreControl(target.env, 'abandon', older[0].archiveId);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    if (result.body.complete) break;
+    assert.ok(++batches < 20);
+  }
+  assert.equal(target.kv.values.size, 0, 'All rows from the abandoned archive are removed');
+  let result;
+  for (const page of newer) result = await importPage(target.env, page);
+  assert.equal(result.body.complete, true, JSON.stringify(result));
+  assert.equal(result.body.counts.conflicts, 0);
+  assert.equal(await target.kv.get(hiddenKey), null, 'The new archive does not inherit the old visibility marker');
+});
+
+test('abandonment journals every storage kind before a write and resumes interrupted deletions', async () => {
+  const source = fixture();
+  const metadata = { id: 'cf_journal', resource: 'responses', storageLayer: 'kv', size: 6 };
+  source.kv.values.set(`ce-storage:${slug}:responses:cf_journal`, JSON.stringify(metadata));
+  source.kv.values.set(`ce-storage-payload:${slug}:cf_journal`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('answer').toString('base64url') }));
+  source.kv.values.set(`ce-storage-hidden:${slug}:questions:0xabc`, '{"hidden":true}');
+  source.kv.values.set(`ce-storage-owner:${slug}:questions:0xabc`, '{"uploader":"legacy-admin-only"}');
+  source.kv.values.set(`${workerGroupBackupPrefixes({ slug, sessionId })[0]}fixture`, '{}');
+  await putSessionSecrets(source.env, slug, { openaiKey: 'synthetic-journal-secret' });
+  await callSessionConfigCoordinator({ env: source.env, slug, path: 'backup/export', expectedAuthority });
+  [...source.env.__coordinatorInstances.values()][0].store.set('session-lit-authorization-signer-v1', {
+    version: 1, slug, envelope: JSON.parse(await source.kv.get(`session:${slug}:secrets`)),
+  });
+  await coordinateWorkerGroupBackup({ env: source.env, slug, sessionId, operation: 'export' });
+  const groupStore = [...source.env.__coordinatorInstances.values()].find(({ store }) => [...store.keys()].some((key) => key.startsWith('worker-group-backup-meta:'))).store;
+  groupStore.set('worker-group-capacity-meta-v3', { version: 3, slug, sessionId, phase: 'ready', groupCount: 1 });
+  const [page] = await allPages(source.env);
+  assert.equal(page.manifest.complete, true);
+  const failures = [
+    `ce-storage:${slug}:`, `ce-storage-payload:${slug}:`, `ce-storage-hidden:${slug}:`, `ce-storage-owner:${slug}:`,
+    'ce-worker-group:', 'worker-group-capacity-meta-v3', `session:${slug}:secrets`,
+    'session-lit-authorization-signer-v1', `sessions/${slug}/storage/`, 'ce-import-stage:',
+  ];
+  for (const prefix of failures) {
+    let interrupted = false;
+    const failAfterWrite = (key) => {
+      if (!interrupted && key.startsWith(prefix)) { interrupted = true; throw new Error('Synthetic lost write reply'); }
+    };
+    class InterruptedCoordinator extends SessionWriteCoordinator {
+      constructor(state, env) {
+        super(state, env);
+        const put = state.storage.put;
+        state.storage.put = async (key, value) => { await put(key, value); failAfterWrite(key); };
+      }
+    }
+    const target = fixture(InterruptedCoordinator);
+    target.kv.values.delete(`session:${slug}:config`);
+    const put = target.kv.put;
+    target.kv.put = async (key, value) => { await put(key, value); failAfterWrite(key); };
+    if (prefix.startsWith('sessions/')) {
+      target.env.CE_STORAGE_R2 = memoryR2();
+      const putObject = target.env.CE_STORAGE_R2.put;
+      target.env.CE_STORAGE_R2.put = async (key, bytes, options) => { await putObject(key, bytes, options); failAfterWrite(key); };
+    }
+    const result = await importPage(target.env, page);
+    assert.equal(result.status, 503, `${prefix}: ${JSON.stringify(result)}`);
+    assert.equal(interrupted, true, prefix);
+    assert.equal(await target.kv.get(`session:${slug}:config`), null);
+    const list = target.kv.list;
+    target.kv.list = async (options) => options.prefix.startsWith('ce-import-stage:')
+      ? { keys: [], list_complete: true } : list(options);
+    const mutation = await callSessionConfigCoordinator({ env: target.env, slug, path: 'mutate',
+      expectedAuthority: { ...expectedAuthority, revision: 0 }, mutation: { action: 'set-config', config: {} } });
+    assert.equal(mutation.status, 409, 'An unfinished restore prevents concurrent config publication');
+    let interruptedDelete = false;
+    const remove = target.kv.delete;
+    target.kv.delete = async (key) => {
+      await remove(key);
+      if (!interruptedDelete) { interruptedDelete = true; throw new Error('Synthetic lost delete reply'); }
+    };
+    assert.equal((await restoreControl(target.env, 'abandon', page.archiveId)).status, 503);
+    let cleaned = false;
+    for (let n = 0; n < 20 && !cleaned; n += 1) {
+      const abandoned = await restoreControl(target.env, 'abandon', page.archiveId);
+      assert.equal(abandoned.ok, true, JSON.stringify(abandoned));
+      cleaned = abandoned.body.complete;
+    }
+    assert.equal(cleaned, true);
+    assert.equal(target.kv.values.size, 0, prefix);
+    if (target.env.CE_STORAGE_R2) assert.equal((await target.env.CE_STORAGE_R2.list()).objects.length, 0);
+    for (const { store } of target.env.__coordinatorInstances.values()) {
+      assert.equal([...store.keys()].some((key) => /^(session-backup-import|worker-group-capacity-|worker-group-backup-import|session-lit-authorization-signer)/.test(key)), false, prefix);
+    }
+  }
+});
+
 test('unfinished restores can be abandoned, expire, and never abandon a published config', async () => {
   const source = largeArchiveSource();
   const pages = await allPages(source.env);
@@ -696,7 +844,7 @@ test('cached group snapshots detect mutations during an export page and reclaim 
 });
 
 
-test('a live restore reports a hidden-marker conflict after the question was unhidden', async () => {
+test('restore refuses live sessions regardless of whether their hidden markers match', async () => {
   const source = fixture();
   const key = `ce-storage-hidden:${slug}:questions:0xabc`;
   const marker = JSON.stringify({ hidden: true, updatedAt: '2026-01-01T00:00:00.000Z' });
@@ -708,10 +856,14 @@ test('a live restore reports a hidden-marker conflict after the question was unh
     if (mode === 'hidden') target.kv.values.set(key, marker);
     let result;
     for (const page of pages) result = await importPage(target.env, page, mode === 'fresh' ? 0 : 1);
-    assert.equal(result.ok, true, JSON.stringify(result));
-    assert.equal(result.body.counts.conflicts, mode === 'unhidden' ? 1 : 0);
-    assert.equal(result.body.complete, mode !== 'unhidden');
+    assert.equal(result.ok, mode === 'fresh', JSON.stringify(result));
+    if (mode === 'fresh') {
+      assert.equal(result.body.counts.conflicts, 0);
+      assert.equal(result.body.complete, true);
+    } else {
+      assert.equal(result.status, 409);
+      assert.equal(result.body.reason, 'backup_target_not_empty');
+    }
     assert.equal(await target.kv.get(key), mode === 'unhidden' ? null : marker);
-    if (mode === 'unhidden') assert.ok(result.body.conflicts.includes(key));
   }
 });
