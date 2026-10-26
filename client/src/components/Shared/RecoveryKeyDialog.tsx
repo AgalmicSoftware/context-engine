@@ -25,7 +25,7 @@ const RecoveryKeyDialog = ({ value, onContinue }: { value: RecoveryKeyDisplay; o
           `Fingerprint: ${value.fingerprint}`,
           '',
           '1. Keep this key private and save a complete session backup from admin settings.',
-          '2. On a replacement Worker, bind this value as CE_STORAGE_ENVELOPE_KEK (or CE_STORAGE_ENVELOPE_PREVIOUS_KEK when rotating).',
+          '2. On a replacement Worker, bind this value as CE_STORAGE_ENVELOPE_KEK (or CE_STORAGE_ENVELOPE_PREVIOUS_KEK for break-glass recovery).',
           '3. Use the same session slug, connect the bootstrap admin wallet, and import the backup from Backup & restore.',
         ].join('\n') + '\n';
       const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
@@ -52,7 +52,7 @@ const RecoveryKeyDialog = ({ value, onContinue }: { value: RecoveryKeyDisplay; o
           This key unlocks encrypted session data and saved service credentials. Keep it private with your session
           backup.
         </p>
-        {value.recoveryKey && (
+        {value.recoveryKey && value.supplied !== undefined && (
           <p role="status">
             {value.supplied
               ? 'The Worker uses your supplied recovery key.'

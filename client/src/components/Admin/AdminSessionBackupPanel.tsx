@@ -58,6 +58,41 @@ const saveFile = (pages: BackupPage[], slug: string, partial = false) => {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 };
 
+// The archive can exceed the JS string limit; only one bounded page is decoded
+// at a time. Reopening the immutable File lets an interrupted import resume.
+async function* readBackupPages(file: File): AsyncGenerator<unknown> {
+  const reader = file.stream().pipeThrough(new TextDecoderStream()).getReader();
+  let pending = '';
+  const parse = (line: string): unknown => {
+    if (line.length > 4 * 1024 * 1024) throw new Error('A backup page exceeds the 4 MiB limit.');
+    try {
+      return JSON.parse(line);
+    } catch {
+      throw new Error('This file is not valid backup JSONL.');
+    }
+  };
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      pending += value || '';
+      let newline;
+      while ((newline = pending.indexOf('\n')) >= 0) {
+        const line = pending.slice(0, newline);
+        pending = pending.slice(newline + 1);
+        if (line.trim()) yield parse(line);
+      }
+      if (pending.length > 4 * 1024 * 1024) throw new Error('A backup page exceeds the 4 MiB limit.');
+      if (done) {
+        if (pending.trim()) yield parse(pending);
+        break;
+      }
+    }
+  } finally {
+    await reader.cancel();
+    reader.releaseLock();
+  }
+}
+
 const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWorker, postSignedRequest }: Props) => {
   const [capabilities, setCapabilities] = useState<WorkerCapabilities | null>(null);
   const [busy, setBusy] = useState(false);
@@ -72,7 +107,7 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
   const [conflicts, setConflicts] = useState<string[]>([]);
   const [activeRestore, setActiveRestore] = useState<Record<string, unknown> | null>(null);
   const downloaded = useRef<BackupPage[]>([]);
-  const restore = useRef<BackupPage[]>([]);
+  const restore = useRef<File | null>(null);
   const lifetime = useRef<AbortController | null>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -193,34 +228,30 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
     });
   const readFile = (file?: File) =>
     run(async () => {
-      restore.current = [];
+      restore.current = null;
       setRestoreCount(0);
       setRestorePosition(0);
       if (!file) return;
-      const lines = (await file.text()).split(/\r?\n/).filter((line) => line.trim());
-      assertActive();
-      let pages: unknown[];
-      try {
-        pages = lines.map((line) => JSON.parse(line));
-      } catch {
-        throw new Error('This file is not valid backup JSONL.');
-      }
-      const archiveId = record(pages[0]).archiveId;
-      if (
-        !pages.length ||
-        !pages.every(
-          (page, index) =>
-            isPage(page, sessionSlug) &&
-            page.pageNumber === index &&
-            page.archiveId === archiveId &&
-            page.manifest.complete === (index === pages.length - 1),
+      let count = 0;
+      let archiveId = '';
+      let complete = false;
+      for await (const page of readBackupPages(file)) {
+        assertActive();
+        if (
+          !isPage(page, sessionSlug) ||
+          page.pageNumber !== count ||
+          complete ||
+          (count > 0 && page.archiveId !== archiveId)
         )
-      ) {
-        throw new Error('Choose a complete backup in page order for this session slug.');
+          throw new Error('Choose a complete backup in page order for this session slug.');
+        archiveId = page.archiveId;
+        complete = page.manifest.complete;
+        count += 1;
       }
-      restore.current = pages as BackupPage[];
-      setRestoreCount(pages.length);
-      setStatus(`Ready to restore ${pages.length} pages from ${file.name}.`);
+      if (!count || !complete) throw new Error('Choose a complete backup in page order for this session slug.');
+      restore.current = file;
+      setRestoreCount(count);
+      setStatus(`Ready to restore ${count} pages from ${file.name}.`);
     });
   const checkRestore = () =>
     run(async () => {
@@ -244,16 +275,20 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
     run(async () => {
       let position = restorePosition;
       let result: Record<string, unknown> = {};
-      while (position < restore.current.length) {
-        setStatus(`Restoring page ${position + 1} of ${restore.current.length}…`);
-        const page = restore.current[position];
-        result = record(
-          await request('import-session-backup', { page, adoptSessionId, sessionId: page.manifest.sessionId }),
-        );
-        if (result.ok !== true || !result.counts)
-          throw new Error('The Worker did not confirm this restore page. Resume to retry it.');
-        setActiveRestore(result.restore ? record(result.restore) : null);
-        if (result.pageComplete === false) continue;
+      if (!restore.current) return;
+      for await (const page of readBackupPages(restore.current)) {
+        assertActive();
+        if (!isPage(page, sessionSlug)) throw new Error('The backup page is invalid.');
+        if (page.pageNumber < position) continue;
+        setStatus(`Restoring page ${position + 1} of ${restoreCount}…`);
+        do {
+          result = record(
+            await request('import-session-backup', { page, adoptSessionId, sessionId: page.manifest.sessionId }),
+          );
+          if (result.ok !== true || !result.counts)
+            throw new Error('The Worker did not confirm this restore page. Resume to retry it.');
+          setActiveRestore(result.restore ? record(result.restore) : null);
+        } while (result.pageComplete === false);
         position += 1;
         setRestorePosition(position);
       }

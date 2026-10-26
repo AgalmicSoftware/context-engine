@@ -1,3 +1,5 @@
+import { ReadableStream, TextDecoderStream } from 'node:stream/web';
+import { TextEncoder } from 'node:util';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AdminSessionBackupPanel from './AdminSessionBackupPanel';
 import { readWorkerCapabilities } from '../../utilities/worker/workerCapabilities';
@@ -25,11 +27,33 @@ const page = (pageNumber: number, complete = false) => ({
 const props = { workerUrl: 'https://backup.test', sessionSlug: 'sample', account: '0xadmin', canAdminWorker: true };
 const chooseFile = async (pages: unknown[]) => {
   const file = new File([], 'sample.jsonl');
-  Object.defineProperty(file, 'text', { value: async () => pages.map((value) => JSON.stringify(value)).join('\n') });
+  const bytes = new TextEncoder().encode(pages.map((value) => JSON.stringify(value)).join('\r\n'));
+  Object.defineProperty(file, 'text', {
+    value: jest.fn(() => {
+      throw new Error('Whole-file strings are forbidden.');
+    }),
+  });
+  Object.defineProperty(file, 'stream', {
+    value: jest.fn(() => {
+      let offset = 0;
+      return new ReadableStream({
+        pull(controller) {
+          if (offset === bytes.length) {
+            controller.close();
+            return;
+          }
+          controller.enqueue(bytes.slice(offset, offset + 37));
+          offset = Math.min(bytes.length, offset + 37);
+        },
+      });
+    }),
+  });
   const input = await screen.findByLabelText('Backup file');
   await act(async () => fireEvent.change(input, { target: { files: [file] } }));
+  return file;
 };
 beforeEach(() => {
+  Object.defineProperty(globalThis, 'TextDecoderStream', { configurable: true, value: TextDecoderStream });
   jest.mocked(readWorkerCapabilities).mockResolvedValue({ legacy: false, features: ['session_backup_v1'] });
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: jest.fn(() => 'blob:backup') });
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: jest.fn() });
@@ -140,6 +164,7 @@ test('recovery export asks for confirmation and signs it, then hides the key aft
   expect(post).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Show recovery key' }));
   expect(await screen.findByLabelText('Recovery key')).toHaveAttribute('type', 'password');
+  expect(screen.queryByText('The Worker uses a generated recovery key.')).not.toBeInTheDocument();
   expect(post).toHaveBeenCalledWith({
     action: 'export-recovery-key',
     path: '/admin/export-recovery-key',
@@ -196,4 +221,25 @@ test('resends the same import page until its operation budget continuation finis
   await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Restore complete'));
   expect(post).toHaveBeenCalledTimes(2);
   expect(post.mock.calls[0][0]).toEqual(post.mock.calls[1][0]);
+});
+
+test('streams split UTF-8 lines and reopens the file to resume an interrupted restore', async () => {
+  const counts = { written: 1, skipped: 0, conflicts: 0 };
+  const post = jest
+    .fn()
+    .mockResolvedValueOnce({ data: { ok: true, complete: false, counts } })
+    .mockRejectedValueOnce(new Error('Connection lost'))
+    .mockResolvedValueOnce({ data: { ok: true, complete: true, counts } });
+  render(<AdminSessionBackupPanel {...props} postSignedRequest={post} />);
+  const first = { ...page(0), note: '☃'.repeat(80) };
+  const file = await chooseFile([first, page(1, true)]);
+  expect(screen.getByRole('status')).toHaveTextContent('Ready to restore 2 pages');
+  fireEvent.click(screen.getByRole('button', { name: 'Restore from backup' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Connection lost');
+  fireEvent.click(screen.getByRole('button', { name: 'Resume restore' }));
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Restore complete'));
+  expect(post.mock.calls.map(([request]) => request.body.page.pageNumber)).toEqual([0, 1, 1]);
+  expect(post.mock.calls[0][0].body.page.note).toBe(first.note);
+  expect(file.text).not.toHaveBeenCalled();
+  expect(file.stream).toHaveBeenCalledTimes(3);
 });

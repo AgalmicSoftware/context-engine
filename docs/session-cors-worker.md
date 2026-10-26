@@ -1177,6 +1177,13 @@ visibility changes during export, returning `complete: false` and
 cannot provide a joint point-in-time snapshot. Keep the complete JSONL archive with the deployment's
 recovery key; a fingerprint cannot decrypt it.
 
+Backup restore reads JSONL as a UTF-8 stream, validating the complete file before
+signing and holding only one page while importing. Resuming reopens the selected
+file and skips completed pages. On a live target, an archived hidden marker
+conflicts if no marker exists now: the question may have been unhidden since
+export. Restore keeps the current visibility; a fresh target can restore the
+archived marker normally.
+
 Restore with admin-signed `POST /admin/import-session-backup`, passing each
 saved response as `page` in its original order. The target must hold the source
 KEK as its current key or `CE_STORAGE_ENVELOPE_PREVIOUS_KEK`. The slug and session

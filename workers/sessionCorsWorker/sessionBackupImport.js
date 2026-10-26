@@ -118,7 +118,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     if (page.pageNumber !== 0 || !page.coordinator) fail('Import must begin with the first backup page.', 409);
     progress = { actor: expectedAuthority.actor, pageNumber: 0, nextEntry: 0, pageHash, manifest: { ...manifest, counts: undefined, complete: undefined },
       counts: { written: 0, skipped: 0, conflicts: 0 }, conflicts: [], observed: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 },
-      expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS, configPublished: false,
+      expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS, configPublished: false, liveTarget: !!current,
       pendingPayloads: 0, pendingRecords: 0, snapshotReady: false, finished: false };
     if (page.coordinator.chunked !== true) {
       validateSnapshot({ snapshot: page.coordinator, manifest, ...validators });
@@ -174,7 +174,10 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     if (budget.remaining < cost + 16) return pending();
     const updates = [];
     if (entry.kind === 'owner' || entry.kind === 'hidden') {
-      await write(index, entry.key, entry.value, true);
+      // Absence on a live target can be a later unhide. Restores cannot infer
+      // its time from a deleted marker, so preserve visibility and report it.
+      if (entry.kind === 'hidden' && progress.liveTarget && await index.get(entry.key) == null) conflict(entry.key);
+      else await write(index, entry.key, entry.value, true);
       progress.observed[entry.kind === 'owner' ? 'owners' : 'hidden'] += 1;
     } else if (entry.kind === 'record') {
       if (await storage.get(recordKey(entry.id))) fail('Duplicate backup metadata id.');

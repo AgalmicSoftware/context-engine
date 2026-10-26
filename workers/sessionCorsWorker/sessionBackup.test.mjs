@@ -656,3 +656,24 @@ test('cached group snapshots detect mutations during an export page and reclaim 
   assert.ok(expiredChunks.every((key) => !snapshotStore.has(key)));
   assert.equal(snapshotStore.has(snapshotKey), false);
 });
+
+
+test('a live restore reports a hidden-marker conflict after the question was unhidden', async () => {
+  const source = fixture();
+  const key = `ce-storage-hidden:${slug}:questions:0xabc`;
+  const marker = JSON.stringify({ hidden: true, updatedAt: '2026-01-01T00:00:00.000Z' });
+  source.kv.values.set(key, marker);
+  const pages = await allPages(source.env);
+  for (const mode of ['unhidden', 'hidden', 'fresh']) {
+    const target = fixture();
+    if (mode === 'fresh') target.kv.values.delete(`session:${slug}:config`);
+    if (mode === 'hidden') target.kv.values.set(key, marker);
+    let result;
+    for (const page of pages) result = await importPage(target.env, page, mode === 'fresh' ? 0 : 1);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.body.counts.conflicts, mode === 'unhidden' ? 1 : 0);
+    assert.equal(result.body.complete, mode !== 'unhidden');
+    assert.equal(await target.kv.get(key), mode === 'unhidden' ? null : marker);
+    if (mode === 'unhidden') assert.ok(result.body.conflicts.includes(key));
+  }
+});
