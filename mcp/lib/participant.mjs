@@ -485,7 +485,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     await ensureReady(ctx);
     const scan = await scanMyAnswers(ctx);
     const mine = new Map(scan.answers);
-    const complete = scan.complete;
+    let complete = scan.complete;
+    const blocks = new Map();
     // Add answers this agent recorded locally since the scan (or that it did not reach).
     await loadState();
     const local = sessionState(ctx).sessionId === ctx.client.sessionId && isRecord(sessionState(ctx).answers) ? sessionState(ctx).answers : {};
@@ -493,13 +494,16 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (!isRecord(answer)) continue;
       // An incomplete registry scan cannot establish whether a saved plaintext
       // answer has since been cleared or encrypted by another client.
-      if (ctx.registry && !complete) continue;
+      if (ctx.registry && !scan.complete) continue;
       const known = mine.get(questionId);
       const chainOrder = scan.chainOrders?.get(questionId);
       if (ctx.registry && chainOrder && compareChainOrder(answer, chainOrder) < 0) continue;
       const newer = ctx.registry ? !known || compareChainOrder(answer, known) > 0 : !known || text(answer.answeredAt) > known.createdAt;
       // A remembered answer whose block a reorganization replaced was never answered.
-      if (newer && !(ctx.registry && await ctx.registry.replacedWrite(answer))) {
+      if (!newer) continue;
+      const replaced = ctx.registry && await ctx.registry.replacedWrite(answer, blocks);
+      if (replaced === null) complete = false;
+      if (!replaced) {
         mine.set(questionId, {
           createdAt: text(answer.answeredAt),
           ...(ctx.registry ? { blockNumber: answer.blockNumber, transactionIndex: answer.transactionIndex, logIndex: answer.logIndex } : {}),

@@ -109,17 +109,20 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
   // head it scanned under; when that block changes, a reorganization replaced
   // history the reader already used, and it rebuilds from the session start.
   const readBlock = (number, blocks) => {
-    if (!blocks.has(number)) blocks.set(number, chainRequest(() => provider.getBlock(number)));
+    if (!blocks.has(number)) blocks.set(number, chainRequest(() => provider.getBlock(number)).catch(() => null));
     return blocks.get(number);
   };
-  const readHeadMark = async (number, blocks) => ({ number, hash: (await readBlock(number, blocks))?.hash });
+  const readHeadMark = async (number, blocks) => {
+    const block = await readBlock(number, blocks);
+    return block?.hash ? { number, hash: block.hash } : null;
+  };
   const historyReplaced = async (mark, blocks) => {
-    if (!mark) return false;
+    if (!mark?.hash) return false;
     const block = await readBlock(mark.number, blocks);
     // A missing block means this RPC node is behind; it cannot disprove the mark yet.
-    return !!block && block.hash !== mark.hash;
+    return block?.hash ? block.hash !== mark.hash : null;
   };
-  /** True when a reorganization replaced the block of a confirmed write. */
+  /** True if replaced, false if retained, null if the RPC cannot verify it yet. */
   const replacedWrite = (entry, blocks = new Map()) => historyReplaced(entry?.blockHash ? { number: entry.blockNumber, hash: entry.blockHash } : null, blocks);
   let questionMark = null;
 
@@ -127,28 +130,35 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     const deadline = now() + 90000;
     const blocks = new Map();
     let complete = true;
-    if (await historyReplaced(questionMark, blocks)) {
+    const replaced = await historyReplaced(questionMark, blocks);
+    if (replaced === null) complete = false;
+    if (replaced) {
       questions.clear();
       pending.clear();
       questionCursor = { block: startBlock, offset: 0 };
       questionMark = null;
     }
     for (const [id, entry] of questions) {
-      if (entry.local && await replacedWrite(entry, blocks)) questions.delete(id);
+      if (!entry.local) continue;
+      const replaced = await replacedWrite(entry, blocks);
+      if (replaced === null) complete = false;
+      if (replaced) questions.delete(id);
     }
     if (pending.size < MAX_CACHE && questions.size < MAX_QUESTIONS) {
       const head = await readHeadMark(await chainRequest(() => provider.getBlockNumber()), blocks);
-      const scanned = await scanRegistryLogs({ provider, filter: filter('QuestionsAdded'), cursor: questionCursor,
-        toBlock: head.number, maxLogs: 1000, deadline, now, signal });
-      questionCursor = scanned.cursor;
-      complete = scanned.complete;
-      if (!questionMark || head.number >= questionMark.number) questionMark = head;
-      for (const log of scanned.logs) {
-        const event = surveys.interface.parseLog(log);
-        event.args.questionIds.forEach((id, index) => {
-          if (event.args.surveyIds[index] === ethers.constants.HashZero && !questions.has(normalized(id))) pending.set(normalized(id), log);
-        });
-      }
+      if (head) {
+        const scanned = await scanRegistryLogs({ provider, filter: filter('QuestionsAdded'), cursor: questionCursor,
+          toBlock: head.number, maxLogs: 1000, deadline, now, signal });
+        questionCursor = scanned.cursor;
+        complete = complete && scanned.complete;
+        if (replaced !== null && (!questionMark || head.number >= questionMark.number)) questionMark = head;
+        for (const log of scanned.logs) {
+          const event = surveys.interface.parseLog(log);
+          event.args.questionIds.forEach((id, index) => {
+            if (event.args.surveyIds[index] === ethers.constants.HashZero && !questions.has(normalized(id))) pending.set(normalized(id), log);
+          });
+        }
+      } else complete = false;
     } else complete = false;
     const work = [...pending.entries()];
     let next = 0;
@@ -176,21 +186,26 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     const known = new Set(questionIds);
     const deadline = now() + 90000;
     const blocks = new Map();
+    let verified = true;
     const responseFilter = filter('ResponsesSubmitted');
     if (mine) responseFilter.topics.push(ethers.utils.hexZeroPad(wallet.address, 32));
     const head = await chainRequest(() => provider.getBlockNumber());
     const scope = [...known].sort().join(',');
     let state = answerScans.get(mine);
     const replaced = !!state && state.scope === scope && head >= state.head && await historyReplaced(state.mark, blocks);
+    if (replaced === null) verified = false;
     if (!state || state.scope !== scope || head < state.head || replaced) {
       state = { scope, head: startBlock - 1, mark: null, ranges: [], latest: new Map(), capped: false };
     } else state = { ...state, ranges: state.ranges.map((range) => ({ ...range })), latest: new Map(state.latest) };
     // New blocks take priority while older ranges retain their cursor. Restarting
     // from session creation permanently misses answers beyond one scan's budget.
     if (head > state.head) {
-      state.ranges.unshift({ from: Math.max(startBlock, state.head + 1), cursor: { block: head, offset: 0 } });
-      state.head = head;
-      state.mark = await readHeadMark(head, blocks);
+      const mark = await readHeadMark(head, blocks);
+      if (mark) {
+        state.ranges.unshift({ from: Math.max(startBlock, state.head + 1), cursor: { block: head, offset: 0 } });
+        state.head = head;
+        if (replaced !== null) state.mark = mark;
+      } else verified = false;
     }
     // Bound pending ranges even if the chain advances faster than RPC scans.
     // Merging old gaps only re-reads events; latest-by-chain-order deduplicates them.
@@ -240,7 +255,9 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     for (const [id, entry] of localAnswers) {
       if (!known.has(entry.questionId)) continue;
       // A write can land above the last scanned head, or survive a scope reset.
-      if (await replacedWrite(entry, blocks)) { localAnswers.delete(id); continue; }
+      const replaced = await replacedWrite(entry, blocks);
+      if (replaced === null) verified = false;
+      if (replaced) { localAnswers.delete(id); continue; }
       if (!scannedAll && entry.blockNumber <= head) continue;
       const key = `${entry.questionId}:${normalized(entry.responder)}`;
       if (!latest.has(key) || compareChainOrder(entry, latest.get(key)) > 0) latest.set(key, { ...entry, local: true });
@@ -249,7 +266,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     const chainOrders = new Map(candidates.filter((entry) => normalized(entry.responder) === normalized(wallet.address))
       .map((entry) => [entry.questionId, entry]));
     const entries = [];
-    let complete = scannedAll && candidates.length <= maxRecords;
+    let complete = verified && scannedAll && candidates.length <= maxRecords;
     let next = 0;
     const selected = candidates.slice(0, maxRecords);
     await Promise.all(Array.from({ length: Math.min(6, selected.length) }, async () => {
@@ -262,7 +279,8 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
           if (!registryResponseMatchesSession(payload, sessionConfig) || payload.answer?.encrypted === true) continue;
           if (normalized(payload.questionID || payload.questionId) !== entry.questionId) continue;
           const block = await readBlock(entry.blockNumber, blocks);
-          const createdAt = block?.timestamp ? new Date(Number(block.timestamp) * 1000).toISOString() : '';
+          if (!block) complete = false;
+          const createdAt = block?.timestamp ? new Date(Number(block.timestamp) * 1000).toISOString() : entry.createdAt || '';
           entries.push({ ...entry, storageId: pointer, createdAt, payload });
         } catch { complete = false; }
       }

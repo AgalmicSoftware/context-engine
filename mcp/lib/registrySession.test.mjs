@@ -196,6 +196,95 @@ test('local answer verification and timestamps share one block read per call', a
   assert.equal(reads.filter((number) => number === 11).length, 1);
 });
 
+test('block lookup failures keep local records and report incomplete reads', async () => {
+  const f = fixture();
+  const session = await f.open();
+  await session.addStatement({ client: f.client, record: { id: qid, sessionSlug: 'town', prompt: 'Local', type: 'binary' } });
+  await session.submitAnswers({ client: f.client, records: [{ questionID: qid, sessionSlug: 'town', answer: { value: 'Agree' } }] });
+  await session.loadQuestions();
+  await session.readAnswers({ questionIds: [qid] });
+  f.options.provider.getBlock = async () => { throw new Error('RPC temporarily unavailable'); };
+  const questions = await session.loadQuestions();
+  assert.equal(questions.complete, false);
+  assert.deepEqual(questions.items.map((entry) => entry.id), [qid]);
+  const answers = await session.readAnswers({ questionIds: [qid] });
+  assert.equal(answers.complete, false);
+  assert.deepEqual(answers.entries.map((entry) => entry.questionId), [qid]);
+});
+
+test('a lagging head keeps the previous mark without rescanning session history', async () => {
+  const f = fixture();
+  const session = await f.open();
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'One', type: 'binary' });
+  await session.loadQuestions();
+  await session.readAnswers({ questionIds: [qid] });
+  f.options.provider.getBlockNumber = async () => 11;
+  const getBlock = f.options.provider.getBlock;
+  f.options.provider.getBlock = async (number) => number === 11 ? null : getBlock(number);
+  assert.equal((await session.loadQuestions()).complete, false);
+  assert.equal((await session.readAnswers({ questionIds: [qid] })).complete, false);
+  const ranges = [];
+  const getLogs = f.options.provider.getLogs;
+  f.options.provider.getLogs = (filter) => { ranges.push(filter); return getLogs(filter); };
+  f.options.provider.getBlock = getBlock;
+  assert.equal((await session.loadQuestions()).complete, true);
+  assert.equal((await session.readAnswers({ questionIds: [qid] })).complete, true);
+  assert.ok(ranges.length > 0);
+  assert.ok(ranges.every((range) => range.fromBlock > 0));
+});
+
+test('remembered answers share block checks and remain visible during RPC gaps', async (t) => {
+  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-registry-block-checks-'));
+  t.after(() => fs.rm(stateDir, { recursive: true, force: true }));
+  const f = fixture();
+  const args = { config: readConfig({ CE_MCP_STATE_DIR: stateDir }), wallet, registry: f.options,
+    fetchImpl: async (url, init) => {
+      if (new URL(url).hostname !== 'w.example.dev') return f.fetchImpl(url, init);
+      const pathname = new URL(url).pathname;
+      if (pathname === '/resource-presence') return Response.json({ resources: {} });
+      if (pathname === '/auth/nonce') return Response.json({ nonce: 'nonce123456' });
+      if (pathname === '/auth/login') return Response.json({ token: 'e30.sig', exp: 9999999999 });
+      if (pathname === '/arweave/upload') return Response.json({ id: Buffer.alloc(32, 2).toString('base64url') });
+      throw new Error(`Unexpected route ${pathname}`);
+    },
+  };
+  const first = createParticipant(args);
+  await first.joinSession({ link: 'https://contextengine.sh/session/town' });
+  const ids = Array.from({ length: 20 }, (_, index) => ethers.utils.id(`batch question ${index}`));
+  ids.forEach((id, index) => f.addQuestion(id, { sessionSlug: 'town', prompt: `Question ${index}`, type: 'binary' }));
+  assert.equal((await first.answer({ answers: ids.map((questionId) => ({ questionId, value: 'Agree' })) })).submitted, 20);
+  const reopened = createParticipant(args);
+  const getBlock = f.options.provider.getBlock;
+  const reads = [];
+  f.options.provider.getBlock = (number) => { reads.push(number); return getBlock(number); };
+  assert.equal((await reopened.listQuestions({ filter: 'answered' })).questions.length, 20);
+  assert.equal(reads.filter((number) => number === 11).length, 1);
+  f.options.provider.getBlock = async () => { throw new Error('RPC temporarily unavailable'); };
+  const partial = await reopened.listQuestions({ filter: 'answered' });
+  assert.equal(partial.questions.length, 20);
+  assert.equal(partial.myAnswersComplete, false);
+  assert.equal(partial.questionsComplete, false);
+});
+
+test('an unavailable prior mark is retained until its history can be checked', async () => {
+  const f = fixture();
+  const session = await f.open();
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'Orphaned', type: 'binary' }, 10);
+  f.addResponse(otherId, { questionID: otherId, answer: { value: 'Orphaned' } }, 10);
+  await session.loadQuestions();
+  await session.readAnswers({ questionIds: [otherId] });
+  f.reorg(10, 11);
+  f.logs.splice(0);
+  f.options.provider.getBlockNumber = async () => 11;
+  const getBlock = f.options.provider.getBlock;
+  f.options.provider.getBlock = async (number) => number === 10 ? null : getBlock(number);
+  assert.equal((await session.loadQuestions()).complete, false);
+  assert.equal((await session.readAnswers({ questionIds: [otherId] })).complete, false);
+  f.options.provider.getBlock = getBlock;
+  assert.deepEqual((await session.loadQuestions()).items, []);
+  assert.deepEqual((await session.readAnswers({ questionIds: [otherId] })).entries, []);
+});
+
 test('question scoping keeps explicit slugs authoritative and accepts the general alias', () => {
   assert.equal(registryQuestionMatchesSession({ sessionSlug: 'elsewhere', sessionName: 'Town' }, metadata), false);
   assert.equal(registryQuestionMatchesSession({ sessionName: 'Town' }, metadata), true);
