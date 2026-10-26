@@ -1,42 +1,41 @@
 .dialog {
-  --ce-surface-raised: #171941;
-  --ce-input-bg: #0f172a;
-  --ce-text: #f8fafc;
-  --ce-border-raised: #94a3b8;
-  --ce-border-inset: #94a3b8;
-  --ce-font-ui: system-ui, sans-serif;
-  background: #171941;
-  color: #f8fafc;
-  border: 1px solid #94a3b8;
-  font-family: system-ui, sans-serif;
+  --ce-surface-raised: var(--ce-authoring-panel-bg);
+  --ce-input-bg: var(--ce-authoring-input-bg);
+  --ce-text: var(--ce-authoring-panel-text);
+  --ce-border-raised: var(--ce-authoring-panel-muted);
+  --ce-border-inset: var(--ce-authoring-panel-muted);
+  background: var(--ce-authoring-panel-bg);
+  color: var(--ce-authoring-panel-text);
+  border: 1px solid var(--ce-authoring-panel-muted);
+  font-family: var(--ce-font-ui);
   h2,
   p,
   label {
-    color: #f8fafc;
+    color: var(--ce-authoring-panel-text);
   }
   input {
     width: 100%;
-    background: #0f172a;
-    color: #fff;
-    border: 1px solid #94a3b8;
+    background: var(--ce-authoring-input-bg);
+    color: var(--ce-authoring-input-text);
+    border: 1px solid var(--ce-authoring-panel-muted);
     padding: 10px;
   }
   button {
-    background: #334155;
-    color: #fff;
-    border: 1px solid #94a3b8;
+    background: var(--ce-authoring-control-bg);
+    color: var(--ce-authoring-control-text);
+    border: 1px solid var(--ce-authoring-panel-muted);
     padding: 10px 14px;
     margin: 8px 8px 8px 0;
     border-radius: 4px;
   }
   button:focus-visible,
   input:focus-visible {
-    outline: 3px solid #67e8f9;
+    outline: 3px solid var(--ce-focus-ring);
     outline-offset: 3px;
   }
   .primary {
-    background: #35f5ae;
-    color: #07111c;
+    background: var(--ce-action-accent);
+    color: var(--ce-action-accent-text);
     font-weight: 700;
   }
 }

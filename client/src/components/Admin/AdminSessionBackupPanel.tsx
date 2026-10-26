@@ -1,7 +1,7 @@
 import RecoveryKeyDialog from '../Shared/RecoveryKeyDialog';
 import type { RecoveryKeyDisplay } from '../Shared/RecoveryKeyDialog';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Input, Label } from 'reactstrap';
+import { Input, Label } from 'reactstrap';
 import {
   readWorkerCapabilities,
   describeWorkerUnavailable,
@@ -248,16 +248,15 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
       <h3 className={styles.panelTitle}>Backup &amp; restore</h3>
       {recoveryDisplay && <RecoveryKeyDialog value={recoveryDisplay} onContinue={() => setRecoveryDisplay(null)} />}
       {capabilities?.features.includes('recovery_key_export') && (
-        <Button
+        <button
+          type="button"
           className={styles.actionButton}
-          color="secondary"
-          outline
           disabled={busy || !canAdminWorker}
           onClick={showRecoveryKey}
           data-testid="ce-admin-recovery-key-show"
         >
           Show recovery key
-        </Button>
+        </button>
       )}
 
       <p className={styles.panelSubtitle}>
@@ -265,30 +264,28 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
       </p>
       {unavailable && <p className={styles.statusNote}>{describeWorkerUnavailable(unavailable.reason)}</p>}
       <div className={styles.formRow}>
-        <Button
+        <button
+          type="button"
           className={styles.actionButton}
-          color="primary"
           disabled={busy || !canAdminWorker || !!unavailable}
           onClick={() => void download()}
           data-testid="ce-admin-backup-download"
         >
           {downloadCount && !downloadComplete ? 'Resume download' : 'Download backup'}
-        </Button>
+        </button>
         {downloadCount > 0 && !downloadComplete && (
           <>
-            <Button
+            <button
+              type="button"
               className={styles.actionButton}
-              color="secondary"
-              outline
               disabled={busy}
               onClick={() => saveFile(downloaded.current, sessionSlug, true)}
             >
               Save partial backup
-            </Button>
-            <Button
+            </button>
+            <button
+              type="button"
               className={styles.actionButton}
-              color="secondary"
-              outline
               disabled={busy}
               onClick={() => {
                 downloaded.current = [];
@@ -298,7 +295,7 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
               }}
             >
               Restart download
-            </Button>
+            </button>
           </>
         )}
       </div>
@@ -324,16 +321,15 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
         />{' '}
         Adopt the backup session ID on a fresh deployment
       </Label>
-      <Button
+      <button
+        type="button"
         className={styles.actionButton}
-        color="secondary"
-        outline
         disabled={busy || !account || !restoreCount || restorePosition === restoreCount}
         onClick={() => void importBackup()}
         data-testid="ce-admin-backup-restore"
       >
         {restorePosition > 0 && restorePosition < restoreCount ? 'Resume restore' : 'Restore from backup'}
-      </Button>
+      </button>
       {!account && <p className={styles.statusNote}>Connect the deployment admin wallet to restore a backup.</p>}
       {status && (
         <p className={styles.statusNote} role="status">

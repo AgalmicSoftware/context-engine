@@ -1,14 +1,14 @@
 .panel {
   padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--ce-authoring-panel-muted);
   border-radius: 12px;
-  background: #171941;
-  color: #f4f7ff;
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+  background: var(--ce-authoring-panel-bg);
+  color: var(--ce-authoring-panel-text);
+  box-shadow: var(--ce-card-shadow);
   font-family: var(--ce-font-mono);
 
   .panelTitle {
-    color: #fff;
+    color: var(--ce-authoring-panel-text);
     font-size: 1.2rem;
     font-weight: 700;
     margin: 0 0 12px;
@@ -16,41 +16,45 @@
 
   .panelSubtitle,
   label {
-    color: #e5e7eb;
+    color: var(--ce-authoring-panel-text);
     font-size: 0.9rem;
     line-height: 1.55;
   }
 
   input[type='file'] {
-    background: #fff;
-    color: #1f2733;
-    border: 1px solid #94a3b8;
+    background: var(--ce-document-canvas);
+    color: var(--ce-document-text);
+    border: 1px solid var(--ce-authoring-panel-muted);
     margin: 8px 0 16px;
   }
 
   .actionButton {
-    background: #4dffa4;
-    border: 1px solid #4dffa4;
-    color: #122232;
+    background: var(--ce-action-accent);
+    border: 1px solid var(--ce-action-accent);
+    color: var(--ce-action-accent-text);
     font-weight: 700;
+    padding: 10px 14px;
+    min-height: 44px;
+    cursor: pointer;
     margin: 4px 0;
     opacity: 1;
 
     &:hover:not(:disabled) {
-      background: #8dffc3;
-      border-color: #8dffc3;
-      color: #122232;
+      background: var(--ce-action-accent-hover);
+      border-color: var(--ce-action-accent-hover);
+      color: var(--ce-action-accent-text);
     }
 
     &:focus-visible {
-      outline: 3px solid #fff;
+      outline: 3px solid var(--ce-focus-ring);
       outline-offset: 3px;
     }
 
     &:disabled {
-      background: #334155;
-      border-color: #94a3b8;
-      color: #e2e8f0;
+      background: var(--ce-authoring-control-bg);
+      border-color: var(--ce-authoring-panel-muted);
+      color: var(--ce-authoring-control-text);
+      cursor: not-allowed;
       opacity: 1;
     }
   }
@@ -67,16 +71,16 @@
   margin: 12px 0;
   padding: 12px;
   border-radius: 6px;
-  color: #f4f7ff;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--ce-authoring-panel-text);
+  background: var(--ce-authoring-control-bg);
   font-size: 0.85rem;
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
 
 .warningNote {
-  color: #ffe3e3;
-  background: #572a31;
+  color: var(--ce-status-danger-text);
+  background: var(--ce-response-disagree-bg);
 }
 
 .panel .adoptLabel {

@@ -448,6 +448,12 @@ try {
   await page.getByTestId('ce-admin-backup-restore').click();
   await page.getByRole('status').filter({ hasText: 'Restore complete.' }).waitFor({ timeout: 120000 });
   await page.getByTestId('ce-admin-session-backup').screenshot({ path: `${outputDir}/admin-backup-restore.png`, timeout: 10000 });
+  const originalTheme = await page.evaluate(() => document.documentElement.getAttribute('data-ce-theme'));
+  for (const theme of ['context-engine', 'classic-95', 'civic']) {
+    await page.evaluate((value) => document.documentElement.setAttribute('data-ce-theme', value), theme);
+    await page.getByTestId('ce-admin-session-backup').screenshot({ path: `${outputDir}/admin-backup-${theme}.png` });
+  }
+  await page.evaluate((value) => value ? document.documentElement.setAttribute('data-ce-theme', value) : document.documentElement.removeAttribute('data-ce-theme'), originalTheme);
   console.log('Admin downloaded a complete JSONL backup and restored it idempotently through signed requests.');
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByTestId('ce-admin-recovery-key-show').click();
@@ -455,6 +461,11 @@ try {
   assert.equal(await page.getByLabel('Recovery key', { exact: true }).getAttribute('type'), 'password');
   await page.waitForFunction(() => { const dialog = document.querySelector('[role=dialog]'); return dialog && getComputedStyle(dialog).opacity === '1'; });
   await page.getByRole('dialog').locator('.modal-content').screenshot({ path: `${outputDir}/recovery-key-masked.png` });
+  for (const theme of ['context-engine', 'classic-95', 'civic']) {
+    await page.evaluate((value) => document.documentElement.setAttribute('data-ce-theme', value), theme);
+    await page.getByRole('dialog').locator('.modal-content').screenshot({ path: `${outputDir}/recovery-key-${theme}.png` });
+  }
+  await page.evaluate((value) => value ? document.documentElement.setAttribute('data-ce-theme', value) : document.documentElement.removeAttribute('data-ce-theme'), originalTheme);
   const keyDownload = page.waitForEvent('download');
   await page.getByTestId('ce-recovery-key-download').click();
   const keyPath = `${outputDir}/synthetic-recovery-key.txt`;
@@ -491,6 +502,8 @@ try {
           'three concurrent two-tab bookmark pairs survive reload',
           'explicit submit readiness refusal retains the draft without uploading',
           'admin JSONL download and idempotent signed restore',
+          'confirmed masked recovery-key download without browser persistence',
+          'backup and recovery-key screenshots in all three themes',
         ],
         responseUploads,
         lostReplyUploads,
@@ -501,7 +514,7 @@ try {
     ),
   );
   console.log(
-    `Session publication smoke passed in ${elapsedMs}ms: publication, saved answers, partial retry, lost reply, Results, permissions, and two-tab bookmarks.`,
+    `Session publication smoke passed in ${elapsedMs}ms: publication, saved answers, partial retry, lost reply, Results, permissions, two-tab bookmarks, backup/restore, and recovery-key custody.`,
   );
 } catch (error) {
   if (page) {
