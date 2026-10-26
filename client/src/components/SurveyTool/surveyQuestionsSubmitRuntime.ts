@@ -712,6 +712,7 @@ export const createSurveyQuestionsSubmitRuntime = (
         submitAttemptId: submitContext.submitAttemptId,
         surveysResponseState: nextSurveysResponseState,
         userAnswers: optimisticUserAnswers,
+        retryPending: receipt?.retryPending === true,
         ports: {
           clearSubmitGuard: () => {
             inst._submitGuard = false;

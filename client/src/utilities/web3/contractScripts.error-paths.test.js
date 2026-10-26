@@ -489,6 +489,53 @@ describe('error paths', () => {
     ]);
   });
 
+  it('reports the Worker answers stored before a later upload failed', async () => {
+    window.ethereum = makeRpcProvider();
+    const question2 = `0x${'9'.repeat(64)}`;
+    const stored = { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' };
+    uploadDataToSessionStorage
+      .mockResolvedValueOnce({ storageRef: stored })
+      .mockRejectedValueOnce(new Error('Worker storage is unavailable.'));
+
+    const failure = await submitResponses(
+      'wagmi',
+      [QUESTION_ID, question2],
+      [
+        { questionID: QUESTION_ID, answer: 'yes' },
+        { questionID: question2, answer: 'no' },
+      ],
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+    ).catch((error) => error);
+
+    expect(failure.message).toBe('Worker storage is unavailable.');
+    expect(failure.partialReceipt).toEqual(
+      expect.objectContaining({
+        workerCanonicalSubmission: true,
+        questionResponseRefs: [{ questionId: QUESTION_ID, storageRef: expect.objectContaining(stored) }],
+        storageRefs: [expect.objectContaining(stored)],
+      }),
+    );
+  });
+
+  it('reports no stored answers when the first Worker upload fails', async () => {
+    window.ethereum = makeRpcProvider();
+    uploadDataToSessionStorage.mockRejectedValueOnce(new Error('Worker storage is unavailable.'));
+
+    const failure = await submitResponses(
+      'wagmi',
+      [QUESTION_ID],
+      [{ questionID: QUESTION_ID, answer: 'yes' }],
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+    ).catch((error) => error);
+
+    expect(failure.message).toBe('Worker storage is unavailable.');
+    expect(failure.partialReceipt).toBeUndefined();
+  });
+
   it('persists worker-canonical responses without broadcasting an on-chain transaction', async () => {
     const rpcProvider = makeRpcProvider();
     window.ethereum = rpcProvider;

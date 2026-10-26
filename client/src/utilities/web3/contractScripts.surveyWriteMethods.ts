@@ -582,6 +582,17 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         throw new Error('submitResponses: exact Worker session identity is required.');
       }
       const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES);
+      const workerCanonicalStorage =
+        sessionProjection.profileValid && sessionProjection.isWorkerCanonical && canUseSessionStorage;
+      const workerSubmissionReceipt = (uploads: PayloadPointerUpload[]) => ({
+        workerCanonicalSubmission: true,
+        questionResponseRefs: uploads.map((upload, index) => ({
+          questionId: hashedQuestionIds[index],
+          storageRef: upload.storageRef,
+        })),
+        sessionSlug: workerResponseIdentity?.sessionSlug || resolveStorageSessionSlug(groupKeyOrCfg, cfg),
+        storageRefs: [surveyResponseUpload?.storageRef, ...uploads.map((upload) => upload.storageRef)].filter(Boolean),
+      });
       if (ARWEAVE_ACTIVE || canUseSessionStorage) {
         const uploadContext = {
           account: userAddress,
@@ -628,23 +639,35 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         // Upload response objects sequentially to avoid Arweave anchor/signature races
         // that can appear when multiple uploads are posted in parallel for one wallet.
         questionResponseUploads = [];
-        for (const response of questionResponses) {
-          const responsePayload = workerResponseIdentity ? { ...response, ...workerResponseIdentity } : response;
-          validateNoLockedPlaintextInPayload(responsePayload, {
-            family: 'question_response_payload',
-            path: 'question response',
-          });
+        try {
+          for (const response of questionResponses) {
+            const responsePayload = workerResponseIdentity ? { ...response, ...workerResponseIdentity } : response;
+            validateNoLockedPlaintextInPayload(responsePayload, {
+              family: 'question_response_payload',
+              path: 'question response',
+            });
 
-          const responseUpload = await uploadJsonPayloadForContractPointer({
-            payload: responsePayload,
-            resource: STORAGE_RESOURCE_KEYS.RESPONSES,
-            groupKeyOrCfg,
-            cfg,
-            arweaveUploadOpts: arweaveOpts,
-            uploadWithRetry: true,
-            storageContext: uploadContext,
-          });
-          questionResponseUploads.push(responseUpload);
+            const responseUpload = await uploadJsonPayloadForContractPointer({
+              payload: responsePayload,
+              resource: STORAGE_RESOURCE_KEYS.RESPONSES,
+              groupKeyOrCfg,
+              cfg,
+              arweaveUploadOpts: arweaveOpts,
+              uploadWithRetry: true,
+              storageContext: uploadContext,
+            });
+            questionResponseUploads.push(responseUpload);
+          }
+        } catch (error: unknown) {
+          // A Worker-stored answer is saved on its own. Report the answers stored
+          // before the failure, in order, so the caller retries only the rest.
+          if (workerCanonicalStorage && questionResponseUploads.some((upload) => upload?.storageRef)) {
+            throw Object.assign(new Error(error instanceof Error ? error.message : String(error)), {
+              cause: error,
+              partialReceipt: workerSubmissionReceipt(questionResponseUploads),
+            });
+          }
+          throw error;
         }
       } else {
         return; // no-op when no configured payload storage path is available
@@ -660,23 +683,12 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         assertNonZeroBytes32(surveyResponseHashBytes, 'submitResponses: survey response hash');
       }
 
-      if (sessionProjection.profileValid && sessionProjection.isWorkerCanonical && canUseSessionStorage) {
-        const storageRefs = [
-          surveyResponseUpload?.storageRef,
-          ...questionResponseUploads.map((upload) => upload.storageRef),
-        ].filter(Boolean);
-        if (!storageRefs.length) {
+      if (workerCanonicalStorage) {
+        const receipt = workerSubmissionReceipt(questionResponseUploads);
+        if (!receipt.storageRefs.length) {
           throw new Error('Worker-canonical response submission did not return durable storage references.');
         }
-        return {
-          workerCanonicalSubmission: true,
-          questionResponseRefs: questionResponseUploads.map((upload, index) => ({
-            questionId: hashedQuestionIds[index],
-            storageRef: upload.storageRef,
-          })),
-          sessionSlug: workerResponseIdentity?.sessionSlug || resolveStorageSessionSlug(groupKeyOrCfg, cfg),
-          storageRefs,
-        };
+        return receipt;
       }
 
       // === Address resolution (group-aware; no SURVEYS_ADDRESS fallback)

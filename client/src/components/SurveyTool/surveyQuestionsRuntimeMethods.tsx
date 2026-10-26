@@ -2137,7 +2137,7 @@ export const createSurveyQuestionsRuntimeMethods = (
       ),
     );
     const submitSlice: SurveyQuestionsLegacyValue = overrideState || stateRef.current.surveysResponseState?.[idx] || {};
-    const heldBack = new Map<string, 'unlisted' | 'locked'>();
+    const heldBack = new Map<string, 'unlisted' | 'locked' | 'unsaved'>();
     Array.from(changedSet as Set<string>).forEach((qid) => {
       if (
         !payloadQids.has(normalizeQuestionIdKey(qid)) &&
@@ -2160,6 +2160,7 @@ export const createSurveyQuestionsRuntimeMethods = (
             ?.prompt || '',
         ).trim();
         const name = prompt && !isMaskedPromptText(prompt) ? `“${prompt}”` : `Question ${qid.slice(0, 10)}…`;
+        if (reason === 'unsaved') return `${name} wasn't saved yet; submit again to send it.`;
         return reason === 'locked'
           ? `${name} still holds a locked value that can't be sent as it is, so it wasn't submitted. Decrypt it, set its lock again and submit.`
           : `${name} isn't in this page's question list, so its change wasn't submitted. If it came from an interview, remove that draft; otherwise reload the page and submit again.`;
@@ -2338,18 +2339,38 @@ export const createSurveyQuestionsRuntimeMethods = (
       sessionSlug: submissionGroupKey,
       sessionConfig: submissionSessionConfig,
     });
-    const tx: SurveyQuestionsLegacyValue = await surveyResponseSubmitPort.submitResponses(
-      context.provider,
-      hashedQuestionIds,
-      questionResponses,
-      hashedSurveyId,
-      surveyResponse,
-      submissionTarget,
-    );
+    let tx: SurveyQuestionsLegacyValue;
+    let uploadFailure = '';
+    try {
+      tx = await surveyResponseSubmitPort.submitResponses(
+        context.provider,
+        hashedQuestionIds,
+        questionResponses,
+        hashedSurveyId,
+        surveyResponse,
+        submissionTarget,
+      );
+    } catch (error: any) {
+      // Answers a Worker stored before a later upload failed are saved; the rest keep
+      // their drafts and are named, so the next Submit sends only those.
+      const savedCount = Array.isArray(error?.partialReceipt?.questionResponseRefs)
+        ? error.partialReceipt.questionResponseRefs.length
+        : 0;
+      if (!savedCount) throw error;
+      tx = { ...error.partialReceipt, retryPending: true };
+      uploadFailure = `Some answers didn't save (${String(error?.message || 'upload failed').replace(/\.$/, '')}).`;
+      questionResponses
+        .slice(savedCount)
+        .forEach((response: SurveyQuestionsLegacyValue) =>
+          heldBack.set(normalizeQuestionIdKey(response?.questionID), 'unsaved'),
+        );
+      questionResponses = questionResponses.slice(0, savedCount);
+      if (surveyResponse) surveyResponse = { ...surveyResponse, responses: questionResponses };
+    }
 
     if (heldBack.size) {
       inst._heldBackSubmitQids = Array.from(heldBack.keys());
-      inst._heldBackSubmitMessage = describeHeldBack();
+      inst._heldBackSubmitMessage = [uploadFailure, describeHeldBack()].filter(Boolean).join(' ');
       setState({ submissionError: inst._heldBackSubmitMessage });
     }
     return normalizeSubmitReceipt(tx, {
