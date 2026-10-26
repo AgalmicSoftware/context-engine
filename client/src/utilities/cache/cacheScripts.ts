@@ -756,6 +756,7 @@ const reloadMirrorFromStorage = ({ namespace, slug, key }: StorageKeyParts): Pro
     // This tab's own pending write lands after this and sets the mirror itself.
     if (optimisticWriteSeqByKey.has(key)) return;
     const value = await readPersistentKey(key);
+    if (optimisticWriteSeqByKey.has(key)) return;
     if (value === READ_FAILED) return;
     if (value == null) {
       if (!mirrorByKey.has(key)) return;

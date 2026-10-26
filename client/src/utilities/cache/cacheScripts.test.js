@@ -830,6 +830,47 @@ describe('cacheScripts', () => {
     expect(cacheScripts.peekCacheSync('questionsCache', 'hard-fail')).toBeNull();
   });
 
+  it('keeps an optimistic write started while a cross-tab reload is reading storage', async () => {
+    const { cacheScripts, idb, emitBroadcastMessage } = loadCacheScripts({ withBroadcastChannel: true });
+    await cacheScripts.initCacheManager();
+    await cacheScripts.writeCache('filters', 'shared', { value: 'saved' });
+    let releaseRead;
+    let releaseWrite;
+    let readStarted;
+    let writeStarted;
+    const reading = new Promise((resolve) => {
+      readStarted = resolve;
+    });
+    const writing = new Promise((resolve) => {
+      writeStarted = resolve;
+    });
+    const read = new Promise((resolve) => {
+      releaseRead = resolve;
+    });
+    const write = new Promise((resolve) => {
+      releaseWrite = resolve;
+    });
+    idb.get.mockImplementationOnce(async () => {
+      readStarted();
+      return read;
+    });
+    idb.set.mockImplementationOnce(async () => {
+      writeStarted();
+      await write;
+    });
+    emitBroadcastMessage({ _dgCacheScripts: true, sourceId: 'other-tab', action: 'write', key: 'dg:filters:shared' });
+    await reading;
+    const pending = cacheScripts.writeCacheOptimistic('filters', 'shared', { value: 'pending' });
+    releaseRead({ value: 'saved' });
+    await writing;
+    try {
+      expect(cacheScripts.peekCacheSync('filters', 'shared')).toEqual({ value: 'pending' });
+    } finally {
+      releaseWrite();
+      await pending;
+    }
+  });
+
   it('uses storage-only cross-tab handling in fallback mode to avoid duplicate updates', async () => {
     const { cacheScripts, broadcastChannels, emitBroadcastMessage } = loadCacheScripts({
       failProbe: true,
