@@ -5565,7 +5565,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     width: auto;
   }
 
-  // Keep the counter in a narrow column between the arrows on phones.
+  // Compact fallback; the navigation container expands this when it has room.
   .pileNavCounterText {
     display: inline-flex;
     flex-direction: column;
@@ -7415,8 +7415,35 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .pileInteractionUnit .pileControls > .pileNav {
-    flex: 0 0 auto;
+    container: pile-navigation / inline-size;
+    flex: 1 0 124px;
+    min-width: 124px;
+    max-width: 220px;
+    justify-content: space-between;
+    gap: 0;
     margin-left: auto;
+  }
+
+  // A wrapped navigation group grows into its spare row. Its own available
+  // width, rather than the phone breakpoint, determines the counter layout.
+  @container pile-navigation (min-width: 160px) {
+    .pileNavCounterText {
+      display: inline-flex;
+      flex-direction: row;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .pileNavCounterSeparator {
+      line-height: inherit;
+    }
+  }
+
+  @media (min-width: 641px) {
+    .pileInteractionUnit .pileControls > .pileNav {
+      flex-basis: 180px;
+      min-width: 180px;
+    }
   }
 
   // Binary prompts can be long; let the active card establish the stack height

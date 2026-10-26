@@ -119,10 +119,7 @@ try {
         });
         const detail = JSON.stringify({ theme, width, expected, layout });
         assert.equal(layout.text, `${expected} / 50`, detail);
-        if (width <= 640) {
-          assert.equal(layout.lineTops.length, 3, `Phone counter uses a narrow column: ${detail}`);
-          assert(layout.counter.width < 32, `Counter leaves room for the controls: ${detail}`);
-        } else assert.equal(layout.lineTops.length, 1, `Wide counter stays on one line: ${detail}`);
+        if (width > 640) assert.equal(layout.lineTops.length, 1, `Wide counter stays on one line: ${detail}`);
         if (width <= 768) {
           const topRow = layout.buttons.filter(control => !control.inNav);
           for (const control of topRow) {
@@ -131,9 +128,15 @@ try {
           const wrapped = layout.nav.top >= layout.actions.bottom;
           if (wrapped) {
             assert(layout.nav.top >= Math.max(...topRow.map(control => control.bottom)) + 15, `Wrapped arrows have at least 16px separation from Clear: ${detail}`);
+            assert.equal(layout.lineTops.length, 1, `A separate navigation row uses a horizontal counter: ${detail}`);
+            assert(layout.next.cx - layout.prev.cx >= 170, `A separate navigation row spreads the arrows apart: ${detail}`);
           } else {
             assert(Math.abs(layout.nav.cy - layout.actions.cy) <= 1, `Controls stay on one row when they fit: ${detail}`);
+            if (layout.lineTops.length === 3) {
+              assert(layout.counter.width < 32 && layout.nav.width < 160, `Stacking is reserved for a constrained shared row: ${detail}`);
+            } else assert.equal(layout.lineTops.length, 1, `Counter is horizontal whenever the shared row has room: ${detail}`);
           }
+          if (width <= 390 && topRow.length === 2) assert.equal(layout.lineTops.length, 1, `Without Submit, even a phone has room for the horizontal counter: ${detail}`);
           if (width === 320 && topRow.length > 2) assert(wrapped, `Narrow pending toolbar moves arrows below: ${detail}`);
           if (width >= 596) assert(!wrapped, `Wide mobile toolbar fits one row: ${detail}`);
           assert(layout.submitLabelFits, `Submit label fits its button: ${detail}`);
