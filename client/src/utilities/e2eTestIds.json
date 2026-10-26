@@ -44,6 +44,8 @@
   "ADMIN_BACKUP_DOWNLOAD": "ce-admin-backup-download",
   "ADMIN_BACKUP_FILE": "ce-admin-backup-file",
   "ADMIN_BACKUP_RESTORE": "ce-admin-backup-restore",
+  "ADMIN_BACKUP_STATUS": "ce-admin-backup-status",
+  "ADMIN_BACKUP_ABANDON": "ce-admin-backup-abandon",
   "PAGE_SPONSOR_ROOT": "ce-page-sponsor-root",
   "PAGE_SESSION_ROOT": "ce-page-session-root",
   "PAGE_SESSION_DOCS_ROOT": "ce-page-session-docs-root",

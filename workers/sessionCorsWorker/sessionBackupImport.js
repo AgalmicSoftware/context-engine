@@ -1,3 +1,4 @@
+import { BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStagePrefix, readActiveBackupImport } from './sessionBackupLifecycle.js';
 import { verifyBackupPage } from './sessionBackupAuthentication.js';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
@@ -96,9 +97,9 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const index = getStorageIndexBinding(env);
   if (!index?.get || !index?.put || !index?.delete) fail('Restore storage is unavailable.', 503);
   const stateKey = `session-backup-import:${page.archiveId}`;
-  const activeKey = 'session-backup-import-active';
-  const active = await storage.get(activeKey);
-  if (active && active !== page.archiveId && !(await storage.get(`session-backup-import:${active}`))?.finished) fail('Another backup restore is in progress.', 409);
+  const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
+  const active = await readActiveBackupImport(coordinator, slug);
+  if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail('Another backup restore is in progress. Check restore status to abandon it.', 409, 'backup_restore_in_progress');
   const pageHash = await sha256Hex(JSON.stringify(page));
   const receiptKey = `${stateKey}:page:${page.pageNumber}`;
   const receipt = await storage.get(receiptKey);
@@ -106,15 +107,16 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     if (receipt.hash !== pageHash) fail('This backup page differs from the previously imported page.', 409);
     return Response.json({ ...receipt.result, replayed: true });
   }
-  const root = `ce-import-stage:${slug}:${page.archiveId}:`;
+  const root = backupImportStagePrefix(slug, page.archiveId);
   const descriptorKey = (id, target = '') => `${stateKey}:payload:${target || 'storage'}:${id}`;
   const recordKey = (id) => `${stateKey}:record:${id}`;
-  const chunkKey = (id, n, target = '') => `${target ? 'ce-import-coordinator-chunk' : 'ce-import-chunk'}:${slug}:${id}:${n}`;
+  const chunkKey = (id, n, target = '') => `${root}chunk:${target || 'storage'}:${id}:${n}`;
   let progress = await storage.get(stateKey);
   if (!progress) {
     if (page.pageNumber !== 0 || !page.coordinator) fail('Import must begin with the first backup page.', 409);
     progress = { actor: expectedAuthority.actor, pageNumber: 0, nextEntry: 0, pageHash, manifest: { ...manifest, counts: undefined, complete: undefined },
       counts: { written: 0, skipped: 0, conflicts: 0 }, conflicts: [], observed: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 },
+      expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS, configPublished: false,
       pendingPayloads: 0, pendingRecords: 0, snapshotReady: false, finished: false };
     if (page.coordinator.chunked !== true) {
       validateSnapshot({ snapshot: page.coordinator, manifest, ...validators });
@@ -282,7 +284,11 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
         else { await storage.put('session-lit-authorization-signer-v1', signer); progress.counts.written += 1; }
       }
       if (!progress.counts.conflicts && !current) {
-        await storage.put('session-config-authority', { ...authority, projectionPending: true });
+        progress.configPublished = true;
+        await storage.transaction(async (transaction) => {
+          await transaction.put('session-config-authority', { ...authority, projectionPending: true });
+          await transaction.put(stateKey, progress);
+        });
         await coordinator.projectSessionConfigAuthority(authority);
         progress.counts.written += 1;
       }
@@ -290,7 +296,8 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     progress.finished = true;
   }
   const result = { ok: true, archiveId: page.archiveId, pageNumber: page.pageNumber, counts: progress.counts,
-    conflicts: progress.conflicts, complete: progress.finished && !progress.counts.conflicts };
+    conflicts: progress.conflicts, complete: progress.finished && !progress.counts.conflicts,
+    restore: progress.finished ? null : { archiveId: page.archiveId, inProgress: true, canAbandon: !progress.configPublished } };
   progress.pageNumber += 1;
   progress.nextEntry = 0;
   await storage.transaction(async (transaction) => {

@@ -1,3 +1,4 @@
+import { markStorageBackupWrite } from './storageBackupRevision.js';
 import {
   STORAGE_BACKENDS,
   attachStorageRefCompatibilityFields,
@@ -1588,6 +1589,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     return responseJson(deps, { error: kvValueFailure.error }, kvValueFailure.status, baseHeaders);
   }
 
+  await markStorageBackupWrite(env, slug);
   if (canWriteR2) {
     await r2.put(objectKey, bytesToStore, {
       httpMetadata: { contentType: metadata.contentType },
@@ -1612,6 +1614,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata);
   }
 
+  await markStorageBackupWrite(env, slug);
   const storageRef = normalizeStorageRef(metadata);
   if (uploadReceipt) {
     const settled = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'settle',

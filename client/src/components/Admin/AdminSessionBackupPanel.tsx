@@ -70,6 +70,7 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
   const [restorePosition, setRestorePosition] = useState(0);
   const [adoptSessionId, setAdoptSessionId] = useState(false);
   const [conflicts, setConflicts] = useState<string[]>([]);
+  const [activeRestore, setActiveRestore] = useState<Record<string, unknown> | null>(null);
   const downloaded = useRef<BackupPage[]>([]);
   const restore = useRef<BackupPage[]>([]);
   const lifetime = useRef<AbortController | null>(null);
@@ -163,6 +164,7 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
         setStatus(`Downloading page ${downloaded.current.length + 1}…`);
         const last = downloaded.current.at(-1);
         const value = await request('export-session-backup', { cursor: last?.nextCursor || '' });
+        if (record(value).reason === 'backup_session_changed') throw new Error(String(record(value).error));
         if (
           !isPage(value, sessionSlug) ||
           value.pageNumber !== downloaded.current.length ||
@@ -210,6 +212,24 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
       setRestoreCount(pages.length);
       setStatus(`Ready to restore ${pages.length} pages from ${file.name}.`);
     });
+  const checkRestore = () =>
+    run(async () => {
+      const result = record(await request('session-backup-status', {}));
+      setActiveRestore(result.restore ? record(result.restore) : null);
+      setStatus(result.restore ? 'An unfinished restore is in progress.' : 'No unfinished restore.');
+    });
+  const abandonRestore = () =>
+    run(async () => {
+      for (;;) {
+        const result = record(await request('abandon-session-backup', { archiveId: activeRestore?.archiveId }));
+        if (result.ok !== true) throw new Error('The Worker did not confirm abandonment. Check restore status.');
+        if (result.complete === true) break;
+        setStatus('Removing restore staging…');
+      }
+      setActiveRestore(null);
+      setRestorePosition(0);
+      setStatus('Restore abandoned. Existing records were kept. Choose a complete backup to start again.');
+    });
   const importBackup = () =>
     run(async () => {
       let position = restorePosition;
@@ -222,6 +242,7 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
         );
         if (result.ok !== true || !result.counts)
           throw new Error('The Worker did not confirm this restore page. Resume to retry it.');
+        setActiveRestore(result.restore ? record(result.restore) : null);
         position += 1;
         setRestorePosition(position);
       }
@@ -303,6 +324,28 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
         For a fresh deployment, enter its Worker URL in admin settings and connect its bootstrap admin wallet. Each page
         needs an admin signature.
       </p>
+      <div className={styles.formRow}>
+        <button
+          type="button"
+          className={styles.actionButton}
+          disabled={busy || !account}
+          onClick={() => void checkRestore()}
+          data-testid="ce-admin-backup-status"
+        >
+          Check restore status
+        </button>
+        {activeRestore?.canAbandon === true && (
+          <button
+            type="button"
+            className={styles.actionButton}
+            disabled={busy || !account}
+            onClick={() => void abandonRestore()}
+            data-testid="ce-admin-backup-abandon"
+          >
+            Abandon restore
+          </button>
+        )}
+      </div>
       <Label for="admin-session-backup-file">Backup file</Label>
       <Input
         id="admin-session-backup-file"

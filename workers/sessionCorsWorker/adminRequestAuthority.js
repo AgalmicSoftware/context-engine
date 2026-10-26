@@ -269,7 +269,10 @@ export const resolveAdminRequestAuthority = async ({
       response: deps?.json?.({ error: 'Admin request body mismatch.' }, 400, headers),
     };
   }
-  const restoringFreshSession = !corsState?.config && action === 'import-session-backup' && body?.adoptSessionId === true;
+  const restoringFreshSession = !corsState?.config && (
+    (action === 'import-session-backup' && body?.adoptSessionId === true) ||
+    ['session-backup-status', 'abandon-session-backup'].includes(action)
+  );
   const initializingConfig = restoringFreshSession ? null : (
     !corsState?.config &&
     action === 'set-config' &&

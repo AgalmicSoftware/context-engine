@@ -1,3 +1,4 @@
+import { STORAGE_BACKUP_REVISION_KEY } from './storageBackupRevision.js';
 import { resolveWorkerGroupsKv, workerGroupBackupPrefixes } from './workerGroups.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { normalizeWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
@@ -47,7 +48,7 @@ export const exportCoordinatorBackup = async (coordinator, payload) => {
     fail('Legacy plaintext secrets must be saved through the encrypted secret workflow before backup.', 409);
   }
   if (signer && !isEncryptedSessionSecretsEnvelope(signer.envelope)) fail('Invalid wrapped authorization signer.', 409);
-  return json({ ok: true, coordinator: {
+  return json({ ok: true, writeRevision: await coordinator.state.storage.get(STORAGE_BACKUP_REVISION_KEY) || 0, coordinator: {
     configAuthority: current,
     wrappedSessionKeys: {
       activeSessionKey: current.activeSessionKey || null,

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { installSessionCoordinatorBinding, createSignedSiweBody, makeJsonRequest } from '../../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { createWorkerRuntime } from './worker.js';
+import { storageRoute } from './storageRouteExecution.js';
 import { exportSessionBackup } from './sessionBackup.js';
 import { STORAGE_EXPORT_PAGE_LIMITS } from './storageScanBudget.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
@@ -474,4 +475,101 @@ for (const unsigned of [false, true]) test(`restore rejects unauthenticated part
   assert.equal(denied.status, 403, JSON.stringify(denied));
   assert.equal(denied.body.reason, 'backup_authentication_failed');
   assert.deepEqual([...source.kv.values], before);
+});
+
+const largeArchiveSource = () => {
+  const source = fixture();
+  const config = JSON.parse(source.kv.values.get(`session:${slug}:config`));
+  config.storageProfile = { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } };
+  source.kv.values.set(`session:${slug}:config`, JSON.stringify(config));
+  const id = 'cf_abandon_fixture';
+  const metadata = { id, resource: 'responses', size: 5 * 1024 * 1024 };
+  source.kv.values.set(`ce-storage:${slug}:responses:${id}`, JSON.stringify(metadata));
+  source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.alloc(metadata.size, 120).toString('base64url') }));
+  return source;
+};
+const restoreControl = (env, operation, archiveId, revision = 0) => callSessionConfigCoordinator({ env, slug,
+  path: `backup/${operation}`, expectedAuthority: { ...expectedAuthority, revision }, archiveId });
+
+test('unfinished restores can be abandoned, expire, and never abandon a published config', async () => {
+  const source = largeArchiveSource();
+  const pages = await allPages(source.env);
+  for (const expired of [false, true]) {
+    const target = fixture();
+    target.kv.values.delete(`session:${slug}:config`);
+    assert.equal((await importPage(target.env, pages[0])).ok, true);
+    const status = await restoreControl(target.env, 'status');
+    assert.equal(status.body.restore.inProgress, true);
+    assert.equal(status.body.restore.canAbandon, true);
+    if (expired) {
+      const store = [...target.env.__coordinatorInstances.values()][0].store;
+      const key = `session-backup-import:${pages[0].archiveId}`;
+      store.set(key, { ...store.get(key), expiresAt: 1 });
+      assert.equal((await restoreControl(target.env, 'status')).body.restore, null);
+    } else {
+      assert.equal((await restoreControl(target.env, 'abandon', '0'.repeat(64))).status, 409);
+      for (let n = 0; n < 500; n += 1) target.kv.values.set(`ce-import-stage:${slug}:${pages[0].archiveId}:test:${n}`, 'chunk');
+      let batches = 0;
+      for (;;) {
+        const abandoned = await restoreControl(target.env, 'abandon', pages[0].archiveId);
+        assert.equal(abandoned.ok, true, JSON.stringify(abandoned));
+        batches += 1;
+        if (abandoned.body.complete) break;
+        assert.ok(batches < 10);
+      }
+      assert.ok(batches > 1);
+    }
+    assert.equal([...target.kv.values.keys()].some((key) => key.startsWith('ce-import-')), false);
+    const empty = fixture();
+    const [other] = await allPages(empty.env);
+    assert.equal((await importPage(target.env, other)).body.complete, true);
+    assert.equal((await restoreControl(target.env, 'abandon', other.archiveId, 1)).status, 409);
+    assert.ok(await target.kv.get(`session:${slug}:config`));
+  }
+});
+
+test('fresh restore status and abandonment require a signed deployment admin', async () => {
+  const { ethers } = createRequire(new URL('../../package.json', import.meta.url))('ethers');
+  const wallet = new ethers.Wallet(`0x${'4'.repeat(64)}`);
+  const stranger = new ethers.Wallet(`0x${'5'.repeat(64)}`);
+  const source = largeArchiveSource();
+  const page = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  Object.assign(target.env, { BOOTSTRAP_ADMIN_ADDRESS: wallet.address, ADMIN_TRUSTED_ORIGINS: 'https://app.example' });
+  await callSessionConfigCoordinator({ env: target.env, slug, path: 'backup/import', page, adoptSessionId: true,
+    expectedAuthority: { actor: wallet.address.toLowerCase(), revision: 0, authzEpoch: 0 } });
+  const worker = createWorkerRuntime(target.env);
+  const call = async (signer, action) => {
+    const body = await createSignedSiweBody({ worker, env: target.env, wallet: signer, sessionSlug: slug,
+      adminAction: action, audience: 'https://app.example', body: { archiveId: page.archiveId, adoptSessionId: true } });
+    return worker.fetch(makeJsonRequest(`/admin/${action}`, body, { headers: { Origin: 'https://app.example' } }), target.env);
+  };
+  assert.equal((await call(stranger, 'abandon-session-backup')).status, 403);
+  const status = await call(wallet, 'session-backup-status');
+  assert.equal(status.status, 200);
+  assert.equal((await status.json()).restore.canAbandon, true);
+  const response = await call(wallet, 'abandon-session-backup');
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).complete, true);
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), 'https://app.example');
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+});
+
+test('an upload between export pages makes the archive incomplete and asks for a fresh export', async () => {
+  const source = largeArchiveSource();
+  const first = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  assert.ok(first.nextCursor);
+  const response = await storageRoute({ path: '/storage/upload', method: 'POST', env: source.env, slug,
+    config: JSON.parse(await source.kv.get(`session:${slug}:config`)), uploaderAddress: admin,
+    expectedAuthority, request: makeJsonRequest('/storage/upload', { resource: 'responses',
+      data: JSON.stringify({ questionID: `0x${'7'.repeat(64)}`, answer: { value: 'During export' } }) }),
+    baseHeaders: new Headers(),
+  });
+  assert.equal(response.status, 200, await response.clone().text());
+  const next = await exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: first.nextCursor });
+  assert.equal(next.manifest.complete, false);
+  assert.equal(next.nextCursor, '');
+  assert.equal(next.reason, 'backup_session_changed');
+  assert.match(next.error, /session changed during export; export again/i);
 });

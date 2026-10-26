@@ -1,3 +1,5 @@
+import { controlCoordinatorBackupImport } from './sessionBackupLifecycle.js';
+import { bumpStorageBackupRevision } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
 import { assertExpectedSessionAuthority } from './sessionConfigAuthority.js';
@@ -2070,7 +2072,10 @@ export class SessionWriteCoordinator {
         const runVisibilityMutation = (operation) => this.serializeSessionConfigOperation(async () => {
           const authority = await this.assertSessionAuthority(payload);
           await this.repairPendingSessionConfigProjection();
-          return operation(authority);
+          await bumpStorageBackupRevision(this.state.storage);
+          const result = await operation(authority);
+          await bumpStorageBackupRevision(this.state.storage);
+          return result;
         });
         const authority = await runVisibilityMutation((current) => current);
         const result = await setCloudflareStorageResourceHidden({
@@ -2742,6 +2747,16 @@ export class SessionWriteCoordinator {
     if (url.pathname === '/session-config/current') return this.executeSessionConfigCurrent(payload);
     if (url.pathname === '/session-config/recovery-key/export') {
       return this.serializeSessionConfigOperation(() => exportCoordinatorRecoveryKey(this, payload));
+    }
+    if (url.pathname === '/session-config/backup/write-revision') {
+      await bumpStorageBackupRevision(this.state.storage);
+      return jsonResponse({ ok: true });
+    }
+    if (url.pathname === '/session-config/backup/status' || url.pathname === '/session-config/backup/abandon') {
+      return this.serializeSessionConfigOperation(async () => {
+        try { return await controlCoordinatorBackupImport(this, payload, url.pathname.endsWith('/abandon')); }
+        catch (error) { return jsonResponse({ error: error.message }, error.status || 503); }
+      });
     }
     if (url.pathname === '/session-config/backup/export') {
       return this.serializeSessionConfigOperation(async () => {

@@ -36,7 +36,7 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
   const prefix = `ce-backup:${keySlug}:`;
   const parsed = parseStorageExportCursor({ cursor, prefix, sessionId });
   const position = parsed.continuation || { phase: 0, listCursor: '', lastKey: '', chunk: -1, pageNumber: 0,
-    exportedAt: new Date().toISOString(), snapshotDigest, counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 } };
+    exportedAt: new Date().toISOString(), snapshotDigest, writeRevision: current.body.writeRevision, counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 } };
   const paths = prefixes(keySlug);
   if (!Number.isSafeInteger(position.phase) || position.phase < 0 || position.phase > 6 ||
       !Number.isSafeInteger(position.chunk) || position.chunk < -1 || !Number.isSafeInteger(position.pageNumber) || position.pageNumber < 0 ||
@@ -54,6 +54,18 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
     counts: position.counts, complete: false };
   const page = { ok: true, manifest, pageNumber: position.pageNumber, entries: [], nextCursor: '', snapshotDigest,
     archiveId: await sha256Hex(`${sessionId}:${manifest.exportedAt}:${snapshotDigest}`) };
+  const finish = async () => {
+    const latest = await callSessionConfigCoordinator({ env, slug, path: 'backup/export', expectedAuthority });
+    if (!latest.ok) fail(latest.body?.error || 'Backup authority is unavailable.', latest.status);
+    if (position.writeRevision !== latest.body.writeRevision) {
+      manifest.complete = false;
+      page.nextCursor = '';
+      page.reason = 'backup_session_changed';
+      page.error = 'The session changed during export; export again.';
+    }
+    return signBackupPage(page, env);
+  };
+  if (position.writeRevision !== current.body.writeRevision) return finish();
   let used = jsonByteLength(page) + 16384;
   let rows = 0;
   const append = (entry) => {
@@ -87,7 +99,7 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
       if (!await payload('coordinator', snapshotBytes, null, 'coordinator')) {
         position.pageNumber += 1;
         page.nextCursor = storageExportCursor({ prefix, sessionId, continuation: position });
-        return signBackupPage(page, env);
+        return finish();
       }
     }
     position.phase = 1;
@@ -145,5 +157,5 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
     position.pageNumber += 1;
     page.nextCursor = storageExportCursor({ prefix, sessionId, continuation: position });
   }
-  return signBackupPage(page, env);
+  return finish();
 };

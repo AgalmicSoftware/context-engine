@@ -414,11 +414,11 @@ export const dispatchAdminRequest = async ({
     }
   }
 
-  if (action === 'import-session-backup') {
+  if (['import-session-backup', 'session-backup-status', 'abandon-session-backup'].includes(action)) {
     const responseHeaders = new Headers(headers);
     responseHeaders.set('Cache-Control', 'no-store');
-    const result = await callSessionConfigCoordinator({ env, slug: targetSlug, path: 'backup/import',
-      expectedAuthority, page: body?.page, adoptSessionId: body?.adoptSessionId === true });
+    const result = await callSessionConfigCoordinator({ env, slug: targetSlug, path: action === 'import-session-backup' ? 'backup/import' : action === 'session-backup-status' ? 'backup/status' : 'backup/abandon',
+      expectedAuthority, page: body?.page, archiveId: body?.archiveId, adoptSessionId: body?.adoptSessionId === true });
     return deps?.json?.(result.body, result.status, responseHeaders);
   }
 

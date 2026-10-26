@@ -155,3 +155,19 @@ test('hides key export when the Worker advertises backup without deployment key 
   expect(await screen.findByRole('button', { name: 'Download backup' })).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Show recovery key' })).not.toBeInTheDocument();
 });
+
+test('offers abandonment after the Worker reports an unfinished restore', async () => {
+  const post = jest
+    .fn()
+    .mockResolvedValueOnce({
+      data: { ok: true, restore: { archiveId: 'unfinished', inProgress: true, canAbandon: true } },
+    })
+    .mockResolvedValueOnce({ data: { ok: true, complete: true } });
+  render(<AdminSessionBackupPanel {...props} postSignedRequest={post} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Check restore status' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Abandon restore' }));
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Restore abandoned'));
+  expect(post.mock.calls[1][0].action).toBe('abandon-session-backup');
+  expect(post.mock.calls[1][0].body.archiveId).toBe('unfinished');
+  expect(screen.queryByRole('button', { name: 'Abandon restore' })).not.toBeInTheDocument();
+});

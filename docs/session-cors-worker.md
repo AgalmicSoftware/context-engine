@@ -1165,8 +1165,10 @@ data and are excluded. Legacy plaintext session secrets must first be saved
 through the encrypted secret workflow.
 
 Pause session writes while downloading a backup. Config or group changes
-between pages abort the export, but KV and R2 cannot provide a joint snapshot of
-concurrent payload writes. Keep the complete JSONL archive with the deployment's
+between pages abort the export. A storage-write revision detects uploads and
+visibility changes during export, returning `complete: false` and
+`backup_session_changed` with an instruction to export again. KV and R2 still
+cannot provide a joint point-in-time snapshot. Keep the complete JSONL archive with the deployment's
 recovery key; a fingerprint cannot decrypt it.
 
 Restore with admin-signed `POST /admin/import-session-backup`, passing each
@@ -1185,7 +1187,14 @@ overwritten. The response reports cumulative `written`, `skipped`, and
 resume, or repeat an acknowledged page to receive its saved receipt. Only one
 archive may be in progress for a session. Conflicted restores finish with
 `complete: false`; use a fresh target to resolve conflicts. Temporary staging
-expires after seven days; assembled payload chunks are removed immediately.
+expires after seven days; the next restore or status request releases expired
+progress in bounded cleanup batches. Assembled payload chunks are removed immediately.
+Signed `POST /admin/session-backup-status` reports an unfinished restore. Signed
+`POST /admin/abandon-session-backup` with its `archiveId` removes staging and
+progress before that restore publishes config. Repeat until `complete: true`;
+existing records are kept. The deployment bootstrap admin can perform these
+actions on a fresh target. A completed or config-published restore cannot be
+abandoned.
 The target upload limit still applies, and payloads exceeding KV's encoded
 value limit require an R2 binding. Restore does not migrate the session to a
 different slug, rotate stored keys, or replace newer target policy.
@@ -1195,13 +1204,14 @@ pages before writing backup data. Keep the original downloaded JSONL intact;
 editing participant, ownership or authority fields invalidates authentication.
 Deployment-key holders are trusted operators and can create authenticated archives.
 
-The `session_backup_v1` capability advertises these two signed actions.
+The `session_backup_v1` capability advertises the backup and restore actions.
 Session admin settings show **Backup & restore** only when this capability is
 present. **Download backup** collects all pages into one `.jsonl` file; an
 interrupted download can resume or save its completed pages as `.partial.jsonl`.
 The restore control rejects partial files before signing requests. It reports
 progress and conflicts and resumes an interrupted import at the unacknowledged
-page. Nonce rate limits pause pagination for a minute before retrying. Backup
+page. **Check restore status** offers **Abandon restore** when the Worker reports
+an unfinished restore whose config has not been published. Nonce rate limits pause pagination for a minute before retrying. Backup
 data remains in memory and the downloaded file; the panel does not save it in
 browser storage. To recover into a fresh deployment, set its Worker URL in
 admin settings, connect its bootstrap admin wallet, select the complete file,
