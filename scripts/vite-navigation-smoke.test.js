@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const vm = require('node:vm');
 const { ethers } = require('ethers');
 const registryAbi = require('../client/src/contractsABI/SESSION_REGISTRY_ABI.json');
 const contracts = require('../client/src/variables/contracts.json');
@@ -184,7 +185,7 @@ test('setup fixture preserves live Worker checks and unrelated session routes', 
 
 test('local navigation fixtures allow app assets and fail unmatched external requests', async () => {
   let handler;
-  await installLocalSmokeFixtureRoutes({ route: async (pattern, callback) => {
+  await installLocalSmokeFixtureRoutes({ addInitScript: async () => {}, route: async (pattern, callback) => {
     assert.equal(pattern, '**/*');
     handler = callback;
   } }, 'http://127.0.0.1:4173');
@@ -209,7 +210,7 @@ test('local navigation fixtures allow app assets and fail unmatched external req
 
 test('local navigation uses explicit asset fixtures and ABI-valid registry reads', async () => {
   let handler;
-  await installLocalSmokeFixtureRoutes({ route: async (_pattern, callback) => { handler = callback; } }, 'http://127.0.0.1:4173');
+  await installLocalSmokeFixtureRoutes({ addInitScript: async () => {}, route: async (_pattern, callback) => { handler = callback; } }, 'http://127.0.0.1:4173');
   const request = async (url, method = 'GET', payload) => {
     let result;
     await handler({
@@ -220,8 +221,14 @@ test('local navigation uses explicit asset fixtures and ABI-valid registry reads
     });
     return result;
   };
-  const font = await request('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Poppins:wght@400;600;700;800&display=swap');
-  assert.equal(font.contentType, 'text/css');
+  for (const fontUrl of [
+    'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Poppins:wght@400;600;700;800&display=swap',
+    'https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800',
+    'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,500;1,500;1,600&display=swap',
+  ]) {
+    const font = await request(fontUrl);
+    assert.equal(font.contentType, 'text/css', fontUrl);
+  }
   const logo = await request('https://ethereum.org/images/assets/eth-diamond-glyph.png');
   assert.equal(logo.contentType, 'image/png');
   assert.match(logo.path, /client\/public\/favicon-32x32\.png$/);
@@ -252,6 +259,26 @@ test('local navigation uses explicit asset fixtures and ABI-valid registry reads
     assert.equal((await request(rpcUrl, 'POST', payload)).aborted, 'blockedbyclient');
   }
   assert.equal((await read('getSessionBySlug', ['unconfigured-session'])).aborted, 'blockedbyclient');
+});
+
+test('local service-worker guard tolerates opaque frames and blocks registration elsewhere', async () => {
+  let initScript;
+  await installLocalSmokeFixtureRoutes({
+    addInitScript: async (callback) => { initScript = callback; },
+    route: async () => {},
+  }, 'http://127.0.0.1:4173');
+  const source = `(${initScript.toString()})();`;
+  const opaqueNavigator = Object.defineProperty({}, 'serviceWorker', {
+    get: () => { throw new Error('Service worker is disabled because the context is sandboxed'); },
+  });
+  assert.doesNotThrow(() => vm.runInNewContext(source, { navigator: opaqueNavigator }));
+  assert.doesNotThrow(() => vm.runInNewContext(source, { navigator: {} }));
+
+  let registered = false;
+  const serviceWorker = { register: async () => { registered = true; } };
+  vm.runInNewContext(source, { navigator: { serviceWorker } });
+  await assert.rejects(serviceWorker.register('/worker.js'), /registration is disabled in local navigation smoke/);
+  assert.equal(registered, false);
 });
 
 test('normalizeLayoutProbeSelectors keeps default browser layout checks and accepts overrides', () => {

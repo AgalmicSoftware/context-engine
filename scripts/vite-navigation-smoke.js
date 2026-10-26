@@ -43,7 +43,11 @@ const DEMO_READY_WORKER_SOURCE_SLUG = 'demo-sh';
 const DEMO_READY_WORKER_CONFIG = demoSessions[DEMO_READY_WORKER_SOURCE_SLUG] || {};
 const DEMO_READY_WORKER_ORIGIN = normalizeBaseUrl(DEMO_READY_WORKER_CONFIG.corsWorkerUrl || '');
 const DEMO_STORAGE_LIST_FIXTURE_RESOURCES = new Set(['questions', 'responses', 'surveys']);
-const LOCAL_SMOKE_FONT_URL = 'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Poppins:wght@400;600;700;800&display=swap';
+const LOCAL_SMOKE_FONT_URLS = new Set([
+  'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Poppins:wght@400;600;700;800&display=swap',
+  'https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800',
+  'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,500;1,500;1,600&display=swap',
+]);
 const LOCAL_SMOKE_IMAGE_URLS = new Set([
   'https://www.cosmos-institute.org/media/logo.svg',
   'https://cosmosaccessmemory.b-cdn.net/1777891088662-oaript.png',
@@ -87,13 +91,21 @@ function shouldInstallDemoWorkerFixture(baseUrl, route) {
 async function installLocalSmokeFixtureRoutes(page, baseUrl) {
   if (!isLocalSmokeBaseUrl(baseUrl)) return;
   const appOrigin = new URL(baseUrl).origin;
+  await page.addInitScript(() => {
+    let serviceWorker;
+    // Sandboxed report frames throw when this property is read.
+    try { serviceWorker = navigator.serviceWorker; } catch (_) { return; }
+    if (serviceWorker) serviceWorker.register = async () => {
+      throw new Error('Service worker registration is disabled in local navigation smoke');
+    };
+  });
   // Keep local CI independent of live RPCs and remote presentation assets.
   // Later, specific Worker fixtures run first; unmatched requests still fail.
   await page.route('**/*', async (requestRoute) => {
     const request = requestRoute.request();
     const url = new URL(request.url());
     if (url.origin === appOrigin) return requestRoute.continue();
-    if (request.method() === 'GET' && request.url() === LOCAL_SMOKE_FONT_URL) {
+    if (request.method() === 'GET' && LOCAL_SMOKE_FONT_URLS.has(request.url())) {
       return requestRoute.fulfill({ contentType: 'text/css', body: '/* Use installed fallback fonts in local smoke. */' });
     }
     if (request.method() === 'GET' && LOCAL_SMOKE_IMAGE_URLS.has(request.url())) {
@@ -391,7 +403,6 @@ const DEFAULT_ROUTE_PROBES = Object.freeze({
 async function inspectRoute(browser, baseUrl, route, options = {}) {
   const page = await browser.newPage({
     viewport: options.viewport || resolveViewport(),
-    ...(isLocalSmokeBaseUrl(baseUrl) ? { serviceWorkers: 'block' } : {}),
   });
   const consoleIssues = [];
   const pageErrors = [];
