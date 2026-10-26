@@ -332,6 +332,25 @@ describe('SurveyResults bookmark cache writes', () => {
     jest.useRealTimers();
   });
 
+  // Bookmark saves apply the clicked change to the latest saved bookmarks; this
+  // records each saved result. Each listed failure rejects one save instead.
+  const spyOnBookmarkSaves = (saved: unknown, failures: unknown[] = []) => {
+    const saves: unknown[][] = [];
+    const updateCacheAtomic = cacheScripts.updateCacheAtomic;
+    const spy = jest.spyOn(cacheScripts, 'updateCacheAtomic').mockImplementation((async (
+      namespace: string,
+      slug: string,
+      update: (current: unknown) => unknown,
+    ) => {
+      if (namespace !== 'bookmarksCache') return updateCacheAtomic(namespace, slug, update as never);
+      if (failures.length) throw failures.shift();
+      const next = update(JSON.parse(JSON.stringify(saved)));
+      saves.push([namespace, slug, next]);
+      return next;
+    }) as never);
+    return { saves, spy };
+  };
+
   it('uses clone:false reads when mutating survey/question bookmarks in results view', async () => {
     const liveBookmarksCache = {
       surveys: ['existing-survey'],
@@ -345,7 +364,7 @@ describe('SurveyResults bookmark cache writes', () => {
         }),
       }),
     );
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const { saves } = spyOnBookmarkSaves(liveBookmarksCache);
 
     const surveyView = renderSurveyResults({
       activeSessionSlug: 'edge',
@@ -371,15 +390,10 @@ describe('SurveyResults bookmark cache writes', () => {
     expect(screen.getByRole('button', { name: 'Remove bookmark' })).toBeInTheDocument();
 
     expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
-    expect(writeSpy).toHaveBeenCalledTimes(2);
-    expect(writeSpy).toHaveBeenNthCalledWith(1, 'bookmarksCache', 'edge', {
-      surveys: ['existing-survey', 's1'],
-      questions: ['existing-question'],
-    });
-    expect(writeSpy).toHaveBeenNthCalledWith(2, 'bookmarksCache', 'edge', {
-      surveys: ['existing-survey'],
-      questions: ['existing-question', 'q1'],
-    });
+    expect(saves).toEqual([
+      ['bookmarksCache', 'edge', { surveys: ['existing-survey', 's1'], questions: ['existing-question'] }],
+      ['bookmarksCache', 'edge', { surveys: ['existing-survey'], questions: ['existing-question', 'q1'] }],
+    ]);
     expect(liveBookmarksCache).toEqual({
       surveys: ['existing-survey'],
       questions: ['existing-question'],
@@ -393,7 +407,7 @@ describe('SurveyResults bookmark cache writes', () => {
       otherField: 'discarded',
     };
     const peekSpy = mockPeekCacheSync(buildPeekImpl({ bookmarks: malformedCache }));
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const { saves } = spyOnBookmarkSaves(malformedCache);
 
     renderSurveyResults({
       activeSessionSlug: 'edge',
@@ -406,11 +420,9 @@ describe('SurveyResults bookmark cache writes', () => {
     await clickSurveyBookmark();
 
     expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
-    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
-      otherField: 'discarded',
-      surveys: ['s1'],
-      questions: ['existing-question'],
-    });
+    expect(saves).toEqual([
+      ['bookmarksCache', 'edge', { otherField: 'discarded', surveys: ['s1'], questions: ['existing-question'] }],
+    ]);
     expect(malformedCache).toEqual({
       surveys: 'bad-surveys',
       questions: ['existing-question'],
@@ -430,7 +442,7 @@ describe('SurveyResults bookmark cache writes', () => {
         }),
       }),
     );
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockRejectedValue(writeError);
+    const { spy: writeSpy } = spyOnBookmarkSaves({ surveys: ['s1'], questions: ['q1'] }, [writeError]);
 
     try {
       renderSurveyResults({
@@ -443,10 +455,7 @@ describe('SurveyResults bookmark cache writes', () => {
       // q1 starts bookmarked (seeded from the cache fixture).
       await clickQuestionBookmark('Remove bookmark');
 
-      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
-        surveys: ['s1'],
-        questions: [],
-      });
+      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', expect.any(Function));
       // The removal state applied despite the failed write: the toggle flipped back.
       expect(screen.getByRole('button', { name: 'Bookmark question' })).toBeInTheDocument();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -465,7 +474,7 @@ describe('SurveyResults bookmark cache writes', () => {
       questions: ['existing-question'],
     };
     const peekSpy = mockPeekCacheSync(buildPeekImpl({ bookmarks: liveBookmarksCache }));
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const { saves, spy: writeSpy } = spyOnBookmarkSaves(liveBookmarksCache);
 
     renderSurveyResults({
       activeSessionSlug: 'edge',
@@ -478,16 +487,14 @@ describe('SurveyResults bookmark cache writes', () => {
     const peekCallsBefore = peekSpy.mock.calls.length;
     await clickSurveyBookmark();
 
-    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
-      surveys: ['s-ordered'],
-      questions: ['existing-question'],
-    });
+    expect(saves).toEqual([['bookmarksCache', 'edge', { surveys: ['s-ordered'], questions: ['existing-question'] }]]);
     // The cache read for the click happened before the write dispatch.
     const clickPeekIndex = peekSpy.mock.calls.findIndex(
       (args: any[], index: number) => index >= peekCallsBefore && args[0] === 'bookmarksCache',
     );
     expect(clickPeekIndex).toBeGreaterThanOrEqual(0);
-    expect(peekSpy.mock.invocationCallOrder[clickPeekIndex]).toBeLessThan(writeSpy.mock.invocationCallOrder[0]);
+    const saveIndex = writeSpy.mock.calls.findIndex((args: any[]) => args[0] === 'bookmarksCache');
+    expect(peekSpy.mock.invocationCallOrder[clickPeekIndex]).toBeLessThan(writeSpy.mock.invocationCallOrder[saveIndex]);
     // Slug resolution fed the read/write identity ('edge' in both call args above).
     // port note: the slug-resolved-first and setState-applied-last micro-ordering from the legacy
     // instrumented events array has no behavior seam; the icon reflecting the toggle after flush
@@ -509,7 +516,7 @@ describe('SurveyResults bookmark cache writes', () => {
         }),
       }),
     );
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const { saves } = spyOnBookmarkSaves(malformedCache);
 
     renderSurveyResults({
       activeSessionSlug: 'edge',
@@ -520,11 +527,9 @@ describe('SurveyResults bookmark cache writes', () => {
     await waitFor(() => expect(screen.getAllByText('Q2 prompt').length).toBeGreaterThan(0));
     await clickQuestionBookmark('Bookmark question');
 
-    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
-      surveys: ['existing-survey'],
-      questions: ['q2'],
-      otherField: 'kept',
-    });
+    expect(saves).toEqual([
+      ['bookmarksCache', 'edge', { surveys: ['existing-survey'], questions: ['q2'], otherField: 'kept' }],
+    ]);
     expect(malformedCache).toEqual({
       surveys: ['existing-survey'],
       questions: 'bad-questions',
@@ -540,7 +545,7 @@ describe('SurveyResults bookmark cache writes', () => {
       otherField: 'kept',
     };
     mockPeekCacheSync(buildPeekImpl({ bookmarks: liveBookmarksCache }));
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const { saves } = spyOnBookmarkSaves(liveBookmarksCache);
 
     renderSurveyResults({
       activeSessionSlug: 'edge',
@@ -554,11 +559,9 @@ describe('SurveyResults bookmark cache writes', () => {
     expect(getSurveyBookmarkIcon().getAttribute('color')).toBe('gold');
     await clickSurveyBookmark();
 
-    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
-      surveys: ['s-keep'],
-      questions: ['existing-question'],
-      otherField: 'kept',
-    });
+    expect(saves).toEqual([
+      ['bookmarksCache', 'edge', { surveys: ['s-keep'], questions: ['existing-question'], otherField: 'kept' }],
+    ]);
     expect(liveBookmarksCache).toEqual({
       surveys: ['s-remove', 's-keep'],
       questions: ['existing-question'],
@@ -574,7 +577,7 @@ describe('SurveyResults bookmark cache writes', () => {
       if (namespace === 'bookmarksCache') throw readError;
       return null;
     });
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const { saves } = spyOnBookmarkSaves({});
 
     try {
       renderSurveyResults({
@@ -587,10 +590,7 @@ describe('SurveyResults bookmark cache writes', () => {
       await flushAsync();
       await clickSurveyBookmark();
 
-      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
-        surveys: ['s-read-fallback'],
-        questions: [],
-      });
+      expect(saves).toEqual([['bookmarksCache', 'edge', { surveys: ['s-read-fallback'] }]]);
       expect(getSurveyBookmarkIcon().getAttribute('color')).toBe('gold');
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         '[surveys]',
@@ -611,7 +611,7 @@ describe('SurveyResults bookmark cache writes', () => {
         }),
       }),
     );
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const { saves } = spyOnBookmarkSaves({ surveys: [], questions: [] });
 
     renderSurveyResults({
       activeSessionSlug: '',
@@ -623,10 +623,7 @@ describe('SurveyResults bookmark cache writes', () => {
     await clickQuestionBookmark('Bookmark question');
 
     expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', '', { clone: false });
-    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', '', {
-      surveys: [],
-      questions: ['q-empty-slug'],
-    });
+    expect(saves).toEqual([['bookmarksCache', '', { surveys: [], questions: ['q-empty-slug'] }]]);
     expect(screen.getByRole('button', { name: 'Remove bookmark' })).toBeInTheDocument();
   });
 
@@ -638,10 +635,7 @@ describe('SurveyResults bookmark cache writes', () => {
     const writeError = new Error('survey bookmark write failed');
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     mockPeekCacheSync(buildPeekImpl({ bookmarks: liveBookmarksCache }));
-    const writeSpy = jest
-      .spyOn(cacheScripts, 'writeCache')
-      .mockRejectedValueOnce(writeError)
-      .mockResolvedValueOnce(true);
+    const { saves, spy: writeSpy } = spyOnBookmarkSaves(liveBookmarksCache, [writeError]);
 
     try {
       const view = renderSurveyResults({
@@ -654,11 +648,8 @@ describe('SurveyResults bookmark cache writes', () => {
       await flushAsync();
       await clickSurveyBookmark();
 
-      expect(writeSpy).toHaveBeenCalledTimes(1);
-      expect(writeSpy).toHaveBeenLastCalledWith('bookmarksCache', 'edge', {
-        surveys: ['existing-survey', 's-fail'],
-        questions: ['existing-question'],
-      });
+      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', expect.any(Function));
+      expect(saves).toEqual([]);
       // State applied despite the failed write: s-fail shows bookmarked.
       expect(getSurveyBookmarkIcon().getAttribute('color')).toBe('gold');
       expect(liveBookmarksCache).toEqual({
@@ -677,11 +668,9 @@ describe('SurveyResults bookmark cache writes', () => {
       expect(getSurveyBookmarkIcon().getAttribute('color')).toBe('grey');
       await clickSurveyBookmark();
 
-      expect(writeSpy).toHaveBeenCalledTimes(2);
-      expect(writeSpy).toHaveBeenLastCalledWith('bookmarksCache', 'edge', {
-        surveys: ['existing-survey', 's-retry'],
-        questions: ['existing-question'],
-      });
+      expect(saves).toEqual([
+        ['bookmarksCache', 'edge', { surveys: ['existing-survey', 's-retry'], questions: ['existing-question'] }],
+      ]);
       expect(getSurveyBookmarkIcon().getAttribute('color')).toBe('gold');
     } finally {
       consoleErrorSpy.mockRestore();

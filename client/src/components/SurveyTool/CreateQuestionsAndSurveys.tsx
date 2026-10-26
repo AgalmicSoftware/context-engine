@@ -60,12 +60,8 @@ import {
   resolveSessionCapabilityProjection,
 } from '../../utilities/session/sessionCapabilityProjection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import {
-  peekCacheSync,
-  subscribeCacheUpdates,
-  writeCache,
-  writeCacheOptimistic,
-} from '../../utilities/cache/cacheScripts.js';
+import { subscribeCacheUpdates, updateCacheAtomic, writeCacheOptimistic } from '../../utilities/cache/cacheScripts.js';
+import { applyBookmarkChange, type BookmarkList } from '../../utilities/cache/bookmarkChanges';
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
 import { generateQuestionId as generateSharedQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import { notify } from '../../utilities/ui/notify.js';
@@ -325,10 +321,6 @@ type CreateSurveyCheckboxChangeEvent = {
 };
 type CreateSurveyDraftSaveOptions = {
   immediate?: unknown;
-};
-type CreateSurveyBookmarksCache = UnknownRecord & {
-  questions: unknown[];
-  surveys: unknown[];
 };
 type CreateSurveyCacheWriter = (namespace: string, slug: string, value: unknown) => Promise<unknown>;
 type CreateQuestionsCacheQuestionRow = UnknownRecord & {
@@ -615,7 +607,6 @@ const mergeCreateSurveySessionConfigWithRegistry = ({
     },
   };
 };
-const writeCreateSurveyCache = writeCache as unknown as CreateSurveyCacheWriter;
 const writeCreateSurveyCacheOptimistic = writeCacheOptimistic as unknown as CreateSurveyCacheWriter;
 const contractScriptsForSubmit = contractScripts as unknown as CreateSurveyContractScriptsWithSession;
 
@@ -1550,87 +1541,33 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     });
   };
 
-  bookmarkQuestion = (questionId: unknown): void => {
-    const slug = this.getActiveSessionSlug() || '';
-    let bookmarksCache: CreateSurveyBookmarksCache;
-    try {
-      const parsed = peekCacheSync('bookmarksCache', slug, { clone: false });
-      const parsedRecord = parsed as UnknownRecord;
-      bookmarksCache =
-        parsed && typeof parsed === 'object'
-          ? {
-              ...parsedRecord,
-              surveys: Array.isArray(parsedRecord.surveys) ? [...parsedRecord.surveys] : [],
-              questions: Array.isArray(parsedRecord.questions) ? [...parsedRecord.questions] : [],
-            }
-          : { surveys: [], questions: [] };
-      if (
-        typeof bookmarksCache !== 'object' ||
-        bookmarksCache === null ||
-        !Array.isArray(bookmarksCache.surveys) ||
-        !Array.isArray(bookmarksCache.questions)
-      ) {
-        bookmarksCache = { surveys: [], questions: [] };
-      }
-    } catch {
-      bookmarksCache = { surveys: [], questions: [] };
-    }
-
-    const idL = String(questionId).toLowerCase();
-    const set = new Set<string>(this.state.bookmarkedQuestionsSet);
-    if (set.has(idL)) {
-      set.delete(idL);
-      bookmarksCache.questions = (bookmarksCache.questions || []).filter((x) => String(x).toLowerCase() !== idL);
-    } else {
-      set.add(idL);
-      bookmarksCache.questions = Array.from(new Set([...(bookmarksCache.questions || []), idL]));
-    }
-
-    void writeCreateSurveyCache('bookmarksCache', slug, bookmarksCache).catch((e: unknown) => {
+  // A bookmark follows what this page shows; saving applies it to the latest saved
+  // bookmarks, so bookmarks made in another tab are kept.
+  saveBookmarkChange = (list: BookmarkList, id: string, bookmarked: boolean): void => {
+    void updateCacheAtomic<Record<string, unknown>>('bookmarksCache', this.getActiveSessionSlug() || '', (saved) =>
+      applyBookmarkChange(saved, list, id, bookmarked),
+    ).catch((e: unknown) => {
       surveyLog.warn('CreateQuestionsAndSurveys: fallback', e);
     });
+  };
+
+  bookmarkQuestion = (questionId: unknown): void => {
+    const idL = String(questionId).toLowerCase();
+    const set = new Set<string>(this.state.bookmarkedQuestionsSet);
+    const bookmarked = !set.has(idL);
+    if (bookmarked) set.add(idL);
+    else set.delete(idL);
+    this.saveBookmarkChange('questions', idL, bookmarked);
     this.setState(buildCreateSurveyBookmarkedQuestionsSetPatch(set));
   };
 
   bookmarkSurvey = (surveyId: unknown): void => {
-    const slug = this.getActiveSessionSlug() || '';
-    let bookmarksCache: CreateSurveyBookmarksCache;
-    try {
-      const parsed = peekCacheSync('bookmarksCache', slug, { clone: false });
-      const parsedRecord = parsed as UnknownRecord;
-      bookmarksCache =
-        parsed && typeof parsed === 'object'
-          ? {
-              ...parsedRecord,
-              surveys: Array.isArray(parsedRecord.surveys) ? [...parsedRecord.surveys] : [],
-              questions: Array.isArray(parsedRecord.questions) ? [...parsedRecord.questions] : [],
-            }
-          : { surveys: [], questions: [] };
-      if (
-        typeof bookmarksCache !== 'object' ||
-        bookmarksCache === null ||
-        !Array.isArray(bookmarksCache.surveys) ||
-        !Array.isArray(bookmarksCache.questions)
-      ) {
-        bookmarksCache = { surveys: [], questions: [] };
-      }
-    } catch {
-      bookmarksCache = { surveys: [], questions: [] };
-    }
-
     const idL = String(surveyId).toLowerCase();
     const set = new Set<string>(this.state.bookmarkedSurveysSet);
-    if (set.has(idL)) {
-      set.delete(idL);
-      bookmarksCache.surveys = (bookmarksCache.surveys || []).filter((x) => String(x).toLowerCase() !== idL);
-    } else {
-      set.add(idL);
-      bookmarksCache.surveys = Array.from(new Set([...(bookmarksCache.surveys || []), idL]));
-    }
-
-    void writeCreateSurveyCache('bookmarksCache', slug, bookmarksCache).catch((e: unknown) => {
-      surveyLog.warn('CreateQuestionsAndSurveys: fallback', e);
-    });
+    const bookmarked = !set.has(idL);
+    if (bookmarked) set.add(idL);
+    else set.delete(idL);
+    this.saveBookmarkChange('surveys', idL, bookmarked);
     this.setState(buildCreateSurveyBookmarkedSurveysSetPatch(set));
   };
 

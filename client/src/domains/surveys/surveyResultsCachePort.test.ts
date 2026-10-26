@@ -16,6 +16,8 @@ describe('surveyResultsCachePort', () => {
       .spyOn(cacheScripts, 'listNamespaceEntriesSync')
       .mockReturnValue([{ namespace: 'surveysCache', slug: 'alpha', value: { survey: true } }] as never);
     const subscribeCacheUpdates = jest.spyOn(cacheScripts, 'subscribeCacheUpdates').mockReturnValue(unsubscribe);
+    const updateCacheAtomic = jest.spyOn(cacheScripts, 'updateCacheAtomic').mockResolvedValue({ updated: true });
+    const update = (current: unknown) => current;
 
     expect(surveyResultsCachePort.peekCacheSync('bookmarksCache', 'edge', { clone: false })).toEqual({ cached: true });
     await expect(surveyResultsCachePort.readCache('analysisCache', 'edge')).resolves.toEqual({ asyncCached: true });
@@ -26,12 +28,16 @@ describe('surveyResultsCachePort', () => {
       { namespace: 'surveysCache', slug: 'alpha', value: { survey: true } },
     ]);
     expect(surveyResultsCachePort.subscribeCacheUpdates(updateHandler)).toBe(unsubscribe);
+    await expect(surveyResultsCachePort.updateCacheAtomic('bookmarksCache', 'edge', update)).resolves.toEqual({
+      updated: true,
+    });
 
     expect(peekCacheSync).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
     expect(readCache).toHaveBeenCalledWith('analysisCache', 'edge');
     expect(writeCache).toHaveBeenCalledWith('filters', 'edge', { bookmarkedFilters: [] });
     expect(listNamespaceEntriesSync).toHaveBeenCalledWith('surveysCache', { cloneValues: false });
     expect(subscribeCacheUpdates).toHaveBeenCalledWith(updateHandler);
+    expect(updateCacheAtomic).toHaveBeenCalledWith('bookmarksCache', 'edge', update);
   });
 
   it('performs call-time cacheScripts lookup so spies and replacements stay live', async () => {

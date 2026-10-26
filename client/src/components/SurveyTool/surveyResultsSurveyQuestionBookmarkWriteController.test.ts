@@ -7,7 +7,11 @@ describe('surveyResultsSurveyQuestionBookmarkWriteController', () => {
       questions: ['q1'],
       otherField: 'kept',
     };
-    const writeBookmarksCache = jest.fn().mockResolvedValue(true);
+    let saved: unknown = { surveys: ['s0'], questions: ['q1'], otherField: 'kept' };
+    const updateBookmarksCache = jest.fn(async (_namespace, _slug, update) => {
+      saved = update(saved);
+      return saved;
+    });
 
     const result = await runSurveyResultsSurveyQuestionBookmarkWriteController({
       plan: {
@@ -29,11 +33,13 @@ describe('surveyResultsSurveyQuestionBookmarkWriteController', () => {
         },
       },
       ports: {
-        writeBookmarksCache,
+        updateBookmarksCache,
       },
     });
 
-    expect(writeBookmarksCache).toHaveBeenCalledWith('bookmarksCache', 'edge', payload);
+    expect(updateBookmarksCache).toHaveBeenCalledWith('bookmarksCache', 'edge', expect.any(Function));
+    // Applied to the latest saved bookmarks, which another tab changed since.
+    expect(saved).toEqual({ surveys: ['s0', 's1'], questions: ['q1'], otherField: 'kept' });
     expect(result).toEqual({
       attempted: true,
       error: null,
@@ -55,7 +61,7 @@ describe('surveyResultsSurveyQuestionBookmarkWriteController', () => {
   });
 
   it('does not write when the plan is blocked or missing a payload', async () => {
-    const writeBookmarksCache = jest.fn();
+    const updateBookmarksCache = jest.fn();
 
     await expect(
       runSurveyResultsSurveyQuestionBookmarkWriteController({
@@ -71,7 +77,7 @@ describe('surveyResultsSurveyQuestionBookmarkWriteController', () => {
           toggled: null,
         },
         ports: {
-          writeBookmarksCache,
+          updateBookmarksCache,
         },
       }),
     ).resolves.toEqual({
@@ -85,12 +91,12 @@ describe('surveyResultsSurveyQuestionBookmarkWriteController', () => {
       },
       toggled: null,
     });
-    expect(writeBookmarksCache).not.toHaveBeenCalled();
+    expect(updateBookmarksCache).not.toHaveBeenCalled();
   });
 
   it('returns write failures without throwing or dropping the parent state patch', async () => {
     const writeError = new Error('bookmark write failed');
-    const writeBookmarksCache = jest.fn().mockRejectedValue(writeError);
+    const updateBookmarksCache = jest.fn().mockRejectedValue(writeError);
 
     const result = await runSurveyResultsSurveyQuestionBookmarkWriteController({
       plan: {
@@ -115,11 +121,11 @@ describe('surveyResultsSurveyQuestionBookmarkWriteController', () => {
         },
       },
       ports: {
-        writeBookmarksCache,
+        updateBookmarksCache,
       },
     });
 
-    expect(writeBookmarksCache).toHaveBeenCalledTimes(1);
+    expect(updateBookmarksCache).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       attempted: true,
       error: writeError,
@@ -142,7 +148,8 @@ describe('surveyResultsSurveyQuestionBookmarkWriteController', () => {
 
   it('captures synchronous write-port throws as plain failure results', async () => {
     const writeError = new Error('sync write failed');
-    const writeBookmarksCache = jest.fn(() => {
+    const updateBookmarksCache = jest.fn((_namespace, _slug, update) => {
+      expect(update({ surveys: [], questions: [] })).toEqual({ surveys: [], questions: ['q1'] });
       throw writeError;
     });
 
@@ -169,14 +176,11 @@ describe('surveyResultsSurveyQuestionBookmarkWriteController', () => {
         },
       },
       ports: {
-        writeBookmarksCache,
+        updateBookmarksCache,
       },
     });
 
-    expect(writeBookmarksCache).toHaveBeenCalledWith('bookmarksCache', 'edge', {
-      surveys: [],
-      questions: ['q1'],
-    });
+    expect(updateBookmarksCache).toHaveBeenCalledWith('bookmarksCache', 'edge', expect.any(Function));
     expect(result).toEqual({
       attempted: true,
       error: writeError,

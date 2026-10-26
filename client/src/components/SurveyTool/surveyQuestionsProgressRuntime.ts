@@ -1,4 +1,5 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import { applyBookmarkChange, hasBookmark } from '../../utilities/cache/bookmarkChanges';
 
 export const createSurveyQuestionsProgressRuntime = (context: SurveyQuestionsLegacyRecord) => {
   const {
@@ -30,7 +31,7 @@ export const createSurveyQuestionsProgressRuntime = (context: SurveyQuestionsLeg
     shouldSurveyAutoStartFresh,
     stateRef,
     surveyLog,
-    writeCacheOptimistic,
+    updateCacheAtomic,
   } = context;
 
   const loadBookmarks = async () => {
@@ -56,25 +57,20 @@ export const createSurveyQuestionsProgressRuntime = (context: SurveyQuestionsLeg
     if (!questionId) return;
 
     const slug: SurveyQuestionsLegacyValue = resolveEffectiveSlug(propsRef.current);
-    let obj: SurveyQuestionsLegacyValue = peekCacheSync('bookmarksCache', slug);
-    if (!obj || typeof obj !== 'object') obj = {};
-
-    if (typeof obj !== 'object' || obj === null) obj = {};
-    if (!Array.isArray(obj.questions)) obj.questions = [];
-
-    const set: SurveyQuestionsLegacyValue = new Set(obj.questions.map(String));
     const q: SurveyQuestionsLegacyValue = String(questionId);
-    if (set.has(q)) set.delete(q);
-    else set.add(q);
+    // The toggle follows what this page shows; saving applies it to the latest
+    // saved bookmarks, so bookmarks made in another tab are kept.
+    const shown = { questions: Array.from(stateRef.current.bookmarkedQuestions || []) };
+    const bookmarked = !hasBookmark(shown, 'questions', q);
+    setState(buildBookmarkedQuestionsState(applyBookmarkChange(shown, 'questions', q, bookmarked).questions));
 
-    obj.questions = Array.from(set);
-
-    // Update state first for immediate UI feedback.
-    setState(buildBookmarkedQuestionsState(obj.questions));
-
-    void writeCacheOptimistic('bookmarksCache', slug, obj).catch((error: unknown) => {
-      surveyLog.error('[SurveyQuestions] Error saving bookmarksCache:', error);
-    });
+    void updateCacheAtomic('bookmarksCache', slug, (saved: SurveyQuestionsLegacyValue) =>
+      applyBookmarkChange(saved, 'questions', q, bookmarked),
+    )
+      .then((saved: SurveyQuestionsLegacyValue) => setState(buildBookmarkedQuestionsState(saved?.questions)))
+      .catch((error: unknown) => {
+        surveyLog.error('[SurveyQuestions] Error saving bookmarksCache:', error);
+      });
   };
 
   const getAnsweredQuestionsCount = () => {

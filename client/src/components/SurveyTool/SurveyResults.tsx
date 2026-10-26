@@ -1812,8 +1812,8 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     void runSurveyResultsSurveyQuestionBookmarkWriteController({
       plan: writePlan,
       ports: {
-        writeBookmarksCache: (namespace, cacheSlug, payload) =>
-          surveyResultsCachePort.writeCache(namespace, cacheSlug, payload),
+        updateBookmarksCache: (namespace, cacheSlug, update) =>
+          surveyResultsCachePort.updateCacheAtomic(namespace, cacheSlug, update),
       },
     }).then((writeResult) => {
       if (!writeResult.ok && writeResult.error) {
@@ -1851,8 +1851,8 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     void runSurveyResultsSurveyQuestionBookmarkWriteController({
       plan: writePlan,
       ports: {
-        writeBookmarksCache: (namespace, cacheSlug, payload) =>
-          surveyResultsCachePort.writeCache(namespace, cacheSlug, payload),
+        updateBookmarksCache: (namespace, cacheSlug, update) =>
+          surveyResultsCachePort.updateCacheAtomic(namespace, cacheSlug, update),
       },
     }).then((writeResult) => {
       if (!writeResult.ok && writeResult.error) {

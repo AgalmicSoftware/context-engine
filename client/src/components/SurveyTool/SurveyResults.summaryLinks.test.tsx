@@ -197,6 +197,10 @@ const seedCacheEnvironment = ({
     return null;
   });
   jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(undefined);
+  jest
+    .spyOn(cacheScripts, 'updateCacheAtomic')
+    .mockImplementation((async (namespace: any, slug: any, update: any) =>
+      update(namespace === 'bookmarksCache' ? lookupSlug(bookmarksBySlug, slug, defaultBookmarks) : null)) as never);
   jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockImplementation((namespace: any) => {
     if (namespace !== 'surveysCache') return [];
     return Object.keys(surveysBySlug).map((slug) => ({
@@ -559,6 +563,16 @@ describe('SurveyResults multichoice aggregator summary', () => {
   });
 });
 
+// The bookmarks a click saved: the change applied to the seeded saved bookmarks.
+const savedBookmarks = (slug: string) => {
+  const update = cacheScripts.updateCacheAtomic as unknown as jest.Mock;
+  const index = update.mock.calls.findIndex(
+    ([namespace, saveSlug]) => namespace === 'bookmarksCache' && saveSlug === slug,
+  );
+  expect(index).toBeGreaterThanOrEqual(0);
+  return update.mock.results[index].value;
+};
+
 describe('SurveyResults selected result display wiring', () => {
   it('renders a selected question card with decrypted override data and header handlers', async () => {
     seedCacheEnvironment({
@@ -593,11 +607,7 @@ describe('SurveyResults selected result display wiring', () => {
     const card = getQuestionCard('Explain the decision');
     expect(within(card).getByRole('button', { name: 'Remove bookmark' })).toBeInTheDocument();
     fireEvent.click(within(card).getByRole('button', { name: 'Remove bookmark' }));
-    expect(cacheScripts.writeCache).toHaveBeenCalledWith(
-      'bookmarksCache',
-      'demo',
-      expect.objectContaining({ questions: [] }),
-    );
+    await expect(savedBookmarks('demo')).resolves.toEqual(expect.objectContaining({ questions: [] }));
 
     fireEvent.click(within(card).getByText('Explain the decision'));
     await waitFor(() => {
@@ -650,11 +660,7 @@ describe('SurveyResults selected result display wiring', () => {
     const bookmarkIcon = row.querySelector('svg');
     expect(bookmarkIcon).toBeTruthy();
     fireEvent.click(bookmarkIcon as SVGElement);
-    expect(cacheScripts.writeCache).toHaveBeenCalledWith(
-      'bookmarksCache',
-      'session-one',
-      expect.objectContaining({ questions: ['q1'] }),
-    );
+    await expect(savedBookmarks('session-one')).resolves.toEqual(expect.objectContaining({ questions: ['q1'] }));
 
     fireEvent.click(screen.getByRole('columnheader', { name: /Prompt/ }));
     fireEvent.click(within(row).getByRole('button', { name: 'View' }));

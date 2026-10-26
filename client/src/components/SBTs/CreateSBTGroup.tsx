@@ -51,7 +51,8 @@ import {
   hasInvalidGroupPasswordCharacter,
 } from '../../utilities/crypto/sbtAuthorization';
 import { createLogger } from '../../utilities/logging.js';
-import { peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
+import { peekCacheSync, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
+import { applyBookmarkChange } from '../../utilities/cache/bookmarkChanges';
 import { notify } from '../../utilities/ui/notify.js';
 import { getRelevantDefaultTags } from '../../utilities/defaultTags.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -1958,33 +1959,19 @@ class CreateSBTGroup extends Component<any, any> {
 
   bookmarkSBT = (sbtAddress: unknown): void => {
     if (!sbtAddress) return;
-    let bookmarksCache: BookmarkCachePayload;
-    try {
-      const parsed = peekCacheSync('bookmarksCache', this.getBookmarksSlug(), { clone: false });
-      bookmarksCache = isPlainObject(parsed)
-        ? {
-            ...parsed,
-            sbts: Array.isArray(parsed.sbts) ? [...parsed.sbts] : [],
-          }
-        : {};
-    } catch {
-      bookmarksCache = {};
-    }
-
-    if (!Array.isArray(bookmarksCache.sbts)) bookmarksCache.sbts = [];
-
     const idL = String(sbtAddress).toLowerCase();
     const set = new Set<string>(this.state.bookmarkedSbtsSet);
+    const bookmarked = !set.has(idL);
+    if (bookmarked) set.add(idL);
+    else set.delete(idL);
 
-    if (set.has(idL)) {
-      set.delete(idL);
-      bookmarksCache.sbts = bookmarksCache.sbts.filter((x) => String(x).toLowerCase() !== idL);
-    } else {
-      set.add(idL);
-      bookmarksCache.sbts = Array.from(new Set([...bookmarksCache.sbts, idL]));
-    }
-
-    void writeCache('bookmarksCache', this.getBookmarksSlug(), bookmarksCache as never);
+    // A bookmark follows what this page shows; saving applies it to the latest
+    // saved bookmarks, so bookmarks made in another tab are kept.
+    void updateCacheAtomic<Record<string, unknown>>('bookmarksCache', this.getBookmarksSlug(), (saved) =>
+      applyBookmarkChange(saved, 'sbts', idL, bookmarked),
+    ).catch((e: unknown) => {
+      sbtLog.warn('CreateSBTGroup: fallback', e);
+    });
     this.setState(buildCreateSbtBookmarkedSbtsSetPatch({ bookmarkedSbtsSet: set }));
   };
 
