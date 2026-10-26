@@ -359,6 +359,9 @@ jobs:
       - name: Install Context Engine MCP dependencies
         run: npm --prefix mcp ci
 
+      - name: Check installed production dependency licenses
+        run: npm run -s license:check
+
 
       - name: Resolve client growth baseline
         id: client-growth-base

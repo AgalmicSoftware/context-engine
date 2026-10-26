@@ -34,6 +34,7 @@
     "deploy-helper:deploy": "node scripts/deploy-helper-deploy.mjs",
     "deploy:evm": "node scripts/deploy-evm.mjs",
     "deploy:op-sepolia": "node scripts/deploy-op-sepolia.mjs",
+    "license:check": "node scripts/check-licenses.mjs",
     "verify:public-release-surface": "node scripts/verify-public-release-surface.js",
     "verify:public-assets": "node scripts/verify-public-assets.js",
     "verify:public-text": "node scripts/verify-public-text.js",

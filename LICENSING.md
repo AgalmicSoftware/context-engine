@@ -73,3 +73,13 @@ Current third-party images:
 - Font Awesome Free icons (`@fortawesome/*` packages) - icons under CC-BY-4.0, code under MIT, fonts under SIL OFL 1.1. See https://fontawesome.com/license/free.
 - `polis_logo.png` - Pol.is / The Computational Democracy Project. Used in the About page recognition section.
 - `rxc_logo.png` - RadicalxChange Foundation. Used in the About page recognition section.
+
+## Dependency license check
+
+After installing root, client, MCP and Session Worker dependencies, run
+`npm run -s license:check`. The check reads each installed production package's
+own license metadata, accepts the reviewed permissive/MPL allowlist, and fails
+on missing or unrecognized licenses. Version-specific exceptions and their
+source evidence live in `scripts/license-overrides.json`; upgrades require
+another review when metadata or versions change. CI runs this check after
+installing all four trees. Dependencies retain their own licenses and notices.
