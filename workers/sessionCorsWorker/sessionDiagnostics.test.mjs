@@ -125,18 +125,39 @@ test('receipt aggregation pages at 25 stores, isolates sessions, and bounds inde
   const first = await readUploadReceiptDiagnostics({ env: f.env, slug: 'fixture' });
   assert.equal(first.pendingLeases, 25);
   assert.equal(first.complete, false);
+  const ownerHashes = await Promise.all(Array.from({ length: 27 }, (_, n) =>
+    sha256Hex(`upload-receipts:fixture:0x${(n + 1).toString(16).padStart(40, '0')}`)));
+  assert.equal(ownerHashes.includes(first.cursor), false, 'A cursor must not identify a candidate participant');
+  assert.equal((await readUploadReceiptDiagnostics({ env: f.env, slug: 'fixture' })).cursor, first.cursor);
   const last = await readUploadReceiptDiagnostics({ env: f.env, slug: 'fixture', cursor: first.cursor });
   assert.equal(last.pendingLeases, 2);
   assert.equal(last.complete, true);
   assert.equal((await readUploadReceiptDiagnostics({ env: f.env, slug: 'elsewhere' })).pendingLeases, 0);
+  await assert.rejects(readUploadReceiptDiagnostics({ env: f.env, slug: 'elsewhere', cursor: first.cursor }), { status: 400 });
   await assert.rejects(readUploadReceiptDiagnostics({ env: f.env, slug: 'fixture', cursor: '../bad' }), { status: 400 });
   const index = await f.named('upload-receipt-index:fixture');
-  for (let n = 100; n < 205; n += 1) index.store.set(`upload-receipt-store-v1:${n.toString(16).padStart(64, '0')}`, { expiresAtMs: f.now });
+  for (let n = 100; n < 205; n += 1) {
+    index.store.set(`upload-receipt-store-v1:${n.toString(16).padStart(64, '0')}`, { expiresAtMs: f.now });
+    index.store.set(`upload-receipt-cursor-v1:${n.toString(16).padStart(64, '0')}`, { expiresAtMs: f.now });
+  }
   f.advance(9 * DAY);
   await index.coordinator.alarm();
   assert.equal([...index.store.keys()].filter(key => key.startsWith('upload-receipt-store-v1:')).length, 32);
+  assert.equal([...index.store.keys()].filter(key => key.startsWith('upload-receipt-cursor-v1:')).length, 6);
   await index.coordinator.alarm();
   assert.equal(index.store.size, 0);
+  await assert.rejects(readUploadReceiptDiagnostics({ env: f.env, slug: 'fixture', cursor: first.cursor }), { status: 400 });
+});
+
+test('diagnostics cursors depend on the deployment secret without changing receipt ownership', async () => {
+  const f = await fixture();
+  for (let n = 1; n <= 26; n += 1) await f.receipt(`0x${n.toString(16).padStart(40, '0')}`, `request-${n}`);
+  const before = await readUploadReceiptDiagnostics({ env: f.env, slug: 'fixture' });
+  f.env.TOKEN_HMAC_SECRET = 'another-synthetic-diagnostics-key';
+  const after = await readUploadReceiptDiagnostics({ env: f.env, slug: 'fixture' });
+  assert.notEqual(before.cursor, after.cursor);
+  assert.equal(after.pendingLeases, before.pendingLeases);
+  assert.equal((await readUploadReceiptDiagnostics({ env: f.env, slug: 'fixture', cursor: after.cursor })).pendingLeases, 1);
 });
 
 test('receipt totals include every storage page up to the retained per-participant cap', async () => {

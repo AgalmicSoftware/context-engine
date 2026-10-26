@@ -2673,6 +2673,9 @@ Signed login/bootstrap requests:
   use the stale projection to retain access.
   Receipt counts are sampled from up to 25 participant coordinators per page;
   `complete` and `cursor` distinguish partial totals, and the card can load more.
+  Cursors use a deployment-secret-derived HMAC and a private continuation map;
+  they reveal no participant identifier and expire after one day. Refresh
+  diagnostics if a cursor expires. Receipt-store identities remain unchanged.
   They cover the seven-day retention window, subject to the existing per-store
   receipt cap, and may change while pages are read. Receipt stores register an
   opaque coordinator name in a per-session index before reserve, renewing at
@@ -2682,8 +2685,9 @@ Signed login/bootstrap requests:
   absent from counts until they register. An unavailable index or receipt store
   returns incomplete counts (`complete: false`, `cursor: null`); refresh rather
   than append these totals when diagnostics recover.
-  Index entries expire after eight days; alarms remove at most 100 entries per
-  cleanup step. Neither the index nor its public counts include answer content.
+  Index entries expire after eight days; each alarm step examines at most 100
+  index entries and 100 cursor mappings. Neither the index nor its public
+  counts include answer content.
 - `GET /resource-presence` with `X-Session-Slug`
   - Optional `?interview=1` adds `interview: { ready, reason? }` after checking the voice provider, server-side OpenAI key presence, session lifecycle, and anonymous realtime access. No key values are returned and no OpenAI request is made.
   - Validates the selected session and its browser-origin CORS policy.

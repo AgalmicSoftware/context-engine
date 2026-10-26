@@ -24,8 +24,7 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
-- Recover saved answers and unsaved drafts after reload without resending saved
-  records. Advance saved-answer revisions when edited, including changing an
+- Advance saved-answer revisions when edited, including changing an
   answer back, and discard in-flight submission state when the account changes.
 - Recheck unavailable Worker readiness on Submit and avoid caching transient
   network failures. Expire near-head numeric RPC reads after two seconds so a
@@ -70,11 +69,15 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Add `GET /admin/diagnostics` with incomplete-count reporting and opaque,
+  expiring pagination tokens. Uploads now register their receipt stores in the
+  diagnostics index on a best-effort basis; this requires a Worker redeploy.
 - Preserve CORS headers on deployment, recovery and provider-backoff replies.
 - Restore R2 resource metadata, authenticate backup pages and refuse archives
   when any required recovery key is missing. Detect writes during export,
-  preserve newer live visibility and keep backup/import pages within their
-  storage-operation budget. Expired or abandoned restore staging can be retried.
+  require an empty restore target and keep backup/import pages within their
+  storage-operation budget. Abandoning a restore removes all imported rows
+  through a resumable cleanup journal before releasing the target.
 - Protect receipt identifiers and payload digests with keyed MACs, expire them
   by alarm and validate deterministic upload failures before reserving a lease.
   Replayed settled uploads also recover a missed automatic-analysis enqueue.
@@ -105,6 +108,8 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Verify recovery of saved answers and unsaved drafts after reload without
+  resending saved records.
 - Exercise current MCP and browser readers against the unchanged previous
   released Worker bundle. Add duplicate-alarm, account-switch, reload-recovery
   and same-height/higher-head registry convergence regressions.
