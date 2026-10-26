@@ -248,7 +248,7 @@ const cloneCoordinatorTestValue = (value) => (
     : JSON.parse(JSON.stringify(value))
 );
 
-export const installSessionCoordinatorBinding = (env = {}) => {
+export const installSessionCoordinatorBinding = (env = {}, CoordinatorClass = SessionWriteCoordinator) => {
   if (env.CE_SESSION_COORDINATOR) return env;
   const instances = new Map();
   env.CE_SESSION_COORDINATOR = {
@@ -284,7 +284,7 @@ export const installSessionCoordinatorBinding = (env = {}) => {
             transaction,
           },
         };
-        const coordinator = new SessionWriteCoordinator(state, env);
+        const coordinator = new CoordinatorClass(state, env);
         instances.set(id, {
           fetch: (input, init) => coordinator.fetch(
             input instanceof Request ? input : new Request(input, init),

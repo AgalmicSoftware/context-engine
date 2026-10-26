@@ -34,6 +34,7 @@ const ROOT_JEST_TEST_FILES = Object.freeze([
   'tests/root/sessionCorsWorker.authenticatedRoutes.test.js',
   'tests/root/sessionCorsWorker.gates.test.js',
   'tests/root/sessionCorsWorker.health.test.js',
+  'tests/root/workerPreviousRelease.compat.test.mjs',
 ]);
 
 const ROOT_LOCAL_CHAIN_TEST_FILES = Object.freeze([
