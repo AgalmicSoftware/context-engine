@@ -3,7 +3,7 @@
     "declaredLicense": "WAGMIT",
     "license": "MIT",
     "evidence": {
-      "source": "client/node_modules/abitype/LICENSE",
+      "source": "client/node_modules/@wagmi/connectors/node_modules/abitype/LICENSE",
       "reviewed": "2026-10-26",
       "note": "The installed LICENSE contains the full MIT grant, copyright 2022-present weth, LLC; package metadata declares WAGMIT."
     }

@@ -90,6 +90,7 @@ export const buildWorkerBundles = async ({
     if (normalizedBundle !== bundle) {
       writeFileSyncImpl(target.outputFile, normalizedBundle);
     }
+    if (built?.metafile) writeFileSyncImpl(target.outputFile.replace(/\.js$/, '.metafile.json'), `${JSON.stringify(built.metafile, null, 2)}\n`);
     results.push({ ...target, metafile: built?.metafile });
   }
   return results;

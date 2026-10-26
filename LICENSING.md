@@ -63,9 +63,13 @@ Current third-party images:
 ## Dependency license check
 
 After installing root, client, MCP and Session Worker dependencies, run
-`npm run -s license:check`. The check reads each installed production package's
-own license metadata, accepts the reviewed permissive/MPL allowlist, and fails
-on missing or unrecognized licenses. Version-specific exceptions and their
+`npm run -s license:check`. This builds the client, MCP and Session Worker to
+capture their exact inputs. The check reads installed production packages plus
+packages in the esbuild metafiles and Vite's emitted module IDs, including
+bundled development dependencies. It uses their installed license metadata,
+accepts the reviewed permissive/MPL allowlist, and fails on missing or
+unrecognized licenses. Version-specific exceptions and their
 source evidence live in `scripts/license-overrides.json`; upgrades require
-another review when metadata or versions change. CI runs this check after
+another review when metadata or versions change; an override for a version no
+longer installed fails the gate. CI runs this check after
 installing all four trees. Dependencies retain their own licenses and notices.

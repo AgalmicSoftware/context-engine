@@ -19,6 +19,9 @@ const result = await build({
   metafile: true,
   banner: { js: "import { createRequire as __createRequire } from 'node:module';\nconst require = __createRequire(import.meta.url);" },
 });
+// Keep build metadata outside the npm package, for the shipped-code license gate.
+await mkdir(join(root, 'dist'), { recursive: true });
+await writeFile(join(root, 'dist/mcp.metafile.json'), `${JSON.stringify(result.metafile, null, 2)}\n`);
 
 const packages = new Map();
 for (const input of Object.keys(result.metafile.inputs)) {

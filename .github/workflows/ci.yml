@@ -361,7 +361,7 @@ jobs:
       - name: Install Context Engine MCP dependencies
         run: npm --prefix mcp ci
 
-      - name: Check installed production dependency licenses
+      - name: Build and check production and bundled dependency licenses
         run: npm run -s license:check
 
 

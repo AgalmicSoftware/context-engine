@@ -491,6 +491,21 @@ export const immutableAssetHeadersPlugin = () => {
   };
 };
 
+export const bundledModuleIdsPlugin = ({ rootDir = path.resolve(__dirname, '..'), modules = new Set(), emit = true } = {}) => ({
+  name: 'ce-bundled-module-ids',
+  apply: 'build',
+  generateBundle(_options, bundle) {
+    for (const output of Object.values(bundle)) {
+      if (output.type !== 'chunk') continue;
+      for (const raw of Object.keys(output.modules || {})) {
+        const id = raw.replace(/^\0/, '').split('?')[0];
+        if (path.isAbsolute(id)) modules.add(path.relative(rootDir, id).split(path.sep).join('/'));
+      }
+    }
+    if (emit) this.emitFile({ type: 'asset', fileName: 'bundled-module-ids.json', source: `${JSON.stringify({ moduleIds: [...modules].sort() }, null, 2)}\n` });
+  },
+});
+
 const postsAssetsCompatibilityPlugin = () => ({
   name: 'ce-posts-assets-compatibility',
   configureServer(server) {
@@ -518,6 +533,7 @@ const postsAssetsCompatibilityPlugin = () => ({
 export default defineConfig(({ mode }) => {
   const clientEnv = readClientEnv(mode);
   const walletRuntimeProfile = resolveWalletRuntimeProfile(clientEnv);
+  const bundledModules = new Set();
 
   return {
     appType: 'spa',
@@ -534,6 +550,7 @@ export default defineConfig(({ mode }) => {
       jsToTsCompatibilityPlugin(),
       walletProfileBundleGuardPlugin(walletRuntimeProfile),
       lazyDocumentBuildPlugin(),
+      bundledModuleIdsPlugin({ modules: bundledModules }),
       ...(process.env.CE_BUNDLE_REPORT === '1'
         ? [createBundleReportPlugin({ rootDir: __dirname })]
         : []),
@@ -552,6 +569,7 @@ export default defineConfig(({ mode }) => {
         },
       },
     ],
+    worker: { plugins: [bundledModuleIdsPlugin({ modules: bundledModules, emit: false })] },
     resolve: {
       // Shared sources above the Vite root must use the client's ethers install.
       dedupe: ['ethers'],

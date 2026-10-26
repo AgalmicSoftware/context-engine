@@ -57,7 +57,7 @@ export const buildWorkerThirdPartyNotices = ({ rootDir, metafile }) => {
       .filter((entry) => entry.isFile() && /^(licen[cs]e|copying)([.-]|$)/i.test(entry.name))
       .map((entry) => entry.name).sort();
     if (!licenseFiles.length) throw new Error(`Missing license text for ${identity}`);
-    const texts = licenseFiles.map((name) => `### ${name}\n\n${readFileSync(resolve(directory, name), 'utf8').trim()}`);
+    const texts = licenseFiles.map((name) => `### ${name}\n\n${readFileSync(resolve(directory, name), 'utf8').replace(/\r\n/g, '\n').trim()}`);
     notices.push(`## ${identity}\n\nLicense: ${license}\n\n${texts.join('\n\n')}`);
   }
   return `# Third-party notices\n\nGenerated from the Session Worker bundle inputs. These packages retain their own licenses.\n\n${notices.sort().join('\n\n---\n\n')}\n`;

@@ -113,7 +113,7 @@ test('deploy notices preserve every bundled package license and verification det
     const folder = join(rootDir, directory);
     mkdirSync(folder, { recursive: true });
     writeFileSync(join(folder, 'package.json'), JSON.stringify({ name, version, license: 'MIT' }));
-    writeFileSync(join(folder, 'LICENSE'), `MIT fixture grant for ${name}@${version}\n`);
+    writeFileSync(join(folder, 'LICENSE'), `MIT fixture grant for ${name}@${version}\r\nSecond line.\r\n`);
     inputs[`${directory}/index.js`] = { bytes: 1 };
   };
   addPackage('node_modules/synthetic-one', 'synthetic-one', '1.0.0');
@@ -124,6 +124,7 @@ test('deploy notices preserve every bundled package license and verification det
   };
   const manifest = await buildCloudflareSessionTemplate({ rootDir, buildBundles });
   const notices = readFileSync(join(templateDir, 'THIRD_PARTY_NOTICES.md'), 'utf8');
+  assert.equal(notices.includes('\r'), false, 'Notices must verify after Git normalizes line endings');
   for (const identity of ['synthetic-one@1.0.0', '@fixture/two@2.0.0']) {
     assert.ok(notices.includes(`## ${identity}\n`));
     assert.ok(notices.includes(`MIT fixture grant for ${identity}`));

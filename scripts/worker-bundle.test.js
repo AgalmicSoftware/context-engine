@@ -51,7 +51,8 @@ test('buildWorkerBundles validates guarded worker deps without installing them',
   assert.equal(buildCalls[0].metafile, true);
   assert.deepEqual(result[0].metafile.inputs, { 'node_modules/synthetic/index.js': { bytes: 1 } });
   assert.deepEqual(mkdirCalls, [[path.resolve(rootDir, 'dist'), { recursive: true }]]);
-  assert.deepEqual(writeCalls, []);
+  assert.equal(writeCalls[0][0], path.resolve(rootDir, 'dist/sessionCorsWorker.bundle.metafile.json'));
+  assert.deepEqual(JSON.parse(writeCalls[0][1]), result[0].metafile);
   assert.deepEqual(result.map((target) => target.key), ['sessionCorsWorker']);
 });
 
