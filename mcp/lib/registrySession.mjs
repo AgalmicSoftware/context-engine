@@ -200,9 +200,22 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     const replaced = !!state && state.scope === scope && head >= state.head && await historyReplaced(state.mark, blocks);
     if (replaced === null) {
       // Keep the previous payloads too; current contract pointers may already
-      // name answers from the unverified blocks we must not scan yet.
-      return { entries: (state.result?.entries || []).slice(0, maxRecords), complete: false,
-        chainOrders: new Map(state.result?.chainOrders || []) };
+      // name answers from the unverified blocks we must not scan yet. Confirmed
+      // local writes can fill this gap, but cannot replace a newer chain answer.
+      const held = new Map((state.result?.entries || []).map((entry) =>
+        [`${entry.questionId}:${normalized(entry.responder)}`, entry]));
+      const chainOrders = new Map(state.result?.chainOrders || []);
+      for (const entry of localAnswers.values()) {
+        if (!known.has(entry.questionId)) continue;
+        const key = `${entry.questionId}:${normalized(entry.responder)}`;
+        if ([state.latest.get(key), held.get(key)].some((previous) => previous && compareChainOrder(entry, previous) < 0)) continue;
+        chainOrders.set(entry.questionId, entry);
+        held.delete(key);
+        if (registryResponseMatchesSession(entry.payload, sessionConfig) && entry.payload.answer?.encrypted !== true &&
+            normalized(entry.payload.questionID || entry.payload.questionId) === entry.questionId) held.set(key, entry);
+      }
+      return { entries: [...held.values()].sort((a, b) => compareChainOrder(b, a)).slice(0, maxRecords),
+        complete: false, chainOrders };
     }
     if (!state || state.scope !== scope || head < state.head || replaced) {
       state = { scope, head: startBlock - 1, mark: null, ranges: [], latest: new Map(), capped: false };

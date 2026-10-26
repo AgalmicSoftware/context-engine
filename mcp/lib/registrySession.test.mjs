@@ -246,6 +246,33 @@ test('block lookup failures keep local records and report incomplete reads', asy
   assert.deepEqual(answers.entries.map((entry) => entry.questionId), [qid]);
 });
 
+for (const mine of [false, true]) for (const failure of ['missing', 'throws']) {
+  test(`unverified answer marks retain newly confirmed local answers (${mine}, ${failure})`, async () => {
+    const f = fixture();
+    const session = await f.open();
+    const questionIds = [qid, otherId];
+    f.addResponse(qid, { questionID: qid, answer: { value: 'Before' } }, 9);
+    await session.readAnswers({ questionIds, mine });
+    await session.submitAnswers({ client: f.client, records: [qid, otherId, blockedId].map((questionID) =>
+      ({ questionID, sessionSlug: 'town', answer: { value: 'Confirmed' } })) });
+    f.options.provider.getBlockNumber = async () => 11;
+    f.options.provider.getBlock = async () => {
+      if (failure === 'throws') throw new Error('RPC temporarily unavailable');
+      return null;
+    };
+    f.options.provider.getLogs = async () => assert.fail('The scan must not advance past an unverified mark');
+    const answers = await session.readAnswers({ questionIds, mine });
+    assert.equal(answers.complete, false);
+    assert.deepEqual(new Set(answers.entries.map((entry) => entry.questionId)), new Set(questionIds));
+    assert.ok(answers.entries.every((entry) => entry.payload.answer.value === 'Confirmed'));
+    assert.deepEqual(new Set(answers.chainOrders.keys()), new Set(questionIds));
+    assert.ok([...answers.chainOrders.values()].every((entry) => entry.blockNumber === 11));
+    const capped = await session.readAnswers({ questionIds, mine, maxRecords: 1 });
+    assert.equal(capped.entries.length, 1);
+    assert.equal(capped.chainOrders.size, 2);
+  });
+}
+
 test('a lagging head keeps the previous mark without rescanning session history', async () => {
   const f = fixture();
   const session = await f.open();
@@ -427,6 +454,11 @@ test('newer chain answers supersede locally remembered answers and results obey 
   f.addResponse(qid, { questionID: qid, answer: { value: 'new ciphertext', encrypted: true } }, 12);
   const latest = await session.readAnswers({ questionIds: new Set([qid]) });
   assert.equal(latest.entries.length, 0);
+  f.options.provider.getBlock = async () => null;
+  const held = await session.readAnswers({ questionIds: new Set([qid]) });
+  assert.equal(held.complete, false);
+  assert.equal(held.entries.length, 0, 'Older local plaintext must not replace the held encrypted answer');
+  assert.equal(held.chainOrders.get(qid).blockNumber, 12);
 });
 
 test('long registry sessions read recent answers first and finish older history across calls', async () => {
