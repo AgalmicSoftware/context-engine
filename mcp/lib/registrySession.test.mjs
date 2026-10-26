@@ -33,6 +33,7 @@ const fixture = (overrides = {}) => {
   const logs = [];
   const records = new Map();
   const hashes = new Map();
+  const responseHashes = new Map();
   // A reorganization gives each replaced block a new hash.
   const generations = new Map();
   const blockHash = (number) => ethers.utils.id(`block ${number} ${generations.get(number) || 0}`);
@@ -57,7 +58,7 @@ const fixture = (overrides = {}) => {
     surveys = {
       interface: iface, address: surveysAddress,
       getQuestionHash: async (id) => hashes.get(id), questionHashes: async (id) => hashes.get(id) || ethers.constants.HashZero,
-      getResponse: async (_responder, id) => hashes.get(id),
+      getResponse: async (_responder, id) => responseHashes.get(id),
       connect: () => surveys,
       addQuestions: async (...args) => {
         if (faults.send) throw faults.send;
@@ -95,12 +96,12 @@ const fixture = (overrides = {}) => {
   } };
   const addResponse = (id, payload, blockNumber) => {
     const pointer = ethers.utils.id(JSON.stringify(payload));
-    hashes.set(id, pointer);
+    responseHashes.set(id, pointer);
     records.set(Buffer.from(pointer.slice(2), 'hex').toString('base64url'), payload);
     const event = surveys.interface.encodeEventLog(surveys.interface.getEvent('ResponsesSubmitted'), [wallet.address, [id], ethers.constants.HashZero]);
     logs.push({ ...event, blockNumber, transactionIndex: 0, logIndex: logs.length });
   };
-  return { open, addQuestion, addResponse, hashes, logs, reorg, uploaded, writes, faults, client, fetchImpl, registry,
+  return { open, addQuestion, addResponse, hashes, responseHashes, logs, reorg, uploaded, writes, faults, client, fetchImpl, registry,
     options: { provider, addresses: { sessionRegistry: registryAddress, surveys: surveysAddress }, createContract: factory },
     setChain: (value) => { chain = value; }, setGasPrice: (value) => { gasPrice = value; }, setBalance: (value) => { balance = value; } };
 };
@@ -133,6 +134,39 @@ test('a reorganization that replaces a read block rebuilds the questions from ca
   const after = await session.loadQuestions();
   assert.deepEqual(after.items.map((item) => item.id), [qid]);
   assert.equal(after.complete, true);
+});
+
+for (const nextHead of [10, 11]) test(`existing and fresh readers converge after a reorg to head ${nextHead}`, async () => {
+  const f = fixture();
+  let head = 10;
+  f.options.provider.getBlockNumber = async () => head;
+  const running = await f.open();
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'Retained question', type: 'binary' }, 1);
+  f.addQuestion(otherId, { sessionSlug: 'town', prompt: 'Orphaned question', type: 'binary' }, 10);
+  f.addResponse(qid, { questionID: qid, answer: { value: 'Orphaned answer' } }, 10);
+  const scope = { questionIds: [qid, otherId, blockedId] };
+  const beforeQuestions = await running.loadQuestions();
+  const beforeAnswers = await running.readAnswers(scope);
+  assert.deepEqual(beforeQuestions.items.map(item => item.id), [qid, otherId]);
+  assert.equal(beforeAnswers.entries[0].payload.answer.value, 'Orphaned answer');
+  assert.equal(beforeQuestions.complete, true);
+  assert.equal(beforeAnswers.complete, true);
+
+  f.logs.splice(1);
+  f.reorg(10, nextHead);
+  f.addQuestion(blockedId, { sessionSlug: 'town', prompt: 'Canonical question', type: 'binary' }, 10);
+  f.addResponse(qid, { questionID: qid, answer: { value: 'Canonical answer' } }, 10);
+  head = nextHead;
+  const refreshedQuestions = await running.loadQuestions();
+  const refreshedAnswers = await running.readAnswers(scope);
+  const fresh = await f.open();
+  assert.deepEqual(refreshedQuestions, await fresh.loadQuestions());
+  assert.deepEqual(refreshedAnswers, await fresh.readAnswers(scope));
+  assert.deepEqual(refreshedQuestions.items.map(item => item.id), [qid, blockedId]);
+  assert.equal(refreshedAnswers.entries.length, 1);
+  assert.equal(refreshedAnswers.entries[0].payload.answer.value, 'Canonical answer');
+  assert.equal(refreshedQuestions.complete, true);
+  assert.equal(refreshedAnswers.complete, true);
 });
 
 test('a reorganization drops answers, including the agent\'s own, from replaced blocks', async () => {
@@ -687,7 +721,7 @@ test('a missing stored mark holds both scans until new blocks can be covered by 
   const session = await f.open();
   f.addQuestion(qid, { sessionSlug: 'town', prompt: 'Retained', type: 'binary' }, 9);
   f.addResponse(otherId, { questionID: otherId, answer: { value: 'Retained' } }, 9);
-  const originalPointer = f.hashes.get(otherId);
+  const originalPointer = f.responseHashes.get(otherId);
   const beforeQuestions = await session.loadQuestions();
   const beforeAnswers = await session.readAnswers({ questionIds: [otherId] });
   head = 11;
@@ -707,7 +741,7 @@ test('a missing stored mark holds both scans until new blocks can be covered by 
   assert.equal(scans, 0, 'No cursor may advance beyond an unverified prior mark');
   f.reorg(11, 11);
   f.logs.splice(2);
-  f.hashes.set(otherId, originalPointer);
+  f.responseHashes.set(otherId, originalPointer);
   f.options.provider.getBlock = getBlock;
   const questions = await session.loadQuestions();
   const answers = await session.readAnswers({ questionIds: [otherId] });
