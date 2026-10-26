@@ -1,3 +1,4 @@
+import RecoveryKeyDialog from '../Shared/RecoveryKeyDialog';
 import { getSessionWizardInterviewValidationError } from './sessionWizardInterviewValidation';
 /** @file SessionWizard.tsx */
 import { useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
@@ -2401,7 +2402,15 @@ const SessionWizard = ({
     deployForm,
   };
 
-  const { handleDeployWorker, resolveConnectedAdminAddress, verifyNativeWorker } = useSessionWizardWorkerDeploy({
+  const {
+    handleDeployWorker,
+    resolveConnectedAdminAddress,
+    verifyNativeWorker,
+    operatorRecoveryKey,
+    setOperatorRecoveryKey,
+    recoveryDisplay,
+    finishRecoveryDisplay,
+  } = useSessionWizardWorkerDeploy({
     refs: {
       runtimeRef: workerDeployRuntimeRef,
       resolvedWalletAccountRef,
@@ -2869,6 +2878,17 @@ const SessionWizard = ({
 
   return (
     <SessionWizardShell
+      recoveryKeyDialog={
+        recoveryDisplay ? (
+          <RecoveryKeyDialog
+            key={recoveryDisplay.createdAt}
+            value={recoveryDisplay}
+            onContinue={finishRecoveryDisplay}
+          />
+        ) : null
+      }
+      operatorRecoveryKey={operatorRecoveryKey}
+      setOperatorRecoveryKey={setOperatorRecoveryKey}
       account={account}
       allowNativeWorkerVerification={allowNativeWorkerVerification}
       activeCreateSbtTargetGate={activeCreateSbtTargetGate}

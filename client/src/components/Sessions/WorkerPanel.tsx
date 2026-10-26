@@ -94,6 +94,8 @@ export type WorkerPanelProps = {
   toggleLoginModal?: WorkerDeploySectionProps['toggleLoginModal'];
   resolvedActiveSessionSlug?: string;
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
+  operatorRecoveryKey?: WorkerDeploySectionProps['operatorRecoveryKey'];
+  setOperatorRecoveryKey?: WorkerDeploySectionProps['setOperatorRecoveryKey'];
   handleDeployWorker: () => void;
   deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
   showWorkerUrlField: boolean;
@@ -164,6 +166,8 @@ const WorkerPanel = ({
   toggleLoginModal,
   resolvedActiveSessionSlug,
   setDeployForm,
+  operatorRecoveryKey,
+  setOperatorRecoveryKey,
   handleDeployWorker,
   deployStatusDisplayState,
   showWorkerUrlField,
@@ -318,6 +322,8 @@ const WorkerPanel = ({
             toggleLoginModal={toggleLoginModal}
             cloudflareTokenSlug={toStr(draft.slug || resolvedActiveSessionSlug).trim()}
             setDeployForm={setDeployForm}
+            operatorRecoveryKey={operatorRecoveryKey}
+            setOperatorRecoveryKey={setOperatorRecoveryKey}
             handleDeployWorker={handleDeployWorker}
             deployStatusDisplayState={deployStatusDisplayState}
             deployVerifiedInUi={deployVerifiedInUi}

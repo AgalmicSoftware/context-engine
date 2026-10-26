@@ -1,3 +1,5 @@
+import { recoveryKeyFingerprint } from '../../../../../shared/crypto/recoveryKeyFingerprint.mjs';
+import { useRecoveryKeyCustody } from '../useRecoveryKeyCustody';
 import { useCallback, useRef, type MutableRefObject } from 'react';
 import { normalizeSparseSponsoredBundlePayload } from '../../../utilities/arweave/sponsoredBundles.js';
 import { normalizeBlockLimitsForConfig } from '../../../utilities/session/blockLimits.js';
@@ -122,6 +124,11 @@ const useSessionWizardWorkerDeploy = ({
   verifyPublicWorkerDeployment = verifySessionWizardWorkerPublicDeployment,
 }: UseSessionWizardWorkerDeployOptions = {}) => {
   const { runtimeRef, resolvedWalletAccountRef, sponsoredBundleAppliedBundleRef } = refs;
+  const currentRuntime = readRuntime(runtimeRef);
+  const custody = useRecoveryKeyCustody(
+    `${currentRuntime.draft?.slug || ''}:${currentRuntime.sessionIdHex || ''}:${currentRuntime.account || ''}`,
+  );
+  const { operatorRecoveryKey, presentRecoveryKey } = custody;
   const deployRequestInFlightRef = useRef(false);
   const litBootstrapRecoveryRef = useRef<SessionWizardLitBootstrapRecovery | null>(null);
 
@@ -325,7 +332,10 @@ const useSessionWizardWorkerDeploy = ({
               : normalizeWorkerUrl(runtime.deployHelperUrl),
           },
         });
+        if (operatorRecoveryKey && !/^[0-9a-f]{64}$/i.test(operatorRecoveryKey))
+          throw new Error('Use exactly 64 hex characters for your recovery key.');
         const payload: AnyRecord = {
+          ...(operatorRecoveryKey ? { storageEnvelopeKek: operatorRecoveryKey } : {}),
           deploymentRequestId: deployAttemptIdentity.deploymentRequestId,
           workerName: currentDeployForm.workerName,
           sessionSlug: slug,
@@ -517,6 +527,33 @@ const useSessionWizardWorkerDeploy = ({
         // fact before any later config/secret synchronization can yield or fail.
         if (!markSessionWizardDeployAttemptCompleted(deployAttemptIdentity)) {
           throw new Error('Could not durably record the completed worker deployment.');
+        }
+        if (
+          data.recoveryKey ||
+          data.recoveryKeyFingerprint ||
+          data.envelopeKekSecretPreserved ||
+          data.envelopeKekSecretSet
+        ) {
+          // A replay can preserve an older binding despite edited input. Only
+          // label the supplied key as installed when its fingerprint agrees.
+          const suppliedFingerprint = operatorRecoveryKey
+            ? await recoveryKeyFingerprint(operatorRecoveryKey).catch(() => '')
+            : '';
+          const suppliedMatches = !!suppliedFingerprint && suppliedFingerprint === data.recoveryKeyFingerprint;
+          await presentRecoveryKey({
+            recoveryKey:
+              typeof data.recoveryKey === 'string'
+                ? data.recoveryKey
+                : suppliedMatches
+                  ? operatorRecoveryKey
+                  : undefined,
+            fingerprint: String(data.recoveryKeyFingerprint || ''),
+            slug,
+            workerUrl: String(data.workerUrl || ''),
+            createdAt: new Date().toISOString(),
+            supplied: suppliedMatches,
+          });
+          delete data.recoveryKey;
         }
         const { resolvedDeployWorkerUrl, displayWorkerUrl } = resolveDeployWorkerState({
           responseWorkerUrl: data?.workerUrl,
@@ -934,6 +971,8 @@ const useSessionWizardWorkerDeploy = ({
       }
     },
     [
+      operatorRecoveryKey,
+      presentRecoveryKey,
       clearCachedWorkerSecretsAfterDeploy,
       clearSelectedBundleFile,
       applyWorkerSecretsUpdate,
@@ -988,6 +1027,7 @@ const useSessionWizardWorkerDeploy = ({
   );
 
   return {
+    ...custody,
     handleDeployWorker,
     resolveConnectedAdminAddress,
     verifyNativeWorker,

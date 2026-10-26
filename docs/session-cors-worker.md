@@ -1244,18 +1244,40 @@ next page through the same canonical HTTP route. Authorization is checked for
 every page. The retired bot export commands and receipt ZIP delivery are no
 longer available; encrypted-envelope export remains a Session Worker API.
 
-The export is non-mutating and does not change encryption keys. A worker-envelope
-archive remains tied to the original Worker's `CE_STORAGE_ENVELOPE_KEK`; the
-bundle alone cannot decrypt it. Default and sponsored provisioning deliberately
-do not expose that generated secret, so this release does not claim portable
-cross-Worker recovery. Manual operators who need external disaster recovery must
-preserve their originally supplied secret outside the bundle. The worker does not
-accept a replacement deployment secret in an Admin request.
+The encrypted-envelope export is non-mutating and covers encrypted rows only.
+Its bounded pages still refuse individual oversized rows. For a complete,
+chunked archive and an import route, use the separate **Backup and restore**
+actions above. Both formats retain wrapped keys and require the original KEK.
 
-The archive still covers encrypted rows only and is not a full session restore.
-There is no import route; preserving identity metadata does not remove the
-original deployment KEK requirement for worker-envelope rows or the JSON-page
-size limits above.
+### Recovery key custody
+
+New helper deployments return a newly installed generated KEK once as
+`recoveryKey`, with `recoveryKeyFingerprint` and `Cache-Control: no-store`.
+Helper, coordinator and sponsored-grant receipts omit the raw key; replays
+cannot recover that first display. Preserved bindings are never returned.
+The wizard pauses with a masked key, reveal and text-file download controls,
+then accepts either **I've saved it** or **Skip, I understand the risk**. Key
+material stays in component memory, outside browser storage, drafts and logs.
+
+Operators can enter exactly 64 hex characters in **Advanced: use my own recovery
+key**, or generate a key locally. The helper accepts it as `storageEnvelopeKek`,
+uses its exact case-sensitive text as key material, and returns only its
+fingerprint. Manual Cloudflare setup uses the same input and displays the
+fingerprint of the setup key. Regenerate setup values after changing this input.
+Existing bindings are preserved during deployment recovery; a changed input does
+not rotate them. Keys unlock encrypted data and saved service credentials; store
+them privately with the backup. A key alone is not a data backup.
+
+For an existing deployment or a lost first response, the signed admin action
+`export-recovery-key` requires `confirm: 'export-recovery-key'` in its signed
+payload. It returns `{ ok: true, recoveryKey, fingerprint }` with `no-store`.
+The config coordinator permits three exports per session per UTC day and
+returns `429` / `recovery_key_export_limit` thereafter. When
+`CE_STORAGE_AUDIT_KV` is bound, each export records its time and admin address,
+never the key; an audit-write failure refuses to disclose it. Only the current
+KEK is exported. Preserve a previous KEK separately while older ciphertext
+still needs it. The `recovery_key_export` capability enables **Show recovery
+key** in **Backup & restore**, with a confirmation before signing.
 
 ### Worker-Native Groups
 
@@ -2858,8 +2880,9 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   `CE_STORAGE_ENVELOPE_KEK` independently with 256 bits from Web Crypto for
   every Session Worker. These
   values are never derived from the Cloudflare API token, account, Worker name,
-  deployment ID, provider keys, or each other, and are never returned to the
-  browser. Stable-request recovery inventories existing secret binding names
+  deployment ID, provider keys, or each other. The recovery KEK is returned once
+  for private custody as described above; the token HMAC secret is never returned.
+  An operator may supply the recovery KEK instead. Stable-request recovery inventories existing secret binding names
   before writing; an ambiguous secret-write response is inventoried again and
   accepted only when the exact binding is present. Otherwise the owned Worker
   and KV namespace remain pending for a later safe replay.

@@ -126,3 +126,26 @@ test('leaving the session prevents a late export reply from downloading a file',
   await act(async () => finish());
   expect(URL.createObjectURL).not.toHaveBeenCalled();
 });
+
+test('recovery export asks for confirmation and signs it, then hides the key after dismissal', async () => {
+  jest
+    .mocked(readWorkerCapabilities)
+    .mockResolvedValue({ legacy: false, features: ['session_backup_v1', 'recovery_key_export'] });
+  const confirm = jest.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValue(true);
+  const post = jest
+    .fn()
+    .mockResolvedValue({ data: { ok: true, recoveryKey: 'a'.repeat(64), fingerprint: 'b'.repeat(64) } });
+  render(<AdminSessionBackupPanel {...props} postSignedRequest={post} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Show recovery key' }));
+  expect(post).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Show recovery key' }));
+  expect(await screen.findByLabelText('Recovery key')).toHaveAttribute('type', 'password');
+  expect(post).toHaveBeenCalledWith({
+    action: 'export-recovery-key',
+    path: '/admin/export-recovery-key',
+    body: { sessionSlug: 'sample', confirm: 'export-recovery-key' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: "I've saved it" }));
+  await waitFor(() => expect(screen.queryByLabelText('Recovery key')).not.toBeInTheDocument());
+  expect(confirm).toHaveBeenCalledTimes(2);
+});

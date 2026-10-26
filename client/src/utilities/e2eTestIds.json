@@ -409,5 +409,11 @@
   "SBT_PAGE_NAME": "ce-sbt-page-name",
   "SBT_PAGE_DESCRIPTION": "ce-sbt-page-description",
   "SBT_PAGE_IMAGE": "ce-sbt-page-image",
-  "SBT_PAGE_OPEN_MINT_URL": "ce-sbt-page-open-mint-url"
+  "SBT_PAGE_OPEN_MINT_URL": "ce-sbt-page-open-mint-url",
+  "RECOVERY_KEY_DOWNLOAD": "ce-recovery-key-download",
+  "RECOVERY_KEY_SAVED": "ce-recovery-key-saved",
+  "RECOVERY_KEY_SKIP": "ce-recovery-key-skip",
+  "WIZARD_RECOVERY_KEY_INPUT": "ce-wizard-recovery-key-input",
+  "WIZARD_RECOVERY_KEY_GENERATE": "ce-wizard-recovery-key-generate",
+  "ADMIN_RECOVERY_KEY_SHOW": "ce-admin-recovery-key-show"
 }

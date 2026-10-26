@@ -85,6 +85,9 @@ export type SessionWizardShellProps = {
   handleCopyAdminUrl: PublishSectionProps['onCopyAdminUrl'];
   handleGateAddSbt: EncryptionPanelBoundaryProps['handleGateAddSbt'];
   handleGateRemoveSbt: EncryptionPanelBoundaryProps['handleGateRemoveSbt'];
+  operatorRecoveryKey?: WorkerPanelProps['operatorRecoveryKey'];
+  setOperatorRecoveryKey?: WorkerPanelProps['setOperatorRecoveryKey'];
+  recoveryKeyDialog?: React.ReactNode;
   handleDeployWorker: WorkerPanelProps['handleDeployWorker'];
   verifyNativeWorker?: WorkerPanelProps['verifyNativeWorker'];
   nativeTemplateSetupIdentity?: WorkerPanelProps['nativeTemplateSetupIdentity'];
@@ -267,6 +270,9 @@ const SessionWizardShell = ({
   handleCopyAdminUrl,
   handleGateAddSbt,
   handleGateRemoveSbt,
+  operatorRecoveryKey,
+  setOperatorRecoveryKey,
+  recoveryKeyDialog,
   handleDeployWorker,
   verifyNativeWorker,
   nativeTemplateSetupIdentity,
@@ -446,11 +452,17 @@ const SessionWizardShell = ({
   );
 
   if (showSessionModeProfileGate) {
-    return <div className={styles.groupWizard}>{header}</div>;
+    return (
+      <div className={styles.groupWizard}>
+        {recoveryKeyDialog}
+        {header}
+      </div>
+    );
   }
 
   return (
     <div className={styles.groupWizard}>
+      {recoveryKeyDialog}
       {header}
 
       <SessionWizardIntroStatusRail
@@ -598,6 +610,8 @@ const SessionWizardShell = ({
             toggleLoginModal={toggleLoginModal}
             resolvedActiveSessionSlug={resolvedActiveSessionSlug}
             setDeployForm={setDeployForm}
+            operatorRecoveryKey={operatorRecoveryKey}
+            setOperatorRecoveryKey={setOperatorRecoveryKey}
             handleDeployWorker={handleDeployWorker}
             deployStatusDisplayState={deployStatusDisplayState}
             showWorkerUrlField={showWorkerUrlField}

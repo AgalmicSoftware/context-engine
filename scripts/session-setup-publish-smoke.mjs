@@ -449,6 +449,25 @@ try {
   await page.getByRole('status').filter({ hasText: 'Restore complete.' }).waitFor({ timeout: 120000 });
   await page.getByTestId('ce-admin-session-backup').screenshot({ path: `${outputDir}/admin-backup-restore.png`, timeout: 10000 });
   console.log('Admin downloaded a complete JSONL backup and restored it idempotently through signed requests.');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByTestId('ce-admin-recovery-key-show').click();
+  await page.getByRole('heading', { name: 'Save your recovery key' }).waitFor();
+  assert.equal(await page.getByLabel('Recovery key', { exact: true }).getAttribute('type'), 'password');
+  await page.waitForFunction(() => { const dialog = document.querySelector('[role=dialog]'); return dialog && getComputedStyle(dialog).opacity === '1'; });
+  await page.getByRole('dialog').locator('.modal-content').screenshot({ path: `${outputDir}/recovery-key-masked.png` });
+  const keyDownload = page.waitForEvent('download');
+  await page.getByTestId('ce-recovery-key-download').click();
+  const keyPath = `${outputDir}/synthetic-recovery-key.txt`;
+  await (await keyDownload).saveAs(keyPath);
+  const keyFile = await readFile(keyPath, 'utf8');
+  assert.ok(keyFile.includes(env.CE_STORAGE_ENVELOPE_KEK));
+  assert.ok(keyFile.includes(slug) && keyFile.includes(workerOrigin) && keyFile.includes('Fingerprint:'));
+  const persisted = await page.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
+  assert.ok(!persisted.includes(env.CE_STORAGE_ENVELOPE_KEK), 'The exported recovery key is not persisted in browser storage');
+  await page.getByTestId('ce-recovery-key-saved').click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  console.log('Admin confirmed recovery-key export and downloaded a private copy without browser persistence.');
+
   const elapsedMs = Math.round(performance.now() - startedAt);
   await writeFile(
     `${outputDir}/result.json`,

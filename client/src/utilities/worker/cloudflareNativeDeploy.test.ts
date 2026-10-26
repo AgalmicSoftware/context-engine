@@ -40,3 +40,12 @@ describe('cloudflareNativeDeploy', () => {
     expect(() => createCloudflareNativeSetupSecrets((bytes) => bytes.fill(7))).toThrow(/failed/i);
   });
 });
+
+test('manual setup uses the exact operator key and rejects malformed keys', () => {
+  const key = 'A'.repeat(64);
+  expect(createCloudflareNativeSetupSecrets((bytes) => bytes.fill(1), key)).toEqual({
+    tokenHmacSecret: '01'.repeat(32),
+    storageEnvelopeKek: key,
+  });
+  expect(() => createCloudflareNativeSetupSecrets(undefined, 'invalid')).toThrow(/64 hex/);
+});

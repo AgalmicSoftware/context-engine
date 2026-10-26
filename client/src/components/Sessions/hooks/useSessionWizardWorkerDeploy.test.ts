@@ -1,3 +1,6 @@
+jest.mock('../../../../../shared/crypto/recoveryKeyFingerprint.mjs', () => ({
+  recoveryKeyFingerprint: jest.fn(async () => 'b'.repeat(64)),
+}));
 import { ethers } from 'ethers';
 import { setHostedFaucetEnabled } from '../sessionWizardHostedFaucet';
 import { act, renderHook, waitFor } from '@testing-library/react';
@@ -140,6 +143,84 @@ describe('useSessionWizardWorkerDeploy', () => {
     jest.clearAllMocks();
     localStorage.clear();
     global.fetch = originalFetch;
+  });
+
+  it.each([false, true])(
+    'waits for recovery-key custody without persisting key material (operator=%s)',
+    async (operator) => {
+      const options = buildDeployHookOptions();
+      const fetchMock = mockSuccessfulWorkerDeployFetch();
+      const key = 'a'.repeat(64);
+      fetchMock.mockImplementationOnce(
+        async () =>
+          ({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ok: true,
+              workerUrl: 'https://deployed.example.test',
+              configVerified: true,
+              writesSessionConfig: true,
+              envelopeKekSecretSet: true,
+              recoveryKeyFingerprint: 'b'.repeat(64),
+              ...(!operator ? { recoveryKey: key } : {}),
+            }),
+          }) as Response,
+      );
+      const storage = jest.spyOn(Storage.prototype, 'setItem');
+      const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+      if (operator) act(() => result.current.setOperatorRecoveryKey(key));
+      let pending: ReturnType<typeof result.current.handleDeployWorker> | undefined;
+      act(() => {
+        pending = result.current.handleDeployWorker();
+      });
+      await waitFor(() => expect(result.current.recoveryDisplay?.recoveryKey).toBe(key));
+      expect(result.current.operatorRecoveryKey).toBe('');
+      expect(options.verifyPublicWorkerDeployment).not.toHaveBeenCalled();
+      if (operator) expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).storageEnvelopeKek).toBe(key);
+      act(() => result.current.finishRecoveryDisplay());
+      await act(async () => {
+        expect((await pending)?.ok).toBe(true);
+      });
+      expect(result.current.recoveryDisplay).toBeNull();
+      expect(JSON.stringify(storage.mock.calls)).not.toContain(key);
+      expect(JSON.stringify(options.updateDraftValue.mock.calls)).not.toContain(key);
+      expect(JSON.stringify(options.updateDeploymentState.mock.calls)).not.toContain(key);
+      storage.mockRestore();
+    },
+  );
+
+  it('does not label edited input as installed when a replay preserves a different key', async () => {
+    const options = buildDeployHookOptions();
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    fetchMock.mockImplementationOnce(
+      async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            configVerified: true,
+            writesSessionConfig: true,
+            envelopeKekSecretPreserved: true,
+            recoveryKeyFingerprint: 'c'.repeat(64),
+          }),
+        }) as Response,
+    );
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    act(() => result.current.setOperatorRecoveryKey('a'.repeat(64)));
+    let pending: ReturnType<typeof result.current.handleDeployWorker> | undefined;
+    act(() => {
+      pending = result.current.handleDeployWorker();
+    });
+    await waitFor(() => expect(result.current.recoveryDisplay).not.toBeNull());
+    expect(result.current.recoveryDisplay?.recoveryKey).toBeUndefined();
+    expect(result.current.recoveryDisplay?.supplied).toBe(false);
+    act(() => result.current.finishRecoveryDisplay());
+    await act(async () => {
+      await pending;
+    });
   });
 
   it('returns handleDeployWorker function', () => {

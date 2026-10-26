@@ -1,3 +1,4 @@
+import { recoveryKeyFingerprint } from '../../../../shared/crypto/recoveryKeyFingerprint.mjs';
 /** @file WorkerDeploySection.tsx */
 import React from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
@@ -87,6 +88,8 @@ export type WorkerDeploySectionProps = {
   cloudflareTokenSlug?: string;
   cloudflareNativeDeployUrl?: string;
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
+  operatorRecoveryKey?: string;
+  setOperatorRecoveryKey?: (value: string) => void;
   handleDeployWorker: () => void;
   deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
   deployVerifiedInUi?: boolean;
@@ -134,6 +137,8 @@ const WorkerDeploySection = ({
   cloudflareTokenSlug = '',
   cloudflareNativeDeployUrl = CLOUDFLARE_NATIVE_DEPLOY_URL,
   setDeployForm,
+  operatorRecoveryKey,
+  setOperatorRecoveryKey,
   handleDeployWorker,
   deployStatusDisplayState,
   deployVerifiedInUi,
@@ -143,6 +148,11 @@ const WorkerDeploySection = ({
   nativeTemplateSetupIdentity = '',
   onNativeTemplateSetupGenerated,
 }: WorkerDeploySectionProps) => {
+  const [localOperatorKey, setLocalOperatorKey] = React.useState('');
+  const [revealOperatorKey, setRevealOperatorKey] = React.useState(false);
+  const recoveryKeyInput = operatorRecoveryKey ?? localOperatorKey;
+  const changeRecoveryKey = setOperatorRecoveryKey || setLocalOperatorKey;
+  const [fingerprint, setFingerprint] = React.useState('');
   const [nativeSetupSecrets, setNativeSetupSecrets] = React.useState<{
     tokenHmacSecret: string;
     storageEnvelopeKek: string;
@@ -188,6 +198,21 @@ const WorkerDeploySection = ({
   const currentNativeVerificationIdentityRef = React.useRef(nativeVerificationIdentity);
   currentNativeVerificationIdentityRef.current = nativeVerificationIdentity;
   const currentNativeSetupSecrets = nativeSetupSecretsIdentity === nativeSetupIdentity ? nativeSetupSecrets : null;
+  const fingerprintKey = currentNativeSetupSecrets?.storageEnvelopeKek || recoveryKeyInput;
+  React.useEffect(() => {
+    let active = true;
+    setFingerprint('');
+    if (/^[0-9a-f]{64}$/i.test(fingerprintKey)) {
+      void recoveryKeyFingerprint(fingerprintKey)
+        .then((value: string) => {
+          if (active) setFingerprint(value);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      active = false;
+    };
+  }, [fingerprintKey]);
   const nativeDeployReady = !!(nativeDeployUrl && currentNativeSetupSecrets && nativeSessionSlug && nativeAdminAddress);
   const nativeAttachmentReady = !!(
     nativeVerificationEnabled &&
@@ -238,7 +263,7 @@ const WorkerDeploySection = ({
 
   const generateNativeSetupSecrets = () => {
     try {
-      setNativeSetupSecrets(createCloudflareNativeSetupSecrets());
+      setNativeSetupSecrets(createCloudflareNativeSetupSecrets(undefined, recoveryKeyInput));
       setNativeSetupSecretsIdentity(nativeSetupIdentity);
       onNativeTemplateSetupGenerated?.(nativeSetupIdentity);
       setNativeSetupError('');
@@ -246,10 +271,10 @@ const WorkerDeploySection = ({
       setNativeStatus('Setup values generated in this tab. Copy each value into Cloudflare.');
       setCopiedNativeField('');
       setVerifiedNativeIdentity('');
-    } catch {
+    } catch (error) {
       setNativeSetupSecrets(null);
       setNativeSetupSecretsIdentity('');
-      setNativeSetupError('Secure setup-secret generation failed.');
+      setNativeSetupError(error instanceof Error ? error.message : 'Secure setup-secret generation failed.');
     }
   };
   const copyNativeValue = async (label: string, value: string) => {
@@ -357,6 +382,59 @@ const WorkerDeploySection = ({
 
   return (
     <>
+      <details className={styles.cloudflareNativeDeployCard}>
+        <summary>Advanced: use my own recovery key</summary>
+        <p className={styles.helperText}>
+          Optional. Enter 64 hex characters or generate a key in this tab. Keep a private copy before deploying. This
+          value is never saved in a wizard draft.
+        </p>
+        <Label for="ce-wizard-recovery-key-input">Your recovery key</Label>
+        <Input
+          id="ce-wizard-recovery-key-input"
+          data-testid="ce-wizard-recovery-key-input"
+          type={revealOperatorKey ? 'text' : 'password'}
+          autoComplete="off"
+          value={recoveryKeyInput}
+          onChange={(event) => changeRecoveryKey(event.target.value)}
+        />
+        <Button
+          type="button"
+          className={styles.secondaryButton}
+          onClick={() => setRevealOperatorKey(!revealOperatorKey)}
+        >
+          {revealOperatorKey ? 'Hide supplied key' : 'Reveal supplied key'}
+        </Button>
+        <Button
+          type="button"
+          className={styles.secondaryButton}
+          data-testid="ce-wizard-recovery-key-generate"
+          onClick={() => {
+            try {
+              changeRecoveryKey(createCloudflareNativeSetupSecrets().storageEnvelopeKek);
+              setNativeSetupError('');
+            } catch {
+              setNativeSetupError('Secure key generation is unavailable.');
+            }
+          }}
+        >
+          Generate locally
+        </Button>
+        {recoveryKeyInput && !/^[0-9a-f]{64}$/i.test(recoveryKeyInput) && (
+          <p className={styles.errorText}>Use exactly 64 hex characters.</p>
+        )}
+        {currentNativeSetupSecrets &&
+          recoveryKeyInput !== currentNativeSetupSecrets.storageEnvelopeKek &&
+          recoveryKeyInput && (
+            <p className={styles.helperText}>
+              Select Replace setup values to use this key in the manual Cloudflare deployment.
+            </p>
+          )}
+      </details>
+      {fingerprint && (
+        <p className={styles.helperText} style={{ overflowWrap: 'anywhere' }}>
+          Recovery key fingerprint: {fingerprint}
+        </p>
+      )}
       {nativeVerificationEnabled && (
         <section className={styles.cloudflareNativeDeployCard} aria-labelledby="ce-cloudflare-native-deploy-title">
           <div>

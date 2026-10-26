@@ -1,3 +1,5 @@
+import RecoveryKeyDialog from '../Shared/RecoveryKeyDialog';
+import type { RecoveryKeyDisplay } from '../Shared/RecoveryKeyDialog';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Input, Label } from 'reactstrap';
 import {
@@ -61,6 +63,7 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [recoveryDisplay, setRecoveryDisplay] = useState<RecoveryKeyDisplay | null>(null);
   const [downloadCount, setDownloadCount] = useState(0);
   const [downloadComplete, setDownloadComplete] = useState(false);
   const [restoreCount, setRestoreCount] = useState(0);
@@ -118,6 +121,36 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
     } finally {
       if (!lifetime.current?.signal.aborted) setBusy(false);
     }
+  };
+  const showRecoveryKey = () => {
+    if (
+      !window.confirm(
+        'The recovery key unlocks encrypted session data and saved service credentials. Keep it private. Export is limited to three times per UTC day. Show the recovery key?',
+      )
+    )
+      return;
+    void run(async () => {
+      // Unlike backup pages, secret export is never automatically retried.
+      const result = record(
+        (
+          await postSignedRequest({
+            action: 'export-recovery-key',
+            path: '/admin/export-recovery-key',
+            body: { sessionSlug, confirm: 'export-recovery-key' },
+          })
+        ).data,
+      );
+      assertActive();
+      if (typeof result.recoveryKey !== 'string' || !result.recoveryKey || typeof result.fingerprint !== 'string')
+        throw new Error('The Worker did not return a recovery key.');
+      setRecoveryDisplay({
+        recoveryKey: result.recoveryKey,
+        fingerprint: result.fingerprint,
+        slug: sessionSlug,
+        workerUrl,
+        createdAt: new Date().toISOString(),
+      });
+    });
   };
   const download = () =>
     run(async () => {
@@ -213,6 +246,20 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
   return (
     <section className={styles.panel} data-testid="ce-admin-session-backup">
       <h3 className={styles.panelTitle}>Backup &amp; restore</h3>
+      {recoveryDisplay && <RecoveryKeyDialog value={recoveryDisplay} onContinue={() => setRecoveryDisplay(null)} />}
+      {capabilities?.features.includes('recovery_key_export') && (
+        <Button
+          className={styles.actionButton}
+          color="secondary"
+          outline
+          disabled={busy || !canAdminWorker}
+          onClick={showRecoveryKey}
+          data-testid="ce-admin-recovery-key-show"
+        >
+          Show recovery key
+        </Button>
+      )}
+
       <p className={styles.panelSubtitle}>
         Pause session writes while downloading. Restore to a deployment with the same session slug and recovery key.
       </p>

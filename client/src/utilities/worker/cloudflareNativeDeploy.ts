@@ -46,10 +46,13 @@ const fillWithWebCrypto: FillRandomBytes = (bytes) => {
 
 export const createCloudflareNativeSetupSecrets = (
   fillRandomBytes: FillRandomBytes = fillWithWebCrypto,
+  operatorRecoveryKey = '',
 ): { tokenHmacSecret: string; storageEnvelopeKek: string } => {
+  if (operatorRecoveryKey && !/^[a-f0-9]{64}$/i.test(operatorRecoveryKey))
+    throw new Error('Use exactly 64 hex characters for your recovery key.');
   const first = bytesToHex(fillRandomBytes(new Uint8Array(32)));
-  const second = bytesToHex(fillRandomBytes(new Uint8Array(32)));
-  if (!/^[a-f0-9]{64}$/.test(first) || !/^[a-f0-9]{64}$/.test(second) || first === second) {
+  const second = operatorRecoveryKey || bytesToHex(fillRandomBytes(new Uint8Array(32)));
+  if (!/^[a-f0-9]{64}$/.test(first) || !/^[a-f0-9]{64}$/i.test(second) || first === second) {
     throw new Error('Secure setup-secret generation failed. Do not continue this deployment.');
   }
   return {
