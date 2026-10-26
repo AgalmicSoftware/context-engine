@@ -6849,6 +6849,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: inline-block;
 }
 
+.pileCardFooter .convictionToggleStack {
+  .convictionToggleLine {
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .convictionToggleValue {
+    min-width: 0;
+    text-align: left;
+  }
+}
+
 .convictionToggleButton {
   background: transparent;
   border: none;

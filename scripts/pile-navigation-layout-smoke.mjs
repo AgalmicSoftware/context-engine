@@ -145,6 +145,18 @@ try {
         return layout;
       };
       await inspect(1);
+      const ratingToggle = page.getByRole('button', { name: 'Conviction / importance', exact: true });
+      await ratingToggle.click();
+      for (const label of ['Conviction', 'Importance']) {
+        const line = page.getByRole('button', { name: `${label} 0`, exact: true });
+        await line.waitFor();
+        const spacing = await line.evaluate(button => {
+          const [label, value] = button.querySelectorAll('span');
+          const a = label.getBoundingClientRect(), b = value.getBoundingClientRect();
+          return { gap: b.left - a.right, centerOffset: Math.abs((a.top + a.bottom - b.top - b.bottom) / 2) };
+        });
+        assert(spacing.gap >= 0 && spacing.gap <= 12 && spacing.centerOffset <= 1, `${label} value sits beside its label: ${JSON.stringify(spacing)}`);
+      }
       for (let index = 2; index <= 20; index += 1) await next.click();
       const before = await inspect(20);
       await prev.click();
