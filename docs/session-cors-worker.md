@@ -1737,6 +1737,9 @@ R2 / Durable Objects:
   abandoned leases even when that participant never writes again.
   The client retains one submit operation across failed or partial attempts and
   includes the question id and per-question revision in each receipt key.
+  Within that operation, an unchanged survey container keeps its receipt key
+  even after acknowledgement, so retrying a failed question does not store
+  another identical container. Changed container bytes advance its revision.
   Payload digests stay in client memory and are not embedded in request IDs. It preserves
   timestamps and prepared encrypted ratings while the input is unchanged; edits
   receive a new key. Successful completion or an account/session change clears

@@ -585,14 +585,16 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       const operationId = options.operationId || utils.hexlify(utils.randomBytes(16));
       const uploadRevisions =
         options.uploadRevisions || new Map<string, { revision: number; payloadDigest: string; settled: boolean }>();
-      const responseRequestId = (id: string, payload: MetadataPayload) => {
+      const responseRequestId = (id: string, payload: MetadataPayload, reuseSettled = false) => {
         if (!workerResponseIdentity) return undefined;
         const payloadDigest = utils.sha256(utils.toUtf8Bytes(JSON.stringify(payload)));
         const previous = uploadRevisions.get(id);
-        // Only an unacknowledged, unchanged upload reuses its receipt. Returning
-        // to a previously saved answer is a new revision, even within one operation.
+        // An unchanged survey container stays the same across answer retries.
+        // Individual saved answers still need new revisions when resubmitted,
+        // including returning to a prior value within the same operation.
         const revision = previous
-          ? previous.revision + (previous.settled || previous.payloadDigest !== payloadDigest ? 1 : 0)
+          ? previous.revision +
+            ((previous.settled && !reuseSettled) || previous.payloadDigest !== payloadDigest ? 1 : 0)
           : 0;
         uploadRevisions.set(id, { revision, payloadDigest, settled: false });
         return `answer:v1:${operationId}:${id}:${revision}`;
@@ -646,7 +648,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           });
           surveyResponseUpload = await uploadJsonPayloadForContractPointer({
             payload: surveyResponsePayload,
-            requestId: responseRequestId(hashedSurveyId, surveyResponsePayload),
+            requestId: responseRequestId(hashedSurveyId, surveyResponsePayload, true),
             resource: STORAGE_RESOURCE_KEYS.RESPONSES,
             groupKeyOrCfg,
             cfg,

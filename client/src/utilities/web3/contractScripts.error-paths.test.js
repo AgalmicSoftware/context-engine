@@ -489,6 +489,50 @@ describe('error paths', () => {
     ]);
   });
 
+  it('replays an unchanged settled survey container and revises it only when its bytes change', async () => {
+    window.ethereum = makeRpcProvider();
+    const stored = new Map();
+    let failQuestion = true;
+    uploadDataToSessionStorage.mockImplementation(async (data, _format, options) => {
+      const payload = typeof data === 'string' ? JSON.parse(data) : data;
+      const isSurvey = Array.isArray(payload.responses);
+      if (!isSurvey && failQuestion) {
+        failQuestion = false;
+        throw new Error('Question upload interrupted');
+      }
+      if (!stored.has(options.requestId)) stored.set(options.requestId, { isSurvey, id: `cf_saved_${stored.size}` });
+      return { storageRef: { backend: 'cloudflare', id: stored.get(options.requestId).id, resource: 'responses' } };
+    });
+    const options = { operationId: 'survey-retry', uploadRevisions: new Map() };
+    const submit = (value) => {
+      const answers = [{ questionID: QUESTION_ID, answer: { value } }];
+      return submitResponses(
+        'wagmi',
+        [QUESTION_ID],
+        answers,
+        SURVEY_ID,
+        { surveyID: SURVEY_ID, responses: answers },
+        WORKER_CANONICAL_GROUP_CFG,
+        options,
+      );
+    };
+    await expect(submit('Yes')).rejects.toThrow('Question upload interrupted');
+    await expect(submit('Yes')).resolves.toMatchObject({ workerCanonicalSubmission: true });
+    const surveyCalls = () =>
+      uploadDataToSessionStorage.mock.calls.filter(([data]) =>
+        Array.isArray((typeof data === 'string' ? JSON.parse(data) : data).responses),
+      );
+    const first = surveyCalls()[0];
+    expect(surveyCalls()[1][0]).toEqual(first[0]);
+    expect(surveyCalls()[1][2].requestId).toBe(first[2].requestId);
+    expect([...stored.values()].filter((row) => row.isSurvey)).toHaveLength(1);
+    await submit('No');
+    await submit('Yes');
+    const keys = surveyCalls().map(([, , upload]) => upload.requestId);
+    expect(new Set(keys)).toHaveProperty('size', 3);
+    expect([...stored.values()].filter((row) => row.isSurvey)).toHaveLength(3);
+  });
+
   it('reuses unchanged answer keys after a lost reply and changes keys for edited answers', async () => {
     window.ethereum = makeRpcProvider();
     const stored = new Map();
