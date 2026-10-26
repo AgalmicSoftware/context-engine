@@ -13,12 +13,21 @@ import { loadWorkerResponses } from '../../client/src/utilities/survey/workerRes
 import { loadWorkerCanonicalQuestions } from '../../client/src/domains/surveys/workerCanonicalMetadataHydrationPort';
 import { buildReportResponseStats } from '../../client/src/components/PolisReport/polisReportAnswers';
 import { buildRatingMatrixFromRealData } from '../../client/src/components/PolisReport/polisReportRuntime';
+import currentWorker from '../../workers/sessionCorsWorker/worker.js';
 
 const repo = path.resolve(__dirname, '../..');
-const tag = 'refs/tags/worker-bundles-stable';
+// Move this immutable pin deliberately when choosing the next previous release,
+// updating that release's capability expectations below. Never use the moving
+// stable tag: promoting a release must not silently replace this test fixture.
+const tag = 'refs/tags/worker-bundles-6a8cea63d7da13b2cbea4b71571459881b12134e';
 let hasTag = true;
 try { execFileSync('git', ['rev-parse', '--verify', tag], { cwd: repo, stdio: 'pipe' }); }
-catch { hasTag = false; console.warn('Skipping previous Worker release compatibility: worker-bundles-stable tag is missing (fetch full history to run it).'); }
+catch {
+  const message = `Previous Worker release compatibility requires ${tag} (fetch full history to run it).`;
+  if (process.env.CI) throw new Error(message);
+  hasTag = false;
+  console.warn(`Skipping locally: ${message}`);
+}
 
 const memoryKv = (seed = {}) => {
   const values = new Map(Object.entries(seed));
@@ -46,6 +55,7 @@ const memoryKv = (seed = {}) => {
   let uploads;
   const originalFetch = globalThis.fetch;
   const originalCrypto = globalThis.crypto;
+  const originalResponseJson = Response.json;
   let origin;
   let fixtureNumber = 0;
   const slug = 'compat-session';
@@ -55,6 +65,12 @@ const memoryKv = (seed = {}) => {
   const question = buildQuestionRecord({ prompt: 'Should the pilot continue?', creator: wallet.address, session }).record;
 
   beforeAll(async () => {
+    // The shared jsdom response ponyfill predates the static Web API helper.
+    Response.json ||= (value, init = {}) => {
+      const headers = new Headers(init.headers);
+      if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+      return new Response(JSON.stringify(value), { ...init, headers });
+    };
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-previous-worker-'));
     const bundlePath = path.join(tempDir, 'worker.mjs');
     const bundle = execFileSync('git', ['show', `${tag}:deploy/cloudflare/session-worker/worker.mjs`], { cwd: repo, maxBuffer: 20 * 1024 * 1024 });
@@ -106,6 +122,8 @@ const memoryKv = (seed = {}) => {
 
   afterEach(() => { globalThis.fetch = originalFetch; });
   afterAll(async () => {
+    if (originalResponseJson) Response.json = originalResponseJson;
+    else delete Response.json;
     Object.defineProperty(globalThis, 'crypto', { configurable: true, value: originalCrypto });
     if (tempDir) await fs.rm(tempDir, { recursive: true, force: true });
   });
@@ -159,5 +177,15 @@ const memoryKv = (seed = {}) => {
       context: { account: wallet.address }, credentialToken: token, fetchImpl,
     })).rejects.toThrow('This Worker cannot safely record admin corrections. Upgrade the session Worker');
     expect(uploads).toHaveLength(1);
+  });
+
+  it('runs the current capabilities route successfully in the same HTTP harness', async () => {
+    const env = installSessionCoordinatorBinding({
+      GROUP_KV: memoryKv({ [`session:${slug}:config`]: JSON.stringify(config) }),
+      CE_STORAGE_INDEX_KV: memoryKv(), TOKEN_HMAC_SECRET: 'synthetic-current-release-hmac',
+    });
+    const response = await currentWorker.fetch(new Request(`${origin}/capabilities?slug=${slug}`), env, { waitUntil: () => {} });
+    expect(response.status).toBe(200);
+    expect((await response.json()).features).toContain('upload_authority_stamps');
   });
 });
