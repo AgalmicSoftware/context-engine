@@ -59,7 +59,14 @@ const fixture = (overrides = {}) => {
       getQuestionHash: async (id) => hashes.get(id), questionHashes: async (id) => hashes.get(id) || ethers.constants.HashZero,
       getResponse: async (_responder, id) => hashes.get(id),
       connect: () => surveys,
-      addQuestions: async () => { if (faults.send) throw faults.send; throw new Error('No statement success fixture'); },
+      addQuestions: async (...args) => {
+        if (faults.send) throw faults.send;
+        const event = iface.encodeEventLog(iface.getEvent('QuestionsAdded'), [wallet.address, args[0], args[2]]);
+        return { hash: ethers.utils.id('question-tx'), wait: async () => ({
+          status: 1, blockNumber: 11, blockHash: blockHash(11), transactionIndex: 0,
+          logs: [{ ...event, address: surveysAddress, logIndex: 0 }],
+        }) };
+      },
       submitResponses: async (...args) => {
         writes.push(args);
         if (faults.send) throw faults.send;
@@ -145,6 +152,48 @@ test('a reorganization drops answers, including the agent\'s own, from replaced 
   assert.deepEqual(after.entries, []);
   assert.equal(after.complete, true);
   assert.equal(await session.replacedWrite({ blockNumber: 11, blockHash: ethers.utils.id('block 11 0') }), true);
+});
+
+for (const changeScope of [false, true]) test(`local answers above the scanned head are checked after a reorg (changed scope: ${changeScope})`, async () => {
+  const f = fixture();
+  let head = 10;
+  f.options.provider.getBlockNumber = async () => head;
+  const session = await f.open();
+  await session.readAnswers({ questionIds: [qid] });
+  await session.submitAnswers({ client: f.client, records: [{ questionID: qid, sessionSlug: 'town', answer: { value: 'Agree' } }] });
+  f.reorg(11, 13);
+  head = 13;
+  const after = await session.readAnswers({ questionIds: changeScope ? [qid, otherId] : [qid] });
+  assert.deepEqual(after.entries, []);
+  assert.equal(after.complete, true);
+});
+
+test('local questions above the scanned head are removed when their own block is replaced', async () => {
+  const f = fixture();
+  let head = 10;
+  f.options.provider.getBlockNumber = async () => head;
+  const session = await f.open();
+  await session.loadQuestions();
+  await session.addStatement({ client: f.client, record: { id: qid, sessionSlug: 'town', prompt: 'Local statement', type: 'binary' } });
+  assert.equal((await session.loadQuestions()).items.length, 1);
+  f.reorg(11, 13);
+  head = 13;
+  const after = await session.loadQuestions();
+  assert.deepEqual(after.items, []);
+  assert.equal(after.complete, true);
+});
+
+test('local answer verification and timestamps share one block read per call', async () => {
+  const f = fixture();
+  const session = await f.open();
+  await session.submitAnswers({ client: f.client, records: [qid, otherId].map((questionID) => ({ questionID, sessionSlug: 'town', answer: { value: 'Agree' } })) });
+  const getBlock = f.options.provider.getBlock;
+  const reads = [];
+  f.options.provider.getBlock = (number) => { reads.push(number); return getBlock(number); };
+  const result = await session.readAnswers({ questionIds: [qid, otherId] });
+  assert.equal(result.entries.length, 2);
+  assert.equal(result.complete, true);
+  assert.equal(reads.filter((number) => number === 11).length, 1);
 });
 
 test('question scoping keeps explicit slugs authoritative and accepts the general alias', () => {
