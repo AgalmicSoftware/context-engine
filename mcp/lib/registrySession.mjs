@@ -105,14 +105,36 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
   };
   const filter = (eventName) => ({ address: surveys.address, topics: [surveys.interface.getEventTopic(eventName)] });
 
+  // A block hash commits to every earlier block. Each reader keeps the hash of the
+  // head it scanned under; when that block changes, a reorganization replaced
+  // history the reader already used, and it rebuilds from the session start.
+  const readHeadMark = async (number) => ({ number, hash: (await chainRequest(() => provider.getBlock(number)))?.hash });
+  const historyReplaced = async (mark) => {
+    if (!mark) return false;
+    const block = await chainRequest(() => provider.getBlock(mark.number));
+    // A missing block means this RPC node is behind; it cannot disprove the mark yet.
+    return !!block && block.hash !== mark.hash;
+  };
+  /** True when a reorganization replaced the block of a confirmed write. */
+  const replacedWrite = (entry) => historyReplaced(entry?.blockHash ? { number: entry.blockNumber, hash: entry.blockHash } : null);
+  let questionMark = null;
+
   const readQuestions = async ({ signal } = {}) => {
     const deadline = now() + 90000;
     let complete = true;
+    if (await historyReplaced(questionMark)) {
+      questions.clear();
+      pending.clear();
+      questionCursor = { block: startBlock, offset: 0 };
+      questionMark = null;
+    }
     if (pending.size < MAX_CACHE && questions.size < MAX_QUESTIONS) {
+      const head = await readHeadMark(await chainRequest(() => provider.getBlockNumber()));
       const scanned = await scanRegistryLogs({ provider, filter: filter('QuestionsAdded'), cursor: questionCursor,
-        toBlock: await chainRequest(() => provider.getBlockNumber()), maxLogs: 1000, deadline, now, signal });
+        toBlock: head.number, maxLogs: 1000, deadline, now, signal });
       questionCursor = scanned.cursor;
       complete = scanned.complete;
+      if (!questionMark || head.number >= questionMark.number) questionMark = head;
       for (const log of scanned.logs) {
         const event = surveys.interface.parseLog(log);
         event.args.questionIds.forEach((id, index) => {
@@ -150,14 +172,22 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     const head = await chainRequest(() => provider.getBlockNumber());
     const scope = [...known].sort().join(',');
     let state = answerScans.get(mine);
-    if (!state || state.scope !== scope || head < state.head) {
-      state = { scope, head: startBlock - 1, ranges: [], latest: new Map(), capped: false };
+    const replaced = !!state && state.scope === scope && head >= state.head && await historyReplaced(state.mark);
+    if (replaced) {
+      // A local write whose block was replaced is no longer an answer.
+      for (const [key, entry] of localAnswers) {
+        if (await replacedWrite(entry)) localAnswers.delete(key);
+      }
+    }
+    if (!state || state.scope !== scope || head < state.head || replaced) {
+      state = { scope, head: startBlock - 1, mark: null, ranges: [], latest: new Map(), capped: false };
     } else state = { ...state, ranges: state.ranges.map((range) => ({ ...range })), latest: new Map(state.latest) };
     // New blocks take priority while older ranges retain their cursor. Restarting
     // from session creation permanently misses answers beyond one scan's budget.
     if (head > state.head) {
       state.ranges.unshift({ from: Math.max(startBlock, state.head + 1), cursor: { block: head, offset: 0 } });
       state.head = head;
+      state.mark = await readHeadMark(head);
     }
     // Bound pending ranges even if the chain advances faster than RPC scans.
     // Merging old gaps only re-reads events; latest-by-chain-order deduplicates them.
@@ -240,10 +270,10 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
   const writer = createRegistryWriter({ provider, chainId, wallet, surveys, slug: info.slug, remember: (resource, id, payload, pointer, receipt) => {
     cache(pointer, payload);
     const entry = { id, questionId: id, payload, storageId: pointer, responder: wallet.address,
-      blockNumber: receipt.blockNumber, transactionIndex: receipt.transactionIndex, logIndex: receipt.logs.at(-1)?.logIndex || 0,
-      createdAt: new Date(now()).toISOString() };
+      blockNumber: receipt.blockNumber, blockHash: receipt.blockHash, transactionIndex: receipt.transactionIndex,
+      logIndex: receipt.logs.at(-1)?.logIndex || 0, createdAt: new Date(now()).toISOString() };
     if (resource === 'questions') questions.set(id, entry);
     else localAnswers.set(id, entry);
   } });
-  return { loadConfig, loadQuestions, readAnswers, ...writer, get config() { return sessionConfig; }, workerOrigin };
+  return { loadConfig, loadQuestions, readAnswers, replacedWrite, ...writer, get config() { return sessionConfig; }, workerOrigin };
 };

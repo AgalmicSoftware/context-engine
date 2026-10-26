@@ -33,10 +33,16 @@ const fixture = (overrides = {}) => {
   const logs = [];
   const records = new Map();
   const hashes = new Map();
+  // A reorganization gives each replaced block a new hash.
+  const generations = new Map();
+  const blockHash = (number) => ethers.utils.id(`block ${number} ${generations.get(number) || 0}`);
+  const reorg = (from, to) => {
+    for (let number = from; number <= to; number += 1) generations.set(number, (generations.get(number) || 0) + 1);
+  };
   const provider = {
     _isProvider: true,
     send: async () => ethers.utils.hexValue(chain), getBlockNumber: async () => 10,
-    getBlock: async (number) => ({ timestamp: 1000 + number }),
+    getBlock: async (number) => ({ timestamp: 1000 + number, hash: blockHash(number) }),
     getLogs: async (filter) => logs.filter((log) => log.blockNumber >= filter.fromBlock && log.blockNumber <= filter.toBlock && log.topics[0] === filter.topics[0]),
     getGasPrice: async () => gasPrice, getBalance: async () => balance,
   };
@@ -60,7 +66,7 @@ const fixture = (overrides = {}) => {
         const event = iface.encodeEventLog(iface.getEvent('ResponsesSubmitted'), [wallet.address, args[0], ethers.constants.HashZero]);
         return { hash: ethers.utils.id('tx'), wait: async () => {
           await faults.afterConfirmation?.();
-          return { status: 1, blockNumber: 11, transactionIndex: 0, logs: [{ ...event, address: surveysAddress, logIndex: 0 }] };
+          return { status: 1, blockNumber: 11, blockHash: blockHash(11), transactionIndex: 0, logs: [{ ...event, address: surveysAddress, logIndex: 0 }] };
         } };
       },
     };
@@ -87,7 +93,7 @@ const fixture = (overrides = {}) => {
     const event = surveys.interface.encodeEventLog(surveys.interface.getEvent('ResponsesSubmitted'), [wallet.address, [id], ethers.constants.HashZero]);
     logs.push({ ...event, blockNumber, transactionIndex: 0, logIndex: logs.length });
   };
-  return { open, addQuestion, addResponse, hashes, uploaded, writes, faults, client, fetchImpl, registry,
+  return { open, addQuestion, addResponse, hashes, logs, reorg, uploaded, writes, faults, client, fetchImpl, registry,
     options: { provider, addresses: { sessionRegistry: registryAddress, surveys: surveysAddress }, createContract: factory },
     setChain: (value) => { chain = value; }, setGasPrice: (value) => { gasPrice = value; }, setBalance: (value) => { balance = value; } };
 };
@@ -102,6 +108,43 @@ test('registry question reads filter sessions and blocked ids, trust chain ids a
   assert.deepEqual(first.items.map((item) => item.id), [qid]);
   assert.equal(first.complete, true);
   assert.equal((await session.loadQuestions()).items.length, 1);
+});
+
+test('a reorganization that replaces a read block rebuilds the questions from canonical history', async () => {
+  const f = fixture();
+  let head = 10;
+  f.options.provider.getBlockNumber = async () => head;
+  const session = await f.open();
+  const replacedId = ethers.utils.id('replaced');
+  f.addQuestion(replacedId, { sessionSlug: 'town', prompt: 'Replaced', type: 'binary' }, 10);
+  assert.deepEqual((await session.loadQuestions()).items.map((item) => item.id), [replacedId]);
+  // Block 10 is replaced by one holding a different question, and the chain moves on.
+  f.logs.splice(0);
+  f.reorg(10, 11);
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'One', type: 'binary' }, 10);
+  head = 11;
+  const after = await session.loadQuestions();
+  assert.deepEqual(after.items.map((item) => item.id), [qid]);
+  assert.equal(after.complete, true);
+});
+
+test('a reorganization drops answers, including the agent\'s own, from replaced blocks', async () => {
+  const f = fixture();
+  let head = 12;
+  f.options.provider.getBlockNumber = async () => head;
+  const session = await f.open();
+  await session.submitAnswers({ client: f.client, records: [{ questionID: qid, sessionSlug: 'town', answer: { value: 'Agree', encrypted: false } }] });
+  f.addResponse(otherId, { questionID: otherId, answer: { value: 'Orphaned' } }, 12);
+  const questionIds = new Set([qid, otherId]);
+  assert.deepEqual(new Set((await session.readAnswers({ questionIds })).entries.map((entry) => entry.questionId)), new Set([qid, otherId]));
+  // Blocks 11 and 12, with both answers, are replaced by empty ones.
+  f.logs.splice(0);
+  f.reorg(11, 13);
+  head = 13;
+  const after = await session.readAnswers({ questionIds });
+  assert.deepEqual(after.entries, []);
+  assert.equal(after.complete, true);
+  assert.equal(await session.replacedWrite({ blockNumber: 11, blockHash: ethers.utils.id('block 11 0') }), true);
 });
 
 test('question scoping keeps explicit slugs authoritative and accepts the general alias', () => {
@@ -292,6 +335,35 @@ test('an external registry answer replaces an older answer remembered in agent s
   assert.equal(listed.questions[0].myAnswer.value, 'Disagree');
   f.options.provider.getBlockNumber = async () => 13;
   f.addResponse(qid, { questionID: qid, type: 'binary', answer: { value: 'ciphertext', encrypted: true } }, 13);
+  now += 11 * 60 * 1000;
+  assert.equal((await participant.listQuestions({ filter: 'answered' })).questions.length, 0);
+});
+
+test('a remembered registry answer whose block was replaced is no longer reported as answered', async (t) => {
+  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-registry-reorg-'));
+  t.after(() => fs.rm(stateDir, { recursive: true, force: true }));
+  const f = fixture();
+  let head = 12;
+  f.options.provider.getBlockNumber = async () => head;
+  let now = Date.parse('2026-10-16T00:00:00Z');
+  const participant = createParticipant({ config: readConfig({ CE_MCP_STATE_DIR: stateDir }), wallet, registry: f.options, now: () => now,
+    fetchImpl: async (url, init) => {
+      if (new URL(url).hostname !== 'w.example.dev') return f.fetchImpl(url, init);
+      const pathname = new URL(url).pathname;
+      if (pathname === '/resource-presence') return Response.json({ resources: {} });
+      if (pathname === '/auth/nonce') return Response.json({ nonce: 'nonce123456' });
+      if (pathname === '/auth/login') return Response.json({ token: 'e30.sig', exp: 9999999999 });
+      if (pathname === '/arweave/upload') return Response.json({ id: Buffer.alloc(32, 2).toString('base64url') });
+      throw new Error(`Unexpected route ${pathname}`);
+    },
+  });
+  await participant.joinSession({ link: 'https://contextengine.sh/session/town' });
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'One', type: 'binary' });
+  assert.equal((await participant.answer({ answers: [{ questionId: qid, value: 'Agree' }] })).submitted, 1);
+  assert.equal((await participant.listQuestions({ filter: 'answered' })).questions.length, 1);
+  // The answer's block 11 is replaced without it.
+  f.reorg(11, 13);
+  head = 13;
   now += 11 * 60 * 1000;
   assert.equal((await participant.listQuestions({ filter: 'answered' })).questions.length, 0);
 });

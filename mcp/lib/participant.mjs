@@ -489,23 +489,24 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     // Add answers this agent recorded locally since the scan (or that it did not reach).
     await loadState();
     const local = sessionState(ctx).sessionId === ctx.client.sessionId && isRecord(sessionState(ctx).answers) ? sessionState(ctx).answers : {};
-    Object.entries(local).forEach(([questionId, answer]) => {
-      if (!isRecord(answer)) return;
+    for (const [questionId, answer] of Object.entries(local)) {
+      if (!isRecord(answer)) continue;
       // An incomplete registry scan cannot establish whether a saved plaintext
       // answer has since been cleared or encrypted by another client.
-      if (ctx.registry && !complete) return;
+      if (ctx.registry && !complete) continue;
       const known = mine.get(questionId);
       const chainOrder = scan.chainOrders?.get(questionId);
-      if (ctx.registry && chainOrder && compareChainOrder(answer, chainOrder) < 0) return;
+      if (ctx.registry && chainOrder && compareChainOrder(answer, chainOrder) < 0) continue;
       const newer = ctx.registry ? !known || compareChainOrder(answer, known) > 0 : !known || text(answer.answeredAt) > known.createdAt;
-      if (newer) {
+      // A remembered answer whose block a reorganization replaced was never answered.
+      if (newer && !(ctx.registry && await ctx.registry.replacedWrite(answer))) {
         mine.set(questionId, {
           createdAt: text(answer.answeredAt),
           ...(ctx.registry ? { blockNumber: answer.blockNumber, transactionIndex: answer.transactionIndex, logIndex: answer.logIndex } : {}),
           payload: { answer: { value: answer.value }, additional: { value: answer.comment } },
         });
       }
-    });
+    }
     // A cleared answer (the web client uploads '') leaves the question unanswered.
     [...mine.entries()].forEach(([questionId, entry]) => {
       const value = entry?.payload?.answer?.value;
@@ -760,8 +761,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           txHash = submitted.txHash;
           pendingAnswers.forEach(({ questionId, record }) => {
             answered.push({ questionId, record, answeredAt: new Date(now()).toISOString(), chainOrder: {
-              blockNumber: submitted.receipt.blockNumber, transactionIndex: submitted.receipt.transactionIndex,
-              logIndex: submitted.receipt.logs.at(-1)?.logIndex || 0,
+              blockNumber: submitted.receipt.blockNumber, blockHash: submitted.receipt.blockHash,
+              transactionIndex: submitted.receipt.transactionIndex, logIndex: submitted.receipt.logs.at(-1)?.logIndex || 0,
             } });
             results.push({ questionId, ok: true, answer: record.answer.value });
           });
