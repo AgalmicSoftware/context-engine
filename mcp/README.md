@@ -252,4 +252,5 @@ Worker answer uploads save a pending question, payload digest and request ID in
 `state.json` before sending. Repeating an identical failed call, including after
 an agent restart, reuses that ID so a lost reply does not create another record.
 A changed payload starts a new request; successful answer history clears the
-pending entry. If the pending key cannot be saved, the agent does not upload.
+pending entry. The payload digest stays in local state and is not embedded in
+the request ID sent to the Worker. If the pending key cannot be saved, the agent does not upload.

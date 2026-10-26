@@ -595,7 +595,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           ? previous.revision + (previous.settled || previous.payloadDigest !== payloadDigest ? 1 : 0)
           : 0;
         uploadRevisions.set(id, { revision, payloadDigest, settled: false });
-        return `answer:v1:${operationId}:${id}:${revision}:${payloadDigest}`;
+        return `answer:v1:${operationId}:${id}:${revision}`;
       };
       if (workerResponseIdentity && (!workerResponseIdentity.sessionId || !workerResponseIdentity.sessionSlug)) {
         throw new Error('submitResponses: exact Worker session identity is required.');

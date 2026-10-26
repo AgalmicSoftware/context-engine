@@ -2869,7 +2869,7 @@ const receiptRef = { backend: 'cloudflare', id: 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhc
 
 test('response upload receipts reserve atomically, replay settled writes and reject digest conflicts', async () => {
   const { state, store } = createTransactionalState();
-  const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+  const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' }, { now: () => 1_000 });
   const payload = { requestId: 'answer:v1:test', payloadDigest: 'a'.repeat(64) };
   const responses = await Promise.all([1, 2].map(() => coordinator.fetch(receiptRequest('reserve', payload))));
   assert.deepEqual(responses.map((response) => response.status).sort(), [200, 503]);
@@ -2884,13 +2884,16 @@ test('response upload receipts reserve atomically, replay settled writes and rej
   assert.equal(conflict.status, 409);
   assert.equal((await conflict.json()).reason, 'upload_request_conflict');
   assert.equal(store.size, 1);
-  assert.equal([...store.values()][0].payloadDigest, payload.payloadDigest);
+  assert.notEqual([...store.values()][0].payloadDigest, payload.payloadDigest);
+  assert.match([...store.keys()][0], /^upload-receipt-v1:[a-f0-9]{64}$/);
+  assert.equal(JSON.stringify([...store]).includes(payload.requestId), false);
+  assert.equal(JSON.stringify([...store]).includes(payload.payloadDigest), false);
 });
 
 test('expired upload leases use a new attempt and cannot be settled by the old attempt', async () => {
   const { state } = createTransactionalState();
   let now = 1_000;
-  const coordinator = new SessionWriteCoordinator(state, {}, { now: () => now });
+  const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' }, { now: () => now });
   const payload = { requestId: 'expired', payloadDigest: 'a'.repeat(64) };
   const first = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
   now += 120_001;
@@ -2905,7 +2908,7 @@ test('expired upload leases use a new attempt and cannot be settled by the old a
 test('upload receipt writes prune the oldest settlements and expire them after seven days', async () => {
   const { state, store } = createTransactionalState();
   let now = 10_000;
-  const coordinator = new SessionWriteCoordinator(state, {}, { now: () => now });
+  const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' }, { now: () => now });
   for (let index = 0; index < 2000; index += 1) store.set(`upload-receipt-v1:old-${index}`, {
     state: 'settled', payloadDigest: 'a'.repeat(64), storageRef: receiptRef, settledAt: index + 1,
   });
@@ -2941,4 +2944,42 @@ test('automatic upload enqueue is idempotent across completion and restarts', as
   now += 7 * 24 * 60 * 60 * 1000 + 1;
   await restarted.alarm();
   assert.equal([...store.keys()].some((key) => key.startsWith('results-analysis-upload-v1:')), false);
+});
+
+
+test('receipt alarms remove expired pending and settled entries without another write', async () => {
+  let now = 1_000;
+  const { state, store } = createTransactionalState();
+  let alarmAt;
+  state.storage.setAlarm = async (time) => { alarmAt = time; };
+  const env = { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' };
+  const coordinator = new SessionWriteCoordinator(state, env, { now: () => now });
+  const payload = { requestId: 'private-answer-request', payloadDigest: 'a'.repeat(64) };
+  const pending = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  assert.equal(pending.kind, 'execute');
+  assert.equal(alarmAt, now + 120_000);
+  now = alarmAt;
+  await new SessionWriteCoordinator(state, env, { now: () => now }).alarm();
+  assert.equal(store.size, 0);
+  const reservation = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  await coordinator.fetch(receiptRequest('settle', { requestId: payload.requestId, attemptId: reservation.attemptId, storageRef: receiptRef }));
+  assert.equal(alarmAt, now + 7 * 24 * 60 * 60 * 1000);
+  now = alarmAt;
+  await new SessionWriteCoordinator(state, env, { now: () => now }).alarm();
+  assert.equal(store.size, 0);
+});
+
+test('receipt identifiers depend on the deployment secret and fail closed without it', async () => {
+  const payload = { requestId: 'private-answer-request', payloadDigest: 'a'.repeat(64) };
+  const stored = [];
+  for (const secret of ['synthetic-receipt-secret-one', 'synthetic-receipt-secret-two', '']) {
+    const { state, store } = createTransactionalState();
+    const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: secret }, { now: () => 1_000 });
+    const response = await coordinator.fetch(receiptRequest('reserve', payload));
+    assert.equal(response.status, secret ? 200 : 503);
+    if (secret) stored.push([...store][0]);
+    else assert.equal(store.size, 0);
+  }
+  assert.notEqual(stored[0][0], stored[1][0]);
+  assert.notEqual(stored[0][1].payloadDigest, stored[1][1].payloadDigest);
 });

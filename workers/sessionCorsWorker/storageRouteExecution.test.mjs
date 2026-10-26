@@ -4795,7 +4795,7 @@ test('hide requests validate the resource, id, and flag', async () => {
 
 const createResponseReceiptFixture = ({ binding = true, maxKvValueBytes } = {}) => {
   const kv = createMockKv();
-  const env = { CE_STORAGE_INDEX_KV: kv };
+  const env = { CE_STORAGE_INDEX_KV: kv, TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' };
   const config = { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
   let now = 1_000;
   if (binding) attachSessionCoordinator(env, () => {}, { now: () => now });

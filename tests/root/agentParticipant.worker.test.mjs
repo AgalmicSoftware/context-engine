@@ -205,7 +205,7 @@ test('first encrypted question uploads preserve the authorization checked before
   }
 });
 
-test('agent answer uploads use one operation per tool call and forward their content digest', async () => {
+test('agent answer uploads omit content digests and use fresh keys after success', async () => {
   const env = createEnv([sessionConfig()]);
   const uploads = [];
   const fetchWorker = workerFetch(env);
@@ -221,9 +221,9 @@ test('agent answer uploads use one operation per tool call and forward their con
   const second = await participant.addStatement({ prompt: 'Should the pilot run on weekends?' });
   const answers = [first, second].map(({ questionId }) => ({ questionId, value: 'Agree' }));
   assert.equal((await participant.answer({ answers })).submitted, 2);
-  assert.ok(uploads.every(({ requestId }) => /^answer:v1:[^:]+:0x[a-f0-9]{64}:[a-f0-9]{64}$/.test(requestId)));
+  assert.ok(uploads.every(({ requestId }) => /^answer:v1:[^:]+:0x[a-f0-9]{64}$/.test(requestId)));
   assert.equal(uploads[0].requestId.split(':')[2], uploads[1].requestId.split(':')[2]);
-  for (const upload of uploads) assert.equal(upload.requestId.split(':').at(-1), ethers.utils.sha256(ethers.utils.toUtf8Bytes(upload.data)).slice(2));
+  for (const upload of uploads) assert.equal(upload.requestId.includes(ethers.utils.sha256(ethers.utils.toUtf8Bytes(upload.data)).slice(2)), false);
   assert.equal((await participant.answer({ answers })).submitted, 2);
   assert.notEqual(uploads[0].requestId.split(':')[2], uploads[2].requestId.split(':')[2]);
 });

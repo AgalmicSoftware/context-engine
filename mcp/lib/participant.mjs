@@ -747,7 +747,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
             entry.pendingUploads = isRecord(entry.pendingUploads) ? entry.pendingUploads : {};
             const previous = entry.pendingUploads[questionId];
             requestId = previous?.payloadDigest === digest && trim(previous.requestId)
-              ? previous.requestId : `answer:v1:${operationId}:${questionId}:${digest}`;
+              ? previous.requestId : `answer:v1:${operationId}:${questionId}`;
             entry.pendingUploads[questionId] = { payloadDigest: digest, requestId };
           });
           const storageRef = await ctx.client.upload({ resource: 'responses', data, requestId });

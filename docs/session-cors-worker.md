@@ -1699,10 +1699,13 @@ R2 / Durable Objects:
   reserving a receipt, so deterministic failures do not hold a retry lease.
   An active reservation returns retryable `503 upload_in_progress` for 120 seconds;
   an expired reservation permits a new attempt with a fresh storage id, so a crashed
-  attempt may leave an orphan. Settled receipts retain only the payload digest and
-  reference for seven days, with a maximum of 2,000 per participant and session.
+  attempt may leave an orphan. Settled receipts retain HMACs of request IDs and payload digests, derived from
+  `TOKEN_HMAC_SECRET`, plus the reference for seven days, with a maximum of 2,000
+  per participant and session. Coordinator alarms remove expired receipts and
+  abandoned leases even when that participant never writes again.
   The client retains one submit operation across failed or partial attempts and
-  includes the question id and payload digest in each receipt key. It preserves
+  includes the question id and per-question revision in each receipt key.
+  Payload digests stay in client memory and are not embedded in request IDs. It preserves
   timestamps and prepared encrypted ratings while the input is unchanged; edits
   receive a new key. Successful completion or an account/session change clears
   that in-memory operation. MCP assigns one operation to each answer tool call.

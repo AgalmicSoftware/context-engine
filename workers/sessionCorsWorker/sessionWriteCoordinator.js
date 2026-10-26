@@ -421,17 +421,27 @@ export class SessionWriteCoordinator {
   async pruneUploadReceipts(transaction, nowMs) {
     const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
     const settled = [];
+    let nextExpiry = Infinity;
     for (const [key, record] of records) {
       if (record.state === 'settled' && nowMs - record.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settled.push([key, record]);
       else if (record.state !== 'pending' || record.leaseUntil <= nowMs) await transaction.delete(key);
+      else nextExpiry = Math.min(nextExpiry, record.leaseUntil);
     }
     settled.sort((a, b) => a[1].settledAt - b[1].settledAt);
-    for (const [key] of settled.slice(0, Math.max(0, settled.length - MAX_UPLOAD_RECEIPTS))) await transaction.delete(key);
+    const excess = Math.max(0, settled.length - MAX_UPLOAD_RECEIPTS);
+    for (const [key] of settled.slice(0, excess)) await transaction.delete(key);
+    for (const [, record] of settled.slice(excess)) nextExpiry = Math.min(nextExpiry, record.settledAt + UPLOAD_RECEIPT_RETENTION_MS);
+    return nextExpiry;
+  }
+
+  async scheduleUploadReceiptCleanup() {
+    const nextExpiry = await this.state.storage.transaction((transaction) => this.pruneUploadReceipts(transaction, Number(this.now()) || Date.now()));
+    if (Number.isFinite(nextExpiry) && typeof this.state.storage.setAlarm === 'function') await this.state.storage.setAlarm(nextExpiry);
   }
 
   async executeUploadReceipt(payload, settle = false) {
     const requestId = toTrimmedString(payload?.requestId);
-    const payloadDigest = toTrimmedString(payload?.payloadDigest);
+    let payloadDigest = toTrimmedString(payload?.payloadDigest);
     if (!requestId || requestId.length > 200 || (!settle && !/^[a-f0-9]{64}$/.test(payloadDigest))) {
       return jsonResponse({ error: 'Invalid upload receipt request.' }, 400);
     }
@@ -442,7 +452,18 @@ export class SessionWriteCoordinator {
         return jsonResponse({ error: 'Invalid upload receipt settlement.' }, 400);
       }
     }
-    const key = `${UPLOAD_RECEIPT_PREFIX}${encodeURIComponent(requestId)}`;
+    const secret = toTrimmedString(this.env?.TOKEN_HMAC_SECRET);
+    if (!secret) return jsonResponse({ error: 'Upload receipt coordination is unavailable.', reason: 'upload_receipt_unavailable' }, 503);
+    // Low-entropy answers must not be guessable from a copy of coordinator
+    // storage. Neither the request ID nor an unsalted content digest is retained.
+    const encoder = new TextEncoder();
+    const algorithm = { name: 'HMAC', hash: 'SHA-256' };
+    const master = await this.crypto.subtle.importKey('raw', encoder.encode(secret), algorithm, false, ['sign']);
+    const derived = await this.crypto.subtle.sign('HMAC', master, encoder.encode('ce-upload-receipt-v1'));
+    const macKey = await this.crypto.subtle.importKey('raw', derived, algorithm, false, ['sign']);
+    const mac = async (domain, value) => bytesToHex(new Uint8Array(await this.crypto.subtle.sign('HMAC', macKey, encoder.encode(`${domain}:${value}`))));
+    const key = `${UPLOAD_RECEIPT_PREFIX}${await mac('request', requestId)}`;
+    if (!settle) payloadDigest = await mac('payload', payloadDigest);
     const nowMs = Number(this.now()) || Date.now();
     const result = await this.state.storage.transaction(async (transaction) => {
       const record = await transaction.get(key);
@@ -455,7 +476,7 @@ export class SessionWriteCoordinator {
         return { status: 200, ok: true };
       }
       if (record?.state === 'settled' && nowMs - record.settledAt < UPLOAD_RECEIPT_RETENTION_MS) {
-        return record.payloadDigest === payloadDigest
+        return equalText(record.payloadDigest, payloadDigest)
           ? { status: 200, kind: 'replay', storageRef: record.storageRef }
           : { status: 409, error: 'This upload request id already stored different content.', reason: 'upload_request_conflict' };
       }
@@ -467,6 +488,7 @@ export class SessionWriteCoordinator {
       await this.pruneUploadReceipts(transaction, nowMs);
       return { status: 200, kind: 'execute', attemptId };
     });
+    await this.scheduleUploadReceiptCleanup();
     const { status, ...body } = result;
     return jsonResponse(body, status);
   }
@@ -874,6 +896,7 @@ export class SessionWriteCoordinator {
       await this.recordResultsAnalysisQueueFailure(error);
     }
     await this.pruneResultsAnalysisUploadReceipts();
+    await this.scheduleUploadReceiptCleanup();
   }
 
   async readResultsAnalysisStatus() {

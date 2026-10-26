@@ -516,7 +516,7 @@ describe('error paths', () => {
     await expect(submit('yes')).rejects.toThrow('Reply lost');
     await expect(submit('yes')).resolves.toEqual(expect.objectContaining({ workerCanonicalSubmission: true }));
     const key = uploadDataToSessionStorage.mock.calls[0][2].requestId;
-    expect(key).toMatch(/^answer:v1:same-operation:0x[a-f0-9]{64}:0:0x[a-f0-9]{64}$/);
+    expect(key).toMatch(/^answer:v1:same-operation:0x[a-f0-9]{64}:0$/);
     expect(key.length).toBeLessThanOrEqual(200);
     expect(uploadDataToSessionStorage.mock.calls[1][2].requestId).toBe(key);
     expect(stored.size).toBe(1);
