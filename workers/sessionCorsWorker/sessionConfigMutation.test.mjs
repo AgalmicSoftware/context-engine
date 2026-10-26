@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
 import { resolveRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
+import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
+import { resolveSessionConfigSessionIdHex } from './sessionConfigMutation.js';
 
 const baseConfig = {
   slug: 'session-a',
@@ -77,6 +79,22 @@ const profileBearingConfig = {
   sessionModeProfile: workerModeProfile,
   storageProfile: canonicalWorkerStorageProfile,
 };
+
+test('new session IDs follow the shared grammar while padded stored IDs remain readable', () => {
+  const sessionId = `0x${'12'.repeat(16)}`;
+  for (const invalid of [` ${sessionId}`, `${sessionId} `, `0x12-${'12'.repeat(15)}`]) {
+    const result = applySessionConfigMutation({ existingConfig: {}, slug: 'session-a',
+      mutation: { kind: 'set-config', incomingConfig: { ...baseConfig, sessionId: invalid } } });
+    assert.equal(result.ok, false, invalid);
+    assert.equal(result.status, 400);
+  }
+  const stored = normalizeWorkerConfigRecord({ ...baseConfig, sessionId: ` ${sessionId} ` });
+  assert.equal(resolveSessionConfigSessionIdHex(stored), sessionId);
+  const updated = applySessionConfigMutation({ existingConfig: stored, slug: 'session-a',
+    mutation: { kind: 'set-config', incomingConfig: { sessionName: 'Updated' } } });
+  assert.equal(updated.ok, true);
+  assert.equal(resolveSessionConfigSessionIdHex(updated.config), sessionId);
+});
 
 test('set-config creates and increments the server-managed authorization epoch', () => {
   const initialized = applySessionConfigMutation({

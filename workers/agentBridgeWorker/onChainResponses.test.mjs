@@ -14,10 +14,21 @@ import {
 } from './onChainResponses.mjs';
 import { normalizeLegacyManagedPrincipal } from './legacyCompatibility.mjs';
 import { parseSiweMessage, validateSiweResources } from '../sessionCorsWorker/siweMessageValidation.js';
+import { buildSiweMessage } from '../../shared/auth/siweMessage.mjs';
 
 const bytes32QuestionId = `0x${'12'.repeat(32)}`;
 const surveysAddress = '0x1111111111111111111111111111111111111111';
 const faucetTxHash = `0x${'34'.repeat(32)}`;
+
+test('Bridge session ID normalization follows the browser, MCP and Worker vectors', () => {
+  const id = '0x00112233445566778899aabbccddeeff';
+  for (const [input, expected] of [
+    [id, id], [id.toUpperCase(), id], [id.slice(2), id], ['00112233-4455-6677-8899-AABBCCDDEEFF', id],
+    ['0x00000000000000000000000000000000', ''], ['00000000-0000-0000-0000-000000000000', ''],
+    [` ${id}`, ''], [`${id} `, ''], ['0x0011-2233445566778899aabbccddeeff', ''],
+    ['00112233445566778899aabbccddeeff-', ''], ['0x1234', ''], [null, ''], [{}, ''],
+  ]) assert.equal(__test__onChainResponses.normalizeCanonicalWorkerSessionId(input), expected);
+});
 
 function arweaveId(byte = 7) {
   return Buffer.from(Uint8Array.from({ length: 32 }, () => byte)).toString('base64url');
@@ -138,7 +149,7 @@ test('worker-canonical agent auth sends and verifies the exact session identity'
     },
     session: {
       sessionSlug: 'alpha',
-      sessionIdHex: sessionId,
+      sessionIdHex: ` ${sessionId} `,
       sessionWorkerUrl: 'https://session.example',
       sessionModeProfile: { authority: { mode: 'worker_canonical' } },
     },
@@ -154,7 +165,12 @@ test('worker-canonical agent auth sends and verifies the exact session identity'
           sessionId,
         }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
-      const siwe = parseSiweMessage(JSON.parse(init.body).message);
+      const message = JSON.parse(init.body).message;
+      assert.equal(message, buildSiweMessage({ address: account.accountAddress, nonce: 'nonceexact123',
+        domain: 'localhost:7391', uri: 'http://localhost:7391', chainId: 11155420,
+        statement: 'Sign in to Context Engine.', issuedAt: '2026-05-11T12:00:00.000Z',
+        expirationTime: '2026-05-12T12:00:00.000Z', workerUrl: 'https://session.example', sessionId }));
+      const siwe = parseSiweMessage(message);
       assert.deepEqual(validateSiweResources({
         siwe,
         request: new Request(String(url)),

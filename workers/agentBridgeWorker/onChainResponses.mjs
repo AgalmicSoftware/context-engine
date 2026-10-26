@@ -16,6 +16,7 @@ import {
 } from './managedAccounts.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { normalizeWorkerSessionSlug } from '../sessionCorsWorker/sessionSlugResolution.js';
+import { buildSiweMessage, normalizeSessionIdHex as normalizeCanonicalWorkerSessionId } from '../../shared/auth/siweMessage.mjs';
 
 const HASH_ZERO = `0x${'0'.repeat(64)}`;
 const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/;
@@ -28,15 +29,10 @@ const SUBMIT_RESPONSES_ABI = [
 ];
 const DEFAULT_LOGIN_ORIGIN = 'http://localhost:7391';
 
-function normalizeCanonicalWorkerSessionId(value) {
-  const normalized = lower(value).replace(/^0x/, '').replace(/-/g, '');
-  return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized)
-    ? `0x${normalized}`
-    : '';
-}
-
 function resolveCanonicalWorkerSessionId(session = {}) {
-  const rawValues = [session.sessionId, session.sessionIdHex].filter((value) => safeString(value));
+  // Legacy stored configs may be padded; nonce/login replies remain strict.
+  const rawValues = [session.sessionId, session.sessionIdHex].map((value) =>
+    typeof value === 'string' ? value.trim() : value).filter((value) => safeString(value));
   const normalized = rawValues.map(normalizeCanonicalWorkerSessionId);
   const unique = new Set(normalized.filter(Boolean));
   return normalized.some((value) => !value) || unique.size !== 1 ? '' : [...unique][0];
@@ -541,16 +537,13 @@ export async function authenticateSessionWorker({
         const nonce = nonceResponse.nonce;
 
         // Session Workers require the signed Worker/session binding.
-        const sessionResource = workerCanonical
-          ? `urn:context-engine:session:id:${encodeURIComponent(sessionId)}`
-          : `urn:context-engine:session:slug:${encodeURIComponent(normalizeWorkerSessionSlug(authSessionSlug))}`;
-        const message = `${originUrl.host} wants you to sign in with your Ethereum account:\n`
-          + `${wallet.address}\n\nSign in to Context Engine.\n\n`
-          + `URI: ${origin}\nVersion: 1\nChain ID: ${normalizeChainId(env, session)}`
-          + `\nNonce: ${nonce}`
-          + `\nIssued At: ${issuedAt.toISOString()}`
-          + `\nExpiration Time: ${expiresAt.toISOString()}`
-          + `\nResources:\n- ${new URL(baseUrl).origin}\n- ${sessionResource}`;
+        const message = buildSiweMessage({
+          address: wallet.address, nonce, domain: originUrl.host, uri: origin,
+          chainId: normalizeChainId(env, session), statement: 'Sign in to Context Engine.',
+          issuedAt: issuedAt.toISOString(), expirationTime: expiresAt.toISOString(),
+          workerUrl: baseUrl, sessionId: workerCanonical ? sessionId : '',
+          sessionSlug: normalizeWorkerSessionSlug(authSessionSlug),
+        });
         const signature = await wallet.signMessage(message);
         const login = await checkedJsonFetch(fetchImpl, `${baseUrl}/auth/login`, {
           method: 'POST',
@@ -1022,6 +1015,7 @@ export const __test__onChainResponses = {
   SUBMIT_RESPONSES_ABI,
   broadcastSubmitResponsesWithRpc,
   normalizeAnswerForPayload,
+  normalizeCanonicalWorkerSessionId,
   resolveRpcUrls,
   resolveLoginOrigin,
   resolveLoginOriginCandidates,

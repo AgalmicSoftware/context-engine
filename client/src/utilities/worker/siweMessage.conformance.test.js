@@ -1,5 +1,6 @@
 import { buildSiweMessage as buildClientMessage } from './workerAuth';
 import { normalizeWorkerCanonicalSessionIdHex as normalizeClientId } from '../session/sessionWorkerDiscovery';
+import { resolveSessionConfigSessionIdHex } from '../../../../workers/sessionCorsWorker/sessionConfigMutation.js';
 import {
   buildSiweMessage as buildMcpMessage,
   normalizeSessionIdHex as normalizeMcpId,
@@ -79,11 +80,14 @@ describe('browser, MCP and Worker sign-in conformance', () => {
     ['00000000-0000-0000-0000-000000000000', ''],
     [` ${SESSION_ID}`, ''],
     [`${SESSION_ID} `, ''],
+    ['0x0011-2233445566778899aabbccddeeff', ''],
+    ['00112233445566778899aabbccddeeff-', ''],
     ['0x1234', ''],
     [null, ''],
     [{}, ''],
   ])('normalizes session ID %p consistently', (input, expected) => {
     expect(normalizeClientId(input)).toBe(expected);
     expect(normalizeMcpId(input)).toBe(expected);
+    expect(resolveSessionConfigSessionIdHex({ sessionId: input })).toBe(expected);
   });
 });

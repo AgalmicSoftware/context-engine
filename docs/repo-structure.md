@@ -99,6 +99,8 @@ The client, MCP and local SBT scripts pass their ethers v5 instance into this
 shared WebCrypto implementation.
 
 The SIWE wire format and canonical session-ID normalization live in
-`shared/auth/siweMessage.mjs`, with no ethers dependency. Browser and MCP
-adapters supply their own clock and origin defaults; conformance tests check
-both against the Session Worker parser and validator.
+`shared/auth/siweMessage.mjs`, with no ethers dependency. Browser, MCP and Agent
+Bridge adapters supply their own clock and origin defaults. The Session Worker
+also uses the shared ID normalizer; stored configs are trimmed on read while new
+IDs must satisfy the shared grammar. Conformance tests cover all four consumers
+and check message bytes against the Session Worker parser and validator.
