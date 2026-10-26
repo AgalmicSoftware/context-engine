@@ -9,7 +9,7 @@ const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const { ethers } = require('ethers');
 const esbuild = require('esbuild');
-const { createGroupPasswordDerivation } = require('../client/src/utilities/crypto/groupPasswordDerivation.cjs');
+const { createGroupPasswordDerivation } = require('../shared/crypto/groupPasswordDerivation.cjs');
 
 const root = path.resolve(__dirname, '..');
 const chainId = 11155420;

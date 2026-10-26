@@ -93,3 +93,7 @@ Use it for new files, refactors, and cleanup PRs.
 Public source should follow this contract. Private operator-only compatibility
 tools, when present in the development tree, are tracked separately and are not
 part of the public naming contract.
+
+Group-password derivation lives in `shared/crypto/groupPasswordDerivation.cjs`.
+The client, MCP and local SBT scripts pass their ethers v5 instance into this
+shared WebCrypto implementation.

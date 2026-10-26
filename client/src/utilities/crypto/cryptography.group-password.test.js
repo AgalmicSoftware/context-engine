@@ -1,7 +1,7 @@
 import { pbkdf2Sync } from 'crypto';
 import { ethers } from 'ethers';
 import { cryptoUtils } from './cryptography.js';
-import groupPasswordDerivation from './groupPasswordDerivation.cjs';
+import groupPasswordDerivation from '@ce-shared/crypto/groupPasswordDerivation.cjs';
 import { isGroupPasswordUnverifiableError } from './sbtAuthorization';
 import { useFastGroupPasswordKdf as useFastKdf } from './groupPasswordKdf.testUtils';
 

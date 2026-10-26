@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import groupPasswordDerivation from './groupPasswordDerivation.cjs';
+import groupPasswordDerivation from '@ce-shared/crypto/groupPasswordDerivation.cjs';
 
 type SbtAuthorizationInput = {
   password?: unknown;

@@ -49,10 +49,10 @@ describe('vite PostCSS compatibility', () => {
       'utf8',
     );
 
-    expect(config).toContain("'utilities/crypto/groupPasswordDerivation.cjs'");
+    expect(config).toContain("'@ce-shared/crypto/groupPasswordDerivation.cjs'");
     expect(config).toContain("'@ce-shared/rpcDefaults.cjs'");
     expect(config).toContain("find: '@ce-shared'");
-    expect(cryptographySource).toContain("from 'utilities/crypto/groupPasswordDerivation.cjs'");
+    expect(cryptographySource).toContain("from '@ce-shared/crypto/groupPasswordDerivation.cjs'");
     expect(fs.readFileSync(path.join(clientRoot, 'src', 'variables', 'rpcDefaults.ts'), 'utf8')).toContain(
       "from '@ce-shared/rpcDefaults.cjs'",
     );

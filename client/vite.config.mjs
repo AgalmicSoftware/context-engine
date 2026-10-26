@@ -13,7 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, 'src');
 const publicDir = path.resolve(__dirname, 'public');
 const postsDir = path.resolve(__dirname, '..', 'posts');
-const groupPasswordDerivationCjsPath = path.resolve(srcDir, 'utilities', 'crypto', 'groupPasswordDerivation.cjs');
+const groupPasswordDerivationCjsPath = path.resolve(__dirname, '..', 'shared', 'crypto', 'groupPasswordDerivation.cjs');
 const themeRegistry = JSON.parse(fs.readFileSync(path.resolve(srcDir, 'scss', 'themes', 'registry.json'), 'utf8'));
 const themeIds = Object.freeze(themeRegistry.themes.map(({ id }) => String(id)));
 const lightThemeIds = themeRegistry.themes.filter(({ colorScheme }) => colorScheme === 'light').map(({ id }) => id);
@@ -605,7 +605,7 @@ export default defineConfig(({ mode }) => {
       include: [
         'buffer',
         'process/browser',
-        'utilities/crypto/groupPasswordDerivation.cjs',
+        '@ce-shared/crypto/groupPasswordDerivation.cjs',
         '@ce-shared/rpcDefaults.cjs',
       ],
     },

@@ -71,7 +71,7 @@ import {
   validateEnvelopeBinding,
   wrapCekWithSelfRecipient as wrapCekWithSharedSelfRecipient,
 } from '@ce-shared/encryption/envelopeV1Core.mjs';
-import groupPasswordDerivation from 'utilities/crypto/groupPasswordDerivation.cjs';
+import groupPasswordDerivation from '@ce-shared/crypto/groupPasswordDerivation.cjs';
 import { createLogger } from '../logging';
 import { perfDebugDecryptEnvelope } from '../web3/rpcDebugStats.js';
 

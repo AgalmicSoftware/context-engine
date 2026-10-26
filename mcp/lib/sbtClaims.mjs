@@ -1,7 +1,7 @@
 import { createTestEthRequester } from './testEth.mjs';
 import { ethers } from 'ethers';
 import { safeErrorCode, safeErrorReason } from './chainErrors.mjs';
-import groupPasswordDerivation from '../../client/src/utilities/crypto/groupPasswordDerivation.cjs';
+import groupPasswordDerivation from '../../shared/crypto/groupPasswordDerivation.cjs';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 
 // Claims a session SBT to the agent's own address, the way the web client
