@@ -6520,7 +6520,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     min-width: 0;
     min-height: 44px;
     padding: 10px 6px;
-    font-size: clamp(0.75rem, 2.7vw, 1rem);
+    font-size: 1rem;
     border-radius: var(--ce-radius-8);
   }
 }
@@ -6533,7 +6533,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     min-width: 0;
     min-height: 44px;
     padding: 10px 6px;
-    font-size: clamp(0.75rem, 2.7vw, 1rem);
     border-radius: var(--ce-radius-8);
   }
 

@@ -1215,7 +1215,8 @@ keeps the microphone emphasized even after closing the modal. Closing stops audi
 capture and retains the transcript and review edits on the current page. Reopen to
 continue, submit, or explicitly discard the interview. Reloading or leaving the page
 clears this in-memory interview; closing does not submit responses. On small screens,
-Submit and Clear stay beside the menu and microphone. When the controls need more
+Submit and Clear stay beside the menu and microphone. Submit and its pending count
+retain full-size text on phones. When the controls need more
 width, the navigation arrows wrap onto a right-aligned row below, with extra vertical
 space separating them from Clear. On that separate row, the arrows closely frame a
 horizontal question counter (for example, **5 / 50**). The counter only stacks when

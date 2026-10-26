@@ -112,8 +112,9 @@ try {
             text: counter.textContent.trim(), lineTops: [...new Set(textRects.map(r => Math.round(r.top)))],
             submitLabelFits: [...controls.querySelectorAll('[class*="pileSubmitButtonLabel_"]')].every(label => {
               const labelRect = label.getBoundingClientRect(), buttonRect = label.closest('button').getBoundingClientRect();
-              return labelRect.left >= buttonRect.left && labelRect.right <= buttonRect.right;
+              return labelRect.left >= buttonRect.left && labelRect.right <= buttonRect.right && labelRect.top >= buttonRect.top && labelRect.bottom <= buttonRect.bottom;
             }),
+            submitFontSizes: [...controls.querySelectorAll('[class*="pileSubmitButtonLabel_"]')].map(label => parseFloat(getComputedStyle(label).fontSize)),
             overflow: document.documentElement.scrollWidth > innerWidth + 1,
           };
         });
@@ -140,6 +141,7 @@ try {
           if (width === 320 && topRow.length > 2) assert(wrapped, `Narrow pending toolbar moves arrows below: ${detail}`);
           if (width >= 596) assert(!wrapped, `Wide mobile toolbar fits one row: ${detail}`);
           assert(layout.submitLabelFits, `Submit label fits its button: ${detail}`);
+          assert(layout.submitFontSizes.every(size => size >= 16), `Submit and its count remain readable at phone widths: ${detail}`);
         }
         assert(layout.counter.left >= layout.nav.left && layout.counter.right <= layout.nav.right, `Counter fits its rail: ${detail}`);
         assert(!layout.overflow, `No horizontal overflow: ${detail}`);
