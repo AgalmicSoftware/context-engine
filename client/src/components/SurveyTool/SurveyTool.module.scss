@@ -7419,8 +7419,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     flex: 1 0 124px;
     min-width: 124px;
     max-width: 220px;
-    justify-content: space-between;
-    gap: 0;
+    justify-content: flex-end;
+    gap: 4px;
     margin-left: auto;
   }
 

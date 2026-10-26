@@ -1217,9 +1217,9 @@ continue, submit, or explicitly discard the interview. Reloading or leaving the 
 clears this in-memory interview; closing does not submit responses. On small screens,
 Submit and Clear stay beside the menu and microphone. When the controls need more
 width, the navigation arrows wrap onto a right-aligned row below, with extra vertical
-space separating them from Clear. On that separate row, the arrows spread apart and
-the question counter stays horizontal (for example, **5 / 50**). The counter only
-stacks when it needs to fit into a shared control row. Binary question cards grow to fit long prompts and
+space separating them from Clear. On that separate row, the arrows closely frame a
+horizontal question counter (for example, **5 / 50**). The counter only stacks when
+it needs to fit into a shared control row. Binary question cards grow to fit long prompts and
 keep all three answer buttons visible. The answers retain their original typography
 and wrap when they need more room.
 

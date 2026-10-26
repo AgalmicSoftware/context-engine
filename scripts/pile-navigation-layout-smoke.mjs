@@ -129,7 +129,7 @@ try {
           if (wrapped) {
             assert(layout.nav.top >= Math.max(...topRow.map(control => control.bottom)) + 15, `Wrapped arrows have at least 16px separation from Clear: ${detail}`);
             assert.equal(layout.lineTops.length, 1, `A separate navigation row uses a horizontal counter: ${detail}`);
-            assert(layout.next.cx - layout.prev.cx >= 170, `A separate navigation row spreads the arrows apart: ${detail}`);
+            assert(Math.abs(layout.counter.left - layout.prev.right - 4) <= 1 && Math.abs(layout.next.left - layout.counter.right - 4) <= 1, `Arrows closely frame the horizontal counter with 4px gaps: ${detail}`);
           } else {
             assert(Math.abs(layout.nav.cy - layout.actions.cy) <= 1, `Controls stay on one row when they fit: ${detail}`);
             if (layout.lineTops.length === 3) {
