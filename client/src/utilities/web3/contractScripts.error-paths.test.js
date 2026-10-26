@@ -502,7 +502,8 @@ describe('error paths', () => {
       }
       return { storageRef: stored.get(key), replayed: true };
     });
-    const submit = (answer, options = { operationId: 'same-operation' }) =>
+    const retained = { operationId: 'same-operation', uploadRevisions: new Map() };
+    const submit = (answer, options = retained) =>
       submitResponses(
         'wagmi',
         [QUESTION_ID],
@@ -515,7 +516,7 @@ describe('error paths', () => {
     await expect(submit('yes')).rejects.toThrow('Reply lost');
     await expect(submit('yes')).resolves.toEqual(expect.objectContaining({ workerCanonicalSubmission: true }));
     const key = uploadDataToSessionStorage.mock.calls[0][2].requestId;
-    expect(key).toMatch(/^answer:v1:same-operation:0x[a-f0-9]{64}:0x[a-f0-9]{64}$/);
+    expect(key).toMatch(/^answer:v1:same-operation:0x[a-f0-9]{64}:0:0x[a-f0-9]{64}$/);
     expect(key.length).toBeLessThanOrEqual(200);
     expect(uploadDataToSessionStorage.mock.calls[1][2].requestId).toBe(key);
     expect(stored.size).toBe(1);
@@ -525,6 +526,54 @@ describe('error paths', () => {
     await submit('yes', {});
     await submit('yes', {});
     expect(stored.size).toBe(4);
+  });
+
+  it('stores Yes, No, Yes as three revisions while another question remains unsaved', async () => {
+    window.ethereum = makeRpcProvider();
+    const question2 = ethers.utils.id('held-back-question');
+    const stored = new Map();
+    uploadDataToSessionStorage.mockImplementation(async (data, _format, options) => {
+      const payload = typeof data === 'string' ? JSON.parse(data) : data;
+      if (payload.questionID === question2) throw new Error('Second question held back');
+      if (!stored.has(options.requestId))
+        stored.set(options.requestId, {
+          payload,
+          createdAt: stored.size + 1,
+          responder: TEST_ADDRESS,
+          storageId: `cf_revision_${stored.size + 1}`,
+        });
+      return {
+        storageRef: { backend: 'cloudflare', id: stored.get(options.requestId).storageId, resource: 'responses' },
+      };
+    });
+    const options = { operationId: 'held-back-operation', uploadRevisions: new Map() };
+    for (const value of ['Yes', 'No', 'Yes']) {
+      await expect(
+        submitResponses(
+          'wagmi',
+          [QUESTION_ID, question2],
+          [
+            { questionID: QUESTION_ID, answer: { value } },
+            { questionID: question2, answer: { value: 'pending' } },
+          ],
+          ethers.constants.HashZero,
+          null,
+          WORKER_CANONICAL_GROUP_CFG,
+          options,
+        ),
+      ).rejects.toMatchObject({
+        partialReceipt: { questionResponseRefs: [expect.objectContaining({ questionId: QUESTION_ID })] },
+      });
+    }
+    expect(stored.size).toBe(3);
+    const { latestAnswersByQuestion, summarizeQuestion } = require('../../../../mcp/lib/results.mjs');
+    const entries = [...stored.values()];
+    const latest = latestAnswersByQuestion(entries, {
+      sessionSlug: entries[0].payload.sessionSlug,
+      sessionId: entries[0].payload.sessionId,
+    }).get(QUESTION_ID);
+    expect(latest.get(TEST_ADDRESS).payload.answer.value).toBe('Yes');
+    expect(summarizeQuestion({ id: QUESTION_ID, type: 'freeform' }, latest).recentAnswers).toEqual(['Yes']);
   });
 
   it('reports the Worker answers stored before a later upload failed', async () => {

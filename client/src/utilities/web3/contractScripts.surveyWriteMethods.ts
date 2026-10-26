@@ -485,7 +485,10 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       surveyId: Bytes32Input,
       surveyResponse: MetadataPayload | null | undefined,
       groupKeyOrCfg: GroupKeyOrConfig = null,
-      options: { operationId?: string } = {},
+      options: {
+        operationId?: string;
+        uploadRevisions?: Map<string, { revision: number; payloadDigest: string; settled: boolean }>;
+      } = {},
     ) {
       let cfg = resolveSession(groupKeyOrCfg || '');
       let sessionProjection = resolveSessionCapabilityProjection(cfg);
@@ -580,10 +583,20 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
             }
           : null;
       const operationId = options.operationId || utils.hexlify(utils.randomBytes(16));
-      const responseRequestId = (id: string, payload: MetadataPayload) =>
-        workerResponseIdentity
-          ? `answer:v1:${operationId}:${id}:${utils.sha256(utils.toUtf8Bytes(JSON.stringify(payload)))}`
-          : undefined;
+      const uploadRevisions =
+        options.uploadRevisions || new Map<string, { revision: number; payloadDigest: string; settled: boolean }>();
+      const responseRequestId = (id: string, payload: MetadataPayload) => {
+        if (!workerResponseIdentity) return undefined;
+        const payloadDigest = utils.sha256(utils.toUtf8Bytes(JSON.stringify(payload)));
+        const previous = uploadRevisions.get(id);
+        // Only an unacknowledged, unchanged upload reuses its receipt. Returning
+        // to a previously saved answer is a new revision, even within one operation.
+        const revision = previous
+          ? previous.revision + (previous.settled || previous.payloadDigest !== payloadDigest ? 1 : 0)
+          : 0;
+        uploadRevisions.set(id, { revision, payloadDigest, settled: false });
+        return `answer:v1:${operationId}:${id}:${revision}:${payloadDigest}`;
+      };
       if (workerResponseIdentity && (!workerResponseIdentity.sessionId || !workerResponseIdentity.sessionSlug)) {
         throw new Error('submitResponses: exact Worker session identity is required.');
       }
@@ -641,6 +654,8 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
             uploadWithRetry: true,
             storageContext: uploadContext,
           });
+          const surveyRevision = uploadRevisions.get(hashedSurveyId);
+          if (surveyRevision) surveyRevision.settled = true;
           surveyResponseHashBytes = surveyResponseUpload?.pointerBytes || ethers.constants.HashZero;
         }
         // Upload response objects sequentially to avoid Arweave anchor/signature races
@@ -664,6 +679,8 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
               uploadWithRetry: true,
               storageContext: uploadContext,
             });
+            const questionRevision = uploadRevisions.get(hashedQuestionIds[index]);
+            if (questionRevision) questionRevision.settled = true;
             questionResponseUploads.push(responseUpload);
           }
         } catch (error: unknown) {

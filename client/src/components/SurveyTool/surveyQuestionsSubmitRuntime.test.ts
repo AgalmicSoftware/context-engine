@@ -175,9 +175,12 @@ describe('surveyQuestionsSubmitRuntime', () => {
     const runtime = createSurveyQuestionsSubmitRuntime(context);
     await runtime.encryptAndUpload();
     const operation = context.inst._submitOperationId;
+    const revisions = context.inst._submitUploadRevisions;
+    expect(revisions).toBeInstanceOf(Map);
     expect(operation).toEqual(expect.any(String));
     await runtime.encryptAndUpload();
     expect(context.inst._submitOperationId).toBe(operation);
+    expect(context.inst._submitUploadRevisions).toBe(revisions);
     await runtime.encryptAndUpload();
     expect(
       context.submitSurveyResponse.mock.calls.map(
@@ -185,6 +188,7 @@ describe('surveyQuestionsSubmitRuntime', () => {
       ),
     ).toEqual([operation, operation, operation]);
     expect(context.inst._submitOperationId).toBeUndefined();
+    expect(context.inst._submitUploadRevisions).toBeUndefined();
   });
 
   it('starts a new operation when the account or session changes after a failed attempt', async () => {

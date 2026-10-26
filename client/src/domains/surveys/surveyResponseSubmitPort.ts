@@ -26,7 +26,10 @@ export type SurveyResponseSubmitPort = {
     surveyId: SurveyResponseIdentifier,
     surveyResponse: SurveyResponsePayload | null | undefined,
     submissionGroupKey: SurveyResponseSessionTarget,
-    options?: { operationId?: string },
+    options?: {
+      operationId?: string;
+      uploadRevisions?: Map<string, { revision: number; payloadDigest: string; settled: boolean }>;
+    },
   ) => Promise<SurveyResponseSubmissionResult>;
 };
 

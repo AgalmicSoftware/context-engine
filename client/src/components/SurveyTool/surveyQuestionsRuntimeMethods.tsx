@@ -817,6 +817,7 @@ export const createSurveyQuestionsRuntimeMethods = (
       delete inst._submitOperationContextKey;
       delete inst._submitOperationTimestamp;
       delete inst._submitOperationPayloads;
+      delete inst._submitUploadRevisions;
       // Props already identify the next account/Worker. Never flush the previous
       // form through its key; dirty-edit guards must not preserve it across authorities.
       if (inst._persistTimer) clearTimeout(inst._persistTimer);
@@ -2372,7 +2373,7 @@ export const createSurveyQuestionsRuntimeMethods = (
         hashedSurveyId,
         surveyResponse,
         submissionTarget,
-        { operationId: context.operationId },
+        { operationId: context.operationId, uploadRevisions: context.uploadRevisions },
       );
     } catch (error: any) {
       // Answers a Worker stored before a later upload failed are saved; the rest keep

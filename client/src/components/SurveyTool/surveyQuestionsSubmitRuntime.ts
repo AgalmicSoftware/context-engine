@@ -415,10 +415,12 @@ export const createSurveyQuestionsSubmitRuntime = (
         inst._submitOperationContextKey = operationContextKey;
         inst._submitOperationTimestamp = Date.now();
         inst._submitOperationPayloads = new Map();
+        inst._submitUploadRevisions = new Map();
       }
       submitContext.operationId = inst._submitOperationId;
       submitContext.operationTimestamp = inst._submitOperationTimestamp;
       submitContext.operationPayloads = inst._submitOperationPayloads;
+      submitContext.uploadRevisions = inst._submitUploadRevisions;
       const startResult: SurveyQuestionsSubmitStartControllerResult = runSurveyQuestionsSubmitStartController({
         ports: {
           startSubmitAttempt: () => startSubmitAttempt(),
@@ -719,6 +721,7 @@ export const createSurveyQuestionsSubmitRuntime = (
         delete inst._submitOperationContextKey;
         delete inst._submitOperationTimestamp;
         delete inst._submitOperationPayloads;
+        delete inst._submitUploadRevisions;
       }
       runSurveyQuestionsSubmitSuccessController({
         editBaseline: nextBaseline,
