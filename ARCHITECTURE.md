@@ -273,7 +273,7 @@ stores only `keccak256(signer address)` as `groupPasswordHash`. Because the salt
 is the group's own address, group-password groups deploy through
 `SBTFactory.createSBTDeterministicConfigured` at their predicted CREATE2
 address, and the factory sets `groupPasswordHash` once during that deployment.
-See `client/src/utilities/crypto/groupPasswordDerivation.cjs`.
+See `shared/crypto/groupPasswordDerivation.cjs`.
 
 The current CustomSBT source uses one mutable `admin`, rotated with `changeAdmin`.
 It exposes no transferable collection ownership. Zero admin permanently disables
