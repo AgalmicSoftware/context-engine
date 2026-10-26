@@ -778,9 +778,16 @@ ${sectionShapes}
 Session input:
 ${JSON.stringify(source.aiSnapshot, null, 2)}`;
 
-const normalizeProviderResponse = async (response) => {
+const normalizeProviderResponse = async (response, now = Date.now()) => {
   const data = await response?.json?.().catch?.(() => ({}));
-  if (!response?.ok) return { ok: false, status: response?.status || 502, error: data?.error || 'AI provider request failed.' };
+  if (!response?.ok) {
+    const retryAfter = trim(response?.headers?.get?.('retry-after'));
+    const seconds = Number(retryAfter);
+    const retryAfterMs = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(retryAfter) - now;
+    return { ok: false, status: response?.status || 502, error: data?.error || 'AI provider request failed.',
+      ...(Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? { retryAfterMs } : {}),
+    };
+  }
   const raw = trim(data?.completion || data?.text || data?.content || '');
   try {
     return { ok: true, value: JSON.parse(raw) };
@@ -862,7 +869,7 @@ export const callResultsAnalysisProvider = async ({ env, slug, config, prompt, h
     return (deps?.proxyOpenAI || ((args) => proxyOpenAIBoundary({ ...args, deps: proxyDeps })))(proxyArgs);
   };
   response = await withTimeout(runProvider(), deps?.resultsAnalysisProviderTimeoutMs, 'AI results analysis generation timed out.');
-  return normalizeProviderResponse(response);
+  return normalizeProviderResponse(response, Number(deps?.now?.() ?? Date.now()));
 };
 
 export const validateGeneratedAnalysisOutput = ({ value, source, sections, generatedAt, model = '' } = {}) => {
@@ -1065,6 +1072,7 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
       error: providerResult?.error || 'AI results analysis generation failed.',
       status: providerResult?.status || 502,
       ...(providerResult?.retryable === false ? { retryable: false } : {}),
+      ...(Number.isFinite(providerResult?.retryAfterMs) && providerResult.retryAfterMs > 0 ? { retryAfterMs: providerResult.retryAfterMs } : {}),
       failedAt: generatedAt,
     };
     await finalize({

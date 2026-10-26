@@ -665,10 +665,13 @@ Admin test panel:
   `10`, and queues SessionWriteCoordinator alarm work. It does not rely on
   browser snapshots, does not use `waitUntil` for provider work, and does not
   run for registry/Arweave profiles. A temporary failure (`408`, `425`, `429`,
-  or `5xx`, including a provider timeout) keeps the job queued and retries it
+  `500`, `502`, `503`, or `504`, including a provider timeout) keeps the job queued and retries it
   after 1, 5, and then 30 minutes; status shows `retryAttempt` and
   `nextAttemptAtMs`, and new submissions join the waiting job without resetting
-  its count. Any other failure, or a temporary one after those retries
+  its count. A provider's `Retry-After` (seconds or HTTP date) extends the scheduled
+  delay when longer, capped at 30 minutes; the budget remains three retries.
+  Invalid JSON and output validation failures pause immediately without an automatic retry.
+  Any other failure, or a temporary one after those retries
   (`retriesExhausted`), pauses automatic generation and keeps the last good
   artifact. `automatic`-only sessions allow an explicit admin manual retry as
   recovery; otherwise repeated submissions do not thrash provider calls. Storage

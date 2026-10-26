@@ -684,7 +684,8 @@ export class SessionWriteCoordinator {
       const sameJob = !job || queued?.queuedAtMs === job.queuedAtMs;
       const retryable = error?.retryable !== false && RESULTS_ANALYSIS_RETRYABLE_STATUSES.has(Number(error?.status));
       const retryAttempt = (Number(queued?.retryAttempt) || 0) + 1;
-      const delayMs = retryable && sameJob && isObjectRecord(queued) ? RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS[retryAttempt - 1] : undefined;
+      const scheduledDelay = retryable && sameJob && isObjectRecord(queued) ? RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS[retryAttempt - 1] : undefined;
+      const delayMs = scheduledDelay ? Math.min(Math.max(scheduledDelay, Number(error?.retryAfterMs) || 0), 30 * 60_000) : undefined;
       record.lastFailure = {
         ok: false,
         error: error?.message || error?.error || toTrimmedString(error) || 'Automatic results analysis job failed.',

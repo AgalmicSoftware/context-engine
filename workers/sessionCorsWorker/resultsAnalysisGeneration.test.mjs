@@ -10,6 +10,7 @@ import {
 } from './storageRouteExecution.js';
 import {
   buildResultsAnalysisStatusBody,
+  callResultsAnalysisProvider,
   evaluateResultsAnalysisViewerEligibility,
   generateResultsAnalysisDraft,
   loadAdminSnapshotResultsAnalysisSource,
@@ -1114,6 +1115,32 @@ for (const completion of ['not JSON', 'null']) test(`invalid analysis output pau
     generateAnalysisArtifact: async () => ({ ok: true, value: { breakdown: { summary: { overview: 'Recovered' } } } }),
   } });
   assert.equal(manual.ok, true);
+});
+
+for (const [header, expected] of [
+  ['120', 120_000], ['7200', 7_200_000], ['Wed, 01 Jan 2025 00:02:00 GMT', 120_000],
+  [null, undefined], ['invalid', undefined], ['-5', undefined],
+]) test(`analysis provider carries Retry-After through its real proxy: ${header}`, async () => {
+  const now = Date.parse('2025-01-01T00:00:00Z');
+  const receipts = [];
+  const deps = {
+    now: () => now,
+    getSessionSecrets: async () => ({ openaiKey: 'synthetic-key' }),
+    fetch: async () => Response.json({ error: { message: 'Busy' } }, { status: 503, headers: header === null ? {} : { 'Retry-After': header } }),
+    reserveCoordinatedResultsAnalysis: async () => ({ kind: 'execute', attemptId: 'retry-after' }),
+    finalizeCoordinatedResultsAnalysis: async ({ finalization }) => { receipts.push(finalization.receipt); return { ok: true }; },
+  };
+  const provider = await callResultsAnalysisProvider({ env: {}, slug: 'session-a', config, prompt: 'Test', deps });
+  assert.equal(provider.retryAfterMs, expected);
+  const result = await generateResultsAnalysisDraft({ env: {}, slug: 'session-a', config, deps, body: {
+    requestId: 'retry-after', source: { kind: 'admin-snapshot', snapshot: { sessionSlug: 'session-a', sessionId,
+      questions: [{ id: 'q1', prompt: 'Question?', type: 'text' }],
+      responses: [1, 2, 3].map((index) => ({ questionId: 'q1', participantId: `synthetic-${index}`, answer: `View ${index}` })),
+    } },
+  } });
+  assert.equal(result.status, 503);
+  assert.equal(result.retryAfterMs, expected);
+  assert.equal(receipts[0].retryAfterMs, expected);
 });
 
 test('automatic generation pauses after an automatic failure until manual recovery', async () => {

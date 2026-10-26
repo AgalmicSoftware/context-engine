@@ -117,7 +117,9 @@ export const proxyAnthropic = async ({
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    return json({ error: data?.error?.message || 'Anthropic error', details: data }, response.status, baseHeaders);
+    const retryAfter = response.headers?.get?.('retry-after');
+    return json({ error: data?.error?.message || 'Anthropic error', details: data }, response.status,
+      retryAfter ? { ...baseHeaders, 'retry-after': retryAfter } : baseHeaders);
   }
 
   const completion = data?.content?.[0]?.text || '';
@@ -212,7 +214,9 @@ export const proxyOpenAI = async ({
   );
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    return json({ error: data?.error?.message || 'OpenAI error', details: data }, response.status, baseHeaders);
+    const retryAfter = response.headers?.get?.('retry-after');
+    return json({ error: data?.error?.message || 'OpenAI error', details: data }, response.status,
+      retryAfter ? { ...baseHeaders, 'retry-after': retryAfter } : baseHeaders);
   }
   const completion = extractOpenAiCompletion(data, useResponses);
   return json({ completion, raw: data }, 200, baseHeaders);
@@ -279,7 +283,9 @@ export const proxyOpenRouter = async ({
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    return json({ error: data?.error?.message || 'OpenRouter error', details: data }, response.status, baseHeaders);
+    const retryAfter = response.headers?.get?.('retry-after');
+    return json({ error: data?.error?.message || 'OpenRouter error', details: data }, response.status,
+      retryAfter ? { ...baseHeaders, 'retry-after': retryAfter } : baseHeaders);
   }
 
   const completion = data?.choices?.[0]?.message?.content || '';
@@ -384,7 +390,9 @@ export const proxyCustomRPC = async ({
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    return json({ error: data?.error?.message || 'Custom RPC error', details: data }, response.status, baseHeaders);
+    const retryAfter = response.headers?.get?.('retry-after');
+    return json({ error: data?.error?.message || 'Custom RPC error', details: data }, response.status,
+      retryAfter ? { ...baseHeaders, 'retry-after': retryAfter } : baseHeaders);
   }
 
   const completion =

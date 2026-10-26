@@ -2485,6 +2485,25 @@ test('SessionWriteCoordinator clears failed automatic queues so status surfaces 
 	assert.equal(status.lastFailure.error, 'provider unavailable');
 });
 
+for (const [retryAfterMs, delay] of [[120_000, 120_000], [7_200_000, 1_800_000], [undefined, 60_000]]) {
+	test(`SessionWriteCoordinator honours bounded Retry-After: ${retryAfterMs}`, async () => {
+		const { state } = createTransactionalState();
+		const alarms = [];
+		state.storage.setAlarm = async (time) => alarms.push(time);
+		const coordinator = new SessionWriteCoordinator(state, {}, {
+			now: () => 1_000,
+			runResultsAnalysisAutoJob: async () => ({ ok: false, status: 503, error: 'Busy', retryAfterMs }),
+		});
+		await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'retry-after' });
+		alarms.length = 0;
+		await coordinator.runQueuedResultsAnalysisAutoJob();
+		assert.deepEqual(alarms, [1_000 + delay]);
+		const failure = (await coordinator.readResultsAnalysisStatus()).lastFailure;
+		assert.equal(failure.nextAttemptAtMs, 1_000 + delay);
+		assert.equal(failure.retryAttempt, 1);
+	});
+}
+
 test('SessionWriteCoordinator retries a temporary automatic failure with backoff, then recovers', async () => {
 	let now = 1_000;
 	const alarms = [];

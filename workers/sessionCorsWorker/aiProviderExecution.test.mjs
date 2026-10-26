@@ -15,6 +15,20 @@ const createCustomRpcAuth = (scopes = { ai: true }) => ({
   scopes,
 });
 
+for (const proxy of [proxyAnthropic, proxyOpenAI, proxyOpenRouter, proxyCustomRPC]) {
+  test(`${proxy.name} preserves the provider Retry-After header on failure`, async () => {
+    const fetch = async () => Response.json({ error: { message: 'Busy' } }, { status: 429, headers: { 'Retry-After': '120' } });
+    const result = await proxy({ payload: { prompt: 'Test' },
+      secrets: { anthropicKey: 'synthetic', openaiKey: 'synthetic', openrouterKey: 'synthetic', customRpcUrl: 'https://rpc.example.test', customRpcKey: 'synthetic' },
+      auth: createCustomRpcAuth(), baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+      deps: { json: createJsonStub(), fetch, safeFetch: fetch, log: () => {} },
+    });
+    assert.equal(result.status, 429);
+    assert.equal(result.headers['retry-after'], '120');
+    assert.equal(result.headers['Access-Control-Allow-Origin'], '*');
+  });
+}
+
 test('proxyAnthropic preserves missing worker anthropicKey failure before upstream fetch', async () => {
   let fetchCalled = false;
 
