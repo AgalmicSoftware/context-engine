@@ -1705,6 +1705,9 @@ R2 / Durable Objects:
   Different content under a settled request id returns `409 upload_request_conflict`.
   Payload validation, encryption and serialized KV size checks finish before
   reserving a receipt, so deterministic failures do not hold a retry lease.
+  Browser upload operations are scoped to the current account and session.
+  Switching either clears their retry state in the pile; a late receipt from
+  the previous account cannot populate the next account's saved answers.
   An active reservation returns retryable `503 upload_in_progress` for 120 seconds;
   an expired reservation permits a new attempt with a fresh storage id, so a crashed
   attempt may leave an orphan. Settled receipts retain HMACs of request IDs and payload digests, derived from

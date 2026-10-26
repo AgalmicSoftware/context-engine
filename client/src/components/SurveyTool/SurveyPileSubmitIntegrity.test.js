@@ -1185,3 +1185,53 @@ describe('an answer held back for size', () => {
     expect(row.interviewProvenance?.source).toBeUndefined();
   });
 });
+
+it('keeps a late account A receipt out of account B and starts B with a new operation', async () => {
+  const h = await fixture();
+  await act(async () => h.sync());
+  await h.mount();
+  const nextAccount = `0x${'55'.repeat(20)}`;
+  let releaseUpload;
+  const pendingUpload = new Promise((resolve) => {
+    releaseUpload = resolve;
+  });
+  h.submitResponses.mockImplementationOnce(async (_provider, ids, responses) => {
+    await pendingUpload;
+    const storageRef = h.add('responses', responses[0], OWNER);
+    return {
+      workerCanonicalSubmission: true,
+      sessionSlug: SLUG,
+      questionResponseRefs: [{ questionId: ids[0], storageRef }],
+      storageRefs: [storageRef],
+    };
+  });
+  await act(async () => h.engine().handleAnswerPile(BINARY_QID, 'Agree'));
+  await settle();
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+  const operationA = h.submitResponses.mock.calls[0][6].operationId;
+  expect(operationA).toEqual(expect.any(String));
+
+  try {
+    await act(async () => h.rerender({ account: nextAccount }));
+    await settle();
+    expect(h.engine()._submitOperationId).toBeUndefined();
+  } finally {
+    await act(async () => releaseUpload());
+  }
+  await settle();
+  expect(h.engine().props.account).toBe(nextAccount);
+  expect(h.engine()._submitOperationId).toBeUndefined();
+  expect(h.engine().state.editBaseline?.answers?.[BINARY_QID]?.value).not.toBe('Agree');
+  expect(screen.getByRole('radio', { name: 'Agree' })).not.toBeChecked();
+  expect(h.engine().state.submittedSinceLastEdit).toBe(false);
+
+  await act(async () => h.engine().handleAnswerPile(BINARY_QID, 'Disagree'));
+  await settle();
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(2));
+  const operationB = h.submitResponses.mock.calls[1][6].operationId;
+  expect(operationB).toEqual(expect.any(String));
+  expect(operationB).not.toBe(operationA);
+  expect(h.submitResponses.mock.calls[1][2][0].responder).toBe(nextAccount);
+});

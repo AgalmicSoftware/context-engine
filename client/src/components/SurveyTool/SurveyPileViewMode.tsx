@@ -1211,6 +1211,13 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
   });
 
   if (updatePlan.shouldResetContext) {
+    // The pile owns its lifecycle and does not run the full editor's reset.
+    // Upload retry bytes and IDs belong to the old account/session as well.
+    delete engine._submitOperationId;
+    delete engine._submitOperationContextKey;
+    delete engine._submitOperationTimestamp;
+    delete engine._submitOperationPayloads;
+    delete engine._submitUploadRevisions;
     // Props already name the next identity. Cancel pending writes before resetting
     // so decrypted fields cannot be persisted under another account's draft key.
     if (engine._persistTimer) clearTimeout(engine._persistTimer);
