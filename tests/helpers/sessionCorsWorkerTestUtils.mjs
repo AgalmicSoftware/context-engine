@@ -366,6 +366,7 @@ export const createSignedSiweBody = async ({
   env,
   wallet,
   sessionSlug,
+  sessionId,
   body = {},
   chainId = 84532,
   adminAction,
@@ -396,6 +397,7 @@ export const createSignedSiweBody = async ({
       makeJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug,
+        ...(sessionId ? { sessionId } : {}),
         adminAction: true,
       }, {
         headers: { Origin: resolvedAudience },
@@ -413,6 +415,7 @@ export const createSignedSiweBody = async ({
     const unsignedBody = {
       address,
       sessionSlug: targetSlug,
+      ...(sessionId ? { sessionId } : {}),
       ...body,
     };
     const expiration = Math.floor(Date.now() / 1000) + 5 * 60;

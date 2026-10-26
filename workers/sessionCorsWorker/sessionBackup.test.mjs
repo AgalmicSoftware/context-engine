@@ -7,6 +7,9 @@ import { exportSessionBackup } from './sessionBackup.js';
 import { STORAGE_EXPORT_PAGE_LIMITS } from './storageScanBudget.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { workerGroupBackupPrefixes } from './workerGroups.js';
+import { readFile } from 'node:fs/promises';
+import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
+import { selectCanonicalStorageVersions } from '../../shared/storage/canonicalStorageVersions.mjs';
 
 const slug = 'restore-fixture';
 const sessionId = `0x${'3'.repeat(32)}`;
@@ -255,4 +258,126 @@ test('legacy group rows are backed up only for the matching immutable identity',
   assert.equal(result.body.complete, true, JSON.stringify(result));
   assert.equal(await target.kv.get(groupKey), JSON.stringify(group));
   assert.equal(await target.kv.get(`ce-worker-group:${slug}:another`), null);
+});
+
+test('restore drill preserves encrypted reads, hidden questions, correction authority, groups and AI secrets', async (t) => {
+  let clock = Date.now();
+  t.mock.method(Date, 'now', () => clock);
+  const { ethers } = createRequire(new URL('../../package.json', import.meta.url))('ethers');
+  const wallets = [4, 5, 6].map((digit) => new ethers.Wallet(`0x${String(digit).repeat(64)}`));
+  const [owner, participant] = wallets;
+  const source = fixture();
+  const config = JSON.parse(await readFile(new URL('../../tests/fixtures/worker-compat/previous-minor.json', import.meta.url))).config;
+  Object.assign(config, { slug, sessionId, sessionIdHex: sessionId, adminAddress: owner.address,
+    allowOrigins: ['https://app.example'], corsWorkerUrl: 'https://worker.example',
+    workerAuthority: { version: 1, participantScopes: ['storage', 'groups', 'ai'] }, groupCreationPolicy: 'admin_only' });
+  delete config.resultsAnalysis;
+  await source.kv.put(`session:${slug}:config`, JSON.stringify(config));
+  Object.assign(source.env, { CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2', ADMIN_TRUSTED_ORIGINS: 'https://app.example' });
+  const connect = (target) => {
+    const calls = [];
+    const worker = createWorkerRuntime(target.env, { now: () => clock, fetch: async (url, init) => {
+      assert.match(String(url), /api\.openai\.com/);
+      assert.equal(new Headers(init.headers).get('Authorization'), 'Bearer synthetic-backup-ai-key');
+      calls.push(String(url));
+      return Response.json({ choices: [{ message: { content: 'Recovered secret works.' } }] });
+    }, rpcFetch: async () => { throw new Error('Unexpected network call'); } });
+    const clients = wallets.map((wallet) => createWorkerClient({ workerOrigin: 'https://worker.example', slug,
+      trustedOrigins: ['https://app.example'], wallet,
+      fetchImpl: (url, init) => worker.fetch(new Request(url, init), target.env, { waitUntil() {} }) }));
+    const signed = async (action, body = {}, status = 200) => {
+      clock += 61_000;
+      const signedBody = await createSignedSiweBody({ worker, env: target.env, wallet: owner, sessionSlug: slug, sessionId,
+        adminAction: action, audience: 'https://app.example', body });
+      const response = await worker.fetch(makeJsonRequest(`/admin/${action}`, signedBody, { headers: { Origin: 'https://app.example' } }), target.env);
+      const value = await response.json();
+      assert.equal(response.status, status, `${action}: ${JSON.stringify(value)}`);
+      return value;
+    };
+    return { clients, signed, calls };
+  };
+  const a = connect(source);
+  const questionId = `0x${'7'.repeat(64)}`;
+  const hiddenId = `0x${'8'.repeat(64)}`;
+  const question = { id: questionId, type: 'text', prompt: 'Original prompt', sessionId, sessionSlug: slug };
+  await a.clients[1].upload({ resource: 'questions', data: JSON.stringify(question) });
+  const correction = await a.clients[0].upload({ resource: 'questions', data: JSON.stringify({ ...question, prompt: 'Corrected prompt' }) });
+  const hidden = await a.clients[1].upload({ resource: 'questions', data: JSON.stringify({ ...question, id: hiddenId, prompt: 'Hidden prompt' }) });
+  await a.signed('storage/set-hidden', { resource: 'questions', id: hiddenId, hidden: true });
+  const plain = await a.clients[1].upload({ resource: 'responses', data: JSON.stringify({ questionID: questionId, answer: { value: 'Plain answer' } }) });
+  await a.signed('groups/create', { group: { groupId: 'reviewers', label: 'Reviewers', joinMode: 'admin_add', memberVisibility: 'admin_only' } });
+  for (const wallet of [owner, participant]) await a.signed('groups/add-member', { groupId: 'reviewers', principal: { kind: 'evm_address', address: wallet.address } });
+  // Preserve optional hashed-token fields exactly as an older membership
+  // format may have stored them; raw tokens never enter the archive.
+  const memberPrefix = workerGroupBackupPrefixes({ slug, sessionId })[2];
+  for (const [key, value] of source.kv.values) if (key.startsWith(memberPrefix)) {
+    await source.kv.put(key, JSON.stringify({ ...JSON.parse(value), tokenHash: 'a1'.repeat(32) }));
+  }
+  config.storageProfile.payloadAccessControl = { gate: 'none', encryption: 'worker_envelope' };
+  config.sessionModeProfile.storage.payloadAccessControl = { gate: 'none', encryption: 'worker_envelope' };
+  config.sessionModeProfile.encryption.mode = 'worker_envelope';
+  config.sessionModeProfile.encryption.keyProvider = 'worker_secret';
+  config.sessionModeProfile.results.visibility = 'session_member_aggregate';
+  await a.signed('set-config', { config });
+  await a.signed('set-secrets', { secrets: { openaiKey: 'synthetic-backup-ai-key' } });
+  const encrypted = await a.clients[1].upload({ resource: 'responses', data: JSON.stringify({ questionID: questionId, answer: { value: 'Encrypted answer' } }) });
+  const grouped = await a.clients[1].request('/storage/upload', { method: 'POST', auth: true, body: {
+    resource: 'responses', backend: 'cloudflare', contentType: 'application/json', groupIds: ['reviewers'],
+    data: JSON.stringify({ questionID: hiddenId, answer: { value: 'Group answer' } }),
+  } });
+  const large = await a.clients[0].upload({ resource: 'docsContext', data: JSON.stringify({ text: 'z'.repeat(5 * 1024 * 1024) }) });
+  const pages = [];
+  let cursor = '';
+  do { const page = await a.signed('export-session-backup', { cursor }); pages.push(page); cursor = page.nextCursor; } while (cursor);
+  assert.ok(pages.length > 1);
+  assert.doesNotMatch(JSON.stringify(pages), /synthetic-backup-ai-key|Encrypted answer|Group answer/);
+  assert.ok(pages[0].coordinator.workerGroups.records.some(([, value]) => value.includes('a1'.repeat(32))));
+  for (const previous of [false, true]) {
+    const target = fixture();
+    target.kv.values.delete(`session:${slug}:config`);
+    Object.assign(target.env, { BOOTSTRAP_ADMIN_ADDRESS: owner.address, ADMIN_TRUSTED_ORIGINS: 'https://app.example', CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2' });
+    if (previous) { target.env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK = source.env.CE_STORAGE_ENVELOPE_KEK; target.env.CE_STORAGE_ENVELOPE_KEK = 'b'.repeat(64); }
+    const b = connect(target);
+    for (const page of pages) {
+      const result = await b.signed('import-session-backup', { page, adoptSessionId: true });
+      assert.equal(result.complete, page.manifest.complete);
+      assert.equal(result.counts.conflicts, 0);
+    }
+    for (const client of [b.clients[0], b.clients[1]]) {
+      assert.equal((await client.read(plain.id)).answer.value, 'Plain answer');
+      assert.equal((await client.read(encrypted.id)).answer.value, 'Encrypted answer');
+      assert.equal((await client.read(grouped.id)).answer.value, 'Group answer');
+    }
+    await assert.rejects(b.clients[2].read(encrypted.id), (error) => error.status === 403);
+    await assert.rejects(b.clients[2].read(grouped.id), (error) => error.status === 403);
+    assert.equal((await b.clients[1].listAll('responses')).items.length, 3);
+    assert.equal((await b.clients[0].listAll('responses')).items.length, 3);
+    assert.equal((await b.clients[2].listAll('responses')).items.length, 0);
+    const publicQuestions = await b.clients[1].listAll('questions');
+    assert.ok(publicQuestions.complete);
+    assert.ok(publicQuestions.items.some((row) => row.storageRef?.id === correction.id));
+    assert.equal(publicQuestions.items.some((row) => row.storageRef?.id === hidden.id), false);
+    const adminQuestions = await b.clients[0].listAll('questions');
+    assert.ok(adminQuestions.items.some((row) => row.hidden && row.metadata.resourceId === hiddenId));
+    const canonical = selectCanonicalStorageVersions(publicQuestions.items.filter((row) => row.storageRef).map((row) => ({
+      ...row.metadata, storageRefId: row.storageRef.id, createdAtMs: Date.parse(row.metadata.createdAt),
+    })));
+    assert.equal(canonical.length, 1);
+    assert.equal((await b.clients[1].read(canonical[0].storageRefId)).prompt, 'Corrected prompt');
+    const document = await b.clients[0].request(`/storage/read?id=${large.id}`, { auth: true, maxBytes: 8 * 1024 * 1024 });
+    assert.equal(document.text.length, 5 * 1024 * 1024);
+    const members = await b.signed('groups/list-members', { groupId: 'reviewers' });
+    assert.deepEqual(members.members.map((member) => member.principal.address).sort(), [owner.address.toLowerCase(), participant.address.toLowerCase()].sort());
+    await b.clients[0].request('/ai', { method: 'POST', auth: true, body: { provider: 'openai', prompt: 'Use restored credentials.' } });
+    assert.equal(b.calls.length, 1);
+    await b.signed('groups/remove-member', { groupId: 'reviewers', principal: { kind: 'evm_address', address: participant.address } });
+    await assert.rejects(b.clients[1].read(grouped.id), (error) => error.status === 403);
+    assert.equal((await b.clients[1].read(encrypted.id)).answer.value, 'Encrypted answer');
+  }
+  const unrelated = fixture();
+  unrelated.kv.values.delete(`session:${slug}:config`);
+  Object.assign(unrelated.env, { BOOTSTRAP_ADMIN_ADDRESS: owner.address, ADMIN_TRUSTED_ORIGINS: 'https://app.example', CE_STORAGE_ENVELOPE_KEK: 'c'.repeat(64) });
+  const denied = await connect(unrelated).signed('import-session-backup', { page: pages[0], adoptSessionId: true }, 409);
+  assert.equal(denied.reason, 'recovery_key_mismatch');
+  assert.equal([...unrelated.kv.values.keys()].filter((key) => key.startsWith('ce-storage')).length, 0);
 });
