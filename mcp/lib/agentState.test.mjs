@@ -110,10 +110,60 @@ test('refuses a key file other users can read', { skip: process.platform === 'wi
 
 test('round-trips state and starts empty', async () => {
   const dir = await tempDir();
-  assert.deepEqual(await readAgentState(dir), { version: 1, profile: {}, sessions: {}, current: '' });
-  const state = { version: 1, profile: { displayName: 'bot' }, sessions: { k: { slug: 's' } }, current: 'k' };
+  assert.deepEqual(await readAgentState(dir), { version: 1, address: '', profile: {}, sessions: {}, current: '' });
+  const state = { version: 1, address: '0xabc', profile: { displayName: 'bot' }, sessions: { k: { slug: 's' } }, current: 'k' };
   await writeAgentState(dir, state);
   assert.deepEqual(await readAgentState(dir), state);
+});
+
+test('binds the state file to the agent key', async () => {
+  const dir = await tempDir();
+  const { wallet } = await loadOrCreateWallet(dir);
+  assert.equal((await readAgentState(dir)).address, wallet.address);
+  await updateAgentState(dir, (state) => {
+    state.current = 'kept';
+  });
+  assert.equal((await readAgentState(dir)).address, wallet.address);
+});
+
+test('refuses a new key when saved state outlived its key', async () => {
+  const dir = await tempDir();
+  const { wallet } = await loadOrCreateWallet(dir);
+  await updateAgentState(dir, (state) => {
+    state.sessions.k = { slug: 's', answers: { q1: { value: 'yes' } } };
+  });
+  await fs.rm(path.join(dir, 'agent-key.json'));
+  await assert.rejects(loadOrCreateWallet(dir), new RegExp(`is missing, but state.json belongs to agent ${wallet.address}`));
+  await assert.rejects(fs.access(path.join(dir, 'agent-key.json')), { code: 'ENOENT' });
+  // Moving the state aside starts a new agent on purpose.
+  await fs.rename(path.join(dir, 'state.json'), path.join(dir, 'state.old.json'));
+  const fresh = await loadOrCreateWallet(dir);
+  assert.equal(fresh.created, true);
+  assert.notEqual(fresh.wallet.address, wallet.address);
+});
+
+test('refuses a new key beside unbound state that remembers sessions', async () => {
+  const dir = await tempDir();
+  await writeAgentState(dir, { version: 1, profile: {}, sessions: { k: { slug: 's' } }, current: 'k' });
+  await assert.rejects(loadOrCreateWallet(dir), /is missing, but state.json belongs to an earlier agent/);
+});
+
+test('refuses state that belongs to another key', async () => {
+  const [first, second] = [await tempDir(), await tempDir()];
+  await loadOrCreateWallet(first);
+  const other = await loadOrCreateWallet(second);
+  await fs.copyFile(path.join(first, 'state.json'), path.join(second, 'state.json'));
+  await assert.rejects(loadOrCreateWallet(second), new RegExp(`but agent-key.json holds ${other.wallet.address}`));
+});
+
+test('binds state saved before addresses were recorded to the existing key', async () => {
+  const dir = await tempDir();
+  const { wallet } = await loadOrCreateWallet(dir);
+  await writeAgentState(dir, { version: 1, profile: {}, sessions: { k: { slug: 's' } }, current: 'k' });
+  await loadOrCreateWallet(dir);
+  const state = await readAgentState(dir);
+  assert.equal(state.address, wallet.address);
+  assert.deepEqual(state.sessions, { k: { slug: 's' } });
 });
 
 test('reads settings, rejecting unknown CE_MCP_* names and relative state paths', () => {

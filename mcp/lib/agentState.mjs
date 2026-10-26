@@ -64,15 +64,22 @@ const readKeyFile = async (keyPath) => {
   return wallet;
 };
 
-/** Loads the agent wallet, creating a fresh key on first use. */
-export const loadOrCreateWallet = async (stateDir) => {
-  await ensureStateDir(stateDir);
+const loadOrCreateKey = async (stateDir) => {
   const keyPath = path.join(stateDir, KEY_FILE);
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       return { wallet: await readKeyFile(keyPath), created: false };
     } catch (error) {
       if (error?.code !== 'ENOENT') throw error;
+    }
+    // Saved state without its key is a partial restore, not first use: a new
+    // key would inherit another identity's remembered answers.
+    const saved = await readAgentState(stateDir);
+    if (saved.address || Object.keys(saved.sessions).length) {
+      throw new Error(
+        `${keyPath} is missing, but ${STATE_FILE} belongs to ${saved.address ? `agent ${saved.address}` : 'an earlier agent'}. ` +
+          `Restore the key from a backup, or move ${STATE_FILE} aside to start as a new agent.`,
+      );
     }
     const wallet = ethers.Wallet.createRandom();
     try {
@@ -90,7 +97,25 @@ export const loadOrCreateWallet = async (stateDir) => {
   throw new Error(`${keyPath} could not be read or created.`);
 };
 
-const emptyState = () => ({ version: 1, profile: {}, sessions: {}, current: '' });
+/** Loads the agent wallet, creating a fresh key on first use, and binds the state file to it. */
+export const loadOrCreateWallet = async (stateDir) => {
+  await ensureStateDir(stateDir);
+  const loaded = await loadOrCreateKey(stateDir);
+  await withStateWriter(stateDir, async () => {
+    const state = await readAgentState(stateDir);
+    if (state.address && state.address.toLowerCase() !== loaded.wallet.address.toLowerCase()) {
+      throw new Error(
+        `${path.join(stateDir, STATE_FILE)} belongs to agent ${state.address}, but ${KEY_FILE} holds ${loaded.wallet.address}. ` +
+          `Restore the matching files, or move ${STATE_FILE} aside to start fresh with this key.`,
+      );
+    }
+    // State written before files were bound to an address adopts the key it is used with.
+    if (!state.address) await writeOwnerOnlyJson(path.join(stateDir, STATE_FILE), { ...state, address: loaded.wallet.address });
+  });
+  return loaded;
+};
+
+const emptyState = () => ({ version: 1, address: '', profile: {}, sessions: {}, current: '' });
 
 export const readAgentState = async (stateDir) => {
   let parsed;
@@ -103,6 +128,8 @@ export const readAgentState = async (stateDir) => {
   if (!isRecord(parsed)) return emptyState();
   return {
     version: 1,
+    // The agent this state belongs to; its remembered answers are that agent's.
+    address: typeof parsed.address === 'string' ? parsed.address : '',
     profile: isRecord(parsed.profile) ? parsed.profile : {},
     sessions: isRecord(parsed.sessions) ? parsed.sessions : {},
     current: typeof parsed.current === 'string' ? parsed.current : '',

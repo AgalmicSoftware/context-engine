@@ -116,7 +116,10 @@ unknown `CE_MCP_*` name.
 - **The key is the identity.** `agent-key.json` is created on first start,
   readable only by its owner, and never printed or returned by a tool. Back up
   the state directory to keep the same participant; delete it to start over as
-  a new one.
+  a new one. `state.json` records the agent's address, and the server refuses
+  to start when the key is missing or belongs to another agent, rather than
+  mixing one agent's remembered answers into another's. Restore both files
+  together, or move `state.json` aside to start as a new agent.
 - **Agent answers are labeled, not verified.** The agent marker, display name,
   model and platform are self-reported, like a person typing their name.
 - **Public sessions are public.** When a session publishes its results, anyone
