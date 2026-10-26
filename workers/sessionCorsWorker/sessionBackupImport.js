@@ -42,6 +42,7 @@ const validatePage = (page, slug) => {
   const m = page?.manifest;
   if (!object(m) || m.type !== 'ce_session_backup' || m.version !== 1 || m.sessionSlug !== slug ||
       resolveCanonicalWorkerSessionIdHex({ sessionId: m.sessionId }) !== m.sessionId || !hashPattern.test(m.kekFingerprint || '') ||
+      (m.previousKekFingerprint !== undefined && !hashPattern.test(m.previousKekFingerprint)) ||
       !hashPattern.test(page.archiveId || '') || !hashPattern.test(page.snapshotDigest || '') ||
       !Number.isSafeInteger(page.pageNumber) || page.pageNumber < 0 || typeof m.complete !== 'boolean' ||
       !Array.isArray(page.entries) || jsonByteLength(page) > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes ||
@@ -86,7 +87,9 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const targetId = resolveCanonicalWorkerSessionIdHex(current?.config || {});
   if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail('The backup session identity does not match this target.', 409, 'backup_session_mismatch');
   const fingerprints = await Promise.all([env.CE_STORAGE_ENVELOPE_KEK, env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK].filter(Boolean).map(recoveryKeyFingerprint));
-  if (!fingerprints.includes(manifest.kekFingerprint)) fail('The target does not hold this backup recovery key.', 409, 'recovery_key_mismatch');
+  const required = [manifest.kekFingerprint, manifest.previousKekFingerprint].filter(Boolean);
+  const missing = required.filter((fingerprint) => !fingerprints.includes(fingerprint));
+  if (missing.length) fail(`The target is missing backup recovery keys: ${missing.join(', ')}.`, 409, 'recovery_key_mismatch');
   if (page.archiveId !== await sha256Hex(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail('Invalid backup archive identity.');
   const index = getStorageIndexBinding(env);
   if (!index?.get || !index?.put || !index?.delete) fail('Restore storage is unavailable.', 503);

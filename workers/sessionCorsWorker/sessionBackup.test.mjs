@@ -11,6 +11,7 @@ import { readFile } from 'node:fs/promises';
 import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
 import { selectCanonicalStorageVersions } from '../../shared/storage/canonicalStorageVersions.mjs';
 import { putSessionSecrets } from './sessionConfigSecretsStore.js';
+import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
 
 const slug = 'restore-fixture';
 const sessionId = `0x${'3'.repeat(32)}`;
@@ -418,6 +419,30 @@ test(`restore drill preserves reads, authority, groups and secrets (R2 ${sourceR
     await b.signed('groups/remove-member', { groupId: 'reviewers', principal: { kind: 'evm_address', address: participant.address } });
     await assert.rejects(b.clients[1].read(grouped.id), (error) => error.status === 403);
     assert.equal((await b.clients[1].read(encrypted.id)).answer.value, 'Encrypted answer');
+    if (previous && !sourceR2 && !targetR2) {
+      const newAnswer = await b.clients[1].upload({ resource: 'responses',
+        data: JSON.stringify({ questionID: questionId, answer: { value: 'Written after restore' } }) });
+      const chainedPages = [];
+      let nextCursor = '';
+      do {
+        const page = await b.signed('export-session-backup', { cursor: nextCursor });
+        chainedPages.push(page);
+        nextCursor = page.nextCursor;
+      } while (nextCursor);
+      const next = fixture();
+      next.kv.values.delete(`session:${slug}:config`);
+      Object.assign(next.env, { CE_STORAGE_ENVELOPE_KEK: target.env.CE_STORAGE_ENVELOPE_KEK,
+        BOOTSTRAP_ADMIN_ADDRESS: owner.address, ADMIN_TRUSTED_ORIGINS: 'https://app.example' });
+      const c = connect(next);
+      const denied = await c.signed('import-session-backup', { page: chainedPages[0], adoptSessionId: true }, 409);
+      assert.equal(denied.reason, 'recovery_key_mismatch');
+      assert.ok(denied.error.includes(await recoveryKeyFingerprint(source.env.CE_STORAGE_ENVELOPE_KEK)));
+      assert.equal(next.kv.values.size, 0, 'Reject missing keys before staging or importing data');
+      next.env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK = source.env.CE_STORAGE_ENVELOPE_KEK;
+      for (const page of chainedPages) await c.signed('import-session-backup', { page, adoptSessionId: true });
+      assert.equal((await c.clients[1].read(encrypted.id)).answer.value, 'Encrypted answer');
+      assert.equal((await c.clients[1].read(newAnswer.id)).answer.value, 'Written after restore');
+    }
   }
   const unrelated = fixture();
   unrelated.kv.values.delete(`session:${slug}:config`);

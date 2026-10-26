@@ -1261,8 +1261,9 @@ material stays in component memory, outside browser storage, drafts and logs.
 
 Operators can enter exactly 64 hex characters in **Advanced: use my own recovery
 key**, or generate a key locally. The helper accepts it as `storageEnvelopeKek`,
-uses its exact case-sensitive text as key material, and returns only its
-fingerprint. Manual Cloudflare setup uses the same input and displays the
+normalizes it to lowercase before deriving key material, and returns only its
+fingerprint. Identity edits keep the in-memory supplied key; a cleared or invalid
+field in this mode blocks deployment until corrected or generated-key mode is chosen. Manual Cloudflare setup uses the same input and displays the
 fingerprint of the setup key. Regenerate setup values after changing this input.
 Existing bindings are preserved during deployment recovery; a changed input does
 not rotate them. Keys unlock encrypted data and saved service credentials; store
@@ -1271,6 +1272,8 @@ them privately with the backup. A key alone is not a data backup.
 For an existing deployment or a lost first response, the signed admin action
 `export-recovery-key` requires `confirm: 'export-recovery-key'` in its signed
 payload. It returns `{ ok: true, recoveryKey, fingerprint }` with `no-store`.
+Export is available only when `DEFAULT_SESSION_SLUG` pins this Worker to the
+requested session; otherwise the deployment operator retains the key.
 The config coordinator permits three exports per session per UTC day and
 returns `429` / `recovery_key_export_limit` thereafter. When
 `CE_STORAGE_AUDIT_KV` is bound, each export records its time and admin address,
@@ -1278,6 +1281,10 @@ never the key; an audit-write failure refuses to disclose it. Only the current
 KEK is exported. Preserve a previous KEK separately while older ciphertext
 still needs it. The `recovery_key_export` capability enables **Show recovery
 key** in **Backup & restore**, with a confirmation before signing.
+In-place key rotation is not supported yet.
+If a recovery key leaks, replace the provider API keys saved in the session;
+existing data stays readable to anyone holding both the key and a copy of the
+stored data.
 
 ### Worker-Native Groups
 

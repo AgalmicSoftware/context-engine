@@ -46,6 +46,8 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
   if (position.snapshotDigest !== snapshotDigest) fail('Session config or groups changed during backup. Restart the export.');
   const manifest = { type: 'ce_session_backup', version: 1, sessionSlug: keySlug, sessionId,
     exportedAt: position.exportedAt, workerBundle: env.CE_BUNDLE_SHA256 || null,
+    // Conservatively require both bindings: restored active session keys and
+    // older direct wrappers can still depend on the previous KEK.
     kekFingerprint: await recoveryKeyFingerprint(env.CE_STORAGE_ENVELOPE_KEK),
     ...(env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK ? { previousKekFingerprint: await recoveryKeyFingerprint(env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK) } : {}),
     counts: position.counts, complete: false };
