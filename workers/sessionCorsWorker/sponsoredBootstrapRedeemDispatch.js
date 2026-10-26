@@ -323,7 +323,9 @@ export const dispatchSponsoredBootstrapRedeem = async ({
         sensitiveValues,
         nowMs: deps?.now?.() ?? Date.now(),
       });
-      return deps?.json?.(withFreshRecoveryKey({ body: receipt.body }, embeddedResult).body, receipt.status, { ...headers, 'Cache-Control': 'no-store' });
+      const responseHeaders = new Headers(headers);
+      responseHeaders.set('Cache-Control', 'no-store');
+      return deps?.json?.(withFreshRecoveryKey({ body: receipt.body }, embeddedResult).body, receipt.status, responseHeaders);
     }
 
     const safeEmbeddedResult = redactSponsoredDeployFailure(embeddedResult, sensitiveValues);

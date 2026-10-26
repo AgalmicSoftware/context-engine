@@ -102,6 +102,10 @@ const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, loseResponse
       env,
       { waitUntil: () => {} },
     );
+    if (!failUpload && request.headers().origin) {
+      assert.equal(response.headers.get('access-control-allow-origin'), request.headers().origin,
+        `Worker CORS header missing for ${request.method()} ${url.pathname}`);
+    }
     if (unavailableSubmit && url.pathname === '/capabilities') {
       const capabilities = await response.json();
       capabilities.session.unavailable = [{ operation: 'submit', reason: 'storage_missing' }];

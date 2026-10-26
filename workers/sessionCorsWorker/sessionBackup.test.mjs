@@ -120,6 +120,8 @@ test('backup export requires the signed admin action and sends no-store', async 
   const result = await response.json();
   assert.equal(response.status, 200, JSON.stringify(result));
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), 'https://app.example');
+  assert.equal(response.headers.get('Vary'), 'Origin');
   assert.equal(result.manifest.type, 'ce_session_backup');
 });
 
@@ -241,6 +243,8 @@ test('fresh signed restore requires the deployment bootstrap admin and explicit 
   assert.equal(response.status, 200, JSON.stringify(result));
   assert.equal(result.complete, true);
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), 'https://app.example');
+  assert.equal(response.headers.get('Vary'), 'Origin');
 });
 
 test('legacy group rows are backed up only for the matching immutable identity', async () => {

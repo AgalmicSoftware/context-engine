@@ -16,7 +16,7 @@ const dispatchInterviewBriefRequest = (args) => boundary({
 const { canonicalizeQuestions } = __test__interviewBriefDispatch;
 
 const json = (body, status = 200, headers = {}) =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
+  new Response(JSON.stringify(body), { status, headers: new Headers([['content-type', 'application/json'], ...new Headers(headers)]) });
 
 test('buildInterviewBriefDocument returns only an inert question catalog', () => {
   const document = buildInterviewBriefDocument({

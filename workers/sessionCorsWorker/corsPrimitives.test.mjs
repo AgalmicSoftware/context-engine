@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readdir, readFile } from 'node:fs/promises';
 
 import { corsHeaders, originAllowed, parseAllowOrigins } from './corsPrimitives.js';
 
@@ -35,4 +36,20 @@ test('corsHeaders only reflects allowed origins when an allowlist is present', (
 
   assert.equal(allowed.get('Access-Control-Allow-Origin'), 'https://allowed.example');
   assert.equal(blocked.get('Access-Control-Allow-Origin'), null);
+});
+
+
+test('Worker source never spreads Headers objects', async () => {
+  const root = new URL('../', import.meta.url);
+  const visit = async (dir) => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules') continue;
+      const path = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+      if (entry.isDirectory()) await visit(path);
+      else if (/\.[cm]?js$/.test(entry.name)) {
+        assert.doesNotMatch(await readFile(path, 'utf8'), /\.\.\.\s*(?:headers\b|baseHeaders\b|responseHeaders\b|corsHeaders\s*\()/, path.pathname);
+      }
+    }
+  };
+  await visit(root);
 });

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { corsHeaders } from './corsPrimitives.js';
 
 import {
   CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR,
@@ -20,12 +21,13 @@ for (const proxy of [proxyAnthropic, proxyOpenAI, proxyOpenRouter, proxyCustomRP
     const fetch = async () => Response.json({ error: { message: 'Busy' } }, { status: 429, headers: { 'Retry-After': '120' } });
     const result = await proxy({ payload: { prompt: 'Test' },
       secrets: { anthropicKey: 'synthetic', openaiKey: 'synthetic', openrouterKey: 'synthetic', customRpcUrl: 'https://rpc.example.test', customRpcKey: 'synthetic' },
-      auth: createCustomRpcAuth(), baseHeaders: { 'Access-Control-Allow-Origin': '*' },
-      deps: { json: createJsonStub(), fetch, safeFetch: fetch, log: () => {} },
+      auth: createCustomRpcAuth(), baseHeaders: corsHeaders('https://app.example', ['https://app.example']),
+      deps: { json: (body, status, headers) => Response.json(body, { status, headers }), fetch, safeFetch: fetch, log: () => {} },
     });
     assert.equal(result.status, 429);
-    assert.equal(result.headers['retry-after'], '120');
-    assert.equal(result.headers['Access-Control-Allow-Origin'], '*');
+    assert.equal(result.headers.get('retry-after'), '120');
+    assert.equal(result.headers.get('Access-Control-Allow-Origin'), 'https://app.example');
+    assert.equal(result.headers.get('Vary'), 'Origin');
   });
 }
 

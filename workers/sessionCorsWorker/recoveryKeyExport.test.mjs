@@ -44,6 +44,8 @@ test('recovery key export requires admin signature and explicit signed confirmat
     const response = await request();
     assert.equal(response.status, 200, await response.clone().text());
     assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    assert.equal(response.headers.get('Access-Control-Allow-Origin'), origin);
+    assert.equal(response.headers.get('Vary'), 'Origin');
     assert.deepEqual(await response.json(), { ok: true, recoveryKey: env.CE_STORAGE_ENVELOPE_KEK,
       fingerprint: await recoveryKeyFingerprint(env.CE_STORAGE_ENVELOPE_KEK) });
   }
@@ -73,4 +75,24 @@ test('concurrent exports share a durable per-session limit and fail closed witho
   const failed = await callSessionConfigCoordinator({ ...args, env: broken });
   assert.equal(failed.status, 503);
   assert.equal(failed.body.recoveryKey, undefined);
+});
+
+
+test('backup export success and failure keep the signed request CORS headers', async (t) => {
+  let clock = Date.now();
+  t.mock.method(Date, 'now', () => clock);
+  const env = fixture();
+  env.CE_STORAGE_INDEX_KV = { ...kv(), list: async () => ({ keys: [], list_complete: true }) };
+  env.GROUP_KV.list = async () => ({ keys: [], list_complete: true });
+  const worker = createWorkerRuntime(env, { now: () => clock });
+  for (const cursor of ['', 'invalid']) {
+    clock += 61_000;
+    const body = await createSignedSiweBody({ worker, env, wallet: admin, sessionSlug: slug,
+      adminAction: 'export-session-backup', adminOrigin: origin, audience: origin, body: { slug, cursor } });
+    const response = await worker.fetch(makeJsonRequest('/admin/export-session-backup', body, { headers: { Origin: origin } }), env);
+    assert.equal(response.status, cursor ? 503 : 200, await response.clone().text());
+    assert.equal(response.headers.get('Access-Control-Allow-Origin'), origin);
+    assert.equal(response.headers.get('Vary'), 'Origin');
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  }
 });

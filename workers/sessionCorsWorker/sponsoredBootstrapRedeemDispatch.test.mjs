@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { corsHeaders } from './corsPrimitives.js';
 
 import { dispatchSponsoredBootstrapRedeem } from './sponsoredBootstrapRedeemDispatch.js';
 
@@ -146,6 +147,8 @@ test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path and 
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
     action: 'deploy',
     deps: createDeployDeps({
+      json: (body, status, headers) => Response.json(body, { status, headers }),
+      getCorsContext: async () => ({ ok: true, headers: corsHeaders('https://allowed.example.test', ['https://allowed.example.test']) }),
       executeDeployHelperRequest: async (value) => {
         embeddedCalls.push(value);
         return {
@@ -183,10 +186,10 @@ test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path and 
   }]);
   assert.deepEqual(deletes, []);
   assert.doesNotMatch(JSON.stringify([...store.values()]), new RegExp('a'.repeat(64)));
-  assert.deepEqual(result, {
+  assert.deepEqual({ body: await result.json(), status: result.status, headers: Object.fromEntries(result.headers) }, {
     body: { ok: true, workerUrl: 'https://fresh-session.example.test', envelopeKekSecretSet: true, recoveryKey: 'a'.repeat(64), recoveryKeyFingerprint: 'b'.repeat(64) },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test', 'Cache-Control': 'no-store' },
+    headers: Object.fromEntries(new Headers([...Array.from(corsHeaders('https://allowed.example.test', ['https://allowed.example.test'])), ['Cache-Control', 'no-store'], ['Content-Type', 'application/json']])),
   });
 });
 

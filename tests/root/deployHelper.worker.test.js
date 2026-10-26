@@ -607,7 +607,12 @@ describe('deploy-helper worker', () => {
       else expect(first.recoveryKey).toBe(installed);
       expect(first.recoveryKeyFingerprint).toMatch(/^[a-f0-9]{64}$/);
       expect(response.headers.get('Cache-Control')).toBe('no-store');
-      const replay = await (await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {})).json();
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3000');
+      expect(response.headers.get('Vary')).toBe('Origin');
+      const replayResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(replayResponse.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3000');
+      expect(replayResponse.headers.get('Vary')).toBe('Origin');
+      const replay = await replayResponse.json();
       expect(replay.recoveryKey).toBeUndefined();
       expect(replay.recoveryKeyFingerprint).toBe(first.recoveryKeyFingerprint);
       expect(JSON.stringify([...journal.store.values()])).not.toContain(installed);

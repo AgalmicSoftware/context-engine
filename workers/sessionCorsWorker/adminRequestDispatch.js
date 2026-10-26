@@ -396,24 +396,30 @@ export const dispatchAdminRequest = async ({
   }
 
   if (action === 'export-recovery-key') {
+    const responseHeaders = new Headers(headers);
+    responseHeaders.set('Cache-Control', 'no-store');
     const result = await callSessionConfigCoordinator({ env, slug: targetSlug, path: 'recovery-key/export',
       expectedAuthority, confirm: body?.confirm });
-    return deps?.json?.(result.body, result.status, { ...headers, 'Cache-Control': 'no-store' });
+    return deps?.json?.(result.body, result.status, responseHeaders);
   }
 
   if (action === 'export-session-backup') {
+    const responseHeaders = new Headers(headers);
+    responseHeaders.set('Cache-Control', 'no-store');
     try {
       return deps?.json?.(await exportSessionBackup({ env, slug: targetSlug, expectedAuthority, cursor: body?.cursor || '' }),
-        200, { ...headers, 'Cache-Control': 'no-store' });
+        200, responseHeaders);
     } catch (error) {
-      return deps?.json?.({ error: error.message }, error.status || 503, { ...headers, 'Cache-Control': 'no-store' });
+      return deps?.json?.({ error: error.message }, error.status || 503, responseHeaders);
     }
   }
 
   if (action === 'import-session-backup') {
+    const responseHeaders = new Headers(headers);
+    responseHeaders.set('Cache-Control', 'no-store');
     const result = await callSessionConfigCoordinator({ env, slug: targetSlug, path: 'backup/import',
       expectedAuthority, page: body?.page, adoptSessionId: body?.adoptSessionId === true });
-    return deps?.json?.(result.body, result.status, { ...headers, 'Cache-Control': 'no-store' });
+    return deps?.json?.(result.body, result.status, responseHeaders);
   }
 
   if (action === 'export-storage-envelopes') {

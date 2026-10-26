@@ -78,7 +78,7 @@ const createCryptoDecryptSpy = () => {
 const json = (body, status = 200, headers = {}) =>
 	new Response(JSON.stringify(body), {
 		status,
-		headers: { ...headers, 'Content-Type': 'application/json' },
+		headers: new Headers([...new Headers(headers), ['Content-Type', 'application/json']]),
 	});
 
 const readJson = async (response) => JSON.parse(await response.text());
