@@ -18,7 +18,7 @@ describe('SurveyResultsQuestionTable', () => {
     const onViewQuestion = jest.fn();
     const { container } = render(
       <SurveyResultsQuestionTable
-        bookmarkedQuestionIDs={['q1']}
+        bookmarkedQuestionIDs={['Q1']}
         entries={[
           {
             questionId: 'q1',

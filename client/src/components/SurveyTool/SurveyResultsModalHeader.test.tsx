@@ -23,11 +23,11 @@ const styleMap = {
 describe('SurveyResultsModalHeader', () => {
   it('renders survey title metadata, document links, status nodes, and bookmark state', () => {
     const onToggleSurveyBookmark = jest.fn();
-    const surveyId = '0x1111111111111111111111111111111111111111111111111111111111111111';
+    const surveyId = `0x${'a'.repeat(64)}`;
     const docUrl = 'https://example.test/documents/this-is-a-long-survey-document-url-for-results.pdf';
     const { container } = render(
       <SurveyResultsModalHeader
-        bookmarkedSurveyIDs={[surveyId]}
+        bookmarkedSurveyIDs={[surveyId.toUpperCase()]}
         currentSurveyId={surveyId}
         documentLinkIconStyle={{ marginRight: 4 }}
         effectiveSlug="alpha"
