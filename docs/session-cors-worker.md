@@ -1191,6 +1191,16 @@ value limit require an R2 binding. Restore does not migrate the session to a
 different slug, rotate stored keys, or replace newer target policy.
 
 The `session_backup_v1` capability advertises these two signed actions.
+Session admin settings show **Backup & restore** only when this capability is
+present. **Download backup** collects all pages into one `.jsonl` file; an
+interrupted download can resume or save its completed pages as `.partial.jsonl`.
+The restore control rejects partial files before signing requests. It reports
+progress and conflicts and resumes an interrupted import at the unacknowledged
+page. Nonce rate limits pause pagination for a minute before retrying. Backup
+data remains in memory and the downloaded file; the panel does not save it in
+browser storage. To recover into a fresh deployment, set its Worker URL in
+admin settings, connect its bootstrap admin wallet, select the complete file,
+and enable **Adopt the backup session ID on a fresh deployment**.
 
 ### Encrypted Envelope Archive
 

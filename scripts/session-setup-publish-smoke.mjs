@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { ethers } from 'ethers';
 import worker from '../workers/sessionCorsWorker/worker.js';
@@ -429,6 +429,26 @@ try {
   assert.equal(unavailableUploads.length, 0, 'Explicit readiness refusal blocks before any answer upload');
   const retainedCard = await showQuestion(page, question, questions.length);
   assert.equal(await retainedCard.getByRole('radio', { name: answer, exact: true }).isChecked(), true, 'A readiness refusal retains the draft');
+  page = await adminContext.newPage();
+  const adminUrl = new URL('/admin', baseUrl);
+  adminUrl.searchParams.set('sessionId', adminClient.sessionId);
+  adminUrl.searchParams.set('sessionSlug', slug);
+  adminUrl.searchParams.set('worker', workerOrigin);
+  await page.goto(adminUrl.href, { waitUntil: 'domcontentloaded' });
+  await page.getByTestId('ce-admin-session-backup').waitFor();
+  const downloaded = page.waitForEvent('download', { timeout: 120000 });
+  await page.getByTestId('ce-admin-backup-download').click();
+  const backupPath = `${outputDir}/session-backup.jsonl`;
+  await (await downloaded).saveAs(backupPath);
+  const backupPages = (await readFile(backupPath, 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
+  assert.equal(backupPages.at(-1).manifest.complete, true);
+  assert.ok(backupPages.flatMap((entry) => entry.entries).some((entry) => entry.kind === 'payload'));
+  await page.getByTestId('ce-admin-backup-file').setInputFiles(backupPath);
+  await page.getByRole('status').filter({ hasText: 'Ready to restore' }).waitFor();
+  await page.getByTestId('ce-admin-backup-restore').click();
+  await page.getByRole('status').filter({ hasText: 'Restore complete.' }).waitFor({ timeout: 120000 });
+  await page.getByTestId('ce-admin-session-backup').screenshot({ path: `${outputDir}/admin-backup-restore.png`, timeout: 10000 });
+  console.log('Admin downloaded a complete JSONL backup and restored it idempotently through signed requests.');
   const elapsedMs = Math.round(performance.now() - startedAt);
   await writeFile(
     `${outputDir}/result.json`,
@@ -451,6 +471,7 @@ try {
           'lost upload reply replays the original reference with no duplicate',
           'three concurrent two-tab bookmark pairs survive reload',
           'explicit submit readiness refusal retains the draft without uploading',
+          'admin JSONL download and idempotent signed restore',
         ],
         responseUploads,
         lostReplyUploads,

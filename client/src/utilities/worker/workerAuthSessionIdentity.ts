@@ -76,6 +76,7 @@ export const shouldBootstrapWorkerCanonicalIdentity = ({
   action: unknown;
   body: UnknownRecord;
 }): boolean => {
+  if (toStr(action).trim().toLowerCase() === 'import-session-backup') return body.adoptSessionId === true;
   if (toStr(action).trim().toLowerCase() !== 'set-config') return false;
   const config = asRecord(body.config);
   const profile = asRecord(config.sessionModeProfile);
