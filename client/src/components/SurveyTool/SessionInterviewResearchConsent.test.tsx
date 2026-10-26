@@ -43,9 +43,13 @@ describe('SessionInterviewResearchConsent', () => {
     renderConsent({ researchDetail: 'full' });
     expect(screen.getByText(/Edits are not treated as agreement/i)).toBeInTheDocument();
     expect(screen.getByText(/full interview transcript and imported conversation history/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Predictions, reviewed values, changed fields, and unselected drafts will not be included/i),
-    ).toBeInTheDocument();
+    // An unticked box says what is left out, so the metadata doesn't repeat it.
+    expect(screen.queryByText(/will not be included/i)).not.toBeInTheDocument();
+  });
+
+  it('leaves the metadata out when nothing is shared', () => {
+    renderConsent({ includeProvenance: false });
+    expect(screen.queryByRole('group', { name: 'AI prefill metadata' })).not.toBeInTheDocument();
   });
 
   it('links to the branch documentation and shows selected/unselected counts when opted in', () => {

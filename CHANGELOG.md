@@ -124,6 +124,8 @@ All notable changes to this project will be documented in this file.
   partial-submit retry and concurrent two-tab bookmarks in CI.
 - Open the interview's AI submission choices inside their dropdown instead of
   over the drafts, with every sharing choice listed before the prefill metadata.
+  The metadata no longer repeats what an unticked box leaves out, and is hidden
+  when nothing is shared.
 - Scope cached Worker questions and answers to the signed-in reader. Account
   switches and logouts purge Worker cache nodes, a load started under another
   account is discarded, and a complete listing drops answers the reader can no

@@ -470,9 +470,7 @@ describe('SessionVoiceModeModal', () => {
     expect(metadata).toHaveTextContent('Self-reported');
     expect(metadata).toHaveTextContent('ce-interview-brief-v4');
     expect(metadata).toHaveTextContent('a'.repeat(64));
-    expect(metadata).toHaveTextContent(
-      'Predictions, reviewed values, changed fields, and unselected drafts will not be included.',
-    );
+    expect(metadata).not.toHaveTextContent('will not be included');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
     expect(metadata).toHaveTextContent('2 selected drafts and 0 unselected drafts');
     fireEvent.click(choices.querySelector('summary')!);
@@ -1645,7 +1643,8 @@ describe('SessionVoiceModeModal', () => {
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeChecked();
-    expect(screen.getByRole('group', { name: 'AI research metadata' })).toBeInTheDocument();
+    // Nothing is shared yet, so there is no research metadata to describe.
+    expect(screen.queryByRole('group', { name: 'AI research metadata' })).not.toBeInTheDocument();
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Pause interview')).not.toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -2356,7 +2355,7 @@ describe('SessionVoiceModeModal', () => {
     expect(metadata).toHaveTextContent('Platform');
     expect(metadata).toHaveTextContent('Claude');
     expect(metadata).toHaveTextContent('Question set');
-    expect(metadata).toHaveTextContent('Predictions and changed fields will not be included.');
+    expect(metadata).not.toHaveTextContent('will not be included');
     fireEvent.click(includeComparison);
     expect(metadata).toHaveTextContent('1 selected draft:');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
