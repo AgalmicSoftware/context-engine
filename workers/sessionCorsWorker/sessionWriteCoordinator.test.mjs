@@ -8,6 +8,7 @@ import {
 	SessionWriteCoordinator,
 	executeCoordinatedSponsoredDeploy,
 } from './sessionWriteCoordinator.js';
+import { generateResultsAnalysisDraft, loadAdminSnapshotResultsAnalysisSource } from './resultsAnalysisGeneration.js';
 import { getSessionConfig } from './sessionConfigSecretsStore.js';
 import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 import {
@@ -2983,3 +2984,61 @@ test('receipt identifiers depend on the deployment secret and fail closed withou
   assert.notEqual(stored[0][0], stored[1][0]);
   assert.notEqual(stored[0][1].payloadDigest, stored[1][1].payloadDigest);
 });
+
+for (const concurrent of [false, true]) {
+  test(`duplicate ${concurrent ? 'concurrent' : 'sequential'} alarms call the analysis provider once across restarts`, { timeout: 5_000 }, async () => {
+    const { state, store } = createTransactionalState();
+    state.storage.setAlarm = async () => {};
+    let providerCalls = 0;
+    let releaseProvider;
+    let enteredProvider;
+    const providerStarted = new Promise((resolve) => { enteredProvider = resolve; });
+    const providerGate = new Promise((resolve) => { releaseProvider = resolve; });
+    const config = {
+      sessionIdHex: workerSessionId,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' }, storage: { backend: 'cloudflare' } },
+      resultsAnalysis: { generationMode: 'automatic', views: { circles: false, breakdown: true, riskMatrix: false } },
+    };
+    const loadedSource = await loadAdminSnapshotResultsAnalysisSource({ slug: 'session-a', config,
+      body: { source: { snapshot: {
+        sessionSlug: 'session-a', sessionId: workerSessionId,
+        questions: [{ id: 'q1', type: 'text', prompt: 'Question?' }],
+        responses: [1, 2, 3].map((id) => ({ questionId: 'q1', participantId: `participant-${id}`, answer: `Answer ${id}` })),
+      } } },
+    });
+    assert.equal(loadedSource.ok, true);
+    // Supply the same synthetic source to real generation/reservation code;
+    // only the external provider is held open to overlap the alarm deliveries.
+    const deps = {
+      now: () => 1_000,
+      runResultsAnalysisAutoJob: async ({ job, deps: coordination }) => generateResultsAnalysisDraft({
+        env: {}, slug: job.slug, config, trigger: 'automatic',
+        body: { requestId: job.requestId }, loadedSource,
+        deps: { ...coordination, generateAnalysisArtifact: async () => {
+          providerCalls += 1;
+          enteredProvider();
+          if (concurrent) await providerGate;
+          return { ok: true, value: { breakdown: { summary: { overview: 'Synthetic analysis' }, groups: [] } } };
+        } },
+      }),
+    };
+    const first = new SessionWriteCoordinator(state, {}, deps);
+    const restarted = new SessionWriteCoordinator(state, {}, deps);
+    await first.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'duplicate-alarm' });
+    if (concurrent) {
+      const pending = first.alarm();
+      await providerStarted;
+      await restarted.alarm();
+      releaseProvider();
+      await pending;
+    } else {
+      await first.alarm();
+      await restarted.alarm();
+    }
+    assert.equal(providerCalls, 1);
+    const status = await restarted.readResultsAnalysisStatus();
+    assert.equal(status.jobState, 'succeeded', JSON.stringify(status));
+    assert.equal(status.queued, null);
+    assert.equal(store.has('results-analysis-auto-job-v1'), false);
+  });
+}
