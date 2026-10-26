@@ -497,3 +497,54 @@ test('Worker-stored questions present one current version per question', async (
   assert.equal(loaded.discoveredCount, 2);
   assert.equal(loaded.complete, true);
 });
+
+test('Worker-stored questions fold legacy rows into the version choice and read a few at a time', async () => {
+  const rows = {
+    // Stored before resourceId was recorded; the admin correction below supersedes it.
+    'row-legacy-q1': { createdAt: '2026-09-01T00:00:00.000Z', legacy: true, payload: { id: 'q1', type: 'binary', prompt: 'Legacy original?' } },
+    'row-q1-admin': { createdAt: '2026-10-03T00:00:00.000Z', uploadAuthority: 'admin', payload: { id: 'q1', type: 'binary', prompt: 'Admin correction?' } },
+    // A legacy original still beats a later ordinary re-upload.
+    'row-legacy-q2': { createdAt: '2026-09-02T00:00:00.000Z', legacy: true, payload: { id: 'q2', type: 'binary', prompt: 'Legacy q2?' } },
+    'row-q2-reupload': { createdAt: '2026-10-04T00:00:00.000Z', payload: { id: 'q2', type: 'binary', prompt: 'Re-uploaded q2?' } },
+    ...Object.fromEntries(Array.from({ length: 12 }, (_, index) => [`row-extra-${index}`, {
+      createdAt: '2026-10-05T00:00:00.000Z', payload: { id: `q-extra-${index}`, type: 'binary', prompt: `Extra ${index}?` },
+    }])),
+  };
+  let inFlight = 0;
+  let peak = 0;
+  const env = workerSessionEnv(async (url) => {
+    const { pathname, searchParams } = new URL(url);
+    if (pathname === '/storage/read') {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inFlight -= 1;
+    }
+    const body = pathname === '/auth/nonce' ? { nonce: 'unit-nonce' }
+      : pathname === '/auth/login' ? { token: 'unit-token' }
+        : pathname === '/storage/list'
+          ? {
+              items: Object.entries(rows).map(([id, row]) => ({
+                storageRef: { backend: 'cloudflare', id, resource: 'questions' },
+                metadata: {
+                  resource: 'questions',
+                  createdAt: row.createdAt,
+                  ...(row.legacy ? {} : { resourceId: row.payload.id }),
+                  ...(row.uploadAuthority ? { uploadAuthority: row.uploadAuthority } : {}),
+                },
+              })),
+              cursor: null,
+              listComplete: true,
+            }
+          : rows[searchParams.get('id')]?.payload;
+    return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+  });
+
+  const loaded = await loadQuestionsForSession(env, 'alpha');
+  const prompts = new Map(loaded.questions.map((question) => [question.questionId, question.prompt]));
+
+  assert.equal(prompts.get('q1'), 'Admin correction?');
+  assert.equal(prompts.get('q2'), 'Legacy q2?');
+  assert.equal(loaded.questions.length, 14);
+  assert.ok(peak <= 4, `${peak} reads in flight`);
+});

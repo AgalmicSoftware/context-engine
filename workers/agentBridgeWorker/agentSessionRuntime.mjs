@@ -15,7 +15,7 @@ import { normalizeAgentRatingScale } from './ratingScale.mjs';
 
 import { assertNoSecretShape } from './redaction.mjs';
 
-import { listCachedSessionQuestionsForBridge } from './sessionQuestions.mjs';
+import { listCachedSessionQuestionsForBridge, payloadConcurrency } from './sessionQuestions.mjs';
 
 import { evaluateSponsoredResourceEligibility, resolveSessionInvocation } from './sessionPolicy.mjs';
 
@@ -772,7 +772,7 @@ async function loadWorkerCloudflareQuestions({
   const versionOf = (item) => ({
     resourceId: safeString(item?.metadata?.resourceId),
     createdAtMs: Date.parse(safeString(item?.metadata?.createdAt)) || 0,
-    storageRefId: safeString(item?.storageRef?.id),
+    storageRefId: safeString(item?.storageRef?.id || item?.id),
     uploadAuthority: item?.metadata?.uploadAuthority,
   });
   const listedVersions = items.filter((item) => item?.hidden !== true).map(versionOf);
@@ -787,7 +787,7 @@ async function loadWorkerCloudflareQuestions({
   });
   const questions = [];
   const readErrors = [];
-  const readResults = await Promise.all(selectedItems.map(async (item, index) => {
+  const readItem = async (item, index) => {
     const storageRef = item?.storageRef && typeof item.storageRef === 'object' && !Array.isArray(item.storageRef)
       ? item.storageRef
       : {};
@@ -806,7 +806,7 @@ async function loadWorkerCloudflareQuestions({
           },
       );
       if (normalized && !questionIsPayloadUnavailable(normalized) && !questionRecordMalformedReason(normalized)) {
-        return { question: normalized };
+        return { question: normalized, version: versionOf(item) };
       }
     }
     const read = await fetchWorkerCloudflareJson({
@@ -829,10 +829,34 @@ async function loadWorkerCloudflareQuestions({
         source: 'telegram_only_cloudflare_questions',
         },
     );
-    return normalized ? { question: normalized } : null;
+    return normalized ? { question: normalized, version: versionOf(item) } : null;
+  };
+  // Reads share the Worker's few outbound connections; an unbounded batch starts
+  // every read's timeout while it still waits for one.
+  const readResults = new Array(selectedItems.length);
+  let nextRead = 0;
+  await Promise.all(Array.from({ length: Math.min(selectedItems.length, payloadConcurrency(env)) }, async () => {
+    while (nextRead < selectedItems.length) {
+      const index = nextRead;
+      nextRead += 1;
+      readResults[index] = await readItem(selectedItems[index], index);
+    }
   }));
+  // Legacy rows name their question only in the payload; fold them into the
+  // same version choice now that their ids are known.
+  const loaded = readResults
+    .filter((result) => result?.question)
+    .map(({ question, version }) => ({
+      question,
+      version: { ...version, resourceId: version.resourceId || safeString(question.questionId) },
+    }));
+  const chosenRefs = new Set(
+    selectCanonicalStorageVersions(loaded.map(({ version }) => version)).map((version) => version.storageRefId),
+  );
+  loaded.forEach(({ question, version }) => {
+    if (!version.resourceId || chosenRefs.has(version.storageRefId)) questions.push(question);
+  });
   readResults.forEach((result) => {
-    if (result?.question) questions.push(result.question);
     if (result?.error) readErrors.push(result.error);
   });
   return {
