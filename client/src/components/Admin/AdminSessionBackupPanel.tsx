@@ -101,6 +101,7 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
   const [recoveryDisplay, setRecoveryDisplay] = useState<RecoveryKeyDisplay | null>(null);
   const [downloadCount, setDownloadCount] = useState(0);
   const [downloadComplete, setDownloadComplete] = useState(false);
+  const [downloadRestartRequired, setDownloadRestartRequired] = useState(false);
   const [restoreCount, setRestoreCount] = useState(0);
   const [restorePosition, setRestorePosition] = useState(0);
   const [adoptSessionId, setAdoptSessionId] = useState(false);
@@ -195,36 +196,48 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
         setDownloadCount(0);
       }
       setDownloadComplete(false);
-      for (;;) {
-        setStatus(`Downloading page ${downloaded.current.length + 1}…`);
-        const last = downloaded.current.at(-1);
-        let cursor = last?.nextCursor || '';
-        let value: unknown;
+      setDownloadRestartRequired(false);
+      try {
         for (;;) {
-          value = await request('export-session-backup', { cursor });
-          const preparation = record(value);
-          if (preparation.preparing !== true) break;
-          if (typeof preparation.nextCursor !== 'string' || preparation.nextCursor === cursor)
-            throw new Error('The group snapshot did not advance. Restart the download.');
-          cursor = preparation.nextCursor;
-          setStatus('Preparing the group snapshot…');
+          setStatus(`Downloading page ${downloaded.current.length + 1}…`);
+          const last = downloaded.current.at(-1);
+          let cursor = last?.nextCursor || '';
+          let value: unknown;
+          for (;;) {
+            value = await request('export-session-backup', { cursor });
+            const preparation = record(value);
+            if (preparation.preparing !== true) break;
+            if (typeof preparation.nextCursor !== 'string' || preparation.nextCursor === cursor)
+              throw new Error('The group snapshot did not advance. Restart the download.');
+            cursor = preparation.nextCursor;
+            setStatus('Preparing the group snapshot…');
+          }
+          if (record(value).reason === 'backup_session_changed')
+            throw Object.assign(new Error(String(record(value).error)), { reason: 'backup_session_changed' });
+          if (
+            !isPage(value, sessionSlug) ||
+            value.pageNumber !== downloaded.current.length ||
+            (last && value.archiveId !== last.archiveId) ||
+            (!value.manifest.complete && !value.nextCursor) ||
+            (last && value.nextCursor && value.nextCursor === last.nextCursor)
+          )
+            throw new Error('The Worker returned an invalid backup page. Restart the download.');
+          downloaded.current.push(value);
+          setDownloadCount(downloaded.current.length);
+          if (value.manifest.complete) break;
         }
-        if (record(value).reason === 'backup_session_changed') throw new Error(String(record(value).error));
-        if (
-          !isPage(value, sessionSlug) ||
-          value.pageNumber !== downloaded.current.length ||
-          (last && value.archiveId !== last.archiveId) ||
-          (!value.manifest.complete && !value.nextCursor) ||
-          (last && value.nextCursor && value.nextCursor === last.nextCursor)
-        )
-          throw new Error('The Worker returned an invalid backup page. Restart the download.');
-        downloaded.current.push(value);
-        setDownloadCount(downloaded.current.length);
-        if (value.manifest.complete) break;
+        saveFile(downloaded.current, sessionSlug);
+        setDownloadComplete(true);
+        setStatus(`Downloaded ${downloaded.current.length} pages. Keep this backup with your recovery key.`);
+      } catch (failure) {
+        if (record(failure).reason === 'backup_session_changed') {
+          downloaded.current = [];
+          setDownloadCount(0);
+          setDownloadRestartRequired(true);
+          setStatus('The session changed. Restart the download to create a new backup.');
+        }
+        throw failure;
       }
-      saveFile(downloaded.current, sessionSlug);
-      setDownloadComplete(true);
-      setStatus(`Downloaded ${downloaded.current.length} pages. Keep this backup with your recovery key.`);
     });
   const readFile = (file?: File) =>
     run(async () => {
@@ -343,7 +356,11 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
           onClick={() => void download()}
           data-testid="ce-admin-backup-download"
         >
-          {downloadCount && !downloadComplete ? 'Resume download' : 'Download backup'}
+          {downloadRestartRequired
+            ? 'Restart download'
+            : downloadCount && !downloadComplete
+              ? 'Resume download'
+              : 'Download backup'}
         </button>
         {downloadCount > 0 && !downloadComplete && (
           <>

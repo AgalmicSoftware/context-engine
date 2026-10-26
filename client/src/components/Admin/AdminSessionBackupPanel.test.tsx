@@ -246,3 +246,22 @@ test('streams split UTF-8 lines and reopens the file to resume an interrupted re
   expect(file.text).not.toHaveBeenCalled();
   expect(file.stream).toHaveBeenCalledTimes(3);
 });
+
+test.each(['rejected', 'returned'])('discards changed-session pages and offers only restart (%s)', async (mode) => {
+  const failure = { reason: 'backup_session_changed', error: 'Session changed; restart the backup.' };
+  const post = jest.fn().mockResolvedValueOnce({ data: page(0) });
+  if (mode === 'rejected')
+    post.mockRejectedValueOnce(Object.assign(new Error(failure.error), { reason: failure.reason, status: 409 }));
+  else post.mockResolvedValueOnce({ data: failure });
+  post.mockResolvedValueOnce({ data: { ...page(0, true), archiveId: 'new-archive' } });
+  render(<AdminSessionBackupPanel {...props} postSignedRequest={post} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Download backup' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Session changed');
+  expect(screen.queryByRole('button', { name: 'Resume download' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save partial backup' })).not.toBeInTheDocument();
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Restart download' }));
+  await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[2][0].body.cursor).toBe('');
+  expect(screen.getByRole('status')).toHaveTextContent('Downloaded 1 pages');
+});

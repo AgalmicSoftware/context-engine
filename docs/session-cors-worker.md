@@ -1226,7 +1226,9 @@ pages before writing backup data. Keep the original downloaded JSONL intact;
 editing participant, ownership or authority fields invalidates authentication.
 Export continuation cursors use a separate KEK-derived HMAC over the session,
 archive identity and full scan position. Altered or unsigned cursors are refused
-before storage scanning; restart an export begun on an older Worker.
+before storage scanning; restart an export begun on an older Worker. If the
+session changes during export, the admin panel discards its stale pages and
+offers Restart download. Connection failures keep resumable pages.
 Failed group requests and repeated joins do not invalidate an export. Confirmed
 group changes advance its revision; interrupted group writes hold snapshots
 until replay settles them.
