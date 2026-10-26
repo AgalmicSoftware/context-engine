@@ -59,16 +59,28 @@ try {
         await next.focus();
         await filter.waitFor({ state: 'hidden' });
         await menu.tap();
+        const actionDialog = page.getByRole('dialog', { name: 'Question actions', exact: true });
+        await actionDialog.waitFor();
         await filter.waitFor({ state: 'visible' });
-        for (const name of ['Create New Question', 'View All Questions']) {
-          assert(await page.getByRole('button', { name, exact: true }).isVisible(), `${name} is available in the menu`);
+        for (const name of ['Filter questions', 'Add questions', 'All questions']) {
+          assert(await actionDialog.getByRole('button', { name, exact: true }).isVisible(), `${name} has a visible label`);
         }
+        const popupBox = await actionDialog.boundingBox();
+        assert(popupBox.x >= 0 && popupBox.x + popupBox.width <= width && popupBox.y >= 0 && popupBox.y + popupBox.height <= 900, 'Labelled menu fits viewport');
+        assert(await page.getByTestId('ce-question-actions-backdrop').evaluate(element => getComputedStyle(element).backdropFilter.includes('blur(')), 'Open actions blur the background');
+        assert(await filter.evaluate(element => element === document.activeElement), 'First menu action receives focus');
         if (process.env.OUTPUT_DIR) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-menu.png` });
-        await menu.focus();
         await page.keyboard.press('Tab');
-        assert(await filter.evaluate(element => element === document.activeElement), 'Menu actions are keyboard reachable');
+        assert(await actionDialog.getByRole('button', { name: 'Add questions', exact: true }).evaluate(element => element === document.activeElement), 'Labelled actions are keyboard reachable');
+        await page.keyboard.press('Escape');
+        await actionDialog.waitFor({ state: 'hidden' });
+        assert(await menu.evaluate(element => element === document.activeElement), 'Escape restores hamburger focus');
+        await menu.press('Enter');
+        await actionDialog.waitFor();
+        await page.getByTestId('ce-question-actions-backdrop').click({ position: { x: width - 5, y: 5 } });
+        await actionDialog.waitFor({ state: 'hidden' });
+        assert.equal(await page.getByTestId('ce-question-actions-backdrop').count(), 0, 'Dismissal removes blur');
         await next.tap();
-        await filter.waitFor({ state: 'hidden' });
         await prev.tap();
       } else {
         assert(!await menu.isVisible(), 'Desktop keeps inline actions');

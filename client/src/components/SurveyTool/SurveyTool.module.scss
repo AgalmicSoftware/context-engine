@@ -5439,11 +5439,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       inset 0 0 0 1px color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
   }
 
-  .pileActionMenu:focus-within .pileActionButtonGroup,
-  .pileActionMenu:hover .pileActionButtonGroup {
-    display: flex;
-  }
-
   .pileActionsMenuEligible .pileActionButtonGroup .actionButton {
     width: 42px;
     height: 42px;
@@ -7380,5 +7375,70 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       opacity: 1;
       filter: none;
     }
+  }
+}
+
+.pileActionLabel {
+  display: none;
+}
+
+// The portal keeps the backdrop out of transformed question-card stacking contexts.
+.pileActionBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  background: color-mix(in srgb, var(--ce-overlay-base) 16%, transparent);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.pileActionPopover {
+  position: fixed;
+  z-index: 1041;
+  width: min(240px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  padding: 8px;
+  color: var(--ce-control-text);
+  background: var(--ce-surface);
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-14);
+  box-shadow: var(--ce-card-shadow);
+}
+
+.pileActionPopoverButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  .actionButton {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    gap: 12px;
+    justify-content: flex-start;
+    font-size: 1rem;
+    color: var(--ce-control-text) !important;
+    opacity: 1 !important;
+    text-align: left;
+    transform: none;
+    filter: none;
+
+    svg {
+      width: 20px;
+      flex-shrink: 0;
+    }
+
+    &:hover,
+    &:focus-visible {
+      background: var(--ce-surface-subtle);
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: -2px;
+      transform: none;
+    }
+  }
+
+  .pileActionLabel {
+    display: inline;
   }
 }

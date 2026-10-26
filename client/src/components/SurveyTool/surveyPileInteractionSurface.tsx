@@ -17,6 +17,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import PileHologramAssistant from './PileHologramAssistant';
+import PileQuestionActionMenu from './PileQuestionActionMenu';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SHOW_PILE_HOLOGRAM_TOGGLE } from './surveyToolRuntimeSupport.js';
@@ -280,7 +281,7 @@ const renderPileActionControls = ({
 
   return (
     <div className={`${styles.pileActions} ${styles.pileActionsMenuEligible}`}>
-      <div className={styles.pileActionMenu}>
+      <PileQuestionActionMenu>
         <button
           type="button"
           className={`${styles.actionButton} ${styles.pileActionMenuToggle}`}
@@ -302,6 +303,7 @@ const renderPileActionControls = ({
             data-ce-control-appearance="frameless"
           >
             <FontAwesomeIcon icon={faFilter} style={filterIconStyle} />
+            <span className={styles.pileActionLabel}>Filter questions</span>
           </button>
 
           <button
@@ -312,6 +314,7 @@ const renderPileActionControls = ({
             data-ce-control-appearance="frameless"
           >
             <FontAwesomeIcon icon={showCreate ? faMinus : faPlus} />
+            <span className={styles.pileActionLabel}>{showCreate ? 'Close question editor' : 'Add questions'}</span>
           </button>
 
           {onViewAllClick && (
@@ -323,10 +326,11 @@ const renderPileActionControls = ({
               data-ce-control-appearance="frameless"
             >
               <FontAwesomeIcon icon={faCaretDown} />
+              <span className={styles.pileActionLabel}>All questions</span>
             </button>
           )}
         </div>
-      </div>
+      </PileQuestionActionMenu>
       {showVoiceModeControl ? (
         <button
           onClick={toggleVoiceModeModal}

@@ -387,6 +387,40 @@ describe('surveyPileInteractionSurface', () => {
     expect(screen.getByRole('button', { name: 'Question actions' })).toBeInTheDocument();
   });
 
+  it('opens labelled question actions over a dismissible backdrop and preserves each action', () => {
+    const toggleFilterModal = jest.fn(),
+      toggleCreate = jest.fn(),
+      handleViewAllFromPile = jest.fn();
+    render(
+      renderPileInteractionSurface({ ...buildBaseProps(), toggleFilterModal, toggleCreate, handleViewAllFromPile }),
+    );
+    const toggle = screen.getByRole('button', { name: 'Question actions' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    const dialog = screen.getByRole('dialog', { name: 'Question actions' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(within(dialog).getByRole('button', { name: 'Filter questions' })).toHaveFocus();
+    expect(within(dialog).getByRole('button', { name: 'Add questions' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'All questions' })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ce-question-actions-backdrop'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(toggle).toHaveFocus();
+    fireEvent.click(toggle);
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(toggle).toHaveFocus();
+    for (const [label, handler] of [
+      ['Filter questions', toggleFilterModal],
+      ['Add questions', toggleCreate],
+      ['All questions', handleViewAllFromPile],
+    ] as const) {
+      fireEvent.click(toggle);
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: label }));
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId('ce-question-actions-backdrop')).not.toBeInTheDocument();
+    }
+  });
+
   it('marks every icon-only pile toolbar button as frameless across app themes', () => {
     const tree = renderPileInteractionSurface({
       ...buildBaseProps(),

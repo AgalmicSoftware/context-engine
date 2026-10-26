@@ -1216,3 +1216,7 @@ capture and retains the transcript and review edits on the current page. Reopen 
 continue, submit, or explicitly discard the interview. Reloading or leaving the page
 clears this in-memory interview; closing does not submit responses. On narrow phones,
 pending-answer submission controls use a separate row so their labels remain readable.
+
+The compact question-actions menu labels its controls **Filter questions**,
+**Add questions**, and **All questions**. Opening it blurs the page behind it;
+selecting an action, clicking outside, or pressing Escape dismisses the menu.
