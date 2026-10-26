@@ -1,4 +1,5 @@
 import { executeCoordinatedStorageVisibilityMutation } from './sessionConfigAuthority.js';
+import { exportSessionBackup } from './sessionBackup.js';
 import {
   ADMIN_SESSION_SECRET_KEYS as ALLOWED_SECRET_KEYS,
   ensureSessionLitAuthorizationSigner,
@@ -391,6 +392,15 @@ export const dispatchAdminRequest = async ({
       mutationResult?.status || 503,
       headers,
     );
+  }
+
+  if (action === 'export-session-backup') {
+    try {
+      return deps?.json?.(await exportSessionBackup({ env, slug: targetSlug, expectedAuthority, cursor: body?.cursor || '' }),
+        200, { ...headers, 'Cache-Control': 'no-store' });
+    } catch (error) {
+      return deps?.json?.({ error: error.message }, error.status || 503, { ...headers, 'Cache-Control': 'no-store' });
+    }
   }
 
   if (action === 'export-storage-envelopes') {

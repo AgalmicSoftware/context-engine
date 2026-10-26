@@ -1144,6 +1144,31 @@ use the owning session; opening the page does not join the group. A reference
 never creates a duplicate group or copies membership into the referring session.
 Unavailable or mismatched sessions fail closed with a visible error.
 
+### Backup and restore
+
+Admin-signed `POST /admin/export-session-backup` exports version 1
+`ce_session_backup` pages with `Cache-Control: no-store`. Save every response in
+order and pass `nextCursor` in the next signed request. Only the last page has
+`manifest.complete: true`. The manifest binds the slug and immutable session ID,
+records cumulative counts, and fingerprints the current and optional previous
+KEK with HMAC-SHA256 over `ce-kek-fingerprint-v1`. It contains no recovery key.
+
+The first page includes config authority, wrapped session keys, encrypted
+session secrets and Worker Group authority, catalog and membership records.
+Very large coordinator snapshots use a `chunked` descriptor and payload/chunk
+entries with `target: "coordinator"`. Storage traversal includes every resource,
+hidden rows, plaintext rows, payloads, owner records and hidden markers. Payload
+headers carry size, SHA-256 and chunk count; 256 KiB chunks span bounded 4 MiB
+pages. Wrapped DEKs and stored metadata remain unchanged. Auth nonces, rate
+counters, upload retry receipts and transient analysis jobs are not recovery
+data and are excluded. Legacy plaintext session secrets must first be saved
+through the encrypted secret workflow.
+
+Pause session writes while downloading a backup. Config or group changes
+between pages abort the export, but KV and R2 cannot provide a joint snapshot of
+concurrent payload writes. Keep the complete JSONL archive with the deployment's
+recovery key; a fingerprint cannot decrypt it.
+
 ### Encrypted Envelope Archive
 
 Admin-signed `POST /admin/export-storage-envelopes` returns an encrypted archival bundle for Cloudflare payloads. The response includes a manifest, ciphertext payload entries, per-payload envelope metadata, and wrapped session-key metadata. For `worker_envelope`, payload entries carry the wrapped DEK, IV, algorithm, key provider, and condition document reference. For Cloudflare `lit` payloads, the worker passes through the ciphertext as stored and does not attempt Lit decrypt.

@@ -1,4 +1,5 @@
 import { assertExpectedSessionAuthority } from './sessionConfigAuthority.js';
+import { exportCoordinatorBackup, exportWorkerGroupBackup } from './sessionBackupCoordinator.js';
 import { normalizeStorageRef } from './storageRefNormalization.js';
 import {
   executeDeployHelperRequest,
@@ -2736,6 +2737,19 @@ export class SessionWriteCoordinator {
       return jsonResponse({ error: 'Not found.' }, 404);
     }
     if (url.pathname === '/session-config/current') return this.executeSessionConfigCurrent(payload);
+    if (url.pathname === '/session-config/backup/export') {
+      return this.serializeSessionConfigOperation(async () => {
+        try { return await exportCoordinatorBackup(this, payload); }
+        catch (error) { return jsonResponse({ error: error.message }, error.status || 503); }
+      });
+    }
+    if (url.pathname === '/worker-groups/backup/export') {
+      if (url.hostname !== 'session-coordinator.internal') return jsonResponse({ error: 'Not found.' }, 404);
+      return this.serializeWorkerGroupOperation(async () => {
+        try { return await exportWorkerGroupBackup(this, payload); }
+        catch (error) { return jsonResponse({ error: error.message }, error.status || 503); }
+      });
+    }
     if (url.pathname === '/session-config/storage/set-hidden') return this.executeStorageVisibilityMutation(payload);
     if (url.pathname === '/session-config/storage/publish') return this.executeStoragePublication(payload);
     if (url.pathname === '/session-config/lit-authorization/ensure') {

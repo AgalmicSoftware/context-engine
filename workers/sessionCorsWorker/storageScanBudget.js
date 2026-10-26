@@ -83,7 +83,7 @@ const encodeCursor = (value) => {
   const bytes = encoder.encode(JSON.stringify(value));
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
-export const storageExportCursor = ({ prefix, sessionId = '', pageCursor = '', lastKey = '', hadErrors = false }) => encodeCursor({ version: 1, prefix, sessionId, pageCursor, lastKey, hadErrors });
+export const storageExportCursor = ({ prefix, sessionId = '', pageCursor = '', lastKey = '', hadErrors = false, continuation }) => encodeCursor({ version: 1, prefix, sessionId, pageCursor, lastKey, hadErrors, ...(continuation ? { continuation } : {}) });
 export const parseStorageExportCursor = ({ cursor, prefix, sessionId = '' }) => {
   if (cursor == null || cursor === '') return { pageCursor: '', lastKey: '', hadErrors: false };
   try {
@@ -93,7 +93,9 @@ export const parseStorageExportCursor = ({ cursor, prefix, sessionId = '' }) => 
     if (parsed?.version !== 1 || parsed.prefix !== prefix || parsed.sessionId !== sessionId || typeof parsed.pageCursor !== 'string' || parsed.pageCursor.length > 4096 ||
         typeof parsed.lastKey !== 'string' || parsed.lastKey.length > 512 || (parsed.lastKey && !parsed.lastKey.startsWith(prefix)) ||
         (parsed.hadErrors !== undefined && typeof parsed.hadErrors !== 'boolean')) throw new Error();
-    return { pageCursor: parsed.pageCursor, lastKey: parsed.lastKey, hadErrors: parsed.hadErrors === true };
+    if (parsed.continuation != null && (typeof parsed.continuation !== 'object' || Array.isArray(parsed.continuation))) throw new Error();
+    return { pageCursor: parsed.pageCursor, lastKey: parsed.lastKey, hadErrors: parsed.hadErrors === true,
+      ...(parsed.continuation ? { continuation: parsed.continuation } : {}) };
   } catch {
     throw new Error('Invalid export cursor for this session and resource.');
   }

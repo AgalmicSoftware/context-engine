@@ -151,6 +151,11 @@ const workerGroupIdentityKeyPrefix = ({ slug, sessionId }) => {
 	return `${canonicalSlug}:${sessionIdPart}`;
 };
 
+export const workerGroupBackupPrefixes = ({ slug, sessionId }) => (
+  ['ce-worker-group', 'ce-worker-group-index', 'ce-worker-group-member', 'ce-worker-group-principal']
+    .map((prefix) => `${prefix}:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:`)
+);
+
 const workerGroupRecordMatchesIdentity = ({ row, slug, sessionId }) => {
 	const canonicalSlug = canonicalWorkerGroupSessionSlug(slug);
 	const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
@@ -1825,6 +1830,9 @@ const callWorkerGroupCoordinator = async ({ env, slug, sessionId, path, payload 
 		return workerGroupCoordinationUnavailable();
 	}
 };
+
+export const coordinateWorkerGroupBackup = ({ env, slug, sessionId, operation, snapshot } = {}) =>
+  callWorkerGroupCoordinator({ env, slug, sessionId, path: `/worker-groups/backup/${operation}`, payload: { snapshot } });
 
 export const checkCoordinatedWorkerGroupReady = async ({ env, slug, sessionId } = {}) =>
 	callWorkerGroupCoordinator({

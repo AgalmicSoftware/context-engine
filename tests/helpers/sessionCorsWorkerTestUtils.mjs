@@ -278,6 +278,9 @@ export const installSessionCoordinatorBinding = (env = {}) => {
             get: async (key) => values.get(key),
             put: async (key, value) => values.set(key, cloneCoordinatorTestValue(value)),
             delete: async (key) => values.delete(key),
+            list: async ({ prefix = '', startAfter = '', limit = 1000 } = {}) => new Map([...values]
+              .filter(([key]) => key.startsWith(prefix) && key > startAfter)
+              .sort(([a], [b]) => a < b ? -1 : 1).slice(0, limit)),
             transaction,
           },
         };
