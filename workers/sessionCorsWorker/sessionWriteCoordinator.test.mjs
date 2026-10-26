@@ -2690,3 +2690,19 @@ test('SessionWriteCoordinator settles a group update stranded before intents wer
 	assert.equal((await h.authorize()).status, 200);
 	assert.equal(h.groupPhase(), 'active');
 });
+
+test('SessionWriteCoordinator keeps only the group fields it replays in a pending intent', async () => {
+	const h = createGroupRecoveryHarness();
+	h.failNext('put', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	const create = await h.mutate('create', {
+		input: { groupId: 'group-alpha', label: 'Alpha', joinMode: 'admin_add', memberVisibility: 'members', notes: 'x'.repeat(200_000) },
+	});
+	assert.equal(create.status, 503);
+	assert.deepEqual(Object.keys(h.store.get('worker-group-capacity-group-v3:group-alpha').pending.input).sort(), [
+		'groupId', 'joinMode', 'label', 'memberVisibility',
+	]);
+	const oversized = await h.mutate('update', { input: { description: 'x'.repeat(40_000) } });
+	assert.equal(oversized.status, 400);
+	assert.equal(oversized.body.reason, 'worker_group_input_too_large');
+	assert.equal(h.groupPhase(), 'creating');
+});

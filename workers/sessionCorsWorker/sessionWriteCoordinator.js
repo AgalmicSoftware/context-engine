@@ -288,6 +288,18 @@ const DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES = new Set([
   'invalid_worker_group_id',
 ]);
 
+// The fields the KV group mutations read. Anything else in a request is ignored
+// there and must not inflate the durable intent past its storage limit.
+const WORKER_GROUP_INPUT_FIELDS = Object.freeze([
+  'groupId', 'label', 'description', 'imageUrl', 'tags', 'documentURLs',
+  'memberLimit', 'joinEndsAt', 'joinMode', 'memberVisibility', 'adminAddress',
+]);
+const WORKER_GROUP_INTENT_MAX_BYTES = 32 * 1024;
+
+const pickWorkerGroupInput = (input) => Object.fromEntries(WORKER_GROUP_INPUT_FIELDS
+  .filter((key) => isObjectRecord(input) && Object.prototype.hasOwnProperty.call(input, key))
+  .map((key) => [key, input[key]]));
+
 const sameWorkerGroupInput = (left, right) => {
   const canonical = (value) => JSON.stringify(value, Object.keys(isObjectRecord(value) ? value : {}).sort());
   return canonical(left) === canonical(right);
@@ -1718,10 +1730,13 @@ export class SessionWriteCoordinator {
       let principalDigest = '';
       let activeGroup = null;
       const intent = {
-        ...(mutation.operation === 'delete' ? {} : { input: mutation.input }),
+        ...(mutation.operation === 'delete' ? {} : { input: pickWorkerGroupInput(mutation.input) }),
         ...(mutation.principal ? { principal: mutation.principal } : {}),
         actorPrincipal: mutation.actorPrincipal,
       };
+      if (byteLength(JSON.stringify(intent)) > WORKER_GROUP_INTENT_MAX_BYTES) {
+        return jsonResponse({ ok: false, status: 400, reason: 'worker_group_input_too_large' }, 400);
+      }
       {
         // A retried create meets its own pending reservation here too.
         const settled = await this.settleWorkerGroupReservations({
@@ -1736,7 +1751,7 @@ export class SessionWriteCoordinator {
         const finished = settled.replayed.find((entry) => entry.result.ok && entry.operation === mutation.operation &&
           (mutation.operation === 'delete' ||
             (mutation.operation === 'remove-member' && entry.principalKey === mutation.principalKey) ||
-            (mutation.operation === 'create' && sameWorkerGroupInput(entry.input, mutation.input))));
+            (mutation.operation === 'create' && sameWorkerGroupInput(entry.input, intent.input))));
         if (finished) return this.respondToWorkerGroupMutation(mutation, finished.result);
       }
       if (mutation.operation === 'create') {
