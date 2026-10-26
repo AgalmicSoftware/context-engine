@@ -2873,7 +2873,7 @@ class UserPage extends Component<any, any> {
     const toggleResult = applyUserPageBookmarkToggle({ ...toggle, bookmarksCache: this.getBookmarksCache() });
     // The toggle follows what this page shows; if the saved bookmarks already match, they stay.
     this.persistBookmarksCache((saved) => {
-      const latest = applyUserPageBookmarkToggle({ ...toggle, bookmarksCache: saved });
+      const latest = applyUserPageBookmarkToggle({ ...toggle, bookmarksCache: normalizeUserPageBookmarksCache(saved) });
       return latest.bookmarked === toggleResult.bookmarked ? latest.bookmarksCache : saved;
     }, 'toggleBookmark');
     if (this._isMounted) {

@@ -351,9 +351,24 @@ describe('UserPage bookmark cache controls', () => {
     expect(update(saved)).toEqual({ surveys: [], questions: [], users: [], filters: [] });
     // Already removed in another tab: the saved bookmarks stay as they are.
     const removed = { surveys: [], questions: [], users: [], filters: [] };
-    expect(update(removed)).toBe(removed);
+    expect(update(removed)).toEqual({ surveys: [], questions: [], users: [], filters: [] });
+    expect(removed.users).toEqual([]);
     expect(instance.state.bookmarked).toBe(false);
     expect(instance.state.isEditingNickname).toBe(false);
     expect(instance.state.nicknameInput).toBe('');
+  });
+
+  it('keeps a user already bookmarked by another tab when the page clicks bookmark', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const instance = makeInstance({ viewAddress });
+    instance.getBookmarksCache = jest.fn(() => ({ surveys: [], questions: [], users: [], filters: [] }));
+    instance.persistBookmarksCache = jest.fn();
+    instance.toggleBookmark();
+
+    const [update] = instance.persistBookmarksCache.mock.calls[0];
+    const saved = { surveys: ['s1'], questions: ['q1'], users: [viewAddress], filters: [] };
+    expect(update(saved)).toEqual({ surveys: ['s1'], questions: ['q1'], users: [viewAddress], filters: [] });
+    expect(saved.users).toEqual([viewAddress]);
+    expect(instance.state.bookmarked).toBe(true);
   });
 });
