@@ -4793,14 +4793,14 @@ test('hide requests validate the resource, id, and flag', async () => {
 });
 
 
-const createResponseReceiptFixture = ({ binding = true } = {}) => {
+const createResponseReceiptFixture = ({ binding = true, maxKvValueBytes } = {}) => {
   const kv = createMockKv();
   const env = { CE_STORAGE_INDEX_KV: kv };
   const config = { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
   let now = 1_000;
   if (binding) attachSessionCoordinator(env, () => {}, { now: () => now });
   const queued = [];
-  const deps = { json, randomBytes: createSequenceRandomBytes(), now: () => now,
+  const deps = { json, randomBytes: createSequenceRandomBytes(), now: () => now, maxKvValueBytes,
     enqueueResultsAnalysisAutoJob: async (args) => {
       if (!binding) { queued.push(args); return; }
       const result = await enqueueCoordinatedResultsAnalysisAutoJob(args);
@@ -4896,4 +4896,17 @@ test('legacy response uploads without a binding or a bounded request id retain t
     assert.equal(second.replayed, undefined);
     assert.equal(f.queued.length, 2);
   }
+});
+
+
+test('oversize response retries return the same validation failure without reserving a lease', async () => {
+  const f = createResponseReceiptFixture({ maxKvValueBytes: 1024 });
+  const data = { questionID: 'q1', answer: { value: 'x'.repeat(2000) } };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await f.upload(undefined, data);
+    assert.equal(response.status, 413);
+  }
+  assert.equal(f.kv.store.size, 0);
+  assert.equal(f.queued.length, 0);
+  assert.equal(f.env.CE_SESSION_COORDINATOR.instances.size, 0);
 });

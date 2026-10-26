@@ -1498,21 +1498,6 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     }
   };
 
-  const requestId = trim(payload.requestId);
-  let uploadReceipt = null;
-  if (resource === 'responses' && uploader && requestId && requestId.length <= 200) {
-    const digest = await (deps?.crypto || globalThis.crypto).subtle.digest('SHA-256', payload.bytes || new Uint8Array());
-    const payloadDigest = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-    uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve', payload: { requestId, payloadDigest } });
-    if (uploadReceipt?.kind === 'replay') {
-      await enqueueResponseAnalysis(uploadReceipt.storageRef.id);
-      return responseJson(deps, { id: uploadReceipt.storageRef.id, storageRef: uploadReceipt.storageRef, replayed: true }, 200, baseHeaders);
-    }
-    if (uploadReceipt && uploadReceipt.kind !== 'execute') {
-      return responseJson(deps, { error: uploadReceipt.error, reason: uploadReceipt.reason }, uploadReceipt.status || 503, baseHeaders);
-    }
-  }
-
   let id = '';
   try {
     id = buildCloudflareStorageId({
@@ -1612,6 +1597,22 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   );
   if (kvValueFailure) {
     return responseJson(deps, { error: kvValueFailure.error }, kvValueFailure.status, baseHeaders);
+  }
+
+  // Validation, encryption and serialized KV limits must pass before a retry lease starts.
+  const requestId = trim(payload.requestId);
+  let uploadReceipt = null;
+  if (resource === 'responses' && uploader && requestId && requestId.length <= 200) {
+    const digest = await (deps?.crypto || globalThis.crypto).subtle.digest('SHA-256', payload.bytes || new Uint8Array());
+    const payloadDigest = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve', payload: { requestId, payloadDigest } });
+    if (uploadReceipt?.kind === 'replay') {
+      await enqueueResponseAnalysis(uploadReceipt.storageRef.id);
+      return responseJson(deps, { id: uploadReceipt.storageRef.id, storageRef: uploadReceipt.storageRef, replayed: true }, 200, baseHeaders);
+    }
+    if (uploadReceipt && uploadReceipt.kind !== 'execute') {
+      return responseJson(deps, { error: uploadReceipt.error, reason: uploadReceipt.reason }, uploadReceipt.status || 503, baseHeaders);
+    }
   }
 
   await markStorageBackupWrite(env, slug);

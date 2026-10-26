@@ -1695,6 +1695,8 @@ R2 / Durable Objects:
   analysis was queued; a durable enqueue receipt prevents duplicate jobs, including
   after a lost settlement reply or after the first job finished.
   Different content under a settled request id returns `409 upload_request_conflict`.
+  Payload validation, encryption and serialized KV size checks finish before
+  reserving a receipt, so deterministic failures do not hold a retry lease.
   An active reservation returns retryable `503 upload_in_progress` for 120 seconds;
   an expired reservation permits a new attempt with a fresh storage id, so a crashed
   attempt may leave an orphan. Settled receipts retain only the payload digest and
