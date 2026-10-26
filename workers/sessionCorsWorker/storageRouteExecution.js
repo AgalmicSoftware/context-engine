@@ -2364,9 +2364,17 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
                   encrypted: metadata.encrypted === true,
                   createdAt: trim(metadata.createdAt),
                   size: Number(metadata.size || ciphertextBytes.length || 0) || 0,
+                  ...(Object.hasOwn(metadata, 'responder') ? { responder: metadata.responder } : {}),
+                  ...(Object.hasOwn(metadata, 'uploader') ? { uploader: metadata.uploader } : {}),
+                  ...(Object.hasOwn(metadata, 'uploadAuthority') ? { uploadAuthority: metadata.uploadAuthority } : {}),
+                  ...(Object.hasOwn(metadata, 'resourceId') ? { resourceId: metadata.resourceId } : {}),
+                  ...(Object.hasOwn(metadata, 'hidden') ? { hidden: metadata.hidden } : {}),
+                  ...(Object.hasOwn(metadata, 'groupIds') ? { groupIds: metadata.groupIds } : {}),
                   payloadAccessControl: {
                     gate: metadataAccess.gate,
                     encryption: metadataAccess.encryption,
+                    ...(Object.hasOwn(metadata.payloadAccessControl || {}, 'groupIds')
+                      ? { groupIds: metadata.payloadAccessControl.groupIds } : {}),
                   },
                   payloadAccessMode: deriveLegacyPayloadAccessMode(metadataAccess),
                   ...(metadata.accessConditions ? { accessConditions: metadata.accessConditions } : {}),
@@ -2416,6 +2424,7 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
     payloads.some((entry) => entry.keyProvider === 'worker_secret' || entry.keyProvider === 'mixed');
   const manifest = {
     type: 'ce_storage_encrypted_envelopes_export', version: 1, exportScope: 'encrypted_envelopes_only',
+    metadataFields: 'identity_v1',
     storageBackend: STORAGE_BACKENDS.CLOUDFLARE, sessionSlug: sessionSlugStorageKey(slug), resource: trim(resource) || 'all',
     exportedAt: new Date((deps?.now?.() || Date.now())).toISOString(),
     countScope: 'page', scannedRowCount, exportedPayloadCount: payloads.length, encryptedPayloadCount,

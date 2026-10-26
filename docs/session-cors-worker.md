@@ -1147,6 +1147,13 @@ Admin-signed `POST /admin/export-storage-envelopes` returns an encrypted archiva
 
 The export manifest includes `exportScope: "encrypted_envelopes_only"`, `storageBackend`, `encryptedPayloadCount`, `partial`, `readErrors`, `wrappedKeysIncluded`, `keyProvider`, and `deploymentKekContinuityRequired`. That continuity flag is true when the archive actually contains worker-secret-wrapped material and false for pure-Lit or empty exports. Manifest version 1 also retains `rewrapRequiredForNewDeployment` as a deprecated compatibility alias with the same value; it is a warning to preserve the original secret, not an available rewrap operation. Authorized HTTP callers can use `/storage/export-envelopes?resource=responses` with a session export/admin principal; that route packages ciphertext and envelope metadata, omits session KEK material, and skips `/storage/read`.
 
+Manifest version 1 now includes `metadataFields: "identity_v1"`. Each entry's
+`metadata` preserves `responder`, `uploader`, `uploadAuthority`, `resourceId`,
+`hidden`, `groupIds`, and `payloadAccessControl.groupIds` unchanged when present.
+These server-authored fields retain ownership, admin correction precedence,
+visibility and group restrictions for future recovery tooling. Absent fields
+remain absent; older exports without the marker may omit them.
+
 Both export endpoints return one bounded page, with top-level `cursor` and
 `listComplete`. Pass `cursor` back as a GET query parameter or POST body field
 alongside the same `resource`; signed admin requests also accept the body field.
@@ -1183,6 +1190,11 @@ do not expose that generated secret, so this release does not claim portable
 cross-Worker recovery. Manual operators who need external disaster recovery must
 preserve their originally supplied secret outside the bundle. The worker does not
 accept a replacement deployment secret in an Admin request.
+
+The archive still covers encrypted rows only and is not a full session restore.
+There is no import route; preserving identity metadata does not remove the
+original deployment KEK requirement for worker-envelope rows or the JSON-page
+size limits above.
 
 ### Worker-Native Groups
 
