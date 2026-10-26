@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Verify each remembered registry write against its own block before using it,
+  share block probes within a read, and report incomplete results when RPC
+  history is unavailable without discarding the last verified scan mark.
+- Send response-upload request IDs so a retry within an upload operation can
+  replay the original stored reference.
 - Bind saved agent state to its wallet and stop startup if its key is missing
   or differs from the recorded identity. Legacy state adopts its existing key.
 - Rebuild registry reads when the scanned block is replaced, and discard local
@@ -16,6 +21,18 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep a submission's operation ID across failed and partial attempts, so an
+  unchanged answer can recover a lost upload reply without another stored copy.
+- Gate admin corrections on Worker authority-stamp support and explain known
+  submission readiness failures. Show Worker API/bundle details and upgrade hints.
+- Add complete session backup and resumable restore to admin settings, with
+  generated or operator-supplied recovery keys during setup and confirmed key
+  export for existing sessions. Key dialogs offer a private download and keep
+  their raw values out of browser persistence.
+- Preserve the bookmark action the page showed, match Results bookmark IDs
+  case-insensitively, and keep optimistic writes that start during a tab reload.
+- Extend required browser coverage to lost upload replies, backup/import and
+  recovery-key downloads; pin previous-minor records across canonical readers.
 - Keep successfully stored Worker answers saved after a later upload fails,
   name the unsaved drafts, and keep Submit available to retry only those drafts.
 - Serialize persisted cache writes across tabs and reload saved values on
@@ -39,10 +56,20 @@ All notable changes to this project will be documented in this file.
 ### Workers — requires redeployment
 
 - Retry transient automatic-analysis failures after 1, 5 and 30 minutes before
-  marking retries exhausted. Non-retryable failures still pause immediately.
+  marking retries exhausted. Honor Retry-After up to 30 minutes, preserve uploads
+  merged during a run, and pause invalid output without another billed retry.
 - Preserve ownership, authority, visibility and group fields in encrypted
-  envelope exports. These archives still need the original deployment key for
-  Worker encryption and do not yet provide a full session restore.
+  envelope exports. Add complete paginated session backups and signed imports
+  covering chunked payloads, config, ownership, groups, wrapped keys and encrypted
+  service secrets. Restore requires the matching recovery keys; a hermetic fresh
+  deployment drill verifies recovered reads and access rules.
+- Deduplicate settled response uploads by participant and request ID for seven
+  days, returning the original reference without another write or analysis job.
+  An expired attempt can leave an orphan; legacy Workers retain their old behavior.
+- Advertise public capabilities and non-sensitive session readiness categories.
+- Return newly generated recovery keys only with the fresh deployment response,
+  exclude them from saved receipts, and allow confirmed signed admin export at
+  most three times per session per UTC day.
 - Settle Worker Group mutations stranded by a KV failure: the next operation on
   that group or member replays the recorded intent instead of answering
   not-found, and memberships no longer fail for every member.
