@@ -21,7 +21,7 @@ export type SurveyResultsAnalysisArtifactCacheReadPort = (
 export type SurveyResultsAnalysisArtifactCacheWritePort = (
   namespace: SurveyResultsAnalysisArtifactCacheNamespace,
   slug: string,
-  payload: SurveyResultsRecord,
+  update: (current: unknown) => SurveyResultsRecord,
 ) => Promise<unknown> | unknown;
 
 export type SurveyResultsAnalysisArtifactCacheTarget = {

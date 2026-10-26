@@ -753,7 +753,7 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
 
   it('skips unchanged persisted payloads using stable save signature tracking', async () => {
     const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const writeSpy = jest.spyOn(cacheScripts, 'updateCacheAtomic').mockResolvedValue({});
     const instance = new QuestionFilter({
       activeSessionSlug: 'edge',
       filterType: 'results',
@@ -784,7 +784,7 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
 
   it('writes again when slug changes even if filter payload is unchanged', async () => {
     const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const writeSpy = jest.spyOn(cacheScripts, 'updateCacheAtomic').mockResolvedValue({});
     const instance = new QuestionFilter({
       activeSessionSlug: 'edge',
       filterType: 'results',
@@ -794,7 +794,7 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
     instance.saveFilterStateToLocalStorage();
     await Promise.resolve();
     expect(writeSpy).toHaveBeenCalledTimes(1);
-    expect(writeSpy).toHaveBeenLastCalledWith('filters', 'edge', expect.any(Object));
+    expect(writeSpy).toHaveBeenLastCalledWith('filters', 'edge', expect.any(Function));
 
     writeSpy.mockClear();
     instance.props = {
@@ -805,7 +805,7 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
     instance.saveFilterStateToLocalStorage();
     await Promise.resolve();
     expect(writeSpy).toHaveBeenCalledTimes(1);
-    expect(writeSpy).toHaveBeenLastCalledWith('filters', 'edge-two', expect.any(Object));
+    expect(writeSpy).toHaveBeenLastCalledWith('filters', 'edge-two', expect.any(Function));
 
     peekSpy.mockRestore();
     writeSpy.mockRestore();
@@ -842,7 +842,7 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
   it('writes autosaved filter state into the storageKeyPrefix scope bucket when provided', async () => {
     const scopeSlug = '__scope__:alpha|beta|edge';
     const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const writeSpy = jest.spyOn(cacheScripts, 'updateCacheAtomic').mockResolvedValue({});
     const instance = new QuestionFilter({
       activeSessionSlug: 'edge',
       filterType: 'questions',
@@ -858,9 +858,8 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
     instance.saveFilterStateToLocalStorage();
     await Promise.resolve();
 
-    expect(writeSpy).toHaveBeenCalledWith(
-      'filters',
-      scopeSlug,
+    expect(writeSpy).toHaveBeenCalledWith('filters', scopeSlug, expect.any(Function));
+    expect((writeSpy.mock.calls[0][2] as (current: unknown) => unknown)({})).toEqual(
       expect.objectContaining({
         questionFilterState_questions: expect.objectContaining({
           selectedTags: ['beta'],
@@ -870,6 +869,53 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
 
     peekSpy.mockRestore();
     writeSpy.mockRestore();
+  });
+
+  it.each(['questions', 'results'])("keeps other tabs' saved filters when autosaving %s", async (filterType) => {
+    const modeKey = `questionFilterState_${filterType}`;
+    const otherModeKey = `questionFilterState_${filterType === 'questions' ? 'results' : 'questions'}`;
+    const snapshot = { [modeKey]: { selectedTags: ['old'] }, bookmarkedFilters: ['saved-filter'] };
+    const saved = Object.freeze({
+      [modeKey]: Object.freeze({ selectedTags: ['old'] }),
+      [otherModeKey]: Object.freeze({ selectedTags: ['other-tab'] }),
+      bookmarkedFilters: Object.freeze(['saved-filter', 'other-tab-filter']),
+    });
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(snapshot);
+    let persisted: any;
+    const updateSpy = jest
+      .spyOn(cacheScripts, 'updateCacheAtomic')
+      .mockImplementation(async (_namespace, _slug, update) => {
+        persisted = (update as (current: unknown) => unknown)(saved);
+        return persisted;
+      });
+    const instance = new QuestionFilter({ activeSessionSlug: 'edge', filterType, enableLocalStorage: true });
+    instance.state = { ...instance.state, selectedTags: ['current-tab'] };
+
+    instance.saveFilterStateToLocalStorage();
+    await Promise.resolve();
+
+    expect(persisted[modeKey].selectedTags).toEqual(['current-tab']);
+    expect(persisted[otherModeKey]).toEqual({ selectedTags: ['other-tab'] });
+    expect(persisted.bookmarkedFilters).toEqual(['saved-filter', 'other-tab-filter']);
+    expect(saved[modeKey]).toEqual({ selectedTags: ['old'] });
+    peekSpy.mockRestore();
+    updateSpy.mockRestore();
+  });
+
+  it('retries an unchanged filter state when its atomic save failed', async () => {
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+    const updateSpy = jest.spyOn(cacheScripts, 'updateCacheAtomic').mockResolvedValue(null);
+    const instance = new QuestionFilter({ activeSessionSlug: 'edge', enableLocalStorage: true });
+
+    instance.saveFilterStateToLocalStorage();
+    await Promise.resolve();
+    instance.saveFilterStateToLocalStorage();
+    await Promise.resolve();
+
+    expect(updateSpy).toHaveBeenCalledTimes(2);
+    expect(instance._lastSavedFilterStateSignature).toBeFalsy();
+    peekSpy.mockRestore();
+    updateSpy.mockRestore();
   });
 
   it('invalidates filter pipeline memo on response nonce ticks with stable refs', () => {

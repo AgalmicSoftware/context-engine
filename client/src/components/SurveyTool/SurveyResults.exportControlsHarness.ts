@@ -61,6 +61,13 @@ const installModuleBoundarySpies = (): void => {
       cacheStore.set(cacheStoreKey(namespace, slug), value);
       return true;
     });
+  jest.spyOn(cacheScripts, 'updateCacheAtomic').mockImplementation(async (namespace, slug = '', update) => {
+    const next = await (update as (current: unknown) => unknown)(
+      cacheStore.get(cacheStoreKey(namespace, slug)) ?? null,
+    );
+    await cacheScripts.writeCache(namespace, slug, next);
+    return next;
+  });
   listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockImplementation((namespace: any) => {
     const prefix = `${String(namespace)}|`;
     return Array.from(cacheStore.entries())

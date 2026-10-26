@@ -37,8 +37,8 @@ export function selectSurveyResultsBookmarkLists(cacheValue: unknown): SurveyRes
     return { surveys: [], questions: [] };
   }
   const v = cacheValue as SurveyResultsBookmarksCacheValue;
-  if (!Array.isArray(v.surveys) || !Array.isArray(v.questions)) {
-    return { surveys: [], questions: [] };
-  }
-  return { surveys: [...(v.surveys as string[])], questions: [...(v.questions as string[])] };
+  return {
+    surveys: Array.isArray(v.surveys) ? [...(v.surveys as string[])] : [],
+    questions: Array.isArray(v.questions) ? [...(v.questions as string[])] : [],
+  };
 }

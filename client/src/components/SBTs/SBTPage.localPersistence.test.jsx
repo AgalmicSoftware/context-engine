@@ -26,10 +26,17 @@ describe('SBTPage local persistence', () => {
     window.sessionStorage.clear();
   });
 
-  it('writes bookmark updates to managed cache and legacy localStorage', () => {
+  it("keeps another tab's managed bookmarks while updating the legacy localStorage mirror", () => {
     jest.useFakeTimers();
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ sbts: [] });
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ sbts: [] });
+    const saved = Object.freeze({ sbts: Object.freeze(['0xother']), questions: Object.freeze(['q-other-tab']) });
+    let persisted;
+    const updateSpy = jest
+      .spyOn(cacheScripts, 'updateCacheAtomic')
+      .mockImplementation(async (_namespace, _slug, update) => {
+        persisted = update(saved);
+        return persisted;
+      });
     const subject = createSubject({
       SBTAddress: '0xAbC0000000000000000000000000000000000000',
       activeSessionSlug: 'edge',
@@ -38,14 +45,12 @@ describe('SBTPage local persistence', () => {
     subject.bookmarkSBT();
     jest.runOnlyPendingTimers();
 
-    expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
-    expect(writeSpy).toHaveBeenCalledWith(
-      'bookmarksCache',
-      'edge',
-      expect.objectContaining({
-        sbts: expect.arrayContaining(['0xabc0000000000000000000000000000000000000']),
-      }),
-    );
+    expect(updateSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', expect.any(Function));
+    expect(persisted).toEqual({
+      sbts: ['0xother', '0xabc0000000000000000000000000000000000000'],
+      questions: ['q-other-tab'],
+    });
+    expect(saved.sbts).toEqual(['0xother']);
     expect(JSON.parse(localStorage.getItem('bookmarks'))?.sbts || []).toContain(
       '0xAbC0000000000000000000000000000000000000',
     );
@@ -53,8 +58,8 @@ describe('SBTPage local persistence', () => {
 
   it('uses props.slug as the bookmark cache fallback when explicit session props are absent', () => {
     jest.useFakeTimers();
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ sbts: [] });
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ sbts: [] });
+    const updateSpy = jest.spyOn(cacheScripts, 'updateCacheAtomic').mockResolvedValue({});
     const subject = createSubject({
       SBTAddress: '0xAbD0000000000000000000000000000000000000',
       slug: 'route-slug',
@@ -63,14 +68,30 @@ describe('SBTPage local persistence', () => {
     subject.bookmarkSBT();
     jest.runOnlyPendingTimers();
 
-    expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'route-slug', { clone: false });
-    expect(writeSpy).toHaveBeenCalledWith(
-      'bookmarksCache',
-      'route-slug',
+    expect(updateSpy).toHaveBeenCalledWith('bookmarksCache', 'route-slug', expect.any(Function));
+    expect(updateSpy.mock.calls[0][2]({})).toEqual(
       expect.objectContaining({
         sbts: expect.arrayContaining(['0xabd0000000000000000000000000000000000000']),
       }),
     );
+  });
+
+  it('does not duplicate an SBT that another tab has already bookmarked', () => {
+    jest.useFakeTimers();
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ sbts: [] });
+    const address = '0xAbD0000000000000000000000000000000000000';
+    const saved = Object.freeze({ sbts: Object.freeze([address]), surveys: Object.freeze(['s-other-tab']) });
+    let persisted;
+    jest.spyOn(cacheScripts, 'updateCacheAtomic').mockImplementation(async (_namespace, _slug, update) => {
+      persisted = update(saved);
+      return persisted;
+    });
+
+    createSubject({ SBTAddress: address, activeSessionSlug: 'edge' }).bookmarkSBT();
+    jest.runOnlyPendingTimers();
+
+    expect(persisted).toEqual(saved);
+    expect(persisted.sbts).not.toBe(saved.sbts);
   });
 
   it('coalesces repeated sbtDetails writes when payload is unchanged', () => {

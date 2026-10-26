@@ -354,6 +354,20 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     await waitForHydratedResponseCount(3);
 
     await openHtmlReportModal();
+    const readBeforeChange = readSpy.getMockImplementation();
+    const latestSibling = createAnalysisArtifact('updated-in-another-tab');
+    readSpy.mockImplementation(async (namespace: unknown, slug: unknown = '') => {
+      const snapshot = await readBeforeChange?.(namespace, slug);
+      if (namespace === 'analysisCache' && slug === 'alpha-session') {
+        cacheStore.set(cacheStoreKey(namespace, slug), {
+          ...snapshot,
+          existingFlag: 'updated-in-another-tab',
+          sessionResultsAnalysis: { 'sessionResultsAnalysis:v1:OP Sepolia:old-input': latestSibling },
+          11155420: { profile: { inputSignature: 'another-analysis-family' } },
+        });
+      }
+      return snapshot;
+    });
     clickGenerateAnalysis();
     await waitForAnalysisCacheWrites(1);
     await waitForAnalysisIdle();
@@ -361,8 +375,9 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     expect(readSpy).toHaveBeenCalledWith('analysisCache', 'alpha-session');
     const [, writeSlug, payload] = analysisCacheWrites()[0];
     expect(writeSlug).toBe('alpha-session');
-    expect(payload.existingFlag).toBe(true);
-    expect(payload.sessionResultsAnalysis['sessionResultsAnalysis:v1:OP Sepolia:old-input']).toBe(existingArtifact);
+    expect(payload.existingFlag).toBe('updated-in-another-tab');
+    expect(payload[11155420]).toEqual({ profile: { inputSignature: 'another-analysis-family' } });
+    expect(payload.sessionResultsAnalysis['sessionResultsAnalysis:v1:OP Sepolia:old-input']).toBe(latestSibling);
     const newKeys = Object.keys(payload.sessionResultsAnalysis).filter(
       (key) => key !== 'sessionResultsAnalysis:v1:OP Sepolia:old-input',
     );

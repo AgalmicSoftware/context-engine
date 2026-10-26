@@ -204,7 +204,6 @@ import {
   peekCacheSync,
   subscribeCacheUpdates,
   updateCacheAtomic,
-  writeCache,
 } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
@@ -647,7 +646,6 @@ const globalState = globalThis as UserPageGlobalState;
 const getEffectiveAiConfigTyped = getEffectiveAiConfig as (
   request: UserPageEffectiveAiConfigRequest,
 ) => Promise<UserPageEffectiveAiConfigResult | null | undefined>;
-const writeCacheTyped = writeCache as (namespace: string, slug?: string, value?: unknown) => Promise<unknown>;
 
 const isGateAccessContext = (value: unknown): value is GateAccessContext => isUserPageGateAccessContext(value);
 
@@ -3124,11 +3122,10 @@ class UserPage extends Component<any, any> {
       cachedAt: Date.now(),
       fingerprint,
       networkId,
-      peekCache: peekCacheSync,
       result,
       sessionSlug,
       ttlMs: USER_ANALYSIS_TTL_MS,
-      writeCache: writeCacheTyped,
+      updateCacheAtomic,
     });
     if (cacheWrite.status === 'error') {
       throw cacheWrite.error;

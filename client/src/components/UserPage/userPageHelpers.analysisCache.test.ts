@@ -398,8 +398,17 @@ describe('userPageHelpers analysis cache helpers', () => {
       },
       other: { untouched: true },
     };
-    const peekCache = jest.fn(() => currentCache);
-    const writeCache = jest.fn(async () => true);
+    const savedCache = {
+      ...currentCache,
+      84532: {
+        '0xabc': { ...currentCache[84532]['0xabc'], otherTab: { expiresAt: cachedAt + 2000 } },
+        '0xdef': { otherUser: { expiresAt: cachedAt + 2000 } },
+      },
+      sessionResultsAnalysis: { report: { inputSignature: 'another-tab' } },
+    };
+    const updateCacheAtomic = jest.fn(async (_namespace: string, _slug: string, update: (saved: unknown) => unknown) =>
+      update(savedCache),
+    );
 
     const result = await writeUserPageAnalysisCacheThroughPort({
       addressLower: '0xabc',
@@ -408,11 +417,10 @@ describe('userPageHelpers analysis cache helpers', () => {
       cacheVersion: 2,
       fingerprint: 'fingerprint-new',
       networkId: '84532',
-      peekCache,
       result: { summary: 'fresh summary' },
       sessionSlug: 'edge',
       ttlMs: 1000,
-      writeCache,
+      updateCacheAtomic,
     });
 
     expect(result.status).toBe('written');
@@ -431,21 +439,27 @@ describe('userPageHelpers analysis cache helpers', () => {
       84532: {
         '0xabc': {
           live: liveSibling,
+          otherTab: { expiresAt: cachedAt + 2000 },
           'fingerprint-new': result.entry,
         },
+        '0xdef': { otherUser: { expiresAt: cachedAt + 2000 } },
       },
       other: { untouched: true },
+      sessionResultsAnalysis: { report: { inputSignature: 'another-tab' } },
     });
-    expect(peekCache).toHaveBeenCalledWith('analysisCache', 'edge', { clone: false });
-    expect(writeCache).toHaveBeenCalledWith('analysisCache', 'edge', result.payload);
+    expect(updateCacheAtomic).toHaveBeenCalledWith('analysisCache', 'edge', expect.any(Function));
+    expect(savedCache[84532]['0xabc']).toEqual({
+      stale: staleSibling,
+      live: liveSibling,
+      otherTab: { expiresAt: cachedAt + 2000 },
+    });
 
     const skipped = await writeUserPageAnalysisCacheThroughPort({
       addressLower: '0xabc',
       fingerprint: '',
       networkId: '84532',
-      peekCache,
       sessionSlug: 'edge',
-      writeCache,
+      updateCacheAtomic,
     });
     expect(skipped).toEqual({
       entry: null,
@@ -463,9 +477,8 @@ describe('userPageHelpers analysis cache helpers', () => {
         cachedAt,
         fingerprint: 'fingerprint-new',
         networkId: '84532',
-        peekCache,
         sessionSlug: 'edge',
-        writeCache: throwingWrite,
+        updateCacheAtomic: throwingWrite,
       }),
     ).resolves.toMatchObject({
       error: thrown,

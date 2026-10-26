@@ -409,8 +409,7 @@ type ReadUserPageAnalysisCacheThroughPortArgs = {
   peekCache?: UserPageAnalysisCacheReadPort | null;
 };
 type WriteUserPageAnalysisCacheThroughPortArgs = BuildUserPageAnalysisCacheEntryArgs & {
-  peekCache?: UserPageAnalysisCacheReadPort | null;
-  writeCache?: UserPageAnalysisCacheWritePort | null;
+  updateCacheAtomic?: UserPageAnalysisCacheWritePort | null;
 };
 type ReadUserPageAnalysisCreatedSurveyCachesThroughPortArgs = {
   networkID?: unknown;
@@ -640,7 +639,11 @@ export type UserPageAnalysisCacheReadPort = (
   slug?: string,
   options?: { clone?: boolean },
 ) => unknown;
-export type UserPageAnalysisCacheWritePort = (namespace: string, slug?: string, value?: unknown) => Promise<unknown>;
+export type UserPageAnalysisCacheWritePort = (
+  namespace: string,
+  slug: string,
+  update: (current: unknown) => UserPageUnknownRecord,
+) => Promise<unknown>;
 export type UserPageAnalysisCacheReadPortResult = {
   descriptor: UserPageAnalysisCacheReadDescriptor;
   entry: UserPageAnalysisCacheEntry | null;
@@ -829,11 +832,10 @@ export const writeUserPageAnalysisCacheThroughPort = async ({
   cacheVersion = 1,
   fingerprint = '',
   networkId = '',
-  peekCache = null,
   result = {},
   sessionSlug = '',
   ttlMs = 24 * 60 * 60 * 1000,
-  writeCache = null,
+  updateCacheAtomic = null,
 }: WriteUserPageAnalysisCacheThroughPortArgs = {}): Promise<UserPageAnalysisCacheWritePortResult> => {
   let entry: UserPageAnalysisCacheEntry | null = null;
   let payload: UserPageUnknownRecord | null = null;
@@ -841,8 +843,7 @@ export const writeUserPageAnalysisCacheThroughPort = async ({
     !String(networkId || '') ||
     !String(addressLower || '') ||
     !String(fingerprint || '') ||
-    typeof peekCache !== 'function' ||
-    typeof writeCache !== 'function'
+    typeof updateCacheAtomic !== 'function'
   ) {
     return {
       entry,
@@ -862,16 +863,18 @@ export const writeUserPageAnalysisCacheThroughPort = async ({
       sessionSlug,
       ttlMs,
     });
-    const current = peekCache('analysisCache', String(sessionSlug || ''), { clone: false });
-    payload = buildUserPageAnalysisCacheWritePayload({
-      addressLower,
-      cachedAt,
-      currentCache: current,
-      entry,
-      fingerprint,
-      networkId,
-    });
-    await writeCache('analysisCache', String(sessionSlug || ''), payload);
+    payload = toAnalysisCacheBucket(
+      await updateCacheAtomic('analysisCache', String(sessionSlug || ''), (current) =>
+        buildUserPageAnalysisCacheWritePayload({
+          addressLower,
+          cachedAt,
+          currentCache: current,
+          entry,
+          fingerprint,
+          networkId,
+        }),
+      ),
+    );
     return {
       entry,
       payload,

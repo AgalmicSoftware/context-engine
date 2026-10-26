@@ -1,4 +1,7 @@
-import type { SurveyResultsAnalysisArtifactWritePlan } from './surveyResultsCacheWriteEligibilityPlan';
+import {
+  buildSurveyResultsAnalysisArtifactWritePlan,
+  type SurveyResultsAnalysisArtifactWritePlan,
+} from './surveyResultsCacheWriteEligibilityPlan';
 import type {
   SurveyResultsAnalysisArtifactCacheWritePort,
   SurveyResultsAnalysisArtifactCacheTarget,
@@ -46,7 +49,20 @@ export const runSurveyResultsAnalysisArtifactWriteController = async ({
   }
 
   try {
-    await ports.writeAnalysisArtifact(plan.target.namespace, plan.target.slug, plan.payload as SurveyResultsRecord);
+    const artifacts = plan.payload.sessionResultsAnalysis as SurveyResultsRecord;
+    // Only the requested artifact changes; planned siblings may be stale.
+    await ports.writeAnalysisArtifact(
+      plan.target.namespace,
+      plan.target.slug,
+      (currentCache) =>
+        buildSurveyResultsAnalysisArtifactWritePlan({
+          artifact: artifacts[plan.target.cacheKey],
+          cacheKey: plan.target.cacheKey,
+          currentCache,
+          inputSignature: plan.target.inputSignature,
+          slug: plan.target.slug,
+        }).payload as SurveyResultsRecord,
+    );
     return {
       attempted: true,
       error: null,

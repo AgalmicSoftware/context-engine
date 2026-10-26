@@ -22,7 +22,7 @@ import {
   SPONSORED_GATE_STATES,
 } from '../../utilities/web3/sponsoredAccess.js';
 import { createLogger } from '../../utilities/logging.js';
-import { peekCacheSync, readCache, writeCache } from '../../utilities/cache/cacheScripts.js';
+import { peekCacheSync, readCache, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { notify } from '../../utilities/ui/notify.js';
@@ -92,7 +92,6 @@ import {
   type QuestionFilterStateArg,
   type QuestionFilterStateRecord,
   type QuestionFilterSummaryItem,
-  type QuestionFilterWriteCache,
   type UnknownRecord,
 } from './questionFilterRuntimeSupport';
 import {
@@ -1101,33 +1100,20 @@ class QuestionFilter extends React.Component<any, any> {
     }
 
     const slug = resolveFilterStorageSlug(this.props);
-    let bookmarksCacheObject: QuestionFilterBookmarkCache = {};
-
-    try {
-      const parsedCache = peekCacheSync('filters', slug, { clone: false });
-      bookmarksCacheObject =
-        typeof parsedCache === 'object' && parsedCache !== null
-          ? { ...(parsedCache as QuestionFilterBookmarkCache) }
-          : {};
-    } catch (e) {
-      questionFilterLog.error('Error parsing bookmarksCache from localStorage, resetting.', e);
-    }
-
-    // Canonical field for persisted filter bookmarks.
-    if (!Array.isArray(bookmarksCacheObject.bookmarkedFilters)) {
-      bookmarksCacheObject.bookmarkedFilters = Array.isArray(bookmarksCacheObject.filters)
-        ? [...bookmarksCacheObject.filters]
-        : [];
-    } else {
-      bookmarksCacheObject.bookmarkedFilters = [...bookmarksCacheObject.bookmarkedFilters];
-    }
-
-    // Prevent duplicates
-    if (!bookmarksCacheObject.bookmarkedFilters.includes(currentFilterString)) {
-      bookmarksCacheObject.bookmarkedFilters.push(currentFilterString);
-    }
-
-    const writeResult = (writeCache as QuestionFilterWriteCache)('filters', slug, bookmarksCacheObject);
+    const writeResult = updateCacheAtomic<QuestionFilterBookmarkCache>('filters', slug, (saved) => {
+      const current = saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+      const bookmarks = Array.isArray(current.bookmarkedFilters)
+        ? current.bookmarkedFilters
+        : Array.isArray(current.filters)
+          ? current.filters
+          : [];
+      return {
+        ...current,
+        bookmarkedFilters: bookmarks.includes(currentFilterString)
+          ? [...bookmarks]
+          : [...bookmarks, currentFilterString],
+      };
+    });
     const handleSuccess = (ok: unknown) => {
       if (!ok) {
         questionFilterLog.warn('Failed to persist bookmarked filter state');
@@ -1144,13 +1130,9 @@ class QuestionFilter extends React.Component<any, any> {
         }
       }, 2000);
     };
-    if (writeResult && typeof writeResult !== 'boolean' && typeof writeResult.then === 'function') {
-      void writeResult.then(handleSuccess).catch((e: unknown) => {
-        questionFilterLog.error('Error saving bookmarksCache to local cache:', e);
-      });
-    } else {
-      handleSuccess(writeResult);
-    }
+    void writeResult.then(handleSuccess).catch((e: unknown) => {
+      questionFilterLog.error('Error saving bookmarksCache to local cache:', e);
+    });
   };
 
   // ----------------------------------------------------------------------------------
@@ -1353,21 +1335,18 @@ class QuestionFilter extends React.Component<any, any> {
         this._lastSavedFilterStateSignature = persistenceSignature;
         return;
       }
-      const next =
-        existing && typeof existing === 'object' ? { ...existing, [modeKey]: dataToStore } : { [modeKey]: dataToStore };
-      const writeResult = (writeCache as QuestionFilterWriteCache)('filters', slug, next);
+      const writeResult = updateCacheAtomic<Record<string, unknown>>('filters', slug, (saved) => ({
+        ...(saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {}),
+        [modeKey]: dataToStore,
+      }));
       const handleSuccess = (ok: unknown) => {
-        if (ok !== false) {
+        if (ok) {
           this._lastSavedFilterStateSignature = persistenceSignature;
         }
       };
-      if (writeResult && typeof writeResult !== 'boolean' && typeof writeResult.then === 'function') {
-        void writeResult.then(handleSuccess).catch((error: unknown) => {
-          questionFilterLog.error('Error saving filter state to cache:', error);
-        });
-      } else {
-        handleSuccess(writeResult);
-      }
+      void writeResult.then(handleSuccess).catch((error: unknown) => {
+        questionFilterLog.error('Error saving filter state to cache:', error);
+      });
     } catch (error) {
       questionFilterLog.error('Error saving filter state to cache:', error);
     }
