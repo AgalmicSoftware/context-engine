@@ -545,6 +545,33 @@ test('sessions whose config uses a UUID session id can be joined', async () => {
   assert.equal((await participant.answer({ answers: [{ questionId, value: 'Agree' }] })).submitted, 1);
 });
 
+test('Worker own-answer scans remain complete while the cached listing precedes a new answer', async () => {
+  const env = createEnv([sessionConfig()]);
+  const fetch = workerFetch(env);
+  let ownReads = 0;
+  const { participant } = await createAgent(env, 'own-scan-cache', [], async (url, init) => {
+    const parsed = new URL(url);
+    if (parsed.pathname === '/storage/list' && parsed.searchParams.get('resource') === 'responses') {
+      ownReads++;
+      return Response.json({ items: [], listComplete: true, cursor: null });
+    }
+    return fetch(url, init);
+  });
+  await participant.joinSession({ link: LINK });
+  const { questionId } = await participant.addStatement({ prompt: 'A newly saved answer stays complete.' });
+  assert.notEqual((await participant.listQuestions({ filter: 'all' })).myAnswersComplete, false);
+  assert.equal((await participant.answer({ answers: [{ questionId, value: 'Agree' }] })).submitted, 1);
+  const listed = await participant.listQuestions({ filter: 'all' });
+  const before = ownReads;
+  const cached = await participant.listQuestions({ filter: 'all' });
+  assert.equal(ownReads, before, 'The own-answer scan is still cached');
+  assert.notEqual(cached.myAnswersComplete, false);
+  assert.equal(listed.answeredByMe, 1);
+  assert.equal(listed.questions[0].myAnswer.value, 'Agree');
+  assert.notEqual(listed.myAnswersComplete, false);
+  assert.doesNotMatch(listed.note || '', /large/);
+});
+
 test('own answers are found by paging the Worker alone, without the local record', async () => {
   const env = createEnv([sessionConfig()]);
   const first = await createAgent(env, 'paged', []);

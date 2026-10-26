@@ -485,7 +485,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const newer = ctx.registry ? !known || compareChainOrder(answer, known) > 0 : !known || text(answer.answeredAt) > known.createdAt;
       // A remembered answer whose block a reorganization replaced was never answered.
       if (!newer) continue;
-      const replaced = ctx.registry && await ctx.registry.replacedWrite(answer, blocks);
+      const replaced = ctx.registry ? await ctx.registry.replacedWrite(answer, blocks) : false;
       if (replaced === null) complete = false;
       if (!replaced) {
         mine.set(questionId, {
