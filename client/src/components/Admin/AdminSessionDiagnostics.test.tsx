@@ -92,6 +92,20 @@ test('clears old results and ignores a late reply after the account changes', as
   expect(screen.queryByText('Settled upload receipts')).not.toBeInTheDocument();
 });
 
+test('shows unavailable counts as incomplete and refreshes without accumulating them', async () => {
+  const incomplete = body();
+  incomplete.uploadReceipts.complete = false;
+  fetchStatus.mockResolvedValueOnce(reply(incomplete)).mockResolvedValueOnce(reply());
+  render(<AdminSessionDiagnostics {...props} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh diagnostics' }));
+  await screen.findByText(/Receipt totals are incomplete because some diagnostics are unavailable/);
+  expect(screen.queryByRole('button', { name: 'Load more receipt totals' })).not.toBeInTheDocument();
+  expect(value('Settled upload receipts')).toBe('19');
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh diagnostics' }));
+  await waitFor(() => expect(screen.queryByText(/Receipt totals are incomplete/)).not.toBeInTheDocument());
+  expect(value('Settled upload receipts')).toBe('19');
+});
+
 test('keeps diagnostics unavailable to non-admin viewers', () => {
   render(<AdminSessionDiagnostics {...props} canAdminWorker={false} />);
   expect(screen.queryByRole('region', { name: 'Session diagnostics' })).not.toBeInTheDocument();

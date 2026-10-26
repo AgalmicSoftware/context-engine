@@ -149,7 +149,7 @@ test('receipt totals include every storage page up to the retained per-participa
   assert.equal(counts.pendingLeases, 1);
 });
 
-test('receipt store registration renews while active and an index failure admits no hidden receipt', async () => {
+test('receipt registration renews while active and index outages do not block uploads', async () => {
   const f = await fixture();
   await f.receipt(PARTICIPANT, 'one');
   const index = await f.named('upload-receipt-index:fixture');
@@ -159,9 +159,47 @@ test('receipt store registration renews while active and an index failure admits
   assert.equal([...index.store.values()].find(value => value.expiresAtMs)?.expiresAtMs, expiry + DAY);
   f.advance(DAY);
   index.fetch = async () => { throw new Error('Synthetic index outage'); };
-  assert.equal((await f.receipt(PARTICIPANT, 'three')).status, 503);
+  for (const responder of [PARTICIPANT, ADMIN]) {
+    const reserve = await f.receipt(responder, 'during-outage');
+    assert.equal(reserve.kind, 'execute');
+    assert.equal((await f.receipt(responder, 'during-outage', 'settle', { attemptId: reserve.attemptId, storageRef: ref })).ok, true);
+    assert.equal((await f.receipt(responder, 'during-outage')).kind, 'replay');
+  }
+  const response = await f.status();
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).uploadReceipts, {
+    pendingLeases: 0, oldestPendingAgeMs: null, settledCount: 0, cursor: null, complete: false,
+  });
+});
+
+test('settlement never renews diagnostics registration and retries cannot duplicate a stored answer', async () => {
+  const f = await fixture();
+  const first = await f.receipt(PARTICIPANT, 'day-zero');
+  await f.receipt(PARTICIPANT, 'day-zero', 'settle', { attemptId: first.attemptId, storageRef: ref });
+  f.advance(DAY - 1);
+  const reserve = await f.receipt(PARTICIPANT, 'answer');
+  assert.equal(reserve.kind, 'execute');
+  const index = await f.named('upload-receipt-index:fixture');
+  let indexCalls = 0;
+  index.fetch = async () => { indexCalls += 1; throw new Error('Synthetic index outage'); };
+  f.advance(2);
+  assert.equal((await f.receipt(PARTICIPANT, 'answer', 'settle', { attemptId: reserve.attemptId, storageRef: ref })).ok, true);
+  assert.equal(indexCalls, 0, 'Daily registration must never run after an answer has been stored');
+  f.advance(121_000);
+  const replay = await f.receipt(PARTICIPANT, 'answer');
+  assert.equal(replay.kind, 'replay');
+  assert.deepEqual(replay.storageRef, { ...ref, uri: `/storage/read?id=${ref.id}` });
+});
+
+test('unavailable participant diagnostics leave readable counts explicitly incomplete', async () => {
+  const f = await fixture();
+  await f.receipt(PARTICIPANT, 'one');
+  await f.receipt(ADMIN, 'two');
   const owner = await f.named(`upload-receipts:fixture:${PARTICIPANT}`);
-  assert.equal([...owner.store.values()].filter(value => value?.state === 'pending').length, 1);
+  owner.fetch = async () => json({ error: 'Synthetic receipt outage' }, 503);
+  const counts = await readUploadReceiptDiagnostics({ env: f.env, slug: 'fixture' });
+  assert.equal(counts.pendingLeases, 1);
+  assert.equal(counts.complete, false);
 });
 
 test('diagnostics expose a failed config projection and its start time without repairing it', async () => {

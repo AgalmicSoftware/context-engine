@@ -455,7 +455,11 @@ export class SessionWriteCoordinator {
     }
     const secret = toTrimmedString(this.env?.TOKEN_HMAC_SECRET);
     if (!secret) return jsonResponse({ error: 'Upload receipt coordination is unavailable.', reason: 'upload_receipt_unavailable' }, 503);
-    await registerUploadReceiptStore(this, payload?.diagnostics);
+    // Diagnostics must not block receipt durability. In particular, a daily
+    // renewal during settle must never turn an already-stored answer into a retry.
+    if (!settle) {
+      try { await registerUploadReceiptStore(this, payload?.diagnostics); } catch { /* best-effort diagnostics only */ }
+    }
     // Low-entropy answers must not be guessable from a copy of coordinator
     // storage. Neither the request ID nor an unsalted content digest is retained.
     const encoder = new TextEncoder();

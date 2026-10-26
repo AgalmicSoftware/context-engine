@@ -2657,8 +2657,13 @@ Signed login/bootstrap requests:
   `complete` and `cursor` distinguish partial totals, and the card can load more.
   They cover the seven-day retention window, subject to the existing per-store
   receipt cap, and may change while pages are read. Receipt stores register an
-  opaque coordinator name in a per-session index before admitting receipts,
-  renewing at most daily. An index failure refuses the receipt before upload.
+  opaque coordinator name in a per-session index before reserve, renewing at
+  most daily. Registration is best-effort and never runs during settlement:
+  an index outage cannot block an upload or lose its settled receipt. Failed
+  registration retries on the next reserve, so newly admitted stores may be
+  absent from counts until they register. An unavailable index or receipt store
+  returns incomplete counts (`complete: false`, `cursor: null`); refresh rather
+  than append these totals when diagnostics recover.
   Index entries expire after eight days; alarms remove at most 100 entries per
   cleanup step. Neither the index nor its public counts include answer content.
 - `GET /resource-presence` with `X-Session-Slug`

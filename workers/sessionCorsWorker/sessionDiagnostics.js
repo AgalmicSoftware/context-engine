@@ -22,7 +22,7 @@ const scheduleSweep = async (storage, at) => {
   if ((!current || current > at) && storage.setAlarm) await storage.setAlarm(at);
 };
 
-// Register opaque coordinator names once a day, before admitting a receipt.
+// Best-effort registration runs once a day before reserve, never during settle.
 // Eight days cover the seven-day receipt lifetime plus the renewal interval.
 // Counts stay in each participant's coordinator; uploads do not share a counter.
 export const registerUploadReceiptStore = async (coordinator, identity) => {
@@ -99,23 +99,33 @@ export const readSessionDiagnosticsAuthority = async ({ env, slug }) => {
 
 export const readUploadReceiptDiagnostics = async ({ env, slug, cursor = '' }) => {
   if (cursor && !HASH.test(cursor)) throw Object.assign(new Error('Invalid diagnostics cursor.'), { status: 400 });
-  const stub = await indexStub(env, slug);
-  if (!stub) throw unavailable();
-  const response = await stub.fetch('https://session-coordinator.internal/upload-receipts/index/list', {
-    method: 'POST', body: JSON.stringify({ cursor }),
-  });
-  const page = await response.json();
-  if (!response.ok || !Array.isArray(page.owners)) throw unavailable();
-  const totals = { pendingLeases: 0, oldestPendingAgeMs: null, settledCount: 0, cursor: page.cursor, complete: !page.cursor };
+  const totals = { pendingLeases: 0, oldestPendingAgeMs: null, settledCount: 0, cursor: null, complete: false };
+  let page;
+  try {
+    const stub = await indexStub(env, slug);
+    const response = await stub.fetch('https://session-coordinator.internal/upload-receipts/index/list', {
+      method: 'POST', body: JSON.stringify({ cursor }),
+    });
+    page = await response.json();
+    if (!response.ok || !Array.isArray(page.owners)) return totals;
+  } catch { return totals; }
+  totals.cursor = page.cursor;
+  totals.complete = !page.cursor;
   for (const owner of page.owners) {
-    if (!HASH.test(owner)) throw unavailable();
-    const ownerStub = env.CE_SESSION_COORDINATOR.get(env.CE_SESSION_COORDINATOR.idFromName(owner));
-    const reply = await ownerStub.fetch('https://session-coordinator.internal/upload-receipts/diagnostics', { method: 'POST', body: '{}' });
-    const counts = await reply.json();
-    if (!reply.ok) throw unavailable();
-    totals.pendingLeases += counts.pendingLeases;
-    totals.settledCount += counts.settledCount;
-    if (counts.oldestPendingAgeMs !== null) totals.oldestPendingAgeMs = Math.max(totals.oldestPendingAgeMs ?? 0, counts.oldestPendingAgeMs);
+    try {
+      if (!HASH.test(owner)) throw unavailable();
+      const ownerStub = env.CE_SESSION_COORDINATOR.get(env.CE_SESSION_COORDINATOR.idFromName(owner));
+      const reply = await ownerStub.fetch('https://session-coordinator.internal/upload-receipts/diagnostics', { method: 'POST', body: '{}' });
+      const counts = await reply.json();
+      if (!reply.ok) throw unavailable();
+      totals.pendingLeases += counts.pendingLeases;
+      totals.settledCount += counts.settledCount;
+      if (counts.oldestPendingAgeMs !== null) totals.oldestPendingAgeMs = Math.max(totals.oldestPendingAgeMs ?? 0, counts.oldestPendingAgeMs);
+    } catch {
+      // An unavailable page must be refreshed, not appended as a complete total.
+      totals.complete = false;
+      totals.cursor = null;
+    }
   }
   return totals;
 };

@@ -49,7 +49,9 @@ const isDiagnostics = (value: unknown): value is Diagnostics => {
     nullableNumber(receipts.oldestPendingAgeMs) &&
     (receipts.complete === true
       ? receipts.cursor === null
-      : receipts.complete === false && typeof receipts.cursor === 'string' && /^[a-f0-9]{64}$/.test(receipts.cursor)) &&
+      : receipts.complete === false &&
+        (receipts.cursor === null ||
+          (typeof receipts.cursor === 'string' && /^[a-f0-9]{64}$/.test(receipts.cursor)))) &&
     nullableNumber(analysis.lastSuccessAtMs) &&
     nonnegative(analysis.retryAttempt) &&
     nullableNumber(analysis.nextAttemptAtMs) &&
@@ -182,16 +184,20 @@ const AdminSessionDiagnostics = ({
           {!snapshot.uploadReceipts.complete && (
             <>
               <p className={styles.inlineResourceStatus}>
-                Receipt totals are partial. Load the next page to include more uploads.
+                {snapshot.uploadReceipts.cursor
+                  ? 'Receipt totals are partial. Load the next page to include more uploads.'
+                  : 'Receipt totals are incomplete because some diagnostics are unavailable. Refresh to retry.'}
               </p>
-              <Button
-                color="primary"
-                className={styles.actionButton}
-                disabled={busy}
-                onClick={() => void refresh(true)}
-              >
-                Load more receipt totals
-              </Button>
+              {snapshot.uploadReceipts.cursor && (
+                <Button
+                  color="primary"
+                  className={styles.actionButton}
+                  disabled={busy}
+                  onClick={() => void refresh(true)}
+                >
+                  Load more receipt totals
+                </Button>
+              )}
             </>
           )}
           <p className={styles.inlineResourceStatus}>
