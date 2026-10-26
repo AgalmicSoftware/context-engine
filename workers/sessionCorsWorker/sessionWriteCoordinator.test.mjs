@@ -2527,6 +2527,57 @@ test('SessionWriteCoordinator retries a temporary automatic failure with backoff
 	assert.equal(store.has('results-analysis-auto-job-v1'), false);
 });
 
+test('SessionWriteCoordinator retries a failure after an upload merges during the run', async () => {
+	const { state, store } = createTransactionalState();
+	const alarms = [];
+	state.storage.setAlarm = async (timestamp) => alarms.push(timestamp);
+	const answer = (id) => ({ metadata: { id, responder: '0x1111111111111111111111111111111111111111' }, payload: { questionId: 'q1', answer: id } });
+	const coordinator = new SessionWriteCoordinator(state, {}, {
+		now: () => 1_000,
+		runResultsAnalysisAutoJob: async () => {
+			await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-new', committedResponses: [answer('r2')] });
+			return { ok: false, status: 503, error: 'Provider unavailable.' };
+		},
+	});
+	await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-old', committedResponses: [answer('r1')] });
+	await coordinator.runQueuedResultsAnalysisAutoJob();
+	const status = await coordinator.readResultsAnalysisStatus();
+	assert.equal(status.lastFailure.retryAttempt, 1);
+	assert.equal(status.lastFailure.nextAttemptAtMs, 61_000);
+	assert.equal(status.lastFailure.retriesExhausted, undefined);
+	assert.equal(alarms.at(-1), 61_000);
+	const queued = store.get('results-analysis-auto-job-v1');
+	assert.equal(queued.requestId, 'auto-new:retry-1');
+	assert.deepEqual(queued.committedResponses.map((entry) => entry.metadata.id), ['r1', 'r2']);
+});
+
+test('SessionWriteCoordinator resets retry attempts after success with a mid-run upload', async () => {
+	const { state, store } = createTransactionalState();
+	let now = 1_000;
+	let run = 0;
+	const coordinator = new SessionWriteCoordinator(state, {}, {
+		now: () => now,
+		runResultsAnalysisAutoJob: async () => {
+			if (++run === 2) {
+				await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-new', committedResponses: [{ metadata: { id: 'r2', responder: '0x1111111111111111111111111111111111111111' }, payload: { answer: 'new' } }] });
+				return { ok: true, jobState: 'succeeded' };
+			}
+			return { ok: false, status: 503, error: 'Provider unavailable.' };
+		},
+	});
+	await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-old', committedResponses: [] });
+	await coordinator.runQueuedResultsAnalysisAutoJob();
+	now = 61_000;
+	await coordinator.runQueuedResultsAnalysisAutoJob();
+	const queued = store.get('results-analysis-auto-job-v1');
+	assert.equal(queued.requestId, 'auto-new');
+	assert.equal(queued.retryAttempt, undefined);
+	assert.equal(queued.committedResponses[0].metadata.id, 'r2');
+	now = 62_000;
+	await coordinator.runQueuedResultsAnalysisAutoJob();
+	assert.equal((await coordinator.readResultsAnalysisStatus()).lastFailure.retryAttempt, 1);
+});
+
 test('SessionWriteCoordinator pauses automatic analysis after its retries or a permanent failure', async () => {
 	let now = 1_000;
 	const alarms = [];

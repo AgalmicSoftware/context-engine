@@ -680,7 +680,8 @@ export class SessionWriteCoordinator {
     const retryDelayMs = await this.state.storage.transaction(async (transaction) => {
       const queued = await transaction.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
       const record = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
-      const sameJob = !job || (queued?.queuedAtMs === job.queuedAtMs && queued?.requestId === job.requestId);
+      // Uploads replace requestId while preserving the queue entry's creation time.
+      const sameJob = !job || queued?.queuedAtMs === job.queuedAtMs;
       const retryable = error?.retryable !== false && RESULTS_ANALYSIS_RETRYABLE_STATUSES.has(Number(error?.status));
       const retryAttempt = (Number(queued?.retryAttempt) || 0) + 1;
       const delayMs = retryable && sameJob && isObjectRecord(queued) ? RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS[retryAttempt - 1] : undefined;
@@ -743,7 +744,7 @@ export class SessionWriteCoordinator {
       return result;
     }
     const current = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-    const sameQueuedJob = current?.queuedAtMs === job.queuedAtMs && current?.requestId === job.requestId;
+    const sameQueuedJob = current?.queuedAtMs === job.queuedAtMs;
     if (
       sameQueuedJob &&
       result?.reason === 'threshold_not_met' &&
@@ -763,8 +764,13 @@ export class SessionWriteCoordinator {
         };
       }
     }
-    if (sameQueuedJob) {
+    if (sameQueuedJob && current.requestId === job.requestId) {
       await this.state.storage.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+    } else if (sameQueuedJob && result?.ok === true && !result.skipped) {
+      // New uploads still need analysis, but the successful run ended this outage.
+      delete current.retryAttempt;
+      await this.state.storage.put(RESULTS_ANALYSIS_AUTO_JOB_KEY, current);
+      await this.scheduleResultsAnalysisAlarm();
     }
     return result;
   }
