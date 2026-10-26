@@ -100,8 +100,8 @@ const workerFetch = (env, seen = []) => async (url, init = {}) => {
   return sessionCorsWorker.fetch(request, env, { waitUntil: () => {}, passThroughOnException: () => {} });
 };
 
-const createAgent = async (env, displayName, seen, fetchImpl = null, { now, sbt, createProvider, wallet: existingWallet } = {}) => {
-  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-agent-'));
+const createAgent = async (env, displayName, seen, fetchImpl = null, { now, sbt, createProvider, wallet: existingWallet, stateDir: existingStateDir } = {}) => {
+  const stateDir = existingStateDir || await fs.mkdtemp(path.join(os.tmpdir(), 'ce-agent-'));
   const wallet = existingWallet || ethers.Wallet.createRandom();
   const participant = createParticipant({
     ...(now ? { now } : {}),
@@ -648,6 +648,67 @@ test('a stopped answer call sends nothing', async () => {
 
 test('a hosted answer remains submitted when saving its local history fails after upload', async (t) => {
   const env = createEnv([sessionConfig()]);
+  let agent;
+  const fetchWorker = workerFetch(env);
+  agent = await createAgent(env, 'state-fixture', [], async (url, init) => {
+    const response = await fetchWorker(url, init);
+    if (new URL(url).pathname === '/storage/upload' && JSON.parse(init.body).resource === 'responses') {
+      await fs.rename(path.join(agent.stateDir, 'state.json'), path.join(agent.stateDir, 'state.saved.json'));
+      await fs.mkdir(path.join(agent.stateDir, 'state.json'));
+    }
+    return response;
+  });
+  t.after(() => fs.rm(agent.stateDir, { recursive: true, force: true }));
+  await agent.participant.joinSession({ link: LINK });
+  const { questionId } = await agent.participant.addStatement({ prompt: STATEMENT });
+  const result = await agent.participant.answer({ answers: [{ questionId, value: 'Agree' }] });
+  assert.equal(result.submitted, 1);
+  assert.equal(result.failed, 0);
+  assert.match(result.warning, /submitted.*local answer history.*not.*saved/i);
+});
+
+
+test('a timed-out answer reuses its persisted request after an agent restart', async (t) => {
+  const env = createEnv([sessionConfig()]);
+  const fetchWorker = workerFetch(env);
+  let agent;
+  let loseReply = true;
+  const uploads = [];
+  const fetchImpl = async (url, init) => {
+    const body = init.body ? JSON.parse(init.body) : {};
+    if (new URL(url).pathname === '/storage/upload' && body.resource === 'responses') {
+      uploads.push(body);
+      const saved = JSON.parse(await fs.readFile(path.join(agent.stateDir, 'state.json'), 'utf8'));
+      const pending = Object.values(saved.sessions)[0].pendingUploads?.[JSON.parse(body.data).questionID];
+      assert.equal(pending?.requestId, body.requestId, 'the retry key is durable before sending');
+      assert.equal(pending?.payloadDigest, ethers.utils.sha256(ethers.utils.toUtf8Bytes(body.data)).slice(2));
+      const result = await fetchWorker(url, init);
+      if (loseReply) { loseReply = false; throw new DOMException('Timed out', 'TimeoutError'); }
+      return result;
+    }
+    return fetchWorker(url, init);
+  };
+  agent = await createAgent(env, 'retry-fixture', [], fetchImpl);
+  t.after(() => fs.rm(agent.stateDir, { recursive: true, force: true }));
+  await agent.participant.joinSession({ link: LINK });
+  const { questionId } = await agent.participant.addStatement({ prompt: STATEMENT });
+  const answers = [{ questionId, value: 'Agree' }];
+  assert.equal((await agent.participant.answer({ answers })).failed, 1);
+  assert.equal(storedRecords(env, 'responses').length, 1);
+  const restarted = await createAgent(env, 'retry-fixture', [], fetchImpl, { wallet: agent.wallet, stateDir: agent.stateDir });
+  assert.equal((await restarted.participant.answer({ answers })).submitted, 1);
+  assert.equal(uploads[0].requestId, uploads[1].requestId);
+  assert.equal(storedRecords(env, 'responses').length, 1);
+  const saved = JSON.parse(await fs.readFile(path.join(agent.stateDir, 'state.json'), 'utf8'));
+  assert.deepEqual(Object.values(saved.sessions)[0].pendingUploads, {});
+  assert.equal((await restarted.participant.answer({ answers })).submitted, 1);
+  assert.notEqual(uploads[1].requestId, uploads[2].requestId);
+  assert.equal(storedRecords(env, 'responses').length, 2);
+});
+
+
+test('an answer is not sent when its retry key cannot be persisted', async (t) => {
+  const env = createEnv([sessionConfig()]);
   const agent = await createAgent(env, 'state-fixture');
   t.after(() => fs.rm(agent.stateDir, { recursive: true, force: true }));
   await agent.participant.joinSession({ link: LINK });
@@ -655,7 +716,7 @@ test('a hosted answer remains submitted when saving its local history fails afte
   await fs.rename(path.join(agent.stateDir, 'state.json'), path.join(agent.stateDir, 'state.saved.json'));
   await fs.mkdir(path.join(agent.stateDir, 'state.json'));
   const result = await agent.participant.answer({ answers: [{ questionId, value: 'Agree' }] });
-  assert.equal(result.submitted, 1);
-  assert.equal(result.failed, 0);
-  assert.match(result.warning, /submitted.*local answer history.*not.*saved/i);
+  assert.equal(result.submitted, 0);
+  assert.equal(result.failed, 1);
+  assert.equal(storedRecords(env, 'responses').length, 0);
 });

@@ -258,9 +258,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const entry = fresh.sessions[sessionKey(ctx.info)];
       if (!isRecord(entry) || entry.sessionId !== ctx.client.sessionId) return;
       entry.answers = isRecord(entry.answers) ? entry.answers : {};
-      answered.forEach(({ questionId, record, answeredAt, chainOrder }) => {
+      answered.forEach(({ questionId, record, answeredAt, chainOrder, requestId }) => {
         entry.answers[questionId] = { value: record.answer.value, comment: record.additional.value, answeredAt,
           ...(ctx.registry && chainOrder ? chainOrder : {}) };
+        if (requestId && entry.pendingUploads?.[questionId]?.requestId === requestId) delete entry.pendingUploads[questionId];
       });
     });
 
@@ -737,9 +738,21 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         try {
           const data = JSON.stringify(built.record);
           const digest = createHash('sha256').update(data).digest('hex');
-          const storageRef = await ctx.client.upload({ resource: 'responses', data, requestId: `answer:v1:${operationId}:${questionId}:${digest}` });
+          let requestId;
+          // A tool call can time out after storage succeeded. Keep its key before
+          // sending, under the same wallet/session state lock as answer history.
+          await saveState((fresh) => {
+            const entry = fresh.sessions[sessionKey(ctx.info)];
+            if (!isRecord(entry) || entry.sessionId !== ctx.client.sessionId) throw new Error('Session identity changed; join again before answering.');
+            entry.pendingUploads = isRecord(entry.pendingUploads) ? entry.pendingUploads : {};
+            const previous = entry.pendingUploads[questionId];
+            requestId = previous?.payloadDigest === digest && trim(previous.requestId)
+              ? previous.requestId : `answer:v1:${operationId}:${questionId}:${digest}`;
+            entry.pendingUploads[questionId] = { payloadDigest: digest, requestId };
+          });
+          const storageRef = await ctx.client.upload({ resource: 'responses', data, requestId });
           if (text(storageRef?.id)) cacheRecord(ctx, text(storageRef.id), built.record);
-          answered.push({ questionId, record: built.record, answeredAt: text(storageRef?.createdAt) || new Date(now()).toISOString() });
+          answered.push({ questionId, requestId, record: built.record, answeredAt: text(storageRef?.createdAt) || new Date(now()).toISOString() });
           results.push({ questionId, ok: true, answer: built.record.answer.value });
         } catch (error) {
           results.push({ questionId, ok: false, error: describeError(error) });

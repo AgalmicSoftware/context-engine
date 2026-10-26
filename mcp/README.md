@@ -247,3 +247,9 @@ that scope. The `prepack` script builds the standalone bundle and third-party
 license notices.
 Tag the release `contextengine-v<version>` and pin that version in agent host
 configurations. Publishing and tagging are maintainer actions.
+
+Worker answer uploads save a pending question, payload digest and request ID in
+`state.json` before sending. Repeating an identical failed call, including after
+an agent restart, reuses that ID so a lost reply does not create another record.
+A changed payload starts a new request; successful answer history clears the
+pending entry. If the pending key cannot be saved, the agent does not upload.
