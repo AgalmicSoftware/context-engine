@@ -1224,7 +1224,10 @@ it needs to fit into a shared control row. Mobile question cards keep the same h
 across question types and prompt lengths, so the navigation stays in place. Long
 prompts use the space left by each answer type and shrink only when they overflow,
 down to the normal body-text size. Longer text remains scrollable. Binary choices
-share one compact row; multichoice options use two rows with horizontal scrolling.
+use their original larger sizing when the full-size prompt and controls fit;
+otherwise they share one compact row. Rating sliders sit at the card's vertical
+center when the prompt and footer leave enough room. Multichoice options use two
+rows with horizontal scrolling.
 These layout adjustments apply only at narrow phone widths (480px and below);
 wider views retain their existing typography, button sizes, and answer layout.
 Above 768px, the navigation arrows and question-action icons form one evenly

@@ -7573,6 +7573,45 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     line-height: 1.25;
   }
 
+  .pileCardBody[data-pile-answer-layout='roomy'] {
+    .pileCardHeader {
+      flex: 0 0 auto;
+    }
+
+    .pileCardMainContent {
+      flex: 1 1 auto;
+    }
+
+    #binaryChoice {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+
+      .radioOptionText {
+        flex: 0 0 auto;
+        padding: 0.5rem 1rem;
+        font-size: 1.5rem;
+        line-height: 1.5;
+      }
+    }
+  }
+
+  .pileCardBody[data-pile-answer-layout='centered'] {
+    position: relative;
+
+    .pileCardHeader {
+      flex: 0 0 auto;
+    }
+
+    .pileCardMainContent {
+      position: absolute;
+      top: 50%;
+      right: 16px;
+      left: 16px;
+      height: 64px;
+      transform: translateY(-50%);
+    }
+  }
+
   .pileCardInner .multichoiceQuestionContainer {
     padding: 0 0 6px;
   }
@@ -7613,6 +7652,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       left: 4px;
       width: 11px;
       height: 11px;
+    }
+
+    .pileCardBody[data-pile-answer-layout='roomy'] #binaryChoice .radioOptionText {
+      padding: 7px 10px 7px 32px;
+      font-size: 0.82rem;
+
+      &::before {
+        left: 9px;
+        width: 13px;
+        height: 13px;
+      }
     }
   }
 
