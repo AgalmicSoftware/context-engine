@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { installSessionCoordinatorBinding, createSignedSiweBody, makeJsonRequest } from '../../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { createWorkerRuntime } from './worker.js';
 import { storageRoute } from './storageRouteExecution.js';
-import { exportSessionBackup } from './sessionBackup.js';
+import { exportSessionBackup as exportPage } from './sessionBackup.js';
 import { STORAGE_EXPORT_PAGE_LIMITS } from './storageScanBudget.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { workerGroupBackupPrefixes } from './workerGroups.js';
@@ -21,9 +21,20 @@ const admin = `0x${'1'.repeat(40)}`;
 const expectedAuthority = { actor: admin, revision: 1, authzEpoch: 0 };
 const memoryKv = () => {
   const values = new Map();
-  return { values, get: async (key) => values.get(key) ?? null,
-    put: async (key, value) => values.set(key, value), delete: async (key) => values.delete(key),
+  const gets = new Map();
+  const requests = [];
+  let operations = null;
+  const operation = () => { if (operations != null && ++operations > 1000) throw new Error('KV request exceeded 1000 operations'); };
+  return { values, gets, requests,
+    request: async (callback) => {
+      operations = 0;
+      try { return await callback(); } finally { requests.push(operations); operations = null; }
+    },
+    get: async (key) => { operation(); gets.set(key, (gets.get(key) || 0) + 1); return values.get(key) ?? null; },
+    put: async (key, value) => { operation(); return values.set(key, value); },
+    delete: async (key) => { operation(); return values.delete(key); },
     list: async ({ prefix = '', cursor = '', limit = 100 } = {}) => {
+      operation();
       const names = [...values.keys()].filter((key) => key.startsWith(prefix) && key > cursor).sort();
       const keys = names.slice(0, limit).map((name) => ({ name }));
       return { keys, list_complete: names.length <= limit, cursor: names.length > limit ? keys.at(-1).name : '' };
@@ -145,6 +156,14 @@ test('backup export requires the signed admin action and sends no-store', async 
   assert.equal(result.manifest.type, 'ce_session_backup');
 });
 
+const exportSessionBackup = async (args) => {
+  for (;;) {
+    const page = await args.env.GROUP_KV.request(() => exportPage(args));
+    if (!page.preparing) return page;
+    assert.ok(page.nextCursor && page.nextCursor !== args.cursor);
+    args = { ...args, cursor: page.nextCursor };
+  }
+};
 const allPages = async (env) => {
   const pages = [];
   let cursor = '';
@@ -155,8 +174,14 @@ const allPages = async (env) => {
   } while (cursor);
   return pages;
 };
-const importPage = (env, page, revision = 0) => callSessionConfigCoordinator({ env, slug, path: 'backup/import',
-  expectedAuthority: { ...expectedAuthority, revision }, page, adoptSessionId: true });
+const importPage = async (env, page, revision = 0) => {
+  for (let tries = 0; tries < 200; tries += 1) {
+    const result = await env.GROUP_KV.request(() => callSessionConfigCoordinator({ env, slug, path: 'backup/import',
+      expectedAuthority: { ...expectedAuthority, revision }, page, adoptSessionId: true }));
+    if (!result.ok || result.body.pageComplete !== false) return result;
+  }
+  assert.fail('Import page did not finish within its bounded continuations');
+};
 
 test('restore validates recovery keys, skips page replays, and never overwrites a conflicting row', async () => {
   const source = fixture();
@@ -572,4 +597,62 @@ test('an upload between export pages makes the archive incomplete and asks for a
   assert.equal(next.nextCursor, '');
   assert.equal(next.reason, 'backup_session_changed');
   assert.match(next.error, /session changed during export; export again/i);
+});
+
+
+test('large group snapshots and small payload pages stay within the KV request budget', async (t) => {
+  const source = fixture();
+  const [, , memberPrefix, principalPrefix] = workerGroupBackupPrefixes({ slug, sessionId });
+  for (let n = 0; n < 1000; n += 1) {
+    source.kv.values.set(`${memberPrefix}group:${n}`, JSON.stringify({ member: n }));
+    source.kv.values.set(`${principalPrefix}${n}:group`, 'group');
+  }
+  for (let n = 0; n < 150; n += 1) {
+    const id = `cf_budget_${String(n).padStart(4, '0')}`;
+    const metadata = { id, resource: 'responses', size: 5 };
+    source.kv.values.set(`ce-storage:${slug}:responses:${id}`, JSON.stringify(metadata));
+    source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('hello').toString('base64url') }));
+  }
+  const pages = await allPages(source.env);
+  assert.equal(pages.at(-1).manifest.complete, true);
+  assert.ok(source.kv.requests.every((operations) => operations <= STORAGE_EXPORT_PAGE_LIMITS.operations));
+  for (const [key, count] of source.kv.gets) if (key.startsWith(memberPrefix) || key.startsWith(principalPrefix)) assert.equal(count, 1, key);
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  let result;
+  for (const page of pages) result = await importPage(target.env, page);
+  assert.equal(result.body.complete, true, JSON.stringify(result));
+  assert.ok(target.kv.requests.every((operations) => operations <= STORAGE_EXPORT_PAGE_LIMITS.operations), JSON.stringify(target.kv.requests));
+  assert.deepEqual(result.body.counts, { written: 2301, skipped: 0, conflicts: 0 });
+  t.diagnostic(`KV peaks: export ${Math.max(...source.kv.requests)}, import ${Math.max(...target.kv.requests)}; ${source.kv.requests.length} export requests, ${target.kv.requests.length} import requests`);
+  assert.equal([...target.kv.values.keys()].filter((key) => key.startsWith(memberPrefix)).length, 1000);
+  assert.equal([...target.kv.values.keys()].filter((key) => key.startsWith(`ce-storage:${slug}:responses:`)).length, 150);
+});
+
+
+test('cached group snapshots detect mutations during an export page and reclaim expired chunks', async () => {
+  const source = largeArchiveSource();
+  const get = source.kv.get;
+  let snapshotStore;
+  let snapshotKey;
+  let changed = false;
+  source.kv.get = async (key) => {
+    if (!changed && key.startsWith('ce-storage-payload:')) {
+      snapshotStore = [...source.env.__coordinatorInstances.values()].find(({ store }) => [...store.keys()].some((name) => name.startsWith('worker-group-backup-meta:'))).store;
+      snapshotKey = [...snapshotStore.keys()].find((name) => name.startsWith('worker-group-backup-meta:'));
+      snapshotStore.set('storage-backup-revision', 1);
+      changed = true;
+    }
+    return get(key);
+  };
+  const page = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  assert.equal(page.reason, 'backup_session_changed');
+  assert.equal(page.manifest.complete, false);
+  assert.equal(page.nextCursor, '');
+  const expiredChunks = [...snapshotStore.keys()].filter((key) => key.includes(':data:'));
+  assert.ok(expiredChunks.length);
+  snapshotStore.set(snapshotKey, { ...snapshotStore.get(snapshotKey), expiresAt: 1 });
+  await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  assert.ok(expiredChunks.every((key) => !snapshotStore.has(key)));
+  assert.equal(snapshotStore.has(snapshotKey), false);
 });

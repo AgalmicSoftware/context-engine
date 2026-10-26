@@ -10,6 +10,7 @@ export const RESULTS_ANALYSIS_SCAN_LIMITS = Object.freeze({
   payloadBytes: 8 * 1024 * 1024,
 });
 export const STORAGE_EXPORT_PAGE_LIMITS = Object.freeze({
+  operations: 800,
   rows: 100,
   metadataBytes: 2 * 1024 * 1024,
   encodedBytes: 4 * 1024 * 1024,
@@ -99,4 +100,25 @@ export const parseStorageExportCursor = ({ cursor, prefix, sessionId = '' }) => 
   } catch {
     throw new Error('Invalid export cursor for this session and resource.');
   }
+};
+
+
+export const createStorageExportBudget = () => {
+  // Leave room for signed authority checks and coordinator snapshot reads.
+  let operations = 32;
+  return {
+    get remaining() { return STORAGE_EXPORT_PAGE_LIMITS.operations - operations; },
+    consume(count = 1) {
+      if (operations + count > STORAGE_EXPORT_PAGE_LIMITS.operations) throw new StorageReadLimitError('operations');
+      operations += count;
+    },
+    wrap(store) {
+      const budget = this;
+      return new Proxy(store, { get(target, property) {
+        const method = target[property];
+        if (!['get', 'put', 'delete', 'list'].includes(property) || typeof method !== 'function') return method;
+        return (...args) => { budget.consume(); return method.apply(target, args); };
+      } });
+    },
+  };
 };

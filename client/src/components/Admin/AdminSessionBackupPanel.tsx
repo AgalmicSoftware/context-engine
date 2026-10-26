@@ -163,7 +163,17 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
       for (;;) {
         setStatus(`Downloading page ${downloaded.current.length + 1}…`);
         const last = downloaded.current.at(-1);
-        const value = await request('export-session-backup', { cursor: last?.nextCursor || '' });
+        let cursor = last?.nextCursor || '';
+        let value: unknown;
+        for (;;) {
+          value = await request('export-session-backup', { cursor });
+          const preparation = record(value);
+          if (preparation.preparing !== true) break;
+          if (typeof preparation.nextCursor !== 'string' || preparation.nextCursor === cursor)
+            throw new Error('The group snapshot did not advance. Restart the download.');
+          cursor = preparation.nextCursor;
+          setStatus('Preparing the group snapshot…');
+        }
         if (record(value).reason === 'backup_session_changed') throw new Error(String(record(value).error));
         if (
           !isPage(value, sessionSlug) ||
@@ -243,6 +253,7 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
         if (result.ok !== true || !result.counts)
           throw new Error('The Worker did not confirm this restore page. Resume to retry it.');
         setActiveRestore(result.restore ? record(result.restore) : null);
+        if (result.pageComplete === false) continue;
         position += 1;
         setRestorePosition(position);
       }

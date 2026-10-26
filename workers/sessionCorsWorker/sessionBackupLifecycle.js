@@ -10,12 +10,13 @@ const fail = (message) => { throw Object.assign(new Error(message), { status: 40
 // Abandonment removes temporary chunks and progress, never existing records.
 // A large staging area is cleaned in bounded requests; the lock stays held
 // until cleanup finishes, so no second archive can reuse its state.
-const cleanup = async (coordinator, slug, archiveId, progress) => {
+const cleanup = async (coordinator, slug, archiveId, progress, budget) => {
   const { storage } = coordinator.state;
   const key = backupImportStateKey(archiveId);
   progress.abandoning = true;
   await storage.put(key, progress);
-  const index = getStorageIndexBinding(coordinator.env);
+  const rawIndex = getStorageIndexBinding(coordinator.env);
+  const index = budget ? budget.wrap(rawIndex) : rawIndex;
   const staged = await index.list({ prefix: backupImportStagePrefix(slug, archiveId), limit: 200 });
   for (const { name } of staged.keys || []) await index.delete(name);
   if (staged.list_complete === false) return false;
@@ -27,7 +28,7 @@ const cleanup = async (coordinator, slug, archiveId, progress) => {
   return true;
 };
 
-export const readActiveBackupImport = async (coordinator, slug, cleanExpired = true) => {
+export const readActiveBackupImport = async (coordinator, slug, cleanExpired = true, budget) => {
   const { storage } = coordinator.state;
   const archiveId = await storage.get(BACKUP_IMPORT_ACTIVE_KEY);
   if (!archiveId) return null;
@@ -35,7 +36,7 @@ export const readActiveBackupImport = async (coordinator, slug, cleanExpired = t
   if (!progress || progress.finished) return null;
   const expired = !Number.isFinite(progress.expiresAt) || progress.expiresAt <= coordinator.now();
   if (cleanExpired && (expired || progress.abandoning) && !progress.configPublished) {
-    if (await cleanup(coordinator, slug, archiveId, progress)) return null;
+    if (await cleanup(coordinator, slug, archiveId, progress, budget)) return null;
   }
   return { archiveId, progress };
 };

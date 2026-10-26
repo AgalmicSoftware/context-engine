@@ -1836,6 +1836,7 @@ export class SessionWriteCoordinator {
       if (byteLength(JSON.stringify(intent)) > WORKER_GROUP_INTENT_MAX_BYTES) {
         return jsonResponse({ ok: false, status: 400, reason: 'worker_group_input_too_large' }, 400);
       }
+      await bumpStorageBackupRevision(this.state.storage);
       {
         // A retried create meets its own pending reservation here too.
         const settled = await this.settleWorkerGroupReservations({

@@ -9,7 +9,7 @@ import { coordinateWorkerGroupBackup } from './workerGroups.js';
 import { base64urlToBytes, bytesToBase64url } from './storageEnvelopeEncryption.js';
 import { isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
 import { isStorageResourceId } from './storageUploadValidation.js';
-import { STORAGE_EXPORT_PAGE_LIMITS, jsonByteLength } from './storageScanBudget.js';
+import { STORAGE_EXPORT_PAGE_LIMITS, createStorageExportBudget, jsonByteLength } from './storageScanBudget.js';
 import { rejectKvValueOverLimit, resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import { buildIndexKey, buildObjectKey, buildPayloadKey, getStorageIndexBinding, getStorageR2Binding, readStoredCloudflarePayloadBytes } from './storageRouteExecution.js';
 
@@ -94,11 +94,13 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const targetId = resolveCanonicalWorkerSessionIdHex(current?.config || {});
   if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail('The backup session identity does not match this target.', 409, 'backup_session_mismatch');
   if (page.archiveId !== await sha256Hex(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail('Invalid backup archive identity.');
-  const index = getStorageIndexBinding(env);
+  const budget = createStorageExportBudget();
+  const rawIndex = getStorageIndexBinding(env);
+  const index = rawIndex ? budget.wrap(rawIndex) : null;
   if (!index?.get || !index?.put || !index?.delete) fail('Restore storage is unavailable.', 503);
   const stateKey = `session-backup-import:${page.archiveId}`;
   const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
-  const active = await readActiveBackupImport(coordinator, slug);
+  const active = await readActiveBackupImport(coordinator, slug, true, budget);
   if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail('Another backup restore is in progress. Check restore status to abandon it.', 409, 'backup_restore_in_progress');
   const pageHash = await sha256Hex(JSON.stringify(page));
   const receiptKey = `${stateKey}:page:${page.pageNumber}`;
@@ -159,10 +161,18 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     if (offset !== header.size || await digest(bytes) !== header.sha256) fail('Backup payload checksum mismatch.');
     return bytes;
   };
+  const pending = async () => {
+    await storage.put(stateKey, progress);
+    return Response.json({ ok: true, archiveId: page.archiveId, pageNumber: page.pageNumber, pageComplete: false,
+      counts: progress.counts, conflicts: progress.conflicts, complete: false,
+      restore: { archiveId: page.archiveId, inProgress: true, canAbandon: !progress.configPublished } });
+  };
   for (let i = progress.nextEntry; i < page.entries.length; i += 1) {
     const entry = page.entries[i];
+    const headerForBudget = entry.kind === 'chunk' ? await storage.get(descriptorKey(entry.id, entry.target)) : null;
+    const cost = headerForBudget && headerForBudget.nextChunk + 1 === headerForBudget.chunkCount ? headerForBudget.chunkCount + 16 : 4;
+    if (budget.remaining < cost + 16) return pending();
     const updates = [];
-    const cleanup = [];
     if (entry.kind === 'owner' || entry.kind === 'hidden') {
       await write(index, entry.key, entry.value, true);
       progress.observed[entry.kind === 'owner' ? 'owners' : 'hidden'] += 1;
@@ -180,6 +190,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       progress.observed.records += 1;
     } else if (entry.kind === 'payload') {
       if (await storage.get(descriptorKey(entry.id, entry.target))) fail('Duplicate backup payload id.');
+      if (entry.chunkCount > STORAGE_EXPORT_PAGE_LIMITS.operations - 64) fail('This payload exceeds the bounded restore assembly limit.', 413);
       if (entry.size > resolveMaxUploadBytes({ env })) fail('The backup payload exceeds this target’s configured upload limit.', 413);
       const { metadata } = entry;
       const header = { id: entry.id, size: entry.size, sha256: entry.sha256, chunkCount: entry.chunkCount, ...(entry.target ? { target: entry.target } : {}) };
@@ -239,7 +250,6 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
           progress.observed.payloads += 1;
           progress.observed.bytes += bytes.length;
           header.payloadOk = payloadOk;
-          for (let n = 0; n < header.chunkCount; n += 1) cleanup.push(chunkKey(entry.id, n));
         }
         progress.pendingPayloads -= 1;
         header.done = true;
@@ -251,18 +261,30 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       for (const [key, value] of updates) await transaction.put(key, value);
       await transaction.put(stateKey, progress);
     });
-    for (const key of cleanup) await index.delete(key);
   }
-  // Repeat cleanup on a retried page even when all its durable entry markers
-  // were already committed before a previous delete failed.
-  for (const id of new Set(page.entries.filter((entry) => entry.kind === 'chunk' && !entry.target).map((entry) => entry.id))) {
+  // Cleanup has its own durable cursor: retrying a busy page cannot spend
+  // its whole budget deleting chunks already removed by a prior request.
+  const cleanupIds = [...new Set(page.entries.filter((entry) => entry.kind === 'chunk' && !entry.target).map((entry) => entry.id))];
+  for (let i = progress.cleanupIndex || 0; i < cleanupIds.length; i += 1) {
+    const id = cleanupIds[i];
     const header = await storage.get(descriptorKey(id));
-    if (header?.done) for (let n = 0; n < header.chunkCount; n += 1) await index.delete(chunkKey(id, n));
+    if (header?.done) {
+      for (let n = progress.cleanupChunk || 0; n < header.chunkCount; n += 1) {
+        if (budget.remaining < 16) return pending();
+        await index.delete(chunkKey(id, n));
+        progress.cleanupChunk = n + 1;
+      }
+    }
+    progress.cleanupIndex = i + 1;
+    progress.cleanupChunk = 0;
+    await storage.put(stateKey, progress);
   }
   if (manifest.complete) {
     if (!progress.snapshotReady || progress.pendingPayloads || progress.pendingRecords || !same(progress.observed, manifest.counts)) fail('The backup is incomplete; its records or chunks are missing.', 409);
+    const snapshotHeader = progress.chunkedSnapshot ? await storage.get(descriptorKey('coordinator', 'coordinator')) : null;
+    if (budget.remaining < (snapshotHeader?.chunkCount || 1) + 32) return pending();
     const snapshot = progress.chunkedSnapshot
-      ? JSON.parse(new TextDecoder().decode(await assemble(await storage.get(descriptorKey('coordinator', 'coordinator')))))
+      ? JSON.parse(new TextDecoder().decode(await assemble(snapshotHeader)))
       : JSON.parse(await index.get(`${root}coordinator`) || 'null');
     validateSnapshot({ snapshot, manifest, ...validators });
     const authority = snapshot.configAuthority;
@@ -270,11 +292,20 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     // already have the same public authority; v1 never rolls it backwards.
     if (current && !same(current, authority)) conflict('session-config-authority');
     if (!progress.counts.conflicts) {
-      const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: 'import', snapshot: snapshot.workerGroups });
-      if (!groups.ok) fail(groups.error || 'Group restore is unavailable.', groups.status || 503);
-      progress.counts.written += groups.counts.written;
-      progress.counts.skipped += groups.counts.skipped;
-      for (const key of groups.conflicts || []) conflict(key);
+      if (!progress.groupsComplete) {
+        if (budget.remaining < 32) return pending();
+        const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: 'import',
+          snapshot: snapshot.workerGroups, cursor: progress.groupCursor, operations: budget.remaining - 16 });
+        if (!groups.ok) fail(groups.error || 'Group restore is unavailable.', groups.status || 503);
+        budget.consume(groups.operations || 0);
+        progress.counts.written += groups.counts.written;
+        progress.counts.skipped += groups.counts.skipped;
+        for (const key of groups.conflicts || []) conflict(key);
+        progress.groupCursor = groups.nextCursor;
+        progress.groupsComplete = !groups.nextCursor;
+        await storage.put(stateKey, progress);
+        if (groups.nextCursor) return pending();
+      }
       if (snapshot.secrets) await write(env.GROUP_KV, `session:${normalizeWorkerSessionSlug(slug)}:secrets`, JSON.stringify(snapshot.secrets), true);
       const signer = snapshot.wrappedSessionKeys.litAuthorizationSigner;
       if (signer) {
@@ -300,13 +331,16 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     restore: progress.finished ? null : { archiveId: page.archiveId, inProgress: true, canAbandon: !progress.configPublished } };
   progress.pageNumber += 1;
   progress.nextEntry = 0;
+  progress.cleanupIndex = 0;
+  progress.cleanupChunk = 0;
   await storage.transaction(async (transaction) => {
     await transaction.put(stateKey, progress);
     await transaction.put(receiptKey, { hash: pageHash, result });
   });
   if (progress.finished && progress.chunkedSnapshot) {
     const header = await storage.get(descriptorKey('coordinator', 'coordinator'));
-    for (let n = 0; n < header.chunkCount; n += 1) await index.delete(chunkKey('coordinator', n, 'coordinator'));
+    // Any remaining coordinator chunks expire with the archive staging TTL.
+    for (let n = 0; n < header.chunkCount && budget.remaining > 8; n += 1) await index.delete(chunkKey('coordinator', n, 'coordinator'));
   }
   return Response.json(result);
 };

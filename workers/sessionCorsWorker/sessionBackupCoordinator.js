@@ -1,3 +1,4 @@
+import { readBackupGroupSnapshot } from './sessionBackupGroupSnapshot.js';
 import { STORAGE_BACKUP_REVISION_KEY } from './storageBackupRevision.js';
 import { resolveWorkerGroupsKv, workerGroupBackupPrefixes } from './workerGroups.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
@@ -62,43 +63,17 @@ export const exportWorkerGroupBackup = async (coordinator, payload) => {
   const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
   const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
   if (!slug || !sessionId) fail('Invalid backup group identity.', 400);
-  const durable = [];
-  let after = '';
-  for (;;) {
-    const page = await coordinator.state.storage.list({ prefix: 'worker-group-capacity-', startAfter: after, limit: 500 });
-    if (!(page instanceof Map)) fail('Group authority could not be read.');
-    const entries = [...page].filter(([key]) => key > after).sort(([a], [b]) => a < b ? -1 : 1);
-    for (const [key, value] of entries) {
+  const kv = resolveWorkerGroupsKv(coordinator.env);
+  if (!kv?.list || !kv?.get) fail('Worker group storage is unavailable.');
+  return json(await readBackupGroupSnapshot({ coordinator, payload: { ...payload, slug, sessionId, kv },
+    prefixes: groupPrefixes(slug), scopeRecords: scopedGroupRecords,
+    validateDurable: (key, value) => {
       if (!object(value) || value.pending || ['creating', 'updating', 'deleting', 'reserved', 'removing'].includes(value.phase || value.state)) {
         fail('A group mutation is pending. Retry the backup after it settles.', 409);
       }
       if (key === 'worker-group-capacity-meta-v3' && (value.slug !== slug || value.sessionId !== sessionId)) fail('Group backup identity conflict.', 409);
-      durable.push([key, value]);
-    }
-    if (entries.length < 500) break;
-    after = entries.at(-1)[0];
-  }
-  const kv = resolveWorkerGroupsKv(coordinator.env);
-  if (!kv?.list || !kv?.get) fail('Worker group storage is unavailable.');
-  const records = [];
-  for (const prefix of groupPrefixes(slug)) {
-    let cursor = '';
-    const visited = new Set();
-    do {
-      if (visited.has(cursor)) fail('Group backup list cursor did not advance.');
-      visited.add(cursor);
-      const page = await kv.list({ prefix, cursor, limit: 100 });
-      for (const { name } of page.keys || []) {
-        if (!name.startsWith(prefix)) fail('Invalid group backup key.');
-        const value = await kv.get(name);
-        if (value == null) fail('Group changed during backup. Retry the export.');
-        records.push([name, value]);
-      }
-      cursor = page.list_complete === false ? String(page.cursor || '') : '';
-      if (page.list_complete === false && !cursor) fail('Group backup list cursor is unavailable.');
-    } while (cursor);
-  }
-  return json({ ok: true, snapshot: { durable, records: scopedGroupRecords(records, slug, sessionId) } });
+    },
+  }));
 };
 
 export const importWorkerGroupBackup = async (coordinator, payload) => {
@@ -122,18 +97,30 @@ export const importWorkerGroupBackup = async (coordinator, payload) => {
   if (!kv?.get || !kv?.put) fail('Group restore storage is unavailable.');
   const counts = { written: 0, skipped: 0 };
   const conflicts = [];
-  // Check every existing row before adding any absent group state. A retry
-  // after a partial storage outage can fill only the still-absent records.
-  for (const [key, value] of [...snapshot.durable, ...snapshot.records]) {
-    const store = key.startsWith('worker-group-capacity-') ? coordinator.state.storage : kv;
-    const existing = await store.get(key);
-    if (existing != null && JSON.stringify(existing) !== JSON.stringify(value)) conflicts.push(key);
+  // A bounded preflight checks existing rows before publication. The apply
+  // pass rechecks each row, preserving changes made between signed pages.
+  let phase = payload.cursor?.phase || 'check';
+  let offset = payload.cursor?.offset || 0;
+  if (!['check', 'apply'].includes(phase) || !Number.isSafeInteger(offset) || offset < 0) fail('Invalid group restore cursor.', 400);
+  const limit = Math.min(700, Math.max(0, Number(payload.operations) || 700));
+  let operations = 0;
+  while (true) {
+    const rows = phase === 'check' ? [...snapshot.durable, ...snapshot.records] : [...snapshot.records, ...snapshot.durable];
+    if (offset > rows.length) fail('Invalid group restore offset.', 400);
+    for (; offset < rows.length; offset += 1) {
+      if (operations + 2 > limit) return json({ ok: true, counts, conflicts, operations, nextCursor: { phase, offset } });
+      const [key, value] = rows[offset];
+      const store = key.startsWith('worker-group-capacity-') ? coordinator.state.storage : kv;
+      const existing = await store.get(key);
+      operations += 1;
+      if (existing != null && JSON.stringify(existing) !== JSON.stringify(value)) conflicts.push(key);
+      else if (phase === 'apply') {
+        if (existing != null) counts.skipped += 1;
+        else { await store.put(key, value); operations += 1; counts.written += 1; }
+      }
+    }
+    if (phase === 'apply' || conflicts.length) return json({ ok: true, counts, conflicts, operations, nextCursor: null });
+    phase = 'apply';
+    offset = 0;
   }
-  if (conflicts.length) return json({ ok: true, counts, conflicts });
-  for (const [key, value] of [...snapshot.records, ...snapshot.durable]) {
-    const store = key.startsWith('worker-group-capacity-') ? coordinator.state.storage : kv;
-    if (await store.get(key) != null) counts.skipped += 1;
-    else { await store.put(key, value); counts.written += 1; }
-  }
-  return json({ ok: true, counts, conflicts });
 };

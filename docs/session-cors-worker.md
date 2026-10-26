@@ -1148,7 +1148,12 @@ Unavailable or mismatched sessions fail closed with a visible error.
 
 Admin-signed `POST /admin/export-session-backup` exports version 1
 `ce_session_backup` pages with `Cache-Control: no-store`. Save every response in
-order and pass `nextCursor` in the next signed request. Only the last page has
+order and pass `nextCursor` in the next signed request. A large group snapshot
+first returns `preparing: true` with a continuation cursor; follow it without
+adding those preparation replies to the archive. Group rows are read once and
+cached in coordinator storage for the archive's seven-day lifetime. Expired
+snapshot chunks are reclaimed in bounded batches on later backup requests.
+Only the last archive page has
 `manifest.complete: true`. The manifest binds the slug and immutable session ID,
 records cumulative counts, and fingerprints the current and optional previous
 KEK with HMAC-SHA256 over `ce-kek-fingerprint-v1`. It contains no recovery key.
@@ -1159,7 +1164,8 @@ Very large coordinator snapshots use a `chunked` descriptor and payload/chunk
 entries with `target: "coordinator"`. Storage traversal includes every resource,
 hidden rows, plaintext rows, payloads, owner records and hidden markers. Payload
 headers carry size, SHA-256 and chunk count; 256 KiB chunks span bounded 4 MiB
-pages. Wrapped DEKs and stored metadata remain unchanged. Auth nonces, rate
+pages. Export and import use an 800-operation budget, leaving headroom below
+the 1,000 KV operations per request limit. Wrapped DEKs and stored metadata remain unchanged. Auth nonces, rate
 counters, upload retry receipts and transient analysis jobs are not recovery
 data and are excluded. Legacy plaintext session secrets must first be saved
 through the encrypted secret workflow.
@@ -1184,7 +1190,10 @@ R2 when bound (otherwise KV), and then publishes metadata. Identical existing
 records are skipped; different records produce conflicts and are never
 overwritten. The response reports cumulative `written`, `skipped`, and
 `conflicts` counts and `complete`. Repeat an unchanged interrupted page to
-resume, or repeat an acknowledged page to receive its saved receipt. Only one
+resume, or repeat an acknowledged page to receive its saved receipt. A reply
+with `pageComplete: false` requests the same page again to continue bounded
+entry processing, chunk cleanup or group publication; advance only after the
+page is acknowledged. The admin panel follows these continuations automatically. Only one
 archive may be in progress for a session. Conflicted restores finish with
 `complete: false`; use a fresh target to resolve conflicts. Temporary staging
 expires after seven days; the next restore or status request releases expired

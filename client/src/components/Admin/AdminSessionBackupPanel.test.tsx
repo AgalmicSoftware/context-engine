@@ -171,3 +171,29 @@ test('offers abandonment after the Worker reports an unfinished restore', async 
   expect(post.mock.calls[1][0].body.archiveId).toBe('unfinished');
   expect(screen.queryByRole('button', { name: 'Abandon restore' })).not.toBeInTheDocument();
 });
+
+test('follows bounded group preparation without putting it in the archive', async () => {
+  const post = jest
+    .fn()
+    .mockResolvedValueOnce({ data: { ok: true, preparing: true, nextCursor: 'groups-next' } })
+    .mockResolvedValueOnce({ data: page(0, true) });
+  render(<AdminSessionBackupPanel {...props} postSignedRequest={post} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Download backup' }));
+  await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[1][0].body.cursor).toBe('groups-next');
+  expect(screen.getByRole('status')).toHaveTextContent('Downloaded 1 pages');
+});
+
+test('resends the same import page until its operation budget continuation finishes', async () => {
+  const counts = { written: 1, skipped: 0, conflicts: 0 };
+  const post = jest
+    .fn()
+    .mockResolvedValueOnce({ data: { ok: true, pageComplete: false, complete: false, counts } })
+    .mockResolvedValueOnce({ data: { ok: true, complete: true, counts } });
+  render(<AdminSessionBackupPanel {...props} postSignedRequest={post} />);
+  await chooseFile([page(0, true)]);
+  fireEvent.click(await screen.findByRole('button', { name: 'Restore from backup' }));
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Restore complete'));
+  expect(post).toHaveBeenCalledTimes(2);
+  expect(post.mock.calls[0][0]).toEqual(post.mock.calls[1][0]);
+});

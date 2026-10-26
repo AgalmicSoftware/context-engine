@@ -9,7 +9,7 @@ import { bytesToBase64url } from './storageEnvelopeEncryption.js';
 import {
   getStorageIndexBinding, getStorageR2Binding, buildPayloadKey, readStoredCloudflarePayloadBytes,
 } from './storageRouteExecution.js';
-import { STORAGE_EXPORT_PAGE_LIMITS, jsonByteLength, storageExportCursor, parseStorageExportCursor } from './storageScanBudget.js';
+import { STORAGE_EXPORT_PAGE_LIMITS, createStorageExportBudget, jsonByteLength, storageExportCursor, parseStorageExportCursor } from './storageScanBudget.js';
 
 const encoder = new TextEncoder();
 const CHUNK_BYTES = 256 * 1024;
@@ -21,22 +21,33 @@ const prefixes = (slug) => [null, `ce-storage-hidden:${slug}:`, `ce-storage-owne
 // export: KV and R2 do not offer a joint, point-in-time snapshot.
 export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = '' }) => {
   const keySlug = sessionSlugStorageKey(slug);
-  const index = getStorageIndexBinding(env);
+  const budget = createStorageExportBudget();
+  const rawIndex = getStorageIndexBinding(env);
+  const index = rawIndex ? budget.wrap(rawIndex) : null;
   if (!index?.list || !index?.get) fail('Backup storage is unavailable.', 503);
   const current = await callSessionConfigCoordinator({ env, slug, path: 'backup/export', expectedAuthority });
   if (!current.ok) fail(current.body?.error || 'Backup authority is unavailable.', current.status);
   const coordinator = current.body.coordinator;
   const sessionId = resolveCanonicalWorkerSessionIdHex(coordinator.configAuthority.config);
   if (!sessionId) fail('The session has no canonical identity.');
-  const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: 'export' });
-  if (!groups.ok) fail(groups.error || 'Group backup is unavailable.', groups.status);
-  coordinator.workerGroups = groups.snapshot;
-  const snapshotBytes = encoder.encode(JSON.stringify(coordinator));
-  const snapshotDigest = await digestBytes(snapshotBytes);
   const prefix = `ce-backup:${keySlug}:`;
   const parsed = parseStorageExportCursor({ cursor, prefix, sessionId });
   const position = parsed.continuation || { phase: 0, listCursor: '', lastKey: '', chunk: -1, pageNumber: 0,
-    exportedAt: new Date().toISOString(), snapshotDigest, writeRevision: current.body.writeRevision, counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 } };
+    exportedAt: new Date().toISOString(), writeRevision: current.body.writeRevision,
+    configDigest: await sha256Hex(JSON.stringify(coordinator)), counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 } };
+  if (position.configDigest !== await sha256Hex(JSON.stringify(coordinator))) fail('Session config changed during backup. Restart the export.');
+  const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: 'export', snapshotId: position.groupSnapshotId });
+  if (!groups.ok) fail(groups.error || 'Group backup is unavailable.', groups.status);
+  budget.consume(groups.operations || 0);
+  position.groupSnapshotId = groups.snapshotId;
+  if (groups.preparing) {
+    position.preparation = (position.preparation || 0) + 1;
+    return { ok: true, preparing: true, nextCursor: storageExportCursor({ prefix, sessionId, continuation: position }) };
+  }
+  coordinator.workerGroups = groups.snapshot;
+  const snapshotBytes = encoder.encode(JSON.stringify(coordinator));
+  const snapshotDigest = await digestBytes(snapshotBytes);
+  if (!position.snapshotDigest) position.snapshotDigest = snapshotDigest;
   const paths = prefixes(keySlug);
   if (!Number.isSafeInteger(position.phase) || position.phase < 0 || position.phase > 6 ||
       !Number.isSafeInteger(position.chunk) || position.chunk < -1 || !Number.isSafeInteger(position.pageNumber) || position.pageNumber < 0 ||
@@ -57,7 +68,9 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
   const finish = async () => {
     const latest = await callSessionConfigCoordinator({ env, slug, path: 'backup/export', expectedAuthority });
     if (!latest.ok) fail(latest.body?.error || 'Backup authority is unavailable.', latest.status);
-    if (position.writeRevision !== latest.body.writeRevision) {
+    const groupCheck = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: 'export', snapshotId: position.groupSnapshotId, checkOnly: true });
+    if (!groupCheck.ok && groupCheck.status !== 409) fail(groupCheck.error || 'Group backup is unavailable.', groupCheck.status);
+    if (!groupCheck.ok || position.writeRevision !== latest.body.writeRevision) {
       manifest.complete = false;
       page.nextCursor = '';
       page.reason = 'backup_session_changed';
@@ -104,7 +117,7 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
     }
     position.phase = 1;
   }
-  outer: while (position.phase < paths.length && rows < STORAGE_EXPORT_PAGE_LIMITS.rows) {
+  outer: while (position.phase < paths.length && rows < STORAGE_EXPORT_PAGE_LIMITS.rows && budget.remaining >= 16) {
     const r2 = position.phase === 5 ? getStorageR2Binding(env) : null;
     if (position.phase === 5 && !r2) { position.phase += 1; break; }
     const listed = await (r2 || index).list({ prefix: paths[position.phase], ...(position.listCursor ? { cursor: position.listCursor } : {}), limit: STORAGE_EXPORT_PAGE_LIMITS.rows });
@@ -114,7 +127,7 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
     for (const key of keys) {
       if (!key.startsWith(paths[position.phase])) fail('Invalid backup storage key.', 503);
       if (key < position.lastKey || (key === position.lastKey && position.chunk === -1)) continue;
-      if (rows >= STORAGE_EXPORT_PAGE_LIMITS.rows) break outer;
+      if (rows >= STORAGE_EXPORT_PAGE_LIMITS.rows || budget.remaining < 16) break outer;
       if (position.phase === 3 || position.phase === 5) {
         const id = key.slice(paths[position.phase].length);
         const raw = await index.get(buildPayloadKey({ slug, id }));
