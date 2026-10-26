@@ -2485,6 +2485,85 @@ test('SessionWriteCoordinator clears failed automatic queues so status surfaces 
 	assert.equal(status.lastFailure.error, 'provider unavailable');
 });
 
+test('SessionWriteCoordinator retries a temporary automatic failure with backoff, then recovers', async () => {
+	let now = 1_000;
+	const alarms = [];
+	const runs = [];
+	const outcomes = [{ ok: false, status: 503, jobState: 'failed', error: 'Provider unavailable.' }, { ok: true, status: 200, jobState: 'succeeded' }];
+	const { state, store } = createTransactionalState();
+	state.storage.setAlarm = async (timestamp) => alarms.push(timestamp);
+	const coordinator = new SessionWriteCoordinator(state, {}, {
+		now: () => now,
+		runResultsAnalysisAutoJob: async ({ job }) => {
+			runs.push(job.requestId);
+			return outcomes.shift();
+		},
+	});
+	const answer = (id) => ({
+		metadata: { id, responder: '0x1111111111111111111111111111111111111111', createdAt: '2026-09-17T00:00:00.000Z' },
+		payload: { sessionSlug: 'session-a', questionId: 'q1', answer: 'a' },
+	});
+	await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-upload:r1', committedResponses: [answer('r1')] });
+	alarms.length = 0;
+	assert.equal((await coordinator.runQueuedResultsAnalysisAutoJob()).status, 503);
+	let status = await coordinator.readResultsAnalysisStatus();
+	assert.equal(status.jobState, 'queued');
+	assert.equal(status.lastFailure.retryAttempt, 1);
+	assert.equal(status.lastFailure.nextAttemptAtMs, 61_000);
+	assert.deepEqual(alarms, [61_000]);
+
+	// A new answer wakes the queue early; it joins the job, which keeps waiting.
+	now = 2_000;
+	await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-upload:r2', committedResponses: [answer('r2')] });
+	alarms.length = 0;
+	assert.equal((await coordinator.runQueuedResultsAnalysisAutoJob()).reason, 'automatic_retry_scheduled');
+	assert.deepEqual(alarms, [61_000]);
+	assert.equal(store.get('results-analysis-auto-job-v1').retryAttempt, 1);
+	assert.deepEqual(runs, ['auto-upload:r1']);
+
+	now = 61_000;
+	assert.equal((await coordinator.runQueuedResultsAnalysisAutoJob()).ok, true);
+	assert.deepEqual(runs, ['auto-upload:r1', 'auto-upload:r2']);
+	assert.equal(store.has('results-analysis-auto-job-v1'), false);
+});
+
+test('SessionWriteCoordinator pauses automatic analysis after its retries or a permanent failure', async () => {
+	let now = 1_000;
+	const alarms = [];
+	let failure = { ok: false, status: 503, jobState: 'failed', error: 'Provider unavailable.' };
+	const { state, store } = createTransactionalState();
+	state.storage.setAlarm = async (timestamp) => alarms.push(timestamp);
+	const coordinator = new SessionWriteCoordinator(state, {}, {
+		now: () => now,
+		runResultsAnalysisAutoJob: async () => failure,
+	});
+	await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-upload:r1', committedResponses: [] });
+	alarms.length = 0;
+	for (const delay of [60_000, 5 * 60_000, 30 * 60_000]) {
+		await coordinator.runQueuedResultsAnalysisAutoJob();
+		assert.equal(alarms.at(-1), now + delay);
+		now += delay;
+	}
+	alarms.length = 0;
+	await coordinator.runQueuedResultsAnalysisAutoJob();
+	assert.equal(store.has('results-analysis-auto-job-v1'), false);
+	assert.deepEqual(alarms, []);
+	let status = await coordinator.readResultsAnalysisStatus();
+	assert.equal(status.jobState, 'failed');
+	assert.equal(status.lastFailure.retriesExhausted, true);
+	assert.equal(status.lastFailure.nextAttemptAtMs, undefined);
+
+	failure = { ok: false, status: 403, jobState: 'unsupported', error: 'AI scope is disabled for this session.' };
+	await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-upload:r2', committedResponses: [] });
+	alarms.length = 0;
+	await coordinator.runQueuedResultsAnalysisAutoJob();
+	assert.equal(store.has('results-analysis-auto-job-v1'), false);
+	assert.deepEqual(alarms, []);
+	status = await coordinator.readResultsAnalysisStatus();
+	assert.equal(status.lastFailure.status, 403);
+	assert.equal(status.lastFailure.retriesExhausted, undefined);
+});
+
 test('SessionWriteCoordinator expires abandoned results-analysis leases and treats failed request replay as terminal', async () => {
 	let now = 1_000;
 	let attempt = 0;

@@ -710,8 +710,9 @@ export const loadWorkerCanonicalResultsAnalysisSource = async (args = {}) => {
       ok: false, status: 503, reason: 'results_analysis_snapshot_unavailable',
       error: 'The complete results snapshot could not be read. No report was generated; the last successful report is unchanged. Retry after storage is available.',
     };
+    // Retrying cannot shrink the session, so automatic runs pause instead.
     return {
-      ok: false, status: 503, reason: 'results_analysis_snapshot_limit',
+      ok: false, status: 503, reason: 'results_analysis_snapshot_limit', retryable: false,
       error: 'The complete results snapshot exceeds the synchronous analysis limit. No report was generated; the last successful report is unchanged. A bounded background snapshot is required for this session.',
     };
   }
@@ -947,6 +948,9 @@ const summarizeFailureState = (failure) => {
     ...(trim(failure.requestId) ? { requestId: trim(failure.requestId) } : {}),
     ...(trim(failure.trigger) ? { trigger: trim(failure.trigger) } : {}),
     ...(Number.isFinite(Number(failure.failedAtMs)) ? { failedAtMs: Number(failure.failedAtMs) } : {}),
+    ...(Number(failure.retryAttempt) > 0 ? { retryAttempt: Number(failure.retryAttempt) } : {}),
+    ...(Number(failure.nextAttemptAtMs) > 0 ? { nextAttemptAtMs: Number(failure.nextAttemptAtMs) } : {}),
+    ...(failure.retriesExhausted === true ? { retriesExhausted: true } : {}),
   };
 };
 
@@ -1135,7 +1139,9 @@ export const maybeTriggerAutomaticResultsAnalysis = async ({ env, slug, config, 
   const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
   const status = await readStatus({ env, slug });
   if (!status?.ok) return { ok: false, status: status?.status || 503, jobState: 'failed', error: status?.error || 'Results analysis status is unavailable; retry.' };
-  if (status?.state?.lastFailure?.trigger === 'automatic') {
+  // A failed automatic run pauses these runs, except for the retry the queue scheduled.
+  const failure = status?.state?.lastFailure;
+  if (failure?.trigger === 'automatic' && !(Number(failure.nextAttemptAtMs) <= Number(deps?.now?.() ?? Date.now()))) {
     return { ok: true, skipped: true, reason: 'automatic_paused_after_failure' };
   }
   const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config, committedResponses });

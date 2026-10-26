@@ -70,6 +70,11 @@ const RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 64;
 const RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES = 48_000;
 const RESULTS_ANALYSIS_RUNNING_LEASE_MS = 14 * 60 * 1000;
 const RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS = 2;
+// A temporary provider or dependency failure retries the queued automatic job
+// after each delay in turn; any other failure, or one past these retries, pauses
+// automatic runs until a manual run succeeds.
+const RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS = [60_000, 5 * 60_000, 30 * 60_000];
+const RESULTS_ANALYSIS_RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const RUNNING_LEASE_MS = 65_000;
 const MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1000;
 const AUTH_NONCE_MAC_KEY = 'auth-nonce-mac-key';
@@ -649,6 +654,8 @@ export class SessionWriteCoordinator {
     if (!job) return { ok: false, status: 400, error: 'Invalid results analysis auto job.' };
     const existing = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
     if (isObjectRecord(existing) && existing.slug === job.slug) {
+      // New answers join a job waiting to retry; they do not reset its retry count.
+      if (existing.retryAttempt) job.retryAttempt = existing.retryAttempt;
       const byId = new Map();
       for (const entry of [...(Array.isArray(existing.committedResponses) ? existing.committedResponses : []), ...job.committedResponses]) {
         const key = toTrimmedString(entry?.metadata?.id) || `${toTrimmedString(entry?.metadata?.responder)}:${toTrimmedString(entry?.metadata?.createdAt)}`;
@@ -670,9 +677,13 @@ export class SessionWriteCoordinator {
 
   async recordResultsAnalysisQueueFailure(error, job) {
     const nowMs = Number(this.now()) || Date.now();
-    await this.state.storage.transaction(async (transaction) => {
+    const retryDelayMs = await this.state.storage.transaction(async (transaction) => {
       const queued = await transaction.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
       const record = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+      const sameJob = !job || (queued?.queuedAtMs === job.queuedAtMs && queued?.requestId === job.requestId);
+      const retryable = error?.retryable !== false && RESULTS_ANALYSIS_RETRYABLE_STATUSES.has(Number(error?.status));
+      const retryAttempt = (Number(queued?.retryAttempt) || 0) + 1;
+      const delayMs = retryable && sameJob && isObjectRecord(queued) ? RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS[retryAttempt - 1] : undefined;
       record.lastFailure = {
         ok: false,
         error: error?.message || error?.error || toTrimmedString(error) || 'Automatic results analysis job failed.',
@@ -680,17 +691,34 @@ export class SessionWriteCoordinator {
         requestId: toTrimmedString(job?.requestId ?? queued?.requestId),
         trigger: 'automatic',
         failedAtMs: nowMs,
+        ...(delayMs ? { retryAttempt, nextAttemptAtMs: nowMs + delayMs } : {}),
+        ...(retryable && !delayMs ? { retriesExhausted: true } : {}),
       };
-      if (!job || (queued?.queuedAtMs === job.queuedAtMs && queued?.requestId === job.requestId)) {
+      if (delayMs) {
+        // Each retry is a new request: the failed one stays a terminal failure.
+        const baseRequestId = toTrimmedString(queued.requestId).replace(/:retry-\d+$/, '');
+        await transaction.put(RESULTS_ANALYSIS_AUTO_JOB_KEY, { ...queued, retryAttempt, requestId: `${baseRequestId}:retry-${retryAttempt}` });
+      } else if (sameJob) {
         await transaction.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
       }
       await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+      return delayMs;
     });
+    if (retryDelayMs) await this.scheduleResultsAnalysisAlarm(retryDelayMs);
   }
 
   async runQueuedResultsAnalysisAutoJob() {
     const job = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
     if (!isObjectRecord(job)) return { ok: true, skipped: true, reason: 'no_job' };
+    // An upload can wake the queue early; a scheduled retry still waits its turn.
+    const retryAtMs = job.retryAttempt
+      ? Number(this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY)).lastFailure?.nextAttemptAtMs) || 0
+      : 0;
+    const nowMs = Number(this.now()) || Date.now();
+    if (retryAtMs > nowMs) {
+      await this.scheduleResultsAnalysisAlarm(retryAtMs - nowMs);
+      return { ok: true, skipped: true, reason: 'automatic_retry_scheduled', nextAttemptAtMs: retryAtMs };
+    }
     const result = await this.runResultsAnalysisAutoJob({
       env: this.env,
       slug: job.slug,

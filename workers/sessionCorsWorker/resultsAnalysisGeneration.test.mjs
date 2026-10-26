@@ -1101,4 +1101,23 @@ test('automatic generation pauses after an automatic failure until manual recove
   assert.equal(result.skipped, true);
   assert.equal(result.reason, 'automatic_paused_after_failure');
   assert.equal(generated, false);
+
+  // A temporary failure's scheduled retry runs once due, and waits until then.
+  const runRetry = (nextAttemptAtMs) => maybeTriggerAutomaticResultsAnalysis({
+    env,
+    slug: 'session-a',
+    config,
+    requestId: 'auto-retry',
+    deps: {
+      now: () => 10_000,
+      readCoordinatedResultsAnalysisStatus: async () => ({ ok: true, state: { lastFailure: { trigger: 'automatic', status: 503, nextAttemptAtMs } } }),
+      reserveCoordinatedResultsAnalysis: async () => ({ kind: 'execute', attemptId: 'attempt-retry' }),
+      finalizeCoordinatedResultsAnalysis: async () => ({ ok: true }),
+      generateAnalysisArtifact: async () => { generated = true; return { ok: true, value: { breakdown: { summary: { overview: 'ok' } } } }; },
+    },
+  });
+  assert.equal((await runRetry(10_001)).reason, 'automatic_paused_after_failure');
+  assert.equal(generated, false);
+  assert.equal((await runRetry(10_000)).ok, true);
+  assert.equal(generated, true);
 });

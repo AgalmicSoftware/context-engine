@@ -664,14 +664,20 @@ Admin test panel:
   distinct participants since the last successful run, defaults to threshold
   `10`, and queues SessionWriteCoordinator alarm work. It does not rely on
   browser snapshots, does not use `waitUntil` for provider work, and does not
-  run for registry/Arweave profiles. If automatic generation fails,
-  `automatic`-only sessions allow an explicit admin manual retry as recovery;
-  otherwise repeated submissions do not thrash provider calls. Storage capacity
-  and read failures before provider admission also persist `lastFailure` and
-  pause automatic generation. An ineligible-input `422` does not persist a
-  failure; later responses can make the next automatic run eligible. The pause
+  run for registry/Arweave profiles. A temporary failure (`408`, `425`, `429`,
+  or `5xx`, including a provider timeout) keeps the job queued and retries it
+  after 1, 5, and then 30 minutes; status shows `retryAttempt` and
+  `nextAttemptAtMs`, and new submissions join the waiting job without resetting
+  its count. Any other failure, or a temporary one after those retries
+  (`retriesExhausted`), pauses automatic generation and keeps the last good
+  artifact. `automatic`-only sessions allow an explicit admin manual retry as
+  recovery; otherwise repeated submissions do not thrash provider calls. Storage
+  capacity and read failures before provider admission also persist
+  `lastFailure` under the same rules. An ineligible-input `422` does not persist
+  a failure; later responses can make the next automatic run eligible. The pause
   check happens before scanning storage, so another submission does not repeat
-  a failing history scan.
+  a failing history scan. Each retry reloads the session's authoritative config,
+  so a disabled AI scope or changed policy stops it.
 - Generated-results AI calls inherit the session's existing AI provider/model
   routing, especially the analysis/thinking assignment. They do not hardcode a
   separate provider or model. Inputs are submitted responses only; Circles is
