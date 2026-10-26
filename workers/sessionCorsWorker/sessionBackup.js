@@ -1,3 +1,4 @@
+import { signBackupPage } from './sessionBackupAuthentication.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { coordinateWorkerGroupBackup } from './workerGroups.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
@@ -86,7 +87,7 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
       if (!await payload('coordinator', snapshotBytes, null, 'coordinator')) {
         position.pageNumber += 1;
         page.nextCursor = storageExportCursor({ prefix, sessionId, continuation: position });
-        return page;
+        return signBackupPage(page, env);
       }
     }
     position.phase = 1;
@@ -144,5 +145,5 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
     position.pageNumber += 1;
     page.nextCursor = storageExportCursor({ prefix, sessionId, continuation: position });
   }
-  return page;
+  return signBackupPage(page, env);
 };

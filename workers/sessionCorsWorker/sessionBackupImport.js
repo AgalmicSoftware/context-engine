@@ -1,3 +1,4 @@
+import { verifyBackupPage } from './sessionBackupAuthentication.js';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
 import { normalizeWorkerSessionSlug, sessionSlugStorageKey } from './sessionSlugResolution.js';
@@ -83,13 +84,14 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const slug = sessionSlugStorageKey(payload?.slug);
   validatePage(page, slug);
   const manifest = page.manifest;
-  const current = await coordinator.assertSessionAuthority(payload);
-  const targetId = resolveCanonicalWorkerSessionIdHex(current?.config || {});
-  if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail('The backup session identity does not match this target.', 409, 'backup_session_mismatch');
   const fingerprints = await Promise.all([env.CE_STORAGE_ENVELOPE_KEK, env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK].filter(Boolean).map(recoveryKeyFingerprint));
   const required = [manifest.kekFingerprint, manifest.previousKekFingerprint].filter(Boolean);
   const missing = required.filter((fingerprint) => !fingerprints.includes(fingerprint));
   if (missing.length) fail(`The target is missing backup recovery keys: ${missing.join(', ')}.`, 409, 'recovery_key_mismatch');
+  if (!await verifyBackupPage(page, env)) fail('Backup page authentication failed. Use the original unmodified archive.', 403, 'backup_authentication_failed');
+  const current = await coordinator.assertSessionAuthority(payload);
+  const targetId = resolveCanonicalWorkerSessionIdHex(current?.config || {});
+  if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail('The backup session identity does not match this target.', 409, 'backup_session_mismatch');
   if (page.archiveId !== await sha256Hex(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail('Invalid backup archive identity.');
   const index = getStorageIndexBinding(env);
   if (!index?.get || !index?.put || !index?.delete) fail('Restore storage is unavailable.', 503);

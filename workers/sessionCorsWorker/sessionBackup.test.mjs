@@ -8,6 +8,7 @@ import { STORAGE_EXPORT_PAGE_LIMITS } from './storageScanBudget.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { workerGroupBackupPrefixes } from './workerGroups.js';
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
 import { selectCanonicalStorageVersions } from '../../shared/storage/canonicalStorageVersions.mjs';
 import { putSessionSecrets } from './sessionConfigSecretsStore.js';
@@ -118,7 +119,7 @@ test('restore refuses missing or altered pages, foreign keys, and mismatched ses
   assert.equal((await importPage(target.env, original)).ok, true);
   const changed = structuredClone(original);
   changed.extra = 'different signed page';
-  assert.equal((await importPage(target.env, changed, 1)).status, 409);
+  assert.equal((await importPage(target.env, changed, 1)).status, 403);
 });
 
 test('backup export requires the signed admin action and sends no-store', async () => {
@@ -450,4 +451,27 @@ test(`restore drill preserves reads, authority, groups and secrets (R2 ${sourceR
   const denied = await connect(unrelated).signed('import-session-backup', { page: pages[0], adoptSessionId: true }, 409);
   assert.equal(denied.reason, 'recovery_key_mismatch');
   assert.equal([...unrelated.kv.values.keys()].filter((key) => key.startsWith('ce-storage')).length, 0);
+});
+
+
+for (const unsigned of [false, true]) test(`restore rejects unauthenticated participant records before writing (unsigned=${unsigned})`, async () => {
+  const source = fixture();
+  const [page] = await allPages(source.env);
+  if (unsigned) delete page.authentication;
+  else {
+    const bytes = Buffer.from(JSON.stringify({ questionID: '0xabc', answer: { value: 'Forged' } }));
+    const metadata = { id: 'cf_forged_answer', resource: 'responses', responder: `0x${'2'.repeat(40)}`,
+      createdAt: '2020-01-01T00:00:00.000Z', size: bytes.length, storageLayer: 'kv' };
+    page.entries.push(
+      { kind: 'payload', id: metadata.id, size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), chunkCount: 1, metadata },
+      { kind: 'chunk', id: metadata.id, index: 0, base64url: bytes.toString('base64url') },
+      { kind: 'record', id: metadata.id, resource: metadata.resource, key: `ce-storage:${slug}:responses:${metadata.id}`, metadata },
+    );
+    Object.assign(page.manifest.counts, { records: 1, payloads: 1, bytes: bytes.length });
+  }
+  const before = [...source.kv.values];
+  const denied = await importPage(source.env, page, 1);
+  assert.equal(denied.status, 403, JSON.stringify(denied));
+  assert.equal(denied.body.reason, 'backup_authentication_failed');
+  assert.deepEqual([...source.kv.values], before);
 });

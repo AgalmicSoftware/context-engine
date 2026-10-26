@@ -1190,6 +1190,11 @@ The target upload limit still applies, and payloads exceeding KV's encoded
 value limit require an R2 binding. Restore does not migrate the session to a
 different slug, rotate stored keys, or replace newer target policy.
 
+Every backup page carries a KEK-derived HMAC. Import refuses unsigned or altered
+pages before writing backup data. Keep the original downloaded JSONL intact;
+editing participant, ownership or authority fields invalidates authentication.
+Deployment-key holders are trusted operators and can create authenticated archives.
+
 The `session_backup_v1` capability advertises these two signed actions.
 Session admin settings show **Backup & restore** only when this capability is
 present. **Download backup** collects all pages into one `.jsonl` file; an
