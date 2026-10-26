@@ -10,10 +10,18 @@ const sessions = JSON.parse(readFileSync(new URL('../client/src/variables/demo/d
 const config = sessions['demo-sh'];
 const quadratic = process.env.SMOKE_QUADRATIC === '1';
 const longPrompt = 'Free AI legal tools that help people challenge government decisions would strengthen democracy more than they would clog the courts.';
+const prompts = [
+  longPrompt,
+  'How should workers get a say in how AI is used in their workplace?',
+  "If a citizens' assembly on AI made clear recommendations tomorrow, how capable is your government of acting on them?",
+  'Think of a time a government gave people like you a real say in a decision. What happened, and what made it work or fail?',
+  'How should a community divide its resources between these priorities?',
+];
 const questions = Array.from({ length: 50 }, (_, index) => ({
   id: `0x${String(index + 1).padStart(64, '0')}`, type: quadratic && index === 0 ? 'quadratic' : ['binary', 'multichoice', 'rating', 'freeform', 'quadratic'][index] || 'binary',
-  prompt: index === 0 ? longPrompt : `Synthetic navigation question ${index + 1}`,
-  options: (quadratic && index === 0) || index === 1 || index === 4 ? Array.from({ length: 8 }, (_, option) => `Synthetic allocation option ${option + 1}`) : [], tags: [],
+  prompt: quadratic && index === 0 ? prompts[4] : index === 6 ? longPrompt.repeat(8) : prompts[index] || `Synthetic navigation question ${index + 1}`,
+  options: index === 1 ? ['No say; management decides', 'Consultation beforehand', 'A union or works council', 'Collective agreements', 'A workplace vote', 'An independent review']
+    : (quadratic && index === 0) || index === 4 ? Array.from({ length: 8 }, (_, option) => `Synthetic allocation option ${option + 1}`) : [], tags: [],
   sessionSlug: 'demo-sh', sessionId: config.sessionId,
 }));
 const browser = await chromium.launch({ headless: true });
@@ -90,11 +98,13 @@ try {
         assert(await filter.isVisible(), 'Desktop filter remains directly accessible');
       }
       const inspect = async expected => {
+        await page.mouse.move(0, 0);
         await page.waitForFunction(expected => {
           const card = document.querySelector('[data-testid="ce-pile-active-question"]');
           if (card?.getAttribute('aria-label') !== `Question ${expected} of 50`) return false;
           const transform = getComputedStyle(card).transform;
-          return transform === 'none' || new DOMMatrixReadOnly(transform).isIdentity;
+          const resting = value => value === 'none' || new DOMMatrixReadOnly(value).isIdentity;
+          return resting(transform) && [...document.querySelectorAll('[class*="pileNavArrow_"]')].every(button => resting(getComputedStyle(button).transform));
         }, expected);
         const layout = await next.evaluate(button => {
           const nav = button.parentElement, controls = nav.parentElement;
@@ -158,13 +168,40 @@ try {
         return layout;
       };
       const firstLayout = await inspect(1);
-      for (let index = 2; index <= 6; index += 1) {
+      const inspectPrompt = async index => {
+        const detail = await page.getByTestId('ce-pile-active-question').evaluate(active => {
+          const header = active.querySelector('[class*="pileCardHeader"]');
+          const title = header.querySelector('h4');
+          const content = active.querySelector('[class*="pileCardMainContent"]');
+          const footer = active.querySelector('[class*="pileCardFooter"]');
+          return { font: parseFloat(getComputedStyle(title).fontSize), overflow: header.scrollHeight > header.clientHeight + 1,
+            headerHeight: header.clientHeight, contentHeight: content.clientHeight, contentBottom: content.getBoundingClientRect().bottom,
+            footerTop: footer.getBoundingClientRect().top, inlineSize: title.style.fontSize, focusable: header.tabIndex === 0 };
+        });
+        if (width <= 480) {
+          assert(detail.font >= 16, `Prompt remains readable: ${JSON.stringify({theme, width, index, detail})}`);
+          if (index === 7) assert(detail.overflow && detail.focusable, 'Extreme prompts retain keyboard-accessible scrolling');
+          else assert(!detail.overflow, `Representative ${questions[index - 1].type} prompt fits: ${JSON.stringify({theme, width, index, detail})}`);
+          assert(detail.footerTop - detail.contentBottom < 15, `Answer area does not leave a large unused gap above the footer: ${JSON.stringify({theme, width, index, detail})}`);
+          if (index === 2) {
+            const optionSizes = await page.getByTestId('ce-pile-active-question').locator('input[type="checkbox"]').evaluateAll(inputs => inputs.map(input => {
+              const label = input.closest('label');
+              return { text: label.textContent, height: label.clientHeight, scrollHeight: label.scrollHeight, width: label.clientWidth };
+            }));
+            assert(optionSizes.every(label => label.scrollHeight <= label.height + 1), `Multichoice option labels fit their rows: ${theme} ${width} ${JSON.stringify(optionSizes)}`);
+          }
+        } else assert.equal(detail.inlineSize, '', 'Wider views retain their original prompt size');
+        if (process.env.OUTPUT_DIR && index <= 5) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-type-${questions[index - 1].type}.png` });
+      };
+      await inspectPrompt(1);
+      for (let index = 2; index <= 7; index += 1) {
         await next.click();
         const current = await inspect(index);
         assert.equal(current.card.bottom - current.card.top, firstLayout.card.bottom - firstLayout.card.top, 'Every question type retains the same card height');
         assert.equal(current.nav.top, firstLayout.nav.top, 'Navigation stays fixed across long/short prompts and question types');
+        await inspectPrompt(index);
       }
-      for (let index = 5; index >= 1; index -= 1) await prev.click();
+      for (let index = 6; index >= 1; index -= 1) await prev.click();
       await inspect(1);
       if (!quadratic && width <= 768) {
         const answerLayout = await page.getByTestId('ce-pile-active-question').evaluate(active => {
@@ -195,9 +232,10 @@ try {
         });
         assert.equal(answerLayout.choices.length, 3, 'All three binary choices are present');
         for (const choice of answerLayout.choices) {
-          if (width >= 596) assert(Math.abs(choice.top - answerLayout.choices[0].top) <= 1, 'Answer buttons share one row when space permits');
-          const originalFontSize = theme === 'classic-95' ? (width <= 640 ? 0.82 : 1) : 1.5;
-          assert(Math.abs(choice.fontSize - answerLayout.rootFontSize * originalFontSize) < 0.1, 'Answer labels retain their original font size');
+          if (width <= 480 || width >= 596) assert(Math.abs(choice.top - answerLayout.choices[0].top) <= 1, 'Binary choices share a row on narrow phones and when the wider layout has room');
+          if (width <= 480) assert(choice.bottom - choice.top >= 44, 'Compact binary choices remain touch-sized');
+          const expectedFontSize = theme === 'classic-95' ? (width <= 640 ? 0.82 : 1) : width <= 480 ? 1 : 1.5;
+          assert(Math.abs(choice.fontSize - answerLayout.rootFontSize * expectedFontSize) < 0.1, 'Only narrow phones use compact labels; wider views keep their original font size');
           assert.equal(choice.fontWeight, '400', 'Unselected answer labels retain their original weight');
           assert(choice.top >= answerLayout.header.bottom && choice.bottom <= answerLayout.footer.top, 'Answer buttons sit between the scrollable prompt and footer');
           assert(choice.top >= answerLayout.content.top && choice.bottom <= answerLayout.content.bottom + 1, 'Answer buttons are not clipped by their content area');
@@ -250,9 +288,25 @@ try {
       const after = await inspect(20);
       assert.equal(after.nav.top, before.nav.top, 'Navigation does not jump after switching questions');
       if (process.env.OUTPUT_DIR) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}.png` });
-      await page.getByTestId('ce-pile-active-question').getByText('Agree', { exact: true }).click();
+      await page.getByTestId('ce-pile-active-question').getByText('Disagree', { exact: true }).click();
       await inspect(21);
       assert(await page.getByRole('button', { name: /^Submit/ }).isVisible(), 'Pending draft keeps Submit visible');
+      await prev.click();
+      await inspect(20);
+      const selectedChoice = page.getByTestId('ce-pile-active-question').getByText('Disagree', { exact: true });
+      await page.waitForFunction(() => {
+        const input = document.querySelector('[data-testid="ce-pile-active-question"] input[type="radio"]:checked');
+        return input && Number(getComputedStyle(input.closest('label')).fontWeight) >= 700;
+      });
+      assert(await selectedChoice.evaluate(label => {
+        const box = label.getBoundingClientRect();
+        return [...label.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).every(node => {
+          const range = document.createRange(); range.selectNodeContents(node);
+          return [...range.getClientRects()].every(r => r.left >= box.left && r.right <= box.right);
+        });
+      }), 'The longest binary label fits in its selected weight');
+      await next.click();
+      await inspect(21);
       if (process.env.OUTPUT_DIR) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-pending.png` });
       if (width === 320) {
         for (let expected = 22; expected <= 31; expected += 1) {

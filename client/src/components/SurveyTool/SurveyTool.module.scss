@@ -7460,6 +7460,118 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 }
 
+@media (max-width: 480px) {
+  // Reserve only the space each answer needs; the prompt receives the rest of
+  // the fixed-height card. Its text can fit without moving the navigation.
+  .pileCardInner .pileCardBody,
+  .pileCardInner.pileQuadraticCard .pileCardBody {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .pileCardInner .pileCardHeader,
+  .pileCardInner.pileQuadraticCard .pileCardHeader {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    display: block;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    overscroll-behavior-y: contain;
+  }
+
+  .pileCardInner .pileCardHeader #questionTitle {
+    margin: 0;
+    padding: 0;
+    line-height: 1.4;
+  }
+
+  .pileCardInner .pileCardMainContent {
+    flex: 0 0 64px;
+    padding: 0;
+    scrollbar-gutter: auto;
+  }
+
+  .pileCardMainContent:has(.binaryQuestionContainer) {
+    flex-basis: 44px;
+  }
+
+  .pileCardMainContent:has(.freeformQuestionContainer) {
+    flex-basis: 104px;
+  }
+
+  .pileCardMainContent:has(.multichoiceQuestionContainer) {
+    flex-basis: 176px;
+  }
+
+  .pileCardInner.pileQuadraticCard .pileCardMainContent {
+    flex-basis: 170px;
+  }
+
+  .pileCardInner #binaryChoice {
+    flex-wrap: nowrap;
+    gap: 6px;
+    width: 100%;
+    margin: 0;
+  }
+
+  .pileCardInner #binaryChoice .radioOptionText {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    margin: 0;
+    padding: 6px 4px;
+    font-size: 1rem;
+    line-height: 1.25;
+  }
+
+  .pileCardInner .multichoiceQuestionContainer {
+    padding: 0 0 6px;
+  }
+
+  .pileCardInner .multichoiceQuestionContainer #multiChoice {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    grid-auto-columns: 72%;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 2px;
+  }
+
+  .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
+    height: 100%;
+    min-height: 44px;
+    margin: 0;
+    padding: 4px 10px;
+    align-self: stretch;
+    overflow-y: auto;
+  }
+
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .pileCardInner .pileCardHeader {
+      padding: 8px;
+    }
+
+    .pileCardInner #binaryChoice .radioOptionText {
+      padding-left: 19px;
+      font-size: 0.82rem;
+    }
+
+    .pileCardInner #binaryChoice .radioOptionText::before {
+      left: 4px;
+      width: 11px;
+      height: 11px;
+    }
+  }
+
+}
+
 // The portal keeps the backdrop out of transformed question-card stacking contexts.
 .pileActionBackdrop {
   position: fixed;

@@ -1222,7 +1222,11 @@ space separating them from Clear. On that separate row, the arrows closely frame
 horizontal question counter (for example, **5 / 50**). The counter only stacks when
 it needs to fit into a shared control row. Mobile question cards keep the same height
 across question types and prompt lengths, so the navigation stays in place. Long
-prompts scroll inside the card; question text and answers retain their original sizing.
+prompts use the space left by each answer type and shrink only when they overflow,
+down to the normal body-text size. Longer text remains scrollable. Binary choices
+share one compact row; multichoice options use two rows with horizontal scrolling.
+These layout adjustments apply only at narrow phone widths (480px and below);
+wider views retain their existing typography, button sizes, and answer layout.
 
 The compact question-actions menu labels its controls **Filter questions**,
 **Add questions**, and **All questions**. Opening it blurs the page behind it;
