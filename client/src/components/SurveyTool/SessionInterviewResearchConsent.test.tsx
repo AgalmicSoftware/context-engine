@@ -75,13 +75,14 @@ describe('SessionInterviewResearchConsent', () => {
     );
   });
 
-  it('keeps metadata expansion bounded and the help control transparent', () => {
+  it('scrolls metadata with the other choices and keeps the help control transparent', () => {
     const scss = readConsentScss();
 
     expect(scss).toMatch(
       /\.optionGroup\s*\{[\s\S]*?padding:\s*8px;[\s\S]*?border:\s*1px solid color-mix\(in srgb, var\(--ce-text-inverse\) 14%, transparent\);[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-text-inverse\) 5%, transparent\);/,
     );
-    expect(scss).toMatch(/\.metadata\[open\]\s*\{[\s\S]*?max-height:\s*min\(28vh, 300px\);[\s\S]*?overflow:\s*auto;/);
+    // The submission panel scrolls as one region, so the metadata has no scroll of its own.
+    expect(scss).not.toMatch(/\.metadata\[open\]\s*\{[^}]*max-height/);
     expect(scss).toMatch(
       /\.metadata\[open\] summary\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-surface-sunken\) 92%, transparent\);/,
     );

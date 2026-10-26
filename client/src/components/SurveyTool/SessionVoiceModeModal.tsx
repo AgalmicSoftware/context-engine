@@ -932,6 +932,29 @@ function SessionInterviewPanel({
     hasSavedName && (consentOverrides.includeResponderName === undefined || !importedResponderName)
       ? [...new Set(consentDrafts.map((draft) => savedConsent[draft.questionId]?.responderName).filter(Boolean))]
       : [importedResponderName];
+  // The responder-name choice sits with the other sharing choices.
+  const nameOption =
+    importedResponderName || hasSavedName ? (
+      <Label check className={styles.sessionInterviewProvenance}>
+        <Input
+          type="checkbox"
+          checked={nameChoice.mixed ? false : nameChoice.checked}
+          aria-checked={nameChoice.mixed ? 'mixed' : nameChoice.checked}
+          innerRef={(element: HTMLInputElement | null) => {
+            if (element) element.indeterminate = nameChoice.mixed;
+          }}
+          disabled={applying}
+          onChange={(event) => {
+            const included = event.target.checked;
+            setIncludeResponderName(included);
+            setConsentOverrides((prev) => ({ ...prev, includeResponderName: included }));
+          }}
+          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
+        />{' '}
+        {`Include ${displayedResponderNames.map((name) => `“${name}”`).join(', ')} as the responder ${displayedResponderNames.length > 1 ? 'names' : 'name'} with submitted responses`}
+        {nameChoice.mixed ? ' (mixed saved choices)' : ''}
+      </Label>
+    ) : null;
   const researchCoverage = prefillPacket?.source?.researchCoverage;
   const researchCoverageDetails = describeResearchCoverage(researchCoverage);
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
@@ -1230,7 +1253,9 @@ function SessionInterviewPanel({
           {drafts.length && !isInterviewBusy && !mapping ? (
             <div className={styles.sessionInterviewReviewActions} role="group" aria-label="Response submission">
               {researchAvailable || importedResponderName || hasSavedName || hasSavedAi ? (
-                <div className={styles.sessionInterviewConsentGroup}>
+                <div
+                  className={`${styles.sessionInterviewConsentGroup} ${submissionInfoOpen ? styles.sessionInterviewConsentGroupOpen : ''}`}
+                >
                   <details
                     className={styles.sessionInterviewConsentOptions}
                     open={submissionInfoOpen}
@@ -1261,29 +1286,11 @@ function SessionInterviewPanel({
                           unselectedCount={drafts.filter((draft) => !submittableSelection[draft.questionId]).length}
                           disabled={applying}
                           researchDetail={shownResearchDetail}
-                        />
+                        >
+                          {nameOption}
+                        </SessionInterviewResearchConsent>
                       ) : null}
-                      {importedResponderName || hasSavedName ? (
-                        <Label check className={styles.sessionInterviewProvenance}>
-                          <Input
-                            type="checkbox"
-                            checked={nameChoice.mixed ? false : nameChoice.checked}
-                            aria-checked={nameChoice.mixed ? 'mixed' : nameChoice.checked}
-                            innerRef={(element: HTMLInputElement | null) => {
-                              if (element) element.indeterminate = nameChoice.mixed;
-                            }}
-                            disabled={applying}
-                            onChange={(event) => {
-                              const included = event.target.checked;
-                              setIncludeResponderName(included);
-                              setConsentOverrides((prev) => ({ ...prev, includeResponderName: included }));
-                            }}
-                            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
-                          />{' '}
-                          {`Include ${displayedResponderNames.map((name) => `“${name}”`).join(', ')} as the responder ${displayedResponderNames.length > 1 ? 'names' : 'name'} with submitted responses`}
-                          {nameChoice.mixed ? ' (mixed saved choices)' : ''}
-                        </Label>
-                      ) : null}
+                      {researchAvailable || hasSavedAi ? null : nameOption}
                     </div>
                   </details>
                   {/* Sharing can be on by default, so say so without opening the panel. */}

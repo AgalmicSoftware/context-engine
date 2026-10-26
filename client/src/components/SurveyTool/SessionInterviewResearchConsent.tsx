@@ -1,3 +1,4 @@
+import type React from 'react';
 import { Input, Label, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
@@ -25,6 +26,8 @@ type Props = {
   disabled: boolean;
   // The session's interviewMode.researchDetail: what a shared comparison keeps.
   researchDetail?: 'minimal' | 'full';
+  // Further sharing choices, such as the responder name, listed with these.
+  children?: React.ReactNode;
 };
 
 export default function SessionInterviewResearchConsent({
@@ -43,6 +46,7 @@ export default function SessionInterviewResearchConsent({
   unselectedCount,
   disabled,
   researchDetail = 'minimal',
+  children,
 }: Props) {
   const minimal = researchDetail === 'minimal';
   const model = packet.source.modelId || 'Unknown model';
@@ -91,6 +95,7 @@ export default function SessionInterviewResearchConsent({
             <FontAwesomeIcon icon={faQuestionCircle} />
           </button>
         </div>
+        {children}
       </div>
       <span id="ce-interview-research-description" className={styles.srOnly}>
         {minimal

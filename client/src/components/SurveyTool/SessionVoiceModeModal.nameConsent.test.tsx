@@ -259,3 +259,48 @@ it('retains an explicit decline through login and uses the next session’s own 
   rerender(<SessionVoiceModeModal {...props} sessionSlug="next-session" sessionConfig={sessionConfig} />);
   expect(comparison).toBeChecked();
 });
+
+it('lists every sharing choice together inside AI submission info, before the prefill metadata', async () => {
+  render(
+    <SessionVoiceModeModal
+      isOpen
+      mode="interview"
+      onSelectMode={jest.fn()}
+      onClose={jest.fn()}
+      toggleLoginModal={jest.fn()}
+      sessionSlug="demo"
+      account="0x0000000000000000000000000000000000000001"
+      loginComplete
+      workerUrl="https://worker.example"
+      questionPool={[{ id: 'q1', prompt: 'Proceed?', type: 'binary' }]}
+      prefillPacket={{
+        version: 1,
+        sessionSlug: 'demo',
+        source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+        responderContext: { name: 'Fixture Responder' },
+        responses: [{ questionId: 'q1', answer: 'Agree', confidence: 0.8 }],
+      }}
+      onApplyAnswer={jest.fn()}
+      onApplyAdditional={jest.fn()}
+      onApplyImportance={jest.fn()}
+      onApplyConviction={jest.fn()}
+      onRecordProvenance={jest.fn()}
+      onSubmitResponses={jest.fn()}
+    />,
+  );
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const submissionInfo = screen.getByText('AI submission info').closest('details')!;
+  const choices = [
+    screen.getByLabelText('Include platform/model provenance'),
+    screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON),
+    screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME),
+  ];
+  const group = choices[0].closest('label')!.parentElement!;
+  for (const choice of choices) {
+    expect(submissionInfo).toContainElement(choice);
+    expect(group).toContainElement(choice);
+  }
+  const metadata = screen.getByText('AI prefill metadata');
+  expect(submissionInfo).toContainElement(metadata);
+  expect(choices[2].compareDocumentPosition(metadata) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});

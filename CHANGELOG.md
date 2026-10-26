@@ -122,6 +122,8 @@ All notable changes to this project will be documented in this file.
   storage, and retain valid bookmark lists when another list is missing.
 - Require browser checks for hosted publication, reload, Results, permissions,
   partial-submit retry and concurrent two-tab bookmarks in CI.
+- Open the interview's AI submission choices inside their dropdown instead of
+  over the drafts, with every sharing choice listed before the prefill metadata.
 - Scope cached Worker questions and answers to the signed-in reader. Account
   switches and logouts purge Worker cache nodes, a load started under another
   account is discarded, and a complete listing drops answers the reader can no

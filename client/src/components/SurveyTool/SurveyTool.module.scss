@@ -4460,6 +4460,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     outline: 2px solid var(--ce-focus-ring);
     outline-offset: 2px;
   }
+
+  &[open] > summary {
+    border-radius: 8px 8px 0 0;
+  }
 }
 
 .sessionInterviewConsentGroup {
@@ -4470,34 +4474,37 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 4px;
 }
 
+// Open, the choices take the whole footer row and Submit wraps below, still at the bottom.
+.sessionInterviewConsentGroupOpen {
+  flex-basis: 100%;
+  max-width: none;
+}
+
 .sessionInterviewSharingStatus {
   color: var(--ce-panel-text-muted);
   font-size: 0.78rem;
   line-height: 1.3;
 }
 
+// The choices open inside the dropdown, under its summary, and scroll within it.
 .sessionInterviewChoicesPanel {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  // Anchor to the whole footer so the disclosure fits inside the dialog.
-  left: 18px;
-  right: 18px;
-  max-width: 620px;
   min-width: 0;
-  max-height: min(45vh, 420px);
+  max-height: min(35vh, 320px);
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 12px;
+  padding: 10px;
   display: grid;
   gap: 8px;
-  border: 1px solid var(--ce-status-info-text);
-  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 55%, var(--ce-surface-sunken));
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
   background: var(--ce-surface-sunken);
-  box-shadow: 0 -6px 22px color-mix(in srgb, var(--ce-overlay-base) 25%, transparent);
 }
 
 .sessionInterviewReviewActions .sessionInterviewSubmitButton {
   flex: 0 0 min(100%, 280px);
+  // Opening the dropdown grows the footer upward; the button stays at the bottom.
+  align-self: flex-end;
   margin-left: auto;
 }
 
