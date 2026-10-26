@@ -76,6 +76,57 @@ describe('rpcReadCache evictExpiredEntries', () => {
     expect(originalSend).toHaveBeenCalledTimes(2);
   });
 
+  describe.each(['eth_call', 'eth_getLogs'])('%s near the chain head', (method) => {
+    const paramsAt = (block) =>
+      method === 'eth_call'
+        ? [{ to: LOG_ADDRESS, data: '0x1234' }, `0x${block.toString(16)}`]
+        : [{ address: LOG_ADDRESS, fromBlock: '0x1', toBlock: `0x${block.toString(16)}` }];
+
+    it.each([0, 64, 65])('expires a read %i blocks behind the observed head at the right boundary', async (depth) => {
+      let now = 1_000;
+      jest.spyOn(Date, 'now').mockImplementation(() => now);
+      let reads = 0;
+      const { provider } = createWrappedProvider(async (rpcMethod) =>
+        rpcMethod === 'eth_blockNumber' ? '0x100' : ++reads,
+      );
+      await provider.send('eth_blockNumber', []);
+      const params = paramsAt(256 - depth);
+      expect(await provider.send(method, params)).toBe(1);
+      now += 1_999;
+      expect(await provider.send(method, params)).toBe(1);
+      now += 1;
+      expect(await provider.send(method, params)).toBe(depth <= 64 ? 2 : 1);
+      now = 601_000;
+      expect(await provider.send(method, params)).toBe(depth <= 64 ? 3 : 2);
+    });
+
+    it('uses short caching until this provider has observed a head', async () => {
+      let now = 1_000;
+      jest.spyOn(Date, 'now').mockImplementation(() => now);
+      const other = createWrappedProvider(async () => '0x1000', { ...RPC_META, url: 'https://other.invalid' });
+      await other.provider.send('eth_blockNumber', []);
+      let reads = 0;
+      const { provider } = createWrappedProvider(async () => ++reads);
+      expect(await provider.send(method, paramsAt(10))).toBe(1);
+      now += 2_000;
+      expect(await provider.send(method, paramsAt(10))).toBe(2);
+    });
+
+    it('learns the latest block from block details and shares it only with the same provider', async () => {
+      let now = 1_000;
+      jest.spyOn(Date, 'now').mockImplementation(() => now);
+      const observer = createWrappedProvider(async () => ({ number: '0x100' }));
+      await observer.provider.send('eth_getBlockByNumber', ['latest', false]);
+      let reads = 0;
+      const { provider } = createWrappedProvider(async () => ++reads);
+      expect(await provider.send(method, paramsAt(192))).toBe(1);
+      expect(await provider.send(method, paramsAt(191))).toBe(2);
+      now += 2_000;
+      expect(await provider.send(method, paramsAt(192))).toBe(3);
+      expect(await provider.send(method, paramsAt(191))).toBe(2);
+    });
+  });
+
   it.each([
     [
       'single-address arrays to the same key as a plain address',
