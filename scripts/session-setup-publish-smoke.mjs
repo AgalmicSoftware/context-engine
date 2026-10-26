@@ -52,7 +52,7 @@ const browser = await chromium.launch({
   args: [`--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE ${new URL(baseUrl).hostname}`],
 });
 const calls = [];
-const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, responseUploads = [] } = {}) => {
+const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, loseResponseUploadAt = 0, responseUploads = [] } = {}) => {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     serviceWorkers: 'block',
@@ -90,7 +90,7 @@ const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, responseUplo
       : null;
     if (responseUpload) responseUploads.push(responseUpload);
     const failUpload = responseUpload && responseUploads.length === failResponseUploadAt;
-    const response = failUpload ? new Response(JSON.stringify({ error: 'Synthetic storage outage (503)' }), {
+    let response = failUpload ? new Response(JSON.stringify({ error: 'Synthetic storage outage (503)' }), {
       status: 503,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': baseUrl },
     }) : await worker.fetch(
@@ -102,6 +102,16 @@ const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, responseUplo
       env,
       { waitUntil: () => {} },
     );
+    if (loseResponseUploadAt && responseUpload) {
+      const stored = await response.clone().json();
+      Object.assign(responseUpload, { requestId: upload.requestId, storedId: stored.id, replayed: stored.replayed === true });
+      if (responseUploads.length === loseResponseUploadAt) {
+        assert.equal(response.status, 200, 'The lost reply follows a successful Worker upload');
+        response = new Response(JSON.stringify({ error: 'Synthetic lost upload reply (503)' }), {
+          status: 503, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': baseUrl },
+        });
+      }
+    }
     if (responseUpload) responseUpload.status = response.status;
     calls.push({
       path: url.pathname + url.search,
@@ -371,6 +381,36 @@ try {
   }
   console.log('Two tabs retained all six concurrent bookmarks across three reloads.');
   await page.screenshot({ path: `${outputDir}/participant-bookmarks.png`, fullPage: true, timeout: 10000 });
+
+  const lostReplyFixture = passkeyFixture('lost-reply-participant');
+  const lostReplyUploads = [];
+  const lostReplyContext = await fixtureContext(lostReplyFixture, { loseResponseUploadAt: 2, responseUploads: lostReplyUploads });
+  page = await lostReplyContext.newPage();
+  await page.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' });
+  await login(page, lostReplyFixture.wallet);
+  for (const entry of questions.slice(0, 2)) {
+    const card = await showQuestion(page, entry, questions.length);
+    await card.getByText(answer, { exact: true }).click();
+  }
+  await page.getByTestId('ce-survey-submit').click();
+  const lostReplyError = page.getByText(/Some answers didn't save \(/);
+  await lostReplyError.waitFor();
+  assert.deepEqual(lostReplyUploads.map(({ status }) => status), [200, 503]);
+  const lostReplyClient = makeClient(lostReplyFixture.wallet);
+  assert.equal((await lostReplyClient.listAll('responses', { mine: true })).items.length, 2, 'Both answers were stored before the reply was lost');
+  await page.getByTestId('ce-survey-submit').click();
+  await lostReplyError.waitFor({ state: 'hidden' });
+  await page.getByTestId('ce-survey-submitted-indicator').first().waitFor();
+  assert.equal(lostReplyUploads.length, 3, 'Only the answer with a lost reply is retried');
+  assert.equal(lostReplyUploads[2].requestId, lostReplyUploads[1].requestId);
+  assert.equal(lostReplyUploads[2].storedId, lostReplyUploads[1].storedId);
+  assert.equal(lostReplyUploads[2].replayed, true, 'The Worker replays its settled receipt');
+  const restoredReplies = await lostReplyClient.listAll('responses', { mine: true });
+  assert.equal(restoredReplies.items.length, 2, 'A lost reply retry creates no duplicate record');
+  const savedReplies = await Promise.all(restoredReplies.items.map((entry) => lostReplyClient.read(entry.storageRef.id)));
+  assert.deepEqual(savedReplies.map((entry) => entry.questionID).sort(), questions.slice(0, 2).map((entry) => entry.id).sort());
+  await page.screenshot({ path: `${outputDir}/participant-lost-reply.png`, fullPage: true, timeout: 10000 });
+  console.log('A lost upload reply replayed the original reference without another stored answer.');
   const elapsedMs = Math.round(performance.now() - startedAt);
   await writeFile(
     `${outputDir}/result.json`,
@@ -390,9 +430,11 @@ try {
           'other-participant and anonymous denial',
           'encrypted storage',
           'partial submission and unsaved-only retry',
+          'lost upload reply replays the original reference with no duplicate',
           'three concurrent two-tab bookmark pairs survive reload',
         ],
         responseUploads,
+        lostReplyUploads,
         calls,
       },
       null,
@@ -400,7 +442,7 @@ try {
     ),
   );
   console.log(
-    `Session publication smoke passed in ${elapsedMs}ms: publication, saved answers, partial retry, Results, permissions, and two-tab bookmarks.`,
+    `Session publication smoke passed in ${elapsedMs}ms: publication, saved answers, partial retry, lost reply, Results, permissions, and two-tab bookmarks.`,
   );
 } catch (error) {
   if (page) {
