@@ -59,7 +59,7 @@ import {
   writeStorageResourceHidden,
   writeStorageResourceOwner,
 } from './storageResourceOwnership.js';
-import { checkCoordinatedLegacyStorageOwner } from './sessionWriteCoordinator.js';
+import { checkCoordinatedLegacyStorageOwner, coordinateResponseUploadReceipt } from './sessionWriteCoordinator.js';
 import { executeCoordinatedStoragePublication, SUPERSEDED_AUTHORITY_ERROR } from './sessionConfigAuthority.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
@@ -1473,6 +1473,20 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     }
   }
 
+  const requestId = trim(payload.requestId);
+  let uploadReceipt = null;
+  if (resource === 'responses' && uploader && requestId && requestId.length <= 200) {
+    const digest = await (deps?.crypto || globalThis.crypto).subtle.digest('SHA-256', payload.bytes || new Uint8Array());
+    const payloadDigest = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve', payload: { requestId, payloadDigest } });
+    if (uploadReceipt?.kind === 'replay') {
+      return responseJson(deps, { id: uploadReceipt.storageRef.id, storageRef: uploadReceipt.storageRef, replayed: true }, 200, baseHeaders);
+    }
+    if (uploadReceipt && uploadReceipt.kind !== 'execute') {
+      return responseJson(deps, { error: uploadReceipt.error, reason: uploadReceipt.reason }, uploadReceipt.status || 503, baseHeaders);
+    }
+  }
+
   let id = '';
   try {
     id = buildCloudflareStorageId({
@@ -1599,6 +1613,12 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   }
 
   const storageRef = normalizeStorageRef(metadata);
+  if (uploadReceipt) {
+    const settled = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'settle',
+      payload: { requestId, attemptId: uploadReceipt.attemptId, storageRef },
+    });
+    if (!settled?.ok) return responseJson(deps, { error: 'Upload settlement is unavailable; retry.', reason: 'upload_receipt_unavailable' }, 503, baseHeaders);
+  }
   if (resource === 'responses') {
     const enqueueAutomatic = deps?.enqueueResultsAnalysisAutoJob;
     if (typeof enqueueAutomatic === 'function') {

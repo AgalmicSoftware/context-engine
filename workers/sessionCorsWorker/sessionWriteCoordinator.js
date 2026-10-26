@@ -1,4 +1,5 @@
 import { assertExpectedSessionAuthority } from './sessionConfigAuthority.js';
+import { normalizeStorageRef } from './storageRefNormalization.js';
 import {
   executeDeployHelperRequest,
   lookupCloudflareAccount,
@@ -64,6 +65,10 @@ const RESULTS_ANALYSIS_RECORD_KEY = 'results-analysis-v1';
 const RESULTS_ANALYSIS_DRAFT_KEY = 'results-analysis-draft-v1';
 const RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX = 'results-analysis-draft-v1:chunk:';
 const RESULTS_ANALYSIS_AUTO_JOB_KEY = 'results-analysis-auto-job-v1';
+const UPLOAD_RECEIPT_PREFIX = 'upload-receipt-v1:';
+const UPLOAD_RECEIPT_LEASE_MS = 120_000;
+const UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_UPLOAD_RECEIPTS = 2000;
 const MAX_RESULTS_ANALYSIS_REQUESTS = 24;
 const RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24_000;
 const RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 64;
@@ -404,6 +409,59 @@ export class SessionWriteCoordinator {
     this.storageOwnerTail = Promise.resolve();
     this.scanLegacyStorageOwnerIds = deps.scanLegacyStorageOwnerIds || scanLegacyStorageOwnerIds;
     this.legacyScanRowsPerStep = deps.legacyScanRowsPerStep || LEGACY_SCAN_ROWS_PER_STEP;
+  }
+
+  async pruneUploadReceipts(transaction, nowMs) {
+    const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
+    const settled = [];
+    for (const [key, record] of records) {
+      if (record.state === 'settled' && nowMs - record.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settled.push([key, record]);
+      else if (record.state !== 'pending' || record.leaseUntil <= nowMs) await transaction.delete(key);
+    }
+    settled.sort((a, b) => a[1].settledAt - b[1].settledAt);
+    for (const [key] of settled.slice(0, Math.max(0, settled.length - MAX_UPLOAD_RECEIPTS))) await transaction.delete(key);
+  }
+
+  async executeUploadReceipt(payload, settle = false) {
+    const requestId = toTrimmedString(payload?.requestId);
+    const payloadDigest = toTrimmedString(payload?.payloadDigest);
+    if (!requestId || requestId.length > 200 || (!settle && !/^[a-f0-9]{64}$/.test(payloadDigest))) {
+      return jsonResponse({ error: 'Invalid upload receipt request.' }, 400);
+    }
+    let storageRef;
+    if (settle) {
+      try { storageRef = normalizeStorageRef(payload?.storageRef); } catch { storageRef = null; }
+      if (!storageRef || storageRef.backend !== 'cloudflare' || storageRef.resource !== 'responses' || !toTrimmedString(payload?.attemptId)) {
+        return jsonResponse({ error: 'Invalid upload receipt settlement.' }, 400);
+      }
+    }
+    const key = `${UPLOAD_RECEIPT_PREFIX}${encodeURIComponent(requestId)}`;
+    const nowMs = Number(this.now()) || Date.now();
+    const result = await this.state.storage.transaction(async (transaction) => {
+      const record = await transaction.get(key);
+      if (settle) {
+        if (record?.state !== 'pending' || record.attemptId !== payload.attemptId) {
+          return { status: 409, error: 'Upload attempt no longer owns this receipt.', reason: 'upload_attempt_superseded' };
+        }
+        await transaction.put(key, { state: 'settled', payloadDigest: record.payloadDigest, storageRef, settledAt: nowMs });
+        await this.pruneUploadReceipts(transaction, nowMs);
+        return { status: 200, ok: true };
+      }
+      if (record?.state === 'settled' && nowMs - record.settledAt < UPLOAD_RECEIPT_RETENTION_MS) {
+        return record.payloadDigest === payloadDigest
+          ? { status: 200, kind: 'replay', storageRef: record.storageRef }
+          : { status: 409, error: 'This upload request id already stored different content.', reason: 'upload_request_conflict' };
+      }
+      if (record?.state === 'pending' && record.leaseUntil > nowMs) {
+        return { status: 503, error: 'This upload is still in progress; retry shortly.', reason: 'upload_in_progress' };
+      }
+      const attemptId = createAttemptId(this.crypto);
+      await transaction.put(key, { state: 'pending', attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS });
+      await this.pruneUploadReceipts(transaction, nowMs);
+      return { status: 200, kind: 'execute', attemptId };
+    });
+    const { status, ...body } = result;
+    return jsonResponse(body, status);
   }
 
   serializeSessionConfigOperation(operation) {
@@ -2669,6 +2727,11 @@ export class SessionWriteCoordinator {
     }
 
     const payload = await request.json().catch(() => null);
+    if (url.pathname.startsWith('/upload-receipts/')) {
+      if (url.hostname !== 'session-coordinator.internal') return jsonResponse({ error: 'Not found.' }, 404);
+      if (url.pathname === '/upload-receipts/reserve') return this.executeUploadReceipt(payload);
+      if (url.pathname === '/upload-receipts/settle') return this.executeUploadReceipt(payload, true);
+    }
     if (url.pathname.startsWith('/session-config/') && url.hostname !== 'session-coordinator.internal') {
       return jsonResponse({ error: 'Not found.' }, 404);
     }
@@ -2875,6 +2938,27 @@ const resolveCoordinatorStub = async (env, identity) => {
   if (!coordinator?.idFromName || !coordinator?.get) return null;
   const name = await sha256Hex(identity);
   return coordinator.get(coordinator.idFromName(name));
+};
+
+// Old deployments without this binding retain their upload behavior. A broken
+// binding cannot safely admit a second write while an earlier attempt is unknown.
+export const coordinateResponseUploadReceipt = async ({ env, slug, responder, operation, payload } = {}) => {
+  if (!env?.CE_SESSION_COORDINATOR) return null;
+  const unavailable = { status: 503, error: 'Upload receipt coordination is unavailable; retry.', reason: 'upload_receipt_unavailable' };
+  try {
+    const stub = await resolveCoordinatorStub(env, `upload-receipts:${resolveCoordinatorSessionSlugStorageKey(slug)}:${toTrimmedString(responder).toLowerCase()}`);
+    if (!stub?.fetch || !['reserve', 'settle'].includes(operation)) return unavailable;
+    const response = await stub.fetch(`https://session-coordinator.internal/upload-receipts/${operation}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const body = await response.json();
+    if (!isObjectRecord(body) || (!response.ok && ![409, 503].includes(response.status))) return unavailable;
+    if (response.ok && (operation === 'settle' ? body.ok !== true
+      : !(body.kind === 'execute' && toTrimmedString(body.attemptId)) && !(body.kind === 'replay' && body.storageRef?.id))) return unavailable;
+    return { ...body, status: response.status };
+  } catch {
+    return unavailable;
+  }
 };
 
 const AUTH_STATE_UNAVAILABLE = Object.freeze({

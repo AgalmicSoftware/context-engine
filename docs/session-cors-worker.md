@@ -1565,7 +1565,7 @@ R2 / Durable Objects:
   credential-redacted deploy/faucet records, normalized public session config,
   revisions, wrapped session-key records, short-lived random nonces, and numeric
   counter windows, plus Worker Group ids, occupancy counts, and hashed member
-  reservation tokens. Auth object names are derived from SHA-256 identity digests;
+  reservation tokens, plus response upload digests and storage references. Auth object names are derived from SHA-256 identity digests;
   their stored records omit slugs, wallet/anonymous identifiers, and route
   names. It never stores deployment
   credentials, raw session keys, deployment KEKs, raw DEKs, request bodies,
@@ -1576,11 +1576,19 @@ R2 / Durable Objects:
   coordinated write. Use signed Admin routes for runtime config changes. The
   deploy helper may seed a new isolated KV namespace before the Worker can run
   and before coordinator authority exists, but it does not whole-replace a
-  compatible live config during resume. Payload-plus-index uploads intentionally
-  retain at-least-once retry semantics: success means both writes completed, while
-  a failed or response-lost attempt may leave an invisible orphan or a readable
-  duplicate. Supplying an upload `requestId` does not deduplicate those writes.
-  There is no upload receipt journal or key-rotation state machine.
+  compatible live config during resume. Authenticated response uploads with a
+  nonempty `requestId` of at most 200 characters use per-participant receipts.
+  Once the payload and index are written and the receipt settles, sending that
+  request id with identical plaintext bytes returns the original `id` and
+  `storageRef` with `replayed: true`, without writing or queuing analysis again.
+  Different content under a settled request id returns `409 upload_request_conflict`.
+  An active reservation returns retryable `503 upload_in_progress` for 120 seconds;
+  an expired reservation permits a new attempt with a fresh storage id, so a crashed
+  attempt may leave an orphan. Settled receipts retain only the payload digest and
+  reference for seven days, with a maximum of 2,000 per participant and session.
+  A failed coordinator call returns retryable `503`. Deployments without the
+  binding, uploads without a bounded request id, and other resources retain
+  at-least-once semantics. There is no key-rotation state machine.
   Every route that admits work using current session config requires this
   binding, including public, ungated storage reads/lists, interview catalogs,
   and result artifacts. `GET /session-config` remains a public KV projection;

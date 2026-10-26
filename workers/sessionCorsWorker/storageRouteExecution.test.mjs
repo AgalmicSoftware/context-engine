@@ -172,6 +172,8 @@ const attachSessionCoordinator = (env, setConfig, coordinatorDeps = {}) => {
 								put: async (key, value) => {
 									staged.set(key, structuredClone(value));
 								},
+								delete: async (key) => staged.delete(key),
+								list: async ({ prefix = '' } = {}) => new Map([...staged].filter(([key]) => key.startsWith(prefix))),
 							});
 							values.clear();
 							for (const [key, value] of staged) values.set(key, value);
@@ -4788,4 +4790,102 @@ test('hide requests validate the resource, id, and flag', async () => {
 		assert.equal(result.status, 400);
 		assert.match(result.error, error);
 	}
+});
+
+
+const createResponseReceiptFixture = ({ binding = true } = {}) => {
+  const kv = createMockKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const config = { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
+  let now = 1_000;
+  if (binding) attachSessionCoordinator(env, () => {}, { now: () => now });
+  const queued = [];
+  const deps = { json, randomBytes: createSequenceRandomBytes(), now: () => now,
+    enqueueResultsAnalysisAutoJob: async (job) => queued.push(job),
+  };
+  const upload = (requestId = 'answer:v1:operation:q1', data = { questionID: 'q1', answer: { value: 'Agree' } }, address = '0x1111111111111111111111111111111111111111') => storageRoute({
+    path: '/storage/upload', method: 'POST', env, config, slug: 'session-a', uploaderAddress: address, authScopes: { storage: true }, baseHeaders: {}, deps,
+    request: new Request('https://worker.example/storage/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resource: 'responses', requestId, data }),
+    }),
+  });
+  return { kv, env, queued, upload, advance: (ms) => { now += ms; } };
+};
+
+test('response receipts replay the stored reference without writes or another analysis job', async () => {
+  const f = createResponseReceiptFixture();
+  const first = await (await f.upload()).json();
+  const snapshot = [...f.kv.store];
+  const response = await f.upload();
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ...first, replayed: true });
+  assert.deepEqual([...f.kv.store], snapshot);
+  assert.equal(f.queued.length, 1);
+  const conflict = await f.upload(undefined, { questionID: 'q1', answer: { value: 'Edited' } });
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).reason, 'upload_request_conflict');
+  assert.deepEqual([...f.kv.store], snapshot);
+  const other = await (await f.upload(undefined, undefined, '0x2222222222222222222222222222222222222222')).json();
+  assert.notEqual(other.id, first.id, 'receipt scope belongs to the authenticated participant');
+});
+
+test('pending response uploads wait, and an expired attempt gets a fresh storage id', async () => {
+  const f = createResponseReceiptFixture();
+  const put = f.kv.put;
+  let failed = false;
+  f.kv.put = async (key, value) => {
+    if (!failed && key.startsWith('ce-storage:')) { failed = true; throw new Error('index unavailable'); }
+    return put(key, value);
+  };
+  await assert.rejects(f.upload(), /index unavailable/);
+  const orphanKey = [...f.kv.store.keys()][0];
+  const pending = await f.upload();
+  assert.equal(pending.status, 503);
+  assert.equal((await pending.json()).reason, 'upload_in_progress');
+  f.advance(120_001);
+  const retried = await f.upload();
+  assert.equal(retried.status, 200);
+  const saved = await retried.json();
+  assert.notEqual(orphanKey, `ce-storage-payload:session-a:${saved.id}`);
+  assert.equal(f.kv.store.has(orphanKey), true);
+  assert.equal(f.queued.length, 1);
+});
+
+test('response upload receipts fail closed when coordination is unavailable', async () => {
+  const f = createResponseReceiptFixture();
+  f.env.CE_SESSION_COORDINATOR.get = () => ({ fetch: async () => { throw new Error('coordinator unavailable'); } });
+  const response = await f.upload();
+  assert.equal(response.status, 503);
+  assert.equal(f.kv.store.size, 0);
+  assert.equal(f.queued.length, 0);
+});
+
+test('a lost settlement reply retries to the original saved response', async () => {
+  const f = createResponseReceiptFixture();
+  const get = f.env.CE_SESSION_COORDINATOR.get;
+  let lost = false;
+  f.env.CE_SESSION_COORDINATOR.get = (id) => {
+    const stub = get(id);
+    return { fetch: async (url, init) => {
+      const response = await stub.fetch(url, init);
+      if (!lost && new URL(url).pathname.endsWith('/settle')) { lost = true; throw new Error('lost reply'); }
+      return response;
+    } };
+  };
+  assert.equal((await f.upload()).status, 503);
+  const snapshot = [...f.kv.store];
+  const replay = await (await f.upload()).json();
+  assert.equal(replay.replayed, true);
+  assert.deepEqual([...f.kv.store], snapshot);
+});
+
+test('legacy response uploads without a binding or a bounded request id retain their behavior', async () => {
+  for (const [binding, requestId] of [[false, 'same-request'], [true, ''], [true, 'x'.repeat(201)]]) {
+    const f = createResponseReceiptFixture({ binding });
+    const first = await (await f.upload(requestId)).json();
+    const second = await (await f.upload(requestId)).json();
+    assert.notEqual(first.id, second.id);
+    assert.equal(second.replayed, undefined);
+    assert.equal(f.queued.length, 2);
+  }
 });

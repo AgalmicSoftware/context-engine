@@ -35,6 +35,7 @@ const createTransactionalState = () => {
 				get: async (key) => staged.get(key),
 				put: async (key, value) => staged.set(key, structuredClone(value)),
 				delete: async (key) => staged.delete(key),
+				list: async ({ prefix = '' } = {}) => new Map([...staged].filter(([key]) => key.startsWith(prefix))),
 			});
 			store.clear();
 			for (const [key, value] of staged) store.set(key, value);
@@ -2854,4 +2855,64 @@ test('SessionWriteCoordinator keeps only the group fields it replays in a pendin
 	assert.equal(oversized.status, 400);
 	assert.equal(oversized.body.reason, 'worker_group_input_too_large');
 	assert.equal(h.groupPhase(), 'creating');
+});
+
+
+const receiptRequest = (operation, payload) => new Request(`https://session-coordinator.internal/upload-receipts/${operation}`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+});
+const receiptRef = { backend: 'cloudflare', id: 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA', resource: 'responses' };
+
+test('response upload receipts reserve atomically, replay settled writes and reject digest conflicts', async () => {
+  const { state, store } = createTransactionalState();
+  const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+  const payload = { requestId: 'answer:v1:test', payloadDigest: 'a'.repeat(64) };
+  const responses = await Promise.all([1, 2].map(() => coordinator.fetch(receiptRequest('reserve', payload))));
+  assert.deepEqual(responses.map((response) => response.status).sort(), [200, 503]);
+  const results = await Promise.all(responses.map((response) => response.json()));
+  const reservation = results.find((result) => result.kind === 'execute');
+  assert.equal(results.find((result) => result.reason)?.reason, 'upload_in_progress');
+  assert.equal((await coordinator.fetch(receiptRequest('settle', { requestId: payload.requestId, attemptId: reservation.attemptId, storageRef: receiptRef }))).status, 200);
+  const replay = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  assert.equal(replay.kind, 'replay');
+  assert.equal(replay.storageRef.id, receiptRef.id);
+  const conflict = await coordinator.fetch(receiptRequest('reserve', { ...payload, payloadDigest: 'b'.repeat(64) }));
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).reason, 'upload_request_conflict');
+  assert.equal(store.size, 1);
+  assert.equal([...store.values()][0].payloadDigest, payload.payloadDigest);
+});
+
+test('expired upload leases use a new attempt and cannot be settled by the old attempt', async () => {
+  const { state } = createTransactionalState();
+  let now = 1_000;
+  const coordinator = new SessionWriteCoordinator(state, {}, { now: () => now });
+  const payload = { requestId: 'expired', payloadDigest: 'a'.repeat(64) };
+  const first = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  now += 120_001;
+  const second = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  assert.equal(second.kind, 'execute');
+  assert.notEqual(second.attemptId, first.attemptId);
+  const stale = await coordinator.fetch(receiptRequest('settle', { requestId: payload.requestId, attemptId: first.attemptId, storageRef: receiptRef }));
+  assert.equal(stale.status, 409);
+  assert.equal((await coordinator.fetch(receiptRequest('settle', { requestId: payload.requestId, attemptId: second.attemptId, storageRef: receiptRef }))).status, 200);
+});
+
+test('upload receipt writes prune the oldest settlements and expire them after seven days', async () => {
+  const { state, store } = createTransactionalState();
+  let now = 10_000;
+  const coordinator = new SessionWriteCoordinator(state, {}, { now: () => now });
+  for (let index = 0; index < 2000; index += 1) store.set(`upload-receipt-v1:old-${index}`, {
+    state: 'settled', payloadDigest: 'a'.repeat(64), storageRef: receiptRef, settledAt: index + 1,
+  });
+  const payload = { requestId: 'new', payloadDigest: 'b'.repeat(64) };
+  const reservation = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  await coordinator.fetch(receiptRequest('settle', { requestId: 'new', attemptId: reservation.attemptId, storageRef: receiptRef }));
+  assert.equal(store.size, 2000);
+  assert.equal(store.has('upload-receipt-v1:old-0'), false);
+  assert.equal(store.has('upload-receipt-v1:old-1'), true);
+  now += 7 * 24 * 60 * 60 * 1000 + 1;
+  const expired = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  assert.equal(expired.kind, 'execute');
+  assert.equal(store.size, 1);
 });
