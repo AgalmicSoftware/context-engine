@@ -11,9 +11,9 @@ const config = sessions['demo-sh'];
 const quadratic = process.env.SMOKE_QUADRATIC === '1';
 const longPrompt = 'Free AI legal tools that help people challenge government decisions would strengthen democracy more than they would clog the courts.';
 const questions = Array.from({ length: 50 }, (_, index) => ({
-  id: `0x${String(index + 1).padStart(64, '0')}`, type: quadratic && index === 0 ? 'quadratic' : 'binary',
+  id: `0x${String(index + 1).padStart(64, '0')}`, type: quadratic && index === 0 ? 'quadratic' : ['binary', 'multichoice', 'rating', 'freeform', 'quadratic'][index] || 'binary',
   prompt: index === 0 ? longPrompt : `Synthetic navigation question ${index + 1}`,
-  options: quadratic && index === 0 ? Array.from({ length: 8 }, (_, option) => `Synthetic allocation option ${option + 1}`) : [], tags: [],
+  options: (quadratic && index === 0) || index === 1 || index === 4 ? Array.from({ length: 8 }, (_, option) => `Synthetic allocation option ${option + 1}`) : [], tags: [],
   sessionSlug: 'demo-sh', sessionId: config.sessionId,
 }));
 const browser = await chromium.launch({ headless: true });
@@ -157,6 +157,14 @@ try {
         } else assert(layout.nav.top >= layout.card.bottom, `Mobile controls remain below the card: ${detail}`);
         return layout;
       };
+      const firstLayout = await inspect(1);
+      for (let index = 2; index <= 6; index += 1) {
+        await next.click();
+        const current = await inspect(index);
+        assert.equal(current.card.bottom - current.card.top, firstLayout.card.bottom - firstLayout.card.top, 'Every question type retains the same card height');
+        assert.equal(current.nav.top, firstLayout.nav.top, 'Navigation stays fixed across long/short prompts and question types');
+      }
+      for (let index = 5; index >= 1; index -= 1) await prev.click();
       await inspect(1);
       if (!quadratic && width <= 768) {
         const answerLayout = await page.getByTestId('ce-pile-active-question').evaluate(active => {
@@ -191,7 +199,7 @@ try {
           const originalFontSize = theme === 'classic-95' ? (width <= 640 ? 0.82 : 1) : 1.5;
           assert(Math.abs(choice.fontSize - answerLayout.rootFontSize * originalFontSize) < 0.1, 'Answer labels retain their original font size');
           assert.equal(choice.fontWeight, '400', 'Unselected answer labels retain their original weight');
-          assert(choice.top >= answerLayout.header.bottom && choice.bottom <= answerLayout.footer.top, 'Answer buttons sit between the full prompt and footer');
+          assert(choice.top >= answerLayout.header.bottom && choice.bottom <= answerLayout.footer.top, 'Answer buttons sit between the scrollable prompt and footer');
           assert(choice.top >= answerLayout.content.top && choice.bottom <= answerLayout.content.bottom + 1, 'Answer buttons are not clipped by their content area');
           assert(choice.left >= answerLayout.card.left && choice.right <= answerLayout.card.right, 'Answer buttons fit the card width');
           assert(choice.textFits && choice.markerClear, 'Answer labels fit without overlapping a theme indicator');

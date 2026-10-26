@@ -7445,68 +7445,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
   }
 
-  // Binary prompts can be long; let the active card establish the stack height
-  // instead of shrinking the answer row into the fixed-height card's overflow.
-  .pileCardContainer:has(.binaryQuestionContainer) {
+  // Keep the shared card height across question types so navigation never moves
+  // with prompt length. Long prompts scroll within the original typography.
+  .pileCardHeader {
+    flex: 0 1 auto;
     min-height: 0;
-    height: auto;
-
-    .pileCardActive {
-      position: relative;
-      height: auto;
-    }
-
-    .pileCardInner {
-      height: 100%;
-      min-height: 0;
-    }
-
-    .pileCardActive .pileCardInner {
-      height: auto;
-      min-height: 330px;
-    }
-
-    .pileCardBody {
-      height: auto;
-      min-height: inherit;
-      gap: 18px;
-      padding: 18px;
-    }
-
-    .pileCardHeader {
-      flex: 0 0 auto;
-      min-height: 0;
-      margin: 0;
-    }
-
-    .pileCardHeader #questionTitle {
-      padding: 0;
-      margin: 0;
-      font-size: clamp(1.1rem, 4.8vw, 1.45rem);
-      line-height: 1.45;
-      overflow-wrap: anywhere;
-    }
-
-    .pileCardMainContent {
-      flex: 1 0 auto;
-      min-height: 44px;
-      padding: 0;
-      overflow: visible;
-    }
-
-    #binaryChoice {
-      width: 100%;
-      gap: 8px;
-      margin: 0;
-    }
-
-    #binaryChoice .radioOptionText {
-      flex: 1 1 auto;
-      min-width: 0;
-      min-height: 44px;
-      margin: 0;
-    }
+    max-height: 35%;
+    overflow-y: auto;
   }
+
+  .pileCardFooter {
+    flex-shrink: 0;
+  }
+
 }
 
 // The portal keeps the backdrop out of transformed question-card stacking contexts.

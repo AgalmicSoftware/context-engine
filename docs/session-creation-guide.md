@@ -1220,9 +1220,9 @@ retain full-size text on phones. When the controls need more
 width, the navigation arrows wrap onto a right-aligned row below, with extra vertical
 space separating them from Clear. On that separate row, the arrows closely frame a
 horizontal question counter (for example, **5 / 50**). The counter only stacks when
-it needs to fit into a shared control row. Binary question cards grow to fit long prompts and
-keep all three answer buttons visible. The answers retain their original typography
-and wrap when they need more room.
+it needs to fit into a shared control row. Mobile question cards keep the same height
+across question types and prompt lengths, so the navigation stays in place. Long
+prompts scroll inside the card; question text and answers retain their original sizing.
 
 The compact question-actions menu labels its controls **Filter questions**,
 **Add questions**, and **All questions**. Opening it blurs the page behind it;
