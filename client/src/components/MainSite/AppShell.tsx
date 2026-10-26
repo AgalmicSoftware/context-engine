@@ -2763,7 +2763,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     if (accountKey(prevProps.account) !== accountKey(this.props.account)) {
       clearDecryptCaches();
       clearSurveyDraftsForAccount(prevProps.account);
-      void purgeWorkerCanonicalCaches().catch((e) => mainSiteLog.warn('MainSite: cleanup', e));
+      void purgeWorkerCanonicalCaches(prevProps.account).catch((e) => mainSiteLog.warn('MainSite: cleanup', e));
     }
 
     this.redirectLegacyDemoPath();
@@ -3022,7 +3022,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
 
     const homeSessionChanged = currPath === '/' && prevProps.activeSessionSlug !== this.props.activeSessionSlug;
-    if ((sessionPathResolutionChanged || homeSessionChanged) && !isStaticNonCacheRoute(currPath)) {
+    // Worker caches belong to their reader; a new account starts from its own reads.
+    const workerReaderChanged = accountKey(prevProps.account) !== accountKey(this.props.account);
+    if (
+      (sessionPathResolutionChanged || homeSessionChanged || workerReaderChanged) &&
+      !isStaticNonCacheRoute(currPath)
+    ) {
       const workerRouteSlug = this.getBootstrapActiveSessionSlug(currPath, currSearch);
       void this.initializeWorkerCanonicalCachesForGroup(workerRouteSlug, { resetReadiness: true });
     }

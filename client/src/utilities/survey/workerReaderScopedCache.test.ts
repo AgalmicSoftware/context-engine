@@ -5,6 +5,7 @@ import {
   resolveWorkerCanonicalCacheIdentity,
   resolveWorkerCanonicalSessionKey,
   workerCanonicalCacheIdentityMatches,
+  withWorkerCanonicalCacheIdentity,
 } from './workerCanonicalCacheIdentity';
 import { setWorkerCanonicalCacheReader } from './workerCanonicalCacheReader';
 import { loadWorkerResponses } from './workerResponseHydration';
@@ -17,7 +18,7 @@ jest.mock('../cache/cacheScripts', () => ({
   updateCacheAtomic: jest.fn(),
 }));
 
-type Stored = { id: string; responder: string; question?: string; value: string };
+type Stored = { id: string; responder: string; question?: string; value: string; createdAt?: string };
 type Cache = Record<string, any>;
 
 const slug = 'reader-session';
@@ -46,9 +47,9 @@ const createBrowser = () => {
   let hold: { started: () => void; released: Promise<void> } | null = null;
   const listSessionStorageRefsPage = async () => {
     // The Worker answers for the principal at request time.
-    const items = stored.map(({ id, responder }) => ({
+    const items = stored.map(({ id, responder, createdAt }) => ({
       storageRef: { id },
-      metadata: { responder, createdAt: '2026-10-01T00:00:00.000Z' },
+      metadata: { responder, createdAt: createdAt || '2026-10-01T00:00:00.000Z' },
     }));
     if (hold) {
       hold.started();
@@ -180,10 +181,38 @@ it('drops answers the same reader can no longer read, but keeps a save no listin
   expect(Object.keys(node?.workerResponseStorageRefs || {})).toEqual(['r-own']);
 });
 
-it('removes every reader-scoped Worker node from persistent caches on an account change', async () => {
+it('restores an older answer the reader can still read once its newer version is revoked', async () => {
+  const browser = createBrowser();
+  browser.signIn('0xadmin');
+  const first = { id: 'r-a', responder: '0xp', value: 'first answer', createdAt: '2026-10-01T00:00:00.000Z' };
+  browser.store([first, { id: 'r-b', responder: '0xp', value: 'gated edit', createdAt: '2026-10-02T00:00:00.000Z' }]);
+  await browser.hydrate();
+  expect(visibleNode(browser.questions())?.questionResponses.q['0xp']).toMatchObject({
+    answer: { value: 'gated edit' },
+  });
+
+  browser.store([first]);
+  await browser.hydrate();
+  expect(visibleNode(browser.questions())?.questionResponses.q['0xp']).toMatchObject({
+    answer: { value: 'first answer' },
+  });
+  expect(browser.snapshot()).not.toContain('gated edit');
+});
+
+it("removes the previous reader's Worker nodes from persistent caches on an account change", async () => {
   const chainNode = { questions: { q: { id: 'q' } } };
   const cache = new Map<string, unknown>([
     ['questionsCache|a', { worker: { questionResponses: { q: {} } }, 11155420: chainNode }],
+    // Another tab's account keeps its own node.
+    [
+      'questionsCache|b',
+      {
+        worker: withWorkerCanonicalCacheIdentity(
+          { questionResponses: {} },
+          resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: slug, reader: '0xother' }),
+        ),
+      },
+    ],
     ['surveysCache|a', { 11155420: chainNode }],
     ['userCache|a', { '0xadmin': { worker: { data: {} }, 11155420: chainNode }, '0xother': { 11155420: chainNode } }],
   ]);
@@ -199,9 +228,10 @@ it('removes every reader-scoped Worker node from persistent caches on an account
     return next;
   });
 
-  await purgeWorkerCanonicalCaches();
+  await purgeWorkerCanonicalCaches('0xadmin');
 
   expect(cache.get('questionsCache|a')).toEqual({ 11155420: chainNode });
+  expect((cache.get('questionsCache|b') as Cache).worker).toBeDefined();
   expect(cache.get('userCache|a')).toEqual({ '0xadmin': { 11155420: chainNode }, '0xother': { 11155420: chainNode } });
   expect(updateCacheAtomic).toHaveBeenCalledTimes(2);
 });

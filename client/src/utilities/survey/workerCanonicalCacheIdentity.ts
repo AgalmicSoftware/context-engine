@@ -1,5 +1,5 @@
 import { resolveWorkerCanonicalStorageTarget } from '../../domains/surveys/workerCanonicalAuthoringPort';
-import { listNamespaceSlugsSync, peekCacheSync, updateCacheAtomic } from '../cache/cacheScripts';
+import { initCacheManager, listNamespaceSlugsSync, peekCacheSync, updateCacheAtomic } from '../cache/cacheScripts';
 import { getWorkerCanonicalCacheReader, normalizeWorkerCanonicalCacheReader } from './workerCanonicalCacheReader';
 
 type UnknownRecord = Record<string, unknown>;
@@ -140,12 +140,20 @@ export const withWorkerCanonicalCacheIdentity = (
   [WORKER_CANONICAL_CACHE_IDENTITY_FIELD]: { ...identity },
 });
 
-// Removes every reader-scoped Worker node from one cached session root:
-// questionsCache/surveysCache keep it at the root, userCache under each responder.
-const stripWorkerCanonicalCacheNodes = (namespace: string, cacheRoot: unknown): UnknownRecord | null => {
+// Removes one reader's Worker nodes, and nodes whose identity predates readers,
+// from a cached session root: questionsCache/surveysCache keep the node at the
+// root, userCache under each responder. Other readers' nodes belong to other
+// tabs' accounts and stay.
+const stripWorkerCanonicalCacheNodes = (
+  namespace: string,
+  cacheRoot: unknown,
+  reader: string,
+): UnknownRecord | null => {
   if (!isRecord(cacheRoot)) return null;
   const strip = (node: UnknownRecord): UnknownRecord | null => {
     if (!Object.prototype.hasOwnProperty.call(node, WORKER_CANONICAL_CACHE_SCOPE_KEY)) return null;
+    const identity = readWorkerCanonicalCacheIdentity(node[WORKER_CANONICAL_CACHE_SCOPE_KEY]);
+    if (identity && identity.reader !== reader) return null;
     const rest = { ...node };
     delete rest[WORKER_CANONICAL_CACHE_SCOPE_KEY];
     return rest;
@@ -165,16 +173,21 @@ const READER_SCOPED_CACHE_NAMESPACES = ['questionsCache', 'surveysCache', 'userC
 
 // Worker nodes hold what the previous account was authorized to read, including
 // Worker-decrypted answers, so an account change also removes them from storage.
-export const purgeWorkerCanonicalCaches = async (): Promise<void> => {
+export const purgeWorkerCanonicalCaches = async (previousReader: unknown): Promise<void> => {
+  const reader = normalizeWorkerCanonicalCacheReader(previousReader);
+  // The slug listing reads the in-memory mirror, which loads from storage once.
+  await initCacheManager();
   await Promise.all(
     READER_SCOPED_CACHE_NAMESPACES.flatMap((namespace) =>
       listNamespaceSlugsSync(namespace)
-        .filter((slug) => stripWorkerCanonicalCacheNodes(namespace, peekCacheSync(namespace, slug, { clone: false })))
+        .filter((slug) =>
+          stripWorkerCanonicalCacheNodes(namespace, peekCacheSync(namespace, slug, { clone: false }), reader),
+        )
         .map((slug) =>
           updateCacheAtomic<UnknownRecord>(
             namespace,
             slug,
-            (current) => stripWorkerCanonicalCacheNodes(namespace, current) || current || {},
+            (current) => stripWorkerCanonicalCacheNodes(namespace, current, reader) || current || {},
           ),
         ),
     ),

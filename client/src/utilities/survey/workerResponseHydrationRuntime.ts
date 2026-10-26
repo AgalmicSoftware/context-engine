@@ -140,27 +140,38 @@ export const hydrateWorkerCanonicalResponses = async ({
   let capped = false;
   let resumeCursor = '';
   let listedStorageRefIds = null as ReadonlySet<string> | null;
-  const rows = await loadRows({
-    account: getAccount(),
-    providerLike: getProviderLike(),
-    sessionSlug,
-    sessionConfig,
-    cachedStorageRefIds,
-    startCursor: startCursor || null,
-    onPartial: (cursor) => {
-      capped = true;
-      resumeCursor = typeof cursor === 'string' ? cursor : '';
-    },
-    onListed: (storageRefIds) => {
-      listedStorageRefIds = storageRefIds;
-    },
-  });
+  const load = (knownRefIds: ReadonlySet<string>, fromCursor: string) =>
+    loadRows({
+      account: getAccount(),
+      providerLike: getProviderLike(),
+      sessionSlug,
+      sessionConfig,
+      cachedStorageRefIds: knownRefIds,
+      startCursor: fromCursor || null,
+      onPartial: (cursor) => {
+        capped = true;
+        resumeCursor = typeof cursor === 'string' ? cursor : '';
+      },
+      onListed: (storageRefIds) => {
+        listedStorageRefIds = storageRefIds;
+      },
+    });
+  let rows = await load(cachedStorageRefIds, startCursor);
   if (shouldStop()) return;
+  // A complete listing is authoritative for this reader.
+  const listed = listedStorageRefIds as ReadonlySet<string> | null;
+  let staleRefIds = listed ? new Set([...cachedStorageRefIds].filter((refId) => !listed.has(refId))) : undefined;
+  if (staleRefIds?.size) {
+    // An answer this reader could read is gone, so a responder's older version may
+    // be what it can read now. Rebuild from a full read, as a fresh client would.
+    listedStorageRefIds = null;
+    rows = await load(new Set(), '');
+    if (shouldStop()) return;
+    const relisted = listedStorageRefIds as ReadonlySet<string> | null;
+    if (relisted) staleRefIds = cachedStorageRefIds;
+  }
   // Only one run that lists from the first page to the last sees every row.
   const partial = capped || !!startCursor;
-  // A complete listing is authoritative for this reader.
-  const listed = listedStorageRefIds;
-  const staleRefIds = listed ? new Set([...cachedStorageRefIds].filter((refId) => !listed.has(refId))) : undefined;
 
   const questionsPersisted = await updateQuestionsCacheAtomic((current) => {
     if (!targetIsCurrent()) return current || {};
