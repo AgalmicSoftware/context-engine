@@ -252,6 +252,8 @@ describe('useSessionWizardWorkerDeploy', () => {
     await waitFor(() => expect(result.current.recoveryDisplay).not.toBeNull());
     expect(result.current.recoveryDisplay?.recoveryKey).toBeUndefined();
     expect(result.current.recoveryDisplay?.supplied).toBe(false);
+    expect(result.current.recoveryDisplay?.keyPreserved).toBe(true);
+    expect(result.current.recoveryDisplay?.fingerprint).toBe('c'.repeat(64));
     act(() => result.current.finishRecoveryDisplay());
     await act(async () => {
       await pending;

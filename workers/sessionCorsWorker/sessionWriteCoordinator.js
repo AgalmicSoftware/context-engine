@@ -245,7 +245,11 @@ const isTerminalDeployResult = (result = {}) => (
 );
 
 const buildDirectDeployTerminalReplay = ({ result, requestDigestMatches } = {}) => {
-  if (requestDigestMatches || result?.ok !== true) return result;
+  if (result?.ok !== true) return result;
+  if (result.body?.recoveryKeyFingerprint || result.body?.envelopeKekSecretSet || result.body?.envelopeKekSecretPreserved) {
+    result = { ...result, body: { ...result.body, keyPreserved: true } };
+  }
+  if (requestDigestMatches) return result;
   return {
     ...result,
     body: {
@@ -3012,7 +3016,8 @@ export class SessionWriteCoordinator {
       }, 409);
     }
     if (reservation.kind === 'terminal') {
-      return jsonResponse(reservation.result, Number(reservation.result?.status || 0) || 200);
+      const replayResult = buildDirectDeployTerminalReplay({ result: reservation.result, requestDigestMatches: true });
+      return jsonResponse(replayResult, Number(replayResult?.status || 0) || 200);
     }
     if (reservation.kind === 'pending') {
       return jsonResponse({

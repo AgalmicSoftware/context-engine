@@ -1309,7 +1309,13 @@ fingerprint. Identity edits keep the in-memory supplied key; a cleared or invali
 field in this mode blocks deployment until corrected or generated-key mode is chosen. Manual Cloudflare setup uses the same input and displays the
 fingerprint of the setup key. Regenerate setup values after changing this input.
 Existing bindings are preserved during deployment recovery; a changed input does
-not rotate them. Keys unlock encrypted data and saved service credentials; store
+not rotate them. Replayed replies report `keyPreserved: true` and the installed
+key's fingerprint. Before installing a new key, the helper retains its fingerprint
+in the deployment's private KV namespace; it never stores the key there. The
+dialog asks the operator to keep the private copy matching that fingerprint.
+Older deployments without a fingerprint record report preservation without
+claiming that a changed supplied key was installed; use signed admin key export
+to recover their fingerprint. Keys unlock encrypted data and saved service credentials; store
 them privately with the backup. A key alone is not a data backup.
 
 For an existing deployment or a lost first response, the signed admin action

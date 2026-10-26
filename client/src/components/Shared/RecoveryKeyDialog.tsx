@@ -9,6 +9,7 @@ export type RecoveryKeyDisplay = {
   workerUrl: string;
   createdAt: string;
   supplied?: boolean;
+  keyPreserved?: boolean;
 };
 
 const RecoveryKeyDialog = ({ value, onContinue }: { value: RecoveryKeyDisplay; onContinue: () => void }) => {
@@ -52,7 +53,15 @@ const RecoveryKeyDialog = ({ value, onContinue }: { value: RecoveryKeyDisplay; o
           This key unlocks encrypted session data and saved service credentials. Keep it private with your session
           backup.
         </p>
-        {value.recoveryKey && value.supplied !== undefined && (
+        {value.keyPreserved && (
+          <p role="status">
+            The Worker kept its existing recovery key. This retry did not install a new key.
+            {value.fingerprint
+              ? ' Keep the private copy matching the fingerprint below.'
+              : ' Its fingerprint was not recorded by the older deploy helper. Use Show recovery key in Backup & restore to check your private copy.'}
+          </p>
+        )}
+        {!value.keyPreserved && value.recoveryKey && value.supplied !== undefined && (
           <p role="status">
             {value.supplied
               ? 'The Worker uses your supplied recovery key.'
@@ -78,7 +87,7 @@ const RecoveryKeyDialog = ({ value, onContinue }: { value: RecoveryKeyDisplay; o
             <p>This display is kept only in this tab. A replayed deployment reply cannot show the key again.</p>
           </>
         ) : (
-          <p role="status">
+          <p role={value.keyPreserved ? undefined : 'status'}>
             {value.supplied
               ? 'Your supplied recovery key is installed. Keep the original private copy.'
               : 'This reply did not include the key. A replay or recovered deployment cannot show it again. The session admin can use Show recovery key in Backup & restore.'}

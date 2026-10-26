@@ -1,4 +1,4 @@
-const { createHash, webcrypto } = require('crypto');
+const { createHash, createHmac, webcrypto } = require('crypto');
 const deployHelperWorker = require('../../workers/deploy-helper/worker.js').default;
 const { SessionWriteCoordinator } = require('../../workers/sessionCorsWorker/sessionWriteCoordinator.js');
 const { dispatchSponsoredBootstrapRedeem } = require('../../workers/sessionCorsWorker/sponsoredBootstrapRedeemDispatch.js');
@@ -137,6 +137,7 @@ const makeFetchSequence = (responses = []) => {
       return cfSuccess({ bindings: metadata.bindings || [] });
     }
     calls.push(args);
+    if (method === 'PUT' && normalizedUrl.includes('/values/ce-deployment-recovery-key:')) return cfSuccess({});
     if (method === 'GET' && /\/accounts\/[^/]+\/workers\/subdomain$/.test(normalizedUrl)) {
       return cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' });
     }
@@ -334,6 +335,9 @@ const makeResumableDeploymentFetch = () => {
     const valueMatch = normalizedUrl.match(/\/storage\/kv\/namespaces\/([^/]+)\/values\/(.+)$/);
     if (valueMatch && method === 'PUT') {
       const valueKey = `${valueMatch[1]}/${valueMatch[2]}`;
+      if (valueMatch[2].startsWith('ce-deployment-recovery-key:') && fetchMock.recoveryKeyRecordPutFails) {
+        return cfFailure(503, 'Fingerprint record unavailable.');
+      }
       if (valueMatch[2].endsWith(':config') && kvValues.has(valueKey)) {
         finalConfigPuts += 1;
         if (fetchMock.finalConfigPutFailures > 0) {
@@ -614,6 +618,7 @@ describe('deploy-helper worker', () => {
       expect(replayResponse.headers.get('Vary')).toBe('Origin');
       const replay = await replayResponse.json();
       expect(replay.recoveryKey).toBeUndefined();
+      expect(replay.keyPreserved).toBe(true);
       expect(replay.recoveryKeyFingerprint).toBe(first.recoveryKeyFingerprint);
       expect(JSON.stringify([...journal.store.values()])).not.toContain(installed);
       for (const instance of env.__coordinatorInstances.values()) expect(JSON.stringify([...instance.store.values()])).not.toContain(installed);
@@ -628,6 +633,31 @@ describe('deploy-helper worker', () => {
     expect(response.status).toBe(400);
     expect((await response.json()).error).toMatch(/64 hex/);
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not install a key until its private fingerprint has been retained', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    fetchMock.recoveryKeyRecordPutFails = true;
+    global.fetch = fetchMock;
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
+    const body = { apiToken: 'synthetic-token', deploymentRequestId: 'key-record-0001',
+      workerName: 'key-record-worker', sessionSlug: 'key-record-session',
+      bundleText: 'export default { fetch() {} };', storageEnvelopeKek: 'a'.repeat(64) };
+    try {
+      const first = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(first.status).toBe(503);
+      expect((await first.json()).deploymentRequestPending).toBe(true);
+      expect(fetchMock.workerSecretBodies).toHaveLength(0);
+      fetchMock.recoveryKeyRecordPutFails = false;
+      const second = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      const saved = await second.json();
+      expect(second.status).toBe(200);
+      expect(saved.recoveryKeyFingerprint).toBe(createHmac('sha256', body.storageEnvelopeKek).update('ce-kek-fingerprint-v1').digest('hex'));
+      const record = [...fetchMock.kvValues.entries()].find(([key]) => key.includes('ce-deployment-recovery-key:'));
+      expect(JSON.parse(record[1])).toEqual({ deploymentId: saved.deploymentId, fingerprint: saved.recoveryKeyFingerprint });
+      expect(record[1]).not.toContain(body.storageEnvelopeKek);
+    } finally { log.mockRestore(); }
   });
 
   it('authenticates then rejects release-manifest bundle drift before any Cloudflare mutation', async () => {
@@ -760,7 +790,7 @@ describe('deploy-helper worker', () => {
       expect(response.status).toBe(200);
       expect(payload?.ok).toBe(true);
       expect(payload?.configVerified).toBe(true);
-      expect(fetchMock.calls.length).toBe(10);
+      expect(fetchMock.calls.length).toBe(11);
       expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
 
       const scriptUpload = findScriptUploadCall(fetchMock);
@@ -3719,8 +3749,7 @@ describe('deploy-helper worker', () => {
       '33'.repeat(32),
       '55'.repeat(12),
       '44'.repeat(32),
-      '66'.repeat(32),
-      '77'.repeat(12),
+      '66'.repeat(12),
     ];
     let entropyIndex = 0;
     Object.defineProperty(global, 'crypto', {
@@ -3776,12 +3805,17 @@ describe('deploy-helper worker', () => {
         ...body,
         apiToken: 'cf-rotated-resume-token',
         sessionName: 'Recovered mutable config',
+        storageEnvelopeKek: 'a'.repeat(64),
         secrets: { openaiKey: 'sk-provider-after-resume' },
       }), env, {});
       const retryPayload = await retryResponse.json();
 
       expect(retryResponse.status).toBe(200);
       expect(retryPayload.recoveryKey).toBeUndefined();
+      expect(retryPayload.keyPreserved).toBe(true);
+      expect(retryPayload.recoveryKeyFingerprint).toBe(
+        createHmac('sha256', entropy[0]).update('ce-kek-fingerprint-v1').digest('hex'),
+      );
       expect(retryPayload).toEqual(expect.objectContaining({
         ok: true,
         kvNamespaceId: 'kv-resume-1',
@@ -3801,7 +3835,7 @@ describe('deploy-helper worker', () => {
         { name: 'CE_STORAGE_ENVELOPE_KEK', text: entropy[0] },
         { name: 'TOKEN_HMAC_SECRET', text: entropy[2] },
       ]);
-      expect(entropyIndex).toBe(5);
+      expect(entropyIndex).toBe(4);
       const sessionSecretWrites = fetchMock.mock.calls.filter(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':secrets')
       ));

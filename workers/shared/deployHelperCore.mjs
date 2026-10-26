@@ -601,6 +601,7 @@ const buildSafeDeployJournalResult = (result = {}, credentials = []) => {
     'envelopeKekSecretSet',
     'envelopeKekSecretPreserved',
     'recoveryKeyFingerprint',
+    'keyPreserved',
     'subdomain',
     'subdomainStatus',
     'subdomainEnabled',
@@ -2419,6 +2420,7 @@ const executeDeployHelperRequestCore = async ({
     tokenSecretPreserved,
     envelopeKekSecretSet,
     envelopeKekSecretPreserved,
+    keyPreserved: envelopeKekSecretPreserved,
     subdomain,
     subdomainStatus,
     subdomainEnabled,
@@ -2574,8 +2576,41 @@ const executeDeployHelperRequestCore = async ({
     workerName,
     workerCleanupStatus: 'retained-runtime-secret-pending',
   });
+  // Cloudflare never returns secret values. Keep only the fingerprint in the
+  // owned private namespace BEFORE installing the key, so a lost reply can
+  // identify the preserved binding without trusting changed retry input.
+  const recoveryKeyRecordPath = `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/ce-deployment-recovery-key:${deploymentId}`;
+  if (envelopeKekSecretPreserved) {
+    const readback = await cfFetch(apiToken, recoveryKeyRecordPath, { method: 'GET' }, cfFetchOptions);
+    const record = readback?.data?.result || readback?.data;
+    if (readback.ok && record?.deploymentId === deploymentId && /^[a-f0-9]{64}$/.test(record?.fingerprint || '')) {
+      deploymentPayload.recoveryKeyFingerprint = record.fingerprint;
+    } else if (!readback.ok && Number(readback.status) !== 404) {
+      return buildDeploymentFailure(503, {
+        error: 'Could not read the preserved recovery key fingerprint; retry.',
+        deploymentRequestPending: true,
+        orphanResources: retainedRuntimeSecretResources(),
+      }, { fallbackEligible: true });
+    }
+    // Older deployments may have no fingerprint record. Report preservation
+    // honestly; signed admin export can recover their key and fingerprint.
+  }
   if (envelopeKekSecretRequired) {
     if (!deploymentPayload.envelopeKekSecretPreserved) {
+      const fingerprint = await recoveryKeyFingerprint(envelopeKekSecret);
+      const recorded = await cfFetch(apiToken, recoveryKeyRecordPath, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deploymentId, fingerprint }),
+      }, cfFetchOptions);
+      if (!recorded.ok) {
+        return buildDeploymentFailure(503, {
+          error: 'Could not retain the recovery key fingerprint; retry.',
+          deploymentRequestPending: true,
+          orphanResources: retainedRuntimeSecretResources(),
+        }, { fallbackEligible: true });
+      }
+      deploymentPayload.recoveryKeyFingerprint = fingerprint;
       const envelopeKekResp = await cfFetch(apiToken, runtimeSecretsPath, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -2907,8 +2942,11 @@ export const executeDeployHelperRequest = async (options = {}) => {
     }
   };
   const buildTerminalJournalReplay = (record) => {
-    const result = record?.result;
+    let result = record?.result;
     if (result?.ok !== true) return result;
+    if (result.body?.recoveryKeyFingerprint || result.body?.envelopeKekSecretSet || result.body?.envelopeKekSecretPreserved) {
+      result = { ...result, body: { ...result.body, keyPreserved: true } };
+    }
     const recordedFullRequestDigest = toStr(record?.fullRequestDigest).trim().toLowerCase();
     const fullRequestDigestMatches = recordedFullRequestDigest
       ? recordedFullRequestDigest === context.fullRequestDigest

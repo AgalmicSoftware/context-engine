@@ -530,6 +530,7 @@ const useSessionWizardWorkerDeploy = ({
         }
         setOperatorRecoveryKey(null);
         if (
+          data.keyPreserved ||
           data.recoveryKey ||
           data.recoveryKeyFingerprint ||
           data.envelopeKekSecretPreserved ||
@@ -553,6 +554,7 @@ const useSessionWizardWorkerDeploy = ({
             workerUrl: String(data.workerUrl || ''),
             createdAt: new Date().toISOString(),
             supplied: suppliedMatches,
+            keyPreserved: data.keyPreserved === true || data.envelopeKekSecretPreserved === true,
           });
           delete data.recoveryKey;
         }

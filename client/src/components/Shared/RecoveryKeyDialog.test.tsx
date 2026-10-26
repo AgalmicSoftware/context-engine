@@ -72,3 +72,18 @@ test.each([false, true])('identifies whether the displayed key was supplied (%s)
   render(<RecoveryKeyDialog value={{ ...value, supplied }} onContinue={() => {}} />);
   expect(screen.getByRole('status')).toHaveTextContent(supplied ? 'supplied recovery key' : 'generated recovery key');
 });
+
+test.each([value.fingerprint, ''])('identifies a preserved key and gives honest custody advice (%s)', (fingerprint) => {
+  render(
+    <RecoveryKeyDialog
+      value={{ ...value, recoveryKey: undefined, keyPreserved: true, fingerprint }}
+      onContinue={() => {}}
+    />,
+  );
+  expect(screen.getByRole('status')).toHaveTextContent('The Worker kept its existing recovery key');
+  expect(screen.getByRole('status')).toHaveTextContent(
+    fingerprint ? 'matching the fingerprint below' : 'fingerprint was not recorded',
+  );
+  expect(screen.queryByLabelText('Recovery key')).not.toBeInTheDocument();
+  expect(screen.queryByText(/supplied recovery key is installed/)).not.toBeInTheDocument();
+});
