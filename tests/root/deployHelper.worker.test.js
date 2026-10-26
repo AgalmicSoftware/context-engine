@@ -585,6 +585,46 @@ describe('deploy-helper worker', () => {
     });
   });
 
+  it.each([false, true])('returns only a newly generated recovery key once (operator=%s)', async (operator) => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeDeploymentRequestFetchSequence([
+      cfSuccess({ id: 'kv-request-1' }), cfSuccess({}), cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }), cfSuccess({}),
+    ]);
+    global.fetch = fetchMock;
+    const journal = makeKvBinding();
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journal });
+    const body = { apiToken: 'synthetic-api-token', deploymentRequestId: 'recovery-fixture-0001',
+      workerName: 'recovery-worker', sessionSlug: 'recovery-session', bundleText: 'export default { fetch() {} };',
+      ...(operator ? { storageEnvelopeKek: 'A'.repeat(64) } : {}) };
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      const first = await response.json();
+      expect(response.status).toBe(200);
+      const installed = fetchMock.calls.filter(([url, init = {}]) => String(url).endsWith('/secrets') && init.method === 'PUT')
+        .map(([, init]) => JSON.parse(init.body)).find((entry) => entry.name === 'CE_STORAGE_ENVELOPE_KEK').text;
+      if (operator) { expect(installed).toBe(body.storageEnvelopeKek); expect(first.recoveryKey).toBeUndefined(); }
+      else expect(first.recoveryKey).toBe(installed);
+      expect(first.recoveryKeyFingerprint).toMatch(/^[a-f0-9]{64}$/);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      const replay = await (await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {})).json();
+      expect(replay.recoveryKey).toBeUndefined();
+      expect(replay.recoveryKeyFingerprint).toBe(first.recoveryKeyFingerprint);
+      expect(JSON.stringify([...journal.store.values()])).not.toContain(installed);
+      for (const instance of env.__coordinatorInstances.values()) expect(JSON.stringify([...instance.store.values()])).not.toContain(installed);
+      expect(JSON.stringify(log.mock.calls)).not.toContain(installed);
+    } finally { log.mockRestore(); }
+  });
+
+  it.each(['bad-key', 'a'.repeat(63), 123])('rejects an invalid operator recovery key before any remote action: %s', async (key) => {
+    global.fetch = jest.fn();
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', { apiToken: 'synthetic-token',
+      workerName: 'fixture', sessionSlug: 'fixture', bundleText: 'export default { fetch() {} };', storageEnvelopeKek: key }), {}, {});
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/64 hex/);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it('authenticates then rejects release-manifest bundle drift before any Cloudflare mutation', async () => {
     const calls = [];
     const manifestUrl = 'https://bundles.example.test/worker-release-manifest.json';
@@ -1281,7 +1321,7 @@ describe('deploy-helper worker', () => {
 
       const configWrite = JSON.parse(findConfigWriteCall(fetchMock)[1].body);
       expect(configWrite.storageProfile.payloadAccessControl.encryption).toBe('worker_envelope');
-      expect(JSON.stringify(payload)).not.toContain(envelopeKek);
+      expect(payload.recoveryKey).toBe(envelopeKek);
       expect(JSON.stringify(configWrite)).not.toContain(envelopeKek);
       expect(JSON.stringify(consoleLogSpy.mock.calls)).not.toContain(envelopeKek);
       expect(JSON.stringify(consoleErrorSpy.mock.calls)).not.toContain(envelopeKek);
@@ -3736,6 +3776,7 @@ describe('deploy-helper worker', () => {
       const retryPayload = await retryResponse.json();
 
       expect(retryResponse.status).toBe(200);
+      expect(retryPayload.recoveryKey).toBeUndefined();
       expect(retryPayload).toEqual(expect.objectContaining({
         ok: true,
         kvNamespaceId: 'kv-resume-1',

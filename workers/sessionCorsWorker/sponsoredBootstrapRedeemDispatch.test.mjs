@@ -120,7 +120,7 @@ test('dispatchSponsoredBootstrapRedeem rejects invalid JSON before reading grant
 });
 
 test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path and stores a safe receipt on success', async () => {
-  const { env, deletes } = createKvEnv({
+  const { env, deletes, store } = createKvEnv({
     type: 'deploy-worker',
     sourceSessionSlug: 'source-session',
     sourceConfig: {
@@ -151,7 +151,7 @@ test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path and 
         return {
           ok: true,
           status: 200,
-          body: { ok: true, workerUrl: 'https://fresh-session.example.test' },
+          body: { ok: true, workerUrl: 'https://fresh-session.example.test', envelopeKekSecretSet: true, recoveryKey: 'a'.repeat(64), recoveryKeyFingerprint: 'b'.repeat(64) },
         };
       },
       fetch: async () => {
@@ -182,10 +182,11 @@ test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path and 
     consoleImpl: console,
   }]);
   assert.deepEqual(deletes, []);
+  assert.doesNotMatch(JSON.stringify([...store.values()]), new RegExp('a'.repeat(64)));
   assert.deepEqual(result, {
-    body: { ok: true, workerUrl: 'https://fresh-session.example.test' },
+    body: { ok: true, workerUrl: 'https://fresh-session.example.test', envelopeKekSecretSet: true, recoveryKey: 'a'.repeat(64), recoveryKeyFingerprint: 'b'.repeat(64) },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test', 'Cache-Control': 'no-store' },
   });
 });
 

@@ -5,6 +5,7 @@ import { getStorageIndexBinding, resolvePayloadAccessControl } from './storageRo
 
 export const FEATURES = Object.freeze([
   'envelope_export_identity_v1',
+  'recovery_key_export',
   'response_upload_receipts',
   'results_analysis_retry_v1',
   'session_backup_v1',

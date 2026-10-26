@@ -395,6 +395,12 @@ export const dispatchAdminRequest = async ({
     );
   }
 
+  if (action === 'export-recovery-key') {
+    const result = await callSessionConfigCoordinator({ env, slug: targetSlug, path: 'recovery-key/export',
+      expectedAuthority, confirm: body?.confirm });
+    return deps?.json?.(result.body, result.status, { ...headers, 'Cache-Control': 'no-store' });
+  }
+
   if (action === 'export-session-backup') {
     try {
       return deps?.json?.(await exportSessionBackup({ env, slug: targetSlug, expectedAuthority, cursor: body?.cursor || '' }),

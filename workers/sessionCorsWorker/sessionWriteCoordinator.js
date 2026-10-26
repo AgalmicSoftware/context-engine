@@ -1,3 +1,5 @@
+import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
+import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
 import { assertExpectedSessionAuthority } from './sessionConfigAuthority.js';
 import { exportCoordinatorBackup, exportWorkerGroupBackup, importWorkerGroupBackup } from './sessionBackupCoordinator.js';
 import { importCoordinatorBackupPage } from './sessionBackupImport.js';
@@ -2673,7 +2675,7 @@ export class SessionWriteCoordinator {
         result,
         terminal,
       });
-      return jsonResponse(result, result.status);
+      return jsonResponse(withFreshRecoveryKey(result, rawResult), result.status);
     } finally {
       if (this.activeDirectAttemptId === reservation.attemptId) this.activeDirectAttemptId = '';
     }
@@ -2738,6 +2740,9 @@ export class SessionWriteCoordinator {
       return jsonResponse({ error: 'Not found.' }, 404);
     }
     if (url.pathname === '/session-config/current') return this.executeSessionConfigCurrent(payload);
+    if (url.pathname === '/session-config/recovery-key/export') {
+      return this.serializeSessionConfigOperation(() => exportCoordinatorRecoveryKey(this, payload));
+    }
     if (url.pathname === '/session-config/backup/export') {
       return this.serializeSessionConfigOperation(async () => {
         try { return await exportCoordinatorBackup(this, payload); }
@@ -2901,7 +2906,7 @@ export class SessionWriteCoordinator {
         result,
         terminal,
       });
-      return jsonResponse(result, result.status);
+      return jsonResponse(withFreshRecoveryKey(result, rawResult), result.status);
     } finally {
       if (this.activeAttemptId === reservation.attemptId) this.activeAttemptId = '';
     }

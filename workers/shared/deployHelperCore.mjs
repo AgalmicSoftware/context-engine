@@ -1,3 +1,4 @@
+import { recoveryKeyFingerprint, withFreshRecoveryKey } from './recoveryKey.mjs';
 import { fetchArtifactText } from './artifactFetch.mjs';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import {
@@ -556,7 +557,7 @@ const collectKnownRequestCredentials = (body) => {
     }
     if (!isObj(value)) return;
     Object.entries(value).forEach(([key, entry]) => {
-      const credentialField = sensitive || /(?:token|secret|password|api[_-]?key|private[_-]?key)/i.test(key);
+      const credentialField = sensitive || /(?:token|secret|password|kek|recovery[_-]?key|api[_-]?key|private[_-]?key)/i.test(key);
       visit(entry, credentialField);
     });
   };
@@ -599,6 +600,7 @@ const buildSafeDeployJournalResult = (result = {}, credentials = []) => {
     'tokenSecretPreserved',
     'envelopeKekSecretSet',
     'envelopeKekSecretPreserved',
+    'recoveryKeyFingerprint',
     'subdomain',
     'subdomainStatus',
     'subdomainEnabled',
@@ -1584,7 +1586,7 @@ const executeDeployHelperRequestCore = async ({
   // when payload-level worker-envelope encryption is not selected. The shared
   // envelope helper derives a domain-separated AES key from this value.
   const envelopeKekSecretRequired = true;
-  const candidateEnvelopeKekSecret = randomSecret();
+  const candidateEnvelopeKekSecret = body?.storageEnvelopeKek || randomSecret();
   const secretsEnvelope = await buildEncryptedSessionSecretsEnvelope(secrets, {
     env: { [STORAGE_ENVELOPE_KEK_SECRET_NAME]: candidateEnvelopeKekSecret },
     slug: sessionSlug || displaySlug,
@@ -2679,6 +2681,10 @@ const executeDeployHelperRequestCore = async ({
     deploymentPayload.agentSessionWrapped = capabilityWrite.body.agentSessionWrapped;
   }
 
+  if (envelopeKekSecretSet && !envelopeKekSecretPreserved) {
+    deploymentPayload.recoveryKeyFingerprint = await recoveryKeyFingerprint(envelopeKekSecret);
+    if (!body?.storageEnvelopeKek) deploymentPayload.recoveryKey = envelopeKekSecret;
+  }
   return buildSuccess(200, deploymentPayload);
 };
 
@@ -2746,6 +2752,10 @@ const resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImp
 };
 
 const validateDeployHelperLocalInputs = (body = {}, env = {}) => {
+  if (body?.storageEnvelopeKek !== undefined &&
+      (typeof body.storageEnvelopeKek !== 'string' || !/^[0-9a-f]{64}$/i.test(body.storageEnvelopeKek))) {
+    return 'storageEnvelopeKek must be exactly 64 hex characters.';
+  }
   const publicConfigError = validateDeployHelperPublicConfigInputs(body);
   if (publicConfigError) return publicConfigError;
   const slugCheck = validateInboundSlug(body?.sessionSlug);
@@ -3157,5 +3167,5 @@ export const executeDeployHelperRequest = async (options = {}) => {
     context.definitiveUploadRejected === true,
   );
   if (authorityCleanupFailure) return authorityCleanupFailure;
-  return safeResult;
+  return withFreshRecoveryKey(safeResult, result);
 };

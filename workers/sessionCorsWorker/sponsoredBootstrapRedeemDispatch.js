@@ -1,3 +1,4 @@
+import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
 import {
   buildSafeSponsoredReceiptBody,
   deleteSponsoredGrantRecord,
@@ -122,7 +123,7 @@ const collectSponsoredSensitiveValues = (value, parentSensitive = false, output 
   Object.entries(value).forEach(([key, entry]) => {
     collectSponsoredSensitiveValues(
       entry,
-      parentSensitive || SENSITIVE_FIELD_PATTERN.test(key.replace(/[^a-z0-9]/gi, '')),
+      parentSensitive || (/kek|recoverykey/i.test(key) || SENSITIVE_FIELD_PATTERN.test(key.replace(/[^a-z0-9]/gi, ''))),
       output,
     );
   });
@@ -322,7 +323,7 @@ export const dispatchSponsoredBootstrapRedeem = async ({
         sensitiveValues,
         nowMs: deps?.now?.() ?? Date.now(),
       });
-      return deps?.json?.(receipt.body, receipt.status, headers);
+      return deps?.json?.(withFreshRecoveryKey({ body: receipt.body }, embeddedResult).body, receipt.status, { ...headers, 'Cache-Control': 'no-store' });
     }
 
     const safeEmbeddedResult = redactSponsoredDeployFailure(embeddedResult, sensitiveValues);

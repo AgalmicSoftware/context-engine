@@ -1718,7 +1718,7 @@ test('SessionWriteCoordinator chooses one payload before concurrent sponsored de
 				return {
 					ok: true,
 					status: 200,
-					body: { ok: true, workerUrl: 'https://winner.example.test' },
+					body: { ok: true, workerUrl: 'https://winner.example.test', envelopeKekSecretSet: true, recoveryKey: 'a'.repeat(64), recoveryKeyFingerprint: 'b'.repeat(64) },
 				};
 			},
 		},
@@ -1749,6 +1749,10 @@ test('SessionWriteCoordinator chooses one payload before concurrent sponsored de
 	const winner = await readResponse(await first);
 	assert.equal(winner.status, 200);
 	assert.equal(winner.body.body.workerUrl, 'https://winner.example.test');
+	assert.equal(winner.body.body.recoveryKey, 'a'.repeat(64));
+	const replay = await readResponse(await coordinator.fetch(createRequest({ requestDigest: 'digest-a' })));
+	assert.equal(replay.body.body.recoveryKey, undefined);
+	assert.doesNotMatch(JSON.stringify([...store.values()]), new RegExp('a'.repeat(64)));
 	assert.equal(calls.length, 1);
 	assert.doesNotMatch(JSON.stringify([...store.values()]), /cf-sponsor-secret|sk-provider-secret/);
 });

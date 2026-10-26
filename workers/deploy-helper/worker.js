@@ -127,7 +127,7 @@ const handleResolvedRequest = async ({ request, env, origin, url, allowListInfo,
     requestOrigin: origin,
     consoleImpl: console,
   });
-  return json(deployResult.body, deployResult.status, headers);
+  return json(deployResult.body, deployResult.status, { ...headers, 'Cache-Control': 'no-store' });
 };
 
 export default {

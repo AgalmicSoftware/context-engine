@@ -1,10 +1,10 @@
-const encoder = new TextEncoder();
+export { recoveryKeyFingerprint } from '../../shared/crypto/recoveryKeyFingerprint.mjs';
 
-// Domain-separated proof of key continuity; never return or log key material.
-export const recoveryKeyFingerprint = async (secret) => {
-  const material = typeof secret === 'string' ? secret.trim() : '';
-  if (!material) throw new Error('Recovery key is missing.');
-  const key = await crypto.subtle.importKey('raw', encoder.encode(material), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const bytes = new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode('ce-kek-fingerprint-v1')));
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+// Add the ephemeral display only AFTER all durable receipts have been written.
+// Replays pass through the safe receipt, which never contains this field.
+export const withFreshRecoveryKey = (safeResult, freshResult) => {
+  const source = freshResult?.body;
+  if (freshResult?.ok !== true || source?.envelopeKekSecretSet !== true ||
+      source?.envelopeKekSecretPreserved === true || !/^[0-9a-f]{64}$/i.test(source?.recoveryKey || '')) return safeResult;
+  return { ...safeResult, body: { ...safeResult.body, recoveryKey: source.recoveryKey } };
 };

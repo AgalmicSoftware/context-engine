@@ -100,6 +100,7 @@ export const buildSafeSponsoredReceiptBody = (incoming = {}, sensitiveValues = [
     'tokenSecretPreserved',
     'envelopeKekSecretSet',
     'envelopeKekSecretPreserved',
+    'recoveryKeyFingerprint',
     'subdomain',
     'subdomainStatus',
     'subdomainEnabled',
