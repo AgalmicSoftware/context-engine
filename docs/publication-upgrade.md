@@ -37,6 +37,31 @@ back only one reader can restore the disagreement; preserve the inventory and
 coordinate any rollback across the affected surfaces. No deployment ordering or
 traffic restriction is applied automatically.
 
+## Supported client and Worker versions
+
+The supported window is the current client with the current or immediately
+previous minor Worker. Within that window, support is feature-specific:
+
+| Client | Worker | Supported behavior |
+| --- | --- | --- |
+| Current | Current, API 1 | Advertised operations, subject to session readiness |
+| Current | Previous minor, no capabilities endpoint | Existing stored records, normal creation and submission; no admin corrections, backup/import or recovery-key UI without the corresponding feature |
+| Current | Older than previous minor | Best effort reads only; upgrade before relying on writes |
+
+Release numbers alone do not prove support: the 0.6.14 fallback bundle also
+predates authority stamps and capabilities. A current client can safely read
+its records, but cannot change historical correction intent. An old Worker's
+own results/interview implementation may still apply its old selection rule;
+the coordinated upgrade procedure above remains necessary for agreement across
+all deployed readers.
+
+`tests/fixtures/worker-compat/previous-minor.json` pins synthetic stored-format
+compatibility: unstamped admin corrections, legacy rows without resource IDs,
+equal-time versions, and repeated answer uploads without receipts. Browser
+hydration, the current Worker results and interview readers, and MCP all choose
+the same versions before and after adding a new stamped correction. The fixture
+tests stored-format compatibility, not an executable copy of an old release.
+
 ## Legacy config preflight
 
 Before routing traffic to the new Worker, verify `CE_SESSION_COORDINATOR` binds

@@ -416,7 +416,7 @@ test('locked questions are listed as locked and cannot be answered', async () =>
   assert.equal(storedRecords(env, 'responses').filter((row) => row.resource === 'responses').length, 0);
 });
 
-test('a statement that hashes to its id under either id encoding beats an earlier rewrite', async () => {
+test('an earlier stored version wins even when a later upload hashes to either id encoding', async () => {
   const env = createEnv([sessionConfig()]);
   const { participant: author } = await createAgent(env, 'author', []);
   await author.joinSession({ link: LINK });
@@ -434,7 +434,7 @@ test('a statement that hashes to its id under either id encoding beats an earlie
   const { participant } = await createAgent(env, 'reader', []);
   await participant.joinSession({ link: LINK });
   const { questions } = await participant.listQuestions({ filter: 'all' });
-  for (const id of ids) assert.equal(questions.find((question) => question.id === id)?.prompt, 'Which budget?');
+  for (const id of ids) assert.equal(questions.find((question) => question.id === id)?.prompt, 'Rewritten budget?');
 });
 
 test('a long-running agent picks up admin changes to the session', async () => {

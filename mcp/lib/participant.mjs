@@ -5,7 +5,8 @@ import { compareChainOrder } from './registryChain.mjs';
 import { normalizeLabel } from './config.mjs';
 import { describeError } from './mcpServer.mjs';
 import { readAgentState, updateAgentState } from './agentState.mjs';
-import { buildQuestionRecord, buildResponseRecord, isLockedQuestion, isSingleSelect, questionIdMatchesContent, ratingScaleFor } from './records.mjs';
+import { buildQuestionRecord, buildResponseRecord, isLockedQuestion, isSingleSelect, ratingScaleFor } from './records.mjs';
+import { isPreferredStorageVersion } from '../../shared/storage/canonicalStorageVersions.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
 import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
@@ -113,29 +114,10 @@ const sanitizeQuestion = (payload, id) => {
   return question;
 };
 
-const contentMatchesId = (question, id) =>
-  questionIdMatchesContent(id, {
-    type: question.type,
-    prompt: question.prompt,
-    options: stringOptions(question),
-    singleSelect: isSingleSelect(question),
-    voiceCredits: question.voiceCredits ?? 99,
-  });
-
 /** Picks the canonical version per question id like the web client does. */
-const chooseQuestionVersion = (versions) => {
-  const admin = versions.filter((version) => version.uploaderIsAdmin);
-  if (admin.length) return admin.sort((left, right) => (left.createdAt < right.createdAt ? 1 : -1))[0];
-  // A version that hashes to its id beats the others; otherwise (including
-  // locked versions, which cannot be checked) the earliest wins.
-  const ranked = [...versions].sort((left, right) => {
-    const leftMatches = left.contentMatches === true ? 0 : 1;
-    const rightMatches = right.contentMatches === true ? 0 : 1;
-    if (leftMatches !== rightMatches) return leftMatches - rightMatches;
-    return left.createdAt < right.createdAt ? -1 : left.createdAt > right.createdAt ? 1 : 0;
-  });
-  return ranked[0];
-};
+const chooseQuestionVersion = (versions) => versions.reduce(
+  (chosen, candidate) => isPreferredStorageVersion(candidate, chosen) ? candidate : chosen, null,
+);
 
 const describeQuestion = (question, myAnswer) => {
   const options = stringOptions(question);
@@ -402,8 +384,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         list.push({
           payload: question,
           createdAt: text(item.metadata?.createdAt),
-          uploaderIsAdmin: item.metadata?.uploaderIsAdmin === true,
-          contentMatches: question.locked ? null : contentMatchesId(question, id),
+          createdAtMs: Date.parse(text(item.metadata?.createdAt)) || 0,
+          storageRefId: text(item.storageRef.id),
+          uploadAuthority: item.metadata?.uploadAuthority,
         });
         versions.set(id, list);
       } catch {
