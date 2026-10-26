@@ -272,7 +272,7 @@ test('Cloudflare catalog still chooses among the rows it listed when it cannot f
   const listed = { storageRef: { id: 'row-q1' }, metadata: { resourceId: 'q1' } };
   const page = (body, status = 200) => new Response(JSON.stringify(body), { status });
   for (const [nextPage, expectedListCalls] of [
-    [(cursor) => page({ items: [listed], cursor: `${cursor}+`, listComplete: false }), 50],
+    [(cursor) => page({ items: [listed], cursor: `${cursor}+`, listComplete: false }), 5],
     [() => page({ items: [listed], cursor: 'same', listComplete: false }), 2],
     [() => page({ items: [listed], cursor: null, listComplete: false }), 1],
     [(cursor) => (cursor ? page({ error: 'unavailable' }, 503) : page({ items: [listed], cursor: 'next', listComplete: false })), 2],
@@ -289,4 +289,25 @@ test('Cloudflare catalog still chooses among the rows it listed when it cannot f
     assert.deepEqual(prompts(questions), [{ id: 'q1', prompt: 'Listed question' }]);
     assert.equal(listCalls, expectedListCalls);
   }
+});
+
+test('Cloudflare catalog keeps room for its payload reads within the per-request KV operation limit', async () => {
+  const { kv, put, load } = createQuestionStore();
+  for (let index = 0; index < 1500; index += 1) {
+    const id = `q-${String(index).padStart(4, '0')}`;
+    await put(`row-${id}`, new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(), { uploader: author, resourceId: id }, question(id, `Question ${index}?`));
+  }
+  // Cloudflare allows 1,000 KV operations per invocation.
+  let operations = 0;
+  const counted = (method) => async (...args) => {
+    operations += 1;
+    if (operations > 1000) throw new Error('Too many API requests by single worker invocation');
+    return method(...args);
+  };
+  kv.get = counted(kv.get.bind(kv));
+  kv.list = counted(kv.list.bind(kv));
+
+  const questions = await load();
+  assert.equal(questions.length, 100);
+  assert.ok(operations <= 800, `${operations} KV operations`);
 });

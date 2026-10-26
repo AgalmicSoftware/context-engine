@@ -2,12 +2,15 @@ const QUESTIONS_ADDED_TOPIC0 = '0x3b584fb360a325f39352e75bd13458807d8e31735ef4da
 const GET_QUESTION_HASH_SELECTOR = '0x24b9f713';
 const ZERO_BYTES32 = `0x${'00'.repeat(32)}`;
 const MAX_QUESTIONS = 100;
-// Every version of a question must be listed before one is chosen; this only
-// stops a runaway walk. Matches the client's canonical metadata walk.
-const MAX_CLOUDFLARE_LIST_PAGES = 50;
-// Payload reads per pass (legacy rows, then chosen versions), with room for
-// rows that turn out unreadable or restricted.
+// Payload reads across legacy rows and chosen versions, with room for rows
+// that turn out unreadable or restricted.
 const MAX_PAYLOAD_READS = MAX_QUESTIONS * 2;
+// One Worker invocation may make 1,000 KV operations, some spent before the
+// catalog runs. A listed page costs about MAX_QUESTIONS + 2 (index list,
+// hidden-id list, one metadata read per row) and a payload read about one, so
+// the walk stops early enough to leave room for its reads.
+const CATALOG_KV_OPERATION_BUDGET = 800;
+const MAX_CLOUDFLARE_LIST_PAGES = Math.floor((CATALOG_KV_OPERATION_BUDGET - MAX_PAYLOAD_READS) / (MAX_QUESTIONS + 2));
 const MAX_SCAN_BLOCKS = 2_000_000;
 const RPC_CHUNK_SIZE = 100_000;
 import { normalizePublicInterviewQuestions, hasRestrictedPrompt, hasRatingScaleMetadata, normalizeRatingScale, normalizeQuestion } from '../../shared/interviewQuestionCatalog.mjs';
@@ -32,9 +35,9 @@ const readJsonResponse = async (response) => {
   }
 };
 
-// A walk that cannot finish (page cap, per-request storage limits, a failed
-// page) may miss a later admin correction. Without a current-version index it
-// still chooses among every row it listed, never fewer than before.
+// A walk that cannot finish (the page cap above, a failed page) may miss a later
+// admin correction. Without a current-version index it still chooses among
+// every row it listed, which covers more rows than the former 200-row window.
 const listQuestionRows = async (callStorage) => {
   const items = [];
   const seenCursors = new Set();
@@ -95,7 +98,9 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
   // Rows stored before resourceId was recorded name their question only in the
   // payload. They predate admin stamps, so the earliest wins: read oldest first.
   legacyVersions.sort((left, right) => left.createdAtMs - right.createdAtMs);
-  for (const version of legacyVersions.slice(0, MAX_PAYLOAD_READS)) {
+  // Legacy reads leave at least MAX_QUESTIONS reads for the chosen versions.
+  const legacyReads = legacyVersions.slice(0, MAX_PAYLOAD_READS - MAX_QUESTIONS);
+  for (const version of legacyReads) {
     const payload = await readPayload(version.storageRefId);
     const resourceId = payloadQuestionId(payload);
     if (resourceId) versions.push({ ...version, resourceId, payload });
@@ -103,7 +108,7 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
   // Only an upload-time admin stamp can replace the earliest ordinary version.
   const chosen = selectCanonicalStorageVersions(versions)
     .filter((version) => !hiddenIds.has(version.resourceId))
-    .slice(0, MAX_PAYLOAD_READS);
+    .slice(0, MAX_PAYLOAD_READS - legacyReads.length);
   const questions = [];
   for (const version of chosen) {
     if (questions.length >= MAX_QUESTIONS) break;
