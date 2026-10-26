@@ -233,6 +233,14 @@ test('local navigation uses explicit asset fixtures and ABI-valid registry reads
   assert.equal(logo.contentType, 'image/png');
   assert.match(logo.path, /client\/public\/favicon-32x32\.png$/);
 
+  const capabilitiesUrl = 'https://demo-worker-030226.agalmic.workers.dev/capabilities?slug=';
+  const capabilities = await request(capabilitiesUrl);
+  assert.equal(capabilities.json.type, 'ce_worker_capabilities');
+  assert.deepEqual(capabilities.json.features, []);
+  assert.deepEqual(await request(capabilitiesUrl, 'POST'), { aborted: 'blockedbyclient' });
+  assert.deepEqual(await request(capabilitiesUrl.replace('slug=', 'slug=private')), { aborted: 'blockedbyclient' });
+  assert.deepEqual(await request(capabilitiesUrl.replace('demo-worker-030226', 'unknown-worker')), { aborted: 'blockedbyclient' });
+
   const registry = new ethers.utils.Interface(registryAbi);
   const to = contracts.sessionRegistryAddresses['11155420'];
   const rpcUrl = 'https://sepolia.optimism.io/';

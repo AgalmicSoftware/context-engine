@@ -105,6 +105,9 @@ async function installLocalSmokeFixtureRoutes(page, baseUrl) {
     const request = requestRoute.request();
     const url = new URL(request.url());
     if (url.origin === appOrigin) return requestRoute.continue();
+    if (request.method() === 'GET' && request.url() === 'https://demo-worker-030226.agalmic.workers.dev/capabilities?slug=') {
+      return requestRoute.fulfill({ json: { type: 'ce_worker_capabilities', version: 1, apiVersion: 1, bundle: null, features: [] } });
+    }
     if (request.method() === 'GET' && LOCAL_SMOKE_FONT_URLS.has(request.url())) {
       return requestRoute.fulfill({ contentType: 'text/css', body: '/* Use installed fallback fonts in local smoke. */' });
     }
