@@ -24,6 +24,7 @@ interface StorageWorkerOptions {
 }
 
 interface UploadDataToSessionStorageOptions extends StorageWorkerOptions {
+  requestId?: string;
   tags?: unknown;
   contentType?: unknown;
   resource?: unknown;
@@ -117,6 +118,7 @@ export const uploadDataToSessionStorage = async (
     payloadEncrypted = false,
     arweaveJwk = '',
     credentialToken = '',
+    requestId = '',
     fetchImpl = fetch,
   }: UploadDataToSessionStorageOptions = {},
 ): Promise<UnknownRecord> => {
@@ -174,6 +176,7 @@ export const uploadDataToSessionStorage = async (
     form.append('resource', resource as string);
     form.append('contentType', bodyContentType);
     form.append('payloadEncrypted', payloadIsEncrypted ? 'true' : 'false');
+    if (requestId) form.append('requestId', requestId);
     if (normalizedTags.length) form.append('tags', JSON.stringify(normalizedTags));
     requestInit = { method: 'POST', body: form };
   } else {
@@ -186,6 +189,7 @@ export const uploadDataToSessionStorage = async (
         contentType: bodyContentType,
         payloadEncrypted: payloadIsEncrypted,
         tags: normalizedTags,
+        ...(requestId ? { requestId } : {}),
         data,
       }),
     };

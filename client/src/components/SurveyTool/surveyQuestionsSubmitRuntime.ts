@@ -409,6 +409,16 @@ export const createSurveyQuestionsSubmitRuntime = (
       }
 
       submitContext = buildSubmitContextSnapshot();
+      const operationContextKey = buildSubmitContextKey(submitContext);
+      if (!inst._submitOperationId || inst._submitOperationContextKey !== operationContextKey) {
+        inst._submitOperationId = ethers.utils.hexlify(ethers.utils.randomBytes(16));
+        inst._submitOperationContextKey = operationContextKey;
+        inst._submitOperationTimestamp = Date.now();
+        inst._submitOperationPayloads = new Map();
+      }
+      submitContext.operationId = inst._submitOperationId;
+      submitContext.operationTimestamp = inst._submitOperationTimestamp;
+      submitContext.operationPayloads = inst._submitOperationPayloads;
       const startResult: SurveyQuestionsSubmitStartControllerResult = runSurveyQuestionsSubmitStartController({
         ports: {
           startSubmitAttempt: () => startSubmitAttempt(),
@@ -704,6 +714,12 @@ export const createSurveyQuestionsSubmitRuntime = (
       invalidateDiffCaches();
       inst._userAnswersSliceCache = { source: null, value: null };
 
+      if (receipt?.retryPending !== true && !inst._heldBackSubmitQids?.length) {
+        delete inst._submitOperationId;
+        delete inst._submitOperationContextKey;
+        delete inst._submitOperationTimestamp;
+        delete inst._submitOperationPayloads;
+      }
       runSurveyQuestionsSubmitSuccessController({
         editBaseline: nextBaseline,
         hasEncrypted,

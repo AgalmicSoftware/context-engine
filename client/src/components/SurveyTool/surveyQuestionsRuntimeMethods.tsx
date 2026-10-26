@@ -813,6 +813,10 @@ export const createSurveyQuestionsRuntimeMethods = (
     const workerTargetChanged =
       resolveWorkerTargetForProps(prevProps).key !== resolveWorkerTargetForProps(propsRef.current).key;
     if (prevProps.account !== propsRef.current.account || workerTargetChanged) {
+      delete inst._submitOperationId;
+      delete inst._submitOperationContextKey;
+      delete inst._submitOperationTimestamp;
+      delete inst._submitOperationPayloads;
       // Props already identify the next account/Worker. Never flush the previous
       // form through its key; dirty-edit guards must not preserve it across authorities.
       if (inst._persistTimer) clearTimeout(inst._persistTimer);
@@ -2126,6 +2130,8 @@ export const createSurveyQuestionsRuntimeMethods = (
 
     // Changed questions upload even when blank: clearing a saved answer is an edit.
     const data: SurveyQuestionsLegacyValue = prepareJsonAndHash(idx, undefined, overrideState, changedSet);
+    // A retry must not change otherwise identical bytes just because time passed.
+    if (context.operationTimestamp && data?.timeStamp) data.timeStamp = context.operationTimestamp;
 
     // A changed question that cannot be uploaded as it is stays unsaved and is named; it never
     // holds back the other edits, and only rows that reach storage are marked saved.
@@ -2243,6 +2249,19 @@ export const createSurveyQuestionsRuntimeMethods = (
         }
         return source;
       });
+      // Re-encrypting an unchanged rating would change its bytes and defeat the
+      // upload receipt. Keep prepared bytes only for this operation and input.
+      const retryPayloads = context.operationPayloads instanceof Map ? context.operationPayloads : null;
+      const inputSignatures = new Map<string, string>();
+      const responsesToEncrypt = questionResponses.filter((response: SurveyQuestionsLegacyValue) => {
+        const qid = normalizeQuestionIdKey(response.questionID);
+        const input = JSON.stringify(response);
+        inputSignatures.set(qid, input);
+        const prior = retryPayloads?.get(qid);
+        if (prior?.input !== input) return true;
+        Object.assign(response, deepClone(prior.payload));
+        return false;
+      });
       await processRatingEnvelopesForSubmit(
         {
           sliceForSubmit:
@@ -2256,7 +2275,7 @@ export const createSurveyQuestionsRuntimeMethods = (
                 },
           // A standalone pile may hydrate fields without populating userAnswers.
           userAnswersSource: { responses: ratingSources },
-          questionResponses,
+          questionResponses: responsesToEncrypt,
           changedMapForSubmit,
           encryptionBaseOpts: {
             sessionSlug: submissionGroupKey,
@@ -2291,6 +2310,10 @@ export const createSurveyQuestionsRuntimeMethods = (
           warn: (msg: SurveyQuestionsLegacyValue, err: SurveyQuestionsLegacyValue) => surveyLog.warn(msg, err),
         },
       );
+      questionResponses.forEach((response: SurveyQuestionsLegacyValue) => {
+        const qid = normalizeQuestionIdKey(response.questionID);
+        retryPayloads?.set(qid, { input: inputSignatures.get(qid), payload: deepClone(response) });
+      });
     } catch (e: any) {
       surveyLog.error('Failed to encrypt response rating:', e);
       throw e;
@@ -2349,6 +2372,7 @@ export const createSurveyQuestionsRuntimeMethods = (
         hashedSurveyId,
         surveyResponse,
         submissionTarget,
+        { operationId: context.operationId },
       );
     } catch (error: any) {
       // Answers a Worker stored before a later upload failed are saved; the rest keep

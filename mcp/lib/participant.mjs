@@ -1,4 +1,5 @@
 import { createTestEthRequester } from './testEth.mjs';
+import { createHash, randomUUID } from 'node:crypto';
 import { createRegistrySession } from './registrySession.mjs';
 import { compareChainOrder } from './registryChain.mjs';
 import { normalizeLabel } from './config.mjs';
@@ -706,6 +707,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const results = [];
       const answered = [];
       const pendingAnswers = [];
+      const operationId = randomUUID();
       let txHash;
       let reconciliationRequired = false;
       const seen = new Set();
@@ -750,7 +752,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           continue;
         }
         try {
-          const storageRef = await ctx.client.upload({ resource: 'responses', data: JSON.stringify(built.record) });
+          const data = JSON.stringify(built.record);
+          const digest = createHash('sha256').update(data).digest('hex');
+          const storageRef = await ctx.client.upload({ resource: 'responses', data, requestId: `answer:v1:${operationId}:${questionId}:${digest}` });
           if (text(storageRef?.id)) cacheRecord(ctx, text(storageRef.id), built.record);
           answered.push({ questionId, record: built.record, answeredAt: text(storageRef?.createdAt) || new Date(now()).toISOString() });
           results.push({ questionId, ok: true, answer: built.record.answer.value });

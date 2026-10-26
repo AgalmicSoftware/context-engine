@@ -205,6 +205,29 @@ test('first encrypted question uploads preserve the authorization checked before
   }
 });
 
+test('agent answer uploads use one operation per tool call and forward their content digest', async () => {
+  const env = createEnv([sessionConfig()]);
+  const uploads = [];
+  const fetchWorker = workerFetch(env);
+  const { participant } = await createAgent(env, 'synthetic-agent', [], async (url, init) => {
+    if (new URL(url).pathname === '/storage/upload') {
+      const body = JSON.parse(init.body);
+      if (body.resource === 'responses') uploads.push(body);
+    }
+    return fetchWorker(url, init);
+  });
+  await participant.joinSession({ link: LINK });
+  const first = await participant.addStatement({ prompt: 'Should the pilot run on weekdays?' });
+  const second = await participant.addStatement({ prompt: 'Should the pilot run on weekends?' });
+  const answers = [first, second].map(({ questionId }) => ({ questionId, value: 'Agree' }));
+  assert.equal((await participant.answer({ answers })).submitted, 2);
+  assert.ok(uploads.every(({ requestId }) => /^answer:v1:[^:]+:0x[a-f0-9]{64}:[a-f0-9]{64}$/.test(requestId)));
+  assert.equal(uploads[0].requestId.split(':')[2], uploads[1].requestId.split(':')[2]);
+  for (const upload of uploads) assert.equal(upload.requestId.split(':').at(-1), ethers.utils.sha256(ethers.utils.toUtf8Bytes(upload.data)).slice(2));
+  assert.equal((await participant.answer({ answers })).submitted, 2);
+  assert.notEqual(uploads[0].requestId.split(':')[2], uploads[2].requestId.split(':')[2]);
+});
+
 test('agents join a public hosted session, add statements, answer, and read results like web participants', async () => {
   const env = createEnv([sessionConfig()]);
   const seen = [];

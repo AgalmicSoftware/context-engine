@@ -264,6 +264,7 @@ export const installSessionCoordinatorBinding = (env = {}) => {
               get: async (key) => staged.get(key),
               put: async (key, value) => staged.set(key, cloneCoordinatorTestValue(value)),
               delete: async (key) => staged.delete(key),
+              list: async ({ prefix = '' } = {}) => new Map([...staged].filter(([key]) => key.startsWith(prefix))),
             });
             values.clear();
             for (const [key, value] of staged) values.set(key, value);

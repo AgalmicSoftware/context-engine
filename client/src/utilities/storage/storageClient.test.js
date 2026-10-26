@@ -114,6 +114,7 @@ describe('storageClient', () => {
       sessionSlug: 'alpha',
       sessionConfig: { storageProfile: { backend: 'cloudflare' } },
       context: { account: '0xabc' },
+      requestId: 'answer:v1:json',
       tags: [{ name: 'CE-DocStorage', value: 'cloudflare' }],
     });
 
@@ -124,6 +125,7 @@ describe('storageClient', () => {
       expect.objectContaining({
         backend: 'cloudflare',
         resource: 'docsContext',
+        requestId: 'answer:v1:json',
       }),
     );
     expect(JSON.stringify(result)).not.toMatch(/account|bucket|token|secret|r2:\/\//i);
@@ -279,6 +281,7 @@ describe('storageClient', () => {
       sessionConfig: { storageProfile: { backend: 'cloudflare' } },
       workerUrl: 'https://worker.example',
       credentialToken: 'existing-worker-token',
+      requestId: 'answer:v1:form',
       fetchImpl,
       resource: 'images',
       contentType: 'image/png',
@@ -294,6 +297,7 @@ describe('storageClient', () => {
       }),
     );
     const requestHeaders = fetchImpl.mock.calls[0][1].headers;
+    expect(fetchImpl.mock.calls[0][1].body.get('requestId')).toBe('answer:v1:form');
     expect(requestHeaders.get('Authorization')).toBe('Bearer existing-worker-token');
     expect(requestHeaders.get('X-Group-Slug')).toBe('alpha');
     expect(result.storageRef.resource).toBe('images');

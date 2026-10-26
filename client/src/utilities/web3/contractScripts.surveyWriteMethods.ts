@@ -485,6 +485,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       surveyId: Bytes32Input,
       surveyResponse: MetadataPayload | null | undefined,
       groupKeyOrCfg: GroupKeyOrConfig = null,
+      options: { operationId?: string } = {},
     ) {
       let cfg = resolveSession(groupKeyOrCfg || '');
       let sessionProjection = resolveSessionCapabilityProjection(cfg);
@@ -578,6 +579,11 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
               sessionSlug: normalizeSessionSlug(resolveStorageSessionSlug(groupKeyOrCfg, cfg)),
             }
           : null;
+      const operationId = options.operationId || utils.hexlify(utils.randomBytes(16));
+      const responseRequestId = (id: string, payload: MetadataPayload) =>
+        workerResponseIdentity
+          ? `answer:v1:${operationId}:${id}:${utils.sha256(utils.toUtf8Bytes(JSON.stringify(payload)))}`
+          : undefined;
       if (workerResponseIdentity && (!workerResponseIdentity.sessionId || !workerResponseIdentity.sessionSlug)) {
         throw new Error('submitResponses: exact Worker session identity is required.');
       }
@@ -627,6 +633,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           });
           surveyResponseUpload = await uploadJsonPayloadForContractPointer({
             payload: surveyResponsePayload,
+            requestId: responseRequestId(hashedSurveyId, surveyResponsePayload),
             resource: STORAGE_RESOURCE_KEYS.RESPONSES,
             groupKeyOrCfg,
             cfg,
@@ -640,7 +647,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         // that can appear when multiple uploads are posted in parallel for one wallet.
         questionResponseUploads = [];
         try {
-          for (const response of questionResponses) {
+          for (const [index, response] of questionResponses.entries()) {
             const responsePayload = workerResponseIdentity ? { ...response, ...workerResponseIdentity } : response;
             validateNoLockedPlaintextInPayload(responsePayload, {
               family: 'question_response_payload',
@@ -649,6 +656,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
 
             const responseUpload = await uploadJsonPayloadForContractPointer({
               payload: responsePayload,
+              requestId: responseRequestId(hashedQuestionIds[index], responsePayload),
               resource: STORAGE_RESOURCE_KEYS.RESPONSES,
               groupKeyOrCfg,
               cfg,

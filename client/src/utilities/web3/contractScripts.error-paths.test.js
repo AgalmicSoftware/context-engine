@@ -489,6 +489,44 @@ describe('error paths', () => {
     ]);
   });
 
+  it('reuses unchanged answer keys after a lost reply and changes keys for edited answers', async () => {
+    window.ethereum = makeRpcProvider();
+    const stored = new Map();
+    let lost = false;
+    uploadDataToSessionStorage.mockImplementation(async (data, _format, options) => {
+      const key = options.requestId || `missing-${stored.size}`;
+      if (!stored.has(key)) stored.set(key, { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' });
+      if (!lost) {
+        lost = true;
+        throw new Error('Reply lost after storing the answer.');
+      }
+      return { storageRef: stored.get(key), replayed: true };
+    });
+    const submit = (answer, options = { operationId: 'same-operation' }) =>
+      submitResponses(
+        'wagmi',
+        [QUESTION_ID],
+        [{ questionID: QUESTION_ID, answer }],
+        ethers.constants.HashZero,
+        null,
+        WORKER_CANONICAL_GROUP_CFG,
+        options,
+      );
+    await expect(submit('yes')).rejects.toThrow('Reply lost');
+    await expect(submit('yes')).resolves.toEqual(expect.objectContaining({ workerCanonicalSubmission: true }));
+    const key = uploadDataToSessionStorage.mock.calls[0][2].requestId;
+    expect(key).toMatch(/^answer:v1:same-operation:0x[a-f0-9]{64}:0x[a-f0-9]{64}$/);
+    expect(key.length).toBeLessThanOrEqual(200);
+    expect(uploadDataToSessionStorage.mock.calls[1][2].requestId).toBe(key);
+    expect(stored.size).toBe(1);
+    await submit('edited');
+    expect(uploadDataToSessionStorage.mock.calls[2][2].requestId).not.toBe(key);
+    expect(stored.size).toBe(2);
+    await submit('yes', {});
+    await submit('yes', {});
+    expect(stored.size).toBe(4);
+  });
+
   it('reports the Worker answers stored before a later upload failed', async () => {
     window.ethereum = makeRpcProvider();
     const question2 = `0x${'9'.repeat(64)}`;

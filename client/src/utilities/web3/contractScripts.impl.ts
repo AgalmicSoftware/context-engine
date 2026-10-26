@@ -642,6 +642,7 @@ const uploadJsonPayloadForContractPointer = async ({
   arweaveUploadOpts,
   uploadWithRetry = false,
   storageContext = {},
+  requestId,
 }: any) => {
   const payloadString = JSON.stringify(payload);
   if (isCloudflareStorageResource(cfg, resource)) {
@@ -652,6 +653,7 @@ const uploadJsonPayloadForContractPointer = async ({
       context: storageContext,
       resource,
       contentType: 'application/json',
+      ...(requestId ? { requestId } : {}),
     });
     const storageRef = normalizeStorageRef(result?.storageRef || result, {
       fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE,

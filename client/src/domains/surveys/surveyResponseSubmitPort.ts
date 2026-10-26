@@ -26,11 +26,12 @@ export type SurveyResponseSubmitPort = {
     surveyId: SurveyResponseIdentifier,
     surveyResponse: SurveyResponsePayload | null | undefined,
     submissionGroupKey: SurveyResponseSessionTarget,
+    options?: { operationId?: string },
   ) => Promise<SurveyResponseSubmissionResult>;
 };
 
 export const surveyResponseSubmitPort: SurveyResponseSubmitPort = {
-  submitResponses: (provider, questionIds, questionResponses, surveyId, surveyResponse, submissionGroupKey) =>
+  submitResponses: (provider, questionIds, questionResponses, surveyId, surveyResponse, submissionGroupKey, options) =>
     chainGateway.submitResponses(
       provider,
       questionIds,
@@ -38,5 +39,6 @@ export const surveyResponseSubmitPort: SurveyResponseSubmitPort = {
       surveyId,
       surveyResponse,
       submissionGroupKey,
+      ...(options ? [options] : []),
     ),
 };

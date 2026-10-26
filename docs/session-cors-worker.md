@@ -1586,6 +1586,11 @@ R2 / Durable Objects:
   an expired reservation permits a new attempt with a fresh storage id, so a crashed
   attempt may leave an orphan. Settled receipts retain only the payload digest and
   reference for seven days, with a maximum of 2,000 per participant and session.
+  The client retains one submit operation across failed or partial attempts and
+  includes the question id and payload digest in each receipt key. It preserves
+  timestamps and prepared encrypted ratings while the input is unchanged; edits
+  receive a new key. Successful completion or an account/session change clears
+  that in-memory operation. MCP assigns one operation to each answer tool call.
   A failed coordinator call returns retryable `503`. Deployments without the
   binding, uploads without a bounded request id, and other resources retain
   at-least-once semantics. There is no key-rotation state machine.

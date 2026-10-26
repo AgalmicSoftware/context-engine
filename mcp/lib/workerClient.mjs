@@ -323,11 +323,11 @@ export const createWorkerClient = ({ workerOrigin, slug, trustedOrigins, wallet,
     return data;
   };
 
-  const upload = async ({ resource, data, tags = [] }) => {
+  const upload = async ({ resource, data, tags = [], requestId = '' }) => {
     const result = await request('/storage/upload', {
       method: 'POST',
       auth: true,
-      body: { backend: 'cloudflare', resource, contentType: 'application/json', payloadEncrypted: false, tags, data },
+      body: { backend: 'cloudflare', resource, contentType: 'application/json', payloadEncrypted: false, tags, data, ...(requestId ? { requestId } : {}) },
     });
     return isRecord(result?.storageRef) ? result.storageRef : { id: text(result?.id) };
   };

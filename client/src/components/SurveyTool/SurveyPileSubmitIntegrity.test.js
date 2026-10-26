@@ -310,6 +310,21 @@ it('uploads the other edits and names a changed answer that cannot be included',
   expect(draftHolds(unknownQid)).toBe(true);
 });
 
+it('keeps a single-question payload byte-identical after a lost reply', async () => {
+  const h = await fixture();
+  await act(async () => h.sync());
+  await h.mountEditor({ isStandalone: false, singleQuestionMode: true, questionID: FREEFORM_QID });
+  await act(async () => h.editor().handleAnswer(0, FREEFORM_QID, 'Retry this answer'));
+  await settle();
+  h.submitResponses.mockRejectedValueOnce(new Error('Reply lost after storing.'));
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+  await settle();
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(2));
+  expect(JSON.stringify(h.submitResponses.mock.calls[1][2])).toBe(JSON.stringify(h.submitResponses.mock.calls[0][2]));
+});
+
 it('keeps answers the Worker stored before a failed upload saved, and resends only the rest', async () => {
   const h = await fixture();
   await act(async () => h.sync());
@@ -348,6 +363,10 @@ it('keeps answers the Worker stored before a failed upload saved, and resends on
   await settle();
 
   expect(h.submitResponses.mock.calls[1][2].map((row) => row.questionID)).toEqual([unsaved]);
+  const operation = h.submitResponses.mock.calls[0][6]?.operationId;
+  expect(operation).toEqual(expect.any(String));
+  expect(h.submitResponses.mock.calls[1][6]?.operationId).toBe(operation);
+  expect(engine()._submitOperationId).toBeUndefined();
   expect(h.savedRows(stored)).toHaveLength(1);
   expect(h.savedRows(unsaved)).toHaveLength(1);
   expect(engine().getPendingEditStats().total).toBe(0);
