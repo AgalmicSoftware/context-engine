@@ -11,7 +11,8 @@ export const exportCoordinatorRecoveryKey = async (coordinator, payload) => {
         reason: 'recovery_key_deployment_scoped' }, 403);
     }
     if (payload?.confirm !== 'export-recovery-key') return reply({ error: 'Confirm export-recovery-key in the signed payload.' }, 400);
-    const recoveryKey = String(coordinator.env.CE_STORAGE_ENVELOPE_KEK || '').trim();
+    const rawKey = String(coordinator.env.CE_STORAGE_ENVELOPE_KEK || '').trim();
+    const recoveryKey = /^[a-f0-9]{64}$/i.test(rawKey) ? rawKey.toLowerCase() : rawKey;
     if (!recoveryKey) return reply({ error: 'Recovery key is not configured.' }, 503);
     const fingerprint = await recoveryKeyFingerprint(recoveryKey);
     const now = Number(coordinator.now()) || Date.now();

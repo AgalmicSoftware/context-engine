@@ -380,7 +380,8 @@ test(`restore drill preserves reads, authority, groups and secrets (R2 ${sourceR
     if (targetR2) target.env.CE_STORAGE_R2 = memoryR2();
     target.kv.values.delete(`session:${slug}:config`);
     Object.assign(target.env, { BOOTSTRAP_ADMIN_ADDRESS: owner.address, ADMIN_TRUSTED_ORIGINS: 'https://app.example', CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2' });
-    if (previous) { target.env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK = source.env.CE_STORAGE_ENVELOPE_KEK; target.env.CE_STORAGE_ENVELOPE_KEK = 'b'.repeat(64); }
+    target.env.CE_STORAGE_ENVELOPE_KEK = source.env.CE_STORAGE_ENVELOPE_KEK.toUpperCase();
+    if (previous) { target.env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK = source.env.CE_STORAGE_ENVELOPE_KEK.toUpperCase(); target.env.CE_STORAGE_ENVELOPE_KEK = 'b'.repeat(64); }
     const b = connect(target);
     for (const page of pages) {
       const result = await b.signed('import-session-backup', { page, adoptSessionId: true });

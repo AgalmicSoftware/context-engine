@@ -718,3 +718,16 @@ describe('WorkerDeploySection', () => {
     consoleErrorSpy.mockRestore();
   });
 });
+
+test('manual setup refuses a cleared operator key until generated-key mode is explicitly chosen', () => {
+  renderWorkerDeploySection({ cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/' });
+  const input = screen.getByLabelText('Your recovery key');
+  fireEvent.change(input, { target: { value: 'a'.repeat(64) } });
+  fireEvent.change(input, { target: { value: '' } });
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+  expect(screen.getByText(/Use exactly 64 hex characters for your recovery key/)).toBeVisible();
+  expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_SESSION_SLUG)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Use a generated deployment key' }));
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+  expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_SESSION_SLUG)).toHaveValue('demo-worker');
+});

@@ -1586,7 +1586,7 @@ const executeDeployHelperRequestCore = async ({
   // when payload-level worker-envelope encryption is not selected. The shared
   // envelope helper derives a domain-separated AES key from this value.
   const envelopeKekSecretRequired = true;
-  const candidateEnvelopeKekSecret = body?.storageEnvelopeKek || randomSecret();
+  const candidateEnvelopeKekSecret = body?.storageEnvelopeKek?.toLowerCase() || randomSecret();
   const secretsEnvelope = await buildEncryptedSessionSecretsEnvelope(secrets, {
     env: { [STORAGE_ENVELOPE_KEK_SECRET_NAME]: candidateEnvelopeKekSecret },
     slug: sessionSlug || displaySlug,

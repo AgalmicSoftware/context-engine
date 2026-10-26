@@ -88,8 +88,8 @@ export type WorkerDeploySectionProps = {
   cloudflareTokenSlug?: string;
   cloudflareNativeDeployUrl?: string;
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
-  operatorRecoveryKey?: string;
-  setOperatorRecoveryKey?: (value: string) => void;
+  operatorRecoveryKey?: string | null;
+  setOperatorRecoveryKey?: (value: string | null) => void;
   handleDeployWorker: () => void;
   deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
   deployVerifiedInUi?: boolean;
@@ -148,9 +148,10 @@ const WorkerDeploySection = ({
   nativeTemplateSetupIdentity = '',
   onNativeTemplateSetupGenerated,
 }: WorkerDeploySectionProps) => {
-  const [localOperatorKey, setLocalOperatorKey] = React.useState('');
+  const [localOperatorKey, setLocalOperatorKey] = React.useState<string | null>(null);
   const [revealOperatorKey, setRevealOperatorKey] = React.useState(false);
-  const recoveryKeyInput = operatorRecoveryKey ?? localOperatorKey;
+  const chosenRecoveryKey = operatorRecoveryKey === undefined ? localOperatorKey : operatorRecoveryKey;
+  const recoveryKeyInput = chosenRecoveryKey || '';
   const changeRecoveryKey = setOperatorRecoveryKey || setLocalOperatorKey;
   const [fingerprint, setFingerprint] = React.useState('');
   const [nativeSetupSecrets, setNativeSetupSecrets] = React.useState<{
@@ -263,7 +264,7 @@ const WorkerDeploySection = ({
 
   const generateNativeSetupSecrets = () => {
     try {
-      setNativeSetupSecrets(createCloudflareNativeSetupSecrets(undefined, recoveryKeyInput));
+      setNativeSetupSecrets(createCloudflareNativeSetupSecrets(undefined, chosenRecoveryKey));
       setNativeSetupSecretsIdentity(nativeSetupIdentity);
       onNativeTemplateSetupGenerated?.(nativeSetupIdentity);
       setNativeSetupError('');
@@ -382,7 +383,12 @@ const WorkerDeploySection = ({
 
   return (
     <>
-      <details className={styles.cloudflareNativeDeployCard}>
+      <details
+        className={styles.cloudflareNativeDeployCard}
+        onToggle={(event) => {
+          if (event.currentTarget.open && chosenRecoveryKey === null) changeRecoveryKey('');
+        }}
+      >
         <summary>Advanced: use my own recovery key</summary>
         <p className={styles.helperText}>
           Optional. Enter 64 hex characters or generate a key in this tab. Keep a private copy before deploying. This
@@ -395,7 +401,7 @@ const WorkerDeploySection = ({
           type={revealOperatorKey ? 'text' : 'password'}
           autoComplete="off"
           value={recoveryKeyInput}
-          onChange={(event) => changeRecoveryKey(event.target.value)}
+          onChange={(event) => changeRecoveryKey(event.target.value.trim().toLowerCase())}
         />
         <Button
           type="button"
@@ -419,7 +425,10 @@ const WorkerDeploySection = ({
         >
           Generate locally
         </Button>
-        {recoveryKeyInput && !/^[0-9a-f]{64}$/i.test(recoveryKeyInput) && (
+        <Button type="button" className={styles.secondaryButton} onClick={() => changeRecoveryKey(null)}>
+          Use a generated deployment key
+        </Button>
+        {chosenRecoveryKey !== null && !/^[0-9a-f]{64}$/i.test(recoveryKeyInput) && (
           <p className={styles.errorText}>Use exactly 64 hex characters.</p>
         )}
         {currentNativeSetupSecrets &&

@@ -603,7 +603,7 @@ describe('deploy-helper worker', () => {
       expect(response.status).toBe(200);
       const installed = fetchMock.calls.filter(([url, init = {}]) => String(url).endsWith('/secrets') && init.method === 'PUT')
         .map(([, init]) => JSON.parse(init.body)).find((entry) => entry.name === 'CE_STORAGE_ENVELOPE_KEK').text;
-      if (operator) { expect(installed).toBe(body.storageEnvelopeKek); expect(first.recoveryKey).toBeUndefined(); }
+      if (operator) { expect(installed).toBe(body.storageEnvelopeKek.toLowerCase()); expect(first.recoveryKey).toBeUndefined(); }
       else expect(first.recoveryKey).toBe(installed);
       expect(first.recoveryKeyFingerprint).toMatch(/^[a-f0-9]{64}$/);
       expect(response.headers.get('Cache-Control')).toBe('no-store');

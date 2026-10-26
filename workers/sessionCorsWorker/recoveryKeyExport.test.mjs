@@ -113,3 +113,9 @@ for (const configuredSlug of [undefined, '', 'another-session']) {
     for (let i = 0; i < 3; i++) assert.equal((await callSessionConfigCoordinator(args)).status, 200);
   });
 }
+
+
+test('hex recovery key fingerprints are independent of letter case', async () => {
+  assert.equal(await recoveryKeyFingerprint('AB'.repeat(32)), await recoveryKeyFingerprint('ab'.repeat(32)));
+  assert.notEqual(await recoveryKeyFingerprint('Case-sensitive passphrase'), await recoveryKeyFingerprint('case-sensitive passphrase'));
+});

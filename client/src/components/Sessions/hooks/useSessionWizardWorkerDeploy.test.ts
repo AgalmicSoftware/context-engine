@@ -175,7 +175,7 @@ describe('useSessionWizardWorkerDeploy', () => {
         pending = result.current.handleDeployWorker();
       });
       await waitFor(() => expect(result.current.recoveryDisplay?.recoveryKey).toBe(key));
-      expect(result.current.operatorRecoveryKey).toBe('');
+      expect(result.current.operatorRecoveryKey).toBeNull();
       expect(options.verifyPublicWorkerDeployment).not.toHaveBeenCalled();
       if (operator) expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).storageEnvelopeKek).toBe(key);
       act(() => result.current.finishRecoveryDisplay());
@@ -189,6 +189,41 @@ describe('useSessionWizardWorkerDeploy', () => {
       storage.mockRestore();
     },
   );
+
+  it.each(['account', 'slug', 'sessionIdHex'])(
+    'keeps the operator key when %s changes before deployment',
+    async (field) => {
+      const options = buildDeployHookOptions();
+      const fetchMock = mockSuccessfulWorkerDeployFetch();
+      const { result, rerender } = renderHook(() => useSessionWizardWorkerDeploy(options));
+      act(() => result.current.setOperatorRecoveryKey('A'.repeat(64)));
+      const runtime = options.refs.runtimeRef.current;
+      options.refs.runtimeRef.current =
+        field === 'slug'
+          ? { ...runtime, draft: { ...runtime.draft, slug: 'renamed-session' } }
+          : { ...runtime, [field]: field === 'account' ? `0x${'c'.repeat(40)}` : `0x${'d'.repeat(32)}` };
+      rerender();
+      expect(result.current.operatorRecoveryKey).toBe('a'.repeat(64));
+      await act(async () => {
+        expect((await result.current.handleDeployWorker())?.ok).toBe(true);
+      });
+      expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).storageEnvelopeKek).toBe('a'.repeat(64));
+    },
+  );
+
+  it.each(['', 'invalid'])('refuses a chosen but invalid operator key (%s)', async (key) => {
+    const options = buildDeployHookOptions();
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    act(() => result.current.setOperatorRecoveryKey(key));
+    await act(async () => {
+      expect((await result.current.handleDeployWorker())?.ok).toBe(false);
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(
+      expect.objectContaining({ deployStatus: expect.stringMatching(/64 hex/) }),
+    );
+  });
 
   it('does not label edited input as installed when a replay preserves a different key', async () => {
     const options = buildDeployHookOptions();

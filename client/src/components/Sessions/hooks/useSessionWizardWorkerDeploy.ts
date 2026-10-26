@@ -128,7 +128,7 @@ const useSessionWizardWorkerDeploy = ({
   const custody = useRecoveryKeyCustody(
     `${currentRuntime.draft?.slug || ''}:${currentRuntime.sessionIdHex || ''}:${currentRuntime.account || ''}`,
   );
-  const { operatorRecoveryKey, presentRecoveryKey } = custody;
+  const { operatorRecoveryKey, setOperatorRecoveryKey, presentRecoveryKey } = custody;
   const deployRequestInFlightRef = useRef(false);
   const litBootstrapRecoveryRef = useRef<SessionWizardLitBootstrapRecovery | null>(null);
 
@@ -332,10 +332,10 @@ const useSessionWizardWorkerDeploy = ({
               : normalizeWorkerUrl(runtime.deployHelperUrl),
           },
         });
-        if (operatorRecoveryKey && !/^[0-9a-f]{64}$/i.test(operatorRecoveryKey))
+        if (operatorRecoveryKey !== null && !/^[0-9a-f]{64}$/i.test(operatorRecoveryKey))
           throw new Error('Use exactly 64 hex characters for your recovery key.');
         const payload: AnyRecord = {
-          ...(operatorRecoveryKey ? { storageEnvelopeKek: operatorRecoveryKey } : {}),
+          ...(operatorRecoveryKey ? { storageEnvelopeKek: operatorRecoveryKey.toLowerCase() } : {}),
           deploymentRequestId: deployAttemptIdentity.deploymentRequestId,
           workerName: currentDeployForm.workerName,
           sessionSlug: slug,
@@ -528,6 +528,7 @@ const useSessionWizardWorkerDeploy = ({
         if (!markSessionWizardDeployAttemptCompleted(deployAttemptIdentity)) {
           throw new Error('Could not durably record the completed worker deployment.');
         }
+        setOperatorRecoveryKey(null);
         if (
           data.recoveryKey ||
           data.recoveryKeyFingerprint ||
@@ -545,7 +546,7 @@ const useSessionWizardWorkerDeploy = ({
               typeof data.recoveryKey === 'string'
                 ? data.recoveryKey
                 : suppliedMatches
-                  ? operatorRecoveryKey
+                  ? operatorRecoveryKey || undefined
                   : undefined,
             fingerprint: String(data.recoveryKeyFingerprint || ''),
             slug,
@@ -972,6 +973,7 @@ const useSessionWizardWorkerDeploy = ({
     },
     [
       operatorRecoveryKey,
+      setOperatorRecoveryKey,
       presentRecoveryKey,
       clearCachedWorkerSecretsAfterDeploy,
       clearSelectedBundleFile,

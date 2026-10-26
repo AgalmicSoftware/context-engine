@@ -52,6 +52,13 @@ const RecoveryKeyDialog = ({ value, onContinue }: { value: RecoveryKeyDisplay; o
           This key unlocks encrypted session data and saved service credentials. Keep it private with your session
           backup.
         </p>
+        {value.recoveryKey && (
+          <p role="status">
+            {value.supplied
+              ? 'The Worker uses your supplied recovery key.'
+              : 'The Worker uses a generated recovery key.'}
+          </p>
+        )}
         {value.recoveryKey ? (
           <>
             <label htmlFor="ce-recovery-key-value">Recovery key</label>

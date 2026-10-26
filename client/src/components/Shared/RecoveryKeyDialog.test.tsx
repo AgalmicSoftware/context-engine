@@ -67,3 +67,8 @@ test('context changes discard key material and reject an in-flight display', asy
   await rejected;
   await waitFor(() => expect(result.current.recoveryDisplay).toBeNull());
 });
+
+test.each([false, true])('identifies whether the displayed key was supplied (%s)', (supplied) => {
+  render(<RecoveryKeyDialog value={{ ...value, supplied }} onContinue={() => {}} />);
+  expect(screen.getByRole('status')).toHaveTextContent(supplied ? 'supplied recovery key' : 'generated recovery key');
+});
