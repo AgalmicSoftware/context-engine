@@ -26,6 +26,23 @@ const memoryKv = () => {
       return { keys, list_complete: names.length <= limit, cursor: names.length > limit ? keys.at(-1).name : '' };
     } };
 };
+const memoryR2 = () => {
+  const objects = new Map();
+  return {
+    get: async (key) => {
+      const item = objects.get(key);
+      return item ? { key, size: item.bytes.length, customMetadata: item.customMetadata,
+        httpMetadata: item.httpMetadata, arrayBuffer: async () => item.bytes.slice().buffer } : null;
+    },
+    put: async (key, bytes, options = {}) => objects.set(key, { bytes: new Uint8Array(bytes), ...options }),
+    list: async ({ prefix = '', cursor = '', limit = 1000 } = {}) => {
+      const names = [...objects.keys()].filter((key) => key.startsWith(prefix) && key > cursor).sort();
+      const page = names.slice(0, limit);
+      return { objects: page.map((key) => ({ key })), truncated: names.length > limit,
+        cursor: names.length > limit ? page.at(-1) : '' };
+    },
+  };
+};
 const fixture = () => {
   const kv = memoryKv();
   const env = installSessionCoordinatorBinding({ GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv,
@@ -284,13 +301,15 @@ for (const absentSlug of [false, true]) test(`backup preserves secrets and punct
   assert.equal(await target.kv.get(`session:${slug}:secrets`), await source.kv.get(`session:${slug}:secrets`));
 });
 
-test('restore drill preserves encrypted reads, hidden questions, correction authority, groups and AI secrets', async (t) => {
+for (const [sourceR2, targetR2] of [[false, false], [false, true], [true, true], [true, false]])
+test(`restore drill preserves reads, authority, groups and secrets (R2 ${sourceR2} to ${targetR2})`, async (t) => {
   let clock = Date.now();
   t.mock.method(Date, 'now', () => clock);
   const { ethers } = createRequire(new URL('../../package.json', import.meta.url))('ethers');
   const wallets = [4, 5, 6].map((digit) => new ethers.Wallet(`0x${String(digit).repeat(64)}`));
   const [owner, participant] = wallets;
   const source = fixture();
+  if (sourceR2) source.env.CE_STORAGE_R2 = memoryR2();
   const config = JSON.parse(await readFile(new URL('../../tests/fixtures/worker-compat/previous-minor.json', import.meta.url))).config;
   Object.assign(config, { slug, sessionId, sessionIdHex: sessionId, adminAddress: owner.address,
     allowOrigins: ['https://app.example'], corsWorkerUrl: 'https://worker.example',
@@ -358,6 +377,7 @@ test('restore drill preserves encrypted reads, hidden questions, correction auth
   assert.ok(pages[0].coordinator.workerGroups.records.some(([, value]) => value.includes('a1'.repeat(32))));
   for (const previous of [false, true]) {
     const target = fixture();
+    if (targetR2) target.env.CE_STORAGE_R2 = memoryR2();
     target.kv.values.delete(`session:${slug}:config`);
     Object.assign(target.env, { BOOTSTRAP_ADMIN_ADDRESS: owner.address, ADMIN_TRUSTED_ORIGINS: 'https://app.example', CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2' });
     if (previous) { target.env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK = source.env.CE_STORAGE_ENVELOPE_KEK; target.env.CE_STORAGE_ENVELOPE_KEK = 'b'.repeat(64); }

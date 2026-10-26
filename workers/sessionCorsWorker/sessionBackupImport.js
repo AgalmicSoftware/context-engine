@@ -205,7 +205,17 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
             else conflict(buildPayloadKey({ slug, id: entry.id }));
           } else {
             const r2 = getStorageR2Binding(env);
-            if (r2?.put) await r2.put(buildObjectKey({ slug, id: entry.id }), bytes, { httpMetadata: { contentType: metadata.contentType || 'application/octet-stream' } });
+            if (r2?.put) await r2.put(buildObjectKey({ slug, id: entry.id }), bytes, {
+              httpMetadata: { contentType: metadata.contentType || 'application/octet-stream' },
+              customMetadata: {
+                id: entry.id,
+                resource: metadata.resource,
+                encrypted: metadata.encrypted ? 'true' : 'false',
+                payloadAccessMode: metadata.payloadAccessMode || '',
+                payloadAccessControl: JSON.stringify(metadata.payloadAccessControl || {}),
+                groupIds: metadata.groupIds?.length ? JSON.stringify(metadata.groupIds) : '',
+              },
+            });
             else {
               const value = JSON.stringify({ metadata, payloadBase64url: bytesToBase64url(bytes) });
               const tooLarge = rejectKvValueOverLimit({ serializedValue: value });
