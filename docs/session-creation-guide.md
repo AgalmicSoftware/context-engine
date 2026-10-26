@@ -1227,6 +1227,9 @@ down to the normal body-text size. Longer text remains scrollable. Binary choice
 share one compact row; multichoice options use two rows with horizontal scrolling.
 These layout adjustments apply only at narrow phone widths (480px and below);
 wider views retain their existing typography, button sizes, and answer layout.
+Above 768px, the navigation arrows and question-action icons form one evenly
+spaced vertical rail alongside the full card height, with the question counter
+between the two arrows.
 
 The compact question-actions menu labels its controls **Filter questions**,
 **Add questions**, and **All questions**. Opening it blurs the page behind it;

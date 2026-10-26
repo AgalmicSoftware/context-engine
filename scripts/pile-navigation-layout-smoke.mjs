@@ -118,7 +118,7 @@ try {
           const rect = element => { const r = element.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, cx: r.left + r.width / 2, cy: r.top + r.height / 2, width: r.width }; };
           return {
             nav: rect(nav), menu: rect(actions.querySelector('button')), next: rect(button), counter: rect(counter), card: rect(card), prev: rect(nav.querySelector('button')), actions: rect(actions),
-            buttons: [...controls.querySelectorAll('button')].filter(button => button.getBoundingClientRect().width > 0 && getComputedStyle(button).visibility !== 'hidden').map(button => ({ ...rect(button), inNav: nav.contains(button) })),
+            buttons: [...controls.querySelectorAll('button')].filter(button => button.getBoundingClientRect().width > 0 && getComputedStyle(button).visibility !== 'hidden').map(button => ({ ...rect(button), inNav: nav.contains(button), inRail: nav.contains(button) || actions.contains(button) })),
             text: counter.textContent.trim(), lineTops: [...new Set(textRects.map(r => Math.round(r.top)))],
             submitLabelFits: [...controls.querySelectorAll('[class*="pileSubmitButtonLabel_"]')].every(label => {
               const labelRect = label.getBoundingClientRect(), buttonRect = label.closest('button').getBoundingClientRect();
@@ -153,7 +153,7 @@ try {
           assert(layout.submitLabelFits, `Submit label fits its button: ${detail}`);
           assert(layout.submitFontSizes.every(size => size >= 16), `Submit and its count remain readable at phone widths: ${detail}`);
         }
-        assert(layout.counter.left >= layout.nav.left && layout.counter.right <= layout.nav.right, `Counter fits its rail: ${detail}`);
+        if (width <= 768) assert(layout.counter.left >= layout.nav.left && layout.counter.right <= layout.nav.right, `Counter fits its rail: ${detail}`);
         assert(!layout.overflow, `No horizontal overflow: ${detail}`);
         for (const [index, button] of layout.buttons.entries()) {
           for (const other of layout.buttons.slice(index + 1)) {
@@ -161,9 +161,15 @@ try {
           }
         }
         if (width > 768) {
-          assert(Math.abs(layout.nav.top - layout.card.top) < 1, `Top edge alignment: ${detail}`);
-          assert(Math.abs(layout.nav.cx - layout.actions.cx) < 1, `Rail center alignment: ${detail}`);
-          assert(layout.actions.top >= layout.nav.bottom + 19, `Actions follow navigation: ${detail}`);
+          const rail = layout.buttons.filter(button => button.inRail).sort((a, b) => a.cy - b.cy);
+          const spacing = (layout.card.bottom - layout.card.top) / rail.length;
+          assert.equal(rail.length, 6, 'Both navigation arrows and all four action icons occupy the rail');
+          for (const [index, button] of rail.entries()) {
+            assert(Math.abs(button.cy - (layout.card.top + (index + 0.5) * spacing)) < 1, `Desktop icons are evenly spaced across the full card height: ${detail}`);
+            assert(Math.abs(button.cx - rail[0].cx) < 1, `All desktop icons share one vertical line: ${detail}`);
+            assert(button.top >= layout.card.top && button.bottom <= layout.card.bottom, `Desktop icons stay within the card height: ${detail}`);
+          }
+          assert(Math.abs(layout.counter.cy - (layout.prev.cy + layout.next.cy) / 2) < 1, `Counter stays between the two navigation arrows: ${detail}`);
         } else assert(layout.nav.top >= layout.card.bottom, `Mobile controls remain below the card: ${detail}`);
         return layout;
       };
