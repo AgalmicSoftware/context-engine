@@ -39,15 +39,44 @@ test('corsHeaders only reflects allowed origins when an allowlist is present', (
 });
 
 
-test('Worker source never spreads Headers objects', async () => {
+// These helpers return plain objects, verified at their definitions. Allow only
+// calls in these files; a similarly named variable can still be a Headers object.
+const plainHeaderHelpers = new Map([
+  ['agentBridgeWorker/onChainResponses.mjs', ['jsonHeaders']],
+]);
+const unsafeHeaderCopy = (source, path = '') => {
+  for (const name of plainHeaderHelpers.get(path) || []) {
+    source = source.replace(new RegExp(`\\b${name}(?=\\s*\\()`, 'g'), 'plainHeaderObject');
+  }
+  return /\.\.\.\s*(?:[\w$]+\.)*(?:[\w$]*Headers|headers)\b/.test(source) ||
+    /Object\.assign\s*\(\s*\{\s*\}\s*,[^;]*(?:\b[\w$]*Headers|\bheaders)\b/.test(source) ||
+    /\b(?:[\w$]*Headers|headers)\s*[:=]\s*Object\.assign\s*\(\s*\{\s*\}\s*,/.test(source);
+};
+
+test('header copy guard covers arbitrary header names and Object.assign', () => {
+  for (const source of [
+    '({ ...headers })', '({ ...routeBaseHeaders })', '({ ...customResponseHeaders })',
+    '({ ...context.headers })', '({ ...corsHeaders(origin) })',
+    'Object.assign({}, headers)', 'Object.assign({}, plain, context.routeBaseHeaders)',
+    'Object.assign( {},\n getExtras(),\n responseHeaders)',
+    'const headers = Object.assign({}, value)',
+  ]) assert.equal(unsafeHeaderCopy(source), true, source);
+  const plainCall = '({ ...jsonHeaders(origin) })';
+  assert.equal(unsafeHeaderCopy(plainCall), true);
+  assert.equal(unsafeHeaderCopy(plainCall, 'agentBridgeWorker/onChainResponses.mjs'), false);
+  assert.equal(unsafeHeaderCopy('({ ...jsonHeaders })', 'agentBridgeWorker/onChainResponses.mjs'), true);
+  assert.equal(unsafeHeaderCopy('new Headers(routeBaseHeaders)'), false);
+});
+
+test('Worker source never spreads or Object.assigns Headers objects', async () => {
   const root = new URL('../', import.meta.url);
   const visit = async (dir) => {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       if (entry.name === 'node_modules') continue;
       const path = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
       if (entry.isDirectory()) await visit(path);
-      else if (/\.[cm]?js$/.test(entry.name)) {
-        assert.doesNotMatch(await readFile(path, 'utf8'), /\.\.\.\s*(?:headers\b|baseHeaders\b|responseHeaders\b|corsHeaders\s*\()/, path.pathname);
+      else if (/\.[cm]?js$/.test(entry.name) && !entry.name.includes('.test.')) {
+        assert.equal(unsafeHeaderCopy(await readFile(path, 'utf8'), path.pathname.slice(root.pathname.length)), false, path.pathname);
       }
     }
   };

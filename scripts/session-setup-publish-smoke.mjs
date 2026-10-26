@@ -77,6 +77,8 @@ const fixtureContext = async ({ seed }, { workerEnv = env, failResponseUploadAt 
     },
     { seed, appOrigin: new URL(baseUrl).origin },
   );
+  // Playwright answers CORS preflights itself for fulfilled routes. The header
+  // assertion below checks actual replies; direct Worker tests cover OPTIONS.
   await context.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());

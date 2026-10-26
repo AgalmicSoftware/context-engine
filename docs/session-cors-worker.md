@@ -881,7 +881,7 @@ Authenticated clients can use the worker as the session storage boundary:
     object without a mode returns `400`, including invalid aliases hidden
     behind another supplied policy. Omitted, null, or blank optional policies
     retain the existing fallback behavior.
-  - Request bodies are capped at 25 MiB by default at the route shell, before JSON, text, or multipart parsing. `CE_MAX_UPLOAD_BYTES` configures this cap, including `/storage/upload` and `/arweave/upload`. The Worker counts actual streamed bytes even when `Content-Length` is absent or understated, cancels oversized bodies, and returns `413`. Accepted request bytes remain unchanged for signature validation.
+  - Request bodies are capped at 25 MiB by default at the route shell, before JSON, text, or multipart parsing. `CE_MAX_UPLOAD_BYTES` configures this cap, including `/storage/upload` and `/arweave/upload`. The Worker counts actual streamed bytes even when `Content-Length` is absent or understated, cancels oversized bodies, and returns `413` with the route CORS headers intact. Accepted request bytes remain unchanged for signature validation.
   - Questions, surveys, and responses are small JSON records that every
     reader downloads, so they also have tighter caps: 128 KiB per question,
     256 KiB per survey, and 2 MiB per response upload, with at most 96 KiB per

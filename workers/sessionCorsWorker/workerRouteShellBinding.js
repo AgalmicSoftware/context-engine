@@ -704,8 +704,10 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       });
     } catch (error) {
       if (error instanceof BodyByteLimitError) {
+        const responseHeaders = new Headers(routeBaseHeaders);
+        responseHeaders.set('Content-Type', 'application/json');
         return new ResponseCtor(JSON.stringify({ error: error.message }), {
-          status: 413, headers: { ...routeBaseHeaders, 'Content-Type': 'application/json' },
+          status: 413, headers: responseHeaders,
         });
       }
       log?.error?.('[worker] unhandled route error', {
