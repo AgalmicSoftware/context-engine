@@ -65,6 +65,28 @@ describe('Worker capability upload gates', () => {
     await expect(uploadDataToSessionStorage({}, 'json', options())).rejects.toThrow('missing its storage index');
     expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
   });
+  test('pressing Submit again recovers immediately after a transient coordinator failure', async () => {
+    readWorkerCapabilities.mockImplementation(
+      jest.requireActual('../worker/workerCapabilities').readWorkerCapabilities,
+    );
+    const capabilities = {
+      type: 'ce_worker_capabilities',
+      version: 1,
+      apiVersion: 1,
+      features: [],
+      session: { readiness: {}, unavailable: [{ operation: 'submit', reason: 'coordinator_unavailable' }] },
+    };
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(capabilities)))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ...capabilities, session: { readiness: {}, unavailable: [] } })),
+      );
+    const args = { ...options(), workerUrl: 'https://submit-retry-readiness.test', fetchImpl };
+    await expect(uploadDataToSessionStorage({}, 'json', args)).rejects.toThrow('coordinator is unavailable');
+    await expect(uploadDataToSessionStorage({}, 'json', args)).resolves.toHaveProperty('id', 'cf_gate_result');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
   test('continues submit on a legacy Worker', async () => {
     await expect(uploadDataToSessionStorage({}, 'json', options())).resolves.toHaveProperty('id', 'cf_gate_result');
   });

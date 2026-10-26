@@ -2581,7 +2581,10 @@ Signed login/bootstrap requests:
   requiring migration reports `migration_required`. It remains reachable during
   an authority outage and never returns config values, addresses or counts.
   A missing KEK blocks envelope-encrypted writes and backup, while plaintext
-  writes remain available when their other prerequisites are ready.
+  writes remain available when their other prerequisites are ready. The client
+  never caches transport failures; unavailable readiness expires within 30 seconds
+  and pressing Submit rechecks it immediately. Only a definitive 404 or non-JSON
+  reply identifies a legacy Worker.
 - `GET /resource-presence` with `X-Session-Slug`
   - Optional `?interview=1` adds `interview: { ready, reason? }` after checking the voice provider, server-side OpenAI key presence, session lifecycle, and anonymous realtime access. No key values are returned and no OpenAI request is made.
   - Validates the selected session and its browser-origin CORS policy.

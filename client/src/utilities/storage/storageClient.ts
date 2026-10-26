@@ -95,7 +95,10 @@ const requireSafeAdminMetadataUpload = async ({
   credentialToken,
   fetchImpl,
 }: StorageWorkerOptions & { data: unknown; resource: string; baseUrl: string }): Promise<void> => {
-  const capabilities = await readWorkerCapabilities(baseUrl, toStr(sessionSlug), { fetchImpl });
+  const capabilities = await readWorkerCapabilities(baseUrl, toStr(sessionSlug), {
+    fetchImpl,
+    refreshUnavailable: true,
+  });
   if (capabilities.features.includes('upload_authority_stamps')) return;
   const refusal = () =>
     new Error(
@@ -262,7 +265,10 @@ export const uploadDataToSessionStorage = async (
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
   if (!baseUrl) throw new Error('Worker URL is missing for storage upload.');
   if (resource === 'responses') {
-    const capabilities = await readWorkerCapabilities(baseUrl, toStr(sessionSlug), { fetchImpl });
+    const capabilities = await readWorkerCapabilities(baseUrl, toStr(sessionSlug), {
+      fetchImpl,
+      refreshUnavailable: true,
+    });
     const refusal = capabilities.session?.unavailable.find((item) => item.operation === 'submit');
     if (refusal) throw new Error(describeWorkerUnavailable(refusal.reason));
   }

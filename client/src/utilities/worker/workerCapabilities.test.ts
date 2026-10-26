@@ -8,7 +8,7 @@ const body = {
   features: ['upload_authority_stamps'],
   session: { readiness: {}, unavailable: [{ operation: 'submit', reason: 'storage_missing' }] },
 };
-test('caches per origin and slug for five minutes, including concurrent reads', async () => {
+test('caches unavailable readiness per origin and slug for at most 30 seconds', async () => {
   let time = 0;
   const fetchImpl = jest.fn().mockImplementation(async () => new Response(JSON.stringify(body)));
   const options = { fetchImpl, now: () => time };
@@ -22,19 +22,51 @@ test('caches per origin and slug for five minutes, including concurrent reads', 
   await readWorkerCapabilities('https://cache-worker.test', 'b', options);
   await readWorkerCapabilities('https://other-worker.test', 'a', options);
   expect(fetchImpl).toHaveBeenCalledTimes(3);
-  time = 300_000;
+  time = 30_000;
   await readWorkerCapabilities('https://cache-worker.test', 'a', options);
   expect(fetchImpl).toHaveBeenCalledTimes(4);
   expect(fetchImpl.mock.calls[0][1]).toMatchObject({ credentials: 'omit' });
 });
 
-test.each(['404', 'network', 'invalid'])('treats %s as legacy without inventing a submit refusal', async (kind) => {
-  const fetchImpl = jest.fn(async () => {
-    if (kind === 'network') throw new Error('offline');
-    return new Response(JSON.stringify({}), { status: kind === '404' ? 404 : 200 });
-  });
+test.each(['404', 'html'])('treats a definitive %s reply as legacy', async (kind) => {
+  const fetchImpl = jest.fn(
+    async () =>
+      new Response(kind === 'html' ? '<html>Old Worker</html>' : '{}', { status: kind === '404' ? 404 : 200 }),
+  );
   expect(await readWorkerCapabilities(`https://${kind}-worker.test`, 'sample', { fetchImpl })).toEqual({
     legacy: true,
     features: [],
   });
+  await readWorkerCapabilities(`https://${kind}-worker.test`, 'sample', { fetchImpl });
+  expect(fetchImpl).toHaveBeenCalledTimes(1);
+});
+
+test.each(['network', 'invalid', '503'])('does not cache %s failures or classify them as legacy', async (kind) => {
+  let failed = true;
+  const fetchImpl = jest.fn(async () => {
+    if (!failed) return new Response(JSON.stringify(body));
+    if (kind === 'network') throw new Error('offline');
+    return new Response('{}', { status: kind === '503' ? 503 : 200 });
+  });
+  const url = `https://transient-${kind}.test`;
+  expect(await readWorkerCapabilities(url, 'sample', { fetchImpl })).toMatchObject({
+    legacy: false,
+    unavailable: true,
+  });
+  failed = false;
+  expect((await readWorkerCapabilities(url, 'sample', { fetchImpl })).features).toContain('upload_authority_stamps');
+  expect(fetchImpl).toHaveBeenCalledTimes(2);
+});
+
+test('an explicit submit refresh bypasses unavailable readiness but keeps healthy cached answers', async () => {
+  const fetchImpl = jest
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(body)))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ ...body, session: { readiness: {}, unavailable: [] } })));
+  const url = 'https://submit-refresh.test';
+  await readWorkerCapabilities(url, 'sample', { fetchImpl });
+  const options = { fetchImpl, refreshUnavailable: true };
+  expect((await readWorkerCapabilities(url, 'sample', options)).session?.unavailable).toEqual([]);
+  await readWorkerCapabilities(url, 'sample', options);
+  expect(fetchImpl).toHaveBeenCalledTimes(2);
 });

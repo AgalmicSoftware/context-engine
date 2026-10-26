@@ -1,5 +1,6 @@
 export type WorkerCapabilities = {
   legacy: boolean;
+  unavailable?: boolean;
   features: string[];
   apiVersion?: number;
   bundle?: string | null;
@@ -21,23 +22,34 @@ export const KNOWN_WORKER_FEATURES = [
 
 const cache = new Map<string, { until: number; value: Promise<WorkerCapabilities> }>();
 const legacy = (): WorkerCapabilities => ({ legacy: true, features: [] });
+const unavailable = (): WorkerCapabilities => ({ legacy: false, features: [], unavailable: true });
 
 export const readWorkerCapabilities = async (
   workerUrl: string,
   slug: string,
-  { fetchImpl = globalThis.fetch, now = Date.now }: { fetchImpl?: typeof fetch; now?: () => number } = {},
+  {
+    fetchImpl = globalThis.fetch,
+    now = Date.now,
+    refreshUnavailable = false,
+  }: { fetchImpl?: typeof fetch; now?: () => number; refreshUnavailable?: boolean } = {},
 ): Promise<WorkerCapabilities> => {
   let origin: string;
   try {
     const url = new URL(workerUrl);
-    if (!['http:', 'https:'].includes(url.protocol)) return legacy();
+    if (!['http:', 'https:'].includes(url.protocol)) return unavailable();
     origin = url.origin;
   } catch {
-    return legacy();
+    return unavailable();
   }
   const key = JSON.stringify([origin, slug]);
   const cached = cache.get(key);
-  if (cached && cached.until > now()) return cached.value;
+  if (cached && cached.until > now()) {
+    const known = await cached.value;
+    if (!refreshUnavailable || !known.session?.unavailable.length) return known;
+    const newer = cache.get(key);
+    if (newer && newer !== cached && newer.until > now()) return newer.value;
+  }
+  let cacheable = false;
   const value = (async (): Promise<WorkerCapabilities> => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
@@ -45,10 +57,22 @@ export const readWorkerCapabilities = async (
       const response = await fetchImpl(`${origin}/capabilities?slug=${encodeURIComponent(slug)}`, {
         method: 'GET',
         credentials: 'omit',
+        cache: refreshUnavailable ? 'no-store' : 'default',
         signal: controller.signal,
       });
-      if (!response.ok) return legacy();
-      const body = await response.json();
+      if (response.status === 404) {
+        cacheable = true;
+        return legacy();
+      }
+      if (!response.ok) return unavailable();
+      let body;
+      try {
+        body = await response.json();
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) return unavailable();
+        cacheable = true;
+        return legacy();
+      }
       if (
         body?.type !== 'ce_worker_capabilities' ||
         body.version !== 1 ||
@@ -56,7 +80,8 @@ export const readWorkerCapabilities = async (
         body.apiVersion < 1 ||
         !Array.isArray(body.features)
       )
-        return legacy();
+        return unavailable();
+      cacheable = true;
       return {
         legacy: false,
         apiVersion: body.apiVersion,
@@ -75,12 +100,18 @@ export const readWorkerCapabilities = async (
           : {}),
       };
     } catch {
-      return legacy();
+      return unavailable();
     } finally {
       clearTimeout(timeout);
     }
   })();
-  cache.set(key, { until: now() + 5 * 60_000, value });
+  const entry = { until: Infinity, value };
+  cache.set(key, entry);
+  void value.then((result) => {
+    if (cache.get(key) !== entry) return;
+    if (!cacheable) cache.delete(key);
+    else entry.until = now() + (result.session?.unavailable.length ? 30_000 : 5 * 60_000);
+  });
   return value;
 };
 

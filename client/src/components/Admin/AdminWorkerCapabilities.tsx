@@ -26,6 +26,8 @@ const AdminWorkerCapabilities = ({ workerUrl, sessionSlug }: { workerUrl: string
       <div className={styles.inlineResourceBalance}>Worker version</div>
       {!capabilities ? (
         <p className={styles.inlineResourceStatus}>Checking Worker capabilities…</p>
+      ) : capabilities.unavailable ? (
+        <p className={styles.inlineResourceStatus}>Worker capabilities are temporarily unavailable. Try again.</p>
       ) : (
         <>
           <p className={styles.inlineResourceStatus}>API version: {capabilities.apiVersion ?? 'Unknown'}</p>

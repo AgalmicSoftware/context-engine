@@ -16,3 +16,10 @@ test('shows reported bundle, API and upgrade guidance', async () => {
   expect(screen.getByText('Bundle: fixture-sha')).toBeInTheDocument();
   expect(screen.getByText(/Upgrade recommended/)).toBeInTheDocument();
 });
+
+test('reports a transient read failure without recommending an upgrade', async () => {
+  jest.mocked(readWorkerCapabilities).mockResolvedValue({ legacy: false, features: [], unavailable: true });
+  render(<AdminWorkerCapabilities workerUrl="https://unreachable.test" sessionSlug="sample" />);
+  expect(await screen.findByText(/temporarily unavailable/)).toBeVisible();
+  expect(screen.queryByText(/Upgrade recommended/)).not.toBeInTheDocument();
+});
