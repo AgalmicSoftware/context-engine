@@ -52,7 +52,7 @@ const browser = await chromium.launch({
   args: [`--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE ${new URL(baseUrl).hostname}`],
 });
 const calls = [];
-const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, loseResponseUploadAt = 0, responseUploads = [] } = {}) => {
+const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, loseResponseUploadAt = 0, unavailableSubmit = false, responseUploads = [] } = {}) => {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     serviceWorkers: 'block',
@@ -102,6 +102,11 @@ const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, loseResponse
       env,
       { waitUntil: () => {} },
     );
+    if (unavailableSubmit && url.pathname === '/capabilities') {
+      const capabilities = await response.json();
+      capabilities.session.unavailable = [{ operation: 'submit', reason: 'storage_missing' }];
+      response = new Response(JSON.stringify(capabilities), { status: 200, headers: response.headers });
+    }
     if (loseResponseUploadAt && responseUpload) {
       const stored = await response.clone().json();
       Object.assign(responseUpload, { requestId: upload.requestId, storedId: stored.id, replayed: stored.replayed === true });
@@ -411,6 +416,19 @@ try {
   assert.deepEqual(savedReplies.map((entry) => entry.questionID).sort(), questions.slice(0, 2).map((entry) => entry.id).sort());
   await page.screenshot({ path: `${outputDir}/participant-lost-reply.png`, fullPage: true, timeout: 10000 });
   console.log('A lost upload reply replayed the original reference without another stored answer.');
+  const unavailableFixture = passkeyFixture('readiness-participant');
+  const unavailableUploads = [];
+  const unavailableContext = await fixtureContext(unavailableFixture, { unavailableSubmit: true, responseUploads: unavailableUploads });
+  page = await unavailableContext.newPage();
+  await page.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' });
+  await login(page, unavailableFixture.wallet);
+  const unavailableCard = await showQuestion(page, question, questions.length);
+  await unavailableCard.getByText(answer, { exact: true }).click();
+  await page.getByTestId('ce-survey-submit').click();
+  await page.getByText(/The session Worker is missing its storage index/).first().waitFor();
+  assert.equal(unavailableUploads.length, 0, 'Explicit readiness refusal blocks before any answer upload');
+  const retainedCard = await showQuestion(page, question, questions.length);
+  assert.equal(await retainedCard.getByRole('radio', { name: answer, exact: true }).isChecked(), true, 'A readiness refusal retains the draft');
   const elapsedMs = Math.round(performance.now() - startedAt);
   await writeFile(
     `${outputDir}/result.json`,
@@ -432,6 +450,7 @@ try {
           'partial submission and unsaved-only retry',
           'lost upload reply replays the original reference with no duplicate',
           'three concurrent two-tab bookmark pairs survive reload',
+          'explicit submit readiness refusal retains the draft without uploading',
         ],
         responseUploads,
         lostReplyUploads,

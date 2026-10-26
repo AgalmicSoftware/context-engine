@@ -7,6 +7,20 @@ migration, or republication runs automatically during an upgrade or read.
 
 ## Rollout order and mixed versions
 
+The client reads public `GET /capabilities?slug=<slug>` lazily and caches it for
+five minutes per Worker origin and session. Admin settings show the reported
+API version and bundle hash, with an upgrade recommendation for missing
+features. A 404, invalid response or network error is treated as a legacy
+Worker. Normal submission continues unless a valid response explicitly lists
+`submit` as unavailable; that refusal preserves unsaved drafts.
+
+Admin re-uploads of existing question or survey IDs require
+`upload_authority_stamps`. With an older Worker the client permits a new
+admin-authored ID only after a complete authenticated listing establishes its
+absence; incomplete or unreadable history cannot establish that. Upgrade the
+Worker to make a correction. These checks guide the UI; the Worker's
+authorization remains authoritative.
+
 Old Workers do not write the explicit admin publication stamp. A new client
 reading an old Worker's unstamped history can therefore select the original
 version while old interview or results readers still select a later correction
@@ -109,8 +123,11 @@ Publication now rechecks the admitted revision and authorization epoch after
 external payload storage. A stale completion returns `409` before its index or
 initial owner record is written. Its bytes may remain orphaned; they are absent
 from listing and canonical version selection. A KV-only orphan remains readable
-by its opaque ID under current access rules. Upload retries are not deduplicated
-and may create another reference; do not treat a failed upload as published.
+by its opaque ID under current access rules. Question and survey upload retries
+are not deduplicated and may create another reference; do not treat a failed
+upload as published. Answer uploads with a stable request ID use bounded
+coordinator receipts when supported; see the storage retry contract in
+`session-cors-worker.md`.
 
 ## Hosted faucet compatibility
 

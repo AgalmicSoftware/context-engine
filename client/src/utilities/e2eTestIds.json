@@ -39,6 +39,7 @@
   "PAGE_POSTS_ROOT": "ce-page-posts-root",
   "PAGE_BENCHMARKS_ROOT": "ce-page-benchmarks-root",
   "PAGE_ADMIN_ROOT": "ce-page-admin-root",
+  "ADMIN_WORKER_CAPABILITIES": "ce-admin-worker-capabilities",
   "PAGE_SPONSOR_ROOT": "ce-page-sponsor-root",
   "PAGE_SESSION_ROOT": "ce-page-session-root",
   "PAGE_SESSION_DOCS_ROOT": "ce-page-session-docs-root",

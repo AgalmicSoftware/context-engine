@@ -6,6 +6,12 @@ import {
 } from './storageClient.js';
 import { normalizeSessionStorageConfig } from './sessionStorageConfig.js';
 import { buildResponsePayload } from '../../components/SurveyTool/surveyToolResponsePayloadController';
+import { readWorkerCapabilities } from '../worker/workerCapabilities';
+
+jest.mock('../worker/workerCapabilities', () => ({
+  ...jest.requireActual('../worker/workerCapabilities'),
+  readWorkerCapabilities: jest.fn(),
+}));
 
 jest.mock('../arweave/arweaveClient.js', () => ({
   arweaveClient: {
@@ -27,6 +33,81 @@ const { getCorsProxyUrlOrThrow } = require('../worker/corsProxy.js');
 const { fetchWorkerWithAuth } = require('../worker/workerAuth.js');
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
+
+describe('Worker capability upload gates', () => {
+  const account = '0x1111111111111111111111111111111111111111';
+  const options = (resource = 'responses') => ({
+    resource,
+    workerUrl: 'https://gate-worker.test',
+    sessionSlug: 'sample',
+    context: { account },
+    sessionConfig: { adminAddress: account, storageProfile: { backend: 'cloudflare' } },
+  });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    readWorkerCapabilities.mockResolvedValue({ legacy: true, features: [] });
+    fetchWorkerWithAuth.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          storageRef: { backend: 'cloudflare', id: 'cf_gate_result' },
+        }),
+      ),
+    );
+  });
+  test('refuses submit only for an explicit unavailable operation', async () => {
+    readWorkerCapabilities.mockResolvedValue({
+      legacy: false,
+      features: [],
+      session: {
+        unavailable: [{ operation: 'submit', reason: 'storage_missing' }],
+      },
+    });
+    await expect(uploadDataToSessionStorage({}, 'json', options())).rejects.toThrow('missing its storage index');
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+  });
+  test('continues submit on a legacy Worker', async () => {
+    await expect(uploadDataToSessionStorage({}, 'json', options())).resolves.toHaveProperty('id', 'cf_gate_result');
+  });
+  test.each(['questions', 'surveys'])('blocks an unstamped admin correction to %s before upload', async (resource) => {
+    fetchWorkerWithAuth.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          items: [{ metadata: { resourceId: '0xABC' } }],
+          listComplete: true,
+          cursor: null,
+        }),
+      ),
+    );
+    await expect(uploadDataToSessionStorage({ id: '0xabc' }, 'json', options(resource))).rejects.toThrow(
+      'Upgrade the session Worker',
+    );
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    expect(fetchWorkerWithAuth.mock.calls[0][0]).toContain('/storage/list');
+  });
+  test('allows a new admin-authored id after a complete previous-version listing', async () => {
+    fetchWorkerWithAuth.mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [], listComplete: true, cursor: null })),
+    );
+    await expect(uploadDataToSessionStorage({ id: '0xabc' }, 'json', options('questions'))).resolves.toHaveProperty(
+      'id',
+      'cf_gate_result',
+    );
+  });
+  test('allows a correction on a Worker that stamps upload authority', async () => {
+    readWorkerCapabilities.mockResolvedValue({ legacy: false, features: ['upload_authority_stamps'] });
+    await expect(uploadDataToSessionStorage({ id: '0xabc' }, 'json', options('questions'))).resolves.toHaveProperty(
+      'id',
+      'cf_gate_result',
+    );
+    expect(fetchWorkerWithAuth.mock.calls[0][0]).toContain('/storage/upload');
+  });
+  test('does not mistake an incomplete or unreadable listing for a new id', async () => {
+    fetchWorkerWithAuth.mockResolvedValue(new Response(JSON.stringify({ items: [] })));
+    await expect(uploadDataToSessionStorage({ id: '0xabc' }, 'json', options('questions'))).rejects.toThrow(
+      'Upgrade the session Worker',
+    );
+  });
+});
 
 const buildSingleQuestionResponsePayload = ({ answer, additional, questionType, options, voiceCredits }) =>
   buildResponsePayload({
@@ -57,6 +138,7 @@ const buildSingleQuestionResponsePayload = ({ answer, additional, questionType, 
 describe('storageClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    readWorkerCapabilities.mockResolvedValue({ legacy: true, features: [] });
     arweaveClient.uploadDataToArweave.mockResolvedValue(TX_ID);
     getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
     fetchWorkerWithAuth.mockResolvedValue(

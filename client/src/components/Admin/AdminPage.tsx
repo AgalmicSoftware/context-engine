@@ -52,6 +52,7 @@ import AdminAgentSessionWrappedPanel from './AdminAgentSessionWrappedPanel';
 import { resolveAdminAgentSessionWrappedWorkerOrigin } from './adminAgentSessionWrapped';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
 import AdminStorageVisibilityPanel from './AdminStorageVisibilityPanel';
+import AdminWorkerCapabilities from './AdminWorkerCapabilities';
 import {
   getBackgroundResultsAnalysisUnsupportedReason,
   supportsBackgroundResultsAnalysis,
@@ -2903,6 +2904,11 @@ const AdminPageRuntime = ({
             postSignedRequest={postSignedAdminRequest}
           />
         ) : null}
+
+        <AdminWorkerCapabilities
+          workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
+          sessionSlug={normalizeSlug(selectedSlug)}
+        />
 
         <AdminPageWorkerSecretsPanel
           workerSecretsOpen={workerSecretsOpen}
