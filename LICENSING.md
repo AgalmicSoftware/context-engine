@@ -27,9 +27,9 @@ CC0 material must retain its source, license and attribution notices when
 copied, bundled or shared; moving it into a project directory does not change
 those rights.
 
-The two `adminTypedData.mjs` helpers currently use different ethers runtimes:
-the client uses v5 and the Session Worker uses v6. Keep their EIP-712 behavior
-aligned while preserving that dependency boundary.
+The `adminTypedData.mjs` wrappers inject hashing utilities into shared EIP-712
+rules in `shared/auth/`. The client uses ethers v5 and the Session Worker uses
+v6; sharing rules preserves that dependency boundary.
 
 ## Third-Party Dependencies
 
