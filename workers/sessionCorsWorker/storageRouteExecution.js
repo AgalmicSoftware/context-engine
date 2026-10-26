@@ -476,7 +476,7 @@ const resolveConfiguredStorageBackend = ({ config, requestedBackend, payloadEncr
   return normalizeStorageBackend(requestedBackend, configured);
 };
 
-const resolvePayloadAccessControl = (config = {}) => {
+export const resolvePayloadAccessControl = (config = {}) => {
   const profile = isObj(config?.storageProfile) ? config.storageProfile : {};
   const cloudflare = isObj(profile.cloudflare) ? profile.cloudflare : {};
   const payloadAccessControl = isObj(profile.payloadAccessControl) ? profile.payloadAccessControl : {};

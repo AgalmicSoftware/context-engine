@@ -1,4 +1,5 @@
 import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
+import { dispatchWorkerCapabilities } from './workerCapabilities.js';
 import { isModelAllowed } from './aiRequestNormalization.js';
 import {
   dispatchPublicWorkerGroupListRequest as dispatchPublicWorkerGroupListRequestBoundary,
@@ -37,6 +38,8 @@ export const dispatchAnonymousRoute = async ({
     headers,
     env,
   } = anonymousContext || {};
+
+  if (path === '/capabilities') return dispatchWorkerCapabilities({ request, env, headers });
 
   if (path === '/groups/list') {
     const dispatchPublicWorkerGroupListRequest =

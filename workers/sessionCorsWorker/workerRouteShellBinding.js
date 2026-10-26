@@ -151,6 +151,13 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       }
       const envSlug = getDefaultWorkerSessionSlug(env);
 
+      // Readiness must remain public when config authority is missing or down.
+      if (routeSelection.kind === 'capabilities') {
+        return await dispatchAnonymousRoute({
+          path, request, anonymousContext: { env, headers: routeBaseHeaders },
+        });
+      }
+
       if (routeSelection.kind === 'session-config') {
         return await dispatchSessionConfigBootstrapRequest({
           request,

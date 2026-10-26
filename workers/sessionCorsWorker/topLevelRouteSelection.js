@@ -12,6 +12,8 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'options' };
   }
 
+  if (path === '/capabilities' && method === 'GET') return { kind: 'capabilities' };
+
   if (path === '/auth/nonce' && method === 'POST') {
     return { kind: 'auth-nonce' };
   }

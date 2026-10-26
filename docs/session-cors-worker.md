@@ -2493,6 +2493,15 @@ Signed login/bootstrap requests:
   - Success and error responses are `Cache-Control: no-store` and vary on both
     `Origin` and `X-Session-Slug`.
 - `GET /health` (requires Authorization token; does not require session KV config, so it works for newly registered sessions during bootstrap)
+- `GET /capabilities` is public and returns the code-defined feature list, API
+  version and optional bundle hash, cached for 30 seconds. With `?slug=<slug>`,
+  it also reports coordinator, config authority, storage-index and secret-presence
+  readiness, plus fixed reasons for unavailable submit, publication, correction
+  and backup operations. A fresh authority reports `seeding`; legacy config
+  requiring migration reports `migration_required`. It remains reachable during
+  an authority outage and never returns config values, addresses or counts.
+  A missing KEK blocks envelope-encrypted writes and backup, while plaintext
+  writes remain available when their other prerequisites are ready.
 - `GET /resource-presence` with `X-Session-Slug`
   - Optional `?interview=1` adds `interview: { ready, reason? }` after checking the voice provider, server-side OpenAI key presence, session lifecycle, and anonymous realtime access. No key values are returned and no OpenAI request is made.
   - Validates the selected session and its browser-origin CORS policy.
