@@ -213,6 +213,7 @@ try {
   assert(sessionLink, 'Publication returns a portable session link');
   const sessionUrl = new URL(sessionLink, baseUrl);
   const slug = decodeURIComponent(sessionUrl.pathname.split('/').at(-1));
+  env.DEFAULT_SESSION_SLUG = slug;
   const workerFetch = (url, init = {}) => worker.fetch(new Request(url, init), env, { waitUntil: () => {} });
   const adminClient = createWorkerClient({
     workerOrigin,

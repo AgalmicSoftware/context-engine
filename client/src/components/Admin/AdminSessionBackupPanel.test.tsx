@@ -149,3 +149,9 @@ test('recovery export asks for confirmation and signs it, then hides the key aft
   await waitFor(() => expect(screen.queryByLabelText('Recovery key')).not.toBeInTheDocument());
   expect(confirm).toHaveBeenCalledTimes(2);
 });
+
+test('hides key export when the Worker advertises backup without deployment key custody', async () => {
+  render(<AdminSessionBackupPanel {...props} postSignedRequest={jest.fn()} />);
+  expect(await screen.findByRole('button', { name: 'Download backup' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Show recovery key' })).not.toBeInTheDocument();
+});

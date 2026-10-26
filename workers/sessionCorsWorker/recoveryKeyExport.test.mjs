@@ -22,7 +22,7 @@ const fixture = () => {
   group.values.set(`session:${slug}:config`, JSON.stringify({ slug, sessionId: `0x${'1'.repeat(32)}`,
     adminAddress: admin.address, chainId: 11155420, allowOrigins: [origin] }));
   return installSessionCoordinatorBinding({ GROUP_KV: group, CE_STORAGE_ENVELOPE_KEK: 'a'.repeat(64),
-    TOKEN_HMAC_SECRET: 'synthetic-token-secret', CE_STORAGE_AUDIT_KV: kv() });
+    DEFAULT_SESSION_SLUG: slug, TOKEN_HMAC_SECRET: 'synthetic-token-secret', CE_STORAGE_AUDIT_KV: kv() });
 };
 
 test('recovery key export requires admin signature and explicit signed confirmation, limits and audits exports', async (t) => {
@@ -96,3 +96,20 @@ test('backup export success and failure keep the signed request CORS headers', a
     assert.equal(response.headers.get('Cache-Control'), 'no-store');
   }
 });
+
+
+for (const configuredSlug of [undefined, '', 'another-session']) {
+  test(`key export refuses deployment-scoped keys without spending an allowance (${configuredSlug})`, async () => {
+    const env = fixture();
+    env.DEFAULT_SESSION_SLUG = configuredSlug;
+    const current = await callSessionConfigCoordinator({ env, slug, path: 'current' });
+    const args = { env, slug, path: 'recovery-key/export', confirm: action,
+      expectedAuthority: { actor: admin.address, revision: current.body.revision, authzEpoch: 0 } };
+    const denied = await callSessionConfigCoordinator(args);
+    assert.equal(denied.status, 403);
+    assert.equal(denied.body.reason, 'recovery_key_deployment_scoped');
+    assert.equal(env.CE_STORAGE_AUDIT_KV.values.size, 0);
+    env.DEFAULT_SESSION_SLUG = slug;
+    for (let i = 0; i < 3; i++) assert.equal((await callSessionConfigCoordinator(args)).status, 200);
+  });
+}

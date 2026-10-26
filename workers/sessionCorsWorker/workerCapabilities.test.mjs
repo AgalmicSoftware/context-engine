@@ -74,3 +74,13 @@ test('capabilities rejects malformed slugs without calling the coordinator', asy
   env.CE_SESSION_COORDINATOR.get = () => { throw new Error('must not call'); };
   assert.equal((await fetchCapabilities(env, '?slug=bad/slug')).status, 400);
 });
+
+
+test('key export is advertised only for the deployment’s single configured session', async () => {
+  for (const configuredSlug of [undefined, '', 'another-session', 'sample']) {
+    const env = { ...envFor({ ok: true, revision: 1, config: {} }), DEFAULT_SESSION_SLUG: configuredSlug };
+    const body = await (await fetchCapabilities(env, '?slug=sample')).json();
+    assert.equal(body.features.includes('recovery_key_export'), configuredSlug === 'sample');
+    assert.equal((await (await fetchCapabilities(env)).json()).features.includes('recovery_key_export'), false);
+  }
+});

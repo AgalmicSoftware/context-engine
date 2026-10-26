@@ -6,6 +6,10 @@ export const exportCoordinatorRecoveryKey = async (coordinator, payload) => {
   try {
     const authority = await coordinator.assertSessionAuthority(payload);
     if (!authority) return reply({ error: 'Session config is not initialized.' }, 409);
+    if (String(coordinator.env.DEFAULT_SESSION_SLUG || '').trim() !== authority.slug) {
+      return reply({ error: 'The deployment operator holds the recovery key for this Worker.',
+        reason: 'recovery_key_deployment_scoped' }, 403);
+    }
     if (payload?.confirm !== 'export-recovery-key') return reply({ error: 'Confirm export-recovery-key in the signed payload.' }, 400);
     const recoveryKey = String(coordinator.env.CE_STORAGE_ENVELOPE_KEK || '').trim();
     if (!recoveryKey) return reply({ error: 'Recovery key is not configured.' }, 503);

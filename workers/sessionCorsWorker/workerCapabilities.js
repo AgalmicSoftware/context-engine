@@ -16,7 +16,7 @@ export const FEATURES = Object.freeze([
 export const dispatchWorkerCapabilities = async ({ request, env = {}, headers = {} }) => {
   const body = {
     type: 'ce_worker_capabilities', version: 1, apiVersion: 1,
-    bundle: env.CE_BUNDLE_SHA256 || null, features: FEATURES,
+    bundle: env.CE_BUNDLE_SHA256 || null, features: FEATURES.filter((feature) => feature !== 'recovery_key_export'),
   };
   const responseHeaders = new Headers(headers);
   responseHeaders.set('Cache-Control', 'public, max-age=30');
@@ -24,6 +24,7 @@ export const dispatchWorkerCapabilities = async ({ request, env = {}, headers = 
   if (url.searchParams.has('slug')) {
     const validated = validateInboundWorkerSessionSlug(url.searchParams.get('slug'));
     if (!validated.ok) return Response.json({ error: validated.error }, { status: 400, headers: responseHeaders });
+    if (String(env.DEFAULT_SESSION_SLUG || '').trim() === (validated.slug || 'general')) body.features = FEATURES;
     const bound = !!env.CE_SESSION_COORDINATOR?.idFromName && !!env.CE_SESSION_COORDINATOR?.get;
     const current = bound
       ? await callSessionConfigCoordinator({ env, slug: validated.slug, path: 'current' })
