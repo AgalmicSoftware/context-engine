@@ -1,6 +1,6 @@
 import { resolveWorkerGroupsKv, workerGroupBackupPrefixes } from './workerGroups.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
-import { resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
+import { normalizeWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
 import { isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 
 const json = (body, status = 200) => Response.json(body, { status });
@@ -41,7 +41,7 @@ export const exportCoordinatorBackup = async (coordinator, payload) => {
   await coordinator.repairPendingSessionConfigProjection();
   const current = await coordinator.state.storage.get('session-config-authority');
   const signer = await coordinator.state.storage.get('session-lit-authorization-signer-v1');
-  const rawSecrets = await coordinator.env.GROUP_KV.get(`session:${current.config.slug || ''}:secrets`);
+  const rawSecrets = await coordinator.env.GROUP_KV.get(`session:${normalizeWorkerSessionSlug(current.slug)}:secrets`);
   const secrets = rawSecrets == null ? null : parse(rawSecrets);
   if (secrets && !isEncryptedSessionSecretsEnvelope(secrets)) {
     fail('Legacy plaintext secrets must be saved through the encrypted secret workflow before backup.', 409);

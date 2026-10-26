@@ -10,6 +10,7 @@ import { workerGroupBackupPrefixes } from './workerGroups.js';
 import { readFile } from 'node:fs/promises';
 import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
 import { selectCanonicalStorageVersions } from '../../shared/storage/canonicalStorageVersions.mjs';
+import { putSessionSecrets } from './sessionConfigSecretsStore.js';
 
 const slug = 'restore-fixture';
 const sessionId = `0x${'3'.repeat(32)}`;
@@ -258,6 +259,25 @@ test('legacy group rows are backed up only for the matching immutable identity',
   assert.equal(result.body.complete, true, JSON.stringify(result));
   assert.equal(await target.kv.get(groupKey), JSON.stringify(group));
   assert.equal(await target.kv.get(`ce-worker-group:${slug}:another`), null);
+});
+
+for (const absentSlug of [false, true]) test(`backup preserves secrets and punctuated owned ids (absent slug=${absentSlug})`, async () => {
+  const source = fixture();
+  const config = JSON.parse(await source.kv.get(`session:${slug}:config`));
+  if (absentSlug) delete config.slug;
+  await source.kv.put(`session:${slug}:config`, JSON.stringify(config));
+  await putSessionSecrets(source.env, slug, { openaiKey: 'synthetic-secret' });
+  const ownerKey = `ce-storage-owner:${slug}:questions:fixture.question:v1`;
+  source.kv.values.set(ownerKey, '{"uploader":"legacy-admin-only"}');
+  const [page] = await allPages(source.env);
+  assert.equal(page.coordinator.secrets.cipher, 'AES-256-GCM');
+  assert.doesNotMatch(JSON.stringify(page), /synthetic-secret/);
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  const result = await importPage(target.env, page);
+  assert.equal(result.body.complete, true, JSON.stringify(result));
+  assert.equal(await target.kv.get(ownerKey), await source.kv.get(ownerKey));
+  assert.equal(await target.kv.get(`session:${slug}:secrets`), await source.kv.get(`session:${slug}:secrets`));
 });
 
 test('restore drill preserves encrypted reads, hidden questions, correction authority, groups and AI secrets', async (t) => {

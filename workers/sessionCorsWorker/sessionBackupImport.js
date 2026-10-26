@@ -6,6 +6,7 @@ import { isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvel
 import { coordinateWorkerGroupBackup } from './workerGroups.js';
 import { base64urlToBytes, bytesToBase64url } from './storageEnvelopeEncryption.js';
 import { isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
+import { isStorageResourceId } from './storageUploadValidation.js';
 import { STORAGE_EXPORT_PAGE_LIMITS, jsonByteLength } from './storageScanBudget.js';
 import { rejectKvValueOverLimit, resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import { buildIndexKey, buildObjectKey, buildPayloadKey, getStorageIndexBinding, getStorageR2Binding, readStoredCloudflarePayloadBytes } from './storageRouteExecution.js';
@@ -55,7 +56,9 @@ const validatePage = (page, slug) => {
           entry.key !== buildIndexKey({ slug, resource: entry.resource, id: entry.id })) fail('Invalid backup metadata key.');
     } else if (entry.kind === 'owner' || entry.kind === 'hidden') {
       const prefix = `ce-storage-${entry.kind}:${slug}:`;
-      if (typeof entry.key !== 'string' || !entry.key.startsWith(prefix) || !/^(questions|surveys):[a-z0-9_-]+$/.test(entry.key.slice(prefix.length)) ||
+      const suffix = typeof entry.key === 'string' ? entry.key.slice(prefix.length) : '';
+      const separator = suffix.indexOf(':');
+      if (typeof entry.key !== 'string' || !entry.key.startsWith(prefix) || !['questions', 'surveys'].includes(suffix.slice(0, separator)) || !isStorageResourceId(suffix.slice(separator + 1)) ||
           typeof entry.value !== 'string' || !object(JSON.parse(entry.value))) fail('Invalid backup ownership key.');
     } else if (entry.kind === 'payload' || entry.kind === 'chunk') {
       if (entry.target !== undefined && entry.target !== 'coordinator') fail('Invalid backup payload target.');
