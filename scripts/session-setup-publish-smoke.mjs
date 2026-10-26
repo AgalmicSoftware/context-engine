@@ -52,7 +52,7 @@ const browser = await chromium.launch({
   args: [`--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE ${new URL(baseUrl).hostname}`],
 });
 const calls = [];
-const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, loseResponseUploadAt = 0, unavailableSubmit = false, responseUploads = [] } = {}) => {
+const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, loseResponseUploadAt = 0, deferLostResponseListingUntilReplay = false, unavailableSubmit = false, responseUploads = [] } = {}) => {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     serviceWorkers: 'block',
@@ -105,6 +105,15 @@ const fixtureContext = async ({ seed }, { failResponseUploadAt = 0, loseResponse
     if (!failUpload && request.headers().origin) {
       assert.equal(response.headers.get('access-control-allow-origin'), request.headers().origin,
         `Worker CORS header missing for ${request.method()} ${url.pathname}`);
+    }
+    // Receipt replay must also work while KV listings lag the committed upload.
+    // Keep this one fixture stale until replay; reload fixtures use fresh lists.
+    const deferredId = deferLostResponseListingUntilReplay && responseUploads.length === loseResponseUploadAt
+      ? responseUploads[loseResponseUploadAt - 1]?.storedId : '';
+    if (deferredId && response.ok && url.pathname === '/storage/list' && url.searchParams.get('resource') === 'responses') {
+      const listing = await response.json();
+      listing.items = listing.items.filter((entry) => (entry.storageRef?.id || entry.id) !== deferredId);
+      response = new Response(JSON.stringify(listing), { status: 200, headers: response.headers });
     }
     if (unavailableSubmit && url.pathname === '/capabilities') {
       const capabilities = await response.json();
@@ -394,7 +403,7 @@ try {
 
   const lostReplyFixture = passkeyFixture('lost-reply-participant');
   const lostReplyUploads = [];
-  const lostReplyContext = await fixtureContext(lostReplyFixture, { loseResponseUploadAt: 2, responseUploads: lostReplyUploads });
+  const lostReplyContext = await fixtureContext(lostReplyFixture, { loseResponseUploadAt: 2, deferLostResponseListingUntilReplay: true, responseUploads: lostReplyUploads });
   page = await lostReplyContext.newPage();
   await page.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' });
   await login(page, lostReplyFixture.wallet);
@@ -421,6 +430,54 @@ try {
   assert.deepEqual(savedReplies.map((entry) => entry.questionID).sort(), questions.slice(0, 2).map((entry) => entry.id).sort());
   await page.screenshot({ path: `${outputDir}/participant-lost-reply.png`, fullPage: true, timeout: 10000 });
   console.log('A lost upload reply replayed the original reference without another stored answer.');
+  const reloadRecoveryStartedAt = performance.now();
+  const reloadRecoveryUploads = {};
+  for (const mode of ['lost', 'failed']) {
+    const fixture = passkeyFixture(`reload-${mode}-participant`);
+    const uploads = [];
+    reloadRecoveryUploads[mode] = uploads;
+    const context = await fixtureContext(fixture, {
+      ...(mode === 'lost' ? { loseResponseUploadAt: 2 } : { failResponseUploadAt: 2 }),
+      responseUploads: uploads,
+    });
+    page = await context.newPage();
+    await page.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' });
+    await login(page, fixture.wallet);
+    for (const entry of questions.slice(0, 2)) {
+      const card = await showQuestion(page, entry, questions.length);
+      await card.getByText(answer, { exact: true }).click();
+    }
+    await page.getByTestId('ce-survey-submit').click();
+    await page.getByText(/Some answers didn't save \(/).waitFor();
+    assert.deepEqual(uploads.map(({ status }) => status), [200, 503]);
+    const client = makeClient(fixture.wallet);
+    assert.equal((await client.listAll('responses', { mine: true })).items.length, mode === 'lost' ? 2 : 1);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    for (const entry of questions.slice(0, 2)) {
+      const card = await showQuestion(page, entry, questions.length);
+      assert.equal(await card.getByRole('radio', { name: answer, exact: true }).isChecked(), true,
+        `${mode}: saved answers and unsaved drafts survive reload`);
+    }
+    if (mode === 'lost') {
+      await page.getByTestId('ce-survey-submit').waitFor({ state: 'hidden' });
+      assert.equal(await page.getByTestId('ce-survey-submit').isVisible(), false, 'Hydrated saved answers offer nothing to resend');
+      assert.equal(uploads.length, 2, 'Reload does not resend either stored answer');
+    } else {
+      await page.getByTestId('ce-survey-submit').click();
+      await page.getByTestId('ce-survey-submitted-indicator').first().waitFor();
+      assert.deepEqual(uploads.slice(2), [{ questionId: uploads[1].questionId, status: 200 }],
+        'After reload, only the unsaved draft uploads');
+    }
+    const stored = await client.listAll('responses', { mine: true });
+    assert.equal(stored.complete, true);
+    assert.equal(stored.items.length, 2, `${mode}: reload recovery leaves exactly two records`);
+    const records = await Promise.all(stored.items.map((entry) => client.read(entry.storageRef.id)));
+    assert.deepEqual(records.map((entry) => entry.questionID).sort(), questions.slice(0, 2).map((entry) => entry.id).sort());
+    await page.screenshot({ path: `${outputDir}/participant-reload-${mode}.png`, fullPage: true, timeout: 10000 });
+    await context.close();
+  }
+  const reloadRecoveryElapsedMs = Math.round(performance.now() - reloadRecoveryStartedAt);
+  console.log(`Reload recovery kept saved answers and retried only the unsaved draft in ${reloadRecoveryElapsedMs}ms.`);
   const unavailableFixture = passkeyFixture('readiness-participant');
   const unavailableUploads = [];
   const unavailableContext = await fixtureContext(unavailableFixture, { unavailableSubmit: true, responseUploads: unavailableUploads });
@@ -504,6 +561,8 @@ try {
           'encrypted storage',
           'partial submission and unsaved-only retry',
           'lost upload reply replays the original reference with no duplicate',
+          'lost reply then reload hydrates both saved answers without resending',
+          'failed upload then reload keeps the unsaved draft and uploads it once',
           'three concurrent two-tab bookmark pairs survive reload',
           'explicit submit readiness refusal retains the draft without uploading',
           'admin JSONL download and idempotent signed restore',
@@ -512,6 +571,8 @@ try {
         ],
         responseUploads,
         lostReplyUploads,
+        reloadRecoveryUploads,
+        reloadRecoveryElapsedMs,
         calls,
       },
       null,
