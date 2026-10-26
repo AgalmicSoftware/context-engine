@@ -13,7 +13,7 @@
 //    \ \_______\ \__\\ \__\ \_______\ \__\ \__\\ \__\ \_______\
 //     \|_______|\|__| \|__|\|_______|\|__|\|__| \|__|\|_______|
 
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MPL-2.0
 pragma solidity ^0.8.24;
 
 /// @title Enhanced Survey and Question Management on Ethereum

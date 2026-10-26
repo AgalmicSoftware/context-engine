@@ -2,7 +2,7 @@
   "name": "context-engine-session-worker-deploy",
   "version": "1.0.0",
   "private": true,
-  "license": "MIT",
+  "license": "MPL-2.0",
   "description": "Isolated, checksummed Deploy to Cloudflare package for a user-owned Context Engine Session Worker",
   "cloudflare": {
     "bindings": {

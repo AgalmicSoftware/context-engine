@@ -32,16 +32,9 @@ full source, template, local-build, and release boundary.
 
 ## Licensing
 
-The `workers/` subtree is part of the repo's worker/tooling boundary, not the
-main `MPL-2.0` public core surface.
+All project-authored Worker code uses MPL-2.0, including the Session Worker,
+Agent Bridge, deploy helper and shared modules. Third-party dependencies and
+tooling keep their own licenses and notices. Earlier releases keep the
+licenses they shipped with.
 
-Current status:
-
-- `workers/` project code is `MIT`.
-- `workers/sessionCorsWorker/` is `MIT`.
-- `workers/deploy-helper/` is `MIT`.
-- `workers/agentBridgeWorker/` is `MIT`.
-- Third-party worker dependencies and tooling keep their own licenses and should be checked separately from the worker subtree's MIT designation.
-
-See [LICENSE](LICENSE) for the worker subtree's MIT text.
-See [../LICENSING.md](../LICENSING.md) for the boundary map and shared-file rules.
+See [LICENSE](LICENSE) and the [project license map](../LICENSING.md).

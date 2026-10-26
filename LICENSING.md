@@ -1,56 +1,35 @@
-# Licensing Map
+# Project license
 
-This repository is intentionally multi-license.
+Project-authored code is licensed under **MPL-2.0** throughout: the browser
+client, Workers, deployment package, contracts, tools, shared modules and
+repository add-ons. The root [LICENSE](LICENSE) contains the complete Mozilla
+Public License Version 2.0. Contributions to project code use MPL-2.0.
 
-The public open-source core is licensed under `MPL-2.0`. The root [LICENSE](LICENSE) file contains the standard Mozilla Public License Version 2.0 text. Files or directories with their own license notices remain under those notices. Contributions to `MPL-2.0`-covered files are accepted under `MPL-2.0` unless otherwise stated. Third-party dependencies retain their own licenses.
+Earlier releases keep the licenses they shipped with. Deployed contracts keep
+their verified source notices; newly distributed source uses MPL-2.0.
 
-## Current Status
+## Package and material map
 
-- The public open-source core is `MPL-2.0` by default.
-- The worker subtree is `MIT`.
-- Project-authored annotations in `ai-discourse-corpus/` are dedicated under `CC0-1.0`.
-- Files with explicit SPDX identifiers or local license notices remain under those notices.
-- Third-party dependencies, assets, and tooling keep their own licenses.
-
-## Package And Subtree Map
-
-| Path | Current treatment | Notes |
+| Material | License | Notes |
 | --- | --- | --- |
-| `LICENSE` | `MPL-2.0` | Standard MPL 2.0 text for the public open-source core default. |
-| `package.json` / `package-lock.json` | `MPL-2.0` | Root package metadata for repo-level project code and tooling unless a more specific notice applies. |
-| `client/` | `MPL-2.0` | Main browser app/package. `client/package.json` declares `MPL-2.0`, and `client/LICENSE` points to the root MPL text. |
-| `ai-discourse-bench/` | `MPL-2.0` | AI Opinions Benchmark harness, question-bank tooling, report generator, and package documentation. `ai-discourse-bench/package.json` declares `MPL-2.0`. |
-| `mcp/` | `MPL-2.0` | Context Engine MCP server for agent participants. `mcp/package.json` declares `MPL-2.0`. |
-| Repository docs/spec prose | `MPL-2.0` unless a more specific local note says otherwise | The previous map treated remaining docs/spec material as part of the root default license. No separate documentation-content license notice was found. |
-| Files with `SPDX-License-Identifier: MIT` | MIT | Explicit file-level notices control, including Solidity contracts, deployment scripts, and contract tests that carry MIT SPDX headers. |
-| `workers/` | MIT | Worker subtree. `workers/LICENSE` contains the MIT text for worker-side project code. |
-| `workers/sessionCorsWorker/` | MIT | Cloudflare worker/tooling package. `workers/sessionCorsWorker/package.json` declares `MIT`, and `workers/sessionCorsWorker/LICENSE` points to the subtree MIT text. |
-| `workers/deploy-helper/` | MIT | Helper worker source that stays on the worker side of the boundary. |
-| `deploy/cloudflare/session-worker/` | MIT | Isolated, generated Cloudflare-native deployment package for the Session Worker. Its local `LICENSE` contains the MIT text. |
-| `ai-discourse-corpus/` | Mixed upstream rights; `CC0-1.0` for project-authored annotations | No ownership is claimed over upstream linked/source material. See `ai-discourse-corpus/LICENSE.md` for the directory-specific rights notice covering summaries, tags, and structure. |
+| Root tools, `client/`, `mcp/`, `ai-discourse-bench/`, `shared/` and add-ons | MPL-2.0 | The root license applies to project code. |
+| `workers/` | MPL-2.0 | Includes the Session Worker, Agent Bridge, deploy helper and shared Worker modules. |
+| `deploy/cloudflare/session-worker/` | MPL-2.0 | The standalone deploy package includes the full license text. |
+| `contracts/` and `foundry/` | MPL-2.0 | Source files carry matching SPDX identifiers. |
+| Repository documentation | MPL-2.0 | Except material with a specific third-party or corpus notice. |
+| `ai-discourse-corpus/` annotations | CC0-1.0 | Project-authored summaries, tags and structure are dedicated under [the corpus notice](ai-discourse-corpus/LICENSE.md). Upstream source material retains its own rights. |
+| Third-party dependencies, fonts, images and logos | Their own licenses | Preserve the notices described below. |
 
-This map does not override more specific file, directory, package, or third-party notices.
+## Shared-file rules
 
-The duplicated `client/src/utilities/worker/adminTypedData.mjs` and `workers/sessionCorsWorker/adminTypedData.mjs` helpers intentionally sit on opposite sides of the client/worker license boundary. Keep them in sync intentionally until the shared shape is retired or moved to a separately managed shared module.
+Project modules can share code under the root MPL-2.0 license. Third-party and
+CC0 material must retain its source, license and attribution notices when
+copied, bundled or shared; moving it into a project directory does not change
+those rights.
 
-## Shared-File Rules
-
-If a file or module is used across license boundaries, it must be handled in one of these ways and recorded in code or nearby docs:
-
-- Keep it under a common license that is acceptable to both sides.
-- Dual-license it explicitly.
-- Move it to a neutral shared package or location.
-- Duplicate and separate the implementation so the seam goes away.
-
-Do not assume a path alone settles the licensing question. Follow the more specific subtree/package/file notice when one exists.
-
-## How To Read The Root LICENSE
-
-- The root [LICENSE](LICENSE) file is the full `MPL-2.0` text for the public open-source core default.
-- The worker subtree uses [workers/LICENSE](workers/LICENSE) for the MIT text that applies to worker-side project code.
-- The AI discourse corpus uses [ai-discourse-corpus/LICENSE.md](ai-discourse-corpus/LICENSE.md) for its CC0 project-authored annotation notice and upstream-rights disclaimer.
-- This file is the repo-level exception and boundary map.
-- If a local file or package note is more specific than the root default, follow the more specific note.
+The two `adminTypedData.mjs` helpers currently use different ethers runtimes:
+the client uses v5 and the Session Worker uses v6. Keep their EIP-712 behavior
+aligned while preserving that dependency boundary.
 
 ## Third-Party Dependencies
 

@@ -141,7 +141,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 
 ## Licensing
 
-This repo is intentionally multi-license. The public open-source core is licensed under `MPL-2.0`. Files and directories with their own license notices remain under those notices, including MIT worker-side code, files with explicit MIT notices, and the CC0 project-authored annotations in [`ai-discourse-corpus/`](ai-discourse-corpus/). Third-party dependencies retain their own licenses. See [LICENSING.md](LICENSING.md) for the current boundary map and shared-file rules.
+Project-authored code is licensed under `MPL-2.0`, including the client, Workers, contracts, deploy package and add-ons. Earlier releases keep the licenses they shipped with. Project-authored annotations in [`ai-discourse-corpus/`](ai-discourse-corpus/) remain `CC0-1.0`; upstream material and third-party dependencies, fonts and assets keep their own rights and notices. See [LICENSING.md](LICENSING.md).
 
 ## Roadmap
 

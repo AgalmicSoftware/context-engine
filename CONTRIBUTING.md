@@ -56,7 +56,7 @@ Before opening a PR, run the smallest relevant test set for your change plus `np
 
 ## Licensing Contributions
 
-By contributing, you agree that your contributions are licensed under the license applicable to the files you modify. For most public core files, that license is `MPL-2.0`; files or directories with their own license notices keep those terms.
+Contributions to project-authored code use `MPL-2.0`. Preserve the existing rights and notices for third-party material and the `CC0-1.0` dedication for project-authored corpus annotations. See [LICENSING.md](LICENSING.md).
 
 ## Commits
 

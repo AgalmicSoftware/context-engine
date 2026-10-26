@@ -3,4 +3,4 @@ SPDX-License-Identifier: MPL-2.0
 This package is part of the Context Engine public open-source core and is licensed under MPL-2.0 unless a more specific file or directory notice says otherwise.
 
 See ../LICENSE for the full MPL-2.0 text.
-See ../LICENSING.md for the repo-wide multi-license map, including the worker/tooling boundary and shared-file rules.
+See ../LICENSING.md for the project license map and third-party/CC0 exceptions.
