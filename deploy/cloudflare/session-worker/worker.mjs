@@ -2297,10 +2297,10 @@ function arrayifyInteger(value) {
   }
   return result;
 }
-function _encode(object2) {
-  if (Array.isArray(object2)) {
+function _encode(object4) {
+  if (Array.isArray(object4)) {
     let payload = [];
-    object2.forEach(function(child) {
+    object4.forEach(function(child) {
       payload = payload.concat(_encode(child));
     });
     if (payload.length <= 55) {
@@ -2311,7 +2311,7 @@ function _encode(object2) {
     length2.unshift(247 + length2.length);
     return length2.concat(payload);
   }
-  const data = Array.prototype.slice.call(getBytes(object2, "object"));
+  const data = Array.prototype.slice.call(getBytes(object4, "object"));
   if (data.length === 1 && data[0] <= 127) {
     return data;
   } else if (data.length <= 55) {
@@ -2322,9 +2322,9 @@ function _encode(object2) {
   length.unshift(183 + length.length);
   return length.concat(data);
 }
-function encodeRlp(object2) {
+function encodeRlp(object4) {
   let result = "0x";
-  for (const v of _encode(object2)) {
+  for (const v of _encode(object4)) {
     result += nibbles[v >> 4];
     result += nibbles[v & 15];
   }
@@ -2460,15 +2460,15 @@ function toObject(names2, items, deep) {
 }
 function checkResultErrors(result) {
   const errors = [];
-  const checkErrors = function(path, object2) {
-    if (!Array.isArray(object2)) {
+  const checkErrors = function(path, object4) {
+    if (!Array.isArray(object4)) {
       return;
     }
-    for (let key in object2) {
+    for (let key in object4) {
       const childPath = path.slice();
       childPath.push(key);
       try {
-        checkErrors(childPath, object2[key]);
+        checkErrors(childPath, object4[key]);
       } catch (error) {
         errors.push({ path: childPath, error });
       }
@@ -4617,15 +4617,15 @@ function createHmacDrbg(hashLen, qByteLen, hmacFn) {
   };
   return genUntil;
 }
-function validateObject(object2, validators, optValidators = {}) {
+function validateObject(object4, validators, optValidators = {}) {
   const checkField = (fieldName, type, isOptional) => {
     const checkVal = validatorFns[type];
     if (typeof checkVal !== "function")
       throw new Error(`Invalid validator "${type}", expected function`);
-    const val = object2[fieldName];
+    const val = object4[fieldName];
     if (isOptional && val === void 0)
       return;
-    if (!checkVal(val, object2)) {
+    if (!checkVal(val, object4)) {
       throw new Error(`Invalid param ${String(fieldName)}=${val} (${typeof val}), expected ${type}`);
     }
   };
@@ -4633,7 +4633,7 @@ function validateObject(object2, validators, optValidators = {}) {
     checkField(fieldName, type, false);
   for (const [fieldName, type] of Object.entries(optValidators))
     checkField(fieldName, type, true);
-  return object2;
+  return object4;
 }
 var _0n2, _1n2, _2n2, u8a2, hexes, bitSet, bitMask, u8n, u8fr, validatorFns;
 var init_utils3 = __esm({
@@ -4657,7 +4657,7 @@ var init_utils3 = __esm({
       stringOrUint8Array: (val) => typeof val === "string" || val instanceof Uint8Array,
       isSafeInteger: (val) => Number.isSafeInteger(val),
       array: (val) => Array.isArray(val),
-      field: (val, object2) => object2.Fp.isValid(val),
+      field: (val, object4) => object4.Fp.isValid(val),
       hash: (val) => typeof val === "function" && Number.isSafeInteger(val.outputLen)
     };
   }
@@ -6377,9 +6377,9 @@ var init_signing_key = __esm({
       /**
        *  Return the signature of the signed %%digest%%.
        */
-      sign(digest) {
-        assertArgument(dataLength(digest) === 32, "invalid digest length", "digest", digest);
-        const sig = secp256k1.sign(getBytesCopy(digest), getBytesCopy(__privateGet(this, _privateKey)), {
+      sign(digest2) {
+        assertArgument(dataLength(digest2) === 32, "invalid digest length", "digest", digest2);
+        const sig = secp256k1.sign(getBytesCopy(digest2), getBytesCopy(__privateGet(this, _privateKey)), {
           lowS: true
         });
         return Signature.from({
@@ -6472,12 +6472,12 @@ var init_signing_key = __esm({
        *    //_result:
        *
        */
-      static recoverPublicKey(digest, signature) {
-        assertArgument(dataLength(digest) === 32, "invalid digest length", "digest", digest);
+      static recoverPublicKey(digest2, signature) {
+        assertArgument(dataLength(digest2) === 32, "invalid digest length", "digest", digest2);
         const sig = Signature.from(signature);
         let secpSig = secp256k1.Signature.fromCompact(getBytesCopy(concat([sig.r, sig.s])));
         secpSig = secpSig.addRecoveryBit(sig.yParity);
-        const pubKey = secpSig.recoverPublicKey(getBytesCopy(digest));
+        const pubKey = secpSig.recoverPublicKey(getBytesCopy(digest2));
         assertArgument(pubKey != null, "invalid signature for digest", "signature", signature);
         return "0x" + pubKey.toHex(false);
       }
@@ -8005,8 +8005,8 @@ function computeAddress(key) {
   }
   return getAddress(keccak256("0x" + pubkey.substring(4)).substring(26));
 }
-function recoverAddress(digest, signature) {
-  return computeAddress(SigningKey.recoverPublicKey(digest, signature));
+function recoverAddress(digest2, signature) {
+  return computeAddress(SigningKey.recoverPublicKey(digest2, signature));
 }
 var init_address4 = __esm({
   "workers/sessionCorsWorker/node_modules/ethers/lib.esm/transaction/address.js"() {
@@ -10039,8 +10039,8 @@ function hashMessage(message) {
   ]));
 }
 function verifyMessage(message, sig) {
-  const digest = hashMessage(message);
-  return recoverAddress(digest, sig);
+  const digest2 = hashMessage(message);
+  return recoverAddress(digest2, sig);
 }
 var init_message = __esm({
   "workers/sessionCorsWorker/node_modules/ethers/lib.esm/hash/message.js"() {
@@ -10321,8 +10321,8 @@ var init_typed_data = __esm({
             uniqueNames.add(field.name);
             const baseType = splitArray(field.type).base;
             assertArgument(baseType !== name, `circular type reference to ${JSON.stringify(baseType)}`, "types", _types2);
-            const encoder6 = getBaseEncoder(baseType);
-            if (encoder6) {
+            const encoder8 = getBaseEncoder(baseType);
+            if (encoder8) {
               continue;
             }
             assertArgument(parents.has(baseType), `unknown type ${JSON.stringify(baseType)}`, "types", _types2);
@@ -10365,12 +10365,12 @@ var init_typed_data = __esm({
        *  Returnthe encoder for the specific %%type%%.
        */
       getEncoder(type) {
-        let encoder6 = __privateGet(this, _encoderCache).get(type);
-        if (!encoder6) {
-          encoder6 = __privateMethod(this, _TypedDataEncoder_instances, getEncoder_fn).call(this, type);
-          __privateGet(this, _encoderCache).set(type, encoder6);
+        let encoder8 = __privateGet(this, _encoderCache).get(type);
+        if (!encoder8) {
+          encoder8 = __privateMethod(this, _TypedDataEncoder_instances, getEncoder_fn).call(this, type);
+          __privateGet(this, _encoderCache).set(type, encoder8);
         }
-        return encoder6;
+        return encoder8;
       }
       /**
        *  Return the full type for %%name%%.
@@ -10409,8 +10409,8 @@ var init_typed_data = __esm({
        */
       _visit(type, value, callback) {
         {
-          const encoder6 = getBaseEncoder(type);
-          if (encoder6) {
+          const encoder8 = getBaseEncoder(type);
+          if (encoder8) {
             return callback(type, value);
           }
         }
@@ -10506,8 +10506,8 @@ var init_typed_data = __esm({
         if (domain.verifyingContract && !isHexString(domain.verifyingContract, 20)) {
           ensCache[domain.verifyingContract] = "0x";
         }
-        const encoder6 = _TypedDataEncoder.from(types);
-        encoder6.visit(value, (type, value2) => {
+        const encoder8 = _TypedDataEncoder.from(types);
+        encoder8.visit(value, (type, value2) => {
           if (type === "address" && !isHexString(value2, 20)) {
             ensCache[value2] = "0x";
           }
@@ -10519,7 +10519,7 @@ var init_typed_data = __esm({
         if (domain.verifyingContract && ensCache[domain.verifyingContract]) {
           domain.verifyingContract = ensCache[domain.verifyingContract];
         }
-        value = encoder6.visit(value, (type, value2) => {
+        value = encoder8.visit(value, (type, value2) => {
           if (type === "address" && ensCache[value2]) {
             return ensCache[value2];
           }
@@ -10543,17 +10543,17 @@ var init_typed_data = __esm({
           domainValues[name] = domainChecks[name](value2);
           domainTypes.push({ name, type: domainFieldTypes[name] });
         });
-        const encoder6 = _TypedDataEncoder.from(types);
-        types = encoder6.types;
+        const encoder8 = _TypedDataEncoder.from(types);
+        types = encoder8.types;
         const typesWithDomain = Object.assign({}, types);
         assertArgument(typesWithDomain.EIP712Domain == null, "types must not contain EIP712Domain type", "types.EIP712Domain", types);
         typesWithDomain.EIP712Domain = domainTypes;
-        encoder6.encode(value);
+        encoder8.encode(value);
         return {
           types: typesWithDomain,
           domain: domainValues,
-          primaryType: encoder6.primaryType,
-          message: encoder6.visit(value, (type, value2) => {
+          primaryType: encoder8.primaryType,
+          message: encoder8.visit(value, (type, value2) => {
             if (type.match(/^bytes(\d*)/)) {
               return hexlify(getBytes(value2));
             }
@@ -10580,9 +10580,9 @@ var init_typed_data = __esm({
     _TypedDataEncoder_instances = new WeakSet();
     getEncoder_fn = function(type) {
       {
-        const encoder6 = getBaseEncoder(type);
-        if (encoder6) {
-          return encoder6;
+        const encoder8 = getBaseEncoder(type);
+        if (encoder8) {
+          return encoder8;
         }
       }
       const array = splitArray(type).array;
@@ -23267,13 +23267,13 @@ function getPassword(password) {
   }
   return getBytesCopy(password);
 }
-function spelunk(object2, _path) {
+function spelunk(object4, _path) {
   const match = _path.match(/^([a-z0-9$_.-]*)(:([a-z]+))?(!)?$/i);
   assertArgument(match != null, "invalid path", "path", _path);
   const path = match[1];
   const type = match[3];
   const reqd = match[4] === "!";
-  let cur = object2;
+  let cur = object4;
   for (const comp of path.toLowerCase().split(".")) {
     if (Array.isArray(cur)) {
       if (!comp.match(/^[0-9]+$/)) {
@@ -23332,9 +23332,9 @@ var init_utils4 = __esm({
 });
 
 // workers/sessionCorsWorker/node_modules/ethers/lib.esm/wallet/json-keystore.js
-function isKeystoreJson(json3) {
+function isKeystoreJson(json4) {
   try {
-    const data = JSON.parse(json3);
+    const data = JSON.parse(json4);
     const version2 = data.version != null ? parseInt(data.version) : 0;
     if (version2 === 3) {
       return true;
@@ -23409,8 +23409,8 @@ function getDecryptKdfParams(data) {
   }
   assertArgument(false, "unsupported key-derivation function", "kdf", kdf);
 }
-function decryptKeystoreJsonSync(json3, _password) {
-  const data = JSON.parse(json3);
+function decryptKeystoreJsonSync(json4, _password) {
+  const data = JSON.parse(json4);
   const password = getPassword(_password);
   const params = getDecryptKdfParams(data);
   if (params.name === "pbkdf2") {
@@ -23430,8 +23430,8 @@ function stall3(duration) {
     }, duration);
   });
 }
-async function decryptKeystoreJson(json3, _password, progress) {
-  const data = JSON.parse(json3);
+async function decryptKeystoreJson(json4, _password, progress) {
+  const data = JSON.parse(json4);
   const password = getPassword(_password);
   const params = getDecryptKdfParams(data);
   if (params.name === "pbkdf2") {
@@ -24015,9 +24015,9 @@ var init_hdwallet = __esm({
 });
 
 // workers/sessionCorsWorker/node_modules/ethers/lib.esm/wallet/json-crowdsale.js
-function isCrowdsaleJson(json3) {
+function isCrowdsaleJson(json4) {
   try {
-    const data = JSON.parse(json3);
+    const data = JSON.parse(json4);
     if (data.encseed) {
       return true;
     }
@@ -24025,12 +24025,12 @@ function isCrowdsaleJson(json3) {
   }
   return false;
 }
-function decryptCrowdsaleJson(json3, _password) {
-  const data = JSON.parse(json3);
+function decryptCrowdsaleJson(json4, _password) {
+  const data = JSON.parse(json4);
   const password = getPassword(_password);
   const address2 = getAddress(spelunk(data, "ethaddr:string!"));
   const encseed = looseArrayify(spelunk(data, "encseed:string!"));
-  assertArgument(encseed && encseed.length % 16 === 0, "invalid encseed", "json", json3);
+  assertArgument(encseed && encseed.length % 16 === 0, "invalid encseed", "json", json4);
   const key = getBytes(pbkdf22(password, password, 2e3, 32, "sha256")).slice(0, 16);
   const iv = encseed.slice(0, 16);
   const encryptedSeed = encseed.slice(16);
@@ -24118,17 +24118,17 @@ var init_wallet = __esm({
        *  If %%progress%% is provided, it is called periodically during
        *  decryption so that any UI can be updated.
        */
-      static async fromEncryptedJson(json3, password, progress) {
+      static async fromEncryptedJson(json4, password, progress) {
         var _a2;
         let account = null;
-        if (isKeystoreJson(json3)) {
-          account = await decryptKeystoreJson(json3, password, progress);
-        } else if (isCrowdsaleJson(json3)) {
+        if (isKeystoreJson(json4)) {
+          account = await decryptKeystoreJson(json4, password, progress);
+        } else if (isCrowdsaleJson(json4)) {
           if (progress) {
             progress(0);
             await stall4(0);
           }
-          account = decryptCrowdsaleJson(json3, password);
+          account = decryptCrowdsaleJson(json4, password);
           if (progress) {
             progress(1);
             await stall4(0);
@@ -24143,13 +24143,13 @@ var init_wallet = __esm({
        *  will lock up and freeze the UI during decryption, which may take
        *  some time.
        */
-      static fromEncryptedJsonSync(json3, password) {
+      static fromEncryptedJsonSync(json4, password) {
         var _a2;
         let account = null;
-        if (isKeystoreJson(json3)) {
-          account = decryptKeystoreJsonSync(json3, password);
-        } else if (isCrowdsaleJson(json3)) {
-          account = decryptCrowdsaleJson(json3, password);
+        if (isKeystoreJson(json4)) {
+          account = decryptKeystoreJsonSync(json4, password);
+        } else if (isCrowdsaleJson(json4)) {
+          account = decryptCrowdsaleJson(json4, password);
         } else {
           assertArgument(false, "invalid JSON wallet", "json", "[ REDACTED ]");
         }
@@ -25411,6 +25411,34 @@ var init_interviewSettings = __esm({
   }
 });
 
+// shared/crypto/recoveryKeyFingerprint.mjs
+var encoder, recoveryKeyFingerprint;
+var init_recoveryKeyFingerprint = __esm({
+  "shared/crypto/recoveryKeyFingerprint.mjs"() {
+    encoder = new TextEncoder();
+    recoveryKeyFingerprint = async (secret) => {
+      const material = typeof secret === "string" ? secret.trim() : "";
+      if (!material) throw new Error("Recovery key is missing.");
+      const key = await crypto.subtle.importKey("raw", encoder.encode(material), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      const bytes3 = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode("ce-kek-fingerprint-v1")));
+      return [...bytes3].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    };
+  }
+});
+
+// workers/shared/recoveryKey.mjs
+var withFreshRecoveryKey;
+var init_recoveryKey = __esm({
+  "workers/shared/recoveryKey.mjs"() {
+    init_recoveryKeyFingerprint();
+    withFreshRecoveryKey = (safeResult, freshResult) => {
+      const source = freshResult?.body;
+      if (freshResult?.ok !== true || source?.envelopeKekSecretSet !== true || source?.envelopeKekSecretPreserved === true || !/^[0-9a-f]{64}$/i.test(source?.recoveryKey || "")) return safeResult;
+      return { ...safeResult, body: { ...safeResult.body, recoveryKey: source.recoveryKey } };
+    };
+  }
+});
+
 // workers/shared/bodyByteLimit.mjs
 var BodyByteLimitError, readBodyBytes, readBodyText;
 var init_bodyByteLimit = __esm({
@@ -25689,11 +25717,11 @@ var init_sessionSecretsEnvelope = __esm({
       const material = toTrimmedString3(secret);
       if (!material) throw new Error(`${SESSION_SECRETS_CURRENT_KEK_NAME} is missing.`);
       const cryptoImpl = getCryptoImpl(deps);
-      const digest = await cryptoImpl.subtle.digest(
+      const digest2 = await cryptoImpl.subtle.digest(
         "SHA-256",
         textEncoder.encode(`${KEY_DERIVATION_DOMAIN}\0${material}`)
       );
-      return cryptoImpl.subtle.importKey("raw", digest, { name: AES_GCM }, false, usages);
+      return cryptoImpl.subtle.importKey("raw", digest2, { name: AES_GCM }, false, usages);
     };
     isSessionSecretsEnvelope = (value) => isRecord(value) && Number(value.v || 0) === SESSION_SECRETS_ENVELOPE_VERSION && value.kind === SESSION_SECRETS_ENVELOPE_KIND;
     isEncryptedSessionSecretsEnvelope = (value) => isSessionSecretsEnvelope(value) && value.cipher === SESSION_SECRETS_ENVELOPE_CIPHER && value.keyRef === SESSION_SECRETS_ENVELOPE_KEY_REF && typeof value.aad === "string" && typeof value.iv === "string" && typeof value.encryptedSecrets === "string";
@@ -25824,11 +25852,11 @@ var init_workerReleaseManifest = __esm({
       if (matches.length !== 1) {
         return { ok: false, error: `Worker release manifest must contain exactly one ${artifactKind} artifact.` };
       }
-      const digest = normalizeWorkerBundleSha256(matches[0]?.sha256);
-      if (!digest || !Number.isSafeInteger(matches[0]?.bytes) || matches[0].bytes <= 0) {
+      const digest2 = normalizeWorkerBundleSha256(matches[0]?.sha256);
+      if (!digest2 || !Number.isSafeInteger(matches[0]?.bytes) || matches[0].bytes <= 0) {
         return { ok: false, error: `Worker release manifest has invalid ${artifactKind} digest metadata.` };
       }
-      return { ok: true, digest };
+      return { ok: true, digest: digest2 };
     };
     fetchExpectedWorkerBundleDigest = async ({
       manifestUrl,
@@ -25933,7 +25961,7 @@ async function executeAgentSessionWrappedDeployment({
     if (typeof markMutationStarted === "function") await markMutationStarted();
     mutationMarked = true;
   };
-  const fail2 = (status, step, error) => {
+  const fail5 = (status, step, error) => {
     const result = failure(status, step, error);
     if (mutationMarked) result.body.deploymentRequestPending = true;
     return result;
@@ -25946,23 +25974,23 @@ async function executeAgentSessionWrappedDeployment({
   const authorityMode = normalizeAuthorityMode(body.authorityMode);
   const agentHttpEnabled = body.agentHttpEnabled === void 0 ? true : body.agentHttpEnabled;
   if (body.deploymentKind !== AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
-    return fail2(400, "validate", "Invalid deployment kind.");
+    return fail5(400, "validate", "Invalid deployment kind.");
   }
   if (!apiToken || !resolvedAccountId || !sessionSlug || !sessionWorkerOrigin || !sessionDeploymentIdentity || !authorityMode || typeof agentHttpEnabled !== "boolean") {
-    return fail2(400, "validate", "Dedicated Wrapped deployment requires token, account, session identity, authority mode, and HTTPS session Worker origin.");
+    return fail5(400, "validate", "Dedicated Wrapped deployment requires token, account, session identity, authority mode, and HTTPS session Worker origin.");
   }
   const sessionId = normalizeSessionId(body.sessionId || body.sessionIdHex);
   if (authorityMode === "worker_canonical" && !sessionId) {
-    return fail2(400, "validate", "Dedicated Wrapped deployment for a hosted session requires its session ID.");
+    return fail5(400, "validate", "Dedicated Wrapped deployment for a hosted session requires its session ID.");
   }
-  if (typeof cfFetchImpl !== "function") return fail2(500, "validate", "Cloudflare deployment client is unavailable.");
+  if (typeof cfFetchImpl !== "function") return fail5(500, "validate", "Cloudflare deployment client is unavailable.");
   if (body.telegramEnabled === true || toStr8(body.telegramBotToken || body.telegramWebhookSecret)) {
-    return fail2(400, "validate", "Telegram configuration is not part of the default dedicated Wrapped deployment.");
+    return fail5(400, "validate", "Telegram configuration is not part of the default dedicated Wrapped deployment.");
   }
   const suppliedBundleSha256 = toStr8(body.bundleSha256);
   let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
   if (suppliedBundleSha256 && !expectedBundleSha256) {
-    return fail2(400, "bundle_provenance", "bundleSha256 must be a complete SHA-256 hex digest.");
+    return fail5(400, "bundle_provenance", "bundleSha256 must be a complete SHA-256 hex digest.");
   }
   if (!toStr8(body.bundleText) && toStr8(body.bundleManifestUrl)) {
     const manifestDigest = await fetchExpectedWorkerBundleDigest({
@@ -25971,20 +25999,20 @@ async function executeAgentSessionWrappedDeployment({
       artifactKind: "agent-bridge-worker",
       fetchImpl
     });
-    if (!manifestDigest.ok) return fail2(502, "bundle_provenance", manifestDigest.error);
+    if (!manifestDigest.ok) return fail5(502, "bundle_provenance", manifestDigest.error);
     if (expectedBundleSha256 && expectedBundleSha256 !== manifestDigest.digest) {
-      return fail2(409, "bundle_provenance", "Worker release manifest digest conflicts with bundleSha256.");
+      return fail5(409, "bundle_provenance", "Worker release manifest digest conflicts with bundleSha256.");
     }
     expectedBundleSha256 = manifestDigest.digest;
   }
   const bundle = await readBundle({ body, env, fetchImpl });
-  if (!bundle.ok) return fail2(400, "bundle", bundle.error);
+  if (!bundle.ok) return fail5(400, "bundle", bundle.error);
   const [deploymentId, bundleSha256] = await Promise.all([
     sha256Hex(`context-engine:agent-session-wrapped:deployment:v1:${sessionDeploymentIdentity}`),
     sha256Hex(bundle.source)
   ]);
   if (expectedBundleSha256 && bundleSha256 !== expectedBundleSha256) {
-    return fail2(409, "bundle_provenance", "Agent Bridge bundle SHA-256 does not match the verified release manifest.");
+    return fail5(409, "bundle_provenance", "Agent Bridge bundle SHA-256 does not match the verified release manifest.");
   }
   const workerName = workerNameFor({ sessionSlug, deploymentId });
   const accountSubdomain = await cfFetchImpl(
@@ -25994,7 +26022,7 @@ async function executeAgentSessionWrappedDeployment({
   );
   const subdomain = toStr8(accountSubdomain.data?.result?.subdomain);
   if (!accountSubdomain.ok || !subdomain) {
-    return fail2(502, "workers_dev_subdomain", accountSubdomain.error || "Cloudflare workers.dev subdomain is unavailable.");
+    return fail5(502, "workers_dev_subdomain", accountSubdomain.error || "Cloudflare workers.dev subdomain is unavailable.");
   }
   const workerUrl = `https://${workerName}.${subdomain}.workers.dev`;
   const policyJson = JSON.stringify(policyFor({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled, sessionId }));
@@ -26014,7 +26042,7 @@ async function executeAgentSessionWrappedDeployment({
     title: kvTitle,
     cfFetchImpl
   });
-  if (!inventory.ok) return fail2(inventory.status || 502, "kv_inventory", inventory.error);
+  if (!inventory.ok) return fail5(inventory.status || 502, "kv_inventory", inventory.error);
   let kvId = toStr8(inventory.match?.id);
   let kvReused = !!kvId;
   if (!kvId) {
@@ -26025,7 +26053,7 @@ async function executeAgentSessionWrappedDeployment({
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: kvTitle }) }
     );
     kvId = toStr8(created.data?.result?.id);
-    if (!created.ok || !kvId) return fail2(502, "kv_create", created.error || "Cloudflare did not create Wrapped KV.");
+    if (!created.ok || !kvId) return fail5(502, "kv_create", created.error || "Cloudflare did not create Wrapped KV.");
     kvReused = false;
   }
   const bindings = [
@@ -26036,7 +26064,7 @@ async function executeAgentSessionWrappedDeployment({
   const beforeSettings = await cfFetchImpl(apiToken, settingsPath, { method: "GET" });
   const exists2 = beforeSettings.ok;
   if (!exists2 && Number(beforeSettings.status || 0) !== 404) {
-    return fail2(502, "worker_preflight", beforeSettings.error || "Unable to verify Wrapped Worker identity.");
+    return fail5(502, "worker_preflight", beforeSettings.error || "Unable to verify Wrapped Worker identity.");
   }
   if (exists2 && !settingsOwnDeployment({
     settings: beforeSettings,
@@ -26045,7 +26073,7 @@ async function executeAgentSessionWrappedDeployment({
     verifyBundle: false,
     allowAccessChange: true
   })) {
-    return fail2(409, "worker_preflight", "Existing Worker does not match this Wrapped deployment identity.");
+    return fail5(409, "worker_preflight", "Existing Worker does not match this Wrapped deployment identity.");
   }
   const bundleAlreadyUploaded = exists2 && settingsOwnDeployment({
     settings: beforeSettings,
@@ -26062,11 +26090,11 @@ async function executeAgentSessionWrappedDeployment({
       `/accounts/${resolvedAccountId}/workers/scripts/${workerName}`,
       { method: "PUT", body: upload.form }
     );
-    if (!uploaded.ok) return fail2(502, "worker_upload", uploaded.error || "Wrapped Worker upload failed.");
+    if (!uploaded.ok) return fail5(502, "worker_upload", uploaded.error || "Wrapped Worker upload failed.");
   }
   const verifiedSettings = await cfFetchImpl(apiToken, settingsPath, { method: "GET" });
   if (!settingsOwnDeployment({ settings: verifiedSettings, expectedBindings: plainBindings, kvNamespaceId: kvId })) {
-    return fail2(502, "worker_binding_verification", "Wrapped Worker bindings did not verify after upload.");
+    return fail5(502, "worker_binding_verification", "Wrapped Worker bindings did not verify after upload.");
   }
   let existingSecrets = /* @__PURE__ */ new Set();
   if (exists2) {
@@ -26076,7 +26104,7 @@ async function executeAgentSessionWrappedDeployment({
       { method: "GET" }
     );
     if (!listedSecrets.ok || !Array.isArray(listedSecrets.data?.result)) {
-      return fail2(502, "worker_secret_inventory", listedSecrets.error || "Unable to verify existing Wrapped secrets.");
+      return fail5(502, "worker_secret_inventory", listedSecrets.error || "Unable to verify existing Wrapped secrets.");
     }
     existingSecrets = new Set(listedSecrets.data.result.filter((entry) => toStr8(entry?.type) === "secret_text").map((entry) => toStr8(entry?.name)));
   }
@@ -26101,7 +26129,7 @@ async function executeAgentSessionWrappedDeployment({
         const inventory2 = await cfFetchImpl(apiToken, secretsPath, { method: "GET" });
         reconciled = inventory2.ok && Array.isArray(inventory2.data?.result) && inventory2.data.result.some((entry) => toStr8(entry?.type) === "secret_text" && toStr8(entry?.name) === name);
       }
-      if (!reconciled) return fail2(502, `worker_secret_${name}`, written.error || `Failed to write ${name}.`);
+      if (!reconciled) return fail5(502, `worker_secret_${name}`, written.error || `Failed to write ${name}.`);
     }
     generated.push(name);
   }
@@ -26112,7 +26140,7 @@ async function executeAgentSessionWrappedDeployment({
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: true }) }
   );
   if (!activation.ok || activation.data?.result?.enabled !== true) {
-    return fail2(502, "worker_activation", activation.error || "Wrapped Worker workers.dev activation failed.");
+    return fail5(502, "worker_activation", activation.error || "Wrapped Worker workers.dev activation failed.");
   }
   let healthResponse;
   let health;
@@ -26120,11 +26148,11 @@ async function executeAgentSessionWrappedDeployment({
     healthResponse = await fetchImpl(`${workerUrl}/health`, { method: "GET", headers: { Accept: "application/json" } });
     health = await healthResponse.json();
   } catch (error) {
-    return fail2(503, "authority_health_probe", toStr8(error?.message || error) || "Wrapped health request failed.");
+    return fail5(503, "authority_health_probe", toStr8(error?.message || error) || "Wrapped health request failed.");
   }
   const authorityReady = healthResponse.ok && health?.ok === true && health?.worker === "agentBridgeWorker" && health?.protocolVersion === AGENT_SESSION_WRAPPED_PROTOCOL_VERSION && health?.agentSessionWrappedConfigured === true && health?.agentSessionWrappedReady === agentHttpEnabled && safeSlug(health?.dedicatedSession?.sessionSlug) === sessionSlug && normalizeHttpsOrigin(health?.dedicatedSession?.sessionWorkerOrigin) === sessionWorkerOrigin && health?.dedicatedSession?.accessEnabled === agentHttpEnabled;
   if (!authorityReady) {
-    return fail2(503, "authority_health_probe", "Wrapped Worker health, protocol, or pinned authority did not verify.");
+    return fail5(503, "authority_health_probe", "Wrapped Worker health, protocol, or pinned authority did not verify.");
   }
   const revisionDigest = agentHttpEnabled ? bundleSha256 : await sha256Hex(`${bundleSha256}:agent-http-disabled`);
   const verifiedAt = now().toISOString();
@@ -26696,10 +26724,10 @@ var init_sessionLifecycle = __esm({
         ended: normalized.ok && !!normalized.value && Number.isFinite(nowMs) && Date.parse(normalized.value) <= nowMs
       };
     };
-    buildSessionEndedResponse = ({ config, headers, json: json3, now } = {}) => {
+    buildSessionEndedResponse = ({ config, headers, json: json4, now } = {}) => {
       const lifecycle = resolveSessionLifecycle(config, { now });
       if (!lifecycle.ended) return null;
-      return json3?.(
+      return json4?.(
         {
           error: "This session has ended.",
           code: "session_ended",
@@ -27370,6 +27398,7 @@ var init_workerConfigModeValidation = __esm({
 var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_URL, DEFAULT_FAUCET_AMOUNT_ETH, DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH, DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED, DEFAULT_ALLOWED_ORIGINS, DEPLOYMENT_JOURNAL_PREFIX, DEPLOYMENT_JOURNAL_VERSION, DEPLOYMENT_JOURNAL_TTL_SECONDS, DEPLOYMENT_REQUEST_ID_RE, KV_NAMESPACE_TITLE_MAX_LENGTH, SESSION_SLUG_MAX_LENGTH, TRUE_STRINGS, FALSE_STRINGS, STORAGE_RESOURCE_STAGES, DEFAULT_STORAGE_RESOURCES, DEFAULT_PAYLOAD_ACCESS_RESOURCES, DEFAULT_CLOUDFLARE_PRIMITIVES, PAYLOAD_ACCESS_MODES2, PAYLOAD_ACCESS_GATES2, PAYLOAD_ENCRYPTION_MODES2, STORAGE_ENVELOPE_KEK_SECRET_NAME, DEPLOYMENT_ID_BINDING_NAME, DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, BUNDLE_SHA256_BINDING_NAME, SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME, SESSION_COORDINATOR_MIGRATION_TAG, R2_BUCKET_NAME_RE, ALLOWED_WORKER_AUTHORITY_SCOPES, DEFAULT_WORKER_CANONICAL_AUTHORITY, toStr10, isObj4, hasScheme, ensureHttpUrl, normalizeOrigin, normalizeOriginList, normalizeAllowList, validateInboundSlug, readJsonOrText, cfFetch, NEW_KV_NAMESPACE_RETRY_DELAYS_MS, NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS, FINAL_CONFIG_READBACK_RETRY_DELAYS_MS, isNewKvNamespacePropagationFailure, putFreshKvNamespaceValue, lookupCloudflareAccount, randomSecret2, sha256Hex2, canonicalizeJsonValue, stableCanonicalSerialize, buildBundleDiagnostics, formatBundleDiagnostics, normalizeSecretValue, sanitizeSecrets, sanitizeBlockLimits, normalizeWorkerAuthorityScopes, normalizeWorkerAuthorityLoginGate, resolveWorkerCanonicalAuthorityForDeploy, workerAuthorityPoliciesMatch, normalizeRequestedWorkerName, buildFreshDeploymentName, buildPreLimitDeploymentName, normalizeDeploymentRequestId, collectKnownRequestCredentials, redactKnownCredentials, buildSafeDeployJournalResult, resolveDeployJournalBinding, buildDeploymentRequestContext, readDeployJournalRecord, writeDeployJournalRecord, writeDurableDeployJournalRecord, normalizeResourceStage, normalizePayloadAccessMode, normalizePayloadAccessGate, normalizePayloadEncryptionMode, deriveLegacyPayloadAccessMode, cloneAccessConditions, normalizePayloadAccessControl, normalizeStorageProfileInput, normalizeDeployStorageProfile, firstTrimmed, resolveRequestedR2BucketName, truthyR2Marker, hasExplicitR2Request, resolveDeployStorageBindingPlan, normalizeEmbeddedDeployHelperEnabled, buildFailure, buildSuccess, shouldAllowFallbackForCloudflareFailure, isAmbiguousCloudflareMutationFailure, isDefinitiveWorkerUploadRejection, ensureWorkersDevAccountSubdomain, ensureWorkersDevSubdomain, resolveDeploymentAccountId, validateDeployHelperPublicConfigInputs, normalizeAgentBridgeBundleUrl, executeDeployHelperRequestCore, resolveDeploymentBundleProvenance, validateDeployHelperLocalInputs, executeDeployHelperRequest;
 var init_deployHelperCore = __esm({
   "workers/shared/deployHelperCore.mjs"() {
+    init_recoveryKey();
     init_artifactFetch();
     import_rpcDefaults3 = __toESM(require_rpcDefaults(), 1);
     init_storageRefNormalization();
@@ -27636,8 +27665,8 @@ var init_deployHelperCore = __esm({
     };
     sha256Hex2 = async (value) => {
       const input = new TextEncoder().encode(toStr10(value));
-      const digest = await crypto.subtle.digest("SHA-256", input);
-      return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+      const digest2 = await crypto.subtle.digest("SHA-256", input);
+      return Array.from(new Uint8Array(digest2)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
     };
     canonicalizeJsonValue = (value, arrayEntry = false) => {
       if (value === null || typeof value === "string" || typeof value === "boolean") return value;
@@ -27835,7 +27864,7 @@ var init_deployHelperCore = __esm({
         }
         if (!isObj4(value)) return;
         Object.entries(value).forEach(([key, entry]) => {
-          const credentialField = sensitive || /(?:token|secret|password|api[_-]?key|private[_-]?key)/i.test(key);
+          const credentialField = sensitive || /(?:token|secret|password|kek|recovery[_-]?key|api[_-]?key|private[_-]?key)/i.test(key);
           visit(entry, credentialField);
         });
       };
@@ -27876,6 +27905,7 @@ var init_deployHelperCore = __esm({
         "tokenSecretPreserved",
         "envelopeKekSecretSet",
         "envelopeKekSecretPreserved",
+        "recoveryKeyFingerprint",
         "subdomain",
         "subdomainStatus",
         "subdomainEnabled",
@@ -28700,7 +28730,7 @@ var init_deployHelperCore = __esm({
       const sessionSecretsKey = `session:${sessionSlug}:secrets`;
       const secrets = sanitizeSecrets(body?.secrets || {});
       const envelopeKekSecretRequired = true;
-      const candidateEnvelopeKekSecret = randomSecret2();
+      const candidateEnvelopeKekSecret = body?.storageEnvelopeKek || randomSecret2();
       const secretsEnvelope = await buildEncryptedSessionSecretsEnvelope(secrets, {
         env: { [STORAGE_ENVELOPE_KEK_SECRET_NAME]: candidateEnvelopeKekSecret },
         slug: sessionSlug || displaySlug
@@ -29559,6 +29589,10 @@ var init_deployHelperCore = __esm({
         }
         deploymentPayload.agentSessionWrapped = capabilityWrite.body.agentSessionWrapped;
       }
+      if (envelopeKekSecretSet && !envelopeKekSecretPreserved) {
+        deploymentPayload.recoveryKeyFingerprint = await recoveryKeyFingerprint(envelopeKekSecret);
+        if (!body?.storageEnvelopeKek) deploymentPayload.recoveryKey = envelopeKekSecret;
+      }
       return buildSuccess(200, deploymentPayload);
     };
     resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImpl = globalThis.fetch } = {}) => {
@@ -29621,6 +29655,9 @@ var init_deployHelperCore = __esm({
       return { ok: true, body: resolvedBody };
     };
     validateDeployHelperLocalInputs = (body = {}, env = {}) => {
+      if (body?.storageEnvelopeKek !== void 0 && (typeof body.storageEnvelopeKek !== "string" || !/^[0-9a-f]{64}$/i.test(body.storageEnvelopeKek))) {
+        return "storageEnvelopeKek must be exactly 64 hex characters.";
+      }
       const publicConfigError = validateDeployHelperPublicConfigInputs(body);
       if (publicConfigError) return publicConfigError;
       const slugCheck = validateInboundSlug(body?.sessionSlug);
@@ -29969,7 +30006,7 @@ var init_deployHelperCore = __esm({
         context.definitiveUploadRejected === true
       );
       if (authorityCleanupFailure) return authorityCleanupFailure;
-      return safeResult;
+      return withFreshRecoveryKey(safeResult, result);
     };
   }
 });
@@ -30764,7 +30801,7 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, safeKeyPart, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, legacyEncodedMemberKey, legacyCaseFoldedMemberKey, legacyMemberPrefix, legacyEncodedPrincipalPrefix, legacyCaseFoldedPrincipalPrefix, legacyEncodedMemberIndexKey, legacyCaseFoldedMemberIndexKey, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, safeKeyPart, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, legacyEncodedMemberKey, legacyCaseFoldedMemberKey, legacyMemberPrefix, legacyEncodedPrincipalPrefix, legacyCaseFoldedPrincipalPrefix, legacyEncodedMemberIndexKey, legacyCaseFoldedMemberIndexKey, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
     init_workerGroupUrl();
@@ -30879,6 +30916,7 @@ var init_workerGroups = __esm({
       }
       return `${canonicalSlug}:${sessionIdPart}`;
     };
+    workerGroupBackupPrefixes = ({ slug, sessionId }) => ["ce-worker-group", "ce-worker-group-index", "ce-worker-group-member", "ce-worker-group-principal"].map((prefix) => `${prefix}:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:`);
     workerGroupRecordMatchesIdentity = ({ row, slug, sessionId }) => {
       const canonicalSlug = canonicalWorkerGroupSessionSlug(slug);
       const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
@@ -32286,6 +32324,7 @@ ${row.principalKey}`, row);
         return workerGroupCoordinationUnavailable();
       }
     };
+    coordinateWorkerGroupBackup = ({ env, slug, sessionId, operation, snapshot } = {}) => callWorkerGroupCoordinator({ env, slug, sessionId, path: `/worker-groups/backup/${operation}`, payload: { snapshot } });
     checkCoordinatedWorkerGroupReady = async ({ env, slug, sessionId } = {}) => callWorkerGroupCoordinator({
       env,
       slug,
@@ -33450,7 +33489,7 @@ function __addDisposableResource(env, value, async) {
   return value;
 }
 function __disposeResources(env) {
-  function fail2(e) {
+  function fail5(e) {
     env.error = env.hasError ? new _SuppressedError(e, env.error, "An error was suppressed during disposal.") : e;
     env.hasError = true;
   }
@@ -33462,12 +33501,12 @@ function __disposeResources(env) {
         if (r.dispose) {
           var result = r.dispose.call(r.value);
           if (r.async) return s |= 2, Promise.resolve(result).then(next, function(e) {
-            fail2(e);
+            fail5(e);
             return next();
           });
         } else s |= 1;
       } catch (e) {
-        fail2(e);
+        fail5(e);
       }
     }
     if (s === 1) return env.hasError ? Promise.reject(env.error) : Promise.resolve();
@@ -35881,10 +35920,10 @@ var require_rlp_encode = __commonJS({
       }
       return result;
     }
-    function _encode2(object2) {
-      if (Array.isArray(object2)) {
+    function _encode2(object4) {
+      if (Array.isArray(object4)) {
         let payload = [];
-        object2.forEach(function(child) {
+        object4.forEach(function(child) {
           payload = payload.concat(_encode2(child));
         });
         if (payload.length <= 55) {
@@ -35895,7 +35934,7 @@ var require_rlp_encode = __commonJS({
         length2.unshift(247 + length2.length);
         return length2.concat(payload);
       }
-      const data = Array.prototype.slice.call((0, data_js_1.getBytes)(object2, "object"));
+      const data = Array.prototype.slice.call((0, data_js_1.getBytes)(object4, "object"));
       if (data.length === 1 && data[0] <= 127) {
         return data;
       } else if (data.length <= 55) {
@@ -35907,9 +35946,9 @@ var require_rlp_encode = __commonJS({
       return length.concat(data);
     }
     var nibbles2 = "0123456789abcdef";
-    function encodeRlp2(object2) {
+    function encodeRlp2(object4) {
       let result = "0x";
-      for (const v of _encode2(object2)) {
+      for (const v of _encode2(object4)) {
         result += nibbles2[v >> 4];
         result += nibbles2[v & 15];
       }
@@ -36430,15 +36469,15 @@ var require_abstract_coder = __commonJS({
     exports.Result = Result2;
     function checkResultErrors2(result) {
       const errors = [];
-      const checkErrors = function(path, object2) {
-        if (!Array.isArray(object2)) {
+      const checkErrors = function(path, object4) {
+        if (!Array.isArray(object4)) {
           return;
         }
-        for (let key in object2) {
+        for (let key in object4) {
           const childPath = path.slice();
           childPath.push(key);
           try {
-            checkErrors(childPath, object2[key]);
+            checkErrors(childPath, object4[key]);
           } catch (error) {
             errors.push({ path: childPath, error });
           }
@@ -38654,18 +38693,18 @@ var require_utils3 = __commonJS({
       stringOrUint8Array: (val) => typeof val === "string" || val instanceof Uint8Array,
       isSafeInteger: (val) => Number.isSafeInteger(val),
       array: (val) => Array.isArray(val),
-      field: (val, object2) => object2.Fp.isValid(val),
+      field: (val, object4) => object4.Fp.isValid(val),
       hash: (val) => typeof val === "function" && Number.isSafeInteger(val.outputLen)
     };
-    function validateObject2(object2, validators, optValidators = {}) {
+    function validateObject2(object4, validators, optValidators = {}) {
       const checkField = (fieldName, type, isOptional) => {
         const checkVal = validatorFns2[type];
         if (typeof checkVal !== "function")
           throw new Error(`Invalid validator "${type}", expected function`);
-        const val = object2[fieldName];
+        const val = object4[fieldName];
         if (isOptional && val === void 0)
           return;
-        if (!checkVal(val, object2)) {
+        if (!checkVal(val, object4)) {
           throw new Error(`Invalid param ${String(fieldName)}=${val} (${typeof val}), expected ${type}`);
         }
       };
@@ -38673,7 +38712,7 @@ var require_utils3 = __commonJS({
         checkField(fieldName, type, false);
       for (const [fieldName, type] of Object.entries(optValidators))
         checkField(fieldName, type, true);
-      return object2;
+      return object4;
     }
     exports.validateObject = validateObject2;
   }
@@ -40911,9 +40950,9 @@ var require_signing_key = __commonJS({
       /**
        *  Return the signature of the signed %%digest%%.
        */
-      sign(digest) {
-        (0, index_js_1.assertArgument)((0, index_js_1.dataLength)(digest) === 32, "invalid digest length", "digest", digest);
-        const sig = secp256k1_1.secp256k1.sign((0, index_js_1.getBytesCopy)(digest), (0, index_js_1.getBytesCopy)(__privateGet(this, _privateKey2)), {
+      sign(digest2) {
+        (0, index_js_1.assertArgument)((0, index_js_1.dataLength)(digest2) === 32, "invalid digest length", "digest", digest2);
+        const sig = secp256k1_1.secp256k1.sign((0, index_js_1.getBytesCopy)(digest2), (0, index_js_1.getBytesCopy)(__privateGet(this, _privateKey2)), {
           lowS: true
         });
         return signature_js_1.Signature.from({
@@ -41006,12 +41045,12 @@ var require_signing_key = __commonJS({
        *    //_result:
        *
        */
-      static recoverPublicKey(digest, signature) {
-        (0, index_js_1.assertArgument)((0, index_js_1.dataLength)(digest) === 32, "invalid digest length", "digest", digest);
+      static recoverPublicKey(digest2, signature) {
+        (0, index_js_1.assertArgument)((0, index_js_1.dataLength)(digest2) === 32, "invalid digest length", "digest", digest2);
         const sig = signature_js_1.Signature.from(signature);
         let secpSig = secp256k1_1.secp256k1.Signature.fromCompact((0, index_js_1.getBytesCopy)((0, index_js_1.concat)([sig.r, sig.s])));
         secpSig = secpSig.addRecoveryBit(sig.yParity);
-        const pubKey = secpSig.recoverPublicKey((0, index_js_1.getBytesCopy)(digest));
+        const pubKey = secpSig.recoverPublicKey((0, index_js_1.getBytesCopy)(digest2));
         (0, index_js_1.assertArgument)(pubKey != null, "invalid signature for digest", "signature", signature);
         return "0x" + pubKey.toHex(false);
       }
@@ -42669,8 +42708,8 @@ var require_address4 = __commonJS({
       return (0, index_js_1.getAddress)((0, index_js_2.keccak256)("0x" + pubkey.substring(4)).substring(26));
     }
     exports.computeAddress = computeAddress2;
-    function recoverAddress2(digest, signature) {
-      return computeAddress2(index_js_2.SigningKey.recoverPublicKey(digest, signature));
+    function recoverAddress2(digest2, signature) {
+      return computeAddress2(index_js_2.SigningKey.recoverPublicKey(digest2, signature));
     }
     exports.recoverAddress = recoverAddress2;
   }
@@ -44907,8 +44946,8 @@ var require_message = __commonJS({
     }
     exports.hashMessage = hashMessage2;
     function verifyMessage2(message, sig) {
-      const digest = hashMessage2(message);
-      return (0, index_js_3.recoverAddress)(digest, sig);
+      const digest2 = hashMessage2(message);
+      return (0, index_js_3.recoverAddress)(digest2, sig);
     }
     exports.verifyMessage = verifyMessage2;
   }
@@ -45189,8 +45228,8 @@ var require_typed_data = __commonJS({
             uniqueNames.add(field.name);
             const baseType = splitArray2(field.type).base;
             (0, index_js_4.assertArgument)(baseType !== name, `circular type reference to ${JSON.stringify(baseType)}`, "types", _types3);
-            const encoder6 = getBaseEncoder2(baseType);
-            if (encoder6) {
+            const encoder8 = getBaseEncoder2(baseType);
+            if (encoder8) {
               continue;
             }
             (0, index_js_4.assertArgument)(parents.has(baseType), `unknown type ${JSON.stringify(baseType)}`, "types", _types3);
@@ -45233,12 +45272,12 @@ var require_typed_data = __commonJS({
        *  Returnthe encoder for the specific %%type%%.
        */
       getEncoder(type) {
-        let encoder6 = __privateGet(this, _encoderCache2).get(type);
-        if (!encoder6) {
-          encoder6 = __privateMethod(this, _TypedDataEncoder_instances2, getEncoder_fn2).call(this, type);
-          __privateGet(this, _encoderCache2).set(type, encoder6);
+        let encoder8 = __privateGet(this, _encoderCache2).get(type);
+        if (!encoder8) {
+          encoder8 = __privateMethod(this, _TypedDataEncoder_instances2, getEncoder_fn2).call(this, type);
+          __privateGet(this, _encoderCache2).set(type, encoder8);
         }
-        return encoder6;
+        return encoder8;
       }
       /**
        *  Return the full type for %%name%%.
@@ -45277,8 +45316,8 @@ var require_typed_data = __commonJS({
        */
       _visit(type, value, callback) {
         {
-          const encoder6 = getBaseEncoder2(type);
-          if (encoder6) {
+          const encoder8 = getBaseEncoder2(type);
+          if (encoder8) {
             return callback(type, value);
           }
         }
@@ -45374,8 +45413,8 @@ var require_typed_data = __commonJS({
         if (domain.verifyingContract && !(0, index_js_4.isHexString)(domain.verifyingContract, 20)) {
           ensCache[domain.verifyingContract] = "0x";
         }
-        const encoder6 = _TypedDataEncoder2.from(types);
-        encoder6.visit(value, (type, value2) => {
+        const encoder8 = _TypedDataEncoder2.from(types);
+        encoder8.visit(value, (type, value2) => {
           if (type === "address" && !(0, index_js_4.isHexString)(value2, 20)) {
             ensCache[value2] = "0x";
           }
@@ -45387,7 +45426,7 @@ var require_typed_data = __commonJS({
         if (domain.verifyingContract && ensCache[domain.verifyingContract]) {
           domain.verifyingContract = ensCache[domain.verifyingContract];
         }
-        value = encoder6.visit(value, (type, value2) => {
+        value = encoder8.visit(value, (type, value2) => {
           if (type === "address" && ensCache[value2]) {
             return ensCache[value2];
           }
@@ -45411,17 +45450,17 @@ var require_typed_data = __commonJS({
           domainValues[name] = domainChecks2[name](value2);
           domainTypes.push({ name, type: domainFieldTypes2[name] });
         });
-        const encoder6 = _TypedDataEncoder2.from(types);
-        types = encoder6.types;
+        const encoder8 = _TypedDataEncoder2.from(types);
+        types = encoder8.types;
         const typesWithDomain = Object.assign({}, types);
         (0, index_js_4.assertArgument)(typesWithDomain.EIP712Domain == null, "types must not contain EIP712Domain type", "types.EIP712Domain", types);
         typesWithDomain.EIP712Domain = domainTypes;
-        encoder6.encode(value);
+        encoder8.encode(value);
         return {
           types: typesWithDomain,
           domain: domainValues,
-          primaryType: encoder6.primaryType,
-          message: encoder6.visit(value, (type, value2) => {
+          primaryType: encoder8.primaryType,
+          message: encoder8.visit(value, (type, value2) => {
             if (type.match(/^bytes(\d*)/)) {
               return (0, index_js_4.hexlify)((0, index_js_4.getBytes)(value2));
             }
@@ -45448,9 +45487,9 @@ var require_typed_data = __commonJS({
     _TypedDataEncoder_instances2 = new WeakSet();
     getEncoder_fn2 = function(type) {
       {
-        const encoder6 = getBaseEncoder2(type);
-        if (encoder6) {
-          return encoder6;
+        const encoder8 = getBaseEncoder2(type);
+        if (encoder8) {
+          return encoder8;
         }
       }
       const array = splitArray2(type).array;
@@ -51192,7 +51231,7 @@ var require_format = __commonJS({
       });
     }
     exports.arrayOf = arrayOf2;
-    function object2(format, altNames) {
+    function object4(format, altNames) {
       return ((value) => {
         const result = {};
         for (const key in format) {
@@ -51218,7 +51257,7 @@ var require_format = __commonJS({
         return result;
       });
     }
-    exports.object = object2;
+    exports.object = object4;
     function formatBoolean2(value) {
       switch (value) {
         case true:
@@ -51248,7 +51287,7 @@ var require_format = __commonJS({
       return (0, index_js_4.zeroPadValue)(value, 32);
     }
     exports.formatUint256 = formatUint256;
-    var _formatLog2 = object2({
+    var _formatLog2 = object4({
       address: index_js_1.getAddress,
       blockHash: formatHash2,
       blockNumber: index_js_4.getNumber,
@@ -51265,7 +51304,7 @@ var require_format = __commonJS({
       return _formatLog2(value);
     }
     exports.formatLog = formatLog2;
-    var _formatBlock2 = object2({
+    var _formatBlock2 = object4({
       hash: allowNull2(formatHash2),
       parentHash: formatHash2,
       parentBeaconBlockRoot: allowNull2(formatHash2, null),
@@ -51297,7 +51336,7 @@ var require_format = __commonJS({
       return result;
     }
     exports.formatBlock = formatBlock2;
-    var _formatReceiptLog2 = object2({
+    var _formatReceiptLog2 = object4({
       transactionIndex: index_js_4.getNumber,
       blockNumber: index_js_4.getNumber,
       transactionHash: formatHash2,
@@ -51313,7 +51352,7 @@ var require_format = __commonJS({
       return _formatReceiptLog2(value);
     }
     exports.formatReceiptLog = formatReceiptLog2;
-    var _formatTransactionReceipt2 = object2({
+    var _formatTransactionReceipt2 = object4({
       to: allowNull2(index_js_1.getAddress, null),
       from: allowNull2(index_js_1.getAddress, null),
       contractAddress: allowNull2(index_js_1.getAddress, null),
@@ -51346,7 +51385,7 @@ var require_format = __commonJS({
       if (value.to && (0, index_js_4.getBigInt)(value.to) === BN_012) {
         value.to = "0x0000000000000000000000000000000000000000";
       }
-      const result = object2({
+      const result = object4({
         hash: formatHash2,
         // Some nodes do not return this, usually test nodes (like Ganache)
         index: allowNull2(index_js_4.getNumber, void 0),
@@ -58902,13 +58941,13 @@ var require_utils4 = __commonJS({
       return (0, index_js_1.getBytesCopy)(password);
     }
     exports.getPassword = getPassword2;
-    function spelunk2(object2, _path) {
+    function spelunk2(object4, _path) {
       const match = _path.match(/^([a-z0-9$_.-]*)(:([a-z]+))?(!)?$/i);
       (0, index_js_1.assertArgument)(match != null, "invalid path", "path", _path);
       const path = match[1];
       const type = match[3];
       const reqd = match[4] === "!";
-      let cur = object2;
+      let cur = object4;
       for (const comp of path.toLowerCase().split(".")) {
         if (Array.isArray(cur)) {
           if (!comp.match(/^[0-9]+$/)) {
@@ -58978,9 +59017,9 @@ var require_json_keystore = __commonJS({
     var utils_js_1 = require_utils4();
     var _version_js_1 = require_version();
     var defaultPath3 = "m/44'/60'/0'/0/0";
-    function isKeystoreJson2(json3) {
+    function isKeystoreJson2(json4) {
       try {
-        const data = JSON.parse(json3);
+        const data = JSON.parse(json4);
         const version2 = data.version != null ? parseInt(data.version) : 0;
         if (version2 === 3) {
           return true;
@@ -59056,8 +59095,8 @@ var require_json_keystore = __commonJS({
       }
       (0, index_js_4.assertArgument)(false, "unsupported key-derivation function", "kdf", kdf);
     }
-    function decryptKeystoreJsonSync2(json3, _password) {
-      const data = JSON.parse(json3);
+    function decryptKeystoreJsonSync2(json4, _password) {
+      const data = JSON.parse(json4);
       const password = (0, utils_js_1.getPassword)(_password);
       const params = getDecryptKdfParams2(data);
       if (params.name === "pbkdf2") {
@@ -59078,8 +59117,8 @@ var require_json_keystore = __commonJS({
         }, duration);
       });
     }
-    async function decryptKeystoreJson2(json3, _password, progress) {
-      const data = JSON.parse(json3);
+    async function decryptKeystoreJson2(json4, _password, progress) {
+      const data = JSON.parse(json4);
       const password = (0, utils_js_1.getPassword)(_password);
       const params = getDecryptKdfParams2(data);
       if (params.name === "pbkdf2") {
@@ -59673,9 +59712,9 @@ var require_json_crowdsale = __commonJS({
     var index_js_3 = require_hash();
     var index_js_4 = require_utils();
     var utils_js_1 = require_utils4();
-    function isCrowdsaleJson2(json3) {
+    function isCrowdsaleJson2(json4) {
       try {
-        const data = JSON.parse(json3);
+        const data = JSON.parse(json4);
         if (data.encseed) {
           return true;
         }
@@ -59684,12 +59723,12 @@ var require_json_crowdsale = __commonJS({
       return false;
     }
     exports.isCrowdsaleJson = isCrowdsaleJson2;
-    function decryptCrowdsaleJson2(json3, _password) {
-      const data = JSON.parse(json3);
+    function decryptCrowdsaleJson2(json4, _password) {
+      const data = JSON.parse(json4);
       const password = (0, utils_js_1.getPassword)(_password);
       const address2 = (0, index_js_1.getAddress)((0, utils_js_1.spelunk)(data, "ethaddr:string!"));
       const encseed = (0, utils_js_1.looseArrayify)((0, utils_js_1.spelunk)(data, "encseed:string!"));
-      (0, index_js_4.assertArgument)(encseed && encseed.length % 16 === 0, "invalid encseed", "json", json3);
+      (0, index_js_4.assertArgument)(encseed && encseed.length % 16 === 0, "invalid encseed", "json", json4);
       const key = (0, index_js_4.getBytes)((0, index_js_2.pbkdf2)(password, password, 2e3, 32, "sha256")).slice(0, 16);
       const iv = encseed.slice(0, 16);
       const encryptedSeed = encseed.slice(16);
@@ -59773,17 +59812,17 @@ var require_wallet = __commonJS({
        *  If %%progress%% is provided, it is called periodically during
        *  decryption so that any UI can be updated.
        */
-      static async fromEncryptedJson(json3, password, progress) {
+      static async fromEncryptedJson(json4, password, progress) {
         var _a2;
         let account = null;
-        if ((0, json_keystore_js_1.isKeystoreJson)(json3)) {
-          account = await (0, json_keystore_js_1.decryptKeystoreJson)(json3, password, progress);
-        } else if ((0, json_crowdsale_js_1.isCrowdsaleJson)(json3)) {
+        if ((0, json_keystore_js_1.isKeystoreJson)(json4)) {
+          account = await (0, json_keystore_js_1.decryptKeystoreJson)(json4, password, progress);
+        } else if ((0, json_crowdsale_js_1.isCrowdsaleJson)(json4)) {
           if (progress) {
             progress(0);
             await stall5(0);
           }
-          account = (0, json_crowdsale_js_1.decryptCrowdsaleJson)(json3, password);
+          account = (0, json_crowdsale_js_1.decryptCrowdsaleJson)(json4, password);
           if (progress) {
             progress(1);
             await stall5(0);
@@ -59798,13 +59837,13 @@ var require_wallet = __commonJS({
        *  will lock up and freeze the UI during decryption, which may take
        *  some time.
        */
-      static fromEncryptedJsonSync(json3, password) {
+      static fromEncryptedJsonSync(json4, password) {
         var _a2;
         let account = null;
-        if ((0, json_keystore_js_1.isKeystoreJson)(json3)) {
-          account = (0, json_keystore_js_1.decryptKeystoreJsonSync)(json3, password);
-        } else if ((0, json_crowdsale_js_1.isCrowdsaleJson)(json3)) {
-          account = (0, json_crowdsale_js_1.decryptCrowdsaleJson)(json3, password);
+        if ((0, json_keystore_js_1.isKeystoreJson)(json4)) {
+          account = (0, json_keystore_js_1.decryptKeystoreJsonSync)(json4, password);
+        } else if ((0, json_crowdsale_js_1.isCrowdsaleJson)(json4)) {
+          account = (0, json_crowdsale_js_1.decryptCrowdsaleJson)(json4, password);
         } else {
           (0, index_js_2.assertArgument)(false, "invalid JSON wallet", "json", "[ REDACTED ]");
         }
@@ -60675,843 +60714,192 @@ var require_lib2 = __commonJS({
   }
 });
 
-// workers/sessionCorsWorker/sponsoredBootstrapGrantStore.js
-var DEFAULT_TOKEN_BYTE_LENGTH, toTrimmedString8, SPONSORED_GRANT_TYPES, buildSponsoredGrantKvKey, buildSponsoredGrantToken, computeSponsoredGrantExpirationTtl, readSponsoredGrantRecord, writeSponsoredGrantRecord, deleteSponsoredGrantRecord, normalizeSensitiveValues, redactSponsoredSensitiveText, buildSafeSponsoredReceiptBody, buildSponsoredGrantContinuationRecord, writeSponsoredGrantReceipt;
-var init_sponsoredBootstrapGrantStore = __esm({
-  "workers/sessionCorsWorker/sponsoredBootstrapGrantStore.js"() {
-    init_responseKvHelpers();
-    DEFAULT_TOKEN_BYTE_LENGTH = 24;
-    toTrimmedString8 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-    SPONSORED_GRANT_TYPES = Object.freeze({
-      deploy: "deploy-worker",
-      faucet: "faucet-tx"
-    });
-    buildSponsoredGrantKvKey = (token = "") => `sponsoredGrant:${toTrimmedString8(token)}`;
-    buildSponsoredGrantToken = ({
-      byteLength: byteLength2 = DEFAULT_TOKEN_BYTE_LENGTH,
-      cryptoImpl = globalThis.crypto
-    } = {}) => {
-      if (!cryptoImpl?.getRandomValues) {
-        throw new Error("Secure random generator unavailable.");
-      }
-      const bytes3 = new Uint8Array(Number(byteLength2 || 0) || DEFAULT_TOKEN_BYTE_LENGTH);
-      cryptoImpl.getRandomValues(bytes3);
-      return Array.from(bytes3).map((value) => value.toString(16).padStart(2, "0")).join("");
-    };
-    computeSponsoredGrantExpirationTtl = (expiresAt = "", nowMs = Date.now()) => {
-      const normalized = toTrimmedString8(expiresAt);
-      if (!normalized) return null;
-      const expirationMs = Date.parse(normalized);
-      if (!Number.isFinite(expirationMs)) {
-        throw new Error("Sponsored bootstrap grant expiry must be a valid date/time.");
-      }
-      const ttlSeconds = Math.ceil((expirationMs - Number(nowMs || 0)) / 1e3);
-      if (ttlSeconds <= 0) {
-        throw new Error("Sponsored bootstrap grant expiry must be in the future.");
-      }
-      return ttlSeconds;
-    };
-    readSponsoredGrantRecord = async (env, token, deps = {}) => {
-      const getKvJsonFn = typeof deps.getKvJson === "function" ? deps.getKvJson : getKvJson;
-      return getKvJsonFn(env, buildSponsoredGrantKvKey(token));
-    };
-    writeSponsoredGrantRecord = async (env, token, record, ttlSeconds = null, deps = {}) => {
-      const putKvJsonFn = typeof deps.putKvJson === "function" ? deps.putKvJson : putKvJson;
-      return putKvJsonFn(env, buildSponsoredGrantKvKey(token), record, ttlSeconds || void 0);
-    };
-    deleteSponsoredGrantRecord = async (env, token) => env?.GROUP_KV?.delete?.(buildSponsoredGrantKvKey(token));
-    normalizeSensitiveValues = (values = []) => Array.from(new Set(
-      (Array.isArray(values) ? values : []).map((value) => toTrimmedString8(value)).filter((value) => value.length >= 4)
-    )).sort((left, right) => right.length - left.length);
-    redactSponsoredSensitiveText = (value, sensitiveValues = []) => {
-      let redacted = toTrimmedString8(value);
-      normalizeSensitiveValues(sensitiveValues).forEach((secret) => {
-        redacted = redacted.split(secret).join("[REDACTED]");
-      });
-      return redacted;
-    };
-    buildSafeSponsoredReceiptBody = (incoming = {}, sensitiveValues = []) => {
-      const body = {};
-      [
-        "ok",
-        "error",
-        "workerName",
-        "workerUrl",
-        "deploymentKind",
-        "accountId",
-        "sessionSlug",
-        "sessionWorkerOrigin",
-        "telegramConfigured",
-        "resolvedSlug",
-        "kvNamespaceId",
-        "deploymentId",
-        "sessionConfigKey",
-        "sessionSecretsKey",
-        "sessionKvPrefix",
-        "partial",
-        "writesSessionConfig",
-        "writesSessionSecrets",
-        "tokenSecretSet",
-        "tokenSecretPreserved",
-        "envelopeKekSecretSet",
-        "envelopeKekSecretPreserved",
-        "subdomain",
-        "subdomainStatus",
-        "subdomainEnabled",
-        "subdomainError",
-        "scriptSubdomainEnabled",
-        "scriptSubdomainError",
-        "configVerified",
-        "deploymentRequestPending",
-        "deploymentRequestTerminal",
-        "deploymentRequestConflict",
-        "sponsoredGrantPayloadConflict",
-        "txHash",
-        "status",
-        "to",
-        "amountEth",
-        "chainId"
-      ].forEach((key) => {
-        const rawValue = incoming?.[key];
-        const value = key === "error" && typeof rawValue === "string" ? redactSponsoredSensitiveText(rawValue, sensitiveValues) : rawValue;
-        if (typeof value === "string" || typeof value === "boolean" || Number.isFinite(value)) {
-          body[key] = value;
-        }
-      });
-      if (incoming?.orphanResources && typeof incoming.orphanResources === "object") {
-        const orphanResources = {};
-        ["kvNamespaceId", "kvCleanupStatus", "workerName", "workerCleanupStatus"].forEach((key) => {
-          const value = incoming.orphanResources[key];
-          if (typeof value === "string") {
-            orphanResources[key] = redactSponsoredSensitiveText(value, sensitiveValues);
-          }
+// workers/sessionCorsWorker/recoveryKeyExport.js
+var exportCoordinatorRecoveryKey;
+var init_recoveryKeyExport = __esm({
+  "workers/sessionCorsWorker/recoveryKeyExport.js"() {
+    init_recoveryKey();
+    exportCoordinatorRecoveryKey = async (coordinator, payload) => {
+      const headers = { "Cache-Control": "no-store" };
+      const reply = (body, status) => Response.json(body, { status, headers });
+      try {
+        const authority = await coordinator.assertSessionAuthority(payload);
+        if (!authority) return reply({ error: "Session config is not initialized." }, 409);
+        if (payload?.confirm !== "export-recovery-key") return reply({ error: "Confirm export-recovery-key in the signed payload." }, 400);
+        const recoveryKey = String(coordinator.env.CE_STORAGE_ENVELOPE_KEK || "").trim();
+        if (!recoveryKey) return reply({ error: "Recovery key is not configured." }, 503);
+        const fingerprint = await recoveryKeyFingerprint(recoveryKey);
+        const now = Number(coordinator.now()) || Date.now();
+        const day = Math.floor(now / 864e5);
+        const count = await coordinator.state.storage.transaction(async (transaction) => {
+          const previous = await transaction.get("recovery-key-export-counter");
+          const used = previous?.day === day ? previous.count : 0;
+          if (used >= 3) return 0;
+          await transaction.put("recovery-key-export-counter", { day, count: used + 1 });
+          return used + 1;
         });
-        if (Object.keys(orphanResources).length) body.orphanResources = orphanResources;
-      }
-      if (incoming?.bundleDiagnostics && typeof incoming.bundleDiagnostics === "object") {
-        const bundleDiagnostics = {};
-        [
-          "source",
-          "length",
-          "sha256",
-          "hasAnyExport",
-          "hasExportDefault",
-          "hasNamedDefaultExport",
-          "hasStringExportWrapper",
-          "hasFetchHandler",
-          "hasServiceWorkerFetch"
-        ].forEach((key) => {
-          const value = incoming.bundleDiagnostics[key];
-          if (typeof value === "string") {
-            bundleDiagnostics[key] = redactSponsoredSensitiveText(value, sensitiveValues);
-          } else if (typeof value === "boolean" || Number.isFinite(value)) {
-            bundleDiagnostics[key] = value;
-          }
-        });
-        if (Object.keys(bundleDiagnostics).length) body.bundleDiagnostics = bundleDiagnostics;
-      }
-      for (const [field, keys] of Object.entries({
-        resources: ["kvNamespaceId", "kvReused"],
-        health: ["ok", "protocolVersion", "authorityPinned", "accessEnabled"],
-        agentSessionWrapped: ["version", "enabled", "origin", "protocolVersion", "revision", "verifiedAt"]
-      })) {
-        if (!incoming?.[field] || typeof incoming[field] !== "object" || Array.isArray(incoming[field])) continue;
-        const safe = {};
-        for (const key of keys) {
-          const value = incoming[field][key];
-          if (typeof value === "string") safe[key] = redactSponsoredSensitiveText(value, sensitiveValues);
-          else if (typeof value === "boolean" || Number.isFinite(value)) safe[key] = value;
+        if (!count) return reply({ error: "Recovery key export is limited to three times per UTC day.", reason: "recovery_key_export_limit" }, 429);
+        const audit = coordinator.env.CE_STORAGE_AUDIT_KV;
+        if (audit) {
+          await audit.put(`ce-recovery-key-audit:${authority.slug}:${day}:${count}`, JSON.stringify({
+            action: "export-recovery-key",
+            sessionSlug: authority.slug,
+            adminAddress: payload.expectedAuthority.actor,
+            timestamp: new Date(now).toISOString()
+          }));
         }
-        if (Object.keys(safe).length) body[field] = safe;
+        return reply({ ok: true, recoveryKey, fingerprint }, 200);
+      } catch (error) {
+        return reply({ error: error.status === 409 ? error.message : "Recovery key export is unavailable; retry." }, error.status || 503);
       }
-      return body;
-    };
-    buildSponsoredGrantContinuationRecord = ({
-      grantRecord,
-      requestDigest,
-      state
-    } = {}) => {
-      const expiresAt = toTrimmedString8(grantRecord?.expiresAt);
-      const sourceAllowOrigins = Array.isArray(grantRecord?.sourceConfig?.allowOrigins) ? grantRecord.sourceConfig.allowOrigins.map((value) => toTrimmedString8(value)).filter(Boolean) : [];
-      return {
-        type: toTrimmedString8(grantRecord?.type),
-        sourceSessionSlug: toTrimmedString8(grantRecord?.sourceSessionSlug),
-        sourceConfig: sourceAllowOrigins.length ? { allowOrigins: sourceAllowOrigins } : {},
-        ...expiresAt ? { expiresAt } : {},
-        state,
-        requestDigest: toTrimmedString8(requestDigest)
-      };
-    };
-    writeSponsoredGrantReceipt = async ({
-      env,
-      token,
-      grantRecord,
-      requestDigest,
-      response: response3,
-      sensitiveValues = [],
-      nowMs = Date.now()
-    } = {}) => {
-      const expiresAt = toTrimmedString8(grantRecord?.expiresAt);
-      const ttlSeconds = expiresAt ? computeSponsoredGrantExpirationTtl(expiresAt, nowMs) : null;
-      const safeRecord = {
-        ...buildSponsoredGrantContinuationRecord({
-          grantRecord,
-          requestDigest,
-          state: "redeemed"
-        }),
-        receipt: {
-          status: Number(response3?.status || 0) || 200,
-          body: buildSafeSponsoredReceiptBody(response3?.body, sensitiveValues)
-        }
-      };
-      await writeSponsoredGrantRecord(env, token, safeRecord, ttlSeconds);
-      return safeRecord.receipt;
     };
   }
 });
 
-// workers/sessionCorsWorker/resultsAnalysisArtifactValidation.js
-var ARTIFACT_KIND, ARTIFACT_VERSION, SECTION_ORDER, SEVERITY_LEVELS, WALLET_TEXT_RE, WALLET_ID_RE, LIMITS, isObj9, toArray, hasOwn5, toPrimitiveStr, compactWhitespace, cleanText, cleanId, slugId, unique, sectionRecord, normalizeSections, unavailable, defaultSection, buildAllowedSourceIds, normalizeParticipants, normalizeIdRefs, normalizeSourceFields, normalizeSummaryRecord, normalizeArgumentMap, hasCycle, normalizeAtlas, normalizeBreakdown, normalizeSeverity, DEFAULT_RISK_AXES, normalizeRiskAxis, normalizeRiskAxes, normalizeRiskAssessments, normalizeDynamicRiskMatrix, normalizeLegacyRiskMatrix, normalizeRiskMatrix, normalizeGeneratedAt, normalizeModel, normalizeSection, normalizeResultsAnalysisArtifact, applyResultsAnalysisExposurePolicy;
-var init_resultsAnalysisArtifactValidation = __esm({
-  "workers/sessionCorsWorker/resultsAnalysisArtifactValidation.js"() {
-    ARTIFACT_KIND = "ce_session_results_analysis_artifact";
-    ARTIFACT_VERSION = 1;
-    SECTION_ORDER = ["argumentMap", "atlas", "breakdown", "riskMatrix"];
-    SEVERITY_LEVELS = /* @__PURE__ */ new Set(["low", "medium", "high"]);
-    WALLET_TEXT_RE = /\b0x[a-fA-F0-9]{40}\b/g;
-    WALLET_ID_RE = /^0x[a-fA-F0-9]{40}$/;
-    LIMITS = Object.freeze({
-      debates: 24,
-      claimsPerDebate: 16,
-      atlasNodes: 80,
-      atlasEdges: 120,
-      breakdownDimensions: 24,
-      breakdownDimensionValues: 24,
-      breakdownGroups: 40,
-      breakdownThemes: 24,
-      riskCategories: 24,
-      riskAssessments: 80,
-      riskAxisLevels: 6,
-      riskComments: 80,
-      riskScenarioLinks: 0,
-      sourceRefs: 16,
-      idChars: 128,
-      labelChars: 180,
-      summaryChars: 900,
-      modelChars: 180
-    });
-    isObj9 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    toArray = (value) => Array.isArray(value) ? value : [];
-    hasOwn5 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-    toPrimitiveStr = (value) => {
-      if (value == null) return "";
-      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
-        return String(value);
-      }
-      return "";
+// workers/sessionCorsWorker/sessionBackupCoordinator.js
+var json2, fail, object2, parse, groupPrefixes, scopedGroupRecords, exportCoordinatorBackup, exportWorkerGroupBackup, importWorkerGroupBackup;
+var init_sessionBackupCoordinator = __esm({
+  "workers/sessionCorsWorker/sessionBackupCoordinator.js"() {
+    init_workerGroups();
+    init_sessionConfigMutation();
+    init_sessionSlugResolution();
+    init_sessionSecretsEnvelope();
+    json2 = (body, status = 200) => Response.json(body, { status });
+    fail = (message, status = 503) => {
+      throw Object.assign(new Error(message), { status });
     };
-    compactWhitespace = (value) => toPrimitiveStr(value).replace(/\s+/g, " ").trim();
-    cleanText = (value, maxLength = LIMITS.summaryChars) => {
-      const text = compactWhitespace(value).replace(WALLET_TEXT_RE, "[redacted-address]");
-      if (!text) return "";
-      return text.slice(0, Math.max(0, maxLength));
-    };
-    cleanId = (value, fallback = "") => {
-      const text = compactWhitespace(value).slice(0, LIMITS.idChars);
-      if (!text || WALLET_ID_RE.test(text)) return fallback;
-      return [...text].filter((char) => {
-        const code = char.codePointAt(0);
-        return code > 31 && code !== 127;
-      }).join("") || fallback;
-    };
-    slugId = (value, fallback) => {
-      const base = cleanId(value).toLowerCase().replace(/[^a-z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, LIMITS.idChars);
-      return base || fallback;
-    };
-    unique = (values) => [...new Set(values.filter(Boolean))];
-    sectionRecord = (value) => {
-      const raw = isObj9(value?.sections) ? value.sections : value;
-      return isObj9(raw) ? raw : {};
-    };
-    normalizeSections = (sections) => {
-      const requested = /* @__PURE__ */ new Set();
-      toArray(sections).forEach((section) => {
-        const key = compactWhitespace(section);
-        if (key === "circles") {
-          requested.add("argumentMap");
-          requested.add("atlas");
-        } else if (SECTION_ORDER.includes(key)) {
-          requested.add(key);
+    object2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    parse = (raw) => typeof raw === "string" ? JSON.parse(raw) : raw;
+    groupPrefixes = (slug) => ["ce-worker-group", "ce-worker-group-index", "ce-worker-group-member", "ce-worker-group-principal"].map((kind) => `${kind}:${slug}:`);
+    scopedGroupRecords = (records, slug, sessionId) => {
+      const canonical = workerGroupBackupPrefixes({ slug, sessionId });
+      const allowed = new Set(records.filter(([key]) => canonical.some((prefix) => key.startsWith(prefix))).map(([key]) => key));
+      const indexValues = /* @__PURE__ */ new Map();
+      for (const [key, raw] of records) {
+        if (allowed.has(key)) continue;
+        let row;
+        try {
+          row = JSON.parse(raw);
+        } catch {
+          continue;
         }
-      });
-      return SECTION_ORDER.filter((section) => requested.has(section));
+        if (row?.sessionSlug !== slug || resolveCanonicalWorkerSessionIdHex({ sessionId: row.sessionId }) !== sessionId || !/^[a-z0-9][a-z0-9._-]*$/.test(row.groupId || "")) continue;
+        if (key === `ce-worker-group:${slug}:${row.groupId}`) {
+          allowed.add(key);
+          indexValues.set(`ce-worker-group-index:${slug}:${row.groupId}`, row.groupId);
+        } else if (typeof row.principalKey === "string") {
+          const encoded = btoa(row.principalKey.trim()).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+          const folded = row.principalKey.trim().toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "id";
+          if (![encoded, folded].some((part) => key === `ce-worker-group-member:${slug}:${row.groupId}:${part}`)) continue;
+          allowed.add(key);
+          for (const part of [encoded, folded]) indexValues.set(`ce-worker-group-principal:${slug}:${part}:${row.groupId}`, row.groupId);
+        }
+      }
+      return records.filter(([key, value]) => allowed.has(key) || indexValues.get(key) === value).sort(([a], [b2]) => a < b2 ? -1 : 1);
     };
-    unavailable = (reason, extra = {}) => ({ available: false, ...extra, reason });
-    defaultSection = (key, reason) => {
-      if (key === "argumentMap") return unavailable(reason, { debates: [] });
-      if (key === "atlas") return unavailable(reason, { nodes: [], edges: [] });
-      if (key === "breakdown") return unavailable(reason, { dimensions: [], groups: [], summary: {} });
-      return unavailable(reason, { categories: [], comments: [], heatmap: {}, scenarioLinks: [] });
+    exportCoordinatorBackup = async (coordinator, payload) => {
+      const authority = await coordinator.assertSessionAuthority(payload);
+      if (!authority) fail("Session config is not initialized.", 409);
+      await coordinator.repairPendingSessionConfigProjection();
+      const current = await coordinator.state.storage.get("session-config-authority");
+      const signer = await coordinator.state.storage.get("session-lit-authorization-signer-v1");
+      const rawSecrets = await coordinator.env.GROUP_KV.get(`session:${normalizeWorkerSessionSlug(current.slug)}:secrets`);
+      const secrets = rawSecrets == null ? null : parse(rawSecrets);
+      if (secrets && !isEncryptedSessionSecretsEnvelope(secrets)) {
+        fail("Legacy plaintext secrets must be saved through the encrypted secret workflow before backup.", 409);
+      }
+      if (signer && !isEncryptedSessionSecretsEnvelope(signer.envelope)) fail("Invalid wrapped authorization signer.", 409);
+      return json2({ ok: true, coordinator: {
+        configAuthority: current,
+        wrappedSessionKeys: {
+          activeSessionKey: current.activeSessionKey || null,
+          litAuthorizationSigner: signer || null
+        },
+        secrets
+      } });
     };
-    buildAllowedSourceIds = (source = {}) => {
-      const aiSnapshotPresent = hasOwn5(source, "aiSnapshot");
-      const aiQuestions = [
-        ...toArray(source?.aiSnapshot?.questions),
-        ...toArray(source?.aiSnapshot?.responses)
-      ];
-      const snapshotQuestions = [
-        ...toArray(source?.snapshot?.questions),
-        ...toArray(source?.snapshot?.responses)
-      ];
-      const aiParticipants = toArray(source?.aiSnapshot?.responses);
-      const snapshotParticipants = [
-        ...toArray(source?.participants),
-        ...toArray(source?.snapshot?.responses)
-      ];
-      const questions = aiSnapshotPresent ? aiQuestions : snapshotQuestions;
-      const participants = aiSnapshotPresent ? aiParticipants : snapshotParticipants;
-      const responses = aiSnapshotPresent ? aiParticipants : toArray(source?.snapshot?.responses);
-      const questionsByParticipant = /* @__PURE__ */ new Map();
-      responses.forEach((response3) => {
-        const participantId = cleanId(response3?.syntheticId || response3?.participantId);
-        const questionId = cleanId(response3?.questionId || response3?.questionID);
-        if (!participantId || !questionId) return;
-        if (!questionsByParticipant.has(participantId)) questionsByParticipant.set(participantId, /* @__PURE__ */ new Set());
-        questionsByParticipant.get(participantId).add(questionId);
-      });
-      return {
-        questionsByParticipant,
-        questions: new Set(questions.map((entry) => cleanId(entry?.id || entry?.questionId || entry?.questionID)).filter(Boolean)),
-        participants: new Set(participants.map((entry) => cleanId(entry?.syntheticId || entry?.participantId)).filter(Boolean))
-      };
-    };
-    normalizeParticipants = (participants) => toArray(participants).map((entry) => {
-      const syntheticId = cleanId(entry?.syntheticId);
-      return syntheticId ? { syntheticId } : null;
-    }).filter(Boolean);
-    normalizeIdRefs = ({ value, allowed, label, errors, limit = LIMITS.sourceRefs }) => {
-      const refs = unique(toArray(value).map((entry) => cleanId(entry)).filter(Boolean)).slice(0, limit);
-      refs.forEach((ref) => {
-        if (!allowed.has(ref)) errors.push(`unknown ${label}: ${ref}`);
-      });
-      return refs;
-    };
-    normalizeSourceFields = (record, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
-      const participantIds = normalizeIdRefs({ value: record.participantIds, allowed: allowed.participants, label: "participantId", errors, limit: participantLimit });
-      const questionIds = normalizeIdRefs({ value: record.questionIds, allowed: allowed.questions, label: "questionId", errors });
-      if (participantIds.length && questionIds.length) {
-        for (const participantId of participantIds) {
-          if (!questionIds.some((questionId) => allowed.questionsByParticipant.get(participantId)?.has(questionId))) {
-            errors.push(`unsupported source attribution: participantId ${participantId} has no response to the cited questions`);
+    exportWorkerGroupBackup = async (coordinator, payload) => {
+      const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+      if (!slug || !sessionId) fail("Invalid backup group identity.", 400);
+      const durable = [];
+      let after = "";
+      for (; ; ) {
+        const page = await coordinator.state.storage.list({ prefix: "worker-group-capacity-", startAfter: after, limit: 500 });
+        if (!(page instanceof Map)) fail("Group authority could not be read.");
+        const entries = [...page].filter(([key]) => key > after).sort(([a], [b2]) => a < b2 ? -1 : 1);
+        for (const [key, value] of entries) {
+          if (!object2(value) || value.pending || ["creating", "updating", "deleting", "reserved", "removing"].includes(value.phase || value.state)) {
+            fail("A group mutation is pending. Retry the backup after it settles.", 409);
           }
+          if (key === "worker-group-capacity-meta-v3" && (value.slug !== slug || value.sessionId !== sessionId)) fail("Group backup identity conflict.", 409);
+          durable.push([key, value]);
         }
-        for (const questionId of questionIds) {
-          if (!participantIds.some((participantId) => allowed.questionsByParticipant.get(participantId)?.has(questionId))) {
-            errors.push(`unsupported source attribution: questionId ${questionId} has no response from the cited participants`);
+        if (entries.length < 500) break;
+        after = entries.at(-1)[0];
+      }
+      const kv = resolveWorkerGroupsKv(coordinator.env);
+      if (!kv?.list || !kv?.get) fail("Worker group storage is unavailable.");
+      const records = [];
+      for (const prefix of groupPrefixes(slug)) {
+        let cursor = "";
+        const visited = /* @__PURE__ */ new Set();
+        do {
+          if (visited.has(cursor)) fail("Group backup list cursor did not advance.");
+          visited.add(cursor);
+          const page = await kv.list({ prefix, cursor, limit: 100 });
+          for (const { name } of page.keys || []) {
+            if (!name.startsWith(prefix)) fail("Invalid group backup key.");
+            const value = await kv.get(name);
+            if (value == null) fail("Group changed during backup. Retry the export.");
+            records.push([name, value]);
           }
-        }
+          cursor = page.list_complete === false ? String(page.cursor || "") : "";
+          if (page.list_complete === false && !cursor) fail("Group backup list cursor is unavailable.");
+        } while (cursor);
       }
-      return {
-        ...participantIds.length ? { participantIds } : {},
-        ...questionIds.length ? { questionIds } : {}
-      };
+      return json2({ ok: true, snapshot: { durable, records: scopedGroupRecords(records, slug, sessionId) } });
     };
-    normalizeSummaryRecord = (value) => {
-      const record = isObj9(value) ? value : {};
-      const overview = cleanText(record.overview || record.summary || record.interpretation || record.narrative);
-      const themes = toArray(record.themes || record.keyFindings || record.findings).slice(0, LIMITS.breakdownThemes).map((entry, index) => {
-        const item = isObj9(entry) ? entry : { summary: entry };
-        const label = cleanText(item.label || item.name || item.title || `Theme ${index + 1}`, LIMITS.labelChars);
-        const summary = cleanText(item.summary || item.description || item.finding || item.body);
-        if (!label && !summary) return null;
-        return {
-          id: slugId(item.id || label || summary, `theme_${index + 1}`),
-          label: label || `Theme ${index + 1}`,
-          ...summary ? { summary } : {}
-        };
-      }).filter(Boolean);
-      return {
-        ...overview ? { overview } : {},
-        ...themes.length ? { themes } : {}
-      };
-    };
-    normalizeArgumentMap = (rawSection, allowed) => {
-      if (!isObj9(rawSection)) return defaultSection("argumentMap", "AI generation did not return argument-map data.");
-      const errors = [];
-      const debates = toArray(rawSection.debates).slice(0, LIMITS.debates).map((debate, debateIndex) => {
-        if (!isObj9(debate)) return null;
-        const title = cleanText(debate.title || debate.label || debate.question || debate.summary, LIMITS.labelChars);
-        if (!title) return null;
-        const claims = toArray(debate.claims).slice(0, LIMITS.claimsPerDebate).map((claim, claimIndex) => {
-          if (!isObj9(claim)) return null;
-          const label = cleanText(claim.label || claim.claim || claim.title || claim.summary, LIMITS.labelChars);
-          if (!label) return null;
-          const summary2 = cleanText(claim.summary || claim.description || claim.evidence);
-          const stance = cleanText(claim.stance, 24).toLowerCase();
-          const sourceFields = normalizeSourceFields(claim, allowed, errors);
-          if (!sourceFields.participantIds?.length || !sourceFields.questionIds?.length) {
-            errors.push("claim requires participantIds and questionIds");
-          }
-          return {
-            id: slugId(claim.id || label, `claim_${debateIndex + 1}_${claimIndex + 1}`),
-            label,
-            ...summary2 ? { summary: summary2 } : {},
-            ...["support", "oppose", "mixed"].includes(stance) ? { stance } : {},
-            ...sourceFields
-          };
-        }).filter(Boolean);
-        const summary = cleanText(debate.summary || debate.description);
-        return {
-          id: slugId(debate.id || title, `debate_${debateIndex + 1}`),
-          title,
-          ...summary ? { summary } : {},
-          ...normalizeSourceFields(debate, allowed, errors),
-          ...claims.length ? { claims } : { claims: [] }
-        };
-      }).filter(Boolean);
-      if (errors.length) return defaultSection("argumentMap", `AI generation referenced unknown source ids or unsupported source attribution in argument map: ${errors.slice(0, 4).join(", ")}.`);
-      if (!debates.length) return defaultSection("argumentMap", "AI generation did not return renderable argument-map debates.");
-      return { available: true, debates };
-    };
-    hasCycle = (nodes, edges) => {
-      const adjacency = new Map(nodes.map((node) => [node.id, []]));
-      edges.forEach((edge) => adjacency.get(edge.source)?.push(edge.target));
-      const visiting = /* @__PURE__ */ new Set();
-      const visited = /* @__PURE__ */ new Set();
-      const visit = (id2) => {
-        if (visiting.has(id2)) return true;
-        if (visited.has(id2)) return false;
-        visiting.add(id2);
-        for (const child of adjacency.get(id2) || []) {
-          if (visit(child)) return true;
-        }
-        visiting.delete(id2);
-        visited.add(id2);
-        return false;
-      };
-      return nodes.some((node) => visit(node.id));
-    };
-    normalizeAtlas = (rawSection, allowed) => {
-      if (!isObj9(rawSection)) return defaultSection("atlas", "AI generation did not return atlas data.");
-      const errors = [];
-      const seenIds = /* @__PURE__ */ new Set();
-      const nodes = toArray(rawSection.nodes).slice(0, LIMITS.atlasNodes).map((node, index) => {
-        if (!isObj9(node)) return null;
-        const label = cleanText(node.label || node.name || node.title || node.summary, LIMITS.labelChars);
-        if (!label) return null;
-        let id2 = slugId(node.id || label, `atlas_${index + 1}`);
-        if (seenIds.has(id2)) id2 = `atlas_${index + 1}`;
-        seenIds.add(id2);
-        const summary = cleanText(node.summary || node.description);
-        return {
-          id: id2,
-          label,
-          ...summary ? { summary } : {},
-          ...normalizeSourceFields(node, allowed, errors)
-        };
-      }).filter(Boolean);
-      const nodeIds = new Set(nodes.map((node) => node.id));
-      const edges = toArray(rawSection.edges).slice(0, LIMITS.atlasEdges).map((edge, index) => {
-        if (!isObj9(edge)) return null;
-        const source = slugId(edge.source || edge.sourceId, "");
-        const target = slugId(edge.target || edge.targetId, "");
-        if (!source || !target || source === target || !nodeIds.has(source) || !nodeIds.has(target)) {
-          errors.push(`invalid atlas edge ${index + 1}`);
-          return null;
-        }
-        const label = cleanText(edge.label || edge.relationship || edge.summary, LIMITS.labelChars);
-        return { source, target, ...label ? { label } : {} };
-      }).filter(Boolean);
-      if (errors.length) return defaultSection("atlas", `AI generation returned invalid atlas data: ${errors.slice(0, 4).join(", ")}.`);
-      if (!nodes.length) return defaultSection("atlas", "AI generation did not return renderable atlas nodes.");
-      if (hasCycle(nodes, edges)) return defaultSection("atlas", "AI generation returned an atlas graph with a cycle.");
-      const childIds = new Set(edges.map((edge) => edge.target));
-      if (nodes.length && nodes.every((node) => childIds.has(node.id))) {
-        return defaultSection("atlas", "AI generation returned an atlas graph without a renderable root.");
-      }
-      return { available: true, nodes, edges };
-    };
-    normalizeBreakdown = (rawSection, allowed) => {
-      if (!isObj9(rawSection)) return defaultSection("breakdown", "AI generation did not return breakdown data.");
-      const errors = [];
-      const summary = normalizeSummaryRecord(rawSection.summary);
-      const dimensions = toArray(rawSection.dimensions).slice(0, LIMITS.breakdownDimensions).map((dimension, index) => {
-        if (!isObj9(dimension)) return null;
-        const label = cleanText(dimension.label || dimension.name || dimension.dimension, LIMITS.labelChars);
-        if (!label) return null;
-        const description = cleanText(dimension.summary || dimension.description || dimension.interpretation);
-        const values = toArray(dimension.values).slice(0, LIMITS.breakdownDimensionValues).map((value, valueIndex) => {
-          const item = isObj9(value) ? value : { label: value };
-          const valueLabel = cleanText(item.label || item.value || item.name, LIMITS.labelChars);
-          if (!valueLabel) return null;
-          const valueSummary = cleanText(item.summary || item.description || item.interpretation);
-          return {
-            id: slugId(item.id || item.valueId || valueLabel, `value_${index + 1}_${valueIndex + 1}`),
-            label: valueLabel,
-            ...valueSummary ? { summary: valueSummary } : {}
-          };
-        }).filter(Boolean);
-        return {
-          id: slugId(dimension.id || dimension.dimensionId || label, `dimension_${index + 1}`),
-          label,
-          ...description ? { summary: description } : {},
-          ...values.length ? { values } : {}
-        };
-      }).filter(Boolean);
-      const groups = toArray(rawSection.groups).slice(0, LIMITS.breakdownGroups).map((group, index) => {
-        if (!isObj9(group)) return null;
-        const label = cleanText(group.label || group.name || group.title || group.group, LIMITS.labelChars);
-        const summaryText = cleanText(group.summary || group.description || group.interpretation || group.insight);
-        if (!label && !summaryText) return null;
-        return {
-          id: slugId(group.id || label || summaryText, `group_${index + 1}`),
-          label: label || `Group ${index + 1}`,
-          ...summaryText ? { summary: summaryText } : {},
-          // Groups need complete membership evidence for thresholds above the citation cap.
-          ...normalizeSourceFields(group, allowed, errors, allowed.participants.size)
-        };
-      }).filter(Boolean);
-      if (errors.length) return defaultSection("breakdown", `AI generation referenced unknown source ids or unsupported source attribution in breakdown: ${errors.slice(0, 4).join(", ")}.`);
-      if (!Object.keys(summary).length && !dimensions.length && !groups.length) {
-        return defaultSection("breakdown", "AI generation did not return renderable breakdown content.");
-      }
-      return { available: true, summary, dimensions, groups };
-    };
-    normalizeSeverity = (value) => {
-      const normalized = cleanText(value, 16).toLowerCase();
-      return SEVERITY_LEVELS.has(normalized) ? normalized : "";
-    };
-    DEFAULT_RISK_AXES = Object.freeze({
-      x: {
-        id: "likelihood",
-        label: "Likelihood",
-        levels: [
-          { id: "low", label: "Low" },
-          { id: "medium", label: "Medium" },
-          { id: "high", label: "High" }
-        ]
-      },
-      y: {
-        id: "impact",
-        label: "Impact",
-        levels: [
-          { id: "low", label: "Low" },
-          { id: "medium", label: "Medium" },
-          { id: "high", label: "High" }
-        ]
-      }
-    });
-    normalizeRiskAxis = (axis, fallback) => {
-      if (!isObj9(axis)) return null;
-      const record = axis;
-      const label = cleanText(record.label || record.name, LIMITS.labelChars);
-      if (!label) return null;
-      const id2 = slugId(record.id || label, fallback.id);
-      const rawLevels = toArray(record.levels);
+    importWorkerGroupBackup = async (coordinator, payload) => {
+      const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+      const snapshot = payload?.snapshot;
+      if (!slug || !sessionId || !Array.isArray(snapshot?.durable) || !Array.isArray(snapshot?.records)) fail("Invalid group backup.", 400);
+      const scoped = scopedGroupRecords(snapshot.records, slug, sessionId);
+      if (scoped.length !== snapshot.records.length) fail("Invalid group backup scope.", 400);
       const seen = /* @__PURE__ */ new Set();
-      const levels = rawLevels.slice(0, LIMITS.riskAxisLevels).map((level, index) => {
-        const levelRecord = isObj9(level) ? level : { label: level, id: level };
-        const levelLabel = cleanText(levelRecord.label || levelRecord.name || levelRecord.id, LIMITS.labelChars);
-        if (!levelLabel) return null;
-        let levelId = slugId(levelRecord.id || levelLabel, `level_${index + 1}`);
-        if (seen.has(levelId)) levelId = `level_${index + 1}`;
-        seen.add(levelId);
-        const description = cleanText(levelRecord.description || levelRecord.summary, LIMITS.summaryChars);
-        return { id: levelId, label: levelLabel, ...description ? { description } : {} };
-      }).filter(Boolean);
-      if (levels.length < 2) return null;
-      return { id: id2, label, levels };
-    };
-    normalizeRiskAxes = (rawAxes) => {
-      const axes = isObj9(rawAxes) ? rawAxes : {};
-      const x = normalizeRiskAxis(axes.x || axes.columns || axes.horizontal, DEFAULT_RISK_AXES.x);
-      const y = normalizeRiskAxis(axes.y || axes.rows || axes.vertical, DEFAULT_RISK_AXES.y);
-      return x && y ? { x, y } : null;
-    };
-    normalizeRiskAssessments = ({ rawAssessments, axes, allowed, errors }) => {
-      const xLevelIds = new Set(axes.x.levels.map((level) => level.id));
-      const yLevelIds = new Set(axes.y.levels.map((level) => level.id));
-      return toArray(rawAssessments).slice(0, LIMITS.riskAssessments).map((assessment, index) => {
-        if (!isObj9(assessment)) return null;
-        const label = cleanText(assessment.label || assessment.category || assessment.name || assessment.title, LIMITS.labelChars);
-        const summary = cleanText(assessment.summary || assessment.description || assessment.rationale || assessment.evidence);
-        const xLevelId = slugId(assessment.xLevelId || assessment.x || assessment.columnLevelId || assessment.likelihood, "");
-        const yLevelId = slugId(assessment.yLevelId || assessment.y || assessment.rowLevelId || assessment.impact, "");
-        if (!label || !summary || !xLevelIds.has(xLevelId) || !yLevelIds.has(yLevelId)) {
-          errors.push(`invalid assessment ${index + 1}`);
-          return null;
-        }
-        return {
-          id: slugId(assessment.id || label, `assessment_${index + 1}`),
-          label,
-          summary,
-          xLevelId,
-          yLevelId,
-          ...normalizeSourceFields(assessment, allowed, errors)
-        };
-      }).filter(Boolean);
-    };
-    normalizeDynamicRiskMatrix = (rawSection, allowed) => {
-      const errors = [];
-      const axes = normalizeRiskAxes(rawSection.axes);
-      if (!axes) return defaultSection("riskMatrix", "AI generation returned invalid risk matrix axes.");
-      const assessments = normalizeRiskAssessments({
-        rawAssessments: rawSection.assessments,
-        axes,
-        allowed,
-        errors
-      });
-      if (errors.length) return defaultSection("riskMatrix", `AI generation returned invalid risk matrix data: ${errors.slice(0, 4).join(", ")}.`);
-      if (!assessments.length) return defaultSection("riskMatrix", "AI generation did not return renderable risk matrix assessments.");
-      return {
-        available: true,
-        axes,
-        assessments,
-        categories: [],
-        comments: [],
-        heatmap: {},
-        scenarioLinks: []
-      };
-    };
-    normalizeLegacyRiskMatrix = (rawSection, allowed) => {
-      const errors = [];
-      const rawHeatmap = isObj9(rawSection.heatmap) ? rawSection.heatmap : {};
-      const categoryEntries = [];
-      const heatmap = {};
-      const assessments = [];
-      toArray(rawSection.categories).slice(0, LIMITS.riskCategories).forEach((category, index) => {
-        if (!isObj9(category)) return;
-        const label = cleanText(category.label || category.name || category.title, LIMITS.labelChars);
-        if (!label) return;
-        const id2 = slugId(category.id || label, `risk_${index + 1}`);
-        const heat = isObj9(rawHeatmap[id2]) ? rawHeatmap[id2] : {};
-        const likelihood = normalizeSeverity(category.likelihood || heat.likelihood);
-        const impact = normalizeSeverity(category.impact || heat.impact);
-        if (!likelihood || !impact) {
-          errors.push(`invalid severity for ${id2}`);
-          return;
-        }
-        const description = cleanText(category.description || category.summary || category.rationale);
-        const sourceFields = normalizeSourceFields(category, allowed, errors);
-        categoryEntries.push({
-          id: id2,
-          label,
-          ...description ? { description } : {},
-          ...sourceFields
-        });
-        assessments.push({
-          id: id2,
-          label,
-          summary: description || label,
-          xLevelId: likelihood,
-          yLevelId: impact,
-          ...sourceFields
-        });
-        heatmap[id2] = { likelihood, impact };
-      });
-      const categoryIds = new Set(categoryEntries.map((category) => category.id));
-      const comments = toArray(rawSection.comments).slice(0, LIMITS.riskComments).map((comment, index) => {
-        if (!isObj9(comment)) return null;
-        const categoryId = slugId(comment.categoryId || comment.category || comment.id, "");
-        if (!categoryId || !categoryIds.has(categoryId)) {
-          errors.push(`unknown risk category for comment ${index + 1}`);
-          return null;
-        }
-        const summary = cleanText(comment.summary || comment.comment || comment.description || comment.evidence);
-        if (!summary) return null;
-        return {
-          id: slugId(comment.id || summary, `risk_comment_${index + 1}`),
-          categoryId,
-          summary,
-          ...normalizeSourceFields(comment, allowed, errors)
-        };
-      }).filter(Boolean);
-      if (errors.length) return defaultSection("riskMatrix", `AI generation returned invalid risk matrix data: ${errors.slice(0, 4).join(", ")}.`);
-      if (!categoryEntries.length) return defaultSection("riskMatrix", "AI generation did not return renderable risk likelihood/impact assessments.");
-      return {
-        available: true,
-        axes: DEFAULT_RISK_AXES,
-        assessments,
-        categories: categoryEntries,
-        comments,
-        heatmap,
-        scenarioLinks: []
-      };
-    };
-    normalizeRiskMatrix = (rawSection, allowed) => {
-      if (!isObj9(rawSection)) return defaultSection("riskMatrix", "AI generation did not return risk matrix data.");
-      if (isObj9(rawSection.axes) || Array.isArray(rawSection.assessments)) return normalizeDynamicRiskMatrix(rawSection, allowed);
-      return normalizeLegacyRiskMatrix(rawSection, allowed);
-    };
-    normalizeGeneratedAt = (value) => {
-      const parsed = Date.parse(toPrimitiveStr(value));
-      return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "1970-01-01T00:00:00.000Z";
-    };
-    normalizeModel = (model) => cleanText(model, LIMITS.modelChars);
-    normalizeSection = ({ key, rawSection, requested, allowed }) => {
-      if (!requested.has(key)) return defaultSection(key, `${key} was not requested.`);
-      if (key === "argumentMap") return normalizeArgumentMap(rawSection, allowed);
-      if (key === "atlas") return normalizeAtlas(rawSection, allowed);
-      if (key === "breakdown") return normalizeBreakdown(rawSection, allowed);
-      return normalizeRiskMatrix(rawSection, allowed);
-    };
-    normalizeResultsAnalysisArtifact = ({ value, source = {}, sections = [], generatedAt, model = "" } = {}) => {
-      const requestedSections = normalizeSections(sections);
-      if (!requestedSections.length) throw new Error("No supported results analysis sections were requested.");
-      const requested = new Set(requestedSections);
-      const raw = sectionRecord(value);
-      const allowed = buildAllowedSourceIds(source);
-      const normalizedSections = Object.fromEntries(SECTION_ORDER.map((key) => [
-        key,
-        normalizeSection({ key, rawSection: raw[key], requested, allowed })
-      ]));
-      const anyRequestedAvailable = requestedSections.some((key) => normalizedSections[key]?.available === true);
-      if (!anyRequestedAvailable) {
-        const reasons = requestedSections.map((key) => normalizedSections[key]?.reason).filter(Boolean).join(" ");
-        throw new Error(`Results analysis artifact did not include any renderable requested sections. ${reasons}`.trim());
+      for (const [key, value] of [...snapshot.durable, ...snapshot.records]) {
+        if (typeof key !== "string" || seen.has(key)) fail("Invalid or duplicate group backup key.", 400);
+        seen.add(key);
+        if (key.startsWith("worker-group-capacity-")) {
+          if (!/^(worker-group-capacity-meta-v3|worker-group-capacity-(group|member)-v3:.+)$/.test(key) || !object2(value) || value.pending || ["creating", "updating", "deleting", "reserved", "removing"].includes(value.phase || value.state) || key === "worker-group-capacity-meta-v3" && (value.slug !== slug || value.sessionId !== sessionId)) fail("Invalid group authority backup.", 400);
+        } else if (typeof value !== "string") fail("Invalid group backup value.", 400);
       }
-      const safeModel = normalizeModel(model);
-      return {
-        generatedAt: normalizeGeneratedAt(generatedAt || value?.generatedAt),
-        inputSignature: cleanText(source?.signature || value?.inputSignature, 160),
-        kind: ARTIFACT_KIND,
-        ...safeModel ? { model: safeModel } : {},
-        participants: normalizeParticipants(source?.participants),
-        sections: normalizedSections,
-        source: "ai-generated",
-        version: ARTIFACT_VERSION
-      };
-    };
-    applyResultsAnalysisExposurePolicy = ({ artifact, exposure, sections = SECTION_ORDER } = {}) => {
-      if (!isObj9(artifact?.sections)) return artifact;
-      const enabled = new Set(sections);
-      const groupPolicy = isObj9(exposure) && (hasOwn5(exposure, "anonymizedGroupsEnabled") || hasOwn5(exposure, "minGroupSize"));
-      const minGroupSize = Number.isSafeInteger(exposure?.minGroupSize) && exposure.minGroupSize >= 2 ? exposure.minGroupSize : 2;
-      const participants = new Set(toArray(artifact.participants).map((participant) => participant.syntheticId));
-      const projected = {};
-      for (const key of SECTION_ORDER) {
-        const section = artifact.sections[key];
-        if (!enabled.has(key)) {
-          projected[key] = defaultSection(key, "This generated view is disabled for the session.");
-        } else if (key === "breakdown" && isObj9(section) && section.available !== false && groupPolicy) {
-          projected[key] = { ...section, groups: toArray(section.groups).filter((group) => exposure.anonymizedGroupsEnabled !== false && unique(toArray(group?.participantIds).filter((id2) => participants.has(id2))).length >= minGroupSize) };
-        } else {
-          projected[key] = section;
+      const kv = resolveWorkerGroupsKv(coordinator.env);
+      if (!kv?.get || !kv?.put) fail("Group restore storage is unavailable.");
+      const counts = { written: 0, skipped: 0 };
+      const conflicts = [];
+      for (const [key, value] of [...snapshot.durable, ...snapshot.records]) {
+        const store = key.startsWith("worker-group-capacity-") ? coordinator.state.storage : kv;
+        const existing = await store.get(key);
+        if (existing != null && JSON.stringify(existing) !== JSON.stringify(value)) conflicts.push(key);
+      }
+      if (conflicts.length) return json2({ ok: true, counts, conflicts });
+      for (const [key, value] of [...snapshot.records, ...snapshot.durable]) {
+        const store = key.startsWith("worker-group-capacity-") ? coordinator.state.storage : kv;
+        if (await store.get(key) != null) counts.skipped += 1;
+        else {
+          await store.put(key, value);
+          counts.written += 1;
         }
       }
-      return { ...artifact, sections: projected };
-    };
-  }
-});
-
-// workers/sessionCorsWorker/payloadAccessControl.js
-var trim4, lower2, isObj10, LEGACY_PAYLOAD_ACCESS_MODES, PAYLOAD_ACCESS_GATES3, PAYLOAD_ENCRYPTION_MODES3, normalizeGate, normalizeEncryption, normalizeLegacyPayloadAccessMode, normalizePayloadAccessControl2, deriveLegacyPayloadAccessMode2;
-var init_payloadAccessControl = __esm({
-  "workers/sessionCorsWorker/payloadAccessControl.js"() {
-    init_stringCoercion();
-    trim4 = (value) => toStr6(value).trim();
-    lower2 = (value) => trim4(value).toLowerCase().replace(/-/g, "_");
-    isObj10 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    LEGACY_PAYLOAD_ACCESS_MODES = Object.freeze({
-      PUBLIC_READ: "public_read",
-      WORKER_SBT_GATE: "worker_sbt_gate",
-      LIT_ENCRYPTED: "lit_encrypted"
-    });
-    PAYLOAD_ACCESS_GATES3 = Object.freeze({
-      NONE: "none",
-      SBT_GATE: "sbt_gate",
-      GROUP_GATE: "group_gate",
-      ROLE_GATE: "role_gate"
-    });
-    PAYLOAD_ENCRYPTION_MODES3 = Object.freeze({
-      NONE: "none",
-      WORKER_ENVELOPE: "worker_envelope",
-      LIT: "lit"
-    });
-    normalizeGate = (value, fallback = PAYLOAD_ACCESS_GATES3.SBT_GATE) => {
-      const normalized = lower2(value);
-      if (!normalized) return fallback;
-      if (normalized === "none" || normalized === "public" || normalized === "public_read") {
-        return PAYLOAD_ACCESS_GATES3.NONE;
-      }
-      if (normalized === "sbt" || normalized === "sbt_gate" || normalized === "worker_sbt" || normalized === "worker_sbt_gate") {
-        return PAYLOAD_ACCESS_GATES3.SBT_GATE;
-      }
-      if (normalized === "group" || normalized === "group_gate" || normalized === "worker_group") {
-        return PAYLOAD_ACCESS_GATES3.GROUP_GATE;
-      }
-      if (normalized === "role" || normalized === "role_gate" || normalized === "worker_role") {
-        return PAYLOAD_ACCESS_GATES3.ROLE_GATE;
-      }
-      return fallback;
-    };
-    normalizeEncryption = (value, fallback = PAYLOAD_ENCRYPTION_MODES3.NONE) => {
-      const raw = isObj10(value) ? value.mode : value;
-      const normalized = lower2(raw);
-      if (!normalized) return fallback;
-      if (normalized === "none" || normalized === "plaintext" || normalized === "plain") {
-        return PAYLOAD_ENCRYPTION_MODES3.NONE;
-      }
-      if (normalized === "worker_envelope" || normalized === "cloudflare_envelope") {
-        return PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE;
-      }
-      if (normalized === "lit" || normalized === "lit_encrypted" || normalized === "lit_arweave") {
-        return PAYLOAD_ENCRYPTION_MODES3.LIT;
-      }
-      return fallback;
-    };
-    normalizeLegacyPayloadAccessMode = (value, fallback = LEGACY_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE) => {
-      const normalized = lower2(value);
-      if (normalized === LEGACY_PAYLOAD_ACCESS_MODES.PUBLIC_READ || normalized === "public") {
-        return LEGACY_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
-      }
-      if (normalized === LEGACY_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED || normalized === "lit" || normalized === "encrypted") {
-        return LEGACY_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
-      }
-      if (normalized === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE || normalized === "cloudflare_envelope") {
-        return PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE;
-      }
-      if (normalized === LEGACY_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE || normalized === "worker_sbt" || normalized === "sbt_gate" || normalized === "sbt_gated") {
-        return LEGACY_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
-      }
-      return fallback;
-    };
-    normalizePayloadAccessControl2 = (value, fallback = LEGACY_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE) => {
-      const fallbackLegacy = normalizeLegacyPayloadAccessMode(fallback);
-      if (isObj10(value) && (Object.prototype.hasOwnProperty.call(value, "gate") || Object.prototype.hasOwnProperty.call(value, "encryption"))) {
-        return {
-          gate: normalizeGate(value.gate, fallbackLegacy === LEGACY_PAYLOAD_ACCESS_MODES.PUBLIC_READ ? PAYLOAD_ACCESS_GATES3.NONE : PAYLOAD_ACCESS_GATES3.SBT_GATE),
-          encryption: normalizeEncryption(value.encryption, PAYLOAD_ENCRYPTION_MODES3.NONE)
-        };
-      }
-      const candidate = isObj10(value) ? value.mode || value.payloadAccessMode || value.accessControlMode || (isObj10(value.encryption) ? value.encryption.mode : value.encryption) : value;
-      const legacy = normalizeLegacyPayloadAccessMode(candidate, fallbackLegacy);
-      if (legacy === LEGACY_PAYLOAD_ACCESS_MODES.PUBLIC_READ) {
-        return { gate: PAYLOAD_ACCESS_GATES3.NONE, encryption: PAYLOAD_ENCRYPTION_MODES3.NONE };
-      }
-      if (legacy === LEGACY_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) {
-        return { gate: PAYLOAD_ACCESS_GATES3.NONE, encryption: PAYLOAD_ENCRYPTION_MODES3.LIT };
-      }
-      if (legacy === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE) {
-        return { gate: PAYLOAD_ACCESS_GATES3.SBT_GATE, encryption: PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE };
-      }
-      return { gate: PAYLOAD_ACCESS_GATES3.SBT_GATE, encryption: PAYLOAD_ENCRYPTION_MODES3.NONE };
-    };
-    deriveLegacyPayloadAccessMode2 = (accessControl) => {
-      const access = normalizePayloadAccessControl2(accessControl);
-      if (access.encryption === PAYLOAD_ENCRYPTION_MODES3.LIT) {
-        return LEGACY_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
-      }
-      if (access.gate === PAYLOAD_ACCESS_GATES3.NONE) {
-        return LEGACY_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
-      }
-      return LEGACY_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
+      return json2({ ok: true, counts, conflicts });
     };
   }
 });
 
 // workers/sessionCorsWorker/storageEnvelopeEncryption.js
-var textEncoder2, textDecoder2, STORAGE_ENVELOPE_KEK_SECRET_NAME2, STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME, ENVELOPE_VERSION, AES_GCM2, AES_256_GCM, trim5, isObj11, cloneJson, safeSlugPart, bytesToBase64url2, base64urlToBytes2, toUint8Array, getCryptoImpl2, randomBytes5, nowIso2, importAesKey, deriveDeploymentKeyBytes, readDeploymentSecret, importDeploymentKek, aesEncrypt, aesDecrypt, wrapBytesWithKey, unwrapBytesWithKey, wrapResponseFieldKey, unwrapResponseFieldKey, readSessionKeyRecord, isCoordinatorWrappedSessionKeyRecord, unwrapSessionKeyBytes, ensureStorageEnvelopeSessionKey, encryptPayloadWithStorageEnvelope, decryptPayloadWithStorageEnvelope, resolveAuditKv, auditSuffix, writeStorageEnvelopeKeyReleaseAudit, writeStorageVisibilityAudit;
+var textEncoder2, textDecoder2, STORAGE_ENVELOPE_KEK_SECRET_NAME2, STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME, ENVELOPE_VERSION, AES_GCM2, AES_256_GCM, trim4, isObj9, cloneJson, safeSlugPart, bytesToBase64url2, base64urlToBytes2, toUint8Array, getCryptoImpl2, randomBytes5, nowIso2, importAesKey, deriveDeploymentKeyBytes, readDeploymentSecret, importDeploymentKek, aesEncrypt, aesDecrypt, wrapBytesWithKey, unwrapBytesWithKey, wrapResponseFieldKey, unwrapResponseFieldKey, readSessionKeyRecord, isCoordinatorWrappedSessionKeyRecord, unwrapSessionKeyBytes, ensureStorageEnvelopeSessionKey, encryptPayloadWithStorageEnvelope, decryptPayloadWithStorageEnvelope, resolveAuditKv, auditSuffix, writeStorageEnvelopeKeyReleaseAudit, writeStorageVisibilityAudit;
 var init_storageEnvelopeEncryption = __esm({
   "workers/sessionCorsWorker/storageEnvelopeEncryption.js"() {
     init_sessionWriteCoordinator();
@@ -61523,10 +60911,10 @@ var init_storageEnvelopeEncryption = __esm({
     ENVELOPE_VERSION = 1;
     AES_GCM2 = "AES-GCM";
     AES_256_GCM = "AES-256-GCM";
-    trim5 = (value) => toStr6(value).trim();
-    isObj11 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    trim4 = (value) => toStr6(value).trim();
+    isObj9 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     cloneJson = (value) => JSON.parse(JSON.stringify(value || {}));
-    safeSlugPart = (value) => trim5(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
+    safeSlugPart = (value) => trim4(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
     bytesToBase64url2 = (bytes3) => {
       const source = bytes3 instanceof Uint8Array ? bytes3 : new Uint8Array(bytes3 || []);
       if (typeof Buffer !== "undefined") {
@@ -61539,7 +60927,7 @@ var init_storageEnvelopeEncryption = __esm({
       return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
     };
     base64urlToBytes2 = (value) => {
-      const text = trim5(value);
+      const text = trim4(value);
       if (!text) return new Uint8Array();
       const base64 = text.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(text.length / 4) * 4, "=");
       if (typeof Buffer !== "undefined") return new Uint8Array(Buffer.from(base64, "base64"));
@@ -61573,10 +60961,10 @@ var init_storageEnvelopeEncryption = __esm({
     nowIso2 = (deps = {}) => new Date(deps.now?.() || Date.now()).toISOString();
     importAesKey = async (keyBytes, usages, deps = {}) => getCryptoImpl2(deps).subtle.importKey("raw", keyBytes, { name: AES_GCM2 }, false, usages);
     deriveDeploymentKeyBytes = async (secret, deps = {}) => {
-      const material = trim5(secret);
+      const material = trim4(secret);
       if (!material) throw new Error(`${STORAGE_ENVELOPE_KEK_SECRET_NAME2} is missing.`);
-      const digest = await getCryptoImpl2(deps).subtle.digest("SHA-256", textEncoder2.encode(material));
-      return new Uint8Array(digest);
+      const digest2 = await getCryptoImpl2(deps).subtle.digest("SHA-256", textEncoder2.encode(material));
+      return new Uint8Array(digest2);
     };
     readDeploymentSecret = ({ env = {}, previous = false, deps = {} } = {}) => {
       if (typeof deps.getStorageEnvelopeKek === "function") {
@@ -61624,7 +61012,7 @@ var init_storageEnvelopeEncryption = __esm({
       };
     };
     unwrapBytesWithKey = async ({ wrappingKey, wrapped, aad = "", deps = {} }) => {
-      if (!isObj11(wrapped) || !trim5(wrapped.iv) || !trim5(wrapped.wrappedKey)) {
+      if (!isObj9(wrapped) || !trim4(wrapped.iv) || !trim4(wrapped.wrappedKey)) {
         throw new Error("Invalid wrapped storage envelope key.");
       }
       const params = { name: AES_GCM2, iv: base64urlToBytes2(wrapped.iv) };
@@ -61648,14 +61036,14 @@ var init_storageEnvelopeEncryption = __esm({
       }
     };
     readSessionKeyRecord = (config = {}) => {
-      const envelope = isObj11(config.storageEnvelope) ? config.storageEnvelope : {};
-      return isObj11(envelope.sessionKey) ? envelope.sessionKey : null;
+      const envelope = isObj9(config.storageEnvelope) ? config.storageEnvelope : {};
+      return isObj9(envelope.sessionKey) ? envelope.sessionKey : null;
     };
     isCoordinatorWrappedSessionKeyRecord = (record, slug) => {
-      if (!isObj11(record)) return false;
-      const createdAt = trim5(record.createdAt);
+      if (!isObj9(record)) return false;
+      const createdAt = trim4(record.createdAt);
       const createdAtMs = Date.parse(createdAt);
-      return record.version === ENVELOPE_VERSION && record.keyProvider === "worker_secret" && record.alg === AES_256_GCM && record.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs) && new Date(createdAtMs).toISOString() === createdAt && trim5(record.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim5(record.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim5(record.wrappedKey));
+      return record.version === ENVELOPE_VERSION && record.keyProvider === "worker_secret" && record.alg === AES_256_GCM && record.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs) && new Date(createdAtMs).toISOString() === createdAt && trim4(record.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim4(record.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim4(record.wrappedKey));
     };
     unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
       const record = readSessionKeyRecord(config);
@@ -61664,7 +61052,7 @@ var init_storageEnvelopeEncryption = __esm({
       const attempts = [false, true];
       let lastError = null;
       for (const previous of attempts) {
-        if (previous && !trim5(readDeploymentSecret({ env, previous, deps }))) continue;
+        if (previous && !trim4(readDeploymentSecret({ env, previous, deps }))) continue;
         try {
           const deploymentKey = await importDeploymentKek({ env, previous, deps });
           return await unwrapBytesWithKey({ wrappingKey: deploymentKey, wrapped: record, aad, deps });
@@ -61715,7 +61103,7 @@ var init_storageEnvelopeEncryption = __esm({
         candidateRecord
       });
       const nextConfig = coordinated?.config;
-      if (!isObj11(nextConfig) || !readSessionKeyRecord(nextConfig)) {
+      if (!isObj9(nextConfig) || !readSessionKeyRecord(nextConfig)) {
         throw new Error("Session config coordination returned no wrapped session key.");
       }
       return {
@@ -61766,8 +61154,8 @@ var init_storageEnvelopeEncryption = __esm({
             ...wrappedDek
           },
           conditionRef: conditionRef || "gate_fallback",
-          ...isObj11(accessConditions) ? { accessConditions: cloneJson(accessConditions) } : {},
-          contentType: trim5(contentType) || "application/octet-stream",
+          ...isObj9(accessConditions) ? { accessConditions: cloneJson(accessConditions) } : {},
+          contentType: trim4(contentType) || "application/octet-stream",
           encryptedAt: nowIso2(deps)
         }
       };
@@ -61781,7 +61169,7 @@ var init_storageEnvelopeEncryption = __esm({
       envelope,
       deps = {}
     }) => {
-      if (!isObj11(envelope) || envelope.encryption !== "worker_envelope") {
+      if (!isObj9(envelope) || envelope.encryption !== "worker_envelope") {
         throw new Error("Storage envelope metadata is missing.");
       }
       const sessionKeyBytes = await unwrapSessionKeyBytes({ env, config, slug, deps });
@@ -61803,11 +61191,11 @@ var init_storageEnvelopeEncryption = __esm({
     };
     resolveAuditKv = (env = {}) => env.CE_STORAGE_AUDIT_KV || env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
     auditSuffix = (deps = {}) => {
-      if (typeof deps.randomUUID === "function") return trim5(deps.randomUUID());
+      if (typeof deps.randomUUID === "function") return trim4(deps.randomUUID());
       try {
         return bytesToBase64url2(randomBytes5(12, deps));
       } catch {
-        return trim5(Date.now());
+        return trim4(Date.now());
       }
     };
     writeStorageEnvelopeKeyReleaseAudit = async ({
@@ -61823,9 +61211,9 @@ var init_storageEnvelopeEncryption = __esm({
         version: ENVELOPE_VERSION,
         event: "storage_envelope_key_release",
         sessionSlug: safeSlugPart(slug),
-        payloadId: trim5(payloadId),
-        principal: trim5(principal).toLowerCase() || "anonymous",
-        conditionMatched: isObj11(conditionMatched) ? cloneJson(conditionMatched) : conditionMatched || "gate_fallback",
+        payloadId: trim4(payloadId),
+        principal: trim4(principal).toLowerCase() || "anonymous",
+        conditionMatched: isObj9(conditionMatched) ? cloneJson(conditionMatched) : conditionMatched || "gate_fallback",
         timestamp
       };
       const kv = resolveAuditKv(env);
@@ -61852,9 +61240,9 @@ var init_storageEnvelopeEncryption = __esm({
         version: ENVELOPE_VERSION,
         event: hidden ? "storage_resource_hidden" : "storage_resource_unhidden",
         sessionSlug: safeSlugPart(slug),
-        resource: trim5(resource),
-        resourceId: trim5(resourceId),
-        principal: trim5(principal).toLowerCase(),
+        resource: trim4(resource),
+        resourceId: trim4(resourceId),
+        principal: trim4(principal).toLowerCase(),
         timestamp
       };
       const kv = resolveAuditKv(env);
@@ -61924,13 +61312,13 @@ var init_uploadSizeLimits = __esm({
 });
 
 // workers/sessionCorsWorker/storageUploadValidation.js
-var KIB, decoder2, encoder2, STORAGE_RESOURCE_MAX_BYTES, MAX_RESPONSE_ITEM_BYTES, MAX_RESPONSE_PLAINTEXT_BYTES, RESOURCE_ID_RE, isStorageResourceId, isObj12, isText, jsonBytes, invalid2, readStoragePayloadResourceId, validateResponseItem, validateStorageUploadPayload;
+var KIB, decoder2, encoder3, STORAGE_RESOURCE_MAX_BYTES, MAX_RESPONSE_ITEM_BYTES, MAX_RESPONSE_PLAINTEXT_BYTES, RESOURCE_ID_RE, isStorageResourceId, isObj10, isText, jsonBytes, invalid2, readStoragePayloadResourceId, validateResponseItem, validateStorageUploadPayload;
 var init_storageUploadValidation = __esm({
   "workers/sessionCorsWorker/storageUploadValidation.js"() {
     init_uploadSizeLimits();
     KIB = 1024;
     decoder2 = new TextDecoder();
-    encoder2 = new TextEncoder();
+    encoder3 = new TextEncoder();
     STORAGE_RESOURCE_MAX_BYTES = Object.freeze({
       questions: 128 * KIB,
       surveys: 256 * KIB,
@@ -61942,16 +61330,16 @@ var init_storageUploadValidation = __esm({
     MAX_RESPONSE_PLAINTEXT_BYTES = 48 * KIB;
     RESOURCE_ID_RE = /^[a-z0-9][a-z0-9._:-]{0,127}$/;
     isStorageResourceId = (value) => typeof value === "string" && RESOURCE_ID_RE.test(value);
-    isObj12 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj10 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     isText = (value) => typeof value === "string" && value.trim() !== "";
-    jsonBytes = (value) => encoder2.encode(JSON.stringify(value)).byteLength;
+    jsonBytes = (value) => encoder3.encode(JSON.stringify(value)).byteLength;
     invalid2 = (resource, detail) => ({ ok: false, status: 400, error: `Invalid ${resource} payload: ${detail}.` });
     readStoragePayloadResourceId = (resource, payload) => {
       const raw = resource === "questions" ? payload?.id || payload?.questionId || payload?.questionID : payload?.surveyID || payload?.id;
       return typeof raw === "string" ? raw.trim().toLowerCase() : "";
     };
     validateResponseItem = (item, label) => {
-      if (!isObj12(item) || !isText(item.questionID || item.questionId)) {
+      if (!isObj10(item) || !isText(item.questionID || item.questionId)) {
         return invalid2("responses", `${label} needs a questionID`);
       }
       if (jsonBytes(item) > MAX_RESPONSE_ITEM_BYTES) {
@@ -61982,7 +61370,7 @@ var init_storageUploadValidation = __esm({
       } catch {
         return invalid2(resource, "expected JSON");
       }
-      if (!isObj12(payload)) return invalid2(resource, "expected a JSON object");
+      if (!isObj10(payload)) return invalid2(resource, "expected a JSON object");
       if (resource === "responses") {
         if (payload.responses !== void 0) {
           if (!Array.isArray(payload.responses) || !payload.responses.length) {
@@ -62019,6 +61407,219 @@ var init_storageUploadValidation = __esm({
   }
 });
 
+// workers/sessionCorsWorker/storageScanBudget.js
+var encoder4, decoder3, RESULTS_ANALYSIS_SCAN_LIMITS, STORAGE_EXPORT_PAGE_LIMITS, StorageReadLimitError, isStorageReadLimitError, jsonByteLength, createResultsAnalysisScanBudget, readStorageBytesBounded, encodeCursor, storageExportCursor, parseStorageExportCursor;
+var init_storageScanBudget = __esm({
+  "workers/sessionCorsWorker/storageScanBudget.js"() {
+    encoder4 = new TextEncoder();
+    decoder3 = new TextDecoder();
+    RESULTS_ANALYSIS_SCAN_LIMITS = Object.freeze({
+      operations: 800,
+      rows: 1e3,
+      metadataBytes: 2 * 1024 * 1024,
+      payloadBytes: 8 * 1024 * 1024
+    });
+    STORAGE_EXPORT_PAGE_LIMITS = Object.freeze({
+      rows: 100,
+      metadataBytes: 2 * 1024 * 1024,
+      encodedBytes: 4 * 1024 * 1024
+    });
+    StorageReadLimitError = class extends Error {
+      constructor(kind) {
+        super(`Storage ${kind} exceeds the synchronous read limit.`);
+        this.code = "storage_read_limit";
+        this.kind = kind;
+      }
+    };
+    isStorageReadLimitError = (error) => error?.code === "storage_read_limit";
+    jsonByteLength = (value) => encoder4.encode(typeof value === "string" ? value : JSON.stringify(value)).byteLength;
+    createResultsAnalysisScanBudget = () => {
+      const used = { operations: 0, rows: 0, metadataBytes: 0, payloadBytes: 0 };
+      const consume = (kind, amount = 1) => {
+        if (used[kind] + amount > RESULTS_ANALYSIS_SCAN_LIMITS[kind]) throw new StorageReadLimitError(kind);
+        used[kind] += amount;
+      };
+      return {
+        operation: () => consume("operations"),
+        rows: (count = 1) => consume("rows", count),
+        metadata: (value) => consume("metadataBytes", jsonByteLength(value)),
+        payload: (count) => consume("payloadBytes", count),
+        get remainingPayloadBytes() {
+          return RESULTS_ANALYSIS_SCAN_LIMITS.payloadBytes - used.payloadBytes;
+        }
+      };
+    };
+    readStorageBytesBounded = async (value, maxBytes = Infinity) => {
+      const size = Number(value?.size);
+      if (Number.isFinite(size) && size > maxBytes) {
+        await value?.body?.cancel?.().catch(() => {
+        });
+        throw new StorageReadLimitError("payloadBytes");
+      }
+      const stream = value?.body?.getReader ? value.body : value?.getReader ? value : null;
+      if (stream && Number.isFinite(maxBytes)) {
+        const reader = stream.getReader();
+        const chunks = [];
+        let total = 0;
+        try {
+          for (; ; ) {
+            const { done, value: chunk } = await reader.read();
+            if (done) break;
+            total += chunk.byteLength;
+            if (total > maxBytes) throw new StorageReadLimitError("payloadBytes");
+            chunks.push(chunk);
+          }
+        } catch (error) {
+          await reader.cancel().catch(() => {
+          });
+          throw error;
+        } finally {
+          reader.releaseLock();
+        }
+        const bytes4 = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+          bytes4.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+        return bytes4;
+      }
+      const bytes3 = value instanceof Uint8Array ? value : value instanceof ArrayBuffer ? new Uint8Array(value) : ArrayBuffer.isView(value) ? new Uint8Array(value.buffer, value.byteOffset, value.byteLength) : typeof value?.arrayBuffer === "function" ? new Uint8Array(await value.arrayBuffer()) : typeof value === "string" ? encoder4.encode(value) : new Uint8Array(value || []);
+      if (bytes3.byteLength > maxBytes) throw new StorageReadLimitError("payloadBytes");
+      return bytes3;
+    };
+    encodeCursor = (value) => {
+      const bytes3 = encoder4.encode(JSON.stringify(value));
+      return btoa(String.fromCharCode(...bytes3)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    };
+    storageExportCursor = ({ prefix, sessionId = "", pageCursor = "", lastKey = "", hadErrors = false, continuation }) => encodeCursor({ version: 1, prefix, sessionId, pageCursor, lastKey, hadErrors, ...continuation ? { continuation } : {} });
+    parseStorageExportCursor = ({ cursor, prefix, sessionId = "" }) => {
+      if (cursor == null || cursor === "") return { pageCursor: "", lastKey: "", hadErrors: false };
+      try {
+        if (typeof cursor !== "string" || cursor.length > 8192 || !/^[A-Za-z0-9_-]+$/.test(cursor)) throw new Error();
+        const base64 = cursor.replace(/-/g, "+").replace(/_/g, "/");
+        const parsed = JSON.parse(decoder3.decode(Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))));
+        if (parsed?.version !== 1 || parsed.prefix !== prefix || parsed.sessionId !== sessionId || typeof parsed.pageCursor !== "string" || parsed.pageCursor.length > 4096 || typeof parsed.lastKey !== "string" || parsed.lastKey.length > 512 || parsed.lastKey && !parsed.lastKey.startsWith(prefix) || parsed.hadErrors !== void 0 && typeof parsed.hadErrors !== "boolean") throw new Error();
+        if (parsed.continuation != null && (typeof parsed.continuation !== "object" || Array.isArray(parsed.continuation))) throw new Error();
+        return {
+          pageCursor: parsed.pageCursor,
+          lastKey: parsed.lastKey,
+          hadErrors: parsed.hadErrors === true,
+          ...parsed.continuation ? { continuation: parsed.continuation } : {}
+        };
+      } catch {
+        throw new Error("Invalid export cursor for this session and resource.");
+      }
+    };
+  }
+});
+
+// workers/sessionCorsWorker/payloadAccessControl.js
+var trim5, lower2, isObj11, LEGACY_PAYLOAD_ACCESS_MODES, PAYLOAD_ACCESS_GATES3, PAYLOAD_ENCRYPTION_MODES3, normalizeGate, normalizeEncryption, normalizeLegacyPayloadAccessMode, normalizePayloadAccessControl2, deriveLegacyPayloadAccessMode2;
+var init_payloadAccessControl = __esm({
+  "workers/sessionCorsWorker/payloadAccessControl.js"() {
+    init_stringCoercion();
+    trim5 = (value) => toStr6(value).trim();
+    lower2 = (value) => trim5(value).toLowerCase().replace(/-/g, "_");
+    isObj11 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    LEGACY_PAYLOAD_ACCESS_MODES = Object.freeze({
+      PUBLIC_READ: "public_read",
+      WORKER_SBT_GATE: "worker_sbt_gate",
+      LIT_ENCRYPTED: "lit_encrypted"
+    });
+    PAYLOAD_ACCESS_GATES3 = Object.freeze({
+      NONE: "none",
+      SBT_GATE: "sbt_gate",
+      GROUP_GATE: "group_gate",
+      ROLE_GATE: "role_gate"
+    });
+    PAYLOAD_ENCRYPTION_MODES3 = Object.freeze({
+      NONE: "none",
+      WORKER_ENVELOPE: "worker_envelope",
+      LIT: "lit"
+    });
+    normalizeGate = (value, fallback = PAYLOAD_ACCESS_GATES3.SBT_GATE) => {
+      const normalized = lower2(value);
+      if (!normalized) return fallback;
+      if (normalized === "none" || normalized === "public" || normalized === "public_read") {
+        return PAYLOAD_ACCESS_GATES3.NONE;
+      }
+      if (normalized === "sbt" || normalized === "sbt_gate" || normalized === "worker_sbt" || normalized === "worker_sbt_gate") {
+        return PAYLOAD_ACCESS_GATES3.SBT_GATE;
+      }
+      if (normalized === "group" || normalized === "group_gate" || normalized === "worker_group") {
+        return PAYLOAD_ACCESS_GATES3.GROUP_GATE;
+      }
+      if (normalized === "role" || normalized === "role_gate" || normalized === "worker_role") {
+        return PAYLOAD_ACCESS_GATES3.ROLE_GATE;
+      }
+      return fallback;
+    };
+    normalizeEncryption = (value, fallback = PAYLOAD_ENCRYPTION_MODES3.NONE) => {
+      const raw = isObj11(value) ? value.mode : value;
+      const normalized = lower2(raw);
+      if (!normalized) return fallback;
+      if (normalized === "none" || normalized === "plaintext" || normalized === "plain") {
+        return PAYLOAD_ENCRYPTION_MODES3.NONE;
+      }
+      if (normalized === "worker_envelope" || normalized === "cloudflare_envelope") {
+        return PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE;
+      }
+      if (normalized === "lit" || normalized === "lit_encrypted" || normalized === "lit_arweave") {
+        return PAYLOAD_ENCRYPTION_MODES3.LIT;
+      }
+      return fallback;
+    };
+    normalizeLegacyPayloadAccessMode = (value, fallback = LEGACY_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE) => {
+      const normalized = lower2(value);
+      if (normalized === LEGACY_PAYLOAD_ACCESS_MODES.PUBLIC_READ || normalized === "public") {
+        return LEGACY_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
+      }
+      if (normalized === LEGACY_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED || normalized === "lit" || normalized === "encrypted") {
+        return LEGACY_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
+      }
+      if (normalized === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE || normalized === "cloudflare_envelope") {
+        return PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE;
+      }
+      if (normalized === LEGACY_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE || normalized === "worker_sbt" || normalized === "sbt_gate" || normalized === "sbt_gated") {
+        return LEGACY_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
+      }
+      return fallback;
+    };
+    normalizePayloadAccessControl2 = (value, fallback = LEGACY_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE) => {
+      const fallbackLegacy = normalizeLegacyPayloadAccessMode(fallback);
+      if (isObj11(value) && (Object.prototype.hasOwnProperty.call(value, "gate") || Object.prototype.hasOwnProperty.call(value, "encryption"))) {
+        return {
+          gate: normalizeGate(value.gate, fallbackLegacy === LEGACY_PAYLOAD_ACCESS_MODES.PUBLIC_READ ? PAYLOAD_ACCESS_GATES3.NONE : PAYLOAD_ACCESS_GATES3.SBT_GATE),
+          encryption: normalizeEncryption(value.encryption, PAYLOAD_ENCRYPTION_MODES3.NONE)
+        };
+      }
+      const candidate = isObj11(value) ? value.mode || value.payloadAccessMode || value.accessControlMode || (isObj11(value.encryption) ? value.encryption.mode : value.encryption) : value;
+      const legacy = normalizeLegacyPayloadAccessMode(candidate, fallbackLegacy);
+      if (legacy === LEGACY_PAYLOAD_ACCESS_MODES.PUBLIC_READ) {
+        return { gate: PAYLOAD_ACCESS_GATES3.NONE, encryption: PAYLOAD_ENCRYPTION_MODES3.NONE };
+      }
+      if (legacy === LEGACY_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) {
+        return { gate: PAYLOAD_ACCESS_GATES3.NONE, encryption: PAYLOAD_ENCRYPTION_MODES3.LIT };
+      }
+      if (legacy === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE) {
+        return { gate: PAYLOAD_ACCESS_GATES3.SBT_GATE, encryption: PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE };
+      }
+      return { gate: PAYLOAD_ACCESS_GATES3.SBT_GATE, encryption: PAYLOAD_ENCRYPTION_MODES3.NONE };
+    };
+    deriveLegacyPayloadAccessMode2 = (accessControl) => {
+      const access = normalizePayloadAccessControl2(accessControl);
+      if (access.encryption === PAYLOAD_ENCRYPTION_MODES3.LIT) {
+        return LEGACY_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
+      }
+      if (access.gate === PAYLOAD_ACCESS_GATES3.NONE) {
+        return LEGACY_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
+      }
+      return LEGACY_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
+    };
+  }
+});
+
 // shared/storage/canonicalStorageVersions.mjs
 var trim6, compareStorageIds, compareVersionAge, isAdminStorageVersion, isPreferredStorageVersion, selectCanonicalStorageVersions;
 var init_canonicalStorageVersions = __esm({
@@ -62048,7 +61649,7 @@ var init_canonicalStorageVersions = __esm({
 });
 
 // workers/sessionCorsWorker/storageResourceOwnership.js
-var OWNED_STORAGE_RESOURCES, trim7, lower3, isObj13, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, listHiddenStorageResourceIds;
+var OWNED_STORAGE_RESOURCES, trim7, lower3, isObj12, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, listHiddenStorageResourceIds;
 var init_storageResourceOwnership = __esm({
   "workers/sessionCorsWorker/storageResourceOwnership.js"() {
     init_sessionSlugResolution();
@@ -62057,7 +61658,7 @@ var init_storageResourceOwnership = __esm({
     OWNED_STORAGE_RESOURCES = Object.freeze(["questions", "surveys"]);
     trim7 = (value) => toStr6(value).trim();
     lower3 = (value) => trim7(value).toLowerCase();
-    isObj13 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj12 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     isOwnedStorageResource = (resource) => OWNED_STORAGE_RESOURCES.includes(trim7(resource));
     recordKey = (kind, { slug, resource, resourceId = "" }) => `ce-storage-${kind}:${sessionSlugStorageKey(slug)}:${trim7(resource)}:${lower3(resourceId)}`;
     readJsonRecord = async (index, key) => {
@@ -62065,7 +61666,7 @@ var init_storageResourceOwnership = __esm({
       if (raw == null || raw === "") return null;
       try {
         const value = typeof raw === "string" ? JSON.parse(raw) : raw;
-        return isObj13(value) ? value : null;
+        return isObj12(value) ? value : null;
       } catch {
         return null;
       }
@@ -62222,109 +61823,8 @@ var init_responseFieldKeyRoute = __esm({
   }
 });
 
-// workers/sessionCorsWorker/storageScanBudget.js
-var encoder3, decoder3, RESULTS_ANALYSIS_SCAN_LIMITS, STORAGE_EXPORT_PAGE_LIMITS, StorageReadLimitError, isStorageReadLimitError, jsonByteLength, createResultsAnalysisScanBudget, readStorageBytesBounded, encodeCursor, storageExportCursor, parseStorageExportCursor;
-var init_storageScanBudget = __esm({
-  "workers/sessionCorsWorker/storageScanBudget.js"() {
-    encoder3 = new TextEncoder();
-    decoder3 = new TextDecoder();
-    RESULTS_ANALYSIS_SCAN_LIMITS = Object.freeze({
-      operations: 800,
-      rows: 1e3,
-      metadataBytes: 2 * 1024 * 1024,
-      payloadBytes: 8 * 1024 * 1024
-    });
-    STORAGE_EXPORT_PAGE_LIMITS = Object.freeze({
-      rows: 100,
-      metadataBytes: 2 * 1024 * 1024,
-      encodedBytes: 4 * 1024 * 1024
-    });
-    StorageReadLimitError = class extends Error {
-      constructor(kind) {
-        super(`Storage ${kind} exceeds the synchronous read limit.`);
-        this.code = "storage_read_limit";
-        this.kind = kind;
-      }
-    };
-    isStorageReadLimitError = (error) => error?.code === "storage_read_limit";
-    jsonByteLength = (value) => encoder3.encode(typeof value === "string" ? value : JSON.stringify(value)).byteLength;
-    createResultsAnalysisScanBudget = () => {
-      const used = { operations: 0, rows: 0, metadataBytes: 0, payloadBytes: 0 };
-      const consume = (kind, amount = 1) => {
-        if (used[kind] + amount > RESULTS_ANALYSIS_SCAN_LIMITS[kind]) throw new StorageReadLimitError(kind);
-        used[kind] += amount;
-      };
-      return {
-        operation: () => consume("operations"),
-        rows: (count = 1) => consume("rows", count),
-        metadata: (value) => consume("metadataBytes", jsonByteLength(value)),
-        payload: (count) => consume("payloadBytes", count),
-        get remainingPayloadBytes() {
-          return RESULTS_ANALYSIS_SCAN_LIMITS.payloadBytes - used.payloadBytes;
-        }
-      };
-    };
-    readStorageBytesBounded = async (value, maxBytes = Infinity) => {
-      const size = Number(value?.size);
-      if (Number.isFinite(size) && size > maxBytes) {
-        await value?.body?.cancel?.().catch(() => {
-        });
-        throw new StorageReadLimitError("payloadBytes");
-      }
-      const stream = value?.body?.getReader ? value.body : value?.getReader ? value : null;
-      if (stream && Number.isFinite(maxBytes)) {
-        const reader = stream.getReader();
-        const chunks = [];
-        let total = 0;
-        try {
-          for (; ; ) {
-            const { done, value: chunk } = await reader.read();
-            if (done) break;
-            total += chunk.byteLength;
-            if (total > maxBytes) throw new StorageReadLimitError("payloadBytes");
-            chunks.push(chunk);
-          }
-        } catch (error) {
-          await reader.cancel().catch(() => {
-          });
-          throw error;
-        } finally {
-          reader.releaseLock();
-        }
-        const bytes4 = new Uint8Array(total);
-        let offset = 0;
-        for (const chunk of chunks) {
-          bytes4.set(chunk, offset);
-          offset += chunk.byteLength;
-        }
-        return bytes4;
-      }
-      const bytes3 = value instanceof Uint8Array ? value : value instanceof ArrayBuffer ? new Uint8Array(value) : ArrayBuffer.isView(value) ? new Uint8Array(value.buffer, value.byteOffset, value.byteLength) : typeof value?.arrayBuffer === "function" ? new Uint8Array(await value.arrayBuffer()) : typeof value === "string" ? encoder3.encode(value) : new Uint8Array(value || []);
-      if (bytes3.byteLength > maxBytes) throw new StorageReadLimitError("payloadBytes");
-      return bytes3;
-    };
-    encodeCursor = (value) => {
-      const bytes3 = encoder3.encode(JSON.stringify(value));
-      return btoa(String.fromCharCode(...bytes3)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-    };
-    storageExportCursor = ({ prefix, sessionId = "", pageCursor = "", lastKey = "", hadErrors = false }) => encodeCursor({ version: 1, prefix, sessionId, pageCursor, lastKey, hadErrors });
-    parseStorageExportCursor = ({ cursor, prefix, sessionId = "" }) => {
-      if (cursor == null || cursor === "") return { pageCursor: "", lastKey: "", hadErrors: false };
-      try {
-        if (typeof cursor !== "string" || cursor.length > 8192 || !/^[A-Za-z0-9_-]+$/.test(cursor)) throw new Error();
-        const base64 = cursor.replace(/-/g, "+").replace(/_/g, "/");
-        const parsed = JSON.parse(decoder3.decode(Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))));
-        if (parsed?.version !== 1 || parsed.prefix !== prefix || parsed.sessionId !== sessionId || typeof parsed.pageCursor !== "string" || parsed.pageCursor.length > 4096 || typeof parsed.lastKey !== "string" || parsed.lastKey.length > 512 || parsed.lastKey && !parsed.lastKey.startsWith(prefix) || parsed.hadErrors !== void 0 && typeof parsed.hadErrors !== "boolean") throw new Error();
-        return { pageCursor: parsed.pageCursor, lastKey: parsed.lastKey, hadErrors: parsed.hadErrors === true };
-      } catch {
-        throw new Error("Invalid export cursor for this session and resource.");
-      }
-    };
-  }
-});
-
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder4, decoder4, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim8, isObj14, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
+var encoder5, decoder4, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim8, isObj13, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_storageRefNormalization();
@@ -62343,12 +61843,12 @@ var init_storageRouteExecution = __esm({
     init_responseFieldKeyRoute();
     init_stringCoercion();
     init_storageScanBudget();
-    encoder4 = new TextEncoder();
+    encoder5 = new TextEncoder();
     decoder4 = new TextDecoder();
     RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol("resolve-storage-gate-runtime-config");
     STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol("storage-rpc-chain-attestation-cache");
     trim8 = (value) => toStr6(value).trim();
-    isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj13 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     isJsonContentType = (contentType) => {
       const mediaType = trim8(contentType).split(";", 1)[0].trim().toLowerCase();
       return mediaType === "application/json" || mediaType.endsWith("+json");
@@ -62426,7 +61926,7 @@ var init_storageRouteExecution = __esm({
       }
       try {
         const envelope = JSON.parse(raw || "null");
-        return envelope && isObj14(envelope?.metadata) ? envelope : null;
+        return envelope && isObj13(envelope?.metadata) ? envelope : null;
       } catch {
         return null;
       }
@@ -62451,9 +61951,9 @@ var init_storageRouteExecution = __esm({
           raw = null;
         }
       }
-      if (!isObj14(raw)) return null;
+      if (!isObj13(raw)) return null;
       const match = trim8(raw.match).toLowerCase() === "all" ? "all" : "any";
-      const conditions = (Array.isArray(raw.conditions) ? raw.conditions : []).filter(isObj14).map((condition) => ({ ...condition, kind: trim8(condition.kind).toLowerCase() })).filter((condition) => condition.kind);
+      const conditions = (Array.isArray(raw.conditions) ? raw.conditions : []).filter(isObj13).map((condition) => ({ ...condition, kind: trim8(condition.kind).toLowerCase() })).filter((condition) => condition.kind);
       return { match, conditions };
     };
     invalidUploadPolicy = (field, detail) => {
@@ -62499,7 +61999,7 @@ var init_storageRouteExecution = __esm({
         }
       }
       if (raw === null) return null;
-      if (!isObj14(raw)) return invalidUploadPolicy("accessConditions", "expected an object");
+      if (!isObj13(raw)) return invalidUploadPolicy("accessConditions", "expected an object");
       if (raw.match !== void 0 && (typeof raw.match !== "string" || !["any", "all"].includes(raw.match.trim().toLowerCase()))) {
         return invalidUploadPolicy("accessConditions.match", "expected any or all");
       }
@@ -62515,7 +62015,7 @@ var init_storageRouteExecution = __esm({
         return fields.some((field) => typeof condition[field] === "string" && condition[field].trim());
       };
       const conditions = raw.conditions.map((condition) => {
-        if (!isObj14(condition) || typeof condition.kind !== "string") {
+        if (!isObj13(condition) || typeof condition.kind !== "string") {
           return invalidUploadPolicy("accessConditions.conditions", "expected a rule with a kind");
         }
         const kind = condition.kind.trim().toLowerCase();
@@ -62563,7 +62063,7 @@ var init_storageRouteExecution = __esm({
           raw = { mode: raw };
         }
       }
-      if (!isObj14(raw)) return null;
+      if (!isObj13(raw)) return null;
       const mode = trim8(raw.mode || raw.kind || raw.type).toLowerCase();
       if (!mode) return null;
       return {
@@ -62602,7 +62102,7 @@ var init_storageRouteExecution = __esm({
             }
           }
           if (raw === null) return null;
-          if (!isObj14(raw)) return invalidUploadPolicy("uploadPolicy", "expected an object");
+          if (!isObj13(raw)) return invalidUploadPolicy("uploadPolicy", "expected an object");
           for (const field of ["mode", "kind", "type"]) {
             if (raw[field] !== void 0 && (typeof raw[field] !== "string" || !["group_allowlist", "sbt_allowlist"].includes(raw[field].trim().toLowerCase()))) {
               return invalidUploadPolicy(`uploadPolicy.${field}`, "expected group_allowlist or sbt_allowlist");
@@ -62628,11 +62128,11 @@ var init_storageRouteExecution = __esm({
       } catch {
         return { ok: false, error: "Invalid JSON." };
       }
-      if (!isObj14(raw)) return { ok: false, error: "Invalid JSON." };
+      if (!isObj13(raw)) return { ok: false, error: "Invalid JSON." };
       const data = Object.prototype.hasOwnProperty.call(raw, "data") ? raw.data : "";
       const contentType = trim8(raw.contentType) || (typeof data === "string" ? "text/plain" : "application/json");
       const serialized = isJsonContentType(contentType) && typeof data !== "string" ? JSON.stringify(data) : toStr6(data);
-      const bytes3 = encoder4.encode(serialized);
+      const bytes3 = encoder5.encode(serialized);
       const tooLarge2 = rejectBytesOverLimit({ bytes: bytes3, maxUploadBytes });
       if (tooLarge2) return tooLarge2;
       const policy = readUploadPolicyFields(raw);
@@ -62707,8 +62207,8 @@ var init_storageRouteExecution = __esm({
       return { ok: false, error: "Unsupported Content-Type." };
     };
     readConfiguredStorageBackendCandidate = (config = {}) => {
-      const storageProfile = isObj14(config?.storageProfile) ? config.storageProfile : {};
-      const docLibrary = isObj14(config?.docLibrary) ? config.docLibrary : {};
+      const storageProfile = isObj13(config?.storageProfile) ? config.storageProfile : {};
+      const docLibrary = isObj13(config?.docLibrary) ? config.docLibrary : {};
       return storageProfile.backend || config?.storageBackend || docLibrary.provider || docLibrary.backend || docLibrary.storageBackend;
     };
     resolveConfiguredStorageBackend = ({ config, requestedBackend, payloadEncrypted } = {}) => {
@@ -62718,14 +62218,14 @@ var init_storageRouteExecution = __esm({
       return normalizeStorageBackend(requestedBackend, configured);
     };
     resolvePayloadAccessControl = (config = {}) => {
-      const profile = isObj14(config?.storageProfile) ? config.storageProfile : {};
-      const cloudflare = isObj14(profile.cloudflare) ? profile.cloudflare : {};
-      const payloadAccessControl = isObj14(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
+      const profile = isObj13(config?.storageProfile) ? config.storageProfile : {};
+      const cloudflare = isObj13(profile.cloudflare) ? profile.cloudflare : {};
+      const payloadAccessControl = isObj13(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
       const legacyMode = normalizeLegacyPayloadAccessMode(
         payloadAccessControl.mode || cloudflare.payloadAccessMode || profile.payloadAccessMode || profile.accessControlMode
       );
       const accessControl = Object.prototype.hasOwnProperty.call(payloadAccessControl, "gate") || Object.prototype.hasOwnProperty.call(payloadAccessControl, "encryption") ? normalizePayloadAccessControl2(payloadAccessControl, legacyMode) : normalizePayloadAccessControl2(legacyMode);
-      const resourceGates = isObj14(payloadAccessControl.resources) ? payloadAccessControl.resources : {};
+      const resourceGates = isObj13(payloadAccessControl.resources) ? payloadAccessControl.resources : {};
       const conditions = normalizeAccessConditionDocument(
         payloadAccessControl.accessConditions || payloadAccessControl.conditions || cloudflare.accessConditions || profile.accessConditions
       );
@@ -62743,7 +62243,7 @@ var init_storageRouteExecution = __esm({
     };
     normalizeGateMode = (mode) => mode === 1 || trim8(mode).toLowerCase() === "1" || trim8(mode).toLowerCase() === "all" ? "all" : "any";
     normalizeDirectGate = (gate) => {
-      if (!isObj14(gate)) return null;
+      if (!isObj13(gate)) return null;
       const sbtAddresses = Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses.filter(Boolean) : [];
       return {
         sbtAddresses,
@@ -62782,7 +62282,7 @@ var init_storageRouteExecution = __esm({
     normalizeAddress = (value) => trim8(value).toLowerCase();
     listRoleAddresses = (value) => {
       if (Array.isArray(value)) return value.map(normalizeAddress).filter(Boolean);
-      if (isObj14(value)) {
+      if (isObj13(value)) {
         if (Array.isArray(value.addresses)) return value.addresses.map(normalizeAddress).filter(Boolean);
         if (Array.isArray(value.members)) return value.members.map(normalizeAddress).filter(Boolean);
       }
@@ -62797,7 +62297,7 @@ var init_storageRouteExecution = __esm({
         listRoleAddresses(config.adminAddresses).forEach((address2) => addresses.add(address2));
         listRoleAddresses(config.admin?.addresses).forEach((address2) => addresses.add(address2));
       }
-      const roleMaps = [config.workerRoles, config.roles, config.authorization?.roles].filter(isObj14);
+      const roleMaps = [config.workerRoles, config.roles, config.authorization?.roles].filter(isObj13);
       roleMaps.forEach((roles) => {
         listRoleAddresses(roles[normalizedRole]).forEach((address2) => addresses.add(address2));
       });
@@ -62819,7 +62319,7 @@ var init_storageRouteExecution = __esm({
       return addresses;
     };
     isEnvelopeExportAuthorized = ({ config, requesterAddress, authScopes }) => {
-      const scopes = isObj14(authScopes) ? authScopes : {};
+      const scopes = isObj13(authScopes) ? authScopes : {};
       if (scopes.admin === true || scopes.responseExport === true || scopes.response_export === true || scopes.encryptedEnvelopeExport === true) {
         return true;
       }
@@ -62840,7 +62340,7 @@ var init_storageRouteExecution = __esm({
     evaluateAgentGrantScopeCondition = ({ condition, authScopes }) => {
       const scope = trim8(condition.scope || condition.value);
       if (!scope) return { ok: false, reason: "missing_agent_grant_scope" };
-      const scopes = isObj14(authScopes) ? authScopes : {};
+      const scopes = isObj13(authScopes) ? authScopes : {};
       const scopeLists = [
         scopes.agent_grant,
         scopes.agentGrant,
@@ -63098,9 +62598,9 @@ var init_storageRouteExecution = __esm({
       };
     };
     resolveBareRoleGateCondition = (config = {}) => {
-      const profile = isObj14(config?.storageProfile) ? config.storageProfile : {};
-      const cloudflare = isObj14(profile.cloudflare) ? profile.cloudflare : {};
-      const payloadAccessControl = isObj14(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
+      const profile = isObj13(config?.storageProfile) ? config.storageProfile : {};
+      const cloudflare = isObj13(profile.cloudflare) ? profile.cloudflare : {};
+      const payloadAccessControl = isObj13(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
       return {
         kind: "worker_role",
         role: trim8(
@@ -63137,7 +62637,7 @@ var init_storageRouteExecution = __esm({
     };
     canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
       if (operation === "upload" || !hasPrivateResponsePolicy({ config, resource })) return true;
-      const scopes = isObj14(authScopes) ? authScopes : {};
+      const scopes = isObj13(authScopes) ? authScopes : {};
       const address2 = normalizeAddress(requesterAddress);
       if (address2 && resolveRoleAddressSet2({ config, role: "admin" }).has(address2)) return true;
       const delegatedScopes = [scopes.agent_grant, scopes.agentGrant, scopes.delegationScopes].filter(Array.isArray);
@@ -63627,6 +63127,19 @@ var init_storageRouteExecution = __esm({
           }, 409, baseHeaders);
         }
       }
+      const requestId = trim8(payload.requestId);
+      let uploadReceipt = null;
+      if (resource === "responses" && uploader && requestId && requestId.length <= 200) {
+        const digest2 = await (deps?.crypto || globalThis.crypto).subtle.digest("SHA-256", payload.bytes || new Uint8Array());
+        const payloadDigest = Array.from(new Uint8Array(digest2), (byte) => byte.toString(16).padStart(2, "0")).join("");
+        uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: "reserve", payload: { requestId, payloadDigest } });
+        if (uploadReceipt?.kind === "replay") {
+          return responseJson(deps, { id: uploadReceipt.storageRef.id, storageRef: uploadReceipt.storageRef, replayed: true }, 200, baseHeaders);
+        }
+        if (uploadReceipt && uploadReceipt.kind !== "execute") {
+          return responseJson(deps, { error: uploadReceipt.error, reason: uploadReceipt.reason }, uploadReceipt.status || 503, baseHeaders);
+        }
+      }
       let id2 = "";
       try {
         id2 = buildCloudflareStorageId({
@@ -63742,6 +63255,16 @@ var init_storageRouteExecution = __esm({
         await index.put(buildIndexKey({ slug, resource, id: id2 }), serializedMetadata);
       }
       const storageRef = normalizeStorageRef(metadata);
+      if (uploadReceipt) {
+        const settled = await coordinateResponseUploadReceipt({
+          env,
+          slug,
+          responder: uploader,
+          operation: "settle",
+          payload: { requestId, attemptId: uploadReceipt.attemptId, storageRef }
+        });
+        if (!settled?.ok) return responseJson(deps, { error: "Upload settlement is unavailable; retry.", reason: "upload_receipt_unavailable" }, 503, baseHeaders);
+      }
       if (resource === "responses") {
         const enqueueAutomatic = deps?.enqueueResultsAnalysisAutoJob;
         if (typeof enqueueAutomatic === "function") {
@@ -63819,7 +63342,7 @@ var init_storageRouteExecution = __esm({
       } catch {
         return { ok: false, error: "Invalid JSON." };
       }
-      if (!isObj14(body)) return { ok: false, error: "Invalid JSON." };
+      if (!isObj13(body)) return { ok: false, error: "Invalid JSON." };
       return {
         ok: true,
         resource: queryResource || trim8(body.resource) || "docsContext",
@@ -63841,13 +63364,13 @@ var init_storageRouteExecution = __esm({
       if (canReadR2 && !canReadKvPayload) {
         return responseJson(deps, { error: "Cloudflare R2 storage requires an index KV binding." }, 501, baseHeaders);
       }
-      let object2 = null;
+      let object4 = null;
       let metadata = null;
       let body = null;
       if (canReadR2) {
-        object2 = await r2.get(buildObjectKey({ slug, id: id2 }));
-        if (object2) {
-          const indexedResource = trim8(object2?.customMetadata?.resource) || "docsContext";
+        object4 = await r2.get(buildObjectKey({ slug, id: id2 }));
+        if (object4) {
+          const indexedResource = trim8(object4?.customMetadata?.resource) || "docsContext";
           let rawMetadata;
           try {
             rawMetadata = await index.get(buildIndexKey({ slug, resource: indexedResource, id: id2 }));
@@ -63872,7 +63395,7 @@ var init_storageRouteExecution = __esm({
               baseHeaders
             );
           }
-          if (!isObj14(metadata) || trim8(metadata.id) !== id2 || (trim8(metadata.resource) || "docsContext") !== indexedResource) {
+          if (!isObj13(metadata) || trim8(metadata.id) !== id2 || (trim8(metadata.resource) || "docsContext") !== indexedResource) {
             return responseJson(
               deps,
               { error: "Cloudflare storage index metadata is unavailable." },
@@ -63882,14 +63405,14 @@ var init_storageRouteExecution = __esm({
           }
         }
       }
-      if (!object2 && canReadKvPayload) {
+      if (!object4 && canReadKvPayload) {
         const envelope = await readKvPayloadEnvelope({ index, slug, id: id2 });
-        if (!envelope || !isObj14(envelope?.metadata)) {
+        if (!envelope || !isObj13(envelope?.metadata)) {
           return responseJson(deps, { error: "Storage object not found." }, 404, baseHeaders);
         }
         metadata = envelope.metadata;
         body = base64urlToBytes2(envelope.payloadBase64url);
-      } else if (!object2 && !canReadKvPayload) {
+      } else if (!object4 && !canReadKvPayload) {
         return responseJson(deps, { error: "Storage object not found." }, 404, baseHeaders);
       }
       const resource = trim8(metadata?.resource) || "docsContext";
@@ -63905,12 +63428,12 @@ var init_storageRouteExecution = __esm({
         deps
       });
       if (!access.ok) return access.response;
-      if (object2) {
-        body = object2?.body || object2;
-        if (typeof object2?.arrayBuffer === "function") {
-          body = await object2.arrayBuffer();
-        } else if (typeof object2?.text === "function") {
-          body = await object2.text();
+      if (object4) {
+        body = object4?.body || object4;
+        if (typeof object4?.arrayBuffer === "function") {
+          body = await object4.arrayBuffer();
+        } else if (typeof object4?.text === "function") {
+          body = await object4.text();
         }
       }
       let responseBody = body;
@@ -64108,7 +63631,7 @@ var init_storageRouteExecution = __esm({
             const raw = await index.get(key);
             if (raw != null) budget?.metadata(raw);
             const metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
-            if (isObj14(metadata) && trim8(metadata.id)) rows.push({ key, metadata });
+            if (isObj13(metadata) && trim8(metadata.id)) rows.push({ key, metadata });
             else if (strict) throw new Error("Storage metadata is missing or invalid.");
           } catch (error) {
             if (strict || isStorageReadLimitError(error)) throw error;
@@ -64129,9 +63652,9 @@ var init_storageRouteExecution = __esm({
       const r2 = getStorageR2Binding(env);
       if (r2 && typeof r2.get === "function") {
         budget?.operation();
-        const object2 = await r2.get(buildObjectKey({ slug, id: id2 }));
-        if (object2) {
-          const bytes3 = await readStorageBytesBounded(object2, limit);
+        const object4 = await r2.get(buildObjectKey({ slug, id: id2 }));
+        if (object4) {
+          const bytes3 = await readStorageBytesBounded(object4, limit);
           budget?.payload(bytes3.length);
           return bytes3;
         }
@@ -64154,7 +63677,7 @@ var init_storageRouteExecution = __esm({
       try {
         let bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata });
         if (!bytes3) return null;
-        if (isObj14(metadata?.envelope)) {
+        if (isObj13(metadata?.envelope)) {
           bytes3 = await decryptPayloadWithStorageEnvelope({
             env,
             config,
@@ -64166,7 +63689,7 @@ var init_storageRouteExecution = __esm({
           });
         }
         const payload = JSON.parse(decoder4.decode(await toUint8Array(bytes3)));
-        return isObj14(payload) ? payload : null;
+        return isObj13(payload) ? payload : null;
       } catch {
         return null;
       }
@@ -64182,11 +63705,11 @@ var init_storageRouteExecution = __esm({
     readLegacyRowResourceId = async ({ env, index, slug, config, resource, metadata, deps }) => {
       const recorded = normalizeAddress(metadata.resourceId);
       if (recorded) return recorded;
-      if (metadata.encrypted === true && !isObj14(metadata.envelope)) return "";
+      if (metadata.encrypted === true && !isObj13(metadata.envelope)) return "";
       let bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true });
       if (!bytes3) return "";
       try {
-        if (isObj14(metadata.envelope)) {
+        if (isObj13(metadata.envelope)) {
           bytes3 = await decryptPayloadWithStorageEnvelope({
             env,
             config,
@@ -64198,7 +63721,7 @@ var init_storageRouteExecution = __esm({
           });
         }
         const payload = JSON.parse(decoder4.decode(await toUint8Array(bytes3)));
-        const resourceId = isObj14(payload) ? readStoragePayloadResourceId(resource, payload) : "";
+        const resourceId = isObj13(payload) ? readStoragePayloadResourceId(resource, payload) : "";
         return isStorageResourceId(resourceId) ? resourceId : "";
       } catch {
         return "";
@@ -64240,7 +63763,7 @@ var init_storageRouteExecution = __esm({
           } catch {
             continue;
           }
-          if (!isObj14(metadata) || !trim8(metadata.id) || normalizeAddress(metadata.uploader)) continue;
+          if (!isObj13(metadata) || !trim8(metadata.id) || normalizeAddress(metadata.uploader)) continue;
           const resourceId = await readLegacyRowResourceId({ env, index, slug, config, resource, metadata, deps });
           if (resourceId) ids.add(resourceId);
           else skippedRows += 1;
@@ -64280,7 +63803,7 @@ var init_storageRouteExecution = __esm({
             } catch {
               metadata = null;
             }
-            rows.push({ key, metadata: isObj14(metadata) && trim8(metadata.id) ? metadata : null });
+            rows.push({ key, metadata: isObj13(metadata) && trim8(metadata.id) ? metadata : null });
           }
           yield rows;
         }
@@ -64458,7 +63981,7 @@ var init_storageRouteExecution = __esm({
             metadata = null;
           }
           let deferred = false;
-          if (!isObj14(metadata) || !trim8(metadata.id)) {
+          if (!isObj13(metadata) || !trim8(metadata.id)) {
             readErrors.push({ key, error: "invalid_metadata" });
           } else {
             const metadataAccess = normalizePayloadAccessControl2(metadata.payloadAccessControl || metadata.payloadAccessMode || resolvePayloadAccessControl(config));
@@ -64493,7 +64016,7 @@ var init_storageRouteExecution = __esm({
                       payloadAccessMode: deriveLegacyPayloadAccessMode2(metadataAccess),
                       ...metadata.accessConditions ? { accessConditions: metadata.accessConditions } : {}
                     },
-                    envelope: isObj14(metadata.envelope) ? metadata.envelope : null,
+                    envelope: isObj13(metadata.envelope) ? metadata.envelope : null,
                     ciphertextBase64url: bytesToBase64url2(ciphertextBytes),
                     keyProvider: keyProvider2,
                     wrappedKeysIncluded: !!trim8(metadata.envelope?.dek?.wrappedKey)
@@ -64530,7 +64053,7 @@ var init_storageRouteExecution = __esm({
         storageListError = { reason: trim8(error?.message || "storage_list_failed").slice(0, 500) };
         nextCursor || (nextCursor = resume(position.pageCursor, position.lastKey));
       }
-      const sessionEnvelope = includeSessionEnvelope && isObj14(config?.storageEnvelope) ? JSON.parse(JSON.stringify(config.storageEnvelope)) : null;
+      const sessionEnvelope = includeSessionEnvelope && isObj13(config?.storageEnvelope) ? JSON.parse(JSON.stringify(config.storageEnvelope)) : null;
       const keyProvider = resolveEnvelopeExportManifestKeyProvider({ sessionEnvelope, payloads });
       const deploymentKekContinuityRequired = !!trim8(sessionEnvelope?.sessionKey?.wrappedKey) || payloads.some((entry) => entry.keyProvider === "worker_secret" || entry.keyProvider === "mixed");
       const manifest = {
@@ -64667,6 +64190,1032 @@ var init_storageRouteExecution = __esm({
         return responseJson(deps, result, result.ok ? 200 : result.status || 500, baseHeaders);
       }
       return responseJson(deps, { error: "Not found." }, 404, baseHeaders);
+    };
+  }
+});
+
+// workers/sessionCorsWorker/sessionBackupImport.js
+var fail2, object3, stable, same, digest, hashPattern, resources, temporary, validateSnapshot, validatePage, importCoordinatorBackupPage;
+var init_sessionBackupImport = __esm({
+  "workers/sessionCorsWorker/sessionBackupImport.js"() {
+    init_recoveryKey();
+    init_deployHelperCore();
+    init_sessionSlugResolution();
+    init_sessionConfigMutation();
+    init_sessionSecretsEnvelope();
+    init_workerGroups();
+    init_storageEnvelopeEncryption();
+    init_storageRefNormalization();
+    init_storageUploadValidation();
+    init_storageScanBudget();
+    init_uploadSizeLimits();
+    init_storageRouteExecution();
+    fail2 = (message, status = 400, reason) => {
+      throw Object.assign(new Error(message), { status, reason });
+    };
+    object3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    stable = (value) => JSON.stringify(value, (_, item) => object3(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+    same = (a, b2) => stable(a) === stable(b2);
+    digest = async (bytes3) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes3))].map((v) => v.toString(16).padStart(2, "0")).join("");
+    hashPattern = /^[a-f0-9]{64}$/;
+    resources = /* @__PURE__ */ new Set(["docsContext", "questions", "surveys", "responses", "generatedArtifacts", "media", "images"]);
+    temporary = { expirationTtl: 7 * 86400 };
+    validateSnapshot = ({ snapshot, manifest, normalizeConfig, normalizeSessionKey }) => {
+      const authority = snapshot?.configAuthority;
+      const slug = manifest.sessionSlug;
+      if (!object3(authority) || authority.schemaVersion !== 1 || authority.slug !== slug || Object.keys(authority).some((key) => !["schemaVersion", "slug", "revision", "config", "projectionPending", "activeSessionKey"].includes(key)) || !Number.isSafeInteger(authority.revision) || authority.revision < 1 || authority.projectionPending !== false || !normalizeConfig(authority.config, slug) || resolveCanonicalWorkerSessionIdHex(authority.config) !== manifest.sessionId || !object3(snapshot.wrappedSessionKeys) || !same(snapshot.wrappedSessionKeys.activeSessionKey, authority.activeSessionKey || null)) {
+        fail2("Invalid backup config authority.");
+      }
+      if (authority.activeSessionKey && !normalizeSessionKey(authority.activeSessionKey, slug)) fail2("Invalid wrapped session key.");
+      const signer = snapshot.wrappedSessionKeys.litAuthorizationSigner;
+      if (signer && (signer.version !== 1 || signer.slug !== slug || Object.keys(signer).some((key) => !["version", "slug", "envelope"].includes(key)) || !isEncryptedSessionSecretsEnvelope(signer.envelope))) fail2("Invalid wrapped authorization signer.");
+      if (snapshot.secrets && !isEncryptedSessionSecretsEnvelope(snapshot.secrets)) fail2("Backup secrets must be ciphertext.");
+      if (!Array.isArray(snapshot.workerGroups?.durable) || !Array.isArray(snapshot.workerGroups?.records)) fail2("Invalid backup groups.");
+    };
+    validatePage = (page, slug) => {
+      const m = page?.manifest;
+      if (!object3(m) || m.type !== "ce_session_backup" || m.version !== 1 || m.sessionSlug !== slug || resolveCanonicalWorkerSessionIdHex({ sessionId: m.sessionId }) !== m.sessionId || !hashPattern.test(m.kekFingerprint || "") || !hashPattern.test(page.archiveId || "") || !hashPattern.test(page.snapshotDigest || "") || !Number.isSafeInteger(page.pageNumber) || page.pageNumber < 0 || typeof m.complete !== "boolean" || !Array.isArray(page.entries) || jsonByteLength(page) > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes || !object3(m.counts) || !["records", "payloads", "owners", "hidden", "bytes"].every((key) => Number.isSafeInteger(m.counts[key]) && m.counts[key] >= 0)) {
+        fail2("Invalid session backup page.");
+      }
+      for (const entry of page.entries) {
+        if (!object3(entry)) fail2("Invalid backup entry.");
+        if (entry.kind === "record") {
+          if (!resources.has(entry.resource) || !isSafeCloudflareStorageRefId(entry.id) || !object3(entry.metadata) || entry.metadata.id !== entry.id || entry.metadata.resource !== entry.resource || entry.key !== buildIndexKey({ slug, resource: entry.resource, id: entry.id })) fail2("Invalid backup metadata key.");
+        } else if (entry.kind === "owner" || entry.kind === "hidden") {
+          const prefix = `ce-storage-${entry.kind}:${slug}:`;
+          const suffix = typeof entry.key === "string" ? entry.key.slice(prefix.length) : "";
+          const separator = suffix.indexOf(":");
+          if (typeof entry.key !== "string" || !entry.key.startsWith(prefix) || !["questions", "surveys"].includes(suffix.slice(0, separator)) || !isStorageResourceId(suffix.slice(separator + 1)) || typeof entry.value !== "string" || !object3(JSON.parse(entry.value))) fail2("Invalid backup ownership key.");
+        } else if (entry.kind === "payload" || entry.kind === "chunk") {
+          if (entry.target !== void 0 && entry.target !== "coordinator") fail2("Invalid backup payload target.");
+          if (entry.target === "coordinator" ? entry.id !== "coordinator" : !isSafeCloudflareStorageRefId(entry.id)) fail2("Invalid backup payload id.");
+          if (entry.kind === "payload") {
+            if (!Number.isSafeInteger(entry.size) || entry.size < 0 || !hashPattern.test(entry.sha256 || "") || entry.chunkCount !== Math.max(1, Math.ceil(entry.size / (256 * 1024))) || entry.metadata && (!object3(entry.metadata) || entry.metadata.id !== entry.id)) fail2("Invalid backup payload header.");
+          } else if (!Number.isSafeInteger(entry.index) || entry.index < 0 || typeof entry.base64url !== "string" || entry.base64url.length > Math.ceil(256 * 1024 * 4 / 3) || !/^[A-Za-z0-9_-]*$/.test(entry.base64url)) fail2("Invalid backup chunk.");
+        } else fail2("Unknown backup entry kind.");
+      }
+    };
+    importCoordinatorBackupPage = async (coordinator, payload, validators) => {
+      const { env, state: { storage } } = coordinator;
+      const { page, expectedAuthority } = payload || {};
+      const slug = sessionSlugStorageKey(payload?.slug);
+      validatePage(page, slug);
+      const manifest = page.manifest;
+      const current = await coordinator.assertSessionAuthority(payload);
+      const targetId = resolveCanonicalWorkerSessionIdHex(current?.config || {});
+      if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail2("The backup session identity does not match this target.", 409, "backup_session_mismatch");
+      const fingerprints = await Promise.all([env.CE_STORAGE_ENVELOPE_KEK, env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK].filter(Boolean).map(recoveryKeyFingerprint));
+      if (!fingerprints.includes(manifest.kekFingerprint)) fail2("The target does not hold this backup recovery key.", 409, "recovery_key_mismatch");
+      if (page.archiveId !== await sha256Hex2(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail2("Invalid backup archive identity.");
+      const index = getStorageIndexBinding(env);
+      if (!index?.get || !index?.put || !index?.delete) fail2("Restore storage is unavailable.", 503);
+      const stateKey = `session-backup-import:${page.archiveId}`;
+      const activeKey = "session-backup-import-active";
+      const active = await storage.get(activeKey);
+      if (active && active !== page.archiveId && !(await storage.get(`session-backup-import:${active}`))?.finished) fail2("Another backup restore is in progress.", 409);
+      const pageHash = await sha256Hex2(JSON.stringify(page));
+      const receiptKey = `${stateKey}:page:${page.pageNumber}`;
+      const receipt = await storage.get(receiptKey);
+      if (receipt) {
+        if (receipt.hash !== pageHash) fail2("This backup page differs from the previously imported page.", 409);
+        return Response.json({ ...receipt.result, replayed: true });
+      }
+      const root = `ce-import-stage:${slug}:${page.archiveId}:`;
+      const descriptorKey = (id2, target = "") => `${stateKey}:payload:${target || "storage"}:${id2}`;
+      const recordKey2 = (id2) => `${stateKey}:record:${id2}`;
+      const chunkKey = (id2, n2, target = "") => `${target ? "ce-import-coordinator-chunk" : "ce-import-chunk"}:${slug}:${id2}:${n2}`;
+      let progress = await storage.get(stateKey);
+      if (!progress) {
+        if (page.pageNumber !== 0 || !page.coordinator) fail2("Import must begin with the first backup page.", 409);
+        progress = {
+          actor: expectedAuthority.actor,
+          pageNumber: 0,
+          nextEntry: 0,
+          pageHash,
+          manifest: { ...manifest, counts: void 0, complete: void 0 },
+          counts: { written: 0, skipped: 0, conflicts: 0 },
+          conflicts: [],
+          observed: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 },
+          pendingPayloads: 0,
+          pendingRecords: 0,
+          snapshotReady: false,
+          finished: false
+        };
+        if (page.coordinator.chunked !== true) {
+          validateSnapshot({ snapshot: page.coordinator, manifest, ...validators });
+          if (await sha256Hex2(JSON.stringify(page.coordinator)) !== page.snapshotDigest) fail2("The coordinator snapshot checksum does not match.");
+          await index.put(`${root}coordinator`, JSON.stringify(page.coordinator), temporary);
+          progress.snapshotReady = true;
+        } else if (page.coordinator.sha256 !== page.snapshotDigest) fail2("Invalid coordinator snapshot descriptor.");
+        await storage.put(activeKey, page.archiveId);
+        await storage.put(stateKey, progress);
+      }
+      if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.finished || progress.nextEntry > 0 && progress.pageHash !== pageHash || !same(progress.manifest, { ...manifest, counts: void 0, complete: void 0 })) fail2("Backup pages must be imported unchanged and in order.", 409);
+      progress.pageHash = pageHash;
+      const conflict = (key) => {
+        progress.counts.conflicts += 1;
+        if (progress.conflicts.length < 50) progress.conflicts.push(key);
+      };
+      const write = async (store, key, value, json4 = false) => {
+        const existing = await store.get(key);
+        if (existing != null) {
+          let identical = existing === value;
+          if (!identical && json4) {
+            try {
+              identical = same(JSON.parse(existing), JSON.parse(value));
+            } catch {
+            }
+          }
+          if (identical) progress.counts.skipped += 1;
+          else conflict(key);
+          return identical;
+        }
+        await store.put(key, value);
+        progress.counts.written += 1;
+        return true;
+      };
+      const assemble = async (header) => {
+        const bytes3 = new Uint8Array(header.size);
+        let offset = 0;
+        for (let n2 = 0; n2 < header.chunkCount; n2 += 1) {
+          const raw = await index.get(chunkKey(header.id, n2, header.target));
+          if (raw == null) fail2("A restore chunk is missing. Retry the interrupted page.", 409);
+          const chunk = base64urlToBytes2(raw);
+          if (offset + chunk.length > bytes3.length) fail2("Backup payload size mismatch.");
+          bytes3.set(chunk, offset);
+          offset += chunk.length;
+        }
+        if (offset !== header.size || await digest(bytes3) !== header.sha256) fail2("Backup payload checksum mismatch.");
+        return bytes3;
+      };
+      for (let i = progress.nextEntry; i < page.entries.length; i += 1) {
+        const entry = page.entries[i];
+        const updates = [];
+        const cleanup = [];
+        if (entry.kind === "owner" || entry.kind === "hidden") {
+          await write(index, entry.key, entry.value, true);
+          progress.observed[entry.kind === "owner" ? "owners" : "hidden"] += 1;
+        } else if (entry.kind === "record") {
+          if (await storage.get(recordKey2(entry.id))) fail2("Duplicate backup metadata id.");
+          const header = await storage.get(descriptorKey(entry.id));
+          if (header?.done) {
+            if (header.payloadOk !== false) await write(index, entry.key, JSON.stringify(entry.metadata), true);
+            updates.push([recordKey2(entry.id), { applied: true }]);
+          } else {
+            await index.put(`${root}record:${entry.id}`, JSON.stringify(entry), temporary);
+            updates.push([recordKey2(entry.id), { pending: true }]);
+            progress.pendingRecords += 1;
+          }
+          progress.observed.records += 1;
+        } else if (entry.kind === "payload") {
+          if (await storage.get(descriptorKey(entry.id, entry.target))) fail2("Duplicate backup payload id.");
+          if (entry.size > resolveMaxUploadBytes({ env })) fail2("The backup payload exceeds this target\u2019s configured upload limit.", 413);
+          const { metadata } = entry;
+          const header = { id: entry.id, size: entry.size, sha256: entry.sha256, chunkCount: entry.chunkCount, ...entry.target ? { target: entry.target } : {} };
+          if (metadata) await index.put(`${root}metadata:${entry.id}`, JSON.stringify(metadata), temporary);
+          updates.push([descriptorKey(entry.id, entry.target), { ...header, nextChunk: 0, done: false }]);
+          progress.pendingPayloads += 1;
+        } else {
+          const header = await storage.get(descriptorKey(entry.id, entry.target));
+          if (!header || header.done || header.nextChunk !== entry.index || entry.index >= header.chunkCount) fail2("Backup chunks must follow their payload header in order.");
+          if (bytesToBase64url2(base64urlToBytes2(entry.base64url)) !== entry.base64url) fail2("Invalid backup chunk encoding.");
+          await index.put(chunkKey(entry.id, entry.index, entry.target), entry.base64url, temporary);
+          header.nextChunk += 1;
+          if (header.nextChunk === header.chunkCount) {
+            const bytes3 = await assemble(header);
+            if (entry.target === "coordinator") {
+              const snapshot = JSON.parse(new TextDecoder().decode(bytes3));
+              validateSnapshot({ snapshot, manifest, ...validators });
+              if (header.sha256 !== page.snapshotDigest) fail2("The coordinator snapshot checksum does not match.");
+              progress.snapshotReady = true;
+              progress.chunkedSnapshot = true;
+            } else {
+              const staged = JSON.parse(await index.get(`${root}record:${entry.id}`) || "null");
+              const metadata = staged?.metadata || JSON.parse(await index.get(`${root}metadata:${entry.id}`) || "null") || { id: entry.id };
+              const existing = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true });
+              let payloadOk = true;
+              const rawExisting = await index.get(buildPayloadKey({ slug, id: entry.id }));
+              if (existing || rawExisting != null) {
+                payloadOk = !!existing && existing.length === bytes3.length && await digest(existing) === header.sha256;
+                if (payloadOk) progress.counts.skipped += 1;
+                else conflict(buildPayloadKey({ slug, id: entry.id }));
+              } else {
+                const r2 = getStorageR2Binding(env);
+                if (r2?.put) await r2.put(buildObjectKey({ slug, id: entry.id }), bytes3, { httpMetadata: { contentType: metadata.contentType || "application/octet-stream" } });
+                else {
+                  const value = JSON.stringify({ metadata, payloadBase64url: bytesToBase64url2(bytes3) });
+                  const tooLarge2 = rejectKvValueOverLimit({ serializedValue: value });
+                  if (tooLarge2) fail2("This payload needs an R2 binding on the restore target.", 413);
+                  await index.put(buildPayloadKey({ slug, id: entry.id }), value);
+                }
+                progress.counts.written += 1;
+              }
+              if (staged && (await storage.get(recordKey2(entry.id)))?.pending) {
+                if (payloadOk) await write(index, staged.key, JSON.stringify(staged.metadata), true);
+                progress.pendingRecords -= 1;
+                updates.push([recordKey2(entry.id), { applied: true }]);
+              }
+              progress.observed.payloads += 1;
+              progress.observed.bytes += bytes3.length;
+              header.payloadOk = payloadOk;
+              for (let n2 = 0; n2 < header.chunkCount; n2 += 1) cleanup.push(chunkKey(entry.id, n2));
+            }
+            progress.pendingPayloads -= 1;
+            header.done = true;
+          }
+          updates.push([descriptorKey(entry.id, entry.target), header]);
+        }
+        progress.nextEntry = i + 1;
+        await storage.transaction(async (transaction) => {
+          for (const [key, value] of updates) await transaction.put(key, value);
+          await transaction.put(stateKey, progress);
+        });
+        for (const key of cleanup) await index.delete(key);
+      }
+      for (const id2 of new Set(page.entries.filter((entry) => entry.kind === "chunk" && !entry.target).map((entry) => entry.id))) {
+        const header = await storage.get(descriptorKey(id2));
+        if (header?.done) for (let n2 = 0; n2 < header.chunkCount; n2 += 1) await index.delete(chunkKey(id2, n2));
+      }
+      if (manifest.complete) {
+        if (!progress.snapshotReady || progress.pendingPayloads || progress.pendingRecords || !same(progress.observed, manifest.counts)) fail2("The backup is incomplete; its records or chunks are missing.", 409);
+        const snapshot = progress.chunkedSnapshot ? JSON.parse(new TextDecoder().decode(await assemble(await storage.get(descriptorKey("coordinator", "coordinator"))))) : JSON.parse(await index.get(`${root}coordinator`) || "null");
+        validateSnapshot({ snapshot, manifest, ...validators });
+        const authority = snapshot.configAuthority;
+        if (current && !same(current, authority)) conflict("session-config-authority");
+        if (!progress.counts.conflicts) {
+          const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: "import", snapshot: snapshot.workerGroups });
+          if (!groups.ok) fail2(groups.error || "Group restore is unavailable.", groups.status || 503);
+          progress.counts.written += groups.counts.written;
+          progress.counts.skipped += groups.counts.skipped;
+          for (const key of groups.conflicts || []) conflict(key);
+          if (snapshot.secrets) await write(env.GROUP_KV, `session:${normalizeWorkerSessionSlug(slug)}:secrets`, JSON.stringify(snapshot.secrets), true);
+          const signer = snapshot.wrappedSessionKeys.litAuthorizationSigner;
+          if (signer) {
+            const existing = await storage.get("session-lit-authorization-signer-v1");
+            if (existing && !same(existing, signer)) conflict("session-lit-authorization-signer-v1");
+            else if (existing) progress.counts.skipped += 1;
+            else {
+              await storage.put("session-lit-authorization-signer-v1", signer);
+              progress.counts.written += 1;
+            }
+          }
+          if (!progress.counts.conflicts && !current) {
+            await storage.put("session-config-authority", { ...authority, projectionPending: true });
+            await coordinator.projectSessionConfigAuthority(authority);
+            progress.counts.written += 1;
+          }
+        }
+        progress.finished = true;
+      }
+      const result = {
+        ok: true,
+        archiveId: page.archiveId,
+        pageNumber: page.pageNumber,
+        counts: progress.counts,
+        conflicts: progress.conflicts,
+        complete: progress.finished && !progress.counts.conflicts
+      };
+      progress.pageNumber += 1;
+      progress.nextEntry = 0;
+      await storage.transaction(async (transaction) => {
+        await transaction.put(stateKey, progress);
+        await transaction.put(receiptKey, { hash: pageHash, result });
+      });
+      if (progress.finished && progress.chunkedSnapshot) {
+        const header = await storage.get(descriptorKey("coordinator", "coordinator"));
+        for (let n2 = 0; n2 < header.chunkCount; n2 += 1) await index.delete(chunkKey("coordinator", n2, "coordinator"));
+      }
+      return Response.json(result);
+    };
+  }
+});
+
+// workers/sessionCorsWorker/sponsoredBootstrapGrantStore.js
+var DEFAULT_TOKEN_BYTE_LENGTH, toTrimmedString8, SPONSORED_GRANT_TYPES, buildSponsoredGrantKvKey, buildSponsoredGrantToken, computeSponsoredGrantExpirationTtl, readSponsoredGrantRecord, writeSponsoredGrantRecord, deleteSponsoredGrantRecord, normalizeSensitiveValues, redactSponsoredSensitiveText, buildSafeSponsoredReceiptBody, buildSponsoredGrantContinuationRecord, writeSponsoredGrantReceipt;
+var init_sponsoredBootstrapGrantStore = __esm({
+  "workers/sessionCorsWorker/sponsoredBootstrapGrantStore.js"() {
+    init_responseKvHelpers();
+    DEFAULT_TOKEN_BYTE_LENGTH = 24;
+    toTrimmedString8 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+    SPONSORED_GRANT_TYPES = Object.freeze({
+      deploy: "deploy-worker",
+      faucet: "faucet-tx"
+    });
+    buildSponsoredGrantKvKey = (token = "") => `sponsoredGrant:${toTrimmedString8(token)}`;
+    buildSponsoredGrantToken = ({
+      byteLength: byteLength2 = DEFAULT_TOKEN_BYTE_LENGTH,
+      cryptoImpl = globalThis.crypto
+    } = {}) => {
+      if (!cryptoImpl?.getRandomValues) {
+        throw new Error("Secure random generator unavailable.");
+      }
+      const bytes3 = new Uint8Array(Number(byteLength2 || 0) || DEFAULT_TOKEN_BYTE_LENGTH);
+      cryptoImpl.getRandomValues(bytes3);
+      return Array.from(bytes3).map((value) => value.toString(16).padStart(2, "0")).join("");
+    };
+    computeSponsoredGrantExpirationTtl = (expiresAt = "", nowMs = Date.now()) => {
+      const normalized = toTrimmedString8(expiresAt);
+      if (!normalized) return null;
+      const expirationMs = Date.parse(normalized);
+      if (!Number.isFinite(expirationMs)) {
+        throw new Error("Sponsored bootstrap grant expiry must be a valid date/time.");
+      }
+      const ttlSeconds = Math.ceil((expirationMs - Number(nowMs || 0)) / 1e3);
+      if (ttlSeconds <= 0) {
+        throw new Error("Sponsored bootstrap grant expiry must be in the future.");
+      }
+      return ttlSeconds;
+    };
+    readSponsoredGrantRecord = async (env, token, deps = {}) => {
+      const getKvJsonFn = typeof deps.getKvJson === "function" ? deps.getKvJson : getKvJson;
+      return getKvJsonFn(env, buildSponsoredGrantKvKey(token));
+    };
+    writeSponsoredGrantRecord = async (env, token, record, ttlSeconds = null, deps = {}) => {
+      const putKvJsonFn = typeof deps.putKvJson === "function" ? deps.putKvJson : putKvJson;
+      return putKvJsonFn(env, buildSponsoredGrantKvKey(token), record, ttlSeconds || void 0);
+    };
+    deleteSponsoredGrantRecord = async (env, token) => env?.GROUP_KV?.delete?.(buildSponsoredGrantKvKey(token));
+    normalizeSensitiveValues = (values = []) => Array.from(new Set(
+      (Array.isArray(values) ? values : []).map((value) => toTrimmedString8(value)).filter((value) => value.length >= 4)
+    )).sort((left, right) => right.length - left.length);
+    redactSponsoredSensitiveText = (value, sensitiveValues = []) => {
+      let redacted = toTrimmedString8(value);
+      normalizeSensitiveValues(sensitiveValues).forEach((secret) => {
+        redacted = redacted.split(secret).join("[REDACTED]");
+      });
+      return redacted;
+    };
+    buildSafeSponsoredReceiptBody = (incoming = {}, sensitiveValues = []) => {
+      const body = {};
+      [
+        "ok",
+        "error",
+        "workerName",
+        "workerUrl",
+        "deploymentKind",
+        "accountId",
+        "sessionSlug",
+        "sessionWorkerOrigin",
+        "telegramConfigured",
+        "resolvedSlug",
+        "kvNamespaceId",
+        "deploymentId",
+        "sessionConfigKey",
+        "sessionSecretsKey",
+        "sessionKvPrefix",
+        "partial",
+        "writesSessionConfig",
+        "writesSessionSecrets",
+        "tokenSecretSet",
+        "tokenSecretPreserved",
+        "envelopeKekSecretSet",
+        "envelopeKekSecretPreserved",
+        "recoveryKeyFingerprint",
+        "subdomain",
+        "subdomainStatus",
+        "subdomainEnabled",
+        "subdomainError",
+        "scriptSubdomainEnabled",
+        "scriptSubdomainError",
+        "configVerified",
+        "deploymentRequestPending",
+        "deploymentRequestTerminal",
+        "deploymentRequestConflict",
+        "sponsoredGrantPayloadConflict",
+        "txHash",
+        "status",
+        "to",
+        "amountEth",
+        "chainId"
+      ].forEach((key) => {
+        const rawValue = incoming?.[key];
+        const value = key === "error" && typeof rawValue === "string" ? redactSponsoredSensitiveText(rawValue, sensitiveValues) : rawValue;
+        if (typeof value === "string" || typeof value === "boolean" || Number.isFinite(value)) {
+          body[key] = value;
+        }
+      });
+      if (incoming?.orphanResources && typeof incoming.orphanResources === "object") {
+        const orphanResources = {};
+        ["kvNamespaceId", "kvCleanupStatus", "workerName", "workerCleanupStatus"].forEach((key) => {
+          const value = incoming.orphanResources[key];
+          if (typeof value === "string") {
+            orphanResources[key] = redactSponsoredSensitiveText(value, sensitiveValues);
+          }
+        });
+        if (Object.keys(orphanResources).length) body.orphanResources = orphanResources;
+      }
+      if (incoming?.bundleDiagnostics && typeof incoming.bundleDiagnostics === "object") {
+        const bundleDiagnostics = {};
+        [
+          "source",
+          "length",
+          "sha256",
+          "hasAnyExport",
+          "hasExportDefault",
+          "hasNamedDefaultExport",
+          "hasStringExportWrapper",
+          "hasFetchHandler",
+          "hasServiceWorkerFetch"
+        ].forEach((key) => {
+          const value = incoming.bundleDiagnostics[key];
+          if (typeof value === "string") {
+            bundleDiagnostics[key] = redactSponsoredSensitiveText(value, sensitiveValues);
+          } else if (typeof value === "boolean" || Number.isFinite(value)) {
+            bundleDiagnostics[key] = value;
+          }
+        });
+        if (Object.keys(bundleDiagnostics).length) body.bundleDiagnostics = bundleDiagnostics;
+      }
+      for (const [field, keys] of Object.entries({
+        resources: ["kvNamespaceId", "kvReused"],
+        health: ["ok", "protocolVersion", "authorityPinned", "accessEnabled"],
+        agentSessionWrapped: ["version", "enabled", "origin", "protocolVersion", "revision", "verifiedAt"]
+      })) {
+        if (!incoming?.[field] || typeof incoming[field] !== "object" || Array.isArray(incoming[field])) continue;
+        const safe = {};
+        for (const key of keys) {
+          const value = incoming[field][key];
+          if (typeof value === "string") safe[key] = redactSponsoredSensitiveText(value, sensitiveValues);
+          else if (typeof value === "boolean" || Number.isFinite(value)) safe[key] = value;
+        }
+        if (Object.keys(safe).length) body[field] = safe;
+      }
+      return body;
+    };
+    buildSponsoredGrantContinuationRecord = ({
+      grantRecord,
+      requestDigest,
+      state
+    } = {}) => {
+      const expiresAt = toTrimmedString8(grantRecord?.expiresAt);
+      const sourceAllowOrigins = Array.isArray(grantRecord?.sourceConfig?.allowOrigins) ? grantRecord.sourceConfig.allowOrigins.map((value) => toTrimmedString8(value)).filter(Boolean) : [];
+      return {
+        type: toTrimmedString8(grantRecord?.type),
+        sourceSessionSlug: toTrimmedString8(grantRecord?.sourceSessionSlug),
+        sourceConfig: sourceAllowOrigins.length ? { allowOrigins: sourceAllowOrigins } : {},
+        ...expiresAt ? { expiresAt } : {},
+        state,
+        requestDigest: toTrimmedString8(requestDigest)
+      };
+    };
+    writeSponsoredGrantReceipt = async ({
+      env,
+      token,
+      grantRecord,
+      requestDigest,
+      response: response3,
+      sensitiveValues = [],
+      nowMs = Date.now()
+    } = {}) => {
+      const expiresAt = toTrimmedString8(grantRecord?.expiresAt);
+      const ttlSeconds = expiresAt ? computeSponsoredGrantExpirationTtl(expiresAt, nowMs) : null;
+      const safeRecord = {
+        ...buildSponsoredGrantContinuationRecord({
+          grantRecord,
+          requestDigest,
+          state: "redeemed"
+        }),
+        receipt: {
+          status: Number(response3?.status || 0) || 200,
+          body: buildSafeSponsoredReceiptBody(response3?.body, sensitiveValues)
+        }
+      };
+      await writeSponsoredGrantRecord(env, token, safeRecord, ttlSeconds);
+      return safeRecord.receipt;
+    };
+  }
+});
+
+// workers/sessionCorsWorker/resultsAnalysisArtifactValidation.js
+var ARTIFACT_KIND, ARTIFACT_VERSION, SECTION_ORDER, SEVERITY_LEVELS, WALLET_TEXT_RE, WALLET_ID_RE, LIMITS, isObj14, toArray, hasOwn5, toPrimitiveStr, compactWhitespace, cleanText, cleanId, slugId, unique, sectionRecord, normalizeSections, unavailable, defaultSection, buildAllowedSourceIds, normalizeParticipants, normalizeIdRefs, normalizeSourceFields, normalizeSummaryRecord, normalizeArgumentMap, hasCycle, normalizeAtlas, normalizeBreakdown, normalizeSeverity, DEFAULT_RISK_AXES, normalizeRiskAxis, normalizeRiskAxes, normalizeRiskAssessments, normalizeDynamicRiskMatrix, normalizeLegacyRiskMatrix, normalizeRiskMatrix, normalizeGeneratedAt, normalizeModel, normalizeSection, normalizeResultsAnalysisArtifact, applyResultsAnalysisExposurePolicy;
+var init_resultsAnalysisArtifactValidation = __esm({
+  "workers/sessionCorsWorker/resultsAnalysisArtifactValidation.js"() {
+    ARTIFACT_KIND = "ce_session_results_analysis_artifact";
+    ARTIFACT_VERSION = 1;
+    SECTION_ORDER = ["argumentMap", "atlas", "breakdown", "riskMatrix"];
+    SEVERITY_LEVELS = /* @__PURE__ */ new Set(["low", "medium", "high"]);
+    WALLET_TEXT_RE = /\b0x[a-fA-F0-9]{40}\b/g;
+    WALLET_ID_RE = /^0x[a-fA-F0-9]{40}$/;
+    LIMITS = Object.freeze({
+      debates: 24,
+      claimsPerDebate: 16,
+      atlasNodes: 80,
+      atlasEdges: 120,
+      breakdownDimensions: 24,
+      breakdownDimensionValues: 24,
+      breakdownGroups: 40,
+      breakdownThemes: 24,
+      riskCategories: 24,
+      riskAssessments: 80,
+      riskAxisLevels: 6,
+      riskComments: 80,
+      riskScenarioLinks: 0,
+      sourceRefs: 16,
+      idChars: 128,
+      labelChars: 180,
+      summaryChars: 900,
+      modelChars: 180
+    });
+    isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    toArray = (value) => Array.isArray(value) ? value : [];
+    hasOwn5 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+    toPrimitiveStr = (value) => {
+      if (value == null) return "";
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+        return String(value);
+      }
+      return "";
+    };
+    compactWhitespace = (value) => toPrimitiveStr(value).replace(/\s+/g, " ").trim();
+    cleanText = (value, maxLength = LIMITS.summaryChars) => {
+      const text = compactWhitespace(value).replace(WALLET_TEXT_RE, "[redacted-address]");
+      if (!text) return "";
+      return text.slice(0, Math.max(0, maxLength));
+    };
+    cleanId = (value, fallback = "") => {
+      const text = compactWhitespace(value).slice(0, LIMITS.idChars);
+      if (!text || WALLET_ID_RE.test(text)) return fallback;
+      return [...text].filter((char) => {
+        const code = char.codePointAt(0);
+        return code > 31 && code !== 127;
+      }).join("") || fallback;
+    };
+    slugId = (value, fallback) => {
+      const base = cleanId(value).toLowerCase().replace(/[^a-z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, LIMITS.idChars);
+      return base || fallback;
+    };
+    unique = (values) => [...new Set(values.filter(Boolean))];
+    sectionRecord = (value) => {
+      const raw = isObj14(value?.sections) ? value.sections : value;
+      return isObj14(raw) ? raw : {};
+    };
+    normalizeSections = (sections) => {
+      const requested = /* @__PURE__ */ new Set();
+      toArray(sections).forEach((section) => {
+        const key = compactWhitespace(section);
+        if (key === "circles") {
+          requested.add("argumentMap");
+          requested.add("atlas");
+        } else if (SECTION_ORDER.includes(key)) {
+          requested.add(key);
+        }
+      });
+      return SECTION_ORDER.filter((section) => requested.has(section));
+    };
+    unavailable = (reason, extra = {}) => ({ available: false, ...extra, reason });
+    defaultSection = (key, reason) => {
+      if (key === "argumentMap") return unavailable(reason, { debates: [] });
+      if (key === "atlas") return unavailable(reason, { nodes: [], edges: [] });
+      if (key === "breakdown") return unavailable(reason, { dimensions: [], groups: [], summary: {} });
+      return unavailable(reason, { categories: [], comments: [], heatmap: {}, scenarioLinks: [] });
+    };
+    buildAllowedSourceIds = (source = {}) => {
+      const aiSnapshotPresent = hasOwn5(source, "aiSnapshot");
+      const aiQuestions = [
+        ...toArray(source?.aiSnapshot?.questions),
+        ...toArray(source?.aiSnapshot?.responses)
+      ];
+      const snapshotQuestions = [
+        ...toArray(source?.snapshot?.questions),
+        ...toArray(source?.snapshot?.responses)
+      ];
+      const aiParticipants = toArray(source?.aiSnapshot?.responses);
+      const snapshotParticipants = [
+        ...toArray(source?.participants),
+        ...toArray(source?.snapshot?.responses)
+      ];
+      const questions = aiSnapshotPresent ? aiQuestions : snapshotQuestions;
+      const participants = aiSnapshotPresent ? aiParticipants : snapshotParticipants;
+      const responses = aiSnapshotPresent ? aiParticipants : toArray(source?.snapshot?.responses);
+      const questionsByParticipant = /* @__PURE__ */ new Map();
+      responses.forEach((response3) => {
+        const participantId = cleanId(response3?.syntheticId || response3?.participantId);
+        const questionId = cleanId(response3?.questionId || response3?.questionID);
+        if (!participantId || !questionId) return;
+        if (!questionsByParticipant.has(participantId)) questionsByParticipant.set(participantId, /* @__PURE__ */ new Set());
+        questionsByParticipant.get(participantId).add(questionId);
+      });
+      return {
+        questionsByParticipant,
+        questions: new Set(questions.map((entry) => cleanId(entry?.id || entry?.questionId || entry?.questionID)).filter(Boolean)),
+        participants: new Set(participants.map((entry) => cleanId(entry?.syntheticId || entry?.participantId)).filter(Boolean))
+      };
+    };
+    normalizeParticipants = (participants) => toArray(participants).map((entry) => {
+      const syntheticId = cleanId(entry?.syntheticId);
+      return syntheticId ? { syntheticId } : null;
+    }).filter(Boolean);
+    normalizeIdRefs = ({ value, allowed, label, errors, limit = LIMITS.sourceRefs }) => {
+      const refs = unique(toArray(value).map((entry) => cleanId(entry)).filter(Boolean)).slice(0, limit);
+      refs.forEach((ref) => {
+        if (!allowed.has(ref)) errors.push(`unknown ${label}: ${ref}`);
+      });
+      return refs;
+    };
+    normalizeSourceFields = (record, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
+      const participantIds = normalizeIdRefs({ value: record.participantIds, allowed: allowed.participants, label: "participantId", errors, limit: participantLimit });
+      const questionIds = normalizeIdRefs({ value: record.questionIds, allowed: allowed.questions, label: "questionId", errors });
+      if (participantIds.length && questionIds.length) {
+        for (const participantId of participantIds) {
+          if (!questionIds.some((questionId) => allowed.questionsByParticipant.get(participantId)?.has(questionId))) {
+            errors.push(`unsupported source attribution: participantId ${participantId} has no response to the cited questions`);
+          }
+        }
+        for (const questionId of questionIds) {
+          if (!participantIds.some((participantId) => allowed.questionsByParticipant.get(participantId)?.has(questionId))) {
+            errors.push(`unsupported source attribution: questionId ${questionId} has no response from the cited participants`);
+          }
+        }
+      }
+      return {
+        ...participantIds.length ? { participantIds } : {},
+        ...questionIds.length ? { questionIds } : {}
+      };
+    };
+    normalizeSummaryRecord = (value) => {
+      const record = isObj14(value) ? value : {};
+      const overview = cleanText(record.overview || record.summary || record.interpretation || record.narrative);
+      const themes = toArray(record.themes || record.keyFindings || record.findings).slice(0, LIMITS.breakdownThemes).map((entry, index) => {
+        const item = isObj14(entry) ? entry : { summary: entry };
+        const label = cleanText(item.label || item.name || item.title || `Theme ${index + 1}`, LIMITS.labelChars);
+        const summary = cleanText(item.summary || item.description || item.finding || item.body);
+        if (!label && !summary) return null;
+        return {
+          id: slugId(item.id || label || summary, `theme_${index + 1}`),
+          label: label || `Theme ${index + 1}`,
+          ...summary ? { summary } : {}
+        };
+      }).filter(Boolean);
+      return {
+        ...overview ? { overview } : {},
+        ...themes.length ? { themes } : {}
+      };
+    };
+    normalizeArgumentMap = (rawSection, allowed) => {
+      if (!isObj14(rawSection)) return defaultSection("argumentMap", "AI generation did not return argument-map data.");
+      const errors = [];
+      const debates = toArray(rawSection.debates).slice(0, LIMITS.debates).map((debate, debateIndex) => {
+        if (!isObj14(debate)) return null;
+        const title = cleanText(debate.title || debate.label || debate.question || debate.summary, LIMITS.labelChars);
+        if (!title) return null;
+        const claims = toArray(debate.claims).slice(0, LIMITS.claimsPerDebate).map((claim, claimIndex) => {
+          if (!isObj14(claim)) return null;
+          const label = cleanText(claim.label || claim.claim || claim.title || claim.summary, LIMITS.labelChars);
+          if (!label) return null;
+          const summary2 = cleanText(claim.summary || claim.description || claim.evidence);
+          const stance = cleanText(claim.stance, 24).toLowerCase();
+          const sourceFields = normalizeSourceFields(claim, allowed, errors);
+          if (!sourceFields.participantIds?.length || !sourceFields.questionIds?.length) {
+            errors.push("claim requires participantIds and questionIds");
+          }
+          return {
+            id: slugId(claim.id || label, `claim_${debateIndex + 1}_${claimIndex + 1}`),
+            label,
+            ...summary2 ? { summary: summary2 } : {},
+            ...["support", "oppose", "mixed"].includes(stance) ? { stance } : {},
+            ...sourceFields
+          };
+        }).filter(Boolean);
+        const summary = cleanText(debate.summary || debate.description);
+        return {
+          id: slugId(debate.id || title, `debate_${debateIndex + 1}`),
+          title,
+          ...summary ? { summary } : {},
+          ...normalizeSourceFields(debate, allowed, errors),
+          ...claims.length ? { claims } : { claims: [] }
+        };
+      }).filter(Boolean);
+      if (errors.length) return defaultSection("argumentMap", `AI generation referenced unknown source ids or unsupported source attribution in argument map: ${errors.slice(0, 4).join(", ")}.`);
+      if (!debates.length) return defaultSection("argumentMap", "AI generation did not return renderable argument-map debates.");
+      return { available: true, debates };
+    };
+    hasCycle = (nodes, edges) => {
+      const adjacency = new Map(nodes.map((node) => [node.id, []]));
+      edges.forEach((edge) => adjacency.get(edge.source)?.push(edge.target));
+      const visiting = /* @__PURE__ */ new Set();
+      const visited = /* @__PURE__ */ new Set();
+      const visit = (id2) => {
+        if (visiting.has(id2)) return true;
+        if (visited.has(id2)) return false;
+        visiting.add(id2);
+        for (const child of adjacency.get(id2) || []) {
+          if (visit(child)) return true;
+        }
+        visiting.delete(id2);
+        visited.add(id2);
+        return false;
+      };
+      return nodes.some((node) => visit(node.id));
+    };
+    normalizeAtlas = (rawSection, allowed) => {
+      if (!isObj14(rawSection)) return defaultSection("atlas", "AI generation did not return atlas data.");
+      const errors = [];
+      const seenIds = /* @__PURE__ */ new Set();
+      const nodes = toArray(rawSection.nodes).slice(0, LIMITS.atlasNodes).map((node, index) => {
+        if (!isObj14(node)) return null;
+        const label = cleanText(node.label || node.name || node.title || node.summary, LIMITS.labelChars);
+        if (!label) return null;
+        let id2 = slugId(node.id || label, `atlas_${index + 1}`);
+        if (seenIds.has(id2)) id2 = `atlas_${index + 1}`;
+        seenIds.add(id2);
+        const summary = cleanText(node.summary || node.description);
+        return {
+          id: id2,
+          label,
+          ...summary ? { summary } : {},
+          ...normalizeSourceFields(node, allowed, errors)
+        };
+      }).filter(Boolean);
+      const nodeIds = new Set(nodes.map((node) => node.id));
+      const edges = toArray(rawSection.edges).slice(0, LIMITS.atlasEdges).map((edge, index) => {
+        if (!isObj14(edge)) return null;
+        const source = slugId(edge.source || edge.sourceId, "");
+        const target = slugId(edge.target || edge.targetId, "");
+        if (!source || !target || source === target || !nodeIds.has(source) || !nodeIds.has(target)) {
+          errors.push(`invalid atlas edge ${index + 1}`);
+          return null;
+        }
+        const label = cleanText(edge.label || edge.relationship || edge.summary, LIMITS.labelChars);
+        return { source, target, ...label ? { label } : {} };
+      }).filter(Boolean);
+      if (errors.length) return defaultSection("atlas", `AI generation returned invalid atlas data: ${errors.slice(0, 4).join(", ")}.`);
+      if (!nodes.length) return defaultSection("atlas", "AI generation did not return renderable atlas nodes.");
+      if (hasCycle(nodes, edges)) return defaultSection("atlas", "AI generation returned an atlas graph with a cycle.");
+      const childIds = new Set(edges.map((edge) => edge.target));
+      if (nodes.length && nodes.every((node) => childIds.has(node.id))) {
+        return defaultSection("atlas", "AI generation returned an atlas graph without a renderable root.");
+      }
+      return { available: true, nodes, edges };
+    };
+    normalizeBreakdown = (rawSection, allowed) => {
+      if (!isObj14(rawSection)) return defaultSection("breakdown", "AI generation did not return breakdown data.");
+      const errors = [];
+      const summary = normalizeSummaryRecord(rawSection.summary);
+      const dimensions = toArray(rawSection.dimensions).slice(0, LIMITS.breakdownDimensions).map((dimension, index) => {
+        if (!isObj14(dimension)) return null;
+        const label = cleanText(dimension.label || dimension.name || dimension.dimension, LIMITS.labelChars);
+        if (!label) return null;
+        const description = cleanText(dimension.summary || dimension.description || dimension.interpretation);
+        const values = toArray(dimension.values).slice(0, LIMITS.breakdownDimensionValues).map((value, valueIndex) => {
+          const item = isObj14(value) ? value : { label: value };
+          const valueLabel = cleanText(item.label || item.value || item.name, LIMITS.labelChars);
+          if (!valueLabel) return null;
+          const valueSummary = cleanText(item.summary || item.description || item.interpretation);
+          return {
+            id: slugId(item.id || item.valueId || valueLabel, `value_${index + 1}_${valueIndex + 1}`),
+            label: valueLabel,
+            ...valueSummary ? { summary: valueSummary } : {}
+          };
+        }).filter(Boolean);
+        return {
+          id: slugId(dimension.id || dimension.dimensionId || label, `dimension_${index + 1}`),
+          label,
+          ...description ? { summary: description } : {},
+          ...values.length ? { values } : {}
+        };
+      }).filter(Boolean);
+      const groups = toArray(rawSection.groups).slice(0, LIMITS.breakdownGroups).map((group, index) => {
+        if (!isObj14(group)) return null;
+        const label = cleanText(group.label || group.name || group.title || group.group, LIMITS.labelChars);
+        const summaryText = cleanText(group.summary || group.description || group.interpretation || group.insight);
+        if (!label && !summaryText) return null;
+        return {
+          id: slugId(group.id || label || summaryText, `group_${index + 1}`),
+          label: label || `Group ${index + 1}`,
+          ...summaryText ? { summary: summaryText } : {},
+          // Groups need complete membership evidence for thresholds above the citation cap.
+          ...normalizeSourceFields(group, allowed, errors, allowed.participants.size)
+        };
+      }).filter(Boolean);
+      if (errors.length) return defaultSection("breakdown", `AI generation referenced unknown source ids or unsupported source attribution in breakdown: ${errors.slice(0, 4).join(", ")}.`);
+      if (!Object.keys(summary).length && !dimensions.length && !groups.length) {
+        return defaultSection("breakdown", "AI generation did not return renderable breakdown content.");
+      }
+      return { available: true, summary, dimensions, groups };
+    };
+    normalizeSeverity = (value) => {
+      const normalized = cleanText(value, 16).toLowerCase();
+      return SEVERITY_LEVELS.has(normalized) ? normalized : "";
+    };
+    DEFAULT_RISK_AXES = Object.freeze({
+      x: {
+        id: "likelihood",
+        label: "Likelihood",
+        levels: [
+          { id: "low", label: "Low" },
+          { id: "medium", label: "Medium" },
+          { id: "high", label: "High" }
+        ]
+      },
+      y: {
+        id: "impact",
+        label: "Impact",
+        levels: [
+          { id: "low", label: "Low" },
+          { id: "medium", label: "Medium" },
+          { id: "high", label: "High" }
+        ]
+      }
+    });
+    normalizeRiskAxis = (axis, fallback) => {
+      if (!isObj14(axis)) return null;
+      const record = axis;
+      const label = cleanText(record.label || record.name, LIMITS.labelChars);
+      if (!label) return null;
+      const id2 = slugId(record.id || label, fallback.id);
+      const rawLevels = toArray(record.levels);
+      const seen = /* @__PURE__ */ new Set();
+      const levels = rawLevels.slice(0, LIMITS.riskAxisLevels).map((level, index) => {
+        const levelRecord = isObj14(level) ? level : { label: level, id: level };
+        const levelLabel = cleanText(levelRecord.label || levelRecord.name || levelRecord.id, LIMITS.labelChars);
+        if (!levelLabel) return null;
+        let levelId = slugId(levelRecord.id || levelLabel, `level_${index + 1}`);
+        if (seen.has(levelId)) levelId = `level_${index + 1}`;
+        seen.add(levelId);
+        const description = cleanText(levelRecord.description || levelRecord.summary, LIMITS.summaryChars);
+        return { id: levelId, label: levelLabel, ...description ? { description } : {} };
+      }).filter(Boolean);
+      if (levels.length < 2) return null;
+      return { id: id2, label, levels };
+    };
+    normalizeRiskAxes = (rawAxes) => {
+      const axes = isObj14(rawAxes) ? rawAxes : {};
+      const x = normalizeRiskAxis(axes.x || axes.columns || axes.horizontal, DEFAULT_RISK_AXES.x);
+      const y = normalizeRiskAxis(axes.y || axes.rows || axes.vertical, DEFAULT_RISK_AXES.y);
+      return x && y ? { x, y } : null;
+    };
+    normalizeRiskAssessments = ({ rawAssessments, axes, allowed, errors }) => {
+      const xLevelIds = new Set(axes.x.levels.map((level) => level.id));
+      const yLevelIds = new Set(axes.y.levels.map((level) => level.id));
+      return toArray(rawAssessments).slice(0, LIMITS.riskAssessments).map((assessment, index) => {
+        if (!isObj14(assessment)) return null;
+        const label = cleanText(assessment.label || assessment.category || assessment.name || assessment.title, LIMITS.labelChars);
+        const summary = cleanText(assessment.summary || assessment.description || assessment.rationale || assessment.evidence);
+        const xLevelId = slugId(assessment.xLevelId || assessment.x || assessment.columnLevelId || assessment.likelihood, "");
+        const yLevelId = slugId(assessment.yLevelId || assessment.y || assessment.rowLevelId || assessment.impact, "");
+        if (!label || !summary || !xLevelIds.has(xLevelId) || !yLevelIds.has(yLevelId)) {
+          errors.push(`invalid assessment ${index + 1}`);
+          return null;
+        }
+        return {
+          id: slugId(assessment.id || label, `assessment_${index + 1}`),
+          label,
+          summary,
+          xLevelId,
+          yLevelId,
+          ...normalizeSourceFields(assessment, allowed, errors)
+        };
+      }).filter(Boolean);
+    };
+    normalizeDynamicRiskMatrix = (rawSection, allowed) => {
+      const errors = [];
+      const axes = normalizeRiskAxes(rawSection.axes);
+      if (!axes) return defaultSection("riskMatrix", "AI generation returned invalid risk matrix axes.");
+      const assessments = normalizeRiskAssessments({
+        rawAssessments: rawSection.assessments,
+        axes,
+        allowed,
+        errors
+      });
+      if (errors.length) return defaultSection("riskMatrix", `AI generation returned invalid risk matrix data: ${errors.slice(0, 4).join(", ")}.`);
+      if (!assessments.length) return defaultSection("riskMatrix", "AI generation did not return renderable risk matrix assessments.");
+      return {
+        available: true,
+        axes,
+        assessments,
+        categories: [],
+        comments: [],
+        heatmap: {},
+        scenarioLinks: []
+      };
+    };
+    normalizeLegacyRiskMatrix = (rawSection, allowed) => {
+      const errors = [];
+      const rawHeatmap = isObj14(rawSection.heatmap) ? rawSection.heatmap : {};
+      const categoryEntries = [];
+      const heatmap = {};
+      const assessments = [];
+      toArray(rawSection.categories).slice(0, LIMITS.riskCategories).forEach((category, index) => {
+        if (!isObj14(category)) return;
+        const label = cleanText(category.label || category.name || category.title, LIMITS.labelChars);
+        if (!label) return;
+        const id2 = slugId(category.id || label, `risk_${index + 1}`);
+        const heat = isObj14(rawHeatmap[id2]) ? rawHeatmap[id2] : {};
+        const likelihood = normalizeSeverity(category.likelihood || heat.likelihood);
+        const impact = normalizeSeverity(category.impact || heat.impact);
+        if (!likelihood || !impact) {
+          errors.push(`invalid severity for ${id2}`);
+          return;
+        }
+        const description = cleanText(category.description || category.summary || category.rationale);
+        const sourceFields = normalizeSourceFields(category, allowed, errors);
+        categoryEntries.push({
+          id: id2,
+          label,
+          ...description ? { description } : {},
+          ...sourceFields
+        });
+        assessments.push({
+          id: id2,
+          label,
+          summary: description || label,
+          xLevelId: likelihood,
+          yLevelId: impact,
+          ...sourceFields
+        });
+        heatmap[id2] = { likelihood, impact };
+      });
+      const categoryIds = new Set(categoryEntries.map((category) => category.id));
+      const comments = toArray(rawSection.comments).slice(0, LIMITS.riskComments).map((comment, index) => {
+        if (!isObj14(comment)) return null;
+        const categoryId = slugId(comment.categoryId || comment.category || comment.id, "");
+        if (!categoryId || !categoryIds.has(categoryId)) {
+          errors.push(`unknown risk category for comment ${index + 1}`);
+          return null;
+        }
+        const summary = cleanText(comment.summary || comment.comment || comment.description || comment.evidence);
+        if (!summary) return null;
+        return {
+          id: slugId(comment.id || summary, `risk_comment_${index + 1}`),
+          categoryId,
+          summary,
+          ...normalizeSourceFields(comment, allowed, errors)
+        };
+      }).filter(Boolean);
+      if (errors.length) return defaultSection("riskMatrix", `AI generation returned invalid risk matrix data: ${errors.slice(0, 4).join(", ")}.`);
+      if (!categoryEntries.length) return defaultSection("riskMatrix", "AI generation did not return renderable risk likelihood/impact assessments.");
+      return {
+        available: true,
+        axes: DEFAULT_RISK_AXES,
+        assessments,
+        categories: categoryEntries,
+        comments,
+        heatmap,
+        scenarioLinks: []
+      };
+    };
+    normalizeRiskMatrix = (rawSection, allowed) => {
+      if (!isObj14(rawSection)) return defaultSection("riskMatrix", "AI generation did not return risk matrix data.");
+      if (isObj14(rawSection.axes) || Array.isArray(rawSection.assessments)) return normalizeDynamicRiskMatrix(rawSection, allowed);
+      return normalizeLegacyRiskMatrix(rawSection, allowed);
+    };
+    normalizeGeneratedAt = (value) => {
+      const parsed = Date.parse(toPrimitiveStr(value));
+      return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "1970-01-01T00:00:00.000Z";
+    };
+    normalizeModel = (model) => cleanText(model, LIMITS.modelChars);
+    normalizeSection = ({ key, rawSection, requested, allowed }) => {
+      if (!requested.has(key)) return defaultSection(key, `${key} was not requested.`);
+      if (key === "argumentMap") return normalizeArgumentMap(rawSection, allowed);
+      if (key === "atlas") return normalizeAtlas(rawSection, allowed);
+      if (key === "breakdown") return normalizeBreakdown(rawSection, allowed);
+      return normalizeRiskMatrix(rawSection, allowed);
+    };
+    normalizeResultsAnalysisArtifact = ({ value, source = {}, sections = [], generatedAt, model = "" } = {}) => {
+      const requestedSections = normalizeSections(sections);
+      if (!requestedSections.length) throw new Error("No supported results analysis sections were requested.");
+      const requested = new Set(requestedSections);
+      const raw = sectionRecord(value);
+      const allowed = buildAllowedSourceIds(source);
+      const normalizedSections = Object.fromEntries(SECTION_ORDER.map((key) => [
+        key,
+        normalizeSection({ key, rawSection: raw[key], requested, allowed })
+      ]));
+      const anyRequestedAvailable = requestedSections.some((key) => normalizedSections[key]?.available === true);
+      if (!anyRequestedAvailable) {
+        const reasons = requestedSections.map((key) => normalizedSections[key]?.reason).filter(Boolean).join(" ");
+        throw new Error(`Results analysis artifact did not include any renderable requested sections. ${reasons}`.trim());
+      }
+      const safeModel = normalizeModel(model);
+      return {
+        generatedAt: normalizeGeneratedAt(generatedAt || value?.generatedAt),
+        inputSignature: cleanText(source?.signature || value?.inputSignature, 160),
+        kind: ARTIFACT_KIND,
+        ...safeModel ? { model: safeModel } : {},
+        participants: normalizeParticipants(source?.participants),
+        sections: normalizedSections,
+        source: "ai-generated",
+        version: ARTIFACT_VERSION
+      };
+    };
+    applyResultsAnalysisExposurePolicy = ({ artifact, exposure, sections = SECTION_ORDER } = {}) => {
+      if (!isObj14(artifact?.sections)) return artifact;
+      const enabled = new Set(sections);
+      const groupPolicy = isObj14(exposure) && (hasOwn5(exposure, "anonymizedGroupsEnabled") || hasOwn5(exposure, "minGroupSize"));
+      const minGroupSize = Number.isSafeInteger(exposure?.minGroupSize) && exposure.minGroupSize >= 2 ? exposure.minGroupSize : 2;
+      const participants = new Set(toArray(artifact.participants).map((participant) => participant.syntheticId));
+      const projected = {};
+      for (const key of SECTION_ORDER) {
+        const section = artifact.sections[key];
+        if (!enabled.has(key)) {
+          projected[key] = defaultSection(key, "This generated view is disabled for the session.");
+        } else if (key === "breakdown" && isObj14(section) && section.available !== false && groupPolicy) {
+          projected[key] = { ...section, groups: toArray(section.groups).filter((group) => exposure.anonymizedGroupsEnabled !== false && unique(toArray(group?.participantIds).filter((id2) => participants.has(id2))).length >= minGroupSize) };
+        } else {
+          projected[key] = section;
+        }
+      }
+      return { ...artifact, sections: projected };
     };
   }
 });
@@ -64892,12 +65441,12 @@ var init_aiProviderExecution = __esm({
       deps,
       constants
     } = {}) => {
-      const json3 = resolveJson(deps);
+      const json4 = resolveJson(deps);
       const fetchImpl = deps?.fetch || fetch;
       const payloadKey = toStr6(payload?.apiKey).trim();
       const key = payloadKey || toStr6(secrets?.anthropicKey).trim();
       if (!key) {
-        return json3({ error: "Server misconfigured: anthropicKey is missing." }, 401, baseHeaders);
+        return json4({ error: "Server misconfigured: anthropicKey is missing." }, 401, baseHeaders);
       }
       const {
         model,
@@ -64929,10 +65478,15 @@ var init_aiProviderExecution = __esm({
       });
       const data = await response3.json().catch(() => ({}));
       if (!response3.ok) {
-        return json3({ error: data?.error?.message || "Anthropic error", details: data }, response3.status, baseHeaders);
+        const retryAfter = response3.headers?.get?.("retry-after");
+        return json4(
+          { error: data?.error?.message || "Anthropic error", details: data },
+          response3.status,
+          retryAfter ? { ...baseHeaders, "retry-after": retryAfter } : baseHeaders
+        );
       }
       const completion = data?.content?.[0]?.text || "";
-      return json3({ completion, raw: data }, 200, baseHeaders);
+      return json4({ completion, raw: data }, 200, baseHeaders);
     };
     proxyOpenAI = async ({
       payload,
@@ -64941,12 +65495,12 @@ var init_aiProviderExecution = __esm({
       deps,
       constants
     } = {}) => {
-      const json3 = resolveJson(deps);
+      const json4 = resolveJson(deps);
       const fetchImpl = deps?.fetch || fetch;
       const payloadKey = toStr6(payload?.apiKey).trim();
       const key = payloadKey || toStr6(secrets?.openaiKey).trim();
       if (!key) {
-        return json3({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
+        return json4({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
       }
       const {
         model,
@@ -65013,10 +65567,15 @@ var init_aiProviderExecution = __esm({
       );
       const data = await response3.json().catch(() => ({}));
       if (!response3.ok) {
-        return json3({ error: data?.error?.message || "OpenAI error", details: data }, response3.status, baseHeaders);
+        const retryAfter = response3.headers?.get?.("retry-after");
+        return json4(
+          { error: data?.error?.message || "OpenAI error", details: data },
+          response3.status,
+          retryAfter ? { ...baseHeaders, "retry-after": retryAfter } : baseHeaders
+        );
       }
       const completion = extractOpenAiCompletion(data, useResponses);
-      return json3({ completion, raw: data }, 200, baseHeaders);
+      return json4({ completion, raw: data }, 200, baseHeaders);
     };
     proxyOpenRouter = async ({
       payload,
@@ -65025,12 +65584,12 @@ var init_aiProviderExecution = __esm({
       deps,
       constants
     } = {}) => {
-      const json3 = resolveJson(deps);
+      const json4 = resolveJson(deps);
       const fetchImpl = deps?.fetch || fetch;
       const payloadKey = toStr6(payload?.apiKey).trim();
       const key = payloadKey || toStr6(secrets?.openrouterKey).trim();
       if (!key) {
-        return json3({ error: "Server misconfigured: openrouterKey is missing." }, 401, baseHeaders);
+        return json4({ error: "Server misconfigured: openrouterKey is missing." }, 401, baseHeaders);
       }
       const {
         model,
@@ -65074,10 +65633,15 @@ var init_aiProviderExecution = __esm({
       });
       const data = await response3.json().catch(() => ({}));
       if (!response3.ok) {
-        return json3({ error: data?.error?.message || "OpenRouter error", details: data }, response3.status, baseHeaders);
+        const retryAfter = response3.headers?.get?.("retry-after");
+        return json4(
+          { error: data?.error?.message || "OpenRouter error", details: data },
+          response3.status,
+          retryAfter ? { ...baseHeaders, "retry-after": retryAfter } : baseHeaders
+        );
       }
       const completion = data?.choices?.[0]?.message?.content || "";
-      return json3({ completion, raw: data }, 200, baseHeaders);
+      return json4({ completion, raw: data }, 200, baseHeaders);
     };
     proxyCustomRPC = async ({
       payload,
@@ -65086,7 +65650,7 @@ var init_aiProviderExecution = __esm({
       deps,
       auth
     } = {}) => {
-      const json3 = resolveJson(deps);
+      const json4 = resolveJson(deps);
       const safeFetch = deps?.safeFetch || fetch;
       const isBlockedOutboundUrl = deps?.isBlockedOutboundUrl || (() => false);
       const payloadRpcUrl = toStr6(payload?.rpcUrl).trim();
@@ -65095,26 +65659,26 @@ var init_aiProviderExecution = __esm({
       const secretKey = toStr6(secrets?.customRpcKey).trim();
       const requestOverridesRpcUrl = !!payloadRpcUrl && normalizeComparableRpcUrl(payloadRpcUrl) !== normalizeComparableRpcUrl(secretRpcUrl);
       if (!payloadKey && requestOverridesRpcUrl && (secretRpcUrl || secretKey)) {
-        return json3({ error: CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR }, 400, baseHeaders);
+        return json4({ error: CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR }, 400, baseHeaders);
       }
       const rpcUrl = payloadRpcUrl || secretRpcUrl;
       if (!rpcUrl) {
-        return json3({ error: "Server misconfigured: customRpcUrl is missing." }, 400, baseHeaders);
+        return json4({ error: "Server misconfigured: customRpcUrl is missing." }, 400, baseHeaders);
       }
       let parsedRpcUrl;
       try {
         parsedRpcUrl = new URL(rpcUrl);
       } catch {
-        return json3({ error: "Custom RPC URL target is not allowed" }, 403, baseHeaders);
+        return json4({ error: "Custom RPC URL target is not allowed" }, 403, baseHeaders);
       }
       if (parsedRpcUrl.protocol !== "https:") {
-        return json3({ error: "Custom RPC must use HTTPS" }, 403, baseHeaders);
+        return json4({ error: "Custom RPC must use HTTPS" }, 403, baseHeaders);
       }
       if (parsedRpcUrl.username || parsedRpcUrl.password) {
-        return json3({ error: "Custom RPC URL must not contain credentials" }, 403, baseHeaders);
+        return json4({ error: "Custom RPC URL must not contain credentials" }, 403, baseHeaders);
       }
       if (!auth || !auth?.scopes) {
-        return json3({ error: "Custom RPC requires authentication" }, 403, baseHeaders);
+        return json4({ error: "Custom RPC requires authentication" }, 403, baseHeaders);
       }
       const walletAddress = toStr6(auth?.address || auth?.walletAddress || auth?.sub).trim().toLowerCase();
       (typeof deps?.log === "function" ? deps.log : console.log)("[ai] custom rpc request", {
@@ -65122,7 +65686,7 @@ var init_aiProviderExecution = __esm({
         rpcDomain: parsedRpcUrl.hostname
       });
       if (isBlockedOutboundUrl(rpcUrl)) {
-        return json3({ error: "Custom RPC URL target is not allowed" }, 403, baseHeaders);
+        return json4({ error: "Custom RPC URL target is not allowed" }, 403, baseHeaders);
       }
       const {
         model,
@@ -65163,14 +65727,19 @@ var init_aiProviderExecution = __esm({
         body: JSON.stringify(body)
       });
       if (!(response3 instanceof Response)) {
-        return json3({ error: response3?.error }, response3?.status, baseHeaders);
+        return json4({ error: response3?.error }, response3?.status, baseHeaders);
       }
       const data = await response3.json().catch(() => ({}));
       if (!response3.ok) {
-        return json3({ error: data?.error?.message || "Custom RPC error", details: data }, response3.status, baseHeaders);
+        const retryAfter = response3.headers?.get?.("retry-after");
+        return json4(
+          { error: data?.error?.message || "Custom RPC error", details: data },
+          response3.status,
+          retryAfter ? { ...baseHeaders, "retry-after": retryAfter } : baseHeaders
+        );
       }
       const completion = data?.choices?.[0]?.message?.content || data?.completion || data?.content?.[0]?.text || "";
-      return json3({ completion, raw: data }, 200, baseHeaders);
+      return json4({ completion, raw: data }, 200, baseHeaders);
     };
   }
 });
@@ -65684,8 +66253,8 @@ var init_resultsAnalysisGeneration = __esm({
         });
       }
       const sortedParticipantDigests = [...participantDigests].sort();
-      const participantLabels = new Map(sortedParticipantDigests.map((digest, index) => [digest, `participant_${String(index + 1).padStart(3, "0")}`]));
-      const participants = sortedParticipantDigests.map((digest) => ({ syntheticId: participantLabels.get(digest) }));
+      const participantLabels = new Map(sortedParticipantDigests.map((digest2, index) => [digest2, `participant_${String(index + 1).padStart(3, "0")}`]));
+      const participants = sortedParticipantDigests.map((digest2) => ({ syntheticId: participantLabels.get(digest2) }));
       const responseRows = includedRows.sort((a, b2) => a.questionId.localeCompare(b2.questionId) || (participantLabels.get(a.participantKey) || "").localeCompare(participantLabels.get(b2.participantKey) || ""));
       const sanitizedResponses = responseRows.map((row, index) => ({
         responseId: `r${index + 1}`,
@@ -65949,14 +66518,24 @@ ${sectionShapes}
 
 Session input:
 ${JSON.stringify(source.aiSnapshot, null, 2)}`;
-    normalizeProviderResponse = async (response3) => {
+    normalizeProviderResponse = async (response3, now = Date.now()) => {
       const data = await response3?.json?.().catch?.(() => ({}));
-      if (!response3?.ok) return { ok: false, status: response3?.status || 502, error: data?.error || "AI provider request failed." };
+      if (!response3?.ok) {
+        const retryAfter = trim9(response3?.headers?.get?.("retry-after"));
+        const seconds = Number(retryAfter);
+        const retryAfterMs = Number.isFinite(seconds) ? seconds * 1e3 : Date.parse(retryAfter) - now;
+        return {
+          ok: false,
+          status: response3?.status || 502,
+          error: data?.error || "AI provider request failed.",
+          ...Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? { retryAfterMs } : {}
+        };
+      }
       const raw = trim9(data?.completion || data?.text || data?.content || "");
       try {
         return { ok: true, value: JSON.parse(raw) };
       } catch {
-        return { ok: false, status: 502, error: "AI provider returned invalid JSON." };
+        return { ok: false, status: 502, retryable: false, error: "AI provider returned invalid JSON." };
       }
     };
     resolveAiTaskEntry = (ai = {}, task = "thinking") => {
@@ -66024,7 +66603,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
         return (deps?.proxyOpenAI || ((args) => proxyOpenAI({ ...args, deps: proxyDeps })))(proxyArgs);
       };
       response3 = await withTimeout(runProvider(), deps?.resultsAnalysisProviderTimeoutMs, "AI results analysis generation timed out.");
-      return normalizeProviderResponse(response3);
+      return normalizeProviderResponse(response3, Number(deps?.now?.() ?? Date.now()));
     };
     normalizeGeneratedArtifact = ({ value, source, sections, generatedAt, model = "" }) => {
       const validationSource = {
@@ -66198,6 +66777,8 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
           ok: false,
           error: providerResult?.error || "AI results analysis generation failed.",
           status: providerResult?.status || 502,
+          ...providerResult?.retryable === false ? { retryable: false } : {},
+          ...Number.isFinite(providerResult?.retryAfterMs) && providerResult.retryAfterMs > 0 ? { retryAfterMs: providerResult.retryAfterMs } : {},
           failedAt: generatedAt
         };
         await finalize({
@@ -66211,7 +66792,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
             receipt: failure2
           }
         });
-        return { ok: false, status: failure2.status, jobState: "failed", reservation: summarizeReservation(reservation, requestId), capability, error: failure2.error };
+        return { ...failure2, jobState: "failed", reservation: summarizeReservation(reservation, requestId), capability };
       }
       let artifact;
       try {
@@ -66224,9 +66805,9 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
         });
         artifact = applyCurrentArtifactPolicy(artifact, config);
       } catch (error) {
-        const failure2 = { ok: false, error: error?.message || "AI results analysis output failed validation.", status: 502, failedAt: generatedAt };
+        const failure2 = { ok: false, error: error?.message || "AI results analysis output failed validation.", status: 502, retryable: false, failedAt: generatedAt };
         await finalize({ env, slug, finalization: { requestId, reservationKey, attemptId: reservation.attemptId, success: false, receipt: failure2 } });
-        return { ok: false, status: failure2.status, jobState: "failed", reservation: summarizeReservation(reservation, requestId), capability, error: failure2.error };
+        return { ...failure2, jobState: "failed", reservation: summarizeReservation(reservation, requestId), capability };
       }
       const draftId = `sha256:${await sha256Hex2(stableCanonicalSerialize({ artifact, source: sourceDescriptor.snapshot, sections }))}`;
       const draft = {
@@ -66279,7 +66860,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config, committedResponses });
       if (!source.ok) return source;
       const watermark = new Set(Array.isArray(status?.state?.lastGood?.participantWatermark) ? status.state.lastGood.participantWatermark : []);
-      const newDistinctCount = source.participantDigests.filter((digest) => !watermark.has(digest)).length;
+      const newDistinctCount = source.participantDigests.filter((digest2) => !watermark.has(digest2)).length;
       if (newDistinctCount < settings.autoAfter.threshold) {
         return { ok: true, skipped: true, reason: "threshold_not_met", newDistinctCount, threshold: settings.autoAfter.threshold };
       }
@@ -66746,7 +67327,7 @@ async function main(params) {
 });
 
 // workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js
-var SIGNER_RECORD, SETUP_RECORD, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json2, fail, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair;
+var SIGNER_RECORD, SETUP_RECORD, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json3, fail3, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair;
 var init_sessionLitAuthorizationCoordinator = __esm({
   "workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js"() {
     init_lib2();
@@ -66777,45 +67358,45 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     PENDING_ERROR = "Lit setup projection is pending; retry before using the new authority.";
     isRecord3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     hasOwn7 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-    json2 = (body, status = 200) => new Response(JSON.stringify(body), {
+    json3 = (body, status = 200) => new Response(JSON.stringify(body), {
       status,
       headers: { "Content-Type": "application/json", "Cache-Control": "private, no-store" }
     });
-    fail = (status = 409) => {
+    fail3 = (status = 409) => {
       throw Object.assign(new Error(COORDINATION_ERROR), { status });
     };
     walletFor = (key) => {
-      if (typeof key !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(key)) fail();
+      if (typeof key !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(key)) fail3();
       try {
         return new ethers_exports.Wallet(key);
       } catch {
-        return fail();
+        return fail3();
       }
     };
     authorityConfig = (authority, baseConfig, slug) => {
-      if (authority != null && (!isRecord3(authority) || authority.slug !== slug || !isRecord3(authority.config))) fail();
+      if (authority != null && (!isRecord3(authority) || authority.slug !== slug || !isRecord3(authority.config))) fail3();
       const config = authority?.config || baseConfig;
-      if (!isRecord3(config)) fail(400);
+      if (!isRecord3(config)) fail3(400);
       return config;
     };
     assertConfiguredSigner = (config, wallet, hasExistingKey) => {
-      if (config?.litCredentials != null && !isRecord3(config.litCredentials)) fail();
+      if (config?.litCredentials != null && !isRecord3(config.litCredentials)) fail3();
       const credentials = config?.litCredentials || {};
       const signer = credentials.litAuthorizationSigner;
       const version2 = credentials.litAuthorizationVersion;
       if (signer == null && version2 == null) return;
-      if (!hasExistingKey || version2 !== LIT_AUTHORIZATION_VERSION || typeof signer !== "string" || signer.toLowerCase() !== wallet.address.toLowerCase()) fail();
+      if (!hasExistingKey || version2 !== LIT_AUTHORIZATION_VERSION || typeof signer !== "string" || signer.toLowerCase() !== wallet.address.toLowerCase()) fail3();
     };
     readSignerSecrets = async (record, env, slug) => {
-      if (!isRecord3(record) || record.version !== 1 || record.slug !== slug) fail();
+      if (!isRecord3(record) || record.version !== 1 || record.slug !== slug) fail3();
       const secrets = await decryptSessionSecretsEnvelope(record.envelope, { env, slug });
-      if (!isRecord3(secrets) || Object.keys(secrets).some((key) => !SECRET_KEYS.includes(key)) || Object.values(secrets).some((value) => typeof value !== "string")) fail();
+      if (!isRecord3(secrets) || Object.keys(secrets).some((key) => !SECRET_KEYS.includes(key)) || Object.values(secrets).some((value) => typeof value !== "string")) fail3();
       walletFor(secrets[PRIVATE_KEY]);
       return secrets;
     };
     executeLitAuthorizationSignerEnsure = async (coordinator, payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-      if (!slug || !isRecord3(payload?.baseConfig)) return json2({ error: COORDINATION_ERROR }, 400);
+      if (!slug || !isRecord3(payload?.baseConfig)) return json3({ error: COORDINATION_ERROR }, 400);
       try {
         const proposed = walletFor(payload.proposedPrivateKey);
         await coordinator.assertSessionAuthority(payload);
@@ -66833,9 +67414,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           }
           return chosen.privateKey;
         });
-        return json2({ ok: true, privateKey });
+        return json3({ ok: true, privateKey });
       } catch (error) {
-        return json2({ error: COORDINATION_ERROR }, error?.status || 503);
+        return json3({ error: COORDINATION_ERROR }, error?.status || 503);
       }
     };
     repairPendingLitAuthorizationSetup = async (coordinator) => {
@@ -66843,7 +67424,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       if (pending == null) return;
       const authority = await coordinator.state.storage.get(CONFIG_RECORD);
       const slug = resolveCoordinatorSessionSlugStorageKey(pending.slug);
-      if (!slug || pending.version !== 1 || !Number.isSafeInteger(pending.revision) || authority?.slug !== slug || authority?.revision !== pending.revision) fail();
+      if (!slug || pending.version !== 1 || !Number.isSafeInteger(pending.revision) || authority?.slug !== slug || authority?.revision !== pending.revision) fail3();
       await decryptSessionSecretsEnvelope(pending.envelope, { env: coordinator.env, slug });
       await putKvJson(coordinator.env, `session:${normalizeWorkerSessionSlug(slug)}:secrets`, pending.envelope);
       await coordinator.projectSessionConfigAuthority(authority);
@@ -66856,7 +67437,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const outputs = payload?.secretOutputs;
       if (!slug || !isRecord3(payload?.baseConfig) || !isRecord3(payload?.litCredentials) || !isRecord3(outputs) || Object.keys(outputs).some((key) => !SECRET_KEYS.includes(key)) || Object.values(outputs).some((value) => typeof value !== "string")) {
-        return json2({ error: COORDINATION_ERROR }, 400);
+        return json3({ error: COORDINATION_ERROR }, 400);
       }
       try {
         await coordinator.assertSessionAuthority(payload);
@@ -66865,9 +67446,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           const record = await transaction.get(SIGNER_RECORD);
           const signerSecrets = await readSignerSecrets(record, coordinator.env, slug);
           const wallet = walletFor(signerSecrets[PRIVATE_KEY]);
-          if (walletFor(outputs[PRIVATE_KEY]).privateKey !== wallet.privateKey) fail();
+          if (walletFor(outputs[PRIVATE_KEY]).privateKey !== wallet.privateKey) fail3();
           assertConfiguredSigner({ litCredentials: payload.litCredentials }, wallet, true);
-          if (payload.litCredentials.litAuthorizationVersion !== LIT_AUTHORIZATION_VERSION) fail();
+          if (payload.litCredentials.litAuthorizationVersion !== LIT_AUTHORIZATION_VERSION) fail3();
           const existing = await transaction.get(CONFIG_RECORD);
           const config = authorityConfig(existing, payload.baseConfig, slug);
           assertConfiguredSigner(config, wallet, true);
@@ -66876,7 +67457,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
             slug,
             mutation: { kind: "merge-lit-credentials", litCredentials: payload.litCredentials }
           });
-          if (!mutation?.ok) fail(mutation?.status || 400);
+          if (!mutation?.ok) fail3(mutation?.status || 400);
           const secrets = { ...await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug)) || {}, ...signerSecrets };
           for (const [key, value] of Object.entries(outputs)) {
             if (value.trim()) secrets[key] = value.trim();
@@ -66900,20 +67481,20 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           await transaction.put(SETUP_RECORD, { version: 1, slug, revision, envelope });
         });
       } catch (error) {
-        return json2({ error: error?.status ? COORDINATION_ERROR : PENDING_ERROR }, error?.status || 503);
+        return json3({ error: error?.status ? COORDINATION_ERROR : PENDING_ERROR }, error?.status || 503);
       }
       try {
         await repairPendingLitAuthorizationSetup(coordinator);
-        return json2({ ok: true });
+        return json3({ ok: true });
       } catch {
-        return json2({ error: PENDING_ERROR }, 503);
+        return json3({ error: PENDING_ERROR }, 503);
       }
     };
     executeSessionSecretsAfterLitRepair = async (coordinator, payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const patch = payload?.incomingSecrets;
       if (!slug || !isRecord3(patch) || Object.keys(patch).some((key) => !ADMIN_SESSION_SECRET_KEYS.includes(key)) || Object.values(patch).some((value) => typeof value !== "string")) {
-        return json2({ error: "Invalid session secrets update." }, 400);
+        return json3({ error: "Invalid session secrets update." }, 400);
       }
       try {
         await coordinator.assertSessionAuthority(payload);
@@ -66931,9 +67512,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
             await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope });
           });
         }
-        return json2({ ok: true });
+        return json3({ ok: true });
       } catch (error) {
-        return json2({ error: error.status === 409 ? error.message : "Session secrets update is pending; retry after setup repair." }, error.status || 503);
+        return json3({ error: error.status === 409 ? error.message : "Session secrets update is pending; retry after setup repair." }, error.status || 503);
       }
     };
     callCoordinator = async ({ env, slug, path, ...payload }) => {
@@ -66978,6 +67559,7 @@ __export(sessionWriteCoordinator_exports, {
   checkCoordinatedAuthRateLimit: () => checkCoordinatedAuthRateLimit,
   checkCoordinatedLegacyStorageOwner: () => checkCoordinatedLegacyStorageOwner,
   consumeCoordinatedAuthNonce: () => consumeCoordinatedAuthNonce,
+  coordinateResponseUploadReceipt: () => coordinateResponseUploadReceipt,
   enqueueCoordinatedResultsAnalysisAutoJob: () => enqueueCoordinatedResultsAnalysisAutoJob,
   executeCoordinatedSessionConfigMutation: () => executeCoordinatedSessionConfigMutation,
   executeCoordinatedSponsoredDeploy: () => executeCoordinatedSponsoredDeploy,
@@ -66991,10 +67573,15 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, MAX_UPLOAD_RECEIPTS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
+    init_recoveryKeyExport();
+    init_recoveryKey();
     init_sessionConfigAuthority();
+    init_sessionBackupCoordinator();
+    init_sessionBackupImport();
+    init_storageRefNormalization();
     init_deployHelperCore();
     init_sponsoredBootstrapGrantStore();
     init_resultsAnalysisGeneration();
@@ -67027,6 +67614,10 @@ var init_sessionWriteCoordinator = __esm({
     RESULTS_ANALYSIS_DRAFT_KEY = "results-analysis-draft-v1";
     RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX = "results-analysis-draft-v1:chunk:";
     RESULTS_ANALYSIS_AUTO_JOB_KEY = "results-analysis-auto-job-v1";
+    UPLOAD_RECEIPT_PREFIX = "upload-receipt-v1:";
+    UPLOAD_RECEIPT_LEASE_MS = 12e4;
+    UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1e3;
+    MAX_UPLOAD_RECEIPTS = 2e3;
     MAX_RESULTS_ANALYSIS_REQUESTS = 24;
     RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24e3;
     RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 64;
@@ -67293,6 +67884,59 @@ ${expiry}`);
         this.scanLegacyStorageOwnerIds = deps.scanLegacyStorageOwnerIds || scanLegacyStorageOwnerIds;
         this.legacyScanRowsPerStep = deps.legacyScanRowsPerStep || LEGACY_SCAN_ROWS_PER_STEP;
       }
+      async pruneUploadReceipts(transaction, nowMs) {
+        const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
+        const settled = [];
+        for (const [key, record] of records) {
+          if (record.state === "settled" && nowMs - record.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settled.push([key, record]);
+          else if (record.state !== "pending" || record.leaseUntil <= nowMs) await transaction.delete(key);
+        }
+        settled.sort((a, b2) => a[1].settledAt - b2[1].settledAt);
+        for (const [key] of settled.slice(0, Math.max(0, settled.length - MAX_UPLOAD_RECEIPTS))) await transaction.delete(key);
+      }
+      async executeUploadReceipt(payload, settle = false) {
+        const requestId = toTrimmedString9(payload?.requestId);
+        const payloadDigest = toTrimmedString9(payload?.payloadDigest);
+        if (!requestId || requestId.length > 200 || !settle && !/^[a-f0-9]{64}$/.test(payloadDigest)) {
+          return jsonResponse2({ error: "Invalid upload receipt request." }, 400);
+        }
+        let storageRef;
+        if (settle) {
+          try {
+            storageRef = normalizeStorageRef(payload?.storageRef);
+          } catch {
+            storageRef = null;
+          }
+          if (!storageRef || storageRef.backend !== "cloudflare" || storageRef.resource !== "responses" || !toTrimmedString9(payload?.attemptId)) {
+            return jsonResponse2({ error: "Invalid upload receipt settlement." }, 400);
+          }
+        }
+        const key = `${UPLOAD_RECEIPT_PREFIX}${encodeURIComponent(requestId)}`;
+        const nowMs = Number(this.now()) || Date.now();
+        const result = await this.state.storage.transaction(async (transaction) => {
+          const record = await transaction.get(key);
+          if (settle) {
+            if (record?.state !== "pending" || record.attemptId !== payload.attemptId) {
+              return { status: 409, error: "Upload attempt no longer owns this receipt.", reason: "upload_attempt_superseded" };
+            }
+            await transaction.put(key, { state: "settled", payloadDigest: record.payloadDigest, storageRef, settledAt: nowMs });
+            await this.pruneUploadReceipts(transaction, nowMs);
+            return { status: 200, ok: true };
+          }
+          if (record?.state === "settled" && nowMs - record.settledAt < UPLOAD_RECEIPT_RETENTION_MS) {
+            return record.payloadDigest === payloadDigest ? { status: 200, kind: "replay", storageRef: record.storageRef } : { status: 409, error: "This upload request id already stored different content.", reason: "upload_request_conflict" };
+          }
+          if (record?.state === "pending" && record.leaseUntil > nowMs) {
+            return { status: 503, error: "This upload is still in progress; retry shortly.", reason: "upload_in_progress" };
+          }
+          const attemptId = createAttemptId(this.crypto);
+          await transaction.put(key, { state: "pending", attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS });
+          await this.pruneUploadReceipts(transaction, nowMs);
+          return { status: 200, kind: "execute", attemptId };
+        });
+        const { status, ...body } = result;
+        return jsonResponse2(body, status);
+      }
       serializeSessionConfigOperation(operation) {
         const run = this.sessionConfigTail.then(operation);
         this.sessionConfigTail = run.catch(() => void 0);
@@ -67541,10 +68185,11 @@ ${expiry}`);
         const retryDelayMs = await this.state.storage.transaction(async (transaction) => {
           const queued = await transaction.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
           const record = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
-          const sameJob = !job || queued?.queuedAtMs === job.queuedAtMs && queued?.requestId === job.requestId;
+          const sameJob = !job || queued?.queuedAtMs === job.queuedAtMs;
           const retryable = error?.retryable !== false && RESULTS_ANALYSIS_RETRYABLE_STATUSES.has(Number(error?.status));
           const retryAttempt = (Number(queued?.retryAttempt) || 0) + 1;
-          const delayMs = retryable && sameJob && isObjectRecord(queued) ? RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS[retryAttempt - 1] : void 0;
+          const scheduledDelay = retryable && sameJob && isObjectRecord(queued) ? RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS[retryAttempt - 1] : void 0;
+          const delayMs = scheduledDelay ? Math.min(Math.max(scheduledDelay, Number(error?.retryAfterMs) || 0), 30 * 6e4) : void 0;
           record.lastFailure = {
             ok: false,
             error: error?.message || error?.error || toTrimmedString9(error) || "Automatic results analysis job failed.",
@@ -67596,7 +68241,7 @@ ${expiry}`);
           return result;
         }
         const current = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-        const sameQueuedJob = current?.queuedAtMs === job.queuedAtMs && current?.requestId === job.requestId;
+        const sameQueuedJob = current?.queuedAtMs === job.queuedAtMs;
         if (sameQueuedJob && result?.reason === "threshold_not_met" && Array.isArray(current.committedResponses) && current.committedResponses.length > 0) {
           const attempts = Math.max(0, Number(current.thresholdRecheckAttempts || 0) || 0);
           if (attempts < RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS) {
@@ -67611,8 +68256,12 @@ ${expiry}`);
             };
           }
         }
-        if (sameQueuedJob) {
+        if (sameQueuedJob && current.requestId === job.requestId) {
           await this.state.storage.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+        } else if (sameQueuedJob && result?.ok === true && !result.skipped) {
+          delete current.retryAttempt;
+          await this.state.storage.put(RESULTS_ANALYSIS_AUTO_JOB_KEY, current);
+          await this.scheduleResultsAnalysisAlarm();
         }
         return result;
       }
@@ -69237,7 +69886,7 @@ ${expiry}`);
             result,
             terminal
           });
-          return jsonResponse2(result, result.status);
+          return jsonResponse2(withFreshRecoveryKey(result, rawResult), result.status);
         } finally {
           if (this.activeDirectAttemptId === reservation.attemptId) this.activeDirectAttemptId = "";
         }
@@ -69289,10 +69938,46 @@ ${expiry}`);
           return jsonResponse2({ error: "Not found." }, 404);
         }
         const payload = await request.json().catch(() => null);
+        if (url.pathname.startsWith("/upload-receipts/")) {
+          if (url.hostname !== "session-coordinator.internal") return jsonResponse2({ error: "Not found." }, 404);
+          if (url.pathname === "/upload-receipts/reserve") return this.executeUploadReceipt(payload);
+          if (url.pathname === "/upload-receipts/settle") return this.executeUploadReceipt(payload, true);
+        }
         if (url.pathname.startsWith("/session-config/") && url.hostname !== "session-coordinator.internal") {
           return jsonResponse2({ error: "Not found." }, 404);
         }
         if (url.pathname === "/session-config/current") return this.executeSessionConfigCurrent(payload);
+        if (url.pathname === "/session-config/recovery-key/export") {
+          return this.serializeSessionConfigOperation(() => exportCoordinatorRecoveryKey(this, payload));
+        }
+        if (url.pathname === "/session-config/backup/export") {
+          return this.serializeSessionConfigOperation(async () => {
+            try {
+              return await exportCoordinatorBackup(this, payload);
+            } catch (error) {
+              return jsonResponse2({ error: error.message }, error.status || 503);
+            }
+          });
+        }
+        if (url.pathname === "/session-config/backup/import") {
+          return this.serializeSessionConfigOperation(async () => {
+            try {
+              return await importCoordinatorBackupPage(this, payload, { normalizeConfig: normalizePublicSessionConfig, normalizeSessionKey: normalizeWrappedSessionKeyRecord });
+            } catch (error) {
+              return jsonResponse2({ error: error.message, ...error.reason ? { reason: error.reason } : {} }, error.status || 503);
+            }
+          });
+        }
+        if (url.pathname === "/worker-groups/backup/export" || url.pathname === "/worker-groups/backup/import") {
+          if (url.hostname !== "session-coordinator.internal") return jsonResponse2({ error: "Not found." }, 404);
+          return this.serializeWorkerGroupOperation(async () => {
+            try {
+              return await (url.pathname.endsWith("/import") ? importWorkerGroupBackup : exportWorkerGroupBackup)(this, payload);
+            } catch (error) {
+              return jsonResponse2({ error: error.message }, error.status || 503);
+            }
+          });
+        }
         if (url.pathname === "/session-config/storage/set-hidden") return this.executeStorageVisibilityMutation(payload);
         if (url.pathname === "/session-config/storage/publish") return this.executeStoragePublication(payload);
         if (url.pathname === "/session-config/lit-authorization/ensure") {
@@ -69429,7 +70114,7 @@ ${expiry}`);
             result,
             terminal
           });
-          return jsonResponse2(result, result.status);
+          return jsonResponse2(withFreshRecoveryKey(result, rawResult), result.status);
         } finally {
           if (this.activeAttemptId === reservation.attemptId) this.activeAttemptId = "";
         }
@@ -69482,6 +70167,25 @@ ${expiry}`);
       if (!coordinator?.idFromName || !coordinator?.get) return null;
       const name = await sha256Hex2(identity);
       return coordinator.get(coordinator.idFromName(name));
+    };
+    coordinateResponseUploadReceipt = async ({ env, slug, responder, operation, payload } = {}) => {
+      if (!env?.CE_SESSION_COORDINATOR) return null;
+      const unavailable2 = { status: 503, error: "Upload receipt coordination is unavailable; retry.", reason: "upload_receipt_unavailable" };
+      try {
+        const stub = await resolveCoordinatorStub(env, `upload-receipts:${resolveCoordinatorSessionSlugStorageKey(slug)}:${toTrimmedString9(responder).toLowerCase()}`);
+        if (!stub?.fetch || !["reserve", "settle"].includes(operation)) return unavailable2;
+        const response3 = await stub.fetch(`https://session-coordinator.internal/upload-receipts/${operation}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const body = await response3.json();
+        if (!isObjectRecord(body) || !response3.ok && ![409, 503].includes(response3.status)) return unavailable2;
+        if (response3.ok && (operation === "settle" ? body.ok !== true : !(body.kind === "execute" && toTrimmedString9(body.attemptId)) && !(body.kind === "replay" && body.storageRef?.id))) return unavailable2;
+        return { ...body, status: response3.status };
+      } catch {
+        return unavailable2;
+      }
     };
     AUTH_STATE_UNAVAILABLE = Object.freeze({
       ok: false,
@@ -69673,14 +70377,14 @@ ${expiry}`);
     };
     reserveCoordinatedSponsoredFaucet = async ({ env, grantToken, requestDigest } = {}) => {
       const token = toTrimmedString9(grantToken);
-      const digest = toTrimmedString9(requestDigest);
+      const digest2 = toTrimmedString9(requestDigest);
       const stub = token ? await resolveCoordinatorStub(env, `sponsored-faucet:${token}`) : null;
       if (!stub) return { kind: "unavailable" };
       try {
         const response3 = await stub.fetch("https://session-coordinator.internal/sponsored-faucet/reserve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ requestDigest: digest })
+          body: JSON.stringify({ requestDigest: digest2 })
         });
         return response3.json().catch(() => ({ kind: "unavailable" }));
       } catch {
@@ -71562,8 +72266,8 @@ var require_webcrypto_driver = __commonJS({
         return new Uint8Array(signature);
       }
       async hash(data, algorithm = "SHA-256") {
-        let digest = await this.driver.digest(algorithm, data);
-        return new Uint8Array(digest);
+        let digest2 = await this.driver.digest(algorithm, data);
+        return new Uint8Array(digest2);
       }
       async verify(publicModulus, data, signature) {
         const publicKey = {
@@ -71572,7 +72276,7 @@ var require_webcrypto_driver = __commonJS({
           n: publicModulus
         };
         const key = await this.jwkToPublicCryptoKey(publicKey);
-        const digest = await this.driver.digest("SHA-256", data);
+        const digest2 = await this.driver.digest("SHA-256", data);
         const salt0 = await this.driver.verify({
           name: "RSA-PSS",
           saltLength: 0
@@ -71581,7 +72285,7 @@ var require_webcrypto_driver = __commonJS({
           name: "RSA-PSS",
           saltLength: 32
         }, key, signature, data);
-        const saltLengthN = Math.ceil((key.algorithm.modulusLength - 1) / 8) - digest.byteLength - 2;
+        const saltLengthN = Math.ceil((key.algorithm.modulusLength - 1) / 8) - digest2.byteLength - 2;
         const saltN = await this.driver.verify({
           name: "RSA-PSS",
           saltLength: saltLengthN
@@ -72843,17 +73547,17 @@ var require_silo = __commonJS({
         }
         const siloName = parsed[1];
         const hashIterations = Math.pow(2, parseInt(parsed[2]));
-        const digest = await this.hash(ArweaveUtils.stringToBuffer(siloName), hashIterations);
-        const accessKey = ArweaveUtils.bufferTob64(digest.slice(0, 15));
-        const encryptionkey = await this.hash(digest.slice(16, 31), 1);
+        const digest2 = await this.hash(ArweaveUtils.stringToBuffer(siloName), hashIterations);
+        const accessKey = ArweaveUtils.bufferTob64(digest2.slice(0, 15));
+        const encryptionkey = await this.hash(digest2.slice(16, 31), 1);
         return new SiloResource(siloURI, accessKey, encryptionkey);
       }
       async hash(input, iterations) {
-        let digest = await this.crypto.hash(input);
+        let digest2 = await this.crypto.hash(input);
         for (let count = 0; count < iterations - 1; count++) {
-          digest = await this.crypto.hash(digest);
+          digest2 = await this.crypto.hash(digest2);
         }
-        return digest;
+        return digest2;
       }
     };
     exports.default = Silo;
@@ -74483,7 +75187,7 @@ var validateAdmin = async ({
 
 // workers/sessionCorsWorker/tokenSigning.js
 init_stringCoercion();
-var encoder = new TextEncoder();
+var encoder2 = new TextEncoder();
 var decoder = new TextDecoder();
 var hmacKeyCache = /* @__PURE__ */ new Map();
 var getBase64Encoder = (deps) => {
@@ -74535,7 +75239,7 @@ var getHmacKey = async (secret, deps) => {
   if (cache.has(keyText)) return cache.get(keyText);
   const key = await getCryptoSubtle(deps).importKey(
     "raw",
-    encoder.encode(keyText),
+    encoder2.encode(keyText),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
@@ -74546,13 +75250,13 @@ var getHmacKey = async (secret, deps) => {
 var signHmac = async (payload, secret, deps) => {
   const key = await getHmacKey(secret, deps);
   if (!key) throw new Error("TOKEN_HMAC_SECRET is missing.");
-  const sig = await getCryptoSubtle(deps).sign("HMAC", key, encoder.encode(payload));
+  const sig = await getCryptoSubtle(deps).sign("HMAC", key, encoder2.encode(payload));
   return new Uint8Array(sig);
 };
 var signToken = async (payload, secret, deps) => {
   const payloadJson = JSON.stringify(payload);
   const sigBytes = await signHmac(payloadJson, secret, deps);
-  return `${base64UrlEncode(encoder.encode(payloadJson), deps)}.${base64UrlEncode(sigBytes, deps)}`;
+  return `${base64UrlEncode(encoder2.encode(payloadJson), deps)}.${base64UrlEncode(sigBytes, deps)}`;
 };
 var verifyToken = async (token, secret, deps) => {
   const raw = toStr6(token);
@@ -75221,14 +75925,14 @@ var parseSiweMessage = (message) => {
   const missing = SIWE_REQUIRED_FIELDS.find((field) => !readField(field));
   if (missing) return malformedSiwe(`expected ${missing[0].trim()} in order`);
   SIWE_OPTIONAL_FIELDS.forEach(readField);
-  let resources;
+  let resources2;
   if (lines[index] === "Resources:") {
-    resources = [];
+    resources2 = [];
     index += 1;
     while (index < lines.length && lines[index].startsWith("- ")) {
       const resource = lines[index].slice(2);
       if (!SIWE_VALUE_RE.test(resource)) return malformedSiwe("invalid resource");
-      resources.push(resource);
+      resources2.push(resource);
       index += 1;
     }
   }
@@ -75247,7 +75951,7 @@ var parseSiweMessage = (message) => {
     expirationTime: fields.expirationTime || "",
     ...fields.notBefore ? { notBefore: fields.notBefore } : {},
     ...fields.requestId ? { requestId: fields.requestId } : {},
-    ...resources === void 0 ? {} : { resources }
+    ...resources2 === void 0 ? {} : { resources: resources2 }
   };
 };
 var validateSiwe = (siwe, deps) => {
@@ -75299,8 +76003,8 @@ var validateSiweResources = ({ siwe, request, config, targetSlug } = {}) => {
   const sessionId = resolveCanonicalWorkerSessionIdHex(config);
   const slug = toStr6(targetSlug).trim().toLowerCase();
   const sessionResource = canonical ? `urn:context-engine:session:id:${encodeURIComponent(sessionId)}` : `urn:context-engine:session:slug:${encodeURIComponent(slug === "general" ? "" : slug)}`;
-  const resources = siwe.resources;
-  if (!workerOrigin || canonical && !sessionId || !Array.isArray(resources) || resources.length !== 2 || !resources.includes(workerOrigin) || !resources.includes(sessionResource)) {
+  const resources2 = siwe.resources;
+  if (!workerOrigin || canonical && !sessionId || !Array.isArray(resources2) || resources2.length !== 2 || !resources2.includes(workerOrigin) || !resources2.includes(sessionResource)) {
     return { ok: false, error: "Signed login resources do not match this Worker and session." };
   }
   return { ok: true };
@@ -76973,7 +77677,7 @@ var resolveArweaveUploadJwk = ({ providedJwk = null, secrets = {} } = {}) => {
 // workers/sessionCorsWorker/arweaveUploadRequestNormalization.js
 init_uploadSizeLimits();
 var hasOwn8 = Object.prototype.hasOwnProperty;
-var encoder5 = new TextEncoder();
+var encoder6 = new TextEncoder();
 var normalizeArweaveUploadJsonPayload = (raw, { maxUploadBytes } = {}) => {
   const source = raw && typeof raw === "object" ? raw : {};
   if (!hasOwn8.call(source, "data")) {
@@ -76984,7 +77688,7 @@ var normalizeArweaveUploadJsonPayload = (raw, { maxUploadBytes } = {}) => {
     };
   }
   const rawData = typeof source.data === "string" ? source.data : JSON.stringify(source.data);
-  const bytes3 = encoder5.encode(rawData);
+  const bytes3 = encoder6.encode(rawData);
   const tooLarge2 = rejectBytesOverLimit({ bytes: bytes3, maxUploadBytes });
   if (tooLarge2) return tooLarge2;
   return {
@@ -77147,12 +77851,12 @@ var arweaveUpload = async ({
   const log2 = resolveLog(deps);
   const warn = resolveWarn(deps);
   const error = resolveError(deps);
-  const json3 = deps?.json;
+  const json4 = deps?.json;
   const hasAuthHeader = !!request?.headers?.get?.("authorization");
   const maxUploadBytes = resolveMaxUploadBytes({ env, deps });
   const uploadPayload = await (deps?.readArweaveUploadRequestPayload || readArweaveUploadRequestPayload)(request, { maxUploadBytes });
   if (!uploadPayload?.ok) {
-    return json3?.({ error: uploadPayload?.error }, uploadPayload?.status || 400, baseHeaders);
+    return json4?.({ error: uploadPayload?.error }, uploadPayload?.status || 400, baseHeaders);
   }
   const {
     bytes: bytes3,
@@ -77163,17 +77867,17 @@ var arweaveUpload = async ({
   } = uploadPayload.payload || {};
   const Arweave = await (deps?.resolveArweaveCtor || resolveArweaveCtor)({ deps });
   if (!Arweave) {
-    return json3?.({ error: ARWEAVE_UNAVAILABLE_ERROR }, 500, baseHeaders);
+    return json4?.({ error: ARWEAVE_UNAVAILABLE_ERROR }, 500, baseHeaders);
   }
   const jwkResult = (deps?.resolveArweaveUploadJwk || resolveArweaveUploadJwk)({ providedJwk, secrets });
   if (!jwkResult?.ok) {
-    return json3?.({ error: jwkResult?.error }, 500, baseHeaders);
+    return json4?.({ error: jwkResult?.error }, 500, baseHeaders);
   }
   const { jwk, hasProvidedJwk, hasWorkerJwk } = jwkResult;
   const tagCheck = (deps?.normalizeArweaveCeTags || normalizeArweaveCeTags)(tagsInput);
   if (!tagCheck?.ok) {
     warn("[arweave] tag reject", { requestId: requestId || null, error: tagCheck?.error });
-    return json3?.({ error: tagCheck?.error || "Invalid tags." }, 400, baseHeaders);
+    return json4?.({ error: tagCheck?.error || "Invalid tags." }, 400, baseHeaders);
   }
   const tags = tagCheck?.tags || [];
   const runtimeConfig = attachSessionSecretRpcForGateRuntime({ config, secrets });
@@ -77199,7 +77903,7 @@ var arweaveUpload = async ({
         error: association?.error || ""
       });
     }
-    return json3?.(
+    return json4?.(
       { error: association?.error || "SBT association authorization failed." },
       association?.status || 403,
       baseHeaders
@@ -77235,14 +77939,14 @@ var arweaveUpload = async ({
     await arweave.transactions.sign(tx, jwk);
     await uploadTransactionWithFallback({ arweave, tx, deps });
     log2("[arweave] upload success", { requestId: requestId || null, id: tx.id });
-    return json3?.({ id: tx.id }, 200, baseHeaders);
+    return json4?.({ id: tx.id }, 200, baseHeaders);
   } catch (e) {
     error("[arweave] upload error", {
       requestId: requestId || null,
       message: e?.message || "Arweave upload failed",
       stack: e?.stack
     });
-    return json3?.({ error: e?.message || "Arweave upload failed" }, 500, baseHeaders);
+    return json4?.({ error: e?.message || "Arweave upload failed" }, 500, baseHeaders);
   }
 };
 
@@ -77731,7 +78435,7 @@ var faucet = async ({
   constants,
   defaults
 } = {}) => {
-  const json3 = resolveJson2(deps);
+  const json4 = resolveJson2(deps);
   const log2 = resolveLog2(deps);
   const warn = resolveWarn2(deps);
   const error = resolveError2(deps);
@@ -77781,7 +78485,7 @@ var faucet = async ({
     log2("[faucet] request", logContext);
   }
   if (!normalizedFaucet?.ok) {
-    return json3(
+    return json4(
       { error: normalizedFaucet?.error },
       normalizedFaucet?.status || 400,
       baseHeaders
@@ -77802,7 +78506,7 @@ var faucet = async ({
     expectedChainId
   } = normalizedFaucet.normalized || {};
   if (!expectedChainId) {
-    return json3(
+    return json4(
       { error: "Invalid faucet chain configuration." },
       500,
       baseHeaders
@@ -77842,7 +78546,7 @@ var faucet = async ({
       privateRpcUrls,
       errorLabel: "Faucet eligibility RPC request failed."
     });
-    return json3(
+    return json4(
       {
         error: faucetEligibility?.error || DEFAULT_ACCESS_DENIED_ERROR,
         reason: faucetEligibility?.reason || "",
@@ -77920,7 +78624,7 @@ var faucet = async ({
       continue;
     }
     if (currentBalanceWei > thresholdWeiBig) {
-      return json3(
+      return json4(
         {
           error: `Balance above threshold (${thresholdEth} ETH).`,
           balanceEth: formatEther2(currentBalanceWei.toString()),
@@ -77982,7 +78686,7 @@ var faucet = async ({
         method: "eth_sendRawTransaction",
         params: [signedTx]
       });
-      return json3(
+      return json4(
         {
           txHash,
           status: null,
@@ -78022,7 +78726,7 @@ var faucet = async ({
       if (!retryAfterSubmissionFailure) break;
     }
   }
-  return json3(
+  return json4(
     {
       error: errors[errors.length - 1]?.error || "Faucet transfer failed.",
       rpcUrl: (rpcUrls || []).length ? maskRpcUrl(rpcUrls[0]) : maskRpcUrl(rpcMasked),
@@ -78104,12 +78808,12 @@ var fetchNormalizedTarget = async ({
   baseHeaders,
   deps
 } = {}) => {
-  const json3 = resolveJson3(deps);
+  const json4 = resolveJson3(deps);
   const normalized = resolveNormalizedTarget({ url, deps });
   if (!normalized?.ok) {
     return {
       ok: false,
-      response: json3({ error: normalized?.error }, normalized?.status || 400, baseHeaders)
+      response: json4({ error: normalized?.error }, normalized?.status || 400, baseHeaders)
     };
   }
   const response3 = await deps?.safeFetch?.(normalized.targetUrl, {
@@ -78119,13 +78823,13 @@ var fetchNormalizedTarget = async ({
   if (!(response3 instanceof Response)) {
     return {
       ok: false,
-      response: json3({ error: response3?.error }, response3?.status, baseHeaders)
+      response: json4({ error: response3?.error }, response3?.status, baseHeaders)
     };
   }
   return {
     ok: true,
     response: response3,
-    json: json3
+    json: json4
   };
 };
 var readFetchBytes = async (response3) => {
@@ -78144,16 +78848,16 @@ var fetchImage = async ({
 } = {}) => {
   const fetchResult = await fetchNormalizedTarget({ url, baseHeaders, deps });
   if (!fetchResult?.ok) return fetchResult?.response;
-  const { response: response3, json: json3 } = fetchResult;
+  const { response: response3, json: json4 } = fetchResult;
   if (!response3.ok) {
-    return json3({ error: `HTTP ${response3.status}` }, 400, baseHeaders);
+    return json4({ error: `HTTP ${response3.status}` }, 400, baseHeaders);
   }
   const type = response3.headers.get("content-type") || "";
   if (!type.startsWith("image/")) {
-    return json3({ error: "URL must return an image" }, 400, baseHeaders);
+    return json4({ error: "URL must return an image" }, 400, baseHeaders);
   }
   const bytes3 = await readFetchBytes(response3);
-  if (!bytes3) return json3({ error: "Response too large" }, 413, baseHeaders);
+  if (!bytes3) return json4({ error: "Response too large" }, 413, baseHeaders);
   const headers = new Headers(baseHeaders);
   headers.set("Content-Type", type);
   return new Response(bytes3, { status: 200, headers });
@@ -78165,26 +78869,26 @@ var fetchUrl = async ({
 } = {}) => {
   const fetchResult = await fetchNormalizedTarget({ url, baseHeaders, deps });
   if (!fetchResult?.ok) return fetchResult?.response;
-  const { response: response3, json: json3 } = fetchResult;
+  const { response: response3, json: json4 } = fetchResult;
   if (!response3.ok) {
-    return json3({ error: `HTTP ${response3.status}` }, 400, baseHeaders);
+    return json4({ error: `HTTP ${response3.status}` }, 400, baseHeaders);
   }
   const type = response3.headers.get("content-type") || "";
   if (!/text\/html|application\/json/i.test(type)) {
-    return json3({ error: "URL must return HTML or JSON" }, 400, baseHeaders);
+    return json4({ error: "URL must return HTML or JSON" }, 400, baseHeaders);
   }
   const bytes3 = await readFetchBytes(response3);
-  if (!bytes3) return json3({ error: "Response too large" }, 413, baseHeaders);
+  if (!bytes3) return json4({ error: "Response too large" }, 413, baseHeaders);
   const text = new TextDecoder().decode(bytes3);
   if (type.includes("application/json")) {
     const data = JSON.parse(text);
-    return json3({ content: JSON.stringify(data), status: "success", contentType: type }, 200, baseHeaders);
+    return json4({ content: JSON.stringify(data), status: "success", contentType: type }, 200, baseHeaders);
   }
   const stripped = stripHtml(text);
   if (!stripped || stripped.length < 50) {
-    return json3({ error: "Insufficient content extracted" }, 400, baseHeaders);
+    return json4({ error: "Insufficient content extracted" }, 400, baseHeaders);
   }
-  return json3({ content: stripped, status: "success", contentType: type }, 200, baseHeaders);
+  return json4({ content: stripped, status: "success", contentType: type }, 200, baseHeaders);
 };
 
 // workers/sessionCorsWorker/adminSignatureAuthority.js
@@ -78551,10 +79255,10 @@ var transcribe = async ({
   deps,
   constants
 } = {}) => {
-  const json3 = deps?.json;
+  const json4 = deps?.json;
   const normalizedRequest = transcribeRequest || await (deps?.readTranscribeRequestPayload || readTranscribeRequestPayload)({ request });
   if (!normalizedRequest?.ok) {
-    return json3?.({ error: normalizedRequest?.error }, normalizedRequest?.status || 400, baseHeaders);
+    return json4?.({ error: normalizedRequest?.error }, normalizedRequest?.status || 400, baseHeaders);
   }
   const {
     provider,
@@ -78571,22 +79275,22 @@ var transcribe = async ({
     try {
       parsedTargetUrl = new URL(targetUrl);
     } catch {
-      return json3?.({ error: "Custom transcription URL target is not allowed" }, 403, baseHeaders);
+      return json4?.({ error: "Custom transcription URL target is not allowed" }, 403, baseHeaders);
     }
     if (parsedTargetUrl.protocol !== "https:") {
-      return json3?.({ error: "Custom transcription URL must use HTTPS" }, 403, baseHeaders);
+      return json4?.({ error: "Custom transcription URL must use HTTPS" }, 403, baseHeaders);
     }
     if (parsedTargetUrl.username || parsedTargetUrl.password) {
-      return json3?.({ error: "Custom transcription URL must not contain credentials" }, 403, baseHeaders);
+      return json4?.({ error: "Custom transcription URL must not contain credentials" }, 403, baseHeaders);
     }
     if (deps?.isBlockedOutboundUrl?.(targetUrl)) {
-      return json3?.({ error: "Custom transcription URL target is not allowed" }, 403, baseHeaders);
+      return json4?.({ error: "Custom transcription URL target is not allowed" }, 403, baseHeaders);
     }
     key = requestApiKey;
     outboundUrlPolicy = STRICT_HTTPS_NO_CREDENTIALS_POLICY;
   }
   if (provider !== "custom" && !key) {
-    return json3?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
+    return json4?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
   }
   const headers = {};
   if (key) headers.authorization = `Bearer ${key}`;
@@ -78598,7 +79302,7 @@ var transcribe = async ({
   if (outboundUrlPolicy) fetchOptions.outboundUrlPolicy = outboundUrlPolicy;
   const response3 = await deps?.safeFetch?.(targetUrl, fetchOptions);
   if (!(response3 instanceof Response)) {
-    return json3?.({ error: response3?.error }, response3?.status, baseHeaders);
+    return json4?.({ error: response3?.error }, response3?.status, baseHeaders);
   }
   let data = {};
   try {
@@ -78608,9 +79312,9 @@ var transcribe = async ({
   }
   if (!response3.ok) {
     const message = typeof data?.error === "string" ? data.error : data?.error?.message || data?.message || (response3.status === 401 ? "Unauthorized: invalid API key on server." : "Transcription failed.");
-    return json3?.({ error: String(message), details: data }, response3.status, baseHeaders);
+    return json4?.({ error: String(message), details: data }, response3.status, baseHeaders);
   }
-  return json3?.({ text: data?.text || "" }, 200, baseHeaders);
+  return json4?.({ text: data?.text || "" }, 200, baseHeaders);
 };
 
 // workers/sessionCorsWorker/workerExecutionServiceBinding.js
@@ -79438,6 +80142,65 @@ var dispatchAnonymousRouteEntry = async ({
 
 // workers/sessionCorsWorker/anonymousRouteDispatch.js
 init_aiDefaults();
+
+// workers/sessionCorsWorker/workerCapabilities.js
+init_sessionConfigAuthority();
+init_sessionConfigSecretsStore();
+init_sessionSlugResolution();
+init_storageRouteExecution();
+var FEATURES = Object.freeze([
+  "envelope_export_identity_v1",
+  "recovery_key_export",
+  "response_upload_receipts",
+  "results_analysis_retry_v1",
+  "session_backup_v1",
+  "upload_authority_stamps",
+  "worker_groups"
+]);
+var dispatchWorkerCapabilities = async ({ request, env = {}, headers = {} }) => {
+  const body = {
+    type: "ce_worker_capabilities",
+    version: 1,
+    apiVersion: 1,
+    bundle: env.CE_BUNDLE_SHA256 || null,
+    features: FEATURES
+  };
+  const responseHeaders = new Headers(headers);
+  responseHeaders.set("Cache-Control", "public, max-age=30");
+  const url = new URL(request.url);
+  if (url.searchParams.has("slug")) {
+    const validated = validateInboundWorkerSessionSlug(url.searchParams.get("slug"));
+    if (!validated.ok) return Response.json({ error: validated.error }, { status: 400, headers: responseHeaders });
+    const bound = !!env.CE_SESSION_COORDINATOR?.idFromName && !!env.CE_SESSION_COORDINATOR?.get;
+    const current = bound ? await callSessionConfigCoordinator({ env, slug: validated.slug, path: "current" }) : null;
+    const migration = current?.body?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON;
+    const validCurrent = current?.ok && Number.isSafeInteger(current.body.revision) && (current.body.config === null ? current.body.revision === 0 : current.body.revision > 0 && typeof current.body.config === "object" && !Array.isArray(current.body.config));
+    const index = getStorageIndexBinding(env);
+    const readiness = {
+      coordinator: !bound ? "missing" : validCurrent || migration ? "ok" : "unavailable",
+      configAuthority: migration ? "migration_required" : !validCurrent ? "unavailable" : current.body.config === null ? "seeding" : "ok",
+      storage: index?.get && index?.put ? "ok" : "missing",
+      kek: String(env.CE_STORAGE_ENVELOPE_KEK || "").trim() ? "ok" : "missing",
+      tokenHmac: String(env.TOKEN_HMAC_SECRET || "").trim() ? "ok" : "missing"
+    };
+    const needsKek = resolvePayloadAccessControl(current?.body?.config || {}).encryption === "worker_envelope";
+    const unavailable2 = [];
+    for (const operation of ["submit", "publish_question", "admin_correction", "backup"]) {
+      const required = [
+        "coordinator",
+        "configAuthority",
+        "storage",
+        ...operation === "backup" ? ["kek"] : ["tokenHmac", ...needsKek ? ["kek"] : []]
+      ];
+      const failed = required.find((key) => readiness[key] !== "ok");
+      if (failed) unavailable2.push({ operation, reason: `${failed}_${readiness[failed]}` });
+    }
+    body.session = { readiness, unavailable: unavailable2 };
+  }
+  return Response.json(body, { headers: responseHeaders });
+};
+
+// workers/sessionCorsWorker/anonymousRouteDispatch.js
 init_aiRequestNormalization();
 init_workerGroups();
 init_sessionLifecycle();
@@ -79593,6 +80356,7 @@ var dispatchAnonymousRoute = async ({
     headers,
     env
   } = anonymousContext || {};
+  if (path === "/capabilities") return dispatchWorkerCapabilities({ request, env, headers });
   if (path === "/groups/list") {
     const dispatchPublicWorkerGroupListRequest2 = deps?.dispatchPublicWorkerGroupListRequest || dispatchPublicWorkerGroupListRequest;
     return dispatchPublicWorkerGroupListRequest2({
@@ -79931,6 +80695,177 @@ var resolveAuthenticatedRouteContext = async ({
 
 // workers/sessionCorsWorker/adminRequestDispatch.js
 init_sessionConfigAuthority();
+
+// workers/sessionCorsWorker/sessionBackup.js
+init_sessionConfigAuthority();
+init_workerGroups();
+init_sessionConfigMutation();
+init_sessionSlugResolution();
+init_recoveryKey();
+init_deployHelperCore();
+init_storageEnvelopeEncryption();
+init_storageRouteExecution();
+init_storageScanBudget();
+var encoder7 = new TextEncoder();
+var CHUNK_BYTES = 256 * 1024;
+var fail4 = (message, status = 409) => {
+  throw Object.assign(new Error(message), { status });
+};
+var digestBytes = async (bytes3) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes3))].map((v) => v.toString(16).padStart(2, "0")).join("");
+var prefixes = (slug) => [null, `ce-storage-hidden:${slug}:`, `ce-storage-owner:${slug}:`, `ce-storage-payload:${slug}:`, `ce-storage:${slug}:`, `sessions/${slug}/storage/`];
+var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) => {
+  const keySlug = sessionSlugStorageKey(slug);
+  const index = getStorageIndexBinding(env);
+  if (!index?.list || !index?.get) fail4("Backup storage is unavailable.", 503);
+  const current = await callSessionConfigCoordinator({ env, slug, path: "backup/export", expectedAuthority });
+  if (!current.ok) fail4(current.body?.error || "Backup authority is unavailable.", current.status);
+  const coordinator = current.body.coordinator;
+  const sessionId = resolveCanonicalWorkerSessionIdHex(coordinator.configAuthority.config);
+  if (!sessionId) fail4("The session has no canonical identity.");
+  const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: "export" });
+  if (!groups.ok) fail4(groups.error || "Group backup is unavailable.", groups.status);
+  coordinator.workerGroups = groups.snapshot;
+  const snapshotBytes = encoder7.encode(JSON.stringify(coordinator));
+  const snapshotDigest = await digestBytes(snapshotBytes);
+  const prefix = `ce-backup:${keySlug}:`;
+  const parsed = parseStorageExportCursor({ cursor, prefix, sessionId });
+  const position = parsed.continuation || {
+    phase: 0,
+    listCursor: "",
+    lastKey: "",
+    chunk: -1,
+    pageNumber: 0,
+    exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    snapshotDigest,
+    counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 }
+  };
+  const paths = prefixes(keySlug);
+  if (!Number.isSafeInteger(position.phase) || position.phase < 0 || position.phase > 6 || !Number.isSafeInteger(position.chunk) || position.chunk < -1 || !Number.isSafeInteger(position.pageNumber) || position.pageNumber < 0 || typeof position.listCursor !== "string" || position.listCursor.length > 4096 || typeof position.lastKey !== "string" || position.lastKey && position.phase > 0 && !position.lastKey.startsWith(paths[position.phase]) || !position.counts || !["records", "payloads", "owners", "hidden", "bytes"].every((key) => Number.isSafeInteger(position.counts[key]) && position.counts[key] >= 0) || !Number.isFinite(Date.parse(position.exportedAt))) fail4("Invalid backup cursor.", 400);
+  if (position.snapshotDigest !== snapshotDigest) fail4("Session config or groups changed during backup. Restart the export.");
+  const manifest = {
+    type: "ce_session_backup",
+    version: 1,
+    sessionSlug: keySlug,
+    sessionId,
+    exportedAt: position.exportedAt,
+    workerBundle: env.CE_BUNDLE_SHA256 || null,
+    kekFingerprint: await recoveryKeyFingerprint(env.CE_STORAGE_ENVELOPE_KEK),
+    ...env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK ? { previousKekFingerprint: await recoveryKeyFingerprint(env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK) } : {},
+    counts: position.counts,
+    complete: false
+  };
+  const page = {
+    ok: true,
+    manifest,
+    pageNumber: position.pageNumber,
+    entries: [],
+    nextCursor: "",
+    snapshotDigest,
+    archiveId: await sha256Hex2(`${sessionId}:${manifest.exportedAt}:${snapshotDigest}`)
+  };
+  let used = jsonByteLength(page) + 16384;
+  let rows = 0;
+  const append = (entry) => {
+    const size = jsonByteLength(entry) + 1;
+    if (size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes - 16384) fail4("A backup metadata record exceeds the page limit.");
+    if (used + size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes) return false;
+    page.entries.push(entry);
+    used += size;
+    return true;
+  };
+  const payload = async (id2, bytes3, metadata, target) => {
+    const sha2564 = await digestBytes(bytes3);
+    const chunkCount = Math.max(1, Math.ceil(bytes3.length / CHUNK_BYTES));
+    if (position.chunk === -1) {
+      if (!append({ kind: "payload", id: id2, size: bytes3.length, sha256: sha2564, chunkCount, ...metadata ? { metadata } : {}, ...target ? { target } : {} })) return false;
+      position.chunk = 0;
+    }
+    for (; position.chunk < chunkCount; position.chunk += 1) {
+      if (!append({ kind: "chunk", id: id2, index: position.chunk, base64url: bytesToBase64url2(bytes3.subarray(position.chunk * CHUNK_BYTES, (position.chunk + 1) * CHUNK_BYTES)), ...target ? { target } : {} })) return false;
+    }
+    position.chunk = -1;
+    if (!target) {
+      position.counts.payloads += 1;
+      position.counts.bytes += bytes3.length;
+    }
+    return true;
+  };
+  if (position.phase === 0) {
+    if (snapshotBytes.length <= STORAGE_EXPORT_PAGE_LIMITS.metadataBytes && position.chunk === -1) {
+      page.coordinator = coordinator;
+      used += snapshotBytes.length;
+    } else {
+      if (position.pageNumber === 0) page.coordinator = { chunked: true, sha256: snapshotDigest };
+      if (!await payload("coordinator", snapshotBytes, null, "coordinator")) {
+        position.pageNumber += 1;
+        page.nextCursor = storageExportCursor({ prefix, sessionId, continuation: position });
+        return page;
+      }
+    }
+    position.phase = 1;
+  }
+  outer: while (position.phase < paths.length && rows < STORAGE_EXPORT_PAGE_LIMITS.rows) {
+    const r2 = position.phase === 5 ? getStorageR2Binding(env) : null;
+    if (position.phase === 5 && !r2) {
+      position.phase += 1;
+      break;
+    }
+    const listed = await (r2 || index).list({ prefix: paths[position.phase], ...position.listCursor ? { cursor: position.listCursor } : {}, limit: STORAGE_EXPORT_PAGE_LIMITS.rows });
+    const keys = r2 ? listed.objects?.map(({ key }) => key) : listed.keys?.map(({ name }) => name);
+    if (!Array.isArray(keys)) fail4("Backup storage listing is unavailable.", 503);
+    keys.sort();
+    for (const key of keys) {
+      if (!key.startsWith(paths[position.phase])) fail4("Invalid backup storage key.", 503);
+      if (key < position.lastKey || key === position.lastKey && position.chunk === -1) continue;
+      if (rows >= STORAGE_EXPORT_PAGE_LIMITS.rows) break outer;
+      if (position.phase === 3 || position.phase === 5) {
+        const id2 = key.slice(paths[position.phase].length);
+        const raw = await index.get(buildPayloadKey({ slug, id: id2 }));
+        if (r2 && raw != null) {
+          position.lastKey = key;
+          continue;
+        }
+        const metadata = raw != null ? JSON.parse(raw).metadata : { id: id2 };
+        const bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true });
+        if (!bytes3) fail4("A backup payload is missing or unreadable.", 503);
+        const priorKey = position.lastKey;
+        position.lastKey = key;
+        if (!await payload(id2, bytes3, metadata)) {
+          if (position.chunk === -1) position.lastKey = priorKey;
+          break outer;
+        }
+      } else {
+        const value = await index.get(key);
+        if (value == null) fail4("A storage record changed during backup. Restart the export.");
+        const metadata = position.phase === 4 ? JSON.parse(value) : null;
+        const entry = metadata ? { kind: "record", key, id: metadata.id, resource: metadata.resource, metadata } : { kind: position.phase === 1 ? "hidden" : "owner", key, value };
+        if (!append(entry)) break outer;
+        position.counts[metadata ? "records" : position.phase === 1 ? "hidden" : "owners"] += 1;
+        position.lastKey = key;
+      }
+      rows += 1;
+    }
+    const more = r2 ? listed.truncated === true : listed.list_complete === false;
+    if (more) {
+      if (!listed.cursor || listed.cursor === position.listCursor) fail4("Backup list cursor did not advance.", 503);
+      position.listCursor = listed.cursor;
+      position.lastKey = "";
+    } else {
+      position.phase += 1;
+      position.listCursor = "";
+      position.lastKey = "";
+    }
+  }
+  manifest.complete = position.phase === paths.length;
+  if (!manifest.complete) {
+    position.pageNumber += 1;
+    page.nextCursor = storageExportCursor({ prefix, sessionId, continuation: position });
+  }
+  return page;
+};
+
+// workers/sessionCorsWorker/adminRequestDispatch.js
+init_sessionConfigAuthority();
 init_sessionLitAuthorizationCoordinator();
 
 // workers/sessionCorsWorker/adminRequestAuthority.js
@@ -79943,11 +80878,11 @@ var getEthersFn3 = (...candidates) => candidates.find((fn) => typeof fn === "fun
 var getEthersUtils3 = () => ethers2?.utils || lib_exports?.utils || lib_exports?.ethers?.utils || lib_exports?.default?.utils || lib_exports?.default?.ethers?.utils || null;
 var getTypedDataEncoder = () => ethers2?.TypedDataEncoder || lib_exports?.TypedDataEncoder || lib_exports?.ethers?.TypedDataEncoder || lib_exports?.default?.TypedDataEncoder || lib_exports?.default?.ethers?.TypedDataEncoder || getEthersUtils3()?._TypedDataEncoder || null;
 var hashTypedData = (domain, types, message) => {
-  const encoder6 = getTypedDataEncoder();
-  if (typeof encoder6?.hash !== "function") {
+  const encoder8 = getTypedDataEncoder();
+  if (typeof encoder8?.hash !== "function") {
     throw new Error("TypedDataEncoder.hash unavailable.");
   }
-  return encoder6.hash(domain, types, message);
+  return encoder8.hash(domain, types, message);
 };
 var recoverAddressCompat = (...args) => {
   const recoverFn = getEthersFn3(
@@ -80015,12 +80950,12 @@ var verifyAdminActionSignature = ({
         signature
       );
     } else {
-      const digest = hashTypedData(
+      const digest2 = hashTypedData(
         typedData.domain,
         ADMIN_ACTION_TYPES,
         typedData.message
       );
-      recovered = recoverAddressCompat(digest, signature);
+      recovered = recoverAddressCompat(digest2, signature);
     }
   } catch {
     try {
@@ -80129,7 +81064,8 @@ var resolveAdminRequestAuthority = async ({
       response: deps?.json?.({ error: "Admin request body mismatch." }, 400, headers)
     };
   }
-  const initializingConfig = !corsState?.config && action === "set-config" && body?.config && typeof body.config === "object" ? body.config : null;
+  const restoringFreshSession = !corsState?.config && action === "import-session-backup" && body?.adoptSessionId === true;
+  const initializingConfig = restoringFreshSession ? null : !corsState?.config && action === "set-config" && body?.config && typeof body.config === "object" ? body.config : null;
   const audienceCheck = (deps?.validateAdminActionAudience || validateAdminActionAudience)({
     audience,
     request,
@@ -80178,8 +81114,12 @@ var resolveAdminRequestAuthority = async ({
   }
   const existingConfig = corsState.config;
   let adminOk = false;
-  if (!existingConfig && action === "set-config") {
-    adminOk = await deps?.validateBootstrapAdmin?.({ env, slug: targetSlug, address: address2, body });
+  if (!existingConfig && (action === "set-config" || restoringFreshSession)) {
+    const bootstrapBody = restoringFreshSession ? { ...body, config: {
+      adminAddress: address2,
+      sessionId: body?.page?.manifest?.sessionId
+    } } : body;
+    adminOk = await deps?.validateBootstrapAdmin?.({ env, slug: targetSlug, address: address2, body: bootstrapBody });
   }
   if (!adminOk) {
     adminOk = await deps?.validateAdmin?.({
@@ -82112,6 +83052,38 @@ var dispatchAdminRequest = async ({
       headers
     );
   }
+  if (action === "export-recovery-key") {
+    const result = await callSessionConfigCoordinator({
+      env,
+      slug: targetSlug,
+      path: "recovery-key/export",
+      expectedAuthority,
+      confirm: body?.confirm
+    });
+    return deps?.json?.(result.body, result.status, { ...headers, "Cache-Control": "no-store" });
+  }
+  if (action === "export-session-backup") {
+    try {
+      return deps?.json?.(
+        await exportSessionBackup({ env, slug: targetSlug, expectedAuthority, cursor: body?.cursor || "" }),
+        200,
+        { ...headers, "Cache-Control": "no-store" }
+      );
+    } catch (error) {
+      return deps?.json?.({ error: error.message }, error.status || 503, { ...headers, "Cache-Control": "no-store" });
+    }
+  }
+  if (action === "import-session-backup") {
+    const result = await callSessionConfigCoordinator({
+      env,
+      slug: targetSlug,
+      path: "backup/import",
+      expectedAuthority,
+      page: body?.page,
+      adoptSessionId: body?.adoptSessionId === true
+    });
+    return deps?.json?.(result.body, result.status, { ...headers, "Cache-Control": "no-store" });
+  }
   if (action === "export-storage-envelopes") {
     try {
       const result = await (deps?.exportCloudflareEncryptedPayloadEnvelopes || exportCloudflareEncryptedPayloadEnvelopes)({
@@ -83170,6 +84142,7 @@ var dispatchBootstrapArweaveUpload = async ({
 };
 
 // workers/sessionCorsWorker/sponsoredBootstrapRedeemDispatch.js
+init_recoveryKey();
 init_sponsoredBootstrapGrantStore();
 init_deployHelperCore();
 init_sessionWriteCoordinator();
@@ -83248,7 +84221,7 @@ var collectSponsoredSensitiveValues = (value, parentSensitive = false, output2 =
   Object.entries(value).forEach(([key, entry]) => {
     collectSponsoredSensitiveValues(
       entry,
-      parentSensitive || SENSITIVE_FIELD_PATTERN.test(key.replace(/[^a-z0-9]/gi, "")),
+      parentSensitive || (/kek|recoverykey/i.test(key) || SENSITIVE_FIELD_PATTERN.test(key.replace(/[^a-z0-9]/gi, ""))),
       output2
     );
   });
@@ -83414,7 +84387,7 @@ var dispatchSponsoredBootstrapRedeem = async ({
         sensitiveValues,
         nowMs: deps?.now?.() ?? Date.now()
       });
-      return deps?.json?.(receipt.body, receipt.status, headers);
+      return deps?.json?.(withFreshRecoveryKey({ body: receipt.body }, embeddedResult).body, receipt.status, { ...headers, "Cache-Control": "no-store" });
     }
     const safeEmbeddedResult = redactSponsoredDeployFailure(embeddedResult, sensitiveValues);
     return deps?.json?.(
@@ -83761,8 +84734,8 @@ var safeSessionUrl = (value, { slug = "", allowOrigins } = {}) => {
 };
 var sha2563 = async (value) => {
   const bytes3 = new TextEncoder().encode(String(value));
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes3);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const digest2 = await globalThis.crypto.subtle.digest("SHA-256", bytes3);
+  return [...new Uint8Array(digest2)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 var canonicalizeQuestions = (questions = []) => [...questions].sort(
   (left, right) => trim14(left?.id).localeCompare(trim14(right?.id)) || trim14(left?.prompt).localeCompare(trim14(right?.prompt)) || trim14(left?.type).localeCompare(trim14(right?.type))
@@ -83904,6 +84877,7 @@ var resolveTopLevelRouteSelection = ({
   if (method === "OPTIONS") {
     return { kind: "options" };
   }
+  if (path === "/capabilities" && method === "GET") return { kind: "capabilities" };
   if (path === "/auth/nonce" && method === "POST") {
     return { kind: "auth-nonce" };
   }
@@ -84032,6 +85006,13 @@ var createWorkerRouteShellWithWorkerDeps = ({
         request = new Request(request, { body: bytes3 });
       }
       const envSlug = getDefaultWorkerSessionSlug2(env);
+      if (routeSelection.kind === "capabilities") {
+        return await dispatchAnonymousRoute2({
+          path,
+          request,
+          anonymousContext: { env, headers: routeBaseHeaders }
+        });
+      }
       if (routeSelection.kind === "session-config") {
         return await dispatchSessionConfigBootstrapRequest2({
           request,
