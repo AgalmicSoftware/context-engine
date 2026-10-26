@@ -674,3 +674,19 @@
 .addressButton {
   height: var(--ce-navbar-control-size, auto);
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  @media (max-width: 768px) {
+    #navbarContainer,
+    #navbarContainerLoggedIn {
+      --ce-navbar-logo-size: 64px;
+      --ce-navbar-logo-scale: 1;
+      padding-block: 12px;
+    }
+
+    #navbarContainer {
+      --ce-navbar-control-size: 48px;
+      --ce-navbar-control-scale: 1;
+    }
+  }
+}

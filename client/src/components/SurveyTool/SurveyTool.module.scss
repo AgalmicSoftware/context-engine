@@ -5517,15 +5517,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (max-width: 480px) {
-  // Keep the always-visible microphone and navigation on one row without
-  // squeezing the pending-answer Submit label between them.
-  .pileControls:has(.pileVoiceModeToggle) {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'actions nav'
-      'footer footer';
-  }
-
   .pileControls {
     gap: 4px;
     padding: 0 6px;
@@ -7392,6 +7383,104 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .pileActionLabel {
   display: none;
+}
+
+@media (max-width: 768px) {
+  // Wrap the final navigation group only when the actual controls need the room.
+  // The row gap separates its touch targets from Clear pending changes above.
+  .pileInteractionUnit .pileControls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 8px;
+    margin-top: 20px;
+  }
+
+  .pileInteractionUnit .pileControls > .pileActions {
+    flex: 0 0 auto;
+  }
+
+  .pileInteractionUnit .pileFooter {
+    flex: 1 1 max-content;
+    min-width: max-content;
+    width: auto;
+    gap: 4px;
+  }
+
+  .pileInteractionUnit .pileFooter .pileSubmitButton {
+    width: auto;
+    min-width: max-content;
+    max-width: none;
+    padding-inline: 10px;
+  }
+
+  .pileInteractionUnit .pileControls > .pileNav {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  // Binary prompts can be long; let the active card establish the stack height
+  // instead of shrinking the answer row into the fixed-height card's overflow.
+  .pileCardContainer:has(.binaryQuestionContainer) {
+    min-height: 0;
+    height: auto;
+
+    .pileCardActive {
+      position: relative;
+      height: auto;
+    }
+
+    .pileCardInner {
+      height: 100%;
+      min-height: 0;
+    }
+
+    .pileCardActive .pileCardInner {
+      height: auto;
+      min-height: 330px;
+    }
+
+    .pileCardBody {
+      height: auto;
+      min-height: inherit;
+      gap: 18px;
+      padding: 18px;
+    }
+
+    .pileCardHeader {
+      flex: 0 0 auto;
+      min-height: 0;
+      margin: 0;
+    }
+
+    .pileCardHeader #questionTitle {
+      padding: 0;
+      margin: 0;
+      font-size: clamp(1.1rem, 4.8vw, 1.45rem);
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .pileCardMainContent {
+      flex: 1 0 auto;
+      min-height: 44px;
+      padding: 0;
+      overflow: visible;
+    }
+
+    #binaryChoice {
+      width: 100%;
+      gap: 8px;
+      margin: 0;
+    }
+
+    #binaryChoice .radioOptionText {
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 44px;
+      margin: 0;
+    }
+  }
 }
 
 // The portal keeps the backdrop out of transformed question-card stacking contexts.

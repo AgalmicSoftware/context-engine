@@ -4201,6 +4201,17 @@ h1 {
     display: none;
   }
 
+  @media (max-width: 768px) {
+    .navConnectButton {
+      min-width: 140px;
+      padding: 10px 20px;
+    }
+
+    .loginPromptText {
+      font-size: 1.2rem;
+    }
+  }
+
   #closeModalIcon,
   .Web3SettingsModalTitle,
   .passkeyWalletStatus {

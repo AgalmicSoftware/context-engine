@@ -1214,8 +1214,12 @@ interview. Its idle appearance matches the adjacent controls; an interview in pr
 keeps the microphone emphasized even after closing the modal. Closing stops audio
 capture and retains the transcript and review edits on the current page. Reopen to
 continue, submit, or explicitly discard the interview. Reloading or leaving the page
-clears this in-memory interview; closing does not submit responses. On narrow phones,
-pending-answer submission controls use a separate row so their labels remain readable.
+clears this in-memory interview; closing does not submit responses. On small screens,
+Submit and Clear stay beside the menu and microphone. When the controls need more
+width, the navigation arrows wrap onto a right-aligned row below, with extra vertical
+space separating them from Clear. Binary question cards grow to fit long prompts and
+keep all three answer buttons visible. The answers retain their original typography
+and wrap when they need more room.
 
 The compact question-actions menu labels its controls **Filter questions**,
 **Add questions**, and **All questions**. Opening it blurs the page behind it;

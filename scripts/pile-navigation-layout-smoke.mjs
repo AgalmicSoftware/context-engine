@@ -9,9 +9,10 @@ const base = process.env.BASE_URL || 'http://127.0.0.1:3000';
 const sessions = JSON.parse(readFileSync(new URL('../client/src/variables/demo/demo_sessions.json', import.meta.url)));
 const config = sessions['demo-sh'];
 const quadratic = process.env.SMOKE_QUADRATIC === '1';
+const longPrompt = 'Free AI legal tools that help people challenge government decisions would strengthen democracy more than they would clog the courts.';
 const questions = Array.from({ length: 50 }, (_, index) => ({
   id: `0x${String(index + 1).padStart(64, '0')}`, type: quadratic && index === 0 ? 'quadratic' : 'binary',
-  prompt: `Synthetic navigation question ${index + 1}`,
+  prompt: index === 0 ? longPrompt : `Synthetic navigation question ${index + 1}`,
   options: quadratic && index === 0 ? Array.from({ length: 8 }, (_, option) => `Synthetic allocation option ${option + 1}`) : [], tags: [],
   sessionSlug: 'demo-sh', sessionId: config.sessionId,
 }));
@@ -107,7 +108,7 @@ try {
           const rect = element => { const r = element.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, cx: r.left + r.width / 2, cy: r.top + r.height / 2, width: r.width }; };
           return {
             nav: rect(nav), menu: rect(actions.querySelector('button')), next: rect(button), counter: rect(counter), card: rect(card), prev: rect(nav.querySelector('button')), actions: rect(actions),
-            buttons: [...controls.querySelectorAll('button')].filter(button => button.getBoundingClientRect().width > 0 && getComputedStyle(button).visibility !== 'hidden').map(button => ({ ...rect(button), inFooter: !!button.closest('[class*="pileFooter_"]') })),
+            buttons: [...controls.querySelectorAll('button')].filter(button => button.getBoundingClientRect().width > 0 && getComputedStyle(button).visibility !== 'hidden').map(button => ({ ...rect(button), inNav: nav.contains(button) })),
             text: counter.textContent.trim(), lineTops: [...new Set(textRects.map(r => Math.round(r.top)))],
             submitLabelFits: [...controls.querySelectorAll('[class*="pileSubmitButtonLabel_"]')].every(label => {
               const labelRect = label.getBoundingClientRect(), buttonRect = label.closest('button').getBoundingClientRect();
@@ -123,13 +124,18 @@ try {
           assert(layout.counter.width < 32, `Counter leaves room for the controls: ${detail}`);
         } else assert.equal(layout.lineTops.length, 1, `Wide counter stays on one line: ${detail}`);
         if (width <= 768) {
-          for (const control of layout.buttons) {
-            if (width <= 480 && control.inFooter) {
-              assert(control.top >= layout.nav.bottom, `Submit and clear have their own row on narrow phones: ${detail}`);
-            } else {
-              assert(Math.abs(control.cy - layout.nav.cy) <= 1, `Microphone, menu, and arrows share a row: ${detail}`);
-            }
+          const topRow = layout.buttons.filter(control => !control.inNav);
+          for (const control of topRow) {
+            assert(Math.abs(control.cy - layout.actions.cy) <= 1, `Menu, microphone, Submit and Clear share the top row: ${detail}`);
           }
+          const wrapped = layout.nav.top >= layout.actions.bottom;
+          if (wrapped) {
+            assert(layout.nav.top >= Math.max(...topRow.map(control => control.bottom)) + 15, `Wrapped arrows have at least 16px separation from Clear: ${detail}`);
+          } else {
+            assert(Math.abs(layout.nav.cy - layout.actions.cy) <= 1, `Controls stay on one row when they fit: ${detail}`);
+          }
+          if (width === 320 && topRow.length > 2) assert(wrapped, `Narrow pending toolbar moves arrows below: ${detail}`);
+          if (width >= 596) assert(!wrapped, `Wide mobile toolbar fits one row: ${detail}`);
           assert(layout.submitLabelFits, `Submit label fits its button: ${detail}`);
         }
         assert(layout.counter.left >= layout.nav.left && layout.counter.right <= layout.nav.right, `Counter fits its rail: ${detail}`);
@@ -147,6 +153,51 @@ try {
         return layout;
       };
       await inspect(1);
+      if (!quadratic && width <= 768) {
+        const answerLayout = await page.getByTestId('ce-pile-active-question').evaluate(active => {
+          const card = active.querySelector('.card');
+          const body = card.querySelector('[class*="pileCardBody"]');
+          const header = card.querySelector('[class*="pileCardHeader"]');
+          const content = card.querySelector('[class*="pileCardMainContent"]');
+          const footer = card.querySelector('[class*="pileCardFooter"]');
+          const rect = element => { const r = element.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width }; };
+          const choices = [...active.querySelectorAll('input[type="radio"]')].map(input => input.closest('label'));
+          return {
+            card: rect(card), header: rect(header), content: rect(content), footer: rect(footer),
+            rootFontSize: parseFloat(getComputedStyle(document.documentElement).fontSize),
+            choices: choices.map(label => {
+              const box = rect(label), marker = getComputedStyle(label, '::before'), appearance = getComputedStyle(label);
+              const text = [...label.childNodes].filter(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim()).flatMap(node => {
+                const range = document.createRange(); range.selectNodeContents(node);
+                return [...range.getClientRects()];
+              });
+              return { ...box,
+                fontSize: parseFloat(appearance.fontSize), fontWeight: appearance.fontWeight,
+                textFits: text.every(r => r.left >= box.left && r.right <= box.right),
+                markerClear: marker.content === 'none' || text.every(r => r.left >= box.left + parseFloat(marker.left) + parseFloat(marker.width)),
+              };
+            }),
+            bodyClips: body.scrollHeight > body.clientHeight + 1,
+          };
+        });
+        assert.equal(answerLayout.choices.length, 3, 'All three binary choices are present');
+        for (const choice of answerLayout.choices) {
+          if (width >= 596) assert(Math.abs(choice.top - answerLayout.choices[0].top) <= 1, 'Answer buttons share one row when space permits');
+          const originalFontSize = theme === 'classic-95' ? (width <= 640 ? 0.82 : 1) : 1.5;
+          assert(Math.abs(choice.fontSize - answerLayout.rootFontSize * originalFontSize) < 0.1, 'Answer labels retain their original font size');
+          assert.equal(choice.fontWeight, '400', 'Unselected answer labels retain their original weight');
+          assert(choice.top >= answerLayout.header.bottom && choice.bottom <= answerLayout.footer.top, 'Answer buttons sit between the full prompt and footer');
+          assert(choice.top >= answerLayout.content.top && choice.bottom <= answerLayout.content.bottom + 1, 'Answer buttons are not clipped by their content area');
+          assert(choice.left >= answerLayout.card.left && choice.right <= answerLayout.card.right, 'Answer buttons fit the card width');
+          assert(choice.textFits && choice.markerClear, 'Answer labels fit without overlapping a theme indicator');
+        }
+        assert(!answerLayout.bodyClips, 'Long prompt and answers fit inside the card');
+        if (theme === 'civic') {
+          const login = await page.getByTestId('ce-account-login-button').boundingBox();
+          assert(login.height >= 44 && login.height <= 50 && login.width <= 150, 'Mobile login stays compact and touch-sized');
+        }
+        if (process.env.OUTPUT_DIR) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-long-prompt.png` });
+      }
       const optionArrows = page.getByTestId('ce-quadratic-scroll-more').locator('..');
       const arrowsBefore = quadratic ? await optionArrows.boundingBox() : null;
       const ratingToggle = page.getByRole('button', { name: 'Conviction / importance', exact: true });
