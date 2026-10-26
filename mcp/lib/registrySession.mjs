@@ -125,13 +125,19 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
   /** True if replaced, false if retained, null if the RPC cannot verify it yet. */
   const replacedWrite = (entry, blocks = new Map()) => historyReplaced(entry?.blockHash ? { number: entry.blockNumber, hash: entry.blockHash } : null, blocks);
   let questionMark = null;
+  const visibleQuestions = () => {
+    const blocked = new Set((Array.isArray(sessionConfig.BLOCKED_QUESTION_IDS) ? sessionConfig.BLOCKED_QUESTION_IDS : []).map(normalized));
+    return [...questions.values()].filter((entry) => !blocked.has(entry.id));
+  };
 
   const readQuestions = async ({ signal } = {}) => {
     const deadline = now() + 90000;
     const blocks = new Map();
     let complete = true;
     const replaced = await historyReplaced(questionMark, blocks);
-    if (replaced === null) complete = false;
+    // Advancing a cursor without verifying its prior mark leaves new blocks
+    // uncovered: a later reorg above that old mark would never be noticed.
+    if (replaced === null) return { items: visibleQuestions(), complete: false };
     if (replaced) {
       questions.clear();
       pending.clear();
@@ -174,8 +180,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
         } catch { complete = false; }
       }
     }));
-    const blocked = new Set((Array.isArray(sessionConfig.BLOCKED_QUESTION_IDS) ? sessionConfig.BLOCKED_QUESTION_IDS : []).map(normalized));
-    return { items: [...questions.values()].filter((entry) => !blocked.has(entry.id)), complete: complete && !pending.size && questions.size < MAX_QUESTIONS };
+    return { items: visibleQuestions(), complete: complete && !pending.size && questions.size < MAX_QUESTIONS };
   };
   const loadQuestions = (args) => {
     if (!loadingQuestions) loadingQuestions = readQuestions(args).finally(() => { loadingQuestions = null; });
@@ -193,7 +198,12 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     const scope = [...known].sort().join(',');
     let state = answerScans.get(mine);
     const replaced = !!state && state.scope === scope && head >= state.head && await historyReplaced(state.mark, blocks);
-    if (replaced === null) verified = false;
+    if (replaced === null) {
+      // Keep the previous payloads too; current contract pointers may already
+      // name answers from the unverified blocks we must not scan yet.
+      return { entries: (state.result?.entries || []).slice(0, maxRecords), complete: false,
+        chainOrders: new Map(state.result?.chainOrders || []) };
+    }
     if (!state || state.scope !== scope || head < state.head || replaced) {
       state = { scope, head: startBlock - 1, mark: null, ranges: [], latest: new Map(), capped: false };
     } else state = { ...state, ranges: state.ranges.map((range) => ({ ...range })), latest: new Map(state.latest) };
@@ -285,7 +295,8 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
         } catch { complete = false; }
       }
     }));
-    return { entries, complete, chainOrders };
+    state.result = { entries, complete, chainOrders };
+    return state.result;
   };
 
   const writer = createRegistryWriter({ provider, chainId, wallet, surveys, slug: info.slug, remember: (resource, id, payload, pointer, receipt) => {

@@ -193,7 +193,9 @@ manifest, with the session's Surveys address when supplied.
 
 Arweave propagation can delay reads. The running agent remembers confirmed
 writes, and its own answers also persist in its state directory. Question
-scans resume from an in-memory watermark. Answer scans read new blocks first
+scans resume from an in-memory watermark. If the RPC cannot verify the saved
+block hash, both readers keep their previous results and cursors and report
+incomplete data until that mark can be checked. Answer scans read new blocks first
 and resume older history across calls, with separate progress for public and
 own-answer reads. Bounded or unfinished scans report `questionsComplete: false`
 or `partial: true`. Saved plaintext is not restored over an incomplete

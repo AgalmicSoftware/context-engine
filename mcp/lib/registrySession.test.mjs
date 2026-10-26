@@ -678,3 +678,41 @@ test('deliberate join errors reach the agent unchanged', async (t) => {
   assert.deepEqual(await call('join_session', { link: 'town' }), { content: [{ type: 'text', text: message }], isError: true });
   assert.deepEqual(logs, [`tool join_session failed: ${message}`]);
 });
+
+
+test('a missing stored mark holds both scans until new blocks can be covered by a verified mark', async () => {
+  const f = fixture();
+  let head = 10;
+  f.options.provider.getBlockNumber = async () => head;
+  const session = await f.open();
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'Retained', type: 'binary' }, 9);
+  f.addResponse(otherId, { questionID: otherId, answer: { value: 'Retained' } }, 9);
+  const originalPointer = f.hashes.get(otherId);
+  const beforeQuestions = await session.loadQuestions();
+  const beforeAnswers = await session.readAnswers({ questionIds: [otherId] });
+  head = 11;
+  f.addQuestion(blockedId, { sessionSlug: 'town', prompt: 'Unverified orphan', type: 'binary' }, 11);
+  f.addResponse(otherId, { questionID: otherId, answer: { value: 'Unverified orphan' } }, 11);
+  const getBlock = f.options.provider.getBlock;
+  f.options.provider.getBlock = (number) => number === 10 ? null : getBlock(number);
+  const getLogs = f.options.provider.getLogs;
+  let scans = 0;
+  f.options.provider.getLogs = (filter) => { scans += 1; return getLogs(filter); };
+  const gapQuestions = await session.loadQuestions();
+  const gapAnswers = await session.readAnswers({ questionIds: [otherId] });
+  assert.equal(gapQuestions.complete, false);
+  assert.equal(gapAnswers.complete, false);
+  assert.deepEqual(gapQuestions.items, beforeQuestions.items);
+  assert.deepEqual(gapAnswers.entries, beforeAnswers.entries);
+  assert.equal(scans, 0, 'No cursor may advance beyond an unverified prior mark');
+  f.reorg(11, 11);
+  f.logs.splice(2);
+  f.hashes.set(otherId, originalPointer);
+  f.options.provider.getBlock = getBlock;
+  const questions = await session.loadQuestions();
+  const answers = await session.readAnswers({ questionIds: [otherId] });
+  assert.deepEqual(questions.items, beforeQuestions.items);
+  assert.deepEqual(answers.entries, beforeAnswers.entries);
+  assert.equal(questions.complete, true);
+  assert.equal(answers.complete, true);
+});
