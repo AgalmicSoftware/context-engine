@@ -4764,12 +4764,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: contents;
 }
 
-.pileActions .pileVoiceModeToggle {
+.pileVoiceModeToggle {
   width: 44px;
   height: 44px;
   flex-shrink: 0;
-  color: var(--ce-control-text);
-  opacity: 1;
 }
 
 .actionButton.pileActionMenuToggle {
@@ -5403,7 +5401,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     overflow: visible;
   }
 
-  .pileActionsMenuEligible .pileActionMenuToggle {
+  .pileActionsMenuEligible .pileActionMenuToggle,
+  .pileActionsMenuEligible .pileVoiceModeToggle {
     display: flex;
     width: 44px;
     height: 44px;
@@ -5415,7 +5414,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .pileActionsMenuEligible .pileActionMenuToggle:hover,
-  .pileActionsMenuEligible .pileActionMenuToggle:focus-visible {
+  .pileActionsMenuEligible .pileActionMenuToggle:focus-visible,
+  .pileActionsMenuEligible .pileVoiceModeToggle:hover,
+  .pileActionsMenuEligible .pileVoiceModeToggle:focus-visible {
     color: var(--ce-color-accent);
     opacity: 1;
     outline: none;
@@ -7092,6 +7093,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileNavArrow,
   .actionButton,
   .pileActionsMenuEligible .pileActionMenuToggle,
+  .pileActionsMenuEligible .pileVoiceModeToggle,
   .pileCardFooter .pileIconButton,
   .pileCardFooter .iconButton,
   .fullQuestionBody .iconButton,
@@ -7326,6 +7328,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileNavArrow,
   .actionButton,
   .pileActionsMenuEligible .pileActionMenuToggle,
+  .pileActionsMenuEligible .pileVoiceModeToggle,
   .pileCardFooter .pileIconButton,
   .pileCardFooter .iconButton,
   .fullQuestionBody .iconButton,
@@ -7363,4 +7366,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 .draftPersistenceStatus:empty {
   margin: 0;
+}
+
+// Match the adjacent controls at rest; a retained interview stays emphasized.
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .pileActions .pileVoiceModeToggle {
+    opacity: 0.45;
+
+    &:hover,
+    &:focus-visible,
+    &[aria-pressed='true'] {
+      color: var(--ce-control-text) !important;
+      opacity: 1;
+      filter: none;
+    }
+  }
 }

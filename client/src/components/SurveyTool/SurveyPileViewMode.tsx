@@ -1468,11 +1468,12 @@ const toggleSessionVoiceModeModal = (engine: PileViewModeEngine) => {
     engine.closeSessionVoiceModeModal();
     return;
   }
+  const resumeInterview =
+    engine.state.interviewProgressContext === engine.buildSessionInterviewSubmitContextToken(engine.props);
   engine.setState({
     showVoiceModeModal: true,
-    sessionVoiceMode: null,
-    interviewPrefillPacket: null,
-    interviewPrefillError: '',
+    sessionVoiceMode: resumeInterview ? 'interview' : null,
+    ...(resumeInterview ? {} : { interviewPrefillPacket: null, interviewPrefillError: '' }),
   });
 };
 
@@ -1486,9 +1487,6 @@ const closeSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   engine.setState(
     {
       showVoiceModeModal: false,
-      sessionVoiceMode: null,
-      interviewPrefillPacket: null,
-      interviewPrefillError: '',
     },
     () => {
       engine.syncSessionVoiceModeQuery(null);
@@ -3289,7 +3287,9 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             showListeningPanel,
             toggleListeningPanel: engine.toggleListeningPanel,
             showVoiceModeControl: isInterviewFeatureEnabled(engine.props?.sessionConfig),
-            voiceModeActive: !!showVoiceModeModal || showListeningPanel,
+            voiceModeActive:
+              showListeningPanel ||
+              engine.state.interviewProgressContext === engine.buildSessionInterviewSubmitContextToken(engine.props),
             toggleVoiceModeModal: engine.toggleSessionVoiceModeModal,
             onViewAllClick: engine.props.onViewAllClick,
             handleViewAllFromPile: engine.handleViewAllFromPile,
@@ -3331,6 +3331,13 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             const responseReadinessContextToken = engine.getSessionInterviewResponseReadinessToken(submitContextToken);
             return (
               <LazySessionVoiceModeModal
+                key={submitContextToken}
+                onInterviewProgressChange={(inProgress: boolean) => {
+                  const interviewProgressContext = inProgress ? submitContextToken : '';
+                  if (engine.state.interviewProgressContext !== interviewProgressContext) {
+                    engine.setState({ interviewProgressContext });
+                  }
+                }}
                 questionCreatorProps={{ ...engine.props, ...engine.getAudioInputWorkerProps() }}
                 {...engine.props}
                 {...engine.getAudioInputWorkerProps()}

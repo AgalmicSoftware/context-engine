@@ -1209,5 +1209,10 @@ link directly.
 
 The question pile’s microphone button sits beside the question-actions menu on
 small screens and remains directly visible in the desktop toolbar. It opens the
-voice-mode chooser when the session supports voice features. On narrow phones,
+voice-mode chooser when the session supports voice features, or resumes an unfinished
+interview. Its idle appearance matches the adjacent controls; an interview in progress
+keeps the microphone emphasized even after closing the modal. Closing stops audio
+capture and retains the transcript and review edits on the current page. Reopen to
+continue, submit, or explicitly discard the interview. Reloading or leaving the page
+clears this in-memory interview; closing does not submit responses. On narrow phones,
 pending-answer submission controls use a separate row so their labels remain readable.

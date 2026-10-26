@@ -135,6 +135,13 @@ export function useSessionInterviewRecorder({
       update('idle');
     }
   };
+  const suspend = useCallback(() => {
+    const transcript = sessionRef.current?.getTranscript() || '';
+    // Closing preserves review state, but must cancel even a pending connection.
+    dispose();
+    update('idle');
+    return transcript;
+  }, [dispose, update]);
   const pause = () => sessionRef.current?.pause();
   const resume = () => sessionRef.current?.resume();
   const appendInstructions = (content: string) => sessionRef.current?.appendInstructions?.(content) || false;
@@ -148,5 +155,6 @@ export function useSessionInterviewRecorder({
     stop,
     pause,
     resume,
+    suspend,
   };
 }

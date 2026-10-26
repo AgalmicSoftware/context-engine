@@ -1,5 +1,4 @@
 import { safeString, lower, stableFingerprint, envFlagEnabled, nowIso, safeEnvJsonParse as safeJsonParse, sanitizeSessionSlug } from './runtimePrimitives.mjs';
-import { selectCanonicalStorageVersions } from '../../shared/storage/canonicalStorageVersions.mjs';
 
 import { listKvRecordsByPrefix } from './kvReadHelpers.mjs';
 
@@ -15,7 +14,7 @@ import { normalizeAgentRatingScale } from './ratingScale.mjs';
 
 import { assertNoSecretShape } from './redaction.mjs';
 
-import { listCachedSessionQuestionsForBridge, payloadConcurrency } from './sessionQuestions.mjs';
+import { listCachedSessionQuestionsForBridge } from './sessionQuestions.mjs';
 
 import { evaluateSponsoredResourceEligibility, resolveSessionInvocation } from './sessionPolicy.mjs';
 
@@ -52,10 +51,6 @@ const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const DEFAULT_LIVE_QUESTION_FALLBACK_TIMEOUT_MS = 2500;
 
 const DEFAULT_WORKER_STORAGE_TIMEOUT_MS = 5000;
-
-// Every listed row costs a payload read (a subrequest), so a load lists at
-// most 10 pages (1,000 rows) and reports itself incomplete beyond that.
-const MAX_WORKER_QUESTION_LIST_PAGES = 10;
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
@@ -324,7 +319,6 @@ function cloudflareQuestionItemIds(item = {}) {
   return [
     storageRef.id,
     storageRef.questionId,
-    item?.metadata?.resourceId,
     item?.id,
     item?.questionId,
     item?.key,
@@ -731,63 +725,29 @@ async function loadWorkerCloudflareQuestions({
       questions: [],
     };
   }
-  const items = [];
-  const seenCursors = new Set();
-  let cursor = '';
-  let listComplete = false;
-  for (let page = 0; page < MAX_WORKER_QUESTION_LIST_PAGES && !listComplete; page += 1) {
-    const query = new URLSearchParams({ resource: 'questions', limit: '100', ...(cursor ? { cursor } : {}) });
-    const listed = await fetchWorkerCloudflareJson({
-      auth,
-      path: `/storage/list?${query}`,
-      env,
-      fetchImpl,
-    });
-    if (!listed.ok) {
-      return {
-        ok: false,
-        reason: 'telegram_only_cloudflare_questions_list_failed',
-        error: listed.error,
-        status: listed.status || 0,
-        questions: [],
-      };
-    }
-    if (Array.isArray(listed.body?.items)) items.push(...listed.body.items);
-    cursor = safeString(listed.body?.cursor);
-    // A filtered page can be empty and still continue. Workers that predate
-    // pagination send neither field and list everything at once.
-    listComplete = listed.body?.listComplete === true || (listed.body?.listComplete === undefined && !cursor);
-    if (!listComplete && (!cursor || seenCursors.has(cursor))) {
-      return {
-        ok: false,
-        reason: 'telegram_only_cloudflare_questions_list_failed',
-        error: 'Worker question list cursor is missing or repeated.',
-        questions: [],
-      };
-    }
-    seenCursors.add(cursor);
+  const listed = await fetchWorkerCloudflareJson({
+    auth,
+    path: '/storage/list?resource=questions',
+    env,
+    fetchImpl,
+  });
+  if (!listed.ok) {
+    return {
+      ok: false,
+      reason: 'telegram_only_cloudflare_questions_list_failed',
+      error: listed.error,
+      status: listed.status || 0,
+      questions: [],
+    };
   }
-  // Every upload of a question shares its id; present only the version each
-  // reader chooses. Rows stored before resourceId was recorded pass through.
-  const versionOf = (item) => ({
-    resourceId: safeString(item?.metadata?.resourceId),
-    createdAtMs: Date.parse(safeString(item?.metadata?.createdAt)) || 0,
-    storageRefId: safeString(item?.storageRef?.id || item?.id),
-    uploadAuthority: item?.metadata?.uploadAuthority,
-  });
-  const listedVersions = items.filter((item) => item?.hidden !== true).map(versionOf);
-  const currentRefs = new Set(selectCanonicalStorageVersions(listedVersions).map((version) => version.storageRefId));
-  const currentItems = items.filter((item) => {
-    const version = versionOf(item);
-    return item?.hidden !== true && (!version.resourceId || currentRefs.has(version.storageRefId));
-  });
-  const selectedItems = selectWorkerCloudflareQuestionItems(currentItems, {
+  const items = Array.isArray(listed.body?.items) ? listed.body.items : [];
+  const selectedItems = selectWorkerCloudflareQuestionItems(items, {
     questionLimit,
     preferredQuestionIds,
   });
   const questions = [];
   const readErrors = [];
-  const readItem = async (item, index) => {
+  const readResults = await Promise.all(selectedItems.map(async (item, index) => {
     const storageRef = item?.storageRef && typeof item.storageRef === 'object' && !Array.isArray(item.storageRef)
       ? item.storageRef
       : {};
@@ -806,7 +766,7 @@ async function loadWorkerCloudflareQuestions({
           },
       );
       if (normalized && !questionIsPayloadUnavailable(normalized) && !questionRecordMalformedReason(normalized)) {
-        return { question: normalized, version: versionOf(item) };
+        return { question: normalized };
       }
     }
     const read = await fetchWorkerCloudflareJson({
@@ -829,34 +789,10 @@ async function loadWorkerCloudflareQuestions({
         source: 'telegram_only_cloudflare_questions',
         },
     );
-    return normalized ? { question: normalized, version: versionOf(item) } : null;
-  };
-  // Reads share the Worker's few outbound connections; an unbounded batch starts
-  // every read's timeout while it still waits for one.
-  const readResults = new Array(selectedItems.length);
-  let nextRead = 0;
-  await Promise.all(Array.from({ length: Math.min(selectedItems.length, payloadConcurrency(env)) }, async () => {
-    while (nextRead < selectedItems.length) {
-      const index = nextRead;
-      nextRead += 1;
-      readResults[index] = await readItem(selectedItems[index], index);
-    }
+    return normalized ? { question: normalized } : null;
   }));
-  // Legacy rows name their question only in the payload; fold them into the
-  // same version choice now that their ids are known.
-  const loaded = readResults
-    .filter((result) => result?.question)
-    .map(({ question, version }) => ({
-      question,
-      version: { ...version, resourceId: version.resourceId || safeString(question.questionId) },
-    }));
-  const chosenRefs = new Set(
-    selectCanonicalStorageVersions(loaded.map(({ version }) => version)).map((version) => version.storageRefId),
-  );
-  loaded.forEach(({ question, version }) => {
-    if (!version.resourceId || chosenRefs.has(version.storageRefId)) questions.push(question);
-  });
   readResults.forEach((result) => {
+    if (result?.question) questions.push(result.question);
     if (result?.error) readErrors.push(result.error);
   });
   return {
@@ -867,9 +803,9 @@ async function loadWorkerCloudflareQuestions({
     source: 'telegram_only_cloudflare_storage',
     questions,
     questionCount: questions.length,
-    complete: listComplete && selectedItems.length >= currentItems.length && readErrors.length === 0,
+    complete: selectedItems.length >= items.length && readErrors.length === 0,
     loadedCount: questions.length,
-    discoveredCount: currentItems.length,
+    discoveredCount: items.length,
     payloadFailureCount: readErrors.length,
     readErrors,
   };

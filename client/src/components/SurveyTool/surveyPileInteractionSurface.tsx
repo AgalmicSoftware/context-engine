@@ -331,7 +331,7 @@ const renderPileActionControls = ({
         <button
           onClick={toggleVoiceModeModal}
           className={`${styles.actionButton} ${styles.pileVoiceModeToggle} ${voiceModeActive ? styles.actionButtonActive : ''}`}
-          title={voiceModeActive ? 'Close voice mode' : 'Open voice mode'}
+          title={voiceModeActive ? 'Interview in progress' : 'Open voice mode'}
           aria-label="Open voice mode"
           aria-pressed={voiceModeActive}
           data-testid={E2E_TESTIDS.SESSION_LISTENING_TOGGLE}

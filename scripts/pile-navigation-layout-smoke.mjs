@@ -1,6 +1,8 @@
 // Synthetic browser-local questions and drafts; never submit answers or modify a Worker.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { normalizePublicInterviewQuestions } from '../shared/interviewQuestionCatalog.mjs';
 import { chromium } from 'playwright';
 
 const base = process.env.BASE_URL || 'http://127.0.0.1:3000';
@@ -43,6 +45,11 @@ try {
       if (width <= 768) {
         assert(await menu.isVisible(), 'Mobile hamburger is available before answering');
         assert(!await filter.isVisible(), 'Mobile actions start collapsed');
+        if (theme === 'civic') {
+          const appearance = locator => locator.evaluate(element => ({ color: getComputedStyle(element).color, opacity: getComputedStyle(element).opacity }));
+          assert.deepEqual(await appearance(voice), await appearance(menu), 'Idle microphone matches hamburger color and opacity');
+          assert.deepEqual(await appearance(voice), await appearance(next), 'Idle microphone matches enabled arrow color and opacity');
+        }
         const voiceBox = await voice.boundingBox(), menuBox = await menu.boundingBox();
         assert(voiceBox.x >= menuBox.x + menuBox.width && Math.abs(voiceBox.y + voiceBox.height / 2 - menuBox.y - menuBox.height / 2) <= 1, 'Microphone sits beside the hamburger');
         await voice.click();
@@ -147,6 +154,35 @@ try {
         if (process.env.OUTPUT_DIR) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-pending-11.png` });
       }
       console.log(`PASS pile navigation: ${theme} ${width}, 20 / 50, forward/back, and pending draft`);
+      if (theme === 'civic' && width === 390) {
+        const catalog = normalizePublicInterviewQuestions(questions).sort((a, b) => a.id.localeCompare(b.id));
+        const questionSetHash = createHash('sha256').update(JSON.stringify(catalog)).digest('hex');
+        const packet = { version: 1, sessionSlug: 'demo-sh', questionSetHash, promptVersion: 'ce-interview-brief-v5',
+          source: { platform: 'other', modelId: 'synthetic', verification: 'self_reported' },
+          responderContext: {}, responses: [{ questionId: questions[0].id, answer: 'Agree', confidence: 0.8 }] };
+        await page.route('**/agent/interview-catalog?*', route => route.fulfill({ json: {
+          type: 'context-engine.interview-question-catalog', version: 1, sessionSlug: 'demo-sh',
+          prefillPromptVersion: packet.promptVersion, questionSetHash, questions: catalog,
+        } }));
+        await page.goto(`${base}/session/demo-sh#prefill=${Buffer.from(JSON.stringify(packet)).toString('base64url')}`);
+        await page.getByTestId('ce-session-interview-review').waitFor();
+        await page.getByRole('button', { name: 'Close', exact: true }).click();
+        await page.getByRole('dialog').waitFor({ state: 'hidden' });
+        await next.focus();
+        assert.equal(await voice.getAttribute('aria-pressed'), 'true', 'Retained review keeps microphone active while closed');
+        await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="ce-session-listening-toggle"]')).opacity === '1');
+        await voice.click();
+        await page.getByTestId('ce-session-interview-review').waitFor();
+        assert(!await page.getByTestId('ce-session-voice-mode-chooser').isVisible(), 'Microphone resumes the retained review');
+        await page.getByRole('button', { name: 'Discard interview', exact: true }).click();
+        await page.getByRole('dialog', { name: 'Discard this interview?' }).getByRole('button', { name: 'Discard interview', exact: true }).click();
+        await page.getByRole('dialog', { name: 'Interview', exact: true }).waitFor({ state: 'hidden' });
+        await page.getByRole('dialog', { name: /Discard this interview/ }).waitFor({ state: 'hidden' });
+        await next.focus();
+        assert.equal(await voice.getAttribute('aria-pressed'), 'false', 'Discard clears the interview indicator');
+        await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="ce-session-listening-toggle"]')).opacity === '0.45');
+        console.log('PASS interview close/reopen, retained indicator, and explicit discard');
+      }
       await page.close();
     }
   }

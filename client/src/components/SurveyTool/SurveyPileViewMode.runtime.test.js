@@ -615,6 +615,28 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
   });
 
+  it('keeps the microphone active for retained interviews and resumes them after closing', async () => {
+    renderDemoPile({}, { route: '/session/demo' });
+    const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE);
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(toggle);
+    await screen.findByTestId('mock-voice-mode-modal');
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await act(async () => mockVoiceModeProps.onSelectMode('interview'));
+    await act(async () => mockVoiceModeProps.onInterviewProgressChange(true));
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await act(async () => mockVoiceModeProps.onClose());
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(mockVoiceModeProps.mode).toBe('interview');
+    fireEvent.click(toggle);
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
+    await act(async () => mockVoiceModeProps.onInterviewProgressChange(false));
+    await act(async () => mockVoiceModeProps.onClose());
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(toggle);
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
+  });
+
   it('opens interview and group conversation directly from their mode query values', async () => {
     const first = renderDemoPile({}, { route: '/session/demo?foo=1&mode=interview' });
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
