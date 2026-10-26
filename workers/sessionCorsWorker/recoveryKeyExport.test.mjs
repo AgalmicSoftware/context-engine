@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { installSessionCoordinatorBinding, createSignedSiweBody, makeJsonRequest } from '../../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { createWorkerRuntime } from './worker.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
+import { resolveWorkerBodySlugContext } from './sessionSlugResolution.js';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
 
 const { ethers } = createRequire(new URL('../../package.json', import.meta.url))('ethers');
@@ -118,4 +119,38 @@ for (const configuredSlug of [undefined, '', 'another-session']) {
 test('hex recovery key fingerprints are independent of letter case', async () => {
   assert.equal(await recoveryKeyFingerprint('AB'.repeat(32)), await recoveryKeyFingerprint('ab'.repeat(32)));
   assert.notEqual(await recoveryKeyFingerprint('Case-sensitive passphrase'), await recoveryKeyFingerprint('case-sensitive passphrase'));
+});
+
+for (const configuredSlug of ['general', ' General ', '']) {
+  test(`general aliases cannot export a shared deployment key (${configuredSlug})`, async () => {
+    const env = fixture();
+    env.DEFAULT_SESSION_SLUG = configuredSlug;
+    env.GROUP_KV.values.set('session::config', JSON.stringify({ slug: '',
+      sessionId: `0x${'2'.repeat(32)}`, adminAddress: admin.address, chainId: 11155420 }));
+    const other = resolveWorkerBodySlugContext({ body: { sessionSlug: slug }, env });
+    assert.equal(other.ok, true);
+    assert.equal(other.targetSlug, slug);
+    const current = await callSessionConfigCoordinator({ env, slug: 'general', path: 'current' });
+    assert.equal(current.ok, true);
+    const exported = await callSessionConfigCoordinator({ env, slug: 'general', path: 'recovery-key/export', confirm: action,
+      expectedAuthority: { actor: admin.address, revision: current.body.revision, authzEpoch: 0 } });
+    assert.equal(exported.status, 403);
+    assert.equal(exported.body.reason, 'recovery_key_deployment_scoped');
+    assert.equal(exported.body.recoveryKey, undefined);
+    assert.equal(env.CE_STORAGE_AUDIT_KV.values.size, 0);
+  });
+}
+
+test('key export follows the same configured alias and case normalization as routing', async () => {
+  for (const configured of [{ DEFAULT_SESSION_SLUG: ' Debate ' }, { DEFAULT_GROUP_SLUG: 'debate' }]) {
+    const env = fixture();
+    delete env.DEFAULT_SESSION_SLUG;
+    Object.assign(env, configured);
+    env.GROUP_KV.values.set('session:rxc:config', JSON.stringify({ slug: 'rxc',
+      sessionId: `0x${'3'.repeat(32)}`, adminAddress: admin.address, chainId: 11155420 }));
+    const current = await callSessionConfigCoordinator({ env, slug: 'rxc', path: 'current' });
+    const exported = await callSessionConfigCoordinator({ env, slug: 'rxc', path: 'recovery-key/export', confirm: action,
+      expectedAuthority: { actor: admin.address, revision: current.body.revision, authzEpoch: 0 } });
+    assert.equal(exported.status, 200);
+  }
 });

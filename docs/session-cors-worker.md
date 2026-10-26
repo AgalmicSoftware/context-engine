@@ -1316,7 +1316,9 @@ For an existing deployment or a lost first response, the signed admin action
 `export-recovery-key` requires `confirm: 'export-recovery-key'` in its signed
 payload. It returns `{ ok: true, recoveryKey, fingerprint }` with `no-store`.
 Export is available only when `DEFAULT_SESSION_SLUG` pins this Worker to the
-requested session; otherwise the deployment operator retains the key.
+requested session; otherwise the deployment operator retains the key. The pin
+uses the same slug normalization as routing: `general` normalizes to an empty
+slug and therefore never enables recovery-key export on a shared deployment.
 The config coordinator permits three exports per session per UTC day and
 returns `429` / `recovery_key_export_limit` thereafter. When
 `CE_STORAGE_AUDIT_KV` is bound, each export records its time and admin address,

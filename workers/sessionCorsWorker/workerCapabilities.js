@@ -1,6 +1,6 @@
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { SESSION_CONFIG_MIGRATION_REQUIRED_REASON } from './sessionConfigSecretsStore.js';
-import { validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
+import { getDefaultWorkerSessionSlug, validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
 import { getStorageIndexBinding, resolvePayloadAccessControl } from './storageRouteExecution.js';
 
 export const FEATURES = Object.freeze([
@@ -24,7 +24,8 @@ export const dispatchWorkerCapabilities = async ({ request, env = {}, headers = 
   if (url.searchParams.has('slug')) {
     const validated = validateInboundWorkerSessionSlug(url.searchParams.get('slug'));
     if (!validated.ok) return Response.json({ error: validated.error }, { status: 400, headers: responseHeaders });
-    if (String(env.DEFAULT_SESSION_SLUG || '').trim() === (validated.slug || 'general')) body.features = FEATURES;
+    const pinnedSlug = getDefaultWorkerSessionSlug(env);
+    if (pinnedSlug && pinnedSlug === validated.slug) body.features = FEATURES;
     const bound = !!env.CE_SESSION_COORDINATOR?.idFromName && !!env.CE_SESSION_COORDINATOR?.get;
     const current = bound
       ? await callSessionConfigCoordinator({ env, slug: validated.slug, path: 'current' })

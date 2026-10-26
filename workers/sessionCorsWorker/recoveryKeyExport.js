@@ -1,4 +1,5 @@
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
+import { getDefaultWorkerSessionSlug, normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 
 export const exportCoordinatorRecoveryKey = async (coordinator, payload) => {
   const headers = { 'Cache-Control': 'no-store' };
@@ -6,7 +7,8 @@ export const exportCoordinatorRecoveryKey = async (coordinator, payload) => {
   try {
     const authority = await coordinator.assertSessionAuthority(payload);
     if (!authority) return reply({ error: 'Session config is not initialized.' }, 409);
-    if (String(coordinator.env.DEFAULT_SESSION_SLUG || '').trim() !== authority.slug) {
+    const pinnedSlug = getDefaultWorkerSessionSlug(coordinator.env);
+    if (!pinnedSlug || pinnedSlug !== normalizeWorkerSessionSlug(authority.slug)) {
       return reply({ error: 'The deployment operator holds the recovery key for this Worker.',
         reason: 'recovery_key_deployment_scoped' }, 403);
     }

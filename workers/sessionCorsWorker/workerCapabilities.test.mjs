@@ -77,10 +77,14 @@ test('capabilities rejects malformed slugs without calling the coordinator', asy
 
 
 test('key export is advertised only for the deployment’s single configured session', async () => {
-  for (const configuredSlug of [undefined, '', 'another-session', 'sample']) {
+  for (const [configuredSlug, requestedSlug, enabled] of [
+    [undefined, 'sample', false], ['', 'sample', false], ['another-session', 'sample', false],
+    ['sample', 'sample', true], [' Sample ', 'sample', true], ['debate', 'rxc', true],
+    ['general', 'general', false], [' General ', 'general', false], ['', 'general', false],
+  ]) {
     const env = { ...envFor({ ok: true, revision: 1, config: {} }), DEFAULT_SESSION_SLUG: configuredSlug };
-    const body = await (await fetchCapabilities(env, '?slug=sample')).json();
-    assert.equal(body.features.includes('recovery_key_export'), configuredSlug === 'sample');
+    const body = await (await fetchCapabilities(env, `?slug=${requestedSlug}`)).json();
+    assert.equal(body.features.includes('recovery_key_export'), enabled);
     assert.equal((await (await fetchCapabilities(env)).json()).features.includes('recovery_key_export'), false);
   }
 });
