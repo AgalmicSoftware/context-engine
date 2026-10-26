@@ -1,6 +1,7 @@
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 
 export const STORAGE_BACKUP_REVISION_KEY = 'storage-backup-revision';
+export const WORKER_GROUP_BACKUP_PENDING_PREFIX = 'worker-group-backup-pending:';
 export const bumpStorageBackupRevision = (storage) => storage.transaction(async (transaction) => {
   const revision = (await transaction.get(STORAGE_BACKUP_REVISION_KEY) || 0) + 1;
   await transaction.put(STORAGE_BACKUP_REVISION_KEY, revision);

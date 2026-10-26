@@ -8,7 +8,7 @@ import { storageRoute } from './storageRouteExecution.js';
 import { exportSessionBackup as exportPage } from './sessionBackup.js';
 import { STORAGE_EXPORT_PAGE_LIMITS } from './storageScanBudget.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
-import { workerGroupBackupPrefixes, coordinateWorkerGroupBackup } from './workerGroups.js';
+import { workerGroupBackupPrefixes, coordinateWorkerGroupBackup, executeCoordinatedWorkerGroupMutation } from './workerGroups.js';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
@@ -559,6 +559,85 @@ const largeArchiveSource = () => {
 };
 const restoreControl = (env, operation, archiveId, revision = 0) => callSessionConfigCoordinator({ env, slug,
   path: `backup/${operation}`, expectedAuthority: { ...expectedAuthority, revision }, archiveId });
+
+test('failed and repeated group requests preserve a running backup; successful changes invalidate it', async () => {
+  const source = largeArchiveSource();
+  source.env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
+  const principal = { kind: 'evm_address', address: `0x${'7'.repeat(40)}` };
+  const mutate = (operation, groupId, extra = {}) => executeCoordinatedWorkerGroupMutation({
+    env: source.env, slug, sessionId, operation, groupId, principal, actorPrincipal: principal, ...extra,
+  });
+  assert.equal((await mutate('create', 'open', { input: { groupId: 'open', label: 'Open', joinMode: 'open' } })).ok, true);
+  assert.equal((await mutate('create', 'closed', { input: { groupId: 'closed', label: 'Closed', joinMode: 'admin_add' } })).ok, true);
+  assert.equal((await mutate('join', 'open')).ok, true);
+  let page = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  assert.ok(page.nextCursor);
+  const groupStore = [...source.env.__coordinatorInstances.values()].find(({ store }) => store.has('worker-group-capacity-meta-v3')).store;
+  const revision = groupStore.get('storage-backup-revision');
+  for (const [operation, groupId, extra, ok] of [
+    ['join', 'missing', {}, false],
+    ['remove-member', 'missing', {}, false],
+    ['join', 'closed', {}, false],
+    ['update', 'open', { input: { memberLimit: -1 } }, false],
+    ['join', 'open', {}, true],
+    ['join', 'open', {}, true],
+  ]) {
+    assert.equal((await mutate(operation, groupId, extra)).ok, ok);
+    assert.equal(groupStore.get('storage-backup-revision'), revision, operation);
+  }
+  do {
+    page = await exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: page.nextCursor });
+    assert.equal(page.ok, true);
+  } while (page.nextCursor);
+  assert.equal(page.manifest.complete, true);
+  page = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  assert.equal((await mutate('remove-member', 'open')).ok, true);
+  assert.equal(groupStore.get('storage-backup-revision'), revision + 1);
+  await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: page.nextCursor }), /groups changed/i);
+});
+
+test('an interrupted group write blocks snapshots until replay records its successful change', async () => {
+  const source = largeArchiveSource();
+  source.env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
+  const principal = { kind: 'evm_address', address: `0x${'7'.repeat(40)}` };
+  const mutate = (operation, extra = {}) => executeCoordinatedWorkerGroupMutation({
+    env: source.env, slug, sessionId, operation, groupId: 'open', principal, actorPrincipal: principal, ...extra,
+  });
+  await mutate('create', { input: { groupId: 'open', label: 'Open', joinMode: 'open' } });
+  const page = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  const groupStore = [...source.env.__coordinatorInstances.values()].find(({ store }) => store.has('worker-group-capacity-meta-v3')).store;
+  const revision = groupStore.get('storage-backup-revision');
+  const put = source.kv.put;
+  let interrupt = true;
+  source.kv.put = async (key, value) => {
+    await put(key, value);
+    if (interrupt && key.startsWith('ce-worker-group-member:')) { interrupt = false; throw new Error('Lost membership write reply'); }
+  };
+  assert.equal((await mutate('join')).reason, 'worker_group_mutation_ambiguous');
+  assert.equal(groupStore.get('storage-backup-revision'), revision);
+  await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: page.nextCursor }), /group mutation is pending/i);
+  assert.equal((await mutate('join')).ok, true);
+  assert.equal(groupStore.get('storage-backup-revision'), revision + 1);
+  assert.equal([...groupStore.keys()].some((key) => key.startsWith('worker-group-backup-pending:')), false);
+  await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: page.nextCursor }), /groups changed/i);
+});
+
+test('a lost group finalization reply leaves no orphan backup blocker', async () => {
+  class InterruptedCoordinator extends SessionWriteCoordinator {
+    async activateWorkerGroupCapacity(group) {
+      await super.activateWorkerGroupCapacity(group);
+      throw new Error('Lost group finalization reply');
+    }
+  }
+  const source = fixture(InterruptedCoordinator);
+  source.env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
+  const result = await executeCoordinatedWorkerGroupMutation({ env: source.env, slug, sessionId, operation: 'create',
+    input: { groupId: 'open', label: 'Open', joinMode: 'open' }, actorPrincipal: { kind: 'evm_address', address: admin } });
+  assert.equal(result.status, 503);
+  const pages = await allPages(source.env);
+  assert.equal(pages.at(-1).manifest.complete, true);
+  assert.ok(pages[0].coordinator.workerGroups.records.some(([key]) => key.startsWith('ce-worker-group:')));
+});
 
 test('restore refuses targets containing config, rows, payloads, groups, or keys', async () => {
   const [page] = await allPages(fixture().env);

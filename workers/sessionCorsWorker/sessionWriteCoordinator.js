@@ -1,6 +1,6 @@
 import { controlCoordinatorBackupImport, assertNoActiveBackupImport } from './sessionBackupLifecycle.js';
 import { registerUploadReceiptStore, dispatchUploadReceiptIndex, sweepUploadReceiptIndex } from './sessionDiagnostics.js';
-import { bumpStorageBackupRevision } from './storageBackupRevision.js';
+import { bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
 import { assertExpectedSessionAuthority } from './sessionConfigAuthority.js';
@@ -286,6 +286,8 @@ const WORKER_GROUP_MUTATIONS = new Set([
   'remove-member',
   'join',
 ]);
+const workerGroupBackupPendingKey = (mutation, reservation) =>
+  `${WORKER_GROUP_BACKUP_PENDING_PREFIX}${encodeURIComponent(reservation?.memberKey || mutation.groupId)}`;
 
 // Phases a thrown KV mutation can leave behind, and the mutation each replays.
 const PENDING_WORKER_GROUP_OPERATIONS = Object.freeze({ creating: 'create', updating: 'update', deleting: 'delete' });
@@ -1560,12 +1562,12 @@ export class SessionWriteCoordinator {
   async completeWorkerGroupReservation(mutation, result, reservation, { replay = false } = {}) {
     const { slug, sessionId, groupId, operation } = mutation;
     if (!result.ok) {
+      if (operation === 'create' && !replay && !DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES.has(result.reason)) return;
+      await this.state.storage.delete(workerGroupBackupPendingKey(mutation, reservation));
       if (operation === 'create') {
         // A live create keeps its slot unless the failure preceded any write;
         // a replay already counts an earlier attempt's write as done.
-        if (replay || DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES.has(result.reason)) {
-          await this.rollbackWorkerGroupSlot({ slug, sessionId, groupId });
-        }
+        await this.rollbackWorkerGroupSlot({ slug, sessionId, groupId });
       } else if (operation === 'update') {
         await this.rollbackWorkerGroupUpdate({ groupId, prior: reservation.prior });
       } else if (operation === 'delete') {
@@ -1577,6 +1579,12 @@ export class SessionWriteCoordinator {
       }
       return;
     }
+    // Count a confirmed effect, including a replay that finishes an interrupted
+    // write. Pending markers block snapshots until revision and capacity agree.
+    if (replay || result.created !== false) await bumpStorageBackupRevision(this.state.storage);
+    // Clear the marker before finalization: a crash after it leaves a replayable
+    // reservation, never an orphan marker beside already-finalized capacity.
+    await this.state.storage.delete(workerGroupBackupPendingKey(mutation, reservation));
     if (operation === 'create') {
       await this.activateWorkerGroupCapacity(result.group);
     } else if (operation === 'update') {
@@ -1603,6 +1611,7 @@ export class SessionWriteCoordinator {
       actorPrincipal: intent.actorPrincipal ?? null,
     };
     let result;
+    await this.state.storage.put(workerGroupBackupPendingKey(mutation, reservation), true);
     try {
       result = await executeWorkerGroupMutation({ env: this.env, ...mutation, capacityAuthorized: true, resume: true });
     } catch {
@@ -1922,7 +1931,6 @@ export class SessionWriteCoordinator {
       if (byteLength(JSON.stringify(intent)) > WORKER_GROUP_INTENT_MAX_BYTES) {
         return jsonResponse({ ok: false, status: 400, reason: 'worker_group_input_too_large' }, 400);
       }
-      await bumpStorageBackupRevision(this.state.storage);
       {
         // A retried create meets its own pending reservation here too.
         const settled = await this.settleWorkerGroupReservations({
@@ -2023,6 +2031,8 @@ export class SessionWriteCoordinator {
         }
       }
 
+      const reservation = groupReservation || updateReservation || deleteReservation || memberReservation || removalReservation;
+      await this.state.storage.put(workerGroupBackupPendingKey(mutation, reservation), true);
       let result;
       try {
         result = await executeWorkerGroupMutation({
@@ -2043,7 +2053,7 @@ export class SessionWriteCoordinator {
       await this.completeWorkerGroupReservation(
         mutation,
         result,
-        groupReservation || updateReservation || deleteReservation || memberReservation || removalReservation,
+        reservation,
       );
       if (!result.ok) return jsonResponse(result, result.status || 400);
       return this.respondToWorkerGroupMutation(mutation, result);

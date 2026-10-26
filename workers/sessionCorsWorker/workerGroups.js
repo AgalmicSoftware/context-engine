@@ -1262,6 +1262,7 @@ export const addWorkerGroupMember = async ({
 	principal,
 	actorPrincipal,
 	capacityAuthorized = false,
+	resume = false,
 	deps = {},
 } = {}) => {
 	const store = resolveWorkerGroupStore(env);
@@ -1291,6 +1292,8 @@ export const addWorkerGroupMember = async ({
 			return { ok: false, status: 409, reason: 'worker_group_member_cap_exceeded' };
 		}
 	}
+	// Repeated joins are no-ops. An interrupted write still replays the indexes.
+	if (existing && !resume) return { ok: true, store: store.kind, group: redactGroupForMember(group), member: existing, created: false };
 	const addedAt = nowIso(deps);
 	const member = {
 		groupId: normalizeWorkerGroupId(groupId),
@@ -1744,6 +1747,7 @@ export const executeWorkerGroupMutation = async ({
 			principal,
 			actorPrincipal,
 			capacityAuthorized,
+			resume,
 			deps,
 		});
 	}
@@ -1784,6 +1788,7 @@ export const executeWorkerGroupMutation = async ({
 			principal,
 			actorPrincipal,
 			capacityAuthorized,
+			resume,
 			deps,
 		});
 	}

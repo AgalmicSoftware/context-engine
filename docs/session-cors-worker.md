@@ -1227,6 +1227,9 @@ editing participant, ownership or authority fields invalidates authentication.
 Export continuation cursors use a separate KEK-derived HMAC over the session,
 archive identity and full scan position. Altered or unsigned cursors are refused
 before storage scanning; restart an export begun on an older Worker.
+Failed group requests and repeated joins do not invalidate an export. Confirmed
+group changes advance its revision; interrupted group writes hold snapshots
+until replay settles them.
 Deployment-key holders are trusted operators and can create authenticated archives.
 
 The `session_backup_v1` capability advertises the backup and restore actions.

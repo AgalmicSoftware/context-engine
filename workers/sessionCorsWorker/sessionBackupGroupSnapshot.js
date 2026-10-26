@@ -1,4 +1,4 @@
-import { STORAGE_BACKUP_REVISION_KEY } from './storageBackupRevision.js';
+import { STORAGE_BACKUP_REVISION_KEY, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
 
 const fail = (message) => { throw Object.assign(new Error(message), { status: 409 }); };
 const pad = (n) => String(n).padStart(8, '0');
@@ -8,6 +8,9 @@ const pad = (n) => String(n).padStart(8, '0');
 export const readBackupGroupSnapshot = async ({ coordinator, payload, prefixes, validateDurable, scopeRecords }) => {
   const { storage } = coordinator.state;
   const { slug, sessionId } = payload;
+  if ((await storage.list({ prefix: WORKER_GROUP_BACKUP_PENDING_PREFIX, limit: 1 })).size) {
+    fail('A group mutation is pending. Retry the backup after it settles.');
+  }
   // DO storage has no TTL; reclaim expired snapshot chunks incrementally.
   const snapshots = await storage.list({ prefix: 'worker-group-backup-meta:', limit: 100 });
   const expired = [...snapshots].find(([, value]) => value.expiresAt <= coordinator.now());
