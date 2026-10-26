@@ -101,6 +101,8 @@ const LIVE_STATUS_MATCHERS = [
 
 const PROPOSED_STATUS_MATCHERS = [
   'proposed',
+  'passed one chamber',
+  'passed legislature',
   'pending',
   'draft',
   'bill',
@@ -110,7 +112,7 @@ const PROPOSED_STATUS_MATCHERS = [
   'planned',
 ];
 
-const INACTIVE_STATUS_MATCHERS = ['vetoed', 'withdrawn', 'rejected', 'failed', 'expired'];
+const INACTIVE_STATUS_MATCHERS = ['vetoed', 'withdrawn', 'rejected', 'failed', 'expired', 'repealed', 'superseded'];
 
 const JURISDICTION_RULES: JurisdictionRule[] = [
   {
