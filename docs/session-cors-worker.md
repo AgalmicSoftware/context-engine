@@ -673,7 +673,8 @@ Admin test panel:
   Invalid JSON and output validation failures pause immediately without an automatic retry.
   Any other failure, or a temporary one after those retries
   (`retriesExhausted`), pauses automatic generation and keeps the last good
-  artifact. `automatic`-only sessions allow an explicit admin manual retry as
+  artifact. The admin Results view states “Automatic retries have stopped”
+  with the failure reason beside the **Retry AI Views** action. `automatic`-only sessions allow an explicit admin manual retry as
   recovery; otherwise repeated submissions do not thrash provider calls. Storage
   capacity and read failures before provider admission also persist
   `lastFailure` under the same rules. An ineligible-input `422` does not persist

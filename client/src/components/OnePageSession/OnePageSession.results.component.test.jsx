@@ -1,3 +1,4 @@
+import { resolveGeneratedResultsControllerState } from '../../domains/sessionResults/sessionResultsAnalysisController';
 /** @file OnePageSession.component.test.jsx */
 import fs from 'fs';
 import path from 'path';
@@ -1285,6 +1286,24 @@ describe('OnePageSession results routing', () => {
     fireEvent.click(screen.getByTestId('ce-session-generated-results-generate'));
     expect(screen.getByTestId('ce-session-generated-results-generate')).toHaveTextContent('Retry AI Views');
     expect(generate).toHaveBeenCalledWith(true);
+
+    view.rerender(
+      <OnePageSessionStandardShell
+        {...shellProps}
+        resultsViewMode="circles"
+        generatedResultsAnalysis={resolveGeneratedResultsControllerState({
+          statusBody: {
+            ok: true,
+            adminAuthorized: true,
+            settings: { generationMode: 'automatic', views: { circles: true } },
+            capability: { manual: { supported: true } },
+            state: { jobState: 'failed', lastFailure: { error: 'Provider failed.', retriesExhausted: true } },
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText('Automatic retries have stopped. Provider failed.')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-session-generated-results-generate')).toHaveTextContent('Retry AI Views');
 
     view.rerender(
       <OnePageSessionStandardShell

@@ -185,14 +185,18 @@ describe('sessionResultsAnalysisController', () => {
           publication: 'latest_success_visible',
         },
         capability: { manual: { supported: true } },
-        state: { jobState: 'failed', lastFailure: { error: 'Provider failed.' }, lastGood: null },
+        state: {
+          jobState: 'failed',
+          lastFailure: { error: 'Provider failed.', retriesExhausted: true },
+          lastGood: null,
+        },
       },
     });
 
     expect(state.isRunning).toBe(false);
     expect(state.canGenerate).toBe(true);
     expect(state.canCheckStatus).toBe(false);
-    expect(state.lastFailure).toBe('Provider failed.');
+    expect(state.lastFailure).toBe('Automatic retries have stopped. Provider failed.');
   });
 
   it('turns an expired running poll into a status recheck without enabling another signed generation', () => {
