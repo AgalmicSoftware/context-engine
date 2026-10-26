@@ -45,7 +45,7 @@ export const readWorkerCapabilities = async (
   const cached = cache.get(key);
   if (cached && cached.until > now()) {
     const known = await cached.value;
-    if (!refreshUnavailable || !known.session?.unavailable.length) return known;
+    if (!refreshUnavailable || !known.session?.unavailable.some((item) => item.operation === 'submit')) return known;
     const newer = cache.get(key);
     if (newer && newer !== cached && newer.until > now()) return newer.value;
   }
@@ -110,7 +110,9 @@ export const readWorkerCapabilities = async (
   void value.then((result) => {
     if (cache.get(key) !== entry) return;
     if (!cacheable) cache.delete(key);
-    else entry.until = now() + (result.session?.unavailable.length ? 30_000 : 5 * 60_000);
+    else
+      entry.until =
+        now() + (result.session?.unavailable.some((item) => item.operation === 'submit') ? 30_000 : 5 * 60_000);
   });
   return value;
 };

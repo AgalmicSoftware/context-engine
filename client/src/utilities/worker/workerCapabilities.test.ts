@@ -70,3 +70,26 @@ test('an explicit submit refresh bypasses unavailable readiness but keeps health
   await readWorkerCapabilities(url, 'sample', options);
   expect(fetchImpl).toHaveBeenCalledTimes(2);
 });
+
+test('backup-only unavailability keeps the normal cache lifetime during submissions', async () => {
+  let time = 0;
+  const fetchImpl = jest.fn(
+    async () =>
+      new Response(
+        JSON.stringify({
+          ...body,
+          session: { readiness: { kek: 'missing' }, unavailable: [{ operation: 'backup', reason: 'kek_missing' }] },
+        }),
+      ),
+  );
+  const url = 'https://plaintext-no-kek.test';
+  const options = { fetchImpl, now: () => time, refreshUnavailable: true };
+  for (let i = 0; i < 5; i += 1) await readWorkerCapabilities(url, 'sample', options);
+  expect(fetchImpl).toHaveBeenCalledTimes(1);
+  time = 30_001;
+  await readWorkerCapabilities(url, 'sample', options);
+  expect(fetchImpl).toHaveBeenCalledTimes(1);
+  time = 300_000;
+  await readWorkerCapabilities(url, 'sample', options);
+  expect(fetchImpl).toHaveBeenCalledTimes(2);
+});

@@ -2655,9 +2655,11 @@ Signed login/bootstrap requests:
   an authority outage and never returns config values, addresses or counts.
   A missing KEK blocks envelope-encrypted writes and backup, while plaintext
   writes remain available when their other prerequisites are ready. The client
-  never caches transport failures; unavailable readiness expires within 30 seconds
-  and pressing Submit rechecks it immediately. Only a definitive 404 or non-JSON
-  reply identifies a legacy Worker.
+  never caches transport failures; unavailable Submit readiness expires within
+  30 seconds and pressing Submit rechecks it immediately. If Submit is ready,
+  other unavailable operations (such as backup without a KEK) keep the normal
+  five-minute client cache. Only a definitive 404 or non-JSON reply identifies a
+  legacy Worker.
 - `GET /admin/diagnostics?sessionSlug=<slug>[&cursor=<cursor>]` requires the same
   current session token, identity/authorization-epoch checks, CORS policy, and
   admin authority as the Results-analysis status endpoint. Replies are private,
