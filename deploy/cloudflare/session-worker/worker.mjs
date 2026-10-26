@@ -64479,9 +64479,16 @@ var init_storageRouteExecution = __esm({
                       encrypted: metadata.encrypted === true,
                       createdAt: trim8(metadata.createdAt),
                       size: Number(metadata.size || ciphertextBytes.length || 0) || 0,
+                      ...Object.hasOwn(metadata, "responder") ? { responder: metadata.responder } : {},
+                      ...Object.hasOwn(metadata, "uploader") ? { uploader: metadata.uploader } : {},
+                      ...Object.hasOwn(metadata, "uploadAuthority") ? { uploadAuthority: metadata.uploadAuthority } : {},
+                      ...Object.hasOwn(metadata, "resourceId") ? { resourceId: metadata.resourceId } : {},
+                      ...Object.hasOwn(metadata, "hidden") ? { hidden: metadata.hidden } : {},
+                      ...Object.hasOwn(metadata, "groupIds") ? { groupIds: metadata.groupIds } : {},
                       payloadAccessControl: {
                         gate: metadataAccess.gate,
-                        encryption: metadataAccess.encryption
+                        encryption: metadataAccess.encryption,
+                        ...Object.hasOwn(metadata.payloadAccessControl || {}, "groupIds") ? { groupIds: metadata.payloadAccessControl.groupIds } : {}
                       },
                       payloadAccessMode: deriveLegacyPayloadAccessMode2(metadataAccess),
                       ...metadata.accessConditions ? { accessConditions: metadata.accessConditions } : {}
@@ -64530,6 +64537,7 @@ var init_storageRouteExecution = __esm({
         type: "ce_storage_encrypted_envelopes_export",
         version: 1,
         exportScope: "encrypted_envelopes_only",
+        metadataFields: "identity_v1",
         storageBackend: STORAGE_BACKENDS.CLOUDFLARE,
         sessionSlug: sessionSlugStorageKey(slug),
         resource: trim8(resource) || "all",
@@ -65881,6 +65889,7 @@ var init_resultsAnalysisGeneration = __esm({
           ok: false,
           status: 503,
           reason: "results_analysis_snapshot_limit",
+          retryable: false,
           error: "The complete results snapshot exceeds the synchronous analysis limit. No report was generated; the last successful report is unchanged. A bounded background snapshot is required for this session."
         };
       }
@@ -66081,7 +66090,10 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
         status: Number(failure2.status || 0) || 502,
         ...trim9(failure2.requestId) ? { requestId: trim9(failure2.requestId) } : {},
         ...trim9(failure2.trigger) ? { trigger: trim9(failure2.trigger) } : {},
-        ...Number.isFinite(Number(failure2.failedAtMs)) ? { failedAtMs: Number(failure2.failedAtMs) } : {}
+        ...Number.isFinite(Number(failure2.failedAtMs)) ? { failedAtMs: Number(failure2.failedAtMs) } : {},
+        ...Number(failure2.retryAttempt) > 0 ? { retryAttempt: Number(failure2.retryAttempt) } : {},
+        ...Number(failure2.nextAttemptAtMs) > 0 ? { nextAttemptAtMs: Number(failure2.nextAttemptAtMs) } : {},
+        ...failure2.retriesExhausted === true ? { retriesExhausted: true } : {}
       };
     };
     buildResultsAnalysisStatusBody = ({ slug, config, coordinatorState, includeDraft = true } = {}) => {
@@ -66260,7 +66272,8 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
       const status = await readStatus({ env, slug });
       if (!status?.ok) return { ok: false, status: status?.status || 503, jobState: "failed", error: status?.error || "Results analysis status is unavailable; retry." };
-      if (status?.state?.lastFailure?.trigger === "automatic") {
+      const failure2 = status?.state?.lastFailure;
+      if (failure2?.trigger === "automatic" && !(Number(failure2.nextAttemptAtMs) <= Number(deps?.now?.() ?? Date.now()))) {
         return { ok: true, skipped: true, reason: "automatic_paused_after_failure" };
       }
       const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config, committedResponses });
@@ -66978,7 +66991,7 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_sessionConfigAuthority();
@@ -67020,6 +67033,8 @@ var init_sessionWriteCoordinator = __esm({
     RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES = 48e3;
     RESULTS_ANALYSIS_RUNNING_LEASE_MS = 14 * 60 * 1e3;
     RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS = 2;
+    RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS = [6e4, 5 * 6e4, 30 * 6e4];
+    RESULTS_ANALYSIS_RETRYABLE_STATUSES = /* @__PURE__ */ new Set([408, 425, 429, 500, 502, 503, 504]);
     RUNNING_LEASE_MS = 65e3;
     MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1e3;
     AUTH_NONCE_MAC_KEY = "auth-nonce-mac-key";
@@ -67502,6 +67517,7 @@ ${expiry}`);
         if (!job) return { ok: false, status: 400, error: "Invalid results analysis auto job." };
         const existing = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
         if (isObjectRecord(existing) && existing.slug === job.slug) {
+          if (existing.retryAttempt) job.retryAttempt = existing.retryAttempt;
           const byId = /* @__PURE__ */ new Map();
           for (const entry of [...Array.isArray(existing.committedResponses) ? existing.committedResponses : [], ...job.committedResponses]) {
             const key = toTrimmedString9(entry?.metadata?.id) || `${toTrimmedString9(entry?.metadata?.responder)}:${toTrimmedString9(entry?.metadata?.createdAt)}`;
@@ -67522,26 +67538,43 @@ ${expiry}`);
       }
       async recordResultsAnalysisQueueFailure(error, job) {
         const nowMs = Number(this.now()) || Date.now();
-        await this.state.storage.transaction(async (transaction) => {
+        const retryDelayMs = await this.state.storage.transaction(async (transaction) => {
           const queued = await transaction.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
           const record = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          const sameJob = !job || queued?.queuedAtMs === job.queuedAtMs && queued?.requestId === job.requestId;
+          const retryable = error?.retryable !== false && RESULTS_ANALYSIS_RETRYABLE_STATUSES.has(Number(error?.status));
+          const retryAttempt = (Number(queued?.retryAttempt) || 0) + 1;
+          const delayMs = retryable && sameJob && isObjectRecord(queued) ? RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS[retryAttempt - 1] : void 0;
           record.lastFailure = {
             ok: false,
             error: error?.message || error?.error || toTrimmedString9(error) || "Automatic results analysis job failed.",
             status: Number(error?.status) >= 400 && Number(error?.status) <= 599 ? Number(error.status) : 502,
             requestId: toTrimmedString9(job?.requestId ?? queued?.requestId),
             trigger: "automatic",
-            failedAtMs: nowMs
+            failedAtMs: nowMs,
+            ...delayMs ? { retryAttempt, nextAttemptAtMs: nowMs + delayMs } : {},
+            ...retryable && !delayMs ? { retriesExhausted: true } : {}
           };
-          if (!job || queued?.queuedAtMs === job.queuedAtMs && queued?.requestId === job.requestId) {
+          if (delayMs) {
+            const baseRequestId = toTrimmedString9(queued.requestId).replace(/:retry-\d+$/, "");
+            await transaction.put(RESULTS_ANALYSIS_AUTO_JOB_KEY, { ...queued, retryAttempt, requestId: `${baseRequestId}:retry-${retryAttempt}` });
+          } else if (sameJob) {
             await transaction.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
           }
           await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+          return delayMs;
         });
+        if (retryDelayMs) await this.scheduleResultsAnalysisAlarm(retryDelayMs);
       }
       async runQueuedResultsAnalysisAutoJob() {
         const job = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
         if (!isObjectRecord(job)) return { ok: true, skipped: true, reason: "no_job" };
+        const retryAtMs = job.retryAttempt ? Number(this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY)).lastFailure?.nextAttemptAtMs) || 0 : 0;
+        const nowMs = Number(this.now()) || Date.now();
+        if (retryAtMs > nowMs) {
+          await this.scheduleResultsAnalysisAlarm(retryAtMs - nowMs);
+          return { ok: true, skipped: true, reason: "automatic_retry_scheduled", nextAttemptAtMs: retryAtMs };
+        }
         const result = await this.runResultsAnalysisAutoJob({
           env: this.env,
           slug: job.slug,
