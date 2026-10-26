@@ -6,12 +6,24 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Bind saved agent state to its wallet and stop startup if its key is missing
+  or differs from the recorded identity. Legacy state adopts its existing key.
+- Rebuild registry reads when the scanned block is replaced, and discard local
+  questions and remembered answers from orphaned blocks.
 - Route every MCP registry chain call, including reads, log scans and test-ETH
   checks, through one error sanitizer, and redact URLs and ethers diagnostics
   from tool errors and logs, so a keyed RPC URL cannot reach a transcript.
 
 ### Client — available when the site deploys
 
+- Keep successfully stored Worker answers saved after a later upload fails,
+  name the unsaved drafts, and keep Submit available to retry only those drafts.
+- Serialize persisted cache writes across tabs and reload saved values on
+  cross-tab notifications. Bookmark changes preserve other tabs' additions.
+- Merge saved filters, SBT bookmarks and analysis results into current local
+  storage, and retain valid bookmark lists when another list is missing.
+- Require browser checks for hosted publication, reload, Results, permissions,
+  partial-submit retry and concurrent two-tab bookmarks in CI.
 - Scope cached Worker questions and answers to the signed-in reader. Account
   switches and logouts purge Worker cache nodes, a load started under another
   account is discarded, and a complete listing drops answers the reader can no
@@ -26,6 +38,11 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Retry transient automatic-analysis failures after 1, 5 and 30 minutes before
+  marking retries exhausted. Non-retryable failures still pause immediately.
+- Preserve ownership, authority, visibility and group fields in encrypted
+  envelope exports. These archives still need the original deployment key for
+  Worker encryption and do not yet provide a full session restore.
 - Settle Worker Group mutations stranded by a KV failure: the next operation on
   that group or member replays the recorded intent instead of answering
   not-found, and memberships no longer fail for every member.
