@@ -1219,6 +1219,9 @@ different slug, rotate stored keys, or replace newer target policy.
 Every backup page carries a KEK-derived HMAC. Import refuses unsigned or altered
 pages before writing backup data. Keep the original downloaded JSONL intact;
 editing participant, ownership or authority fields invalidates authentication.
+Export continuation cursors use a separate KEK-derived HMAC over the session,
+archive identity and full scan position. Altered or unsigned cursors are refused
+before storage scanning; restart an export begun on an older Worker.
 Deployment-key holders are trusted operators and can create authenticated archives.
 
 The `session_backup_v1` capability advertises the backup and restore actions.

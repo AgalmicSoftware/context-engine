@@ -1,4 +1,4 @@
-import { signBackupPage } from './sessionBackupAuthentication.js';
+import { signBackupPage, signBackupCursor, authenticateBackupCursor } from './sessionBackupAuthentication.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { coordinateWorkerGroupBackup } from './workerGroups.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
@@ -21,6 +21,9 @@ const prefixes = (slug) => [null, `ce-storage-hidden:${slug}:`, `ce-storage-owne
 // export: KV and R2 do not offer a joint, point-in-time snapshot.
 export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = '' }) => {
   const keySlug = sessionSlugStorageKey(slug);
+  // Authenticate the entire position before trusting scan offsets or revisions.
+  // Page MACs alone would let an admin ask us to sign an incomplete archive.
+  const authenticatedCursor = cursor ? await authenticateBackupCursor(cursor, env) : '';
   const budget = createStorageExportBudget();
   const rawIndex = getStorageIndexBinding(env);
   const index = rawIndex ? budget.wrap(rawIndex) : null;
@@ -31,10 +34,11 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
   const sessionId = resolveCanonicalWorkerSessionIdHex(coordinator.configAuthority.config);
   if (!sessionId) fail('The session has no canonical identity.');
   const prefix = `ce-backup:${keySlug}:`;
-  const parsed = parseStorageExportCursor({ cursor, prefix, sessionId });
+  const parsed = parseStorageExportCursor({ cursor: authenticatedCursor, prefix, sessionId });
   const position = parsed.continuation || { phase: 0, listCursor: '', lastKey: '', chunk: -1, pageNumber: 0,
     exportedAt: new Date().toISOString(), writeRevision: current.body.writeRevision,
     configDigest: await sha256Hex(JSON.stringify(coordinator)), counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 } };
+  const nextCursor = () => signBackupCursor(storageExportCursor({ prefix, sessionId, continuation: position }), env);
   if (position.configDigest !== await sha256Hex(JSON.stringify(coordinator))) fail('Session config changed during backup. Restart the export.');
   const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: 'export', snapshotId: position.groupSnapshotId });
   if (!groups.ok) fail(groups.error || 'Group backup is unavailable.', groups.status);
@@ -42,12 +46,13 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
   position.groupSnapshotId = groups.snapshotId;
   if (groups.preparing) {
     position.preparation = (position.preparation || 0) + 1;
-    return { ok: true, preparing: true, nextCursor: storageExportCursor({ prefix, sessionId, continuation: position }) };
+    return { ok: true, preparing: true, nextCursor: await nextCursor() };
   }
   coordinator.workerGroups = groups.snapshot;
   const snapshotBytes = encoder.encode(JSON.stringify(coordinator));
   const snapshotDigest = await digestBytes(snapshotBytes);
   if (!position.snapshotDigest) position.snapshotDigest = snapshotDigest;
+  position.archiveId = await sha256Hex(`${sessionId}:${position.exportedAt}:${snapshotDigest}`);
   const paths = prefixes(keySlug);
   if (!Number.isSafeInteger(position.phase) || position.phase < 0 || position.phase > 6 ||
       !Number.isSafeInteger(position.chunk) || position.chunk < -1 || !Number.isSafeInteger(position.pageNumber) || position.pageNumber < 0 ||
@@ -64,7 +69,7 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
     ...(env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK ? { previousKekFingerprint: await recoveryKeyFingerprint(env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK) } : {}),
     counts: position.counts, complete: false };
   const page = { ok: true, manifest, pageNumber: position.pageNumber, entries: [], nextCursor: '', snapshotDigest,
-    archiveId: await sha256Hex(`${sessionId}:${manifest.exportedAt}:${snapshotDigest}`) };
+    archiveId: position.archiveId };
   const finish = async () => {
     const latest = await callSessionConfigCoordinator({ env, slug, path: 'backup/export', expectedAuthority });
     if (!latest.ok) fail(latest.body?.error || 'Backup authority is unavailable.', latest.status);
@@ -111,7 +116,7 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
       if (position.pageNumber === 0) page.coordinator = { chunked: true, sha256: snapshotDigest };
       if (!await payload('coordinator', snapshotBytes, null, 'coordinator')) {
         position.pageNumber += 1;
-        page.nextCursor = storageExportCursor({ prefix, sessionId, continuation: position });
+        page.nextCursor = await nextCursor();
         return finish();
       }
     }
@@ -168,7 +173,7 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
   manifest.complete = position.phase === paths.length;
   if (!manifest.complete) {
     position.pageNumber += 1;
-    page.nextCursor = storageExportCursor({ prefix, sessionId, continuation: position });
+    page.nextCursor = await nextCursor();
   }
   return finish();
 };

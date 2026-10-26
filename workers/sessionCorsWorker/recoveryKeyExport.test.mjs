@@ -90,7 +90,7 @@ test('backup export success and failure keep the signed request CORS headers', a
     const body = await createSignedSiweBody({ worker, env, wallet: admin, sessionSlug: slug,
       adminAction: 'export-session-backup', adminOrigin: origin, audience: origin, body: { slug, cursor } });
     const response = await worker.fetch(makeJsonRequest('/admin/export-session-backup', body, { headers: { Origin: origin } }), env);
-    assert.equal(response.status, cursor ? 503 : 200, await response.clone().text());
+    assert.equal(response.status, cursor ? 403 : 200, await response.clone().text());
     assert.equal(response.headers.get('Access-Control-Allow-Origin'), origin);
     assert.equal(response.headers.get('Vary'), 'Origin');
     assert.equal(response.headers.get('Cache-Control'), 'no-store');

@@ -183,6 +183,44 @@ const importPage = async (env, page, revision = 0) => {
   assert.fail('Import page did not finish within its bounded continuations');
 };
 
+test('backup export refuses modified, unsigned, or foreign-session cursors before scanning storage', async () => {
+  const source = fixture();
+  for (let n = 0; n < 120; n += 1) {
+    const id = `cf_cursor_${String(n).padStart(3, '0')}`;
+    const metadata = { id, resource: 'responses', responder: admin, storageLayer: 'kv', size: 6 };
+    source.kv.values.set(`ce-storage:${slug}:responses:${id}`, JSON.stringify(metadata));
+    source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('answer').toString('base64url') }));
+  }
+  const first = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  assert.ok(first.nextCursor);
+  const [encoded, mac] = first.nextCursor.split('.');
+  const original = JSON.parse(Buffer.from(encoded, 'base64url').toString());
+  for (const mutate of [
+    (cursor) => { cursor.continuation.lastKey = `ce-storage-payload:${slug}:cf_cursor_119`; },
+    (cursor) => { cursor.continuation.phase = 6; },
+    (cursor) => { cursor.continuation.writeRevision += 2; },
+    (cursor) => { cursor.continuation.counts.records += 1; },
+    (cursor) => { cursor.continuation.exportedAt = new Date(0).toISOString(); },
+    (cursor) => { cursor.continuation.pageNumber += 1; },
+    (cursor) => { cursor.continuation.archiveId = '0'.repeat(64); },
+    (cursor) => { cursor.prefix = 'ce-backup:other-session:'; },
+    (cursor) => { cursor.sessionId = `0x${'8'.repeat(64)}`; },
+  ]) {
+    const changed = structuredClone(original);
+    mutate(changed);
+    const cursor = Buffer.from(JSON.stringify(changed)).toString('base64url') + (mac ? `.${mac}` : '');
+    source.kv.gets.clear();
+    await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor }),
+      (error) => error.status === 403 && error.reason === 'backup_cursor_authentication_failed');
+    assert.equal(source.kv.gets.size, 0, 'No payload or config reads after a forged cursor');
+  }
+  await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: encoded }),
+    (error) => error.reason === 'backup_cursor_authentication_failed');
+  await callSessionConfigCoordinator({ env: source.env, slug, path: 'backup/write-revision' });
+  const stale = await exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: first.nextCursor });
+  assert.equal(stale.reason, 'backup_session_changed', 'A valid cursor cannot conceal concurrent writes');
+});
+
 test('restore validates recovery keys, skips page replays, and never overwrites a conflicting row', async () => {
   const source = fixture();
   const metadata = { id: 'cf_restore_answer', resource: 'responses', responder: admin, size: 5, storageLayer: 'kv' };
