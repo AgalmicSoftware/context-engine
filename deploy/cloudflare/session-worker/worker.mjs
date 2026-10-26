@@ -66978,7 +66978,7 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_sessionConfigAuthority();
@@ -67173,6 +67173,21 @@ ${expiry}`);
       "invalid_group_admin_address",
       "invalid_worker_group_id"
     ]);
+    WORKER_GROUP_INPUT_FIELDS = Object.freeze([
+      "groupId",
+      "label",
+      "description",
+      "imageUrl",
+      "tags",
+      "documentURLs",
+      "memberLimit",
+      "joinEndsAt",
+      "joinMode",
+      "memberVisibility",
+      "adminAddress"
+    ]);
+    WORKER_GROUP_INTENT_MAX_BYTES = 32 * 1024;
+    pickWorkerGroupInput = (input) => Object.fromEntries(WORKER_GROUP_INPUT_FIELDS.filter((key) => isObjectRecord(input) && Object.prototype.hasOwnProperty.call(input, key)).map((key) => [key, input[key]]));
     sameWorkerGroupInput = (left, right) => {
       const canonical = (value) => JSON.stringify(value, Object.keys(isObjectRecord(value) ? value : {}).sort());
       return canonical(left) === canonical(right);
@@ -68448,10 +68463,13 @@ ${expiry}`);
           let principalDigest = "";
           let activeGroup = null;
           const intent = {
-            ...mutation.operation === "delete" ? {} : { input: mutation.input },
+            ...mutation.operation === "delete" ? {} : { input: pickWorkerGroupInput(mutation.input) },
             ...mutation.principal ? { principal: mutation.principal } : {},
             actorPrincipal: mutation.actorPrincipal
           };
+          if (byteLength(JSON.stringify(intent)) > WORKER_GROUP_INTENT_MAX_BYTES) {
+            return jsonResponse2({ ok: false, status: 400, reason: "worker_group_input_too_large" }, 400);
+          }
           {
             const settled = await this.settleWorkerGroupReservations({
               slug: mutation.slug,
@@ -68460,7 +68478,7 @@ ${expiry}`);
               principal: mutation.principal ? { principal: mutation.principal, key: mutation.principalKey } : null
             });
             if (!settled.ok) return jsonResponse2(settled, settled.status || 503);
-            const finished = settled.replayed.find((entry) => entry.result.ok && entry.operation === mutation.operation && (mutation.operation === "delete" || mutation.operation === "remove-member" && entry.principalKey === mutation.principalKey || mutation.operation === "create" && sameWorkerGroupInput(entry.input, mutation.input)));
+            const finished = settled.replayed.find((entry) => entry.result.ok && entry.operation === mutation.operation && (mutation.operation === "delete" || mutation.operation === "remove-member" && entry.principalKey === mutation.principalKey || mutation.operation === "create" && sameWorkerGroupInput(entry.input, intent.input)));
             if (finished) return this.respondToWorkerGroupMutation(mutation, finished.result);
           }
           if (mutation.operation === "create") {
@@ -78966,8 +78984,9 @@ var QUESTIONS_ADDED_TOPIC0 = "0x3b584fb360a325f39352e75bd13458807d8e31735ef4dada
 var GET_QUESTION_HASH_SELECTOR = "0x24b9f713";
 var ZERO_BYTES32 = `0x${"00".repeat(32)}`;
 var MAX_QUESTIONS = 100;
-var MAX_CLOUDFLARE_LIST_PAGES = 50;
 var MAX_PAYLOAD_READS = MAX_QUESTIONS * 2;
+var CATALOG_KV_OPERATION_BUDGET = 800;
+var MAX_CLOUDFLARE_LIST_PAGES = Math.floor((CATALOG_KV_OPERATION_BUDGET - MAX_PAYLOAD_READS) / (MAX_QUESTIONS + 2));
 var MAX_SCAN_BLOCKS = 2e6;
 var RPC_CHUNK_SIZE = 1e5;
 var trim12 = (value) => String(value == null ? "" : value).trim();
@@ -79037,12 +79056,13 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
     (version2.resourceId ? versions : legacyVersions).push(version2);
   }
   legacyVersions.sort((left, right) => left.createdAtMs - right.createdAtMs);
-  for (const version2 of legacyVersions.slice(0, MAX_PAYLOAD_READS)) {
+  const legacyReads = legacyVersions.slice(0, MAX_PAYLOAD_READS - MAX_QUESTIONS);
+  for (const version2 of legacyReads) {
     const payload = await readPayload(version2.storageRefId);
     const resourceId = payloadQuestionId(payload);
     if (resourceId) versions.push({ ...version2, resourceId, payload });
   }
-  const chosen = selectCanonicalStorageVersions(versions).filter((version2) => !hiddenIds.has(version2.resourceId)).slice(0, MAX_PAYLOAD_READS);
+  const chosen = selectCanonicalStorageVersions(versions).filter((version2) => !hiddenIds.has(version2.resourceId)).slice(0, MAX_PAYLOAD_READS - legacyReads.length);
   const questions = [];
   for (const version2 of chosen) {
     if (questions.length >= MAX_QUESTIONS) break;
