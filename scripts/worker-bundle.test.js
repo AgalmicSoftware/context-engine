@@ -29,6 +29,7 @@ test('buildWorkerBundles validates guarded worker deps without installing them',
     },
     esbuildImpl: async (options) => {
       buildCalls.push(options);
+      return { metafile: { inputs: { 'node_modules/synthetic/index.js': { bytes: 1 } } } };
     },
     mkdirSyncImpl: (...args) => {
       mkdirCalls.push(args);
@@ -46,6 +47,9 @@ test('buildWorkerBundles validates guarded worker deps without installing them',
   ]);
   assert.equal(buildCalls[0].outfile, path.resolve(rootDir, 'dist/sessionCorsWorker.bundle.js'));
   assert.equal(buildCalls[0].preserveSymlinks, true);
+  assert.equal(buildCalls[0].absWorkingDir, rootDir);
+  assert.equal(buildCalls[0].metafile, true);
+  assert.deepEqual(result[0].metafile.inputs, { 'node_modules/synthetic/index.js': { bytes: 1 } });
   assert.deepEqual(mkdirCalls, [[path.resolve(rootDir, 'dist'), { recursive: true }]]);
   assert.deepEqual(writeCalls, []);
   assert.deepEqual(result.map((target) => target.key), ['sessionCorsWorker']);

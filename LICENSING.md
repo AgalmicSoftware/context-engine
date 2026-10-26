@@ -14,7 +14,7 @@ their verified source notices; newly distributed source uses MPL-2.0.
 | --- | --- | --- |
 | Root tools, `client/`, `mcp/`, `ai-discourse-bench/`, `shared/` and add-ons | MPL-2.0 | The root license applies to project code. |
 | `workers/` | MPL-2.0 | Includes the Session Worker, Agent Bridge, deploy helper and shared Worker modules. |
-| `deploy/cloudflare/session-worker/` | MPL-2.0 | The standalone deploy package includes the full license text. |
+| `deploy/cloudflare/session-worker/` | MPL-2.0 for project code | The standalone package includes the project license and bundled dependency notices in `THIRD_PARTY_NOTICES.md`. |
 | `contracts/` and `foundry/` | MPL-2.0 | Source files carry matching SPDX identifiers. |
 | Repository documentation | MPL-2.0 | Except material with a specific third-party or corpus notice. |
 | `ai-discourse-corpus/` annotations | CC0-1.0 | Project-authored summaries, tags and structure are dedicated under [the corpus notice](ai-discourse-corpus/LICENSE.md). Upstream source material retains its own rights. |
@@ -34,6 +34,13 @@ v6; sharing rules preserves that dependency boundary.
 ## Third-Party Dependencies
 
 Third-party dependencies retain their own licenses. Package metadata, lockfiles, vendored notices, and upstream project notices should be checked before redistributing dependency code or bundled artifacts.
+
+The Session Worker deploy package generates `THIRD_PARTY_NOTICES.md` from its
+esbuild input packages, preserving each package's version, license and full
+license text. Template verification checks these notices against the bundle.
+The vendored `contextEngine-cc/public/ethers.umd.min.js` is ethers 5.7.2 under
+MIT; its notice is kept beside it in `ethers.LICENSE.md`. The add-on's MPL-2.0
+license applies to project-authored code.
 
 The Classic 95 theme bundles Wine Tahoma regular and bold font files under
 `client/src/assets/fonts/classic-95/`. These are the Wine project's

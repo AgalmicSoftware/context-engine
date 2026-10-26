@@ -72,13 +72,15 @@ export const buildWorkerBundles = async ({
   const results = [];
   for (const target of targets) {
     mkdirSyncImpl(dirname(target.outputFile), { recursive: true });
-    await esbuildImpl({
+    const built = await esbuildImpl({
+      absWorkingDir: rootDir,
       entryPoints: [target.entryPoint],
       outfile: target.outputFile,
       bundle: true,
       platform: 'browser',
       format: 'esm',
       preserveSymlinks: true,
+      metafile: true,
       target: [target.target || 'es2020'],
       ...(target.legalComments ? { legalComments: target.legalComments } : {}),
       ...(target.mainFields ? { mainFields: target.mainFields } : {}),
@@ -88,7 +90,7 @@ export const buildWorkerBundles = async ({
     if (normalizedBundle !== bundle) {
       writeFileSyncImpl(target.outputFile, normalizedBundle);
     }
-    results.push(target);
+    results.push({ ...target, metafile: built?.metafile });
   }
   return results;
 };
