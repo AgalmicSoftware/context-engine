@@ -1066,6 +1066,56 @@ test('automatic generation carries queued fresh responses into the provider sour
   assert.equal(providerSource.aiSnapshot.responses.length, 3);
 });
 
+for (const completion of ['not JSON', 'null']) test(`invalid analysis output pauses without a billed retry: ${completion}`, async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  await putPayload({ kv, resource: 'questions', id: 'qmeta1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Question?', type: 'text' } });
+  const committedResponses = [1, 2, 3].map((index) => ({
+    metadata: { id: `r${index}`, responder: `0x${String(index).repeat(40)}`, createdAt: '2026-09-17T00:00:00.000Z' },
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: `View ${index}` },
+  }));
+  const values = new Map();
+  const alarms = [];
+  const receipts = [];
+  const storage = { get: async (key) => structuredClone(values.get(key)), put: async (key, value) => values.set(key, structuredClone(value)),
+    delete: async (key) => values.delete(key), transaction: async (callback) => callback(storage), setAlarm: async (time) => alarms.push(time) };
+  const coordinator = new SessionWriteCoordinator({ storage }, env, {
+    now: () => 1_000,
+    runResultsAnalysisAutoJob: async ({ job, deps }) => maybeTriggerAutomaticResultsAnalysis({
+      env, slug: 'session-a', config, requestId: job.requestId, committedResponses: job.committedResponses,
+      deps: { ...deps, getSessionSecrets: async () => ({}), proxyOpenAI: async () => Response.json({ completion }),
+        finalizeCoordinatedResultsAnalysis: async (args) => {
+          receipts.push(args.finalization.receipt);
+          return deps.finalizeCoordinatedResultsAnalysis(args);
+        },
+      },
+    }),
+  });
+  for (const entry of committedResponses) {
+    await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: `invalid-output:${entry.metadata.id}`, committedResponses: [entry] });
+  }
+  alarms.length = 0;
+  const result = await coordinator.runQueuedResultsAnalysisAutoJob();
+  assert.equal(result.status, 502, JSON.stringify(result));
+  assert.equal(result.retryable, false);
+  assert.equal(receipts[0].retryable, false);
+  assert.equal(values.has('results-analysis-auto-job-v1'), false);
+  assert.deepEqual(alarms, []);
+  const status = await coordinator.readResultsAnalysisStatus();
+  assert.equal(status.jobState, 'failed');
+  assert.equal(status.lastFailure.nextAttemptAtMs, undefined);
+  assert.equal(status.lastFailure.retriesExhausted, undefined);
+  const manual = await generateResultsAnalysisDraft({ env, slug: 'session-a', config, body: {
+    requestId: 'manual-recovery', refresh: true, source: { kind: 'worker-canonical' }, committedResponses,
+  }, deps: {
+    reserveCoordinatedResultsAnalysis: async ({ reservation }) => coordinator.reserveResultsAnalysis(reservation),
+    finalizeCoordinatedResultsAnalysis: async ({ finalization }) => coordinator.finalizeResultsAnalysis(finalization),
+    generateAnalysisArtifact: async () => ({ ok: true, value: { breakdown: { summary: { overview: 'Recovered' } } } }),
+  } });
+  assert.equal(manual.ok, true);
+});
+
 test('automatic generation pauses after an automatic failure until manual recovery', async () => {
   const kv = createKv();
   const env = { CE_STORAGE_INDEX_KV: kv };

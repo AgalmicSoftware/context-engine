@@ -785,7 +785,7 @@ const normalizeProviderResponse = async (response) => {
   try {
     return { ok: true, value: JSON.parse(raw) };
   } catch {
-    return { ok: false, status: 502, error: 'AI provider returned invalid JSON.' };
+    return { ok: false, status: 502, retryable: false, error: 'AI provider returned invalid JSON.' };
   }
 };
 
@@ -1064,6 +1064,7 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
       ok: false,
       error: providerResult?.error || 'AI results analysis generation failed.',
       status: providerResult?.status || 502,
+      ...(providerResult?.retryable === false ? { retryable: false } : {}),
       failedAt: generatedAt,
     };
     await finalize({
@@ -1077,7 +1078,7 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
         receipt: failure,
       },
     });
-    return { ok: false, status: failure.status, jobState: 'failed', reservation: summarizeReservation(reservation, requestId), capability, error: failure.error };
+    return { ...failure, jobState: 'failed', reservation: summarizeReservation(reservation, requestId), capability };
   }
   let artifact;
   try {
@@ -1090,9 +1091,9 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
     });
     artifact = applyCurrentArtifactPolicy(artifact, config);
   } catch (error) {
-    const failure = { ok: false, error: error?.message || 'AI results analysis output failed validation.', status: 502, failedAt: generatedAt };
+    const failure = { ok: false, error: error?.message || 'AI results analysis output failed validation.', status: 502, retryable: false, failedAt: generatedAt };
     await finalize({ env, slug, finalization: { requestId, reservationKey, attemptId: reservation.attemptId, success: false, receipt: failure } });
-    return { ok: false, status: failure.status, jobState: 'failed', reservation: summarizeReservation(reservation, requestId), capability, error: failure.error };
+    return { ...failure, jobState: 'failed', reservation: summarizeReservation(reservation, requestId), capability };
   }
   const draftId = `sha256:${await sha256Hex(stableCanonicalSerialize({ artifact, source: sourceDescriptor.snapshot, sections }))}`;
   const draft = {
