@@ -1169,6 +1169,29 @@ between pages abort the export, but KV and R2 cannot provide a joint snapshot of
 concurrent payload writes. Keep the complete JSONL archive with the deployment's
 recovery key; a fingerprint cannot decrypt it.
 
+Restore with admin-signed `POST /admin/import-session-backup`, passing each
+saved response as `page` in its original order. The target must hold the source
+KEK as its current key or `CE_STORAGE_ENVELOPE_PREVIOUS_KEK`. The slug and session
+ID must match. A fresh deployment may pass `adoptSessionId: true`; only its
+trusted bootstrap admin can do this. Config authority is published after the
+last verified page. An existing target must have identical config authority
+and revision; a revision number alone does not establish common history.
+
+Restore uses original payload IDs, verifies chunk sizes and SHA-256, writes to
+R2 when bound (otherwise KV), and then publishes metadata. Identical existing
+records are skipped; different records produce conflicts and are never
+overwritten. The response reports cumulative `written`, `skipped`, and
+`conflicts` counts and `complete`. Repeat an unchanged interrupted page to
+resume, or repeat an acknowledged page to receive its saved receipt. Only one
+archive may be in progress for a session. Conflicted restores finish with
+`complete: false`; use a fresh target to resolve conflicts. Temporary staging
+expires after seven days; assembled payload chunks are removed immediately.
+The target upload limit still applies, and payloads exceeding KV's encoded
+value limit require an R2 binding. Restore does not migrate the session to a
+different slug, rotate stored keys, or replace newer target policy.
+
+The `session_backup_v1` capability advertises these two signed actions.
+
 ### Encrypted Envelope Archive
 
 Admin-signed `POST /admin/export-storage-envelopes` returns an encrypted archival bundle for Cloudflare payloads. The response includes a manifest, ciphertext payload entries, per-payload envelope metadata, and wrapped session-key metadata. For `worker_envelope`, payload entries carry the wrapped DEK, IV, algorithm, key provider, and condition document reference. For Cloudflare `lit` payloads, the worker passes through the ciphertext as stored and does not attempt Lit decrypt.

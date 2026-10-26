@@ -1,5 +1,6 @@
 import { executeCoordinatedStorageVisibilityMutation } from './sessionConfigAuthority.js';
 import { exportSessionBackup } from './sessionBackup.js';
+import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import {
   ADMIN_SESSION_SECRET_KEYS as ALLOWED_SECRET_KEYS,
   ensureSessionLitAuthorizationSigner,
@@ -401,6 +402,12 @@ export const dispatchAdminRequest = async ({
     } catch (error) {
       return deps?.json?.({ error: error.message }, error.status || 503, { ...headers, 'Cache-Control': 'no-store' });
     }
+  }
+
+  if (action === 'import-session-backup') {
+    const result = await callSessionConfigCoordinator({ env, slug: targetSlug, path: 'backup/import',
+      expectedAuthority, page: body?.page, adoptSessionId: body?.adoptSessionId === true });
+    return deps?.json?.(result.body, result.status, { ...headers, 'Cache-Control': 'no-store' });
   }
 
   if (action === 'export-storage-envelopes') {

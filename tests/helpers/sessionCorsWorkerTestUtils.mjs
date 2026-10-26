@@ -243,7 +243,7 @@ export const createMemoryKv = (seed = {}) => {
 };
 
 const cloneCoordinatorTestValue = (value) => (
-  typeof globalThis.structuredClone === 'function'
+  value == null ? value : typeof globalThis.structuredClone === 'function'
     ? globalThis.structuredClone(value)
     : JSON.parse(JSON.stringify(value))
 );
@@ -261,7 +261,7 @@ export const installSessionCoordinatorBinding = (env = {}) => {
           const run = tail.then(async () => {
             const staged = new Map([...values].map(([key, value]) => [key, cloneCoordinatorTestValue(value)]));
             const result = await callback({
-              get: async (key) => staged.get(key),
+              get: async (key) => cloneCoordinatorTestValue(staged.get(key)),
               put: async (key, value) => staged.set(key, cloneCoordinatorTestValue(value)),
               delete: async (key) => staged.delete(key),
               list: async ({ prefix = '' } = {}) => new Map([...staged].filter(([key]) => key.startsWith(prefix))),
@@ -275,7 +275,7 @@ export const installSessionCoordinatorBinding = (env = {}) => {
         };
         const state = {
           storage: {
-            get: async (key) => values.get(key),
+            get: async (key) => cloneCoordinatorTestValue(values.get(key)),
             put: async (key, value) => values.set(key, cloneCoordinatorTestValue(value)),
             delete: async (key) => values.delete(key),
             list: async ({ prefix = '', startAfter = '', limit = 1000 } = {}) => new Map([...values]

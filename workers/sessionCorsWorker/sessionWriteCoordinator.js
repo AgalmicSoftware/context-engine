@@ -1,5 +1,6 @@
 import { assertExpectedSessionAuthority } from './sessionConfigAuthority.js';
-import { exportCoordinatorBackup, exportWorkerGroupBackup } from './sessionBackupCoordinator.js';
+import { exportCoordinatorBackup, exportWorkerGroupBackup, importWorkerGroupBackup } from './sessionBackupCoordinator.js';
+import { importCoordinatorBackupPage } from './sessionBackupImport.js';
 import { normalizeStorageRef } from './storageRefNormalization.js';
 import {
   executeDeployHelperRequest,
@@ -2743,10 +2744,16 @@ export class SessionWriteCoordinator {
         catch (error) { return jsonResponse({ error: error.message }, error.status || 503); }
       });
     }
-    if (url.pathname === '/worker-groups/backup/export') {
+    if (url.pathname === '/session-config/backup/import') {
+      return this.serializeSessionConfigOperation(async () => {
+        try { return await importCoordinatorBackupPage(this, payload, { normalizeConfig: normalizePublicSessionConfig, normalizeSessionKey: normalizeWrappedSessionKeyRecord }); }
+        catch (error) { return jsonResponse({ error: error.message, ...(error.reason ? { reason: error.reason } : {}) }, error.status || 503); }
+      });
+    }
+    if (url.pathname === '/worker-groups/backup/export' || url.pathname === '/worker-groups/backup/import') {
       if (url.hostname !== 'session-coordinator.internal') return jsonResponse({ error: 'Not found.' }, 404);
       return this.serializeWorkerGroupOperation(async () => {
-        try { return await exportWorkerGroupBackup(this, payload); }
+        try { return await (url.pathname.endsWith('/import') ? importWorkerGroupBackup : exportWorkerGroupBackup)(this, payload); }
         catch (error) { return jsonResponse({ error: error.message }, error.status || 503); }
       });
     }
