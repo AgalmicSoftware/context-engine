@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Persist pending answer-upload identities so repeating a timed-out tool call
+  replays the settled record. Keep complete Worker listings complete after an
+  agent answers, and hold registry scan cursors when a block mark cannot be checked.
 - Verify each remembered registry write against its own block before using it,
   share block probes within a read, and report incomplete results when RPC
   history is unavailable without discarding the last verified scan mark.
@@ -21,6 +24,18 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Recover saved answers and unsaved drafts after reload without resending saved
+  records. Advance saved-answer revisions when edited, including changing an
+  answer back, and discard in-flight submission state when the account changes.
+- Recheck unavailable Worker readiness on Submit and avoid caching transient
+  network failures. Expire near-head numeric RPC reads after two seconds so a
+  recent chain replacement cannot remain cached for ten minutes.
+- Preserve operator-supplied recovery keys through wizard identity changes,
+  normalize hex case and distinguish supplied from generated keys. Stream JSONL
+  restore files and let admins abandon an unfinished restore.
+- Show automatic-analysis retry exhaustion beside manual recovery controls.
+  Add private admin diagnostics for upload receipts, automatic-analysis retries
+  and pending configuration repair, with bounded pages and explicit refresh.
 - Keep a submission's operation ID across failed and partial attempts, so an
   unchanged answer can recover a lost upload reply without another stored copy.
 - Gate admin corrections on Worker authority-stamp support and explain known
@@ -55,6 +70,14 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Preserve CORS headers on deployment, recovery and provider-backoff replies.
+- Restore R2 resource metadata, authenticate backup pages and refuse archives
+  when any required recovery key is missing. Detect writes during export,
+  preserve newer live visibility and keep backup/import pages within their
+  storage-operation budget. Expired or abandoned restore staging can be retried.
+- Protect receipt identifiers and payload digests with keyed MACs, expire them
+  by alarm and validate deterministic upload failures before reserving a lease.
+  Replayed settled uploads also recover a missed automatic-analysis enqueue.
 - Retry transient automatic-analysis failures after 1, 5 and 30 minutes before
   marking retries exhausted. Honor Retry-After up to 30 minutes, preserve uploads
   merged during a run, and pause invalid output without another billed retry.
@@ -64,12 +87,14 @@ All notable changes to this project will be documented in this file.
   service secrets. Restore requires the matching recovery keys; a hermetic fresh
   deployment drill verifies recovered reads and access rules.
 - Deduplicate settled response uploads by participant and request ID for seven
-  days, returning the original reference without another write or analysis job.
+  days, returning the original reference without another storage write and
+  enqueueing automatic analysis idempotently.
   An expired attempt can leave an orphan; legacy Workers retain their old behavior.
 - Advertise public capabilities and non-sensitive session readiness categories.
 - Return newly generated recovery keys only with the fresh deployment response,
   exclude them from saved receipts, and allow confirmed signed admin export at
-  most three times per session per UTC day.
+  most three times per session per UTC day on single-session deployments.
+  Multi-session deployment keys remain with the operator.
 - Settle Worker Group mutations stranded by a KV failure: the next operation on
   that group or member replays the recorded intent instead of answering
   not-found, and memberships no longer fail for every member.
@@ -77,6 +102,23 @@ All notable changes to this project will be documented in this file.
   config, so disabling AI also stops jobs already queued.
 - Walk every question page in the interview catalog and the Agent Bridge before
   choosing versions, and present one current version per question in the Bridge.
+
+### Verification and shared rules
+
+- Exercise current MCP and browser readers against the unchanged previous
+  released Worker bundle. Add duplicate-alarm, account-switch, reload-recovery
+  and same-height/higher-head registry convergence regressions.
+- Share group-password derivation, sign-in message/session-ID rules and admin
+  typed-data construction while preserving the client/MCP ethers-v5 and Session
+  Worker ethers-v6 package boundary.
+- Check installed production dependency licenses in CI with reviewed exceptions.
+
+### License
+
+- Project-authored code is MPL-2.0 throughout, including Workers, the generated
+  deployment package, contracts/Foundry sources and the CC add-on. Earlier
+  releases keep the licenses they shipped with. Corpus data remains CC0-1.0;
+  third-party dependencies and assets keep their own licenses and notices.
 
 ### Benchmark reports
 
