@@ -276,12 +276,16 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             client/package-lock.json
+            workers/sessionCorsWorker/package-lock.json
 
       - name: Install root dependencies
         run: npm ci
 
       - name: Install client dependencies
         run: npm --prefix client ci
+
+      - name: Install Session Worker dependencies
+        run: npm --prefix workers/sessionCorsWorker ci
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
@@ -295,6 +299,7 @@ jobs:
         env:
           BASE_URL: http://127.0.0.1:4173
           SMOKE_ROUTES: /session/new,/session/pe4,/about,/contracts
+          OUTPUT_DIR: /tmp/context-engine-publication-smoke
         run: |
           set -euo pipefail
           npm --prefix client run preview -- --host 127.0.0.1 --port 4173 > /tmp/context-engine-vite-preview.log 2>&1 &
@@ -314,7 +319,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: e2e-smoke-diagnostics
-          path: /tmp/context-engine-vite-preview.log
+          path: |
+            /tmp/context-engine-vite-preview.log
+            /tmp/context-engine-publication-smoke/
           if-no-files-found: warn
           retention-days: 7
 

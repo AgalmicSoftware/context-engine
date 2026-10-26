@@ -1022,7 +1022,7 @@ function cacheTtlSeconds(env = {}) {
   return normalizePositiveInteger(env.AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS, DEFAULT_CACHE_TTL_SECONDS);
 }
 
-function payloadConcurrency(env = {}) {
+export function payloadConcurrency(env = {}) {
   return normalizePositiveInteger(env.AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY, DEFAULT_PAYLOAD_CONCURRENCY);
 }
 

@@ -285,6 +285,14 @@
             "run",
             "test:e2e:smoke"
           ]
+        },
+        {
+          "label": "Run session publication smoke",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:e2e:publish"
+          ]
         }
       ]
     },

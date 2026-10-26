@@ -6,13 +6,20 @@ import worker from '../workers/sessionCorsWorker/worker.js';
 import { installSessionCoordinatorBinding } from '../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { createWorkerClient } from '../mcp/lib/workerClient.mjs';
 import { buildQuestionRecord } from '../mcp/lib/records.mjs';
+import { buildPasskeyDerivedWallet, toPasskeyEoaSeedRecord } from './lib/passkey-derived-wallet.js';
 
 const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 assert(['127.0.0.1', 'localhost', '[::1]'].includes(new URL(baseUrl).hostname), 'This smoke requires a local client');
 const workerOrigin = 'https://setup-smoke.example.test';
 const outputDir = process.env.OUTPUT_DIR || 'artifacts/session-setup-smoke';
 await mkdir(outputDir, { recursive: true });
-const admin = ethers.Wallet.createRandom();
+const passkeyFixture = (name) => {
+  const credentialId = Buffer.from(`setup-smoke-${name}`).toString('base64url');
+  const { wallet } = buildPasskeyDerivedWallet(credentialId);
+  return { wallet, seed: toPasskeyEoaSeedRecord({ credentialId, address: wallet.address }) };
+};
+const adminFixture = passkeyFixture('admin');
+const admin = adminFixture.wallet;
 const kv = () => {
   const values = new Map();
   return {
@@ -39,73 +46,35 @@ const originalFetch = globalThis.fetch;
 globalThis.fetch = async () => {
   throw new Error('Session setup smoke must not call an external service');
 };
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  args: [`--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE ${new URL(baseUrl).hostname}`],
+});
 const calls = [];
-const fixtureContext = async (wallet) => {
+const fixtureContext = async ({ seed }) => {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
+    serviceWorkers: 'block',
   });
   context.setDefaultTimeout(30000);
-  await context.exposeFunction('__ceSetupWalletRequest', async ({ method, params = [] }) => {
-    if (method === 'eth_accounts' || method === 'eth_requestAccounts') return [wallet.address];
-    if (method === 'eth_chainId') return '0xaa37dc';
-    if (method === 'net_version') return '11155420';
-    if (method === 'eth_getCode') return '0x';
-    if (method === 'wallet_switchEthereumChain' || method === 'wallet_addEthereumChain') return null;
-    if (method === 'personal_sign')
-      return wallet.signMessage(ethers.utils.isHexString(params[0]) ? ethers.utils.arrayify(params[0]) : params[0]);
-    if (method === 'eth_signTypedData_v4' || method === 'eth_signTypedData') {
-      const data = typeof params[1] === 'string' ? JSON.parse(params[1]) : params[1];
-      const types = { ...data.types };
-      delete types.EIP712Domain;
-      return wallet._signTypedData(data.domain, types, data.message);
-    }
-    throw new Error(`Unexpected fixture wallet method: ${method}`);
-  });
   await context.addInitScript(
-    ({ address, appOrigin }) => {
+    ({ seed, appOrigin }) => {
       if (location.origin !== appOrigin) return;
       localStorage.setItem('ce_onboarding_complete', 'true');
-      window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ = (...enhancers) => {
-        const compose = enhancers.length
-          ? enhancers.reduce(
-              (left, right) =>
-                (...args) =>
-                  left(right(...args)),
-            )
-          : (value) => value;
-        return (createStore) =>
-          (...args) => {
-            const store = compose(createStore)(...args);
-            store.dispatch({
-              type: 'LOGIN_ACCOUNT',
-              payload: {
-                account: address,
-                provider: 'web3auth',
-                network: {
-                  chainId: 11155420,
-                  id: 11155420,
-                  name: 'OP Sepolia',
-                },
-              },
-            });
-            store.dispatch({
-              type: 'LOGIN_IN_PROGRESS',
-              payload: {
-                loginComplete: true,
-                loginInProgress: false,
-                provider: 'web3auth',
-              },
-            });
-            return store;
-          };
+      const bytes = (value) => {
+        const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+        return Uint8Array.from(atob(base64 + '='.repeat((4 - base64.length % 4) % 4)), (char) => char.charCodeAt(0));
       };
-      window.web3authProvider = {
-        isWeb3Auth: true,
-        request: (args) => window.__ceSetupWalletRequest(args),
+      const credential = {
+        rawId: bytes(seed.credentialId).buffer,
+        getClientExtensionResults: () => ({ prf: { enabled: true, results: { first: bytes(seed.prfOutput).buffer } } }),
       };
+      Object.defineProperty(navigator, 'credentials', {
+        configurable: true,
+        value: { create: async () => credential, get: async () => credential },
+      });
     },
-    { address: wallet.address, appOrigin: new URL(baseUrl).origin },
+    { seed, appOrigin: new URL(baseUrl).origin },
   );
   await context.route('**/*', async (route) => {
     const request = route.request();
@@ -135,11 +104,20 @@ const fixtureContext = async (wallet) => {
   });
   return context;
 };
+const login = async (page, wallet) => {
+  await page.getByTestId('ce-account-login-button').click();
+  await page.getByTestId('ce-passkey-wallet-create').click();
+  const display = page.getByTestId('ce-wallet-display');
+  await display.waitFor();
+  assert.equal((await display.getAttribute('data-ce-wallet-address')).toLowerCase(), wallet.address.toLowerCase());
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+};
 let page;
 try {
-  const adminContext = await fixtureContext(admin);
+  const adminContext = await fixtureContext(adminFixture);
   page = await adminContext.newPage();
   await page.goto(`${baseUrl}/new`, { waitUntil: 'domcontentloaded' });
+  await login(page, admin);
   await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').click();
   await page.getByTestId('ce-wizard-session-name').fill('Setup smoke session');
   await page.getByTestId('ce-wizard-session-info').fill('Synthetic publication and participant fixture.');
@@ -203,10 +181,12 @@ try {
       { name: 'CE-ResourceId', value: question.id },
     ],
   });
-  const participant = ethers.Wallet.createRandom();
-  const participantContext = await fixtureContext(participant);
+  const participantFixture = passkeyFixture('participant');
+  const participant = participantFixture.wallet;
+  const participantContext = await fixtureContext(participantFixture);
   page = await participantContext.newPage();
   await page.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' });
+  await login(page, participant);
   await page.getByText(question.record.prompt, { exact: true }).first().waitFor();
   const answer = 'Agree';
   await page.getByTestId('ce-pile-active-question').getByText(answer, { exact: true }).click();

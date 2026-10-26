@@ -82,6 +82,24 @@ test('E2E smoke timeout leaves room for Playwright installation and execution', 
   assert.match(e2eJob, /timeout-minutes: 20/);
 });
 
+test('E2E gate runs publication with isolated Worker dependencies and diagnostics', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
+  const e2eJob = workflow.slice(workflow.indexOf('  e2e-smoke:'), workflow.indexOf('  cecc-and-node:'));
+  const gates = JSON.parse(fs.readFileSync(path.join(rootDir, 'scripts/ci-gates.json'), 'utf8'));
+  const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+
+  assert.deepEqual(gates.gates['e2e-smoke'].commands.map(({ args }) => args), [
+    ['run', 'test:e2e:smoke'],
+    ['run', 'test:e2e:publish'],
+  ]);
+  assert.equal(manifest.scripts['test:e2e:publish'], 'node scripts/session-setup-publish-smoke.mjs');
+  assert.match(e2eJob, /workers\/sessionCorsWorker\/package-lock\.json/);
+  assert.match(e2eJob, /npm --prefix workers\/sessionCorsWorker ci/);
+  assert.match(e2eJob, /OUTPUT_DIR: \/tmp\/context-engine-publication-smoke/);
+  assert.match(e2eJob, /path: \|\s+\/tmp\/context-engine-vite-preview\.log\s+\/tmp\/context-engine-publication-smoke\//);
+});
+
 test('Context Engine CC and Node gate installs client parser dependencies', () => {
   const rootDir = path.resolve(__dirname, '..');
   const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
