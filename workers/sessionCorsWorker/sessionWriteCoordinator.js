@@ -71,6 +71,7 @@ const RESULTS_ANALYSIS_RECORD_KEY = 'results-analysis-v1';
 const RESULTS_ANALYSIS_DRAFT_KEY = 'results-analysis-draft-v1';
 const RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX = 'results-analysis-draft-v1:chunk:';
 const RESULTS_ANALYSIS_AUTO_JOB_KEY = 'results-analysis-auto-job-v1';
+const RESULTS_ANALYSIS_UPLOAD_PREFIX = 'results-analysis-upload-v1:';
 const UPLOAD_RECEIPT_PREFIX = 'upload-receipt-v1:';
 const UPLOAD_RECEIPT_LEASE_MS = 120_000;
 const UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -716,27 +717,53 @@ export class SessionWriteCoordinator {
   async enqueueResultsAnalysisAutoJob(payload = {}) {
     const job = this.sanitizeResultsAnalysisAutoJob(payload);
     if (!job) return { ok: false, status: 400, error: 'Invalid results analysis auto job.' };
-    const existing = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-    if (isObjectRecord(existing) && existing.slug === job.slug) {
-      // New answers join a job waiting to retry; they do not reset its retry count.
-      if (existing.retryAttempt) job.retryAttempt = existing.retryAttempt;
-      const byId = new Map();
-      for (const entry of [...(Array.isArray(existing.committedResponses) ? existing.committedResponses : []), ...job.committedResponses]) {
-        const key = toTrimmedString(entry?.metadata?.id) || `${toTrimmedString(entry?.metadata?.responder)}:${toTrimmedString(entry?.metadata?.createdAt)}`;
-        if (key) byId.set(key, entry);
+    const nowMs = Number(this.now()) || Date.now();
+    const uploadKey = job.requestId.startsWith('auto-upload:') ? `${RESULTS_ANALYSIS_UPLOAD_PREFIX}${job.requestId}` : '';
+    const result = await this.state.storage.transaction(async (transaction) => {
+      // Persist enqueue and its receipt together, so a lost reply or completed
+      // job cannot turn an upload replay into a second analysis request.
+      if (uploadKey && (await transaction.get(uploadKey))?.expiresAt > nowMs) {
+        return { ok: true, status: 200, replayed: true, queued: !!(await transaction.get(RESULTS_ANALYSIS_AUTO_JOB_KEY)) };
       }
-      job.committedResponses = [...byId.values()].slice(-12);
-      job.queuedAtMs = Number(existing.queuedAtMs || 0) || job.queuedAtMs;
+      const existing = await transaction.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+      if (isObjectRecord(existing) && existing.slug === job.slug) {
+        // New answers join a job waiting to retry; they do not reset its retry count.
+        if (existing.retryAttempt) job.retryAttempt = existing.retryAttempt;
+        const byId = new Map();
+        for (const entry of [...(Array.isArray(existing.committedResponses) ? existing.committedResponses : []), ...job.committedResponses]) {
+          const key = toTrimmedString(entry?.metadata?.id) || `${toTrimmedString(entry?.metadata?.responder)}:${toTrimmedString(entry?.metadata?.createdAt)}`;
+          if (key) byId.set(key, entry);
+        }
+        job.committedResponses = [...byId.values()].slice(-12);
+        job.queuedAtMs = Number(existing.queuedAtMs || 0) || job.queuedAtMs;
+      }
+      if (byteLength(JSON.stringify(job)) > RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES) {
+        job.committedResponses = job.committedResponses.slice(-4);
+      }
+      if (byteLength(JSON.stringify(job)) > RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES) {
+        return { ok: false, status: 413, error: 'Results analysis auto job is too large.' };
+      }
+      await transaction.put(RESULTS_ANALYSIS_AUTO_JOB_KEY, job);
+      if (uploadKey) await transaction.put(uploadKey, { expiresAt: nowMs + UPLOAD_RECEIPT_RETENTION_MS });
+      return { ok: true, status: 202, queued: true };
+    });
+    const scheduled = result.ok && result.queued ? await this.scheduleResultsAnalysisAlarm(1_000) : false;
+    return { ...result, scheduled };
+  }
+
+  async pruneResultsAnalysisUploadReceipts() {
+    const nowMs = Number(this.now()) || Date.now();
+    const nextExpiry = await this.state.storage.transaction(async (transaction) => {
+      let next = Infinity;
+      for (const [key, record] of await transaction.list({ prefix: RESULTS_ANALYSIS_UPLOAD_PREFIX })) {
+        if (record.expiresAt <= nowMs) await transaction.delete(key);
+        else next = Math.min(next, record.expiresAt);
+      }
+      return next;
+    });
+    if (Number.isFinite(nextExpiry) && !await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY)) {
+      await this.scheduleResultsAnalysisAlarm(nextExpiry - nowMs);
     }
-    if (byteLength(JSON.stringify(job)) > RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES) {
-      job.committedResponses = job.committedResponses.slice(-4);
-    }
-    if (byteLength(JSON.stringify(job)) > RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES) {
-      return { ok: false, status: 413, error: 'Results analysis auto job is too large.' };
-    }
-    await this.state.storage.put(RESULTS_ANALYSIS_AUTO_JOB_KEY, job);
-    const scheduled = await this.scheduleResultsAnalysisAlarm(1_000);
-    return { ok: true, status: 202, queued: true, scheduled };
   }
 
   async recordResultsAnalysisQueueFailure(error, job) {
@@ -846,6 +873,7 @@ export class SessionWriteCoordinator {
     } catch (error) {
       await this.recordResultsAnalysisQueueFailure(error);
     }
+    await this.pruneResultsAnalysisUploadReceipts();
   }
 
   async readResultsAnalysisStatus() {

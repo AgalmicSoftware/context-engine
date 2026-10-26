@@ -1691,7 +1691,9 @@ R2 / Durable Objects:
   nonempty `requestId` of at most 200 characters use per-participant receipts.
   Once the payload and index are written and the receipt settles, sending that
   request id with identical plaintext bytes returns the original `id` and
-  `storageRef` with `replayed: true`, without writing or queuing analysis again.
+  `storageRef` with `replayed: true`, without writing again. A replay also ensures
+  analysis was queued; a durable enqueue receipt prevents duplicate jobs, including
+  after a lost settlement reply or after the first job finished.
   Different content under a settled request id returns `409 upload_request_conflict`.
   An active reservation returns retryable `503 upload_in_progress` for 120 seconds;
   an expired reservation permits a new attempt with a fresh storage id, so a crashed

@@ -2920,3 +2920,25 @@ test('upload receipt writes prune the oldest settlements and expire them after s
   assert.equal(expired.kind, 'execute');
   assert.equal(store.size, 1);
 });
+
+
+test('automatic upload enqueue is idempotent across completion and restarts', async () => {
+  let now = 1_000;
+  const { state, store } = createTransactionalState();
+  let runs = 0;
+  const deps = { now: () => now, runResultsAnalysisAutoJob: async () => { runs += 1; return { ok: true }; } };
+  const first = new SessionWriteCoordinator(state, {}, deps);
+  const restarted = new SessionWriteCoordinator(state, {}, deps);
+  const job = { slug: 'session-a', requestId: 'auto-upload:stored-response' };
+  const results = await Promise.all([first.enqueueResultsAnalysisAutoJob(job), restarted.enqueueResultsAnalysisAutoJob(job)]);
+  assert.equal(results.filter((result) => result.replayed).length, 1);
+  await first.alarm();
+  assert.equal(runs, 1);
+  assert.equal(store.has('results-analysis-auto-job-v1'), false);
+  assert.equal((await restarted.enqueueResultsAnalysisAutoJob(job)).replayed, true);
+  await restarted.alarm();
+  assert.equal(runs, 1);
+  now += 7 * 24 * 60 * 60 * 1000 + 1;
+  await restarted.alarm();
+  assert.equal([...store.keys()].some((key) => key.startsWith('results-analysis-upload-v1:')), false);
+});

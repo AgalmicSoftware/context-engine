@@ -142,6 +142,7 @@ test('automatic analysis checks its pause state before any storage scan', async 
 test('automatic capacity failure is recorded and later uploads do not rescan or replace the last good report', async () => {
   const values = new Map();
   const storage = { get: async (key) => structuredClone(values.get(key)), put: async (key, value) => values.set(key, structuredClone(value)),
+    list: async ({ prefix = '' } = {}) => new Map([...values].filter(([key]) => key.startsWith(prefix))),
     delete: async (key) => values.delete(key), transaction: async (callback) => callback(storage), setAlarm: async () => {} };
   const env = {};
   let providerCalls = 0;
@@ -199,6 +200,7 @@ test('unreadable latest answer metadata cannot silently select the participant o
 test('queued and manual analysis both honor the authoritative AI policy over a stale KV projection', async () => {
   const values = new Map();
   const storage = { get: async (key) => structuredClone(values.get(key)), put: async (key, value) => values.set(key, structuredClone(value)),
+    list: async ({ prefix = '' } = {}) => new Map([...values].filter(([key]) => key.startsWith(prefix))),
     delete: async (key) => values.delete(key), transaction: async (callback) => callback(storage), setAlarm: async () => {} };
   const enabled = { ...config, slug: 'session-a' };
   values.set('session-config-authority', { schemaVersion: 1, slug: 'session-a', revision: 2, config: { ...enabled, scopes: { ai: false } }, projectionPending: false });

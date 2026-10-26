@@ -1474,6 +1474,30 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     }
   }
 
+  const enqueueResponseAnalysis = async (id, metadata, bytesToStore) => {
+    if (resource !== 'responses') return;
+    const enqueueAutomatic = deps?.enqueueResultsAnalysisAutoJob;
+    if (typeof enqueueAutomatic === 'function') {
+      let committedPayload = null;
+      try { committedPayload = JSON.parse(decoder.decode(bytesToStore || new Uint8Array())); } catch { committedPayload = null; }
+      const committedResponses = committedPayload && typeof committedPayload === 'object'
+        ? [{ metadata, payload: committedPayload }]
+        : [];
+      await enqueueAutomatic({
+        env,
+        slug,
+        config,
+        job: {
+          slug,
+          requestId: `auto-upload:${id}`,
+          committedResponses,
+        },
+      }).catch((error) => {
+        deps?.log?.warn?.('[results-analysis] auto enqueue failed', { slug, error: error?.message || String(error || '') });
+      });
+    }
+  };
+
   const requestId = trim(payload.requestId);
   let uploadReceipt = null;
   if (resource === 'responses' && uploader && requestId && requestId.length <= 200) {
@@ -1481,6 +1505,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     const payloadDigest = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
     uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve', payload: { requestId, payloadDigest } });
     if (uploadReceipt?.kind === 'replay') {
+      await enqueueResponseAnalysis(uploadReceipt.storageRef.id);
       return responseJson(deps, { id: uploadReceipt.storageRef.id, storageRef: uploadReceipt.storageRef, replayed: true }, 200, baseHeaders);
     }
     if (uploadReceipt && uploadReceipt.kind !== 'execute') {
@@ -1622,28 +1647,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     });
     if (!settled?.ok) return responseJson(deps, { error: 'Upload settlement is unavailable; retry.', reason: 'upload_receipt_unavailable' }, 503, baseHeaders);
   }
-  if (resource === 'responses') {
-    const enqueueAutomatic = deps?.enqueueResultsAnalysisAutoJob;
-    if (typeof enqueueAutomatic === 'function') {
-      let committedPayload = null;
-      try { committedPayload = JSON.parse(decoder.decode(bytesToStore || new Uint8Array())); } catch { committedPayload = null; }
-      const committedResponses = committedPayload && typeof committedPayload === 'object'
-        ? [{ metadata, payload: committedPayload }]
-        : [];
-      await enqueueAutomatic({
-        env,
-        slug,
-        config,
-        job: {
-          slug,
-          requestId: `auto-upload:${id}`,
-          committedResponses,
-        },
-      }).catch((error) => {
-        deps?.log?.warn?.('[results-analysis] auto enqueue failed', { slug, error: error?.message || String(error || '') });
-      });
-    }
-  }
+  await enqueueResponseAnalysis(id, metadata, bytesToStore);
   return responseJson(deps, {
     id,
     storageRef,

@@ -16,7 +16,7 @@ import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
 import { createEthersInterfaceProviderGateHelpersWithWorkerDeps } from './ethersInterfaceProviderGateBinding.js';
 import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
 import { addWorkerGroupMember, createWorkerGroup, deleteWorkerGroup, readWorkerGroupMembershipProjection } from './workerGroups.js';
-import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
+import { SessionWriteCoordinator, enqueueCoordinatedResultsAnalysisAutoJob } from './sessionWriteCoordinator.js';
 import { resolveWorkerCanonicalLoginScopes } from './workerCanonicalAuthority.js';
 import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
 
@@ -4801,7 +4801,12 @@ const createResponseReceiptFixture = ({ binding = true } = {}) => {
   if (binding) attachSessionCoordinator(env, () => {}, { now: () => now });
   const queued = [];
   const deps = { json, randomBytes: createSequenceRandomBytes(), now: () => now,
-    enqueueResultsAnalysisAutoJob: async (job) => queued.push(job),
+    enqueueResultsAnalysisAutoJob: async (args) => {
+      if (!binding) { queued.push(args); return; }
+      const result = await enqueueCoordinatedResultsAnalysisAutoJob(args);
+      if (result.ok && !result.replayed) queued.push(args);
+      return result;
+    },
   };
   const upload = (requestId = 'answer:v1:operation:q1', data = { questionID: 'q1', answer: { value: 'Agree' } }, address = '0x1111111111111111111111111111111111111111') => storageRoute({
     path: '/storage/upload', method: 'POST', env, config, slug: 'session-a', uploaderAddress: address, authScopes: { storage: true }, baseHeaders: {}, deps,
@@ -4877,6 +4882,9 @@ test('a lost settlement reply retries to the original saved response', async () 
   const replay = await (await f.upload()).json();
   assert.equal(replay.replayed, true);
   assert.deepEqual([...f.kv.store], snapshot);
+  assert.equal(f.queued.length, 1, 'the replay queues the saved response for analysis');
+  assert.equal((await f.upload()).status, 200);
+  assert.equal(f.queued.length, 1, 'another replay does not enqueue again');
 });
 
 test('legacy response uploads without a binding or a bounded request id retain their behavior', async () => {
