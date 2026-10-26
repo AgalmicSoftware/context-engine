@@ -1222,4 +1222,5 @@ The compact question-actions menu labels its controls **Filter questions**,
 selecting an action, clicking outside, or pressing Escape dismisses the menu.
 
 In the expanded question-card rating controls, Conviction and Importance each
-show their value directly beside the label.
+show their value directly beside the label. For quadratic questions, these
+expanded controls sit below the centered option-scroll arrows.

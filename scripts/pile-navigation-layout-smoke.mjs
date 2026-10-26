@@ -8,9 +8,11 @@ import { chromium } from 'playwright';
 const base = process.env.BASE_URL || 'http://127.0.0.1:3000';
 const sessions = JSON.parse(readFileSync(new URL('../client/src/variables/demo/demo_sessions.json', import.meta.url)));
 const config = sessions['demo-sh'];
+const quadratic = process.env.SMOKE_QUADRATIC === '1';
 const questions = Array.from({ length: 50 }, (_, index) => ({
-  id: `0x${String(index + 1).padStart(64, '0')}`, type: 'binary',
-  prompt: `Synthetic navigation question ${index + 1}`, options: [], tags: [],
+  id: `0x${String(index + 1).padStart(64, '0')}`, type: quadratic && index === 0 ? 'quadratic' : 'binary',
+  prompt: `Synthetic navigation question ${index + 1}`,
+  options: quadratic && index === 0 ? Array.from({ length: 8 }, (_, option) => `Synthetic allocation option ${option + 1}`) : [], tags: [],
   sessionSlug: 'demo-sh', sessionId: config.sessionId,
 }));
 const browser = await chromium.launch({ headless: true });
@@ -145,6 +147,8 @@ try {
         return layout;
       };
       await inspect(1);
+      const optionArrows = page.getByTestId('ce-quadratic-scroll-more').locator('..');
+      const arrowsBefore = quadratic ? await optionArrows.boundingBox() : null;
       const ratingToggle = page.getByRole('button', { name: 'Conviction / importance', exact: true });
       await ratingToggle.click();
       for (const label of ['Conviction', 'Importance']) {
@@ -156,6 +160,23 @@ try {
           return { gap: b.left - a.right, centerOffset: Math.abs((a.top + a.bottom - b.top - b.bottom) / 2) };
         });
         assert(spacing.gap >= 0 && spacing.gap <= 12 && spacing.centerOffset <= 1, `${label} value sits beside its label: ${JSON.stringify(spacing)}`);
+      }
+      if (quadratic) {
+        const geometry = await optionArrows.evaluate(arrows => {
+          const footer = arrows.parentElement.parentElement;
+          const ratings = footer.querySelector('[class*="importanceSlider"]');
+          const a = arrows.getBoundingClientRect(), f = footer.getBoundingClientRect(), r = ratings.getBoundingClientRect();
+          return { center: a.x + a.width / 2, footerCenter: f.x + f.width / 2, arrowBottom: a.bottom, ratingTop: r.top };
+        });
+        assert(Math.abs(geometry.center - geometry.footerCenter) < 1, 'Quadratic arrows stay centered in the footer');
+        assert(Math.abs(geometry.center - arrowsBefore.x - arrowsBefore.width / 2) < 1, 'Opening ratings does not move arrows horizontally');
+        assert(geometry.ratingTop >= geometry.arrowBottom + 4, 'Expanded conviction and importance sit below the arrows');
+        const more = page.getByTestId('ce-quadratic-scroll-more');
+        const answersBefore = await page.getByTestId('ce-quadratic-allocation').locator('input[type="range"]').evaluateAll(inputs => inputs.map(input => input.value));
+        await more.click();
+        await page.getByRole('button', { name: 'Scroll to previous options', exact: true }).waitFor();
+        assert.deepEqual(await page.getByTestId('ce-quadratic-allocation').locator('input[type="range"]').evaluateAll(inputs => inputs.map(input => input.value)), answersBefore, 'Option arrows preserve allocations');
+        if (process.env.OUTPUT_DIR) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-quadratic-ratings.png` });
       }
       for (let index = 2; index <= 20; index += 1) await next.click();
       const before = await inspect(20);
@@ -178,7 +199,7 @@ try {
         if (process.env.OUTPUT_DIR) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-pending-11.png` });
       }
       console.log(`PASS pile navigation: ${theme} ${width}, 20 / 50, forward/back, and pending draft`);
-      if (theme === 'civic' && width === 390) {
+      if (!quadratic && theme === 'civic' && width === 390) {
         const catalog = normalizePublicInterviewQuestions(questions).sort((a, b) => a.id.localeCompare(b.id));
         const questionSetHash = createHash('sha256').update(JSON.stringify(catalog)).digest('hex');
         const packet = { version: 1, sessionSlug: 'demo-sh', questionSetHash, promptVersion: 'ce-interview-brief-v5',
