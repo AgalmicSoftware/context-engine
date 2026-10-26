@@ -97,3 +97,8 @@ part of the public naming contract.
 Group-password derivation lives in `shared/crypto/groupPasswordDerivation.cjs`.
 The client, MCP and local SBT scripts pass their ethers v5 instance into this
 shared WebCrypto implementation.
+
+The SIWE wire format and canonical session-ID normalization live in
+`shared/auth/siweMessage.mjs`, with no ethers dependency. Browser and MCP
+adapters supply their own clock and origin defaults; conformance tests check
+both against the Session Worker parser and validator.

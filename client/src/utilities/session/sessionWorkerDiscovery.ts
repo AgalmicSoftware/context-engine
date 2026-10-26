@@ -1,3 +1,4 @@
+import { normalizeSessionIdHex } from '@ce-shared/auth/siweMessage.mjs';
 type UnknownRecord = Record<string, unknown>;
 
 import { classifySessionModeProfileSupport, type SessionModeProfile } from './sessionModeProfile';
@@ -387,17 +388,7 @@ const validateExactSlug = (value: unknown, label: string): string => {
   return value;
 };
 
-export const normalizeWorkerCanonicalSessionIdHex = (value: unknown): string => {
-  if (typeof value !== 'string' || value !== value.trim()) return '';
-  const lower = value.toLowerCase();
-  const hex = lower.startsWith('0x') ? lower.slice(2) : lower;
-  if (/^[0-9a-f]{32}$/.test(hex) && !/^0+$/.test(hex)) return `0x${hex}`;
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(lower)) {
-    const uuidHex = lower.replace(/-/g, '');
-    return /^0+$/.test(uuidHex) ? '' : `0x${uuidHex}`;
-  }
-  return '';
-};
+export const normalizeWorkerCanonicalSessionIdHex = (value: unknown): string => normalizeSessionIdHex(value);
 
 export const resolveWorkerCanonicalSessionIdHex = (value: unknown): string => {
   if (!isRecord(value)) return '';

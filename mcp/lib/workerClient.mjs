@@ -1,3 +1,4 @@
+import { buildSiweMessage as buildSharedSiweMessage, normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
 import { describeTestEthOffer } from '../../shared/sessions/testEthOffer.mjs';
 
 // HTTP client for one Worker-hosted session, signing in exactly as the web
@@ -71,18 +72,7 @@ const readLimitedText = async (response, maxBytes = MAX_RESPONSE_BYTES) => {
   return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf8');
 };
 
-/** Same rules as client/src/utilities/session/sessionWorkerDiscovery.ts normalizeWorkerCanonicalSessionIdHex. */
-export const normalizeSessionIdHex = (value) => {
-  if (typeof value !== 'string' || value !== value.trim()) return '';
-  const lower = value.toLowerCase();
-  const hex = lower.startsWith('0x') ? lower.slice(2) : lower;
-  if (/^[0-9a-f]{32}$/.test(hex) && !/^0+$/.test(hex)) return `0x${hex}`;
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(lower)) {
-    const uuidHex = lower.replace(/-/g, '');
-    return /^0+$/.test(uuidHex) ? '' : `0x${uuidHex}`;
-  }
-  return '';
-};
+export { normalizeSessionIdHex };
 
 /** Same rules as resolveWorkerCanonicalSessionIdHex: sessionId and sessionIdHex must agree. */
 export const resolveSessionIdHex = (config) => {
@@ -100,14 +90,12 @@ export const resolveSessionIdHex = (config) => {
   return sessionId || sessionIdHex;
 };
 
-/** Mirrors client/src/utilities/worker/workerAuth.ts buildSiweMessage. */
-export const buildSiweMessage = ({ address, nonce, appOrigin, workerOrigin, sessionId, sessionSlug = '', issuedAt, expirationTime, chainId = 1 }) => {
-  const { host } = new URL(appOrigin);
-  const resource = sessionId
-    ? `urn:context-engine:session:id:${encodeURIComponent(sessionId)}`
-    : `urn:context-engine:session:slug:${encodeURIComponent(sessionSlug === 'general' ? '' : sessionSlug)}`;
-  return `${host} wants you to sign in with your Ethereum account:\n${address}\n\nSign in to Context Engine.\n\nURI: ${appOrigin}\nVersion: 1\nChain ID: ${chainId}\nNonce: ${nonce}\nIssued At: ${issuedAt}\nExpiration Time: ${expirationTime}\nResources:\n- ${workerOrigin}\n- ${resource}`;
-};
+export const buildSiweMessage = ({ address, nonce, appOrigin, workerOrigin, sessionId, sessionSlug = '', issuedAt, expirationTime, chainId = 1 }) =>
+  buildSharedSiweMessage({
+    address, nonce, domain: new URL(appOrigin).host, uri: appOrigin,
+    workerUrl: workerOrigin, sessionId, sessionSlug, issuedAt, expirationTime, chainId,
+    statement: 'Sign in to Context Engine.',
+  });
 
 export const decodeTokenClaims = (token) => {
   try {
