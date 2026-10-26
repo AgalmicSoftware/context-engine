@@ -498,6 +498,13 @@ try {
   adminUrl.searchParams.set('worker', workerOrigin);
   await page.goto(adminUrl.href, { waitUntil: 'domcontentloaded' });
   await page.getByTestId('ce-admin-session-backup').waitFor();
+  const diagnostics = page.getByTestId('ce-admin-session-diagnostics');
+  await diagnostics.getByTestId('ce-admin-diagnostics-refresh').click();
+  await diagnostics.getByText('Settled upload receipts', { exact: true }).waitFor();
+  const diagnosticValue = (label) => diagnostics.locator('dt').filter({ hasText: label }).locator('+ dd').innerText();
+  assert.equal(await diagnosticValue('Pending upload leases'), '0');
+  assert.equal(await diagnosticValue('Settled upload receipts'), '9', 'Diagnostics count all nine settled answers across five participants');
+  assert.equal(await diagnosticValue('Config projection repair'), 'Not pending');
   const downloaded = page.waitForEvent('download', { timeout: 120000 });
   await page.getByTestId('ce-admin-backup-download').click();
   const backupPath = `${outputDir}/session-backup.jsonl`;
@@ -514,6 +521,7 @@ try {
   for (const theme of ['context-engine', 'classic-95', 'civic']) {
     await page.evaluate((value) => document.documentElement.setAttribute('data-ce-theme', value), theme);
     await page.getByTestId('ce-admin-session-backup').screenshot({ path: `${outputDir}/admin-backup-${theme}.png` });
+    await diagnostics.screenshot({ path: `${outputDir}/admin-diagnostics-${theme}.png` });
   }
   await page.evaluate((value) => value ? document.documentElement.setAttribute('data-ce-theme', value) : document.documentElement.removeAttribute('data-ce-theme'), originalTheme);
   console.log('Admin downloaded a complete JSONL backup and restored it idempotently through signed requests.');
@@ -566,6 +574,7 @@ try {
           'three concurrent two-tab bookmark pairs survive reload',
           'explicit submit readiness refusal retains the draft without uploading',
           'admin JSONL download and idempotent signed restore',
+          'admin diagnostics across five participant receipt stores',
           'confirmed masked recovery-key download without browser persistence',
           'backup and recovery-key screenshots in all three themes',
         ],

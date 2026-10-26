@@ -40,6 +40,8 @@
   "PAGE_BENCHMARKS_ROOT": "ce-page-benchmarks-root",
   "PAGE_ADMIN_ROOT": "ce-page-admin-root",
   "ADMIN_WORKER_CAPABILITIES": "ce-admin-worker-capabilities",
+  "ADMIN_SESSION_DIAGNOSTICS": "ce-admin-session-diagnostics",
+  "ADMIN_DIAGNOSTICS_REFRESH": "ce-admin-diagnostics-refresh",
   "ADMIN_SESSION_BACKUP": "ce-admin-session-backup",
   "ADMIN_BACKUP_DOWNLOAD": "ce-admin-backup-download",
   "ADMIN_BACKUP_FILE": "ce-admin-backup-file",

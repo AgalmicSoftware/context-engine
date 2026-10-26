@@ -1,4 +1,5 @@
 import { controlCoordinatorBackupImport } from './sessionBackupLifecycle.js';
+import { registerUploadReceiptStore, dispatchUploadReceiptIndex, sweepUploadReceiptIndex } from './sessionDiagnostics.js';
 import { bumpStorageBackupRevision } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
@@ -454,6 +455,7 @@ export class SessionWriteCoordinator {
     }
     const secret = toTrimmedString(this.env?.TOKEN_HMAC_SECRET);
     if (!secret) return jsonResponse({ error: 'Upload receipt coordination is unavailable.', reason: 'upload_receipt_unavailable' }, 503);
+    await registerUploadReceiptStore(this, payload?.diagnostics);
     // Low-entropy answers must not be guessable from a copy of coordinator
     // storage. Neither the request ID nor an unsalted content digest is retained.
     const encoder = new TextEncoder();
@@ -491,6 +493,27 @@ export class SessionWriteCoordinator {
     await this.scheduleUploadReceiptCleanup();
     const { status, ...body } = result;
     return jsonResponse(body, status);
+  }
+
+  async readUploadReceiptDiagnostics() {
+    const nowMs = Number(this.now()) || Date.now();
+    let pendingLeases = 0;
+    let oldestPendingAgeMs = null;
+    let settledCount = 0;
+    let cursor = '';
+    for (;;) {
+      const records = await this.state.storage.list({ prefix: UPLOAD_RECEIPT_PREFIX, ...(cursor ? { startAfter: cursor } : {}), limit: 500 });
+      for (const record of records.values()) {
+        if (record.state === 'pending' && record.leaseUntil > nowMs) {
+          pendingLeases += 1;
+          oldestPendingAgeMs = Math.max(oldestPendingAgeMs ?? 0, nowMs - (record.leaseUntil - UPLOAD_RECEIPT_LEASE_MS));
+        }
+        if (record.state === 'settled' && nowMs - record.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settledCount += 1;
+      }
+      if (records.size < 500) break;
+      cursor = [...records.keys()].at(-1);
+    }
+    return jsonResponse({ pendingLeases, oldestPendingAgeMs, settledCount: Math.min(settledCount, MAX_UPLOAD_RECEIPTS) });
   }
 
   serializeSessionConfigOperation(operation) {
@@ -574,6 +597,8 @@ export class SessionWriteCoordinator {
       active: isObjectRecord(source.active) ? source.active : null,
       lastGood: isObjectRecord(source.lastGood) ? source.lastGood : null,
       lastFailure: isObjectRecord(source.lastFailure) ? source.lastFailure : null,
+      lastAutomaticSuccessAtMs: Number(source.lastAutomaticSuccessAtMs) ||
+        (source.lastGood?.trigger === 'automatic' ? Number(source.lastGood.completedAtMs) || null : null),
       requests,
     };
   }
@@ -806,7 +831,8 @@ export class SessionWriteCoordinator {
         requestId: toTrimmedString(job?.requestId ?? queued?.requestId),
         trigger: 'automatic',
         failedAtMs: nowMs,
-        ...(delayMs ? { retryAttempt, nextAttemptAtMs: nowMs + delayMs } : {}),
+        retryAttempt: delayMs ? retryAttempt : Number(queued?.retryAttempt) || 0,
+        ...(delayMs ? { nextAttemptAtMs: nowMs + delayMs } : {}),
         ...(retryable && !delayMs ? { retriesExhausted: true } : {}),
       };
       if (delayMs) {
@@ -890,6 +916,7 @@ export class SessionWriteCoordinator {
   }
 
   async alarm() {
+    if (await sweepUploadReceiptIndex(this)) return;
     try {
       await this.runQueuedResultsAnalysisAutoJob();
     } catch (error) {
@@ -1045,6 +1072,7 @@ export class SessionWriteCoordinator {
           sections: Array.isArray(draft.sections) ? draft.sections : [],
           completedAtMs: nowMs,
         };
+        if (active.trigger === 'automatic') record.lastAutomaticSuccessAtMs = nowMs;
         record.lastFailure = null;
         if (requestId) record.requests[requestId] = { state: 'succeeded', draftId, updatedAtMs: nowMs };
       } else {
@@ -2101,6 +2129,31 @@ export class SessionWriteCoordinator {
     }
   }
 
+  async executeSessionDiagnostics(payload) {
+    const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+    if (!slug) return jsonResponse({ error: 'Invalid session slug.' }, 400);
+    // Diagnostics must inspect a failed projection without repairing it first.
+    // The HTTP boundary still checks identity, auth epoch and the current admin
+    // against this durable authority, never a potentially stale KV projection.
+    const authority = await this.readSessionConfigAuthority(slug);
+    const record = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
+    const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+    const failure = record.lastFailure?.trigger === 'automatic' ? record.lastFailure : null;
+    return jsonResponse({
+      ok: true, config: authority?.config ?? null, revision: authority?.revision ?? 0,
+      analysis: {
+        lastSuccessAtMs: record.lastAutomaticSuccessAtMs,
+        retryAttempt: Number(queued?.retryAttempt ?? failure?.retryAttempt) || 0,
+        nextAttemptAtMs: queued ? Number(failure?.nextAttemptAtMs) || null : null,
+        retriesExhausted: failure?.retriesExhausted === true,
+      },
+      configProjection: {
+        pending: authority?.projectionPending === true,
+        sinceMs: authority?.projectionPending === true ? Number(authority.projectionPendingSinceMs) || null : null,
+      },
+    });
+  }
+
   async executeStoragePublication(payload) {
     return this.serializeSessionConfigOperation(async () => {
       try {
@@ -2147,10 +2200,9 @@ export class SessionWriteCoordinator {
     await this.state.storage.transaction(async (transaction) => {
       const current = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
       if (current?.revision !== revision || current?.projectionPending !== true) return;
-      await transaction.put(SESSION_CONFIG_AUTHORITY_KEY, {
-        ...current,
-        projectionPending: false,
-      });
+      const completed = { ...current, projectionPending: false };
+      delete completed.projectionPendingSinceMs;
+      await transaction.put(SESSION_CONFIG_AUTHORITY_KEY, completed);
     });
   }
 
@@ -2224,6 +2276,7 @@ export class SessionWriteCoordinator {
           config: nextConfig,
           activeSessionKey: chosen,
           projectionPending: true,
+          projectionPendingSinceMs: Number(this.now()) || Date.now(),
         };
         await transaction.put(SESSION_CONFIG_AUTHORITY_KEY, authority);
         return {
@@ -2315,6 +2368,7 @@ export class SessionWriteCoordinator {
           config: nextConfig,
           activeSessionKey,
           projectionPending: true,
+          projectionPendingSinceMs: Number(this.now()) || Date.now(),
         };
         await transaction.put(SESSION_CONFIG_AUTHORITY_KEY, authority);
         return { authority, config: nextConfig, project: true, skipPersistence: false };
@@ -2790,6 +2844,8 @@ export class SessionWriteCoordinator {
     const payload = await request.json().catch(() => null);
     if (url.pathname.startsWith('/upload-receipts/')) {
       if (url.hostname !== 'session-coordinator.internal') return jsonResponse({ error: 'Not found.' }, 404);
+      if (url.pathname.startsWith('/upload-receipts/index/')) return dispatchUploadReceiptIndex(this, url.pathname, payload);
+      if (url.pathname === '/upload-receipts/diagnostics') return this.readUploadReceiptDiagnostics();
       if (url.pathname === '/upload-receipts/reserve') return this.executeUploadReceipt(payload);
       if (url.pathname === '/upload-receipts/settle') return this.executeUploadReceipt(payload, true);
     }
@@ -2797,6 +2853,7 @@ export class SessionWriteCoordinator {
       return jsonResponse({ error: 'Not found.' }, 404);
     }
     if (url.pathname === '/session-config/current') return this.executeSessionConfigCurrent(payload);
+    if (url.pathname === '/session-config/diagnostics') return this.executeSessionDiagnostics(payload);
     if (url.pathname === '/session-config/recovery-key/export') {
       return this.serializeSessionConfigOperation(() => exportCoordinatorRecoveryKey(this, payload));
     }
@@ -3039,10 +3096,12 @@ export const coordinateResponseUploadReceipt = async ({ env, slug, responder, op
   if (!env?.CE_SESSION_COORDINATOR) return null;
   const unavailable = { status: 503, error: 'Upload receipt coordination is unavailable; retry.', reason: 'upload_receipt_unavailable' };
   try {
-    const stub = await resolveCoordinatorStub(env, `upload-receipts:${resolveCoordinatorSessionSlugStorageKey(slug)}:${toTrimmedString(responder).toLowerCase()}`);
+    const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+    const owner = await sha256Hex(`upload-receipts:${normalizedSlug}:${toTrimmedString(responder).toLowerCase()}`);
+    const stub = env.CE_SESSION_COORDINATOR.get(env.CE_SESSION_COORDINATOR.idFromName(owner));
     if (!stub?.fetch || !['reserve', 'settle'].includes(operation)) return unavailable;
     const response = await stub.fetch(`https://session-coordinator.internal/upload-receipts/${operation}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, diagnostics: { slug: normalizedSlug, owner } }),
     });
     const body = await response.json();
     if (!isObjectRecord(body) || (!response.ok && ![409, 503].includes(response.status))) return unavailable;

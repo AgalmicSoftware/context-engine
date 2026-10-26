@@ -2634,6 +2634,25 @@ Signed login/bootstrap requests:
   never caches transport failures; unavailable readiness expires within 30 seconds
   and pressing Submit rechecks it immediately. Only a definitive 404 or non-JSON
   reply identifies a legacy Worker.
+- `GET /admin/diagnostics?sessionSlug=<slug>[&cursor=<cursor>]` requires the same
+  current session token, identity/authorization-epoch checks, CORS policy, and
+  admin authority as the Results-analysis status endpoint. Replies are private,
+  uncached, and contain no secrets, participant addresses, payloads, or request IDs.
+  The Admin page's Session diagnostics card shows pending upload leases, their
+  oldest age, retained settled receipts, the last automatic-analysis success,
+  retry attempt/next attempt/exhaustion, and pending config projection repair
+  with its start time. A missing legacy repair timestamp is reported as unknown.
+  Diagnostics inspect the current durable authority without first repairing its
+  KV projection, so a failed repair remains visible and a removed admin cannot
+  use the stale projection to retain access.
+  Receipt counts are sampled from up to 25 participant coordinators per page;
+  `complete` and `cursor` distinguish partial totals, and the card can load more.
+  They cover the seven-day retention window, subject to the existing per-store
+  receipt cap, and may change while pages are read. Receipt stores register an
+  opaque coordinator name in a per-session index before admitting receipts,
+  renewing at most daily. An index failure refuses the receipt before upload.
+  Index entries expire after eight days; alarms remove at most 100 entries per
+  cleanup step. Neither the index nor its public counts include answer content.
 - `GET /resource-presence` with `X-Session-Slug`
   - Optional `?interview=1` adds `interview: { ready, reason? }` after checking the voice provider, server-side OpenAI key presence, session lifecycle, and anonymous realtime access. No key values are returned and no OpenAI request is made.
   - Validates the selected session and its browser-origin CORS policy.

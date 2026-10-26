@@ -411,8 +411,9 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       });
       }
 
-      if (routeSelection.kind === 'admin-results-analysis-status') {
+      if (routeSelection.kind === 'admin-results-analysis-status' || routeSelection.kind === 'admin-session-diagnostics') {
         return await dispatchAdminResultsAnalysisStatusRequest({
+          diagnostics: routeSelection.kind === 'admin-session-diagnostics',
           request,
           env,
           baseHeaders: routeBaseHeaders,

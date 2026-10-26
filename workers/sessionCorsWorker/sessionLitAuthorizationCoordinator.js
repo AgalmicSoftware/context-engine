@@ -147,6 +147,7 @@ export const executeLitAuthorizationFinalize = async (coordinator, payload) => {
       await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope: signerEnvelope });
       await transaction.put(CONFIG_RECORD, {
         ...existing, schemaVersion: 1, slug, revision, config: mutation.config, projectionPending: true,
+        projectionPendingSinceMs: coordinator.now(),
       });
       await transaction.put(SETUP_RECORD, { version: 1, slug, revision, envelope });
     });

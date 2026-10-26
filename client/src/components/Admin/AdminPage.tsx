@@ -53,6 +53,7 @@ import { resolveAdminAgentSessionWrappedWorkerOrigin } from './adminAgentSession
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
 import AdminStorageVisibilityPanel from './AdminStorageVisibilityPanel';
 import AdminWorkerCapabilities from './AdminWorkerCapabilities';
+import AdminSessionDiagnostics from './AdminSessionDiagnostics';
 import AdminSessionBackupPanel from './AdminSessionBackupPanel';
 import {
   getBackgroundResultsAnalysisUnsupportedReason,
@@ -2909,6 +2910,14 @@ const AdminPageRuntime = ({
         <AdminWorkerCapabilities
           workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
           sessionSlug={normalizeSlug(selectedSlug)}
+        />
+        <AdminSessionDiagnostics
+          workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
+          sessionSlug={normalizeSlug(selectedSlug)}
+          sessionId={signedWorkerSessionId}
+          account={account}
+          canAdminWorker={canAdminWorker}
+          workerAuthContext={testContext}
         />
         <AdminSessionBackupPanel
           key={JSON.stringify([baseWorkerUrl || selectedConfigWorkerUrl, selectedSlug, signedWorkerSessionId, account])}

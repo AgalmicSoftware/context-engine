@@ -320,7 +320,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       if (!progress.counts.conflicts && !current) {
         progress.configPublished = true;
         await storage.transaction(async (transaction) => {
-          await transaction.put('session-config-authority', { ...authority, projectionPending: true });
+          await transaction.put('session-config-authority', { ...authority, projectionPending: true, projectionPendingSinceMs: coordinator.now() });
           await transaction.put(stateKey, progress);
         });
         await coordinator.projectSessionConfigAuthority(authority);

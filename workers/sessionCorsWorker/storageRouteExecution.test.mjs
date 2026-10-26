@@ -164,6 +164,7 @@ const attachSessionCoordinator = (env, setConfig, coordinatorDeps = {}) => {
 				let tail = Promise.resolve();
 				const storage = {
 					get: async (key) => structuredClone(values.get(key)),
+					put: async (key, value) => values.set(key, structuredClone(value)),
 					transaction: (callback) => {
 						const run = tail.then(async () => {
 							const staged = new Map([...values].map(([key, value]) => [key, structuredClone(value)]));

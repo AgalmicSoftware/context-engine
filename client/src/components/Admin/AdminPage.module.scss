@@ -1204,6 +1204,32 @@ $card-shadow: var(--ce-card-shadow);
   gap: 10px;
 }
 
+.diagnosticsCard {
+  background: var(--ce-control-face);
+  color: var(--ce-control-text);
+
+  .inlineResourceStatus {
+    color: var(--ce-control-text);
+  }
+
+  .actionButton:global(.btn) {
+    background: var(--ce-action-primary);
+    color: var(--ce-action-primary-text);
+  }
+
+  .actionButton:global(.btn:hover:not(:disabled)),
+  .actionButton:global(.btn:focus-visible) {
+    background: var(--ce-action-primary-hover);
+    color: var(--ce-action-primary-text);
+  }
+
+  .actionButton:global(.btn:disabled) {
+    background: var(--ce-control-disabled-bg);
+    color: var(--ce-control-disabled-text);
+    opacity: 1;
+  }
+}
+
 .inlineResourceBalance {
   font-size: 1.05rem;
   font-weight: 700;
