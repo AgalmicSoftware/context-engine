@@ -128,6 +128,7 @@ import {
 } from './sessionInterview';
 import { resolveInterviewDraftOrigin } from './sessionInterviewResearch';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
+import { confidenceMeaningOf } from '../../../../shared/interviewConfidence.mjs';
 import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
 
 // Crypto and contract utilities
@@ -1628,6 +1629,8 @@ export const recordInterviewProvenance = (
                   userEditedFields: reviewed.userEditedFields || [],
                   researchTier,
                   draftOrigin: resolveInterviewDraftOrigin(originalDraft, packet, normalizedSource),
+                  // Read by research without the AI provenance choice, which carries the prompt version.
+                  confidenceMeaning: confidenceMeaningOf(packet?.promptVersion || INTERVIEW_PROMPT_VERSION),
                   predictionCondition: reviewed.predictionCondition === 'blind' ? 'blind' : 'shown',
                   // A hidden draft keeps the answer given before its guess was shown.
                   ...(reviewed.predictionCondition === 'blind' && reviewed.revealedAt !== undefined

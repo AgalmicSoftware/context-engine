@@ -36,7 +36,12 @@ const recordFor = async (sessionConfig) => {
 
 it('records minimal detail by default and leaves out drafts for skipped questions', async () => {
   const record = await recordFor({ slug: 'demo' });
-  expect(record).toMatchObject({ researchTier: 'minimal', draftOrigin: 'external_prefill' });
+  // A v5 prefill asked for strength of support, not the chance of keeping the answer.
+  expect(record).toMatchObject({
+    researchTier: 'minimal',
+    draftOrigin: 'external_prefill',
+    confidenceMeaning: 'support',
+  });
   expect(record.unselectedDrafts).toBeUndefined();
 });
 
@@ -68,7 +73,11 @@ it('labels voice drafts that did not come from a prefill packet', async () => {
     { questionId: 'q1', answer: 'Agree', revisions: [{ revision: 1, modelId: 'gpt-realtime', answer: 'Agree' }] },
   ];
   await recordInterviewProvenance(engine, voiceDrafts, null, null, true, true, '', []);
-  expect(engine.state.surveysResponseState[0].interviewProvenance.q1.draftOrigin).toBe('voice_interview');
+  expect(engine.state.surveysResponseState[0].interviewProvenance.q1).toMatchObject({
+    draftOrigin: 'voice_interview',
+    // The in-app drafting prompt asks for the chance of keeping the answer.
+    confidenceMeaning: 'keep',
+  });
 });
 
 it('records minimal detail when that is what the participant was shown, even if the session now asks for full', async () => {
@@ -118,12 +127,14 @@ it('withdrawing research consent removes the tier and origin with the rest of th
       predictionCondition: 'blind',
       blindAnswer: 'Disagree',
       revealedAt: 1234,
+      confidenceMeaning: 'keep',
     },
     { includePredictionComparison: false },
   );
   expect(kept).toMatchObject({ includePredictionComparison: false });
   expect(kept).not.toHaveProperty('researchTier');
   expect(kept).not.toHaveProperty('draftOrigin');
-  for (const key of ['predictionCondition', 'blindAnswer', 'revealedAt']) expect(kept).not.toHaveProperty(key);
+  for (const key of ['predictionCondition', 'blindAnswer', 'revealedAt', 'confidenceMeaning'])
+    expect(kept).not.toHaveProperty(key);
   expect(kept).not.toHaveProperty('predictionComparison');
 });

@@ -120,6 +120,7 @@ Cloudflare encrypted-envelope export is a different route: `/storage/export-enve
 | `version` | AI provenance or draft-comparison sharing is included | Schema version for the submitted `interviewProvenance` object: `2` for draft comparisons that record `researchTier`, `1` otherwise and for older records. |
 | `researchTier` | Draft-comparison sharing is included (version 2) | `minimal` or `full`, from the session's `interviewMode.researchDetail` at review time. |
 | `draftOrigin` | Draft-comparison sharing is included (version 2) | Where the first prediction came from: `external_prefill` (a ChatGPT or Claude prefill packet), `voice_interview` or `typed_context`. |
+| `confidenceMeaning` | Draft-comparison sharing is included (version 2) | What the AI's `confidence` means: `keep`, the chance the person keeps the answer unchanged (prompt `ce-interview-brief-v6` and in-app drafting), or `support`, strength of support (earlier prompts). Kept with the research data, so calibration doesn't depend on the AI provenance choice. |
 | `predictionCondition` | Draft-comparison sharing is included (version 2) | `shown` when the AI's draft was in review, `blind` when it was hidden until the person answered ([Hidden drafts](#hidden-drafts)). |
 | `blindAnswer` | A hidden draft was answered (version 2) | The answer given before the AI's guess was shown; redacted like the answer when the answer is encrypted. |
 | `revealedAt` | A hidden draft was answered (version 2) | When the AI's guess was shown, in milliseconds since 1970. |
@@ -207,7 +208,7 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
           "modelId": "gpt-example",
           "verification": "self_reported"
         },
-        "promptVersion": "ce-interview-brief-v5",
+        "promptVersion": "ce-interview-brief-v6",
         "questionSetHash": "8b7f...",
         "originalPrediction": {
           "answer": "I expect model evaluations to miss deployment risks.",

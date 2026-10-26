@@ -246,6 +246,10 @@ All notable changes to this project will be documented in this file.
   after the answer, and research records keep `predictionCondition`, the answer
   from before the reveal and when it was shown. Anchoring now compares hidden
   drafts only with shown drafts from the same source.
+- Ask AI prefill and interview drafting for confidence as the chance the
+  person keeps the answer unchanged (prompt `ce-interview-brief-v6`), so it can
+  be calibrated. v4 and v5 links and catalogs still work; the fidelity report
+  calibrates only confidences with this meaning.
 
 ## [0.7.0] - 2026-10-21
 

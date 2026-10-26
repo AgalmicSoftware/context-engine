@@ -156,9 +156,11 @@ to response drafts. Imported context remains editable in a collapsed
 that context editor is absent, keeping the microphone as the primary action.
 Drafts may include comments,
 importance, and conviction only when the evidence explicitly supports them.
-Every generated draft also carries a confidence value from 0 to 1. The review
-panel labels this **AI-estimated confidence**, describing the AI’s estimate of
-how well the evidence supports its draft. It renders the estimate as weak
+Every generated draft also carries a confidence value from 0 to 1. From prompt
+version `ce-interview-brief-v6` it is the AI’s estimate of the chance the
+responder keeps the draft unchanged, which research can check against what they
+submit; earlier versions estimated how well the evidence supports the draft. The
+review panel labels it **AI-estimated confidence** and renders it as weak
 inference (0–39%), moderate support (40–69%), or strong support (70–100%) so a responder can keep, edit, or reject tentative answers
 instead of losing useful low-confidence signal.
 If the evidence cannot support any session answer, the modal says that there
@@ -298,11 +300,13 @@ credential and is carried in `#prefill=...`, so it
 is not sent to the web host as an HTTP request target. The fragment is still
 intentionally readable by scripts on the destination page, which is why source
 identifiers are forbidden and the exact JSON is shown first. The current catalog prompt version is
-`ce-interview-brief-v5`. The copied request accepts a catalog with type
+`ce-interview-brief-v6`. The copied request accepts a catalog with type
 `context-engine.interview-question-catalog`, schema `version: 1`, the expected
-session slug, and prompt version v4 or v5. Unknown or inconsistent contracts
-must stop generation. The packet copies `prefillPromptVersion` to `promptVersion`
-and retains `questionSetHash` exactly; a v4 hash must never be relabeled v5.
+session slug, and prompt version v4, v5 or v6, and states confidence by that
+version: for v6 the chance the responder keeps the answer, for v4/v5 strength of
+support. Unknown or inconsistent contracts must stop generation. The packet
+copies `prefillPromptVersion` to `promptVersion` and retains `questionSetHash`
+exactly; a version or hash must never be relabeled as another.
 The distinct `/agent/interview-catalog` URL avoids stale external brief fetches.
 
 The answer contract is question-specific:

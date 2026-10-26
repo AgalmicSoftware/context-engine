@@ -2,7 +2,8 @@ import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
 
-export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v5';
+// v6 asks for confidence as the chance the person keeps the answer; hashes follow v5.
+export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v6';
 
 const trim = (value) => String(value == null ? '' : value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);

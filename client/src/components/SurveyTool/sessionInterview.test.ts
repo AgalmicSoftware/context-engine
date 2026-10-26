@@ -189,7 +189,7 @@ describe('session interview protocol', () => {
           promptVersion: INTERVIEW_PROMPT_VERSION,
         }),
       )?.promptVersion,
-    ).toBe('ce-interview-brief-v5');
+    ).toBe('ce-interview-brief-v6');
   });
 
   it('builds a user-authored no-install kickoff and confidence-aware mapper prompt', () => {
@@ -202,19 +202,24 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain(
       'https://worker.example/agent/interview-catalog?slug=demo%20one&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%20one',
     );
-    expect(kickoff).toContain('prefillPromptVersion "ce-interview-brief-v4" or "ce-interview-brief-v5"');
+    expect(kickoff).toContain(
+      'prefillPromptVersion "ce-interview-brief-v4", "ce-interview-brief-v5" or "ce-interview-brief-v6"',
+    );
     expect(kickoff).toContain('stop and report a stale catalog');
     expect(kickoff).toContain('conversation history, memory, and connected sources already available to you');
     expect(kickoff).toContain('reasonable inferences');
     expect(kickoff).toContain('question-relevant background, views, experience, uncertainties, and caveats');
     expect(kickoff).toContain('Distinguish stated facts from inferred context');
     expect(kickoff).toContain(
-      'v5: require boolean singleSelect; true => one exact option string, false => array of exact options, absent => stop',
+      'v5/v6: require boolean singleSelect; true => one exact option string, false => array of exact options, absent => stop',
     );
     expect(kickoff).toContain(
       'Quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99)',
     );
-    expect(kickoff).toContain('Every response needs confidence from 0 to 1');
+    expect(kickoff).toContain('Every response needs confidence (0-1) and evidence');
+    // Confidence follows the catalog version the AI verified.
+    expect(kickoff).toContain('v6 confidence: the chance I keep that answer unchanged on review');
+    expect(kickoff).toContain('v4/v5: strength of support. Anchors: 0-.39 weak');
     expect(kickoff).toContain('additionalComments is text');
     expect(kickoff).toContain('Platform/model are self-reported fidelity metadata');
     expect(kickoff).toContain('historyChatsSearched');
@@ -229,7 +234,7 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain('Nothing is submitted;');
     expect(kickoff).toContain('Markdown link labeled "Open prefilled interview"');
     expect(kickoff).toContain('never visible text or a code block');
-    expect(kickoff.length).toBeLessThan(3600);
+    expect(kickoff.length).toBeLessThan(3700);
 
     const mappingPrompt = buildInterviewResponseMappingPrompt({
       questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
@@ -239,6 +244,7 @@ describe('session interview protocol', () => {
     expect(mappingPrompt).toContain('defensible indirect signal');
     expect(mappingPrompt).toContain('Low-confidence inference is allowed');
     expect(mappingPrompt).toContain('confidence is required for every response');
+    expect(mappingPrompt).toContain('the chance from 0 to 1 that the responder keeps this answer unchanged');
     expect(mappingPrompt).toContain('first person');
     expect(mappingPrompt).toContain('Do not add an "(Agent):" prefix');
   });
@@ -793,6 +799,9 @@ describe('interview choice selection contract', () => {
       const legacyHash = createHash('sha256').update(JSON.stringify(legacy)).digest('hex');
       expect(await hashInterviewQuestions(multi, 'ce-interview-brief-v4')).toBe(legacyHash);
       expect(await hashInterviewQuestions(single, 'ce-interview-brief-v4')).toBe(legacyHash);
+      // v6 keeps v5's hash rules, so v5 links still validate against a v6 catalog.
+      expect(await hashInterviewQuestions(multi, 'ce-interview-brief-v5')).toBe(await hashInterviewQuestions(multi));
+      expect(await hashInterviewQuestions(single, 'ce-interview-brief-v5')).not.toBe(legacyHash);
       expect(
         decodeInterviewPrefillPacket(
           encodeInterviewPrefillPacket({ ...packet, promptVersion: 'ce-interview-brief-v4' }),

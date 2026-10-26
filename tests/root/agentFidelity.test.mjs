@@ -129,6 +129,32 @@ test('session records yield final answers and prediction pairs', () => {
   assert.deepEqual(skipped, { unknownQuestion: 1, noParticipant: 0, unreadableAnswer: 1, unreadablePrediction: 0, freeformWithoutText: 0 });
 });
 
+test('confidences are labelled by what the prompt asked them to mean', () => {
+  const rows = [
+    {
+      responder: '0xccc0000000000000000000000000000000000003',
+      response: {
+        responses: [
+          entry('qb1', 'Agree', predicted('Agree', 0.8, { promptVersion: 'ce-interview-brief-v6' })),
+          entry('qb2', 'Agree', predicted('Agree', 0.8, { promptVersion: 'ce-interview-brief-v5' })),
+          entry('qb3', 'Agree', predicted('Agree', 0.8)),
+          // Version 2 records state the meaning even without the AI provenance choice.
+          entry('qb4', 'Agree', predicted('Agree', 0.8, { confidenceMeaning: 'keep' })),
+        ],
+      },
+    },
+  ];
+  const { pairs } = collectSessionFidelityData({ questions, payloads: rows });
+  const meanings = Object.fromEntries(pairs.map((pair) => [pair.questionId, pair.confidenceMeaning]));
+  assert.deepEqual(meanings, { qb1: 'keep', qb2: 'support', qb3: 'unknown', qb4: 'keep' });
+  const [wrapped] = collectWrappedFidelityPairs({
+    questions,
+    rows: [{ principal_id: 'p1', statement_id: 'qb1', agent_prediction: { value: 'Agree' }, agent_confidence: 70, human_current_answer: { value: 'Agree' } }],
+  });
+  // The Wrapped rubric grades evidence (90-95 direct, 70-89 supported inference), not a chance of keeping.
+  assert.equal(wrapped.confidenceMeaning, 'support');
+});
+
 test('Session Wrapped export rows become separate-condition pairs', () => {
   const pairs = collectWrappedFidelityPairs({
     questions,
@@ -196,6 +222,19 @@ test('an agent that only knows the stereotype gains nothing over the majority gu
   assert.ok(Math.abs(calibration.expectedCalibrationError - 0.3) < 1e-12);
   assert.ok(Math.abs(calibration.brier - 0.33) < 1e-12);
   assert.ok(report.synthesis.majorityPull.value > 0, 'drafts agree with the majority more often than people do');
+});
+
+test('calibration uses only confidences that mean the chance of keeping the answer', () => {
+  // Prompts before v6 asked for strength of support, which is not a probability to check.
+  const pairs = pairsFor(
+    () => 'Agree',
+    (person, questionId) => (questionId === 'qb1' ? { confidenceMeaning: 'support' } : {}),
+  );
+  // Ratings are never calibrated, so they don't count either way.
+  pairs.push({ ...pairs[0], questionId: 'qr', prediction: 6, actual: 7, confidenceMeaning: 'support' });
+  const report = scoreAgentFidelity({ questions, pairs, answers: answersFor(), options: fast });
+  assert.equal(report.calibration.shown.predictions, 30);
+  assert.deepEqual(report.coverage.byConfidenceMeaning, { keep: 30, support: 10 });
 });
 
 test('hidden drafts measure how much showing a draft changes answers', () => {

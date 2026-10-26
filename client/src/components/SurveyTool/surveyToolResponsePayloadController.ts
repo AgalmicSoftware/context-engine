@@ -333,6 +333,9 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     )
       ? String(interviewProvenanceRecord.draftOrigin)
       : null;
+    const confidenceMeaning = ['keep', 'support'].includes(String(interviewProvenanceRecord.confidenceMeaning))
+      ? String(interviewProvenanceRecord.confidenceMeaning)
+      : null;
     // Whether the AI's draft was shown in review or hidden until the person answered.
     const predictionCondition = interviewProvenanceRecord.predictionCondition === 'blind' ? 'blind' : 'shown';
     const blindFields =
@@ -415,6 +418,7 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
             ...(includePredictionComparison && researchTier ? { researchTier } : {}),
             ...(includePredictionComparison && researchTier && draftOrigin ? { draftOrigin } : {}),
             ...(includePredictionComparison && researchTier ? { predictionCondition } : {}),
+            ...(includePredictionComparison && researchTier && confidenceMeaning ? { confidenceMeaning } : {}),
             ...(includePredictionComparison && researchTier && blindFields && selectedInterviewResearch
               ? { blindAnswer: selectedInterviewResearch.blindAnswer, revealedAt: blindFields.revealedAt }
               : {}),

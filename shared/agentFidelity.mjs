@@ -2,6 +2,7 @@
 // give, and whether AI drafts flatten how strongly or how differently people
 // answer. Pure functions with no I/O. The method is in docs/agent-fidelity.md.
 import { DEFAULT_AI_MODEL } from './aiDefaults.mjs';
+import { confidenceMeaningOf } from './interviewConfidence.mjs';
 import { getVoiceCredits } from './questions/quadraticAllocation.mjs';
 import { normalizeRatingScale } from './questions/ratingScale.mjs';
 import { readStoredRating } from './questions/storedRating.mjs';
@@ -350,6 +351,10 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
       prediction,
       actual: blindAnswer ?? final,
       confidence: readDraftConfidence(original.confidence),
+      // Version 2 records state it; older ones are read from the prompt version.
+      confidenceMeaning: ['keep', 'support'].includes(provenance.confidenceMeaning)
+        ? provenance.confidenceMeaning
+        : confidenceMeaningOf(provenance.promptVersion),
       predictedImportance: readStoredRating(original.importance),
       predictedConviction: readStoredRating(original.conviction),
       // Responses saved without importance fall back on conviction, as the app does.
@@ -389,6 +394,8 @@ export const collectWrappedFidelityPairs = ({ questions = [], rows = [] } = {}) 
       prediction,
       actual,
       confidence: readPercentConfidence(row.agent_confidence),
+      // The Wrapped rubric grades evidence (90-95 direct, 70-89 supported inference).
+      confidenceMeaning: 'support',
       predictedImportance: null,
       predictedConviction: null,
       importance: null,
@@ -620,10 +627,13 @@ const calibrationTable = (summaries, bins) => {
     })),
   };
 };
+// Pairs built outside the collectors carry no meaning and are taken as chances of keeping.
+const confidenceMeaning = (pair) => pair.confidenceMeaning ?? 'keep';
 const calibrationEstimate = (people, condition, options) => {
   const bins = options.calibrationBins;
+  const calibrated = (pair) => pair.condition === condition && isChoice(pair) && confidenceMeaning(pair) === 'keep';
   const summaries = people
-    .map((person) => calibrationSummary(person.pairs.filter((pair) => pair.condition === condition && isChoice(pair)), bins))
+    .map((person) => calibrationSummary(person.pairs.filter(calibrated), bins))
     .filter((summary) => summary.predictions);
   if (!summaries.length) return null;
   if (summaries.length < options.minParticipants) return { participants: summaries.length, suppressed: true };
@@ -808,6 +818,12 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
       freeformPredictions: scored.filter((pair) => pair.question.type === 'freeform').length,
       byCondition: Object.fromEntries(CONDITIONS.map((condition) => [condition, measured.filter((pair) => pair.condition === condition).length])),
       byOrigin: Object.fromEntries([...groupBy(measured, (pair) => pair.origin)].map(([key, list]) => [key, list.length])),
+      // Choice predictions with a confidence, by what it means; only 'keep' is calibrated.
+      byConfidenceMeaning: Object.fromEntries(
+        [...groupBy(measured.filter((pair) => pair.confidence !== null && isChoice(pair)), confidenceMeaning)].map(
+          ([key, list]) => [key, list.length],
+        ),
+      ),
       excludedAgentPredictions: settings.includeAgents ? 0 : pairs.filter((pair) => pair.isAgent).length,
     },
     mirrorScore: {

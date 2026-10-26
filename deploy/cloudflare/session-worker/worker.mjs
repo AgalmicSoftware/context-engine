@@ -103032,7 +103032,7 @@ var dispatchSessionConfigBootstrapRequest = async ({
 
 // workers/sessionCorsWorker/interviewBriefDispatch.js
 init_sessionConfigAuthority();
-var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v5";
+var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v6";
 var trim15 = (value) => String(value == null ? "" : value).trim();
 var isObj22 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {

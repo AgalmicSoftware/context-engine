@@ -107,6 +107,7 @@ const PREDICTION_RESEARCH_KEYS = [
   'predictionCondition',
   'blindAnswer',
   'revealedAt',
+  'confidenceMeaning',
 ];
 
 // Undoing or restoring edits never makes a response more disclosing: a name, AI attribution

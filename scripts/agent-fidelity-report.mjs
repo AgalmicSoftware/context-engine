@@ -106,6 +106,8 @@ const table = (header, rows) => [row(header), row(header.map(() => '---')), ...r
 
 export const renderFidelityMarkdown = (report) => {
   const { coverage, mirrorScore, baselines, anchoring, calibration, unusualViews, synthesis } = report;
+  const { keep: _calibrated, ...otherMeanings } = coverage.byConfidenceMeaning ?? {};
+  const uncalibrated = Object.values(otherMeanings).reduce((sum, count) => sum + count, 0);
   const minimum = report.options.minParticipants;
   const fewer = `fewer than ${minimum} people`;
   const cell = (result, format = decimal) => (result?.suppressed ? fewer : format(result?.value));
@@ -209,7 +211,13 @@ export const renderFidelityMarkdown = (report) => {
     '',
     'For choice questions: when the AI states a confidence, about that share of its answers should be kept unchanged.',
     '',
-    calibrationSections.join('\n\n') || 'No choice predictions carried a confidence.',
+    ...(uncalibrated
+      ? [
+          `${uncalibrated} choice predictions are left out of calibration: their confidence graded strength of support (prompts before ce-interview-brief-v6, and Session Wrapped), or its meaning wasn't recorded.`,
+          '',
+        ]
+      : []),
+    calibrationSections.join('\n\n') || 'No choice predictions carried a confidence meaning the chance of keeping the answer.',
     '',
     '## Unusual views',
     '',

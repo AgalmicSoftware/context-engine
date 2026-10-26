@@ -421,7 +421,7 @@ function SessionInterviewDraftCardContent({
               {draft.confidence !== undefined ? (
                 <div
                   className={styles.confidence}
-                  title="The AI’s estimate of how well this draft is supported by the available evidence."
+                  title="The AI’s confidence in this draft."
                   aria-label={`AI-estimated confidence: ${percent}%`}
                   data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_CONFIDENCE}
                   data-ce-question-id={draft.questionId}

@@ -15,7 +15,7 @@ test('reads the kickoff requirement without treating legacy import versions as s
 
 test('checks a served client against the real local Worker catalog handler using GET only', async (t) => {
   let origin;
-  let clientVersion = 'ce-interview-brief-v5';
+  let clientVersion = 'ce-interview-brief-v6';
   const kv = new Map();
   const env = installSessionCoordinatorBinding({ GROUP_KV: {
     get: async (key) => kv.get(key) ?? null,

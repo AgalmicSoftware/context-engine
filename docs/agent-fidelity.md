@@ -59,7 +59,12 @@ Similarity between a prediction and an answer runs from 0 to 1:
 - **Calibration:** for choice predictions with a stated confidence, the share
   kept unchanged in each tenth of the confidence range, plus the Brier score
   and expected calibration error. Prefill confidences are 0–1; Wrapped
-  confidences are 0–100 and are rescaled.
+  confidences are 0–100 and are rescaled. Only confidences that mean the chance
+  of keeping the answer count. Version 2 records say so in `confidenceMeaning`;
+  older ones are read from their prompt version (`ce-interview-brief-v6` and
+  later). Earlier prompts and Session Wrapped's rubric grade strength of
+  support, so they are left out; `coverage.byConfidenceMeaning` counts each
+  among choice predictions.
 - **Anchoring:** for people with both conditions, agreement on shown drafts
   minus agreement on hidden ones. Above zero means showing a draft pulled
   answers toward it, so shown-draft scores overstate fidelity by about that
@@ -138,8 +143,9 @@ Treat other cuts as exploratory.
 ## Limitations
 
 - Platform and model are self-reported.
-- The prefill prompt defines confidence as strength of support, not as the
-  chance the person keeps the answer, so prefill calibration is approximate.
+- Prompts before `ce-interview-brief-v6` and Session Wrapped's rubric grade
+  confidence as strength of support, so they add nothing to calibration until
+  Wrapped asks for the chance of keeping the answer too.
 - People who use AI prefill are not a random sample.
 - Wrapped principals have pseudonymous ids that don't match session
   addresses. When both sources are mixed, a principal's own answer can be

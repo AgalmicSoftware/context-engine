@@ -2737,7 +2737,12 @@ Signed login/bootstrap requests:
     and hash unchanged. V4 choice drafts use one exact option string; an answer
     requiring multiple selections is omitted with a limitation notice. V5 choice
     drafts require boolean selection metadata. Older v1–v3 packets remain
-    importable but are not requested for new generation. Verify the served
+    importable but are not requested for new generation.
+  - `ce-interview-brief-v6` keeps v5's hashes and choice rules, and asks for
+    confidence as the chance the responder keeps the answer unchanged, so
+    research can calibrate it; v4/v5 asked for strength of support. The
+    clipboard request also accepts v6 catalogs and states confidence by the
+    catalog's version, and v5 links still validate against a v6 Worker. Verify the served
     client/Worker contracts during rollout; bundle publication alone does not
     establish which version a deployed Worker serves.
   - Reads at most 100 accessible public questions. Cloudflare-native questions

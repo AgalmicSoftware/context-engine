@@ -872,8 +872,9 @@ describe('research detail tiers', () => {
   });
 
   it('says whether the draft was shown, and keeps a hidden draft answer from before the reveal', () => {
-    const shown = submit(provenance({ researchTier: 'minimal' }));
+    const shown = submit(provenance({ researchTier: 'minimal', confidenceMeaning: 'keep' }));
     expect(shown.predictionCondition).toBe('shown');
+    expect(shown.confidenceMeaning).toBe('keep');
     expect(shown).not.toHaveProperty('blindAnswer');
     const hidden = submit(
       provenance({ researchTier: 'minimal', predictionCondition: 'blind', blindAnswer: 'Unsure', revealedAt: 1234 }),
@@ -883,6 +884,7 @@ describe('research detail tiers', () => {
     const legacy = submit(provenance({ predictionCondition: 'blind', blindAnswer: 'Unsure', revealedAt: 1234 }));
     expect(legacy).not.toHaveProperty('predictionCondition');
     expect(legacy).not.toHaveProperty('blindAnswer');
+    expect(submit(provenance({ confidenceMeaning: 'keep' }))).not.toHaveProperty('confidenceMeaning');
   });
 
   it("redacts a hidden draft's earlier answer when the answer is encrypted", () => {
