@@ -70,6 +70,9 @@ test('question sets come from Results exports, question lists and the benchmark 
     ['qb:binary', 'qs:multichoice', 'qm:multichoice', 'qr:rating', 'qn:rating', 'qq:quadratic', 'qf:freeform', 'poll:multichoice'],
   );
   assert.deepEqual(set.skipped, { locked: 1, unsupported: 1, invalid: 0 });
+  // Older polls are single choices unless marked otherwise, as the web client shows them.
+  assert.equal(byId(set).poll.singleSelect, true);
+  assert.equal(readQuestionSet([{ ...resultsExport.filteredQuestions[8], singleSelect: false }]).questions[0].singleSelect, false);
 
   const bank = readQuestionSet({
     benchmarkId: 'aidb-sample',
@@ -106,6 +109,10 @@ test('prompts show options in the order asked, and the scale the way round asked
   assert.match(allocation, /1\. Interpretability\n2\. Policy\n3\. Evals/);
   assert.match(allocation, /You have 16 credits/);
   assert.match(buildAnswerPrompt({ question: questions.qr, variant: 'scale' }), /0 means "Very pessimistic" and 10 means "Very optimistic"/);
+  // The JSON shape shows placeholders, not answers a model could copy.
+  assert.match(buildAnswerPrompt({ question: questions.qn, variant: 'scale' }), /\{"answer":<whole number from 0 to 40>,/);
+  assert.match(choice, /\{"answer":"<exact text of one option>",/);
+  assert.match(allocation, /\{"answer":\[<vote for option 1>, <vote for option 2>, <vote for option 3>\],/);
   assert.match(buildAnswerPrompt({ question: questions.qr, variant: 'flipped' }), /0 means "Very optimistic" and 10 means "Very pessimistic"/);
   assert.match(
     buildAnswerPrompt({ question: { ...questions.qb, reversedPrompt: 'Labs should keep evaluations private.' }, variant: 'reversed' }),

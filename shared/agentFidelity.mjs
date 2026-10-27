@@ -470,6 +470,33 @@ const estimate = (values, options) => {
   return { value: mean(kept), interval: bootstrapInterval(kept, mean, options), participants: kept.length };
 };
 
+/**
+ * The keys of a breakdown (groups, platforms) that can be reported beside its
+ * total. Subtracting reported figures from the total, or from each other,
+ * describes the people who share exactly the same reported keys (those with
+ * none of them too), so each such set must be empty or reach `min`. Until each
+ * does, the smallest key behind a set that is too small is withheld.
+ * `keysByPerson` lists each person's keys.
+ */
+export const reportableKeys = (keysByPerson, min) => {
+  const kept = new Set(keysByPerson.flat());
+  const sizeOf = (key) => keysByPerson.filter((keys) => keys.includes(key)).length;
+  for (;;) {
+    const sets = new Map();
+    for (const keys of keysByPerson) {
+      const signature = JSON.stringify([...new Set(keys.filter((key) => kept.has(key)))].sort());
+      sets.set(signature, (sets.get(signature) ?? 0) + 1);
+    }
+    const small = [...sets].find(([, size]) => size < min);
+    if (!small) return [...kept].sort();
+    const behind = JSON.parse(small[0]);
+    const [smallest] = (behind.length ? behind : [...kept]).sort((a, b) => sizeOf(a) - sizeOf(b) || (a < b ? -1 : 1));
+    // Everyone together is fewer than `min`: nothing can be reported.
+    if (smallest === undefined) return [];
+    kept.delete(smallest);
+  }
+};
+
 const ranks = (values) => {
   const order = values.map((value, index) => [value, index]).sort((a, b) => a[0] - b[0]);
   const result = new Array(values.length);

@@ -500,8 +500,11 @@ test('the Worker source pathspec covers every local input of the release bundles
   }
   // Files no bundle imports would only force needless pin moves.
   for (const nonInput of [
+    'shared/agentFidelity.mjs',
     'shared/encryption/envelopeV1Core.mjs',
     'shared/encryption/envelopeWriterFixtures.mjs',
+    'shared/interviewConfidence.mjs',
+    'shared/questions/answerValue.mjs',
     'shared/questions/questionId.mjs',
   ]) {
     assert.ok(!covered.has(nonInput), `${nonInput} is not a bundle input`);

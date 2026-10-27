@@ -49,12 +49,13 @@ const toAnswerableQuestion = (item) => {
   }
   if (isLocked(item)) return { skip: 'locked' };
   const declared = text(item.type || 'freeform').toLowerCase();
-  // Older sessions stored single-choice polls as `poll`.
+  // Older sessions stored choices as `poll`, single choice unless marked otherwise, as the web client reads them.
   const type = declared === 'poll' ? 'multichoice' : declared;
   if (!['binary', 'rating', 'multichoice', 'quadratic', 'freeform'].includes(type)) return { skip: 'unsupported' };
   const prompt = text(item.prompt);
   if (!id || !prompt) return { skip: 'invalid' };
   const question = { ...item, id, type, prompt };
+  if (declared === 'poll' && item.singleSelect !== false && item.singleChoice !== false) question.singleSelect = true;
   if (type === 'multichoice' && optionsOf(question).length < 2) return { skip: 'invalid' };
   if (type === 'quadratic' && validateQuadraticQuestion(question)) return { skip: 'invalid' };
   return question;
@@ -151,7 +152,7 @@ const instructionsFor = (question, variant, order) => {
       const { min, max, minLabel, maxLabel } = ratingScaleFor(question);
       const [low, high] = variant === 'flipped' ? [maxLabel, minLabel] : [minLabel, maxLabel];
       return {
-        shape: `${min}`,
+        shape: `<whole number from ${min} to ${max}>`,
         lines: [
           `Answer with a whole number from ${min} to ${max}` +
             (hasLabelledEnds(question) ? `, where ${min} means "${low}" and ${max} means "${high}".` : '.'),
@@ -162,7 +163,7 @@ const instructionsFor = (question, variant, order) => {
       const max = Number(question.maxSelections);
       const single = isSingleSelect(question);
       return {
-        shape: single ? quoted(shown[0]) : `[${quoted(shown[0])}]`,
+        shape: single ? '"<exact text of one option>"' : '["<exact text of an option>", ...]',
         lines: [
           'Options:',
           ...shown.map((option) => `- ${quoted(option)}`),
@@ -175,7 +176,7 @@ const instructionsFor = (question, variant, order) => {
     case 'quadratic': {
       const budget = getVoiceCredits(question);
       return {
-        shape: `[${shown.map(() => 0).join(', ')}]`,
+        shape: `[${shown.map((_, index) => `<vote for option ${index + 1}>`).join(', ')}]`,
         lines: [
           'Options, in this order:',
           ...shown.map((option, index) => `${index + 1}. ${option}`),

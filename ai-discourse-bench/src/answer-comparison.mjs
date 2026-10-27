@@ -7,8 +7,10 @@ import {
   collectSessionFidelityData,
   normalizeFidelityAnswer,
   normalizeFidelityQuestion,
+  reportableKeys,
   resultsResponseRows,
 } from '../../shared/agentFidelity.mjs';
+import { readQuestionSet } from './answer-set.mjs';
 import { bootstrapDifferenceInterval, newcombeDifferenceInterval } from './statistics.mjs';
 
 export const ANSWER_COMPARISON_METHOD = 'aidb-answer-comparison-v1';
@@ -228,8 +230,10 @@ const readGroups = (input) => {
 
 /**
  * Compares an `answer` file with a Results export. People are grouped by
- * `groups` (address to group ids) or else by the link they arrived through;
- * groups, and any question, with fewer than `minPeople` people are withheld.
+ * `groups` (address to group ids) or else by the link they arrived through.
+ * A group is withheld when it has fewer than `minPeople` people, or when
+ * subtracting it from everyone, or from the other groups, would leave fewer;
+ * each question is checked again with the people who answered it.
  */
 export const compareAnswers = ({
   answersFile,
@@ -239,14 +243,22 @@ export const compareAnswers = ({
   bootstrapSamples = 1000,
   seed = ANSWER_COMPARISON_METHOD,
 }) => {
-  const exportQuestions = Array.isArray(resultsExport?.filteredQuestions) ? resultsExport.filteredQuestions : [];
-  const questions = [...exportQuestions, ...(answersFile?.questions || [])]
+  if (answersFile?.kind !== 'ai_discourse_bench_answers') {
+    throw new Error('The answers file must come from the answer command (kind ai_discourse_bench_answers).');
+  }
+  // Read as the answer command reads them, so old polls are single choices.
+  const exportQuestions = readQuestionSet({ questions: resultsExport?.filteredQuestions ?? [] }).questions;
+  const exportIds = new Set(exportQuestions.map((question) => lower(question.id)));
+  if (!(answersFile.rows || []).some((row) => exportIds.has(lower(row?.questionId)))) {
+    throw new Error("None of the answers are to this Results export's questions.");
+  }
+  const questions = [...exportQuestions, ...(answersFile.questions || [])]
     .map(normalizeFidelityQuestion)
     .filter(Boolean)
     .filter((question, index, list) => list.findIndex((other) => other.id === question.id) === index);
   const questionMap = new Map(questions.map((question) => [question.id, question]));
   const promptOf = new Map(
-    [...exportQuestions, ...(answersFile?.questions || [])].map((question) => [lower(question?.id), text(question?.prompt)]),
+    [...exportQuestions, ...(answersFile.questions || [])].map((question) => [lower(question?.id), text(question?.prompt)]),
   );
 
   const { answers } = collectSessionFidelityData({ questions: exportQuestions, payloads: resultsResponseRows(resultsExport) });
@@ -272,12 +284,12 @@ export const compareAnswers = ({
   participants.forEach((participantId) =>
     groupsOf(participantId).forEach((group) => groupSizes.set(group, (groupSizes.get(group) ?? 0) + 1)),
   );
-  const reported = [...groupSizes].filter(([, size]) => size >= minPeople).map(([group]) => group).sort();
+  const reported = reportableKeys(participants.map(groupsOf), minPeople);
   const groupList = [{ id: EVERYONE, people: participants.length }, ...reported.map((id) => ({ id, people: groupSizes.get(id) }))];
 
-  const modelIds = [...new Set((answersFile?.rows || []).map((row) => row.modelId))].sort();
+  const modelIds = [...new Set((answersFile.rows || []).map((row) => row.modelId))].sort();
   const repliesBy = new Map();
-  for (const row of answersFile?.rows || []) {
+  for (const row of answersFile.rows || []) {
     const question = questionMap.get(lower(row.questionId));
     const value = question ? normalizeFidelityAnswer(question, row.answer) : null;
     if (value === null) continue;
@@ -295,12 +307,22 @@ export const compareAnswers = ({
       return { ...base, notCompared: 'Freeform answers need theme coding by a judge model against a human-checked codebook.' };
     }
     const answered = modelIds.filter((modelId) => modelSummaries[modelId]?.answer !== null && modelSummaries[modelId]?.answer !== undefined);
+    // People skip questions, so the groups are checked again with those who answered this one.
+    const respondents = answersByQuestion.get(question.id) || [];
+    const shown = new Set(
+      reportableKeys(
+        respondents.map((answer) => groupsOf(answer.participantId).filter((group) => reported.includes(group))),
+        minPeople,
+      ),
+    );
     const comparisons = Object.fromEntries(
       groupList.map(({ id: groupId }) => {
-        const values = (answersByQuestion.get(question.id) || [])
+        const values = respondents
           .filter((answer) => groupId === EVERYONE || groupsOf(answer.participantId).includes(groupId))
           .map((answer) => answer.value);
-        if (values.length < minPeople) return [groupId, { people: values.length, suppressed: true }];
+        if (values.length < minPeople || (groupId !== EVERYONE && !shown.has(groupId))) {
+          return [groupId, { people: values.length, suppressed: true }];
+        }
         return [
           groupId,
           {
@@ -341,7 +363,7 @@ export const compareAnswers = ({
   return {
     kind: 'ai_discourse_bench_answer_comparison',
     method: ANSWER_COMPARISON_METHOD,
-    setId: answersFile?.setId || '',
+    setId: answersFile.setId || '',
     generatedAt: new Date().toISOString(),
     options: { minPeople, bootstrapSamples, seed },
     groups: groupList,
@@ -360,7 +382,8 @@ export const renderComparisonMarkdown = (report) => {
   const lines = [
     '# Models compared with people',
     '',
-    `Method \`${report.method}\`. ${report.models.length} models; groups of fewer than ${report.options.minPeople} people are withheld` +
+    `Method \`${report.method}\`. ${report.models.length} models. A group is withheld when it has fewer than ${report.options.minPeople} people, ` +
+      `or when subtracting it from everyone, or from the other groups, would leave fewer` +
       (report.groupsWithheld ? ` (${report.groupsWithheld} withheld)` : '') +
       '. Each model counts once: its replies are summarized as its most common answer, the median rating or the mean allocation.',
     '',
@@ -384,7 +407,7 @@ export const renderComparisonMarkdown = (report) => {
     }
     for (const [groupId, comparison] of Object.entries(question.comparisons)) {
       if (comparison.suppressed) {
-        lines.push('', `**${groupId}**: withheld, ${comparison.people} people answered.`);
+        lines.push('', `**${groupId}**: withheld (${comparison.people} people answered).`);
         continue;
       }
       lines.push('', `**${groupId}** (${comparison.people} people)`, '');

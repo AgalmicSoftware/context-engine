@@ -53,8 +53,6 @@ import { buildQuestionPrompt } from './normalize.mjs';
 import { buildExperimentPlan } from './experiment-plan.mjs';
 import { buildContextEngineBenchmarkDataset } from './ce-native-export.mjs';
 import { buildReportSnapshot, compareLongitudinalSnapshots } from './longitudinal.mjs';
-import { readQuestionSet, runAnswerSet } from './answer-set.mjs';
-import { compareAnswers, renderComparisonMarkdown } from './answer-comparison.mjs';
 
 const usage = `Usage:
   ai-discourse-bench validate --questions <file> --models <file> [--personas <file>]
@@ -190,6 +188,9 @@ const commandAnswer = async (args) => {
   const repeats = parsePositiveInt(args.repeats, DEFAULT_ANSWER_REPEATS, '--repeats');
   const concurrency = parsePositiveInt(args.concurrency, DEFAULT_CONCURRENCY, '--concurrency');
   const maxAttempts = parsePositiveInt(args['max-attempts'], DEFAULT_MAX_ATTEMPTS, '--max-attempts');
+  // Loaded here, not above: these commands use Context Engine's shared answer
+  // rules and scorer, so they run only inside the repo; the rest of the folder doesn't.
+  const { readQuestionSet, runAnswerSet } = await import('./answer-set.mjs');
   const questionSet = readQuestionSet(await readJsonFile(args.questions));
   if (args['limit-questions']) {
     questionSet.questions = questionSet.questions.slice(0, parsePositiveInt(args['limit-questions'], 1, '--limit-questions'));
@@ -229,6 +230,7 @@ const commandCompareAnswers = async (args) => {
   for (const flag of ['answers', 'people', 'out']) {
     if (!args[flag]) throw new Error(`Missing --${flag}\n${usage}`);
   }
+  const { compareAnswers, renderComparisonMarkdown } = await import('./answer-comparison.mjs');
   const report = compareAnswers({
     answersFile: await readJsonFile(args.answers),
     resultsExport: await readJsonFile(args.people),

@@ -258,6 +258,17 @@ test("kappa corrects agreement for chance, and rating error is a share of the sc
   assert.equal(ratings.agreement.choiceKappa.suppressed, true, 'no choice predictions');
   const few = scoreAgentFidelity({ questions, pairs: pairsFor(() => 'Agree').slice(0, 16), answers: answersFor(), options: { minParticipants: 5 } });
   assert.equal(few.agreement.choiceKappa.suppressed, true);
+  // Knowing each question's majority isn't knowing the person. Nine of ten agree
+  // with one statement and disagree with the other, so chance is 0.9 within each
+  // question; pooling both questions' answers (half and half) would give 0.8.
+  const split = (person, questionId) => (people.indexOf(person) < 9) === (questionId === 'qb1') ? 'Agree' : 'Disagree';
+  const majority = pairsFor(
+    (person, questionId) => (questionId === 'qb1' ? 'Agree' : 'Disagree'),
+    (person, questionId) => ({ actual: split(person, questionId) }),
+  ).filter((pair) => pair.questionId === 'qb1' || pair.questionId === 'qb2');
+  const byQuestion = scoreAgentFidelity({ questions, pairs: majority, answers: answersFor(), options: fast });
+  assert.ok(Math.abs(byQuestion.mirrorScore.overall.value - 0.9) < 1e-12);
+  assert.ok(Math.abs(byQuestion.agreement.choiceKappa.value) < 1e-12);
 });
 
 test('an agent that only knows the stereotype gains nothing over the majority guess', () => {

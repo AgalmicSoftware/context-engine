@@ -116,6 +116,9 @@ test('the command writes JSON and Markdown reports from a Results export', () =>
     assert.match(markdown, /^# Agent fidelity report/);
     assert.match(markdown, /\| Mirror Score, all predictions \| 0\.67 \|/);
     assert.match(markdown, /Correction rate \(choice drafts shown and changed\): 33%/);
+    // Always "Agree" is right exactly as often as chance; there are no ratings.
+    assert.match(markdown, /\| Cohen's kappa, choice predictions \| 0\.00 \|/);
+    assert.match(markdown, /\| Rating error, as a share of the scale \| fewer than 3 people \|/);
     // These records don't say which prompt version made them, so their confidences aren't calibrated.
     assert.deepEqual(report.coverage.byConfidenceMeaning, { unknown: 12 });
     assert.match(markdown, /12 choice predictions are left out of calibration/);

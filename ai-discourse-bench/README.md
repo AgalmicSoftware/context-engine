@@ -5,7 +5,9 @@ shift under reversed wording across a broad bank of AI discourse questions.
 
 This is a self-contained benchmark folder inside Context Engine. It uses the
 OSS `ai-discourse-corpus/` as the source substrate for question generation, then
-renders results in a Context Engine-style report shape.
+renders results in a Context Engine-style report shape. Only the `answer` and
+`compare-answers` commands need the rest of the repo, for its shared answer
+rules and fidelity scorer.
 
 The benchmark is descriptive, not a model leaderboard. Each model is one
 participant; repeated generations are nested measurements of that participant.
@@ -338,10 +340,14 @@ node ./bin/ai-discourse-bench.mjs answer \
 ```
 
 `--questions` takes the Results screen's **JSON: Questions + Responses**
-download, a plain list of questions, or this benchmark's own bank. Locked
-(gated) questions are skipped. Answers are checked with the same rules as
-people's and MCP agents' (`shared/questions/answerValue.mjs`); a reply that
-fails them is asked again, then kept as unanswered with the reason.
+download, a plain list of questions, or this benchmark's own bank. Questions
+whose text the export couldn't read (shown as `[encrypted]`) are skipped, but a
+gated question you could read is asked like any other: its text goes to the
+model provider, so remove it from the file first if it shouldn't. Older `poll`
+questions are asked as single choices, as the web client shows them. Answers
+are checked with the same rules as people's and MCP agents'
+(`shared/questions/answerValue.mjs`); a reply that fails them is asked again,
+then kept as unanswered with the reason.
 
 Each question is asked in the ways that expose wording and ordering effects:
 
@@ -370,9 +376,11 @@ node ./bin/ai-discourse-bench.mjs compare-answers \
 
 It writes `answer-comparison.json` and `answer-comparison.md`. People are
 grouped by `--groups` (a JSON object from address to group id or ids) or else by
-the link they arrived through. Groups, and any question a group answered, with
-fewer than `--min-people` people (default 5) are withheld, and self-declared
-agents are left out. Each model counts as one respondent: its replies are
+the link they arrived through, and self-declared agents are left out. A group
+is withheld when it has fewer than `--min-people` people (default 5), or when
+subtracting it from everyone, or from the other groups, would leave fewer;
+each question is checked again with the people who answered it, and a question
+with fewer is withheld for everyone. Each model counts as one respondent: its replies are
 summarized as its most common answer (an even split between agreeing and
 disagreeing counts as Unsure), the options it picked in at least half its
 replies, its median rating, or its mean allocation.

@@ -259,8 +259,9 @@ All notable changes to this project will be documented in this file.
   included: `answer` asks each model with reversed wording, flipped rating
   scales and shuffled options, and checks replies with the MCP's answer rules,
   now shared in `shared/questions/answerValue.mjs`. `compare-answers` then
-  compares models with everyone and with each group of 5 or more people, using
-  statistics suited to each question type.
+  compares models with everyone and with each group, using statistics suited
+  to each question type; a group is withheld when it has fewer than 5 people
+  or when subtracting it from everyone would leave fewer.
 
 ### Research
 

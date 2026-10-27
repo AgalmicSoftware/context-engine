@@ -4,7 +4,9 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { compareAnswers, renderComparisonMarkdown, summarizeModelAnswers } from '../src/answer-comparison.mjs';
+import { readQuestionSet, runAnswerSet } from '../src/answer-set.mjs';
 import { runCli } from '../src/cli.mjs';
+import { newcombeDifferenceInterval } from '../src/statistics.mjs';
 
 const questions = [
   { id: 'qb', type: 'binary', prompt: 'AI labs should publish their safety evaluations.' },
@@ -64,9 +66,12 @@ test('each model counts once, summarized from its replies', () => {
   assert.deepEqual(summarizeModelAnswers(qq, [[2, 1, 0], [0, 1, 2]]).answer, [1, 1, 1]);
 });
 
-test('groups smaller than 5 people are withheld, and freeform is listed but not compared', () => {
-  assert.deepEqual(report.groups, [{ id: 'everyone', people: 6 }, { id: 'rxc', people: 5 }]);
-  assert.equal(report.groupsWithheld, 1);
+test('groups smaller than 5 people are withheld, and so are groups that could be subtracted from everyone', () => {
+  // The edge link brought one person. Everyone (6) minus rxc (5) would be that
+  // person's own answers, so rxc is withheld too.
+  assert.deepEqual(report.groups, [{ id: 'everyone', people: 6 }]);
+  assert.equal(report.groupsWithheld, 2);
+  assert.equal(questionResult('qb').comparisons.rxc, undefined);
   assert.match(questionResult('qf').notCompared, /judge model/);
   assert.equal(questionResult('qf').models['model-a'].replies, 1);
 });
@@ -81,7 +86,8 @@ test('agree/disagree: share giving the same answer, difference in % agree with a
   assert.ok(low < -0.1667 && high > -0.1667);
   // Half of the models disagree against a third of people, across the two-step Disagree–Agree gap.
   assert.equal(everyone.models.earthMovers, 0.3333);
-  assert.equal(questionResult('qb').comparisons.rxc.byModel['model-a'].sameAnswerShare, 0.8);
+  // Newcombe's (1998) worked example: 56/70 against 48/80.
+  assert.deepEqual(newcombeDifferenceInterval(56, 70, 48, 80), [0.0524, 0.3339]);
 });
 
 test('choices: same-answer share and distances, or Jaccard and inclusion rates for several options', () => {
@@ -122,7 +128,7 @@ test('closeness averages each model’s similarity over the questions compared',
   const expected = Number((similarities.reduce((sum, value) => sum + value, 0) / similarities.length).toFixed(4));
   assert.deepEqual(report.closeness.everyone['model-a'], { similarity: expected, questions: 5 });
   const markdown = renderComparisonMarkdown(report);
-  assert.match(markdown, /\| Model \| everyone \(6\) \| rxc \(5\) \|/);
+  assert.match(markdown, /\| Model \| everyone \(6\) \|\n/);
   assert.match(markdown, /Agree: models 0\.5, people 0\.6667; difference -0\.1667/);
 });
 
@@ -133,14 +139,54 @@ test('listed groups replace arrival links, and agents are left out', () => {
     questionId: 'qb',
     response: { questionID: 'qb', answer: { value: 'Agree' }, participant: { kind: 'agent' } },
   });
-  const listed = compareAnswers({
-    answersFile,
-    resultsExport: withAgent,
-    groups: Object.fromEntries([1, 2, 3, 4, 5, 6].map((index) => [person(index), index % 2 ? 'odd' : 'even'])),
-    minPeople: 3,
-    bootstrapSamples: 50,
-  });
+  const oddOrEven = Object.fromEntries([1, 2, 3, 4, 5, 6].map((index) => [person(index), index % 2 ? 'odd' : 'even']));
+  const listed = compareAnswers({ answersFile, resultsExport: withAgent, groups: oddOrEven, minPeople: 3, bootstrapSamples: 50 });
   assert.deepEqual(listed.groups, [{ id: 'everyone', people: 6 }, { id: 'even', people: 3 }, { id: 'odd', people: 3 }]);
+  // People 1, 3 and 5 said Agree, Agree and Disagree; model A said Agree.
+  assert.equal(listed.questions.find((question) => question.id === 'qb').comparisons.odd.byModel['model-a'].sameAnswerShare, 0.6667);
+});
+
+test('each question checks its groups again with the people who answered it', () => {
+  // Person 2 skips qb: two even people answered it, so even is withheld there,
+  // and odd too, since everyone minus odd would be those two.
+  const skipped = structuredClone(resultsExport);
+  skipped.filteredQuestionResponses.qb = skipped.filteredQuestionResponses.qb.filter((row) => row.responder !== person(2));
+  const oddOrEven = Object.fromEntries([1, 2, 3, 4, 5, 6].map((index) => [person(index), index % 2 ? 'odd' : 'even']));
+  const checked = compareAnswers({ answersFile, resultsExport: skipped, groups: oddOrEven, minPeople: 3, bootstrapSamples: 50 });
+  const comparisons = (id) => checked.questions.find((question) => question.id === id).comparisons;
+  assert.deepEqual(comparisons('qb').even, { people: 2, suppressed: true });
+  assert.deepEqual(comparisons('qb').odd, { people: 3, suppressed: true });
+  assert.equal(comparisons('qb').everyone.people, 5);
+  assert.equal(comparisons('qs').odd.people, 3);
+  assert.equal(comparisons('qs').odd.suppressed, undefined);
+});
+
+test('an answer file and a Results export from another session are refused', () => {
+  assert.throws(() => compareAnswers({ answersFile: { runs: [] }, resultsExport }), /must come from the answer command/);
+  const elsewhere = { ...answersFile, rows: answersFile.rows.map((row) => ({ ...row, questionId: `other-${row.questionId}` })) };
+  assert.throws(() => compareAnswers({ answersFile: elsewhere, resultsExport }), /None of the answers/);
+});
+
+test('older polls are asked and compared as single choices, from answer to compare-answers', async () => {
+  const pollExport = structuredClone(resultsExport);
+  pollExport.filteredQuestions = [{ id: 'qp', type: 'poll', prompt: 'Which camp?', options: ['d/acc', 'e/acc', 'PauseAI'] }];
+  pollExport.filteredQuestionResponses = {
+    qp: ['d/acc', 'd/acc', 'e/acc', 'PauseAI', 'd/acc'].map((value, index) => ({
+      responder: person(index + 1),
+      questionId: 'qp',
+      response: { questionID: 'qp', answer: { value } },
+    })),
+  };
+  const answered = await runAnswerSet({
+    questionSet: readQuestionSet(pollExport),
+    modelRoster: { models: [{ id: 'mock-a', provider: 'mock', model: 'mock/a' }] },
+    repeats: 3,
+  });
+  assert.ok(answered.rows.every((row) => row.answer.length === 1), 'one option per reply');
+  const poll = compareAnswers({ answersFile: answered, resultsExport: pollExport, bootstrapSamples: 50 }).questions[0];
+  assert.equal(poll.type, 'multichoice');
+  assert.equal(poll.comparisons.everyone.people, 5);
+  assert.ok(Number.isFinite(poll.comparisons.everyone.models.totalVariation));
 });
 
 test('the compare-answers command writes JSON and Markdown', async () => {
