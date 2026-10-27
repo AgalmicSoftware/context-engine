@@ -320,6 +320,7 @@
   "CREATE_PANEL": "ce-create-panel",
   "CREATE_MODE_SWITCH": "ce-create-mode-switch",
   "CREATE_CLEAR": "ce-create-clear",
+  "CREATE_DRAFT_SAVE_NOTICE": "ce-create-draft-save-notice",
   "CREATE_TITLE": "ce-create-title",
   "CREATE_QUESTION": "ce-create-question",
   "CREATE_QUESTION_PROMPT": "ce-create-question-prompt",

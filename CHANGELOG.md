@@ -24,6 +24,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Show persistent authoring draft save failures with Retry and Copy draft,
+  a JSON download fallback, and an unload warning while failed edits are unsaved.
+
 - Enforce local scripts and wallet workers through the static CSP, with one
   exact script hash for the sandboxed benchmark report. Browser smoke tests
   apply the real headers, reject CSP violations and check blocked injections.

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { installClientSecurityHeaders } from './lib/client-security-headers.js';
+import { assertReadable } from './civic-theme-overlay-smoke.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { ethers } from 'ethers';
@@ -576,6 +577,69 @@ try {
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   console.log('Admin confirmed recovery-key export and downloaded a private copy without browser persistence.');
 
+  page = await adminContext.newPage();
+  await page.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' });
+  await page.getByTestId('ce-survey-create-toggle-pile').click();
+  const authoring = page.getByTestId('ce-create-panel');
+  await authoring.waitFor();
+  const manual = authoring.getByRole('button', { name: 'Manual', exact: true });
+  if (await manual.isVisible()) await manual.click();
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    window.__ceRestoreDraftStorage = () => { Storage.prototype.setItem = setItem; };
+    Storage.prototype.setItem = function (key, value) {
+      if (key.startsWith('unfinishedSurvey')) throw new DOMException('Synthetic full draft storage', 'QuotaExceededError');
+      return setItem.call(this, key, value);
+    };
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: async (value) => { window.__ceCopiedDraft = value; },
+    } });
+  });
+  await authoring.getByRole('button', { name: 'Add Freeform question', exact: true }).click();
+  const draftPrompt = 'Which local draft should survive a storage outage?';
+  await authoring.getByRole('textbox', { name: 'Question prompt', exact: true }).fill(draftPrompt);
+  const draftNotice = authoring.getByTestId('ce-create-draft-save-notice');
+  await draftNotice.getByText('Draft could not be saved in this browser.', { exact: true }).waitFor();
+  await draftNotice.getByRole('button', { name: 'Copy draft', exact: true }).click();
+  const copiedDraft = JSON.parse(await page.evaluate(() => window.__ceCopiedDraft));
+  assert.equal(copiedDraft.questions[0].prompt, draftPrompt);
+  assert.ok(await draftNotice.isVisible(), 'Copying does not claim the browser save succeeded');
+  await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Synthetic clipboard denial'); }; });
+  const draftDownload = page.waitForEvent('download');
+  await draftNotice.getByRole('button', { name: 'Copy draft', exact: true }).click();
+  const draftPath = `${outputDir}/authoring-draft.json`;
+  await (await draftDownload).saveAs(draftPath);
+  assert.equal(JSON.parse(await readFile(draftPath, 'utf8')).questions[0].prompt, draftPrompt);
+  const draftTheme = await page.evaluate(() => document.documentElement.getAttribute('data-ce-theme'));
+  for (const theme of ['context-engine', 'classic-95', 'civic']) {
+    await page.evaluate((value) => document.documentElement.setAttribute('data-ce-theme', value), theme);
+    await assertReadable(draftNotice);
+    for (const control of ['Retry', 'Copy draft']) {
+      await draftNotice.getByRole('button', { name: control, exact: true }).hover();
+      await assertReadable(draftNotice);
+      await draftNotice.getByRole('button', { name: control, exact: true }).focus();
+      await assertReadable(draftNotice);
+    }
+    await draftNotice.screenshot({ path: `${outputDir}/authoring-draft-${theme}.png` });
+  }
+  await page.evaluate((value) => value ? document.documentElement.setAttribute('data-ce-theme', value) : document.documentElement.removeAttribute('data-ce-theme'), draftTheme);
+  const unloadWarning = page.waitForEvent('dialog');
+  const cancelledReload = page.reload().catch(() => null);
+  const warning = await unloadWarning;
+  assert.equal(warning.type(), 'beforeunload');
+  await warning.dismiss();
+  await cancelledReload;
+  assert.equal(await authoring.getByRole('textbox', { name: 'Question prompt', exact: true }).inputValue(), draftPrompt);
+  await page.evaluate(() => window.__ceRestoreDraftStorage());
+  await draftNotice.getByRole('button', { name: 'Retry', exact: true }).click();
+  await draftNotice.waitFor({ state: 'hidden' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByTestId('ce-survey-create-toggle-pile').click();
+  await authoring.waitFor();
+  assert.equal(await authoring.getByRole('textbox', { name: 'Question prompt', exact: true }).inputValue(), draftPrompt);
+  assert.equal(await draftNotice.count(), 0);
+  console.log('Authoring save failure stayed visible through copy/download, warned on unload, then Retry persisted the draft across reload.');
+
   assert.deepEqual(securityPolicyRuns.flat(), [], 'Publication, passkey signing and reloads must have no CSP violations');
   assert.ok([...walletWorkerUrls].some((url) => new URL(url).origin === new URL(baseUrl).origin && /\/assets\/sessionWorker-[^/]+\.js$/.test(new URL(url).pathname)),
     `The passkey wallet module worker must start under CSP: ${JSON.stringify([...walletWorkerUrls])}`);
@@ -589,6 +653,7 @@ try {
         configRevision: config.configRevision,
         elapsedMs,
         checks: [
+          'authoring draft failure notice, copy/download, unload warning and successful retry/reload',
           'real static CSP without violations across the publication journey',
           'passkey wallet module worker startup and signed requests under CSP',
           'signed Worker verification',

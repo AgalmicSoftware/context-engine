@@ -577,6 +577,46 @@ $user-page-background: var(--ce-surface-sunken);
   font-weight: bold;
 }
 
+.draftSaveNotice {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--ce-status-warning);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-surface-sunken);
+  color: var(--ce-panel-text);
+
+  p {
+    margin: 0 0 8px;
+  }
+}
+
+.draftSaveActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.draftSaveAction {
+  padding: 6px 12px;
+  border: 1px solid var(--ce-authoring-control-border);
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-authoring-control-bg);
+  color: var(--ce-authoring-control-text);
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--ce-action-accent);
+    background: var(--ce-authoring-control-bg);
+    color: var(--ce-authoring-control-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-action-accent);
+    outline-offset: 2px;
+  }
+}
+
 .inlineValidationError {
   margin-top: 6px;
   color: var(--ce-status-danger-text);

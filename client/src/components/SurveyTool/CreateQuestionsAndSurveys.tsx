@@ -527,6 +527,7 @@ interface CreateQuestionsAndSurveysState {
   docURLInput: string;
   docURLError: string;
   formValidationError: string;
+  draftSaveFailed: boolean;
   focusTargetUiKey: string | null;
   showAIPrompt: boolean;
   aiPromptText: string;
@@ -716,6 +717,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       docURLInput: sanitizeDocumentUrls(props.documentURLs || [])[0] || '',
       docURLError: '',
       formValidationError: '',
+      draftSaveFailed: false,
 
       // Auto-focus target (replaces scrollTargetUiKey)
       focusTargetUiKey: null,
@@ -786,6 +788,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
   componentDidMount() {
     this._isMounted = true;
+    window.addEventListener('beforeunload', this.handleDraftBeforeUnload);
     if (this.state.showAIPrompt) {
       this.refreshAIPromptModelLabel();
     }
@@ -809,8 +812,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   }
 
   componentWillUnmount() {
-    this.saveToLocalStorage({ immediate: true });
     this._isMounted = false;
+    window.removeEventListener('beforeunload', this.handleDraftBeforeUnload);
+    this.saveToLocalStorage({ immediate: true });
     this.clearCopySuccessTimers();
     this.clearCacheWatch();
     if (this._draftSaveTimer) {
@@ -1238,6 +1242,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           return false;
         }
         delete parsedSurvey._sessionSlug;
+        delete parsedSurvey.draftSaveFailed;
         const autoPopulateState =
           typeof parsedSurvey.autoPopulateAiTags === 'boolean' ? parsedSurvey.autoPopulateAiTags : true;
 
@@ -1332,6 +1337,67 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     );
   };
 
+  serializeUnfinishedSurveyDraft = (): string => {
+    const sessionSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
+    const stateToSave: Partial<CreateQuestionsAndSurveysState> & { _sessionSlug?: string } = { ...this.state };
+    if (sessionSlug) {
+      stateToSave._sessionSlug = sessionSlug;
+    } else {
+      delete stateToSave._sessionSlug;
+    }
+    if (stateToSave.questions && Array.isArray(stateToSave.questions)) {
+      stateToSave.questions = stateToSave.questions.map((question) => {
+        const { uiKey, aiGeneratedTagsFromSource, ...restOfQuestion } = question;
+        return restOfQuestion;
+      });
+    }
+    // Clean up submission state so it doesn't persist on reload
+    delete stateToSave.isSubmitting;
+    delete stateToSave.progress;
+    delete stateToSave.showSubmitSteps;
+    delete stateToSave.submitStep;
+    delete stateToSave.submissionError;
+    delete stateToSave.docURLError;
+    delete stateToSave.formValidationError;
+    delete stateToSave.surveyAddedSuccessfully;
+    delete stateToSave.questionsAddedSuccessfully;
+
+    delete stateToSave.draftSaveFailed;
+    return JSON.stringify(stateToSave);
+  };
+
+  handleDraftBeforeUnload = (event: BeforeUnloadEvent): void => {
+    if (!this.state.draftSaveFailed) return;
+    if (this.serializeUnfinishedSurveyDraft() === this._lastSavedUnfinishedSurveyJson) return;
+    event.preventDefault();
+    event.returnValue = '';
+  };
+
+  copyUnfinishedSurveyDraft = async (): Promise<void> => {
+    const serializedDraft = this.serializeUnfinishedSurveyDraft();
+    try {
+      await navigator.clipboard.writeText(serializedDraft);
+      notify.success('Draft copied to clipboard');
+    } catch (_) {
+      let url: string | null = null;
+      const anchor = document.createElement('a');
+      try {
+        url = URL.createObjectURL(new Blob([serializedDraft], { type: 'application/json' }));
+        anchor.href = url;
+        anchor.download = 'context-engine-draft.json';
+        document.body.appendChild(anchor);
+        anchor.click();
+        notify.success('Draft download started');
+      } catch (_) {
+        notify.warn('Draft could not be copied or downloaded.');
+      } finally {
+        anchor.remove();
+        const downloadUrl = url;
+        if (downloadUrl) setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+      }
+    }
+  };
+
   saveToLocalStorage = (options: CreateSurveyDraftSaveOptions = {}): void => {
     const immediate = options && options.immediate === true;
     if (!immediate) {
@@ -1342,47 +1408,25 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       clearTimeout(this._draftSaveTimer);
       this._draftSaveTimer = null;
     }
-    const storage = getCreateSurveyDraftStorage();
-    if (!storage) return;
-    if (!this.props.preformedQuestions || this.props.preformedQuestions.length === 0) {
-      const sessionSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
-      const stateToSave: Partial<CreateQuestionsAndSurveysState> & { _sessionSlug?: string } = { ...this.state };
-      if (sessionSlug) {
-        stateToSave._sessionSlug = sessionSlug;
-      } else {
-        delete stateToSave._sessionSlug;
-      }
-      if (stateToSave.questions && Array.isArray(stateToSave.questions)) {
-        stateToSave.questions = stateToSave.questions.map((question) => {
-          const { uiKey, aiGeneratedTagsFromSource, ...restOfQuestion } = question;
-          return restOfQuestion;
-        });
-      }
-      // Clean up submission state so it doesn't persist on reload
-      delete stateToSave.isSubmitting;
-      delete stateToSave.progress;
-      delete stateToSave.showSubmitSteps;
-      delete stateToSave.submitStep;
-      delete stateToSave.submissionError;
-      delete stateToSave.docURLError;
-      delete stateToSave.formValidationError;
-      delete stateToSave.surveyAddedSuccessfully;
-      delete stateToSave.questionsAddedSuccessfully;
-
-      const serializedDraft = JSON.stringify(stateToSave);
-      if (serializedDraft === this._lastSavedUnfinishedSurveyJson) {
-        return;
-      }
-      try {
-        const draftKey = buildCreateSurveyDraftStorageKey(sessionSlug);
-        storage.setItem(draftKey, serializedDraft);
-        if (draftKey !== CREATE_SURVEY_DRAFT_LEGACY_KEY) {
+    if (this.props.preformedQuestions?.length) return;
+    try {
+      const storage = getCreateSurveyDraftStorage();
+      if (!storage) throw new Error('Draft storage is unavailable');
+      const serializedDraft = this.serializeUnfinishedSurveyDraft();
+      if (serializedDraft === this._lastSavedUnfinishedSurveyJson && !this.state.draftSaveFailed) return;
+      const draftKey = buildCreateSurveyDraftStorageKey(this.getActiveSessionSlug());
+      storage.setItem(draftKey, serializedDraft);
+      this._lastSavedUnfinishedSurveyJson = serializedDraft;
+      if (this._isMounted && this.state.draftSaveFailed) this.setState({ draftSaveFailed: false });
+      // Legacy cleanup failure cannot undo a successful save of the scoped draft.
+      if (draftKey !== CREATE_SURVEY_DRAFT_LEGACY_KEY) {
+        try {
           storage.removeItem(CREATE_SURVEY_DRAFT_LEGACY_KEY);
-        }
-        this._lastSavedUnfinishedSurveyJson = serializedDraft;
-      } catch (error: unknown) {
-        surveyLog.warn('[CreateQuestionsAndSurveys] Failed to save survey draft:', error);
+        } catch (_) {}
       }
+    } catch (error: unknown) {
+      if (this._isMounted && !this.state.draftSaveFailed) this.setState({ draftSaveFailed: true });
+      surveyLog.warn('[CreateQuestionsAndSurveys] Failed to save survey draft:', error);
     }
   };
 
@@ -4139,6 +4183,23 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         className={`${buildCreateSurveyContainerClassName(styles, this.props.miniaturized)} ${this.props.interviewQuestionReview ? styles.interviewQuestionReview : ''}`}
         data-testid={E2E_TESTIDS.CREATE_PANEL}
       >
+        {this.state.draftSaveFailed && (
+          <div className={styles.draftSaveNotice} data-testid={E2E_TESTIDS.CREATE_DRAFT_SAVE_NOTICE} role="alert">
+            <p>Draft could not be saved in this browser.</p>
+            <div className={styles.draftSaveActions}>
+              <button
+                type="button"
+                className={styles.draftSaveAction}
+                onClick={() => this.saveToLocalStorage({ immediate: true })}
+              >
+                Retry
+              </button>
+              <button type="button" className={styles.draftSaveAction} onClick={this.copyUnfinishedSurveyDraft}>
+                Copy draft
+              </button>
+            </div>
+          </div>
+        )}
         {/* Header: Survey/Questions toggle + single context-aware mode switch */}
         {!this.props.interviewQuestionReview && (
           <div className={styles.modeHeader}>

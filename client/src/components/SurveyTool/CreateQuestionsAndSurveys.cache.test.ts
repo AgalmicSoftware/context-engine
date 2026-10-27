@@ -303,34 +303,210 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(unscopedInstance.updateSurveyHash).toHaveBeenCalled();
   });
 
-  it('treats draft storage read and write failures as no-ops', () => {
+  it('keeps old draft read failures silent', () => {
     const readFailure = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('blocked read');
     });
-    const readInstance = makeInstance({ activeSessionSlug: 'alpha' });
-    expect(readInstance.loadFromLocalStorage()).toBe(false);
-    readFailure.mockRestore();
+    try {
+      const instance = makeInstance({ activeSessionSlug: 'alpha' });
+      expect(instance.loadFromLocalStorage()).toBe(false);
+      expect(treeHasText(instance.render(), 'Draft could not be saved in this browser.')).toBe(false);
+    } finally {
+      readFailure.mockRestore();
+    }
+  });
 
+  it('shows a persistent notice when draft storage is unavailable', () => {
+    const originalStorage = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get: () => {
+        throw new Error('storage unavailable');
+      },
+    });
+    try {
+      const instance = makeInstance({ activeSessionSlug: 'alpha' });
+      instance.state = { ...instance.state, title: 'Unsaved draft' };
+      expect(() => instance.saveToLocalStorage({ immediate: true })).not.toThrow();
+      expect(treeHasText(instance.render(), 'Draft could not be saved in this browser.')).toBe(true);
+      expect(treeHasText(instance.render(), 'Retry')).toBe(true);
+      expect(treeHasText(instance.render(), 'Copy draft')).toBe(true);
+      expect(instance._lastSavedUnfinishedSurveyJson).toBeNull();
+    } finally {
+      if (originalStorage) Object.defineProperty(window, 'localStorage', originalStorage);
+      else Reflect.deleteProperty(window, 'localStorage');
+    }
+  });
+
+  it('shows failed writes until a later save succeeds', () => {
+    const instance = makeInstance({ activeSessionSlug: 'alpha' });
+    instance.state = { ...instance.state, title: 'Unsaved draft' };
     const writeFailure = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('blocked write');
     });
-    const writeInstance = makeInstance({ activeSessionSlug: 'alpha' });
-    writeInstance.state = {
-      ...writeInstance.state,
-      title: 'No-op draft',
-      questions: [
-        {
-          id: 'q-no-op',
-          type: 'freeform',
-          prompt: 'No-op prompt?',
-          tags: [],
-        },
-      ],
-    };
+    try {
+      expect(() => instance.saveToLocalStorage({ immediate: true })).not.toThrow();
+      expect(treeHasText(instance.render(), 'Draft could not be saved in this browser.')).toBe(true);
+      expect(instance._lastSavedUnfinishedSurveyJson).toBeNull();
+      instance.state = { ...instance.state, title: 'Latest draft' };
+      instance.saveToLocalStorage({ immediate: true });
+      expect(treeHasText(instance.render(), 'Draft could not be saved in this browser.')).toBe(true);
+    } finally {
+      writeFailure.mockRestore();
+    }
+    instance.saveToLocalStorage({ immediate: true });
+    expect(treeHasText(instance.render(), 'Draft could not be saved in this browser.')).toBe(false);
+    expect(JSON.parse(localStorage.getItem(buildCreateSurveyDraftStorageKey('alpha')) || '{}').title).toBe(
+      'Latest draft',
+    );
+    expect(instance._lastSavedUnfinishedSurveyJson).not.toContain('draftSaveFailed');
+  });
 
-    expect(() => writeInstance.saveToLocalStorage({ immediate: true })).not.toThrow();
-    expect((writeInstance as any)._lastSavedUnfinishedSurveyJson).toBeNull();
-    writeFailure.mockRestore();
+  it('retries through the notice and warns on unload only while a failed draft differs from the saved copy', () => {
+    const instance = makeInstance({ activeSessionSlug: 'alpha' });
+    instance.state = { ...instance.state, title: 'Saved draft' };
+    instance.saveToLocalStorage({ immediate: true });
+    const unload = () => {
+      const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+      instance.handleDraftBeforeUnload(event);
+      return event.defaultPrevented;
+    };
+    expect(unload()).toBe(false);
+    instance.state = { ...instance.state, title: 'Changed draft' };
+    const writeFailure = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('full');
+    });
+    try {
+      instance.saveToLocalStorage({ immediate: true });
+      expect(unload()).toBe(true);
+      instance.state = { ...instance.state, title: 'Saved draft' };
+      expect(unload()).toBe(false);
+      expect(treeHasText(instance.render(), 'Draft could not be saved in this browser.')).toBe(true);
+      instance.state = { ...instance.state, title: 'Changed again' };
+    } finally {
+      writeFailure.mockRestore();
+    }
+    const retry = collectTreeNodes(instance.render(), (node) => node.props?.children === 'Retry')[0] as {
+      props: { onClick: () => void };
+    };
+    retry.props.onClick();
+    expect(unload()).toBe(false);
+    expect(instance.state.draftSaveFailed).toBe(false);
+    expect(JSON.parse(localStorage.getItem(buildCreateSurveyDraftStorageKey('alpha')) || '{}').title).toBe(
+      'Changed again',
+    );
+  });
+
+  it('copies the latest JSON while keeping the browser-save failure visible', async () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    try {
+      const instance = makeInstance({ activeSessionSlug: 'alpha' });
+      instance.state = { ...instance.state, title: 'Latest copied draft', draftSaveFailed: true };
+      const copy = collectTreeNodes(instance.render(), (node) => node.props?.children === 'Copy draft')[0] as {
+        props: { onClick: () => Promise<void> };
+      };
+      await copy.props.onClick();
+      const draft = JSON.parse(writeText.mock.calls[0][0]);
+      expect(draft.title).toBe('Latest copied draft');
+      expect(draft._sessionSlug).toBe('alpha');
+      expect(draft).not.toHaveProperty('draftSaveFailed');
+      expect(instance.state.draftSaveFailed).toBe(true);
+    } finally {
+      if (original) Object.defineProperty(navigator, 'clipboard', original);
+      else Reflect.deleteProperty(navigator, 'clipboard');
+    }
+  });
+
+  it.each(['unavailable', 'rejected'])('downloads the latest JSON when clipboard access is %s', async (mode) => {
+    jest.useFakeTimers();
+    const clipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const createUrl = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+    const revokeUrl = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
+    const blobs: Blob[] = [];
+    const revoke = jest.fn();
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: mode === 'unavailable' ? undefined : { writeText: jest.fn().mockRejectedValue(new Error('denied')) },
+    });
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: (blob: Blob) => {
+        blobs.push(blob);
+        return 'blob:synthetic-draft';
+      },
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke });
+    const downloads: string[] = [];
+    const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      downloads.push(this.download);
+    });
+    try {
+      const instance = makeInstance({ activeSessionSlug: 'alpha' });
+      instance.state = { ...instance.state, title: 'Downloaded draft', draftSaveFailed: true };
+      await instance.copyUnfinishedSurveyDraft();
+      expect(downloads).toEqual(['context-engine-draft.json']);
+      expect(blobs[0].type).toBe('application/json');
+      jest.runOnlyPendingTimers();
+      expect(revoke).toHaveBeenCalledWith('blob:synthetic-draft');
+      jest.useRealTimers();
+      const text = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.readAsText(blobs[0]);
+      });
+      expect(JSON.parse(text).title).toBe('Downloaded draft');
+      expect(instance.state.draftSaveFailed).toBe(true);
+      expect(document.querySelector('a[download="context-engine-draft.json"]')).toBeNull();
+    } finally {
+      click.mockRestore();
+      for (const [target, key, descriptor] of [
+        [navigator, 'clipboard', clipboard],
+        [URL, 'createObjectURL', createUrl],
+        [URL, 'revokeObjectURL', revokeUrl],
+      ] as const) {
+        if (descriptor) Object.defineProperty(target, key, descriptor);
+        else Reflect.deleteProperty(target, key);
+      }
+      jest.useRealTimers();
+    }
+  });
+
+  it('attaches the unload guard only while the authoring form is mounted', () => {
+    const instance = makeInstance({ activeSessionSlug: 'alpha' });
+    instance.loadFromLocalStorage = jest.fn().mockReturnValue(false);
+    instance.updateSurveyHash = jest.fn();
+    instance.loadBookmarksIntoState = jest.fn();
+    instance.updateNeedsNetworkSwitch = jest.fn();
+    instance.componentDidMount();
+    instance.state = { ...instance.state, title: 'Unsaved draft', draftSaveFailed: true };
+    const mountedEvent = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(mountedEvent);
+    expect(mountedEvent.defaultPrevented).toBe(true);
+    instance.componentWillUnmount();
+    const unmountedEvent = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(unmountedEvent);
+    expect(unmountedEvent.defaultPrevented).toBe(false);
+  });
+
+  it('keeps a scoped save successful when legacy cleanup fails', () => {
+    const instance = makeInstance({ activeSessionSlug: 'alpha' });
+    instance.state = { ...instance.state, title: 'Saved draft', draftSaveFailed: true };
+    const remove = jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('blocked cleanup');
+    });
+    try {
+      instance.saveToLocalStorage({ immediate: true });
+      expect(instance.state.draftSaveFailed).toBe(false);
+      expect(JSON.parse(localStorage.getItem(buildCreateSurveyDraftStorageKey('alpha')) || '{}').title).toBe(
+        'Saved draft',
+      );
+    } finally {
+      remove.mockRestore();
+    }
   });
 
   it('blocks submit when any question prompt is blank after trim', async () => {
