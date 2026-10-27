@@ -1217,14 +1217,23 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP)).toHaveAccessibleDescription(
       'Record a group discussion and generate questions and context from it.',
     );
-    fireEvent.mouseOver(screen.getByRole('button', { name: 'About Interview' }));
+    // A "?" explains its choice on hover or keyboard focus, and never picks it.
+    const interviewHelp = screen.getByRole('button', { name: 'About Interview' });
+    fireEvent.click(interviewHelp);
+    expect(baseProps.onSelectMode).not.toHaveBeenCalled();
+    fireEvent.mouseOver(interviewHelp);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(interviewAbout);
-    fireEvent.mouseOut(screen.getByRole('button', { name: 'About Interview' }));
+    fireEvent.mouseOut(interviewHelp);
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    const groupHelp = screen.getByRole('button', { name: 'About Group Conversation' });
+    fireEvent.focus(groupHelp);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Record a group discussion');
+    fireEvent.blur(groupHelp);
     const prefill = screen.getByRole('region', { name: 'Let your AI draft your answers' });
     // Its description is only read out with its "?", not shown as text.
     const prefillAbout =
       'Your AI drafts answers from what it knows about you, and you review them here before anything is submitted.';
-    expect(within(prefill).getByText(prefillAbout)).toHaveClass('sessionListeningSrOnly');
+    expect(within(prefill).getByText(prefillAbout)).not.toBeVisible();
     expect(
       within(prefill).getByRole('button', { name: 'About letting your AI draft your answers' }),
     ).toHaveAccessibleDescription(prefillAbout);

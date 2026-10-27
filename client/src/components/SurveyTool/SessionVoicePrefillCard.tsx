@@ -84,8 +84,9 @@ export default function SessionVoicePrefillCard({ sessionSlug = '', sessionConfi
           <FontAwesomeIcon icon={faQuestionCircle} />
         </button>
       </div>
-      {/* Tooltips aren't read out, so screen readers get the description here. */}
-      <span id="ce-session-voice-prefill-about" className={styles.sessionListeningSrOnly}>
+      {/* Tooltips aren't read out, so screen readers get the description from here,
+          with its control only: `aria-describedby` still reads hidden text. */}
+      <span id="ce-session-voice-prefill-about" hidden>
         {PREFILL_ABOUT}
       </span>
       <UncontrolledTooltip

@@ -56,8 +56,9 @@ export default function SessionVoiceModeChooser({ onSelectMode, children }: Sess
             >
               <FontAwesomeIcon icon={faQuestionCircle} />
             </button>
-            {/* Tooltips aren't read out, so screen readers get the description here. */}
-            <span id={`ce-voice-mode-${mode}-about`} className={styles.sessionListeningSrOnly}>
+            {/* Tooltips aren't read out, so screen readers get the description from here,
+                with its controls only: `aria-describedby` still reads hidden text. */}
+            <span id={`ce-voice-mode-${mode}-about`} hidden>
               {about}
             </span>
             <UncontrolledTooltip

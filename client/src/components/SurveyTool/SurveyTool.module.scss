@@ -3493,17 +3493,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 // Just right of the choice's icon and level with it: below the card's border and
 // padding, half the 2.4rem icon's height down and half its fixed 1.25em width
-// across, less half this 44px button.
+// across, less half this 44px button. On very narrow cards it stops at the edge.
 .sessionVoiceModeChoiceHelp {
   position: absolute;
   top: calc(var(--ce-border-control-width, 1px) + var(--ce-voice-choice-pad) + 1.2rem - 22px);
-  left: calc(50% + 1.5rem);
+  left: min(calc(50% + 1.5rem), calc(100% - 44px));
 }
 
-// While its card is highlighted, the "?" takes the card's highlight color.
+// While its card is highlighted, the "?" and its focus ring take the card's
+// highlight color; the theme's ring color can match the highlight itself.
 .sessionVoiceModeChoiceButton:hover + .sessionVoiceModeChoiceHelp,
 .sessionVoiceModeChoiceButton:focus-visible + .sessionVoiceModeChoiceHelp {
   color: var(--ce-action-accent-text) !important;
+  outline-color: var(--ce-action-accent-text);
 }
 
 // The AI-prefill option below the voice choices; the prompt card inside it drops its own frame.
