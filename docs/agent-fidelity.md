@@ -98,8 +98,13 @@ Similarity between a prediction and an answer runs from 0 to 1:
 
 - Intervals are 95% bootstrap intervals that resample people (default 1,000
   samples, seed 1), because rows from one person aren't independent.
-- Any result based on fewer than 5 people is withheld, including calibration,
-  anchoring and each third of the unusual-views table.
+- Any result based on fewer than 5 people is withheld, including calibration
+  and each of its confidence bands, anchoring and each third of the
+  unusual-views table.
+- Each person is the responder the Worker or the chain recorded for the
+  response; a payload's own claim counts only for raw payloads, so one account
+  can't pose as several people. The self-reported platform counts as ChatGPT,
+  Claude or other, as the app records it.
   - Groups that small are not named at all, since a group can be a single
     invite link.
   - Per-person rows, listed by pseudonym (`p001`…) and never by address, appear
@@ -146,11 +151,12 @@ Results report, below its summary statistics. It scores the responses the
 report shows, after its filters, with `scoreFidelityOverview`: the overall and
 hidden-draft Mirror Scores, the share of shown choice drafts people changed,
 a chart of stated confidence against the share kept, and the Mirror Score by
-platform. These are the same numbers as this report's, except that only
+platform. It scores in a background thread, so large sessions don't freeze
+the page, and gives the same numbers as this report's, except that only
 AI-prefill drafts count (voice and typed-context drafts restate what the
-person said) and the browser draws 200 bootstrap samples instead of 1,000.
-Every cell follows the withholding rules above, and until 5 people have shared
-draft comparisons the report shows a one-line note instead.
+person said). Every cell follows the withholding rules above, and until the
+report's responses include AI-prefill drafts from 5 people it shows a
+one-line note instead.
 
 ## Fix the plan before looking
 

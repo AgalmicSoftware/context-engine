@@ -40,13 +40,18 @@ export type FidelityEstimate = {
   suppressed?: true;
 };
 
-export type FidelityCalibrationBin = {
-  from: number;
-  to: number;
-  predictions: number;
-  meanConfidence: number;
-  keepRate: number;
-};
+// Bins from fewer people than the minimum are withheld.
+export type FidelityCalibrationBin =
+  | {
+      from: number;
+      to: number;
+      predictions: number;
+      participants: number;
+      meanConfidence: number;
+      keepRate: number;
+      suppressed?: undefined;
+    }
+  | { from: number; to: number; predictions: number; participants: number; suppressed: true };
 
 export type FidelityCalibration =
   | { participants: number; suppressed: true }

@@ -125,7 +125,11 @@ export const renderFidelityMarkdown = (report) => {
         `${result.predictions} predictions from ${result.participants} people.\n\n` +
         table(
           ['Stated confidence', 'Mean stated', 'Kept unchanged', 'Predictions'],
-          result.bins.map((bin) => [`${percent(bin.from)}–${percent(bin.to)}`, percent(bin.meanConfidence), percent(bin.keepRate), count(bin.predictions)]),
+          result.bins.map((bin) => [
+            `${percent(bin.from)}–${percent(bin.to)}`,
+            ...(bin.suppressed ? [fewer, ''] : [percent(bin.meanConfidence), percent(bin.keepRate)]),
+            count(bin.predictions),
+          ]),
         ),
   );
   const unusual = unusualViews.suppressed

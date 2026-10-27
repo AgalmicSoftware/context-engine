@@ -33,9 +33,18 @@
 .tileLabel,
 .sectionHeading {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   font-weight: 700;
+}
+
+// In the report's PDF, which can't show tooltips, each explanation prints under its label.
+.printedHelp {
+  flex-basis: 100%;
+  color: var(--ce-document-text-muted);
+  font-size: 0.8rem;
+  font-weight: 400;
 }
 
 .tileLabel {
@@ -103,9 +112,12 @@
   stroke: var(--ce-document-border);
 }
 
+// Dotted, so it can't be mistaken for the dashed hidden-drafts line.
 .chartDiagonal {
   stroke: var(--ce-document-text-muted);
-  stroke-dasharray: 4 4;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 0.5 4;
 }
 
 .chartTick,

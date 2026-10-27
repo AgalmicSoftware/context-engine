@@ -11,23 +11,24 @@ const questions = {
 const sessionConfig = { interviewMode: { showFidelityScore: true } };
 const address = (index: number) => `0x${String(index + 1).padStart(40, '0')}`;
 
-// A stored answer whose AI-prefill draft said "Agree" with 80% confidence.
+// A stored answer whose AI-prefill draft said "Agree", by default with 80% confidence.
 const row = (
   responder: string,
   questionId: string,
   answer: string,
-  { platform = 'claude', condition = 'shown', origin = 'external_prefill' } = {},
+  { platform = 'claude', condition = 'shown', origin = 'external_prefill', confidence = 0.8, claimed = '' } = {},
 ) => ({
   responder,
   questionId,
   timestamp: 1,
   response: {
     questionID: questionId,
+    ...(claimed ? { responder: claimed } : {}),
     answer: { value: answer, encrypted: false },
     interviewProvenance: {
       draftOrigin: origin,
       source: { platform, modelId: 'test-model' },
-      originalPrediction: { answer: 'Agree', confidence: 0.8 },
+      originalPrediction: { answer: 'Agree', confidence },
       predictionCondition: condition,
       confidenceMeaning: 'keep',
     },
@@ -52,70 +53,80 @@ const byQuestion = (rows: ReturnType<typeof row>[]) =>
     return map;
   }, {});
 
+const renderSection = (rows: ReturnType<typeof row>[], props = {}) =>
+  render(
+    <PolisReportFidelitySection
+      sessionConfig={sessionConfig}
+      questions={questions}
+      questionResponses={byQuestion(rows)}
+      {...props}
+    />,
+  );
+
 describe('PolisReportFidelitySection', () => {
-  it('scores AI-prefill drafts from the loaded responses, withholding cells with fewer than 5 people', () => {
-    render(
-      <PolisReportFidelitySection
-        sessionConfig={sessionConfig}
-        questions={questions}
-        questionResponses={byQuestion(sixPeople().flat())}
-      />,
-    );
-    const panel = screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);
+  it('scores AI-prefill drafts from the loaded responses, withholding cells with fewer than 5 people', async () => {
+    renderSection(sixPeople().flat());
+    const panel = await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);
     expect(panel).toHaveTextContent('18 AI-drafted answers from 6 people');
     // Mirror Score: three people matched every draft, three matched two of three: 5/6.
     expect(screen.getByRole('group', { name: 'Mirror Score' })).toHaveTextContent(/^Mirror Score.*83%95% interval/);
-    expect(screen.getByRole('group', { name: 'Hidden drafts' })).toHaveTextContent('100%');
+    expect(screen.getByRole('group', { name: 'Hidden drafts' })).toHaveTextContent('100%6 drafts');
     // Changed: half the shown choice drafts for three of six people.
     expect(screen.getByRole('group', { name: 'Changed' })).toHaveTextContent('25%');
     // Stated 80%; 9 of 12 shown drafts and all 6 hidden ones were kept.
     expect(panel).toHaveTextContent('Drafts shown: off by 5 points on average');
     expect(panel).toHaveTextContent('Drafts hidden: off by 20 points on average');
-    expect(
-      screen.getByRole('img', { name: /Stated confidence against the share of answers people kept/ }),
-    ).toBeVisible();
+    expect(screen.getByRole('img', { name: /the diagonal is where they are equal/ })).toBeVisible();
     const platforms = within(screen.getByRole('heading', { name: 'By platform' }).closest('section') as HTMLElement);
     // Claude: three people at 3/3 and two at 2/3.
     expect(platforms.getByRole('row', { name: /^Claude/ })).toHaveTextContent(/^Claude87%.*5$/);
     expect(platforms.getByRole('row', { name: /^ChatGPT/ })).toHaveTextContent(/^ChatGPTFewer than 5 people1$/);
   });
 
-  it('leaves out drafts that only restate what people said', () => {
+  it('keeps confidence bands from fewer than 5 people off the chart', async () => {
+    const rows = sixPeople().flat();
+    rows[0] = row(address(0), 'qb1', 'Agree', { confidence: 0.35 });
+    renderSection(rows);
+    await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);
+    const chart = screen.getByRole('img', { name: /Stated confidence/ });
+    // Two bands for shown drafts (35% and 80%), one plotted; the hidden drafts' band is plotted too.
+    expect(chart.querySelectorAll('circle')).toHaveLength(2);
+    fireEvent.click(screen.getByText('Numbers'));
+    expect(screen.getByRole('row', { name: /30–40%: fewer than 5 people/ })).toHaveTextContent(/1$/);
+  });
+
+  it('leaves out drafts that only restate what people said, and AIs named nothing the app knows count as other', async () => {
+    const people = sixPeople().map((answers, index) =>
+      index === 0
+        ? answers.map((entry) => row(entry.responder, entry.questionId, 'Agree', { platform: '__proto__' }))
+        : answers,
+    );
     const voice = Array.from({ length: 5 }, (_, index) =>
       row(address(index + 10), 'qb1', 'Agree', { origin: 'voice_interview', platform: 'other' }),
     );
-    render(
-      <PolisReportFidelitySection
-        sessionConfig={sessionConfig}
-        questions={questions}
-        questionResponses={byQuestion([...sixPeople().flat(), ...voice])}
-      />,
-    );
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY)).toHaveTextContent(
+    renderSection([...people.flat(), ...voice]);
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY)).toHaveTextContent(
       '18 AI-drafted answers from 6 people',
     );
-    expect(screen.queryByRole('row', { name: /^Other/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /^Other/ })).toHaveTextContent(/^OtherFewer than 5 people1$/);
   });
 
-  it('folds away like the other report sections, and stays open for the PDF', () => {
-    const props = { sessionConfig, questions, questionResponses: byQuestion(sixPeople().flat()) };
-    const { rerender } = render(<PolisReportFidelitySection {...props} />);
-    const toggle = screen.getByRole('button', { name: 'How well AIs predicted people' });
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('group', { name: 'Mirror Score' })).not.toBeInTheDocument();
-    rerender(<PolisReportFidelitySection {...props} pdfMode />);
-    expect(screen.getByRole('group', { name: 'Mirror Score' })).toBeVisible();
-  });
-
-  it('says when it will show, and stays hidden while the session has it off', () => {
-    const three = byQuestion(sixPeople().slice(0, 3).flat());
-    const { rerender, container } = render(
-      <PolisReportFidelitySection sessionConfig={sessionConfig} questions={questions} questionResponses={three} />,
+  it("doesn't let one account pose as five people", async () => {
+    // One account's answers, each claiming a different responder inside the payload.
+    renderSection(
+      ['qb1', 'qb2', 'qb3'].flatMap((questionId) =>
+        Array.from({ length: 5 }, (_, index) => row(address(0), questionId, 'Agree', { claimed: address(index + 20) })),
+      ),
     );
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY)).toHaveTextContent(
-      'shows here once 5 people have shared their AI draft changes',
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY)).toHaveTextContent(
+      'appears once these results include AI-prefill drafts from at least 5 people',
+    );
+  });
+
+  it('says when it will show, and stays hidden while the session has it off', async () => {
+    const { rerender, container } = renderSection(sixPeople().slice(0, 3).flat());
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY)).toHaveTextContent(
+      'How well AIs predicted people appears once these results include AI-prefill drafts from at least 5 people.',
     );
     expect(screen.queryByText('Mirror Score')).not.toBeInTheDocument();
 
@@ -131,19 +142,45 @@ describe('PolisReportFidelitySection', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('explains each number behind a question mark that screen readers can reach', () => {
-    render(
+  it('shows the share of drafts changed only when people saw some', async () => {
+    renderSection(
+      sixPeople()
+        .flat()
+        .map((entry) => row(entry.responder, entry.questionId, 'Agree', { condition: 'blind' })),
+    );
+    await screen.findByRole('group', { name: 'Hidden drafts' });
+    expect(screen.queryByRole('group', { name: 'Changed' })).not.toBeInTheDocument();
+  });
+
+  it('folds away like the other report sections, and prints its explanations for the PDF', async () => {
+    const { rerender } = renderSection(sixPeople().flat());
+    const toggle = await screen.findByRole('button', { name: 'How well AIs predicted people' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('group', { name: 'Mirror Score' })).not.toBeInTheDocument();
+
+    rerender(
       <PolisReportFidelitySection
         sessionConfig={sessionConfig}
         questions={questions}
         questionResponses={byQuestion(sixPeople().flat())}
+        pdfMode
       />,
     );
-    expect(screen.getByRole('button', { name: 'About Mirror Score' })).toHaveAccessibleDescription(
+    const mirror = await screen.findByRole('group', { name: 'Mirror Score' });
+    expect(mirror).toBeVisible();
+    expect(within(mirror).getByText(/How closely the AI's drafts matched people's answers/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'About Mirror Score' })).not.toBeInTheDocument();
+  });
+
+  it('explains each number behind a question mark that screen readers can reach', async () => {
+    renderSection(sixPeople().flat());
+    expect(await screen.findByRole('button', { name: 'About Mirror Score' })).toHaveAccessibleDescription(
       /How closely the AI's drafts matched people's answers/,
     );
     expect(screen.getByRole('button', { name: 'About confidence' })).toHaveAccessibleDescription(
-      /When the AI says it is 80% sure/,
+      /Points below the diagonal mean it was overconfident/,
     );
   });
 });

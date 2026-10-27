@@ -241,6 +241,11 @@ const readPercentConfidence = (value) => {
   return number !== null && number >= 0 && number <= 100 ? number / 100 : null;
 };
 const readAddress = (value) => lower(typeof value === 'string' ? value : isRecord(value) ? value.address : '');
+// Self-reported, so any assistant but the two the app names counts as other, as the app records it.
+const readPlatform = (value) => {
+  const platform = lower(value);
+  return platform === 'chatgpt' || platform === 'claude' ? platform : platform ? 'other' : 'unknown';
+};
 const toMs = (value) => {
   const number = numberOrNull(value);
   if (number !== null) return number < 1e12 ? number * 1000 : number;
@@ -318,7 +323,9 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
         skipped.unknownQuestion += 1;
         continue;
       }
-      const participantId = readAddress(entry.responder) || readAddress(payload.responder) || readAddress(row?.responder);
+      // A row's responder comes from the Worker or the chain; a payload's own
+      // claim is only a fallback for raw payloads, so one account can't pose as many.
+      const participantId = readAddress(row?.responder) || readAddress(payload.responder) || readAddress(entry.responder);
       if (!participantId) {
         skipped.noParticipant += 1;
         continue;
@@ -362,7 +369,7 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
       questionId,
       condition,
       origin: inferDraftOrigin(provenance),
-      platform: lower(source.platform) || 'unknown',
+      platform: readPlatform(source.platform),
       modelId: text(source.modelId) || 'unknown',
       prediction,
       actual: blindAnswer ?? final,
@@ -616,16 +623,27 @@ const calibrationSummary = (pairs, bins) => {
   return summary;
 };
 const calibrationTable = (summaries, bins) => {
-  const totals = Array.from({ length: bins }, () => [0, 0, 0]);
+  // Per bin: predictions, summed confidence, kept answers and people.
+  const totals = Array.from({ length: bins }, () => [0, 0, 0, 0]);
   let [predictions, brier] = [0, 0];
   for (const summary of summaries) {
     predictions += summary.predictions;
     brier += summary.brier;
-    summary.bins.forEach((bin, index) => bin.forEach((value, k) => (totals[index][k] += value)));
+    summary.bins.forEach((bin, index) => {
+      bin.forEach((value, k) => (totals[index][k] += value));
+      if (bin[0]) totals[index][3] += 1;
+    });
   }
   if (!predictions) return null;
   const used = totals
-    .map(([count, confidence, kept], index) => ({ from: index / bins, to: (index + 1) / bins, count, confidence, kept }))
+    .map(([count, confidence, kept, people], index) => ({
+      from: index / bins,
+      to: (index + 1) / bins,
+      count,
+      confidence,
+      kept,
+      people,
+    }))
     .filter((bin) => bin.count);
   return {
     predictions,
@@ -640,6 +658,7 @@ const calibrationTable = (summaries, bins) => {
       predictions: bin.count,
       meanConfidence: bin.confidence / bin.count,
       keepRate: bin.kept / bin.count,
+      participants: bin.people,
     })),
   };
 };
@@ -653,8 +672,15 @@ const calibrationEstimate = (people, condition, options) => {
     .filter((summary) => summary.predictions);
   if (!summaries.length) return null;
   if (summaries.length < options.minParticipants) return { participants: summaries.length, suppressed: true };
+  const table = calibrationTable(summaries, bins);
   return {
-    ...calibrationTable(summaries, bins),
+    ...table,
+    // A bin from fewer people than the minimum would describe those people's answers.
+    bins: table.bins.map(({ from, to, predictions, participants, ...rates }) =>
+      participants < options.minParticipants
+        ? { from, to, predictions, participants, suppressed: true }
+        : { from, to, predictions, ...rates, participants },
+    ),
     participants: summaries.length,
     brierInterval: bootstrapInterval(summaries, (draw) => calibrationTable(draw, bins)?.brier ?? null, options),
     errorInterval: bootstrapInterval(

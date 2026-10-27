@@ -2431,6 +2431,53 @@ it('adds how well AIs predicted people below the summary, when the session shows
   }
 });
 
+it("scores only the report's filtered responses", async () => {
+  cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+    namespace === 'questionsCache'
+      ? {
+          84532: {
+            questions: {
+              q1: { type: 'binary', prompt: 'First', tags: ['kept'] },
+              q2: { type: 'binary', prompt: 'Second', tags: ['other'] },
+            },
+          },
+        }
+      : {},
+  );
+  const rows = (questionId) =>
+    Array.from({ length: 5 }, (_, index) => ({
+      responder: `0x${String(index + 1).repeat(40)}`,
+      questionId,
+      response: JSON.stringify({
+        questionID: questionId,
+        answer: { value: 'Agree', encrypted: false },
+        interviewProvenance: {
+          draftOrigin: 'external_prefill',
+          source: { platform: 'claude', modelId: 'test-model' },
+          originalPrediction: { answer: 'Agree', confidence: 0.8 },
+          predictionCondition: 'shown',
+          confidenceMeaning: 'keep',
+        },
+      }),
+    }));
+  try {
+    render(
+      <PolisReport
+        {...baseReportProps}
+        slug="fidelity-filtered"
+        questionResponses={{ q1: rows('q1'), q2: rows('q2') }}
+        filterState={{ selectedTags: ['kept'] }}
+        sessionConfig={{ interviewMode: { showFidelityScore: true } }}
+      />,
+    );
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY)).toHaveTextContent(
+      '5 AI-drafted answers from 5 people',
+    );
+  } finally {
+    cacheScripts.peekCacheSync.mockImplementation(() => ({}));
+  }
+});
+
 it('ranks top questions by importance before conviction', () => {
   const row = (responder, questionID, importance, conviction) => ({
     responder,

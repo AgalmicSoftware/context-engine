@@ -138,8 +138,8 @@ participant's AI-prefill drafts until they answer, to measure how much seeing
 a draft sways answers; it applies only while they share draft changes. **Show
 participants how well their AI predicted them** (`interviewMode.showFidelityScore`,
 off by default) shows a private score after someone submits AI-prefill drafts,
-and an overall section in the Results report once 5 people share draft
-comparisons.
+and an overall section in the Results report once its responses include
+AI-prefill drafts from 5 people.
 **Suggest open groups that fit participants’ answers**
 (`interviewMode.suggestGroups`, off by default) offers the session's open groups
 after an interview or AI prefill, without joining for anyone. Older Session

@@ -1,31 +1,30 @@
-import React, { useId, useMemo, useState } from 'react';
+import React, { createContext, useContext, useId, useMemo, useState } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
-import {
-  collectSessionFidelityData,
-  resultsResponseRows,
-  scoreFidelityOverview,
-  type FidelityCalibration,
-  type FidelityCalibrationBin,
-  type FidelityEstimate,
+import type {
+  FidelityCalibration,
+  FidelityCalibrationBin,
+  FidelityEstimate,
 } from '../../../../shared/agentFidelity.mjs';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import PolisReportSectionToggleLabel from './PolisReportSectionToggleLabel';
+import { useFidelityOverview } from './useFidelityOverview';
 import styles from './PolisReportFidelitySection.module.scss';
 import reportStyles from './PolisReport.module.scss';
 
-// The page reruns this whenever its data changes, so it draws fewer bootstrap
-// samples than the command-line report's 1000; the intervals are a little rougher.
-const BOOTSTRAP_SAMPLES = 200;
+const TITLE = 'How well AIs predicted people';
 const PLATFORM_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
   claude: 'Claude',
   other: 'Other',
   unknown: 'Not stated',
 };
+// Platforms are self-reported, so only the table's own entries can name one.
+const platformLabel = (platform: string): string =>
+  Object.prototype.hasOwnProperty.call(PLATFORM_LABELS, platform) ? PLATFORM_LABELS[platform] : platform;
 const SERIES = [
   { condition: 'shown', label: 'Drafts shown' },
   { condition: 'blind', label: 'Drafts hidden' },
@@ -36,11 +35,17 @@ const percent = (value: number | null | undefined): string =>
   typeof value === 'number' && Number.isFinite(value) ? `${whole(value)}%` : '–';
 const percentRange = (interval: [number, number] | null | undefined, unit = '%'): string =>
   interval ? `${whole(interval[0])}–${whole(interval[1])}${unit}` : '–';
+const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`;
+
+// A PDF can't show tooltips, so the report's PDF mode prints each explanation instead.
+const PdfMode = createContext(false);
 
 type HelpProps = { id: string; label: string; children: string };
 
 // A "?" with the explanation in a tooltip; screen readers get it from the hidden copy.
 function Help({ id, label, children }: HelpProps) {
+  const printing = useContext(PdfMode);
+  if (printing) return <span className={styles.printedHelp}>{children}</span>;
   return (
     <>
       <button
@@ -94,7 +99,8 @@ function Tile({ id, label, help, estimate, detail, minimum }: TileProps) {
   );
 }
 
-type ChartSeries = { condition: string; label: string; bins: FidelityCalibrationBin[] };
+type PlottedBin = Extract<FidelityCalibrationBin, { meanConfidence: number }>;
+type ChartSeries = { condition: string; label: string; bins: PlottedBin[] };
 
 // Plot area inside a 260 by 240 view box, with room for the axis labels.
 const LEFT = 48;
@@ -108,7 +114,7 @@ function CalibrationChart({ series }: { series: ChartSeries[] }) {
   return (
     <svg className={styles.chart} viewBox="0 0 260 240" role="img" aria-labelledby="ce-results-fidelity-chart-title">
       <title id="ce-results-fidelity-chart-title">
-        Stated confidence against the share of answers people kept; the dashed line is where they are equal.
+        Stated confidence against the share of answers people kept; the diagonal is where they are equal.
       </title>
       <rect className={styles.chartFrame} x={LEFT} y={TOP} width={SIDE} height={SIDE} />
       <line className={styles.chartDiagonal} x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} />
@@ -157,9 +163,14 @@ function Calibration({ calibration, minimum }: CalibrationProps) {
     return result ? [{ condition, label, result }] : [];
   });
   if (!present.length) return <p className={styles.detail}>No draft stated a confidence to check yet.</p>;
-  const charted = present.flatMap(({ condition, label, result }) =>
+  const tabled = present.flatMap(({ condition, label, result }) =>
     result.suppressed ? [] : [{ condition, label, bins: result.bins }],
   );
+  // Confidence bands from fewer people than the minimum stay off the chart.
+  const charted = tabled.flatMap(({ condition, label, bins }) => {
+    const plotted = bins.filter((bin): bin is PlottedBin => !bin.suppressed);
+    return plotted.length ? [{ condition, label, bins: plotted }] : [];
+  });
   return (
     <>
       {charted.length ? <CalibrationChart series={charted} /> : null}
@@ -172,11 +183,11 @@ function Calibration({ calibration, minimum }: CalibrationProps) {
             <strong>{label}:</strong>{' '}
             {result.suppressed
               ? `withheld, fewer than ${minimum} people`
-              : `off by ${whole(result.expectedCalibrationError)} points on average (95% interval ${percentRange(result.errorInterval, '')}), ${result.predictions} answers from ${result.participants} people`}
+              : `off by ${whole(result.expectedCalibrationError)} points on average (95% interval ${percentRange(result.errorInterval, '')}), ${plural(result.predictions, 'answer')} from ${result.participants} people`}
           </li>
         ))}
       </ul>
-      {charted.length ? (
+      {tabled.length ? (
         <details className={styles.numbers}>
           <summary>Numbers</summary>
           <table className={styles.table}>
@@ -189,12 +200,20 @@ function Calibration({ calibration, minimum }: CalibrationProps) {
               </tr>
             </thead>
             <tbody>
-              {charted.flatMap(({ condition, label, bins }) =>
+              {tabled.flatMap(({ condition, label, bins }) =>
                 bins.map((bin) => (
                   <tr key={`${condition}-${bin.from}`}>
                     <td>{label}</td>
-                    <td>{percent(bin.meanConfidence)}</td>
-                    <td>{percent(bin.keepRate)}</td>
+                    {bin.suppressed ? (
+                      <td colSpan={2}>
+                        {percentRange([bin.from, bin.to])}: fewer than {minimum} people
+                      </td>
+                    ) : (
+                      <>
+                        <td>{percent(bin.meanConfidence)}</td>
+                        <td>{percent(bin.keepRate)}</td>
+                      </>
+                    )}
                     <td>{bin.predictions}</td>
                   </tr>
                 )),
@@ -215,8 +234,6 @@ export type PolisReportFidelitySectionProps = {
   pdfMode?: boolean;
 };
 
-const TITLE = 'How well AIs predicted people';
-
 /**
  * How well people's AI-prefill drafts predicted their answers, for sessions
  * that show participants their score. It scores the responses the report
@@ -232,35 +249,18 @@ export default function PolisReportFidelitySection({
   const bodyId = useId();
   const config = sessionConfig && typeof sessionConfig === 'object' ? (sessionConfig as Record<string, unknown>) : {};
   const enabled = normalizeInterviewSettings(config.interviewMode).showFidelityScore;
-  const overview = useMemo(() => {
-    if (!enabled || !questionResponses) return null;
-    // Cached questions are keyed by ID and may not repeat it inside.
-    const questionList = Object.entries(questions || {}).map(([id, question]) => ({
-      id,
-      ...(question && typeof question === 'object' ? question : {}),
-    }));
-    const { pairs } = collectSessionFidelityData({
-      questions: questionList,
-      payloads: resultsResponseRows({ filteredQuestionResponses: questionResponses }),
-    });
-    // Like each person's own score: voice and typed-context drafts restate
-    // what the person said, so only their AI's prefill counts.
-    const prefill = pairs.filter((pair) => pair.origin === 'external_prefill');
-    return prefill.length
-      ? scoreFidelityOverview({
-          questions: questionList,
-          pairs: prefill,
-          options: { bootstrapSamples: BOOTSTRAP_SAMPLES },
-        })
-      : null;
-  }, [enabled, questions, questionResponses]);
+  const input = useMemo(
+    () => (enabled && questionResponses ? { questions: questions || {}, questionResponses } : null),
+    [enabled, questions, questionResponses],
+  );
+  const overview = useFidelityOverview(input);
   if (!overview) return null;
 
   const minimum = overview.options.minParticipants;
   if (overview.coverage.participants < minimum) {
     return (
       <p className={styles.pending} data-testid={E2E_TESTIDS.SESSION_RESULTS_FIDELITY}>
-        {TITLE} shows here once {minimum} people have shared their AI draft changes.
+        {TITLE} appears once these results include AI-prefill drafts from at least {minimum} people.
       </p>
     );
   }
@@ -289,84 +289,88 @@ export default function PolisReportFidelitySection({
           </span>
         </button>
       </h2>
-      <div id={bodyId} className={`${reportStyles.statsSection} ${styles.body}`} hidden={!expanded}>
-        <p className={styles.detail}>
-          {coverage.predictions} AI-drafted answers from {coverage.participants} people, compared with what they
-          submitted.
-        </p>
-        <div className={styles.tiles}>
-          <Tile
-            id="ce-results-fidelity-mirror"
-            label="Mirror Score"
-            help="How closely the AI's drafts matched people's answers, from 0 to 100%. Near misses get partial credit, and each person counts once."
-            estimate={mirrorScore.overall}
-            detail="All drafts"
-            minimum={minimum}
-          />
-          {hidden ? (
+      <PdfMode.Provider value={pdfMode}>
+        <div id={bodyId} className={`${reportStyles.statsSection} ${styles.body}`} hidden={!expanded}>
+          <p className={styles.detail}>
+            {plural(coverage.predictions, 'AI-drafted answer')} from {coverage.participants} people, compared with what
+            they submitted.
+          </p>
+          <div className={styles.tiles}>
             <Tile
-              id="ce-results-fidelity-hidden"
-              label="Hidden drafts"
-              help="The Mirror Score for drafts kept hidden until the person answered, so seeing the draft couldn't sway them."
-              estimate={hidden}
-              detail={`${coverage.byCondition.blind} drafts`}
+              id="ce-results-fidelity-mirror"
+              label="Mirror Score"
+              help="How closely the AI's drafts matched people's answers, from 0 to 100%. Near misses get partial credit, and each person counts once."
+              estimate={mirrorScore.overall}
+              detail="All drafts"
               minimum={minimum}
             />
-          ) : null}
-          <Tile
-            id="ce-results-fidelity-changed"
-            label="Changed"
-            help="The share of the choice drafts people saw that they changed before submitting."
-            estimate={correctionRate}
-            detail="Choice drafts shown"
-            minimum={minimum}
-          />
-        </div>
-        <section className={styles.section} aria-labelledby="ce-results-fidelity-confidence">
-          <div className={styles.sectionHeading}>
-            <h3 id="ce-results-fidelity-confidence">Confidence</h3>
-            <Help id="ce-results-fidelity-calibration" label="About confidence">
-              When the AI says it is 80% sure, people should keep about 80% of those answers. Points below the dashed
-              line mean it was overconfident; above it, underconfident.
-            </Help>
+            {hidden ? (
+              <Tile
+                id="ce-results-fidelity-hidden"
+                label="Hidden drafts"
+                help="The Mirror Score for drafts kept hidden until the person answered, so seeing the draft couldn't sway them."
+                estimate={hidden}
+                detail={plural(coverage.byCondition.blind, 'draft')}
+                minimum={minimum}
+              />
+            ) : null}
+            {correctionRate.participants ? (
+              <Tile
+                id="ce-results-fidelity-changed"
+                label="Changed"
+                help="How many of the choice drafts each person saw they changed before submitting, averaged over people."
+                estimate={correctionRate}
+                detail="Choice drafts shown"
+                minimum={minimum}
+              />
+            ) : null}
           </div>
-          <Calibration calibration={calibration} minimum={minimum} />
-        </section>
-        <section className={styles.section} aria-labelledby="ce-results-fidelity-platforms">
-          <div className={styles.sectionHeading}>
-            <h3 id="ce-results-fidelity-platforms">By platform</h3>
-            <Help id="ce-results-fidelity-platform" label="About platforms">
-              Which AI drafted the answers, as each prefill reported it.
-            </Help>
-          </div>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th scope="col">Platform</th>
-                <th scope="col">Mirror Score</th>
-                <th scope="col">95% interval</th>
-                <th scope="col">People</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(mirrorScore.byPlatform).map(([platform, estimate]) => (
-                <tr key={platform}>
-                  <th scope="row">{PLATFORM_LABELS[platform] || platform}</th>
-                  {estimate.suppressed ? (
-                    <td colSpan={2}>Fewer than {minimum} people</td>
-                  ) : (
-                    <>
-                      <td>{percent(estimate.value)}</td>
-                      <td>{percentRange(estimate.interval)}</td>
-                    </>
-                  )}
-                  <td>{estimate.participants}</td>
+          <section className={styles.section} aria-labelledby="ce-results-fidelity-confidence">
+            <div className={styles.sectionHeading}>
+              <h3 id="ce-results-fidelity-confidence">Confidence</h3>
+              <Help id="ce-results-fidelity-calibration" label="About confidence">
+                When the AI says it is 80% sure, people should keep about 80% of those answers. Points below the
+                diagonal mean it was overconfident; above it, underconfident.
+              </Help>
+            </div>
+            <Calibration calibration={calibration} minimum={minimum} />
+          </section>
+          <section className={styles.section} aria-labelledby="ce-results-fidelity-platforms">
+            <div className={styles.sectionHeading}>
+              <h3 id="ce-results-fidelity-platforms">By platform</h3>
+              <Help id="ce-results-fidelity-platform" label="About platforms">
+                Which AI drafted the answers, as each prefill reported it.
+              </Help>
+            </div>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th scope="col">Platform</th>
+                  <th scope="col">Mirror Score</th>
+                  <th scope="col">95% interval</th>
+                  <th scope="col">People</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      </div>
+              </thead>
+              <tbody>
+                {Object.entries(mirrorScore.byPlatform).map(([platform, estimate]) => (
+                  <tr key={platform}>
+                    <th scope="row">{platformLabel(platform)}</th>
+                    {estimate.suppressed ? (
+                      <td colSpan={2}>Fewer than {minimum} people</td>
+                    ) : (
+                      <>
+                        <td>{percent(estimate.value)}</td>
+                        <td>{percentRange(estimate.interval)}</td>
+                      </>
+                    )}
+                    <td>{estimate.participants}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        </div>
+      </PdfMode.Provider>
     </section>
   );
 }

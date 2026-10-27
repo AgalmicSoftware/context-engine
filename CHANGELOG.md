@@ -73,10 +73,11 @@ All notable changes to this project will be documented in this file.
 ### Client — available when the site deploys
 
 - Add **How well AIs predicted people** to the Results report of sessions with
-  `interviewMode.showFidelityScore`, once 5 people share AI draft comparisons:
-  the overall and hidden-draft Mirror Scores, how often people changed a
-  shown draft, stated confidence against answers kept, and results by
-  platform, each withheld below 5 people.
+  `interviewMode.showFidelityScore`, once its responses include AI-prefill
+  drafts from 5 people: the overall and hidden-draft Mirror Scores, how often
+  people changed a shown draft, stated confidence against answers kept, and
+  results by platform, each withheld below 5 people. It scores in a
+  background thread.
 - Suggest the session's open groups after an interview or AI prefill link
   (`interviewMode.suggestGroups`, off by default; needs a Session Worker
   newer than 0.7.0). A group named like the person's single-choice answer
@@ -256,6 +257,9 @@ All notable changes to this project will be documented in this file.
   export or Session Wrapped rows. It reports Mirror Score, correction rate,
   calibration, lift over a majority guess, accuracy for unusual views, and
   whether drafts flatten strong or varied views. See `docs/agent-fidelity.md`.
+  It counts each response under the responder the Worker or chain recorded,
+  not the payload's own claim, reads platforms as ChatGPT, Claude or other,
+  and withholds calibration bands from fewer than 5 people.
 - Keep shared AI draft comparisons minimal by default: predicted answers, ratings,
   confidence and changed fields, without the AI's notes, drafted text or drafts
   for skipped questions. Owners can choose full detail with

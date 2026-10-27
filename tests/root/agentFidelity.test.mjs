@@ -132,6 +132,32 @@ test('session records yield final answers and prediction pairs', () => {
   assert.deepEqual(skipped, { unknownQuestion: 1, noParticipant: 0, unreadableAnswer: 1, unreadablePrediction: 0, freeformWithoutText: 0 });
 });
 
+test('one account counts once, whoever its payloads claim to be, and platforms are read like the app reads them', () => {
+  // The Worker attests the row's responder; the payload's claims are not trusted.
+  const account = '0xaaa0000000000000000000000000000000000001';
+  const platforms = ['ChatGPT', '__proto__', '', 'gemini', 'claude'];
+  const rows = ['qb1', 'qb2', 'qb3', 'qb4', 'qs'].map((questionId, index) => ({
+    responder: account,
+    questionId,
+    response: {
+      ...entry(questionId, questionId === 'qs' ? ['A'] : 'Agree', {
+        ...predicted(questionId === 'qs' ? ['A'] : 'Agree', 0.8),
+        source: { platform: platforms[index], modelId: 'm' },
+      }),
+      responder: `0xbbb${String(index).padStart(37, '0')}`,
+    },
+  }));
+  const { pairs } = collectSessionFidelityData({ questions, payloads: rows });
+  assert.deepEqual([...new Set(pairs.map((pair) => pair.participantId))], [account]);
+  assert.deepEqual(
+    pairs.map((pair) => pair.platform),
+    ['chatgpt', 'other', 'unknown', 'other', 'claude'],
+  );
+  // Raw payloads without a row still name their responder.
+  const raw = collectSessionFidelityData({ questions, payloads: [{ ...rows[0].response }] });
+  assert.equal(raw.pairs[0].participantId, rows[0].response.responder);
+});
+
 test('confidences are labelled by what the prompt asked them to mean', () => {
   const rows = [
     {
@@ -304,6 +330,21 @@ test('results from fewer people than the minimum are withheld everywhere', () =>
   assert.deepEqual(report.calibration.blind, { participants: 1, suppressed: true });
   assert.equal(report.anchoring.exactMatchShift.suppressed, true);
   assert.ok(report.calibration.shown.bins.length > 0);
+
+  // A confidence band only one person's AI used is withheld, while the rest of calibration shows.
+  const banded = scoreAgentFidelity({
+    questions,
+    pairs: pairsFor(
+      () => 'Agree',
+      (person, questionId) => (questionId === 'qb1' && person === people[0] ? { confidence: 0.35 } : {}),
+    ),
+    answers: answersFor(),
+    options: { bootstrapSamples: 50, minParticipants: 5 },
+  });
+  assert.deepEqual(banded.calibration.shown.bins[0], { from: 0.3, to: 0.4, predictions: 1, participants: 1, suppressed: true });
+  // The other 39 drafts said "Agree" at 90%; 23 of them were kept.
+  assert.equal(banded.calibration.shown.bins[1].participants, 10);
+  assert.ok(Math.abs(banded.calibration.shown.bins[1].keepRate - 23 / 39) < 1e-12);
 
   const few = scoreAgentFidelity({ questions, pairs: pairsFor(() => 'Agree').slice(0, 16), answers: answersFor(), options: { minParticipants: 5 } });
   assert.equal(few.coverage.participants, 4);
