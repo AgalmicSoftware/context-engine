@@ -35,7 +35,10 @@ export default function PileQuestionPrompt({ children }: { children: ReactNode }
         body.dataset.pileAnswerLayout = 'centered';
         const gap = parseFloat(getComputedStyle(body).rowGap) || 0;
         const answerBox = content.getBoundingClientRect();
-        if (header.getBoundingClientRect().bottom + gap > answerBox.top || answerBox.bottom + gap > footer.getBoundingClientRect().top) {
+        if (
+          header.getBoundingClientRect().bottom + gap > answerBox.top ||
+          answerBox.bottom + gap > footer.getBoundingClientRect().top
+        ) {
           delete body.dataset.pileAnswerLayout;
         }
       }
@@ -67,5 +70,9 @@ export default function PileQuestionPrompt({ children }: { children: ReactNode }
     };
   }, [children]);
 
-  return <div ref={headerRef} className={styles.pileCardHeader}>{children}</div>;
+  return (
+    <div ref={headerRef} className={styles.pileCardHeader}>
+      {children}
+    </div>
+  );
 }
