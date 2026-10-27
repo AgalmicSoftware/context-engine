@@ -29,6 +29,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Add a versioned product film and 1200×630 poster for site link previews, with
+  crawler HTML for About. Posts keep their own header images and omit the film.
+
 - Show persistent authoring draft save failures with Retry and Copy draft,
   a JSON download fallback, and an unload warning while failed edits are unsaved.
 - Enforce local scripts and wallet workers through the static CSP, with one

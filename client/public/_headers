@@ -9,3 +9,11 @@
 # sandboxed srcdoc frame. The CSP smoke test checks it against the artifact.
 
 # The build appends one immutable Cache-Control rule per hashed file under /assets.
+
+# Published media uses versioned filenames. List only files that exist; never a wildcard.
+/media/product-film/v1/context-engine-film-720p.mp4
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff
+/media/product-film/v1/context-engine-og-1200x630.png
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff

@@ -1,0 +1,197 @@
+/*
+  Context Engine product film — styles.
+  The composition is a fixed 1920x1080 stage. Every animated property is set
+  from film.js as a pure function of time; nothing here uses CSS transitions
+  or keyframe animations, so seeking and frame capture stay deterministic.
+*/
+
+@font-face { font-family: 'Poppins'; font-weight: 400; font-style: normal; font-display: block; src: url('fonts/poppins-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-weight: 500; font-style: normal; font-display: block; src: url('fonts/poppins-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-weight: 600; font-style: normal; font-display: block; src: url('fonts/poppins-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-weight: 700; font-style: normal; font-display: block; src: url('fonts/poppins-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 400; font-style: normal; font-display: block; src: url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 500; font-style: normal; font-display: block; src: url('fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 700; font-style: normal; font-display: block; src: url('fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2'); }
+
+/* Layout: a fixed 1920x1080 stage scaled into a light viewer, controls below it.
+   The film is light; the viewer matches it. */
+:root {
+  color-scheme: light;
+  /* Film palette (film.js keeps the matching values in TH) */
+  --bg: #f7f6f2;
+  --ink: #202b3a;
+  --ink-2: #526174;
+  --teal: #0b9aa8;
+
+  --sans: 'Poppins', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+
+  /* Viewer chrome */
+  --ui-bg: #ebe9e3;
+  --ui-panel: #ffffff;
+  --ui-text: #202b3a;
+  --ui-muted: #63667c;
+  --ui-border: rgba(29, 30, 51, 0.16);
+  --ui-border-strong: rgba(29, 30, 51, 0.32);
+  --ui-accent: #087f8b;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Viewer shell (outside the captured composition) ---------- */
+
+.viewer {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-block: 16px 20px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  gap: 14px;
+}
+
+.viewer-header {
+  width: 100%;
+  max-width: 1280px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+.viewer-header strong { color: var(--ui-text); font-weight: 500; }
+.viewer-header a { color: var(--ui-muted); }
+
+.stage-frame {
+  position: relative;
+  width: 100%;
+  max-width: 1920px;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(29, 30, 51, 0.08), 0 18px 48px rgba(37, 41, 90, 0.14);
+  background: var(--bg);
+}
+
+.stage-sizer { position: relative; width: 100%; }
+
+.controls {
+  width: 100%;
+  max-width: 1280px;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 10px 14px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.controls button {
+  appearance: none;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-panel);
+  color: var(--ui-text);
+  font: inherit;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  min-width: 44px;
+}
+.controls button:hover { border-color: var(--ui-border-strong); }
+.controls button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.controls button[aria-pressed='true'] { border-color: var(--ui-accent); color: var(--ui-accent); }
+
+.scrubber { width: 100%; accent-color: var(--ui-accent); }
+.timecode { color: var(--ui-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.timecode b { color: var(--ui-text); font-weight: 500; }
+
+.scene-nav {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.scene-nav button { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+.scene-nav button.is-current { border-color: var(--ui-accent); color: var(--ui-accent); }
+
+.viewer-note {
+  width: 100%;
+  max-width: 1280px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ui-muted);
+  font-family: var(--mono);
+}
+
+@media (max-width: 640px) {
+  .controls { grid-template-columns: auto auto 1fr; }
+  .controls .timecode { grid-column: 1 / -1; }
+  .viewer-header { flex-direction: column; gap: 4px; }
+}
+
+/* Capture mode: only the composition, at 1:1, no chrome. */
+body.capture { background: var(--bg); overflow: hidden; }
+body.capture .viewer { padding-block: 0; padding-left: 0; padding-right: 0; gap: 0; display: block; }
+body.capture .viewer-header,
+body.capture .controls,
+body.capture .viewer-note { display: none; }
+body.capture .stage-frame { border-radius: 0; box-shadow: none; max-width: none; width: auto; }
+
+/* ---------- The composition ---------- */
+
+.stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  transform-origin: 0 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-kerning: normal;
+  text-rendering: geometricPrecision;
+}
+.stage.poster { width: 1200px; height: 630px; }
+
+.layer { position: absolute; inset: 0; pointer-events: none; }
+.abs { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.svg-layer { position: absolute; left: 0; top: 0; overflow: visible; }
+
+.bg-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(1100px 760px at 78% 50%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(900px 600px at 8% 100%, rgba(222, 225, 240, 0.7), rgba(222, 225, 240, 0) 70%);
+}
+
+/* Product card (simplified, faithful to the SurveyTool question card) */
+.ce-card {
+  border-radius: 28px;
+  background: #ffffff;
+  /* Keep the blur modest: very large blurs can rasterize differently after seeking. */
+  box-shadow: 0 0 0 1px rgba(29, 30, 51, 0.06), 0 10px 24px rgba(37, 41, 90, 0.12);
+  /* No overflow clipping: a clipping container with overflowing children becomes
+     a composited scroller, and composited layers keep rasters between frames,
+     which makes edges depend on playback history. */
+}
+.ce-q { font-family: var(--sans); font-weight: 600; font-size: 46px; letter-spacing: -0.012em; line-height: 1.16; color: var(--ink); white-space: nowrap; }
+
+/* Brand card */
+.end-title { font-size: 104px; font-weight: 600; color: var(--ink); letter-spacing: -0.03em; line-height: 1; white-space: nowrap; }
+.end-tag { font-size: 58px; font-weight: 600; color: #36455a; letter-spacing: -0.02em; white-space: nowrap; }

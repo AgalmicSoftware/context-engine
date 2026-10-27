@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Context Engine — Product Film</title>
+  <link rel="preload" href="fonts/poppins-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="fonts/jetbrains-mono-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="film.css" />
+</head>
+<body>
+  <div class="viewer">
+    <header class="viewer-header">
+      <span><strong>Context Engine</strong> · product film · 14.1 s · 1920×1080 · 30 fps</span>
+      <span id="mode-links"><a href="?capture=1">capture mode</a> · <a href="?poster=1">og:image poster</a></span>
+    </header>
+
+    <div class="stage-frame" id="stage-frame">
+      <div class="stage-sizer" id="stage-sizer">
+        <div class="stage" id="stage" aria-label="Context Engine product film" role="img"></div>
+      </div>
+    </div>
+
+    <div class="controls" id="controls">
+      <button type="button" id="btn-play" aria-label="Play">Play</button>
+      <button type="button" id="btn-restart" aria-label="Restart">Restart</button>
+      <input class="scrubber" id="scrubber" type="range" min="0" max="14.1" step="0.001" value="0" aria-label="Scrub timeline" />
+      <span class="timecode" id="timecode"><b>00:00.0</b> / 00:14.1</span>
+      <nav class="scene-nav" id="scene-nav" aria-label="Scenes"></nav>
+    </div>
+
+    <p class="viewer-note">
+      Space play/pause · ←/→ one second · Shift+←/→ one frame · 1–4 scenes · Home restart.
+      Silent and text-light by design: apart from the title card and the “Question” and “Results” headings, the story reads from graphics alone. Data shown is illustrative.
+    </p>
+  </div>
+
+  <script src="film.js"></script>
+</body>
+</html>

@@ -18,6 +18,9 @@ Use it for new files, refactors, and cleanup PRs.
 - `foundry/` holds Foundry-specific Solidity entry points; `foundry/script/` and `foundry/test/` intentionally keep Foundry's singular directory names one level below repo root.
 - `docs/` holds canonical implementation and operations documentation.
 - `posts/` holds public Markdown posts and the `/posts` route manifest.
+- `media/` holds editable sources and render tooling for public media such as
+  the product film. Files the site serves are copied into `client/public/media/`;
+  local render output stays in each project's ignored `dist/`.
 - `tests/` holds source-of-truth root Node/Jest test harnesses that are not practical to colocate elsewhere; shared helpers live under `tests/helpers/`.
 - `broadcast/`, `cache/`, `dist/`, `out/`, `release-public/`, and `tmp/` are
   generated or runtime output locations and are not canonical homes for new

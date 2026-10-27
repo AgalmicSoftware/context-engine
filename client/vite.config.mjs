@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, transformWithEsbuild } from 'vite';
 import { createBundleReportPlugin } from './scripts/bundle-report.mjs';
 import { isDocumentExportModule, lazyDocumentBuildPlugin } from './scripts/lazy-document-build.mjs';
-import { writePostSocialPreviewHtml } from './scripts/post-social-preview.mjs';
+import { writePostSocialPreviewHtml, writeStaticPageSocialPreviewHtml } from './scripts/post-social-preview.mjs';
 import { transformGroupPasswordDerivationCommonJs } from './scripts/source-commonjs-compatibility.mjs';
 import { normalizeThemeIdForHtml } from './scripts/theme-registry-core.mjs';
 
@@ -18,6 +18,9 @@ const themeRegistry = JSON.parse(fs.readFileSync(path.resolve(srcDir, 'scss', 't
 const themeIds = Object.freeze(themeRegistry.themes.map(({ id }) => String(id)));
 const lightThemeIds = themeRegistry.themes.filter(({ colorScheme }) => colorScheme === 'light').map(({ id }) => id);
 const themeColors = themeRegistry.themes.map(({ id, themeColor }) => `${id}:${themeColor}`);
+const publicSocialPreview = JSON.parse(
+  fs.readFileSync(path.resolve(srcDir, 'variables', 'publicSocialPreview.json'), 'utf8'),
+);
 const headers = {
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
   'Cross-Origin-Embedder-Policy': 'unsafe-none',
@@ -68,6 +71,7 @@ const publicAssetContentTypes = {
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.md': 'text/markdown; charset=utf-8',
+  '.mp4': 'video/mp4',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.txt': 'text/plain; charset=utf-8',
@@ -530,6 +534,20 @@ const postsAssetsCompatibilityPlugin = () => ({
   },
 });
 
+// Crawler-facing copies of selected SPA routes with their own canonical URL.
+const staticPageSocialPreviewPlugin = () => ({
+  name: 'ce-static-page-social-preview',
+  writeBundle: {
+    // Wait until the built index and copied public assets are available.
+    order: 'post',
+    sequential: true,
+    handler(options) {
+      const outputDir = options.dir || path.resolve(__dirname, 'build');
+      writeStaticPageSocialPreviewHtml({ buildDir: outputDir, pages: publicSocialPreview.staticPages });
+    },
+  },
+});
+
 export default defineConfig(({ mode }) => {
   const clientEnv = readClientEnv(mode);
   const walletRuntimeProfile = resolveWalletRuntimeProfile(clientEnv);
@@ -557,6 +575,7 @@ export default defineConfig(({ mode }) => {
       publicAssetsCompatibilityPlugin(),
       immutableAssetHeadersPlugin(),
       postsAssetsCompatibilityPlugin(),
+      staticPageSocialPreviewPlugin(),
       {
         name: 'ce-public-url-html-compatibility',
         transformIndexHtml(html) {

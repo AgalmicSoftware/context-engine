@@ -342,6 +342,8 @@ describe('PostsPage', () => {
       `${window.location.origin}/posts/first-post/attachments/first-hero.jpeg`,
     );
     expect(document.head.querySelector('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image');
+    // A post keeps its own header image and does not inherit the product film.
+    expect(document.head.querySelector('meta[property="og:video"]')).toBeNull();
     expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute(
       'href',
       `${window.location.origin}/posts/first-post`,
@@ -514,7 +516,15 @@ describe('PostsPage', () => {
     expect(screen.getByTestId('test-location')).toHaveTextContent('/posts');
     expect(await screen.findByRole('heading', { name: 'Posts', level: 1 })).toBeInTheDocument();
     await waitFor(() =>
-      expect(document.head.querySelector('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary'),
+      expect(document.head.querySelector('meta[name="twitter:card"]')).toHaveAttribute(
+        'content',
+        'summary_large_image',
+      ),
+    );
+    // Leaving a post restores the site-wide preview: the product film and its poster.
+    expect(document.head.querySelector('meta[property="og:video"]')).toHaveAttribute(
+      'content',
+      'https://contextengine.sh/media/product-film/v1/context-engine-film-720p.mp4',
     );
     expect(await screen.findByRole('link', { name: /First Post/i })).toBeInTheDocument();
     expect(screen.getByText('First summary')).toBeInTheDocument();

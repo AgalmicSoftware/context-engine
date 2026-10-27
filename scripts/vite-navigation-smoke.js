@@ -7,6 +7,7 @@ const { ethers } = require('ethers');
 const demoSessions = require('../client/src/variables/demo/demo_sessions.json');
 const registryAbi = require('../client/src/contractsABI/SESSION_REGISTRY_ABI.json');
 const contracts = require('../client/src/variables/contracts.json');
+const publicSocialPreview = require('../client/src/variables/publicSocialPreview.json');
 const registryInterface = new ethers.utils.Interface(registryAbi);
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:3000';
@@ -398,10 +399,37 @@ async function probeBenchmarkReportFrame(page, { timeoutMs } = {}) {
   }
 }
 
+async function probeDefaultPublicPreview(page, { timeoutMs, baseUrl, route } = {}) {
+  const { image, video, twitterCard } = publicSocialPreview;
+  const expected = {
+    'meta[property="og:type"]': 'video.other',
+    'meta[property="og:video"]': video.url,
+    'meta[property="og:video:secure_url"]': video.url,
+    'meta[property="og:video:type"]': video.type,
+    'meta[property="og:video:width"]': String(video.width),
+    'meta[property="og:video:height"]': String(video.height),
+    'meta[property="og:image"]': image.url,
+    'meta[property="og:image:type"]': image.type,
+    'meta[property="og:image:width"]': String(image.width),
+    'meta[property="og:image:height"]': String(image.height),
+    'meta[property="og:image:alt"]': image.alt,
+    'meta[name="twitter:card"]': twitterCard,
+    'meta[name="twitter:image"]': image.url,
+    'meta[name="twitter:image:alt"]': image.alt,
+    'meta[property="og:url"]': routeUrl(baseUrl, route),
+  };
+  await page.waitForFunction((tags) => Object.entries(tags).every(([selector, content]) => {
+    const nodes = document.head.querySelectorAll(selector);
+    return nodes.length === 1 && nodes[0].getAttribute('content') === content;
+  }), expected, { timeout: timeoutMs });
+  return [];
+}
+
 const DEFAULT_ROUTE_PROBES = Object.freeze({
   '/new': probeSessionModePresets,
   '/session/new': probeSessionModePresets,
   '/benchmarks': probeBenchmarkReportFrame,
+  '/about': probeDefaultPublicPreview,
 });
 
 async function inspectRoute(browser, baseUrl, route, options = {}) {

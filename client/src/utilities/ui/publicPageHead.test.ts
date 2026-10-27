@@ -1,7 +1,9 @@
 import {
   DEFAULT_PUBLIC_PAGE_DESCRIPTION,
   DEFAULT_PUBLIC_PAGE_IMAGE,
+  DEFAULT_PUBLIC_PAGE_IMAGE_ALT,
   DEFAULT_PUBLIC_PAGE_TITLE,
+  DEFAULT_PUBLIC_PAGE_VIDEO,
   DEFAULT_PUBLIC_SITE_URL,
   buildCanonicalPublicUrl,
   syncPublicPageHead,
@@ -42,7 +44,15 @@ describe('publicPageHead', () => {
 
   it('uses contextengine.sh for deployment-independent public metadata defaults', () => {
     expect(DEFAULT_PUBLIC_SITE_URL).toBe('https://contextengine.sh/');
-    expect(DEFAULT_PUBLIC_PAGE_IMAGE).toBe('https://contextengine.sh/context-engine-social-preview-square.png');
+    expect(DEFAULT_PUBLIC_PAGE_IMAGE).toBe(
+      'https://contextengine.sh/media/product-film/v1/context-engine-og-1200x630.png',
+    );
+    expect(DEFAULT_PUBLIC_PAGE_VIDEO).toEqual({
+      url: 'https://contextengine.sh/media/product-film/v1/context-engine-film-720p.mp4',
+      type: 'video/mp4',
+      width: 1280,
+      height: 720,
+    });
   });
 
   it('falls back to the live browser origin for router-style locations', () => {
@@ -192,6 +202,82 @@ describe('publicPageHead', () => {
     expect(document.head.querySelector('meta[name="twitter:card"]')?.getAttribute('content')).toBe(
       'summary_large_image',
     );
+  });
+
+  const metaContent = (selector: string): string | null | undefined =>
+    document.head.querySelector(selector)?.getAttribute('content');
+
+  it('advertises the product film and its matching poster on default routes', () => {
+    const state = syncPublicPageHead({ location: new URL('https://contextengine.sh/about') });
+
+    expect(state?.video).toEqual(DEFAULT_PUBLIC_PAGE_VIDEO);
+    expect(state?.ogType).toBe('video.other');
+    expect(metaContent('meta[property="og:type"]')).toBe('video.other');
+    expect(metaContent('meta[property="og:video"]')).toBe(DEFAULT_PUBLIC_PAGE_VIDEO.url);
+    expect(metaContent('meta[property="og:video:secure_url"]')).toBe(DEFAULT_PUBLIC_PAGE_VIDEO.url);
+    expect(metaContent('meta[property="og:video:secure_url"]')).toMatch(/^https:\/\//);
+    expect(metaContent('meta[property="og:video:type"]')).toBe('video/mp4');
+    expect(metaContent('meta[property="og:video:width"]')).toBe('1280');
+    expect(metaContent('meta[property="og:video:height"]')).toBe('720');
+    expect(metaContent('meta[property="og:image"]')).toBe(DEFAULT_PUBLIC_PAGE_IMAGE);
+    expect(metaContent('meta[property="og:image:width"]')).toBe('1200');
+    expect(metaContent('meta[property="og:image:height"]')).toBe('630');
+    expect(metaContent('meta[property="og:image:type"]')).toBe('image/png');
+    expect(metaContent('meta[property="og:image:alt"]')).toBe(DEFAULT_PUBLIC_PAGE_IMAGE_ALT);
+    expect(metaContent('meta[name="twitter:card"]')).toBe('summary_large_image');
+    expect(metaContent('meta[name="twitter:image"]')).toBe(DEFAULT_PUBLIC_PAGE_IMAGE);
+    expect(metaContent('meta[name="twitter:image:alt"]')).toBe(DEFAULT_PUBLIC_PAGE_IMAGE_ALT);
+    expect(document.head.querySelector('meta[name="twitter:player"]')).toBeNull();
+    expect(document.head.querySelectorAll('meta[property="og:video"]')).toHaveLength(1);
+  });
+
+  it('drops the product film and poster dimensions when a page supplies its own image', () => {
+    syncPublicPageHead({ location: new URL('https://contextengine.sh/') });
+    expect(document.head.querySelector('meta[property="og:video"]')).not.toBeNull();
+
+    const state = syncPublicPageHead({
+      location: new URL('https://contextengine.sh/posts/agent-village-wrapped-2026'),
+      title: 'Agent Village Wrapped',
+      image: 'https://contextengine.sh/posts/agent-village-wrapped/attachments/header.jpg',
+      imageAlt: 'Two illustrated robots read papers.',
+      ogType: 'article',
+      twitterCard: 'summary_large_image',
+    });
+
+    expect(state?.video).toBeNull();
+    [
+      'og:video',
+      'og:video:secure_url',
+      'og:video:type',
+      'og:video:width',
+      'og:video:height',
+      'og:image:width',
+      'og:image:height',
+      'og:image:type',
+    ].forEach((property) => {
+      expect(document.head.querySelector(`meta[property="${property}"]`)).toBeNull();
+    });
+    expect(metaContent('meta[property="og:image:alt"]')).toBe('Two illustrated robots read papers.');
+    expect(metaContent('meta[name="twitter:image:alt"]')).toBe('Two illustrated robots read papers.');
+
+    syncPublicPageHead({ location: new URL('https://contextengine.sh/posts/no-header'), video: null });
+    expect(document.head.querySelector('meta[property="og:video"]')).toBeNull();
+    expect(metaContent('meta[property="og:type"]')).toBe('website');
+    expect(metaContent('meta[property="og:image"]')).toBe(DEFAULT_PUBLIC_PAGE_IMAGE);
+
+    syncPublicPageHead({ location: new URL('https://contextengine.sh/') });
+    expect(metaContent('meta[property="og:video"]')).toBe(DEFAULT_PUBLIC_PAGE_VIDEO.url);
+    expect(metaContent('meta[property="og:image:width"]')).toBe('1200');
+  });
+
+  it('rejects non-HTTPS video URLs', () => {
+    const state = syncPublicPageHead({
+      location: new URL('https://contextengine.sh/'),
+      video: { url: 'http://example.test/film.mp4', type: 'video/mp4', width: 1280, height: 720 },
+    });
+
+    expect(state?.video).toBeNull();
+    expect(document.head.querySelector('meta[property="og:video"]')).toBeNull();
   });
 
   it('emits deployment-origin discovery significantLink URLs for root-host deployments', () => {
