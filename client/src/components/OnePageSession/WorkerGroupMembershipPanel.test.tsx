@@ -16,13 +16,13 @@ const createResponseDeferred = () => {
 };
 
 const envelope: AgentClientLoginEnvelope = {
-  v: 2,
+  v: 3,
   sessionId: SESSION_ID,
   sessionSlug: 'alpha',
   expiresAt: '2027-07-05T00:00:00.000Z',
   address: '0x00000000000000000000000000000000000000aa',
   capabilities: { readGroups: true },
-  bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'bridge-browser-token' },
+  agentCredential: { kind: 'session_agent_browser_token', token: 'bridge-browser-token' },
   workerCredential: { kind: 'session_worker_jwt', token: 'worker-jwt-token' },
   workerUrl: 'https://session-worker.example',
 };

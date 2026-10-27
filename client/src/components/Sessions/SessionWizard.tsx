@@ -2611,8 +2611,7 @@ const SessionWizard = ({
   const allowNativeWorkerVerification =
     sessionModeRequirements.selected &&
     sessionModeRequirements.usesWorkerRuntime &&
-    !sessionModeRequirements.requiresLit &&
-    !sessionModeRequirements.usesAgentSessionWrapped;
+    !sessionModeRequirements.requiresLit;
   const { deployWorkerMatchesConfiguredUrl, usesDefaultWorkerUrl, workerUrlSource } =
     resolveSessionWizardWorkerUrlSourceState({
       defaultWorkerUrl,
@@ -2891,6 +2890,7 @@ const SessionWizard = ({
       setOperatorRecoveryKey={setOperatorRecoveryKey}
       account={account}
       allowNativeWorkerVerification={allowNativeWorkerVerification}
+      agentHttpEnabled={sessionModeRequirements.usesAgentSessionWrapped}
       activeCreateSbtTargetGate={activeCreateSbtTargetGate}
       activeCreateSbtTargetGateId={activeCreateSbtTargetGateId}
       activeNormalModeIndex={activeNormalModeIndex}

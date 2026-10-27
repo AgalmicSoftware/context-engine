@@ -88,8 +88,8 @@ test('the default release gate checks root-installed Bridge and deploy-helper de
   await writeFile(path.join(rootDir, 'dist/client.bundled-module-ids.json'), JSON.stringify({ moduleIds: [] }));
   await writeFile(path.join(rootDir, 'dist/mcp.metafile.json'), JSON.stringify({ inputs: {} }));
   const check = () => checkLicenses({ rootDir, overrides: {} });
-  for (const selected of ['sessionCorsWorker', 'agentBridgeWorker', 'deployHelper']) {
-    for (const bundle of ['sessionCorsWorker', 'agentBridgeWorker', 'deployHelper']) {
+  for (const selected of ['sessionCorsWorker', 'deployHelper']) {
+    for (const bundle of ['sessionCorsWorker', 'deployHelper']) {
       const inputs = bundle === selected ? { 'node_modules/synthetic-released/index.js': {} } : {};
       await writeFile(path.join(rootDir, `dist/${bundle}.bundle.metafile.json`), JSON.stringify({ inputs }));
       await writeFile(path.join(rootDir, `dist/${bundle}.bundle.js`), 'const worker = true;\n');
@@ -101,7 +101,7 @@ test('the default release gate checks root-installed Bridge and deploy-helper de
   }
   await setLicense('MIT');
   const { buildWorkerThirdPartyNotices } = await import('./lib/worker-third-party-notices.mjs');
-  for (const bundle of ['sessionCorsWorker', 'agentBridgeWorker', 'deployHelper']) {
+  for (const bundle of ['sessionCorsWorker', 'deployHelper']) {
     const metafile = JSON.parse(await readFile(path.join(rootDir, `dist/${bundle}.bundle.metafile.json`), 'utf8'));
     const notices = buildWorkerThirdPartyNotices({ rootDir, metafile });
     await writeFile(path.join(rootDir, `dist/${bundle}.bundle.js`), `const worker = true;\n/*\n${notices.trimEnd()}\n*/\n`);

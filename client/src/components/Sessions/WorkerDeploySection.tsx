@@ -57,6 +57,7 @@ const buildNativeVerificationIdentity = ({
 
 export type WorkerDeploySectionProps = {
   allowNativeWorkerVerification?: boolean;
+  agentHttpEnabled?: boolean;
   isNormalMode: boolean;
   renderInfoTooltip?: RenderInfoTooltip;
   workerMode: string;
@@ -106,6 +107,7 @@ export type WorkerDeploySectionProps = {
 
 const WorkerDeploySection = ({
   allowNativeWorkerVerification = false,
+  agentHttpEnabled = false,
   isNormalMode,
   renderInfoTooltip,
   workerMode,
@@ -157,6 +159,7 @@ const WorkerDeploySection = ({
   const [nativeSetupSecrets, setNativeSetupSecrets] = React.useState<{
     tokenHmacSecret: string;
     storageEnvelopeKek: string;
+    agentManagedRootSecret?: string;
   } | null>(null);
   const [nativeSetupSecretsIdentity, setNativeSetupSecretsIdentity] = React.useState('');
   const [nativeSetupError, setNativeSetupError] = React.useState('');
@@ -264,7 +267,7 @@ const WorkerDeploySection = ({
 
   const generateNativeSetupSecrets = () => {
     try {
-      setNativeSetupSecrets(createCloudflareNativeSetupSecrets(undefined, chosenRecoveryKey));
+      setNativeSetupSecrets(createCloudflareNativeSetupSecrets(undefined, chosenRecoveryKey, agentHttpEnabled));
       setNativeSetupSecretsIdentity(nativeSetupIdentity);
       onNativeTemplateSetupGenerated?.(nativeSetupIdentity);
       setNativeSetupError('');
@@ -456,6 +459,12 @@ const WorkerDeploySection = ({
               path.
             </p>
           </div>
+          {agentHttpEnabled && (
+            <p className={styles.helperText}>
+              Agent HTTP uses this same Worker. Set its fresh AGENT_MANAGED_ROOT_SECRET in Cloudflare’s encrypted secret
+              fields before verification. Keep it separate from the login and storage secrets.
+            </p>
+          )}
           {nativeDeployUrl ? (
             <Button
               type="button"
@@ -469,7 +478,7 @@ const WorkerDeploySection = ({
           {currentNativeSetupSecrets && (
             <>
               <ol data-testid="ce-wizard-cloudflare-native-checklist">
-                <li>Copy the four setup values below.</li>
+                <li>Copy the {agentHttpEnabled ? 'five' : 'four'} setup values below.</li>
                 <li>Open Cloudflare and complete the dashboard deployment in the new tab.</li>
                 <li>Return here and paste the resulting workers.dev URL into the Worker URL field.</li>
                 <li>
@@ -497,7 +506,17 @@ const WorkerDeploySection = ({
                   currentNativeSetupSecrets.storageEnvelopeKek,
                   E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK,
                 )}
+                {agentHttpEnabled &&
+                  currentNativeSetupSecrets.agentManagedRootSecret &&
+                  renderCopyField(
+                    'AGENT_MANAGED_ROOT_SECRET',
+                    currentNativeSetupSecrets.agentManagedRootSecret,
+                    'ce-wizard-cloudflare-native-agent-root',
+                  )}
               </div>
+              {agentHttpEnabled && !currentNativeSetupSecrets.agentManagedRootSecret && (
+                <p className={styles.helperText}>Replace setup values to generate the agent signing secret.</p>
+              )}
             </>
           )}
           {nativeSetupError && <div className={styles.errorText}>{nativeSetupError}</div>}
@@ -524,7 +543,7 @@ const WorkerDeploySection = ({
           )}
           <div className={styles.helperText}>
             {currentNativeSetupSecrets
-              ? "Paste the four values above into Cloudflare. The two 64-character values are independent Session Worker runtime secrets, not Cloudflare credentials; they stay only in this tab and Cloudflare's encrypted Worker-secret store. After deployment, paste the resulting workers.dev URL into the Worker URL field."
+              ? "Paste the displayed values into Cloudflare. The 64-character secrets stay only in this tab and Cloudflare's encrypted Worker-secret store. After deployment, paste the resulting workers.dev URL into the Worker URL field."
               : 'Already have a compatible Session Worker? Paste its URL into the Worker URL field and verify it without generating replacement setup values.'}
           </div>
           {currentNativeSetupSecrets || nativeAttachmentReady ? (

@@ -76,24 +76,13 @@ const buildDeployExecutionFailure = (error) => ({
 // redeemer's bundle fields (and a different deployment kind) are dropped and
 // only the release this Worker is configured with is deployed; the manifest
 // pins its digest.
-const resolveSponsoredReleaseBundles = (env, deployPayload) => {
+const resolveSponsoredReleaseBundles = (env) => {
   const bundleUrl = toTrimmedString(env?.WORKER_BUNDLE_URL);
   const bundleManifestUrl = toTrimmedString(env?.WORKER_BUNDLE_MANIFEST_URL);
   if (!bundleUrl || !bundleManifestUrl) {
     return { ok: false, error: 'Sponsored deploys need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on the sponsoring Worker.' };
   }
-  if (deployPayload?.sessionModeProfile?.surfaces?.agentHttp !== true) {
-    return { ok: true, fields: { bundleUrl, bundleManifestUrl } };
-  }
-  const agentBridgeBundleUrl = toTrimmedString(env?.AGENT_BRIDGE_BUNDLE_URL);
-  const agentBridgeBundleManifestUrl = toTrimmedString(env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL);
-  if (!agentBridgeBundleUrl || !agentBridgeBundleManifestUrl) {
-    return {
-      ok: false,
-      error: 'Sponsored Agents HTTP deploys need AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL on the sponsoring Worker.',
-    };
-  }
-  return { ok: true, fields: { bundleUrl, bundleManifestUrl, agentBridgeBundleUrl, agentBridgeBundleManifestUrl } };
+  return { ok: true, fields: { bundleUrl, bundleManifestUrl } };
 };
 
 const buildSponsoredRequestDigest = async (action, payload, requestOrigin = '') => sha256Hex(

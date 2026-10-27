@@ -87,13 +87,13 @@ For testing, run modes, and deeper setup:
   from an MCP host: [mcp/README.md](mcp/README.md). Pin an exact published version
   for reproducible runs. This installs a local tool
   server; it does not deploy or upgrade the web app or Session Workers.
-- Optional Agent Bridge Worker with scoped `/api/agent/*` credentials and
+- Optional Session Agent HTTP with scoped `/api/agent/*` credentials and
   versioned runtime instructions
 - Agent token login in the browser, one-time invites, and Session Wrapped over HTTPS
 - Delegated membership, gate, storage, and chain authority rather than a second
   copy of canonical session state
 - Setup and endpoint reference in
-  [workers/agentBridgeWorker/README.md](workers/agentBridgeWorker/README.md)
+  [workers/sessionCorsWorker/agent/README.md](workers/sessionCorsWorker/agent/README.md)
 
 ### User and Deployer UX: Passkey Sign-On
 
@@ -103,7 +103,7 @@ For testing, run modes, and deeper setup:
 
 ### Deployer UX: Sponsored Bundles
 
-- Setup requirements follow the selected profile: the default Cloudflare profile needs a Cloudflare account/dashboard login and one AI-provider key; a Cloudflare API token is used only by Agent Session Wrapped or the explicit legacy deploy-helper fallback
+- Setup requirements follow the selected profile: the default Cloudflare profile needs a Cloudflare account/dashboard login and one AI-provider key; a Cloudflare API token is used only by the explicit legacy deploy-helper fallback
 - Sponsored bundles and advanced configuration can supply Arweave, EVM/RPC, Lit, or other credentials only when the selected decentralized or encrypted profile needs them; planned company-operated adapters will connect internal services instead
 
 ## AI Discourse Corpus
@@ -133,7 +133,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 - Session interview research metadata: [docs/session-interview-research.md](docs/session-interview-research.md)
 - PATH / RPC behavior: [docs/path-rpc.md](docs/path-rpc.md)
 - Cloudflare worker docs: [docs/session-cors-worker.md](docs/session-cors-worker.md)
-- Agent Bridge worker docs: [workers/agentBridgeWorker/README.md](workers/agentBridgeWorker/README.md)
+- Session Agent HTTP docs: [workers/sessionCorsWorker/agent/README.md](workers/sessionCorsWorker/agent/README.md)
 - Agent participants (MCP server): [docs/agent-participants.md](docs/agent-participants.md)
 - Session registry and gate model: [docs/session-registry.md](docs/session-registry.md)
 - Scaling reference: [docs/scaling.md](docs/scaling.md)

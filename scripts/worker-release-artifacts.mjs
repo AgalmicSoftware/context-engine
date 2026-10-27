@@ -24,7 +24,6 @@ export const LOCKFILES = Object.freeze([
 export const WORKER_ARTIFACTS = Object.freeze([
   Object.freeze({ kind: 'session-cors-worker', file: 'sessionCorsWorker.bundle.js' }),
   Object.freeze({ kind: 'deploy-helper', file: 'deployHelper.bundle.js' }),
-  Object.freeze({ kind: 'agent-bridge-worker', file: 'agentBridgeWorker.bundle.js' }),
 ]);
 
 const PUBLIC_PII_SCANNER = path.join(

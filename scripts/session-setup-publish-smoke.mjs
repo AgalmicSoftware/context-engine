@@ -43,6 +43,7 @@ const env = installSessionCoordinatorBinding({
   LOGIN_TRUSTED_ORIGINS: baseUrl,
   ADMIN_TRUSTED_ORIGINS: baseUrl,
   TOKEN_HMAC_SECRET: 'synthetic-session-setup-token-key',
+  AGENT_MANAGED_ROOT_SECRET: 'synthetic-fresh-session-agent-root-secret',
   CE_STORAGE_ENVELOPE_KEK: 'synthetic-session-setup-envelope-key',
 });
 const originalFetch = globalThis.fetch;
@@ -209,6 +210,7 @@ try {
   const key = page.getByTestId('ce-wizard-secret-openai-key');
   if (!(await key.isVisible())) await page.getByTestId('ce-wizard-worker-panel-toggle').click();
   await key.fill('synthetic-ai-key-not-a-credential');
+  await page.getByRole('checkbox', { name: 'Agents (HTTP API)', exact: true }).check();
   await page
     .locator('label')
     .filter({ hasText: 'Allowed origins (comma or newline)' })
@@ -243,7 +245,12 @@ try {
   assert.equal(config.sessionName, 'Setup smoke session');
   assert.equal(config.sessionModeProfile.authority.mode, 'worker_canonical');
   assert.equal(config.sessionModeProfile.encryption.mode, 'worker_envelope');
-  assert.equal(config.sessionModeProfile.surfaces.agentHttp, false);
+  assert.equal(config.sessionModeProfile.surfaces.agentHttp, true);
+  const agentCaps = await (await workerFetch(`${workerOrigin}/capabilities?slug=${slug}`)).json();
+  assert.equal(agentCaps.agentHttp.ready, true);
+  assert.equal(agentCaps.agentSessionWrapped.origin, workerOrigin);
+  assert.equal(calls.some(call => call.path === '/deploy'), false);
+  env.GROUP_KV.values.set(`ce-agent:${adminClient.sessionId}:agent:credential:v2:fixture`, 'synthetic-agent-credential-not-exported');
   assert.ok(config.configRevision, 'The published configuration has a readback revision');
   const seedQuestion = async (prompt) => {
     const question = buildQuestionRecord({
@@ -263,6 +270,36 @@ try {
     return question;
   };
   const question = await seedQuestion('Community decisions should be easier to understand.');
+  const memberExchange = await adminClient.request('/api/agent/wrapped/member-exchange', {
+    method: 'POST', auth: true, body: { sessionSlug: slug },
+  });
+  const wrappedRequest = async (path, body) => {
+    const response = await workerFetch(`${workerOrigin}${path}?sessionSlug=${encodeURIComponent(slug)}`, {
+      method: body ? 'POST' : 'GET', headers: { authorization: `Bearer ${memberExchange.token}`, 'content-type': 'application/json' },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    assert.equal(response.status, 200, await response.clone().text());
+    return response.json();
+  };
+  const beforeStatements = new Map(env.GROUP_KV.values);
+  const wrapped = await wrappedRequest('/api/agent/agent-only/statements');
+  assert.equal(Object.hasOwn(wrapped, 'window_id'), false);
+  assert.deepEqual(env.GROUP_KV.values, beforeStatements, 'Wrapped reads must not write shared statements');
+  const statement = wrapped.statements.find(row => row.statement_id === question.id);
+  assert.equal(statement.text, question.record.prompt);
+  const answersBeforeWrapped = await adminClient.listAll('responses', { mine: true });
+  const wrappedBody = { run_id: 'continuous-space-smoke', request_id: 'continuous-space-answer',
+    agent_metadata: { model: 'synthetic-smoke-model', scaffold_version: 'smoke-v1' },
+    answers: [{ statement_id: statement.statement_id, statement_version: statement.statement_version,
+      answer: { value: 'agree' }, confidence: 80 }] };
+  assert.equal((await wrappedRequest('/api/agent/agent-only/answers/bulk', wrappedBody)).accepted, 1);
+  assert.equal((await wrappedRequest('/api/agent/agent-only/answers/bulk', wrappedBody)).replay, true);
+  const savedResearch = [...env.GROUP_KV.values].filter(([key]) => key.includes(':answer-event:')).map(([, value]) => JSON.parse(value));
+  assert.equal(savedResearch.length, 1);
+  assert.deepEqual(savedResearch[0].statement, statement);
+  assert.deepEqual(await adminClient.listAll('responses', { mine: true }), answersBeforeWrapped,
+    'Wrapped research must remain separate from ordinary participant responses');
+  console.log('Continuous Wrapped statements, exact saved wording, replay and separate research storage verified.');
   const participantFixture = passkeyFixture('participant');
   const participant = participantFixture.wallet;
   const participantContext = await fixtureContext(participantFixture);
@@ -519,6 +556,8 @@ try {
   await (await downloaded).saveAs(backupPath);
   const backupPages = (await readFile(backupPath, 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
   assert.equal(backupPages.at(-1).manifest.complete, true);
+  assert.equal(JSON.stringify(backupPages).includes('synthetic-agent-credential-not-exported'), false);
+  assert.equal(JSON.stringify(backupPages).includes(env.AGENT_MANAGED_ROOT_SECRET), false);
   assert.ok(backupPages.flatMap((entry) => entry.entries).some((entry) => entry.kind === 'payload'));
   await page.getByTestId('ce-admin-backup-file').setInputFiles(backupPath);
   await page.getByRole('status').filter({ hasText: 'Ready to restore' }).waitFor();
@@ -542,6 +581,9 @@ try {
   await page.getByRole('status').filter({ hasText: 'Restore complete.' }).waitFor({ timeout: 120000 });
   assert.deepEqual([...restoreEnv.CE_STORAGE_INDEX_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(),
     [...env.CE_STORAGE_INDEX_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(), 'Fresh restore preserves every metadata record');
+  assert.equal([...restoreEnv.GROUP_KV.values.keys()].some(key => key.startsWith(`ce-agent:${adminClient.sessionId}:`)), false);
+  const restoredAgentCaps = await (await worker.fetch(new Request(`${workerOrigin}/capabilities?slug=${slug}`), restoreEnv)).json();
+  assert.equal(restoredAgentCaps.agentHttp.ready, false, 'Restored session needs fresh agent resources and credentials');
   await page.getByTestId('ce-admin-session-backup').screenshot({ path: `${outputDir}/admin-backup-restore.png`, timeout: 10000 });
   await restoreContext.close();
   page = sourceAdminPage;
@@ -658,6 +700,7 @@ try {
           'passkey wallet module worker startup and signed requests under CSP',
           'signed Worker verification',
           'wizard publication and config readback',
+          'continuous Wrapped reads without shared writes, exact saved wording, replay and separate research',
           'fresh-context answer submission',
           'reload persistence',
           'participant Results UI',

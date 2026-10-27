@@ -257,7 +257,7 @@ It is not automatically in the Edge2026 agent-only export schema, and it does no
 
 ## Comparison with Edge2026 agent-village agent-only research
 
-The Edge2026 agent-village experiment is implemented by `workers/agentBridgeWorker/agentOnlyMode.mjs`. It stores a separate agent-only event/state stream under retained legacy agent-only KV prefixes and can export dedicated research views through `exportAgentOnlyData()`.
+The Edge2026 agent-village experiment is implemented by `workers/sessionCorsWorker/agent/agentOnlyMode.mjs`. It stores a separate agent-only event/state stream under retained legacy agent-only KV prefixes and can export dedicated research views through `exportAgentOnlyData()`.
 
 Agent-only records include agent answer events with `source: "agent_autofill"`, `eventKind`, answer payload, required confidence, optional rationale, model/scaffold/instructions metadata, run/request ids, token-usage metadata when available, privacy-protective skips, and a semantic fingerprint produced by `semanticFingerprintForAgentOnlyAnswer()`. Historical verified Mini App human review is preserved as separate explicit `confirm` or `edit` sidecars. Current HTTP routes cannot create those review records; `humanApproved` is a caller assertion authorizing a normal response submission, not verified review evidence. The export path derives `review_status` values such as `human_confirm`, `human_edit`, or `human_stale_confirm`; calibration exports bucket agent confidence into 10-point bands and count predictions, confirms, edits, and edit rate. Wide/gold exports can join current normal answers, prior submitted answers, agent predictions, confidence, eval type, and review status.
 

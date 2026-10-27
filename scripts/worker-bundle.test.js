@@ -99,16 +99,10 @@ test('buildWorkerBundles removes trailing horizontal whitespace from generated o
   ]]);
 });
 
-test('Agent Bridge is a release bundle target for browser-driven dedicated deployment', async () => {
+test('the retired Bridge is not a deployable bundle target', async () => {
   const { resolveWorkerBundleTargets } = await loadModule();
-  const [target] = resolveWorkerBundleTargets({
-    rootDir: '/tmp/context-engine',
-    targetKeys: ['agentBridgeWorker'],
-  });
-
-  assert.equal(target.entryPoint, path.resolve('/tmp/context-engine', 'workers/agentBridgeWorker/worker.js'));
-  assert.equal(target.outputFile, path.resolve('/tmp/context-engine', 'dist/agentBridgeWorker.bundle.js'));
-  assert.equal(target.target, 'es2022');
+  assert.deepEqual(resolveWorkerBundleTargets().map(target => target.key), ['sessionCorsWorker', 'deployHelper']);
+  assert.throws(() => resolveWorkerBundleTargets({ targetKeys: ['agentBridgeWorker'] }), /Unknown worker bundle target/);
 });
 
 test('every released bundle carries complete deterministic notices inside a safe trailing comment', async (t) => {

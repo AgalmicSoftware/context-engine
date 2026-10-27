@@ -2,3 +2,8 @@
 # They must be independent 32-byte random values and must never be committed.
 TOKEN_HMAC_SECRET=replace-with-first-independent-64-hex-value
 CE_STORAGE_ENVELOPE_KEK=replace-with-second-independent-64-hex-value
+
+# Optional: required only when enabling Agent HTTP. Generate a THIRD independent value.
+# AGENT_MANAGED_ROOT_SECRET=replace-with-third-independent-64-hex-value
+# Optional paid Wrapped posters (off by default); never use a text AI key fallback.
+# AGENT_POSTER_API_KEY=replace-with-operator-provider-key

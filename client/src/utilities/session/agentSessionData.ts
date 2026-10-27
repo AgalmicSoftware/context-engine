@@ -1,5 +1,5 @@
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
-import { buildAgentBridgeAuthHeaders } from './agentClientLogin';
+import { buildSessionAgentAuthHeaders } from './agentClientLogin';
 
 type UnknownRecord = Record<string, unknown>;
 export type AgentPolisRow = { responder: string; questionId: string; response: string };
@@ -76,55 +76,88 @@ export type AgentQuestionsResult = {
   answerState?: { answeredCount: number; unansweredCount: number; sort: string };
 };
 
-const resolveAgentBridgeUrl = (envelope: AgentClientLoginEnvelope | null, agentBridgeUrl?: unknown): string =>
-  toStr(agentBridgeUrl || envelope?.agentBridgeUrl).replace(/\/+$/g, '');
+const resolveAgentWorkerUrl = (envelope: AgentClientLoginEnvelope | null, agentWorkerUrl?: unknown): string =>
+  envelope?.workerUrl &&
+  envelope.agentWorkerUrl === envelope.workerUrl &&
+  (!agentWorkerUrl || toStr(agentWorkerUrl).replace(/\/+$/g, '') === envelope.workerUrl)
+    ? envelope.workerUrl
+    : '';
 
 export const fetchAgentQuestions = async ({
   envelope,
   sessionSlug,
-  agentBridgeUrl,
+  agentWorkerUrl,
   limit = 30,
   fetchImpl = fetch,
 }: {
   envelope: AgentClientLoginEnvelope | null;
   sessionSlug?: unknown;
-  agentBridgeUrl?: unknown;
+  agentWorkerUrl?: unknown;
   limit?: number;
   fetchImpl?: typeof fetch;
 }): Promise<AgentQuestionsResult> => {
-  const base = resolveAgentBridgeUrl(envelope, agentBridgeUrl);
-  if (!envelope?.bridgeCredential?.token || !base) {
+  const base = resolveAgentWorkerUrl(envelope, agentWorkerUrl);
+  if (!envelope?.agentCredential?.token || !base) {
     return { ok: false, status: 0, reason: 'agent_credentials_missing' };
   }
   const url = new URL(`${base}/api/agent/questions`);
   url.searchParams.set('sessionSlug', toStr(envelope.sessionSlug || sessionSlug));
   if (Number(limit) > 0) url.searchParams.set('limit', String(Number(limit)));
   try {
-    const response = await fetchImpl(url.toString(), {
-      method: 'GET',
-      headers: buildAgentBridgeAuthHeaders(envelope),
-      cache: 'no-store',
-    });
-    const body = toRecord(await response.json().catch(() => ({})));
-    if (!response.ok || body.ok !== true) {
-      return {
-        ok: false,
-        status: response.status,
-        reason: toStr(body.reason) || `agent_questions_failed_${response.status}`,
-      };
+    const questions: AgentQuestion[] = [];
+    const seenCursors = new Set<string>();
+    let answerState: UnknownRecord = {};
+    let expectedTotal: number | undefined;
+    for (let page = 0; page < 1000; page++) {
+      const response = await fetchImpl(url.toString(), {
+        method: 'GET',
+        headers: buildSessionAgentAuthHeaders(envelope),
+        cache: 'no-store',
+      });
+      const body = toRecord(await response.json().catch(() => ({})));
+      if (!response.ok || body.ok !== true) {
+        return {
+          ok: false,
+          status: response.status,
+          reason: toStr(body.reason) || `agent_questions_failed_${response.status}`,
+        };
+      }
+      if (
+        !Array.isArray(body.questions) ||
+        !Number.isSafeInteger(body.total) ||
+        Number(body.total) < 0 ||
+        (expectedTotal !== undefined && body.total !== expectedTotal)
+      ) {
+        return { ok: false, status: 0, reason: 'agent_questions_page_invalid' };
+      }
+      expectedTotal = Number(body.total);
+      questions.push(...body.questions.map(normalizeAgentQuestion));
+      answerState = toRecord(body.answerState);
+      if (body.hasMore === false && !body.nextCursor) {
+        if (
+          questions.length !== expectedTotal ||
+          new Set(questions.map((q) => q.questionId)).size !== questions.length
+        ) {
+          return { ok: false, status: 0, reason: 'agent_questions_incomplete' };
+        }
+        return {
+          ok: true,
+          questions,
+          answerState: {
+            answeredCount: toNum(answerState.answeredCount),
+            unansweredCount: toNum(answerState.unansweredCount),
+            sort: toStr(answerState.sort),
+          },
+        };
+      }
+      const cursor = toStr(body.nextCursor);
+      if (body.hasMore !== true || !cursor || seenCursors.has(cursor) || questions.length >= expectedTotal) {
+        return { ok: false, status: 0, reason: 'agent_questions_incomplete' };
+      }
+      seenCursors.add(cursor);
+      url.searchParams.set('cursor', cursor);
     }
-    const answerState = toRecord(body.answerState);
-    return {
-      ok: true,
-      questions: (Array.isArray(body.questions) ? body.questions : [])
-        .map(normalizeAgentQuestion)
-        .filter((question) => question.prompt),
-      answerState: {
-        answeredCount: toNum(answerState.answeredCount),
-        unansweredCount: toNum(answerState.unansweredCount),
-        sort: toStr(answerState.sort),
-      },
-    };
+    return { ok: false, status: 0, reason: 'agent_questions_page_limit' };
   } catch (_) {
     return { ok: false, status: 0, reason: 'agent_questions_network_error' };
   }
@@ -478,16 +511,16 @@ const AGENT_RESULT_VIEW_REQUESTS: Array<{
 export const fetchAgentResults = async ({
   envelope,
   sessionSlug,
-  agentBridgeUrl,
+  agentWorkerUrl,
   fetchImpl = fetch,
 }: {
   envelope: AgentClientLoginEnvelope | null;
   sessionSlug?: unknown;
-  agentBridgeUrl?: unknown;
+  agentWorkerUrl?: unknown;
   fetchImpl?: typeof fetch;
 }): Promise<AgentResultsResult> => {
-  const base = resolveAgentBridgeUrl(envelope, agentBridgeUrl);
-  if (!envelope?.bridgeCredential?.token || !base) {
+  const base = resolveAgentWorkerUrl(envelope, agentWorkerUrl);
+  if (!envelope?.agentCredential?.token || !base) {
     return { ok: false, status: 0, reason: 'agent_credentials_missing' };
   }
   const fetchView = async ({ key, view }: { key: string; view: string }): Promise<AgentResultViewState> => {
@@ -497,7 +530,7 @@ export const fetchAgentResults = async ({
     try {
       const response = await fetchImpl(url.toString(), {
         method: 'GET',
-        headers: buildAgentBridgeAuthHeaders(envelope),
+        headers: buildSessionAgentAuthHeaders(envelope),
         cache: 'no-store',
       });
       const body = toRecord(await response.json().catch(() => ({})));

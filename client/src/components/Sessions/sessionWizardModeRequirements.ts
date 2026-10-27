@@ -130,9 +130,6 @@ export const resolveSessionWizardModeRequirements = (
   } else if (usesWorkerRuntime) {
     requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.SESSION_WORKER);
   }
-  if (usesAgentSessionWrapped) {
-    requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_API_TOKEN);
-  }
   requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.AI_PROVIDER_KEY);
   if (requiresArweave) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.ARWEAVE_JWK);
   if (requiresRpc) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.RPC);
@@ -154,14 +151,14 @@ export const resolveSessionWizardModeRequirements = (
   const presetKeyChips = usesCloudflare
     ? [
         'Cloudflare account',
-        ...(usesAgentSessionWrapped ? ['Request-only Cloudflare API token'] : []),
+        ...(usesAgentSessionWrapped ? ['Agent signing secret in Cloudflare'] : []),
         'OpenAI API Key',
         ...(requiresRpc ? ['RPC URL/key'] : []),
         ...(requiresLit ? ['Lit API key'] : []),
       ]
     : [
         ...(usesWorkerRuntime ? ['Compatible Session Worker'] : []),
-        ...(usesAgentSessionWrapped ? ['Request-only Cloudflare API token'] : []),
+        ...(usesAgentSessionWrapped ? ['Agent signing secret in Cloudflare'] : []),
         'OpenAI API Key',
         'Arweave wallet/JWK',
         'RPC URL/key',

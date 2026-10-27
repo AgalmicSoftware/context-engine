@@ -37,11 +37,6 @@ export const WORKER_BUNDLE_URL = readPublicEnv(
   buildPublicRepoReleaseAssetUrl(WORKER_RELEASE_TAG, 'sessionCorsWorker.bundle.js'),
 );
 
-export const AGENT_BRIDGE_WORKER_BUNDLE_URL = readPublicEnv(
-  'REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL',
-  buildPublicRepoReleaseAssetUrl(WORKER_RELEASE_TAG, 'agentBridgeWorker.bundle.js'),
-);
-
 export const WORKER_RELEASE_MANIFEST_URL = readPublicEnv(
   'REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL',
   buildPublicRepoReleaseAssetUrl(WORKER_RELEASE_TAG, 'worker-release-manifest.json'),

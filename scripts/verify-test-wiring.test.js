@@ -264,11 +264,11 @@ test('release workflow fetches preserve public ancestry for exact release refs',
   });
 });
 
-test('agent bridge runner skips cleanly when a public artifact omits the worker', () => {
+test('agent behavior runner fails when maintained tests are missing', () => {
   const { runAgentBridgeWorkerTests } = require('./run-agent-bridge-worker-tests');
 
   withTempRepo((rootDir) => {
-    assert.equal(runAgentBridgeWorkerTests(rootDir), 0);
+    assert.throws(() => runAgentBridgeWorkerTests(rootDir), /ENOENT|missing/);
   });
 });
 
@@ -604,7 +604,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/lib/public-release-strip-patterns.sh',
       'scripts/run-agent-bridge-worker-tests.js',
       'workers/sessionCorsWorker/package.json',
-      'workers/agentBridgeWorker/package.json',
+      'workers/sessionCorsWorker/agent/requestBoundary.mjs',
       'workers/deploy-helper/wrangler.example.toml',
       'workers/deploy-helper/.dev.vars.example',
       'workers/deploy-helper/LICENSE',

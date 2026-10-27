@@ -5,7 +5,7 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 const capability = {
   version: 1 as const,
   enabled: true,
-  origin: 'https://wrapped-alpha.example.workers.dev',
+  origin: 'https://session-worker.example.workers.dev',
   protocolVersion: 'agent-session-wrapped-v1',
   revision: 'wrapped-0123456789abcdef',
   verifiedAt: '2026-07-20T18:00:00.000Z',
@@ -69,16 +69,18 @@ describe('AdminAgentSessionWrappedPanel', () => {
       />,
     );
 
-    expect(screen.getByText(/permanently locked session has no usable paired Worker/i)).toBeInTheDocument();
+    expect(screen.getByText(/permanently locked session has no usable Session Worker/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Enable Wrapped' })).not.toBeInTheDocument();
   });
 
-  it('enables through one request-only token and clears it after durable publication', async () => {
+  it('enables with a signed session configuration write and verifies capabilities', async () => {
     global.fetch = jest.fn(
       async () =>
         new Response(
           JSON.stringify({
             ok: true,
+            features: ['agent_http_v1'],
+            agentHttp: { enabled: true, configured: true, ready: true },
             sessionSlug: 'alpha',
             sessionWorkerOrigin: 'https://session-worker.example.workers.dev',
             workerUrl: capability.origin,
@@ -89,17 +91,15 @@ describe('AdminAgentSessionWrappedPanel', () => {
     );
     render(<AdminAgentSessionWrappedPanel {...baseProps} />);
 
-    const tokenInput = screen.getByLabelText('Cloudflare API token');
-    fireEvent.change(tokenInput, { target: { value: 'cf-request-only-token' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enable Wrapped' }));
 
     await waitFor(() => expect(baseProps.onConfigUpdated).toHaveBeenCalled());
     expect(baseProps.postSignedRequest).toHaveBeenCalled();
-    expect(tokenInput).toHaveValue('');
+    expect(screen.queryByLabelText('Cloudflare API token')).not.toBeInTheDocument();
     expect(screen.getByText(/Wrapped access enabled and published/i)).toBeInTheDocument();
   });
 
-  it('shows health, disable-access, and redeploy controls for direct HTTP access', () => {
+  it('shows health and disable access for the same Session Worker', () => {
     render(
       <AdminAgentSessionWrappedPanel
         {...baseProps}
@@ -112,8 +112,7 @@ describe('AdminAgentSessionWrappedPanel', () => {
 
     expect(screen.getByRole('button', { name: 'Check health' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Disable access' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Redeploy' })).toBeInTheDocument();
-    expect(screen.getByText(/Attaching a new registry Worker prompts an admin transaction/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Redeploy' })).not.toBeInTheDocument();
   });
 
   it('keeps health observable when a locked or non-admin session is read-only', () => {

@@ -3,7 +3,7 @@ import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClie
 import {
   cacheAgentClientLoginEnvelope,
   resolveAgentClientLoginIdentityTarget,
-  resolveSessionAgentBridgeUrl,
+  resolveSessionAgentWorkerUrl,
 } from '../OnePageSession/onePageSessionAgentController';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 
@@ -19,7 +19,7 @@ export type LoginDisplaySessionConfig = UnknownRecord & {
 };
 
 export type LoginAgentSessionContext = {
-  agentBridgeUrl: string;
+  agentWorkerUrl: string;
   sessionId: string;
   sessionConfig: LoginDisplaySessionConfig;
   sessionSlug: string;
@@ -35,7 +35,7 @@ type AgentTokenStatePatch =
 export type LoginAgentActionsDeps = {
   changeAccount: (payload: unknown) => void;
   exchangeAgentClientLogin: (args: {
-    agentBridgeUrl: string;
+    agentWorkerUrl: string;
     sessionId?: unknown;
     sessionSlug: string;
     tokenOrLink: string;
@@ -62,7 +62,7 @@ export type LoginAgentActions = {
   getAgentTokenLoginSessionContext: () => LoginAgentSessionContext;
   getDisplaySessionConfig: (slugIn?: unknown, cfgIn?: unknown) => LoginDisplaySessionConfig;
   handleAgentTokenLoginSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  resolveAgentBridgeUrl: (sessionConfig?: unknown) => string;
+  resolveAgentWorkerUrl: (sessionConfig?: unknown) => string;
   shouldShowAgentTokenLogin: () => boolean;
   toggleAgentTokenLogin: () => void;
 };
@@ -151,7 +151,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     );
   };
 
-  const resolveAgentBridgeUrl = (sessionConfig: unknown = null): string => resolveSessionAgentBridgeUrl(sessionConfig);
+  const resolveAgentWorkerUrl = (sessionConfig: unknown = null): string => resolveSessionAgentWorkerUrl(sessionConfig);
 
   const getAgentTokenLoginSessionContext = (): LoginAgentSessionContext => {
     const sessionSlug = deps.getActiveSessionSlug();
@@ -161,7 +161,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     return {
       sessionSlug,
       sessionConfig,
-      agentBridgeUrl: resolveAgentBridgeUrl(sessionConfig),
+      agentWorkerUrl: resolveAgentWorkerUrl(sessionConfig),
       sessionId: toStr(identity.sessionId),
       workerCanonical: projection.isWorkerCanonical,
       workerUrl: toStr(identity.workerUrl),
@@ -217,7 +217,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
   const handleAgentTokenLoginSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     if (!shouldShowAgentTokenLogin()) return;
-    const { sessionSlug, agentBridgeUrl, sessionId, workerCanonical, workerUrl } = getAgentTokenLoginSessionContext();
+    const { sessionSlug, agentWorkerUrl, sessionId, workerCanonical, workerUrl } = getAgentTokenLoginSessionContext();
     const tokenOrLink = deps.getAgentTokenInput();
     const validation = deps.extractAgentClientToken(tokenOrLink);
     deps.setState({
@@ -243,7 +243,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
 
     try {
       const envelope = await deps.exchangeAgentClientLogin({
-        agentBridgeUrl,
+        agentWorkerUrl,
         sessionId,
         sessionSlug,
         tokenOrLink,
@@ -275,7 +275,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     getAgentTokenLoginSessionContext,
     getDisplaySessionConfig,
     handleAgentTokenLoginSubmit,
-    resolveAgentBridgeUrl,
+    resolveAgentWorkerUrl,
     shouldShowAgentTokenLogin,
     toggleAgentTokenLogin,
   };

@@ -1,3 +1,4 @@
+import { assertAgentBackupTargetEmpty } from './agent/backup.mjs';
 import { BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStagePrefix, backupImportJournalKey, journalBackupImportWrite, readActiveBackupImport, cleanupCompletedBackupImport } from './sessionBackupLifecycle.js';
 import { verifyBackupPage } from './sessionBackupAuthentication.js';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
@@ -26,6 +27,8 @@ const assertEmptyTarget = async ({ coordinator, current, slug, page, index, budg
   const nonempty = () => fail('Restore requires an empty target session. Abandon any unfinished restore before starting again.', 409, 'backup_target_not_empty');
   if (current || await coordinator.state.storage.get('session-lit-authorization-signer-v1')) nonempty();
   const groupKv = budget.wrap(coordinator.env.GROUP_KV);
+  await assertAgentBackupTargetEmpty({ kv: groupKv, storage: coordinator.state.storage, sessionId: page.manifest.sessionId });
+  budget.consume(1);
   for (const suffix of ['config', 'secrets']) {
     if (await groupKv.get(`session:${normalizeWorkerSessionSlug(slug)}:${suffix}`) != null) nonempty();
   }
@@ -49,6 +52,7 @@ const assertEmptyTarget = async ({ coordinator, current, slug, page, index, budg
 
 const validateSnapshot = ({ snapshot, manifest, normalizeConfig, normalizeSessionKey }) => {
   const authority = snapshot?.configAuthority;
+  if (authority?.config?.agentHttp?.invites !== undefined) fail('Agent invite admission material is not restorable.');
   const slug = manifest.sessionSlug;
   if (!object(authority) || authority.schemaVersion !== 1 || authority.slug !== slug ||
       Object.keys(authority).some((key) => !['schemaVersion', 'slug', 'revision', 'config', 'projectionPending', 'activeSessionKey'].includes(key)) ||

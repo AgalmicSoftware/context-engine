@@ -61,7 +61,7 @@ import {
   normalizeOnePageSessionSlug,
   resolveAgentClientLoginIdentityTarget,
   resolveCurrentSessionSlugForProps,
-  resolveSessionAgentBridgeUrl as resolveSessionAgentBridgeUrlForSession,
+  resolveSessionAgentWorkerUrl as resolveSessionAgentWorkerUrlForSession,
   type OnePageSessionPropsLike,
 } from './onePageSessionAgentController';
 import {
@@ -379,7 +379,7 @@ class OnePageSession extends Component<any, any> {
       },
       resolveCurrentSessionConfig: () => this.resolveCurrentSessionConfig(),
       resolveCurrentSessionSlug: () => this.resolveCurrentSessionSlug(),
-      resolveSessionAgentBridgeUrl: (sessionConfig) => this.resolveSessionAgentBridgeUrl(sessionConfig),
+      resolveSessionAgentWorkerUrl: (sessionConfig) => this.resolveSessionAgentWorkerUrl(sessionConfig),
       setState: (patch, callback) => this.setState(patch, callback),
     });
     Object.assign(this, agentActions);
@@ -613,8 +613,8 @@ class OnePageSession extends Component<any, any> {
     return this.getResolvedSessionConfig(buildCurrentSessionConfigRequest(propsIn, resolveEffectiveSlug));
   }
 
-  resolveSessionAgentBridgeUrl(sessionConfig: unknown = this.resolveCurrentSessionConfig()) {
-    return resolveSessionAgentBridgeUrlForSession(sessionConfig);
+  resolveSessionAgentWorkerUrl(sessionConfig: unknown = this.resolveCurrentSessionConfig()) {
+    return resolveSessionAgentWorkerUrlForSession(sessionConfig);
   }
 
   isAgentBackendMode(

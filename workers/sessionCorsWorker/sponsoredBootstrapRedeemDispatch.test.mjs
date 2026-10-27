@@ -242,8 +242,8 @@ test('dispatchSponsoredBootstrapRedeem deploys only the sponsor-configured relea
   }
   assert.equal(deployed.bundleUrl, SPONSOR_RELEASE_ENV.WORKER_BUNDLE_URL);
   assert.equal(deployed.bundleManifestUrl, SPONSOR_RELEASE_ENV.WORKER_BUNDLE_MANIFEST_URL);
-  assert.equal(deployed.agentBridgeBundleUrl, bridgeRelease.AGENT_BRIDGE_BUNDLE_URL);
-  assert.equal(deployed.agentBridgeBundleManifestUrl, bridgeRelease.AGENT_BRIDGE_BUNDLE_MANIFEST_URL);
+  assert.equal(deployed.agentBridgeBundleUrl, undefined);
+  assert.equal(deployed.agentBridgeBundleManifestUrl, undefined);
 });
 
 test('dispatchSponsoredBootstrapRedeem refuses deploys before using the grant when no release is configured', async () => {
@@ -273,9 +273,7 @@ test('dispatchSponsoredBootstrapRedeem refuses deploys before using the grant wh
     assert.equal(result.status, 400);
     assert.match(result.body.error, /WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL/);
   }
-  const bridge = await attempt({}, { ...payload, sessionModeProfile: { surfaces: { agentHttp: true } } });
-  assert.equal(bridge.status, 400);
-  assert.match(bridge.body.error, /AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL/);
+
 });
 
 test('dispatchSponsoredBootstrapRedeem returns retryable embedded deploy failures directly and keeps the grant', async () => {

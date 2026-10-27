@@ -16,11 +16,10 @@ const MANIFEST_FILE = 'worker-release-manifest.json';
 // The bundles hosted clients deploy, by their manifest artifact kind.
 const CLIENT_BUNDLES = Object.freeze([
   Object.freeze({ kind: 'session-cors-worker', file: 'sessionCorsWorker.bundle.js' }),
-  Object.freeze({ kind: 'agent-bridge-worker', file: 'agentBridgeWorker.bundle.js' }),
+  Object.freeze({ kind: 'deploy-helper', file: 'deployHelper.bundle.js' }),
 ]);
 const ASSET_URL_OVERRIDES = Object.freeze([
   'REACT_APP_CE_WORKER_BUNDLE_URL',
-  'REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL',
   'REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL',
 ]);
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/;

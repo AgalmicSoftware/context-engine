@@ -154,7 +154,7 @@ test('buildDeployHelperUploadMetadata writes the expected bindings', async () =>
     new_sqlite_classes: ['SessionWriteCoordinator'],
   });
   assert.equal(metadata.compatibility_date, '2025-01-01');
-  // The helper probes the Wrapped Bridge on this account's workers.dev zone.
+  // The helper probes the Session Worker on this account's workers.dev zone.
   // Without this runtime flag Cloudflare returns 1042 before the probe arrives.
   assert.ok(metadata.compatibility_flags.includes('global_fetch_strictly_public'));
 });
@@ -162,7 +162,6 @@ test('buildDeployHelperUploadMetadata writes the expected bindings', async () =>
 test('manual Worker deployment configs permit public same-account Worker calls', () => {
   for (const relativePath of [
     '../workers/deploy-helper/wrangler.example.toml',
-    '../workers/agentBridgeWorker/wrangler.example.toml',
     '../deploy/cloudflare/session-worker/wrangler.jsonc',
   ]) {
     const source = fs.readFileSync(path.join(__dirname, relativePath), 'utf8');

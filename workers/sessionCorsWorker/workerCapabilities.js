@@ -1,9 +1,12 @@
+import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
+import { buildSessionAgentCapability } from './agent/capability.mjs';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { SESSION_CONFIG_MIGRATION_REQUIRED_REASON } from './sessionConfigSecretsStore.js';
 import { getDefaultWorkerSessionSlug, validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
 import { getStorageIndexBinding, resolvePayloadAccessControl } from './storageRouteExecution.js';
 
 export const FEATURES = Object.freeze([
+  'agent_http_v1',
   'envelope_export_identity_v1',
   'recovery_key_export',
   'response_upload_receipts',
@@ -54,6 +57,17 @@ export const dispatchWorkerCapabilities = async ({ request, env = {}, headers = 
       if (failed) unavailable.push({ operation, reason: `${failed}_${readiness[failed]}` });
     }
     body.session = { readiness, unavailable };
+    if (validCurrent && current.body.config && resolveCanonicalWorkerSessionIdHex(current.body.config)) {
+      const config = current.body.config;
+      const enabled = config.sessionModeProfile?.surfaces?.agentHttp === true;
+      const configured = readiness.coordinator === 'ok' && readiness.configAuthority === 'ok' && readiness.tokenHmac === 'ok' &&
+        !!env.GROUP_KV?.get && !!env.GROUP_KV?.put && !!env.GROUP_KV?.list && !!env.GROUP_KV?.delete && !!env.AGENT_MANAGED_ROOT_SECRET;
+      const ready = enabled && configured;
+      body.agentHttp = { enabled, configured, ready };
+      body.agentSessionWrapped = await buildSessionAgentCapability({ config, revision: current.body.revision,
+        origin: url.origin, enabled: ready, bundle: body.bundle });
+      responseHeaders.set('Cache-Control', 'no-store');
+    }
   }
   return Response.json(body, { headers: responseHeaders });
 };

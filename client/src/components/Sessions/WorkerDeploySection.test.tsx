@@ -731,3 +731,25 @@ test('manual setup refuses a cleared operator key until generated-key mode is ex
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
   expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_SESSION_SLUG)).toHaveValue('demo-worker');
 });
+
+it('shows an independent agent signing secret in native setup without putting it in the deploy URL', () => {
+  renderWorkerDeploySection({
+    agentHttpEnabled: true,
+    cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+    cloudflareTokenSlug: 'agent-fixture',
+    account: '0x0000000000000000000000000000000000000001',
+  });
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+  const root = screen.getByTestId('ce-wizard-cloudflare-native-agent-root') as HTMLInputElement;
+  expect(root.value).toMatch(/^[a-f0-9]{64}$/);
+  expect(root.value).not.toBe(
+    (screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC) as HTMLInputElement).value,
+  );
+  expect(root.value).not.toBe(
+    (screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK) as HTMLInputElement).value,
+  );
+  expect(screen.getByTestId('ce-wizard-cloudflare-native-checklist')).toHaveTextContent('five setup values');
+  expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY).getAttribute('href')).not.toContain(
+    root.value,
+  );
+});

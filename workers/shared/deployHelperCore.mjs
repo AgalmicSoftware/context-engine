@@ -1,3 +1,4 @@
+import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import { recoveryKeyFingerprint, withFreshRecoveryKey } from './recoveryKey.mjs';
 import { fetchArtifactText } from './artifactFetch.mjs';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
@@ -6,11 +7,6 @@ import {
   normalizeStorageBackend,
 } from '../sessionCorsWorker/storageRefNormalization.js';
 import { buildEncryptedSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
-import {
-  AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
-  executeAgentSessionWrappedDeployment,
-  persistAgentSessionWrappedCapability,
-} from './agentSessionWrappedDeployment.mjs';
 import { resolveCloudflareApiBaseUrl } from './deployHelperEndpointConfig.mjs';
 import {
   findForbiddenCloudflareDeploymentTokenPath,
@@ -1257,7 +1253,8 @@ const resolveDeploymentAccountId = async ({
 };
 
 export const validateDeployHelperPublicConfigInputs = (body = {}) => {
-  if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) return '';
+  if (!validSessionAgentConfig(body)) return 'Invalid agent configuration.';
+  if (body?.deploymentKind) return 'Separate agent deployments are no longer supported; configure the Session Worker.';
   const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
   if (allowOriginsInput.some((origin) => toStr(origin).includes('*'))) {
     return 'Worker CORS allowlists must contain exact origins.';
@@ -1280,18 +1277,6 @@ export const validateDeployHelperPublicConfigInputs = (body = {}) => {
     : '';
 };
 
-// The URL rule readBundle applies in agentSessionWrappedDeployment.mjs, so a
-// bridge URL this helper checks and records is one the bridge deploy accepts.
-const normalizeAgentBridgeBundleUrl = (value) => {
-  try {
-    const parsed = new URL(toStr(value).trim());
-    if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.hash) return '';
-    return parsed.toString();
-  } catch {
-    return '';
-  }
-};
-
 const executeDeployHelperRequestCore = async ({
   body,
   env,
@@ -1305,16 +1290,6 @@ const executeDeployHelperRequestCore = async ({
   const apiToken = toStr(body?.apiToken || body?.token).trim();
   const apiBaseUrl = resolveCloudflareApiBaseUrl({ env });
   const cfFetchOptions = { fetchImpl, apiBaseUrl };
-  if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
-    return executeAgentSessionWrappedDeployment({
-      body,
-      env,
-      accountId: toStr(resolvedAccountId).trim(),
-      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
-      fetchImpl,
-      markMutationStarted: idempotencyContext?.markMutationStarted,
-    });
-  }
   const requestedWorkerName = toStr(body?.workerName).trim();
   const defaultSlugInput = env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? '';
   const defaultSlugCheck = validateInboundSlug(defaultSlugInput);
@@ -1835,17 +1810,7 @@ const executeDeployHelperRequestCore = async ({
     }
   }
 
-  // An Agents HTTP session also gets an Agent Bridge Worker after this one.
-  // When a release manifest pins that bundle (resolveDeploymentBundleProvenance
-  // set agentBridgeBundleSha256 from it), the upload below records it once the
-  // bytes are checked.
   const agentHttpRequested = body?.sessionModeProfile?.surfaces?.agentHttp === true;
-  const agentBridgeBundleUrl = normalizeAgentBridgeBundleUrl(body?.agentBridgeBundleUrl || env?.AGENT_BRIDGE_BUNDLE_URL);
-  const agentBridgeBundleManifestUrl = toStr(body?.agentBridgeBundleManifestUrl).trim();
-  const agentBridgeManifestSha256 = agentBridgeBundleManifestUrl
-    ? normalizeWorkerBundleSha256(body?.agentBridgeBundleSha256)
-    : '';
-  let agentBridgeReleaseVerified = false;
 
   // An exactly owned uploaded Worker already contains the requested module.
   // Do not make recovery depend on the original bundle host still being
@@ -1862,24 +1827,6 @@ const executeDeployHelperRequestCore = async ({
         error: 'Deployment bundle content changed after this request started; upload was stopped.',
         deploymentRequestPending: true,
       });
-    }
-    // Check the bridge bytes before this upload, so a bad bridge release stops
-    // the deploy instead of leaving a session Worker without its bridge.
-    if (agentHttpRequested && agentBridgeBundleUrl && agentBridgeManifestSha256) {
-      let agentBridgeSource = '';
-      try {
-        agentBridgeSource = await fetchArtifactText(agentBridgeBundleUrl, { fetchImpl });
-      } catch (error) {
-        return keepStagedResourcesPending(buildFailure(502, {
-          error: `Failed to fetch Agent Bridge bundle: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
-        }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) }));
-      }
-      if (await sha256Hex(agentBridgeSource) !== agentBridgeManifestSha256) {
-        return keepStagedResourcesPending(buildFailure(409, {
-          error: 'Agent Bridge bundle SHA-256 does not match the verified release manifest.',
-        }));
-      }
-      agentBridgeReleaseVerified = true;
     }
   }
 
@@ -2044,12 +1991,7 @@ const executeDeployHelperRequestCore = async ({
             { name: 'WORKER_BUNDLE_MANIFEST_URL', type: 'plain_text', text: bundleManifestUrl },
           ]
         : []),
-      ...(agentBridgeReleaseVerified
-        ? [
-            { name: 'AGENT_BRIDGE_BUNDLE_URL', type: 'plain_text', text: agentBridgeBundleUrl },
-            { name: 'AGENT_BRIDGE_BUNDLE_MANIFEST_URL', type: 'plain_text', text: agentBridgeBundleManifestUrl },
-          ]
-        : []),
+
     ],
     migrations: {
       old_tag: '',
@@ -2666,50 +2608,29 @@ const executeDeployHelperRequestCore = async ({
   }
 
   if (agentHttpRequested) {
-    const wrappedDeploy = await executeAgentSessionWrappedDeployment({
-      body: {
-        deploymentKind: AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
-        apiToken,
-        sessionSlug: displaySlug,
-        sessionWorkerOrigin: workerUrl,
-        sessionDeploymentIdentity: body?.agentSessionWrappedDeploymentIdentity,
-        sessionId: body?.sessionIdHex || body?.sessionId,
-        authorityMode: body?.sessionModeProfile?.authority?.mode,
-        bundleUrl: body?.agentBridgeBundleUrl,
-        bundleManifestUrl: body?.agentBridgeBundleManifestUrl,
-        bundleSha256: body?.agentBridgeBundleSha256,
-      },
-      env,
-      accountId,
-      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
-      fetchImpl,
-      markMutationStarted: idempotencyContext?.markMutationStarted,
-    });
-    if (!wrappedDeploy.ok) {
-      return buildDeploymentFailure(wrappedDeploy.status, {
-        ...(wrappedDeploy.body || {}),
-        partial: true,
-        deploymentRequestPending: true,
-      }, { fallbackEligible: wrappedDeploy.status >= 500 });
+    if (!resumedSecretBindings.has('AGENT_MANAGED_ROOT_SECRET')) {
+      const secret = await cfFetch(apiToken, runtimeSecretsPath, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'AGENT_MANAGED_ROOT_SECRET', type: 'secret_text', text: randomSecret() }),
+      }, cfFetchOptions);
+      if (!secret.ok && !(await reconcileRuntimeSecretWrite('AGENT_MANAGED_ROOT_SECRET', secret)).ok) {
+        return buildDeploymentFailure(502, { error: 'Agent signing setup could not be confirmed.', deploymentRequestPending: true,
+          orphanResources: retainedRuntimeSecretResources() }, { fallbackEligible: true });
+      }
     }
-    const capabilityWrite = await persistAgentSessionWrappedCapability({
-      apiToken,
-      accountId,
-      kvNamespaceId: kvId,
-      sessionConfigKey,
-      sessionSlug: displaySlug,
-      sessionWorkerOrigin: workerUrl,
-      capability: wrappedDeploy.body.agentSessionWrapped,
-      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
-    });
-    if (!capabilityWrite.ok) {
-      return buildDeploymentFailure(capabilityWrite.status, {
-        ...(capabilityWrite.body || {}),
-        partial: true,
-        deploymentRequestPending: true,
-      }, { fallbackEligible: capabilityWrite.status >= 500 });
+    // Verify the persisted configuration through the newly created Worker.
+    // An uncertain response retains the deployment journal and fresh resources.
+    let capabilities;
+    try {
+      const checked = await fetchImpl(new URL(`/capabilities?slug=${encodeURIComponent(sessionSlug)}`, workerUrl).toString());
+      capabilities = checked.ok ? await checked.json() : null;
+    } catch { capabilities = null; }
+    if (!capabilities?.features?.includes('agent_http_v1') || capabilities.agentHttp?.ready !== true ||
+        capabilities.agentSessionWrapped?.origin !== new URL(workerUrl).origin) {
+      return buildDeploymentFailure(502, { error: 'Session Worker agent capabilities could not be verified.',
+        deploymentRequestPending: true, orphanResources: retainedRuntimeSecretResources() }, { fallbackEligible: true });
     }
-    deploymentPayload.agentSessionWrapped = capabilityWrite.body.agentSessionWrapped;
+    deploymentPayload.agentSessionWrapped = capabilities.agentSessionWrapped;
   }
 
   if (envelopeKekSecretSet && !envelopeKekSecretPreserved) {
@@ -2722,16 +2643,8 @@ const executeDeployHelperRequestCore = async ({
 const resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImpl = globalThis.fetch } = {}) => {
   const resolvedBody = { ...(isObj(body) ? body : {}) };
   if (!toStr(resolvedBody.bundleManifestUrl)) {
-    const defaultBundleManifestUrl = toStr(
-      resolvedBody.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND
-        ? env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL
-        : env?.WORKER_BUNDLE_MANIFEST_URL,
-    );
+    const defaultBundleManifestUrl = toStr(env?.WORKER_BUNDLE_MANIFEST_URL);
     if (defaultBundleManifestUrl) resolvedBody.bundleManifestUrl = defaultBundleManifestUrl;
-  }
-  if (!toStr(resolvedBody.agentBridgeBundleManifestUrl)) {
-    const defaultAgentManifestUrl = toStr(env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL);
-    if (defaultAgentManifestUrl) resolvedBody.agentBridgeBundleManifestUrl = defaultAgentManifestUrl;
   }
   const resolveOne = async ({ manifestField, digestField, artifactFile, artifactKind }) => {
     const manifestUrl = toStr(resolvedBody[manifestField]).trim();
@@ -2755,30 +2668,9 @@ const resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImp
     return null;
   };
 
-  if (resolvedBody.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
-    const failure = await resolveOne({
-      manifestField: 'bundleManifestUrl',
-      digestField: 'bundleSha256',
-      artifactFile: 'agentBridgeWorker.bundle.js',
-      artifactKind: 'agent-bridge-worker',
-    });
-    if (failure) return { ok: false, failure };
-  } else {
-    const sessionFailure = await resolveOne({
-      manifestField: 'bundleManifestUrl',
-      digestField: 'bundleSha256',
-      artifactFile: 'sessionCorsWorker.bundle.js',
-      artifactKind: 'session-cors-worker',
-    });
-    if (sessionFailure) return { ok: false, failure: sessionFailure };
-    const bridgeFailure = await resolveOne({
-      manifestField: 'agentBridgeBundleManifestUrl',
-      digestField: 'agentBridgeBundleSha256',
-      artifactFile: 'agentBridgeWorker.bundle.js',
-      artifactKind: 'agent-bridge-worker',
-    });
-    if (bridgeFailure) return { ok: false, failure: bridgeFailure };
-  }
+  const failure = await resolveOne({ manifestField: 'bundleManifestUrl', digestField: 'bundleSha256',
+    artifactFile: 'sessionCorsWorker.bundle.js', artifactKind: 'session-cors-worker' });
+  if (failure) return { ok: false, failure };
   return { ok: true, body: resolvedBody };
 };
 
@@ -2795,7 +2687,7 @@ const validateDeployHelperLocalInputs = (body = {}, env = {}) => {
     return 'Legacy groupSlug is no longer accepted. Use sessionSlug instead.';
   }
   if (!toStr(body?.apiToken || body?.token).trim()) return 'Missing apiToken.';
-  if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) return '';
+  if (body?.deploymentKind) return 'Separate agent deployments are no longer supported; configure the Session Worker.';
   if (!toStr(body?.workerName).trim()) return 'Missing workerName.';
   const defaultSlugCheck = validateInboundSlug(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? '');
   if (body?.sessionSlug == null && !defaultSlugCheck.ok) return defaultSlugCheck.error;

@@ -1,3 +1,4 @@
+import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from '../../shared/interviewSettings.mjs';
 import { normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
 import { stableCanonicalSerialize } from '../shared/deployHelperCore.mjs';
@@ -49,6 +50,8 @@ const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
   'allowOrigins',
   'sessionModeProfile',
   'agentSessionWrapped',
+  'agentHttp',
+  'resultsExposure',
   'workerAuthority',
   'workerRoles',
   'roles',
@@ -328,6 +331,7 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
       return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
     }
+    if (!validSessionAgentConfig(incomingConfig)) return { ok: false, status: 400, error: 'Invalid agent configuration.' };
     if (!validAllowOrigins(incomingConfig)) {
       return { ok: false, status: 400, error: 'Worker CORS allowlists must contain exact origins.' };
     }
@@ -394,6 +398,7 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
     return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
   }
+  if (!validSessionAgentConfig(mergedConfig)) return { ok: false, status: 400, error: 'Invalid agent configuration.' };
   if (!validAllowOrigins(mergedConfig)) {
     return { ok: false, status: 400, error: 'Worker CORS allowlists must contain exact origins.' };
   }

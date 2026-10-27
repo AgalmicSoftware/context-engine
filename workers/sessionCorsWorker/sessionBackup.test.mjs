@@ -363,6 +363,14 @@ test('fresh signed restore requires the deployment bootstrap admin and explicit 
   };
   assert.equal((await call(stranger, true)).status, 403);
   assert.equal((await call(wallet, false)).status, 403);
+  const occupiedKey = `ce-agent:${sessionId}:agent:credential:v2:fixture`;
+  target.kv.values.set(occupiedKey, '{"type":"agent_credential"}');
+  const refused = await call(wallet, true);
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).reason, 'backup_target_not_empty');
+  assert.equal(await target.kv.get(`session:${slug}:config`), null);
+  assert.equal(await target.kv.get(occupiedKey), '{"type":"agent_credential"}');
+  target.kv.values.delete(occupiedKey);
   const response = await call(wallet, true);
   const result = await response.json();
   assert.equal(response.status, 200, JSON.stringify(result));
@@ -1100,4 +1108,27 @@ test('legacy completed imports are cleaned in batches without replaying stale re
     assert.equal((await restoreControl(target.env, 'status', archiveId, 1)).ok, true);
   }
   assertCompletedRestoreClean(target, archiveId);
+});
+
+
+test('agent-enabled backup restores canonical records but excludes credentials, invites and managed keys', async () => {
+  const source = fixture();
+  const key = `session:${slug}:config`;
+  const config = JSON.parse(source.kv.values.get(key));
+  config.sessionModeProfile = { authority: { mode: 'worker_canonical' }, surfaces: { agentHttp: true } };
+  config.agentHttp = { invites: [{ tokenHash: 'b'.repeat(64) }], managedAccountSubmitAllowed: true };
+  source.kv.values.set(key, JSON.stringify(config));
+  source.env.AGENT_MANAGED_ROOT_SECRET = 'fixture-root-must-stay-out';
+  source.kv.values.set(`ce-agent:${sessionId}:agent:credential:v2:fixture`, 'fixture-credential-must-stay-out');
+  source.kv.values.set(`ce-agent:${sessionId}:telegram:answer-draft:fixture`, 'fixture-draft-must-stay-out');
+  const pages = await allPages(source.env);
+  const archive = JSON.stringify(pages);
+  assert.doesNotMatch(archive, /fixture-root-must-stay-out|fixture-credential-must-stay-out|fixture-draft-must-stay-out/);
+  assert.equal(archive.includes('b'.repeat(64)), false);
+  const target = fixture(); target.kv.values.delete(key);
+  for (const page of pages) assert.equal((await importPage(target.env, page)).ok, true);
+  const restored = JSON.parse(target.kv.values.get(key));
+  assert.equal(restored.agentHttp.invites, undefined);
+  assert.equal(restored.agentHttp.managedAccountSubmitAllowed, true);
+  assert.equal([...target.kv.values.keys()].some(key => key.startsWith(`ce-agent:${sessionId}:`)), false);
 });

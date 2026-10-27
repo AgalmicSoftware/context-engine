@@ -11,7 +11,7 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 const capability = {
   version: 1 as const,
   enabled: true,
-  origin: 'https://wrapped-alpha.example.workers.dev',
+  origin: 'https://session-worker.example.workers.dev',
   protocolVersion: 'agent-session-wrapped-v1',
   revision: 'wrapped-0123456789abcdef',
   verifiedAt: '2026-07-20T18:00:00.000Z',
@@ -178,72 +178,46 @@ describe('adminAgentSessionWrapped', () => {
     const legacySession = registrySession();
     delete (legacySession as { sessionModeProfile?: unknown }).sessionModeProfile;
 
-    expect(buildAdminAgentSessionWrappedConfigPatch({ sessionConfig: legacySession, capability })).toEqual({
-      agentSessionWrapped: capability,
-    });
+    expect(() => buildAdminAgentSessionWrappedConfigPatch({ sessionConfig: legacySession, capability })).toThrow(
+      /complete session mode profile/i,
+    );
+    expect(
+      resolveAdminAgentSessionWrappedAvailability({
+        canAdminWorker: true,
+        sessionConfig: legacySession,
+        sessionWorkerUrl: capability.origin,
+      }),
+    ).toMatchObject({ code: 'profile_required', manageable: false });
   });
 
-  it('awaits verified deployment before signed config publication and returns no token', async () => {
+  it('verifies one origin, saves signed config and verifies the resulting capability', async () => {
     const calls: string[] = [];
-    const fetchImpl = jest.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
-      calls.push('deploy');
-      const body = JSON.parse(String(init?.body || '{}'));
-      expect(body).toEqual(
-        expect.objectContaining({
-          apiToken: 'cf-request-only-token',
-          deploymentKind: 'agent_session_wrapped',
-          deploymentRequestId: 'wrapped-admin-request-1',
-          agentHttpEnabled: true,
-          sessionSlug: 'alpha',
-          sessionId: '0x01',
-          sessionWorkerOrigin: 'https://session-worker.example.workers.dev',
-          authorityMode: 'evm_registry_canonical',
-        }),
-      );
-      expect(JSON.stringify(body)).not.toContain('TELEGRAM_');
+    const fetchImpl = jest.fn(async (url: RequestInfo | URL) => {
+      calls.push('verify');
+      expect(String(url)).toBe(`${capability.origin}/capabilities?slug=alpha`);
       return new Response(
         JSON.stringify({
-          ok: true,
-          sessionSlug: 'alpha',
-          sessionWorkerOrigin: 'https://session-worker.example.workers.dev',
-          workerUrl: capability.origin,
+          features: ['agent_http_v1'],
+          agentHttp: { configured: true, enabled: true, ready: true },
           agentSessionWrapped: capability,
         }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
       );
     });
     const postSignedRequest = jest.fn(async (args) => {
       calls.push('publish');
-      expect(args).toEqual(
-        expect.objectContaining({
-          action: 'set-config',
-          path: '/admin/set-config',
-          workerUrl: 'https://session-worker.example.workers.dev',
-        }),
-      );
-      expect(args.body.config).toEqual(expect.objectContaining({ agentSessionWrapped: capability }));
-      return { data: { ok: true } };
+      expect(args).toMatchObject({ action: 'set-config', path: '/admin/set-config', workerUrl: capability.origin });
     });
-    const ensureSessionWorkerAttached = jest.fn(async () => {
-      calls.push('attach');
-    });
-
     const result = await applyAdminAgentSessionWrappedChange({
       accessEnabled: true,
-      apiToken: 'cf-request-only-token',
-      deployHelperUrl: 'https://deploy-helper.example.workers.dev',
-      deploymentRequestId: 'wrapped-admin-request-1',
       sessionConfig: registrySession(),
       sessionSlug: 'alpha',
-      sessionWorkerUrl: 'https://session-worker.example.workers.dev',
+      sessionWorkerUrl: capability.origin,
       fetchImpl,
-      ensureSessionWorkerAttached,
       postSignedRequest,
     });
-
-    expect(calls).toEqual(['deploy', 'attach', 'publish']);
-    expect(result).toEqual(expect.objectContaining({ capability }));
-    expect(JSON.stringify(result)).not.toContain('cf-request-only-token');
+    expect(calls).toEqual(['verify', 'publish', 'verify']);
+    expect(result.capability).toEqual(capability);
+    expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('/deploy');
   });
 
   it('attaches a missing registry Worker but never rewrites encrypted pointers', async () => {
@@ -297,26 +271,20 @@ describe('adminAgentSessionWrapped', () => {
     expect(setSessionFieldsOnChain).not.toHaveBeenCalled();
   });
 
-  it('does not report success when durable signed config publication fails', async () => {
+  it('does not report success when signed config publication fails', async () => {
     await expect(
       applyAdminAgentSessionWrappedChange({
         accessEnabled: true,
-        apiToken: 'cf-request-only-token',
-        deployHelperUrl: 'https://deploy-helper.example.workers.dev',
-        deploymentRequestId: 'wrapped-admin-request-2',
         sessionConfig: registrySession(),
         sessionSlug: 'alpha',
-        sessionWorkerUrl: 'https://session-worker.example.workers.dev',
+        sessionWorkerUrl: capability.origin,
         fetchImpl: async () =>
           new Response(
             JSON.stringify({
-              ok: true,
-              sessionSlug: 'alpha',
-              sessionWorkerOrigin: 'https://session-worker.example.workers.dev',
-              workerUrl: capability.origin,
+              features: ['agent_http_v1'],
+              agentHttp: { configured: true },
               agentSessionWrapped: capability,
             }),
-            { status: 200, headers: { 'content-type': 'application/json' } },
           ),
         postSignedRequest: async () => {
           throw new Error('signed config write failed');
@@ -325,53 +293,35 @@ describe('adminAgentSessionWrapped', () => {
     ).rejects.toThrow('signed config write failed');
   });
 
-  it('health-checks the published origin against the exact paired Worker and access state', async () => {
-    const result = await verifyAdminAgentSessionWrappedHealth({
-      capability,
-      sessionSlug: 'alpha',
-      sessionWorkerUrl: 'https://session-worker.example.workers.dev',
-      fetchImpl: async () =>
+  it('verifies current capabilities and rejects a separate origin before fetching', async () => {
+    const fetchImpl = jest.fn(
+      async () =>
         new Response(
           JSON.stringify({
-            ok: true,
-            worker: 'agentBridgeWorker',
-            protocolVersion: 'agent-session-wrapped-v1',
-            agentSessionWrappedConfigured: true,
-            agentSessionWrappedReady: true,
-            dedicatedSession: {
-              accessEnabled: true,
-              sessionSlug: 'alpha',
-              sessionWorkerOrigin: 'https://session-worker.example.workers.dev',
-            },
+            features: ['agent_http_v1'],
+            agentHttp: { enabled: true, ready: true },
+            agentSessionWrapped: capability,
           }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
         ),
-    });
-    expect(result).toEqual(expect.objectContaining({ ok: true, accessEnabled: true }));
-
+    );
     await expect(
       verifyAdminAgentSessionWrappedHealth({
         capability,
         sessionSlug: 'alpha',
-        sessionWorkerUrl: 'https://different-worker.example.workers.dev',
-        fetchImpl: async () =>
-          new Response(
-            JSON.stringify({
-              ok: true,
-              worker: 'agentBridgeWorker',
-              protocolVersion: 'agent-session-wrapped-v1',
-              agentSessionWrappedConfigured: true,
-              agentSessionWrappedReady: true,
-              dedicatedSession: {
-                accessEnabled: true,
-                sessionSlug: 'alpha',
-                sessionWorkerOrigin: 'https://session-worker.example.workers.dev',
-              },
-            }),
-            { status: 200, headers: { 'content-type': 'application/json' } },
-          ),
+        sessionWorkerUrl: capability.origin,
+        fetchImpl,
       }),
-    ).rejects.toThrow('pinned authority');
+    ).resolves.toMatchObject({ ok: true, accessEnabled: true });
+    fetchImpl.mockClear();
+    await expect(
+      verifyAdminAgentSessionWrappedHealth({
+        capability,
+        sessionSlug: 'alpha',
+        sessionWorkerUrl: 'https://foreign.example',
+        fetchImpl,
+      }),
+    ).rejects.toThrow('origin');
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
 

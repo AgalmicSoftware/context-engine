@@ -100,11 +100,6 @@ export const verifyNativeSessionWorker = async ({
   if (initialDraftWorkerUrl && initialDraftWorkerUrl !== workerUrl) {
     throw new Error('The Worker URL must match the current draft Worker URL before verification.');
   }
-  if (currentDraft.sessionModeProfile?.surfaces?.agentHttp === true) {
-    throw new Error(
-      'Agent Session Wrapped requires the legacy/manual deploy-helper flow; native Cloudflare dashboard verification cannot provision its dedicated Bridge.',
-    );
-  }
   if (!modeRequirements.selected || !modeRequirements.usesWorkerRuntime) {
     throw new Error('Native Session Worker verification requires a selected Worker-runtime profile.');
   }
@@ -211,6 +206,27 @@ export const verifyNativeSessionWorker = async ({
       throw new Error(secretsSyncStatus.warning || 'Worker secrets could not be verified.');
     }
 
+    if (currentDraft.sessionModeProfile?.surfaces?.agentHttp === true) {
+      const response = await fetch(`${workerUrl}/capabilities?slug=${encodeURIComponent(slug)}`, { cache: 'no-store' });
+      const capabilities = await response.json().catch(() => ({}));
+      if (
+        !response.ok ||
+        !capabilities.features?.includes('agent_http_v1') ||
+        capabilities.agentHttp?.ready !== true ||
+        capabilities.agentSessionWrapped?.origin !== new URL(workerUrl).origin
+      ) {
+        throw new Error(
+          'Agent HTTP is not ready. Configure a fresh AGENT_MANAGED_ROOT_SECRET in the Session Worker dashboard, then verify again.',
+        );
+      }
+      // Registry verification may return the input config itself. Keep the
+      // capability projection out of the signed-config fingerprint used below.
+      verifiedConfig.publicConfig = {
+        ...verifiedConfig.publicConfig,
+        agentSessionWrapped: capabilities.agentSessionWrapped,
+      };
+    }
+
     // Verify has already checked the public readback and identity. Publication
     // creates the revision later; the participant bootstrap requires that revision.
     const bootstrap: SessionWizardVerifiedWorkerConnection = {
@@ -273,21 +289,18 @@ export const verifyNativeSessionWorker = async ({
       throw new Error('Session settings changed while Worker verification was in progress. Verify the Worker again.');
     }
 
+    const agentSessionWrapped = bootstrap.config.agentSessionWrapped;
+    if (agentSessionWrapped) updateDraftValue(['agentSessionWrapped'], agentSessionWrapped);
     updateDraftValue(['corsWorkerUrl'], bootstrap.workerOrigin);
     if (deployedFromTemplate) {
       // Publication rebuilds this config from the draft; keep it matching the
       // verified one.
       updateDraftValue(['embeddedDeployHelperEnabled'], false);
     }
-    publishVerifiedRuntime(
-      runtimeRef,
-      currentDraft,
-      bootstrap.workerOrigin,
-      bootstrap.workerOrigin,
-      true,
-      proof,
-      deployedFromTemplate ? { embeddedDeployHelperEnabled: false } : {},
-    );
+    publishVerifiedRuntime(runtimeRef, currentDraft, bootstrap.workerOrigin, bootstrap.workerOrigin, true, proof, {
+      ...(deployedFromTemplate ? { embeddedDeployHelperEnabled: false } : {}),
+      ...(agentSessionWrapped ? { agentSessionWrapped } : {}),
+    });
     if (runtimeRef?.current) runtimeRef.current = withTemplateHelperFlag(runtimeRef.current);
     updateDeploymentState({
       deployStatus: bootstrap.configRevision

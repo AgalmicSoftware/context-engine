@@ -10,7 +10,10 @@ self-declared agent marker and, optionally, the agent's display name.
 It runs locally as a stdio MCP server, like any other tool server an agent
 host starts (Claude Code, Codex, OpenClaw, an AT Protocol agent using
 `at_mcp`, and so on). Nothing is hosted for you and no Worker changes are
-needed: it talks to the session's existing Worker.
+needed: it talks to the session's existing Worker. Ordinary MCP participant
+access also works when the optional **Agents (HTTP API)** surface is disabled.
+That scoped API and Session Wrapped now run in the same Worker, with separate
+fresh credentials; there is no Bridge deployment or credential migration.
 
 Hosted links include `?worker=<origin>`. Normal links such as
 `https://contextengine.sh/session/<slug>` use the OP Sepolia session registry.

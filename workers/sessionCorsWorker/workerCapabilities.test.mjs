@@ -88,3 +88,21 @@ test('key export is advertised only for the deployment’s single configured ses
     assert.equal((await (await fetchCapabilities(env)).json()).features.includes('recovery_key_export'), false);
   }
 });
+
+test('agent capabilities bind readiness to fresh resources and current canonical identity/revision', async () => {
+  const config = { sessionId: '0x11111111111111111111111111111111', sessionModeProfile: { surfaces: { agentHttp: true } },
+    agentHttp: { invites: [{ tokenHash: 'fixture-private-verifier' }] } };
+  const env = envFor({ ok: true, revision: 3, config });
+  env.GROUP_KV = { get() {}, put() {}, delete() {}, list() {} };
+  env.AGENT_MANAGED_ROOT_SECRET = 'fixture-private-root';
+  const response = await fetchCapabilities(env, '?slug=sample');
+  const first = await response.json(); assert.equal(first.agentHttp.ready, true); assert.equal(first.agentSessionWrapped.origin, 'https://worker.example');
+  assert.ok(first.features.includes('agent_http_v1')); assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.ok(!JSON.stringify(first).includes('fixture-private'));
+  env.CE_SESSION_COORDINATOR.get = () => ({ fetch: async () => Response.json({ ok: true, revision: 4, config }) });
+  const next = await (await fetchCapabilities(env, '?slug=sample')).json(); assert.notEqual(first.agentSessionWrapped.revision, next.agentSessionWrapped.revision);
+  delete env.AGENT_MANAGED_ROOT_SECRET;
+  const missing = await (await fetchCapabilities(env, '?slug=sample')).json(); assert.equal(missing.agentHttp.ready, false);
+  config.sessionModeProfile.surfaces.agentHttp = false;
+  const disabled = await (await fetchCapabilities(env, '?slug=sample')).json(); assert.equal(disabled.agentHttp.enabled, false); assert.equal(disabled.agentSessionWrapped.enabled, false);
+});

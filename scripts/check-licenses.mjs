@@ -11,7 +11,6 @@ const shippedBundles = [
   { tree: 'mcp', path: 'dist/mcp.metafile.json', format: 'esbuild' },
   { tree: 'workers/sessionCorsWorker', path: 'dist/sessionCorsWorker.bundle.metafile.json', format: 'esbuild', bundleFile: 'dist/sessionCorsWorker.bundle.js' },
   { tree: '.', path: 'dist/deployHelper.bundle.metafile.json', format: 'esbuild', bundleFile: 'dist/deployHelper.bundle.js' },
-  { tree: '.', path: 'dist/agentBridgeWorker.bundle.metafile.json', format: 'esbuild', bundleFile: 'dist/agentBridgeWorker.bundle.js' },
 ];
 const allowed = new Set([
   'MIT', 'ISC', 'BSD-2-Clause', 'BSD-3-Clause', '0BSD', 'Apache-2.0', 'MPL-2.0',

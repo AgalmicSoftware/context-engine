@@ -9,7 +9,7 @@ button.
 | --- | --- |
 | `sessionCorsWorker/` | Session runtime: authentication, canonical session data, storage, AI/transcription proxies, gates, and related routes. |
 | `deploy-helper/` | Optional legacy installer that deploys a Session Worker through the Cloudflare API. It is a separate Worker, not another Session Worker copy. |
-| `agentBridgeWorker/` | Agent HTTP, scoped credentials, submission queue, and Session Wrapped. It is deployed separately from a Session Worker. |
+| `sessionCorsWorker/agent/` | Agent HTTP, scoped credentials, optional registry submission queue, and Session Wrapped within the Session Worker. |
 | `shared/` | Implementation shared by two or more Worker services. |
 
 Related outputs live outside this source tree:
@@ -33,7 +33,7 @@ full source, template, local-build, and release boundary.
 ## Licensing
 
 All project-authored Worker code uses MPL-2.0, including the Session Worker,
-Agent Bridge, deploy helper and shared modules. Third-party dependencies and
+agent modules, deploy helper and shared modules. Third-party dependencies and
 tooling keep their own licenses and notices. Earlier releases keep the
 licenses they shipped with.
 

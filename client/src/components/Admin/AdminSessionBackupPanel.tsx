@@ -333,6 +333,9 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
       </p>
       <p className={styles.statusNote}>
         Restore requires an empty target session. Abandoning an unfinished restore removes all data it imported.
+        Archives exclude agent credentials, drafts, proposals, Wrapped records, caches, pending submissions, invites and
+        managed signing secrets. Reissue credentials and create fresh invites after restore. Session archives cannot
+        recover managed account keys.
       </p>
       {recoveryDisplay && <RecoveryKeyDialog value={recoveryDisplay} onContinue={() => setRecoveryDisplay(null)} />}
       {capabilities?.features.includes('recovery_key_export') && (

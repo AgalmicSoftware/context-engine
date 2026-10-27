@@ -6,6 +6,40 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Serialize Wrapped research batches in the session coordinator. Bind retries
+  to their original content, preserve concurrent answer summaries, and return a
+  retryable response while KV is busy. Export both readable question sources
+  and report source outages instead of silently dropping history.
+- Retry unexpected queue-processing failures instead of acknowledging an
+  unprocessed submission.
+
+- Use one continuous Wrapped space per session. Remove weekly windows and their
+  opening action; saved answers retain their exact statement wording and schema,
+  with current access checked on reads and exports.
+- Project completed direct agent submissions to KV once and repair delayed
+  projections with a durable alarm. Queued successes retain their outcome while
+  an accepted persistence-only message repairs KV. Keep successful outcomes successful, retain uploaded
+  payload IDs on retry, validate before admission, and use server timestamps.
+- Surface Wrapped config/state read failures and proposal outages. Keep the
+  first 2,000 proposals with an explicit incomplete marker instead of dropping
+  them or reporting complete aggregates.
+
+- Apply participant upload preflight to agent writes, retain submission outcomes
+  across authority changes, and retry pre-send failures without duplicate uploads.
+- Preserve Wrapped history across selection and visibility changes; fail closed
+  on incomplete KV reads and invalid export cursors. Bind signed operator writes
+  to their HTTP method and body, and bound registry RPC response bodies.
+- Persist native verification capabilities for Admin and reject deployment
+  capabilities whose origin differs from the Session Worker.
+
+- Serve new-session Agent HTTP and Session Wrapped from the Session Worker,
+  including scoped credentials, atomic invites, source-bound browser exchange,
+  managed testnet submissions and optional queue processing. Remove separate
+  Bridge deployment and release bundles without migrating or retiring existing resources.
+- Apply canonical session gates and stored-key AI policy to agent workflows.
+  Optional operator-funded posters stay disabled by default. Agent auxiliary
+  state and signing keys are excluded from session archives.
+
 - Prepare MCP 0.1.2 with the updated agent behavior and automated release workflow.
   Default new host configurations to `npx -y --prefer-online @agalmic/contextengine@latest`.
   Existing users should update their host command once and restart to receive
@@ -16,8 +50,8 @@ All notable changes to this project will be documented in this file.
   npm Trusted Publishing, with version, source, integrity and stale-run checks.
 
 - Require explicit `session_login` scope when a service credential exchanges
-  into a Session Worker login. Personal user credentials retain login, and an
-  exchange is refused if its source expires before the Worker token would.
+  into a Session Worker login. Personal user credentials retain login, and exchanged
+  tokens are capped by source expiry and invalidated when the source is revoked.
 - Retain confirmed local answers in incomplete registry reads during a failed
   block-mark check, while preserving newer canonical answers.
 - Persist pending answer-upload identities so repeating a timed-out tool call

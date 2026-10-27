@@ -14,7 +14,7 @@ const SHA_C = 'c'.repeat(40);
 const REPOSITORY = 'example/fixture';
 const PREFIX = `repos/${REPOSITORY}`;
 const MARKER = 'worker-bundles-latest-manual';
-const FILES = ['sessionCorsWorker.bundle.js', 'agentBridgeWorker.bundle.js', 'deployHelper.bundle.js', 'worker-release-manifest.json'];
+const FILES = ['sessionCorsWorker.bundle.js', 'deployHelper.bundle.js', 'worker-release-manifest.json'];
 const tagFor = (sha) => `worker-bundles-${sha}`;
 const refFor = (ref, sha) => ({ ref, object: { type: 'commit', sha } });
 const releaseFor = (sha, id = 2) => ({ id, tag_name: tagFor(sha), draft: false, prerelease: false });

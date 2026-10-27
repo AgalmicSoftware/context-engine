@@ -1,3 +1,6 @@
+import { dispatchSessionAgentQueue } from './agent/queueBoundary.mjs';
+import { isAgentPath } from './agent/routes.mjs';
+import { dispatchSessionAgentRequest } from './agent/requestBoundary.mjs';
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { evaluateAuthenticatedRoutePreflight as evaluateAuthenticatedRoutePreflightBoundary } from './authenticatedRoutePreflight.js';
 import { dispatchInterviewStarterRequest } from './interviewStarter.js';
@@ -133,6 +136,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       deps: { corsHeaders: deps?.corsHeaders },
     });
     try {
+      if (isAgentPath(path)) return await dispatchSessionAgentRequest({ request, env, deps, baseHeaders: routeBaseHeaders });
       if (routeSelection.kind === 'options') {
         if (path === '/arweave/upload') {
           log('[arweave] preflight', {
@@ -735,5 +739,6 @@ export const createWorkerRouteShellWithWorkerDeps = ({
 
   return {
     fetch: handleRequest,
+    queue: (batch, env) => dispatchSessionAgentQueue({ batch, env, deps }),
   };
 };

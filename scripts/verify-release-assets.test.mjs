@@ -25,7 +25,7 @@ const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex'
 const buildRelease = (commit = COMMIT, { mutate = () => {} } = {}) => {
   const bundles = {
     'sessionCorsWorker.bundle.js': Buffer.from(`session worker ${commit}`),
-    'agentBridgeWorker.bundle.js': Buffer.from(`agent bridge ${commit}`),
+    'deployHelper.bundle.js': Buffer.from(`deploy helper ${commit}`),
   };
   const artifact = (kind, file) => ({ kind, file, bytes: bundles[file].length, sha256: sha256(bundles[file]) });
   const tree = 'c'.repeat(40);
@@ -48,7 +48,7 @@ const buildRelease = (commit = COMMIT, { mutate = () => {} } = {}) => {
     },
     artifacts: [
       artifact('session-cors-worker', 'sessionCorsWorker.bundle.js'),
-      artifact('agent-bridge-worker', 'agentBridgeWorker.bundle.js'),
+      artifact('deploy-helper', 'deployHelper.bundle.js'),
     ],
   };
   mutate(manifest);
@@ -96,7 +96,7 @@ test('accepts a deliberately pinned older release without consulting latest', as
 
 test('names every missing asset', async () => {
   const release = buildRelease();
-  delete release.assets['agentBridgeWorker.bundle.js'];
+  delete release.assets['deployHelper.bundle.js'];
   delete release.assets['worker-release-manifest.json'];
   const { fetchImpl } = serve(workerReleaseBaseUrl(COMMIT), release.assets);
 
@@ -104,7 +104,7 @@ test('names every missing asset', async () => {
 
   assert.equal(result.ok, false);
   assert.match(result.failures.join('\n'), /worker-release-manifest\.json: HTTP 404/);
-  assert.match(result.failures.join('\n'), /agentBridgeWorker\.bundle\.js: HTTP 404/);
+  assert.match(result.failures.join('\n'), /deployHelper\.bundle\.js: HTTP 404/);
   assert.equal(result.failures.length, 2);
 });
 
@@ -145,7 +145,7 @@ test('rejects manifests that deploy-time validation would reject', async () => {
     'non-CI builder': (manifest) => {
       manifest.builder.workflow = 'nightly';
     },
-    'duplicate bridge artifact': (manifest) => {
+    'duplicate helper artifact': (manifest) => {
       manifest.artifacts.push({ ...manifest.artifacts[1] });
     },
   };
@@ -295,7 +295,7 @@ test('the command exits non-zero and names every missing asset', async () => {
   );
 
   assert.equal(result.status, 1);
-  for (const file of ['worker-release-manifest.json', 'sessionCorsWorker.bundle.js', 'agentBridgeWorker.bundle.js']) {
+  for (const file of ['worker-release-manifest.json', 'sessionCorsWorker.bundle.js', 'deployHelper.bundle.js']) {
     assert.ok(result.stderr.includes(`release check failed: ${file}: HTTP 404`), `${file}\n${result.stderr}`);
   }
 });

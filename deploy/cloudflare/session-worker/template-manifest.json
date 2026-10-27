@@ -5,24 +5,24 @@
   "generator": "scripts/cloudflare-session-template.mjs",
   "files": {
     "worker.mjs": {
-      "bytes": 3633779,
-      "sha256": "47836f8b0ebd27da48e0e540366a3e9374e0f28fa1a1268d5fa1d1d8b04103ee"
+      "bytes": 4801697,
+      "sha256": "7caff696c5db6f5d8afd92a124017ecb4598bddf54fe5d999a89ed0194b04429"
     },
     "wrangler.jsonc": {
       "bytes": 951,
-      "sha256": "fbbe2196e501e74ff99d79a143e8059e8a53f4295025616fa9b84511110cb636"
+      "sha256": "84319a1bf8e909d000552b3d8e61f8b233ce2dd1ddec049ee095ce15d89a4487"
     },
     "package.json": {
       "bytes": 1431,
       "sha256": "48ce075c2a3b9f29fa6a685bc73c84e105955eff02e1251cc4eff6ad1e3ec4fa"
     },
     ".dev.vars.example": {
-      "bytes": 275,
-      "sha256": "5f8fec95e46a641e06c4c1b056e9dadec21efe19195ee2525f8fb5100bed8edb"
+      "bytes": 578,
+      "sha256": "fbeb187d2442ca66ecc870abc93d80454b949b266961defd4936de8152be9067"
     },
     "README.md": {
-      "bytes": 3376,
-      "sha256": "5a20aee17c1ebb178e519ede68675051459342388f14d814e2189e12f999e8c0"
+      "bytes": 4640,
+      "sha256": "4f9f80e233f4e3d767a2c6418fb42bc5649e315c1669bd69d00043aba40e755c"
     },
     "LICENSE": {
       "bytes": 16726,
@@ -33,5 +33,5 @@
       "sha256": "c42f8978b12334dff7d62f1767182b734be990ad9e5abb960b8e819306166330"
     }
   },
-  "packageSha256": "6954cb0e4897c69fab06edc5b15501ed29266f68d2a12134beab44af7fc36dd6"
+  "packageSha256": "74c0024323cf2687ca7af571a280c407caba304cfc7685a76a61782fb2c34918"
 }

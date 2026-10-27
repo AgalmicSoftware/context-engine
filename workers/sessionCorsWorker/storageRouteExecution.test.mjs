@@ -163,6 +163,7 @@ const attachSessionCoordinator = (env, setConfig, coordinatorDeps = {}) => {
 				const values = new Map();
 				let tail = Promise.resolve();
 				const storage = {
+					list: async ({ prefix = '' } = {}) => new Map([...values].filter(([key]) => key.startsWith(prefix))),
 					get: async (key) => structuredClone(values.get(key)),
 					put: async (key, value) => values.set(key, structuredClone(value)),
 					transaction: (callback) => {

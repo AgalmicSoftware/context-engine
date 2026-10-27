@@ -59,6 +59,9 @@ const SERVER_MANAGED_WORKER_CONFIG_FIELDS = new Set([
   'configRevision',
   'workerCanonicalPublicationRevision',
   'workerGroupsBootstrap',
+  // Verified capability status is projected after verification; agent policy
+  // remains bound through sessionModeProfile and the signed worker config.
+  'agentSessionWrapped',
 ]);
 
 const createSecretFingerprintSalt = (): string => {

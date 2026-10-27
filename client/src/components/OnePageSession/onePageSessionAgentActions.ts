@@ -63,7 +63,7 @@ export type OnePageSessionAgentActionDeps = {
   ports: OnePageSessionAgentActionPorts;
   resolveCurrentSessionConfig: () => unknown;
   resolveCurrentSessionSlug: () => string;
-  resolveSessionAgentBridgeUrl: (sessionConfig?: unknown) => string;
+  resolveSessionAgentWorkerUrl: (sessionConfig?: unknown) => string;
   setState: OnePageSessionAgentSetState;
 };
 
@@ -108,7 +108,7 @@ export const createOnePageSessionAgentActions = ({
   ports,
   resolveCurrentSessionConfig,
   resolveCurrentSessionSlug,
-  resolveSessionAgentBridgeUrl,
+  resolveSessionAgentWorkerUrl,
   setState,
 }: OnePageSessionAgentActionDeps): OnePageSessionAgentActions => {
   const resolveCurrentIdentityTarget = () =>
@@ -150,8 +150,8 @@ export const createOnePageSessionAgentActions = ({
     if (disposed) return null;
     const envelope = ports.readStoredEnvelope(resolveCurrentIdentityTarget());
     const state = getState();
-    const currentToken = state.agentClientEnvelope?.bridgeCredential?.token || '';
-    const nextToken = envelope?.bridgeCredential?.token || '';
+    const currentToken = state.agentClientEnvelope?.agentCredential?.token || '';
+    const nextToken = envelope?.agentCredential?.token || '';
     if (currentToken !== nextToken || state.agentClientEnvelope?.sessionSlug !== envelope?.sessionSlug) {
       setState({ agentClientEnvelope: envelope });
     }
@@ -162,12 +162,12 @@ export const createOnePageSessionAgentActions = ({
     if (disposed) return null;
     const sessionSlug = resolveCurrentSessionSlug();
     const sessionConfig = resolveCurrentSessionConfig();
-    const agentBridgeUrl = resolveSessionAgentBridgeUrl(sessionConfig);
-    if (!sessionSlug || !agentBridgeUrl) return null;
+    const agentWorkerUrl = resolveSessionAgentWorkerUrl(sessionConfig);
+    if (!sessionSlug || !agentWorkerUrl) return null;
     const requestSnapshot = beginRequest('meta');
     setState({ agentSessionMetaStatus: 'loading' });
     try {
-      const url = new URL(`${agentBridgeUrl}/api/agent/session-meta`);
+      const url = new URL(`${agentWorkerUrl}/api/agent/session-meta`);
       url.searchParams.set('sessionSlug', sessionSlug);
       // Native browser fetch rejects the ports object as its receiver.
       const fetchImpl = ports.fetchImpl;
@@ -221,7 +221,7 @@ export const createOnePageSessionAgentActions = ({
     setState({ agentQuestionsStatus: 'loading', agentQuestionSubmitError: '' });
     const result = await ports.loadQuestions({
       envelope,
-      agentBridgeUrl: resolveSessionAgentBridgeUrl(sessionConfig),
+      agentWorkerUrl: resolveSessionAgentWorkerUrl(sessionConfig),
     });
     if (!isRequestCurrent(requestSnapshot)) return result;
     if (!result.ok) {
@@ -256,7 +256,7 @@ export const createOnePageSessionAgentActions = ({
     setState({ agentResultsStatus: 'loading' });
     const result = await ports.loadResultsDataset({
       envelope,
-      agentBridgeUrl: resolveSessionAgentBridgeUrl(sessionConfig),
+      agentWorkerUrl: resolveSessionAgentWorkerUrl(sessionConfig),
     });
     if (!isRequestCurrent(requestSnapshot)) return result;
     const authFailureReason = resolveAgentResultsAuthFailureReason(result);
@@ -290,7 +290,7 @@ export const createOnePageSessionAgentActions = ({
     setState({ agentSubmittingQuestionId: question.questionId, agentQuestionSubmitError: '' });
     const result = await ports.submitAnswer({
       envelope,
-      agentBridgeUrl: resolveSessionAgentBridgeUrl(),
+      agentWorkerUrl: resolveSessionAgentWorkerUrl(),
       question,
       answer,
     });

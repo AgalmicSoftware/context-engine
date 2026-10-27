@@ -1,3 +1,4 @@
+import { stripAgentAdmissionFromBackup } from './agent/backup.mjs';
 import { readBackupGroupSnapshot } from './sessionBackupGroupSnapshot.js';
 import { STORAGE_BACKUP_REVISION_KEY } from './storageBackupRevision.js';
 import { resolveWorkerGroupsKv, workerGroupBackupPrefixes } from './workerGroups.js';
@@ -52,7 +53,7 @@ export const exportCoordinatorBackup = async (coordinator, payload) => {
   }
   if (signer && !isEncryptedSessionSecretsEnvelope(signer.envelope)) fail('Invalid wrapped authorization signer.', 409);
   return json({ ok: true, writeRevision: await coordinator.state.storage.get(STORAGE_BACKUP_REVISION_KEY) || 0, coordinator: {
-    configAuthority: current,
+    configAuthority: { ...current, config: stripAgentAdmissionFromBackup(current.config) },
     wrappedSessionKeys: {
       activeSessionKey: current.activeSessionKey || null,
       litAuthorizationSigner: signer || null,

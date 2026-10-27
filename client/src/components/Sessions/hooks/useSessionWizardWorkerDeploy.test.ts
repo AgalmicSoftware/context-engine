@@ -580,11 +580,7 @@ describe('useSessionWizardWorkerDeploy', () => {
       status: 400,
       body: { error: workerError },
     });
-    const {
-      AGENT_BRIDGE_WORKER_BUNDLE_URL,
-      WORKER_BUNDLE_URL,
-      WORKER_RELEASE_MANIFEST_URL,
-    } = require('../../../variables/publicDeploymentConfig.js');
+    const { WORKER_BUNDLE_URL, WORKER_RELEASE_MANIFEST_URL } = require('../../../variables/publicDeploymentConfig.js');
 
     const deployResult = await redeemSponsoredDeploy(options);
 
@@ -595,9 +591,6 @@ describe('useSessionWizardWorkerDeploy', () => {
       expect.objectContaining({
         bundleUrl: WORKER_BUNDLE_URL,
         bundleManifestUrl: WORKER_RELEASE_MANIFEST_URL,
-        agentBridgeBundleUrl: AGENT_BRIDGE_WORKER_BUNDLE_URL,
-        agentBridgeBundleManifestUrl: WORKER_RELEASE_MANIFEST_URL,
-        agentSessionWrappedDeploymentIdentity: expect.any(String),
       }),
     );
     expect(deployPayload).not.toHaveProperty('bundleText');
@@ -648,75 +641,80 @@ describe('useSessionWizardWorkerDeploy', () => {
     );
   });
 
-  it('requests and adopts the dedicated Wrapped capability when surfaces.agentHttp is enabled', async () => {
-    const capability = {
-      version: 1,
-      enabled: true,
-      origin: 'https://ce-wrapped-deploy-storage-session.example.workers.dev',
-      protocolVersion: 'agent-session-wrapped-v1',
-      revision: 'wrapped-0123456789abcdef',
-      verifiedAt: '2026-07-20T18:00:00.000Z',
-    };
-    const deployBodies: Record<string, unknown>[] = [];
-    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
-      if (String(url).endsWith('/deploy')) {
-        deployBodies.push(JSON.parse(String(init?.body || '{}')));
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
+  it.each([true, false])(
+    'accepts a Wrapped deployment capability only for the Session Worker origin (same origin %s)',
+    async (sameOrigin) => {
+      const capability = {
+        version: 1,
+        enabled: true,
+        origin: sameOrigin ? 'https://deployed.example.test' : 'https://retired-bridge.example.test',
+        protocolVersion: 'agent-session-wrapped-v1',
+        revision: 'wrapped-0123456789abcdef',
+        verifiedAt: '2026-07-20T18:00:00.000Z',
+      };
+      const deployBodies: Record<string, unknown>[] = [];
+      global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+        if (String(url).endsWith('/deploy')) {
+          deployBodies.push(JSON.parse(String(init?.body || '{}')));
+          return {
             ok: true,
-            workerUrl: 'https://deployed.example.test',
-            configVerified: true,
-            writesSessionConfig: true,
-            writesSessionSecrets: false,
-            agentSessionWrapped: capability,
-          }),
-        } as Response;
-      }
-      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
-    });
-    const options = buildDeployHookOptions();
-    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    profile.preset = 'custom';
-    profile.surfaces.agentHttp = true;
-    options.refs.runtimeRef.current.draft = {
-      ...options.refs.runtimeRef.current.draft,
-      ai: {
-        models: {
-          fast: { provider: 'openai' },
-          thinking: { provider: 'openai' },
-          transcription: { provider: 'openai' },
+            status: 200,
+            json: async () => ({
+              ok: true,
+              workerUrl: 'https://deployed.example.test',
+              configVerified: true,
+              writesSessionConfig: true,
+              writesSessionSecrets: false,
+              agentSessionWrapped: capability,
+            }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+      });
+      const options = buildDeployHookOptions();
+      const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+      profile.preset = 'custom';
+      profile.surfaces.agentHttp = true;
+      options.refs.runtimeRef.current.draft = {
+        ...options.refs.runtimeRef.current.draft,
+        ai: {
+          models: {
+            fast: { provider: 'openai' },
+            thinking: { provider: 'openai' },
+            transcription: { provider: 'openai' },
+          },
         },
-      },
-      sessionModeProfile: profile,
-    };
-    options.refs.runtimeRef.current.workerSecretsEnabled = true;
-    options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'sk-agent-runtime' });
-    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+        sessionModeProfile: profile,
+      };
+      options.refs.runtimeRef.current.workerSecretsEnabled = true;
+      options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'sk-agent-runtime' });
+      const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
 
-    let deployResult: Record<string, unknown> = {};
-    await act(async () => {
-      deployResult = await result.current.handleDeployWorker();
-    });
+      let deployResult: Record<string, unknown> = {};
+      await act(async () => {
+        deployResult = await result.current.handleDeployWorker();
+      });
 
-    expect(deployResult).toEqual(expect.objectContaining({ ok: true, agentSessionWrapped: capability }));
-    expect(deployBodies).toHaveLength(1);
-    expect(deployBodies[0]).toEqual(
-      expect.objectContaining({
-        agentBridgeBundleUrl: expect.stringContaining('agentBridgeWorker.bundle.js'),
-        agentSessionWrappedDeploymentIdentity: expect.stringContaining('deploy-storage-session'),
-      }),
-    );
-    expect(options.updateDraftValue).toHaveBeenCalledWith(['agentSessionWrapped'], capability);
-    expect(JSON.stringify(deployBodies[0])).not.toContain('TELEGRAM_');
-    expect(
-      resolveSessionWizardWorkerPublishEvidence({
-        runtime: options.refs.runtimeRef.current,
-        workerSecrets: options.getCurrentWorkerSecrets(),
-      }),
-    ).toEqual(expect.objectContaining({ verified: true }));
-  });
+      if (!sameOrigin) {
+        expect(deployResult).toEqual(
+          expect.objectContaining({ ok: false, error: expect.stringMatching(/Session Worker origin/) }),
+        );
+        expect(options.updateDraftValue).not.toHaveBeenCalledWith(['agentSessionWrapped'], expect.anything());
+        return;
+      }
+      expect(deployResult).toEqual(expect.objectContaining({ ok: true, agentSessionWrapped: capability }));
+      expect(deployBodies).toHaveLength(1);
+      expect(deployBodies[0]).toEqual(expect.objectContaining({}));
+      expect(options.updateDraftValue).toHaveBeenCalledWith(['agentSessionWrapped'], capability);
+      expect(JSON.stringify(deployBodies[0])).not.toContain('TELEGRAM_');
+      expect(
+        resolveSessionWizardWorkerPublishEvidence({
+          runtime: options.refs.runtimeRef.current,
+          workerSecrets: options.getCurrentWorkerSecrets(),
+        }),
+      ).toEqual(expect.objectContaining({ verified: true }));
+    },
+  );
 
   it('skips a concurrent worker deploy while the first deploy is still resolving', async () => {
     let resolveAccounts: ((accounts: string[]) => void) | undefined;

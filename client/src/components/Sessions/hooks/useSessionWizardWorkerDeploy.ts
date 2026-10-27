@@ -519,6 +519,7 @@ const useSessionWizardWorkerDeploy = ({
         const agentSessionWrapped = requireSessionWizardAgentSessionWrappedCapability({
           requested: agentSessionWrappedDeployment.requested,
           value: data?.agentSessionWrapped,
+          workerUrl: data?.workerUrl,
         });
         if (agentSessionWrapped) {
           updateDraftValue(['agentSessionWrapped'], agentSessionWrapped);

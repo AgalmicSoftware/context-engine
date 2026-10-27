@@ -272,27 +272,12 @@ const makeResumableDeploymentFetch = () => {
       if (fetchMock.bundleFetchResponses.length) return fetchMock.bundleFetchResponses.shift();
       return new Response('export default { fetch() {} };', { status: 200 });
     }
-    if (normalizedUrl === 'https://bundles.example.test/agentBridgeWorker.bundle.js') {
-      return new Response('export default { fetch() {} };', { status: 200 });
-    }
-    const wrappedHealthMatch = normalizedUrl.match(/^https:\/\/([^./]+)\.tenant-subdomain\.workers\.dev\/health$/);
-    if (method === 'GET' && wrappedHealthMatch) {
-      const bindings = workerBindings.get(wrappedHealthMatch[1]) || [];
-      const byName = new Map(bindings.map((binding) => [binding.name, binding]));
-      const policy = JSON.parse(byName.get('AGENT_BRIDGE_SESSION_POLICY_JSON')?.text || '{}');
-      const session = policy.sessions?.[0] || {};
-      return new Response(JSON.stringify({
-        ok: true,
-        worker: 'agentBridgeWorker',
-        protocolVersion: 'agent-session-wrapped-v1',
-        agentSessionWrappedConfigured: true,
-        agentSessionWrappedReady: true,
-        dedicatedSession: {
-          accessEnabled: true,
-          sessionSlug: session.sessionSlug,
-          sessionWorkerOrigin: byName.get('CE_SESSION_WORKER_BASE_URL')?.text,
-        },
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const capabilitiesMatch = normalizedUrl.match(/^https:\/\/([^./]+)\.tenant-subdomain\.workers\.dev\/capabilities\?slug=/);
+    if (method === 'GET' && capabilitiesMatch) {
+      const origin = new URL(normalizedUrl).origin;
+      return new Response(JSON.stringify({ features: ['agent_http_v1'], agentHttp: { enabled: true, ready: fetchMock.agentReady !== false },
+        agentSessionWrapped: { version: 1, enabled: true, origin, protocolVersion: 'agent-session-wrapped-v1',
+          revision: 'wrapped-1234567890abcdef', verifiedAt: '2026-10-27T00:00:00.000Z' } }), { status: 200 });
     }
     if (method === 'GET' && /\/accounts\?per_page=5$/.test(normalizedUrl)) {
       const authorization = init.headers instanceof Headers
@@ -1596,7 +1581,7 @@ describe('deploy-helper worker', () => {
     }
   });
 
-  it('composes Agent Session Wrapped before publishing its capability into the paired session Worker config', async () => {
+  it('creates one Worker with fresh agent signing material and verifies its same-origin capability', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeResumableDeploymentFetch();
     global.fetch = fetchMock;
@@ -1624,11 +1609,12 @@ describe('deploy-helper worker', () => {
         version: 1,
         enabled: true,
         protocolVersion: 'agent-session-wrapped-v1',
-        origin: expect.stringMatching(/^https:\/\/ce-wrapped-wrapped-alpha-/),
+        origin: new URL(payload.workerUrl).origin,
       }));
-      expect(fetchMock.getScriptUploadCount()).toBe(2);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.workerSecretBodies.some(entry => JSON.stringify(entry).includes('AGENT_MANAGED_ROOT_SECRET'))).toBe(true);
       const sessionConfigEntry = [...fetchMock.kvValues.entries()].find(([key]) => key.endsWith('/session:wrapped-alpha:config'));
-      expect(JSON.parse(sessionConfigEntry?.[1] || '{}').agentSessionWrapped).toEqual(payload.agentSessionWrapped);
+      expect(JSON.parse(sessionConfigEntry?.[1] || '{}').corsWorkerUrl).toBe(new URL(payload.workerUrl).origin);
       expect(JSON.stringify([...fetchMock.workerSecretBodies])).not.toContain('cf-request-only-token');
     } finally {
       consoleLogSpy.mockRestore();
@@ -5078,6 +5064,27 @@ describe('deploy-helper worker', () => {
       consoleErrorSpy.mockRestore();
     });
 
+    it('retains a pending deployment when the Session Worker agent capability is not ready', async () => {
+      const release = makeWorkerRelease('9');
+      const fetchMock = makeReleaseFetch(release);
+      fetchMock.cloudflare.agentReady = false;
+      global.fetch = fetchMock;
+      const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
+      const body = { deploymentRequestId: 'not-ready-request-0001', workerName: 'not-ready-worker',
+        sessionSlug: 'not-ready-session', ...makeWorkerModeDeployFields({ agentHttp: true }),
+        bundleUrl: release.workerBundleUrl, bundleManifestUrl: release.manifestUrl };
+      const failed = await deploySessionWorker(body, env);
+      expect(failed.status).toBe(502);
+      expect(failed.payload.deploymentRequestPending).toBe(true);
+      expect(failed.payload.agentSessionWrapped).toBeUndefined();
+      const uploads = fetchMock.cloudflare.getScriptUploadCount();
+      fetchMock.cloudflare.agentReady = true;
+      const resumed = await deploySessionWorker(body, env);
+      expect(resumed.status).toBe(200);
+      expect(resumed.payload.agentSessionWrapped.enabled).toBe(true);
+      expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(uploads);
+    });
+
     it('records the verified release on a new session Worker, which then sponsors exactly that release', async () => {
       const release = makeWorkerRelease('1');
       const fetchMock = makeReleaseFetch(release);
@@ -5099,8 +5106,6 @@ describe('deploy-helper worker', () => {
       const expectedRelease = {
         WORKER_BUNDLE_URL: release.workerBundleUrl,
         WORKER_BUNDLE_MANIFEST_URL: release.manifestUrl,
-        AGENT_BRIDGE_BUNDLE_URL: release.agentBridgeBundleUrl,
-        AGENT_BRIDGE_BUNDLE_MANIFEST_URL: release.manifestUrl,
       };
       const sponsorVars = workerVars(fetchMock, sponsor.payload.workerName);
       expect(recordedRelease(sponsorVars)).toEqual(expectedRelease);
@@ -5131,13 +5136,10 @@ describe('deploy-helper worker', () => {
       expect(redeemedVars.CE_BUNDLE_SHA256).toBe(release.sessionSha256);
       // The new Worker records the same release, so it can sponsor in turn.
       expect(recordedRelease(redeemedVars)).toEqual(expectedRelease);
-      const redeemedBridgeName = [...fetchMock.uploadedModules.keys()]
-        .find((name) => name.startsWith('ce-wrapped-redeemed-session-'));
-      expect(fetchMock.uploadedModules.get(redeemedBridgeName)).toBe(release.agentBridgeBundle);
+      expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(2); // one sponsor and one redeemed Worker
+      expect([...fetchMock.uploadedModules.keys()].some(name => name.startsWith('ce-wrapped-'))).toBe(false);
       expect([...new Set(fetchMock.releaseReads.slice(readsBeforeRedeem))].sort()).toEqual([
-        release.agentBridgeBundleUrl,
-        release.manifestUrl,
-        release.workerBundleUrl,
+        release.manifestUrl, release.workerBundleUrl,
       ].sort());
       expect(fetchMock.mock.calls.some(([url]) => String(url).includes('redeemer.example.test'))).toBe(false);
     });
@@ -5195,8 +5197,6 @@ describe('deploy-helper worker', () => {
         sessionSlug: 'unverified-session',
         bundleUrl: release.workerBundleUrl,
       }, {
-        AGENT_BRIDGE_BUNDLE_URL: release.agentBridgeBundleUrl,
-        AGENT_BRIDGE_BUNDLE_MANIFEST_URL: release.manifestUrl,
       });
 
       expect(deployed.status).toBe(200);
@@ -5243,37 +5243,24 @@ describe('deploy-helper worker', () => {
       });
     });
 
-    it.each([
-      [
-        'does not match its manifest',
-        'export default { fetch() { return new Response("tampered bridge"); } };',
-        409,
-        'Agent Bridge bundle SHA-256 does not match the verified release manifest.',
-      ],
-      ['is unavailable', null, 502, 'Failed to fetch Agent Bridge bundle: Artifact fetch failed (404).'],
-    ])('stops before any Cloudflare change when the Agent Bridge bundle %s', async (_label, bridgeBytes, status, error) => {
+    it.each([null, 'untrusted retired bytes'])('ignores obsolete Bridge bundle input (%s) and creates one Worker', async (bytes) => {
       const release = makeWorkerRelease('6');
+      release.agentBridgeBundle = bytes;
       const fetchMock = makeReleaseFetch(release);
       global.fetch = fetchMock;
-      release.agentBridgeBundle = bridgeBytes;
-
       const deployed = await deploySessionWorker({
-        workerName: 'bridge-check-worker',
-        sessionSlug: 'bridge-check-session',
-        agentSessionWrappedDeploymentIdentity: 'session:worker:bridge-check-session',
+        workerName: 'agent-only-worker', sessionSlug: 'agent-only-session',
         ...makeWorkerModeDeployFields({ agentHttp: true }),
-        bundleUrl: release.workerBundleUrl,
-        bundleManifestUrl: release.manifestUrl,
-        agentBridgeBundleUrl: release.agentBridgeBundleUrl,
-        agentBridgeBundleManifestUrl: release.manifestUrl,
+        bundleUrl: release.workerBundleUrl, bundleManifestUrl: release.manifestUrl,
+        agentBridgeBundleUrl: release.agentBridgeBundleUrl, agentBridgeBundleManifestUrl: release.manifestUrl,
       });
-
-      expect(deployed).toEqual({ status, payload: { error } });
-      expect(fetchMock.cloudflare.getNamespaceCreateCount()).toBe(0);
-      expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(0);
+      expect(deployed.status).toBe(200);
+      expect(fetchMock.cloudflare.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.releaseReads).not.toContain(release.agentBridgeBundleUrl);
     });
 
-    it('keeps a resumed Agents HTTP deploy pending when only the bridge host later fails', async () => {
+    it('resumes an uploaded agent Worker after lost terminal persistence without a Bridge dependency', async () => {
       const release = makeWorkerRelease('7');
       const fetchMock = makeReleaseFetch(release);
       global.fetch = fetchMock;
@@ -5303,87 +5290,37 @@ describe('deploy-helper worker', () => {
       const first = await deploySessionWorker(body, env);
       expect(first.status).toBe(503);
       expect(first.payload.deploymentRequestPending).toBe(true);
-      expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(2);
+      expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(1);
 
-      // The retry finds the session Worker already uploaded and owned, so it
-      // resumes without the upload path's bridge check; the bridge step itself
-      // reports the outage and the request stays resumable.
+      const secretWrites = fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith('/secrets') && init?.method === 'PUT').length;
       release.agentBridgeBundle = null;
       const retry = await deploySessionWorker(body, env);
-
-      expect(retry.status).toBe(400);
-      expect(retry.payload).toEqual(expect.objectContaining({
-        error: 'Failed to fetch Agent Bridge bundle: Artifact fetch failed (404).',
-        partial: true,
-        deploymentRequestPending: true,
-      }));
-      expect(retry.payload.deploymentRequestTerminal).toBeUndefined();
-      expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(2);
+      expect(retry.status).toBe(200);
+      expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith('/secrets') && init?.method === 'PUT')).toHaveLength(secretWrites);
+      expect(fetchMock.releaseReads).not.toContain(release.agentBridgeBundleUrl);
     });
 
-    it.each([
-      ['is unavailable', null, 502, 'Failed to fetch Agent Bridge bundle: Artifact fetch failed (404).'],
-      [
-        'does not match its manifest',
-        'export default { fetch() { return new Response("tampered bridge"); } };',
-        409,
-        'Agent Bridge bundle SHA-256 does not match the verified release manifest.',
-      ],
-    ])('keeps a replay with staged resources pending when its bridge bundle %s, then finishes', async (
-      _label,
-      bridgeBytes,
-      status,
-      error,
-    ) => {
+    it('resumes staged resources for agent setup without fetching retired bundle inputs', async () => {
       const release = makeWorkerRelease('8');
       const fetchMock = makeReleaseFetch(release);
       global.fetch = fetchMock;
       const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
-      const body = {
-        deploymentRequestId: 'bridge-replay-request-0001',
-        workerName: 'bridge-replay-worker',
-        sessionSlug: 'bridge-replay-session',
-        agentSessionWrappedDeploymentIdentity: 'session:worker:bridge-replay-session',
-        ...makeWorkerModeDeployFields({ agentHttp: true }),
-        bundleUrl: release.workerBundleUrl,
-        bundleManifestUrl: release.manifestUrl,
-        agentBridgeBundleUrl: release.agentBridgeBundleUrl,
-        agentBridgeBundleManifestUrl: release.manifestUrl,
-      };
-      // The first attempt stages its KV namespace, then loses the upload response.
+      const body = { deploymentRequestId: 'agent-resume-request-0001', workerName: 'agent-resume-worker',
+        sessionSlug: 'agent-resume-session', ...makeWorkerModeDeployFields({ agentHttp: true }),
+        bundleUrl: release.workerBundleUrl, bundleManifestUrl: release.manifestUrl,
+        agentBridgeBundleUrl: release.agentBridgeBundleUrl };
       fetchMock.cloudflare.scriptUploadResponses.push(cfFailure(500, 'Upload response lost.'));
       const first = await deploySessionWorker(body, env);
       expect(first.status).toBe(502);
       expect(first.payload.deploymentRequestPending).toBe(true);
-      const staged = first.payload.orphanResources;
-      expect(staged).toEqual(expect.objectContaining({ kvCleanupStatus: 'retained-upload-pending' }));
-
-      const bridgeBundle = release.agentBridgeBundle;
-      release.agentBridgeBundle = bridgeBytes;
-      const retry = await deploySessionWorker(body, env);
-
-      expect(retry.status).toBe(status);
-      expect(retry.payload).toEqual(expect.objectContaining({
-        error,
-        deploymentRequestPending: true,
-        orphanResources: {
-          kvNamespaceId: staged.kvNamespaceId,
-          kvCleanupStatus: 'retained-upload-pending',
-          workerName: staged.workerName,
-        },
-      }));
-      expect(retry.payload.deploymentRequestTerminal).toBeUndefined();
-
-      release.agentBridgeBundle = bridgeBundle;
+      release.agentBridgeBundle = null;
       const recovered = await deploySessionWorker(body, env);
-
       expect(recovered.status).toBe(200);
-      expect(recovered.payload.kvNamespaceId).toBe(staged.kvNamespaceId);
-      expect(recordedRelease(workerVars(fetchMock, staged.workerName))).toEqual({
-        WORKER_BUNDLE_URL: release.workerBundleUrl,
-        WORKER_BUNDLE_MANIFEST_URL: release.manifestUrl,
-        AGENT_BRIDGE_BUNDLE_URL: release.agentBridgeBundleUrl,
-        AGENT_BRIDGE_BUNDLE_MANIFEST_URL: release.manifestUrl,
+      expect(recovered.payload.kvNamespaceId).toBe(first.payload.orphanResources.kvNamespaceId);
+      expect(fetchMock.releaseReads).not.toContain(release.agentBridgeBundleUrl);
+      expect(recordedRelease(workerVars(fetchMock, recovered.payload.workerName))).toEqual({
+        WORKER_BUNDLE_URL: release.workerBundleUrl, WORKER_BUNDLE_MANIFEST_URL: release.manifestUrl,
       });
     });
 
@@ -5610,7 +5547,7 @@ describe('deploy-helper worker', () => {
       });
     });
 
-    it('never records an Agent Bridge URL that the bridge deploy would refuse', async () => {
+    it('does not persist retired Bridge URL inputs even when malformed', async () => {
       const release = makeWorkerRelease('9');
       const fetchMock = makeReleaseFetch(release);
       global.fetch = fetchMock;
@@ -5626,9 +5563,8 @@ describe('deploy-helper worker', () => {
         agentBridgeBundleManifestUrl: release.manifestUrl,
       });
 
-      // The bridge deploy refuses URLs with a #fragment, so none is recorded.
-      expect(deployed.status).toBe(400);
-      expect(deployed.payload.error).toBe('Missing a trusted Agent Bridge bundle.');
+      expect(deployed.status).toBe(200);
+      expect(fetchMock.releaseReads).not.toContain(`${release.agentBridgeBundleUrl}#latest`);
       const sessionWorkerName = [...fetchMock.cloudflare.workerBindings.keys()]
         .find((name) => name.startsWith('fragment-bridge-worker-'));
       expect(recordedRelease(workerVars(fetchMock, sessionWorkerName))).toEqual({

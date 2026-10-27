@@ -46,6 +46,7 @@ type SessionWizardShellRenderInfoTooltip = (options: {
 export type SessionWizardShellProps = {
   account: WizardModalsProps['account'];
   allowNativeWorkerVerification: WorkerPanelProps['allowNativeWorkerVerification'];
+  agentHttpEnabled?: boolean;
   activeCreateSbtTargetGate: EncryptionPanelBoundaryProps['activeCreateSbtTargetGate'];
   activeCreateSbtTargetGateId: EncryptionPanelBoundaryProps['activeCreateSbtTargetGateId'];
   activeNormalModeIndex: IntroStatusRailProps['activeNormalModeIndex'];
@@ -231,6 +232,7 @@ export type SessionWizardShellProps = {
 const SessionWizardShell = ({
   account,
   allowNativeWorkerVerification,
+  agentHttpEnabled = false,
   activeCreateSbtTargetGate,
   activeCreateSbtTargetGateId,
   activeNormalModeIndex,
@@ -549,6 +551,7 @@ const SessionWizardShell = ({
         {(!isNormalMode || (showNormalModeWorkerStep && !collapsedSections.worker)) && (
           <WorkerPanel
             allowNativeWorkerVerification={allowNativeWorkerVerification}
+            agentHttpEnabled={agentHttpEnabled}
             isNormalMode={isNormalMode}
             t={t}
             renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}

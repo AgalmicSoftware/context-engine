@@ -33,6 +33,7 @@ type DeployForm = {
 
 export type WorkerPanelProps = {
   allowNativeWorkerVerification?: boolean;
+  agentHttpEnabled?: boolean;
   isNormalMode: boolean;
   t?: (key: string) => string;
   renderSessionWizardInfoTooltip?: (props: {
@@ -111,6 +112,7 @@ export type WorkerPanelProps = {
 
 const WorkerPanel = ({
   allowNativeWorkerVerification = false,
+  agentHttpEnabled = false,
   isNormalMode,
   t,
   renderSessionWizardInfoTooltip,
@@ -291,6 +293,7 @@ const WorkerPanel = ({
             defaultAllowedOrigins={defaultAllowedOrigins}
           />
           <WorkerDeploySection
+            agentHttpEnabled={agentHttpEnabled}
             allowNativeWorkerVerification={allowNativeWorkerVerification}
             isNormalMode={isNormalMode}
             renderInfoTooltip={renderInfoTooltip}

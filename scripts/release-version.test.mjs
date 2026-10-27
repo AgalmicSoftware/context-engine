@@ -503,9 +503,6 @@ test('the Worker source pathspec covers every local input of the release bundles
     'shared/encryption/envelopeV1Core.mjs',
     'shared/encryption/envelopeWriterFixtures.mjs',
     'shared/questions/questionId.mjs',
-    'workers/agentBridgeWorker/agentOnlyLoadTest.mjs',
-    'workers/agentBridgeWorker/deployHelperApply.mjs',
-    'workers/agentBridgeWorker/deployHelperPlan.mjs',
   ]) {
     assert.ok(!covered.has(nonInput), `${nonInput} is not a bundle input`);
   }

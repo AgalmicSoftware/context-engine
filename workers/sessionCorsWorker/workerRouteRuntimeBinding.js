@@ -113,6 +113,7 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
       readCurrentSessionConfig: deps?.readCurrentSessionConfig,
       resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
       verifyToken: deps?.verifyToken,
+      computeScopesForLogin: registryLoginBootstrapAdapters.computeScopesForLogin,
       validateAuthTokenRecord: deps?.validateAuthTokenRecord,
       resolveWorkerRequestSlugContext: deps?.resolveWorkerRequestSlugContext,
       ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
@@ -313,5 +314,6 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
       resolveAnonymousRateIdentity: anonymousRegistrySupport.resolveAnonymousRateIdentity,
     },
     fetch: routeShell.fetch,
+    queue: routeShell.queue,
   };
 };

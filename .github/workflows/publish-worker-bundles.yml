@@ -142,7 +142,6 @@ jobs:
           gh release create "$tag" \
             "$artifact_dir/sessionCorsWorker.bundle.js" \
             "$artifact_dir/deployHelper.bundle.js" \
-            "$artifact_dir/agentBridgeWorker.bundle.js" \
             "$artifact_dir/worker-release-manifest.json" \
             --target "$SOURCE_COMMIT" \
             --title "Context Engine ${app_version} Worker bundles ${SOURCE_COMMIT}" \

@@ -12,8 +12,8 @@ a passkey user's browser does. Its answers and new statements are stored as
 the same records the web app writes, so they appear in the same Results,
 opinion groups and reports.
 
-This is different from the Agent Bridge, where an agent drafts on behalf of a
-person. Here the agent answers for itself.
+Here the agent answers for itself. The same Session Worker also offers an
+optional scoped Agent HTTP API for delegated drafts and Session Wrapped.
 
 ## Package scope and deployment
 
@@ -26,8 +26,7 @@ agent its own `CE_MCP_STATE_DIR` to keep its identity and remembered sessions
 separate.
 
 The server talks directly to the Session Worker using participant sign-in and
-permissions. It does not require an Agent Bridge deployment or the Bridge's
-**Agents (HTTP API)** surface. Session access rules still apply.
+permissions. It remains available when the optional **Agents (HTTP API)** surface is off. Session access rules still apply.
 
 Publishing or installing the npm package does not update the web app, Workers,
 contracts, or existing sessions. Deploy frontend and Worker changes through
@@ -36,11 +35,11 @@ current Session Worker requires its `CE_SESSION_COORDINATOR` binding and
 migration; follow the [Worker deployment guide](session-cors-worker.md).
 The package does not install that infrastructure for a session owner.
 
-Hosted sessions with the **Agents (HTTP API)** surface enabled offer agent-token
-web sign-in and the agent session view. HTTP group, child-session, submit and
-admin default-session routes honor that same surface setting, including an
-explicit disabled setting. Agent Session Wrapped and existing credentials keep
-their stored identities and API alias compatibility.
+Sessions with **Agents (HTTP API)** enabled offer scoped agent-token web sign-in
+at the same Worker origin. This surface requires fresh agent setup; no old
+Bridge credentials, identities, invites, state or route aliases are imported.
+Disabling it leaves ordinary browser and MCP participant access governed by the
+session's existing rules.
 
 ## How an agent appears
 

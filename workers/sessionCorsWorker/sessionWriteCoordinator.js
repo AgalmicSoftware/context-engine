@@ -1,3 +1,6 @@
+import { dispatchAgentSubmissionJournal, nextAgentSubmitProjectionAt, repairAgentSubmitProjections } from './agent/submissionJournal.mjs';
+import { dispatchAgentInviteJournal } from './agent/inviteJournal.mjs';
+import { dispatchWrappedResearch } from './agent/wrappedJournal.mjs';
 import { controlCoordinatorBackupImport, assertNoActiveBackupImport } from './sessionBackupLifecycle.js';
 import { registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispatchUploadReceiptIndex, sweepUploadReceiptIndex } from './sessionDiagnostics.js';
 import { bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
@@ -443,7 +446,7 @@ export class SessionWriteCoordinator {
 
   async scheduleUploadReceiptCleanup() {
     const nextExpiry = await this.state.storage.transaction((transaction) => this.pruneUploadReceipts(transaction, Number(this.now()) || Date.now()));
-    const nextAlarm = Math.min(nextExpiry, await readUploadReceiptRegistrationRetryAt(this));
+    const nextAlarm = Math.min(nextExpiry, await readUploadReceiptRegistrationRetryAt(this), await nextAgentSubmitProjectionAt(this));
     if (Number.isFinite(nextAlarm) && typeof this.state.storage.setAlarm === 'function') await this.state.storage.setAlarm(nextAlarm);
   }
 
@@ -768,7 +771,7 @@ export class SessionWriteCoordinator {
 
   async scheduleResultsAnalysisAlarm(delayMs = 1_000) {
     if (typeof this.state.storage?.setAlarm !== 'function') return false;
-    await this.state.storage.setAlarm((Number(this.now()) || Date.now()) + Math.max(0, Number(delayMs) || 0));
+    await this.state.storage.setAlarm(Math.min((Number(this.now()) || Date.now()) + Math.max(0, Number(delayMs) || 0), await nextAgentSubmitProjectionAt(this)));
     return true;
   }
 
@@ -927,6 +930,7 @@ export class SessionWriteCoordinator {
   }
 
   async alarm() {
+    await repairAgentSubmitProjections(this);
     if (await sweepUploadReceiptIndex(this)) return;
     try { await registerUploadReceiptStore(this); } catch { /* The persisted backoff schedules another attempt. */ }
     try {
@@ -2877,6 +2881,18 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname.startsWith('/session-config/') && url.hostname !== 'session-coordinator.internal') {
       return jsonResponse({ error: 'Not found.' }, 404);
+    }
+    if (url.pathname.startsWith('/session-config/agent-submit/')) {
+      try { return await dispatchAgentSubmissionJournal(this, url.pathname.split('/').pop(), payload); }
+      catch (error) { return jsonResponse({ ok: false, reason: 'submit_coordinator_unavailable' }, error.status || 503); }
+    }
+    if (url.pathname.startsWith('/session-config/agent-invite/')) {
+      try { return await dispatchAgentInviteJournal(this, url.pathname.split('/').pop(), payload); }
+      catch { return jsonResponse({ ok: false, reason: 'invite_coordinator_unavailable' }, 503); }
+    }
+    if (url.pathname === '/session-config/agent-wrapped/commit') {
+      try { return await dispatchWrappedResearch(this, payload); }
+      catch (error) { return jsonResponse({ ok: false, reason: 'wrapped_coordinator_unavailable', retryable: true }, error.status || 503); }
     }
     if (url.pathname === '/session-config/current') return this.executeSessionConfigCurrent(payload);
     if (url.pathname === '/session-config/diagnostics') return this.executeSessionDiagnostics(payload);

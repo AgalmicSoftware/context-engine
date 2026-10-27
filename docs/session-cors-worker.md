@@ -10,49 +10,32 @@ credentials.
 
 It also exposes canonical session storage routes for future backend routing: `POST /storage/upload`, `GET|POST /storage/read`, `GET|POST /storage/list`, and the authorization-gated `GET|POST /storage/export-envelopes`. `/arweave/upload` remains supported for compatibility.
 
-## Agent Bridge Client Handoff
+## Agent HTTP client handoff
 
-The agent bridge worker exposes the browser-facing handoff under
-canonical `/api/agent/*` routes:
+Each session has one continuous Wrapped space. There is no opening action,
+weekly rotation, window ID or shared statement snapshot. Statement reads check
+current per-question access and never write shared research data. Every answer
+and vote supplies the returned `statement_version`; a question edit invalidates
+that version and requires a fresh read. Saved research retains the exact
+statement wording and answer schema it used. Later edits or selection changes
+do not rewrite those records, and exports still filter current access.
 
-- `GET /api/agent/session-meta?sessionSlug=<slug>` returns public metadata for
-  the selected session, including the sanctioned `clientSubmitReady` boolean the
-  client uses to decide whether direct submit is deploy-ready.
-- `POST /api/agent/client-login/exchange` accepts a pasted user/install or named
-  service `ceagt_` credential once and returns a short-TTL versioned envelope.
-  That envelope contains a Bridge browser credential for Bridge reads and a
-  distinct session-worker JWT for canonical worker routes. The current
-  agent token client sends the Bridge credential only to Bridge routes and
-  retains the worker JWT separately for direct canonical worker consumers; it
-  never sends the worker JWT to the Bridge. The client keeps the exchanged
-  envelope only in page memory and requires a fresh exchange after reload. It
-  also removes legacy Agent-envelope and Session Worker JWT browser-storage
-  entries at startup. Source credentials and exchanged bearer credentials must
-  not be put in URLs, localStorage, sessionStorage, Redux, or logs.
-- Credentials are bound to one principal, session, audience, scope set, expiry,
-  and revocation slot. A `worker_canonical` Bridge browser credential also
-  carries the normalized canonical 16-byte session ID and exact Worker origin.
-  The Bridge re-resolves current policy before authenticated route dispatch and
-  rejects the credential before route reads or writes after a same-slug Worker
-  identity/origin replacement. Registry-compatible browser credentials retain
-  their existing behavior. `POST /api/agent/invite/onboard` creates an opaque
-  user from a one-time body-only invite; caller-supplied transport identity
-  cannot claim a historical account. The Bridge root token is
-  bootstrap/break-glass authority and can mint named scoped services through
-  `POST /api/agent/credentials/service`.
-- Hosted Agent HTTP session reads and submits use the shared browser components
-  after one page-boundary backend-mode decision. The profile must explicitly
-  enable `surfaces.agentHttp` with `authority.mode=worker_canonical`; explicit
-  HTTP-off overrides stale legacy flags. Profile-less legacy flags remain
-  accepted as HTTP enablement inputs. `/session/demo` keeps its existing demo/off-chain behavior.
+New sessions serve scoped Agent HTTP and optional Session Wrapped in this same
+Worker. Enable `sessionModeProfile.surfaces.agentHttp` and configure a fresh
+`AGENT_MANAGED_ROOT_SECRET`. Public `/capabilities?slug=<slug>` advertises
+`agent_http_v1` and current readiness; `/health` remains authenticated.
 
-Hosted origin allowlists for the bridge live in deploy environment variables,
-not repo source: `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS` controls browser
-token exchange/result cache reads. `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS` is a
-legacy origin alias only. The current first-party set should include the canonical
-`https://contextengine.sh`, `https://www.contextengine.sh` origins and the
-redirect-compatible `https://contextengine.xyz`, `https://www.contextengine.xyz`
-origins.
+Browser exchange returns a distinct agent credential and participant JWT for
+this one origin. Both live only in page memory. Their lifetime is capped by the
+source credential, and source revocation/rotation also invalidates the JWT.
+The client purges historical envelopes and does not follow Bridge URLs. Invites
+use the existing session coordinator's per-invite journal. Operator actions use
+signed Session Worker admin requests. Ordinary browser/MCP access remains
+available when Agent HTTP is disabled. Explicit HTTP-off overrides stale legacy flags.
+
+See [Agent HTTP setup, authority and routes](../workers/sessionCorsWorker/agent/README.md)
+for current scopes, canonical storage, optional queues, AI funding and backups.
+Existing Bridge deployments are neither migrated nor retired by this change.
 
 ## OSS worker model
 
@@ -87,9 +70,8 @@ Public links:
 - Pinned release bundle: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>/sessionCorsWorker.bundle.js` (the selected build commit or `workerReleasePin.json`).
 - Deploy-helper source: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/deploy-helper`
 
-`workers/deploy-helper/` and `workers/agentBridgeWorker/` are separate Worker
-services with different runtime responsibilities. They are not alternate
-Session Worker source trees.
+`workers/deploy-helper/` is an optional separate installer. Agent HTTP lives
+in `workers/sessionCorsWorker/agent/` within the Session Worker.
 
 - Canonical CI publishes each successful public-branch bundle set as an
   immutable, commit-addressed GitHub release. Automatic publication advances
@@ -123,12 +105,13 @@ For the default **Hosted & Fast** profile, labeled `Centralized (Cloudflare)`
 in the wizard:
 
 1. Context Engine shows the exact session slug, public passkey-derived admin
-   address, and two independently generated Worker runtime secrets.
+   address, and two independently generated Worker runtime secrets. Selecting
+   Agent HTTP adds a third, independent `AGENT_MANAGED_ROOT_SECRET`.
 2. The deploy link opens Cloudflare with an immutable 40-character Git commit
    and the isolated `deploy/cloudflare/session-worker/` package. Cloudflare
    provisions the Worker, KV namespace, and Durable Object in the user's own
    account.
-3. The user copies all four displayed values into Cloudflare, including the two
+3. The user copies all displayed values into Cloudflare, including the
    runtime secrets in Cloudflare's encrypted secret fields, deploys, and
    returns the resulting `workers.dev` URL to the wizard.
 4. The wizard verifies reachability, browser-origin/CORS access, and canonical
@@ -155,8 +138,9 @@ the distinct browser-visible RPC fallback.
 It does not call public `/session-config` for this path: that discovery route
 remains Worker-canonical-only, while the EVM registry and Arweave remain
 authoritative for the decentralized session. Browser CORS acceptance proves
-reachability, not Worker-canonical discovery authority. Lit and Agent Session
-Wrapped profiles retain the manual deploy-helper/bootstrap path.
+reachability, not Worker-canonical discovery authority. Agent HTTP verifies
+current same-origin capabilities after config acceptance. Lit retains its
+additional provisioning requirements.
 
 The signed registry config keeps its session ID immutable once initialized.
 When an unbound Worker authorizes first configuration from the registry, a
@@ -322,81 +306,29 @@ deleted speculatively.
 
 ### Sponsored deploy release
 
-From 0.6.8, a sponsoring session Worker's own code pins every grant-backed
-deploy to the release recorded on that Worker, never code chosen by the person
-who redeems the grant. The pinning is in the Worker's code, not in its
-settings: a sponsoring Worker running code older than 0.6.8 still deploys
-whatever bundle the redeemer sends, whether or not the variables below are
-set. The first-party wizard sends its own build's release with each grant (the
-Worker bundle URL and manifest, plus the Agent Bridge pair for Agents HTTP
-sessions), never an uploaded file or a manual bundle URL. Older sponsoring
-Workers deploy that release; 0.6.8 or later code ignores it. Before issuing
-deploy grants from such a Worker, update it to 0.6.8 or
-later code: replace only its code with a 0.6.8 or later release's
-`sessionCorsWorker.bundle.js` and keep its bindings, variables and secrets.
-The deploy helper cannot do this, because it only creates new Workers
-(in-place redeploy is disabled; see [Self-deploy](#self-deploy)).
-
-The Worker keeps its release in four plain-text variables, where `<release>`
-is
+A sponsoring Worker pins grant-backed deploys to the verified release recorded
+on that Worker. Current code ignores the redeemer's uploaded bytes and bundle
+URLs. The sponsor needs these two plain-text variables, where `<release>` is
 `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>`:
 
-| Variable                           | Value                                                                      |
-| ---------------------------------- | -------------------------------------------------------------------------- |
-| `WORKER_BUNDLE_URL`                | `<release>/sessionCorsWorker.bundle.js`                                    |
-| `WORKER_BUNDLE_MANIFEST_URL`       | `<release>/worker-release-manifest.json`                                   |
-| `AGENT_BRIDGE_BUNDLE_URL`          | `<release>/agentBridgeWorker.bundle.js` (to sponsor Agents HTTP sessions)  |
-| `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` | `<release>/worker-release-manifest.json` (to sponsor Agents HTTP sessions) |
+| Variable | Value |
+| --- | --- |
+| `WORKER_BUNDLE_URL` | `<release>/sessionCorsWorker.bundle.js` |
+| `WORKER_BUNDLE_MANIFEST_URL` | `<release>/worker-release-manifest.json` |
 
-Each sponsored deploy downloads the manifest and bundles again and stops if a
-bundle's SHA-256 differs from the digest the manifest lists.
+The helper records this pair only after fetching and checking the bundle's
+SHA-256 against its release manifest. Uploaded bundle text or a URL without a
+manifest records no sponsor release. Each sponsored deploy rechecks the manifest
+and uses that same verified release. A missing pin fails before consuming the
+grant. Agent HTTP uses the same Session Worker, so it needs no additional bundle
+pin or deployment. Its fresh signing secret is preserved on setup retry, and
+capabilities are published only after the saved configuration and bindings pass
+verification. Failed verification leaves staged resources resumable.
 
-The 0.6.8 or later deploy helper records these variables on each new session
-Worker it deploys:
-
-- The helper sets `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` only
-  when it downloaded the Worker bundle from a URL and the bundle matched its
-  release manifest. An uploaded bundle file (`bundleText`), or a bundle URL
-  without a manifest, records nothing.
-- It sets the Agent Bridge pair only when the new session enables Agents HTTP
-  and the bridge bundle matched its manifest. The helper checks that bundle
-  before it uploads the session Worker: a first attempt stops before creating
-  the session's KV namespace or Worker, and a retry that already staged
-  resources stays pending.
-- The recorded URLs are the ones that deploy used. A release named in the
-  deploy request takes precedence over the helper's own `WORKER_BUNDLE_URL`
-  and `WORKER_BUNDLE_MANIFEST_URL` defaults. A sponsored deploy always uses
-  the sponsoring Worker's variables, so each new Worker records its sponsor's
-  release.
-- The helper writes these variables only into the upload of a Worker it is
-  creating. It never changes an existing Worker, so values set by hand stay
-  as they are.
-- Recording does not change the code a Worker runs. The variables pin grant
-  deploys only once the Worker runs 0.6.8 or later code. Local and self-hosted
-  client builds deploy the release pinned in
-  `client/src/variables/workerReleasePin.json` by default, which can be older
-  (see [Release bundle](#release-bundle)).
-
-A Worker running 0.6.8 or later code can still lack the variables: it was
-deployed by an older deploy helper, from an uploaded bundle file, or from a
-bundle URL without a manifest. It also records the Agent Bridge pair only when
-its own session enabled Agents HTTP at deploy time. Such a Worker refuses
-grant deploys with `400` before using the grant, and refuses Agents HTTP grant
-deploys the same way without the bridge pair, until you set the missing
-variables once:
-
-1. Choose the release new sessions should run, usually the
-   `worker-bundles-<commit>` release the sponsoring Worker itself runs. Check
-   it with `CE_RELEASE_COMMIT=<commit> npm run verify:release-assets`. Its
-   GitHub release page
-   `https://github.com/AgalmicSoftware/context-engine/releases/tag/worker-bundles-<commit>`
-   lists the assets.
-2. In the Cloudflare dashboard, open the sponsoring Worker's **Settings** >
-   **Variables and Secrets**, add `WORKER_BUNDLE_URL` and
-   `WORKER_BUNDLE_MANIFEST_URL` as **Text** variables with the values above,
-   and deploy. If you sponsor sessions that enable Agents HTTP, add the Agent
-   Bridge pair too; both manifest variables use the same
-   `worker-release-manifest.json`, which lists both bundles.
+The helper creates new Workers; it does not update old sponsoring Worker code.
+Older deployed releases retain their own behavior. To verify an existing release
+selection, run `CE_RELEASE_COMMIT=<commit> npm run verify:release-assets`. Updating
+live code or settings is a separate operator action.
 
 ## Sponsored bundle flow (`/sponsor` -> `/new?sponsored=<txId>` + separate key handoff)
 
@@ -446,11 +378,10 @@ variables once:
 - For grant-backed sponsored deploys, the browser posts to the sponsoring `sessionCorsWorker` `/sponsored/redeem-deploy` route, and that source worker must have embedded deploy enabled from its deploy-time `DEPLOY_HELPER_ENABLED` binding. `/sponsor` no longer writes a standalone deploy-helper fallback URL into the bundle or grant.
   - A grant lends the sponsor's Cloudflare token, not a code upload. The
     sponsoring Worker ignores the redeemer's `bundleText`, `bundleUrl`,
-    `bundleSha256`, `bundleManifestUrl`, `deploymentKind` and agent-bridge
+    `bundleSha256`, `bundleManifestUrl`, `deploymentKind` and agent capability
     bundle fields, and deploys only the release recorded on it: the
-    `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` plain-text vars, plus
-    `AGENT_BRIDGE_BUNDLE_URL` and `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` when the
-    new session enables the Agents HTTP surface. The manifest pins the bundle
+    `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` plain-text vars.
+    Agent HTTP uses this same bundle. The manifest pins the bundle
     digest. Without these vars the route returns `400` before the grant is used.
     This pinning is the sponsoring Worker's own code from 0.6.8; a sponsoring
     Worker running older code still deploys the redeemer's bundle, so update
@@ -1159,6 +1090,13 @@ Only the last archive page has
 records cumulative counts, and fingerprints the current and optional previous
 KEK with HMAC-SHA256 over `ce-kek-fingerprint-v1`. It contains no recovery key.
 
+Agent auxiliary state is excluded: credentials/slots, drafts, proposals,
+Wrapped records/images, caches, pending submissions, invite admission material
+and journals, and managed signing secrets. Canonical responses and groups retain
+their normal coverage. Restore also rejects existing agent or invite state.
+Reissue credentials and create fresh invites after restore. Session archives do
+not recover managed account keys.
+
 The first page includes config authority, wrapped session keys, encrypted
 session secrets and Worker Group authority, catalog and membership records.
 Very large coordinator snapshots use a `chunked` descriptor and payload/chunk
@@ -1372,9 +1310,9 @@ those identities cannot yet be matched. Older Workers without the member-directo
 Clearing Group filters restores the unfiltered cohort while retaining other
 selected filters.
 
-Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic
+Groups are canonical in `sessionCorsWorker`; the agent module's research
 research buckets are separate profile data and never grant worker access, and
-the Bridge does not mirror worker group definitions or memberships. A
+research buckets do not mirror Worker group authority. A
 Worker-native Group belongs to one exact identity tuple: the validated Worker
 origin, normalized canonical slug, and canonical session ID. The client pins
 the Worker origin. Worker-canonical nonce/login requests and responses bind the
@@ -1406,10 +1344,8 @@ Group authority and labels the chain-dependent controls separately as
 **Advanced on-chain access**. Registry-canonical sessions retain the existing
 SBT Groups experience. Agent-enabled sessions use the session-worker JWT
 returned by client login to call `/groups/list`, `/groups/my-memberships`,
-`/groups/members`, `/groups/join`, and `/groups/leave` directly. A dedicated Agent Session Wrapped Bridge may also
-validate that same JWT at its deployment-pinned `/groups/my-memberships`
-endpoint before issuing a shorter, session-bound Bridge credential; the Bridge
-does not evaluate the login's SIWE, registry, RPC, SBT, or gate logic. The Admin
+`/groups/members`, `/groups/join`, and `/groups/leave` directly. Session Wrapped exchanges that JWT in-process for a shorter member credential,
+rechecking the current canonical membership and source token on use. The Admin
 page uses the existing signed worker-admin request path for group and member
 management. It labels these controls **Native Worker Groups** for Worker-owned
 participant Groups. A default registry profile does not expose Worker group
@@ -1436,17 +1372,27 @@ the principal. A registry session may use Wrapped only with an already usable
 or newly attached compatible Worker. A permanently locked workerless session
 fails closed because it cannot attach a new `corsWorkerUrl`. After exchange,
 Wrapped answer submission is HTTPS/KV and requires no agent-originated EVM
-transaction. The Bridge member credential expires at the earlier of 24 hours
-or the remaining Worker-JWT lifetime, which is also the maximum propagation
-delay after either authority revokes access.
+transaction. The member credential expires at the earlier of 24 hours or the
+remaining Worker-JWT lifetime. Each request rechecks its source record and
+current membership, so revocation does not wait for credential expiry.
 
-The non-secret version-1 `agentSessionWrapped` session-config record contains
-only `enabled`, the verified dedicated origin, protocol/revision identifiers,
-and `verifiedAt`. `sessionModeProfile.surfaces.agentHttp` is its sole product
-enablement bit. Reserved `telegram` and `miniApp` surface flags are false for
-new configs and cannot reactivate retired transports. The record is written
-only after the dedicated Bridge proves its exact session slug and pinned Worker
-origin. Failed deploy/redeploy attempts preserve the last verified record.
+Wrapped research batches are serialized by the session coordinator. The first
+admission binds the request ID to its exact content, including the original
+statement wording and schema. A retry with changed content returns `409`.
+Concurrent batches preserve both answer summaries; a busy KV projection returns
+retryable `503` with `retryAfterSeconds: 1`. Retry the same request after that
+delay. The coordinator retains a partially projected batch across restarts and
+completes it before admitting another batch for that principal and vote mode.
+Exports include both currently readable question sources, irrespective of the
+source selected for new answers. An unavailable source fails the export rather
+than silently returning incomplete history. Archived proposals are no longer
+readable and their stored research is excluded from these views.
+
+Admin enable/disable uses signed Session Worker configuration and verifies
+current same-origin `/capabilities`. Native and helper setup share this code.
+Capability v1 retains `enabled`, `origin`, `protocolVersion`, `revision` and
+`verifiedAt`; `sessionModeProfile.surfaces.agentHttp` remains the product switch.
+
 
 Group records and membership rows are stored separately in KV and stamped with
 the canonical session ID. A group record has a generated `groupId`, label,
@@ -1685,8 +1631,8 @@ group metadata and member identities, while `session` lets any authenticated
 session principal see both. Self-membership visibility is always allowed, but
 does not grant an `admin_only` identity list. Anonymous discovery never returns
 member identities or counts. `passkey_account` and `evm_address` principals use
-normalized EVM addresses, and `agent` uses the grant id. Retained Agent Bridge
-requests authenticate with SIWE and use their EVM address. Historical explicit
+normalized EVM addresses, and `agent` uses the grant id. Agent HTTP requests use a scoped session-bound credential and the derived
+managed account address. Historical explicit
 `telegram` principals remain readable with their original case-sensitive
 principal IDs and storage keys; obsolete implicit transport scope hints no
 longer select a principal. Malformed principals fail closed.
@@ -1809,7 +1755,7 @@ Runtime:
   excluding deployment credentials from saved receipts.
 - Enable `nodejs_compat` and `global_fetch_strictly_public` when deploying from
   the dashboard. The latter routes calls to sibling Workers through their public
-  endpoint; without it, Wrapped health and authority checks on the same account
+  endpoint; without it, public Worker capability checks on the same account
   can fail with Cloudflare error 1042. The native template and API deployment
   metadata include both flags. Existing deployments need these settings applied
   on redeployment; updating source alone does not change a running Worker.
@@ -2757,7 +2703,7 @@ Signed login/bootstrap requests:
     model/output/tool behavior and existing access/URL rules. Provider rejection
     never retries with the session's key. These are request limits only: they
     provide no aggregate allowance, concurrency limit, or total-spend guarantee.
-    Client-delegated live interviews and separately funded Bridge image calls
+    Client-delegated live interviews and optional operator-funded Wrapped posters
     have no new whole-session usage bound.
   - Optional overrides: `apiKey` (all providers), `rpcUrl` (custom provider only).
   - Anonymous `apiKey` + `provider: "custom"` requires `rpcUrl`; worker secret `customRpcUrl` is not used for this bypass path.
@@ -2818,8 +2764,8 @@ Signed login/bootstrap requests:
     still verifies the Worker-canonical session config before using that hint.
 - `GET /api/agent/questions` with a session Worker bearer credential returns
   the same public, access-checked question catalog when
-  `sessionModeProfile.surfaces.agentHttp=true`. This is the first canonical
-  Agent API family on the Session Worker; the Agent Bridge compatibility route
+  `sessionModeProfile.surfaces.agentHttp=true`. This is a canonical
+  Agent API family on the Session Worker; the retired Bridge compatibility route
   remains during the staged transport migration.
 - `POST /interview/starter?slug=<slug>`
   - Uses session CORS, anonymous AI eligibility, expiry, and rate limits; never accepts a caller-supplied generation prompt or forced refresh.
@@ -3099,7 +3045,7 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   and any later non-success remains pending. The helper returns/replays success
   only after the terminal receipt commits and the rejection marker is removed.
 - A same-ID retry whose earlier attempt already staged the KV namespace checks
-  the Worker and Agent Bridge bundles just before upload. If a bundle is
+  the Session Worker bundle just before upload. If a bundle is
   unavailable or does not match its manifest, the request stays pending (`502`
   or `409` with `deploymentRequestPending` and the retained `orphanResources`)
   instead of ending, so a later retry can finish once the bundle is fixed.

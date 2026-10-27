@@ -6,7 +6,6 @@ import { resolveSessionCapabilityProjection } from '../../utilities/session/sess
 import { normalizeBoundedSessionStorageSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability.js';
-import { AGENT_BRIDGE_WORKER_BUNDLE_URL, WORKER_RELEASE_MANIFEST_URL } from '../../variables/publicDeploymentConfig.js';
 
 type AdminRecord = Record<string, unknown>;
 type PostSignedRequest = (args: {
@@ -17,7 +16,13 @@ type PostSignedRequest = (args: {
 }) => Promise<unknown>;
 
 export type AdminAgentSessionWrappedAvailabilityCode =
-  'ready' | 'read_only' | 'worker_required' | 'locked_workerless' | 'encrypted_worker_pointer' | 'incompatible';
+  | 'ready'
+  | 'profile_required'
+  | 'read_only'
+  | 'worker_required'
+  | 'locked_workerless'
+  | 'encrypted_worker_pointer'
+  | 'incompatible';
 
 export type AdminAgentSessionWrappedAvailability = {
   code: AdminAgentSessionWrappedAvailabilityCode;
@@ -41,9 +46,6 @@ const normalizeHttpsOrigin = (value: unknown): string => {
     return '';
   }
 };
-
-const authorityModeFrom = (sessionConfig: unknown): string =>
-  resolveSessionCapabilityProjection(sessionConfig).authorityMode;
 
 const hasCompatibleAuthority = (sessionConfig: unknown): boolean => {
   const capabilities = resolveSessionCapabilityProjection(sessionConfig);
@@ -117,8 +119,17 @@ export const resolveAdminAgentSessionWrappedAvailability = ({
       compatible: true,
       manageable: false,
       message: locked
-        ? 'This permanently locked session has no usable paired Worker, so Wrapped cannot be attached.'
-        : 'Attach a compatible session Worker before enabling Agent Session Wrapped.',
+        ? 'This permanently locked session has no usable Session Worker, so Wrapped cannot be attached.'
+        : 'Attach a compatible Session Worker before enabling Agent Session Wrapped.',
+      capability,
+    };
+  }
+  if (sessionCapabilities.source === 'legacy_registry') {
+    return {
+      code: 'profile_required',
+      compatible: true,
+      manageable: false,
+      message: 'Configure a complete session mode profile before enabling Agent Session Wrapped.',
       capability,
     };
   }
@@ -153,9 +164,7 @@ export const buildAdminAgentSessionWrappedConfigPatch = ({
   const profile = asRecord(config.sessionModeProfile);
   const sessionCapabilities = resolveSessionCapabilityProjection(config);
   if (sessionCapabilities.source === 'legacy_registry' && Object.keys(profile).length === 0) {
-    return {
-      agentSessionWrapped: capability,
-    };
+    throw new Error('Configure a complete session mode profile before enabling Agent Session Wrapped.');
   }
   const surfaces = asRecord(profile.surfaces);
   return {
@@ -217,35 +226,34 @@ export const ensureAdminAgentSessionWrappedWorkerAttached = async ({
   return { attached: true };
 };
 
-const sessionIdFrom = (sessionConfig: unknown): string => {
-  const config = asRecord(sessionConfig);
-  const registry = registryFrom(config);
-  return toStr(registry.sessionIdHex || registry.sessionId || config.sessionId).trim();
-};
-
-const deploymentIdentityFrom = ({
-  sessionConfig,
-  sessionSlug,
-}: {
-  sessionConfig: unknown;
-  sessionSlug: string;
-}): string => {
-  const config = asRecord(sessionConfig);
-  const registry = registryFrom(config);
-  const chainIdentity = Number(registry.registryChainId || registry.chainId || config.networkChainId || 0) || 'worker';
-  return ['session', chainIdentity, sessionIdFrom(sessionConfig) || 'pending', sessionSlug].join(':');
-};
-
-const redactToken = (message: unknown, token: string): string => {
-  const text = toStr(message).trim();
-  return token ? text.split(token).join('[redacted]') : text;
+const readAgentCapabilities = async (workerOrigin: string, slug: string, fetchImpl: typeof fetch) => {
+  const response = await fetchImpl(`${workerOrigin}/capabilities?slug=${encodeURIComponent(slug)}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  });
+  const data = asRecord(await response.json().catch(() => ({})));
+  const capability = normalizeAgentSessionWrappedCapability(data.agentSessionWrapped);
+  if (
+    !response.ok ||
+    !Array.isArray(data.features) ||
+    !data.features.includes('agent_http_v1') ||
+    !capability ||
+    capability.origin !== workerOrigin ||
+    capability.protocolVersion !== 'agent-session-wrapped-v1'
+  ) {
+    throw new Error('The Session Worker did not verify its agent capabilities.');
+  }
+  return {
+    capability,
+    configured: asRecord(data.agentHttp).configured === true,
+    enabled: asRecord(data.agentHttp).enabled === true,
+    ready: asRecord(data.agentHttp).ready === true,
+  };
 };
 
 export const applyAdminAgentSessionWrappedChange = async ({
   accessEnabled,
-  apiToken,
-  deployHelperUrl,
-  deploymentRequestId,
   sessionConfig,
   sessionSlug,
   sessionWorkerUrl,
@@ -254,9 +262,6 @@ export const applyAdminAgentSessionWrappedChange = async ({
   postSignedRequest,
 }: {
   accessEnabled: boolean;
-  apiToken: string;
-  deployHelperUrl: string;
-  deploymentRequestId: string;
   sessionConfig: unknown;
   sessionSlug: string;
   sessionWorkerUrl: string;
@@ -264,73 +269,32 @@ export const applyAdminAgentSessionWrappedChange = async ({
   ensureSessionWorkerAttached?: (input: { sessionWorkerUrl: string }) => Promise<unknown>;
   postSignedRequest: PostSignedRequest;
 }) => {
-  const token = toStr(apiToken).trim();
-  const helperOrigin = normalizeHttpsOrigin(deployHelperUrl);
   const workerOrigin = normalizeHttpsOrigin(sessionWorkerUrl);
   const slug = normalizeSessionSlug(sessionSlug || asRecord(sessionConfig).slug);
-  const requestId = toStr(deploymentRequestId).trim();
-  const authorityMode = authorityModeFrom(sessionConfig);
-  if (!token) throw new Error('Enter a request-only Cloudflare API token.');
-  if (!helperOrigin) throw new Error('The deploy-helper URL is unavailable.');
-  if (!workerOrigin) throw new Error('A compatible paired session Worker is required.');
-  if (!slug || !requestId || !hasCompatibleAuthority(sessionConfig)) {
-    throw new Error('Wrapped deployment identity or session authority is invalid.');
-  }
-
-  let response: Response;
-  try {
-    response = await fetchImpl(`${helperOrigin}/deploy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deploymentKind: 'agent_session_wrapped',
-        deploymentRequestId: requestId,
-        apiToken: token,
-        sessionSlug: slug,
-        sessionWorkerOrigin: workerOrigin,
-        sessionDeploymentIdentity: deploymentIdentityFrom({ sessionConfig, sessionSlug: slug }),
-        sessionId: sessionIdFrom(sessionConfig),
-        authorityMode,
-        agentHttpEnabled: accessEnabled,
-        bundleUrl: AGENT_BRIDGE_WORKER_BUNDLE_URL,
-        bundleManifestUrl: WORKER_RELEASE_MANIFEST_URL,
-      }),
-    });
-  } catch (error) {
-    throw new Error(redactToken(error instanceof Error ? error.message : error, token) || 'Wrapped deploy failed.');
-  }
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || data?.ok !== true) {
-    throw new Error(redactToken(data?.error, token) || `Wrapped deploy failed (${response.status}).`);
-  }
-  const capability = normalizeAgentSessionWrappedCapability(data?.agentSessionWrapped);
-  if (
-    !capability ||
-    capability.enabled !== accessEnabled ||
-    normalizeHttpsOrigin(data?.workerUrl) !== capability.origin ||
-    normalizeSessionSlug(data?.sessionSlug) !== slug ||
-    normalizeHttpsOrigin(data?.sessionWorkerOrigin) !== workerOrigin
-  ) {
-    throw new Error('Wrapped deploy did not return a verified session-bound capability.');
-  }
-  const configPatch = buildAdminAgentSessionWrappedConfigPatch({ sessionConfig, capability });
+  if (!workerOrigin || !slug || !hasCompatibleAuthority(sessionConfig))
+    throw new Error('A compatible Session Worker is required.');
+  const before = await readAgentCapabilities(workerOrigin, slug, fetchImpl);
+  if (accessEnabled && !before.configured)
+    throw new Error('Agent resources are not configured on this Session Worker.');
+  const proposed = { ...before.capability, enabled: accessEnabled };
+  const configPatch = buildAdminAgentSessionWrappedConfigPatch({ sessionConfig, capability: proposed });
   const config = asRecord(sessionConfig);
   const registry = registryFrom(config);
-  const adminAddress = toStr(registry.adminAddress || config.adminAddress).trim();
-  if (ensureSessionWorkerAttached) {
-    await ensureSessionWorkerAttached({ sessionWorkerUrl: workerOrigin });
-  }
+  if (ensureSessionWorkerAttached) await ensureSessionWorkerAttached({ sessionWorkerUrl: workerOrigin });
   await postSignedRequest({
     action: 'set-config',
     path: '/admin/set-config',
     workerUrl: workerOrigin,
     body: {
       sessionSlug: slug,
-      adminAddress,
+      adminAddress: toStr(registry.adminAddress || config.adminAddress).trim(),
       config: configPatch,
     },
   });
-  return { capability, configPatch };
+  const after = await readAgentCapabilities(workerOrigin, slug, fetchImpl);
+  if (after.enabled !== accessEnabled || (accessEnabled && !after.ready))
+    throw new Error('The saved agent access state could not be verified.');
+  return { capability: after.capability, configPatch: { ...configPatch, agentSessionWrapped: after.capability } };
 };
 
 export const verifyAdminAgentSessionWrappedHealth = async ({
@@ -347,28 +311,15 @@ export const verifyAdminAgentSessionWrappedHealth = async ({
   const capability = normalizeAgentSessionWrappedCapability(capabilityInput);
   const slug = normalizeSessionSlug(sessionSlug);
   const workerOrigin = normalizeHttpsOrigin(sessionWorkerUrl);
-  if (!capability || !slug || !workerOrigin) throw new Error('Wrapped health configuration is incomplete.');
-  let response: Response;
-  try {
-    response = await fetchImpl(`${capability.origin}/health`, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
-    });
-  } catch {
-    throw new Error('Wrapped Worker is unavailable.');
-  }
-  const data = await response.json().catch(() => ({}));
-  const exactAuthority =
-    response.ok &&
-    data?.ok === true &&
-    data?.worker === 'agentBridgeWorker' &&
-    data?.protocolVersion === capability.protocolVersion &&
-    data?.agentSessionWrappedConfigured === true &&
-    data?.agentSessionWrappedReady === capability.enabled &&
-    data?.dedicatedSession?.accessEnabled === capability.enabled &&
-    normalizeSessionSlug(data?.dedicatedSession?.sessionSlug) === slug &&
-    normalizeHttpsOrigin(data?.dedicatedSession?.sessionWorkerOrigin) === workerOrigin;
-  if (!exactAuthority) throw new Error('Wrapped health did not prove the expected pinned authority and access state.');
-  return { ok: true as const, accessEnabled: capability.enabled, protocolVersion: capability.protocolVersion };
+  if (!slug || !workerOrigin || (capability && capability.origin !== workerOrigin))
+    throw new Error('Wrapped capability origin does not match the Session Worker.');
+  const current = await readAgentCapabilities(workerOrigin, slug, fetchImpl);
+  if ((current.enabled && !current.ready) || (capability && current.enabled !== capability.enabled))
+    throw new Error('The Session Worker agent access state did not verify.');
+  return {
+    ok: true as const,
+    accessEnabled: current.enabled,
+    protocolVersion: current.capability.protocolVersion,
+    capability: current.capability,
+  };
 };

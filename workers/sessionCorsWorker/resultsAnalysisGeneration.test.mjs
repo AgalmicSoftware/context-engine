@@ -1098,6 +1098,7 @@ for (const completion of ['not JSON', 'null']) test(`invalid analysis output pau
   const alarms = [];
   const receipts = [];
   const storage = { get: async (key) => structuredClone(values.get(key)), put: async (key, value) => values.set(key, structuredClone(value)),
+    list: async ({ prefix = '' } = {}) => new Map([...values].filter(([key]) => key.startsWith(prefix))),
     delete: async (key) => values.delete(key), transaction: async (callback) => callback(storage), setAlarm: async (time) => alarms.push(time) };
   const coordinator = new SessionWriteCoordinator({ storage }, env, {
     now: () => 1_000,

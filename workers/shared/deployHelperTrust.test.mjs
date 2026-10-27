@@ -6,7 +6,7 @@ import { fetchExpectedWorkerBundleDigest } from './workerReleaseManifest.mjs';
 const assetUrl = 'https://assets.example/worker-release-manifest.json';
 const manifestOptions = { manifestUrl: assetUrl, artifactFile: 'sessionCorsWorker.bundle.js', artifactKind: 'session-cors-worker' };
 
-for (const deploymentKind of [undefined, 'agent_session_wrapped']) {
+for (const deploymentKind of [undefined]) {
   test(`account authority precedes every artifact read (${deploymentKind || 'session'})`, async () => {
     const calls = [];
     const result = await executeDeployHelperRequest({
@@ -21,6 +21,16 @@ for (const deploymentKind of [undefined, 'agent_session_wrapped']) {
     assert.deepEqual(calls, ['https://api.cloudflare.com/client/v4/accounts?per_page=5']);
   });
 }
+
+test('retired Bridge deployment rejects before account or artifact requests', async () => {
+  const result = await executeDeployHelperRequest({
+    body: { apiToken: 'fixture-invalid', deploymentKind: 'agent_session_wrapped',
+      workerName: 'fixture-worker', bundleUrl: 'https://assets.example/worker.js', bundleManifestUrl: assetUrl },
+    fetchImpl: async () => assert.fail('retired deployment must have no external effects'),
+  });
+  assert.equal(result.status, 400);
+  assert.match(result.body.error, /no longer supported/i);
+});
 
 test('missing token cannot trigger a manifest fetch or trust a body-supplied resolved account', async () => {
   const result = await executeDeployHelperRequest({
