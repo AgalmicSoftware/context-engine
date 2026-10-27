@@ -23,6 +23,36 @@ export const cleanupBackupImportJournal = async (storage, archiveId, stores) => 
   return { complete: rows.size < 100, operations: rows.size * 2 + 1 };
 };
 
+// Completion keeps restored rows; only abandonment follows journal targets.
+// Delete small batches without a cursor so a lost reply safely repeats cleanup.
+export const clearBackupImportMetadata = async (storage, archiveId) => {
+  const rows = await storage.list({ prefix: `${backupImportStateKey(archiveId)}:`, limit: 200 });
+  for (const [key] of rows) await storage.delete(key);
+  return rows.size < 200;
+};
+
+export const cleanupCompletedBackupImport = async (coordinator, slug, archiveId, progress, budget) => {
+  const { storage } = coordinator.state;
+  if (budget && budget.remaining < 32) return false;
+  const groups = await coordinateWorkerGroupBackup({ env: coordinator.env, slug, sessionId: progress.manifest.sessionId,
+    operation: 'finish', archiveId });
+  if (!groups.ok) throw Object.assign(new Error(groups.error || 'Group restore completion is unavailable.'), { status: groups.status || 503 });
+  if (!groups.complete) return false;
+  const rawIndex = getStorageIndexBinding(coordinator.env);
+  const index = budget ? budget.wrap(rawIndex) : rawIndex;
+  const limit = Math.min(100, budget ? budget.remaining - 8 : 100);
+  const staged = await index.list({ prefix: backupImportStagePrefix(slug, archiveId), limit });
+  if (!Array.isArray(staged.keys)) throw new Error('Restore cleanup storage could not be read.');
+  for (const { name } of staged.keys) await index.delete(name);
+  if (staged.list_complete === false || !await clearBackupImportMetadata(storage, archiveId)) return false;
+  await storage.transaction(async (transaction) => {
+    await transaction.put('session-backup-import-completion', { archiveId, completedAt: coordinator.now(), counts: progress.counts });
+    await transaction.delete(backupImportStateKey(archiveId));
+    await transaction.delete(BACKUP_IMPORT_ACTIVE_KEY);
+  });
+  return true;
+};
+
 export const assertNoActiveBackupImport = async (coordinator) => {
   const { storage } = coordinator.state;
   const archiveId = await storage.get(BACKUP_IMPORT_ACTIVE_KEY);
@@ -67,7 +97,13 @@ export const readActiveBackupImport = async (coordinator, slug, cleanExpired = t
   const archiveId = await storage.get(BACKUP_IMPORT_ACTIVE_KEY);
   if (!archiveId) return null;
   const progress = await storage.get(backupImportStateKey(archiveId));
-  if (!progress || progress.finished) return null;
+  if (!progress) return null;
+  if (progress.finished) {
+    // Older versions retained completed receipts indefinitely. Reclaim them,
+    // but never let them bypass the next import's empty-target check.
+    if (await cleanupCompletedBackupImport(coordinator, slug, archiveId, progress, budget)) return null;
+    return { archiveId, progress };
+  }
   const expired = !Number.isFinite(progress.expiresAt) || progress.expiresAt <= coordinator.now();
   if (cleanExpired && (expired || progress.abandoning) && !progress.configPublished) {
     if (await cleanup(coordinator, slug, archiveId, progress, budget)) return null;
@@ -87,6 +123,6 @@ export const controlCoordinatorBackupImport = async (coordinator, payload, aband
   }
   return Response.json({ ok: true, restore: active ? {
     archiveId: active.archiveId, inProgress: true, canAbandon: !active.progress.configPublished,
-    cleaning: active.progress.abandoning === true, expiresAt: active.progress.expiresAt,
+    cleaning: active.progress.abandoning === true || active.progress.finishing === true || active.progress.finished === true, expiresAt: active.progress.expiresAt,
   } : null });
 };

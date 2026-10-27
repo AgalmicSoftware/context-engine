@@ -1186,7 +1186,12 @@ file and skips completed pages. Restore requires an empty target session: no
 published config, records, payloads, visibility/ownership markers, groups or
 session keys. It never merges an archive into a live session. Rows already
 written by the same in-progress archive are identified by its durable journal
-and may be replayed when resuming.
+and may be replayed when resuming. Receipts replay only while their import is
+in progress. Completion removes both coordinators' journals, descriptors,
+progress, page receipts and temporary staged data in bounded, resumable batches,
+keeping only a small completion record. Continue sending the final unchanged
+page while `pageComplete: false`; `complete: true` follows cleanup. A later import
+runs the empty-target check again, even for the same archive.
 
 Restore with admin-signed `POST /admin/import-session-backup`, passing each
 saved response as `page` in its original order. The target must hold the source

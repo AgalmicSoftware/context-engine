@@ -216,6 +216,7 @@ const importPage = async (env, page, revision = 0) => {
     const result = await env.GROUP_KV.request(() => callSessionConfigCoordinator({ env, slug, path: 'backup/import',
       expectedAuthority: { ...expectedAuthority, revision }, page, adoptSessionId: true }));
     if (!result.ok || result.body.pageComplete !== false) return result;
+    revision = (await callSessionConfigCoordinator({ env, slug, path: 'current' })).body.revision;
   }
   assert.fail('Import page did not finish within its bounded continuations');
 };
@@ -258,7 +259,7 @@ test('backup export refuses modified, unsigned, or foreign-session cursors befor
   assert.equal(stale.reason, 'backup_session_changed', 'A valid cursor cannot conceal concurrent writes');
 });
 
-test('restore validates recovery keys, skips page replays, and refuses a nonempty target', async () => {
+test('restore validates recovery keys and refuses a completed archive on a nonempty target', async () => {
   const source = fixture();
   const metadata = { id: 'cf_restore_answer', resource: 'responses', responder: admin, size: 5, storageLayer: 'kv' };
   const indexKey = `ce-storage:${slug}:responses:${metadata.id}`;
@@ -287,8 +288,8 @@ test('restore validates recovery keys, skips page replays, and refuses a nonempt
       assert.equal(result.body.counts.conflicts, 0);
       assert.equal(await target.kv.get(indexKey), JSON.stringify(metadata));
       const replay = await importPage(target.env, page, 1);
-      assert.equal(replay.body.replayed, true);
-      assert.deepEqual(replay.body.counts, result.body.counts);
+      assert.equal(replay.status, 409);
+      assert.equal(replay.body.reason, 'backup_target_not_empty');
     }
   }
 });
@@ -980,4 +981,123 @@ test('restore refuses live sessions regardless of whether their hidden markers m
     }
     assert.equal(await target.kv.get(key), mode === 'unhidden' ? null : marker);
   }
+});
+
+const completedRestoreSource = async () => {
+  const source = fixture();
+  source.env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
+  const group = await executeCoordinatedWorkerGroupMutation({ env: source.env, slug, sessionId, operation: 'create',
+    input: { groupId: 'restored', label: 'Restored', joinMode: 'open' }, actorPrincipal: { kind: 'evm_address', address: admin } });
+  assert.equal(group.ok, true);
+  for (let n = 0; n < 120; n += 1) {
+    const id = `cf_complete_${String(n).padStart(3, '0')}`;
+    const metadata = { id, resource: 'responses', responder: admin, storageLayer: 'kv', size: 6 };
+    source.kv.values.set(`ce-storage:${slug}:responses:${id}`, JSON.stringify(metadata));
+    source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('answer').toString('base64url') }));
+  }
+  return { source, pages: await allPages(source.env) };
+};
+const assertCompletedRestoreClean = (target, archiveId) => {
+  for (const { store } of target.env.__coordinatorInstances.values()) {
+    assert.equal([...store.keys()].some((key) => key.startsWith(`session-backup-import:${archiveId}`)), false,
+      'Completion removes journals, descriptors, progress and page receipts in both coordinators');
+    assert.equal(store.has('session-backup-import-active'), false);
+    assert.equal(store.has('worker-group-backup-import-active'), false);
+  }
+  assert.equal([...target.kv.values.keys()].some((key) => key.startsWith('ce-import-stage:')), false);
+  const completions = [...target.env.__coordinatorInstances.values()].flatMap(({ store }) =>
+    [...store].filter(([key]) => key.endsWith('backup-import-completion')));
+  assert.equal(completions.length, 2);
+  for (const [, value] of completions) {
+    assert.equal(value.archiveId, archiveId);
+    assert.ok(JSON.stringify(value).length < 512, 'Only a small completion record is kept');
+  }
+};
+
+test('completed restores clear transient state and cannot replay after KV loss', async () => {
+  const { pages } = await completedRestoreSource();
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  for (const page of pages) {
+    const result = await importPage(target.env, page);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    if (!page.manifest.complete) {
+      const replay = await importPage(target.env, page);
+      assert.equal(replay.body.replayed, true, 'Only the active import may replay its page receipts');
+    } else assert.equal(result.body.complete, true);
+  }
+  assertCompletedRestoreClean(target, pages[0].archiveId);
+  assert.equal([...target.kv.values.keys()].filter((key) => key.startsWith(`ce-storage:${slug}:responses:`)).length, 120);
+  target.kv.values.clear();
+  for (const page of pages) {
+    const result = await importPage(target.env, page, 1);
+    assert.equal(result.status, 409);
+    assert.equal(result.body.complete, undefined, 'Surviving receipts must not claim data has been restored');
+    assert.equal(result.body.replayed, undefined);
+  }
+  assert.equal(target.kv.values.size, 0);
+  // If the surviving authority is also removed, this really is an empty
+  // target: importing the same archive must write its data again.
+  for (const { store } of target.env.__coordinatorInstances.values()) {
+    store.delete('session-config-authority');
+    for (const key of store.keys()) if (key.startsWith('worker-group-capacity-')) store.delete(key);
+  }
+  for (const page of pages) assert.equal((await importPage(target.env, page)).ok, true);
+  assert.equal([...target.kv.values.keys()].filter((key) => key.startsWith(`ce-storage:${slug}:responses:`)).length, 120);
+  assertCompletedRestoreClean(target, pages[0].archiveId);
+});
+
+test('completion cleanup resumes after lost session or group journal deletion replies', async () => {
+  const { pages } = await completedRestoreSource();
+  for (const kind of ['index', 'group']) {
+    class InterruptedCleanupCoordinator extends SessionWriteCoordinator {
+      constructor(state, env) {
+        super(state, env);
+        const remove = state.storage.delete;
+        state.storage.delete = async (key) => {
+          const result = await remove(key);
+          if (env.interruptCleanup && key.includes(`:journal:${kind}:`)) {
+            env.interruptCleanup = false;
+            throw new Error('Lost completion cleanup reply');
+          }
+          return result;
+        };
+      }
+    }
+    const target = fixture(InterruptedCleanupCoordinator);
+    target.env.interruptCleanup = true;
+    target.kv.values.delete(`session:${slug}:config`);
+    for (const page of pages.slice(0, -1)) assert.equal((await importPage(target.env, page)).ok, true);
+    const interrupted = await importPage(target.env, pages.at(-1));
+    assert.equal(interrupted.status, 503, JSON.stringify(interrupted));
+    assert.equal(target.env.interruptCleanup, false, 'The fixture must interrupt completion cleanup');
+    const result = await importPage(target.env, pages.at(-1), 1);
+    assert.equal(result.body.complete, true, JSON.stringify(result));
+    assertCompletedRestoreClean(target, pages[0].archiveId);
+    assert.equal([...target.kv.values.keys()].filter((key) => key.startsWith(`ce-storage:${slug}:responses:`)).length, 120,
+      'Cleanup deletes tracking keys, never restored data');
+    assert.ok([...target.kv.values.keys()].some((key) => key.startsWith('ce-worker-group:')));
+  }
+});
+
+test('legacy completed imports are cleaned in batches without replaying stale receipts', async () => {
+  const { pages } = await completedRestoreSource();
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  for (const page of pages) assert.equal((await importPage(target.env, page)).ok, true);
+  const sessionStore = [...target.env.__coordinatorInstances.values()].find(({ store }) => store.has('session-config-authority')).store;
+  const archiveId = pages[0].archiveId;
+  sessionStore.set('session-backup-import-active', archiveId);
+  sessionStore.set(`session-backup-import:${archiveId}`, { finished: true, configPublished: true,
+    manifest: pages[0].manifest, counts: { written: 241, skipped: 0, conflicts: 0 } });
+  for (let n = 0; n < 450; n += 1) sessionStore.set(`session-backup-import:${archiveId}:payload:old-${n}`, {});
+  sessionStore.set(`session-backup-import:${archiveId}:page:0`, { hash: createHash('sha256').update(JSON.stringify(pages[0])).digest('hex'),
+    result: { ok: true, complete: true } });
+  const refused = await importPage(target.env, pages[0], 1);
+  assert.equal(refused.status, 409);
+  assert.equal(refused.body.reason, 'backup_target_not_empty');
+  for (let n = 0; n < 10 && sessionStore.has('session-backup-import-active'); n += 1) {
+    assert.equal((await restoreControl(target.env, 'status', archiveId, 1)).ok, true);
+  }
+  assertCompletedRestoreClean(target, archiveId);
 });

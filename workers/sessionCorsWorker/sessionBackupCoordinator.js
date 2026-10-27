@@ -4,7 +4,7 @@ import { resolveWorkerGroupsKv, workerGroupBackupPrefixes } from './workerGroups
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { normalizeWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
 import { isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
-import { backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJournal } from './sessionBackupLifecycle.js';
+import { backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJournal, clearBackupImportMetadata } from './sessionBackupLifecycle.js';
 
 const json = (body, status = 200) => Response.json(body, { status });
 const fail = (message, status = 503) => { throw Object.assign(new Error(message), { status }); };
@@ -105,8 +105,14 @@ export const controlWorkerGroupBackupImport = async (coordinator, payload, opera
     if (result.complete) await storage.delete(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
     return json({ ok: true, ...result });
   }
-  await storage.delete(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
-  return json({ ok: true });
+  const complete = await clearBackupImportMetadata(storage, archiveId);
+  if (complete) {
+    await storage.transaction(async (transaction) => {
+      await transaction.put('worker-group-backup-import-completion', { archiveId, completedAt: coordinator.now() });
+      await transaction.delete(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
+    });
+  }
+  return json({ ok: true, complete });
 };
 
 export const importWorkerGroupBackup = async (coordinator, payload) => {

@@ -1,4 +1,4 @@
-import { BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStagePrefix, backupImportJournalKey, journalBackupImportWrite, readActiveBackupImport } from './sessionBackupLifecycle.js';
+import { BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStagePrefix, backupImportJournalKey, journalBackupImportWrite, readActiveBackupImport, cleanupCompletedBackupImport } from './sessionBackupLifecycle.js';
 import { verifyBackupPage } from './sessionBackupAuthentication.js';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
@@ -127,9 +127,28 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
   const active = await readActiveBackupImport(coordinator, slug, true, budget);
   if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail('Another backup restore is in progress. Check restore status to abandon it.', 409, 'backup_restore_in_progress');
+  if (active?.progress.finished) {
+    await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
+    fail('Previous restore cleanup is still in progress. Retry this page.', 503, 'backup_cleanup_pending');
+  }
   const pageHash = await sha256Hex(JSON.stringify(page));
   const receiptKey = `${stateKey}:page:${page.pageNumber}`;
-  const receipt = await storage.get(receiptKey);
+  const complete = async (progress) => {
+    const done = await cleanupCompletedBackupImport(coordinator, slug, page.archiveId, progress, budget);
+    return Response.json({ ok: true, archiveId: page.archiveId, pageNumber: page.pageNumber,
+      counts: progress.counts, conflicts: progress.conflicts, complete: done,
+      ...(done ? {} : { pageComplete: false }),
+      restore: done ? null : { archiveId: page.archiveId, inProgress: true, canAbandon: false, cleaning: true } });
+  };
+  if (active?.progress.finishing) {
+    if (active.progress.actor !== expectedAuthority.actor || active.progress.pageNumber !== page.pageNumber || active.progress.pageHash !== pageHash) {
+      fail('Resume completion with the final unchanged backup page.', 409);
+    }
+    return complete(active.progress);
+  }
+  // A receipt proves a page in an active restore, not the continued existence
+  // of its data after completion or storage loss.
+  const receipt = active ? await storage.get(receiptKey) : null;
   if (receipt) {
     if (receipt.hash !== pageHash) fail('This backup page differs from the previously imported page.', 409);
     return Response.json({ ...receipt.result, replayed: true });
@@ -142,10 +161,10 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const descriptorKey = (id, target = '') => `${stateKey}:payload:${target || 'storage'}:${id}`;
   const recordKey = (id) => `${stateKey}:record:${id}`;
   const chunkKey = (id, n, target = '') => `${root}chunk:${target || 'storage'}:${id}:${n}`;
-  let progress = await storage.get(stateKey);
+  let progress = active?.progress;
   if (!progress) {
-    if (page.pageNumber !== 0 || !page.coordinator) fail('Import must begin with the first backup page.', 409);
     await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
+    if (page.pageNumber !== 0 || !page.coordinator) fail('Import must begin with the first backup page.', 409);
     progress = { actor: expectedAuthority.actor, pageNumber: 0, nextEntry: 0, pageHash, manifest: { ...manifest, counts: undefined, complete: undefined },
       counts: { written: 0, skipped: 0, conflicts: 0 }, conflicts: [], observed: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 },
       expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS, configPublished: false,
@@ -375,13 +394,13 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
         await coordinator.projectSessionConfigAuthority(authority);
         progress.counts.written += 1;
       }
-      if (progress.configPublished) {
-        await coordinator.repairPendingSessionConfigProjection();
-        const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: 'finish', archiveId: page.archiveId });
-        if (!groups.ok) fail(groups.error || 'Group restore completion is unavailable.', groups.status || 503);
-      }
+      if (progress.configPublished) await coordinator.repairPendingSessionConfigProjection();
     }
-    progress.finished = progress.configPublished && !progress.counts.conflicts;
+    if (progress.configPublished && !progress.counts.conflicts) {
+      progress.finishing = true;
+      await storage.put(stateKey, progress);
+      return complete(progress);
+    }
   }
   const result = { ok: true, archiveId: page.archiveId, pageNumber: page.pageNumber, counts: progress.counts,
     conflicts: progress.conflicts, complete: progress.finished && !progress.counts.conflicts,
@@ -394,10 +413,5 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     await transaction.put(stateKey, progress);
     await transaction.put(receiptKey, { hash: pageHash, result });
   });
-  if (progress.finished && progress.chunkedSnapshot) {
-    const header = await storage.get(descriptorKey('coordinator', 'coordinator'));
-    // Any remaining coordinator chunks expire with the archive staging TTL.
-    for (let n = 0; n < header.chunkCount && budget.remaining > 8; n += 1) await index.delete(chunkKey('coordinator', n, 'coordinator'));
-  }
   return Response.json(result);
 };
