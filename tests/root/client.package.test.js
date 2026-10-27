@@ -158,13 +158,14 @@ const readHeaderRules = () => {
   return rules;
 };
 
-test('client static headers enforce the baseline CSP and report a strict-script policy', () => {
+test('client static headers enforce script and wallet worker CSP with the exact benchmark hash', () => {
   const headers = readHeaderRules()['/*'];
+  const scripts = "'self' 'sha256-mKjUh0E6CnzsRRh0Cq3xv9KzngAwXUZS8Mj9O5EV+d0='";
 
   assert.equal(headers['Referrer-Policy'], 'strict-origin-when-cross-origin');
   assert.equal(
     headers['Content-Security-Policy'],
-    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
+    `frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; script-src ${scripts}; worker-src 'self' blob:`,
   );
   const reportOnly = Object.fromEntries(
     headers['Content-Security-Policy-Report-Only'].split(';').map((directive) => {
@@ -174,7 +175,7 @@ test('client static headers enforce the baseline CSP and report a strict-script 
   );
   assert.deepEqual(reportOnly, {
     'default-src': "'self'",
-    'script-src': "'self'",
+    'script-src': scripts,
     'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com",
     'img-src': "'self' data: blob: https:",
     'font-src': "'self' data: https://fonts.gstatic.com",
