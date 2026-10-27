@@ -11,6 +11,9 @@ export const DEFAULT_RETRY_BASE_DELAY_MS = 750;
 export const HARNESS_VERSION = '0.5.0';
 export const QUESTION_PROMPT_TEMPLATE_VERSION = 'aidb-question-v4';
 export const IMPORTANCE_PROMPT_TEMPLATE_VERSION = 'aidb-importance-v3';
+export const ANSWER_SET_PROMPT_VERSION = 'aidb-answer-v1';
+// Answering a session's questions asks each one several ways per repeat, so it repeats less by default.
+export const DEFAULT_ANSWER_REPEATS = 3;
 
 export const ANSWER_VALUES = Object.freeze(['Agree', 'Unsure', 'Disagree']);
 

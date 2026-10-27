@@ -10,6 +10,7 @@ import { renderHtmlReport } from './render-html.mjs';
 import { buildContextEnginePolisExport } from './ce-export.mjs';
 import { attachAnalysisOverlay, buildSecondPassAnalysisInput } from './analysis-export.mjs';
 import {
+  DEFAULT_ANSWER_REPEATS,
   DEFAULT_CONCURRENCY,
   DEFAULT_IMPORTANCE_BUDGET,
   DEFAULT_IMPORTANCE_MAX_ALLOCATIONS,
@@ -51,11 +52,13 @@ import { buildQuestionPrompt } from './normalize.mjs';
 import { buildExperimentPlan } from './experiment-plan.mjs';
 import { buildContextEngineBenchmarkDataset } from './ce-native-export.mjs';
 import { buildReportSnapshot, compareLongitudinalSnapshots } from './longitudinal.mjs';
+import { readQuestionSet, runAnswerSet } from './answer-set.mjs';
 
 const usage = `Usage:
   ai-discourse-bench validate --questions <file> --models <file> [--personas <file>]
   ai-discourse-bench plan-run --questions <file> --models <file> [--out <file>] [--provider mock|local|openrouter] [--mode self|persona] [--persona <id>] [--personas <file>] [--repeats <n>] [--limit-questions <n>]
   ai-discourse-bench run --questions <file> --models <file> --out <file> [--provider mock|local|openrouter] [--mode self|persona] [--persona <id>] [--personas <file>] [--repeats <n>] [--concurrency <n>] [--max-attempts <n>] [--resume] [--checkpoint <file.jsonl>]
+  ai-discourse-bench answer --questions <Results export or question JSON> --models <file[,file...]> --out <file> [--provider mock|local|openrouter] [--repeats <n>] [--concurrency <n>] [--max-attempts <n>] [--seed <text>] [--limit-questions <n>] [--resume] [--checkpoint <file.jsonl>]
   ai-discourse-bench run-importance --questions <file> --models <file> --out <file> [--provider mock|local|openrouter] [--budget <credits>] [--max-allocations <n>] [--repeats <n>] [--concurrency <n>] [--max-attempts <n>] [--resume] [--checkpoint <file.jsonl>]
   ai-discourse-bench build-report --questions <file> --models <file[,file...]> --runs <file[,file...]> --out <file> [--importance <file[,file...]>] [--limit-questions <n>] [--release]
   ai-discourse-bench render-report --report <file> --out <file.html> [--analysis <overlay.json>]
@@ -170,6 +173,52 @@ const commandRun = async (args) => {
   }));
   await writeJsonFile(args.out, result);
   console.log(`wrote ${result.runs.length} runs to ${args.out} (${result.resumedRuns} resumed; checkpoint ${checkpointPath})`);
+};
+
+// Answers any session's questions, every type included, in rows that can be compared with people's answers.
+const commandAnswer = async (args) => {
+  if (!args.questions) throw new Error(`Missing --questions\n${usage}`);
+  if (!args.models) throw new Error(`Missing --models\n${usage}`);
+  if (!args.out) throw new Error(`Missing --out\n${usage}`);
+  const provider = args.provider || '';
+  if (provider && !PROVIDERS.includes(provider)) {
+    throw new Error(`--provider must be one of ${PROVIDERS.join(', ')}`);
+  }
+  const repeats = parsePositiveInt(args.repeats, DEFAULT_ANSWER_REPEATS, '--repeats');
+  const concurrency = parsePositiveInt(args.concurrency, DEFAULT_CONCURRENCY, '--concurrency');
+  const maxAttempts = parsePositiveInt(args['max-attempts'], DEFAULT_MAX_ATTEMPTS, '--max-attempts');
+  const questionSet = readQuestionSet(await readJsonFile(args.questions));
+  if (args['limit-questions']) {
+    questionSet.questions = questionSet.questions.slice(0, parsePositiveInt(args['limit-questions'], 1, '--limit-questions'));
+  }
+  if (!questionSet.questions.length) throw new Error(`${args.questions} has no questions a model can answer.`);
+  const modelPaths = parseInputFileList(args.models);
+  const modelRosters = await Promise.all(modelPaths.map((modelPath) => readJsonFile(modelPath)));
+  modelRosters.forEach((modelRoster, index) => {
+    throwIfErrors(`model roster ${modelPaths[index]}`, validateModelRoster(modelRoster));
+  });
+  const modelRoster = mergeModelRosters(modelRosters);
+  const checkpointPath = args.checkpoint || `${args.out}.jsonl`;
+  const priorOutput = args.resume ? await readJsonFileIfExists(args.out, { rows: [] }) : { rows: [] };
+  const checkpointRows = args.resume ? await readCheckpointRuns(checkpointPath) : [];
+  const checkpointWriter = await createCheckpointWriter(checkpointPath, { reset: !args.resume });
+  const result = await runAnswerSet({
+    questionSet,
+    modelRoster,
+    providerOverride: provider,
+    repeats,
+    concurrency,
+    maxAttempts,
+    seed: args.seed || '',
+    existingRows: [...(priorOutput?.rows || []), ...checkpointRows],
+    onRow: checkpointWriter,
+  });
+  await writeJsonFile(args.out, result);
+  const skipped = Object.values(questionSet.skipped).reduce((sum, count) => sum + count, 0);
+  console.log(
+    `wrote ${result.rows.length} answers to ${args.out} (${result.unanswered} unanswered, ${result.resumedRows} resumed` +
+      `${skipped ? `, ${skipped} questions skipped` : ''}; checkpoint ${checkpointPath})`,
+  );
 };
 
 const commandRunImportance = async (args) => {
@@ -383,6 +432,8 @@ export const runCli = async (argv) => {
       return commandValidate(args);
     case 'run':
       return commandRun(args);
+    case 'answer':
+      return commandAnswer(args);
     case 'run-importance':
       return commandRunImportance(args);
     case 'plan-run':

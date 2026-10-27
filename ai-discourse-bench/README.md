@@ -320,6 +320,41 @@ versions, and results remain unchanged; any redesigned instrument needs its own
 measurement version.
 Use `--max-allocations` to change that cap for a separately identified run.
 
+## Answer Any Question Set
+
+`answer` asks every model in a roster every question of a Context Engine
+session, whatever its type: agree/disagree, rating, single and multiple choice,
+quadratic allocation and freeform. It writes one row per reply, with the answer
+in the form people's answers are stored in, so models can be compared with
+people.
+
+```bash
+node ./bin/ai-discourse-bench.mjs answer \
+  --provider openrouter \
+  --questions ./results.json \
+  --models ./data/model-roster.openrouter.sample.json \
+  --out ./runs/session-answers.json \
+  --repeats 3
+```
+
+`--questions` takes the Results screen's **JSON: Questions + Responses**
+download, a plain list of questions, or this benchmark's own bank. Locked
+(gated) questions are skipped. Answers are checked with the same rules as
+people's and MCP agents' (`shared/questions/answerValue.mjs`); a reply that
+fails them is asked again, then kept as unanswered with the reason.
+
+Each question is asked in the ways that expose wording and ordering effects:
+
+- agree/disagree statements also in their reversed wording, when the set has
+  one (this benchmark's bank does; session questions don't);
+- ratings with labelled ends also with the scale flipped, mapped back to the
+  question's own scale;
+- choice and allocation questions with a fresh option order on every repeat,
+  recorded in each row, with allocations mapped back to the question's order.
+
+The command has the same retry, concurrency, checkpoint and `--resume`
+behavior as stance runs; `--seed` fixes the option orders.
+
 ## Generate a Report
 
 ```bash
