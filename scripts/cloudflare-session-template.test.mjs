@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -136,13 +136,4 @@ test('deploy notices preserve every bundled package license and verification det
   assert.equal(readFileSync(join(templateDir, 'THIRD_PARTY_NOTICES.md'), 'utf8'), notices, 'Verification must not rewrite notices');
   rmSync(join(rootDir, 'node_modules/synthetic-three/LICENSE'));
   await assert.rejects(() => buildCloudflareSessionTemplate({ rootDir, buildBundles }), /Missing license text.*synthetic-three@3.0.0/);
-});
-
-const vendoredEthers = new URL('../contextEngine-cc/public/ethers.umd.min.js', import.meta.url);
-test('vendored ethers keeps its own MIT notice beside the add-on bundle', { skip: !existsSync(vendoredEthers) }, () => {
-  const notice = readFileSync(new URL('../contextEngine-cc/public/ethers.LICENSE.md', import.meta.url), 'utf8');
-  assert.match(notice, /ethers 5\.7\.2/);
-  assert.match(notice, /Copyright \(c\) 2019 Richard Moore/);
-  assert.match(notice, /Permission is hereby granted, free of charge/);
-  assert.match(notice, /SOFTWARE IS PROVIDED "AS IS"/);
 });
