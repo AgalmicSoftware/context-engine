@@ -380,7 +380,17 @@ jobs:
       - name: Run Context Engine CC and Node gate
         env:
           CLIENT_LARGE_FILE_BASE_REF: ${{ steps.client-growth-base.outputs.base_sha }}
+          MCP_RELEASE_OUTPUT: ${{ runner.temp }}/mcp-release
         run: npm run ci:gate -- cecc-and-node
+
+      - name: Upload tested MCP package
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mcp-package-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mcp-release
+          if-no-files-found: error
+          retention-days: 30
 
   test:
     name: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'release-staging') && 'release-staging-pr-deduplicated' || 'test' }}

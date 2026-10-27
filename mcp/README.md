@@ -243,12 +243,17 @@ From the repository root, install root and MCP dependencies, then run
 `npm run test:mcp` and `npm run test:mcp:pack`. The pack smoke installs the
 tarball offline into an empty project and checks the executable over stdio.
 
-The package uses the `@agalmic` scope and public access. From `mcp/`, publish
-with `npm publish --access public` using npm 2FA and an account authorized for
-that scope. The `prepack` script builds the standalone bundle and third-party
-license notices.
-Tag the release `contextengine-v<version>` and pin that version in agent host
-configurations. Publishing and tagging are maintainer actions.
+The package uses the `@agalmic` scope and public access. Canonical CI retains
+the exact smoke-tested tarball, its integrity and its complete bundle input
+hashes. Once enabled, `publish-mcp.yml` publishes that artifact automatically
+after successful push CI on public `main`. Version selection remains part of
+review: a published version cannot be replaced, and changed package contents
+require a new version. See [MCP release setup](../docs/mcp-releases.md) for
+account configuration, activation and recovery.
+
+Exact version pins remain available for reproducibility. Hosts that opt into
+updates on restart can use `npx --yes --prefer-online @agalmic/contextengine@latest`;
+an already-running server does not update itself.
 
 Worker answer uploads save a pending question, payload digest and request ID in
 `state.json` before sending. Repeating an identical failed call, including after

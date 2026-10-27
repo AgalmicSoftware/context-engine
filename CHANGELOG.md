@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Add opt-in GitHub-to-npm publication of the exact CI-tested MCP tarball using
+  npm Trusted Publishing, with version, source, integrity and stale-run checks.
+
 - Require explicit `session_login` scope when a service credential exchanges
   into a Session Worker login. Personal user credentials retain login, and an
   exchange is refused if its source expires before the Worker token would.
