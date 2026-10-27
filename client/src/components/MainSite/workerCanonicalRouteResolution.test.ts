@@ -166,6 +166,7 @@ describe('workerCanonicalRouteResolution', () => {
   it.each([
     ['rxc-test', 'https://ce-rxc-test-96862a1dc78f.agalmic.workers.dev'],
     ['rxc-ra-test', 'https://ce-rxc-ra-test-784bb9e31813.agalmic.workers.dev'],
+    ['rxc-ra-test-2', 'https://ce-rxc-ra-test-2-e14873da7c8f.agalmic.workers.dev'],
   ])('bootstraps the %s clean route from bundled discovery', (slug, workerOrigin) => {
     const result = resolveMainSiteSessionRouteForRender({
       sessionTokenRaw: slug,
