@@ -1,7 +1,7 @@
 import React from 'react';
-import { Button, Input } from 'reactstrap';
+import { Button, Input, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCircle, faMicrophone, faPause, faPlay, faSpinner, faStop } from '@fortawesome/free-solid-svg-icons';
+import { faCircle, faMicrophone, faPause, faPlay, faSpinner, faStop, faTrash } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
 import SessionInterviewTranscriptDisclosure from './SessionInterviewTranscriptDisclosure';
 import { formatSessionRecordingElapsed, SessionListeningWaveform } from './SessionListeningPanel';
@@ -63,6 +63,9 @@ type SessionInterviewVoiceControlsProps = {
   onResume: () => void;
   onToggleTranscript: () => void;
   onGenerateDrafts: () => void;
+  // Shown beside the microphone while there's an interview to discard.
+  onDiscard?: () => void;
+  discardDisabled?: boolean;
 };
 
 export function SessionInterviewVoiceControls({
@@ -85,11 +88,39 @@ export function SessionInterviewVoiceControls({
   onResume,
   onToggleTranscript,
   onGenerateDrafts,
+  onDiscard,
+  discardDisabled,
 }: SessionInterviewVoiceControlsProps) {
   return (
     <div className={styles.sessionInterviewActions}>
       {!isRecorderSessionActive ? (
         <div className={styles.sessionInterviewPrimaryAction}>
+          {onDiscard ? (
+            <>
+              <button
+                type="button"
+                id="ce-interview-discard-button"
+                className={styles.sessionInterviewDiscard}
+                data-ce-control-appearance="frameless"
+                onClick={onDiscard}
+                disabled={discardDisabled}
+                aria-label="Discard interview"
+              >
+                <span className={styles.sessionInterviewDiscardCircle} aria-hidden="true">
+                  <FontAwesomeIcon icon={faTrash} />
+                </span>
+              </button>
+              <UncontrolledTooltip
+                target="ce-interview-discard-button"
+                placement="top"
+                trigger="hover focus"
+                autohide={false}
+              >
+                Discard interview: clears the transcript, imported AI drafts and unsaved edits, then closes. Responses
+                you’ve submitted are kept.
+              </UncontrolledTooltip>
+            </>
+          ) : null}
           <Button
             color="link"
             className={styles.sessionInterviewMicrophone}
@@ -110,6 +141,9 @@ export function SessionInterviewVoiceControls({
               transcript={transcript}
               onToggleTranscript={onToggleTranscript}
             />
+          ) : onDiscard ? (
+            // Balances the discard button so the microphone stays centered.
+            <span className={styles.sessionInterviewDiscardBalance} aria-hidden="true" />
           ) : null}
         </div>
       ) : (

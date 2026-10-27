@@ -21,7 +21,7 @@ import {
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
 import { useInterviewOpening } from './useInterviewOpening';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Input, Label, Modal, ModalBody, ModalHeader, ModalFooter } from 'reactstrap';
+import { Button, Input, Label, Modal, ModalBody, ModalHeader } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
@@ -138,8 +138,8 @@ type SessionInterviewPanelProps = SessionInterviewPanelBaseProps & {
   questions: InterviewQuestion[];
   isOpen: boolean;
   onReviewStateChange: (dirty: boolean) => void;
-  // Whether the score screen is showing; the modal keeps its footer so nothing shifts.
-  onScoreScreenChange: (shown: boolean) => void;
+  // Asks the modal to confirm discarding this interview.
+  onRequestDiscard: () => void;
 };
 
 function SessionInterviewPanel({
@@ -177,7 +177,7 @@ function SessionInterviewPanel({
   renderFieldLock,
   onClose,
   onReviewStateChange,
-  onScoreScreenChange,
+  onRequestDiscard,
 }: SessionInterviewPanelProps) {
   const disposedRef = useRef(false);
   const importedRef = useRef(false);
@@ -1035,33 +1035,22 @@ function SessionInterviewPanel({
           (idle && (readiness.state !== 'ready' || interviewOpening.loading))
         ? 'pending'
         : 'ready';
+  const hasUnsavedReview =
+    isInterviewBusy ||
+    mapping ||
+    applying ||
+    (!submitSucceeded &&
+      Boolean(
+        transcript.trim() || drafts.length || prefillPacket || responderContext.trim() || suggestedQuestions.length,
+      ));
   useEffect(() => {
-    onReviewStateChange(
-      isInterviewBusy ||
-        mapping ||
-        applying ||
-        (!submitSucceeded &&
-          Boolean(
-            transcript.trim() || drafts.length || prefillPacket || responderContext.trim() || suggestedQuestions.length,
-          )),
-    );
-  }, [
-    submitSucceeded,
-    isInterviewBusy,
-    mapping,
-    applying,
-    transcript,
-    drafts.length,
-    prefillPacket,
-    responderContext,
-    suggestedQuestions.length,
-    onReviewStateChange,
-  ]);
+    onReviewStateChange(hasUnsavedReview);
+  }, [hasUnsavedReview, onReviewStateChange]);
   const scoreScreenShown = Boolean(submitSucceeded && fidelityScore);
   useEffect(() => {
-    onScoreScreenChange(scoreScreenShown);
-    if (scoreScreenShown) setSubmissionInfoOpen(false); // Settled choices fold away to give the score room.
-  }, [onScoreScreenChange, scoreScreenShown]);
+    // The submission choices are settled; fold them away so the score has the room.
+    if (scoreScreenShown) setSubmissionInfoOpen(false);
+  }, [scoreScreenShown]);
   const hasTranscript = !isInterviewBusy && Boolean(transcript.trim());
   const startLabel = interviewOpening.loading
     ? 'Preparing opening…'
@@ -1155,6 +1144,8 @@ function SessionInterviewPanel({
             onGenerateDrafts={() => {
               void runMapping();
             }}
+            onDiscard={hasUnsavedReview || scoreScreenShown ? onRequestDiscard : undefined}
+            discardDisabled={mapping || applying || isStarting}
           />
 
           {hasTranscript && showTranscript ? (
@@ -1397,7 +1388,6 @@ function SessionInterviewPanel({
 export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps) {
   const { isOpen, mode, onSelectMode, onClose, questionPool = [] } = props;
   const [hasUnsavedReview, setHasUnsavedReview] = useState(false);
-  const [scoreScreenShown, setScoreScreenShown] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [interviewVersion, setInterviewVersion] = useState(0);
   const [discardedPrefill, setDiscardedPrefill] = useState<InterviewPrefillPacket | null>(null);
@@ -1434,15 +1424,8 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
               onClose={requestClose}
               questions={questions}
               onReviewStateChange={setHasUnsavedReview}
-              onScoreScreenChange={setScoreScreenShown}
+              onRequestDiscard={() => setConfirmDiscard(true)}
             />
-            {hasUnsavedReview || scoreScreenShown ? (
-              <ModalFooter>
-                <Button color="link" onClick={() => setConfirmDiscard(true)}>
-                  Discard interview
-                </Button>
-              </ModalFooter>
-            ) : null}
           </>
         ) : (
           <>

@@ -172,7 +172,7 @@ it('counts every hidden draft, scored on the answer given before the reveal', as
   expect(submissionInfo).not.toHaveAttribute('open');
 });
 
-it('keeps the modal height and footer while the score shows, and moves focus to it', async () => {
+it('keeps the modal height and the discard control while the score shows, and moves focus to it', async () => {
   const clientHeight = jest.spyOn(Element.prototype, 'clientHeight', 'get').mockImplementation(function (
     this: Element,
   ) {
@@ -183,7 +183,7 @@ it('keeps the modal height and footer while the score shows, and moves focus to 
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
     submit();
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_FIDELITY_SCORE);
-    // The shorter score keeps the body's height and the modal's footer, so the button doesn't move.
+    // The shorter score keeps the body's height, so the button doesn't move, and can still be discarded.
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PANEL)).toHaveStyle({ minHeight: '600px' });
     expect(screen.getByRole('button', { name: 'Discard interview' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How well your AI knew you' })).toHaveFocus();

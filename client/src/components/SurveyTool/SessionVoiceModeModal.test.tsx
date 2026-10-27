@@ -173,7 +173,14 @@ describe('SessionVoiceModeModal', () => {
     view.rerender(<SessionVoiceModeModal {...props} />);
     await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
     expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Discard interview' }));
+    // Discard sits beside the microphone and explains itself on hover or focus.
+    const discard = screen.getByRole('button', { name: 'Discard interview' });
+    expect(discard.parentElement).toContainElement(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    expect(document.querySelector('.modal-footer')).toBeNull();
+    fireEvent.focus(discard);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Responses you’ve submitted are kept.');
+    fireEvent.blur(discard);
+    fireEvent.click(discard);
     fireEvent.click(await screen.findByRole('button', { name: 'Keep reviewing' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Keep reviewing' })).not.toBeInTheDocument());
     await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');

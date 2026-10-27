@@ -3368,17 +3368,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     color: var(--ce-panel-text);
   }
 
-  // The global link-button color is a border tone, too faint on the footer surface.
-  :global(.modal-footer) :global(.btn-link) {
-    color: var(--ce-panel-text-muted);
-  }
-
-  :global(.modal-footer) :global(.btn-link):hover,
-  :global(.modal-footer) :global(.btn-link):focus-visible {
-    color: var(--ce-panel-text);
-    text-decoration: underline;
-  }
-
   :global(.modal-header) {
     background: var(--ce-surface-sunken) !important;
     color: var(--ce-panel-text) !important;
@@ -3696,6 +3685,51 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   height: 104px;
   border: 2px solid var(--ce-panel-text-muted);
   border-radius: 50%;
+}
+
+// Discard sits left of the microphone, level with its circle, and is quieter than
+// it; it takes the danger tone on hover or focus.
+.sessionInterviewPanel .sessionInterviewDiscard,
+.sessionInterviewDiscardBalance {
+  flex: 0 0 44px;
+  align-self: flex-start;
+  // The microphone's 10px top padding and half its 104px circle, less half of this 44px one.
+  margin-top: 40px;
+}
+
+.sessionInterviewPanel .sessionInterviewDiscard {
+  display: inline-flex;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent !important;
+  color: var(--ce-panel-text-muted) !important;
+  cursor: pointer;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    color: var(--ce-status-danger-text) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+}
+
+.sessionInterviewDiscardCircle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 1rem;
 }
 
 .sessionInterviewPanel .sessionListeningWaveformTimer {

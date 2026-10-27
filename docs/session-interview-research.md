@@ -104,9 +104,9 @@ how many hidden drafts it guessed, and up to three of its most confident
 misses. It is worked out in the browser from the submitted drafts and answers
 (`summarizeParticipantFidelity` in `shared/agentFidelity.mjs`); nothing new is
 stored or sent. Voice drafts restate what the person just said, so they aren't
-scored. The modal keeps its height and footer while the score shows, so the
-button that becomes **View results** stays in place, and folds the AI
-submission info away to give the score room.
+scored. The modal keeps its height while the score shows, so the button that
+becomes **View results** stays in place, and folds the AI submission info away
+to give the score room.
 
 The disclosure panel stays within the interview footer width and wraps its text,
 including long model identifiers and question-set hashes.
@@ -358,8 +358,9 @@ as a change from an empty response. Interview comparison metadata retains exact
 JSON value equality, while the form accepts equivalent numeric strings.
 
 Closing an unsubmitted interview review through its close button, backdrop, or
-Escape asks before discarding the transcript, prefill, and review edits. Choosing
-“Keep reviewing” retains them in memory; no transcript is persisted for reload.
+Escape keeps the transcript, prefill, and review edits in memory; no transcript is
+persisted for reload. The trash button beside the microphone discards them after
+a confirmation, and its tooltip says what is cleared.
 
 Quadratic comment-only responses do not count as invalid allocations. An explicit
 all-zero allocation counts as an allocation; undecrypted or invalid vote vectors
