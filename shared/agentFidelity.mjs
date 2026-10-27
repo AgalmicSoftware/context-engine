@@ -915,6 +915,30 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
 };
 
 /**
+ * Pairs for one person's own review, from the raw predicted and given answers,
+ * ready for summarizeParticipantFidelity. Unreadable answers are left out.
+ */
+export const fidelityPairsFromReview = ({ questions = [], reviewed = [] } = {}) => {
+  const questionMap = mapQuestions(questions);
+  return reviewed
+    .map((entry) => {
+      const question = questionMap.get(lower(entry.questionId));
+      if (!question) return null;
+      const prediction = normalizeFidelityAnswer(question, entry.predicted);
+      const actual = normalizeFidelityAnswer(question, entry.answered);
+      if (prediction === null || actual === null) return null;
+      return {
+        questionId: question.id,
+        condition: entry.condition === 'blind' ? 'blind' : 'shown',
+        prediction,
+        actual,
+        confidence: readDraftConfidence(entry.confidence),
+      };
+    })
+    .filter(Boolean);
+};
+
+/**
  * One person's own result, for showing back to them: the Mirror Score, how
  * many choice predictions matched (also for hidden drafts), and the AI's most
  * confident misses.
@@ -924,6 +948,7 @@ export const summarizeParticipantFidelity = ({ questions = [], pairs = [] } = {}
   if (!scored.length) return null;
   const choices = scored.filter(isChoice);
   const hidden = choices.filter((pair) => pair.condition === 'blind');
+  const hiddenAll = scored.filter((pair) => pair.condition === 'blind');
   return {
     predictions: scored.length,
     mirrorScore: meanSimilarity(scored),
@@ -931,6 +956,9 @@ export const summarizeParticipantFidelity = ({ questions = [], pairs = [] } = {}
     choiceMatches: choices.filter((pair) => pair.match).length,
     hiddenChoicePredictions: hidden.length,
     hiddenChoiceMatches: hidden.filter((pair) => pair.match).length,
+    // Every hidden draft, ratings and allocations included, guessed exactly or not.
+    hiddenPredictions: hiddenAll.length,
+    hiddenMatches: hiddenAll.filter((pair) => pair.match).length,
     meanConfidence: mean(choices.map((pair) => pair.confidence).filter(finite)),
     confidentMisses: choices
       .filter((pair) => !pair.match && pair.confidence !== null)

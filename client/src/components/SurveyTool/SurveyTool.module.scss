@@ -4411,7 +4411,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 0 -18px -18px;
+  // Auto top margin keeps it at the bottom when the panel holds its height for the score.
+  margin: auto -18px -18px;
   padding: 12px 18px;
   border: 1px solid var(--ce-status-info-text);
   border-radius: 10px 10px 0 0;
@@ -4523,7 +4524,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .sessionInterviewReviewActions {
     bottom: -18px;
-    margin: 0 -18px -18px;
+    margin: auto -18px -18px;
     padding: 12px 18px;
     align-items: stretch;
     flex-direction: column;

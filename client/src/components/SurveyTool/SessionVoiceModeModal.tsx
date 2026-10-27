@@ -58,6 +58,8 @@ import {
   pickHiddenInterviewDrafts,
   useInterviewHiddenDrafts,
 } from './sessionInterviewHiddenDrafts';
+import SessionInterviewFidelityScore, { summarizeOwnInterviewFidelity } from './SessionInterviewFidelityScore';
+import type { ParticipantFidelitySummary } from '../../../../shared/agentFidelity.mjs';
 import {
   buildResearchPacket,
   describeResearchCoverage,
@@ -72,6 +74,14 @@ type UnknownRecord = SessionInterviewModalRecord;
 
 // Temporarily disable group suggestions and their background requests together.
 const INTERVIEW_GROUP_SUGGESTIONS_ENABLED = false;
+
+// The scrolling modal body's visible height, less its padding.
+const visibleBodyHeight = (panel: HTMLElement | null) => {
+  const body = panel?.parentElement;
+  if (!body) return 0;
+  const style = getComputedStyle(body);
+  return Math.max(0, body.clientHeight - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0));
+};
 
 type InterviewDraftApplicationProps = InterviewQuestionControls & {
   questionCreatorProps?: React.ComponentProps<typeof SessionInterviewSuggestions>['creatorProps'];
@@ -128,6 +138,8 @@ type SessionInterviewPanelProps = SessionInterviewPanelBaseProps & {
   questions: InterviewQuestion[];
   isOpen: boolean;
   onReviewStateChange: (dirty: boolean) => void;
+  // Whether the score screen is showing; the modal keeps its footer so nothing shifts.
+  onScoreScreenChange: (shown: boolean) => void;
 };
 
 function SessionInterviewPanel({
@@ -165,6 +177,7 @@ function SessionInterviewPanel({
   renderFieldLock,
   onClose,
   onReviewStateChange,
+  onScoreScreenChange,
 }: SessionInterviewPanelProps) {
   const disposedRef = useRef(false);
   const importedRef = useRef(false);
@@ -242,6 +255,13 @@ function SessionInterviewPanel({
   const [promptCopied, setPromptCopied] = useState(false);
   const [contextExpanded, setContextExpanded] = useState(false);
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
+  // After a submit, how well the person's AI predicted them, and the panel height it keeps
+  // so the shorter score doesn't move the footer button.
+  const [fidelityScore, setFidelityScore] = useState<{ summary: ParticipantFidelitySummary; height: number } | null>(
+    null,
+  );
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const showFidelityScore = normalizeInterviewSettings(sessionConfig?.interviewMode).showFidelityScore;
   const [showViewResults, setShowViewResults] = useState(false);
   const [hasRefreshableGroups, setHasRefreshableGroups] = useState(false);
   useEffect(() => {
@@ -803,6 +823,15 @@ function SessionInterviewPanel({
   const applyDrafts = useCallback(async () => {
     // Hidden drafts submit only the person's own answer, with the one given before the reveal.
     const review = prepareHiddenDraftSubmit(selected);
+    const score = showFidelityScore
+      ? summarizeOwnInterviewFidelity({
+          drafts,
+          editedDrafts: review.editedDrafts,
+          selected: review.selected,
+          questions,
+          packet: prefillPacket,
+        })
+      : null;
     await runInterviewDraftSubmit({
       activeSubmitContextToken,
       authenticatedForSubmit,
@@ -839,6 +868,7 @@ function SessionInterviewPanel({
       onRecordProvenance,
       onSubmitResponses,
       onSubmitted: () => {
+        setFidelityScore(score ? { summary: score, height: visibleBodyHeight(panelRef.current) } : null);
         setSubmitSucceeded(true);
         setShowViewResults(false);
         if (viewResultsRevealRef.current) clearTimeout(viewResultsRevealRef.current);
@@ -875,10 +905,12 @@ function SessionInterviewPanel({
     onSubmitResponses,
     prefillPacket,
     prepareHiddenDraftSubmit,
+    questions,
     researchAvailable,
     responderContext,
     responseStateReadyForSubmit,
     selected,
+    showFidelityScore,
     toggleLoginModal,
     transcript,
   ]);
@@ -1025,6 +1057,10 @@ function SessionInterviewPanel({
     suggestedQuestions.length,
     onReviewStateChange,
   ]);
+  const scoreScreenShown = Boolean(submitSucceeded && fidelityScore);
+  useEffect(() => {
+    onScoreScreenChange(scoreScreenShown);
+  }, [onScoreScreenChange, scoreScreenShown]);
   const hasTranscript = !isInterviewBusy && Boolean(transcript.trim());
   const startLabel = interviewOpening.loading
     ? 'Preparing opening…'
@@ -1056,7 +1092,12 @@ function SessionInterviewPanel({
         statusRef={statusRef}
       />
       <ModalBody>
-        <div className={styles.sessionInterviewPanel} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_PANEL}>
+        <div
+          ref={panelRef}
+          className={styles.sessionInterviewPanel}
+          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_PANEL}
+          style={submitSucceeded && fidelityScore?.height ? { minHeight: fidelityScore.height } : undefined}
+        >
           {hasImportedResponderContext ? (
             <ImportedResponderContextEditor
               expanded={contextExpanded}
@@ -1158,7 +1199,9 @@ function SessionInterviewPanel({
               <Button onClick={ownAnswers.retry}>Retry saved answers</Button>
             </div>
           ) : null}
-          {visibleDrafts.length && !isInterviewBusy && !mapping ? (
+          {submitSucceeded && fidelityScore ? (
+            <SessionInterviewFidelityScore summary={fidelityScore.summary} questions={questions} />
+          ) : visibleDrafts.length && !isInterviewBusy && !mapping ? (
             <SessionInterviewReviewSection
               title="Review proposed responses"
               summaryRef={reviewRef}
@@ -1353,6 +1396,7 @@ function SessionInterviewPanel({
 export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps) {
   const { isOpen, mode, onSelectMode, onClose, questionPool = [] } = props;
   const [hasUnsavedReview, setHasUnsavedReview] = useState(false);
+  const [scoreScreenShown, setScoreScreenShown] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [interviewVersion, setInterviewVersion] = useState(0);
   const [discardedPrefill, setDiscardedPrefill] = useState<InterviewPrefillPacket | null>(null);
@@ -1389,8 +1433,9 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
               onClose={requestClose}
               questions={questions}
               onReviewStateChange={setHasUnsavedReview}
+              onScoreScreenChange={setScoreScreenShown}
             />
-            {hasUnsavedReview ? (
+            {hasUnsavedReview || scoreScreenShown ? (
               <ModalFooter>
                 <Button color="link" onClick={() => setConfirmDiscard(true)}>
                   Discard interview

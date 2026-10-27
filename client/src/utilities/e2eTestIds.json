@@ -285,6 +285,7 @@
   "SESSION_INTERVIEW_COPY_AGENT_PROMPT": "ce-session-interview-copy-agent-prompt",
   "SESSION_INTERVIEW_REVIEW": "ce-session-interview-review",
   "SESSION_INTERVIEW_DRAFT": "ce-session-interview-draft",
+  "SESSION_INTERVIEW_FIDELITY_SCORE": "ce-session-interview-fidelity-score",
   "SESSION_INTERVIEW_DRAFT_REMOVE": "ce-session-interview-draft-remove",
   "SESSION_INTERVIEW_DRAFT_CONFIDENCE": "ce-session-interview-draft-confidence",
   "SESSION_INTERVIEW_DRAFT_BASIS_TOGGLE": "ce-session-interview-draft-basis-toggle",

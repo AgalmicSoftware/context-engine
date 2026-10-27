@@ -252,6 +252,11 @@ All notable changes to this project will be documented in this file.
   person keeps the answer unchanged (prompt `ce-interview-brief-v6`), so it can
   be calibrated. v4 and v5 links and catalogs still work; the fidelity report
   calibrates only confidences with this meaning.
+- Show participants a private score after they submit AI-prefill drafts
+  (`interviewMode.showFidelityScore`, which needs a Session Worker newer than
+  0.7.0): how many answers their AI matched, its Mirror Score, its hidden-draft
+  guesses and most confident misses, worked out in the browser. The footer
+  button stays in place.
 
 ## [0.7.0] - 2026-10-21
 

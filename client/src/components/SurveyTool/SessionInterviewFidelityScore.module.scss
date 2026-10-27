@@ -1,0 +1,40 @@
+// Laid out like a review card, so the score reads as part of the same review.
+.score {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: 14px;
+  background: var(--ce-card-bg);
+  box-shadow: var(--ce-card-shadow);
+  color: var(--ce-panel-text);
+  line-height: 1.45;
+
+  p {
+    margin: 0;
+  }
+}
+
+.title {
+  margin: 0;
+  color: var(--ce-panel-text);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+// Focus lands here so the score is announced; the heading itself isn't a control.
+.title:focus {
+  outline: none;
+}
+
+.misses {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.privacy {
+  color: color-mix(in srgb, var(--ce-panel-text) 78%, transparent);
+  font-size: 0.9rem;
+}

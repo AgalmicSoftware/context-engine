@@ -10,6 +10,7 @@ export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   shareDraftChangesByDefault: false,
   researchDetail: 'minimal',
   hiddenDraftShare: 0,
+  showFidelityScore: false,
 });
 // At most half of a person's AI drafts can be hidden, so most stay useful to them.
 const MAX_HIDDEN_DRAFT_SHARE = 0.5;
@@ -37,6 +38,8 @@ export const normalizeInterviewSettings = (value = {}) => {
     hiddenDraftShare: Number.isFinite(source.hiddenDraftShare)
       ? Math.max(0, Math.min(MAX_HIDDEN_DRAFT_SHARE, source.hiddenDraftShare))
       : 0,
+    // After submitting, show the person how well their AI predicted them (private, in the browser).
+    showFidelityScore: source.showFidelityScore === true,
   };
 };
 export const validInterviewSettings = (value = {}) => {
@@ -67,7 +70,14 @@ export const validInterviewSettings = (value = {}) => {
       value.hiddenDraftShare > MAX_HIDDEN_DRAFT_SHARE)
   )
     return false;
-  return ['autoRegenerate', 'followNewQuestions', 'suggestQuestions', 'allowManualRefresh', 'shareDraftChangesByDefault'].every(
+  return [
+    'autoRegenerate',
+    'followNewQuestions',
+    'suggestQuestions',
+    'allowManualRefresh',
+    'shareDraftChangesByDefault',
+    'showFidelityScore',
+  ].every(
     (key) => value[key] === undefined || typeof value[key] === 'boolean',
   );
 };

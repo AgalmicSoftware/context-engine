@@ -782,6 +782,7 @@ test('set-config preserves owner opening and optional interview features', () =>
     shareDraftChangesByDefault: true,
     researchDetail: 'full',
     hiddenDraftShare: 0.2,
+    showFidelityScore: true,
   };
   const result = applySessionConfigMutation({
     existingConfig: cloneJson(profileBearingConfig),

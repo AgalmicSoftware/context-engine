@@ -117,7 +117,9 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
         value={settings.steeringPrompt}
         onChange={(e) => change('steeringPrompt', e.target.value)}
       />
-      {(['autoRegenerate', 'followNewQuestions', 'suggestQuestions', 'allowManualRefresh'] as const).map((key) => (
+      {(
+        ['autoRegenerate', 'followNewQuestions', 'suggestQuestions', 'allowManualRefresh', 'showFidelityScore'] as const
+      ).map((key) => (
         <Label key={key} style={{ display: 'block', marginTop: 12 }}>
           <input
             type="checkbox"
@@ -131,6 +133,7 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
               followNewQuestions: 'Check for new session questions during interviews',
               suggestQuestions: 'Suggest new question drafts from interview evidence',
               allowManualRefresh: 'Allow admins to regenerate the opening',
+              showFidelityScore: 'Show participants how well their AI predicted them',
             }[key]
           }
         </Label>

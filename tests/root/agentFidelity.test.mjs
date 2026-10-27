@@ -9,6 +9,7 @@ import {
   normalizeFidelityAnswer,
   normalizeFidelityQuestion,
   scoreAgentFidelity,
+  fidelityPairsFromReview,
   summarizeParticipantFidelity,
 } from '../../shared/agentFidelity.mjs';
 
@@ -480,8 +481,32 @@ test('a participant summary lists the most confident misses first', () => {
   assert.equal(summary.choicePredictions, 3);
   assert.equal(summary.choiceMatches, 1);
   assert.equal(summary.hiddenChoicePredictions, 1);
+  assert.equal(summary.hiddenPredictions, 1);
+  assert.equal(summary.hiddenMatches, 0);
   assert.deepEqual(summary.confidentMisses.map((miss) => miss.questionId), ['qb3', 'qb2'], 'a near-miss rating is not a miss');
   assert.equal(summarizeParticipantFidelity({ questions, pairs: [] }), null);
+});
+
+test("a person's own review becomes pairs from raw drafts and answers", () => {
+  const pairs = fidelityPairsFromReview({
+    questions,
+    reviewed: [
+      { questionId: 'QB1', predicted: 'Agree', answered: 'agree', confidence: 0.9 },
+      { questionId: 'qs', predicted: 'B', answered: ['B'], confidence: 0.6, condition: 'blind' },
+      { questionId: 'qr', predicted: 7, answered: '7', confidence: 80 },
+      { questionId: 'qb2', predicted: 'Maybe', answered: 'Agree', confidence: 0.5 },
+      { questionId: 'missing', predicted: 'Agree', answered: 'Agree', confidence: 0.5 },
+    ],
+  });
+  assert.deepEqual(pairs, [
+    { questionId: 'qb1', condition: 'shown', prediction: 'Agree', actual: 'Agree', confidence: 0.9 },
+    { questionId: 'qs', condition: 'blind', prediction: ['B'], actual: ['B'], confidence: 0.6 },
+    { questionId: 'qr', condition: 'shown', prediction: 7, actual: 7, confidence: 0.8 },
+  ]);
+  const summary = summarizeParticipantFidelity({ questions, pairs });
+  assert.equal(summary.choiceMatches, 2);
+  assert.equal(summary.hiddenChoiceMatches, 1);
+  assert.deepEqual([summary.hiddenPredictions, summary.hiddenMatches], [1, 1]);
 });
 
 test('minimal freeform predictions are counted as unscored, not unreadable', () => {

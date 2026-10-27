@@ -85,6 +85,8 @@ test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings({ hiddenDraftShare: 0.2 }).hiddenDraftShare, 0.2);
   assert.equal(normalizeInterviewSettings({ hiddenDraftShare: 0.9 }).hiddenDraftShare, 0.5);
   assert.equal(normalizeInterviewSettings({ hiddenDraftShare: '0.2' }).hiddenDraftShare, 0);
+  assert.equal(normalizeInterviewSettings().showFidelityScore, false);
+  assert.equal(normalizeInterviewSettings({ showFidelityScore: true }).showFidelityScore, true);
   assert.equal(normalizeInterviewSettings().steeringPrompt, '');
   assert.equal(normalizeInterviewSettings({ steeringPrompt: '  Guide the interview.  ' }).steeringPrompt, 'Guide the interview.');
   assert.equal(
@@ -101,6 +103,7 @@ test('defaults are stable and settings reject invalid values', () => {
     { hiddenDraftShare: 0.6 },
     { hiddenDraftShare: -0.1 },
     { hiddenDraftShare: '0.2' },
+    { showFidelityScore: 'true' },
     { questionGrowthPercent: 0 },
     { steeringPrompt: 42 },
     { steeringPrompt: 'x'.repeat(3001) },

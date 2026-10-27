@@ -86,3 +86,12 @@ it('edits the share of hidden AI drafts, defaulting to off', () => {
   rerender(<InterviewSettingsFields value={{ hiddenDraftShare: 0.3 }} onChange={onChange} />);
   expect(screen.getByLabelText(label)).toHaveDisplayValue('30%');
 });
+
+it('turns on the private fidelity score, off by default', () => {
+  const onChange = jest.fn();
+  render(<InterviewSettingsFields value={{}} onChange={onChange} />);
+  const box = screen.getByLabelText('Show participants how well their AI predicted them');
+  expect(box).not.toBeChecked();
+  fireEvent.click(box);
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ showFidelityScore: true }));
+});

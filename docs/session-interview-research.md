@@ -95,6 +95,18 @@ hidden.
   the voice interviewer and the drafting request see. If a saved answer for
   its question loads after review starts, it becomes an ordinary draft.
 
+### Score screen
+
+With `interviewMode.showFidelityScore` (off by default), a successful submit
+that included the person's own AI-prefill drafts replaces the review list with
+a private score: how many choice answers their AI matched, its Mirror Score,
+how many hidden drafts it guessed, and up to three of its most confident
+misses. It is worked out in the browser from the submitted drafts and answers
+(`summarizeParticipantFidelity` in `shared/agentFidelity.mjs`); nothing new is
+stored or sent. Voice drafts restate what the person just said, so they aren't
+scored. The modal keeps its height and footer while the score shows, so the
+button that becomes **View results** stays in place.
+
 The disclosure panel stays within the interview footer width and wraps its text,
 including long model identifiers and question-set hashes.
 

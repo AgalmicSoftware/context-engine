@@ -133,6 +133,14 @@ This writes `agent-fidelity-report.json` and `agent-fidelity-report.md`.
 | `--bootstrap`, `--seed`, `--min-participants` | Interval samples, random seed, smallest reported cell. |
 | `--include-agents` | Keep self-declared agent participants. |
 
+## What participants see
+
+When a session turns on `interviewMode.showFidelityScore`, each person sees
+their own result after submitting AI-prefill drafts: matches on choice
+questions, the Mirror Score, hidden-draft guesses and the most confident
+misses. It's computed in their browser and never stored; see
+[session-interview-research.md](session-interview-research.md#score-screen).
+
 ## Fix the plan before looking
 
 Write down the primary measure, exclusions and minimum cell size before
