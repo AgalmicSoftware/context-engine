@@ -122,6 +122,11 @@ All notable changes to this project will be documented in this file.
   storage, and retain valid bookmark lists when another list is missing.
 - Require browser checks for hosted publication, reload, Results, permissions,
   partial-submit retry and concurrent two-tab bookmarks in CI.
+- Offer the ChatGPT or Claude prefill prompt from the voice chooser, in a
+  **Let your AI draft your answers** card below Interview and Group
+  Conversation, instead of inside the interview. `?mode=voice` opens the
+  chooser. Prefill links still open the interview on their drafts, now with a
+  status line and a **Talk through your drafts** microphone.
 - Open the interview's AI submission choices inside their dropdown instead of
   over the drafts, with every sharing choice listed before the prefill metadata.
   The metadata no longer repeats what an unticked box leaves out, and is hidden

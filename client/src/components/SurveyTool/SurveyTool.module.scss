@@ -3436,6 +3436,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+.sessionVoiceModeLauncher {
+  display: grid;
+  gap: 12px;
+}
+
 .sessionVoiceModeChooser {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3491,11 +3496,55 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+// The AI-prefill option below the voice choices; the prompt card inside it drops its own frame.
+.sessionVoicePrefill {
+  display: grid;
+  gap: 8px;
+  padding: clamp(14px, 3vw, 20px);
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-card-bg);
+  box-shadow: var(--ce-card-shadow);
+  color: var(--ce-panel-text);
+  // Matches the voice choices above it rather than the dialog's mono titles.
+  font-family: var(--ce-font-body);
+
+  h3 {
+    margin: 0;
+    color: var(--ce-panel-text);
+    font-family: inherit;
+    font-size: clamp(1.05rem, 2.6vw, 1.25rem);
+    font-weight: 800;
+    line-height: 1.25;
+  }
+
+  > p {
+    margin: 0;
+    color: var(--ce-panel-text-muted);
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .sessionAgentKickoff {
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+  }
+}
+
 .sessionInterviewPanel {
   display: flex;
   flex-direction: column;
   gap: 14px;
   color: var(--ce-panel-text);
+}
+
+.sessionInterviewPrefillStatus {
+  margin: 0;
+  color: var(--ce-panel-text-muted);
+  font-size: 0.9rem;
+  text-align: center;
 }
 
 .sessionInterviewContext {

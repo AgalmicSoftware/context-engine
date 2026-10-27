@@ -17,6 +17,8 @@ export { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtime
 
 export const INTERVIEW_MODE_QUERY_VALUE = 'interview';
 export const GROUP_CONVERSATION_MODE_QUERY_VALUE = 'recordGroup';
+// Opens the voice modal on its chooser, with no mode picked yet.
+export const VOICE_CHOOSER_QUERY_VALUE = 'voice';
 export const INTERVIEW_PREFILL_FRAGMENT_KEY = 'prefill';
 // v6 asks for confidence as the chance the person keeps the answer, so it can be calibrated.
 export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v6';
@@ -245,17 +247,25 @@ const normalizeDraftCandidates = (
     }, []);
 };
 
-export const resolveSessionVoiceMode = (search: unknown): SessionVoiceMode | null => {
+const readModeQuery = (search: unknown): string | null => {
   try {
     const raw = toTrimmedString(search);
-    const mode = new URLSearchParams(raw.startsWith('?') ? raw : `?${raw}`).get('mode');
-    if (mode === INTERVIEW_MODE_QUERY_VALUE) return 'interview';
-    if (mode === GROUP_CONVERSATION_MODE_QUERY_VALUE) return 'recordGroup';
-    return null;
+    return new URLSearchParams(raw.startsWith('?') ? raw : `?${raw}`).get('mode');
   } catch {
     return null;
   }
 };
+
+export const resolveSessionVoiceMode = (search: unknown): SessionVoiceMode | null => {
+  const mode = readModeQuery(search);
+  if (mode === INTERVIEW_MODE_QUERY_VALUE) return 'interview';
+  if (mode === GROUP_CONVERSATION_MODE_QUERY_VALUE) return 'recordGroup';
+  return null;
+};
+
+/** Whether a link asks for the voice chooser (`?mode=voice`). */
+export const opensSessionVoiceChooser = (search: unknown): boolean =>
+  readModeQuery(search) === VOICE_CHOOSER_QUERY_VALUE;
 
 export const buildSessionVoiceModeSearch = (search: unknown, mode: SessionVoiceMode | null): string => {
   const raw = toTrimmedString(search);
@@ -263,7 +273,8 @@ export const buildSessionVoiceModeSearch = (search: unknown, mode: SessionVoiceM
   if (mode) params.set('mode', mode);
   else if (
     params.get('mode') === INTERVIEW_MODE_QUERY_VALUE ||
-    params.get('mode') === GROUP_CONVERSATION_MODE_QUERY_VALUE
+    params.get('mode') === GROUP_CONVERSATION_MODE_QUERY_VALUE ||
+    params.get('mode') === VOICE_CHOOSER_QUERY_VALUE
   ) {
     params.delete('mode');
   }

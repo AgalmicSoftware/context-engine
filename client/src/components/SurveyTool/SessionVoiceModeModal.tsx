@@ -1,6 +1,5 @@
 import { resolveConsentFlags, summarizeConsentChoice, type InterviewConsentOverrides } from './sessionInterviewConsent';
 import { useInterviewSavedAnswers, type InterviewSavedAnswerLoader } from './useInterviewSavedAnswers';
-import { verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { getSessionAiSettings } from '../../utilities/ai/aiSettings';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
@@ -12,8 +11,8 @@ import SessionInterviewRecommendedGroups from './SessionInterviewRecommendedGrou
 import SessionInterviewReviewSection from './SessionInterviewReviewSection';
 import SessionInterviewModalHeader from './SessionInterviewModalHeader';
 import SessionInterviewResearchConsent from './SessionInterviewResearchConsent';
-import SessionInterviewMemoryKickoffCard from './SessionInterviewMemoryKickoffCard';
 import SessionVoiceModeChooser from './SessionVoiceModeChooser';
+import SessionVoicePrefillCard from './SessionVoicePrefillCard';
 import {
   useSessionInterviewGroupRecommendations,
   type SessionInterviewGroupRecommendationRequest,
@@ -33,7 +32,6 @@ import { buildInterviewReturnSessionUrl } from './sessionInterviewReturnUrl';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { getAnonymousRateId } from '../../utilities/worker/workerAuthAnonymousHeaders.js';
 import {
-  buildExternalInterviewKickoff,
   buildRealtimeInterviewInstructions,
   mapInterviewEvidenceToResponses,
   normalizeInterviewQuestions,
@@ -62,6 +60,7 @@ import SessionInterviewFidelityScore, { summarizeOwnInterviewFidelity } from './
 import type { ParticipantFidelitySummary } from '../../../../shared/agentFidelity.mjs';
 import {
   buildResearchPacket,
+  describeInterviewPlatform,
   describeResearchCoverage,
   displayResponderContext,
   hasDraftValue,
@@ -186,7 +185,6 @@ function SessionInterviewPanel({
   const validatedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
   // The question set a prefill link was last checked against.
   const checkedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
-  const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewResultsRevealRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
   const readiness = useInterviewReadiness(resolvedWorkerUrl, sessionSlug);
@@ -250,9 +248,9 @@ function SessionInterviewPanel({
   useEffect(() => {
     if (sessionResearchDetail === 'minimal') setShownResearchDetail('minimal');
   }, [sessionResearchDetail]);
-  const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
-  const [promptCopied, setPromptCopied] = useState(false);
+  // How many answers an imported AI prefill drafted, for its status line.
+  const [prefillDraftCount, setPrefillDraftCount] = useState(0);
   const [contextExpanded, setContextExpanded] = useState(false);
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
   // After a submit, how well the person's AI predicted them, and the panel height it keeps
@@ -273,7 +271,6 @@ function SessionInterviewPanel({
     return () => {
       disposedRef.current = true;
       catalogAbortRef.current?.abort();
-      if (copyResetRef.current) clearTimeout(copyResetRef.current);
       if (viewResultsRevealRef.current) clearTimeout(viewResultsRevealRef.current);
     };
   }, []);
@@ -641,6 +638,7 @@ function SessionInterviewPanel({
         setDrafts(review.drafts);
         setEditedDrafts(review.edited);
         setSelected(review.selected);
+        if (importedDrafts) setPrefillDraftCount(importedDrafts.length);
         if (review.drafts.length) {
           // Chosen once per review, and only while research sharing is on.
           const share = normalizeInterviewSettings(sessionConfig?.interviewMode).hiddenDraftShare;
@@ -945,19 +943,6 @@ function SessionInterviewPanel({
     reviewSavedConflicts,
   ]);
 
-  const copyAgentPrompt = async () => {
-    setPromptCopied(false);
-    if (!kickoff || !navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
-    await navigator.clipboard.writeText(kickoff);
-    setPromptCopied(true);
-    if (copyResetRef.current) clearTimeout(copyResetRef.current);
-    copyResetRef.current = setTimeout(() => setPromptCopied(false), 1800);
-  };
-
-  const sessionUrl = buildInterviewReturnSessionUrl();
-  const kickoff = resolvedWorkerUrl
-    ? buildExternalInterviewKickoff({ workerUrl: resolvedWorkerUrl, sessionSlug, sessionUrl })
-    : '';
   const importedContext = prefillPacket?.responderContext;
   const importedResponderName = String(importedContext?.name || '').trim();
   const displayedResponderNames =
@@ -990,11 +975,6 @@ function SessionInterviewPanel({
   const researchCoverage = prefillPacket?.source?.researchCoverage;
   const researchCoverageDetails = describeResearchCoverage(researchCoverage);
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
-  const hasImportedExternalPrefill = Boolean(
-    prefillPacket &&
-    Array.isArray(prefillPacket.responses) &&
-    ['claude', 'chatgpt'].includes(String(prefillPacket.source?.platform || '').toLowerCase()),
-  );
   const canManuallyRefreshGroupRecommendations = hasRefreshableGroups && drafts.length > 0;
 
   const guidance = isPaused
@@ -1052,13 +1032,18 @@ function SessionInterviewPanel({
     if (scoreScreenShown) setSubmissionInfoOpen(false);
   }, [scoreScreenShown]);
   const hasTranscript = !isInterviewBusy && Boolean(transcript.trim());
+  // A prefill link goes straight to its drafts; the interview then talks them through.
+  const showPrefillStatus = hasAiPrefill && prefillDraftCount > 0;
+  const prefillPlatform = prefillPacket?.source.platform;
   const startLabel = interviewOpening.loading
     ? 'Preparing opening…'
     : isStarting
       ? 'Connecting…'
       : transcript.trim()
         ? 'Continue interview'
-        : 'Start voice interview';
+        : showPrefillStatus
+          ? 'Talk through your drafts'
+          : 'Start voice interview';
   const canGenerateDrafts = Boolean(
     !isInterviewBusy &&
     !mapping &&
@@ -1172,17 +1157,16 @@ function SessionInterviewPanel({
             </div>
           ) : null}
 
-          {kickoff && !hasImportedExternalPrefill ? (
-            <SessionInterviewMemoryKickoffCard
-              kickoff={kickoff}
-              validateKickoff={() =>
-                verifyInterviewKickoffCatalog({ workerUrl: resolvedWorkerUrl, sessionSlug, sessionUrl })
-              }
-              promptCopied={promptCopied}
-              showAgentPrompt={showAgentPrompt}
-              onCopyPrompt={copyAgentPrompt}
-              onTogglePrompt={() => setShowAgentPrompt((current) => !current)}
-            />
+          {showPrefillStatus ? (
+            <p
+              className={styles.sessionInterviewPrefillStatus}
+              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS}
+            >
+              Your AI drafted {prefillDraftCount} {prefillDraftCount === 1 ? 'answer' : 'answers'}
+              {prefillPlatform && prefillPlatform !== 'other'
+                ? ` · ${describeInterviewPlatform(prefillPlatform)}, self-reported`
+                : ''}
+            </p>
           ) : null}
 
           {ownAnswers.error ? (
@@ -1434,7 +1418,14 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
             </ModalHeader>
             <ModalBody>
               {!mode ? (
-                <SessionVoiceModeChooser onSelectMode={onSelectMode} />
+                <SessionVoiceModeChooser onSelectMode={onSelectMode}>
+                  <SessionVoicePrefillCard
+                    sessionSlug={props.sessionSlug}
+                    sessionConfig={props.sessionConfig}
+                    context={props.context}
+                    workerUrl={props.workerUrl}
+                  />
+                </SessionVoiceModeChooser>
               ) : (
                 <SessionListeningPanel {...props} panelMode="recordGroup" embeddedInModal onClose={onClose} />
               )}

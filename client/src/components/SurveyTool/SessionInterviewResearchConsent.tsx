@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { INTERVIEW_PROMPT_VERSION, type InterviewPrefillPacket } from './sessionInterview';
+import { describeInterviewPlatform } from './sessionInterviewModalState';
 import styles from './SessionInterviewResearchConsent.module.scss';
 
 const RESEARCH_DOC_URL =
@@ -50,7 +51,7 @@ export default function SessionInterviewResearchConsent({
 }: Props) {
   const minimal = researchDetail === 'minimal';
   const model = packet.source.modelId || 'Unknown model';
-  const platform = { chatgpt: 'ChatGPT', claude: 'Claude', other: 'Other' }[packet.source.platform];
+  const platform = describeInterviewPlatform(packet.source.platform);
   return (
     <>
       <div className={styles.optionGroup}>

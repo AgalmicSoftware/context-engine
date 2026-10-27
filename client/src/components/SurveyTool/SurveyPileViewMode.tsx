@@ -119,6 +119,7 @@ import {
   hasInterviewPrefillHash,
   INTERVIEW_PROMPT_VERSION,
   isInterviewFeatureEnabled,
+  opensSessionVoiceChooser,
   readInterviewPrefillFromHash,
   resolveRealtimeInterviewSource,
   resolveSessionVoiceMode,
@@ -238,6 +239,8 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
   const interviewEnabled = isInterviewFeatureEnabled(props.sessionConfig);
   const initialVoiceMode =
     interviewEnabled && typeof window !== 'undefined' ? resolveSessionVoiceMode(window.location.search || '') : null;
+  const opensVoiceChooser =
+    interviewEnabled && typeof window !== 'undefined' && opensSessionVoiceChooser(window.location.search || '');
   let initialPrefillPacket: InterviewPrefillPacket | null = null;
   let initialInterviewPrefillError = '';
   if (interviewEnabled && typeof window !== 'undefined') {
@@ -290,7 +293,7 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
     showHologramAssistant: false,
     showListeningPanel:
       typeof window !== 'undefined' ? isListeningModeQueryEnabled(window.location.search || '') : false,
-    showVoiceModeModal: !!(initialVoiceMode || initialPrefillPacket),
+    showVoiceModeModal: !!(initialVoiceMode || initialPrefillPacket || opensVoiceChooser),
     sessionVoiceMode: initialPrefillPacket ? 'interview' : initialVoiceMode,
     interviewPrefillPacket: initialPrefillPacket,
     interviewPrefillError: initialInterviewPrefillError,

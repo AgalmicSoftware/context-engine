@@ -1205,7 +1205,7 @@ describe('SessionVoiceModeModal', () => {
     ).toBe(true);
   });
 
-  it('offers the two large requested voice-mode choices', () => {
+  it('offers the two large requested voice-mode choices, with the AI-prefill option below them', () => {
     render(<SessionVoiceModeModal {...baseProps} />);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW)).toHaveTextContent(
       'Talk with an AI interviewer to answer the session’s questions, then review your responses.',
@@ -1213,6 +1213,14 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP)).toHaveTextContent(
       'Record a group discussion and generate questions and context from it.',
     );
+    const prefill = screen.getByRole('region', { name: 'Let your AI draft your answers' });
+    expect(prefill).toHaveAttribute('data-testid', E2E_TESTIDS.SESSION_VOICE_PREFILL);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER)).not.toContainElement(prefill);
+    expect(
+      screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP).compareDocumentPosition(prefill) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(prefill).getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW));
     expect(baseProps.onSelectMode).toHaveBeenCalledWith('interview');
@@ -1220,6 +1228,13 @@ describe('SessionVoiceModeModal', () => {
     expect(baseProps.onSelectMode).toHaveBeenCalledWith('recordGroup');
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(baseProps.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the AI-prefill prompt out of the interview itself', () => {
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).not.toBeInTheDocument();
   });
 
   it('opens Group Conversation directly as an embedded recorder', () => {
@@ -1307,7 +1322,7 @@ describe('SessionVoiceModeModal', () => {
         }),
     );
     try {
-      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      render(<SessionVoiceModeModal {...baseProps} />);
       expect(fetchMock).toHaveBeenCalled();
       expect(screen.getByText('Checking session compatibility…')).toBeInTheDocument();
       const copy = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
@@ -1356,7 +1371,7 @@ describe('SessionVoiceModeModal', () => {
       jest.mocked(navigator.clipboard.writeText).mockRejectedValue(new Error('NotAllowedError'));
     else Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
     try {
-      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      render(<SessionVoiceModeModal {...baseProps} />);
       await act(async () => {});
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
       expect(await screen.findByRole('alert')).toHaveTextContent('Copy the prompt below by hand');
@@ -1378,7 +1393,7 @@ describe('SessionVoiceModeModal', () => {
       }),
     } as Response);
     try {
-      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      render(<SessionVoiceModeModal {...baseProps} />);
       await act(async () => {});
       await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)));
       expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
@@ -1404,7 +1419,7 @@ describe('SessionVoiceModeModal', () => {
       .spyOn(globalThis, 'fetch')
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce(catalog('demo'));
-    const view = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    const view = render(<SessionVoiceModeModal {...baseProps} />);
     const retry = await screen.findByRole('button', { name: 'Retry' });
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
     expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
@@ -1425,7 +1440,7 @@ describe('SessionVoiceModeModal', () => {
           resolveCatalog = resolve;
         }),
     );
-    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" sessionSlug="next" />);
+    view.rerender(<SessionVoiceModeModal {...baseProps} sessionSlug="next" />);
     expect(screen.getByText('Checking session compatibility…')).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
@@ -1446,11 +1461,10 @@ describe('SessionVoiceModeModal', () => {
         prefillPromptVersion: 'ce-interview-brief-v4',
       }),
     } as Response);
-    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    render(<SessionVoiceModeModal {...baseProps} />);
 
     expect(screen.queryByText(/A realtime voice interviewer will cover/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT)).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Ready');
     expect(screen.getByRole('button', { name: 'Copy memory augmentation prompt' })).toBeInTheDocument();
     const promptToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE);
     expect(promptToggle).toHaveAccessibleName('Prompt');
@@ -1460,9 +1474,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     const copyButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
     expect(copyButton).toHaveAccessibleName('Copy memory augmentation prompt');
-    expect(copyButton).toHaveTextContent(
-      'Copy and paste this prompt into ChatGPT or Claude to augment your interview and draft responses.',
-    );
+    expect(copyButton).toHaveTextContent('Copy and paste this prompt into ChatGPT or Claude.');
     expect(copyButton).toHaveTextContent('Copy');
     expect(screen.queryByText('Copy prompt')).not.toBeInTheDocument();
 
@@ -1550,7 +1562,7 @@ describe('SessionVoiceModeModal', () => {
         '',
         '/session/demo?src=partner launch&joinGroup=EDDY-2026&agentToken=private#prefill=hidden',
       );
-      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      render(<SessionVoiceModeModal {...baseProps} />);
 
       await act(async () => {});
       await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)));
@@ -1644,9 +1656,7 @@ describe('SessionVoiceModeModal', () => {
     });
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE);
     const startControl = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
-    const copyPromptButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
     expect(startControl.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(toggle.compareDocumentPosition(copyPromptButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeChecked();
@@ -1662,7 +1672,6 @@ describe('SessionVoiceModeModal', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     const transcriptContent = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT);
     expect(transcriptContent).toHaveTextContent('Responder: Reversible decisions matter.');
-    expect(transcriptContent.compareDocumentPosition(copyPromptButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await waitFor(() =>
       expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledWith(
         expect.objectContaining({ transcript: 'Responder: Reversible decisions matter.' }),
@@ -2097,6 +2106,12 @@ describe('SessionVoiceModeModal', () => {
     render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
 
     await expectReadableDraftText('Draft answer for What matters?', 'Predicted answer from memory');
+    // A prefill link opens on its drafts, with a status line, and the interview talks them through.
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
+      'Your AI drafted 1 answer · Claude, self-reported',
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Talk through your drafts');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeEnabled();
     await editReadableDraftText('Draft answer for What matters?', 'Reviewed correction before speaking');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
 
@@ -2110,6 +2125,22 @@ describe('SessionVoiceModeModal', () => {
     expect(instructions).toContain('Related prior signal.');
     expect(instructions).not.toContain('Unknown question answer');
     expect(instructions).not.toContain('claude-example');
+  });
+
+  it('notes how many answers any AI prefill drafted, naming only a known platform', async () => {
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      source: { platform: 'other' as const, modelId: 'other-model', verification: 'self_reported' as const },
+      responderContext: {},
+      responses: [{ questionId: 'q1', answer: 'Drafted by another AI', confidence: 0.5 }],
+    };
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
+    await expectReadableDraftText('Draft answer for What matters?', 'Drafted by another AI');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
+      /^Your AI drafted 1 answer$/,
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Talk through your drafts');
   });
 
   it('sends only the reviewed responder context to the interviewer and the draft mapper', async () => {

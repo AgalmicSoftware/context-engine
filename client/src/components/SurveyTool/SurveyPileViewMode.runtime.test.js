@@ -637,6 +637,15 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
   });
 
+  it('opens the voice chooser from ?mode=voice and swaps in the picked mode', async () => {
+    renderDemoPile({}, { route: '/session/demo?foo=1&mode=voice' });
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
+    await act(async () => mockVoiceModeProps.onSelectMode('interview'));
+    expect(window.location.search).toBe('?foo=1&mode=interview');
+    await act(async () => mockVoiceModeProps.onClose());
+    expect(window.location.search).toBe('?foo=1');
+  });
+
   it('opens interview and group conversation directly from their mode query values', async () => {
     const first = renderDemoPile({}, { route: '/session/demo?foo=1&mode=interview' });
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');

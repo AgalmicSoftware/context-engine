@@ -8,13 +8,17 @@ The microphone on `/session/<slug>` opens a modal with two participant workflows
 The session links are:
 
 ```text
+/session/<slug>?mode=voice
 /session/<slug>?mode=interview
 /session/<slug>?mode=recordGroup
 ```
 
-The direct links open the selected modal panel. Clicking the microphone without
-a mode query opens the two-choice launcher. Its cards sit side by side with
-centered icons; the header close button dismisses it without a separate footer.
+The direct links open the selected modal panel; `?mode=voice` opens the
+launcher, as does clicking the microphone without a mode query. The launcher's
+two choices sit side by side with centered icons. Below them, a bordered **Let
+your AI draft your answers** card holds the ChatGPT or Claude prefill prompt
+(see below). The header close button dismisses the launcher without a separate
+footer. Picking a choice replaces `?mode=voice` with its own mode.
 The older
 `?mode=listening` link remains supported and opens the original pile-adjacent
 group recorder.
@@ -61,8 +65,6 @@ indicates an error or missing setup. Older Workers show **Not checked** rather
 than green. Click the idle pill to retry the check. Status changes are also
 announced to screen readers. The adjacent question-mark tooltip explains the
 current phase. A large circular microphone control starts or continues the interview.
-The augmentation prompt displays paragraphs and bold key points for readability;
-its Copy button copies the original plain text without formatting.
 
 Listening requires a connected peer, an open data
 channel, a started voice session, and a live enabled microphone. Connecting
@@ -235,11 +237,12 @@ failed check offers Retry. Copy starts directly from the tap, including on
 Safari. If clipboard access fails or is unavailable, the page shows an error
 and reveals the prompt for manual copying.
 
-Interview mode displays a **Copy and paste this prompt (into Claude or ChatGPT)
-to augment interview** footer card beneath the microphone when the interview has
-not already been opened from a ChatGPT or Claude prefill packet. Clicking its
-heading or enlarged top-right clipboard copies the request without opening the
-preview. The **Prompt** dropdown inside the card expands the instruction and
+The voice launcher's **Let your AI draft your answers** card, below the
+Interview and Group Conversation choices, offers the prompt without expanding
+anything; the interview itself no longer shows it. Clicking its **Copy** line
+copies the request without opening the preview. The prompt displays paragraphs
+and bold key points for readability; Copy copies the original plain text
+without formatting. The **Prompt** dropdown inside the card expands the instruction and
 collapses it again; the preview starts collapsed and remains collapsed after a
 successful copy. A question-mark tooltip to the left of **Prompt** explains:
 “Allows your agent to predict your responses and raise better interview questions.”
@@ -338,6 +341,9 @@ history, and validates the AI-authored response drafts against the current
 questions and listed options. Current direct responses are not re-authored by a
 different mapping model, so their source attribution and confidence remain
 faithful to the external AI. Every proposed answer remains a local review draft.
+A prefill link opens the interview on its drafts with one status line, such as
+“Your AI drafted 6 answers · Claude, self-reported”, and the microphone reads
+**Talk through your drafts**.
 When the participant starts or continues the live voice interview after a valid
 prefill is loaded, the realtime interviewer receives a bounded JSON background
 block with the imported summary/facts, question-matched predictions, and any

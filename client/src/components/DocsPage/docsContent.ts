@@ -149,8 +149,8 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
       summary:
         'Chain-scanned sessions use `blockLimits` to bound discovery. Worker-canonical sessions can instead use `sessionEndsAt` to close participant mutations while preserving allowed reads and admin recovery.',
       points: [
-        'Use `?mode=interview` for one-person conversational response drafting or `?mode=recordGroup` to turn a recorded discussion into draft questions.',
-        'The optional ChatGPT/Claude memory handoff keeps instructions in the pasted user request, fetches only an inert question catalog, shows the exact packet before encoding, and includes explained per-answer confidence; no relevant signal produces a clean interview link.',
+        'Use `?mode=voice` to open the voice chooser, `?mode=interview` for one-person conversational response drafting, or `?mode=recordGroup` to turn a recorded discussion into draft questions.',
+        'The optional ChatGPT/Claude memory handoff, offered in the voice chooser, keeps instructions in the pasted user request, fetches only an inert question catalog, shows the exact packet before encoding, and includes explained per-answer confidence; no relevant signal produces a clean interview link.',
         'The legacy `?mode=listening` link remains supported for the pile-adjacent group recorder, and recording starts only after you press Record.',
       ],
     },

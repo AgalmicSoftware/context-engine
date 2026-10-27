@@ -16,6 +16,7 @@ import {
   isInterviewFeatureEnabled,
   normalizeInterviewQuestions,
   mapInterviewEvidenceToResponses,
+  opensSessionVoiceChooser,
   parseInterviewDraftResponses,
   readImportedInterviewDraftResponses,
   readInterviewPrefillFromHash,
@@ -76,6 +77,14 @@ describe('session interview protocol', () => {
     expect(resolveSessionVoiceMode('?mode=listening')).toBeNull();
     expect(buildSessionVoiceModeSearch('?x=1', 'recordGroup')).toBe('?x=1&mode=recordGroup');
     expect(buildSessionVoiceModeSearch('?x=1&mode=interview', null)).toBe('?x=1');
+  });
+
+  it('opens the voice chooser from ?mode=voice and clears it once a mode is picked or the modal closes', () => {
+    expect(opensSessionVoiceChooser('?x=1&mode=voice')).toBe(true);
+    expect(opensSessionVoiceChooser('?mode=interview')).toBe(false);
+    expect(resolveSessionVoiceMode('?mode=voice')).toBeNull();
+    expect(buildSessionVoiceModeSearch('?x=1&mode=voice', 'interview')).toBe('?x=1&mode=interview');
+    expect(buildSessionVoiceModeSearch('?x=1&mode=voice', null)).toBe('?x=1');
   });
 
   it('defaults the feature on and honors explicit per-session disablement', () => {

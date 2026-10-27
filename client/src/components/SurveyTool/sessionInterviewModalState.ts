@@ -31,6 +31,10 @@ export const displayResponderContext = (packet: InterviewPrefillPacket | null): 
     .join('\n');
 };
 
+/** "ChatGPT", "Claude" or "Other": the platform an AI prefill reports for itself. */
+export const describeInterviewPlatform = (platform: InterviewPrefillPacket['source']['platform']): string =>
+  ({ chatgpt: 'ChatGPT', claude: 'Claude', other: 'Other' })[platform];
+
 export const describeResearchCoverage = (coverage: InterviewResearchCoverage | undefined): string[] => {
   if (!coverage) return [];
   const describeResource = (label: string, searched: number | null, used: number | null): string => {
