@@ -824,6 +824,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   }
 
   clearUnfinishedSurveyDraft: () => void = () => {
+    if (this._draftSaveTimer) {
+      clearTimeout(this._draftSaveTimer);
+      this._draftSaveTimer = null;
+    }
     const storage = getCreateSurveyDraftStorage();
     if (storage) {
       const sessionSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
@@ -838,6 +842,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       }
     }
     this._lastSavedUnfinishedSurveyJson = null;
+    if (this._isMounted && this.state.draftSaveFailed) this.setState({ draftSaveFailed: false });
   };
 
   clearCopySuccessTimer = (stateKey: CreateSurveyCopySuccessStateKey): void => {

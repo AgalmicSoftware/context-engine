@@ -362,6 +362,30 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(instance._lastSavedUnfinishedSurveyJson).not.toContain('draftSaveFailed');
   });
 
+  it('clears the failed-save notice and unload guard when Clear form discards the draft', () => {
+    jest.useFakeTimers();
+    const instance = makeInstance({ activeSessionSlug: 'alpha' });
+    instance.state = { ...instance.state, title: 'Unsaved draft' };
+    const writeFailure = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked write');
+    });
+    try {
+      instance.saveToLocalStorage({ immediate: true });
+      expect(instance.state.draftSaveFailed).toBe(true);
+      instance.saveToLocalStorage();
+      instance.confirmClearForm();
+      jest.runOnlyPendingTimers();
+      expect(instance._lastSavedUnfinishedSurveyJson).toBeNull();
+      expect(treeHasText(instance.render(), 'Draft could not be saved in this browser.')).toBe(false);
+      const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+      instance.handleDraftBeforeUnload(event);
+      expect(event.defaultPrevented).toBe(false);
+    } finally {
+      writeFailure.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
   it('retries through the notice and warns on unload only while a failed draft differs from the saved copy', () => {
     const instance = makeInstance({ activeSessionSlug: 'alpha' });
     instance.state = { ...instance.state, title: 'Saved draft' };
