@@ -6,6 +6,7 @@ const NEWER_INTERVIEW_DEFAULTS: Record<string, unknown> = {
   researchDetail: 'minimal',
   hiddenDraftShare: 0,
   showFidelityScore: false,
+  suggestGroups: false,
 };
 
 export const withoutNewInterviewDefaults = (interviewMode: Record<string, unknown>): Record<string, unknown> => {

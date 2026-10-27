@@ -118,7 +118,14 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
         onChange={(e) => change('steeringPrompt', e.target.value)}
       />
       {(
-        ['autoRegenerate', 'followNewQuestions', 'suggestQuestions', 'allowManualRefresh', 'showFidelityScore'] as const
+        [
+          'autoRegenerate',
+          'followNewQuestions',
+          'suggestQuestions',
+          'suggestGroups',
+          'allowManualRefresh',
+          'showFidelityScore',
+        ] as const
       ).map((key) => (
         <Label key={key} style={{ display: 'block', marginTop: 12 }}>
           <input
@@ -132,6 +139,7 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
               autoRegenerate: 'Regenerate opening when the question bank grows',
               followNewQuestions: 'Check for new session questions during interviews',
               suggestQuestions: 'Suggest new question drafts from interview evidence',
+              suggestGroups: 'Suggest open groups that fit participants’ answers',
               allowManualRefresh: 'Allow admins to regenerate the opening',
               showFidelityScore: 'Show participants how well their AI predicted them',
             }[key]

@@ -885,6 +885,21 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.interviewMode.hiddenDraftShare).toBe(0.2);
   });
 
+  test.each([true, false])('publishes group suggestions only when on (%s)', (suggestGroups) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'group-suggestions',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { suggestGroups },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    // Off is the default, left out so older Session Workers still accept the save.
+    expect(payload.interviewMode.suggestGroups).toBe(suggestGroups || undefined);
+  });
+
   test('write payload builders reject invalid results analysis settings', () => {
     const invalidResultsAnalysis = {
       version: 1,

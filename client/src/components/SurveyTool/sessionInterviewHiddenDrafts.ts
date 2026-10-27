@@ -154,11 +154,12 @@ export function useInterviewHiddenDrafts({ questions, editedDrafts, savedRespons
     if (answered.length) setHidden((current) => showUnrevealed(current, answered));
   }, [savedResponses]);
 
-  /** Hides these drafts. Only the first call in a review counts, so nothing already shown is hidden. */
-  const assign = useCallback((questionIds: string[]) => {
-    if (assignedRef.current) return;
+  /** Hides these drafts and returns those it hid. Only the first call in a review counts, so nothing already shown is hidden. */
+  const assign = useCallback((questionIds: string[]): string[] => {
+    if (assignedRef.current) return [];
     assignedRef.current = true;
     if (questionIds.length) setHidden(Object.fromEntries(questionIds.map((id) => [id, {}])));
+    return questionIds;
   }, []);
 
   /** Whether a draft's guess is still hidden: then nothing of it may reach the person, the interviewer included. */

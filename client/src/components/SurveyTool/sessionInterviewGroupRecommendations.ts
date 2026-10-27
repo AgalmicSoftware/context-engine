@@ -10,7 +10,7 @@ import {
   type WorkerGroup,
   type WorkerGroupMembership,
 } from '../../domains/worker/workerGroupPorts';
-import type { InterviewDraftResponse, InterviewPrefillPacket } from './sessionInterview';
+import type { InterviewDraftResponse, InterviewPrefillPacket, InterviewQuestion } from './sessionInterview';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -507,6 +507,39 @@ const classifyRecommendationError = (error: unknown): InterviewGroupRecommendati
     return 'ai_authentication_required';
   }
   return 'ai_recommendation_failed';
+};
+
+// Group names and options compare without case or extra spacing: "D/acc " names group "d/acc".
+const nameKey = (value: unknown): string => lower(value).replace(/\s+/g, ' ');
+
+/**
+ * Open groups named exactly like an option the person chose, or their AI drafted, on a
+ * single-choice question. These need no AI call: choosing "d/acc" suggests group "d/acc".
+ */
+export const matchInterviewGroupsByAnswer = ({
+  candidates,
+  draftResponses = [],
+  questions = [],
+}: {
+  candidates: InterviewGroupCandidate[];
+  draftResponses?: InterviewDraftResponse[];
+  questions?: InterviewQuestion[];
+}): InterviewGroupRecommendation[] => {
+  const singleChoice = new Set(
+    questions
+      .filter((question) => question.type === 'multichoice' && question.singleSelect === true)
+      .map((question) => lower(question.id)),
+  );
+  const groups = new Map(candidates.map((group) => [nameKey(group.label), group]));
+  const matches: InterviewGroupRecommendation[] = [];
+  for (const draft of draftResponses) {
+    if (!singleChoice.has(lower(draft.questionId))) continue;
+    const choice = toText(Array.isArray(draft.answer) && draft.answer.length === 1 ? draft.answer[0] : draft.answer);
+    const group = choice ? groups.get(nameKey(choice)) : undefined;
+    if (!group || matches.some((match) => match.groupId === group.groupId)) continue;
+    matches.push({ groupId: group.groupId, reason: `You chose “${choice}”.`, evidence: '' });
+  }
+  return matches;
 };
 
 export const recommendInterviewGroups = async ({

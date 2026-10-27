@@ -8,6 +8,9 @@ import {
 } from './sessionInterviewGroupRecommendations';
 
 jest.mock('./sessionInterviewGroupRecommendations', () => ({
+  matchInterviewGroupsByAnswer: jest.requireActual<typeof import('./sessionInterviewGroupRecommendations')>(
+    './sessionInterviewGroupRecommendations',
+  ).matchInterviewGroupsByAnswer,
   loadInterviewWorkerGroupCandidates: jest.fn(),
   recommendInterviewGroups: jest.fn(),
 }));
@@ -88,6 +91,88 @@ describe('useSessionInterviewGroupRecommendations', () => {
         },
       ],
     });
+  });
+
+  it('suggests a group named like a chosen option first, and asks the AI only about the others', async () => {
+    jest.mocked(recommendInterviewGroups).mockResolvedValue(readyResult([recommendation('old-group')]));
+    const props: HookProps = {
+      active: true,
+      request: {
+        requestId: 1,
+        transcript: '',
+        prefillPacket: null,
+        draftResponses: [{ questionId: 'pick', answer: 'new group' }],
+      },
+      questions: [
+        ...questions,
+        { id: 'pick', prompt: 'Which?', type: 'multichoice', options: ['New group'], singleSelect: true },
+      ],
+      sessionConfig,
+      sessionSlug: 'demo',
+      workerUrl,
+    };
+    const { result } = renderHook(() => useSessionInterviewGroupRecommendations(props));
+    await waitFor(() => expect(result.current.availability).toBe('available'));
+    expect(result.current.recommendations).toEqual([
+      { groupId: 'new-group', reason: 'You chose “new group”.', evidence: '' },
+      recommendation('old-group'),
+    ]);
+    expect(jest.mocked(recommendInterviewGroups).mock.calls[0][0].candidates.map(({ groupId }) => groupId)).toEqual([
+      'old-group',
+    ]);
+  });
+
+  it('skips the AI when every open group matches a chosen option', async () => {
+    const pick = { prompt: 'Which?', type: 'multichoice', options: ['Old group', 'New group'], singleSelect: true };
+    const props: HookProps = {
+      active: true,
+      request: {
+        requestId: 1,
+        transcript: '',
+        prefillPacket: null,
+        draftResponses: [
+          { questionId: 'a', answer: 'Old group' },
+          { questionId: 'b', answer: 'New group' },
+        ],
+      },
+      questions: [
+        { ...pick, id: 'a' },
+        { ...pick, id: 'b' },
+      ],
+      sessionConfig,
+      sessionSlug: 'demo',
+      workerUrl,
+    };
+    const { result } = renderHook(() => useSessionInterviewGroupRecommendations(props));
+    await waitFor(() => expect(result.current.availability).toBe('available'));
+    expect(result.current.recommendations.map(({ groupId }) => groupId)).toEqual(['old-group', 'new-group']);
+    expect(recommendInterviewGroups).not.toHaveBeenCalled();
+  });
+
+  it('keeps one lookup and one AI call while the page re-renders with new config objects', async () => {
+    jest.mocked(recommendInterviewGroups).mockResolvedValue(readyResult([recommendation('old-group')]));
+    const stableRequest = request(1, 'first');
+    const props = (): HookProps => ({
+      active: true,
+      request: stableRequest,
+      questions: questions.map((question) => ({ ...question })),
+      sessionConfig: { ...sessionConfig },
+      sessionSlug: 'demo',
+      workerUrl,
+    });
+    const { result, rerender } = renderHook(
+      (hookProps: HookProps) => useSessionInterviewGroupRecommendations(hookProps),
+      {
+        initialProps: props(),
+      },
+    );
+    await waitFor(() => expect(result.current.availability).toBe('available'));
+    rerender(props());
+    rerender(props());
+    await act(async () => {});
+    expect(loadInterviewWorkerGroupCandidates).toHaveBeenCalledTimes(1);
+    expect(recommendInterviewGroups).toHaveBeenCalledTimes(1);
+    expect(result.current.recommendations).toEqual([recommendation('old-group')]);
   });
 
   it('returns no actionable recommendations while a changed request is loading', async () => {

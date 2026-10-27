@@ -25425,7 +25425,8 @@ var init_interviewSettings = __esm({
       shareDraftChangesByDefault: false,
       researchDetail: "minimal",
       hiddenDraftShare: 0,
-      showFidelityScore: false
+      showFidelityScore: false,
+      suggestGroups: false
     });
     MAX_HIDDEN_DRAFT_SHARE = 0.5;
     normalizeInterviewSettings = (value = {}) => {
@@ -25445,7 +25446,9 @@ var init_interviewSettings = __esm({
         // Share of a person's AI prefill drafts hidden until they answer, which measures anchoring.
         hiddenDraftShare: Number.isFinite(source.hiddenDraftShare) ? Math.max(0, Math.min(MAX_HIDDEN_DRAFT_SHARE, source.hiddenDraftShare)) : 0,
         // After submitting, show the person how well their AI predicted them (private, in the browser).
-        showFidelityScore: source.showFidelityScore === true
+        showFidelityScore: source.showFidelityScore === true,
+        // After an interview or AI prefill, suggest the session's open groups that fit the answers.
+        suggestGroups: source.suggestGroups === true
       };
     };
     validInterviewSettings = (value = {}) => {
@@ -25466,7 +25469,8 @@ var init_interviewSettings = __esm({
         "suggestQuestions",
         "allowManualRefresh",
         "shareDraftChangesByDefault",
-        "showFidelityScore"
+        "showFidelityScore",
+        "suggestGroups"
       ].every(
         (key) => value[key] === void 0 || typeof value[key] === "boolean"
       );

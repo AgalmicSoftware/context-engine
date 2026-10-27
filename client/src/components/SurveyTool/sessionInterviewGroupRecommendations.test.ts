@@ -5,6 +5,7 @@ import {
   buildInterviewGroupRecommendationEvidenceText,
   buildInterviewGroupRecommendationPrompt,
   loadInterviewWorkerGroupCandidates,
+  matchInterviewGroupsByAnswer,
   normalizeInterviewGroupCandidates,
   parseInterviewGroupRecommendations,
   recommendInterviewGroups,
@@ -101,6 +102,57 @@ describe('session interview group recommendations', () => {
       supported: false,
       reason: 'registry_groups_inline_join_unsupported',
     });
+  });
+
+  it('suggests groups named exactly like a chosen single-choice option, without the AI', () => {
+    const outlook = {
+      id: 'outlook',
+      prompt: 'Your outlook?',
+      type: 'multichoice',
+      options: ['d/acc', 'e/acc'],
+      singleSelect: true,
+    };
+    const tools = {
+      id: 'tools',
+      prompt: 'Tools you use?',
+      type: 'multichoice',
+      options: ['d/acc', 'Other'],
+      singleSelect: false,
+    };
+    const group = (groupId: string, label: string) => ({ ...eligibleCandidate, groupId, label });
+    const candidates = normalizeInterviewGroupCandidates({
+      source: 'authenticated',
+      memberships: [{ group: { ...baseGroup, groupId: 'joined' }, member: { groupId: 'joined' } }],
+      groups: [
+        { ...baseGroup, groupId: 'dacc', label: 'd/acc' },
+        { ...baseGroup, groupId: 'joined', label: 'e/acc' },
+      ],
+    });
+    const match = (answer: unknown, questionId = 'outlook') =>
+      matchInterviewGroupsByAnswer({
+        candidates,
+        questions: [outlook, tools],
+        draftResponses: [{ questionId, answer }],
+      });
+    // Exact, then case and spacing differences.
+    expect(match('d/acc')).toEqual([{ groupId: 'dacc', reason: 'You chose “d/acc”.', evidence: '' }]);
+    expect(match('  D/ACC ')).toEqual([expect.objectContaining({ groupId: 'dacc', reason: 'You chose “D/ACC”.' })]);
+    expect(match(['d/acc'])).toEqual([expect.objectContaining({ groupId: 'dacc' })]);
+    // No match, an already-joined group, and a multiple-selection question suggest nothing.
+    expect(match('dacc')).toEqual([]);
+    expect(match('e/acc')).toEqual([]);
+    expect(match(['d/acc'], 'tools')).toEqual([]);
+    // One suggestion per group, however many answers name it.
+    expect(
+      matchInterviewGroupsByAnswer({
+        candidates: [group('dacc', 'd/acc')],
+        questions: [outlook, { ...outlook, id: 'outlook-2' }],
+        draftResponses: [
+          { questionId: 'outlook', answer: 'd/acc' },
+          { questionId: 'OUTLOOK-2', answer: 'd/acc' },
+        ],
+      }),
+    ).toHaveLength(1);
   });
 
   it('filters catalog entries to open session-visible groups and excludes known full or already-joined groups', () => {

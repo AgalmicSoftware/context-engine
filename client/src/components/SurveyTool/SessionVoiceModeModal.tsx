@@ -71,9 +71,6 @@ import {
 
 type UnknownRecord = SessionInterviewModalRecord;
 
-// Temporarily disable group suggestions and their background requests together.
-const INTERVIEW_GROUP_SUGGESTIONS_ENABLED = false;
-
 // The scrolling modal body's visible height, less its padding.
 const visibleBodyHeight = (panel: HTMLElement | null) => {
   const body = panel?.parentElement;
@@ -260,6 +257,8 @@ function SessionInterviewPanel({
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
   const showFidelityScore = normalizeInterviewSettings(sessionConfig?.interviewMode).showFidelityScore;
+  // Off by default: the session's open groups that fit the person's answers, never joined for them.
+  const suggestGroups = normalizeInterviewSettings(sessionConfig?.interviewMode).suggestGroups;
   const [showViewResults, setShowViewResults] = useState(false);
   const [hasRefreshableGroups, setHasRefreshableGroups] = useState(false);
   useEffect(() => {
@@ -453,7 +452,7 @@ function SessionInterviewPanel({
     sessionSlug,
   });
   const generatedGroupRecommendationState = useSessionInterviewGroupRecommendations({
-    active: INTERVIEW_GROUP_SUGGESTIONS_ENABLED && !isInterviewBusy && !mapping,
+    active: suggestGroups && !isInterviewBusy && !mapping,
     request: groupRecommendationRequest,
     questions,
     sessionConfig,
@@ -639,11 +638,12 @@ function SessionInterviewPanel({
         setEditedDrafts(review.edited);
         setSelected(review.selected);
         if (importedDrafts) setPrefillDraftCount(importedDrafts.length);
+        let newlyHidden: string[] = [];
         if (review.drafts.length) {
           // Chosen once per review, and only while research sharing is on.
           const share = normalizeInterviewSettings(sessionConfig?.interviewMode).hiddenDraftShare;
           const participant = authenticatedForSubmit ? String(account).trim().toLowerCase() : getAnonymousRateId();
-          assignHiddenDrafts(
+          newlyHidden = assignHiddenDrafts(
             includePredictionComparison && share > 0
               ? pickHiddenInterviewDrafts(
                   hideableInterviewDraftIds(review.drafts, questions, prefillPacket, (id) =>
@@ -661,10 +661,10 @@ function SessionInterviewPanel({
             requestId: Date.now(),
             transcript: nextTranscript,
             prefillPacket: contextPacket,
-            draftResponses: review.drafts.map((draft) => ({
-              ...draft,
-              ...(review.edited[draft.questionId] || {}),
-            })),
+            // A hidden draft's guess stays out of group suggestions until it is shown.
+            draftResponses: review.drafts
+              .filter(({ questionId }) => !newlyHidden.includes(questionId) && !isDraftConcealed(questionId))
+              .map((draft) => ({ ...draft, ...(review.edited[draft.questionId] || {}) })),
           });
         } else {
           setGroupRecommendationRequest(null);
@@ -721,9 +721,21 @@ function SessionInterviewPanel({
             responderContext,
           )
         : null,
-      draftResponses: drafts.map((draft) => ({ ...draft, ...(editedDrafts[draft.questionId] || {}) })),
+      draftResponses: drafts
+        .filter(({ questionId }) => !isDraftConcealed(questionId))
+        .map((draft) => ({ ...draft, ...(editedDrafts[draft.questionId] || {}) })),
     });
-  }, [drafts, editedDrafts, isInterviewBusy, mapping, prefillPacket, questions, responderContext, transcript]);
+  }, [
+    drafts,
+    editedDrafts,
+    isDraftConcealed,
+    isInterviewBusy,
+    mapping,
+    prefillPacket,
+    questions,
+    responderContext,
+    transcript,
+  ]);
 
   useEffect(() => {
     if (!prefillPacket || !questions.length || mapping) return;
@@ -1235,7 +1247,7 @@ function SessionInterviewPanel({
               hidden={isInterviewBusy || mapping || shouldHideSuggestedQuestionSection(suggestedQuestionAuthoringState)}
             />
           ) : null}
-          {INTERVIEW_GROUP_SUGGESTIONS_ENABLED &&
+          {suggestGroups &&
           !isInterviewBusy &&
           !mapping &&
           canManuallyRefreshGroupRecommendations &&
@@ -1244,7 +1256,7 @@ function SessionInterviewPanel({
               Refresh group suggestions
             </Button>
           ) : null}
-          {INTERVIEW_GROUP_SUGGESTIONS_ENABLED && !isInterviewBusy && !mapping ? (
+          {suggestGroups && !isInterviewBusy && !mapping ? (
             <SessionInterviewRecommendedGroups
               recommendations={generatedGroupRecommendations}
               account={account}

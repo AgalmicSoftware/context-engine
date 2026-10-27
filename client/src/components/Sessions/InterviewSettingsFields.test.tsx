@@ -87,6 +87,15 @@ it('edits the share of hidden AI drafts, defaulting to off', () => {
   expect(screen.getByLabelText(label)).toHaveDisplayValue('30%');
 });
 
+it('turns on group suggestions, off by default', () => {
+  const onChange = jest.fn();
+  render(<InterviewSettingsFields value={{}} onChange={onChange} />);
+  const box = screen.getByLabelText('Suggest open groups that fit participants’ answers');
+  expect(box).not.toBeChecked();
+  fireEvent.click(box);
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ suggestGroups: true }));
+});
+
 it('turns on the private fidelity score, off by default', () => {
   const onChange = jest.fn();
   render(<InterviewSettingsFields value={{}} onChange={onChange} />);

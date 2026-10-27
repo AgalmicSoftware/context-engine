@@ -192,6 +192,30 @@ describe('SessionInterviewRecommendedGroups', () => {
     expect(await screen.findByTestId('ce-session-interview-join-group-ai-optimists')).toHaveTextContent('Joined');
   });
 
+  it('keeps a pending join while login sets the account before it completes', async () => {
+    const toggleLoginModal = jest.fn();
+    const view = renderRecommendations({ toggleLoginModal });
+    fireEvent.click(await screen.findByTestId('ce-session-interview-join-group-ai-optimists'));
+    const signedIn = (loginComplete: boolean) => (
+      <SessionInterviewRecommendedGroups
+        recommendations={[recommendation()]}
+        account={account}
+        loginComplete={loginComplete}
+        sessionConfig={{ slug: 'demo', sessionId }}
+        sessionSlug="demo"
+        workerUrl={workerUrl}
+        toggleLoginModal={toggleLoginModal}
+      />
+    );
+    // The account arrives one render before login completes.
+    view.rerender(signedIn(false));
+    view.rerender(signedIn(true));
+    await waitFor(() =>
+      expect(joinWorkerGroup).toHaveBeenCalledWith(expect.objectContaining({ groupId: 'ai-optimists' })),
+    );
+    expect(await screen.findByTestId('ce-session-interview-join-group-ai-optimists')).toHaveTextContent('Joined');
+  });
+
   it('closes the scoped login dialog when a resumed join fails so the retry error stays visible', async () => {
     jest.mocked(joinWorkerGroup).mockRejectedValueOnce(new Error('worker_group_request_failed_503'));
     const toggleLoginModal = jest.fn();

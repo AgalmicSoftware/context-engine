@@ -92,8 +92,9 @@ hidden.
 - **Unanswered.** A hidden draft the person leaves blank isn't submitted, and
   full-detail records don't list it among skipped-question drafts.
 - **Elsewhere.** Until its guess is shown, a hidden draft is left out of what
-  the voice interviewer and the drafting request see. If a saved answer for
-  its question loads after review starts, it becomes an ordinary draft.
+  the voice interviewer, the drafting request and group suggestions see. If a
+  saved answer for its question loads after review starts, it becomes an
+  ordinary draft.
 
 ### Score screen
 

@@ -138,8 +138,12 @@ participant's AI-prefill drafts until they answer, to measure how much seeing
 a draft sways answers; it applies only while they share draft changes. **Show
 participants how well their AI predicted them** (`interviewMode.showFidelityScore`,
 off by default) shows a private score after someone submits AI-prefill drafts.
-Both need a Session Worker newer than 0.7.0. See
-[session-interview-research.md](session-interview-research.md).
+**Suggest open groups that fit participants’ answers**
+(`interviewMode.suggestGroups`, off by default) offers the session's open groups
+after an interview or AI prefill, without joining for anyone. All three need a
+Session Worker newer than 0.7.0. See
+[session-interview-research.md](session-interview-research.md) and
+[session-listening-mode.md](session-listening-mode.md).
 Generation waits for public questions and uses the session Worker's OpenAI key.
 See [Interview settings and lifecycle](session-listening-mode.md#interview).
 

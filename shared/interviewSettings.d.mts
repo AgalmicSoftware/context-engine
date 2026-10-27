@@ -11,6 +11,7 @@ export type InterviewSettings = {
   researchDetail: 'minimal' | 'full';
   hiddenDraftShare: number;
   showFidelityScore: boolean;
+  suggestGroups: boolean;
 };
 export const DEFAULT_INTERVIEW_SETTINGS: Readonly<InterviewSettings>;
 export function normalizeInterviewSettings(value?: unknown): InterviewSettings;

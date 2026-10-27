@@ -301,7 +301,11 @@ export function SessionInterviewRecommendedGroups({
   }, [authenticated, canLoadCatalog, fetchImpl, normalizedAccount, sessionId, sessionSlug, targetKey, workerUrl]);
 
   useEffect(() => {
-    setJoinState(emptyJoinState(targetKey));
+    // A join waiting for login survives the account arriving before login completes;
+    // any other join state belongs to the previous account or target.
+    setJoinState((current) =>
+      current.status === 'waiting-login' && current.targetKey === targetKey ? current : emptyJoinState(targetKey),
+    );
     setJoinedGroupState(emptyJoinedGroupState(targetKey, normalizedAccount));
     void loadCatalog();
     return () => {
@@ -460,7 +464,7 @@ export function SessionInterviewRecommendedGroups({
   return (
     <SessionInterviewReviewSection title={`Suggested groups (${recommendationViews.length})`}>
       <div className={styles.sessionInterviewSuggestions} data-testid="ce-session-interview-group-recommendations">
-        <p>Based on your interview. Join any groups that fit you.</p>
+        <p>Based on your answers. Join any groups that fit you.</p>
         {recommendationViews.map(({ group, reason, evidence }) => {
           const current = activeJoinState.groupId === group.groupId ? activeJoinState.status : 'idle';
           const joining = current === 'joining';

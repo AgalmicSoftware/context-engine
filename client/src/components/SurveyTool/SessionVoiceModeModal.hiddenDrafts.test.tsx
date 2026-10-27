@@ -5,6 +5,7 @@ import { mapInterviewEvidenceToResponses } from './sessionInterview';
 import { HIDDEN_DRAFT_NOTE, pickHiddenInterviewDrafts } from './sessionInterviewHiddenDrafts';
 import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { useSessionInterviewGroupRecommendations } from './useSessionInterviewGroupRecommendations';
 
 jest.mock('./SessionInterviewRecommendedGroups', () => ({ __esModule: true, default: () => null }));
 jest.mock('./useSessionInterviewGroupRecommendations', () => ({
@@ -236,6 +237,25 @@ it('keeps hidden guesses from the voice interviewer and the drafting request', a
   const sent = previousResponses.map((entry) => entry.prediction.questionId);
   expect(sent).toContain(shownStatement);
   for (const id of hiddenIds) expect(sent).not.toContain(id);
+});
+
+it('keeps hidden guesses out of group suggestions until they are shown', async () => {
+  jest
+    .mocked(useSessionInterviewGroupRecommendations)
+    .mockReturnValue({ availability: 'available', recommendations: [] });
+  renderReview({ hiddenDraftShare: share, shareDraftChangesByDefault: true, suggestGroups: true });
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const sent = () =>
+    (jest.mocked(useSessionInterviewGroupRecommendations).mock.calls.at(-1)?.[0].request?.draftResponses || []).map(
+      (draft) => draft.questionId,
+    );
+  await waitFor(() => expect(sent()).toContain(shownStatement));
+  for (const id of hiddenIds) expect(sent()).not.toContain(id);
+  // Answering a statement shows its guess; asking again then includes it, but not the guesses still hidden.
+  answerWith(hiddenStatement, 'Disagree');
+  fireEvent.click(await screen.findByRole('button', { name: 'Refresh group suggestions' }));
+  await waitFor(() => expect(sent()).toContain(hiddenStatement));
+  for (const id of hiddenIds.filter((id) => id !== hiddenStatement)) expect(sent()).not.toContain(id);
 });
 
 it("never applies the AI's comment to a hidden draft, so a locked comment survives", async () => {

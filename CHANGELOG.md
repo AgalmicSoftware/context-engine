@@ -72,6 +72,12 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Suggest the session's open groups after an interview or AI prefill link
+  (`interviewMode.suggestGroups`, off by default; needs a Session Worker
+  newer than 0.7.0). A group named like the person's single-choice answer
+  comes first without an AI call, hidden AI drafts stay out until shown, and
+  suggestions never join anyone. A join started before sign-in now survives
+  it, and suggestions no longer reload, with an AI call, on every render.
 - Restart backup downloads after configuration/group changes or invalid cursors.
   Before restoring into an unpublished session, check the pinned Worker origin
   and show the target before asking for a signature.
