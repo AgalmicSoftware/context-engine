@@ -1,3 +1,4 @@
+import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -91,6 +92,7 @@ test('dispatchAuthenticatedSecretActionRoute resolves ai secrets and dispatches 
   const result = await dispatchAuthenticatedSecretActionRoute({
     path: '/',
     action: 'ai',
+    config: { ai: { model: 'gpt-5' } },
     body: { prompt: 'ping' },
     slug: 'session-a',
     address: '0xabc',
@@ -107,6 +109,7 @@ test('dispatchAuthenticatedSecretActionRoute resolves ai secrets and dispatches 
       },
       proxyOpenAI: async (value) => {
         assert.deepEqual(value, {
+          config: { ai: { model: 'gpt-5' } },
           payload: { prompt: 'ping' },
           secrets,
           baseHeaders: { 'Access-Control-Allow-Origin': '*' },
@@ -155,8 +158,8 @@ test('dispatchAuthenticatedSecretActionRoute rejects models outside the provider
   assert.deepEqual(result, {
     handled: true,
     response: {
-      body: { error: 'Model not allowed for provider' },
-      status: 400,
+      body: AI_MODEL_NOT_ALLOWED,
+      status: 403,
       headers,
     },
   });
@@ -169,6 +172,7 @@ test('dispatchAuthenticatedSecretActionRoute passes auth context to custom RPC e
   const result = await dispatchAuthenticatedSecretActionRoute({
     path: '/ai',
     action: '',
+    config: { ai: { model: 'gpt-5' } },
     body: { provider: 'custom', model: 'gpt-5', prompt: 'ping' },
     slug: 'session-a',
     address: '0xabc',
@@ -182,6 +186,7 @@ test('dispatchAuthenticatedSecretActionRoute passes auth context to custom RPC e
       normalizeAiRequestPayload: ({ payload }) => ({ payload, provider: 'custom' }),
       proxyCustomRPC: async (value) => {
         assert.deepEqual(value, {
+          config: { ai: { model: 'gpt-5' } },
           payload: { provider: 'custom', model: 'gpt-5', prompt: 'ping' },
           secrets,
           baseHeaders: { 'Access-Control-Allow-Origin': '*' },

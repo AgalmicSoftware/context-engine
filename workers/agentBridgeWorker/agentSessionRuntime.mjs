@@ -2205,8 +2205,10 @@ async function analyzeParticipantResultGroup({
         Authorization: `Bearer ${sessionAuth.token}`,
       },
       body: JSON.stringify(withBridgeOpenAiApiKey({
-        provider: 'openai',
-        model: safeString(env.AGENT_BRIDGE_CLUSTER_ANALYSIS_MODEL || env.AGENT_BRIDGE_AI_SEARCH_MODEL || 'gpt-5'),
+        ...(bridgeOpenAiApiKey(env) ? {
+          provider: 'openai',
+          model: safeString(env.AGENT_BRIDGE_CLUSTER_ANALYSIS_MODEL || env.AGENT_BRIDGE_AI_SEARCH_MODEL || 'gpt-5'),
+        } : { taskType: 'summarize', modelType: 'thinking' }),
         messages: [
           {
             role: 'system',

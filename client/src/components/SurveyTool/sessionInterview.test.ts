@@ -560,7 +560,7 @@ describe('session interview protocol', () => {
   });
 });
 
-it('maps a numeric reply using standard Terra with medium effort and keeps the rating value', async () => {
+it('maps a numeric reply using the session thinking model and keeps the rating value', async () => {
   jest
     .mocked(callAI)
     .mockResolvedValue(JSON.stringify({ responses: [{ questionId: 'trust', answer: 4, confidence: 1 }] }));
@@ -574,13 +574,15 @@ it('maps a numeric reply using standard Terra with medium effort and keeps the r
   expect(callAI).toHaveBeenCalledWith(
     expect.stringContaining('Responder: Four.'),
     expect.objectContaining({
-      model: 'gpt-5.6-terra',
-      provider: 'openai',
+      thinking: true,
       preferLocal: false,
       reasoningEffort: 'medium',
       service_tier: 'default',
     }),
   );
+  const options = jest.mocked(callAI).mock.calls[0][1] as Record<string, unknown>;
+  expect(options).not.toHaveProperty('provider');
+  expect(options).not.toHaveProperty('model');
   expect(result).toEqual([{ questionId: 'trust', answer: 4, confidence: 1 }]);
 });
 

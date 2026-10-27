@@ -69,6 +69,11 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Bound session-funded AI requests to configured models, per-operation output
+  limits, standard processing, and configured reasoning effort. Remove caller
+  tools while preserving saved custom-provider Functions. BYO keys keep their
+  existing behavior; interview text generation now follows session settings.
+  These limits do not provide aggregate AI budgets.
 - Add `GET /admin/diagnostics` with incomplete-count reporting and opaque,
   expiring pagination tokens. Uploads now register their receipt stores in the
   diagnostics index on a best-effort basis; this requires a Worker redeploy.

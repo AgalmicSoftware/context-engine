@@ -2,7 +2,7 @@ import { resolveConsentFlags, summarizeConsentChoice, type InterviewConsentOverr
 import { useInterviewSavedAnswers, type InterviewSavedAnswerLoader } from './useInterviewSavedAnswers';
 import { verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
-import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
+import { getSessionAiSettings } from '../../utilities/ai/aiSettings';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { appendInterviewTranscript, mergeInterviewReview } from './sessionInterviewReviewState';
 import { useInterviewReadiness } from './useInterviewReadiness';
@@ -211,7 +211,11 @@ function SessionInterviewPanel({
   const hasPredictionRevisions = drafts.some((draft) => (draft.revisions?.length || 0) > 1);
   const hasAiGeneratedReview = drafts.length > 0 && !isDirectUserContextPrefill;
   const researchAvailable = hasAiPrefill || hasPredictionRevisions || hasAiGeneratedReview;
-  const researchPacket = buildResearchPacket(prefillPacket, sessionSlug);
+  const mappingModelId = useMemo(
+    () => getSessionAiSettings(sessionSlug, sessionConfig).models.thinking,
+    [sessionSlug, sessionConfig],
+  );
+  const researchPacket = buildResearchPacket(prefillPacket, sessionSlug, mappingModelId);
   const [includeProvenance, setIncludeProvenance] = useState(true);
   const [researchSharingChoice, setResearchSharingChoice] = useState<{
     contextToken: string;
@@ -574,7 +578,7 @@ function SessionInterviewPanel({
           selected,
           mapped,
           (id) => !hasDraftValue(responseFieldValue(existingResponsesRef.current, 'answers', id)),
-          importedDrafts ? prefillPacket?.source.modelId : DEFAULT_AI_MODEL,
+          importedDrafts ? prefillPacket?.source.modelId : mappingModelId,
           (id) => responseCommentValue(existingResponsesRef.current, id),
         );
         for (const draft of review.drafts) {
@@ -625,6 +629,7 @@ function SessionInterviewPanel({
       editedDrafts,
       selected,
       suggestedQuestions,
+      mappingModelId,
       prefillPacket,
       questions,
       resolveWorkerUrl,

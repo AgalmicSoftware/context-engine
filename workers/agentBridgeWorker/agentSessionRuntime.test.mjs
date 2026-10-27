@@ -5,6 +5,7 @@ import { clearAgentSkillUpdateFlag, loadQuestionsForSession, loadSubmittedResult
 import { __test__sessionQuestions } from './sessionQuestions.mjs';
 
 import { canonicalAnswerSessionKvKey, submitRequestSessionKvKey } from './agentSubmitQueue.mjs';
+import { analyzeParticipantResultGroup } from './agentSessionRuntime.mjs';
 
 class MemoryKv {
   constructor() {
@@ -80,6 +81,40 @@ function baseEnv(overrides = {}) {
     ...overrides,
   };
 }
+
+for (const operatorKey of ['', 'synthetic-operator-key']) test(`cluster summaries select the payer's model (${operatorKey ? 'operator' : 'session'})`, async () => {
+  let aiRequest;
+  const env = baseEnv({
+    AGENT_BRIDGE_OPENAI_API_KEY: operatorKey,
+    AGENT_BRIDGE_CLUSTER_ANALYSIS_MODEL: 'gpt-5',
+    AGENT_BRIDGE_WORKER_LOGIN_ORIGIN: 'https://client.example.test',
+    AGENT_BRIDGE_FETCH: async (url, init) => {
+      const path = new URL(url).pathname;
+      if (path === '/auth/nonce') return Response.json({ nonce: 'syntheticnonce' });
+      if (path === '/auth/login') return Response.json({ token: 'synthetic-token' });
+      assert.equal(path, '/ai');
+      aiRequest = JSON.parse(init.body);
+      return Response.json({ completion: '{"name":"Shared views","short":"Summary","long":"A synthetic summary."}' });
+    },
+  });
+  const result = await analyzeParticipantResultGroup({ env, normalized: { telegramUserId: '101' },
+    policy: { riskCeiling: 'submit' }, session: { sessionSlug: 'fixture', sessionWorkerUrl: 'https://worker.example.test', sponsoredAiAllowed: true },
+    group: { id: 'group-1', size: 3 }, groups: [],
+  });
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(aiRequest.max_output_tokens, 700);
+  if (operatorKey) {
+    assert.equal(aiRequest.apiKey, operatorKey);
+    assert.equal(aiRequest.provider, 'openai');
+    assert.equal(aiRequest.model, 'gpt-5');
+  } else {
+    assert.equal(aiRequest.apiKey, undefined);
+    assert.equal(aiRequest.provider, undefined);
+    assert.equal(aiRequest.model, undefined);
+    assert.equal(aiRequest.modelType, 'thinking');
+    assert.equal(aiRequest.taskType, 'summarize');
+  }
+});
 
 test('admin default-session override writes a durable KV record', async () => {
   const kv = new MemoryKv();

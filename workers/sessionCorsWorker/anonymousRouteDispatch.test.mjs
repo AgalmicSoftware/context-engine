@@ -1,3 +1,4 @@
+import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -209,6 +210,7 @@ test('dispatchAnonymousRoute skips worker secrets for request-api-key transcribe
           secrets: {},
           baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
           transcribeRequest,
+          config: createAnonymousContext().config,
         });
         return response;
       },
@@ -430,8 +432,8 @@ test('dispatchAnonymousRoute rejects models outside the provider whitelist befor
   assert.equal(secretsCalled, false);
   assert.equal(providerCalled, false);
   assert.deepEqual(result, {
-    body: { error: 'Model not allowed for provider' },
-    status: 400,
+    body: AI_MODEL_NOT_ALLOWED,
+    status: 403,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
   });
 });
@@ -518,6 +520,7 @@ test('dispatchAnonymousRoute dispatches ai providers with worker secrets when no
       proxyOpenAI: async (value) => {
         assert.deepEqual(value, {
           payload: { provider: 'openai', prompt: 'ping' },
+          config: createAnonymousContext().config,
           secrets,
           baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
         });

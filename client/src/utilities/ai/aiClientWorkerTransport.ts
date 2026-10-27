@@ -54,6 +54,7 @@ export const buildAiWorkerRequestPlan = ({
 
   const requestBody: UnknownRecord = {
     action: 'ai',
+    ...(taskType ? { taskType } : {}),
     provider,
     model,
     ...(usesResponsesApi ? { endpoint: 'responses' } : {}),

@@ -4,6 +4,7 @@ import {
   applyPreLoginAiProviderKeyChange,
   clearLocalAiSettings,
   getEffectiveAiConfig,
+  normalizeAiSettings,
   getEffectiveTranscriptionConfig,
   getLocalAiSettings,
   readLocalAiSettingsEnvelope,
@@ -468,5 +469,15 @@ describe('aiSettings secret resolution', () => {
         context: TEST_CONTEXT,
       }),
     ).rejects.toThrow('Custom transcription requires an RPC URL.');
+  });
+});
+
+// Legacy configs remain valid when the Worker restricts requests to saved models.
+it('uses the saved legacy default model until a named model lane overrides it', () => {
+  const settings = normalizeAiSettings({ provider: 'openai', model: 'gpt-4o-mini' });
+  expect(settings.models).toEqual({ fast: 'gpt-4o-mini', thinking: 'gpt-4o-mini' });
+  expect(normalizeAiSettings({ model: 'gpt-4o-mini', models: { thinking: 'gpt-5' } }).models).toEqual({
+    fast: 'gpt-4o-mini',
+    thinking: 'gpt-5',
   });
 });

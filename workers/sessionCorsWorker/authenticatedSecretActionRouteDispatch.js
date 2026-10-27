@@ -1,3 +1,4 @@
+import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
 import { reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet } from './sessionWriteCoordinator.js';
 import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
 import { isModelAllowed } from './aiRequestNormalization.js';
@@ -187,13 +188,14 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
       };
     }
 
-    const aiRequest = deps?.normalizeAiRequestPayload?.({ payload: body }) || {};
+    const aiRequest = deps?.normalizeAiRequestPayload?.({ payload: body, config }) || {};
+    body = aiRequest.payload || body;
     const provider = aiRequest.provider;
     const model = resolveModelForProvider({ payload: aiRequest.payload || body, provider });
     if (!isModelAllowed(model, provider)) {
       return {
         handled: true,
-        response: deps?.json?.({ error: 'Model not allowed for provider' }, 400, headers),
+        response: deps?.json?.(aiRequest.requestApiKey ? { error: 'Model not allowed for provider' } : AI_MODEL_NOT_ALLOWED, aiRequest.requestApiKey ? 400 : 403, headers),
       };
     }
     if (provider === 'anthropic') {
@@ -201,6 +203,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
         handled: true,
         response: await deps?.proxyAnthropic?.({
           payload: body,
+          config,
           secrets: secretContext.secrets,
           baseHeaders: headers,
         }),
@@ -211,6 +214,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
         handled: true,
         response: await deps?.proxyOpenAI?.({
           payload: body,
+          config,
           secrets: secretContext.secrets,
           baseHeaders: headers,
         }),
@@ -221,6 +225,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
         handled: true,
         response: await deps?.proxyOpenRouter?.({
           payload: body,
+          config,
           secrets: secretContext.secrets,
           baseHeaders: headers,
         }),
@@ -231,6 +236,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
         handled: true,
         response: await deps?.proxyCustomRPC?.({
           payload: body,
+          config,
           secrets: secretContext.secrets,
           baseHeaders: headers,
           auth: {

@@ -830,6 +830,24 @@ test('results-analysis capability fails closed when AI scope is disabled', () =>
   assert.equal(capability.reason, 'ai_scope_disabled');
 });
 
+test('Results generation passes saved model authority to the real provider and retains its 6000-token budget', async () => {
+  let body;
+  const result = await callResultsAnalysisProvider({ env: {}, slug: 'session-a',
+    config: { ...config, ai: { model: 'gpt-4o-mini', reasoningEffort: 'low' } }, prompt: 'Synthetic report',
+    deps: { getSessionSecrets: async () => ({ openaiKey: 'synthetic-key' }), fetch: async (_, init) => {
+      body = JSON.parse(init.body);
+      return Response.json({ choices: [{ message: { content: '{"summary":"Synthetic report"}' } }] });
+    } },
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.equal(body.model, 'gpt-4o-mini');
+  assert.equal(body.max_tokens, 6000);
+  assert.equal(body.max_completion_tokens, undefined);
+  assert.equal(body.service_tier, 'default');
+  assert.equal(body.tools, undefined);
+  assert.deepEqual(result.value, { summary: 'Synthetic report' });
+});
+
 test('viewer eligibility only supports public full results with aggregate exposure', () => {
   const publicFull = {
     ...config,

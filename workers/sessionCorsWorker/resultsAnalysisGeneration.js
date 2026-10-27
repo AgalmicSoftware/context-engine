@@ -1,3 +1,4 @@
+import { resolveSessionAiModel } from './aiRequestPolicy.js';
 import { toStr } from './stringCoercion.js';
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 import { applyResultsAnalysisExposurePolicy, normalizeResultsAnalysisArtifact } from './resultsAnalysisArtifactValidation.js';
@@ -796,26 +797,10 @@ const normalizeProviderResponse = async (response, now = Date.now()) => {
   }
 };
 
-const resolveAiTaskEntry = (ai = {}, task = 'thinking') => {
-  const models = isObj(ai.models) ? ai.models : {};
-  const modelProviders = isObj(ai.modelProviders) ? ai.modelProviders : {};
-  const taskEntry = isObj(models[task]) ? models[task] : null;
-  const model = trim(taskEntry?.model || taskEntry?.name || models[task] || models.reasoning || ai.model || '');
-  const provider = lower(
-    taskEntry?.provider ||
-    modelProviders[task] ||
-    modelProviders.reasoning ||
-    ai.provider ||
-    ai.mode ||
-    'openai'
-  ) || 'openai';
-  return { provider, model };
-};
-
 export const resolveAnalysisAiPayload = ({ config, prompt }) => {
   const ai = isObj(config?.ai) ? config.ai : {};
   const providers = isObj(ai.providers) ? ai.providers : {};
-  const { provider, model } = resolveAiTaskEntry(ai, 'thinking');
+  const { provider, model } = resolveSessionAiModel(config, { taskType: 'analysis', modelType: 'thinking' });
   const reasoningEffort = trim(
     ai?.taskReasoningEffort?.analysis || ai?.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || 'low',
   );
@@ -823,6 +808,7 @@ export const resolveAnalysisAiPayload = ({ config, prompt }) => {
   return {
     provider,
     model,
+    taskType: 'analysis',
     prompt,
     messages: [{ role: 'user', content: prompt }],
     response_format: { type: 'json_object' },
@@ -859,7 +845,7 @@ export const callResultsAnalysisProvider = async ({ env, slug, config, prompt, h
     return { ok: false, status: 400, error: 'Model not allowed for provider' };
   }
   const secrets = await (deps?.getSessionSecrets ? deps.getSessionSecrets(env, slug) : getStoredSessionSecrets(env, slug)) || {};
-  const proxyArgs = { payload, secrets, baseHeaders: headers };
+  const proxyArgs = { payload, secrets, config, baseHeaders: headers };
   let response;
   const proxyDeps = { fetch: deps?.fetch || globalThis.fetch?.bind(globalThis), json: deps?.json || jsonResponse };
   const runProvider = async () => {

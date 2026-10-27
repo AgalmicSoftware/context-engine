@@ -1,10 +1,10 @@
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { normalizeInterviewSettings, hasInterviewQuestionGrowth } from '../../shared/interviewSettings.mjs';
-import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
+import { resolveSessionAiModel } from './aiRequestPolicy.js';
 import { getKvJson, putKvJson } from './responseKvHelpers.js';
 import { loadPublicInterviewQuestions } from './interviewQuestionCatalog.js';
-import { proxyOpenAI } from './aiProviderExecution.js';
+import { proxyOpenAI, proxyAnthropic, proxyOpenRouter, proxyCustomRPC } from './aiProviderExecution.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 
 const inFlight = new WeakMap();
@@ -46,14 +46,24 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
   const generation = (async () => {
     if (config.scopes?.ai === false) throw new Error('AI is disabled for this session.');
     const secrets = await deps.getSessionSecrets(env, slug);
-    const result = await (deps.proxyOpenAI || proxyOpenAI)({
+    const { provider, model } = resolveSessionAiModel(config, { taskType: 'interview-opening' });
+    const proxies = {
+      openai: deps.proxyOpenAI || proxyOpenAI, anthropic: deps.proxyAnthropic || proxyAnthropic,
+      openrouter: deps.proxyOpenRouter || proxyOpenRouter, custom: deps.proxyCustomRPC || proxyCustomRPC,
+    };
+    if (!proxies[provider]) throw new Error('Configured AI provider is unavailable for interview openings.');
+    const result = await proxies[provider]({
       secrets,
+      config,
+      auth: { scopes: { ai: true, custom_rpc: true } },
       deps: {
         ...deps,
         fetch: (url, options) => (deps.fetch || fetch)(url, { ...options, signal: AbortSignal.timeout(10000) }),
       },
       payload: {
-        model: DEFAULT_AI_MODEL,
+        model,
+        taskType: 'interview-opening',
+        max_tokens: 600,
         reasoning_effort: 'low',
         service_tier: 'default',
         max_output_tokens: 600,

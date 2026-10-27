@@ -5,6 +5,8 @@ import {
   callAI,
   rankQuestionsAI,
   runCompareToolkit,
+  requestAiRewrite,
+  generateAudioDiscussionSummary,
   transcribeAudio,
 } from './aiClient.js';
 import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSettings.js';
@@ -35,6 +37,35 @@ jest.mock('../logging.js', () => ({
 describe('aiClient worker auth options', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it.each(['rewrite', 'audio-summary'])('keeps %s on the configured session model without tools', async (feature) => {
+    getEffectiveAiConfig.mockResolvedValue({
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      apiKeySource: 'session',
+      reasoningEffort: 'low',
+    });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example.test');
+    fetchWorkerWithAuth.mockResolvedValue({ ok: true, json: async () => ({ completion: 'A concise summary.' }) });
+    const options = { sessionSlug: 'fixture' };
+    const text =
+      feature === 'rewrite'
+        ? await requestAiRewrite('A synthetic response needing punctuation', options)
+        : await generateAudioDiscussionSummary(
+            'A sufficiently long synthetic discussion transcript for a summary.',
+            options,
+          );
+    expect(text).toBe('A concise summary.');
+    const body = JSON.parse(fetchWorkerWithAuth.mock.calls[0][1].body);
+    expect(body).toMatchObject({ provider: 'openai', model: 'gpt-4o-mini', service_tier: 'default' });
+    expect(body).not.toHaveProperty('apiKey');
+    expect(body).not.toHaveProperty('tools');
+    expect(body).not.toHaveProperty('functions');
+    if (feature === 'rewrite') expect(body.taskType).toBe('rewrite');
+    expect(getEffectiveAiConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionSlug: 'fixture', thinking: feature === 'audio-summary' }),
+    );
   });
 
   it.each([

@@ -8,7 +8,6 @@ import {
   buildGeneratedSurveyStatements,
   type GeneratedSurveyStatement,
 } from './SurveyGenerator/surveyGeneratorHelpers';
-import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { resolveRealtimeInterviewModel } from '../../utilities/audio/realtimeInterviewConfig';
 import { normalizeRatingScale, type RatingScale } from '../../utilities/survey/ratingValue.js';
@@ -555,8 +554,7 @@ export const mapInterviewEvidenceToResponses = async ({
       sessionConfig,
       workerUrl,
       taskType: 'interview-map',
-      provider: 'openai',
-      model: DEFAULT_AI_MODEL,
+      thinking: true,
       preferLocal: false,
       reasoningEffort: 'medium',
       service_tier: 'default',

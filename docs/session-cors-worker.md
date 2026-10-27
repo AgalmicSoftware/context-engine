@@ -2716,13 +2716,40 @@ Signed login/bootstrap requests:
     the Worker still enforces authentication, scope access, and provider-key
     availability when the request runs.
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
+  - Requests using the session's stored key are bounded at the final provider
+    adapter, for both authenticated and anonymous callers and server-generated
+    interview/Results requests. Exact provider/model pairs must match the
+    session's `ai.models.fast`/`thinking` (including `default`/`reasoning` aliases),
+    legacy `ai.model`, or the named built-in task in `ai.models`. Missing text
+    settings use the shared text-model default. Other models receive HTTP 403
+    with `reason: ai_model_not_allowed` before a provider call.
+  - Per-call output ceilings are 2,048 for ordinary chat and 16,000 for reasoning
+    models or Responses. Built-in task exceptions are `generate`: 16,000 (up to
+    50 question drafts), `analysis`: 7,000 (HTML report sections and Worker
+    Results), `interview-map`: 8,000, and `interview-opening`: 600. The smallest
+    valid requested value among `max_tokens`, `max_completion_tokens`,
+    `max_output_tokens`, `max_tokens_to_sample`, and `maxTokens` is used, bounded
+    by that ceiling. Invalid values cannot remove the ceiling. Task labels can
+    select only these fixed bounds; they do not confer additional authority.
+  - OpenAI processing uses `service_tier: default`. Other adapters do not forward
+    a caller's service tier. Reasoning effort cannot exceed saved task/global
+    `reasoningEffort` (or `reasoning_effort`), defaulting to `low`; analysis also
+    honors its existing `taskReasoningEffort.generate` fallback. Caller tools
+    and Functions are removed. Custom-provider Functions remain available only
+    from the owner's saved `ai.providers.custom.functions` configuration.
+  - Caller-supplied `apiKey` (or custom `rpcKey`) requests retain their existing
+    model/output/tool behavior and existing access/URL rules. Provider rejection
+    never retries with the session's key. These are request limits only: they
+    provide no aggregate allowance, concurrency limit, or total-spend guarantee.
+    Client-delegated live interviews and separately funded Bridge image calls
+    have no new whole-session usage bound.
   - Optional overrides: `apiKey` (all providers), `rpcUrl` (custom provider only).
   - Anonymous `apiKey` + `provider: "custom"` requires `rpcUrl`; worker secret `customRpcUrl` is not used for this bypass path.
   - Anonymous gate-authority checks now route through a shared helper before provider-specific validation:
     route scope disables still fail before request-`apiKey` bypass, and anonymous access without `apiKey`
     still requires on-chain `default` and `ai` gates to be explicitly open.
   - Request parsing/provider inference now routes through the AI helper:
-    omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI.
+    omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI. When both provider and model are omitted on a session-funded request, the Worker selects the saved fast model (or thinking model when `modelType: thinking`), including its provider.
 - `GET /agent/interview-catalog?slug=<slug>&sessionUrl=<https-session-url>`
   (`/agent/interview-brief` remains a compatibility alias)
   - Public, CORS-scoped, and disabled when `interviewModeEnabled=false` or
@@ -2780,7 +2807,7 @@ Signed login/bootstrap requests:
   remains during the staged transport migration.
 - `POST /interview/starter?slug=<slug>`
   - Uses session CORS, anonymous AI eligibility, expiry, and rate limits; never accepts a caller-supplied generation prompt or forced refresh.
-  - Returns `{ openingPrompt, steeringPrompt, source, questionCount?, generatedAt?, warning? }`. Owner mode returns configured text. Auto mode waits for public questions and lazily generates with Worker-held OpenAI credentials using `gpt-5.6-terra`, low reasoning effort, and standard processing. `steeringPrompt` is the normalized owner-authored `interviewMode.steeringPrompt` value and defaults to an empty string.
+  - Returns `{ openingPrompt, steeringPrompt, source, questionCount?, generatedAt?, warning? }`. Owner mode returns configured text. Auto mode waits for public questions and lazily generates with the session's configured fast model/provider and Worker-held credentials, at most 600 output tokens, low reasoning effort, and standard processing. `steeringPrompt` is the normalized owner-authored `interviewMode.steeringPrompt` value and defaults to an empty string.
   - Stores the generated opening and baseline count in `session:<slug>:interview-opening`, separate from owner configuration. Reuses it by default; optional regeneration uses `interviewMode.questionGrowthPercent` (20% by default). Concurrent requests within one Worker isolate share generation; Cloudflare KV remains eventually consistent across isolates.
   - Failed regeneration preserves the last successful opening; initial failure returns a recoverable error. The client bounds waiting to ten seconds and can start with an existing session question.
 - `POST /admin/refresh-interview-opening`
@@ -2813,6 +2840,7 @@ transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
     Worker configuration or secrets. See [Session Voice Modes](session-listening-mode.md)
     for startup, transcript, stop, and review behavior and the official sources.
 - `POST /transcribe` (multipart/form-data, file field `file` or `audio`)
+  - On the stored OpenAI key, the model must equal `ai.models.transcription.model` or `ai.transcription.model` (default `whisper-1`); a swap receives 403 `ai_model_not_allowed`. BYO and custom transcription retain existing behavior. The multipart adapter forwards only file, model, and JSON response format, with no caller token/tier/tool options.
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
   - Optional overrides: `provider` (`openai` or `custom`), `apiKey`, `rpcUrl` (custom only).
   - Upstream size limit: OpenAI currently caps each speech-to-text file upload at 25 MB.

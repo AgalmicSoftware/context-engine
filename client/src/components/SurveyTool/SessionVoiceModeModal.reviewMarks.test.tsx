@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { mapInterviewEvidenceToResponses } from './sessionInterview';
 import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 jest.mock('./SessionInterviewRecommendedGroups', () => ({ __esModule: true, default: () => null }));
@@ -61,7 +62,7 @@ const runRound = async () => {
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
 };
 
-const renderTwoRounds = async () => {
+const renderTwoRounds = async (model = 'gpt-5.6-terra') => {
   jest
     .mocked(mapInterviewEvidenceToResponses)
     .mockResolvedValueOnce([{ questionId: 'q1', answer: 'First answer', confidence: 0.6 }])
@@ -75,6 +76,12 @@ const renderTwoRounds = async () => {
       onClose={jest.fn()}
       toggleLoginModal={jest.fn()}
       sessionSlug="demo"
+      sessionConfig={{
+        slug: 'demo',
+        corsWorkerUrl: 'https://worker.example',
+        ai: { models: { thinking: model } },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      }}
       account={account}
       loginComplete
       workerUrl="https://worker.example"
@@ -121,4 +128,16 @@ it('continuing an interview does not record the seeded saved comment as a human 
   expect(review[0].additionalComments).toBe('Saved note');
   // Research metadata (userEditedFields) must not claim the responder edited the comment.
   expect(review[0].userEditedFields || []).toEqual([]);
+});
+
+it('attributes voice predictions to the configured mapping model', async () => {
+  const { onRecordProvenance } = await renderTwoRounds('gpt-4o-mini');
+  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+  await waitFor(() => expect(onRecordProvenance).toHaveBeenCalled());
+  const review = onRecordProvenance.mock.calls[0][6];
+  expect(review[0].revisions.map((revision: { modelId: string }) => revision.modelId)).toEqual([
+    'gpt-4o-mini',
+    'gpt-4o-mini',
+  ]);
 });
