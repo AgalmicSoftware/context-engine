@@ -34,6 +34,7 @@ export const AGENT_CREDENTIAL_SCOPES = Object.freeze({
   POSE_QUESTIONS: 'pose_questions',
   MANAGE_GROUP_APPROVALS: 'manage_group_approvals',
   AGENT_AUTOFILL: 'agent_autofill',
+  SESSION_LOGIN: 'session_login',
 });
 
 export const AGENT_CREDENTIAL_DEFAULT_SCOPES = Object.freeze([

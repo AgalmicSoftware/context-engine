@@ -6096,6 +6096,16 @@ async function handleClientLoginExchangeRequest({ request, env = {}, fetchImpl =
       { status: 403 },
     );
   }
+  // The web handoff requires a Worker JWT, whose authority is the managed
+  // account's full session policy. Bridge scopes cannot restrict that token.
+  if (delegated.record.credentialKind === AGENT_CREDENTIAL_KINDS.SERVICE &&
+      !agentCredentialHasScope(delegated.record, AGENT_CREDENTIAL_SCOPES.SESSION_LOGIN)) {
+    return jsonClientLogin(request, env, { ok: false, reason: 'agent_credential_session_login_denied' }, { status: 403 });
+  }
+  const sourceExpiresAtMs = Date.parse(delegated.record.expiresAt);
+  if (!Number.isFinite(sourceExpiresAtMs)) {
+    return jsonClientLogin(request, env, { ok: false, reason: 'agent_credential_expiry_invalid' }, { status: 403 });
+  }
   const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug);
   const context = await resolveHandoffContext({
     env,
@@ -6162,6 +6172,17 @@ async function handleClientLoginExchangeRequest({ request, env = {}, fetchImpl =
       { status: login.skipped ? 400 : 502 },
     );
   }
+  const exchangedAt = new Date();
+  const sourceRemainingSeconds = Math.floor((sourceExpiresAtMs - exchangedAt.getTime()) / 1000);
+  const workerExpiresAtMs = Number(login.exp) * 1000;
+  if (!Number.isSafeInteger(workerExpiresAtMs) || workerExpiresAtMs <= exchangedAt.getTime()) {
+    return jsonClientLogin(request, env, { ok: false, reason: 'session_worker_token_expiry_invalid' }, { status: 502 });
+  }
+  // Current Workers issue fixed-lifetime JWTs. Never expose one that survives
+  // its source; a shorter lifetime requires support from the Worker login API.
+  if (workerExpiresAtMs > sourceExpiresAtMs || sourceRemainingSeconds < 1) {
+    return jsonClientLogin(request, env, { ok: false, reason: 'agent_credential_expiry_too_short' }, { status: 403 });
+  }
   const sessionAuthorityMode = safeString(context.session?.sessionModeProfile?.authority?.mode).toLowerCase();
   const workerCanonical = sessionAuthorityMode === 'worker_canonical';
   const bridgeCredential = await issueAgentCredential({
@@ -6179,7 +6200,8 @@ async function handleClientLoginExchangeRequest({ request, env = {}, fetchImpl =
     scopes: delegated.record.scopes,
     audience: AGENT_CREDENTIAL_AUDIENCES.AGENT_BRIDGE_BROWSER,
     credentialKind: AGENT_CREDENTIAL_KINDS.BROWSER,
-    ttlSeconds: AGENT_BROWSER_CREDENTIAL_TTL_SECONDS,
+    createdAt: exchangedAt.toISOString(),
+    ttlSeconds: Math.min(AGENT_BROWSER_CREDENTIAL_TTL_SECONDS, sourceRemainingSeconds),
   });
   if (!bridgeCredential.ok) {
     return jsonClientLogin(

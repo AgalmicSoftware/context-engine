@@ -4147,7 +4147,7 @@ test('Telegram client login exchanges copied ceagt token for a worker JWT', asyn
       });
     }
     if (String(url).endsWith('/auth/login')) {
-      return new Response(JSON.stringify({ token: 'worker-jwt-1', exp: 1780003600 }), {
+      return new Response(JSON.stringify({ token: 'worker-jwt-1', exp: Math.floor(Date.now() / 1000) + 4 * 60 * 60 }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
@@ -4213,7 +4213,7 @@ test('client login derives the worker wallet from a Telegram-optional service pr
       body: {
         name: 'group-reader',
         sessionSlug: 'alpha',
-        scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_GROUPS],
+        scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_GROUPS, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.SESSION_LOGIN],
       },
     }),
     env,
@@ -4240,7 +4240,7 @@ test('client login derives the worker wallet from a Telegram-optional service pr
         });
       }
       if (String(url).endsWith('/auth/login')) {
-        return new Response(JSON.stringify({ token: 'service-worker-jwt', exp: 1780003600 }), {
+        return new Response(JSON.stringify({ token: 'service-worker-jwt', exp: Math.floor(Date.now() / 1000) + 4 * 60 * 60 }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });
@@ -4278,7 +4278,7 @@ test('client login returns audience-correct credentials and the Bridge credentia
       });
     }
     if (String(url).endsWith('/auth/login')) {
-      return new Response(JSON.stringify({ token: 'worker-jwt-1', exp: 1780003600 }), {
+      return new Response(JSON.stringify({ token: 'worker-jwt-1', exp: Math.floor(Date.now() / 1000) + 4 * 60 * 60 }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
@@ -4377,7 +4377,7 @@ test('worker-canonical browser credentials fail before route reads or writes aft
       label: 'Worker browser reader',
     },
     sessionSlug: 'alpha',
-    scopes: TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES,
+    scopes: [...TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.SESSION_LOGIN],
     audience: AGENT_CREDENTIAL_AUDIENCES.AGENT_BRIDGE,
     credentialKind: AGENT_CREDENTIAL_KINDS.SERVICE,
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
@@ -4528,7 +4528,7 @@ test('Telegram client login ignores caller-supplied workerUrl', async () => {
       });
     }
     if (target.endsWith('/auth/login')) {
-      return new Response(JSON.stringify({ token: 'worker-jwt-1', exp: 1780003600 }), {
+      return new Response(JSON.stringify({ token: 'worker-jwt-1', exp: Math.floor(Date.now() / 1000) + 4 * 60 * 60 }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });

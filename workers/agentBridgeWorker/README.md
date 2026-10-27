@@ -50,7 +50,21 @@ ordinary integrations should use their own scoped credentials.
 
 `POST /api/agent/client-login/exchange` exchanges a source user/service
 credential for a short-lived Bridge browser credential and a separate Session
-Worker JWT. Child credentials cannot be exchanged again. Each credential must
+Worker JWT. A person's own `user` credential retains this behavior. A `service`
+credential needs the explicit `session_login` scope, which is never a default:
+it authorizes the managed account's full Session Worker policy, including any
+permitted storage and AI operations. Bridge capability flags do not restrict
+that JWT. Without this scope, exchange returns 403
+`agent_credential_session_login_denied`; the web client requires both credentials.
+
+The Worker currently issues fixed four-hour tokens. If its returned token would
+outlive the source credential, exchange returns 403
+`agent_credential_expiry_too_short` without exposing either child credential.
+Bridge browser credentials last at most one hour and never outlive the source.
+Revoking the source does not revoke already-issued child credentials; the Worker
+JWT remains usable until its expiry or separate Worker revocation. Shorter
+Worker lifetimes require a login API change. Child credentials cannot be
+exchanged again. Each credential must
 be sent only to its intended origin and audience. Same-slug session or Worker
 replacement invalidates credentials bound to the old identity.
 
