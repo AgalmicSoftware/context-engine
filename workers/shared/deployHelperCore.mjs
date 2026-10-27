@@ -213,13 +213,9 @@ export const cfFetch = async (
   const cloudflareApiBaseUrl = resolveCloudflareApiBaseUrl({ apiBaseUrl, env });
   let resp;
   try {
-    resp = await fetchImpl(`${cloudflareApiBaseUrl}${path}`, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...(options.headers || {}),
-      },
-    });
+    const headers = new Headers({ Authorization: `Bearer ${token}` });
+    new Headers(options.headers).forEach((value, name) => headers.set(name, value));
+    resp = await fetchImpl(`${cloudflareApiBaseUrl}${path}`, { ...options, headers });
   } catch (err) {
     return {
       ok: false,

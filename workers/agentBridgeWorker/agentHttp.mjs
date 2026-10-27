@@ -156,13 +156,9 @@ function toCanonicalAgentApiPathname(pathname = '') {
 }
 
 function json(data, init = {}) {
-  return new Response(JSON.stringify(data, null, 2), {
-    ...init,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      ...(init.headers || {}),
-    },
-  });
+  const headers = new Headers({ 'content-type': 'application/json; charset=utf-8' });
+  new Headers(init.headers).forEach((value, name) => headers.set(name, value));
+  return new Response(JSON.stringify(data, null, 2), { ...init, headers });
 }
 
 function agentBridgePublicUrl(env = {}) {
@@ -394,13 +390,9 @@ function resultViewCacheCorsHeaders(request, env = {}) {
 
 function jsonResultViewCache(request, env, data, init = {}) {
   const cors = resultViewCacheCorsHeaders(request, env);
-  return json(data, {
-    ...init,
-    headers: {
-      ...(cors || {}),
-      ...(init.headers || {}),
-    },
-  });
+  const headers = new Headers(cors || {});
+  new Headers(init.headers).forEach((value, name) => headers.set(name, value));
+  return json(data, { ...init, headers });
 }
 
 function sessionMetaCorsHeaders() {
@@ -415,13 +407,9 @@ function sessionMetaCorsHeaders() {
 
 function jsonSessionMeta(request, env, data, init = {}) {
   const cors = sessionMetaCorsHeaders();
-  return json(data, {
-    ...init,
-    headers: {
-      ...(cors || {}),
-      ...(init.headers || {}),
-    },
-  });
+  const headers = new Headers(cors || {});
+  new Headers(init.headers).forEach((value, name) => headers.set(name, value));
+  return json(data, { ...init, headers });
 }
 
 function configuredSessionMetaPolicy(env = {}) {
@@ -461,13 +449,9 @@ async function resolveSessionMetaPayload(env = {}, sessionSlug = '') {
 
 function jsonClientLogin(request, env, data, init = {}) {
   const cors = clientLoginCorsHeaders(request, env);
-  return json(data, {
-    ...init,
-    headers: {
-      ...(cors || {}),
-      ...(init.headers || {}),
-    },
-  });
+  const headers = new Headers(cors || {});
+  new Headers(init.headers).forEach((value, name) => headers.set(name, value));
+  return json(data, { ...init, headers });
 }
 
 // Token-personalized browser reads (web client results/questions panels). Uses the

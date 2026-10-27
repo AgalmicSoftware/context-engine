@@ -48,9 +48,9 @@ const unsafeHeaderCopy = (source, path = '') => {
   for (const name of plainHeaderHelpers.get(path) || []) {
     source = source.replace(new RegExp(`\\b${name}(?=\\s*\\()`, 'g'), 'plainHeaderObject');
   }
-  return /\.\.\.\s*(?:[\w$]+\.)*(?:[\w$]*Headers|headers)\b/.test(source) ||
-    /Object\.assign\s*\(\s*\{\s*\}\s*,[^;]*(?:\b[\w$]*Headers|\bheaders)\b/.test(source) ||
-    /\b(?:[\w$]*Headers|headers)\s*[:=]\s*Object\.assign\s*\(\s*\{\s*\}\s*,/.test(source);
+  return /\.\.\.\s*\(*\s*(?:[\w$]+(?:\?\.|\.))*(?:[\w$]*Headers|headers)\b/.test(source) ||
+    /Object\.assign\s*\([^,;]+,[^;]*(?:\b[\w$]*Headers|\bheaders)\b/.test(source) ||
+    /\b(?:[\w$]*Headers|headers)\s*[:=]\s*Object\.assign\s*\([^,;]+,/.test(source);
 };
 
 test('header copy guard covers arbitrary header names and Object.assign', () => {
@@ -60,6 +60,9 @@ test('header copy guard covers arbitrary header names and Object.assign', () => 
     'Object.assign({}, headers)', 'Object.assign({}, plain, context.routeBaseHeaders)',
     'Object.assign( {},\n getExtras(),\n responseHeaders)',
     'const headers = Object.assign({}, value)',
+    '({ ...(init.headers || {}) })', '({ ...init?.headers })',
+    '({ ...(context?.request?.headers ?? {}) })',
+    'Object.assign(target, xHeaders)', 'Object.assign(target, plain, init?.headers)',
   ]) assert.equal(unsafeHeaderCopy(source), true, source);
   const plainCall = '({ ...jsonHeaders(origin) })';
   assert.equal(unsafeHeaderCopy(plainCall), true);
