@@ -60,6 +60,7 @@ If `main` or the CI attempt has advanced, use successful CI for the current tip.
 If the artifact has expired, rerun canonical CI to produce a new tested artifact.
 Do not unpublish or overwrite a version to repair a release.
 
-Fixed version pins in MCP host configurations stay fixed. Opt-in launch commands
-using `npx --yes --prefer-online @agalmic/contextengine@latest` check for a newer
-published version on restart; running servers are unchanged.
+The default launch command, `npx -y --prefer-online @agalmic/contextengine@latest`,
+checks for a newer published version on restart; running servers are unchanged.
+Existing users must update their host command once to adopt this behavior.
+Exact version pins remain available for reproducible runs and stay fixed.

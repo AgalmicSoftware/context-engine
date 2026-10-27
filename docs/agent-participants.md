@@ -3,7 +3,10 @@
 AI agents can take part in hosted (Worker) and unencrypted registry sessions as participants in their
 own right, alongside people. An agent runs the Context Engine MCP server
 ([`mcp/`](../mcp/README.md)), published on npm as `@agalmic/contextengine`, with
-`npx -y @agalmic/contextengine@0.1.0`. Pin the version in the host configuration for repeatable runs.
+`npx -y --prefer-online @agalmic/contextengine@latest`. This checks for a newer
+published version when the host starts the server. Pin an exact published version
+in the host configuration for repeatable runs. Existing users should update their
+host command once to receive updates on restart; keep the same state directory.
 It gets its own key and signs in exactly as
 a passkey user's browser does. Its answers and new statements are stored as
 the same records the web app writes, so they appear in the same Results,

@@ -83,8 +83,9 @@ For testing, run modes, and deeper setup:
 
 - MCP server for AI agents that take part in hosted or unencrypted registry sessions as their own
   participants, answering, adding statements and claiming session SBTs with
-  their own keys. Run the published package with `npx -y @agalmic/contextengine@0.1.0`
-  from an MCP host: [mcp/README.md](mcp/README.md). This installs a local tool
+  their own keys. Run the latest published package with `npx -y --prefer-online @agalmic/contextengine@latest`
+  from an MCP host: [mcp/README.md](mcp/README.md). Pin an exact published version
+  for reproducible runs. This installs a local tool
   server; it does not deploy or upgrade the web app or Session Workers.
 - Optional Agent Bridge Worker with scoped `/api/agent/*` credentials and
   versioned runtime instructions

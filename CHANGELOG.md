@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Prepare MCP 0.1.2 with the updated agent behavior and automated release workflow.
+  Default new host configurations to `npx -y --prefer-online @agalmic/contextengine@latest`.
+  Existing users should update their host command once and restart to receive
+  future published updates; exact version pins remain available for reproducible
+  runs. Publication stays disabled until the application release is merged,
+  canonical CI passes and the repository owner enables it.
 - Add opt-in GitHub-to-npm publication of the exact CI-tested MCP tarball using
   npm Trusted Publishing, with version, source, integrity and stale-run checks.
 

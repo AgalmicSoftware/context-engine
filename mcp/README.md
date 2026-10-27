@@ -21,17 +21,22 @@ means for session admins and readers.
 
 ## Install
 
-Requires Node `^20.19.0` or `>=22.12.0`. Start the published package without a
+Requires Node `^20.19.0` or `>=22.12.0`. Start the latest published package without a
 checkout:
 
 ```sh
-npx -y @agalmic/contextengine@0.1.0
+npx -y --prefer-online @agalmic/contextengine@latest
 ```
 
 The npm package is `@agalmic/contextengine`; its installed executable remains
 `contextengine`. The package bundles its runtime dependencies and includes their
 license notices. Contributors can run from a checkout with `npm --prefix mcp ci`
 and `npm --prefix mcp start` from the repository root.
+
+The default command checks for a newer published version each time the host
+starts the server. For reproducible runs, replace `@latest` with an exact
+published version, such as `npx -y @agalmic/contextengine@0.1.2` once 0.1.2 is
+published. A running server does not update itself.
 
 ## Connect an agent
 
@@ -52,7 +57,7 @@ Claude Code and most MCP hosts accept a JSON configuration like this:
   "mcpServers": {
     "context-engine": {
       "command": "npx",
-      "args": ["-y", "@agalmic/contextengine@0.1.0"],
+      "args": ["-y", "--prefer-online", "@agalmic/contextengine@latest"],
       "env": {
         "CE_MCP_STATE_DIR": "/absolute/path/to/.context-engine-agent",
         "CE_MCP_DISPLAY_NAME": "your-handle.delve.town",
@@ -67,6 +72,11 @@ Claude Code and most MCP hosts accept a JSON configuration like this:
 With Claude Code, save it as `mcp.json` and start a session with
 `claude --mcp-config mcp.json`, or add it alongside other servers such as
 `at_mcp` in the same file.
+
+Existing users who want updates on restart should update their host configuration
+to the command and arguments above once, then restart the server. Keep the same
+state directory to retain the agent's identity. Exact version pins remain an
+option for reproducible runs.
 
 Then ask the agent to join with the session link it was given:
 
@@ -158,8 +168,9 @@ unknown `CE_MCP_*` name.
   the session, so the server also remembers what the agent answered; in very
   large sessions it says when answers given elsewhere may be missing.
 
-Repository source is prepared as 0.1.1. The pinned npm examples above remain on
-published 0.1.0 until that separate package release is available. Source 0.1.1
+The 0.8.0 application release prepares MCP 0.1.2 for separate npm publication.
+The `@latest` command uses the most recent published version until 0.1.2 is
+published. Source 0.1.2
 redacts RPC URLs and transaction data from registry write errors, preserves known
 transaction hashes, and tells callers to check uncertain submissions before
 retrying. If local answer-history storage fails after a successful upload or
@@ -251,9 +262,9 @@ review: a published version cannot be replaced, and changed package contents
 require a new version. See [MCP release setup](../docs/mcp-releases.md) for
 account configuration, activation and recovery.
 
-Exact version pins remain available for reproducibility. Hosts that opt into
-updates on restart can use `npx --yes --prefer-online @agalmic/contextengine@latest`;
-an already-running server does not update itself.
+The default launch command is `npx -y --prefer-online @agalmic/contextengine@latest`.
+Exact version pins remain available for reproducibility; an already-running
+server does not update itself.
 
 Worker answer uploads save a pending question, payload digest and request ID in
 `state.json` before sending. Repeating an identical failed call, including after
