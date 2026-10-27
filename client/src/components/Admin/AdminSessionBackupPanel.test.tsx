@@ -276,3 +276,13 @@ test.each([
   expect(post.mock.calls[2][0].body.cursor).toBe('');
   expect(screen.getByRole('status')).toHaveTextContent('Downloaded 1 pages');
 });
+
+test('shows the restore target before the first signed request on an empty deployment', async () => {
+  const post = jest.fn().mockResolvedValue({ data: { ok: true, restore: null } });
+  render(<AdminSessionBackupPanel {...props} canAdminWorker={false} postSignedRequest={post} />);
+  await screen.findByRole('button', { name: 'Check restore status' });
+  expect(screen.getByText(/Target Worker:/)).toHaveTextContent(props.workerUrl);
+  expect(post).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Check restore status' }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+});

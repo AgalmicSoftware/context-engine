@@ -13,8 +13,10 @@ import {
 } from '../../utilities/session/sessionWorkerDiscovery';
 import {
   markWorkerCanonicalSessionBootstrapVerified,
+  readSessionWorkerConfigCache,
   upsertWorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerConfigCache.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 
 type WorkerCanonicalSessionBootstrapBoundaryProps = {
@@ -34,6 +36,8 @@ type BootstrapViewState = {
   errorKind?: string;
   message: string;
   canRetry?: boolean;
+  recoveryWorkerOrigin?: string;
+  recoverySessionSlug?: string;
 };
 
 const DEFAULT_RETRY_DELAYS_MS = [250, 750] as const;
@@ -85,6 +89,7 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
   retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
   missingConfigFallback,
 }: WorkerCanonicalSessionBootstrapBoundaryProps) => {
+  const hasMissingConfigFallback = Boolean(missingConfigFallback);
   const [retryNonce, setRetryNonce] = useState(0);
   const [viewState, setViewState] = useState<BootstrapViewState>({
     kind: 'loading',
@@ -162,13 +167,47 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
         if (active) setViewState({ kind: 'ready', message: 'Worker session ready.' });
       } catch (error) {
         if (!active || abortController.signal.aborted) return;
-        const descriptor = describeWorkerSessionBootstrapError(error);
+        let descriptor = describeWorkerSessionBootstrapError(error);
+        let recoveryWorkerOrigin = '';
+        if (descriptor.kind === 'missing_config' && hasMissingConfigFallback) {
+          try {
+            const target = parseSessionWorkerDiscoveryOrigin(workerQueryValue, { environment });
+            const pinnedOrigins = [
+              ...new Set(
+                Object.values(readSessionWorkerConfigCache().bySession)
+                  .filter(
+                    (record) =>
+                      record.authorityMode === 'worker_canonical' && record.slug === normalizeSessionSlug(sessionSlug),
+                  )
+                  .map((record) => String(record.workerOrigin || ''))
+                  .filter((origin) => origin && origin !== target),
+              ),
+            ];
+            if (
+              pinnedOrigins.length &&
+              !(await confirmWorkerOriginChange(
+                `Session "${sessionSlug}" is pinned to Worker ${pinnedOrigins.join(', ')}. ` +
+                  `The restore target is ${target}. Trust this different Worker for restoring the backup?`,
+                confirmRepin,
+              ))
+            )
+              throw new Error('Worker identity change was not approved.');
+            // No config exists to pin yet. Approval is scoped to this rendered
+            // recovery target; a later successful bootstrap still verifies it.
+            recoveryWorkerOrigin = target;
+          } catch (failure) {
+            descriptor = describeWorkerSessionBootstrapError(failure);
+          }
+          if (!active || abortController.signal.aborted) return;
+        }
         setViewState({
           kind: 'error',
           title: descriptor.title,
           errorKind: descriptor.kind,
           message: descriptor.message,
           canRetry: descriptor.canRetry,
+          recoveryWorkerOrigin,
+          recoverySessionSlug: sessionSlug,
         });
       }
     };
@@ -179,7 +218,17 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
       active = false;
       abortController.abort();
     };
-  }, [confirmRepin, environment, fetchImpl, onResolved, retryDelaysMs, retryNonce, sessionSlug, workerQueryValue]);
+  }, [
+    confirmRepin,
+    environment,
+    fetchImpl,
+    onResolved,
+    retryDelaysMs,
+    retryNonce,
+    sessionSlug,
+    workerQueryValue,
+    hasMissingConfigFallback,
+  ]);
 
   if (viewState.kind === 'error') {
     let safeWorkerOrigin = '';
@@ -212,7 +261,10 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
             <a href={buildPublicRoute('/new')}>Return to session selection</a>
           </div>
         </div>
-        {viewState.errorKind === 'missing_config' && missingConfigFallback}
+        {viewState.errorKind === 'missing_config' &&
+          viewState.recoveryWorkerOrigin === safeWorkerOrigin &&
+          viewState.recoverySessionSlug === sessionSlug &&
+          missingConfigFallback}
         <BootRecoveryReady />
       </>
     );

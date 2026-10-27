@@ -1243,7 +1243,11 @@ Deployment-key holders are trusted operators and can create authenticated archiv
 
 The `session_backup_v1` capability advertises the backup and restore actions.
 Session admin settings show **Backup & restore** only when this capability is
-present. **Download backup** collects all pages into one `.jsonl` file; an
+present. Restore controls show the target Worker URL before signing. When a
+missing-config recovery URL differs from a locally pinned Worker origin, the
+client requires explicit trust approval before displaying those controls; it
+does not replace the pin until a canonical bootstrap can be verified.
+**Download backup** collects all pages into one `.jsonl` file; an
 interrupted download can resume or save its completed pages as `.partial.jsonl`.
 The restore control rejects partial files before signing requests. It reports
 progress and conflicts and resumes an interrupted import at the unacknowledged

@@ -329,6 +329,9 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
     <section className={styles.panel} data-testid="ce-admin-session-backup">
       <h3 className={styles.panelTitle}>Backup &amp; restore</h3>
       <p className={styles.statusNote}>
+        Target Worker: <code>{workerUrl}</code>
+      </p>
+      <p className={styles.statusNote}>
         Restore requires an empty target session. Abandoning an unfinished restore removes all data it imported.
       </p>
       {recoveryDisplay && <RecoveryKeyDialog value={recoveryDisplay} onContinue={() => setRecoveryDisplay(null)} />}
