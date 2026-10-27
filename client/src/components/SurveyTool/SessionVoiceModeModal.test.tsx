@@ -1207,15 +1207,27 @@ describe('SessionVoiceModeModal', () => {
     ).toBe(true);
   });
 
-  it('offers the two large requested voice-mode choices, with the AI-prefill option below them', () => {
+  it('offers the two large requested voice-mode choices, with the AI-prefill option below them', async () => {
     render(<SessionVoiceModeModal {...baseProps} />);
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW)).toHaveTextContent(
-      'Talk with an AI interviewer to answer the session’s questions, then review your responses.',
-    );
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP)).toHaveTextContent(
+    // Each choice shows its icon and title; its description sits behind a "?" beside the icon.
+    const interviewAbout = 'Talk with an AI interviewer to answer the session’s questions, then review your responses.';
+    const interview = screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW);
+    expect(interview).toHaveTextContent(/^Interview$/);
+    expect(interview).toHaveAccessibleDescription(interviewAbout);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP)).toHaveAccessibleDescription(
       'Record a group discussion and generate questions and context from it.',
     );
+    fireEvent.mouseOver(screen.getByRole('button', { name: 'About Interview' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(interviewAbout);
+    fireEvent.mouseOut(screen.getByRole('button', { name: 'About Interview' }));
     const prefill = screen.getByRole('region', { name: 'Let your AI draft your answers' });
+    // Its description is only read out with its "?", not shown as text.
+    const prefillAbout =
+      'Your AI drafts answers from what it knows about you, and you review them here before anything is submitted.';
+    expect(within(prefill).getByText(prefillAbout)).toHaveClass('sessionListeningSrOnly');
+    expect(
+      within(prefill).getByRole('button', { name: 'About letting your AI draft your answers' }),
+    ).toHaveAccessibleDescription(prefillAbout);
     expect(prefill).toHaveAttribute('data-testid', E2E_TESTIDS.SESSION_VOICE_PREFILL);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER)).not.toContainElement(prefill);
     expect(

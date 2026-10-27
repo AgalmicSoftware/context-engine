@@ -15,9 +15,11 @@ The session links are:
 
 The direct links open the selected modal panel; `?mode=voice` opens the
 launcher, as does clicking the microphone without a mode query. The launcher's
-two choices sit side by side with centered icons. Below them, a bordered **Let
-your AI draft your answers** card holds the ChatGPT or Claude prefill prompt
-(see below). The header close button dismisses the launcher without a separate
+two choices sit side by side with centered icons and titles; a question mark
+beside each icon shows what the choice does. Below them, a bordered **Let your
+AI draft your answers** card holds the ChatGPT or Claude prefill prompt (see
+below), with its own question mark beside the heading. Screen readers get each
+description with its choice. The header close button dismisses the launcher without a separate
 footer. Picking a choice replaces `?mode=voice` with its own mode.
 The older
 `?mode=listening` link remains supported and opens the original pile-adjacent

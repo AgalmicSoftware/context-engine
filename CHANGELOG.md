@@ -127,8 +127,8 @@ All notable changes to this project will be documented in this file.
   what discarding clears and that submitted responses are kept.
 - Offer the ChatGPT or Claude prefill prompt from the voice chooser, in a
   **Let your AI draft your answers** card below Interview and Group
-  Conversation, instead of inside the interview. `?mode=voice` opens the
-  chooser. Prefill links still open the interview on their drafts, now with a
+  Conversation, instead of inside the interview; the chooser's descriptions
+  now sit behind question-mark tooltips. `?mode=voice` opens the chooser. Prefill links still open the interview on their drafts, now with a
   status line and a **Talk through your drafts** microphone.
 - Open the interview's AI submission choices inside their dropdown instead of
   over the drafts, with every sharing choice listed before the prefill metadata.
