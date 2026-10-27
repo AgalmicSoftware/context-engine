@@ -211,7 +211,8 @@ test('error text for the client and the log drops RPC URLs and request data that
       reason: 'execution reverted', transaction: { data: '0xfeedfacecafe' }, error: { url: secret, requestBody: '{"params":["0xfeedfacecafe"]}' },
     }),
     new Error(`Faucet check failed: request failed url=${secret} body=0xfeedfacecafe`),
-    new Error('Could not reach https://agent:[redacted-email]:8545/v2/SYNTHETIC_RPC_SECRET_123?key=SYNTHETIC_RPC_SECRET_123'),
+    // A local hostname preserves synthetic userinfo through public text scrubbing.
+    new Error('Could not reach https://agent:fixture-password@localhost:8545/v2/SYNTHETIC_RPC_SECRET_123?key=SYNTHETIC_RPC_SECRET_123'),
     new Error('x'.repeat(5000)),
   ];
   const logs = [];
@@ -219,7 +220,7 @@ test('error text for the client and the log drops RPC URLs and request data that
   assert.deepEqual(texts, [
     'cannot estimate gas; transaction may fail or may require manual gas limit',
     'Faucet check failed: request failed',
-    'Could not reach https://rpc.example.invalid:8545',
+    'Could not reach https://localhost:8545',
     'x'.repeat(1000),
   ]);
   assert.deepEqual(logs, texts.map((text, index) => `tool fail${index} failed: ${text}`));
