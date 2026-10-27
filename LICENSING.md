@@ -38,8 +38,8 @@ Third-party dependencies retain their own licenses. Package metadata, lockfiles,
 The Session Worker deploy package generates `THIRD_PARTY_NOTICES.md` from its
 esbuild input packages, preserving each package's version, license and full
 license text. Template verification checks these notices against the bundle.
-The vendored `contextEngine-cc/public/ethers.umd.min.js` is ethers 5.7.2 under
-MIT; its notice is kept beside it in `ethers.LICENSE.md`. The add-on's MPL-2.0
+The add-on's vendored `ethers.umd.min.js` is ethers 5.7.2 under MIT; its notice
+is kept beside it in `ethers.LICENSE.md`. The add-on's MPL-2.0
 license applies to project-authored code.
 
 The Classic 95 theme bundles Wine Tahoma regular and bold font files under
