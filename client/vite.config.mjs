@@ -506,7 +506,14 @@ export const bundledModuleIdsPlugin = ({ rootDir = path.resolve(__dirname, '..')
         if (path.isAbsolute(id)) modules.add(path.relative(rootDir, id).split(path.sep).join('/'));
       }
     }
-    if (emit) this.emitFile({ type: 'asset', fileName: 'bundled-module-ids.json', source: `${JSON.stringify({ moduleIds: [...modules].sort() }, null, 2)}\n` });
+  },
+  writeBundle() {
+    if (!emit) return;
+    // License analysis needs resolved module paths, which may point outside the
+    // checkout. Keep that private build input beside the other metafiles.
+    const file = path.join(rootDir, 'dist/client.bundled-module-ids.json');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify({ moduleIds: [...modules].sort() }, null, 2)}\n`);
   },
 });
 

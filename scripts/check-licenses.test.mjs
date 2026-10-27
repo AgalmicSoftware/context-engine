@@ -85,7 +85,7 @@ test('the default release gate checks root-installed Bridge and deploy-helper de
   await writeFile(path.join(packageDir, 'LICENSE'), 'Synthetic full license text.');
   await mkdir(path.join(rootDir, 'dist'), { recursive: true });
   await mkdir(path.join(rootDir, 'client/build'), { recursive: true });
-  await writeFile(path.join(rootDir, 'client/build/bundled-module-ids.json'), JSON.stringify({ moduleIds: [] }));
+  await writeFile(path.join(rootDir, 'dist/client.bundled-module-ids.json'), JSON.stringify({ moduleIds: [] }));
   await writeFile(path.join(rootDir, 'dist/mcp.metafile.json'), JSON.stringify({ inputs: {} }));
   const check = () => checkLicenses({ rootDir, overrides: {} });
   for (const selected of ['sessionCorsWorker', 'agentBridgeWorker', 'deployHelper']) {

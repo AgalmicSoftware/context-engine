@@ -88,3 +88,7 @@ source evidence live in `scripts/license-overrides.json`; upgrades require
 another review when metadata or versions change; an override for a version no
 longer installed fails the gate. CI runs this check after
 installing all four trees. Dependencies retain their own licenses and notices.
+
+The client license inventory is written to `dist/client.bundled-module-ids.json`
+for local analysis. It is not part of the published `client/build` directory;
+resolved module paths can include local symlink or hoisted dependency locations.

@@ -7,7 +7,7 @@ import { buildWorkerThirdPartyNotices } from './lib/worker-third-party-notices.m
 const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 const productionTrees = ['.', 'client', 'mcp', 'workers/sessionCorsWorker'];
 const shippedBundles = [
-  { tree: 'client', path: 'client/build/bundled-module-ids.json', format: 'vite' },
+  { tree: 'client', path: 'dist/client.bundled-module-ids.json', format: 'vite' },
   { tree: 'mcp', path: 'dist/mcp.metafile.json', format: 'esbuild' },
   { tree: 'workers/sessionCorsWorker', path: 'dist/sessionCorsWorker.bundle.metafile.json', format: 'esbuild', bundleFile: 'dist/sessionCorsWorker.bundle.js' },
   { tree: '.', path: 'dist/deployHelper.bundle.metafile.json', format: 'esbuild', bundleFile: 'dist/deployHelper.bundle.js' },
