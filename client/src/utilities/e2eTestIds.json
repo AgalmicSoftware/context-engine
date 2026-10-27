@@ -143,6 +143,7 @@
   "WIZARD_SESSION_NAME": "ce-wizard-session-name",
   "WIZARD_SESSION_ENDS_AT": "ce-wizard-session-ends-at",
   "WIZARD_INTERVIEW_REALTIME_MODEL": "ce-wizard-interview-realtime-model",
+  "WIZARD_INTERVIEW_FIDELITY": "ce-wizard-interview-fidelity",
   "WIZARD_SESSION_INFO": "ce-wizard-session-info",
   "WIZARD_SESSION_COLOR_SCHEME": "ce-wizard-session-color-scheme",
   "WIZARD_SESSION_COLOR_PREVIEW": "ce-wizard-session-color-preview",

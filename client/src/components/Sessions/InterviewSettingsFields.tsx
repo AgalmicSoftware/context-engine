@@ -1,7 +1,8 @@
 import { useId } from 'react';
 import { getSessionWizardInterviewValidationError } from './sessionWizardInterviewValidation';
+import SessionWizardInfoTooltip from './SessionWizardInfoTooltip';
 import { Input, Label } from 'reactstrap';
-import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
+import { DEFAULT_INTERVIEW_SETTINGS, normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
@@ -12,6 +13,17 @@ const hiddenDraftShareLabel = (share: number) => {
   return Math.abs(1 / oneIn - share) < 1e-9 ? `1 in ${oneIn}` : `${Math.round(share * 100)}%`;
 };
 
+// What "Measure how well AI represents participants" turns on. AI prefill needs
+// no switch of its own: its links and card work whenever interviews are on.
+const FIDELITY_SETTINGS = { shareDraftChangesByDefault: true, hiddenDraftShare: 1 / 5, showFidelityScore: true };
+const FIDELITY_DEFAULTS = {
+  shareDraftChangesByDefault: DEFAULT_INTERVIEW_SETTINGS.shareDraftChangesByDefault,
+  hiddenDraftShare: DEFAULT_INTERVIEW_SETTINGS.hiddenDraftShare,
+  showFidelityScore: DEFAULT_INTERVIEW_SETTINGS.showFidelityScore,
+};
+const FIDELITY_ABOUT =
+  'Turns on research sharing by default, hides 1 in 5 of each person’s AI-prefill drafts until they answer, and shows people how well their AI predicted them, with an overall section in Results. Turning it off sets these back to their defaults; each can still be changed below.';
+
 type Props = { value: unknown; onChange: (value: Record<string, unknown>) => void; disabled?: boolean };
 export default function InterviewSettingsFields({ value, onChange, disabled = false }: Props) {
   const id = useId();
@@ -19,9 +31,42 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
   const settings = normalizeInterviewSettings(value);
   const validationError = getSessionWizardInterviewValidationError(value);
   const change = (key: string, next: unknown) => onChange({ ...raw, ...settings, [key]: next });
+  // On while all of its settings are, even after the hidden share is changed.
+  const measuring = settings.shareDraftChangesByDefault && settings.hiddenDraftShare > 0 && settings.showFidelityScore;
+  // Tooltip targets are CSS selectors, which can't contain React's colons.
+  const fidelityId = `${id.replace(/:/g, '')}-fidelity`;
   return (
     <fieldset disabled={disabled} style={{ minWidth: 0 }}>
       <legend>Interview settings</legend>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Label style={{ marginBottom: 0, fontWeight: 600 }}>
+          <input
+            type="checkbox"
+            checked={measuring}
+            aria-describedby={`${fidelityId}-about`}
+            data-testid={E2E_TESTIDS.WIZARD_INTERVIEW_FIDELITY}
+            onChange={(e) =>
+              onChange({
+                ...raw,
+                ...settings,
+                ...(e.target.checked ? { ...FIDELITY_SETTINGS, enabled: true } : FIDELITY_DEFAULTS),
+              })
+            }
+          />{' '}
+          Measure how well AI represents participants
+        </Label>
+        {/* Outside the label, so opening the help doesn't toggle the switch. */}
+        <SessionWizardInfoTooltip
+          enabled
+          id={`${fidelityId}-help`}
+          content={FIDELITY_ABOUT}
+          placement="top"
+          ariaLabel="About measuring how well AI represents participants"
+        />
+      </div>
+      <span id={`${fidelityId}-about`} hidden>
+        {FIDELITY_ABOUT}
+      </span>
       <Label for={`${id}-research-sharing`}>Share AI draft changes for research by default</Label>
       <Input
         id={`${id}-research-sharing`}

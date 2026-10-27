@@ -16,6 +16,11 @@ For a visual overview, see the [interview research diagrams](assets/interview-re
 
 ## Consent Controls
 
+The **Measure how well AI represents participants** switch in Interview
+settings turns on the sharing default, hidden drafts and the score screen
+described below in one step; see
+[session-creation-guide.md](session-creation-guide.md#measure-how-well-ai-represents-participants).
+
 Interview review exposes two independent choices under the initially collapsed
 **AI submission info** dropdown. It also contains the metadata disclosure and,
 when available, the optional responder-name checkbox. Expanding it does not

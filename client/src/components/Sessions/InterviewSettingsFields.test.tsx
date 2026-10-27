@@ -104,3 +104,53 @@ it('turns on the private fidelity score, off by default', () => {
   fireEvent.click(box);
   expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ showFidelityScore: true }));
 });
+
+it('turns on every setting that measures how well AI represents people, and back to their defaults', () => {
+  const onChange = jest.fn();
+  const label = 'Measure how well AI represents participants';
+  const latest = () => onChange.mock.calls.at(-1)?.[0];
+  const { rerender } = render(
+    <InterviewSettingsFields
+      value={{ realtimeModel: 'gpt-live-1', researchDetail: 'full', suggestGroups: true, enabled: false }}
+      onChange={onChange}
+    />,
+  );
+  expect(screen.getByLabelText(label)).not.toBeChecked();
+  expect(screen.getByLabelText(label)).toHaveAccessibleDescription(/hides 1 in 5 of each person’s AI-prefill drafts/);
+
+  fireEvent.click(screen.getByLabelText(label));
+  expect(latest()).toEqual(
+    expect.objectContaining({
+      shareDraftChangesByDefault: true,
+      hiddenDraftShare: 0.2,
+      showFidelityScore: true,
+      enabled: true,
+      researchDetail: 'full',
+      suggestGroups: true,
+      realtimeModel: 'gpt-live-1',
+    }),
+  );
+  rerender(<InterviewSettingsFields value={latest()} onChange={onChange} />);
+  expect(screen.getByLabelText(label)).toBeChecked();
+
+  // Each setting can still change: another hidden share keeps it on, none turns it off.
+  fireEvent.change(screen.getByLabelText('Hidden AI drafts'), { target: { value: String(1 / 4) } });
+  rerender(<InterviewSettingsFields value={latest()} onChange={onChange} />);
+  expect(screen.getByLabelText(label)).toBeChecked();
+  fireEvent.change(screen.getByLabelText('Hidden AI drafts'), { target: { value: '0' } });
+  rerender(<InterviewSettingsFields value={latest()} onChange={onChange} />);
+  expect(screen.getByLabelText(label)).not.toBeChecked();
+
+  fireEvent.click(screen.getByLabelText(label));
+  rerender(<InterviewSettingsFields value={latest()} onChange={onChange} />);
+  fireEvent.click(screen.getByLabelText(label));
+  expect(latest()).toEqual(
+    expect.objectContaining({
+      shareDraftChangesByDefault: false,
+      hiddenDraftShare: 0,
+      showFidelityScore: false,
+      researchDetail: 'full',
+      suggestGroups: true,
+    }),
+  );
+});

@@ -156,7 +156,8 @@ the page, and gives the same numbers as this report's, except that only
 AI-prefill drafts count (voice and typed-context drafts restate what the
 person said). Every cell follows the withholding rules above, and until the
 report's responses include AI-prefill drafts from 5 people it shows a
-one-line note instead.
+one-line note instead. To set a session up for this, see
+[session-creation-guide.md](session-creation-guide.md#measure-how-well-ai-represents-participants).
 
 ## Fix the plan before looking
 

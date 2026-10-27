@@ -127,6 +127,11 @@ sessions. It also lets owners supply an opening question, add an optional
 Automatic regeneration and discovery of new questions during a call are off by
 default; when enabled their default addition threshold is 20%. Question
 suggestions are optional and off by default. Admin refresh is on by default.
+**Measure how well AI represents participants**, at the top of Interview
+settings, turns on the next three research settings together: sharing by
+default, hidden drafts for 1 in 5 AI-prefill drafts, and the participant score.
+Turning it off sets them back to their defaults, and each stays editable; see
+[Measure how well AI represents participants](#measure-how-well-ai-represents-participants).
 **Share AI draft changes for research by default** controls the initial review
 checkbox through `interviewMode.shareDraftChangesByDefault` (off when unset).
 Participants can change it before submitting, and their saved choices are retained.
@@ -1100,6 +1105,31 @@ metadata was added must be upgraded before their newly stored rows can
 participate in fresh-browser response hydration.
 
 For payload examples, see [arweave-payloads.md](arweave-payloads.md).
+
+### Measure how well AI represents participants
+
+A session can measure how well people's own AI assistants predict their
+answers ([agent-fidelity.md](agent-fidelity.md)):
+
+1. Turn on **Measure how well AI represents participants** at the top of the
+   wizard's Interview settings, or later under **Session defaults** in
+   `/admin`. It turns on research sharing by default, hides 1 in 5 of each
+   person's AI-prefill drafts until they answer, and shows people their score.
+   These settings need a Session Worker newer than 0.7.0. AI prefill works
+   while **Voice interview modes** is on, as it is by default; `/admin` can't
+   turn that back on, so use the wizard if it was turned off.
+2. Share the session link with `?mode=voice`. It opens the microphone's
+   chooser with **Let your AI draft your answers**: people copy its prompt
+   into ChatGPT or Claude, open the link it returns, and review the drafts
+   before submitting. Only drafts from people who keep research sharing on
+   are compared.
+3. After submitting, each person sees how well their AI predicted them. Once
+   the responses include AI-prefill drafts from 5 people, the Results report
+   adds **How well AIs predicted people**.
+4. Write down the primary measure before reading results
+   ([Fix the plan before looking](agent-fidelity.md#fix-the-plan-before-looking)),
+   then download **JSON: Questions + Responses** from Results and run
+   `node scripts/agent-fidelity-report.mjs --export results.json --out reports/`.
 
 ### Share the session URL
 
