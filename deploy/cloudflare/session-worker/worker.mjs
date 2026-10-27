@@ -25411,6 +25411,24 @@ var init_interviewSettings = __esm({
   }
 });
 
+// shared/auth/siweMessage.mjs
+var normalizeSessionIdHex;
+var init_siweMessage = __esm({
+  "shared/auth/siweMessage.mjs"() {
+    normalizeSessionIdHex = (value) => {
+      if (typeof value !== "string" || value !== value.trim()) return "";
+      const lower7 = value.toLowerCase();
+      const hex = lower7.startsWith("0x") ? lower7.slice(2) : lower7;
+      if (/^[0-9a-f]{32}$/.test(hex) && !/^0+$/.test(hex)) return `0x${hex}`;
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(lower7)) {
+        const uuidHex = lower7.replace(/-/g, "");
+        return /^0+$/.test(uuidHex) ? "" : `0x${uuidHex}`;
+      }
+      return "";
+    };
+  }
+});
+
 // shared/crypto/recoveryKeyFingerprint.mjs
 var encoder, recoveryKeyFingerprint;
 var init_recoveryKeyFingerprint = __esm({
@@ -25595,8 +25613,8 @@ var init_storageRefNormalization = __esm({
         resource: opts.resource
       }, opts);
     };
-    resolvePayloadStorageRef = (record, opts = {}) => {
-      const raw = isObj(record) ? record : {};
+    resolvePayloadStorageRef = (record2, opts = {}) => {
+      const raw = isObj(record2) ? record2 : {};
       const ref = raw.storageRef ? normalizeStorageRef(raw.storageRef, {
         ...opts,
         legacyArweaveTxId: raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId
@@ -25611,17 +25629,17 @@ var init_storageRefNormalization = __esm({
         resource: raw.resource || opts.resource
       });
     };
-    getLegacyArweaveTxId = (record, opts = {}) => {
-      if (!isObj(record)) return trim(record);
-      const storageRef = record.storageRef ? normalizeStorageRef(record.storageRef, {
+    getLegacyArweaveTxId = (record2, opts = {}) => {
+      if (!isObj(record2)) return trim(record2);
+      const storageRef = record2.storageRef ? normalizeStorageRef(record2.storageRef, {
         ...opts,
-        legacyArweaveTxId: record.arweaveTxId || record.txId || opts.legacyArweaveTxId
+        legacyArweaveTxId: record2.arweaveTxId || record2.txId || opts.legacyArweaveTxId
       }) : null;
       if (storageRef) return isArweaveStorageBackend(storageRef.backend) ? storageRef.id : "";
-      return trim(record.arweaveTxId || record.txId || opts.legacyArweaveTxId);
+      return trim(record2.arweaveTxId || record2.txId || opts.legacyArweaveTxId);
     };
-    attachStorageRefCompatibilityFields = (record, opts = {}) => {
-      const source = isObj(record) ? { ...record } : {};
+    attachStorageRefCompatibilityFields = (record2, opts = {}) => {
+      const source = isObj(record2) ? { ...record2 } : {};
       const storageRef = resolvePayloadStorageRef(source, opts);
       if (!storageRef) return source;
       source.storageRef = storageRef;
@@ -26867,23 +26885,23 @@ var init_workerConfigModeValidation = __esm({
       }, {});
     };
     sessionModeValuesEqual = (left, right) => JSON.stringify(stableSessionModeValue(left)) === JSON.stringify(stableSessionModeValue(right));
-    validateEnumField = (record, key, path, allowed) => {
-      if (!hasOwn(record, key)) return valid();
-      const value = record[key];
+    validateEnumField = (record2, key, path, allowed) => {
+      if (!hasOwn(record2, key)) return valid();
+      const value = record2[key];
       return typeof value === "string" && allowed.has(value) ? valid() : invalid(path);
     };
-    validateRequiredEnumField = (record, key, path, allowed) => hasOwn(record, key) ? validateEnumField(record, key, path, allowed) : invalid(path);
-    validateObjectField = (record, key, path) => {
-      if (!hasOwn(record, key)) return { ok: true, value: null };
-      return isObj3(record[key]) ? { ok: true, value: record[key] } : { ok: false, path };
+    validateRequiredEnumField = (record2, key, path, allowed) => hasOwn(record2, key) ? validateEnumField(record2, key, path, allowed) : invalid(path);
+    validateObjectField = (record2, key, path) => {
+      if (!hasOwn(record2, key)) return { ok: true, value: null };
+      return isObj3(record2[key]) ? { ok: true, value: record2[key] } : { ok: false, path };
     };
-    validateExactKeys = (record, path, allowed) => {
+    validateExactKeys = (record2, path, allowed) => {
       const allowedKeys2 = new Set(allowed);
-      const unknownKey = Object.keys(record).find((key) => !allowedKeys2.has(key));
+      const unknownKey = Object.keys(record2).find((key) => !allowedKeys2.has(key));
       return unknownKey ? invalid(path ? `${path}.${unknownKey}` : unknownKey) : valid();
     };
-    validateRequiredObjectField = (record, key, path, allowed) => {
-      const result = validateObjectField(record, key, path);
+    validateRequiredObjectField = (record2, key, path, allowed) => {
+      const result = validateObjectField(record2, key, path);
       if (!result.ok || !result.value) return result.ok ? invalid(path) : result;
       const keysResult = validateExactKeys(result.value, path, allowed);
       return keysResult.ok ? result : keysResult;
@@ -26938,14 +26956,14 @@ var init_workerConfigModeValidation = __esm({
       }
       return { ok: true, sbtChainIds };
     };
-    validatePayloadAccessControl = (record, path) => {
-      if (!isObj3(record)) return invalid(path);
+    validatePayloadAccessControl = (record2, path) => {
+      if (!isObj3(record2)) return invalid(path);
       for (const [key, allowed] of [
         ["mode", PAYLOAD_ACCESS_MODES],
         ["gate", PAYLOAD_ACCESS_GATES],
         ["encryption", PAYLOAD_ENCRYPTION_MODES]
       ]) {
-        const result = validateEnumField(record, key, `${path}.${key}`, allowed);
+        const result = validateEnumField(record2, key, `${path}.${key}`, allowed);
         if (!result.ok) return result;
       }
       return valid();
@@ -27908,6 +27926,7 @@ var init_deployHelperCore = __esm({
         "envelopeKekSecretSet",
         "envelopeKekSecretPreserved",
         "recoveryKeyFingerprint",
+        "keyPreserved",
         "subdomain",
         "subdomainStatus",
         "subdomainEnabled",
@@ -28075,14 +28094,14 @@ var init_deployHelperCore = __esm({
         return null;
       }
     };
-    writeDeployJournalRecord = async (binding, key, record) => binding.put(
+    writeDeployJournalRecord = async (binding, key, record2) => binding.put(
       key,
-      JSON.stringify(record),
+      JSON.stringify(record2),
       { expirationTtl: DEPLOYMENT_JOURNAL_TTL_SECONDS }
     );
-    writeDurableDeployJournalRecord = async (binding, key, record) => binding.put(
+    writeDurableDeployJournalRecord = async (binding, key, record2) => binding.put(
       key,
-      JSON.stringify(record)
+      JSON.stringify(record2)
     );
     normalizeResourceStage = (value, fallback) => {
       const normalized = toStr10(value).trim().toLowerCase();
@@ -29372,6 +29391,7 @@ var init_deployHelperCore = __esm({
         tokenSecretPreserved,
         envelopeKekSecretSet,
         envelopeKekSecretPreserved,
+        keyPreserved: envelopeKekSecretPreserved,
         subdomain,
         subdomainStatus,
         subdomainEnabled,
@@ -29491,8 +29511,36 @@ var init_deployHelperCore = __esm({
         workerName,
         workerCleanupStatus: "retained-runtime-secret-pending"
       });
+      const recoveryKeyRecordPath = `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/ce-deployment-recovery-key:${deploymentId}`;
+      if (envelopeKekSecretPreserved) {
+        const readback = await cfFetch(apiToken, recoveryKeyRecordPath, { method: "GET" }, cfFetchOptions);
+        const record2 = readback?.data?.result || readback?.data;
+        if (readback.ok && record2?.deploymentId === deploymentId && /^[a-f0-9]{64}$/.test(record2?.fingerprint || "")) {
+          deploymentPayload.recoveryKeyFingerprint = record2.fingerprint;
+        } else if (!readback.ok && Number(readback.status) !== 404) {
+          return buildDeploymentFailure(503, {
+            error: "Could not read the preserved recovery key fingerprint; retry.",
+            deploymentRequestPending: true,
+            orphanResources: retainedRuntimeSecretResources()
+          }, { fallbackEligible: true });
+        }
+      }
       if (envelopeKekSecretRequired) {
         if (!deploymentPayload.envelopeKekSecretPreserved) {
+          const fingerprint = await recoveryKeyFingerprint(envelopeKekSecret);
+          const recorded = await cfFetch(apiToken, recoveryKeyRecordPath, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ deploymentId, fingerprint })
+          }, cfFetchOptions);
+          if (!recorded.ok) {
+            return buildDeploymentFailure(503, {
+              error: "Could not retain the recovery key fingerprint; retry.",
+              deploymentRequestPending: true,
+              orphanResources: retainedRuntimeSecretResources()
+            }, { fallbackEligible: true });
+          }
+          deploymentPayload.recoveryKeyFingerprint = fingerprint;
           const envelopeKekResp = await cfFetch(apiToken, runtimeSecretsPath, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -29802,10 +29850,13 @@ var init_deployHelperCore = __esm({
           }, { fallbackEligible: true });
         }
       };
-      const buildTerminalJournalReplay = (record) => {
-        const result2 = record?.result;
+      const buildTerminalJournalReplay = (record2) => {
+        let result2 = record2?.result;
         if (result2?.ok !== true) return result2;
-        const recordedFullRequestDigest = toStr10(record?.fullRequestDigest).trim().toLowerCase();
+        if (result2.body?.recoveryKeyFingerprint || result2.body?.envelopeKekSecretSet || result2.body?.envelopeKekSecretPreserved) {
+          result2 = { ...result2, body: { ...result2.body, keyPreserved: true } };
+        }
+        const recordedFullRequestDigest = toStr10(record2?.fullRequestDigest).trim().toLowerCase();
         const fullRequestDigestMatches = recordedFullRequestDigest ? recordedFullRequestDigest === context.fullRequestDigest : context.requestDigest === context.fullRequestDigest;
         if (fullRequestDigestMatches) return result2;
         return {
@@ -30086,9 +30137,9 @@ var init_resultsAnalysisSettings = __esm({
       inputScope: "submitted",
       publication: "latest_success_visible"
     });
-    allowedKeys = (record, keys) => {
+    allowedKeys = (record2, keys) => {
       const allowed = new Set(keys);
-      const unknown = Object.keys(record || {}).find((key) => !allowed.has(key));
+      const unknown = Object.keys(record2 || {}).find((key) => !allowed.has(key));
       return unknown || "";
     };
     normalizeBoolean = (value, fallback) => typeof value === "boolean" ? value : fallback;
@@ -30415,6 +30466,7 @@ var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGI
 var init_sessionConfigMutation = __esm({
   "workers/sessionCorsWorker/sessionConfigMutation.js"() {
     init_interviewSettings();
+    init_siweMessage();
     init_deployHelperCore();
     init_realtimeInterviewConfig();
     init_workerSessionConfig();
@@ -30548,12 +30600,7 @@ var init_sessionConfigMutation = __esm({
       }
       return { ok: true };
     };
-    normalizeCanonicalSessionId = (value) => {
-      const raw = toTrimmedString6(value).toLowerCase();
-      if (!raw) return "";
-      const normalized = raw.replace(/^0x/, "").replace(/-/g, "");
-      return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? normalized : "";
-    };
+    normalizeCanonicalSessionId = (value) => normalizeSessionIdHex(value).slice(2);
     resolveCanonicalSessionIdentity = (config) => {
       const rawValues = ["sessionId", "sessionIdHex"].filter((key) => hasOwn4(config, key) && toTrimmedString6(config?.[key])).map((key) => config[key]);
       const normalizedValues = rawValues.map(normalizeCanonicalSessionId);
@@ -30656,6 +30703,9 @@ var init_sessionConfigMutation = __esm({
       if (kind === "set-config") {
         incomingConfig = mutation?.incomingConfig && typeof mutation.incomingConfig === "object" ? mutation.incomingConfig : null;
         if (!incomingConfig) return { ok: false, status: 400, error: "Missing config." };
+        if (resolveCanonicalSessionIdentity(incomingConfig).invalid) {
+          return { ok: false, status: 400, error: "Invalid session identity." };
+        }
         if (migrateStoredModel && incomingConfig?.interviewMode?.realtimeModel === storedModel) {
           incomingConfig = { ...incomingConfig, interviewMode: { ...incomingConfig.interviewMode, realtimeModel: existing.interviewMode.realtimeModel } };
         }
@@ -31879,6 +31929,7 @@ ${row.principalKey}`, row);
       principal,
       actorPrincipal,
       capacityAuthorized = false,
+      resume = false,
       deps = {}
     } = {}) => {
       const store = resolveWorkerGroupStore(env);
@@ -31907,6 +31958,7 @@ ${row.principalKey}`, row);
           return { ok: false, status: 409, reason: "worker_group_member_cap_exceeded" };
         }
       }
+      if (existing && !resume) return { ok: true, store: store.kind, group: redactGroupForMember(group), member: existing, created: false };
       const addedAt = nowIso(deps);
       const member = {
         groupId: normalizeWorkerGroupId(groupId),
@@ -32242,6 +32294,7 @@ ${row.principalKey}`, row);
           principal,
           actorPrincipal,
           capacityAuthorized,
+          resume,
           deps
         });
       }
@@ -32282,6 +32335,7 @@ ${row.principalKey}`, row);
           principal,
           actorPrincipal,
           capacityAuthorized,
+          resume,
           deps
         });
       }
@@ -32326,7 +32380,7 @@ ${row.principalKey}`, row);
         return workerGroupCoordinationUnavailable();
       }
     };
-    coordinateWorkerGroupBackup = ({ env, slug, sessionId, operation, snapshot, snapshotId, cursor, operations, checkOnly } = {}) => callWorkerGroupCoordinator({ env, slug, sessionId, path: `/worker-groups/backup/${operation}`, payload: { snapshot, snapshotId, cursor, operations, checkOnly } });
+    coordinateWorkerGroupBackup = ({ env, slug, sessionId, operation, archiveId, snapshot, snapshotId, cursor, operations, checkOnly } = {}) => callWorkerGroupCoordinator({ env, slug, sessionId, path: `/worker-groups/backup/${operation}`, payload: { archiveId, snapshot, snapshotId, cursor, operations, checkOnly } });
     checkCoordinatedWorkerGroupReady = async ({ env, slug, sessionId } = {}) => callWorkerGroupCoordinator({
       env,
       slug,
@@ -60717,11 +60771,12 @@ var require_lib2 = __commonJS({
 });
 
 // workers/sessionCorsWorker/storageBackupRevision.js
-var STORAGE_BACKUP_REVISION_KEY, bumpStorageBackupRevision, markStorageBackupWrite;
+var STORAGE_BACKUP_REVISION_KEY, WORKER_GROUP_BACKUP_PENDING_PREFIX, bumpStorageBackupRevision, markStorageBackupWrite;
 var init_storageBackupRevision = __esm({
   "workers/sessionCorsWorker/storageBackupRevision.js"() {
     init_sessionConfigAuthority();
     STORAGE_BACKUP_REVISION_KEY = "storage-backup-revision";
+    WORKER_GROUP_BACKUP_PENDING_PREFIX = "worker-group-backup-pending:";
     bumpStorageBackupRevision = (storage) => storage.transaction(async (transaction) => {
       const revision = (await transaction.get(STORAGE_BACKUP_REVISION_KEY) || 0) + 1;
       await transaction.put(STORAGE_BACKUP_REVISION_KEY, revision);
@@ -60983,15 +61038,15 @@ var init_storageEnvelopeEncryption = __esm({
       const envelope = isObj10(config.storageEnvelope) ? config.storageEnvelope : {};
       return isObj10(envelope.sessionKey) ? envelope.sessionKey : null;
     };
-    isCoordinatorWrappedSessionKeyRecord = (record, slug) => {
-      if (!isObj10(record)) return false;
-      const createdAt = trim5(record.createdAt);
+    isCoordinatorWrappedSessionKeyRecord = (record2, slug) => {
+      if (!isObj10(record2)) return false;
+      const createdAt = trim5(record2.createdAt);
       const createdAtMs = Date.parse(createdAt);
-      return record.version === ENVELOPE_VERSION && record.keyProvider === "worker_secret" && record.alg === AES_256_GCM && record.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs) && new Date(createdAtMs).toISOString() === createdAt && trim5(record.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim5(record.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim5(record.wrappedKey));
+      return record2.version === ENVELOPE_VERSION && record2.keyProvider === "worker_secret" && record2.alg === AES_256_GCM && record2.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs) && new Date(createdAtMs).toISOString() === createdAt && trim5(record2.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim5(record2.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim5(record2.wrappedKey));
     };
     unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
-      const record = readSessionKeyRecord(config);
-      if (!record) throw new Error("Storage envelope session key is missing.");
+      const record2 = readSessionKeyRecord(config);
+      if (!record2) throw new Error("Storage envelope session key is missing.");
       const aad = `ce-storage-envelope:session:${safeSlugPart(slug)}`;
       const attempts = [false, true];
       let lastError = null;
@@ -60999,7 +61054,7 @@ var init_storageEnvelopeEncryption = __esm({
         if (previous && !trim5(readDeploymentSecret({ env, previous, deps }))) continue;
         try {
           const deploymentKey = await importDeploymentKek({ env, previous, deps });
-          return await unwrapBytesWithKey({ wrappingKey: deploymentKey, wrapped: record, aad, deps });
+          return await unwrapBytesWithKey({ wrappingKey: deploymentKey, wrapped: record2, aad, deps });
         } catch (error) {
           lastError = error;
         }
@@ -64063,17 +64118,38 @@ var init_storageRouteExecution = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupLifecycle.js
-var BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStateKey, backupImportStagePrefix, fail, cleanup, readActiveBackupImport, controlCoordinatorBackupImport;
+var BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStateKey, backupImportStagePrefix, fail, backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJournal, assertNoActiveBackupImport, cleanup, readActiveBackupImport, controlCoordinatorBackupImport;
 var init_sessionBackupLifecycle = __esm({
   "workers/sessionCorsWorker/sessionBackupLifecycle.js"() {
     init_sessionSlugResolution();
     init_storageRouteExecution();
+    init_workerGroups();
     BACKUP_IMPORT_TTL_MS = 7 * 86400 * 1e3;
     BACKUP_IMPORT_ACTIVE_KEY = "session-backup-import-active";
     backupImportStateKey = (archiveId) => `session-backup-import:${archiveId}`;
     backupImportStagePrefix = (slug, archiveId) => `ce-import-stage:${sessionSlugStorageKey(slug)}:${archiveId}:`;
     fail = (message) => {
       throw Object.assign(new Error(message), { status: 409 });
+    };
+    backupImportJournalKey = (archiveId, kind, key) => `${backupImportStateKey(archiveId)}:journal:${kind}:${encodeURIComponent(key)}`;
+    journalBackupImportWrite = (storage, archiveId, kind, key) => storage.put(backupImportJournalKey(archiveId, kind, key), { kind, key });
+    cleanupBackupImportJournal = async (storage, archiveId, stores) => {
+      const rows = await storage.list({ prefix: `${backupImportStateKey(archiveId)}:journal:`, limit: 100 });
+      for (const [name, { kind, key }] of rows) {
+        if (!stores[kind]?.delete) throw new Error("Restore cleanup storage is unavailable.");
+        await stores[kind].delete(key);
+        await storage.delete(name);
+      }
+      return { complete: rows.size < 100, operations: rows.size * 2 + 1 };
+    };
+    assertNoActiveBackupImport = async (coordinator) => {
+      const { storage } = coordinator.state;
+      const archiveId = await storage.get(BACKUP_IMPORT_ACTIVE_KEY);
+      const progress = archiveId && await storage.get(backupImportStateKey(archiveId));
+      if (progress && !progress.finished) throw Object.assign(
+        new Error("A backup restore is in progress. Resume or abandon it first."),
+        { status: 409, reason: "backup_restore_in_progress" }
+      );
     };
     cleanup = async (coordinator, slug, archiveId, progress, budget) => {
       const { storage } = coordinator.state;
@@ -64082,6 +64158,24 @@ var init_sessionBackupLifecycle = __esm({
       await storage.put(key, progress);
       const rawIndex = getStorageIndexBinding(coordinator.env);
       const index = budget ? budget.wrap(rawIndex) : rawIndex;
+      const groups = await coordinateWorkerGroupBackup({
+        env: coordinator.env,
+        slug,
+        sessionId: progress.manifest.sessionId,
+        operation: "abandon",
+        archiveId
+      });
+      if (!groups.ok) throw Object.assign(new Error(groups.error || "Group restore cleanup is unavailable."), { status: groups.status || 503 });
+      budget?.consume(groups.operations || 0);
+      if (!groups.complete) return false;
+      const groupKv = budget ? budget.wrap(coordinator.env.GROUP_KV) : coordinator.env.GROUP_KV;
+      const journal = await cleanupBackupImportJournal(storage, archiveId, {
+        index,
+        group: groupKv,
+        durable: storage,
+        r2: getStorageR2Binding(coordinator.env)
+      });
+      if (!journal.complete) return false;
       const staged = await index.list({ prefix: backupImportStagePrefix(slug, archiveId), limit: 200 });
       for (const { name } of staged.keys || []) await index.delete(name);
       if (staged.list_complete === false) return false;
@@ -64105,7 +64199,7 @@ var init_sessionBackupLifecycle = __esm({
       return { archiveId, progress };
     };
     controlCoordinatorBackupImport = async (coordinator, payload, abandon = false) => {
-      await coordinator.assertSessionAuthority(payload);
+      await coordinator.assertSessionAuthority(payload, { allowRestore: true });
       const active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
       if (abandon) {
         if (!active || active.archiveId !== payload.archiveId || active.progress.configPublished) {
@@ -64126,7 +64220,7 @@ var init_sessionBackupLifecycle = __esm({
 });
 
 // workers/sessionCorsWorker/sessionDiagnostics.js
-var DAY_MS, STORE_PREFIX, SWEEP_KEY, REGISTERED_KEY, PAGE_SIZE, SWEEP_SIZE, HASH, json2, unavailable, indexStub, scheduleSweep, registerUploadReceiptStore, dispatchUploadReceiptIndex, sweepUploadReceiptIndex, readSessionDiagnosticsAuthority, readUploadReceiptDiagnostics;
+var DAY_MS, STORE_PREFIX, CURSOR_PREFIX, SWEEP_KEY, REGISTERED_KEY, PAGE_SIZE, SWEEP_SIZE, HASH, json2, unavailable, invalidCursor, opaqueCursor, indexStub, scheduleSweep, registerUploadReceiptStore, dispatchUploadReceiptIndex, sweepUploadReceiptIndex, readSessionDiagnosticsAuthority, readUploadReceiptDiagnostics;
 var init_sessionDiagnostics = __esm({
   "workers/sessionCorsWorker/sessionDiagnostics.js"() {
     init_deployHelperCore();
@@ -64134,6 +64228,7 @@ var init_sessionDiagnostics = __esm({
     init_sessionConfigAuthority();
     DAY_MS = 24 * 60 * 60 * 1e3;
     STORE_PREFIX = "upload-receipt-store-v1:";
+    CURSOR_PREFIX = "upload-receipt-cursor-v1:";
     SWEEP_KEY = "upload-receipt-store-sweep-v1";
     REGISTERED_KEY = "upload-receipt-indexed-until-v1";
     PAGE_SIZE = 25;
@@ -64141,6 +64236,17 @@ var init_sessionDiagnostics = __esm({
     HASH = /^[a-f0-9]{64}$/;
     json2 = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
     unavailable = () => Object.assign(new Error("Session diagnostics are unavailable; retry."), { status: 503 });
+    invalidCursor = () => Object.assign(new Error("Invalid diagnostics cursor; refresh diagnostics."), { status: 400 });
+    opaqueCursor = async (env, owner) => {
+      if (!env.TOKEN_HMAC_SECRET) throw unavailable();
+      const encoder9 = new TextEncoder();
+      const algorithm = { name: "HMAC", hash: "SHA-256" };
+      const root = await crypto.subtle.importKey("raw", encoder9.encode(env.TOKEN_HMAC_SECRET), algorithm, false, ["sign"]);
+      const derived = await crypto.subtle.sign("HMAC", root, encoder9.encode("ce-diagnostics-cursor-v1"));
+      const key = await crypto.subtle.importKey("raw", derived, algorithm, false, ["sign"]);
+      const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder9.encode(owner)));
+      return [...mac].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    };
     indexStub = async (env, slug) => {
       const binding = env?.CE_SESSION_COORDINATOR;
       const name = await sha256Hex2(`upload-receipt-index:${resolveCoordinatorSessionSlugStorageKey(slug)}`);
@@ -64180,12 +64286,24 @@ var init_sessionDiagnostics = __esm({
       if (path.endsWith("/list")) {
         const cursor = payload?.cursor || "";
         if (cursor && !HASH.test(cursor)) return json2({ error: "Invalid diagnostics cursor." }, 400);
-        const entries = await storage.list({ prefix: STORE_PREFIX, ...cursor ? { startAfter: `${STORE_PREFIX}${cursor}` } : {}, limit: PAGE_SIZE + 1 });
+        const continuation = cursor ? await storage.get(`${CURSOR_PREFIX}${cursor}`) : null;
+        if (cursor && (!continuation || continuation.expiresAtMs <= now)) return json2({ error: "Invalid diagnostics cursor." }, 400);
+        const entries = await storage.list({ prefix: STORE_PREFIX, ...continuation ? { startAfter: `${STORE_PREFIX}${continuation.owner}` } : {}, limit: PAGE_SIZE + 1 });
         const page = [...entries].slice(0, PAGE_SIZE);
+        let next = null;
+        if (entries.size > PAGE_SIZE) {
+          const owner = page.at(-1)[0].slice(STORE_PREFIX.length);
+          next = await opaqueCursor(coordinator.env, owner);
+          await storage.transaction(async (transaction) => {
+            await transaction.put(`${CURSOR_PREFIX}${next}`, { owner, expiresAtMs: now + DAY_MS });
+            if (!await transaction.get(SWEEP_KEY)) await transaction.put(SWEEP_KEY, { cursor: "" });
+          });
+          await scheduleSweep(storage, now + DAY_MS);
+        }
         return json2({
           ok: true,
           owners: page.filter(([, value]) => value.expiresAtMs > now).map(([key]) => key.slice(STORE_PREFIX.length)),
-          cursor: entries.size > PAGE_SIZE ? page.at(-1)[0].slice(STORE_PREFIX.length) : null
+          cursor: next
         });
       }
       return json2({ error: "Not found." }, 404);
@@ -64198,11 +64316,16 @@ var init_sessionDiagnostics = __esm({
         if (!sweep) return null;
         const entries = await transaction.list({ prefix: STORE_PREFIX, ...sweep.cursor ? { startAfter: sweep.cursor } : {}, limit: SWEEP_SIZE });
         for (const [key, value] of entries) if (value.expiresAtMs <= now) await transaction.delete(key);
-        if (entries.size === SWEEP_SIZE) {
-          await transaction.put(SWEEP_KEY, { cursor: [...entries.keys()].at(-1) });
+        const cursors = await transaction.list({ prefix: CURSOR_PREFIX, ...sweep.tokenCursor ? { startAfter: sweep.tokenCursor } : {}, limit: SWEEP_SIZE });
+        for (const [key, value] of cursors) if (value.expiresAtMs <= now) await transaction.delete(key);
+        if (entries.size === SWEEP_SIZE || cursors.size === SWEEP_SIZE) {
+          await transaction.put(SWEEP_KEY, {
+            cursor: [...entries.keys()].at(-1) || sweep.cursor,
+            tokenCursor: [...cursors.keys()].at(-1) || sweep.tokenCursor
+          });
           return 1e3;
         }
-        if ((await transaction.list({ prefix: STORE_PREFIX, limit: 1 })).size) {
+        if ((await transaction.list({ prefix: STORE_PREFIX, limit: 1 })).size || (await transaction.list({ prefix: CURSOR_PREFIX, limit: 1 })).size) {
           await transaction.put(SWEEP_KEY, { cursor: "" });
           return DAY_MS;
         }
@@ -64219,25 +64342,38 @@ var init_sessionDiagnostics = __esm({
       return result.body;
     };
     readUploadReceiptDiagnostics = async ({ env, slug, cursor = "" }) => {
-      if (cursor && !HASH.test(cursor)) throw Object.assign(new Error("Invalid diagnostics cursor."), { status: 400 });
-      const stub = await indexStub(env, slug);
-      if (!stub) throw unavailable();
-      const response3 = await stub.fetch("https://session-coordinator.internal/upload-receipts/index/list", {
-        method: "POST",
-        body: JSON.stringify({ cursor })
-      });
-      const page = await response3.json();
-      if (!response3.ok || !Array.isArray(page.owners)) throw unavailable();
-      const totals = { pendingLeases: 0, oldestPendingAgeMs: null, settledCount: 0, cursor: page.cursor, complete: !page.cursor };
+      if (cursor && !HASH.test(cursor)) throw invalidCursor();
+      const totals = { pendingLeases: 0, oldestPendingAgeMs: null, settledCount: 0, cursor: null, complete: false };
+      let page;
+      let response3;
+      try {
+        const stub = await indexStub(env, slug);
+        response3 = await stub.fetch("https://session-coordinator.internal/upload-receipts/index/list", {
+          method: "POST",
+          body: JSON.stringify({ cursor })
+        });
+        page = await response3.json();
+      } catch {
+        return totals;
+      }
+      if (response3.status === 400) throw invalidCursor();
+      if (!response3.ok || !Array.isArray(page.owners)) return totals;
+      totals.cursor = page.cursor;
+      totals.complete = !page.cursor;
       for (const owner of page.owners) {
-        if (!HASH.test(owner)) throw unavailable();
-        const ownerStub = env.CE_SESSION_COORDINATOR.get(env.CE_SESSION_COORDINATOR.idFromName(owner));
-        const reply = await ownerStub.fetch("https://session-coordinator.internal/upload-receipts/diagnostics", { method: "POST", body: "{}" });
-        const counts = await reply.json();
-        if (!reply.ok) throw unavailable();
-        totals.pendingLeases += counts.pendingLeases;
-        totals.settledCount += counts.settledCount;
-        if (counts.oldestPendingAgeMs !== null) totals.oldestPendingAgeMs = Math.max(totals.oldestPendingAgeMs ?? 0, counts.oldestPendingAgeMs);
+        try {
+          if (!HASH.test(owner)) throw unavailable();
+          const ownerStub = env.CE_SESSION_COORDINATOR.get(env.CE_SESSION_COORDINATOR.idFromName(owner));
+          const reply = await ownerStub.fetch("https://session-coordinator.internal/upload-receipts/diagnostics", { method: "POST", body: "{}" });
+          const counts = await reply.json();
+          if (!reply.ok) throw unavailable();
+          totals.pendingLeases += counts.pendingLeases;
+          totals.settledCount += counts.settledCount;
+          if (counts.oldestPendingAgeMs !== null) totals.oldestPendingAgeMs = Math.max(totals.oldestPendingAgeMs ?? 0, counts.oldestPendingAgeMs);
+        } catch {
+          totals.complete = false;
+          totals.cursor = null;
+        }
       }
       return totals;
     };
@@ -64249,13 +64385,15 @@ var exportCoordinatorRecoveryKey;
 var init_recoveryKeyExport = __esm({
   "workers/sessionCorsWorker/recoveryKeyExport.js"() {
     init_recoveryKey();
+    init_sessionSlugResolution();
     exportCoordinatorRecoveryKey = async (coordinator, payload) => {
       const headers = { "Cache-Control": "no-store" };
       const reply = (body, status) => Response.json(body, { status, headers });
       try {
         const authority = await coordinator.assertSessionAuthority(payload);
         if (!authority) return reply({ error: "Session config is not initialized." }, 409);
-        if (String(coordinator.env.DEFAULT_SESSION_SLUG || "").trim() !== authority.slug) {
+        const pinnedSlug = getDefaultWorkerSessionSlug(coordinator.env);
+        if (!pinnedSlug || pinnedSlug !== normalizeWorkerSessionSlug(authority.slug)) {
           return reply({
             error: "The deployment operator holds the recovery key for this Worker.",
             reason: "recovery_key_deployment_scoped"
@@ -64305,6 +64443,9 @@ var init_sessionBackupGroupSnapshot = __esm({
     readBackupGroupSnapshot = async ({ coordinator, payload, prefixes: prefixes2, validateDurable, scopeRecords }) => {
       const { storage } = coordinator.state;
       const { slug, sessionId } = payload;
+      if ((await storage.list({ prefix: WORKER_GROUP_BACKUP_PENDING_PREFIX, limit: 1 })).size) {
+        fail2("A group mutation is pending. Retry the backup after it settles.");
+      }
       const snapshots = await storage.list({ prefix: "worker-group-backup-meta:", limit: 100 });
       const expired = [...snapshots].find(([, value]) => value.expiresAt <= coordinator.now());
       if (expired) {
@@ -64385,7 +64526,7 @@ var init_sessionBackupGroupSnapshot = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupCoordinator.js
-var json3, fail3, object2, parse, groupPrefixes, scopedGroupRecords, exportCoordinatorBackup, exportWorkerGroupBackup, importWorkerGroupBackup;
+var json3, fail3, object2, parse, groupPrefixes, BACKUP_GROUP_IMPORT_ACTIVE_KEY, scopedGroupRecords, exportCoordinatorBackup, exportWorkerGroupBackup, controlWorkerGroupBackupImport, importWorkerGroupBackup;
 var init_sessionBackupCoordinator = __esm({
   "workers/sessionCorsWorker/sessionBackupCoordinator.js"() {
     init_sessionBackupGroupSnapshot();
@@ -64394,6 +64535,7 @@ var init_sessionBackupCoordinator = __esm({
     init_sessionConfigMutation();
     init_sessionSlugResolution();
     init_sessionSecretsEnvelope();
+    init_sessionBackupLifecycle();
     json3 = (body, status = 200) => Response.json(body, { status });
     fail3 = (message, status = 503) => {
       throw Object.assign(new Error(message), { status });
@@ -64401,6 +64543,7 @@ var init_sessionBackupCoordinator = __esm({
     object2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     parse = (raw) => typeof raw === "string" ? JSON.parse(raw) : raw;
     groupPrefixes = (slug) => ["ce-worker-group", "ce-worker-group-index", "ce-worker-group-member", "ce-worker-group-principal"].map((kind) => `${kind}:${slug}:`);
+    BACKUP_GROUP_IMPORT_ACTIVE_KEY = "worker-group-backup-import-active";
     scopedGroupRecords = (records, slug, sessionId) => {
       const canonical = workerGroupBackupPrefixes({ slug, sessionId });
       const allowed = new Set(records.filter(([key]) => canonical.some((prefix) => key.startsWith(prefix))).map(([key]) => key));
@@ -64467,11 +64610,44 @@ var init_sessionBackupCoordinator = __esm({
         }
       }));
     };
+    controlWorkerGroupBackupImport = async (coordinator, payload, operation) => {
+      const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+      const { archiveId } = payload;
+      if (!slug || !sessionId || !/^[a-f0-9]{64}$/.test(archiveId || "")) fail3("Invalid group restore identity.", 400);
+      const { storage } = coordinator.state;
+      const active = await storage.get(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
+      if (active && active !== archiveId) fail3("Another group restore is in progress.", 409);
+      const kv = resolveWorkerGroupsKv(coordinator.env);
+      if (!kv?.list || !kv?.delete) fail3("Group restore storage is unavailable.");
+      if (operation === "begin") {
+        if (active) return json3({ ok: true, operations: 0 });
+        const nonempty = () => {
+          throw Object.assign(new Error("Restore requires an empty target session."), { status: 409, reason: "backup_target_not_empty" });
+        };
+        if ((await storage.list({ prefix: "worker-group-capacity-", limit: 1 })).size) nonempty();
+        for (const prefix of groupPrefixes(slug)) {
+          const rows = await kv.list({ prefix, limit: 1 });
+          if (!Array.isArray(rows.keys)) fail3("Group restore storage could not be checked.");
+          if (rows.keys.length || rows.list_complete === false) nonempty();
+        }
+        if (!payload.checkOnly) await storage.put(BACKUP_GROUP_IMPORT_ACTIVE_KEY, archiveId);
+        return json3({ ok: true, operations: 5 });
+      }
+      if (operation === "abandon") {
+        const result = await cleanupBackupImportJournal(storage, archiveId, { group: kv, durable: storage });
+        if (result.complete) await storage.delete(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
+        return json3({ ok: true, ...result });
+      }
+      await storage.delete(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
+      return json3({ ok: true });
+    };
     importWorkerGroupBackup = async (coordinator, payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const snapshot = payload?.snapshot;
       if (!slug || !sessionId || !Array.isArray(snapshot?.durable) || !Array.isArray(snapshot?.records)) fail3("Invalid group backup.", 400);
+      if (!payload.archiveId || await coordinator.state.storage.get(BACKUP_GROUP_IMPORT_ACTIVE_KEY) !== payload.archiveId) fail3("The group restore has not reserved an empty target.", 409);
       const scoped = scopedGroupRecords(snapshot.records, slug, sessionId);
       if (scoped.length !== snapshot.records.length) fail3("Invalid group backup scope.", 400);
       const seen = /* @__PURE__ */ new Set();
@@ -64498,12 +64674,14 @@ var init_sessionBackupCoordinator = __esm({
           if (operations + 2 > limit) return json3({ ok: true, counts, conflicts, operations, nextCursor: { phase, offset } });
           const [key, value] = rows[offset];
           const store = key.startsWith("worker-group-capacity-") ? coordinator.state.storage : kv;
+          const kind = store === kv ? "group" : "durable";
           const existing = await store.get(key);
           operations += 1;
-          if (existing != null && JSON.stringify(existing) !== JSON.stringify(value)) conflicts.push(key);
+          if (existing != null && (!await coordinator.state.storage.get(backupImportJournalKey(payload.archiveId, kind, key)) || JSON.stringify(existing) !== JSON.stringify(value))) conflicts.push(key);
           else if (phase === "apply") {
             if (existing != null) counts.skipped += 1;
             else {
+              await journalBackupImportWrite(coordinator.state.storage, payload.archiveId, kind, key);
               await store.put(key, value);
               operations += 1;
               counts.written += 1;
@@ -64519,21 +64697,21 @@ var init_sessionBackupCoordinator = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupAuthentication.js
-var encoder6, pageBytes, pageKey, signBackupPage, verifyBackupPage;
+var encoder6, pageBytes, backupKey, signBackupPage, verifyBackupPage, signBackupCursor, authenticateBackupCursor;
 var init_sessionBackupAuthentication = __esm({
   "workers/sessionCorsWorker/sessionBackupAuthentication.js"() {
     encoder6 = new TextEncoder();
     pageBytes = (page) => encoder6.encode(JSON.stringify({ ...page, authentication: void 0 }, (_, value) => value && typeof value === "object" && !Array.isArray(value) ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]])) : value));
-    pageKey = async (secret) => {
+    backupKey = async (secret, label) => {
       const raw = String(secret || "").trim();
       if (!raw) throw new Error("Backup recovery key is missing.");
       const material = /^[a-f0-9]{64}$/i.test(raw) ? raw.toLowerCase() : raw;
       const deploymentKey = await crypto.subtle.importKey("raw", encoder6.encode(material), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-      const derived = await crypto.subtle.sign("HMAC", deploymentKey, encoder6.encode("ce-backup-page-v1"));
+      const derived = await crypto.subtle.sign("HMAC", deploymentKey, encoder6.encode(label));
       return crypto.subtle.importKey("raw", derived, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
     };
     signBackupPage = async (page, env) => {
-      const mac = new Uint8Array(await crypto.subtle.sign("HMAC", await pageKey(env.CE_STORAGE_ENVELOPE_KEK), pageBytes(page)));
+      const mac = new Uint8Array(await crypto.subtle.sign("HMAC", await backupKey(env.CE_STORAGE_ENVELOPE_KEK, "ce-backup-page-v1"), pageBytes(page)));
       return { ...page, authentication: { version: 1, mac: [...mac].map((byte) => byte.toString(16).padStart(2, "0")).join("") } };
     };
     verifyBackupPage = async (page, env) => {
@@ -64542,15 +64720,32 @@ var init_sessionBackupAuthentication = __esm({
       const mac = Uint8Array.from(authentication.mac.match(/../g), (pair) => parseInt(pair, 16));
       const bytes3 = pageBytes(page);
       for (const secret of [env.CE_STORAGE_ENVELOPE_KEK, env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK].filter(Boolean)) {
-        if (await crypto.subtle.verify("HMAC", await pageKey(secret), mac, bytes3)) return true;
+        if (await crypto.subtle.verify("HMAC", await backupKey(secret, "ce-backup-page-v1"), mac, bytes3)) return true;
       }
       return false;
+    };
+    signBackupCursor = async (cursor, env) => {
+      const key = await backupKey(env.CE_STORAGE_ENVELOPE_KEK, "ce-backup-cursor-v1");
+      const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder6.encode(cursor)));
+      return `${cursor}.${[...mac].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+    };
+    authenticateBackupCursor = async (cursor, env) => {
+      const match = typeof cursor === "string" && cursor.length <= 8257 ? cursor.match(/^([A-Za-z0-9_-]{1,8192})\.([a-f0-9]{64})$/) : null;
+      if (match) {
+        const mac = Uint8Array.from(match[2].match(/../g), (pair) => parseInt(pair, 16));
+        const key = await backupKey(env.CE_STORAGE_ENVELOPE_KEK, "ce-backup-cursor-v1");
+        if (await crypto.subtle.verify("HMAC", key, mac, encoder6.encode(match[1]))) return match[1];
+      }
+      throw Object.assign(
+        new Error("Backup cursor authentication failed. Restart the export."),
+        { status: 403, reason: "backup_cursor_authentication_failed" }
+      );
     };
   }
 });
 
 // workers/sessionCorsWorker/sessionBackupImport.js
-var fail4, object3, stable, same, digest, hashPattern, resources, temporary, validateSnapshot, validatePage, importCoordinatorBackupPage;
+var fail4, object3, stable, same, digest, hashPattern, resources, temporary, assertEmptyTarget, validateSnapshot, validatePage, importCoordinatorBackupPage;
 var init_sessionBackupImport = __esm({
   "workers/sessionCorsWorker/sessionBackupImport.js"() {
     init_sessionBackupLifecycle();
@@ -64577,6 +64772,36 @@ var init_sessionBackupImport = __esm({
     hashPattern = /^[a-f0-9]{64}$/;
     resources = /* @__PURE__ */ new Set(["docsContext", "questions", "surveys", "responses", "generatedArtifacts", "media", "images"]);
     temporary = { expirationTtl: 7 * 86400 };
+    assertEmptyTarget = async ({ coordinator, current, slug, page, index, budget }) => {
+      const nonempty = () => fail4("Restore requires an empty target session. Abandon any unfinished restore before starting again.", 409, "backup_target_not_empty");
+      if (current || await coordinator.state.storage.get("session-lit-authorization-signer-v1")) nonempty();
+      const groupKv = budget.wrap(coordinator.env.GROUP_KV);
+      for (const suffix of ["config", "secrets"]) {
+        if (await groupKv.get(`session:${normalizeWorkerSessionSlug(slug)}:${suffix}`) != null) nonempty();
+      }
+      for (const kind of ["ce-storage", "ce-storage-payload", "ce-storage-owner", "ce-storage-hidden"]) {
+        const rows = await index.list({ prefix: `${kind}:${slug}:`, limit: 1 });
+        if (!Array.isArray(rows.keys)) fail4("Restore storage could not be checked.", 503);
+        if (rows.keys.length || rows.list_complete === false) nonempty();
+      }
+      const r2 = getStorageR2Binding(coordinator.env);
+      if (r2) {
+        if (!r2.list || !r2.delete) fail4("Restore requires an R2 binding that supports listing and cleanup.", 503);
+        const rows = await r2.list({ prefix: `sessions/${slug}/storage/`, limit: 1 });
+        if (!Array.isArray(rows.objects)) fail4("Restore object storage could not be checked.", 503);
+        if (rows.objects.length || rows.truncated) nonempty();
+      }
+      const groups = await coordinateWorkerGroupBackup({
+        env: coordinator.env,
+        slug,
+        sessionId: page.manifest.sessionId,
+        operation: "begin",
+        archiveId: page.archiveId,
+        checkOnly: true
+      });
+      if (!groups.ok) fail4(groups.error || "Group restore storage could not be checked.", groups.status || 503, groups.reason);
+      budget.consume(groups.operations || 0);
+    };
     validateSnapshot = ({ snapshot, manifest, normalizeConfig, normalizeSessionKey }) => {
       const authority = snapshot?.configAuthority;
       const slug = manifest.sessionSlug;
@@ -64623,14 +64848,14 @@ var init_sessionBackupImport = __esm({
       const missing = required.filter((fingerprint) => !fingerprints.includes(fingerprint));
       if (missing.length) fail4(`The target is missing backup recovery keys: ${missing.join(", ")}.`, 409, "recovery_key_mismatch");
       if (!await verifyBackupPage(page, env)) fail4("Backup page authentication failed. Use the original unmodified archive.", 403, "backup_authentication_failed");
-      const current = await coordinator.assertSessionAuthority(payload);
+      const current = await coordinator.assertSessionAuthority(payload, { allowRestore: true });
       const targetId = resolveCanonicalWorkerSessionIdHex(current?.config || {});
       if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail4("The backup session identity does not match this target.", 409, "backup_session_mismatch");
       if (page.archiveId !== await sha256Hex2(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail4("Invalid backup archive identity.");
       const budget = createStorageExportBudget();
       const rawIndex = getStorageIndexBinding(env);
       const index = rawIndex ? budget.wrap(rawIndex) : null;
-      if (!index?.get || !index?.put || !index?.delete) fail4("Restore storage is unavailable.", 503);
+      if (!index?.get || !index?.put || !index?.delete || !index?.list) fail4("Restore storage is unavailable.", 503);
       const stateKey = `session-backup-import:${page.archiveId}`;
       const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
       const active = await readActiveBackupImport(coordinator, slug, true, budget);
@@ -64643,12 +64868,17 @@ var init_sessionBackupImport = __esm({
         return Response.json({ ...receipt.result, replayed: true });
       }
       const root = backupImportStagePrefix(slug, page.archiveId);
+      const stage = async (key, value) => {
+        await journalBackupImportWrite(storage, page.archiveId, "index", key);
+        await index.put(key, value, temporary);
+      };
       const descriptorKey = (id2, target = "") => `${stateKey}:payload:${target || "storage"}:${id2}`;
       const recordKey2 = (id2) => `${stateKey}:record:${id2}`;
       const chunkKey = (id2, n2, target = "") => `${root}chunk:${target || "storage"}:${id2}:${n2}`;
       let progress = await storage.get(stateKey);
       if (!progress) {
         if (page.pageNumber !== 0 || !page.coordinator) fail4("Import must begin with the first backup page.", 409);
+        await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
         progress = {
           actor: expectedAuthority.actor,
           pageNumber: 0,
@@ -64660,7 +64890,6 @@ var init_sessionBackupImport = __esm({
           observed: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 },
           expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS,
           configPublished: false,
-          liveTarget: !!current,
           pendingPayloads: 0,
           pendingRecords: 0,
           snapshotReady: false,
@@ -64669,19 +64898,31 @@ var init_sessionBackupImport = __esm({
         if (page.coordinator.chunked !== true) {
           validateSnapshot({ snapshot: page.coordinator, manifest, ...validators });
           if (await sha256Hex2(JSON.stringify(page.coordinator)) !== page.snapshotDigest) fail4("The coordinator snapshot checksum does not match.");
-          await index.put(`${root}coordinator`, JSON.stringify(page.coordinator), temporary);
-          progress.snapshotReady = true;
         } else if (page.coordinator.sha256 !== page.snapshotDigest) fail4("Invalid coordinator snapshot descriptor.");
-        await storage.put(activeKey, page.archiveId);
-        await storage.put(stateKey, progress);
+        await storage.transaction(async (transaction) => {
+          await transaction.put(activeKey, page.archiveId);
+          await transaction.put(stateKey, progress);
+        });
       }
       if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.finished || progress.nextEntry > 0 && progress.pageHash !== pageHash || !same(progress.manifest, { ...manifest, counts: void 0, complete: void 0 })) fail4("Backup pages must be imported unchanged and in order.", 409);
       progress.pageHash = pageHash;
+      if (!progress.groupsStarted) {
+        const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: "begin", archiveId: page.archiveId });
+        if (!groups.ok) fail4(groups.error || "Group restore is unavailable.", groups.status || 503, groups.reason);
+        budget.consume(groups.operations || 0);
+        progress.groupsStarted = true;
+        await storage.put(stateKey, progress);
+      }
+      if (!progress.snapshotReady && page.pageNumber === 0 && page.coordinator?.chunked !== true) {
+        await stage(`${root}coordinator`, JSON.stringify(page.coordinator));
+        progress.snapshotReady = true;
+        await storage.put(stateKey, progress);
+      }
       const conflict = (key) => {
         progress.counts.conflicts += 1;
         if (progress.conflicts.length < 50) progress.conflicts.push(key);
       };
-      const write = async (store, key, value, json5 = false) => {
+      const write = async (store, key, value, json5 = false, kind = "index") => {
         const existing = await store.get(key);
         if (existing != null) {
           let identical = existing === value;
@@ -64691,10 +64932,12 @@ var init_sessionBackupImport = __esm({
             } catch {
             }
           }
+          identical = identical && !!await storage.get(backupImportJournalKey(page.archiveId, kind, key));
           if (identical) progress.counts.skipped += 1;
           else conflict(key);
           return identical;
         }
+        await journalBackupImportWrite(storage, page.archiveId, kind, key);
         await store.put(key, value);
         progress.counts.written += 1;
         return true;
@@ -64733,8 +64976,7 @@ var init_sessionBackupImport = __esm({
         if (budget.remaining < cost + 16) return pending();
         const updates = [];
         if (entry.kind === "owner" || entry.kind === "hidden") {
-          if (entry.kind === "hidden" && progress.liveTarget && await index.get(entry.key) == null) conflict(entry.key);
-          else await write(index, entry.key, entry.value, true);
+          await write(index, entry.key, entry.value, true);
           progress.observed[entry.kind === "owner" ? "owners" : "hidden"] += 1;
         } else if (entry.kind === "record") {
           if (await storage.get(recordKey2(entry.id))) fail4("Duplicate backup metadata id.");
@@ -64743,7 +64985,7 @@ var init_sessionBackupImport = __esm({
             if (header.payloadOk !== false) await write(index, entry.key, JSON.stringify(entry.metadata), true);
             updates.push([recordKey2(entry.id), { applied: true }]);
           } else {
-            await index.put(`${root}record:${entry.id}`, JSON.stringify(entry), temporary);
+            await stage(`${root}record:${entry.id}`, JSON.stringify(entry));
             updates.push([recordKey2(entry.id), { pending: true }]);
             progress.pendingRecords += 1;
           }
@@ -64754,14 +64996,14 @@ var init_sessionBackupImport = __esm({
           if (entry.size > resolveMaxUploadBytes({ env })) fail4("The backup payload exceeds this target\u2019s configured upload limit.", 413);
           const { metadata } = entry;
           const header = { id: entry.id, size: entry.size, sha256: entry.sha256, chunkCount: entry.chunkCount, ...entry.target ? { target: entry.target } : {} };
-          if (metadata) await index.put(`${root}metadata:${entry.id}`, JSON.stringify(metadata), temporary);
+          if (metadata) await stage(`${root}metadata:${entry.id}`, JSON.stringify(metadata));
           updates.push([descriptorKey(entry.id, entry.target), { ...header, nextChunk: 0, done: false }]);
           progress.pendingPayloads += 1;
         } else {
           const header = await storage.get(descriptorKey(entry.id, entry.target));
           if (!header || header.done || header.nextChunk !== entry.index || entry.index >= header.chunkCount) fail4("Backup chunks must follow their payload header in order.");
           if (bytesToBase64url2(base64urlToBytes2(entry.base64url)) !== entry.base64url) fail4("Invalid backup chunk encoding.");
-          await index.put(chunkKey(entry.id, entry.index, entry.target), entry.base64url, temporary);
+          await stage(chunkKey(entry.id, entry.index, entry.target), entry.base64url);
           header.nextChunk += 1;
           if (header.nextChunk === header.chunkCount) {
             const bytes3 = await assemble(header);
@@ -64778,26 +65020,31 @@ var init_sessionBackupImport = __esm({
               let payloadOk = true;
               const rawExisting = await index.get(buildPayloadKey({ slug, id: entry.id }));
               if (existing || rawExisting != null) {
-                payloadOk = !!existing && existing.length === bytes3.length && await digest(existing) === header.sha256;
+                const kind = rawExisting != null ? "index" : "r2";
+                const key = kind === "index" ? buildPayloadKey({ slug, id: entry.id }) : buildObjectKey({ slug, id: entry.id });
+                payloadOk = !!await storage.get(backupImportJournalKey(page.archiveId, kind, key)) && !!existing && existing.length === bytes3.length && await digest(existing) === header.sha256;
                 if (payloadOk) progress.counts.skipped += 1;
                 else conflict(buildPayloadKey({ slug, id: entry.id }));
               } else {
                 const r2 = getStorageR2Binding(env);
-                if (r2?.put) await r2.put(buildObjectKey({ slug, id: entry.id }), bytes3, {
-                  httpMetadata: { contentType: metadata.contentType || "application/octet-stream" },
-                  customMetadata: {
-                    id: entry.id,
-                    resource: metadata.resource,
-                    encrypted: metadata.encrypted ? "true" : "false",
-                    payloadAccessMode: metadata.payloadAccessMode || "",
-                    payloadAccessControl: JSON.stringify(metadata.payloadAccessControl || {}),
-                    groupIds: metadata.groupIds?.length ? JSON.stringify(metadata.groupIds) : ""
-                  }
-                });
-                else {
+                if (r2?.put) {
+                  await journalBackupImportWrite(storage, page.archiveId, "r2", buildObjectKey({ slug, id: entry.id }));
+                  await r2.put(buildObjectKey({ slug, id: entry.id }), bytes3, {
+                    httpMetadata: { contentType: metadata.contentType || "application/octet-stream" },
+                    customMetadata: {
+                      id: entry.id,
+                      resource: metadata.resource,
+                      encrypted: metadata.encrypted ? "true" : "false",
+                      payloadAccessMode: metadata.payloadAccessMode || "",
+                      payloadAccessControl: JSON.stringify(metadata.payloadAccessControl || {}),
+                      groupIds: metadata.groupIds?.length ? JSON.stringify(metadata.groupIds) : ""
+                    }
+                  });
+                } else {
                   const value = JSON.stringify({ metadata, payloadBase64url: bytesToBase64url2(bytes3) });
                   const tooLarge2 = rejectKvValueOverLimit({ serializedValue: value });
                   if (tooLarge2) fail4("This payload needs an R2 binding on the restore target.", 413);
+                  await journalBackupImportWrite(storage, page.archiveId, "index", buildPayloadKey({ slug, id: entry.id }));
                   await index.put(buildPayloadKey({ slug, id: entry.id }), value);
                 }
                 progress.counts.written += 1;
@@ -64844,7 +65091,6 @@ var init_sessionBackupImport = __esm({
         const snapshot = progress.chunkedSnapshot ? JSON.parse(new TextDecoder().decode(await assemble(snapshotHeader))) : JSON.parse(await index.get(`${root}coordinator`) || "null");
         validateSnapshot({ snapshot, manifest, ...validators });
         const authority = snapshot.configAuthority;
-        if (current && !same(current, authority)) conflict("session-config-authority");
         if (!progress.counts.conflicts) {
           if (!progress.groupsComplete) {
             if (budget.remaining < 32) return pending();
@@ -64853,6 +65099,7 @@ var init_sessionBackupImport = __esm({
               slug,
               sessionId: manifest.sessionId,
               operation: "import",
+              archiveId: page.archiveId,
               snapshot: snapshot.workerGroups,
               cursor: progress.groupCursor,
               operations: budget.remaining - 16
@@ -64867,18 +65114,19 @@ var init_sessionBackupImport = __esm({
             await storage.put(stateKey, progress);
             if (groups.nextCursor) return pending();
           }
-          if (snapshot.secrets) await write(env.GROUP_KV, `session:${normalizeWorkerSessionSlug(slug)}:secrets`, JSON.stringify(snapshot.secrets), true);
+          if (snapshot.secrets) await write(budget.wrap(env.GROUP_KV), `session:${normalizeWorkerSessionSlug(slug)}:secrets`, JSON.stringify(snapshot.secrets), true, "group");
           const signer = snapshot.wrappedSessionKeys.litAuthorizationSigner;
           if (signer) {
             const existing = await storage.get("session-lit-authorization-signer-v1");
-            if (existing && !same(existing, signer)) conflict("session-lit-authorization-signer-v1");
+            if (existing && (!await storage.get(backupImportJournalKey(page.archiveId, "durable", "session-lit-authorization-signer-v1")) || !same(existing, signer))) conflict("session-lit-authorization-signer-v1");
             else if (existing) progress.counts.skipped += 1;
             else {
+              await journalBackupImportWrite(storage, page.archiveId, "durable", "session-lit-authorization-signer-v1");
               await storage.put("session-lit-authorization-signer-v1", signer);
               progress.counts.written += 1;
             }
           }
-          if (!progress.counts.conflicts && !current) {
+          if (!progress.counts.conflicts && !progress.configPublished) {
             progress.configPublished = true;
             await storage.transaction(async (transaction) => {
               await transaction.put("session-config-authority", { ...authority, projectionPending: true, projectionPendingSinceMs: coordinator.now() });
@@ -64887,8 +65135,13 @@ var init_sessionBackupImport = __esm({
             await coordinator.projectSessionConfigAuthority(authority);
             progress.counts.written += 1;
           }
+          if (progress.configPublished) {
+            await coordinator.repairPendingSessionConfigProjection();
+            const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: "finish", archiveId: page.archiveId });
+            if (!groups.ok) fail4(groups.error || "Group restore completion is unavailable.", groups.status || 503);
+          }
         }
-        progress.finished = true;
+        progress.finished = progress.configPublished && !progress.counts.conflicts;
       }
       const result = {
         ok: true,
@@ -64956,9 +65209,9 @@ var init_sponsoredBootstrapGrantStore = __esm({
       const getKvJsonFn = typeof deps.getKvJson === "function" ? deps.getKvJson : getKvJson;
       return getKvJsonFn(env, buildSponsoredGrantKvKey(token));
     };
-    writeSponsoredGrantRecord = async (env, token, record, ttlSeconds = null, deps = {}) => {
+    writeSponsoredGrantRecord = async (env, token, record2, ttlSeconds = null, deps = {}) => {
       const putKvJsonFn = typeof deps.putKvJson === "function" ? deps.putKvJson : putKvJson;
-      return putKvJsonFn(env, buildSponsoredGrantKvKey(token), record, ttlSeconds || void 0);
+      return putKvJsonFn(env, buildSponsoredGrantKvKey(token), record2, ttlSeconds || void 0);
     };
     deleteSponsoredGrantRecord = async (env, token) => env?.GROUP_KV?.delete?.(buildSponsoredGrantKvKey(token));
     normalizeSensitiveValues = (values = []) => Array.from(new Set(
@@ -64997,6 +65250,7 @@ var init_sponsoredBootstrapGrantStore = __esm({
         "envelopeKekSecretSet",
         "envelopeKekSecretPreserved",
         "recoveryKeyFingerprint",
+        "keyPreserved",
         "subdomain",
         "subdomainStatus",
         "subdomainEnabled",
@@ -65108,6 +65362,146 @@ var init_sponsoredBootstrapGrantStore = __esm({
       };
       await writeSponsoredGrantRecord(env, token, safeRecord, ttlSeconds);
       return safeRecord.receipt;
+    };
+  }
+});
+
+// shared/aiDefaults.mjs
+var DEFAULT_AI_MODEL, DEFAULT_AI_MODELS;
+var init_aiDefaults = __esm({
+  "shared/aiDefaults.mjs"() {
+    DEFAULT_AI_MODEL = "gpt-5.6-terra";
+    DEFAULT_AI_MODELS = Object.freeze({ fast: DEFAULT_AI_MODEL, thinking: DEFAULT_AI_MODEL });
+  }
+});
+
+// workers/sessionCorsWorker/aiModelParams.js
+var toModelLeaf, usesOpenAiResponsesApi, isChatReasoningModel, applyChatCompletionBudget, resolveResponsesOutputTokens;
+var init_aiModelParams = __esm({
+  "workers/sessionCorsWorker/aiModelParams.js"() {
+    toModelLeaf = (modelRaw = "") => String(modelRaw || "").trim().toLowerCase().split("/").pop();
+    usesOpenAiResponsesApi = ({ provider = "", model = "", endpoint = "" } = {}) => {
+      const normalizedProvider = String(provider || "").trim().toLowerCase();
+      const normalizedEndpoint = String(endpoint || "").trim().toLowerCase();
+      if (normalizedProvider !== "openai") return false;
+      if (normalizedEndpoint.includes("/responses") || normalizedEndpoint === "responses") return true;
+      return /^(gpt-5|gpt-6-astra(?:$|-))/.test(toModelLeaf(model));
+    };
+    isChatReasoningModel = ({ model = "", thinking = false } = {}) => thinking === true || /^o[13]/.test(toModelLeaf(model));
+    applyChatCompletionBudget = ({
+      body,
+      model = "",
+      thinking = false,
+      max_tokens,
+      max_completion_tokens,
+      temperature,
+      defaultMaxCompletionTokens = 16e3,
+      defaultMaxTokens = 2048,
+      defaultTemperature = 0.7
+    } = {}) => {
+      const target = body && typeof body === "object" ? body : {};
+      if (isChatReasoningModel({ model, thinking })) {
+        target.max_completion_tokens = max_completion_tokens ?? max_tokens ?? defaultMaxCompletionTokens;
+        delete target.max_tokens;
+        delete target.temperature;
+        return target;
+      }
+      target.max_tokens = max_tokens ?? defaultMaxTokens;
+      target.temperature = temperature !== void 0 ? temperature : defaultTemperature;
+      delete target.max_completion_tokens;
+      return target;
+    };
+    resolveResponsesOutputTokens = ({
+      max_output_tokens,
+      max_completion_tokens,
+      max_tokens,
+      fallback = 16e3
+    } = {}) => max_output_tokens ?? max_completion_tokens ?? max_tokens ?? fallback;
+  }
+});
+
+// workers/sessionCorsWorker/aiRequestPolicy.js
+var trim9, record, tasks, taskName, modelEntry, configuredModels, resolveSessionAiModel, AI_MODEL_NOT_ALLOWED, isSessionTranscriptionModelAllowed, operationCeilings, tokenFields, effortOrder, configuredFunctions, boundSessionAiRequest;
+var init_aiRequestPolicy = __esm({
+  "workers/sessionCorsWorker/aiRequestPolicy.js"() {
+    init_aiDefaults();
+    init_aiModelParams();
+    trim9 = (value) => typeof value === "string" ? value.trim() : "";
+    record = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    tasks = /* @__PURE__ */ new Set(["generate", "rewrite", "summarize", "rank", "analysis", "interview-map", "interview-opening"]);
+    taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : "";
+    modelEntry = (entry, provider, fallback = DEFAULT_AI_MODEL) => {
+      const obj = record(entry);
+      return {
+        model: trim9(obj.model || obj.name || obj.value || entry) || fallback,
+        provider: (trim9(obj.provider) || provider || "openai").toLowerCase()
+      };
+    };
+    configuredModels = (config, task) => {
+      const ai = record(config?.ai);
+      const models2 = record(ai.models);
+      const providers = record(ai.modelProviders);
+      const provider = trim9(ai.mode || ai.provider).toLowerCase() || "openai";
+      const fallback = trim9(ai.model) || DEFAULT_AI_MODEL;
+      const fast = modelEntry(models2.fast || models2.default, trim9(providers.fast || providers.default) || provider, fallback);
+      const thinking = modelEntry(models2.thinking || models2.reasoning, trim9(providers.thinking || providers.reasoning) || provider, fallback);
+      const feature = task && models2[task] ? modelEntry(models2[task], trim9(providers[task]) || provider, fallback) : null;
+      return { fast, thinking, feature, ...trim9(ai.model) ? { default: modelEntry(ai.model, provider) } : {} };
+    };
+    resolveSessionAiModel = (config, { taskType = "", modelType = "fast" } = {}) => {
+      const models2 = configuredModels(config, tasks.has(taskType) ? taskType : "");
+      return models2.feature || models2[modelType === "thinking" ? "thinking" : "fast"];
+    };
+    AI_MODEL_NOT_ALLOWED = Object.freeze({
+      error: "This model is not allowed on the session's AI key. Use the session model or your own key.",
+      reason: "ai_model_not_allowed"
+    });
+    isSessionTranscriptionModelAllowed = ({ config, provider, model }) => {
+      const ai = record(config?.ai);
+      const entry = record(ai.models?.transcription || ai.transcription);
+      return provider === (trim9(entry.provider).toLowerCase() || "openai") && model === (trim9(entry.model) || "whisper-1");
+    };
+    operationCeilings = Object.freeze({ generate: 16e3, analysis: 7e3, "interview-map": 8e3, "interview-opening": 600 });
+    tokenFields = ["max_tokens", "max_completion_tokens", "max_output_tokens", "max_tokens_to_sample", "maxTokens"];
+    effortOrder = ["none", "minimal", "low", "medium", "high"];
+    configuredFunctions = (config) => {
+      const value = config?.ai?.providers?.custom?.functions ?? config?.ai?.custom?.functions;
+      if (typeof value !== "string") return value;
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value.trim() || void 0;
+      }
+    };
+    boundSessionAiRequest = ({ payload = {}, provider, config, requestKey = "" }) => {
+      if (requestKey) return { ok: true, payload };
+      const task = taskName(payload);
+      const models2 = configuredModels(config, task);
+      const allowed = Object.values(models2).filter((entry) => entry?.provider === provider);
+      const model = trim9(payload.model) || (models2.feature?.provider === provider ? models2.feature.model : allowed[0]?.model);
+      if (!model || !allowed.some((entry) => entry.model === model)) return { ok: false, ...AI_MODEL_NOT_ALLOWED };
+      const reasoning = isChatReasoningModel({ model });
+      const responses = usesOpenAiResponsesApi({ provider, model, endpoint: payload.endpoint });
+      const ceiling = operationCeilings[task] || (reasoning || responses ? 16e3 : 2048);
+      const requested = tokenFields.filter((key) => Object.hasOwn(payload, key)).map((key) => {
+        const value = payload[key];
+        return typeof value === "number" && Number.isFinite(value) && value >= 1 ? Math.floor(value) : ceiling;
+      });
+      const tokens = Math.min(ceiling, ...requested);
+      const ai = record(config?.ai);
+      const savedEffort = ai.taskReasoningEffort?.[task] || task === "analysis" && ai.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || "low";
+      const maximumEffort = ["low", "medium", "high"].includes(savedEffort) ? savedEffort : "low";
+      const requestedEffort = trim9(payload.reasoning_effort || payload.reasoningEffort || payload.reasoning?.effort);
+      const effort = effortOrder.includes(requestedEffort) && effortOrder.indexOf(requestedEffort) < effortOrder.indexOf(maximumEffort) ? requestedEffort : maximumEffort;
+      const bounded = { ...payload, model, service_tier: "default", reasoning_effort: effort, thinking: reasoning };
+      for (const key of tokenFields) bounded[key] = tokens;
+      delete bounded.tools;
+      delete bounded.functions;
+      if (provider === "custom") {
+        const functions = configuredFunctions(config);
+        if (functions) bounded.functions = functions;
+      }
+      return { ok: true, payload: bounded };
     };
   }
 });
@@ -65238,9 +65632,9 @@ var init_resultsAnalysisArtifactValidation = __esm({
       });
       return refs;
     };
-    normalizeSourceFields = (record, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
-      const participantIds = normalizeIdRefs({ value: record.participantIds, allowed: allowed.participants, label: "participantId", errors, limit: participantLimit });
-      const questionIds = normalizeIdRefs({ value: record.questionIds, allowed: allowed.questions, label: "questionId", errors });
+    normalizeSourceFields = (record2, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
+      const participantIds = normalizeIdRefs({ value: record2.participantIds, allowed: allowed.participants, label: "participantId", errors, limit: participantLimit });
+      const questionIds = normalizeIdRefs({ value: record2.questionIds, allowed: allowed.questions, label: "questionId", errors });
       if (participantIds.length && questionIds.length) {
         for (const participantId of participantIds) {
           if (!questionIds.some((questionId) => allowed.questionsByParticipant.get(participantId)?.has(questionId))) {
@@ -65259,9 +65653,9 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeSummaryRecord = (value) => {
-      const record = isObj14(value) ? value : {};
-      const overview = cleanText(record.overview || record.summary || record.interpretation || record.narrative);
-      const themes = toArray(record.themes || record.keyFindings || record.findings).slice(0, LIMITS.breakdownThemes).map((entry, index) => {
+      const record2 = isObj14(value) ? value : {};
+      const overview = cleanText(record2.overview || record2.summary || record2.interpretation || record2.narrative);
+      const themes = toArray(record2.themes || record2.keyFindings || record2.findings).slice(0, LIMITS.breakdownThemes).map((entry, index) => {
         const item = isObj14(entry) ? entry : { summary: entry };
         const label = cleanText(item.label || item.name || item.title || `Theme ${index + 1}`, LIMITS.labelChars);
         const summary = cleanText(item.summary || item.description || item.finding || item.body);
@@ -65445,11 +65839,11 @@ var init_resultsAnalysisArtifactValidation = __esm({
     });
     normalizeRiskAxis = (axis, fallback) => {
       if (!isObj14(axis)) return null;
-      const record = axis;
-      const label = cleanText(record.label || record.name, LIMITS.labelChars);
+      const record2 = axis;
+      const label = cleanText(record2.label || record2.name, LIMITS.labelChars);
       if (!label) return null;
-      const id2 = slugId(record.id || label, fallback.id);
-      const rawLevels = toArray(record.levels);
+      const id2 = slugId(record2.id || label, fallback.id);
+      const rawLevels = toArray(record2.levels);
       const seen = /* @__PURE__ */ new Set();
       const levels = rawLevels.slice(0, LIMITS.riskAxisLevels).map((level, index) => {
         const levelRecord = isObj14(level) ? level : { label: level, id: level };
@@ -65650,6 +66044,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
 var ANONYMOUS_CUSTOM_RPC_URL_REQUIRED_ERROR, DEFAULT_MODEL_WHITELIST, inferAiProviderFromModel, matchesModelGlob, isModelAllowed, resolveAiProvider, normalizeAiRequestPayload, readAiRequestPayload, validateAnonymousAiRequest;
 var init_aiRequestNormalization = __esm({
   "workers/sessionCorsWorker/aiRequestNormalization.js"() {
+    init_aiRequestPolicy();
     init_stringCoercion();
     ANONYMOUS_CUSTOM_RPC_URL_REQUIRED_ERROR = "Anonymous custom provider requires request rpcUrl when using apiKey bypass.";
     DEFAULT_MODEL_WHITELIST = {
@@ -65686,16 +66081,21 @@ var init_aiRequestNormalization = __esm({
       if (explicit && explicit !== "default" && explicit !== "auto") return explicit;
       return inferAiProviderFromModel(payload?.model) || "openai";
     };
-    normalizeAiRequestPayload = ({ payload } = {}) => ({
-      ok: true,
-      status: 200,
-      error: "",
-      payload,
-      provider: resolveAiProvider(payload),
-      requestApiKey: toTrimmedString2(payload?.apiKey),
-      requestRpcUrl: toTrimmedString2(payload?.rpcUrl)
-    });
-    readAiRequestPayload = async ({ request } = {}) => {
+    normalizeAiRequestPayload = ({ payload, config } = {}) => {
+      if (!toTrimmedString2(payload?.provider) && !toTrimmedString2(payload?.model) && !toTrimmedString2(payload?.apiKey || payload?.rpcKey)) {
+        payload = { ...payload, ...resolveSessionAiModel(config, { taskType: payload?.taskType, modelType: payload?.modelType }) };
+      }
+      return {
+        ok: true,
+        status: 200,
+        error: "",
+        payload,
+        provider: resolveAiProvider(payload),
+        requestApiKey: toTrimmedString2(payload?.apiKey),
+        requestRpcUrl: toTrimmedString2(payload?.rpcUrl)
+      };
+    };
+    readAiRequestPayload = async ({ request, config } = {}) => {
       const contentType = request?.headers?.get("content-type") || "";
       if (!contentType.includes("application/json")) {
         return {
@@ -65722,7 +66122,7 @@ var init_aiRequestNormalization = __esm({
           requestRpcUrl: ""
         };
       }
-      return normalizeAiRequestPayload({ payload });
+      return normalizeAiRequestPayload({ payload, config });
     };
     validateAnonymousAiRequest = ({
       provider = "",
@@ -65745,64 +66145,11 @@ var init_aiRequestNormalization = __esm({
   }
 });
 
-// shared/aiDefaults.mjs
-var DEFAULT_AI_MODEL, DEFAULT_AI_MODELS;
-var init_aiDefaults = __esm({
-  "shared/aiDefaults.mjs"() {
-    DEFAULT_AI_MODEL = "gpt-5.6-terra";
-    DEFAULT_AI_MODELS = Object.freeze({ fast: DEFAULT_AI_MODEL, thinking: DEFAULT_AI_MODEL });
-  }
-});
-
-// workers/sessionCorsWorker/aiModelParams.js
-var toModelLeaf, usesOpenAiResponsesApi, isChatReasoningModel, applyChatCompletionBudget, resolveResponsesOutputTokens;
-var init_aiModelParams = __esm({
-  "workers/sessionCorsWorker/aiModelParams.js"() {
-    toModelLeaf = (modelRaw = "") => String(modelRaw || "").trim().toLowerCase().split("/").pop();
-    usesOpenAiResponsesApi = ({ provider = "", model = "", endpoint = "" } = {}) => {
-      const normalizedProvider = String(provider || "").trim().toLowerCase();
-      const normalizedEndpoint = String(endpoint || "").trim().toLowerCase();
-      if (normalizedProvider !== "openai") return false;
-      if (normalizedEndpoint.includes("/responses") || normalizedEndpoint === "responses") return true;
-      return /^(gpt-5|gpt-6-astra(?:$|-))/.test(toModelLeaf(model));
-    };
-    isChatReasoningModel = ({ model = "", thinking = false } = {}) => thinking === true || /^o[13]/.test(toModelLeaf(model));
-    applyChatCompletionBudget = ({
-      body,
-      model = "",
-      thinking = false,
-      max_tokens,
-      max_completion_tokens,
-      temperature,
-      defaultMaxCompletionTokens = 16e3,
-      defaultMaxTokens = 2048,
-      defaultTemperature = 0.7
-    } = {}) => {
-      const target = body && typeof body === "object" ? body : {};
-      if (isChatReasoningModel({ model, thinking })) {
-        target.max_completion_tokens = max_completion_tokens ?? max_tokens ?? defaultMaxCompletionTokens;
-        delete target.max_tokens;
-        delete target.temperature;
-        return target;
-      }
-      target.max_tokens = max_tokens ?? defaultMaxTokens;
-      target.temperature = temperature !== void 0 ? temperature : defaultTemperature;
-      delete target.max_completion_tokens;
-      return target;
-    };
-    resolveResponsesOutputTokens = ({
-      max_output_tokens,
-      max_completion_tokens,
-      max_tokens,
-      fallback = 16e3
-    } = {}) => max_output_tokens ?? max_completion_tokens ?? max_tokens ?? fallback;
-  }
-});
-
 // workers/sessionCorsWorker/aiProviderExecution.js
 var ANTHROPIC_URL, OPENAI_CHAT_URL, OPENAI_RESPONSES_URL, OPENROUTER_CHAT_URL, CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR, extractOpenAiCompletion, normalizeComparableRpcUrl, resolveJson, proxyAnthropic, proxyOpenAI, proxyOpenRouter, proxyCustomRPC;
 var init_aiProviderExecution = __esm({
   "workers/sessionCorsWorker/aiProviderExecution.js"() {
+    init_aiRequestPolicy();
     init_aiDefaults();
     init_aiModelParams();
     init_responseKvHelpers();
@@ -65863,6 +66210,7 @@ var init_aiProviderExecution = __esm({
     proxyAnthropic = async ({
       payload,
       secrets,
+      config,
       baseHeaders,
       deps,
       constants
@@ -65874,6 +66222,9 @@ var init_aiProviderExecution = __esm({
       if (!key) {
         return json5({ error: "Server misconfigured: anthropicKey is missing." }, 401, baseHeaders);
       }
+      const policy = boundSessionAiRequest({ payload, provider: "anthropic", config, requestKey: payloadKey });
+      if (!policy.ok) return json5({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+      payload = policy.payload;
       const {
         model,
         temperature,
@@ -65919,6 +66270,7 @@ var init_aiProviderExecution = __esm({
     proxyOpenAI = async ({
       payload,
       secrets,
+      config,
       baseHeaders,
       deps,
       constants
@@ -65930,6 +66282,9 @@ var init_aiProviderExecution = __esm({
       if (!key) {
         return json5({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
       }
+      const policy = boundSessionAiRequest({ payload, provider: "openai", config, requestKey: payloadKey });
+      if (!policy.ok) return json5({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+      payload = policy.payload;
       const {
         model,
         temperature,
@@ -66010,6 +66365,7 @@ var init_aiProviderExecution = __esm({
     proxyOpenRouter = async ({
       payload,
       secrets,
+      config,
       baseHeaders,
       deps,
       constants
@@ -66021,6 +66377,9 @@ var init_aiProviderExecution = __esm({
       if (!key) {
         return json5({ error: "Server misconfigured: openrouterKey is missing." }, 401, baseHeaders);
       }
+      const policy = boundSessionAiRequest({ payload, provider: "openrouter", config, requestKey: payloadKey });
+      if (!policy.ok) return json5({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+      payload = policy.payload;
       const {
         model,
         temperature,
@@ -66078,6 +66437,7 @@ var init_aiProviderExecution = __esm({
     proxyCustomRPC = async ({
       payload,
       secrets,
+      config,
       baseHeaders,
       deps,
       auth
@@ -66120,6 +66480,9 @@ var init_aiProviderExecution = __esm({
       if (isBlockedOutboundUrl(rpcUrl)) {
         return json5({ error: "Custom RPC URL target is not allowed" }, 403, baseHeaders);
       }
+      const policy = !payloadKey && secretKey ? boundSessionAiRequest({ payload, provider: "custom", config, requestKey: payloadKey }) : { ok: true, payload };
+      if (!policy.ok) return json5({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+      payload = policy.payload;
       const {
         model,
         temperature,
@@ -66274,9 +66637,9 @@ var init_resultsAnalysisAnswerValidation = __esm({
     RATING_MAX = 10;
     LEGACY_RATING_MAX = 100;
     readStoredRating = (value) => {
-      const record = value && typeof value === "object" && !Array.isArray(value) ? value : null;
-      if (record?.encrypted === true) return null;
-      const raw = record ? record.value : value;
+      const record2 = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+      if (record2?.encrypted === true) return null;
+      const raw = record2 ? record2.value : value;
       if (typeof raw !== "number" && typeof raw !== "string") return null;
       if (typeof raw === "string" && !raw.trim()) return null;
       const rating = Number(raw);
@@ -66288,9 +66651,10 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder5, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj15, hasOwn6, trim9, lower4, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder5, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj15, hasOwn6, trim10, lower4, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
+    init_aiRequestPolicy();
     init_stringCoercion();
     init_resultsAnalysisSettings();
     init_resultsAnalysisArtifactValidation();
@@ -66330,12 +66694,12 @@ var init_resultsAnalysisGeneration = __esm({
     DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS = 8 * 60 * 1e3;
     isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     hasOwn6 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-    trim9 = (value) => toStr6(value).trim();
-    lower4 = (value) => trim9(value).toLowerCase();
+    trim10 = (value) => toStr6(value).trim();
+    lower4 = (value) => trim10(value).toLowerCase();
     getResultsAnalysisSettings = (config = {}) => normalizeResultsAnalysisSettings(
       config?.resultsAnalysis
     );
-    getCanonicalSessionId = (config = {}) => normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
+    getCanonicalSessionId = (config = {}) => normalizeSessionIdHex2(resolveCanonicalWorkerSessionIdHex(config));
     publicDraft = (draft, config) => {
       if (!isObj15(draft)) return null;
       const {
@@ -66354,7 +66718,7 @@ var init_resultsAnalysisGeneration = __esm({
       exposure: normalizedResultsProfile(config)?.exposure,
       sections: normalizeRequestedSections([], getResultsAnalysisSettings(config))
     });
-    normalizeSessionIdHex = (value) => {
+    normalizeSessionIdHex2 = (value) => {
       const raw = lower4(value).replace(/^0x/, "").replace(/-/g, "");
       return /^[0-9a-f]{32}$/.test(raw) ? `0x${raw}` : "";
     };
@@ -66377,12 +66741,12 @@ var init_resultsAnalysisGeneration = __esm({
     ]);
     encryptedEnvelopeValueHasContent = (value) => {
       if (value == null || value === false) return false;
-      if (typeof value === "string") return trim9(value) !== "";
+      if (typeof value === "string") return trim10(value) !== "";
       if (Array.isArray(value)) return value.length > 0;
       if (isObj15(value)) return Object.keys(value).length > 0;
       return true;
     };
-    isBlankFieldValue = (value) => value == null || typeof value === "string" && !trim9(value) || Array.isArray(value) && value.length === 0 || isObj15(value) && Object.keys(value).length === 0;
+    isBlankFieldValue = (value) => value == null || typeof value === "string" && !trim10(value) || Array.isArray(value) && value.length === 0 || isObj15(value) && Object.keys(value).length === 0;
     isClearedFieldWithLockFlag = (value) => hasOwn6(value, "value") && isBlankFieldValue(value.value) && !["envelope", ...ENCRYPTED_ENVELOPE_KEYS].some((key) => encryptedEnvelopeValueHasContent(value[key]));
     valueLooksEncrypted = (value, depth = 0) => {
       if (depth > 5) return false;
@@ -66394,7 +66758,7 @@ var init_resultsAnalysisGeneration = __esm({
     };
     valueFromAnswerLike = (value) => {
       if (value == null) return "";
-      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return trim9(value);
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return trim10(value);
       if (Array.isArray(value)) return value.map(valueFromAnswerLike).filter((entry) => entry !== "").join("; ");
       if (isObj15(value) && hasOwn6(value, "value")) return valueFromAnswerLike(value.value);
       return "";
@@ -66410,9 +66774,9 @@ var init_resultsAnalysisGeneration = __esm({
       return valueLooksEncrypted(hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response);
     };
     VALIDATED_QUESTION_TYPES = /* @__PURE__ */ new Set(["binary", "rating", "multichoice", "quadratic", "freeform"]);
-    normalizeQuestionId = (value) => trim9(value).slice(0, 128);
-    normalizeQuestionPrompt = (value) => trim9(value).replace(/\s+/g, " ").slice(0, 1200);
-    normalizeQuestionType = (value) => trim9(value).slice(0, 64) || "text";
+    normalizeQuestionId = (value) => trim10(value).slice(0, 128);
+    normalizeQuestionPrompt = (value) => trim10(value).replace(/\s+/g, " ").slice(0, 1200);
+    normalizeQuestionType = (value) => trim10(value).slice(0, 64) || "text";
     RATING_SCALE_METADATA_KEYS = [
       "min",
       "minimum",
@@ -66427,8 +66791,8 @@ var init_resultsAnalysisGeneration = __esm({
       const numeric = Number(value);
       return Number.isFinite(numeric) ? numeric : null;
     };
-    hasMetadataValue = (value) => value !== void 0 && value !== null && trim9(value) !== "";
-    recordHasRatingScaleMetadata = (record = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record[key]));
+    hasMetadataValue = (value) => value !== void 0 && value !== null && trim10(value) !== "";
+    recordHasRatingScaleMetadata = (record2 = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record2[key]));
     pickRatingScaleRecord = (question = {}) => {
       const scale = isObj15(question.scale) ? question.scale : null;
       if (scale && recordHasRatingScaleMetadata(scale)) return scale;
@@ -66437,7 +66801,7 @@ var init_resultsAnalysisGeneration = __esm({
       return scale || ratingScale || question;
     };
     normalizeRatingLabel = (value, fallback) => {
-      const label = trim9(value);
+      const label = trim10(value);
       return normalizeQuestionPrompt(label || String(fallback)).slice(0, 120);
     };
     normalizeRatingScale = (question = {}) => {
@@ -66456,7 +66820,7 @@ var init_resultsAnalysisGeneration = __esm({
       };
     };
     normalizeSubmittedAt = (value) => {
-      const text = trim9(value);
+      const text = trim10(value);
       if (!text) return "";
       const ms = Date.parse(text);
       return Number.isFinite(ms) ? new Date(ms).toISOString() : "";
@@ -66467,7 +66831,7 @@ var init_resultsAnalysisGeneration = __esm({
       ...settings?.views?.riskMatrix ? ["riskMatrix"] : []
     ]);
     normalizeRequestedSections = (sections, settings) => {
-      const requested = Array.isArray(sections) && sections.length ? sections.map((entry) => trim9(entry)).filter(Boolean) : [
+      const requested = Array.isArray(sections) && sections.length ? sections.map((entry) => trim10(entry)).filter(Boolean) : [
         ...settings?.views?.circles ? ["circles"] : [],
         ...settings?.views?.breakdown ? ["breakdown"] : [],
         ...settings?.views?.riskMatrix ? ["riskMatrix"] : []
@@ -66514,15 +66878,15 @@ var init_resultsAnalysisGeneration = __esm({
       const actualSlug = normalizeWorkerSessionSlug(suppliedSlug);
       if (!allowInherited && expectedSlug && !actualSlug) return false;
       if (expectedSlug && actualSlug && expectedSlug !== actualSlug) return false;
-      const expectedSessionId = normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
-      const actualSessionId = normalizeSessionIdHex(suppliedSessionId);
+      const expectedSessionId = normalizeSessionIdHex2(resolveCanonicalWorkerSessionIdHex(config));
+      const actualSessionId = normalizeSessionIdHex2(suppliedSessionId);
       if (!allowInherited && expectedSessionId && !actualSessionId) return false;
       if (expectedSessionId && actualSessionId && expectedSessionId !== actualSessionId) return false;
       return true;
     };
     parseAccessRecord = (value) => {
       if (isObj15(value)) return value;
-      const raw = trim9(value);
+      const raw = trim10(value);
       if (!raw || raw[0] !== "{") return {};
       try {
         const parsed = JSON.parse(raw);
@@ -66533,19 +66897,19 @@ var init_resultsAnalysisGeneration = __esm({
     };
     resolveConfiguredPayloadAccessValue = (config = {}) => config?.storageProfile?.payloadAccessControl || config?.sessionModeProfile?.storage?.payloadAccessControl || config?.storageProfile?.payloadAccessMode || config?.sessionModeProfile?.storage?.payloadAccessMode;
     normalizeAccessGroupIds = (value) => {
-      const source = Array.isArray(value) ? value : trim9(value) ? [value] : [];
-      return source.map((entry) => trim9(entry).toLowerCase()).filter(Boolean).sort();
+      const source = Array.isArray(value) ? value : trim10(value) ? [value] : [];
+      return source.map((entry) => trim10(entry).toLowerCase()).filter(Boolean).sort();
     };
     normalizeAccessAudienceExtras = ({ value, metadata } = {}) => {
-      const record = parseAccessRecord(value);
+      const record2 = parseAccessRecord(value);
       return {
-        groupIds: normalizeAccessGroupIds(record.groupIds || metadata?.groupIds),
-        role: trim9(record.role || metadata?.role).toLowerCase(),
-        accessConditions: stableCanonicalSerialize(record.accessConditions || metadata?.accessConditions || null)
+        groupIds: normalizeAccessGroupIds(record2.groupIds || metadata?.groupIds),
+        role: trim10(record2.role || metadata?.role).toLowerCase(),
+        accessConditions: stableCanonicalSerialize(record2.accessConditions || metadata?.accessConditions || null)
       };
     };
     metadataAccessMatchesPublishedAudience = (metadata = {}, config = {}) => {
-      if (!isObj15(metadata?.payloadAccessControl) && !trim9(metadata?.payloadAccessMode)) return true;
+      if (!isObj15(metadata?.payloadAccessControl) && !trim10(metadata?.payloadAccessMode)) return true;
       const expectedValue = resolveConfiguredPayloadAccessValue(config);
       const actualValue = metadata.payloadAccessControl || metadata.payloadAccessMode;
       const expected = normalizePayloadAccessControl2(expectedValue);
@@ -66555,7 +66919,7 @@ var init_resultsAnalysisGeneration = __esm({
       const actualExtras = normalizeAccessAudienceExtras({ value: actualValue, metadata });
       return stableCanonicalSerialize(actualExtras) === stableCanonicalSerialize(expectedExtras);
     };
-    participantDigest = async (sourceKey) => sha256Hex2(`participant:${trim9(sourceKey).toLowerCase()}`);
+    participantDigest = async (sourceKey) => sha256Hex2(`participant:${trim10(sourceKey).toLowerCase()}`);
     normalizeQuestionRecord = (question) => {
       if (!isObj15(question)) return null;
       const questionId = normalizeQuestionId(question.questionId || question.questionID || question.id);
@@ -66599,7 +66963,7 @@ var init_resultsAnalysisGeneration = __esm({
     isNewerResponseRow = (candidate, current) => candidate.rowTime > current.rowTime || candidate.rowTime === current.rowTime && candidate.storageRefId > current.storageRefId;
     normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLocked, requireKnownQuestion = false }) => {
       const expectedSlug = normalizeWorkerSessionSlug(slug || config?.slug);
-      const expectedSessionId = normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
+      const expectedSessionId = normalizeSessionIdHex2(resolveCanonicalWorkerSessionIdHex(config));
       const questionMap = /* @__PURE__ */ new Map();
       (Array.isArray(questions) ? questions : []).forEach((question) => {
         const normalized = normalizeQuestionRecord(question);
@@ -66625,7 +66989,7 @@ var init_resultsAnalysisGeneration = __esm({
           excludedCount += 1;
           continue;
         }
-        const participantSource = trim9(row.__trustedParticipantId || row.participantId || row.responder || row.address || row.account || "");
+        const participantSource = trim10(row.__trustedParticipantId || row.participantId || row.responder || row.address || row.account || "");
         if (!participantSource) {
           excludedCount += 1;
           continue;
@@ -66635,7 +66999,7 @@ var init_resultsAnalysisGeneration = __esm({
           questionId,
           participantKey: await participantDigest(participantSource),
           rowTime: Date.parse(row.submittedAt || row.createdAt || row.timestamp || "") || 0,
-          storageRefId: trim9(row.__storageRefId)
+          storageRefId: trim10(row.__storageRefId)
         };
         const dedupeKey = `${questionId}:${candidate.participantKey}`;
         const existing = latestByQuestionParticipant.get(dedupeKey);
@@ -66742,7 +67106,7 @@ var init_resultsAnalysisGeneration = __esm({
         questions: aiQuestions,
         responses: aiResponses,
         segmentDimensions: [],
-        session: { name: trim9(config?.sessionName), slug: expectedSlug }
+        session: { name: trim10(config?.sessionName), slug: expectedSlug }
       };
       return {
         ok: true,
@@ -66781,7 +67145,7 @@ var init_resultsAnalysisGeneration = __esm({
         const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget }));
         if (!isObj15(payload)) continue;
         if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
-        const payloadId = trim9(payload.id || payload.questionId || payload.questionID);
+        const payloadId = trim10(payload.id || payload.questionId || payload.questionID);
         const trustedId = lower4(metadata.resourceId);
         const normalized2 = normalizeQuestionRecord({
           ...payload,
@@ -66790,9 +67154,9 @@ var init_resultsAnalysisGeneration = __esm({
         if (!normalized2 || hiddenQuestionIds.has(lower4(normalized2.questionId))) continue;
         candidates.push({
           resourceId: normalized2.questionId,
-          createdAtMs: Date.parse(trim9(metadata.createdAt)) || 0,
-          storageRefId: trim9(metadata.id),
-          uploader: trim9(metadata.uploader),
+          createdAtMs: Date.parse(trim10(metadata.createdAt)) || 0,
+          storageRefId: trim10(metadata.id),
+          uploader: trim10(metadata.uploader),
           uploadAuthority: metadata.uploadAuthority,
           question: normalized2
         });
@@ -66807,7 +67171,7 @@ var init_resultsAnalysisGeneration = __esm({
         budget.payload(jsonByteLength(committed));
         const metadata = committed?.metadata;
         const payload = committed?.payload;
-        if (!isObj15(metadata) || !isObj15(payload) || !trim9(metadata.responder)) {
+        if (!isObj15(metadata) || !isObj15(payload) || !trim10(metadata.responder)) {
           excludedCount += 1;
           continue;
         }
@@ -66841,7 +67205,7 @@ var init_resultsAnalysisGeneration = __esm({
           excludedCount += 1;
           continue;
         }
-        if (!trim9(metadata.responder)) {
+        if (!trim10(metadata.responder)) {
           excludedCount += 1;
           continue;
         }
@@ -66912,7 +67276,7 @@ var init_resultsAnalysisGeneration = __esm({
       });
     };
     sourceKindFromBody = (body) => {
-      const kind = trim9(body?.source?.kind || body?.sourceKind || "worker-canonical");
+      const kind = trim10(body?.source?.kind || body?.sourceKind || "worker-canonical");
       return kind === "admin-snapshot" ? "admin-snapshot" : "worker-canonical";
     };
     resolveResultsAnalysisSource = async ({ env, slug, config, body, trigger } = {}) => {
@@ -66955,7 +67319,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
     normalizeProviderResponse = async (response3, now = Date.now()) => {
       const data = await response3?.json?.().catch?.(() => ({}));
       if (!response3?.ok) {
-        const retryAfter = trim9(response3?.headers?.get?.("retry-after"));
+        const retryAfter = trim10(response3?.headers?.get?.("retry-after"));
         const seconds = Number(retryAfter);
         const retryAfterMs = Number.isFinite(seconds) ? seconds * 1e3 : Date.parse(retryAfter) - now;
         return {
@@ -66965,34 +67329,25 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
           ...Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? { retryAfterMs } : {}
         };
       }
-      const raw = trim9(data?.completion || data?.text || data?.content || "");
+      const raw = trim10(data?.completion || data?.text || data?.content || "");
       try {
         return { ok: true, value: JSON.parse(raw) };
       } catch {
         return { ok: false, status: 502, retryable: false, error: "AI provider returned invalid JSON." };
       }
     };
-    resolveAiTaskEntry = (ai = {}, task = "thinking") => {
-      const models2 = isObj15(ai.models) ? ai.models : {};
-      const modelProviders = isObj15(ai.modelProviders) ? ai.modelProviders : {};
-      const taskEntry = isObj15(models2[task]) ? models2[task] : null;
-      const model = trim9(taskEntry?.model || taskEntry?.name || models2[task] || models2.reasoning || ai.model || "");
-      const provider = lower4(
-        taskEntry?.provider || modelProviders[task] || modelProviders.reasoning || ai.provider || ai.mode || "openai"
-      ) || "openai";
-      return { provider, model };
-    };
     resolveAnalysisAiPayload = ({ config, prompt }) => {
       const ai = isObj15(config?.ai) ? config.ai : {};
       const providers = isObj15(ai.providers) ? ai.providers : {};
-      const { provider, model } = resolveAiTaskEntry(ai, "thinking");
-      const reasoningEffort = trim9(
+      const { provider, model } = resolveSessionAiModel(config, { taskType: "analysis", modelType: "thinking" });
+      const reasoningEffort = trim10(
         ai?.taskReasoningEffort?.analysis || ai?.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || "low"
       );
       const providerEntry = isObj15(providers[provider]) ? providers[provider] : {};
       return {
         provider,
         model,
+        taskType: "analysis",
         prompt,
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
@@ -67000,8 +67355,8 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
         max_output_tokens: 6e3,
         reasoning_effort: reasoningEffort,
         thinking: true,
-        ...provider === "custom" && trim9(providerEntry.functions) ? { functions: providerEntry.functions } : {},
-        ...provider === "custom" && trim9(providerEntry.rpcUrl) ? { rpcUrl: trim9(providerEntry.rpcUrl) } : {}
+        ...provider === "custom" && trim10(providerEntry.functions) ? { functions: providerEntry.functions } : {},
+        ...provider === "custom" && trim10(providerEntry.rpcUrl) ? { rpcUrl: trim10(providerEntry.rpcUrl) } : {}
       };
     };
     withTimeout = async (promise, timeoutMs, message) => {
@@ -67022,12 +67377,12 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       const payload = resolveAnalysisAiPayload({ config, prompt });
       const aiRequest = (deps?.normalizeAiRequestPayload || normalizeAiRequestPayload)({ payload });
       const provider = aiRequest.provider;
-      const model = trim9(payload.model);
+      const model = trim10(payload.model);
       if (model && !isModelAllowed(model, provider)) {
         return { ok: false, status: 400, error: "Model not allowed for provider" };
       }
       const secrets = await (deps?.getSessionSecrets ? deps.getSessionSecrets(env, slug) : getSessionSecrets(env, slug)) || {};
-      const proxyArgs = { payload, secrets, baseHeaders: headers };
+      const proxyArgs = { payload, secrets, config, baseHeaders: headers };
       let response3;
       const proxyDeps = { fetch: deps?.fetch || globalThis.fetch?.bind(globalThis), json: deps?.json || json };
       const runProvider = async () => {
@@ -67075,7 +67430,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
     summarizeReservation = (reservation, requestId = "") => {
       if (!isObj15(reservation)) return null;
       return {
-        kind: trim9(reservation.kind),
+        kind: trim10(reservation.kind),
         ...requestId ? { requestId } : {}
       };
     };
@@ -67090,8 +67445,8 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
     summarizeActiveState = (active) => {
       if (!isObj15(active)) return null;
       return {
-        ...trim9(active.requestId) ? { requestId: trim9(active.requestId) } : {},
-        ...trim9(active.trigger) ? { trigger: trim9(active.trigger) } : {},
+        ...trim10(active.requestId) ? { requestId: trim10(active.requestId) } : {},
+        ...trim10(active.trigger) ? { trigger: trim10(active.trigger) } : {},
         ...Number.isFinite(Number(active.startedAtMs)) ? { startedAtMs: Number(active.startedAtMs) } : {}
       };
     };
@@ -67099,10 +67454,10 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       if (!isObj15(failure2)) return null;
       return {
         ok: false,
-        error: trim9(failure2.error) || "Results analysis generation failed.",
+        error: trim10(failure2.error) || "Results analysis generation failed.",
         status: Number(failure2.status || 0) || 502,
-        ...trim9(failure2.requestId) ? { requestId: trim9(failure2.requestId) } : {},
-        ...trim9(failure2.trigger) ? { trigger: trim9(failure2.trigger) } : {},
+        ...trim10(failure2.requestId) ? { requestId: trim10(failure2.requestId) } : {},
+        ...trim10(failure2.trigger) ? { trigger: trim10(failure2.trigger) } : {},
         ...Number.isFinite(Number(failure2.failedAtMs)) ? { failedAtMs: Number(failure2.failedAtMs) } : {},
         ...Number(failure2.retryAttempt) > 0 ? { retryAttempt: Number(failure2.retryAttempt) } : {},
         ...Number(failure2.nextAttemptAtMs) > 0 ? { nextAttemptAtMs: Number(failure2.nextAttemptAtMs) } : {},
@@ -67166,7 +67521,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       const exposure = normalizedResultsProfile(config)?.exposure;
       const viewSignature = `sha256:${await sha256Hex2(stableCanonicalSerialize({ sections, exposure, version: ANALYSIS_ARTIFACT_VERSION }))}`;
       const reservationKey = await buildReservationKey({ sourceSignature: sourceDescriptor.signature, viewSignature });
-      const requestId = trim9(body.requestId || body.id || "");
+      const requestId = trim10(body.requestId || body.id || "");
       const reserve = deps?.reserveCoordinatedResultsAnalysis || reserveCoordinatedResultsAnalysisDefault;
       const finalize = deps?.finalizeCoordinatedResultsAnalysis || finalizeCoordinatedResultsAnalysisDefault;
       const reservation = await reserve({
@@ -67303,7 +67658,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
         slug,
         config,
         body: {
-          requestId: trim9(requestId) || `auto:${source.participantDigests.length}:${Date.now()}`,
+          requestId: trim10(requestId) || `auto:${source.participantDigests.length}:${Date.now()}`,
           refresh: true,
           sections: normalizeRequestedSections([], settings),
           source: { kind: "worker-canonical" },
@@ -67821,9 +68176,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       if (signer == null && version2 == null) return;
       if (!hasExistingKey || version2 !== LIT_AUTHORIZATION_VERSION || typeof signer !== "string" || signer.toLowerCase() !== wallet.address.toLowerCase()) fail5();
     };
-    readSignerSecrets = async (record, env, slug) => {
-      if (!isRecord3(record) || record.version !== 1 || record.slug !== slug) fail5();
-      const secrets = await decryptSessionSecretsEnvelope(record.envelope, { env, slug });
+    readSignerSecrets = async (record2, env, slug) => {
+      if (!isRecord3(record2) || record2.version !== 1 || record2.slug !== slug) fail5();
+      const secrets = await decryptSessionSecretsEnvelope(record2.envelope, { env, slug });
       if (!isRecord3(secrets) || Object.keys(secrets).some((key) => !SECRET_KEYS.includes(key)) || Object.values(secrets).some((value) => typeof value !== "string")) fail5();
       walletFor(secrets[PRIVATE_KEY]);
       return secrets;
@@ -67836,13 +68191,13 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         await coordinator.assertSessionAuthority(payload);
         await coordinator.repairPendingSessionConfigProjection();
         const privateKey = await coordinator.state.storage.transaction(async (transaction) => {
-          const record = await transaction.get(SIGNER_RECORD);
+          const record2 = await transaction.get(SIGNER_RECORD);
           const config = authorityConfig(await transaction.get(CONFIG_RECORD), payload.baseConfig, slug);
-          const secrets = record != null ? await readSignerSecrets(record, coordinator.env, slug) : await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug)) || {};
+          const secrets = record2 != null ? await readSignerSecrets(record2, coordinator.env, slug) : await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug)) || {};
           const hasExistingKey = hasOwn7(secrets, PRIVATE_KEY);
           const chosen = hasExistingKey ? walletFor(secrets[PRIVATE_KEY]) : proposed;
           assertConfiguredSigner(config, chosen, hasExistingKey);
-          if (record == null) {
+          if (record2 == null) {
             const envelope = await buildEncryptedSessionSecretsEnvelope({ [PRIVATE_KEY]: chosen.privateKey }, { env: coordinator.env, slug });
             await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope });
           }
@@ -67877,8 +68232,8 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         await coordinator.assertSessionAuthority(payload);
         await coordinator.repairPendingSessionConfigProjection();
         await coordinator.state.storage.transaction(async (transaction) => {
-          const record = await transaction.get(SIGNER_RECORD);
-          const signerSecrets = await readSignerSecrets(record, coordinator.env, slug);
+          const record2 = await transaction.get(SIGNER_RECORD);
+          const signerSecrets = await readSignerSecrets(record2, coordinator.env, slug);
           const wallet = walletFor(signerSecrets[PRIVATE_KEY]);
           if (walletFor(outputs[PRIVATE_KEY]).privateKey !== wallet.privateKey) fail5();
           assertConfiguredSigner({ litCredentials: payload.litCredentials }, wallet, true);
@@ -67936,8 +68291,8 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         await coordinator.repairPendingSessionConfigProjection();
         const existing = await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug)) || {};
         const litPatch = Object.fromEntries(Object.entries(patch).filter(([key]) => SECRET_KEYS.includes(key)));
-        const record = await coordinator.state.storage.get(SIGNER_RECORD);
-        const litSecrets = record == null ? null : await readSignerSecrets(record, coordinator.env, slug);
+        const record2 = await coordinator.state.storage.get(SIGNER_RECORD);
+        const litSecrets = record2 == null ? null : await readSignerSecrets(record2, coordinator.env, slug);
         const envelope = litSecrets && Object.keys(litPatch).length ? await buildEncryptedSessionSecretsEnvelope({ ...litSecrets, ...litPatch }, { env: coordinator.env, slug }) : null;
         const nextSecrets = { ...existing, ...litSecrets, ...patch };
         for (const key of SECRET_KEYS) if (litSecrets?.[key] === "" && !hasOwn7(patch, key)) delete nextSecrets[key];
@@ -68008,7 +68363,7 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, MAX_UPLOAD_RECEIPTS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, MAX_UPLOAD_RECEIPTS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_sessionBackupLifecycle();
@@ -68091,8 +68446,8 @@ var init_sessionWriteCoordinator = __esm({
       if (!numeric || numeric <= nowMs || numeric > nowMs + maxAheadMs) return 0;
       return numeric;
     };
-    readActiveAuthNonces = (record, nowMs) => {
-      const entries = Array.isArray(record?.entries) ? record.entries : record?.nonce ? [{ nonce: record.nonce, expiresAtMs: record.expiresAtMs }] : [];
+    readActiveAuthNonces = (record2, nowMs) => {
+      const entries = Array.isArray(record2?.entries) ? record2.entries : record2?.nonce ? [{ nonce: record2.nonce, expiresAtMs: record2.expiresAtMs }] : [];
       return entries.map((entry) => ({ nonce: toTrimmedString9(entry?.nonce), expiresAtMs: Number(entry?.expiresAtMs || 0) })).filter((entry) => entry.nonce && entry.expiresAtMs > nowMs);
     };
     putActiveAuthNonces = async (transaction, entries) => {
@@ -68170,7 +68525,11 @@ ${expiry}`);
     });
     isTerminalDeployResult = (result = {}) => result?.ok === true || result?.body?.deploymentRequestTerminal === true;
     buildDirectDeployTerminalReplay = ({ result, requestDigestMatches } = {}) => {
-      if (requestDigestMatches || result?.ok !== true) return result;
+      if (result?.ok !== true) return result;
+      if (result.body?.recoveryKeyFingerprint || result.body?.envelopeKekSecretSet || result.body?.envelopeKekSecretPreserved) {
+        result = { ...result, body: { ...result.body, keyPreserved: true } };
+      }
+      if (requestDigestMatches) return result;
       return {
         ...result,
         body: {
@@ -68202,6 +68561,7 @@ ${expiry}`);
       "remove-member",
       "join"
     ]);
+    workerGroupBackupPendingKey = (mutation, reservation) => `${WORKER_GROUP_BACKUP_PENDING_PREFIX}${encodeURIComponent(reservation?.memberKey || mutation.groupId)}`;
     PENDING_WORKER_GROUP_OPERATIONS = Object.freeze({ creating: "create", updating: "update", deleting: "delete" });
     PENDING_WORKER_GROUP_MEMBER_OPERATIONS = Object.freeze({ reserved: "add-member", removing: "remove-member" });
     DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES = /* @__PURE__ */ new Set([
@@ -68327,15 +68687,15 @@ ${expiry}`);
         const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
         const settled = [];
         let nextExpiry = Infinity;
-        for (const [key, record] of records) {
-          if (record.state === "settled" && nowMs - record.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settled.push([key, record]);
-          else if (record.state !== "pending" || record.leaseUntil <= nowMs) await transaction.delete(key);
-          else nextExpiry = Math.min(nextExpiry, record.leaseUntil);
+        for (const [key, record2] of records) {
+          if (record2.state === "settled" && nowMs - record2.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settled.push([key, record2]);
+          else if (record2.state !== "pending" || record2.leaseUntil <= nowMs) await transaction.delete(key);
+          else nextExpiry = Math.min(nextExpiry, record2.leaseUntil);
         }
         settled.sort((a, b2) => a[1].settledAt - b2[1].settledAt);
         const excess = Math.max(0, settled.length - MAX_UPLOAD_RECEIPTS);
         for (const [key] of settled.slice(0, excess)) await transaction.delete(key);
-        for (const [, record] of settled.slice(excess)) nextExpiry = Math.min(nextExpiry, record.settledAt + UPLOAD_RECEIPT_RETENTION_MS);
+        for (const [, record2] of settled.slice(excess)) nextExpiry = Math.min(nextExpiry, record2.settledAt + UPLOAD_RECEIPT_RETENTION_MS);
         return nextExpiry;
       }
       async scheduleUploadReceiptCleanup() {
@@ -68361,7 +68721,12 @@ ${expiry}`);
         }
         const secret = toTrimmedString9(this.env?.TOKEN_HMAC_SECRET);
         if (!secret) return jsonResponse2({ error: "Upload receipt coordination is unavailable.", reason: "upload_receipt_unavailable" }, 503);
-        await registerUploadReceiptStore(this, payload?.diagnostics);
+        if (!settle) {
+          try {
+            await registerUploadReceiptStore(this, payload?.diagnostics);
+          } catch {
+          }
+        }
         const encoder9 = new TextEncoder();
         const algorithm = { name: "HMAC", hash: "SHA-256" };
         const master = await this.crypto.subtle.importKey("raw", encoder9.encode(secret), algorithm, false, ["sign"]);
@@ -68372,19 +68737,19 @@ ${expiry}`);
         if (!settle) payloadDigest = await mac("payload", payloadDigest);
         const nowMs = Number(this.now()) || Date.now();
         const result = await this.state.storage.transaction(async (transaction) => {
-          const record = await transaction.get(key);
+          const record2 = await transaction.get(key);
           if (settle) {
-            if (record?.state !== "pending" || record.attemptId !== payload.attemptId) {
+            if (record2?.state !== "pending" || record2.attemptId !== payload.attemptId) {
               return { status: 409, error: "Upload attempt no longer owns this receipt.", reason: "upload_attempt_superseded" };
             }
-            await transaction.put(key, { state: "settled", payloadDigest: record.payloadDigest, storageRef, settledAt: nowMs });
+            await transaction.put(key, { state: "settled", payloadDigest: record2.payloadDigest, storageRef, settledAt: nowMs });
             await this.pruneUploadReceipts(transaction, nowMs);
             return { status: 200, ok: true };
           }
-          if (record?.state === "settled" && nowMs - record.settledAt < UPLOAD_RECEIPT_RETENTION_MS) {
-            return equalText(record.payloadDigest, payloadDigest) ? { status: 200, kind: "replay", storageRef: record.storageRef } : { status: 409, error: "This upload request id already stored different content.", reason: "upload_request_conflict" };
+          if (record2?.state === "settled" && nowMs - record2.settledAt < UPLOAD_RECEIPT_RETENTION_MS) {
+            return equalText(record2.payloadDigest, payloadDigest) ? { status: 200, kind: "replay", storageRef: record2.storageRef } : { status: 409, error: "This upload request id already stored different content.", reason: "upload_request_conflict" };
           }
-          if (record?.state === "pending" && record.leaseUntil > nowMs) {
+          if (record2?.state === "pending" && record2.leaseUntil > nowMs) {
             return { status: 503, error: "This upload is still in progress; retry shortly.", reason: "upload_in_progress" };
           }
           const attemptId = createAttemptId(this.crypto);
@@ -68404,12 +68769,12 @@ ${expiry}`);
         let cursor = "";
         for (; ; ) {
           const records = await this.state.storage.list({ prefix: UPLOAD_RECEIPT_PREFIX, ...cursor ? { startAfter: cursor } : {}, limit: 500 });
-          for (const record of records.values()) {
-            if (record.state === "pending" && record.leaseUntil > nowMs) {
+          for (const record2 of records.values()) {
+            if (record2.state === "pending" && record2.leaseUntil > nowMs) {
               pendingLeases += 1;
-              oldestPendingAgeMs = Math.max(oldestPendingAgeMs ?? 0, nowMs - (record.leaseUntil - UPLOAD_RECEIPT_LEASE_MS));
+              oldestPendingAgeMs = Math.max(oldestPendingAgeMs ?? 0, nowMs - (record2.leaseUntil - UPLOAD_RECEIPT_LEASE_MS));
             }
-            if (record.state === "settled" && nowMs - record.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settledCount += 1;
+            if (record2.state === "settled" && nowMs - record2.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settledCount += 1;
           }
           if (records.size < 500) break;
           cursor = [...records.keys()].at(-1);
@@ -68482,8 +68847,8 @@ ${expiry}`);
         this.resultsAnalysisTail = run.catch(() => void 0);
         return run;
       }
-      normalizeResultsAnalysisRecord(record) {
-        const source = isObjectRecord(record) && record.version === 1 ? record : {};
+      normalizeResultsAnalysisRecord(record2) {
+        const source = isObjectRecord(record2) && record2.version === 1 ? record2 : {};
         const requests = isObjectRecord(source.requests) ? source.requests : {};
         return {
           version: 1,
@@ -68508,9 +68873,9 @@ ${expiry}`);
         }
       }
       async readResultsAnalysisDraft(storage = this.state.storage) {
-        const record = await storage.get(RESULTS_ANALYSIS_DRAFT_KEY);
-        if (!isObjectRecord(record) || record.chunked !== true) return record;
-        const chunkCount = Number(record.chunkCount || 0) || 0;
+        const record2 = await storage.get(RESULTS_ANALYSIS_DRAFT_KEY);
+        if (!isObjectRecord(record2) || record2.chunked !== true) return record2;
+        const chunkCount = Number(record2.chunkCount || 0) || 0;
         if (!chunkCount || chunkCount > RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS) return null;
         let serialized = "";
         for (let index = 0; index < chunkCount; index += 1) {
@@ -68673,9 +69038,9 @@ ${expiry}`);
         const nowMs = Number(this.now()) || Date.now();
         const nextExpiry = await this.state.storage.transaction(async (transaction) => {
           let next = Infinity;
-          for (const [key, record] of await transaction.list({ prefix: RESULTS_ANALYSIS_UPLOAD_PREFIX })) {
-            if (record.expiresAt <= nowMs) await transaction.delete(key);
-            else next = Math.min(next, record.expiresAt);
+          for (const [key, record2] of await transaction.list({ prefix: RESULTS_ANALYSIS_UPLOAD_PREFIX })) {
+            if (record2.expiresAt <= nowMs) await transaction.delete(key);
+            else next = Math.min(next, record2.expiresAt);
           }
           return next;
         });
@@ -68687,13 +69052,13 @@ ${expiry}`);
         const nowMs = Number(this.now()) || Date.now();
         const retryDelayMs = await this.state.storage.transaction(async (transaction) => {
           const queued = await transaction.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-          const record = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          const record2 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
           const sameJob = !job || queued?.queuedAtMs === job.queuedAtMs;
           const retryable = error?.retryable !== false && RESULTS_ANALYSIS_RETRYABLE_STATUSES.has(Number(error?.status));
           const retryAttempt = (Number(queued?.retryAttempt) || 0) + 1;
           const scheduledDelay = retryable && sameJob && isObjectRecord(queued) ? RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS[retryAttempt - 1] : void 0;
           const delayMs = scheduledDelay ? Math.min(Math.max(scheduledDelay, Number(error?.retryAfterMs) || 0), 30 * 6e4) : void 0;
-          record.lastFailure = {
+          record2.lastFailure = {
             ok: false,
             error: error?.message || error?.error || toTrimmedString9(error) || "Automatic results analysis job failed.",
             status: Number(error?.status) >= 400 && Number(error?.status) <= 599 ? Number(error.status) : 502,
@@ -68710,7 +69075,7 @@ ${expiry}`);
           } else if (sameJob) {
             await transaction.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
           }
-          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record2);
           return delayMs;
         });
         if (retryDelayMs) await this.scheduleResultsAnalysisAlarm(retryDelayMs);
@@ -68781,18 +69146,18 @@ ${expiry}`);
       }
       async readResultsAnalysisStatus() {
         const existing = await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY);
-        const record = this.normalizeResultsAnalysisRecord(existing);
+        const record2 = this.normalizeResultsAnalysisRecord(existing);
         const latestDraft = await this.readResultsAnalysisDraft();
         const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-        const lastGood = record.lastGood && latestDraft?.draftId === record.lastGood.draftId ? { ...record.lastGood, ...latestDraft } : record.lastGood;
+        const lastGood = record2.lastGood && latestDraft?.draftId === record2.lastGood.draftId ? { ...record2.lastGood, ...latestDraft } : record2.lastGood;
         const nowMs = Number(this.now()) || Date.now();
         return {
           version: 1,
-          jobState: this.isResultsAnalysisActiveFresh(record.active, nowMs) ? "running" : isObjectRecord(queued) ? "queued" : record.lastFailure ? "failed" : lastGood ? "succeeded" : "idle",
+          jobState: this.isResultsAnalysisActiveFresh(record2.active, nowMs) ? "running" : isObjectRecord(queued) ? "queued" : record2.lastFailure ? "failed" : lastGood ? "succeeded" : "idle",
           queued: isObjectRecord(queued) ? { requestId: toTrimmedString9(queued.requestId), queuedAtMs: Number(queued.queuedAtMs || 0) || 0 } : null,
-          active: this.isResultsAnalysisActiveFresh(record.active, nowMs) ? record.active : null,
+          active: this.isResultsAnalysisActiveFresh(record2.active, nowMs) ? record2.active : null,
           lastGood,
-          lastFailure: record.lastFailure
+          lastFailure: record2.lastFailure
         };
       }
       async reserveResultsAnalysis(payload = {}) {
@@ -68808,9 +69173,9 @@ ${expiry}`);
         }
         const nowMs = Number(this.now()) || Date.now();
         return this.state.storage.transaction(async (transaction) => {
-          const record = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          const record2 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
           const latestDraft = await this.readResultsAnalysisDraft(transaction);
-          const prior = requestId ? record.requests[requestId] : null;
+          const prior = requestId ? record2.requests[requestId] : null;
           if (prior?.state === "succeeded" && prior.draftId) {
             if (latestDraft?.draftId === prior.draftId) {
               return { kind: "terminal", draft: latestDraft, draftId: prior.draftId };
@@ -68820,30 +69185,30 @@ ${expiry}`);
           if (prior?.state === "failed") {
             return { kind: "failed", status: prior.status || 502, error: prior.error || "Results analysis generation failed." };
           }
-          if (prior?.state === "running" && record.active?.requestId === requestId && this.isResultsAnalysisActiveFresh(record.active, nowMs)) {
+          if (prior?.state === "running" && record2.active?.requestId === requestId && this.isResultsAnalysisActiveFresh(record2.active, nowMs)) {
             return { kind: "pending" };
           }
-          if (!refresh && record.lastGood?.sourceSignature === sourceSignature && record.lastGood?.viewSignature === viewSignature && latestDraft?.draftId === record.lastGood.draftId) {
+          if (!refresh && record2.lastGood?.sourceSignature === sourceSignature && record2.lastGood?.viewSignature === viewSignature && latestDraft?.draftId === record2.lastGood.draftId) {
             if (requestId) {
-              record.requests[requestId] = { state: "succeeded", draftId: latestDraft.draftId, updatedAtMs: nowMs };
-              record.requests = this.pruneResultsAnalysisRequests(record.requests);
-              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+              record2.requests[requestId] = { state: "succeeded", draftId: latestDraft.draftId, updatedAtMs: nowMs };
+              record2.requests = this.pruneResultsAnalysisRequests(record2.requests);
+              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record2);
             }
             return { kind: "terminal", draft: latestDraft, draftId: latestDraft.draftId };
           }
-          if (trigger === "automatic" && record.lastFailure?.sourceSignature === sourceSignature && record.lastFailure?.viewSignature === viewSignature) {
-            return { kind: "failed", status: record.lastFailure.status || 502, error: record.lastFailure.error || "Results analysis generation failed." };
+          if (trigger === "automatic" && record2.lastFailure?.sourceSignature === sourceSignature && record2.lastFailure?.viewSignature === viewSignature) {
+            return { kind: "failed", status: record2.lastFailure.status || 502, error: record2.lastFailure.error || "Results analysis generation failed." };
           }
-          if (this.isResultsAnalysisActiveFresh(record.active, nowMs)) {
-            if (requestId && !record.requests[requestId]) {
-              record.requests[requestId] = { state: "running", updatedAtMs: nowMs };
-              record.requests = this.pruneResultsAnalysisRequests(record.requests);
-              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+          if (this.isResultsAnalysisActiveFresh(record2.active, nowMs)) {
+            if (requestId && !record2.requests[requestId]) {
+              record2.requests[requestId] = { state: "running", updatedAtMs: nowMs };
+              record2.requests = this.pruneResultsAnalysisRequests(record2.requests);
+              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record2);
             }
             return { kind: "pending" };
           }
           const attemptId = createAttemptId(this.crypto);
-          record.active = {
+          record2.active = {
             reservationKey,
             requestId,
             attemptId,
@@ -68853,9 +69218,9 @@ ${expiry}`);
             trigger,
             startedAtMs: nowMs
           };
-          if (requestId) record.requests[requestId] = { state: "running", updatedAtMs: nowMs };
-          record.requests = this.pruneResultsAnalysisRequests(record.requests);
-          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+          if (requestId) record2.requests[requestId] = { state: "running", updatedAtMs: nowMs };
+          record2.requests = this.pruneResultsAnalysisRequests(record2.requests);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record2);
           return { kind: "execute", attemptId };
         });
       }
@@ -68868,12 +69233,12 @@ ${expiry}`);
         if (!reservationKey || !attemptId || !receipt) return { ok: false, status: 400 };
         const nowMs = Number(this.now()) || Date.now();
         return this.state.storage.transaction(async (transaction) => {
-          const record = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
-          if (record.active?.reservationKey !== reservationKey || record.active?.attemptId !== attemptId) {
+          const record2 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          if (record2.active?.reservationKey !== reservationKey || record2.active?.attemptId !== attemptId) {
             return { ok: false, status: 409 };
           }
-          const active = record.active;
-          record.active = null;
+          const active = record2.active;
+          record2.active = null;
           if (success) {
             const draft = receipt.draft && isObjectRecord(receipt.draft) ? receipt.draft : receipt;
             const draftId = toTrimmedString9(draft.draftId);
@@ -68881,7 +69246,7 @@ ${expiry}`);
             try {
               await this.putResultsAnalysisDraft(transaction, draft);
             } catch (error) {
-              record.lastFailure = {
+              record2.lastFailure = {
                 ok: false,
                 error: error?.message || "Results analysis draft exceeds durable storage limits.",
                 status: Number(error?.status || 0) || 413,
@@ -68892,17 +69257,17 @@ ${expiry}`);
                 trigger: active.trigger,
                 failedAtMs: nowMs
               };
-              if (requestId) record.requests[requestId] = {
+              if (requestId) record2.requests[requestId] = {
                 state: "failed",
-                error: record.lastFailure.error,
-                status: record.lastFailure.status,
+                error: record2.lastFailure.error,
+                status: record2.lastFailure.status,
                 updatedAtMs: nowMs
               };
-              record.requests = this.pruneResultsAnalysisRequests(record.requests);
-              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
-              return { ok: false, status: record.lastFailure.status, error: record.lastFailure.error };
+              record2.requests = this.pruneResultsAnalysisRequests(record2.requests);
+              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record2);
+              return { ok: false, status: record2.lastFailure.status, error: record2.lastFailure.error };
             }
-            record.lastGood = {
+            record2.lastGood = {
               draftId,
               generatedAt: draft.generatedAt,
               requestId,
@@ -68914,11 +69279,11 @@ ${expiry}`);
               sections: Array.isArray(draft.sections) ? draft.sections : [],
               completedAtMs: nowMs
             };
-            if (active.trigger === "automatic") record.lastAutomaticSuccessAtMs = nowMs;
-            record.lastFailure = null;
-            if (requestId) record.requests[requestId] = { state: "succeeded", draftId, updatedAtMs: nowMs };
+            if (active.trigger === "automatic") record2.lastAutomaticSuccessAtMs = nowMs;
+            record2.lastFailure = null;
+            if (requestId) record2.requests[requestId] = { state: "succeeded", draftId, updatedAtMs: nowMs };
           } else {
-            record.lastFailure = {
+            record2.lastFailure = {
               ok: false,
               error: toTrimmedString9(receipt.error) || "Results analysis generation failed.",
               status: Number(receipt.status || 0) || 502,
@@ -68929,15 +69294,15 @@ ${expiry}`);
               trigger: active.trigger,
               failedAtMs: nowMs
             };
-            if (requestId) record.requests[requestId] = {
+            if (requestId) record2.requests[requestId] = {
               state: "failed",
-              error: record.lastFailure.error,
-              status: record.lastFailure.status,
+              error: record2.lastFailure.error,
+              status: record2.lastFailure.status,
               updatedAtMs: nowMs
             };
           }
-          record.requests = this.pruneResultsAnalysisRequests(record.requests);
-          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+          record2.requests = this.pruneResultsAnalysisRequests(record2.requests);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record2);
           return { ok: true, status: 200 };
         });
       }
@@ -68957,6 +69322,11 @@ ${expiry}`);
         return jsonResponse2(result, result.status || 202);
       }
       async initializeWorkerGroupCapacity(slug, sessionId) {
+        if (await this.state.storage.get(BACKUP_GROUP_IMPORT_ACTIVE_KEY)) return {
+          ok: false,
+          status: 409,
+          reason: "backup_restore_in_progress"
+        };
         const existing = await this.state.storage.get(WORKER_GROUP_CAPACITY_META_KEY);
         const initialized = resolveInitializedWorkerGroupCapacity(existing, slug, sessionId);
         if (initialized) return initialized;
@@ -69329,10 +69699,10 @@ ${expiry}`);
       async completeWorkerGroupReservation(mutation, result, reservation, { replay = false } = {}) {
         const { slug, sessionId, groupId, operation } = mutation;
         if (!result.ok) {
+          if (operation === "create" && !replay && !DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES.has(result.reason)) return;
+          await this.state.storage.delete(workerGroupBackupPendingKey(mutation, reservation));
           if (operation === "create") {
-            if (replay || DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES.has(result.reason)) {
-              await this.rollbackWorkerGroupSlot({ slug, sessionId, groupId });
-            }
+            await this.rollbackWorkerGroupSlot({ slug, sessionId, groupId });
           } else if (operation === "update") {
             await this.rollbackWorkerGroupUpdate({ groupId, prior: reservation.prior });
           } else if (operation === "delete") {
@@ -69344,6 +69714,8 @@ ${expiry}`);
           }
           return;
         }
+        if (replay || result.created !== false) await bumpStorageBackupRevision(this.state.storage);
+        await this.state.storage.delete(workerGroupBackupPendingKey(mutation, reservation));
         if (operation === "create") {
           await this.activateWorkerGroupCapacity(result.group);
         } else if (operation === "update") {
@@ -69367,6 +69739,7 @@ ${expiry}`);
           actorPrincipal: intent.actorPrincipal ?? null
         };
         let result;
+        await this.state.storage.put(workerGroupBackupPendingKey(mutation, reservation), true);
         try {
           result = await executeWorkerGroupMutation({ env: this.env, ...mutation, capacityAuthorized: true, resume: true });
         } catch {
@@ -69660,7 +70033,6 @@ ${expiry}`);
           if (byteLength(JSON.stringify(intent)) > WORKER_GROUP_INTENT_MAX_BYTES) {
             return jsonResponse2({ ok: false, status: 400, reason: "worker_group_input_too_large" }, 400);
           }
-          await bumpStorageBackupRevision(this.state.storage);
           {
             const settled = await this.settleWorkerGroupReservations({
               slug: mutation.slug,
@@ -69747,6 +70119,8 @@ ${expiry}`);
               return jsonResponse2(removalReservation, removalReservation.status || 404);
             }
           }
+          const reservation = groupReservation || updateReservation || deleteReservation || memberReservation || removalReservation;
+          await this.state.storage.put(workerGroupBackupPendingKey(mutation, reservation), true);
           let result;
           try {
             result = await executeWorkerGroupMutation({
@@ -69764,7 +70138,7 @@ ${expiry}`);
           await this.completeWorkerGroupReservation(
             mutation,
             result,
-            groupReservation || updateReservation || deleteReservation || memberReservation || removalReservation
+            reservation
           );
           if (!result.ok) return jsonResponse2(result, result.status || 400);
           return this.respondToWorkerGroupMutation(mutation, result);
@@ -69810,10 +70184,11 @@ ${expiry}`);
           return authority;
         });
       }
-      async assertSessionAuthority(payload) {
+      async assertSessionAuthority(payload, { allowRestore = false } = {}) {
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
         const authority = slug ? await this.readSessionConfigAuthority(slug) : null;
         assertExpectedSessionAuthority(authority, payload?.expectedAuthority, slug);
+        if (!allowRestore) await assertNoActiveBackupImport(this);
         return authority;
       }
       // The config HTTP routes enforce, also read in-process by work that already
@@ -69849,15 +70224,15 @@ ${expiry}`);
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
         if (!slug) return jsonResponse2({ error: "Invalid session slug." }, 400);
         const authority = await this.readSessionConfigAuthority(slug);
-        const record = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
+        const record2 = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
         const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-        const failure2 = record.lastFailure?.trigger === "automatic" ? record.lastFailure : null;
+        const failure2 = record2.lastFailure?.trigger === "automatic" ? record2.lastFailure : null;
         return jsonResponse2({
           ok: true,
           config: authority?.config ?? null,
           revision: authority?.revision ?? 0,
           analysis: {
-            lastSuccessAtMs: record.lastAutomaticSuccessAtMs,
+            lastSuccessAtMs: record2.lastAutomaticSuccessAtMs,
             retryAttempt: Number(queued?.retryAttempt ?? failure2?.retryAttempt) || 0,
             nextAttemptAtMs: queued ? Number(failure2?.nextAttemptAtMs) || null : null,
             retriesExhausted: failure2?.retriesExhausted === true
@@ -69940,6 +70315,11 @@ ${expiry}`);
       }
       async executeStorageEnvelopeKeyGetOrCreate(payload) {
         return this.serializeSessionConfigOperation(async () => {
+          try {
+            await assertNoActiveBackupImport(this);
+          } catch (error) {
+            return jsonResponse2({ error: error.message, reason: error.reason }, error.status || 503);
+          }
           const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
           const baseConfig = slug ? normalizePublicSessionConfig(payload?.baseConfig, slug) : null;
           const candidate = normalizeWrappedSessionKeyRecord(payload?.candidateRecord, slug);
@@ -70085,13 +70465,13 @@ ${expiry}`);
         const existing = await this.state.storage.get(AUTH_NONCE_MAC_KEY);
         if (/^[0-9a-f]{64}$/.test(toTrimmedString9(existing?.key)) || !create) return toTrimmedString9(existing?.key);
         const candidate = { version: 1, key: bytesToHex3(this.crypto.getRandomValues(new Uint8Array(32))) };
-        const record = await this.state.storage.transaction(async (transaction) => {
+        const record2 = await this.state.storage.transaction(async (transaction) => {
           const current = await transaction.get(AUTH_NONCE_MAC_KEY);
           if (/^[0-9a-f]{64}$/.test(toTrimmedString9(current?.key))) return current;
           await transaction.put(AUTH_NONCE_MAC_KEY, candidate);
           return candidate;
         });
-        return record.key;
+        return record2.key;
       }
       async executeAuthNonceIssue(payload) {
         const nowMs = Number(this.now()) || Date.now();
@@ -70520,13 +70900,16 @@ ${expiry}`);
             }
           });
         }
-        if (url.pathname === "/worker-groups/backup/export" || url.pathname === "/worker-groups/backup/import") {
+        if (["export", "import", "begin", "abandon", "finish"].some((operation) => url.pathname === `/worker-groups/backup/${operation}`)) {
           if (url.hostname !== "session-coordinator.internal") return jsonResponse2({ error: "Not found." }, 404);
           return this.serializeWorkerGroupOperation(async () => {
             try {
-              return await (url.pathname.endsWith("/import") ? importWorkerGroupBackup : exportWorkerGroupBackup)(this, payload);
+              const operation = url.pathname.split("/").at(-1);
+              if (operation === "export") return await exportWorkerGroupBackup(this, payload);
+              if (operation === "import") return await importWorkerGroupBackup(this, payload);
+              return await controlWorkerGroupBackupImport(this, payload, operation);
             } catch (error) {
-              return jsonResponse2({ error: error.message }, error.status || 503);
+              return jsonResponse2({ error: error.message, ...error.reason ? { reason: error.reason } : {} }, error.status || 503);
             }
           });
         }
@@ -70625,7 +71008,8 @@ ${expiry}`);
           }, 409);
         }
         if (reservation.kind === "terminal") {
-          return jsonResponse2(reservation.result, Number(reservation.result?.status || 0) || 200);
+          const replayResult = buildDirectDeployTerminalReplay({ result: reservation.result, requestDigestMatches: true });
+          return jsonResponse2(replayResult, Number(replayResult?.status || 0) || 200);
         }
         if (reservation.kind === "pending") {
           return jsonResponse2({
@@ -72425,7 +72809,7 @@ var require_ar = __commonJS({
           return new instance(value);
         };
       }
-      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim15 = true } = {}) {
+      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim16 = true } = {}) {
         let number2 = this.stringToBigNum(winstonString, decimals).shiftedBy(-12);
         return formatted ? number2.toFormat(decimals) : number2.toFixed(decimals);
       }
@@ -74796,7 +75180,7 @@ var getEthersUtils = (deps) => deps?.ethers && deps.ethers.utils ? deps.ethers.u
 var createEthersPrimitiveValueHelpersWithWorkerDeps = ({
   deps
 } = {}) => {
-  const normalizeSessionIdHex2 = (raw) => {
+  const normalizeSessionIdHex3 = (raw) => {
     const value = toStr2(raw, deps).trim();
     if (!value) return "";
     if (value.startsWith("0x") && value.length === 34) {
@@ -74867,7 +75251,7 @@ var createEthersPrimitiveValueHelpersWithWorkerDeps = ({
     return fn(value);
   };
   return {
-    normalizeSessionIdHex: normalizeSessionIdHex2,
+    normalizeSessionIdHex: normalizeSessionIdHex3,
     toBigInt: toBigInt2,
     isAddress: isAddress2,
     getAddress: getAddress2,
@@ -79707,6 +80091,9 @@ var verifyAdminSignature = async ({
   };
 };
 
+// workers/sessionCorsWorker/transcribeExecution.js
+init_aiRequestPolicy();
+
 // workers/sessionCorsWorker/transcribeRequestNormalization.js
 init_stringCoercion();
 var MISSING_TRANSCRIBE_FILE_ERROR = 'Missing file (use field "file"; "audio" also accepted).';
@@ -79799,6 +80186,7 @@ var toTrimmedString13 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() 
 var transcribe = async ({
   request,
   secrets,
+  config,
   baseHeaders,
   transcribeRequest = null,
   deps,
@@ -79841,6 +80229,11 @@ var transcribe = async ({
   if (provider !== "custom" && !key) {
     return json5?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
   }
+  if (provider === "openai" && !requestApiKey && !isSessionTranscriptionModelAllowed({
+    config,
+    provider,
+    model: normalizedRequest.payload.model || upstreamFormData.get("model") || "whisper-1"
+  })) return json5?.(AI_MODEL_NOT_ALLOWED, 403, baseHeaders);
   const headers = {};
   if (key) headers.authorization = `Bearer ${key}`;
   const fetchOptions = {
@@ -80163,11 +80556,11 @@ var resolveAnonymousIpDailyLimit = (config = {}) => {
 
 // workers/sessionCorsWorker/interviewStarter.js
 init_interviewSettings();
-init_aiDefaults();
+init_aiRequestPolicy();
 init_responseKvHelpers();
 
 // shared/questions/ratingScale.mjs
-var trim10 = (value) => String(value == null ? "" : value).trim();
+var trim11 = (value) => String(value == null ? "" : value).trim();
 var isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var RATING_SCALE_METADATA_KEYS2 = [
   "min",
@@ -80179,8 +80572,8 @@ var RATING_SCALE_METADATA_KEYS2 = [
   "maxLabel",
   "highLabel"
 ];
-var hasMetadataValue2 = (value) => value !== void 0 && value !== null && trim10(value) !== "";
-var recordHasRatingScaleMetadata2 = (record = {}) => RATING_SCALE_METADATA_KEYS2.some((key) => hasMetadataValue2(record[key]));
+var hasMetadataValue2 = (value) => value !== void 0 && value !== null && trim11(value) !== "";
+var recordHasRatingScaleMetadata2 = (record2 = {}) => RATING_SCALE_METADATA_KEYS2.some((key) => hasMetadataValue2(record2[key]));
 var pickRatingScaleRecord2 = (question = {}) => {
   const scale = isObj17(question.scale) ? question.scale : null;
   if (scale && recordHasRatingScaleMetadata2(scale)) return scale;
@@ -80194,7 +80587,7 @@ var toFiniteNumber = (value) => {
   return Number.isFinite(number2) ? number2 : null;
 };
 var normalizeRatingLabel2 = (value, fallback) => {
-  const label = trim10(value);
+  const label = trim11(value);
   return label || String(fallback);
 };
 var normalizeRatingScale2 = (question = {}) => {
@@ -80223,8 +80616,8 @@ var normalizeRatingScale2 = (question = {}) => {
 
 // shared/interviewQuestionCatalog.mjs
 var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
-var trim11 = (value) => String(value == null ? "" : value).trim();
-var lower5 = (value) => trim11(value).toLowerCase();
+var trim12 = (value) => String(value == null ? "" : value).trim();
+var lower5 = (value) => trim12(value).toLowerCase();
 var isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var hasRestrictedPrompt = (question = {}) => {
   const visibility = lower5(question.visibility || question.access || question.questionVisibility);
@@ -80235,14 +80628,14 @@ var hasRestrictedPrompt = (question = {}) => {
 var normalizeQuestion = (value = {}) => {
   const question = isObj18(value) ? value : {};
   const id2 = lower5(question.id || question.questionId);
-  const prompt = trim11(question.prompt || question.question || question.title);
+  const prompt = trim12(question.prompt || question.question || question.title);
   if (!id2 || !prompt || hasRestrictedPrompt(question) || /^(?:\[encrypted\]|encrypted prompt[.!]?(?:\s*connect.+decrypt[.!]?)?|connect(?: wallet)? to decrypt(?: encrypted prompt)?[.!]?)$/i.test(
     prompt
   ))
     return null;
   const type = lower5(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
-  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim11(isObj18(entry) ? entry.label || entry.value : entry)).filter(Boolean);
+  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim12(isObj18(entry) ? entry.label || entry.value : entry)).filter(Boolean);
   const ratingScale = type === "rating" ? normalizeRatingScale2(question) : null;
   return {
     id: id2,
@@ -80275,8 +80668,8 @@ var CATALOG_KV_OPERATION_BUDGET = 800;
 var MAX_CLOUDFLARE_LIST_PAGES = Math.floor((CATALOG_KV_OPERATION_BUDGET - MAX_PAYLOAD_READS) / (MAX_QUESTIONS + 2));
 var MAX_SCAN_BLOCKS = 2e6;
 var RPC_CHUNK_SIZE = 1e5;
-var trim12 = (value) => String(value == null ? "" : value).trim();
-var lower6 = (value) => trim12(value).toLowerCase();
+var trim13 = (value) => String(value == null ? "" : value).trim();
+var lower6 = (value) => trim13(value).toLowerCase();
 var isObj19 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
 var payloadQuestionId = (payload) => lower6(payload?.id || payload?.questionId);
@@ -80302,7 +80695,7 @@ var listQuestionRows = async (callStorage) => {
     if (!Array.isArray(listing?.items)) break;
     items.push(...listing.items);
     if (listing.listComplete === true) break;
-    cursor = trim12(listing.cursor);
+    cursor = trim13(listing.cursor);
     if (!cursor || seenCursors.has(cursor)) break;
     seenCursors.add(cursor);
   }
@@ -80330,13 +80723,13 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const versions = [];
   const legacyVersions = [];
   for (const item of items) {
-    const storageRefId = trim12(item?.storageRef?.id || item?.metadata?.id || item?.id);
+    const storageRefId = trim13(item?.storageRef?.id || item?.metadata?.id || item?.id);
     if (!storageRefId || item?.hidden === true) continue;
     const version2 = {
       resourceId: lower6(item?.metadata?.resourceId),
-      createdAtMs: Date.parse(trim12(item?.metadata?.createdAt)) || 0,
+      createdAtMs: Date.parse(trim13(item?.metadata?.createdAt)) || 0,
       storageRefId,
-      uploader: trim12(item?.metadata?.uploader),
+      uploader: trim13(item?.metadata?.uploader),
       uploadAuthority: item?.metadata?.uploadAuthority
     };
     (version2.resourceId ? versions : legacyVersions).push(version2);
@@ -80360,10 +80753,10 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
 var pickContractAddress = (config = {}) => {
   const contracts = isObj19(config.contracts) ? config.contracts : {};
   const surveys = isObj19(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
-  return trim12(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
+  return trim13(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
 };
 var pickRpcUrls = (config = {}) => {
-  const chainId = trim12(config.networkChainId || config.registryChainId || config.chainId || "11155420");
+  const chainId = trim13(config.networkChainId || config.registryChainId || config.chainId || "11155420");
   const rpcConfig = isObj19(config.rpc) ? config.rpc : {};
   const pathProvider = isObj19(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj19(rpcConfig.path) ? rpcConfig.path : {};
   const byChainMap = isObj19(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj19(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
@@ -80373,7 +80766,7 @@ var pickRpcUrls = (config = {}) => {
     ...Array.isArray(config.rpcUrls) ? config.rpcUrls : [config.rpcUrl],
     ...Array.isArray(pathProvider.rpcUrls) ? pathProvider.rpcUrls : [pathProvider.rpcUrl]
   ];
-  return [...new Set(source.map(trim12).filter((value) => /^https:\/\//i.test(value)))];
+  return [...new Set(source.map(trim13).filter((value) => /^https:\/\//i.test(value)))];
 };
 var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   let lastError;
@@ -80393,9 +80786,9 @@ var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   }
   throw lastError || new Error(`No RPC URL succeeded for ${method}.`);
 };
-var wordAt = (hex, index) => trim12(hex).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
+var wordAt = (hex, index) => trim13(hex).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
 var decodeQuestionIds = (data = "") => {
-  const clean = trim12(data).replace(/^0x/, "");
+  const clean = trim13(data).replace(/^0x/, "");
   if (clean.length < 128) return [];
   const offsetBytes = Number(BigInt(`0x${wordAt(clean, 0) || "0"}`));
   const lengthWordIndex = offsetBytes / 32;
@@ -80408,7 +80801,7 @@ var decodeQuestionIds = (data = "") => {
   return ids;
 };
 var base64urlFromHex = (hex = "") => {
-  const clean = trim12(hex).replace(/^0x/, "");
+  const clean = trim13(hex).replace(/^0x/, "");
   if (!/^[0-9a-fA-F]{64}$/.test(clean)) return "";
   const bytes3 = new Uint8Array(clean.match(/.{2}/g).map((part) => Number.parseInt(part, 16)));
   let binary = "";
@@ -80543,14 +80936,26 @@ var resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = f
   const generation = (async () => {
     if (config.scopes?.ai === false) throw new Error("AI is disabled for this session.");
     const secrets = await deps.getSessionSecrets(env, slug);
-    const result = await (deps.proxyOpenAI || proxyOpenAI)({
+    const { provider, model } = resolveSessionAiModel(config, { taskType: "interview-opening" });
+    const proxies = {
+      openai: deps.proxyOpenAI || proxyOpenAI,
+      anthropic: deps.proxyAnthropic || proxyAnthropic,
+      openrouter: deps.proxyOpenRouter || proxyOpenRouter,
+      custom: deps.proxyCustomRPC || proxyCustomRPC
+    };
+    if (!proxies[provider]) throw new Error("Configured AI provider is unavailable for interview openings.");
+    const result = await proxies[provider]({
       secrets,
+      config,
+      auth: { scopes: { ai: true, custom_rpc: true } },
       deps: {
         ...deps,
         fetch: (url, options) => (deps.fetch || fetch)(url, { ...options, signal: AbortSignal.timeout(1e4) })
       },
       payload: {
-        model: DEFAULT_AI_MODEL,
+        model,
+        taskType: "interview-opening",
+        max_tokens: 600,
         reasoning_effort: "low",
         service_tier: "default",
         max_output_tokens: 600,
@@ -80690,6 +81095,7 @@ var dispatchAnonymousRouteEntry = async ({
 };
 
 // workers/sessionCorsWorker/anonymousRouteDispatch.js
+init_aiRequestPolicy();
 init_aiDefaults();
 
 // workers/sessionCorsWorker/workerCapabilities.js
@@ -80720,7 +81126,8 @@ var dispatchWorkerCapabilities = async ({ request, env = {}, headers = {} }) => 
   if (url.searchParams.has("slug")) {
     const validated = validateInboundWorkerSessionSlug(url.searchParams.get("slug"));
     if (!validated.ok) return Response.json({ error: validated.error }, { status: 400, headers: responseHeaders });
-    if (String(env.DEFAULT_SESSION_SLUG || "").trim() === (validated.slug || "general")) body.features = FEATURES;
+    const pinnedSlug = getDefaultWorkerSessionSlug(env);
+    if (pinnedSlug && pinnedSlug === validated.slug) body.features = FEATURES;
     const bound = !!env.CE_SESSION_COORDINATOR?.idFromName && !!env.CE_SESSION_COORDINATOR?.get;
     const current = bound ? await callSessionConfigCoordinator({ env, slug: validated.slug, path: "current" }) : null;
     const migration = current?.body?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON;
@@ -80759,7 +81166,7 @@ init_sessionLifecycle();
 init_realtimeInterviewConfig();
 var OPENAI_LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
-var trim13 = (value) => String(value == null ? "" : value).trim();
+var trim14 = (value) => String(value == null ? "" : value).trim();
 var isObj20 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewModeEnabled = (config = {}) => {
   const interview = isObj20(config?.interviewMode || config?.interview) ? config.interviewMode || config.interview : {};
@@ -80794,7 +81201,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   }
   if (!isObj20(body)) return { ok: false, status: 400, error: "Invalid JSON." };
   const sdp = String(body.sdp == null ? "" : body.sdp);
-  const instructions = trim13(body.instructions);
+  const instructions = trim14(body.instructions);
   if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
   if (sdp.length > 64e3) return { ok: false, status: 413, error: "SDP offer is too large." };
   if (!instructions || instructions.length > 32e3) {
@@ -80804,7 +81211,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
 };
 var resolveRealtimeConfig = (config = {}) => {
   const interview = isObj20(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
-  const provider = trim13(interview.provider || "openai").toLowerCase();
+  const provider = trim14(interview.provider || "openai").toLowerCase();
   const model = resolveRealtimeInterviewModel(config);
   return { provider, model };
 };
@@ -80821,7 +81228,7 @@ var proxyOpenAiRealtimeCall = async ({
   if (realtime.provider !== "openai") {
     return deps?.json?.({ error: "Realtime interview voice currently requires the OpenAI provider." }, 400, baseHeaders);
   }
-  const key = trim13(secrets?.openaiKey);
+  const key = trim14(secrets?.openaiKey);
   if (!key) {
     return deps?.json?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
   }
@@ -80966,7 +81373,8 @@ var dispatchAnonymousRoute = async ({
       request: null,
       secrets: secrets2,
       baseHeaders: headers,
-      transcribeRequest
+      transcribeRequest,
+      config
     });
   }
   if (path === "/realtime/call") {
@@ -81005,6 +81413,7 @@ var dispatchAnonymousRoute = async ({
     });
   }
   const aiRequest = await deps?.readAiRequestPayload?.({
+    config,
     request: typeof request?.clone === "function" ? request.clone() : request
   });
   if (!aiRequest?.ok) {
@@ -81048,8 +81457,8 @@ var dispatchAnonymousRoute = async ({
   const model = resolveModelForProvider({ payload, provider });
   if (!isModelAllowed(model, provider)) {
     return deps?.json?.(
-      { error: "Model not allowed for provider" },
-      400,
+      requestApiKey ? { error: "Model not allowed for provider" } : AI_MODEL_NOT_ALLOWED,
+      requestApiKey ? 400 : 403,
       headers
     );
   }
@@ -81062,13 +81471,13 @@ var dispatchAnonymousRoute = async ({
   }
   const secrets = anonymousAccess?.reason === "request-api-key" ? {} : await deps?.getSessionSecrets?.(slug) || {};
   if (provider === "anthropic") {
-    return deps?.proxyAnthropic?.({ payload, secrets, baseHeaders: headers });
+    return deps?.proxyAnthropic?.({ payload, secrets, config, baseHeaders: headers });
   }
   if (provider === "openai") {
-    return deps?.proxyOpenAI?.({ payload, secrets, baseHeaders: headers });
+    return deps?.proxyOpenAI?.({ payload, secrets, config, baseHeaders: headers });
   }
   if (provider === "openrouter") {
-    return deps?.proxyOpenRouter?.({ payload, secrets, baseHeaders: headers });
+    return deps?.proxyOpenRouter?.({ payload, secrets, config, baseHeaders: headers });
   }
   return deps?.json?.({ error: `Unsupported provider: ${provider}` }, 400, headers);
 };
@@ -81266,6 +81675,7 @@ var digestBytes = async (bytes3) => [...new Uint8Array(await crypto.subtle.diges
 var prefixes = (slug) => [null, `ce-storage-hidden:${slug}:`, `ce-storage-owner:${slug}:`, `ce-storage-payload:${slug}:`, `ce-storage:${slug}:`, `sessions/${slug}/storage/`];
 var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) => {
   const keySlug = sessionSlugStorageKey(slug);
+  const authenticatedCursor = cursor ? await authenticateBackupCursor(cursor, env) : "";
   const budget = createStorageExportBudget();
   const rawIndex = getStorageIndexBinding(env);
   const index = rawIndex ? budget.wrap(rawIndex) : null;
@@ -81276,7 +81686,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   const sessionId = resolveCanonicalWorkerSessionIdHex(coordinator.configAuthority.config);
   if (!sessionId) fail6("The session has no canonical identity.");
   const prefix = `ce-backup:${keySlug}:`;
-  const parsed = parseStorageExportCursor({ cursor, prefix, sessionId });
+  const parsed = parseStorageExportCursor({ cursor: authenticatedCursor, prefix, sessionId });
   const position = parsed.continuation || {
     phase: 0,
     listCursor: "",
@@ -81288,6 +81698,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
     configDigest: await sha256Hex2(JSON.stringify(coordinator)),
     counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 }
   };
+  const nextCursor = () => signBackupCursor(storageExportCursor({ prefix, sessionId, continuation: position }), env);
   if (position.configDigest !== await sha256Hex2(JSON.stringify(coordinator))) fail6("Session config changed during backup. Restart the export.");
   const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: "export", snapshotId: position.groupSnapshotId });
   if (!groups.ok) fail6(groups.error || "Group backup is unavailable.", groups.status);
@@ -81295,12 +81706,13 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   position.groupSnapshotId = groups.snapshotId;
   if (groups.preparing) {
     position.preparation = (position.preparation || 0) + 1;
-    return { ok: true, preparing: true, nextCursor: storageExportCursor({ prefix, sessionId, continuation: position }) };
+    return { ok: true, preparing: true, nextCursor: await nextCursor() };
   }
   coordinator.workerGroups = groups.snapshot;
   const snapshotBytes = encoder8.encode(JSON.stringify(coordinator));
   const snapshotDigest = await digestBytes(snapshotBytes);
   if (!position.snapshotDigest) position.snapshotDigest = snapshotDigest;
+  position.archiveId = await sha256Hex2(`${sessionId}:${position.exportedAt}:${snapshotDigest}`);
   const paths = prefixes(keySlug);
   if (!Number.isSafeInteger(position.phase) || position.phase < 0 || position.phase > 6 || !Number.isSafeInteger(position.chunk) || position.chunk < -1 || !Number.isSafeInteger(position.pageNumber) || position.pageNumber < 0 || typeof position.listCursor !== "string" || position.listCursor.length > 4096 || typeof position.lastKey !== "string" || position.lastKey && position.phase > 0 && !position.lastKey.startsWith(paths[position.phase]) || !position.counts || !["records", "payloads", "owners", "hidden", "bytes"].every((key) => Number.isSafeInteger(position.counts[key]) && position.counts[key] >= 0) || !Number.isFinite(Date.parse(position.exportedAt))) fail6("Invalid backup cursor.", 400);
   if (position.snapshotDigest !== snapshotDigest) fail6("Session config or groups changed during backup. Restart the export.");
@@ -81325,7 +81737,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
     entries: [],
     nextCursor: "",
     snapshotDigest,
-    archiveId: await sha256Hex2(`${sessionId}:${manifest.exportedAt}:${snapshotDigest}`)
+    archiveId: position.archiveId
   };
   const finish = async () => {
     const latest = await callSessionConfigCoordinator({ env, slug, path: "backup/export", expectedAuthority });
@@ -81376,7 +81788,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
       if (position.pageNumber === 0) page.coordinator = { chunked: true, sha256: snapshotDigest };
       if (!await payload("coordinator", snapshotBytes, null, "coordinator")) {
         position.pageNumber += 1;
-        page.nextCursor = storageExportCursor({ prefix, sessionId, continuation: position });
+        page.nextCursor = await nextCursor();
         return finish();
       }
     }
@@ -81437,7 +81849,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   manifest.complete = position.phase === paths.length;
   if (!manifest.complete) {
     position.pageNumber += 1;
-    page.nextCursor = storageExportCursor({ prefix, sessionId, continuation: position });
+    page.nextCursor = await nextCursor();
   }
   return finish();
 };
@@ -84494,8 +84906,8 @@ var recordAbuseEventBestEffort = async ({
   now
 } = {}) => {
   try {
-    const record = deps?.recordAbuseEvent || recordAbuseEvent;
-    await record({ env, type, now });
+    const record2 = deps?.recordAbuseEvent || recordAbuseEvent;
+    await record2({ env, type, now });
   } catch {
   }
 };
@@ -84764,8 +85176,8 @@ init_deployHelperCore();
 init_sessionWriteCoordinator();
 var INVALID_GRANT_ERROR = "Invalid, expired, or already used sponsored bootstrap grant.";
 var toTrimmedString19 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var isExpiredGrant = (record = {}, nowMs = Date.now()) => {
-  const expiresAt = toTrimmedString19(record?.expiresAt);
+var isExpiredGrant = (record2 = {}, nowMs = Date.now()) => {
+  const expiresAt = toTrimmedString19(record2?.expiresAt);
   if (!expiresAt) return false;
   const expirationMs = Date.parse(expiresAt);
   if (!Number.isFinite(expirationMs)) return false;
@@ -85295,7 +85707,7 @@ var dispatchSessionConfigBootstrapRequest = async ({
 // workers/sessionCorsWorker/interviewBriefDispatch.js
 init_sessionConfigAuthority();
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v5";
-var trim14 = (value) => String(value == null ? "" : value).trim();
+var trim15 = (value) => String(value == null ? "" : value).trim();
 var isObj22 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
   const interview = isObj22(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
@@ -85303,18 +85715,18 @@ var isInterviewEnabled = (config = {}) => {
 };
 var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry) => {
   try {
-    return new URL(trim14(entry)).origin;
+    return new URL(trim15(entry)).origin;
   } catch {
     return "";
   }
 }).filter(Boolean);
 var isLocalHttpHostname = (hostname = "") => ["localhost", "127.0.0.1", "[::1]", "::1"].includes(String(hostname));
 var normalizeRecruitmentSource = (value) => {
-  const normalized = trim14(value).replace(/\s+/g, "-").slice(0, 128);
+  const normalized = trim15(value).replace(/\s+/g, "-").slice(0, 128);
   return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(normalized) ? normalized : "";
 };
 var normalizeJoinGroup = (value) => {
-  const normalized = trim14(value).toLowerCase();
+  const normalized = trim15(value).toLowerCase();
   return /^[a-z0-9][a-z0-9._-]{0,79}$/.test(normalized) ? normalized : "";
 };
 var copySafeReturnParams = (sourceUrl, targetUrl) => {
@@ -85325,7 +85737,7 @@ var copySafeReturnParams = (sourceUrl, targetUrl) => {
 };
 var safeServedWorkerOrigin = (value) => {
   try {
-    const url = new URL(trim14(value));
+    const url = new URL(trim15(value));
     if (url.protocol === "https:" || url.protocol === "http:" && isLocalHttpHostname(url.hostname)) {
       return url.origin;
     }
@@ -85335,10 +85747,10 @@ var safeServedWorkerOrigin = (value) => {
 };
 var safeSessionUrl = (value, { slug = "", allowOrigins } = {}) => {
   try {
-    const url = new URL(trim14(value));
+    const url = new URL(trim15(value));
     if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocalHttpHostname(url.hostname))) return "";
     const parts = url.pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
-    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim14(slug).toLowerCase()) {
+    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim15(slug).toLowerCase()) {
       return "";
     }
     const allowedOrigins = normalizeAllowedOrigins(allowOrigins);
@@ -85356,7 +85768,7 @@ var sha2563 = async (value) => {
   return [...new Uint8Array(digest2)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 var canonicalizeQuestions = (questions = []) => [...questions].sort(
-  (left, right) => trim14(left?.id).localeCompare(trim14(right?.id)) || trim14(left?.prompt).localeCompare(trim14(right?.prompt)) || trim14(left?.type).localeCompare(trim14(right?.type))
+  (left, right) => trim15(left?.id).localeCompare(trim15(right?.id)) || trim15(left?.prompt).localeCompare(trim15(right?.prompt)) || trim15(left?.type).localeCompare(trim15(right?.type))
 );
 var buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
   const url = new URL(sessionUrl);
@@ -86152,9 +86564,11 @@ var createWorkerRouteShellWithWorkerDeps = ({
       });
     } catch (error) {
       if (error instanceof BodyByteLimitError) {
+        const responseHeaders = new Headers(routeBaseHeaders);
+        responseHeaders.set("Content-Type", "application/json");
         return new ResponseCtor(JSON.stringify({ error: error.message }), {
           status: 413,
-          headers: { ...routeBaseHeaders, "Content-Type": "application/json" }
+          headers: responseHeaders
         });
       }
       log2?.error?.("[worker] unhandled route error", {
@@ -86663,6 +87077,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
     return {
       handled: true,
       response: await deps?.transcribe?.({
+        config,
         request,
         secrets,
         baseHeaders: headers
@@ -86684,6 +87099,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
 };
 
 // workers/sessionCorsWorker/authenticatedSecretActionRouteDispatch.js
+init_aiRequestPolicy();
 init_sessionWriteCoordinator();
 init_aiDefaults();
 init_aiRequestNormalization();
@@ -86858,13 +87274,14 @@ var dispatchAuthenticatedSecretActionRoute = async ({
         response: secretContext2?.response
       };
     }
-    const aiRequest = deps?.normalizeAiRequestPayload?.({ payload: body }) || {};
+    const aiRequest = deps?.normalizeAiRequestPayload?.({ payload: body, config }) || {};
+    body = aiRequest.payload || body;
     const provider = aiRequest.provider;
     const model = resolveModelForProvider2({ payload: aiRequest.payload || body, provider });
     if (!isModelAllowed(model, provider)) {
       return {
         handled: true,
-        response: deps?.json?.({ error: "Model not allowed for provider" }, 400, headers)
+        response: deps?.json?.(aiRequest.requestApiKey ? { error: "Model not allowed for provider" } : AI_MODEL_NOT_ALLOWED, aiRequest.requestApiKey ? 400 : 403, headers)
       };
     }
     if (provider === "anthropic") {
@@ -86872,6 +87289,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
         handled: true,
         response: await deps?.proxyAnthropic?.({
           payload: body,
+          config,
           secrets: secretContext2.secrets,
           baseHeaders: headers
         })
@@ -86882,6 +87300,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
         handled: true,
         response: await deps?.proxyOpenAI?.({
           payload: body,
+          config,
           secrets: secretContext2.secrets,
           baseHeaders: headers
         })
@@ -86892,6 +87311,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
         handled: true,
         response: await deps?.proxyOpenRouter?.({
           payload: body,
+          config,
           secrets: secretContext2.secrets,
           baseHeaders: headers
         })
@@ -86902,6 +87322,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
         handled: true,
         response: await deps?.proxyCustomRPC?.({
           payload: body,
+          config,
           secrets: secretContext2.secrets,
           baseHeaders: headers,
           auth: {
