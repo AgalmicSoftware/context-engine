@@ -144,7 +144,7 @@ worker startup and signed requests. Isolated negative checks prove injected
 inline and other-origin scripts cannot run.
 
 After deployment, check the hosting response with
-`curl -sI <site> | grep -i content-security-policy`: the enforced header must
+`curl -sI <site> | grep -i '^content-security-policy:'`: the enforced header must
 show `script-src 'self'`. Repeat that response check when changing static-host
 configuration. The local header harness verifies the file and application behavior; deployment still
 requires the hosting provider to apply it.

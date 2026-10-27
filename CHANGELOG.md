@@ -29,6 +29,13 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Restart backup downloads after configuration/group changes or invalid cursors.
+  Before restoring into an unpublished session, check the pinned Worker origin
+  and show the target before asking for a signature.
+- Clear authoring draft warnings and unload prompts after Clear form or successful
+  publication, cancelling queued saves of the discarded draft.
+- Keep the license-analysis module inventory outside the published site output.
+
 - Add a versioned product film and 1200×630 poster for site link previews, with
   crawler HTML for About. Posts keep their own header images and omit the film.
 
@@ -85,6 +92,18 @@ All notable changes to this project will be documented in this file.
   and either form verifies in the web client, MCP and CE-CC.
 
 ### Workers — requires redeployment
+
+- Clear completed restore journals and page receipts in resumable steps, retaining
+  a small completion record. A later import must pass the empty-target check.
+- Bound upload diagnostics registration to 250 ms, back off failed attempts for
+  60 seconds, and retry through the existing alarm; counts can lag until retry.
+- Apply outbound URL checks and timeouts to interview openings, and name a missing
+  provider key when refusing a request.
+- Recognize configured thinking models regardless of name and preserve inventoried
+  built-in output budgets with fixed ceilings up to 16,000 tokens. Caller limits
+  can only lower them; aggregate AI usage policy remains separate.
+- Preserve Headers inputs in Bridge replies and deploy-helper requests; expand
+  the source guard to fallback spreads, optional chains and Object.assign targets.
 
 - Bound session-funded AI requests to configured models, per-operation output
   limits, standard processing, and configured reasoning effort. Remove caller
@@ -154,8 +173,9 @@ All notable changes to this project will be documented in this file.
   deployment package, contracts/Foundry sources and the CC add-on. Earlier
   releases keep the licenses they shipped with. Corpus data remains CC0-1.0;
   third-party dependencies and assets keep their own licenses and notices.
-- Ship generated third-party notices with the standalone Worker deploy package
-  and the MIT notice beside the add-on's bundled ethers library.
+- Ship full generated third-party notices inside all three released Worker bundles
+  and with the standalone Worker deploy package, plus the MIT notice beside the
+  add-on's bundled ethers library. Release hashes include the appended notices.
 
 ### Benchmark reports
 
