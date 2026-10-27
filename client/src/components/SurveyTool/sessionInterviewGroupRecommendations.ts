@@ -104,6 +104,8 @@ const MAX_PROMPT_CONTEXT_CHARS = 1600;
 const MAX_PROMPT_DRAFTS = 12;
 const MAX_PROMPT_GROUPS = 100;
 const MAX_RECOMMENDATIONS = 4;
+// callAI has no timeout of its own; a stalled call must not hold back the exact-name matches.
+export const INTERVIEW_GROUP_AI_TIMEOUT_MS = 30_000;
 
 const chunkCandidates = <T>(items: T[], size: number): T[][] => {
   const chunks: T[][] = [];
@@ -560,8 +562,17 @@ export const recommendInterviewGroups = async ({
   });
   const recommendations: InterviewGroupRecommendation[] = [];
   const seen = new Set<string>();
-  try {
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      reject(new Error('Group suggestions timed out.'));
+    }, INTERVIEW_GROUP_AI_TIMEOUT_MS);
+  });
+  const collect = async () => {
     for (const candidateChunk of chunkCandidates(eligible, MAX_PROMPT_GROUPS)) {
+      if (timedOut) return;
       const raw = await callAI(
         buildInterviewGroupRecommendationPrompt({
           candidates: candidateChunk,
@@ -586,11 +597,16 @@ export const recommendInterviewGroups = async ({
         recommendations.push(recommendation);
       });
     }
+  };
+  try {
+    await Promise.race([timeout, collect()]);
     return {
       status: 'ready',
       recommendations: recommendations.slice(0, MAX_RECOMMENDATIONS),
     };
   } catch (error) {
     return { status: 'unavailable', recommendations: [], reason: classifyRecommendationError(error) };
+  } finally {
+    clearTimeout(timer);
   }
 };

@@ -661,9 +661,12 @@ function SessionInterviewPanel({
             requestId: Date.now(),
             transcript: nextTranscript,
             prefillPacket: contextPacket,
-            // A hidden draft's guess stays out of group suggestions until it is shown.
+            // Only answers the person keeps count; a hidden draft's guess stays out until it is shown.
             draftResponses: review.drafts
-              .filter(({ questionId }) => !newlyHidden.includes(questionId) && !isDraftConcealed(questionId))
+              .filter(
+                ({ questionId }) =>
+                  review.selected[questionId] && !newlyHidden.includes(questionId) && !isDraftConcealed(questionId),
+              )
               .map((draft) => ({ ...draft, ...(review.edited[draft.questionId] || {}) })),
           });
         } else {
@@ -722,7 +725,7 @@ function SessionInterviewPanel({
           )
         : null,
       draftResponses: drafts
-        .filter(({ questionId }) => !isDraftConcealed(questionId))
+        .filter(({ questionId }) => selected[questionId] && !isDraftConcealed(questionId))
         .map((draft) => ({ ...draft, ...(editedDrafts[draft.questionId] || {}) })),
     });
   }, [
@@ -734,6 +737,7 @@ function SessionInterviewPanel({
     prefillPacket,
     questions,
     responderContext,
+    selected,
     transcript,
   ]);
 
@@ -1217,6 +1221,7 @@ function SessionInterviewPanel({
                       }
                       setSelected((current) => ({ ...current, [draft.questionId]: value }));
                       setRemovedDraftIds((current) => ({ ...current, [draft.questionId]: !value }));
+                      setGroupRecommendationRequest(null);
                     }}
                     onEdit={(patch) => {
                       hiddenDrafts.noteEdit(draft.questionId, patch);
@@ -1252,7 +1257,14 @@ function SessionInterviewPanel({
           !mapping &&
           canManuallyRefreshGroupRecommendations &&
           !groupRecommendationRequest ? (
-            <Button outline onClick={refreshGroupRecommendations}>
+            <Button
+              outline
+              onClick={() => {
+                refreshGroupRecommendations();
+                // The button goes away once clicked; keep keyboard focus on a control that stays.
+                (reviewRef.current || statusRef.current)?.focus({ preventScroll: true });
+              }}
+            >
               Refresh group suggestions
             </Button>
           ) : null}

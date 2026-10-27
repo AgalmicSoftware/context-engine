@@ -179,23 +179,21 @@ const buildRecommendationViews = (
   recommendations: SessionInterviewGroupRecommendation[],
   sessionSlug: string,
 ): RecommendationView[] => {
-  const byGroupId = new Map(recommendations.map((recommendation) => [recommendation.groupId, recommendation]));
-  const eligible = normalizeInterviewGroupCandidates({
-    groups: overview.groups,
-    memberships: overview.memberships,
-    source: overview.memberships.length ? 'authenticated' : 'public',
-  });
-  return eligible
-    .filter((group) => byGroupId.has(group.groupId))
-    .slice(0, 6)
-    .map((group) => {
-      const recommendation = byGroupId.get(group.groupId);
-      return {
-        group,
-        reason: recommendation?.reason || 'Suggested from the interview review.',
-        evidence: recommendation?.evidence || '',
-      };
-    });
+  const eligible = new Map(
+    normalizeInterviewGroupCandidates({
+      groups: overview.groups,
+      memberships: overview.memberships,
+      source: overview.memberships.length ? 'authenticated' : 'public',
+    }).map((group) => [group.groupId, group]),
+  );
+  // Suggestion order, so groups named like a chosen answer stay first.
+  const views: RecommendationView[] = [];
+  for (const { groupId, reason, evidence } of recommendations) {
+    const group = eligible.get(groupId);
+    if (group)
+      views.push({ group, reason: reason || 'Suggested from the interview review.', evidence: evidence || '' });
+  }
+  return views.slice(0, 6);
 };
 
 const usePreviousBoolean = (value: boolean): boolean => {

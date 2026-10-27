@@ -114,6 +114,22 @@ describe('SessionInterviewRecommendedGroups', () => {
     expect(joinWorkerGroup).not.toHaveBeenCalled();
   });
 
+  it('lists groups in suggestion order, so a group named like a chosen answer stays first', async () => {
+    jest.mocked(loadPublicWorkerGroups).mockResolvedValue([group(), group({ groupId: 'dacc', label: 'd/acc' })]);
+    renderRecommendations({
+      recommendations: [
+        recommendation({ groupId: 'dacc', reason: 'You chose “d/acc”.', evidence: '' }),
+        recommendation(),
+      ],
+    });
+
+    expect(await screen.findByRole('heading', { name: 'Suggested groups (2)' })).toBeInTheDocument();
+    expect(screen.getAllByRole('article').map((card) => card.querySelector('strong')?.textContent)).toEqual([
+      'd/acc',
+      'AI Optimists',
+    ]);
+  });
+
   it('opens login for the selected group and cancels the pending join when login is dismissed', async () => {
     const toggleLoginModal = jest.fn();
     const view = renderRecommendations({ toggleLoginModal });

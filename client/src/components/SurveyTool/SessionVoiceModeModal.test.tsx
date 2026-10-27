@@ -1288,6 +1288,46 @@ describe('SessionVoiceModeModal', () => {
     );
   });
 
+  it('suggests groups from kept answers only, and clears them when an answer is removed', async () => {
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'available', recommendations: [] });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        questionPool={[
+          ...baseProps.questionPool,
+          { id: 'q2', prompt: 'Which camp?', type: 'freeform' },
+          { id: 'q3', prompt: 'Where do you live?', type: 'freeform' },
+        ]}
+        sessionConfig={{ interviewMode: { suggestGroups: true } }}
+        existingResponseSlice={{ answers: { q3: { value: 'My saved answer' } } }}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'claude', modelId: 'claude-test', verification: 'self_reported' },
+          responderContext: {},
+          responses: [
+            { questionId: 'q1', answer: 'Drafted by the AI', confidence: 0.7 },
+            { questionId: 'q2', answer: 'd/acc', confidence: 0.7 },
+            { questionId: 'q3', answer: 'Lyon', confidence: 0.7 },
+          ],
+        }}
+      />,
+    );
+    const lastRequest = () => mockedUseSessionInterviewGroupRecommendations.mock.calls.at(-1)?.[0].request;
+    // The draft for an already-saved answer starts unchosen, so it doesn't count.
+    await waitFor(() =>
+      expect(lastRequest()?.draftResponses.map(({ questionId }) => questionId)).toEqual(['q1', 'q2']),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Which camp?' }));
+    expect(lastRequest()).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh group suggestions' }));
+    expect(lastRequest()?.draftResponses.map(({ questionId }) => questionId)).toEqual(['q1']);
+    // The refresh button goes once clicked, so focus moves to the review heading.
+    expect(screen.getByText('Review proposed responses').closest('summary')).toHaveFocus();
+  });
+
   it('offers the two large requested voice-mode choices, with the AI-prefill option below them', async () => {
     render(<SessionVoiceModeModal {...baseProps} />);
     // Each choice shows its icon and title; its description sits behind a "?" beside the icon.

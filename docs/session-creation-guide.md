@@ -140,8 +140,11 @@ participants how well their AI predicted them** (`interviewMode.showFidelityScor
 off by default) shows a private score after someone submits AI-prefill drafts.
 **Suggest open groups that fit participants’ answers**
 (`interviewMode.suggestGroups`, off by default) offers the session's open groups
-after an interview or AI prefill, without joining for anyone. All three need a
-Session Worker newer than 0.7.0. See
+after an interview or AI prefill, without joining for anyone. Older Session
+Workers reject settings they don't know, so each is saved only when changed from
+its default: the sharing default needs a 0.7.0 or later Session Worker, and
+`full` detail, hidden drafts, the score and group suggestions need one newer
+than 0.7.0. See
 [session-interview-research.md](session-interview-research.md) and
 [session-listening-mode.md](session-listening-mode.md).
 Generation waits for public questions and uses the session Worker's OpenAI key.

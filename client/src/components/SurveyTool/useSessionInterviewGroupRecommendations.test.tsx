@@ -93,33 +93,41 @@ describe('useSessionInterviewGroupRecommendations', () => {
     });
   });
 
+  const pickedNewGroup: HookProps = {
+    active: true,
+    request: {
+      requestId: 1,
+      transcript: '',
+      prefillPacket: null,
+      draftResponses: [{ questionId: 'pick', answer: 'new group' }],
+    },
+    questions: [
+      ...questions,
+      { id: 'pick', prompt: 'Which?', type: 'multichoice', options: ['New group'], singleSelect: true },
+    ],
+    sessionConfig,
+    sessionSlug: 'demo',
+    workerUrl,
+  };
+  const choseNewGroup = { groupId: 'new-group', reason: 'You chose “new group”.', evidence: '' };
+
   it('suggests a group named like a chosen option first, and asks the AI only about the others', async () => {
     jest.mocked(recommendInterviewGroups).mockResolvedValue(readyResult([recommendation('old-group')]));
-    const props: HookProps = {
-      active: true,
-      request: {
-        requestId: 1,
-        transcript: '',
-        prefillPacket: null,
-        draftResponses: [{ questionId: 'pick', answer: 'new group' }],
-      },
-      questions: [
-        ...questions,
-        { id: 'pick', prompt: 'Which?', type: 'multichoice', options: ['New group'], singleSelect: true },
-      ],
-      sessionConfig,
-      sessionSlug: 'demo',
-      workerUrl,
-    };
-    const { result } = renderHook(() => useSessionInterviewGroupRecommendations(props));
+    const { result } = renderHook(() => useSessionInterviewGroupRecommendations(pickedNewGroup));
     await waitFor(() => expect(result.current.availability).toBe('available'));
-    expect(result.current.recommendations).toEqual([
-      { groupId: 'new-group', reason: 'You chose “new group”.', evidence: '' },
-      recommendation('old-group'),
-    ]);
+    expect(result.current.recommendations).toEqual([choseNewGroup, recommendation('old-group')]);
     expect(jest.mocked(recommendInterviewGroups).mock.calls[0][0].candidates.map(({ groupId }) => groupId)).toEqual([
       'old-group',
     ]);
+  });
+
+  it('still suggests exact matches when the AI suggestions fail or time out', async () => {
+    jest
+      .mocked(recommendInterviewGroups)
+      .mockResolvedValue({ status: 'unavailable', recommendations: [], reason: 'ai_recommendation_failed' });
+    const { result } = renderHook(() => useSessionInterviewGroupRecommendations(pickedNewGroup));
+    await waitFor(() => expect(result.current.availability).toBe('available'));
+    expect(result.current.recommendations).toEqual([choseNewGroup]);
   });
 
   it('skips the AI when every open group matches a chosen option', async () => {
