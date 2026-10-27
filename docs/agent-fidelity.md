@@ -56,6 +56,14 @@ Similarity between a prediction and an answer runs from 0 to 1:
 - **Correction rate:** the share of shown choice drafts the person changed.
   Ratings and vote allocations rarely come back exactly, so they count through
   similarity only.
+- **Cohen's kappa:** exact agreement on choice predictions beyond what chance
+  would give. Chance comes from each question's answer shares among the
+  predictions and among the answers, and questions are pooled by their number
+  of predictions. 1 is perfect agreement and 0 no better than predicting from
+  those shares; the interval resamples people.
+- **Rating error:** the mean absolute difference between a predicted and a
+  given rating, as a share of the question's scale (7 against 9 on 0–10 is
+  0.2), per person and then across people.
 - **Calibration:** for choice predictions with a stated confidence, the share
   kept unchanged in each tenth of the confidence range, plus the Brier score
   and expected calibration error. Prefill confidences are 0–1; Wrapped

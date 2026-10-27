@@ -241,6 +241,25 @@ test('an agent that knows each person beats the majority guess, most for unusual
   assert.ok(!JSON.stringify(report).includes(people[0].id), 'addresses stay out of the report');
 });
 
+test("kappa corrects agreement for chance, and rating error is a share of the scale", () => {
+  // Knowing each person: every prediction right, well beyond the 0.52 that the
+  // 60/40 answer split gives by chance.
+  const knows = scoreAgentFidelity({ questions, pairs: pairsFor((person) => person.view), answers: answersFor(), options: fast });
+  assert.equal(knows.agreement.choiceKappa.value, 1);
+  // Always "Agree": right for 60% of people, which is exactly what chance gives.
+  const stereotype = scoreAgentFidelity({ questions, pairs: pairsFor(() => 'Agree'), answers: answersFor(), options: fast });
+  assert.ok(Math.abs(stereotype.agreement.choiceKappa.value) < 1e-12);
+  assert.equal(stereotype.agreement.choiceKappa.participants, 10);
+  assert.ok(stereotype.agreement.choiceKappa.interval);
+  // Rating predictions 7 against answers 9 on a 0–10 scale.
+  const rated = pairsFor(() => 'Agree').map((pair) => ({ ...pair, questionId: 'qr', prediction: 7, actual: 9 }));
+  const ratings = scoreAgentFidelity({ questions, pairs: rated, answers: answersFor(), options: fast });
+  assert.ok(Math.abs(ratings.agreement.ratingError.value - 0.2) < 1e-12);
+  assert.equal(ratings.agreement.choiceKappa.suppressed, true, 'no choice predictions');
+  const few = scoreAgentFidelity({ questions, pairs: pairsFor(() => 'Agree').slice(0, 16), answers: answersFor(), options: { minParticipants: 5 } });
+  assert.equal(few.agreement.choiceKappa.suppressed, true);
+});
+
 test('an agent that only knows the stereotype gains nothing over the majority guess', () => {
   const report = scoreAgentFidelity({ questions, pairs: pairsFor(() => 'Agree'), answers: answersFor(), options: fast });
   assert.ok(Math.abs(report.mirrorScore.overall.value - 0.6) < 1e-12);

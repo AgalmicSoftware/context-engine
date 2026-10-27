@@ -255,9 +255,17 @@ All notable changes to this project will be documented in this file.
 
 - File questions without valid answers under "no data" in the report's tag
   filter instead of "mixed / unsure".
+- Let the AI discourse benchmark answer any session's questions, every type
+  included: `answer` asks each model with reversed wording, flipped rating
+  scales and shuffled options, and checks replies with the MCP's answer rules,
+  now shared in `shared/questions/answerValue.mjs`. `compare-answers` then
+  compares models with everyone and with each group of 5 or more people, using
+  statistics suited to each question type.
 
 ### Research
 
+- Add Cohen's kappa for choice predictions and rating error, as a share of
+  the scale, to the agent fidelity report.
 - Add an agent fidelity report: `scripts/agent-fidelity-report.mjs` scores
   how well AI drafts predicted participants' answers from a Results JSON
   export or Session Wrapped rows. It reports Mirror Score, correction rate,

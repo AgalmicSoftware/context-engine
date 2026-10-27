@@ -702,6 +702,37 @@ const breakdown = (people, keyOf, valueOf, options) => {
 const meanSimilarity = (pairs) => mean(pairs.map((pair) => pair.similarity));
 const matchRate = (pairs) => mean(pairs.map((pair) => (pair.match ? 1 : 0)));
 
+// Cohen's kappa: exact agreement beyond what chance gives, where chance comes
+// from each question's answer shares among the predictions and among the
+// answers. Pooled over questions, weighting each by its predictions.
+const pooledKappa = (pairs) => {
+  if (!pairs.length) return null;
+  let [agreed, chance] = [0, 0];
+  for (const questionPairs of groupBy(pairs, (pair) => pair.questionId).values()) {
+    const answered = groupBy(questionPairs, (pair) => pair.actualKey);
+    for (const [answer, predicted] of groupBy(questionPairs, (pair) => pair.predictionKey)) {
+      chance += (predicted.length * (answered.get(answer)?.length ?? 0)) / questionPairs.length;
+    }
+    agreed += questionPairs.filter((pair) => pair.match).length;
+  }
+  const [observed, expected] = [agreed / pairs.length, chance / pairs.length];
+  return expected < 1 ? (observed - expected) / (1 - expected) : null;
+};
+const kappaEstimate = (people, options) => {
+  const choices = people.map((person) => person.pairs.filter(isChoice)).filter((pairs) => pairs.length);
+  if (choices.length < options.minParticipants) return withheld(choices.length);
+  return {
+    value: pooledKappa(choices.flat()),
+    interval: bootstrapInterval(choices, (draw) => pooledKappa(draw.flat()), options),
+    participants: choices.length,
+  };
+};
+// Mean absolute error of rating predictions, as a share of each question's scale.
+const ratingError = (personPairs) => {
+  const rated = personPairs.filter((pair) => pair.question.type === 'rating');
+  return rated.length ? mean(rated.map((pair) => 1 - pair.similarity)) : null;
+};
+
 const extremity = (question, value) => {
   const half = (question.scale.max - question.scale.min) / 2;
   return half > 0 ? Math.abs(value - (question.scale.min + half)) / half : 0;
@@ -913,6 +944,10 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
     },
     correctionRate: core.correctionRate,
     calibration: core.calibration,
+    agreement: {
+      choiceKappa: kappaEstimate(people, settings),
+      ratingError: perPerson(ratingError),
+    },
     anchoring: {
       exactMatchShift: anchoring(matchRate, isChoice),
       similarityShift: anchoring(meanSimilarity),

@@ -114,6 +114,8 @@ export const renderFidelityMarkdown = (report) => {
     ['Lift over the most common answer', baselines.population.lift],
     ["Lift over the person's group's most common answer", baselines.group.lift],
     ['Anchoring: exact-match rate shown minus hidden', anchoring.exactMatchShift, signed],
+    ["Cohen's kappa, choice predictions", report.agreement?.choiceKappa],
+    ['Rating error, as a share of the scale', report.agreement?.ratingError],
   ].filter(([, result]) => result);
   const conditionLabel = { shown: 'shown', blind: 'hidden until answered', separate: 'made separately' };
   const calibrationSections = Object.entries(calibration).map(([condition, result]) =>
