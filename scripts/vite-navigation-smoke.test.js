@@ -448,6 +448,10 @@ test('summarizeFailures catches Vite-sensitive render, style, and asset failures
       }],
       unexpectedConsoleIssues: [{ type: 'error', text: 'TypeError: boom' }],
       pageErrors: ['ReferenceError: boom'],
+      securityPolicyViolations: [
+        { disposition: 'enforce', effectiveDirective: 'script-src-elem', blockedURI: 'inline', documentURI: 'about:srcdoc' },
+        { disposition: 'report', effectiveDirective: 'connect-src', blockedURI: 'http://outside.example.test/', documentURI: '/session/demo' },
+      ],
       routeProbeFailures: ['results did not hydrate'],
       layoutIssues: ['ce-survey-submit: visible text appears clipped'],
     },
@@ -462,6 +466,8 @@ test('summarizeFailures catches Vite-sensitive render, style, and asset failures
     '/session/demo: failed script http://127.0.0.1:3000/src/main.tsx (net::ERR_FAILED)',
     '/session/demo: console error: TypeError: boom',
     '/session/demo: page error: ReferenceError: boom',
+    '/session/demo: CSP enforce script-src-elem: inline in about:srcdoc',
+    '/session/demo: CSP report connect-src: http://outside.example.test/ in /session/demo',
     '/session/demo: route probe: results did not hydrate',
     '/session/demo: layout issue: ce-survey-submit: visible text appears clipped',
   ]);
@@ -503,10 +509,12 @@ test('compactSmokeSummary keeps success output focused on route health', () => {
       unexpectedFailedRequests: 0,
       unexpectedConsoleIssues: 0,
       pageErrors: 0,
+      securityPolicyViolations: 0,
       routeProbeFailures: 0,
       layoutIssues: 0,
       missingText: [],
     }],
     failures: [],
+    scriptInjection: undefined,
   });
 });

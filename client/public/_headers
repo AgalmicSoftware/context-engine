@@ -2,7 +2,10 @@
   Cross-Origin-Opener-Policy: same-origin-allow-popups
   Cross-Origin-Embedder-Policy: unsafe-none
   Referrer-Policy: strict-origin-when-cross-origin
-  Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'
-  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src https: blob:; media-src 'self' data: blob: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; script-src 'self' 'sha256-mKjUh0E6CnzsRRh0Cq3xv9KzngAwXUZS8Mj9O5EV+d0='; worker-src 'self' blob:
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'sha256-mKjUh0E6CnzsRRh0Cq3xv9KzngAwXUZS8Mj9O5EV+d0='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src https: blob:; media-src 'self' data: blob: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
+# The script hash permits only the checked-in benchmark report script in its
+# sandboxed srcdoc frame. The CSP smoke test checks it against the artifact.
 
 # The build appends one immutable Cache-Control rule per hashed file under /assets.

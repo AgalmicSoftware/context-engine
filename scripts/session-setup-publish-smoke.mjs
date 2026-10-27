@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { installClientSecurityHeaders } from './lib/client-security-headers.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { ethers } from 'ethers';
@@ -52,6 +53,8 @@ const browser = await chromium.launch({
   args: [`--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE ${new URL(baseUrl).hostname}`],
 });
 const calls = [];
+const securityPolicyRuns = [];
+const walletWorkerUrls = new Set();
 const fixtureContext = async ({ seed }, { workerEnv = env, failResponseUploadAt = 0, loseResponseUploadAt = 0, deferLostResponseListingUntilReplay = false, unavailableSubmit = false, responseUploads = [] } = {}) => {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
@@ -145,6 +148,8 @@ const fixtureContext = async ({ seed }, { workerEnv = env, failResponseUploadAt 
       body: Buffer.from(await response.arrayBuffer()),
     });
   });
+  securityPolicyRuns.push(await installClientSecurityHeaders(context, baseUrl));
+  context.on('page', (page) => page.on('worker', (walletWorker) => walletWorkerUrls.add(walletWorker.url())));
   return context;
 };
 const login = async (page, wallet) => {
@@ -571,6 +576,9 @@ try {
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   console.log('Admin confirmed recovery-key export and downloaded a private copy without browser persistence.');
 
+  assert.deepEqual(securityPolicyRuns.flat(), [], 'Publication, passkey signing and reloads must have no CSP violations');
+  assert.ok([...walletWorkerUrls].some((url) => new URL(url).origin === new URL(baseUrl).origin && /\/assets\/sessionWorker-[^/]+\.js$/.test(new URL(url).pathname)),
+    `The passkey wallet module worker must start under CSP: ${JSON.stringify([...walletWorkerUrls])}`);
   const elapsedMs = Math.round(performance.now() - startedAt);
   await writeFile(
     `${outputDir}/result.json`,
@@ -581,6 +589,8 @@ try {
         configRevision: config.configRevision,
         elapsedMs,
         checks: [
+          'real static CSP without violations across the publication journey',
+          'passkey wallet module worker startup and signed requests under CSP',
           'signed Worker verification',
           'wizard publication and config readback',
           'fresh-context answer submission',
@@ -600,6 +610,8 @@ try {
           'confirmed masked recovery-key download without browser persistence',
           'backup and recovery-key screenshots in all three themes',
         ],
+        securityPolicyViolations: securityPolicyRuns.flat(),
+        walletWorkerUrls: [...walletWorkerUrls],
         responseUploads,
         lostReplyUploads,
         reloadRecoveryUploads,

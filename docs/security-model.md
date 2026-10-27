@@ -125,12 +125,26 @@ plaintext key storage or a UI-only passkey prompt.
 
 ## CSP And Third-Party Script Note
 
-The current static app shell still loads Google Fonts from third-party origins
-and includes inline JSON-LD structured data. Font Awesome icons are loaded from
-bundled `@fortawesome` packages, not the remote kit script. A stricter CSP for
-wallet unlock screens should be deployed before production wallet rollout:
+The static host's `client/public/_headers` enforces `script-src 'self'` and
+`worker-src 'self' blob:` alongside `frame-ancestors 'none'`, `object-src 'none'`,
+`base-uri 'self'` and `form-action 'self'`. The only inline script exception is
+an exact SHA-256 hash for the bundled benchmark report's script; its `srcdoc`
+frame remains sandboxed without same-origin access. A regression test checks
+that the hash matches the published artifact, so a report update must review
+and update that exception. The app entry has no executable inline script:
+its JSON-LD is data, and the theme bootstrap and module entry are local files.
+No remote scripts, eval, or arbitrary inline scripts are permitted.
 
-- keep wallet unlock/sign routes free of third-party scripts where practical
-- remove or nonce inline scripts
-- use `script-src 'self'` plus explicit reviewed exceptions only
-- keep `connect-src` limited to configured RPC, worker, Arweave, and API origins
+The remaining CSP directives stay report-only, including the existing Google
+Fonts, image, media, frame and connection sources. Font Awesome is bundled.
+The browser smoke applies the actual `_headers` to local app documents because
+Vite preview does not serve it. Any enforced or report-only violation fails
+normal navigation and publication journeys, including passkey login, wallet
+worker startup and signed requests. Isolated negative checks prove injected
+inline and other-origin scripts cannot run.
+
+After deployment, check the hosting response with
+`curl -sI <site> | grep -i content-security-policy`: the enforced header must
+show `script-src 'self'`. Repeat that response check when changing static-host
+configuration. The local header harness verifies the file and application behavior; deployment still
+requires the hosting provider to apply it.

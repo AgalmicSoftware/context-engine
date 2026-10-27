@@ -2,6 +2,7 @@
 
 const { URL } = require('node:url');
 const path = require('node:path');
+const { installClientSecurityHeaders, verifyBlockedScriptInjection } = require('./lib/client-security-headers');
 const { ethers } = require('ethers');
 const demoSessions = require('../client/src/variables/demo/demo_sessions.json');
 const registryAbi = require('../client/src/contractsABI/SESSION_REGISTRY_ABI.json');
@@ -415,6 +416,8 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
   await installLocalSmokeFixtureRoutes(page, baseUrl);
 
   await installDemoWorkerFixtureRoutes(page, baseUrl, route);
+  const securityPolicyViolations = isLocalSmokeBaseUrl(baseUrl)
+    ? await installClientSecurityHeaders(page, baseUrl) : [];
 
   page.on('console', (msg) => {
     if (msg.type() === 'error' || msg.type() === 'warning') {
@@ -558,6 +561,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
     consoleIssues,
     unexpectedConsoleIssues,
     pageErrors,
+    securityPolicyViolations,
     missingText,
     routeProbeFailures,
   };
@@ -594,6 +598,9 @@ function summarizeFailures(results) {
     result.pageErrors.forEach((error) => {
       failures.push(`${result.route}: page error: ${error}`);
     });
+    (result.securityPolicyViolations || []).forEach((event) => {
+      failures.push(`${result.route}: CSP ${event.disposition} ${event.effectiveDirective}: ${event.blockedURI} in ${event.documentURI}`);
+    });
     (result.routeProbeFailures || []).forEach((failure) => {
       failures.push(`${result.route}: route probe: ${failure}`);
     });
@@ -621,11 +628,13 @@ function compactSmokeSummary(summary) {
       unexpectedFailedRequests: result.unexpectedFailedRequests.length,
       unexpectedConsoleIssues: result.unexpectedConsoleIssues.length,
       pageErrors: result.pageErrors.length,
+      securityPolicyViolations: (result.securityPolicyViolations || []).length,
       routeProbeFailures: (result.routeProbeFailures || []).length,
       layoutIssues: (result.layoutIssues || []).length,
       missingText: result.missingText,
     })),
     failures: summary.failures,
+    scriptInjection: summary.scriptInjection,
   };
 }
 
@@ -665,6 +674,7 @@ async function runSmoke(options = {}) {
       viewport,
       results,
       failures: summarizeFailures(results),
+      scriptInjection: isLocalSmokeBaseUrl(baseUrl) ? await verifyBlockedScriptInjection(browser, baseUrl) : null,
     };
   } finally {
     await browser.close();

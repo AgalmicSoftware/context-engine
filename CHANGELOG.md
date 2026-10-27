@@ -24,6 +24,10 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Enforce local scripts and wallet workers through the static CSP, with one
+  exact script hash for the sandboxed benchmark report. Browser smoke tests
+  apply the real headers, reject CSP violations and check blocked injections.
+
 - Advance saved-answer revisions when edited, including changing an
   answer back, and discard in-flight submission state when the account changes.
 - Recheck unavailable Worker readiness on Submit and avoid caching transient
