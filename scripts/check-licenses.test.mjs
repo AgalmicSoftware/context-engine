@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { checkLicenses, isAllowedLicense } from './check-licenses.mjs';
@@ -69,4 +69,44 @@ test('an override for an absent installed version fails even when all shipped li
     'synthetic-removed@1.0.0': { declaredLicense: null, license: 'MIT', evidence: { source: 'LICENSE', reviewed: '2026-10-26', note: 'Synthetic removed version.' } },
   } });
   assert.match(result.failures[0], /synthetic-removed@1.0.0.*no longer installed/);
+});
+
+test('the default release gate checks root-installed Bridge and deploy-helper dependencies and bundle notices', async (t) => {
+  const rootDir = await mkdtemp(path.join(os.tmpdir(), 'ce-release-license-fixture-'));
+  t.after(() => rm(rootDir, { recursive: true, force: true }));
+  for (const tree of ['.', 'client', 'mcp', 'workers/sessionCorsWorker']) {
+    await mkdir(path.join(rootDir, tree), { recursive: true });
+    await writeFile(path.join(rootDir, tree, 'package.json'), JSON.stringify({ name: 'synthetic-project', version: '1.0.0', ...(tree === '.' ? { devDependencies: { 'synthetic-released': '1.0.0' } } : {}) }));
+  }
+  const packageDir = path.join(rootDir, 'node_modules/synthetic-released');
+  await mkdir(packageDir, { recursive: true });
+  const setLicense = (license) => writeFile(path.join(packageDir, 'package.json'), JSON.stringify({ name: 'synthetic-released', version: '1.0.0', license }));
+  await setLicense('GPL-3.0');
+  await writeFile(path.join(packageDir, 'LICENSE'), 'Synthetic full license text.');
+  await mkdir(path.join(rootDir, 'dist'), { recursive: true });
+  await mkdir(path.join(rootDir, 'client/build'), { recursive: true });
+  await writeFile(path.join(rootDir, 'client/build/bundled-module-ids.json'), JSON.stringify({ moduleIds: [] }));
+  await writeFile(path.join(rootDir, 'dist/mcp.metafile.json'), JSON.stringify({ inputs: {} }));
+  const check = () => checkLicenses({ rootDir, overrides: {} });
+  for (const selected of ['sessionCorsWorker', 'agentBridgeWorker', 'deployHelper']) {
+    for (const bundle of ['sessionCorsWorker', 'agentBridgeWorker', 'deployHelper']) {
+      const inputs = bundle === selected ? { 'node_modules/synthetic-released/index.js': {} } : {};
+      await writeFile(path.join(rootDir, `dist/${bundle}.bundle.metafile.json`), JSON.stringify({ inputs }));
+      await writeFile(path.join(rootDir, `dist/${bundle}.bundle.js`), 'const worker = true;\n');
+    }
+    const result = check();
+    assert.ok(result.failures.some((failure) => failure.startsWith('.: synthetic-released@1.0.0 has GPL-3.0')), `${selected}: root development dependency is shipped`);
+    assert.equal(result.counts.find(({ tree }) => tree === '.').packages, 1);
+    assert.ok(result.failures.some((failure) => failure.includes(`${selected}.bundle.js`) && /notices/i.test(failure)), `${selected}: missing notices fail`);
+  }
+  await setLicense('MIT');
+  const { buildWorkerThirdPartyNotices } = await import('./lib/worker-third-party-notices.mjs');
+  for (const bundle of ['sessionCorsWorker', 'agentBridgeWorker', 'deployHelper']) {
+    const metafile = JSON.parse(await readFile(path.join(rootDir, `dist/${bundle}.bundle.metafile.json`), 'utf8'));
+    const notices = buildWorkerThirdPartyNotices({ rootDir, metafile });
+    await writeFile(path.join(rootDir, `dist/${bundle}.bundle.js`), `const worker = true;\n/*\n${notices.trimEnd()}\n*/\n`);
+  }
+  assert.deepEqual(check().failures, []);
+  await writeFile(path.join(rootDir, 'dist/deployHelper.bundle.js'), '/* synthetic-released@1.0.0 MIT */\n');
+  assert.ok(check().failures.some((failure) => /deployHelper.bundle.js.*notices/.test(failure)), 'a package name alone is not its complete notice');
 });

@@ -2,13 +2,16 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildWorkerThirdPartyNotices } from './lib/worker-third-party-notices.mjs';
 
 const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 const productionTrees = ['.', 'client', 'mcp', 'workers/sessionCorsWorker'];
 const shippedBundles = [
   { tree: 'client', path: 'client/build/bundled-module-ids.json', format: 'vite' },
   { tree: 'mcp', path: 'dist/mcp.metafile.json', format: 'esbuild' },
-  { tree: 'workers/sessionCorsWorker', path: 'dist/sessionCorsWorker.bundle.metafile.json', format: 'esbuild' },
+  { tree: 'workers/sessionCorsWorker', path: 'dist/sessionCorsWorker.bundle.metafile.json', format: 'esbuild', bundleFile: 'dist/sessionCorsWorker.bundle.js' },
+  { tree: '.', path: 'dist/deployHelper.bundle.metafile.json', format: 'esbuild', bundleFile: 'dist/deployHelper.bundle.js' },
+  { tree: '.', path: 'dist/agentBridgeWorker.bundle.metafile.json', format: 'esbuild', bundleFile: 'dist/agentBridgeWorker.bundle.js' },
 ];
 const allowed = new Set([
   'MIT', 'ISC', 'BSD-2-Clause', 'BSD-3-Clause', '0BSD', 'Apache-2.0', 'MPL-2.0',
@@ -80,9 +83,28 @@ export const checkLicenses = ({ rootDir = projectRoot, trees = productionTrees, 
   const counts = [];
   const installed = new Set();
   const bundleFolders = new Map(trees.map((tree) => [tree, new Set()]));
+  const dependencyRoots = trees.map((tree) => ({ tree, folder: path.resolve(rootDir, tree, 'node_modules') }))
+    .filter(({ folder }) => existsSync(folder))
+    .map(({ tree, folder }) => ({ tree, folder: realpathSync(folder) }))
+    .sort((a, b) => b.folder.length - a.folder.length);
   for (const bundle of bundles) {
     if (!bundleFolders.has(bundle.tree)) throw new Error(`Unknown bundle dependency tree: ${bundle.tree}`);
-    for (const folder of bundledPackageFolders(rootDir, bundle)) bundleFolders.get(bundle.tree).add(folder);
+    for (const folder of bundledPackageFolders(rootDir, bundle)) {
+      // A bundle can import another tree's installed package (notably root
+      // ethers v5). Attribute it by its real installation, not its consumer.
+      const owner = dependencyRoots.find((entry) => folder.startsWith(`${entry.folder}${path.sep}`));
+      if (!owner) throw new Error(`Unknown installed dependency tree for bundled package: ${folder}`);
+      bundleFolders.get(owner.tree).add(folder);
+    }
+    if (bundle.bundleFile) {
+      const metafile = JSON.parse(readFileSync(path.resolve(rootDir, bundle.path), 'utf8'));
+      const notices = buildWorkerThirdPartyNotices({ rootDir, metafile });
+      const expected = `/*\n${notices.replace(/\*\//g, '*\\/').trimEnd()}\n*/\n`;
+      const file = path.resolve(rootDir, bundle.bundleFile);
+      if (!existsSync(file) || !readFileSync(file, 'utf8').endsWith(expected)) {
+        failures.push(`${bundle.bundleFile}: missing or stale complete third-party notices.`);
+      }
+    }
   }
   for (const tree of trees) {
     const cwd = realpathSync(path.resolve(rootDir, tree));

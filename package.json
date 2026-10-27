@@ -34,7 +34,7 @@
     "deploy-helper:deploy": "node scripts/deploy-helper-deploy.mjs",
     "deploy:evm": "node scripts/deploy-evm.mjs",
     "deploy:op-sepolia": "node scripts/deploy-op-sepolia.mjs",
-    "license:check": "npm --prefix client run build && npm --prefix mcp run build && node scripts/worker-bundle.mjs --target sessionCorsWorker && node scripts/check-licenses.mjs",
+    "license:check": "npm --prefix client run build && npm --prefix mcp run build && node scripts/worker-bundle.mjs && node scripts/check-licenses.mjs",
     "verify:public-release-surface": "node scripts/verify-public-release-surface.js",
     "verify:public-assets": "node scripts/verify-public-assets.js",
     "verify:public-text": "node scripts/verify-public-text.js",

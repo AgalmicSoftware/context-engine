@@ -76,10 +76,12 @@ Current third-party images:
 ## Dependency license check
 
 After installing root, client, MCP and Session Worker dependencies, run
-`npm run -s license:check`. This builds the client, MCP and Session Worker to
-capture their exact inputs. The check reads installed production packages plus
+`npm run -s license:check`. This builds the client, MCP, Session Worker, Agent Bridge
+and deploy helper to capture their exact inputs. Released Worker bundles must
+end with their complete generated notices. The check reads installed production packages plus
 packages in the esbuild metafiles and Vite's emitted module IDs, including
-bundled development dependencies. It uses their installed license metadata,
+bundled development dependencies, attributed to the tree that installed them.
+It uses their installed license metadata,
 accepts the reviewed permissive/MPL allowlist, and fails on missing or
 unrecognized licenses. Version-specific exceptions and their
 source evidence live in `scripts/license-overrides.json`; upgrades require

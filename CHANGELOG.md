@@ -143,9 +143,10 @@ All notable changes to this project will be documented in this file.
 - Share group-password derivation, sign-in message/session-ID rules and admin
   typed-data construction while preserving the client/MCP ethers-v5 and Session
   Worker ethers-v6 package boundary.
-- Check installed production dependencies and actual client/MCP/Worker bundle
-  inputs in CI, including bundled development packages, with reviewed exceptions
-  that fail when their package versions are no longer installed.
+- Check installed production dependencies and actual client, MCP, Session Worker,
+  Agent Bridge and deploy-helper bundle inputs in CI, including bundled development
+  packages. Released Worker bundles must carry complete notices; reviewed license
+  exceptions fail when their package versions are no longer installed.
 
 ### License
 

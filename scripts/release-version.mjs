@@ -259,6 +259,7 @@ export const WORKER_RELEASE_SOURCE_PATHSPEC = Object.freeze([
   ':(glob)shared/**/*.cjs',
   'workers/sessionCorsWorker/package-lock.json',
   'scripts/worker-bundle.mjs',
+  'scripts/lib/worker-third-party-notices.mjs',
   'deploy/cloudflare/session-worker/worker.mjs',
   'deploy/cloudflare/session-worker/wrangler.jsonc',
   'deploy/cloudflare/session-worker/package.json',

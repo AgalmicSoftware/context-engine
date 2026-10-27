@@ -494,6 +494,7 @@ test('the Worker source pathspec covers every local input of the release bundles
     'deploy/cloudflare/session-worker/wrangler.jsonc',
     'deploy/cloudflare/session-worker/package.json',
     'scripts/cloudflare-session-template.mjs',
+    'scripts/lib/worker-third-party-notices.mjs',
   ]) {
     assert.ok(covered.has(templateInput), `${templateInput} is not in the Worker source pathspec`);
   }
