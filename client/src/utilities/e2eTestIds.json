@@ -112,6 +112,7 @@
   "DATABASE_QUESTION_COUNT_DECREMENT": "ce-database-question-count-decrement",
   "DATABASE_QUESTION_COUNT_INCREMENT": "ce-database-question-count-increment",
   "SESSION_RESULTS_TOGGLE": "ce-session-results-toggle",
+  "SESSION_RESULTS_FIDELITY": "ce-session-results-fidelity",
   "SESSION_GROUPS_TOGGLE": "ce-session-groups-toggle",
   "MAIN_STATS_TAB": "ce-main-stats-tab",
   "COMMUNITY_STAT_USERS": "ce-community-stat-users",

@@ -141,6 +141,17 @@ questions, the Mirror Score, hidden-draft guesses and the most confident
 misses. It's computed in their browser and never stored; see
 [session-interview-research.md](session-interview-research.md#score-screen).
 
+The same setting adds **How well AIs predicted people** to the session's
+Results report, below its summary statistics. It scores the responses the
+report shows, after its filters, with `scoreFidelityOverview`: the overall and
+hidden-draft Mirror Scores, the share of shown choice drafts people changed,
+a chart of stated confidence against the share kept, and the Mirror Score by
+platform. These are the same numbers as this report's, except that only
+AI-prefill drafts count (voice and typed-context drafts restate what the
+person said) and the browser draws 200 bootstrap samples instead of 1,000.
+Every cell follows the withholding rules above, and until 5 people have shared
+draft comparisons the report shows a one-line note instead.
+
 ## Fix the plan before looking
 
 Write down the primary measure, exclusions and minimum cell size before

@@ -286,6 +286,22 @@ const latestByKey = (records) => {
 };
 
 /**
+ * Response rows from the Results screen, or from its "JSON: Questions +
+ * Responses" download: the survey view's `filteredResponses` and the questions
+ * view's `filteredQuestionResponses`, keyed by question. Rows in both are
+ * counted once per person and question by collectSessionFidelityData.
+ */
+export const resultsResponseRows = (source) => {
+  if (Array.isArray(source)) return source;
+  const rows = [
+    ...(Array.isArray(source?.filteredResponses) ? source.filteredResponses : []),
+    ...Object.values(source?.filteredQuestionResponses ?? {}).flatMap((list) => (Array.isArray(list) ? list : [])),
+  ];
+  if (rows.length || Array.isArray(source?.filteredResponses) || source?.filteredQuestionResponses) return rows;
+  return source ? [source] : [];
+};
+
+/**
  * Reads stored session responses into final answers (everyone) and
  * prediction pairs (responses that kept their AI draft comparison). Only each
  * person's latest record for a question counts, so withdrawing research
@@ -696,6 +712,51 @@ const spreadShift = (draw, minParticipants) => {
   return mean(shifts.filter(finite));
 };
 
+const shown = (personPairs) => personPairs.filter((pair) => pair.condition === 'shown');
+const allowedBy = (settings) => {
+  const excluded = new Set(settings.excludeParticipants.map(lower));
+  return (record) => !excluded.has(lower(record.participantId)) && (settings.includeAgents || !record.isAgent);
+};
+const peopleOf = (pairs) =>
+  [...groupBy(pairs, (pair) => pair.participantId)].map(([participantId, personPairs]) => ({
+    participantId,
+    pairs: personPairs,
+  }));
+const coverageOf = ({ pairs, scored, measured, people, settings }) => ({
+  participants: people.length,
+  predictions: measured.length,
+  freeformPredictions: scored.filter((pair) => pair.question.type === 'freeform').length,
+  byCondition: Object.fromEntries(CONDITIONS.map((condition) => [condition, measured.filter((pair) => pair.condition === condition).length])),
+  byOrigin: Object.fromEntries([...groupBy(measured, (pair) => pair.origin)].map(([key, list]) => [key, list.length])),
+  // Choice predictions with a confidence, by what it means; only 'keep' is calibrated.
+  byConfidenceMeaning: Object.fromEntries(
+    [...groupBy(measured.filter((pair) => pair.confidence !== null && isChoice(pair)), confidenceMeaning)].map(
+      ([key, list]) => [key, list.length],
+    ),
+  ),
+  excludedAgentPredictions: settings.includeAgents ? 0 : pairs.filter((pair) => pair.isAgent).length,
+});
+// Mirror Scores, the correction rate and calibration: each person counts once.
+const coreScores = (people, settings) => ({
+  mirrorScore: {
+    overall: estimate(people.map((person) => meanSimilarity(person.pairs)), settings),
+    byCondition: breakdown(people, (pair) => pair.condition, meanSimilarity, settings),
+    byType: breakdown(people, (pair) => pair.question.type, meanSimilarity, settings),
+    byOrigin: breakdown(people, (pair) => pair.origin, meanSimilarity, settings),
+    byPlatform: breakdown(people, (pair) => pair.platform, meanSimilarity, settings),
+  },
+  correctionRate: estimate(
+    people.map((person) => {
+      const visible = shown(person.pairs).filter(isChoice);
+      return visible.length ? 1 - matchRate(visible) : null;
+    }),
+    settings,
+  ),
+  calibration: Object.fromEntries(
+    CONDITIONS.map((condition) => [condition, calibrationEstimate(people, condition, settings)]).filter(([, value]) => value),
+  ),
+});
+
 /**
  * Scores prediction pairs. `answers` are everyone's final answers (used for
  * baselines and typicality); `groups` maps participant ids to group ids (for
@@ -704,8 +765,7 @@ const spreadShift = (draw, minParticipants) => {
 export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], groups = {}, options = {} } = {}) => {
   const settings = { ...DEFAULTS, ...options };
   const questionMap = mapQuestions(questions);
-  const excluded = new Set(settings.excludeParticipants.map(lower));
-  const allowed = (record) => !excluded.has(lower(record.participantId)) && (settings.includeAgents || !record.isAgent);
+  const allowed = allowedBy(settings);
   // Listed groups win; otherwise the `src` link a person arrived through.
   const groupsById = new Map();
   for (const answer of answers) {
@@ -739,10 +799,8 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
       groupSimilarity: answerSimilarity(pair.question, groupGuess, pair.actual),
     };
   });
-  const people = [...groupBy(withBaselines, (pair) => pair.participantId)].map(([participantId, personPairs]) => ({
-    participantId,
-    pairs: personPairs,
-  }));
+  const people = peopleOf(withBaselines);
+  const core = coreScores(people, settings);
   const perPerson = (valueOf) => estimate(people.map((person) => valueOf(person.pairs)), settings);
   const groupSizes = new Map();
   for (const person of people) {
@@ -787,7 +845,6 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
   });
 
   const byType = (type) => (pair) => pair.question.type === type;
-  const shown = (personPairs) => personPairs.filter((pair) => pair.condition === 'shown');
   // Within each person: agreement when drafts were shown minus when they were
   // hidden. Above zero means showing a draft pulled answers toward it. Only
   // drafts from the hidden ones' source compare, since only those could be hidden.
@@ -812,26 +869,9 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
   return {
     method: FIDELITY_METHOD_VERSION,
     options: { ...settings, excludeParticipants: settings.excludeParticipants.length },
-    coverage: {
-      participants: people.length,
-      predictions: measured.length,
-      freeformPredictions: scored.filter((pair) => pair.question.type === 'freeform').length,
-      byCondition: Object.fromEntries(CONDITIONS.map((condition) => [condition, measured.filter((pair) => pair.condition === condition).length])),
-      byOrigin: Object.fromEntries([...groupBy(measured, (pair) => pair.origin)].map(([key, list]) => [key, list.length])),
-      // Choice predictions with a confidence, by what it means; only 'keep' is calibrated.
-      byConfidenceMeaning: Object.fromEntries(
-        [...groupBy(measured.filter((pair) => pair.confidence !== null && isChoice(pair)), confidenceMeaning)].map(
-          ([key, list]) => [key, list.length],
-        ),
-      ),
-      excludedAgentPredictions: settings.includeAgents ? 0 : pairs.filter((pair) => pair.isAgent).length,
-    },
+    coverage: coverageOf({ pairs, scored, measured, people, settings }),
     mirrorScore: {
-      overall: perPerson(meanSimilarity),
-      byCondition: breakdown(people, (pair) => pair.condition, meanSimilarity, settings),
-      byType: breakdown(people, (pair) => pair.question.type, meanSimilarity, settings),
-      byOrigin: breakdown(people, (pair) => pair.origin, meanSimilarity, settings),
-      byPlatform: breakdown(people, (pair) => pair.platform, meanSimilarity, settings),
+      ...core.mirrorScore,
       // Groups below the minimum are left out entirely: their names can be
       // per-invite links.
       byGroup: Object.fromEntries(
@@ -845,13 +885,8 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
       ),
       groupsWithheld: groupSizes.size - reportedGroups.length,
     },
-    correctionRate: perPerson((personPairs) => {
-      const visible = shown(personPairs).filter(isChoice);
-      return visible.length ? 1 - matchRate(visible) : null;
-    }),
-    calibration: Object.fromEntries(
-      CONDITIONS.map((condition) => [condition, calibrationEstimate(people, condition, settings)]).filter(([, value]) => value),
-    ),
+    correctionRate: core.correctionRate,
+    calibration: core.calibration,
     anchoring: {
       exactMatchShift: anchoring(matchRate, isChoice),
       similarityShift: anchoring(meanSimilarity),
@@ -911,6 +946,25 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
           origins: [...new Set(person.pairs.map((pair) => pair.origin))].sort(),
         }))
       : [],
+  };
+};
+
+/**
+ * The report's Mirror Scores, correction rate and calibration, for the Results
+ * screen. It skips the baselines and synthesis checks, which compare every pair
+ * of people and are too slow to rerun in the browser; what it returns matches
+ * the same parts of scoreAgentFidelity.
+ */
+export const scoreFidelityOverview = ({ questions = [], pairs = [], options = {} } = {}) => {
+  const settings = { ...DEFAULTS, ...options };
+  const scored = scorePairs(pairs.filter(allowedBy(settings)), mapQuestions(questions));
+  const measured = scored.filter((pair) => pair.similarity !== null);
+  const people = peopleOf(measured);
+  return {
+    method: FIDELITY_METHOD_VERSION,
+    options: { ...settings, excludeParticipants: settings.excludeParticipants.length },
+    coverage: coverageOf({ pairs, scored, measured, people, settings }),
+    ...coreScores(people, settings),
   };
 };
 

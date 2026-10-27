@@ -2385,6 +2385,52 @@ it.each([
   });
 });
 
+it('adds how well AIs predicted people below the summary, when the session shows scores', async () => {
+  // Cached metadata is keyed by question ID, without repeating it inside.
+  cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+    namespace === 'questionsCache' ? { 84532: { questions: { q1: { type: 'binary', prompt: 'First' } } } } : {},
+  );
+  const responses = {
+    q1: Array.from({ length: 5 }, (_, index) => ({
+      responder: `0x${String(index + 1).repeat(40)}`,
+      questionId: 'q1',
+      response: JSON.stringify({
+        questionID: 'q1',
+        answer: { value: index < 4 ? 'Agree' : 'Disagree', encrypted: false },
+        interviewProvenance: {
+          draftOrigin: 'external_prefill',
+          source: { platform: 'claude', modelId: 'test-model' },
+          originalPrediction: { answer: 'Agree', confidence: 0.8 },
+          predictionCondition: 'shown',
+          confidenceMeaning: 'keep',
+        },
+      }),
+    })),
+  };
+  try {
+    const { rerender } = render(
+      <PolisReport
+        {...baseReportProps}
+        slug="fidelity-report"
+        questionResponses={responses}
+        sessionConfig={{ interviewMode: { showFidelityScore: true } }}
+      />,
+    );
+    const section = await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);
+    expect(section).toHaveTextContent('5 AI-drafted answers from 5 people');
+    expect(within(section).getByRole('group', { name: 'Mirror Score' })).toHaveTextContent('80%');
+    const summary = screen.getByText('Summary and Statistics');
+    expect(summary.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    rerender(
+      <PolisReport {...baseReportProps} slug="fidelity-report" questionResponses={responses} sessionConfig={{}} />,
+    );
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY)).not.toBeInTheDocument();
+  } finally {
+    cacheScripts.peekCacheSync.mockImplementation(() => ({}));
+  }
+});
+
 it('ranks top questions by importance before conviction', () => {
   const row = (responder, questionID, importance, conviction) => ({
     responder,

@@ -115,6 +115,7 @@ import {
   buildPolisDemoSurveyResultsNetworkData,
   buildPolisDemoSurveyResultsAggregatorData,
 } from '../SurveyTool/surveyPolisDemoResultsData';
+import PolisReportFidelitySection from './PolisReportFidelitySection';
 import PolisReportSectionToggleLabel from './PolisReportSectionToggleLabel';
 export {
   OPINION_GROUPS_TOOLTIP_TEXT,
@@ -2771,6 +2772,12 @@ export default function PolisReport({
                 ) : null}
               </div>
             )}
+            <PolisReportFidelitySection
+              sessionConfig={sessionConfig}
+              questions={reportData.metadata}
+              questionResponses={reportData.filtered}
+              pdfMode={isPdfModeActive}
+            />
             {stats && (
               <>
                 {/* CONSENSUS SECTION */}

@@ -1,0 +1,202 @@
+// How well AIs predicted people, a section of the session report. The body
+// sits in the report's statistics box, so it uses the document colors.
+.pending {
+  margin: 0 0 20px;
+  color: var(--ce-document-text-muted);
+  font-size: 0.9rem;
+}
+
+.body {
+  color: var(--ce-document-text);
+}
+
+.detail {
+  margin: 0;
+  color: var(--ce-document-text-muted);
+  font-size: 0.85rem;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.tile {
+  min-width: 0;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-8);
+}
+
+.tileLabel,
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 700;
+}
+
+.tileLabel {
+  justify-content: space-between;
+}
+
+.help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin-block: -10px;
+  padding: 8px;
+  border: 0 !important;
+  border-radius: var(--ce-radius-6);
+  box-shadow: none !important;
+  background: transparent !important;
+  color: inherit !important;
+
+  &:hover {
+    background: color-mix(in srgb, currentColor 12%, transparent) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+.value {
+  margin: 2px 0;
+  color: var(--ce-document-text);
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.withheld {
+  margin: 6px 0;
+  font-weight: 600;
+}
+
+.section {
+  margin-top: 14px;
+}
+
+.sectionHeading h3 {
+  margin: 0;
+  color: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  margin: 6px auto;
+}
+
+.chartFrame {
+  fill: none;
+  stroke: var(--ce-document-border);
+}
+
+.chartDiagonal {
+  stroke: var(--ce-document-text-muted);
+  stroke-dasharray: 4 4;
+}
+
+.chartTick,
+.chartAxis {
+  fill: var(--ce-document-text-muted);
+  font-size: 10px;
+}
+
+.chartAxis {
+  font-size: 11px;
+}
+
+.chartLine {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.chartPoint {
+  fill: currentColor;
+}
+
+.series-shown {
+  color: var(--ce-data-series-1);
+}
+
+// Hidden drafts are dashed with hollow points, so the two lines differ without color.
+.series-blind {
+  color: var(--ce-data-series-2);
+
+  .chartLine {
+    stroke-dasharray: 5 3;
+  }
+
+  .chartPoint {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+  }
+}
+
+.calibrationList {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+
+  li + li {
+    margin-top: 2px;
+  }
+}
+
+.legendMark {
+  display: inline-block;
+  width: 18px;
+  margin-right: 6px;
+  border-top: 2px solid currentColor;
+  vertical-align: middle;
+
+  &.series-blind {
+    border-top-style: dashed;
+  }
+}
+
+.numbers {
+  margin-top: 6px;
+
+  summary {
+    cursor: pointer;
+    color: var(--ce-document-text-muted);
+    font-size: 0.85rem;
+  }
+}
+
+.table {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+
+  th,
+  td {
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--ce-document-border);
+    color: inherit;
+    text-align: left;
+  }
+
+  thead th {
+    color: var(--ce-document-text-muted);
+    font-weight: 600;
+  }
+}

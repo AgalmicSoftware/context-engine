@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import {
   collectSessionFidelityData,
   collectWrappedFidelityPairs,
+  resultsResponseRows,
   scoreAgentFidelity,
 } from '../shared/agentFidelity.mjs';
 
@@ -82,19 +83,6 @@ const listOf = (value, ...keys) => {
   const key = keys.find((candidate) => Array.isArray(value?.[candidate]));
   return key ? value[key] : null;
 };
-// The survey view exports rows in filteredResponses; the questions view puts
-// them under filteredQuestionResponses, keyed by question.
-const responseRows = (source) => {
-  if (Array.isArray(source)) return source;
-  const rows = [
-    ...(Array.isArray(source?.filteredResponses) ? source.filteredResponses : []),
-    ...Object.values(source?.filteredQuestionResponses ?? {}).flatMap((list) => (Array.isArray(list) ? list : [])),
-  ];
-  if (rows.length || hasRowLists(source)) return rows;
-  return source ? [source] : [];
-};
-const hasRowLists = (source) => Array.isArray(source?.filteredResponses) || !!source?.filteredQuestionResponses;
-
 const count = (value) => (Number.isInteger(value) ? String(value) : '–');
 const decimal = (value) => (typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '–');
 const signed = (value) => (typeof value === 'number' && Number.isFinite(value) ? `${value >= 0 ? '+' : ''}${value.toFixed(2)}` : '–');
@@ -243,7 +231,7 @@ export const renderFidelityMarkdown = (report) => {
 export const runFidelityReport = (args) => {
   const exported = args.export ? readJson(args.export) : null;
   const questions = listOf(exported ?? readJson(args.questions), 'filteredQuestions', 'questions') ?? [];
-  const payloads = responseRows(exported ?? readJson(args.responses));
+  const payloads = resultsResponseRows(exported ?? readJson(args.responses));
   if (!payloads.length) throw new Error('No response rows found. Check that the export includes responses.');
   const { answers, pairs, skipped } = collectSessionFidelityData({ questions, payloads });
   const wrappedPairs = args.wrapped ? collectWrappedFidelityPairs({ questions, rows: readRows(args.wrapped) }) : [];

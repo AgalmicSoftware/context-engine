@@ -72,6 +72,11 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Add **How well AIs predicted people** to the Results report of sessions with
+  `interviewMode.showFidelityScore`, once 5 people share AI draft comparisons:
+  the overall and hidden-draft Mirror Scores, how often people changed a
+  shown draft, stated confidence against answers kept, and results by
+  platform, each withheld below 5 people.
 - Suggest the session's open groups after an interview or AI prefill link
   (`interviewMode.suggestGroups`, off by default; needs a Session Worker
   newer than 0.7.0). A group named like the person's single-choice answer

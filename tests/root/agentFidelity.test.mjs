@@ -8,7 +8,9 @@ import {
   inferDraftOrigin,
   normalizeFidelityAnswer,
   normalizeFidelityQuestion,
+  resultsResponseRows,
   scoreAgentFidelity,
+  scoreFidelityOverview,
   fidelityPairsFromReview,
   summarizeParticipantFidelity,
 } from '../../shared/agentFidelity.mjs';
@@ -464,6 +466,43 @@ test('reports are deterministic for a seed', () => {
   const input = { questions, pairs: pairsFor(() => 'Agree'), answers: answersFor(), options: fast };
   assert.deepEqual(scoreAgentFidelity(input).mirrorScore.overall, scoreAgentFidelity(input).mirrorScore.overall);
   assert.ok(scoreAgentFidelity(input).mirrorScore.overall.interval);
+});
+
+test('the Results overview matches the report and withholds the same cells', () => {
+  // Common-view people use Claude and unusual-view people ChatGPT; one person has a hidden draft.
+  const pairs = pairsFor(
+    (person, questionId) => (questionId === 'qb2' ? 'Agree' : person.view),
+    (person, questionId) => ({
+      platform: person.group === 'common' ? 'claude' : 'chatgpt',
+      confidence: questionId === 'qb3' ? 0.4 : 0.9,
+      ...(questionId === 'qb4' && person === people[0] ? { condition: 'blind' } : {}),
+    }),
+  );
+  const input = { questions, pairs, answers: answersFor(), options: { bootstrapSamples: 100, minParticipants: 5 } };
+  const report = scoreAgentFidelity(input);
+  const overview = scoreFidelityOverview(input);
+  const { byGroup: _byGroup, groupsWithheld: _groupsWithheld, ...mirrorScore } = report.mirrorScore;
+  assert.deepEqual(overview.mirrorScore, mirrorScore);
+  assert.deepEqual(overview.correctionRate, report.correctionRate);
+  assert.deepEqual(overview.calibration, report.calibration);
+  assert.deepEqual(overview.coverage, report.coverage);
+  assert.equal(overview.mirrorScore.byCondition.blind.suppressed, true);
+  assert.equal(overview.mirrorScore.byPlatform.chatgpt.suppressed, true, 'four people are too few');
+  assert.equal(overview.mirrorScore.byPlatform.claude.participants, 6);
+});
+
+test('Results rows come from both views of the screen', () => {
+  const surveyRow = { responder: people[0].id, response: { responses: [{ questionID: 'qb1', answer: 'Agree' }] } };
+  const questionRow = { responder: people[0].id, questionId: 'qb1', response: { questionID: 'qb1', answer: 'Agree' } };
+  assert.deepEqual(resultsResponseRows({ filteredResponses: [surveyRow], filteredQuestionResponses: { qb1: [questionRow] } }), [
+    surveyRow,
+    questionRow,
+  ]);
+  assert.deepEqual(resultsResponseRows({ filteredResponses: [], filteredQuestionResponses: {} }), []);
+  assert.deepEqual(resultsResponseRows([questionRow]), [questionRow]);
+  // The same answer seen in both views counts once.
+  const { answers } = collectSessionFidelityData({ questions, payloads: [surveyRow, questionRow] });
+  assert.equal(answers.length, 1);
 });
 
 test('a participant summary lists the most confident misses first', () => {
