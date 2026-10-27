@@ -1400,17 +1400,15 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_MODAL}
       >
         {mode === 'interview' ? (
-          <>
-            <SessionInterviewPanel
-              key={`${interviewVersion}:${prefillIdentity}`}
-              {...props}
-              prefillPacket={prefillPacket}
-              onClose={requestClose}
-              questions={questions}
-              onReviewStateChange={setHasUnsavedReview}
-              onRequestDiscard={() => setConfirmDiscard(true)}
-            />
-          </>
+          <SessionInterviewPanel
+            key={`${interviewVersion}:${prefillIdentity}`}
+            {...props}
+            prefillPacket={prefillPacket}
+            onClose={requestClose}
+            questions={questions}
+            onReviewStateChange={setHasUnsavedReview}
+            onRequestDiscard={() => setConfirmDiscard(true)}
+          />
         ) : (
           <>
             <ModalHeader id="ce-session-voice-mode-title" toggle={requestClose}>
@@ -1436,7 +1434,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
       <CEConfirmDialog
         isOpen={isOpen && confirmDiscard}
         title="Discard this interview?"
-        body="Your transcript, imported prefill, and unsaved review edits will be lost."
+        body="Your transcript, imported prefill, and unsaved review edits will be lost. Responses you’ve already submitted are kept."
         confirmLabel="Discard interview"
         cancelLabel="Keep reviewing"
         danger

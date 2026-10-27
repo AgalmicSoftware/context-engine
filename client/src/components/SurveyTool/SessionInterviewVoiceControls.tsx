@@ -7,6 +7,10 @@ import SessionInterviewTranscriptDisclosure from './SessionInterviewTranscriptDi
 import { formatSessionRecordingElapsed, SessionListeningWaveform } from './SessionListeningPanel';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
+// What Discard does, for its tooltip and for screen readers, which don't get the tooltip.
+const DISCARD_EXPLANATION =
+  'Clears the transcript, imported AI drafts and unsaved edits, then closes. Responses you’ve submitted are kept.';
+
 type ImportedResponderContextProps = {
   expanded: boolean;
   value: string;
@@ -105,19 +109,23 @@ export function SessionInterviewVoiceControls({
                 onClick={onDiscard}
                 disabled={discardDisabled}
                 aria-label="Discard interview"
+                aria-describedby="ce-interview-discard-explanation"
               >
                 <span className={styles.sessionInterviewDiscardCircle} aria-hidden="true">
                   <FontAwesomeIcon icon={faTrash} />
                 </span>
+                <span id="ce-interview-discard-explanation" className={styles.sessionListeningSrOnly}>
+                  {DISCARD_EXPLANATION}
+                </span>
               </button>
+              {/* Hover only: focus returns here after the confirmation, which would reopen it. */}
               <UncontrolledTooltip
                 target="ce-interview-discard-button"
                 placement="top"
-                trigger="hover focus"
+                trigger="hover"
                 autohide={false}
               >
-                Discard interview: clears the transcript, imported AI drafts and unsaved edits, then closes. Responses
-                you’ve submitted are kept.
+                Discard interview: {DISCARD_EXPLANATION}
               </UncontrolledTooltip>
             </>
           ) : null}

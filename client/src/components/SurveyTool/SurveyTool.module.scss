@@ -3361,13 +3361,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   box-shadow: var(--ce-card-shadow) !important;
   font-family: var(--ce-font-mono);
 
-  :global(.modal-header),
-  :global(.modal-footer) {
-    border-color: var(--ce-card-border);
-    background: var(--ce-card-bg);
-    color: var(--ce-panel-text);
-  }
-
   :global(.modal-header) {
     background: var(--ce-surface-sunken) !important;
     color: var(--ce-panel-text) !important;

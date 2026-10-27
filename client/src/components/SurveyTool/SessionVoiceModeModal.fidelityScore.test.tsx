@@ -53,8 +53,12 @@ const prefillPacket = {
 const renderModal = ({
   interviewMode = { showFidelityScore: true },
   packet = prefillPacket as typeof prefillPacket | null,
-}: { interviewMode?: Record<string, unknown>; packet?: typeof prefillPacket | null } = {}) => {
-  const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'submitted' });
+  onSubmitResponses = jest.fn().mockResolvedValue({ status: 'submitted' }),
+}: {
+  interviewMode?: Record<string, unknown>;
+  packet?: typeof prefillPacket | null;
+  onSubmitResponses?: React.ComponentProps<typeof SessionVoiceModeModal>['onSubmitResponses'];
+} = {}) => {
   render(
     <SessionVoiceModeModal
       isOpen
@@ -170,6 +174,21 @@ it('counts every hidden draft, scored on the answer given before the reveal', as
   expect(score).toHaveTextContent(`${hidden.length - 1} of ${hidden.length} hidden guesses matched`);
   // Then folds away, so the score has the room.
   expect(submissionInfo).not.toHaveAttribute('open');
+});
+
+it('offers Discard only once there is an interview to discard', async () => {
+  renderModal({ packet: null });
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
+  expect(screen.queryByRole('button', { name: 'Discard interview' })).not.toBeInTheDocument();
+});
+
+it('disables Discard while the responses are being submitted', async () => {
+  renderModal({ onSubmitResponses: jest.fn(() => new Promise<never>(() => {})) });
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const discard = screen.getByRole('button', { name: 'Discard interview' });
+  expect(discard).toBeEnabled();
+  submit();
+  await waitFor(() => expect(discard).toBeDisabled());
 });
 
 it('keeps the modal height and the discard control while the score shows, and moves focus to it', async () => {

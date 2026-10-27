@@ -122,6 +122,9 @@ All notable changes to this project will be documented in this file.
   storage, and retain valid bookmark lists when another list is missing.
 - Require browser checks for hosted publication, reload, Results, permissions,
   partial-submit retry and concurrent two-tab bookmarks in CI.
+- Move Discard interview out of the modal footer into a trash button beside
+  the microphone. Its tooltip, and its description for screen readers, say
+  what discarding clears and that submitted responses are kept.
 - Offer the ChatGPT or Claude prefill prompt from the voice chooser, in a
   **Let your AI draft your answers** card below Interview and Group
   Conversation, instead of inside the interview. `?mode=voice` opens the
@@ -262,9 +265,6 @@ All notable changes to this project will be documented in this file.
   0.7.0): how many answers their AI matched, its Mirror Score, its hidden-draft
   guesses and most confident misses, worked out in the browser. The footer
   button stays in place.
-- Move Discard interview beside the microphone as a trash button whose
-  tooltip says what discarding clears; the interview modal no longer has a
-  footer.
 
 ## [0.7.0] - 2026-10-21
 
