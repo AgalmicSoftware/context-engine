@@ -726,6 +726,18 @@ const breakdown = (people, keyOf, valueOf, options) => {
       .map((key) => [key, estimate(people.map((person) => valueOf(person.pairs.filter((pair) => keyOf(pair) === key))), options)]),
   );
 };
+// Platforms and draft origins mostly divide people rather than their drafts,
+// so like groups, a key is also withheld when subtracting it from the total,
+// or from the other keys, would leave fewer than the minimum.
+const peopleBreakdown = (people, keyOf, valueOf, options) => {
+  const reportable = new Set(reportableKeys(people.map((person) => person.pairs.map(keyOf)), options.minParticipants));
+  return Object.fromEntries(
+    Object.entries(breakdown(people, keyOf, valueOf, options)).map(([key, result]) => [
+      key,
+      reportable.has(key) ? result : withheld(result.participants),
+    ]),
+  );
+};
 const meanSimilarity = (pairs) => mean(pairs.map((pair) => pair.similarity));
 const matchRate = (pairs) => mean(pairs.map((pair) => (pair.match ? 1 : 0)));
 
@@ -826,8 +838,8 @@ const coreScores = (people, settings) => ({
     overall: estimate(people.map((person) => meanSimilarity(person.pairs)), settings),
     byCondition: breakdown(people, (pair) => pair.condition, meanSimilarity, settings),
     byType: breakdown(people, (pair) => pair.question.type, meanSimilarity, settings),
-    byOrigin: breakdown(people, (pair) => pair.origin, meanSimilarity, settings),
-    byPlatform: breakdown(people, (pair) => pair.platform, meanSimilarity, settings),
+    byOrigin: peopleBreakdown(people, (pair) => pair.origin, meanSimilarity, settings),
+    byPlatform: peopleBreakdown(people, (pair) => pair.platform, meanSimilarity, settings),
   },
   correctionRate: estimate(
     people.map((person) => {
@@ -890,7 +902,7 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
   for (const person of people) {
     for (const group of groupsOf(person.participantId)) groupSizes.set(group, (groupSizes.get(group) ?? 0) + 1);
   }
-  const reportedGroups = [...groupSizes].filter(([, size]) => size >= settings.minParticipants).map(([group]) => group).sort();
+  const reportedGroups = reportableKeys(people.map((person) => groupsOf(person.participantId)), settings.minParticipants);
 
   // Unusual views: how similar each person's own answers are to everyone
   // else's, across every question they answered.
@@ -956,8 +968,8 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
     coverage: coverageOf({ pairs, scored, measured, people, settings }),
     mirrorScore: {
       ...core.mirrorScore,
-      // Groups below the minimum are left out entirely: their names can be
-      // per-invite links.
+      // Groups below the minimum, or that could be subtracted down to fewer,
+      // are left out entirely: their names can be per-invite links.
       byGroup: Object.fromEntries(
         reportedGroups.map((group) => [
           group,

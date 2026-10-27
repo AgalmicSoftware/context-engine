@@ -109,14 +109,20 @@ Similarity between a prediction and an answer runs from 0 to 1:
 - Any result based on fewer than 5 people is withheld, including calibration
   and each of its confidence bands, anchoring and each third of the
   unusual-views table.
+  - Per-person rows, listed by pseudonym (`p001`…) and never by address, appear
+    only when the whole report has at least 5 people.
+- Breakdowns that divide people (by platform, by where the draft came from,
+  and by group) also withhold a row when subtracting it from the total, or
+  from the other rows, would reveal a result for fewer than 5 people: with
+  six people, five on Claude and one on ChatGPT, neither platform is shown.
+  The smallest row goes first. The benchmark's `compare-answers` applies the
+  same rule to its groups.
+  - Withheld groups are not named at all, since a group can be a single
+    invite link.
 - Each person is the responder the Worker or the chain recorded for the
   response; a payload's own claim counts only for raw payloads, so one account
   can't pose as several people. The self-reported platform counts as ChatGPT,
   Claude or other, as the app records it.
-  - Groups that small are not named at all, since a group can be a single
-    invite link.
-  - Per-person rows, listed by pseudonym (`p001`…) and never by address, appear
-    only when the whole report has at least 5 people.
 - Self-declared agents (`participant.kind: "agent"`) are left out unless asked
   for.
 - For each person and question only the latest record counts. If someone later

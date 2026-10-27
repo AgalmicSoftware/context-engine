@@ -8,6 +8,7 @@ import {
   inferDraftOrigin,
   normalizeFidelityAnswer,
   normalizeFidelityQuestion,
+  reportableKeys,
   resultsResponseRows,
   scoreAgentFidelity,
   scoreFidelityOverview,
@@ -348,6 +349,30 @@ test('group baselines, small-cell suppression, exclusions and agents', () => {
   assert.equal(report.baselines.group.baseline.value, 1, 'within a like-minded group the majority guess is right');
 });
 
+test('breakdowns that divide people withhold what subtracting them would reveal', () => {
+  // Nine people use Claude and one ChatGPT: everyone minus Claude would be the
+  // ChatGPT user's own score, so neither is shown. Groups split the same way.
+  const pairs = pairsFor((person) => person.view, (person) => ({ platform: person === people[9] ? 'chatgpt' : 'claude' }));
+  const groups = Object.fromEntries(people.map((person, index) => [person.id, index < 9 ? 'most' : 'one']));
+  const report = scoreAgentFidelity({ questions, pairs, answers: answersFor(), groups, options: fast });
+  assert.equal(report.mirrorScore.overall.participants, 10);
+  assert.deepEqual(report.mirrorScore.byPlatform.claude, { value: null, interval: null, participants: 9, suppressed: true });
+  assert.equal(report.mirrorScore.byPlatform.chatgpt.suppressed, true);
+  assert.deepEqual(report.mirrorScore.byGroup, {});
+  assert.equal(report.mirrorScore.groupsWithheld, 2);
+  // Three ChatGPT users are enough to show both.
+  const three = pairsFor((person) => person.view, (person) => ({ platform: people.indexOf(person) >= 7 ? 'chatgpt' : 'claude' }));
+  const shown = scoreAgentFidelity({ questions, pairs: three, answers: answersFor(), options: fast });
+  assert.equal(shown.mirrorScore.byPlatform.claude.value, 1);
+  assert.equal(shown.mirrorScore.byPlatform.chatgpt.participants, 3);
+  assert.equal(shown.mirrorScore.byPlatform.chatgpt.suppressed, undefined);
+  // Overlapping groups: the two people in both a and b form a set of their own,
+  // so one of the two is withheld (the first by name when they tie).
+  const overlapping = [...Array(5).fill(['a']), ...Array(5).fill(['b']), ['a', 'b'], ['a', 'b']];
+  assert.deepEqual(reportableKeys(overlapping, 3), ['b']);
+  assert.deepEqual(reportableKeys([['a'], ['a']], 3), [], 'fewer than the minimum in all');
+});
+
 test('results from fewer people than the minimum are withheld everywhere', () => {
   // Only one person has a hidden draft, so nothing about hidden drafts can be
   // published without revealing that person's answers.
@@ -560,6 +585,7 @@ test('the Results overview matches the report and withholds the same cells', () 
   assert.equal(overview.mirrorScore.byCondition.blind.suppressed, true);
   assert.equal(overview.mirrorScore.byPlatform.chatgpt.suppressed, true, 'four people are too few');
   assert.equal(overview.mirrorScore.byPlatform.claude.participants, 6);
+  assert.equal(overview.mirrorScore.byPlatform.claude.suppressed, true, 'everyone minus Claude would be those four');
 });
 
 test('Results rows come from both views of the screen', () => {

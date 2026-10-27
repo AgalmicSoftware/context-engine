@@ -37,9 +37,9 @@ const row = (
 
 // Six people: everyone agrees on qb1 and on the hidden qb3; the last three
 // disagree on qb2. The sixth person's AI is ChatGPT, the rest Claude.
-const sixPeople = () =>
+const sixPeople = (sixthPlatform = 'chatgpt') =>
   Array.from({ length: 6 }, (_, index) => {
-    const platform = index === 5 ? 'chatgpt' : 'claude';
+    const platform = index === 5 ? sixthPlatform : 'claude';
     return [
       row(address(index), 'qb1', 'Agree', { platform }),
       row(address(index), 'qb2', index < 3 ? 'Agree' : 'Disagree', { platform }),
@@ -78,9 +78,15 @@ describe('PolisReportFidelitySection', () => {
     expect(panel).toHaveTextContent('Drafts hidden: off by 20 points on average');
     expect(screen.getByRole('img', { name: /the diagonal is where they are equal/ })).toBeVisible();
     const platforms = within(screen.getByRole('heading', { name: 'By platform' }).closest('section') as HTMLElement);
-    // Claude: three people at 3/3 and two at 2/3.
-    expect(platforms.getByRole('row', { name: /^Claude/ })).toHaveTextContent(/^Claude87%.*5$/);
+    // Claude's five are withheld too: the overall score minus theirs would be the ChatGPT user's.
+    expect(platforms.getByRole('row', { name: /^Claude/ })).toHaveTextContent(/^ClaudeWithheld5$/);
     expect(platforms.getByRole('row', { name: /^ChatGPT/ })).toHaveTextContent(/^ChatGPTFewer than 5 people1$/);
+  });
+
+  it('shows a platform once no one else could be worked out from it', async () => {
+    renderSection(sixPeople('claude').flat());
+    await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);
+    expect(screen.getByRole('row', { name: /^Claude/ })).toHaveTextContent(/^Claude83%.*6$/);
   });
 
   it('keeps confidence bands from fewer than 5 people off the chart', async () => {

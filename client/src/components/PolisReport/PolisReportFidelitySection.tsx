@@ -342,7 +342,7 @@ export default function PolisReportFidelitySection({
             <div className={styles.sectionHeading}>
               <h3 id="ce-results-fidelity-platforms">By platform</h3>
               <Help id="ce-results-fidelity-platform" label="About platforms">
-                Which AI drafted the answers, as each prefill reported it.
+                {`Which AI drafted the answers, as each prefill reported it. A platform is withheld when fewer than ${minimum} people used it, or when showing it would let someone work out the score of fewer than ${minimum} others.`}
               </Help>
             </div>
             <table className={styles.table}>
@@ -359,7 +359,9 @@ export default function PolisReportFidelitySection({
                   <tr key={platform}>
                     <th scope="row">{platformLabel(platform)}</th>
                     {estimate.suppressed ? (
-                      <td colSpan={2}>Fewer than {minimum} people</td>
+                      <td colSpan={2}>
+                        {estimate.participants < minimum ? `Fewer than ${minimum} people` : 'Withheld'}
+                      </td>
                     ) : (
                       <>
                         <td>{percent(estimate.value)}</td>

@@ -127,6 +127,30 @@ test('the command writes JSON and Markdown reports from a Results export', () =>
   }
 });
 
+test('rows that subtraction would reveal are marked withheld', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent-fidelity-'));
+  try {
+    // The sixth person's AI is Claude: all six minus the five ChatGPT users would be theirs.
+    const mixed = exportFixture();
+    const sixth = JSON.parse(mixed.filteredResponses[5].response);
+    sixth.responses.forEach((entry) => {
+      entry.interviewProvenance.source.platform = 'claude';
+    });
+    mixed.filteredResponses[5].response = JSON.stringify(sixth);
+    const input = path.join(dir, 'results.json');
+    writeFileSync(input, JSON.stringify(mixed));
+    const run = spawnSync(process.execPath, [script, '--export', input, '--out', dir, '--bootstrap', '100', '--min-participants', '3'], {
+      encoding: 'utf8',
+    });
+    assert.equal(run.status, 0, run.stderr);
+    const markdown = readFileSync(path.join(dir, 'agent-fidelity-report.md'), 'utf8');
+    assert.match(markdown, /\| chatgpt \| withheld \| – \| 5 \|/);
+    assert.match(markdown, /\| claude \| fewer than 3 people \| – \| 1 \|/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('the command exits non-zero with usage on bad input', () => {
   const run = spawnSync(process.execPath, [script], { encoding: 'utf8' });
   assert.equal(run.status, 1);

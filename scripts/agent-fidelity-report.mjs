@@ -103,7 +103,12 @@ export const renderFidelityMarkdown = (report) => {
     Object.keys(results).length
       ? `### ${label}\n\n${table(
           ['', 'Mirror Score', '95% interval', 'People'],
-          Object.entries(results).map(([key, result]) => [key, cell(result), interval(result), count(result.participants)]),
+          Object.entries(results).map(([key, result]) => [
+            key,
+            result.suppressed && result.participants >= minimum ? 'withheld' : cell(result),
+            interval(result),
+            count(result.participants),
+          ]),
         )}`
       : '';
   const headline = [
@@ -192,6 +197,9 @@ export const renderFidelityMarkdown = (report) => {
     '',
     '## Breakdowns',
     '',
+    `Rows from ${fewer} are withheld. Rows that divide people (where the draft came from, platform and group) are also withheld ` +
+      'when subtracting them from the total, or from each other, would leave fewer.',
+    '',
     breakdownTable('By question type', mirrorScore.byType),
     '',
     breakdownTable('By where the draft came from', mirrorScore.byOrigin),
@@ -199,7 +207,7 @@ export const renderFidelityMarkdown = (report) => {
     breakdownTable('By self-reported platform', mirrorScore.byPlatform),
     '',
     breakdownTable('By group', mirrorScore.byGroup),
-    mirrorScore.groupsWithheld ? `\n${mirrorScore.groupsWithheld} smaller groups are not listed.` : '',
+    mirrorScore.groupsWithheld ? `\n${mirrorScore.groupsWithheld} groups are withheld and not named.` : '',
     '',
     '## Calibration',
     '',
