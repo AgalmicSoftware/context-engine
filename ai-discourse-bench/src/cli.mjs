@@ -1,3 +1,4 @@
+import path from 'node:path';
 import {
   readJsonFile,
   readJsonFileIfExists,
@@ -53,12 +54,14 @@ import { buildExperimentPlan } from './experiment-plan.mjs';
 import { buildContextEngineBenchmarkDataset } from './ce-native-export.mjs';
 import { buildReportSnapshot, compareLongitudinalSnapshots } from './longitudinal.mjs';
 import { readQuestionSet, runAnswerSet } from './answer-set.mjs';
+import { compareAnswers, renderComparisonMarkdown } from './answer-comparison.mjs';
 
 const usage = `Usage:
   ai-discourse-bench validate --questions <file> --models <file> [--personas <file>]
   ai-discourse-bench plan-run --questions <file> --models <file> [--out <file>] [--provider mock|local|openrouter] [--mode self|persona] [--persona <id>] [--personas <file>] [--repeats <n>] [--limit-questions <n>]
   ai-discourse-bench run --questions <file> --models <file> --out <file> [--provider mock|local|openrouter] [--mode self|persona] [--persona <id>] [--personas <file>] [--repeats <n>] [--concurrency <n>] [--max-attempts <n>] [--resume] [--checkpoint <file.jsonl>]
   ai-discourse-bench answer --questions <Results export or question JSON> --models <file[,file...]> --out <file> [--provider mock|local|openrouter] [--repeats <n>] [--concurrency <n>] [--max-attempts <n>] [--seed <text>] [--limit-questions <n>] [--resume] [--checkpoint <file.jsonl>]
+  ai-discourse-bench compare-answers --answers <file> --people <Results export> --out <dir> [--groups <file>] [--min-people <n>] [--bootstrap <n>] [--seed <text>]
   ai-discourse-bench run-importance --questions <file> --models <file> --out <file> [--provider mock|local|openrouter] [--budget <credits>] [--max-allocations <n>] [--repeats <n>] [--concurrency <n>] [--max-attempts <n>] [--resume] [--checkpoint <file.jsonl>]
   ai-discourse-bench build-report --questions <file> --models <file[,file...]> --runs <file[,file...]> --out <file> [--importance <file[,file...]>] [--limit-questions <n>] [--release]
   ai-discourse-bench render-report --report <file> --out <file.html> [--analysis <overlay.json>]
@@ -218,6 +221,26 @@ const commandAnswer = async (args) => {
   console.log(
     `wrote ${result.rows.length} answers to ${args.out} (${result.unanswered} unanswered, ${result.resumedRows} resumed` +
       `${skipped ? `, ${skipped} questions skipped` : ''}; checkpoint ${checkpointPath})`,
+  );
+};
+
+// Compares an answer file with people's answers in a Results export, by group and question type.
+const commandCompareAnswers = async (args) => {
+  for (const flag of ['answers', 'people', 'out']) {
+    if (!args[flag]) throw new Error(`Missing --${flag}\n${usage}`);
+  }
+  const report = compareAnswers({
+    answersFile: await readJsonFile(args.answers),
+    resultsExport: await readJsonFile(args.people),
+    groups: args.groups ? await readJsonFile(args.groups) : null,
+    minPeople: parsePositiveInt(args['min-people'], 5, '--min-people'),
+    bootstrapSamples: parsePositiveInt(args.bootstrap, 1000, '--bootstrap'),
+    ...(args.seed ? { seed: args.seed } : {}),
+  });
+  await writeJsonFile(path.join(args.out, 'answer-comparison.json'), report);
+  await writeTextFile(path.join(args.out, 'answer-comparison.md'), renderComparisonMarkdown(report));
+  console.log(
+    `compared ${report.models.length} models with ${report.groups[0].people} people over ${report.questions.length} questions; wrote ${args.out}`,
   );
 };
 
@@ -434,6 +457,8 @@ export const runCli = async (argv) => {
       return commandRun(args);
     case 'answer':
       return commandAnswer(args);
+    case 'compare-answers':
+      return commandCompareAnswers(args);
     case 'run-importance':
       return commandRunImportance(args);
     case 'plan-run':

@@ -55,3 +55,46 @@ export const bootstrapMeanInterval = (inputValues, {
     method: 'deterministic-percentile-bootstrap',
   };
 };
+
+/**
+ * A 95% percentile-bootstrap interval for statistic(a) − statistic(b), with a
+ * and b resampled independently (for example models and a group of people).
+ */
+export const bootstrapDifferenceInterval = (a, b, statistic, {
+  seed = 'ai-discourse-bench-bootstrap-v1',
+  iterations = 1000,
+  confidenceLevel = 0.95,
+} = {}) => {
+  if (!a.length || !b.length || iterations < 1) return null;
+  const random = seededRandom(seed);
+  const draw = (values) => values.map(() => values[Math.floor(random() * values.length)]);
+  const differences = [];
+  for (let index = 0; index < iterations; index += 1) {
+    const difference = statistic(draw(a)) - statistic(draw(b));
+    if (Number.isFinite(difference)) differences.push(difference);
+  }
+  if (!differences.length) return null;
+  differences.sort((left, right) => left - right);
+  const tail = (1 - confidenceLevel) / 2;
+  return [round(quantile(differences, tail)), round(quantile(differences, 1 - tail))];
+};
+
+// Wilson score interval for a proportion of n.
+const wilson = (share, n, z) => {
+  const center = (share + (z * z) / (2 * n)) / (1 + (z * z) / n);
+  const half = (z * Math.sqrt((share * (1 - share)) / n + (z * z) / (4 * n * n))) / (1 + (z * z) / n);
+  return [center - half, center + half];
+};
+
+/** Newcombe's hybrid score 95% interval for the difference of two independent proportions. */
+export const newcombeDifferenceInterval = (hitsA, nA, hitsB, nB, z = 1.959964) => {
+  if (!nA || !nB) return null;
+  const [shareA, shareB] = [hitsA / nA, hitsB / nB];
+  const [lowA, highA] = wilson(shareA, nA, z);
+  const [lowB, highB] = wilson(shareB, nB, z);
+  const difference = shareA - shareB;
+  return [
+    round(difference - Math.sqrt((shareA - lowA) ** 2 + (highB - shareB) ** 2)),
+    round(difference + Math.sqrt((highA - shareA) ** 2 + (shareB - lowB) ** 2)),
+  ];
+};

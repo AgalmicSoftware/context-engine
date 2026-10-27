@@ -355,6 +355,41 @@ Each question is asked in the ways that expose wording and ordering effects:
 The command has the same retry, concurrency, checkpoint and `--resume`
 behavior as stance runs; `--seed` fixes the option orders.
 
+## Compare Models With People
+
+`compare-answers` reads an `answer` file and the same session's Results export,
+then reports how close each model is to everyone and to each group of people,
+and for each question the statistics suited to its type.
+
+```bash
+node ./bin/ai-discourse-bench.mjs compare-answers \
+  --answers ./runs/session-answers.json \
+  --people ./results.json \
+  --out ./results/session-comparison
+```
+
+It writes `answer-comparison.json` and `answer-comparison.md`. People are
+grouped by `--groups` (a JSON object from address to group id or ids) or else by
+the link they arrived through. Groups, and any question a group answered, with
+fewer than `--min-people` people (default 5) are withheld, and self-declared
+agents are left out. Each model counts as one respondent: its replies are
+summarized as its most common answer (an even split between agreeing and
+disagreeing counts as Unsure), the options it picked in at least half its
+replies, its median rating, or its mean allocation.
+
+| Type | One model against a group | Models against a group |
+| --- | --- | --- |
+| Agree / Unsure / Disagree | Share of the group giving the same answer | Difference in % agree with a Newcombe interval; earth mover's distance on the three-point scale |
+| Single choice | Share choosing the same option | Total variation and Jensen–Shannon distances |
+| Multiple choice | Mean Jaccard similarity to people's sets | Per-option inclusion-rate differences with Newcombe intervals |
+| Rating | Percentile within the group; distance from its median | Earth mover's distance; median difference with a bootstrap interval |
+| Quadratic | Cosine to the group's mean allocation | Per-option mean vote differences with bootstrap intervals; top-option shares |
+| Freeform | Not compared yet: it needs theme coding by a judge model against a human-checked codebook | |
+
+Every comparison also gives the mean similarity (0 to 1) of the model's answer
+to each person's, using the agent fidelity report's per-type measure
+(`shared/agentFidelity.mjs`); the headline table averages it over questions.
+
 ## Generate a Report
 
 ```bash
