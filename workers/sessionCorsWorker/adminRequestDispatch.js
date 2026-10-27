@@ -410,7 +410,7 @@ export const dispatchAdminRequest = async ({
       return deps?.json?.(await exportSessionBackup({ env, slug: targetSlug, expectedAuthority, cursor: body?.cursor || '' }),
         200, responseHeaders);
     } catch (error) {
-      return deps?.json?.({ error: error.message }, error.status || 503, responseHeaders);
+      return deps?.json?.({ error: error.message, ...(error.reason ? { reason: error.reason } : {}) }, error.status || 503, responseHeaders);
     }
   }
 

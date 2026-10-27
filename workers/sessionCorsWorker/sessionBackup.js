@@ -13,7 +13,7 @@ import { STORAGE_EXPORT_PAGE_LIMITS, createStorageExportBudget, jsonByteLength, 
 
 const encoder = new TextEncoder();
 const CHUNK_BYTES = 256 * 1024;
-const fail = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
+const fail = (message, status = 409, reason) => { throw Object.assign(new Error(message), { status, ...(reason ? { reason } : {}) }); };
 const digestBytes = async (bytes) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((v) => v.toString(16).padStart(2, '0')).join('');
 const prefixes = (slug) => [null, `ce-storage-hidden:${slug}:`, `ce-storage-owner:${slug}:`, `ce-storage-payload:${slug}:`, `ce-storage:${slug}:`, `sessions/${slug}/storage/`];
 
@@ -23,7 +23,13 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
   const keySlug = sessionSlugStorageKey(slug);
   // Authenticate the entire position before trusting scan offsets or revisions.
   // Page MACs alone would let an admin ask us to sign an incomplete archive.
-  const authenticatedCursor = cursor ? await authenticateBackupCursor(cursor, env) : '';
+  let authenticatedCursor = '';
+  try {
+    authenticatedCursor = cursor ? await authenticateBackupCursor(cursor, env) : '';
+  } catch (error) {
+    if (error.reason === 'backup_cursor_authentication_failed') error.reason = 'backup_cursor_invalid';
+    throw error;
+  }
   const budget = createStorageExportBudget();
   const rawIndex = getStorageIndexBinding(env);
   const index = rawIndex ? budget.wrap(rawIndex) : null;
@@ -34,14 +40,20 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
   const sessionId = resolveCanonicalWorkerSessionIdHex(coordinator.configAuthority.config);
   if (!sessionId) fail('The session has no canonical identity.');
   const prefix = `ce-backup:${keySlug}:`;
-  const parsed = parseStorageExportCursor({ cursor: authenticatedCursor, prefix, sessionId });
+  let parsed;
+  try {
+    parsed = parseStorageExportCursor({ cursor: authenticatedCursor, prefix, sessionId });
+    if (cursor && !parsed.continuation) throw new Error('Missing backup position.');
+  } catch {
+    fail('Invalid backup cursor. Restart the export.', 400, 'backup_cursor_invalid');
+  }
   const position = parsed.continuation || { phase: 0, listCursor: '', lastKey: '', chunk: -1, pageNumber: 0,
     exportedAt: new Date().toISOString(), writeRevision: current.body.writeRevision,
     configDigest: await sha256Hex(JSON.stringify(coordinator)), counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 } };
   const nextCursor = () => signBackupCursor(storageExportCursor({ prefix, sessionId, continuation: position }), env);
-  if (position.configDigest !== await sha256Hex(JSON.stringify(coordinator))) fail('Session config changed during backup. Restart the export.');
+  if (position.configDigest !== await sha256Hex(JSON.stringify(coordinator))) fail('Session config changed during backup. Restart the export.', 409, 'backup_session_changed');
   const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: 'export', snapshotId: position.groupSnapshotId });
-  if (!groups.ok) fail(groups.error || 'Group backup is unavailable.', groups.status);
+  if (!groups.ok) fail(groups.error || 'Group backup is unavailable.', groups.status, groups.status === 409 ? 'backup_session_changed' : undefined);
   budget.consume(groups.operations || 0);
   position.groupSnapshotId = groups.snapshotId;
   if (groups.preparing) {
@@ -59,8 +71,8 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
       typeof position.listCursor !== 'string' || position.listCursor.length > 4096 || typeof position.lastKey !== 'string' ||
       (position.lastKey && position.phase > 0 && !position.lastKey.startsWith(paths[position.phase])) ||
       !position.counts || !['records', 'payloads', 'owners', 'hidden', 'bytes'].every((key) => Number.isSafeInteger(position.counts[key]) && position.counts[key] >= 0) ||
-      !Number.isFinite(Date.parse(position.exportedAt))) fail('Invalid backup cursor.', 400);
-  if (position.snapshotDigest !== snapshotDigest) fail('Session config or groups changed during backup. Restart the export.');
+      !Number.isFinite(Date.parse(position.exportedAt))) fail('Invalid backup cursor.', 400, 'backup_cursor_invalid');
+  if (position.snapshotDigest !== snapshotDigest) fail('Session config or groups changed during backup. Restart the export.', 409, 'backup_session_changed');
   const manifest = { type: 'ce_session_backup', version: 1, sessionSlug: keySlug, sessionId,
     exportedAt: position.exportedAt, workerBundle: env.CE_BUNDLE_SHA256 || null,
     // Conservatively require both bindings: restored active session keys and
@@ -149,7 +161,7 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
         }
       } else {
         const value = await index.get(key);
-        if (value == null) fail('A storage record changed during backup. Restart the export.');
+        if (value == null) fail('A storage record changed during backup. Restart the export.', 409, 'backup_session_changed');
         const metadata = position.phase === 4 ? JSON.parse(value) : null;
         const entry = metadata ? { kind: 'record', key, id: metadata.id, resource: metadata.resource, metadata }
           : { kind: position.phase === 1 ? 'hidden' : 'owner', key, value };

@@ -212,8 +212,8 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
             cursor = preparation.nextCursor;
             setStatus('Preparing the group snapshot…');
           }
-          if (record(value).reason === 'backup_session_changed')
-            throw Object.assign(new Error(String(record(value).error)), { reason: 'backup_session_changed' });
+          if (['backup_session_changed', 'backup_cursor_invalid'].includes(String(record(value).reason)))
+            throw Object.assign(new Error(String(record(value).error)), { reason: record(value).reason });
           if (
             !isPage(value, sessionSlug) ||
             value.pageNumber !== downloaded.current.length ||
@@ -230,11 +230,11 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
         setDownloadComplete(true);
         setStatus(`Downloaded ${downloaded.current.length} pages. Keep this backup with your recovery key.`);
       } catch (failure) {
-        if (record(failure).reason === 'backup_session_changed') {
+        if (['backup_session_changed', 'backup_cursor_invalid'].includes(String(record(failure).reason))) {
           downloaded.current = [];
           setDownloadCount(0);
           setDownloadRestartRequired(true);
-          setStatus('The session changed. Restart the download to create a new backup.');
+          setStatus('The backup can no longer continue. Restart the download to create a new backup.');
         }
         throw failure;
       }

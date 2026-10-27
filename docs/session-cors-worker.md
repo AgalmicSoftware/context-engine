@@ -1172,7 +1172,9 @@ data and are excluded. Legacy plaintext session secrets must first be saved
 through the encrypted secret workflow.
 
 Pause session writes while downloading a backup. Config or group changes
-between pages abort the export. A storage-write revision detects uploads and
+between pages abort the export with HTTP 409 and `reason: backup_session_changed`.
+Refused or obsolete cursors return `reason: backup_cursor_invalid`. The download
+panel discards partial pages for either reason and offers only Restart. A storage-write revision detects uploads and
 visibility changes during export, returning `complete: false` and
 `backup_session_changed` with an instruction to export again. KV and R2 still
 cannot provide a joint point-in-time snapshot. Keep the complete JSONL archive with the deployment's

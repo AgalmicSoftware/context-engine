@@ -158,6 +158,41 @@ test('backup export requires the signed admin action and sends no-store', async 
   assert.equal(result.manifest.type, 'ce_session_backup');
 });
 
+test('signed backup replies identify config, group, and invalid-cursor restarts', async () => {
+  const { ethers } = createRequire(new URL('../../package.json', import.meta.url))('ethers');
+  const wallet = new ethers.Wallet(`0x${'4'.repeat(64)}`);
+  for (const change of ['config', 'groups', 'cursor']) {
+    const { env, kv } = largeArchiveSource();
+    env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
+    const config = JSON.parse(await kv.get(`session:${slug}:config`));
+    Object.assign(config, { adminAddress: wallet.address, allowOrigins: ['https://app.example'] });
+    await kv.put(`session:${slug}:config`, JSON.stringify(config));
+    const authority = { ...expectedAuthority, actor: wallet.address };
+    const first = await exportSessionBackup({ env, slug, expectedAuthority: authority });
+    assert.ok(first.nextCursor);
+    if (change === 'config') {
+      const updated = await callSessionConfigCoordinator({ env, slug, path: 'mutate', expectedAuthority: authority,
+        mutation: { kind: 'set-config', incomingConfig: { ...config, name: 'Changed session' } } });
+      assert.equal(updated.ok, true, JSON.stringify(updated));
+    }
+    if (change === 'groups') {
+      const result = await executeCoordinatedWorkerGroupMutation({ env, slug, sessionId, operation: 'create',
+        input: { groupId: 'new-group', label: 'New group', joinMode: 'open' }, actorPrincipal: { kind: 'evm_address', address: wallet.address } });
+      assert.equal(result.ok, true, JSON.stringify(result));
+    }
+    const worker = createWorkerRuntime(env);
+    const body = await createSignedSiweBody({ worker, env, wallet, sessionSlug: slug, adminAction: 'export-session-backup',
+      adminOrigin: 'https://app.example', audience: 'https://app.example',
+      body: { slug, cursor: change === 'cursor' ? 'invalid-cursor' : first.nextCursor } });
+    const response = await worker.fetch(makeJsonRequest('/admin/export-session-backup', body,
+      { headers: { Origin: 'https://app.example' } }), env);
+    const reply = await response.json();
+    assert.equal(response.status, change === 'cursor' ? 403 : 409, JSON.stringify(reply));
+    assert.equal(reply.reason, change === 'cursor' ? 'backup_cursor_invalid' : 'backup_session_changed');
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  }
+});
+
 const exportSessionBackup = async (args) => {
   for (;;) {
     const page = await args.env.GROUP_KV.request(() => exportPage(args));
@@ -213,11 +248,11 @@ test('backup export refuses modified, unsigned, or foreign-session cursors befor
     const cursor = Buffer.from(JSON.stringify(changed)).toString('base64url') + (mac ? `.${mac}` : '');
     source.kv.gets.clear();
     await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor }),
-      (error) => error.status === 403 && error.reason === 'backup_cursor_authentication_failed');
+      (error) => error.status === 403 && error.reason === 'backup_cursor_invalid');
     assert.equal(source.kv.gets.size, 0, 'No payload or config reads after a forged cursor');
   }
   await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: encoded }),
-    (error) => error.reason === 'backup_cursor_authentication_failed');
+    (error) => error.reason === 'backup_cursor_invalid');
   await callSessionConfigCoordinator({ env: source.env, slug, path: 'backup/write-revision' });
   const stale = await exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: first.nextCursor });
   assert.equal(stale.reason, 'backup_session_changed', 'A valid cursor cannot conceal concurrent writes');
@@ -593,7 +628,7 @@ test('failed and repeated group requests preserve a running backup; successful c
   page = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
   assert.equal((await mutate('remove-member', 'open')).ok, true);
   assert.equal(groupStore.get('storage-backup-revision'), revision + 1);
-  await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: page.nextCursor }), /groups changed/i);
+  await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: page.nextCursor }), (error) => error.status === 409 && error.reason === 'backup_session_changed');
 });
 
 test('an interrupted group write blocks snapshots until replay records its successful change', async () => {
@@ -619,7 +654,7 @@ test('an interrupted group write blocks snapshots until replay records its succe
   assert.equal((await mutate('join')).ok, true);
   assert.equal(groupStore.get('storage-backup-revision'), revision + 1);
   assert.equal([...groupStore.keys()].some((key) => key.startsWith('worker-group-backup-pending:')), false);
-  await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: page.nextCursor }), /groups changed/i);
+  await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: page.nextCursor }), (error) => error.status === 409 && error.reason === 'backup_session_changed');
 });
 
 test('a lost group finalization reply leaves no orphan backup blocker', async () => {

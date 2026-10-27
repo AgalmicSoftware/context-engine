@@ -2,6 +2,7 @@ import { ReadableStream, TextDecoderStream } from 'node:stream/web';
 import { TextEncoder } from 'node:util';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AdminSessionBackupPanel from './AdminSessionBackupPanel';
+import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 import { readWorkerCapabilities } from '../../utilities/worker/workerCapabilities';
 jest.mock('../../utilities/worker/workerCapabilities', () => ({
   ...jest.requireActual<typeof import('../../utilities/worker/workerCapabilities')>(
@@ -247,16 +248,26 @@ test('streams split UTF-8 lines and reopens the file to resume an interrupted re
   expect(file.stream).toHaveBeenCalledTimes(3);
 });
 
-test.each(['rejected', 'returned'])('discards changed-session pages and offers only restart (%s)', async (mode) => {
-  const failure = { reason: 'backup_session_changed', error: 'Session changed; restart the backup.' };
-  const post = jest.fn().mockResolvedValueOnce({ data: page(0) });
-  if (mode === 'rejected')
-    post.mockRejectedValueOnce(Object.assign(new Error(failure.error), { reason: failure.reason, status: 409 }));
-  else post.mockResolvedValueOnce({ data: failure });
-  post.mockResolvedValueOnce({ data: { ...page(0, true), archiveId: 'new-archive' } });
+test.each([
+  [409, 'backup_session_changed'],
+  [403, 'backup_cursor_invalid'],
+  [200, 'backup_session_changed'],
+])('discards unusable pages and offers only restart (%s, %s)', async (status, reason) => {
+  const failure = { reason, error: 'Restart the backup.' };
+  const fetchImpl = jest
+    .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+    .mockResolvedValueOnce(new Response(JSON.stringify(page(0)), { status: 200 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify(failure), { status: Number(status) }))
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ ...page(0, true), archiveId: 'new-archive' }), { status: 200 }),
+    );
+  const signAdminAction = jest.fn().mockResolvedValue({});
+  const post = jest.fn((request) =>
+    postSignedAdminWorkerRequest({ ...request, workerUrl: props.workerUrl, signAdminAction, fetchImpl }),
+  );
   render(<AdminSessionBackupPanel {...props} postSignedRequest={post} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Download backup' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Session changed');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Restart the backup');
   expect(screen.queryByRole('button', { name: 'Resume download' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Save partial backup' })).not.toBeInTheDocument();
   expect(URL.createObjectURL).not.toHaveBeenCalled();
