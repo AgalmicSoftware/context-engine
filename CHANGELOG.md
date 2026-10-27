@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Require explicit `session_login` scope when a service credential exchanges
+  into a Session Worker login. Personal user credentials retain login, and an
+  exchange is refused if its source expires before the Worker token would.
+- Retain confirmed local answers in incomplete registry reads during a failed
+  block-mark check, while preserving newer canonical answers.
 - Persist pending answer-upload identities so repeating a timed-out tool call
   replays the settled record. Keep complete Worker listings complete after an
   agent answers, and hold registry scan cursors when a block mark cannot be checked.
@@ -26,11 +31,13 @@ All notable changes to this project will be documented in this file.
 
 - Show persistent authoring draft save failures with Retry and Copy draft,
   a JSON download fallback, and an unload warning while failed edits are unsaved.
-
 - Enforce local scripts and wallet workers through the static CSP, with one
   exact script hash for the sandboxed benchmark report. Browser smoke tests
   apply the real headers, reject CSP violations and check blocked injections.
-
+- Reuse an unchanged survey container on response retries, and refresh cached
+  readiness on Submit only when submission is unavailable.
+- Restart changed-session backups without retaining stale pages. Deployment
+  replay identifies a preserved recovery key and its known fingerprint.
 - Advance saved-answer revisions when edited, including changing an
   answer back, and discard in-flight submission state when the account changes.
 - Recheck unavailable Worker readiness on Submit and avoid caching transient
@@ -85,6 +92,9 @@ All notable changes to this project will be documented in this file.
   expiring pagination tokens. Uploads now register their receipt stores in the
   diagnostics index on a best-effort basis; this requires a Worker redeploy.
 - Preserve CORS headers on deployment, recovery and provider-backoff replies.
+- Authenticate backup cursors before building signed pages, and advance group
+  backup revisions only when a successful operation changes state. Upload-limit
+  errors retain CORS headers, including their 413 responses.
 - Restore R2 resource metadata, authenticate backup pages and refuse archives
   when any required recovery key is missing. Detect writes during export,
   require an empty restore target and keep backup/import pages within their
@@ -125,10 +135,14 @@ All notable changes to this project will be documented in this file.
 - Exercise current MCP and browser readers against the unchanged previous
   released Worker bundle. Add duplicate-alarm, account-switch, reload-recovery
   and same-height/higher-head registry convergence regressions.
+- Pin previous-release tests to an immutable Worker tag and require that tag in
+  CI. Include the Agent Bridge and Worker in shared session-ID/sign-in vectors.
 - Share group-password derivation, sign-in message/session-ID rules and admin
   typed-data construction while preserving the client/MCP ethers-v5 and Session
   Worker ethers-v6 package boundary.
-- Check installed production dependency licenses in CI with reviewed exceptions.
+- Check installed production dependencies and actual client/MCP/Worker bundle
+  inputs in CI, including bundled development packages, with reviewed exceptions
+  that fail when their package versions are no longer installed.
 
 ### License
 
@@ -136,6 +150,8 @@ All notable changes to this project will be documented in this file.
   deployment package, contracts/Foundry sources and the CC add-on. Earlier
   releases keep the licenses they shipped with. Corpus data remains CC0-1.0;
   third-party dependencies and assets keep their own licenses and notices.
+- Ship generated third-party notices with the standalone Worker deploy package
+  and the MIT notice beside the add-on's bundled ethers library.
 
 ### Benchmark reports
 
