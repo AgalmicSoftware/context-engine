@@ -7,6 +7,9 @@ const STORE_PREFIX = 'upload-receipt-store-v1:';
 const CURSOR_PREFIX = 'upload-receipt-cursor-v1:';
 const SWEEP_KEY = 'upload-receipt-store-sweep-v1';
 const REGISTERED_KEY = 'upload-receipt-indexed-until-v1';
+const REGISTRATION_RETRY_KEY = 'upload-receipt-index-retry-v1';
+const REGISTRATION_BACKOFF_MS = 60_000;
+const REGISTRATION_TIMEOUT_MS = 250;
 const PAGE_SIZE = 25;
 const SWEEP_SIZE = 100;
 const HASH = /^[a-f0-9]{64}$/;
@@ -34,23 +37,50 @@ const scheduleSweep = async (storage, at) => {
   if ((!current || current > at) && storage.setAlarm) await storage.setAlarm(at);
 };
 
-// Best-effort registration runs once a day before reserve, never during settle.
-// Eight days cover the seven-day receipt lifetime plus the renewal interval.
-// Counts stay in each participant's coordinator; uploads do not share a counter.
+// Registration can delay reserve by at most 250 ms, never settlement. Persist
+// the identity and backoff before calling the index so the existing alarm can
+// heal a missed registration even if the participant never uploads again.
 export const registerUploadReceiptStore = async (coordinator, identity) => {
-  if (!identity) return; // Direct coordinator unit fixtures have no namespace binding.
-  if (!HASH.test(identity.owner || '') || !resolveCoordinatorSessionSlugStorageKey(identity.slug)) throw unavailable();
   const now = coordinator.now();
   const storage = coordinator.state.storage;
-  if (Number(await storage.get(REGISTERED_KEY)) > now) return;
-  const stub = await indexStub(coordinator.env, identity.slug);
-  if (!stub) throw unavailable();
-  const response = await stub.fetch('https://session-coordinator.internal/upload-receipts/index/register', {
-    method: 'POST', body: JSON.stringify({ owner: identity.owner }),
+  const pending = await storage.transaction(async transaction => {
+    const retry = await transaction.get(REGISTRATION_RETRY_KEY);
+    const target = identity || retry?.identity;
+    if (!target) return null; // Direct coordinator fixtures have no namespace binding.
+    if (!HASH.test(target.owner || '') || !resolveCoordinatorSessionSlugStorageKey(target.slug)) throw unavailable();
+    if (Number(await transaction.get(REGISTERED_KEY)) > now || retry?.retryAtMs > now) return null;
+    const next = { identity: target, retryAtMs: now + REGISTRATION_BACKOFF_MS };
+    await transaction.put(REGISTRATION_RETRY_KEY, next);
+    return next;
   });
-  if (!response.ok) throw unavailable();
-  await storage.put(REGISTERED_KEY, now + DAY_MS);
+  if (!pending) return;
+  await scheduleSweep(storage, pending.retryAtMs);
+  const controller = new AbortController();
+  let timer;
+  try {
+    const response = await Promise.race([
+      (async () => {
+        const stub = await indexStub(coordinator.env, pending.identity.slug);
+        if (!stub) throw unavailable();
+        return stub.fetch('https://session-coordinator.internal/upload-receipts/index/register', {
+          method: 'POST', body: JSON.stringify({ owner: pending.identity.owner }), signal: controller.signal,
+        });
+      })(),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(unavailable()), REGISTRATION_TIMEOUT_MS); }),
+    ]);
+    if (!response.ok) throw unavailable();
+    await storage.transaction(async transaction => {
+      await transaction.put(REGISTERED_KEY, now + DAY_MS);
+      await transaction.delete(REGISTRATION_RETRY_KEY);
+    });
+  } finally {
+    clearTimeout(timer);
+    controller.abort();
+  }
 };
+
+export const readUploadReceiptRegistrationRetryAt = async (coordinator) =>
+  Number((await coordinator.state.storage.get(REGISTRATION_RETRY_KEY))?.retryAtMs) || Infinity;
 
 export const dispatchUploadReceiptIndex = async (coordinator, path, payload) => {
   const storage = coordinator.state.storage;

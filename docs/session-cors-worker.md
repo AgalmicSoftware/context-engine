@@ -2690,10 +2690,12 @@ Signed login/bootstrap requests:
   They cover the seven-day retention window, subject to the existing per-store
   receipt cap, and may change while pages are read. Receipt stores register an
   opaque coordinator name in a per-session index before reserve, renewing at
-  most daily. Registration is best-effort and never runs during settlement:
-  an index outage cannot block an upload or lose its settled receipt. Failed
-  registration retries on the next reserve, so newly admitted stores may be
-  absent from counts until they register. An unavailable index or receipt store
+  most daily. Registration has a 250 ms timeout and never runs during settlement.
+  An index outage cannot stall uploads indefinitely or lose a settled receipt.
+  Failed registration backs off for 60 seconds and retries from the participant
+  coordinator's existing alarm, even without another upload. Counts can lag
+  until that retry succeeds; `complete` describes pagination of registered
+  stores, not confirmation that every recent registration has reached the index. An unavailable index or receipt store
   returns incomplete counts (`complete: false`, `cursor: null`); refresh rather
   than append these totals when diagnostics recover.
   Index entries expire after eight days; each alarm step examines at most 100

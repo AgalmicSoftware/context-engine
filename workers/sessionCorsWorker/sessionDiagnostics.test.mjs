@@ -290,3 +290,49 @@ test('diagnostics use the same current admin, token identity, and authorization 
   assert.equal((await f.status({ ...token, sub: PARTICIPANT })).status, 200);
   assert.deepEqual(resolveTopLevelRouteSelection({ path: '/admin/diagnostics', method: 'GET', request: new Request('https://worker.example/admin/diagnostics'), deps: { toStr: String } }), { kind: 'admin-session-diagnostics' });
 });
+
+test('a hung diagnostics index bounds reserve latency and backs off repeated registrations', async () => {
+  const f = await fixture();
+  const index = await f.named('upload-receipt-index:fixture');
+  let calls = 0;
+  index.fetch = () => { calls += 1; return new Promise(() => {}); };
+  let deadline;
+  try {
+    const result = await Promise.race([
+      f.receipt(PARTICIPANT, 'bounded'),
+      new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('Reserve still blocked after one second')), 1000); }),
+    ]);
+    assert.equal(result.kind, 'execute');
+  } finally { clearTimeout(deadline); }
+  const owner = await f.named(`upload-receipts:fixture:${PARTICIPANT}`);
+  assert.equal(await owner.coordinator.state.storage.getAlarm(), f.now + 60_000, 'Receipt expiry must not overwrite the earlier registration retry');
+  await Promise.all([f.receipt(PARTICIPANT, 'another'), f.receipt(PARTICIPANT, 'third')]);
+  assert.equal(calls, 1, 'A hung registration must not be retried on every reserve');
+});
+
+test('the existing alarm retries failed registration after backoff without another upload', async () => {
+  const f = await fixture();
+  const first = await f.receipt(ADMIN, 'registered');
+  await f.receipt(ADMIN, 'registered', 'settle', { attemptId: first.attemptId, storageRef: ref });
+  const index = await f.named('upload-receipt-index:fixture');
+  const healthy = index.fetch;
+  let calls = 0;
+  index.fetch = async () => { calls += 1; throw new Error('Synthetic index outage'); };
+  const reserved = await f.receipt(PARTICIPANT, 'during-outage');
+  assert.equal(reserved.kind, 'execute');
+  await f.receipt(PARTICIPANT, 'during-outage', 'settle', { attemptId: reserved.attemptId, storageRef: ref });
+  f.advance(59_999);
+  assert.equal((await f.receipt(PARTICIPANT, 'during-outage')).kind, 'replay');
+  assert.equal(calls, 1);
+  const owner = await f.named(`upload-receipts:fixture:${PARTICIPANT}`);
+  assert.equal(await owner.coordinator.state.storage.getAlarm(), f.now + 1);
+  index.fetch = healthy;
+  f.advance(1);
+  // A new instance proves the retry identity and deadline survive eviction.
+  const restarted = new SessionWriteCoordinator(owner.coordinator.state, f.env, { now: () => f.now });
+  await restarted.alarm();
+  const counts = await readUploadReceiptDiagnostics({ env: f.env, slug: 'fixture' });
+  assert.equal(counts.complete, true);
+  assert.equal(counts.settledCount, 2, 'The participant who never uploaded again must become visible');
+  assert.equal(counts.pendingLeases, 0);
+});

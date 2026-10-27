@@ -1,5 +1,5 @@
 import { controlCoordinatorBackupImport, assertNoActiveBackupImport } from './sessionBackupLifecycle.js';
-import { registerUploadReceiptStore, dispatchUploadReceiptIndex, sweepUploadReceiptIndex } from './sessionDiagnostics.js';
+import { registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispatchUploadReceiptIndex, sweepUploadReceiptIndex } from './sessionDiagnostics.js';
 import { bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
@@ -443,7 +443,8 @@ export class SessionWriteCoordinator {
 
   async scheduleUploadReceiptCleanup() {
     const nextExpiry = await this.state.storage.transaction((transaction) => this.pruneUploadReceipts(transaction, Number(this.now()) || Date.now()));
-    if (Number.isFinite(nextExpiry) && typeof this.state.storage.setAlarm === 'function') await this.state.storage.setAlarm(nextExpiry);
+    const nextAlarm = Math.min(nextExpiry, await readUploadReceiptRegistrationRetryAt(this));
+    if (Number.isFinite(nextAlarm) && typeof this.state.storage.setAlarm === 'function') await this.state.storage.setAlarm(nextAlarm);
   }
 
   async executeUploadReceipt(payload, settle = false) {
@@ -927,6 +928,7 @@ export class SessionWriteCoordinator {
 
   async alarm() {
     if (await sweepUploadReceiptIndex(this)) return;
+    try { await registerUploadReceiptStore(this); } catch { /* The persisted backoff schedules another attempt. */ }
     try {
       await this.runQueuedResultsAnalysisAutoJob();
     } catch (error) {
