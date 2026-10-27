@@ -6,7 +6,7 @@
     "client/src/components/OnePageSession/OnePageSessionStandardShell.tsx": "8dfe76b86404027cb1328e99cd821dd14209f814ddf870acd918f5bed021417a",
     "client/src/components/OnePageSession/OnePageSession.tsx": "3e8ac6ce05284f4497c72aaa31badb18c80903e2216f425662ebad72f54e0c96",
     "client/src/components/OnePageSession/OnePageSession.module.scss": "dbc95310ec5c4eda5cac688306d412d4df3ff4321c74695c82fb5e98bd1273b4",
-    "client/src/components/PolisReport/PolisReport.tsx": "ac9ddbd83c84a4ca613d14aeef35c239995e671ada94a24305889ad3a9cad67b",
+    "client/src/components/PolisReport/PolisReport.tsx": "b8c9401849d37b5275b68a0e5ab8f9569e277ba4dd8a5b014c8ec517db1f64c9",
     "client/src/components/PolisReport/PolisReport.module.scss": "44ecc5aa99f1ac48eb5f9a395be1cbdedbfda7188d708175fa360edf39fea446",
     "client/src/components/DebateMap/DebateMap.tsx": "cb4d9a14c4863a5310699b0399d8aa1abd528d7648c348d152402c60b0fabc28",
     "client/src/components/DebateMap/DebateMap.module.scss": "a4074ea7ff4e7ad7fde28ce2c9c7a6c5eec57765de41adfc290781f4c8f22bec",
