@@ -117,18 +117,16 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const questions = jest
       .spyOn(contractScripts, 'addQuestions')
       .mockResolvedValue({ uploadedQuestions: [], receipt: { status: 1 } });
-    const key = jest
-      .spyOn(resourceKeys, 'getEffectiveArweaveKey')
-      .mockResolvedValue({
-        arweaveJwk: '',
-        source: 'session',
-        sessionConfigSource: 'none',
-        status: 'missing',
-        preferLocal: false,
-        sessionStatus: 'missing',
-        groupStatus: 'missing',
-        localStatus: 'missing',
-      });
+    const key = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({
+      arweaveJwk: '',
+      source: 'session',
+      sessionConfigSource: 'none',
+      status: 'missing',
+      preferLocal: false,
+      sessionStatus: 'missing',
+      groupStatus: 'missing',
+      localStatus: 'missing',
+    });
     const upload = jest.spyOn(arweaveClient, 'uploadDataToArweave').mockResolvedValue('survey-arweave-tx');
     const writeFailure = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('blocked write');
