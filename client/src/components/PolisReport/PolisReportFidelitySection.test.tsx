@@ -124,11 +124,25 @@ describe('PolisReportFidelitySection', () => {
   });
 
   it('says when it will show, and stays hidden while the session has it off', async () => {
-    const { rerender, container } = renderSection(sixPeople().slice(0, 3).flat());
+    const three = byQuestion(sixPeople().slice(0, 3).flat());
+    const { rerender, container } = render(
+      <PolisReportFidelitySection sessionConfig={sessionConfig} questions={questions} questionResponses={three} />,
+    );
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY)).toHaveTextContent(
       'How well AIs predicted people appears once these results include AI-prefill drafts from at least 5 people.',
     );
     expect(screen.queryByText('Mirror Score')).not.toBeInTheDocument();
+
+    // With voice interviews off, no more AI-prefill drafts can come, so nothing is
+    // promised. The same rows keep their score, so this checks the note itself.
+    rerender(
+      <PolisReportFidelitySection
+        sessionConfig={{ ...sessionConfig, interviewModeEnabled: false }}
+        questions={questions}
+        questionResponses={three}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
 
     rerender(
       <PolisReportFidelitySection

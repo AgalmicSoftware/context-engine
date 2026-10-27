@@ -89,6 +89,10 @@ export const buildAdminMetadataDraft = (metadata: any = {}) => {
 
   return {
     interviewMode: { ...metadata?.interviewMode, ...normalizeInterviewSettings(metadata?.interviewMode) },
+    // Only the fidelity switch changes it here, by turning voice interviews back on.
+    ...(typeof metadata?.interviewModeEnabled === 'boolean'
+      ? { interviewModeEnabled: metadata.interviewModeEnabled }
+      : {}),
     resultsAnalysis: buildResultsAnalysisDraft(metadata?.resultsAnalysis),
     defaultTags: toStr(metadata?.defaultTags).trim(),
     questionsGenPrompt: toStr(metadata?.questionsGenPrompt).trim(),
@@ -138,6 +142,7 @@ export const applyAdminMetadataDraft = (
     ...asInterviewRecord(draft.interviewMode),
     ...normalizeInterviewSettings(draft.interviewMode),
   });
+  if (typeof draft.interviewModeEnabled === 'boolean') next.interviewModeEnabled = draft.interviewModeEnabled;
   if (!validResultsAnalysisSettings(draft.resultsAnalysis)) {
     throw new Error('Session results analysis settings are invalid.');
   }
@@ -255,6 +260,7 @@ export const resolveAutoFeatureBySessionSlug = (metadata: any) =>
 
 const WORKER_CANONICAL_METADATA_PATCH_KEYS = Object.freeze([
   'interviewMode',
+  'interviewModeEnabled',
   'resultsAnalysis',
   'defaultTags',
   'defaultSbtTags',

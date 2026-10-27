@@ -128,7 +128,7 @@ Automatic regeneration and discovery of new questions during a call are off by
 default; when enabled their default addition threshold is 20%. Question
 suggestions are optional and off by default. Admin refresh is on by default.
 **Measure how well AI represents participants**, at the top of Interview
-settings, turns on the next three research settings together: sharing by
+settings, turns on three of the settings below together: research sharing by
 default, hidden drafts for 1 in 5 AI-prefill drafts, and the participant score.
 Turning it off sets them back to their defaults, and each stays editable; see
 [Measure how well AI represents participants](#measure-how-well-ai-represents-participants).
@@ -1115,20 +1115,21 @@ answers ([agent-fidelity.md](agent-fidelity.md)):
    wizard's Interview settings, or later under **Session defaults** in
    `/admin`. It turns on research sharing by default, hides 1 in 5 of each
    person's AI-prefill drafts until they answer, and shows people their score.
-   These settings need a Session Worker newer than 0.7.0. AI prefill works
-   while **Voice interview modes** is on, as it is by default; `/admin` can't
-   turn that back on, so use the wizard if it was turned off.
-2. Share the session link with `?mode=voice`. It opens the microphone's
+   AI prefill needs voice interviews, which are on by default; in `/admin` the
+   switch also turns them back on if they were off. These settings need a
+   Session Worker newer than 0.7.0.
+2. Before anyone answers, write down the primary measure
+   ([Fix the plan before looking](agent-fidelity.md#fix-the-plan-before-looking)).
+3. Share the session link with `?mode=voice`. It opens the microphone's
    chooser with **Let your AI draft your answers**: people copy its prompt
    into ChatGPT or Claude, open the link it returns, and review the drafts
-   before submitting. Only drafts from people who keep research sharing on
-   are compared.
-3. After submitting, each person sees how well their AI predicted them. Once
-   the responses include AI-prefill drafts from 5 people, the Results report
-   adds **How well AIs predicted people**.
-4. Write down the primary measure before reading results
-   ([Fix the plan before looking](agent-fidelity.md#fix-the-plan-before-looking)),
-   then download **JSON: Questions + Responses** from Results and run
+   before submitting.
+4. After submitting, each person sees how well their AI predicted them,
+   whether or not they share their draft changes. Results, the command-line
+   report and hidden drafts use only people who keep research sharing on:
+   once their responses include AI-prefill drafts from 5 people, the Results
+   report adds **How well AIs predicted people**. For the full analysis,
+   download **JSON: Questions + Responses** from Results and run
    `node scripts/agent-fidelity-report.mjs --export results.json --out reports/`.
 
 ### Share the session URL

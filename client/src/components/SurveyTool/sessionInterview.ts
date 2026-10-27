@@ -20,6 +20,7 @@ import {
 export { buildRealtimeInterviewInstructions } from './sessionInterviewRealtimeInstructions';
 
 export { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';
+export { isInterviewFeatureEnabled } from '../../utilities/session/interviewFeature';
 
 export const INTERVIEW_PREFILL_FRAGMENT_KEY = 'prefill';
 // v6 asks for confidence as the chance the person keeps the answer, so it can be calibrated.
@@ -276,13 +277,6 @@ export const buildSessionVoiceModeSearch = (search: unknown, mode: SessionVoiceM
   else if (SESSION_VOICE_MODE_QUERY_VALUES.includes(params.get('mode') || '')) params.delete('mode');
   const next = params.toString();
   return next ? `?${next}` : '';
-};
-
-export const isInterviewFeatureEnabled = (sessionConfig: unknown): boolean => {
-  const config = asRecord(sessionConfig);
-  const interview = asRecord(config.interviewMode || config.interview);
-  if (config.interviewModeEnabled === false || interview.enabled === false) return false;
-  return true;
 };
 
 export const resolveRealtimeInterviewSource = (sessionConfig: unknown): InterviewSource => {

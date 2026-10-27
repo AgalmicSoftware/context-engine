@@ -10,6 +10,7 @@ import type {
 } from '../../../../shared/agentFidelity.mjs';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { isInterviewFeatureEnabled } from '../../utilities/session/interviewFeature';
 import PolisReportSectionToggleLabel from './PolisReportSectionToggleLabel';
 import { useFidelityOverview } from './useFidelityOverview';
 import styles from './PolisReportFidelitySection.module.scss';
@@ -258,6 +259,8 @@ export default function PolisReportFidelitySection({
 
   const minimum = overview.options.minParticipants;
   if (overview.coverage.participants < minimum) {
+    // With voice interviews off, no more AI-prefill drafts can arrive.
+    if (!isInterviewFeatureEnabled(config)) return null;
     return (
       <p className={styles.pending} data-testid={E2E_TESTIDS.SESSION_RESULTS_FIDELITY}>
         {TITLE} appears once these results include AI-prefill drafts from at least {minimum} people.

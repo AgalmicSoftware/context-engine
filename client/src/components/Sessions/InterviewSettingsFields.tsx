@@ -1,5 +1,7 @@
-import { useId } from 'react';
+import { useContext, useId } from 'react';
+import { ReactReduxContext } from 'react-redux';
 import { getSessionWizardInterviewValidationError } from './sessionWizardInterviewValidation';
+import useSessionWizardTooltipPreference from './hooks/useSessionWizardTooltipPreference';
 import SessionWizardInfoTooltip from './SessionWizardInfoTooltip';
 import { Input, Label } from 'reactstrap';
 import { DEFAULT_INTERVIEW_SETTINGS, normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
@@ -22,11 +24,18 @@ const FIDELITY_DEFAULTS = {
   showFidelityScore: DEFAULT_INTERVIEW_SETTINGS.showFidelityScore,
 };
 const FIDELITY_ABOUT =
-  'Turns on research sharing by default, hides 1 in 5 of each person’s AI-prefill drafts until they answer, and shows people how well their AI predicted them, with an overall section in Results. Turning it off sets these back to their defaults; each can still be changed below.';
+  'Turns on voice interviews, which AI prefill uses, research sharing by default and hidden drafts for 1 in 5 of each person’s AI-prefill drafts, and shows people how well their AI predicted them, with an overall section in Results. Turning it off sets the research settings back to their defaults; each can still be changed below.';
 
-type Props = { value: unknown; onChange: (value: Record<string, unknown>) => void; disabled?: boolean };
-export default function InterviewSettingsFields({ value, onChange, disabled = false }: Props) {
+type Props = {
+  value: unknown;
+  onChange: (value: Record<string, unknown>) => void;
+  disabled?: boolean;
+  // Where voice interviews can be off while these settings show, as in /admin, this turns them on.
+  onTurnOnInterviews?: () => void;
+};
+export default function InterviewSettingsFields({ value, onChange, disabled = false, onTurnOnInterviews }: Props) {
   const id = useId();
+  const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
   const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   const settings = normalizeInterviewSettings(value);
   const validationError = getSessionWizardInterviewValidationError(value);
@@ -39,25 +48,23 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
     <fieldset disabled={disabled} style={{ minWidth: 0 }}>
       <legend>Interview settings</legend>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Label style={{ marginBottom: 0, fontWeight: 600 }}>
+        <Label style={{ marginBottom: 0 }}>
           <input
             type="checkbox"
             checked={measuring}
             aria-describedby={`${fidelityId}-about`}
             data-testid={E2E_TESTIDS.WIZARD_INTERVIEW_FIDELITY}
-            onChange={(e) =>
-              onChange({
-                ...raw,
-                ...settings,
-                ...(e.target.checked ? { ...FIDELITY_SETTINGS, enabled: true } : FIDELITY_DEFAULTS),
-              })
-            }
+            onChange={(e) => {
+              const on = e.target.checked;
+              onChange({ ...raw, ...settings, ...(on ? { ...FIDELITY_SETTINGS, enabled: true } : FIDELITY_DEFAULTS) });
+              if (on) onTurnOnInterviews?.();
+            }}
           />{' '}
           Measure how well AI represents participants
         </Label>
         {/* Outside the label, so opening the help doesn't toggle the switch. */}
         <SessionWizardInfoTooltip
-          enabled
+          enabled={tooltipsEnabled}
           id={`${fidelityId}-help`}
           content={FIDELITY_ABOUT}
           placement="top"

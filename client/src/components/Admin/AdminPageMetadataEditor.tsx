@@ -106,6 +106,7 @@ const AdminPageMetadataEditor = ({
         <InterviewSettingsFields
           value={metadataConfigDraft.interviewMode}
           onChange={(value) => updateMetadataConfigDraft('interviewMode', value)}
+          onTurnOnInterviews={() => updateMetadataConfigDraft('interviewModeEnabled', true)}
           disabled={metadataUpdateBusy}
         />
         <ResultsAnalysisSettingsFields

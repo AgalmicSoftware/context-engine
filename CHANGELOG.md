@@ -73,9 +73,11 @@ All notable changes to this project will be documented in this file.
 ### Client — available when the site deploys
 
 - Add a **Measure how well AI represents participants** switch to Interview
-  settings, in the wizard and `/admin`. It turns on research sharing by
-  default, hidden drafts for 1 in 5 AI-prefill drafts and the participant
-  score together; turning it off restores their defaults.
+  settings, in the wizard and `/admin` (needs a Session Worker newer than
+  0.7.0). It turns on research sharing by default, hidden drafts for 1 in 5
+  AI-prefill drafts and the participant score together, and in `/admin` turns
+  voice interviews back on if they were off; turning it off restores the
+  research defaults.
 - Add **How well AIs predicted people** to the Results report of sessions with
   `interviewMode.showFidelityScore`, once its responses include AI-prefill
   drafts from 5 people: the overall and hidden-draft Mirror Scores, how often

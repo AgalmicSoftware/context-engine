@@ -1,5 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { createStore } from 'redux';
 import InterviewSettingsFields from './InterviewSettingsFields';
 it('exposes conservative generation defaults and an editable owner opening', () => {
   const onChange = jest.fn();
@@ -116,7 +118,9 @@ it('turns on every setting that measures how well AI represents people, and back
     />,
   );
   expect(screen.getByLabelText(label)).not.toBeChecked();
-  expect(screen.getByLabelText(label)).toHaveAccessibleDescription(/hides 1 in 5 of each person’s AI-prefill drafts/);
+  expect(screen.getByLabelText(label)).toHaveAccessibleDescription(
+    /hidden drafts for 1 in 5 of each person’s AI-prefill drafts/,
+  );
 
   fireEvent.click(screen.getByLabelText(label));
   expect(latest()).toEqual(
@@ -153,4 +157,47 @@ it('turns on every setting that measures how well AI represents people, and back
       suggestGroups: true,
     }),
   );
+});
+
+describe('the switch that measures how well AI represents people', () => {
+  const label = 'Measure how well AI represents participants';
+  const help = 'About measuring how well AI represents participants';
+
+  it('leaves interviews on when turned off, and turns them on through the page that can', () => {
+    const onChange = jest.fn();
+    const onTurnOnInterviews = jest.fn();
+    const latest = () => onChange.mock.calls.at(-1)?.[0];
+    const { rerender } = render(
+      <InterviewSettingsFields value={{}} onChange={onChange} onTurnOnInterviews={onTurnOnInterviews} />,
+    );
+    fireEvent.click(screen.getByLabelText(label));
+    expect(onTurnOnInterviews).toHaveBeenCalledTimes(1);
+    rerender(<InterviewSettingsFields value={latest()} onChange={onChange} onTurnOnInterviews={onTurnOnInterviews} />);
+    fireEvent.click(screen.getByLabelText(label));
+    expect(onTurnOnInterviews).toHaveBeenCalledTimes(1);
+    expect(latest()).toEqual(expect.objectContaining({ enabled: true, showFidelityScore: false }));
+  });
+
+  it('opens its help without changing the switch', () => {
+    const onChange = jest.fn();
+    render(<InterviewSettingsFields value={{}} onChange={onChange} />);
+    const helpButton = screen.getByRole('button', { name: help });
+    fireEvent.click(helpButton);
+    fireEvent.keyDown(helpButton, { key: 'Enter' });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(label)).not.toBeChecked();
+  });
+
+  it('is disabled with the other settings, and hides its help when tooltips are off', () => {
+    const store = createStore(() => ({ sessionState: { tooltipsEnabled: false } }));
+    render(
+      <Provider store={store}>
+        <InterviewSettingsFields value={{}} onChange={jest.fn()} disabled />
+      </Provider>,
+    );
+    expect(screen.getByLabelText(label)).toBeDisabled();
+    expect(screen.queryByRole('button', { name: help })).not.toBeInTheDocument();
+    // Screen readers still get the explanation with the switch.
+    expect(screen.getByLabelText(label)).toHaveAccessibleDescription(/research sharing by default/);
+  });
 });

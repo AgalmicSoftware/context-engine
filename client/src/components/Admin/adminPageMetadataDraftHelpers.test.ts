@@ -428,3 +428,33 @@ it('persists Interview settings through the admin editor and Worker metadata pat
     withoutNewInterviewDefaults({ ...draft.interviewMode, autoRegenerate: false, allowManualRefresh: true }),
   );
 });
+
+it('turns voice interviews back on when the fidelity switch does', () => {
+  const source = { interviewModeEnabled: false, interviewMode: { enabled: false, realtimeModel: 'gpt-live-1' } };
+  const draft = buildAdminMetadataDraft(source);
+  // What the switch writes in /admin: the research settings, `enabled`, and the top-level switch.
+  draft.interviewMode = {
+    ...draft.interviewMode,
+    shareDraftChangesByDefault: true,
+    hiddenDraftShare: 0.2,
+    showFidelityScore: true,
+    enabled: true,
+  };
+  draft.interviewModeEnabled = true;
+  const patch = buildWorkerCanonicalMetadataConfigPatch({
+    metadata: applyAdminMetadataDraft(source, draft),
+    slug: 'demo',
+    adminAddress: '0xabc',
+  });
+  expect(patch.interviewModeEnabled).toBe(true);
+  expect(patch.interviewMode).toEqual(
+    expect.objectContaining({ enabled: true, shareDraftChangesByDefault: true, hiddenDraftShare: 0.2 }),
+  );
+  // A session that never set the top-level switch doesn't start sending it.
+  const untouched = buildWorkerCanonicalMetadataConfigPatch({
+    metadata: applyAdminMetadataDraft({}, buildAdminMetadataDraft({})),
+    slug: 'demo',
+    adminAddress: '0xabc',
+  });
+  expect(untouched).not.toHaveProperty('interviewModeEnabled');
+});
