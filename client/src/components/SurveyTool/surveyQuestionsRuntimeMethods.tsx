@@ -2375,15 +2375,23 @@ export const createSurveyQuestionsRuntimeMethods = (
         submissionTarget,
         { operationId: context.operationId, uploadRevisions: context.uploadRevisions },
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Answers a Worker stored before a later upload failed are saved; the rest keep
       // their drafts and are named, so the next Submit sends only those.
-      const savedCount = Array.isArray(error?.partialReceipt?.questionResponseRefs)
-        ? error.partialReceipt.questionResponseRefs.length
-        : 0;
-      if (!savedCount) throw error;
-      tx = { ...error.partialReceipt, retryPending: true };
-      uploadFailure = `Some answers didn't save (${String(error?.message || 'upload failed').replace(/\.$/, '')}).`;
+      if (!error || typeof error !== 'object' || !('partialReceipt' in error)) throw error;
+      const partialReceipt = error.partialReceipt;
+      if (
+        !partialReceipt ||
+        typeof partialReceipt !== 'object' ||
+        !('questionResponseRefs' in partialReceipt) ||
+        !Array.isArray(partialReceipt.questionResponseRefs) ||
+        !partialReceipt.questionResponseRefs.length
+      )
+        throw error;
+      const savedCount = partialReceipt.questionResponseRefs.length;
+      tx = { ...partialReceipt, retryPending: true };
+      const failureMessage = 'message' in error ? error.message : '';
+      uploadFailure = `Some answers didn't save (${String(failureMessage || 'upload failed').replace(/\.$/, '')}).`;
       questionResponses
         .slice(savedCount)
         .forEach((response: SurveyQuestionsLegacyValue) =>
