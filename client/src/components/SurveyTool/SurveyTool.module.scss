@@ -3879,8 +3879,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   outline-offset: 2px;
 }
 
-.sessionInterviewPanel .sessionInterviewMicrophone:focus-visible,
-.sessionInterviewPanel .sessionAgentKickoffCopyTarget:focus-visible {
+.sessionInterviewPanel .sessionInterviewMicrophone:focus-visible {
   outline: 2px solid var(--ce-status-info-text);
 }
 

@@ -10,6 +10,7 @@ import {
   mapInterviewEvidenceToResponses,
 } from './sessionInterview';
 import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
+import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { useSessionInterviewGroupRecommendations } from './useSessionInterviewGroupRecommendations';
 
 jest.mock('./SessionInterviewRecommendedGroups', () => ({
@@ -1229,6 +1230,32 @@ describe('SessionVoiceModeModal', () => {
     expect(baseProps.onSelectMode).toHaveBeenCalledWith('recordGroup');
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(baseProps.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('finds the session Worker for the AI-prefill card once, even as the page re-renders', async () => {
+    let resolveWorker: (url: string) => void = () => {};
+    jest.mocked(getCorsProxyUrlOrThrow).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveWorker = resolve;
+        }),
+    );
+    const props = { ...baseProps, workerUrl: undefined };
+    const view = render(<SessionVoiceModeModal {...props} context={{ account: '0xabc' }} />);
+    // The page passes a new context object on every render; the lookup isn't restarted.
+    view.rerender(<SessionVoiceModeModal {...props} context={{ account: '0xabc' }} />);
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL)).not.toBeInTheDocument();
+    await act(async () => resolveWorker('https://worker.example'));
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL)).toBeInTheDocument();
+  });
+
+  it('leaves the AI-prefill card out when the session has no Worker', async () => {
+    jest.mocked(getCorsProxyUrlOrThrow).mockRejectedValueOnce(new Error('No session Worker'));
+    render(<SessionVoiceModeModal {...baseProps} workerUrl={undefined} />);
+    await act(async () => {});
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL)).not.toBeInTheDocument();
   });
 
   it('keeps the AI-prefill prompt out of the interview itself', () => {

@@ -11,14 +11,16 @@ import {
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { resolveRealtimeInterviewModel } from '../../utilities/audio/realtimeInterviewConfig';
 import { normalizeRatingScale, type RatingScale } from '../../utilities/survey/ratingValue.js';
+import {
+  GROUP_CONVERSATION_MODE_QUERY_VALUE,
+  INTERVIEW_MODE_QUERY_VALUE,
+  SESSION_VOICE_MODE_QUERY_VALUES,
+  VOICE_CHOOSER_QUERY_VALUE,
+} from './sessionVoiceModeQuery';
 export { buildRealtimeInterviewInstructions } from './sessionInterviewRealtimeInstructions';
 
 export { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';
 
-export const INTERVIEW_MODE_QUERY_VALUE = 'interview';
-export const GROUP_CONVERSATION_MODE_QUERY_VALUE = 'recordGroup';
-// Opens the voice modal on its chooser, with no mode picked yet.
-export const VOICE_CHOOSER_QUERY_VALUE = 'voice';
 export const INTERVIEW_PREFILL_FRAGMENT_KEY = 'prefill';
 // v6 asks for confidence as the chance the person keeps the answer, so it can be calibrated.
 export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v6';
@@ -271,13 +273,7 @@ export const buildSessionVoiceModeSearch = (search: unknown, mode: SessionVoiceM
   const raw = toTrimmedString(search);
   const params = new URLSearchParams(raw.startsWith('?') ? raw : `?${raw}`);
   if (mode) params.set('mode', mode);
-  else if (
-    params.get('mode') === INTERVIEW_MODE_QUERY_VALUE ||
-    params.get('mode') === GROUP_CONVERSATION_MODE_QUERY_VALUE ||
-    params.get('mode') === VOICE_CHOOSER_QUERY_VALUE
-  ) {
-    params.delete('mode');
-  }
+  else if (SESSION_VOICE_MODE_QUERY_VALUES.includes(params.get('mode') || '')) params.delete('mode');
   const next = params.toString();
   return next ? `?${next}` : '';
 };

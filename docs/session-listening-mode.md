@@ -244,7 +244,7 @@ copies the request without opening the preview. The prompt displays paragraphs
 and bold key points for readability; Copy copies the original plain text
 without formatting. The **Prompt** dropdown inside the card expands the instruction and
 collapses it again; the preview starts collapsed and remains collapsed after a
-successful copy. A question-mark tooltip to the left of **Prompt** explains:
+successful copy. In the expanded prompt, a question-mark tooltip explains:
 “Allows your agent to predict your responses and raise better interview questions.”
 The tooltip is available on hover and keyboard focus. The copied request begins:
 
@@ -358,9 +358,8 @@ The account used at final normal submission owns the response. If an older
 packet contains context facts but not responses, the session AI mapping lane
 still converts those facts into drafts.
 
-The **Transcript** and prompt footer cards share one row. Without a transcript,
-the prompt card fills the row, including when expanded. The heading, copy icon,
-dropdown, help tooltip and preview remain inside the same bordered card.
+After an interview, a compact **Transcript** toggle sits beside the microphone;
+the AI-prefill prompt card stays in the voice launcher.
 
 In the full question list, rating sliders update locally during a drag and save
 the final value on release. Loaded lists retain the Questions label during

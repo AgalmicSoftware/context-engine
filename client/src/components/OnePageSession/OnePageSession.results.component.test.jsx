@@ -775,6 +775,16 @@ describe('OnePageSession results routing', () => {
   it('does not restore consumed interview or prefill intent when sections reopen', () => {
     const priorUrl = window.location.href;
     try {
+      // A ?mode=voice visit is consumed the same way.
+      window.history.replaceState({}, '', '/session/alpha?mode=voice&src=event');
+      const chooserVisit = new OnePageSession(buildProps());
+      chooserVisit.hasAutoMintIntent = jest.fn(() => false);
+      chooserVisit.recordOriginalURL();
+      window.history.replaceState({}, '', '/session/alpha?src=event');
+      chooserVisit.resetDemoURL();
+      expect(new URLSearchParams(window.location.search).get('mode')).toBeNull();
+      expect(new URLSearchParams(window.location.search).get('src')).toBe('event');
+
       window.history.replaceState(
         {},
         '',

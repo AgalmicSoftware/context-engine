@@ -21,11 +21,17 @@ export default function SessionVoicePrefillCard({ sessionSlug = '', sessionConfi
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeWorkerUrl = workerUrl || resolvedWorkerUrl;
+  // The pile rebuilds `context` on every render, so the lookup keys on its values
+  // and reads the latest objects, rather than restarting each render.
+  const lookupInputs = useRef({ sessionConfig, context });
+  lookupInputs.current = { sessionConfig, context };
+  const { account, providerLike, chainId } = (context || {}) as Record<string, unknown>;
+  const hasSessionConfig = Boolean(sessionConfig);
 
   useEffect(() => {
     if (activeWorkerUrl) return;
     let active = true;
-    void getCorsProxyUrlOrThrow({ sessionSlug, sessionConfig, context, allowDemoFallback: false })
+    void getCorsProxyUrlOrThrow({ sessionSlug, ...lookupInputs.current, allowDemoFallback: false })
       .then((value: string) => {
         if (active) setResolvedWorkerUrl(value);
       })
@@ -34,7 +40,7 @@ export default function SessionVoicePrefillCard({ sessionSlug = '', sessionConfi
     return () => {
       active = false;
     };
-  }, [activeWorkerUrl, context, sessionConfig, sessionSlug]);
+  }, [activeWorkerUrl, sessionSlug, hasSessionConfig, account, providerLike, chainId]);
   useEffect(
     () => () => {
       if (copyResetRef.current) clearTimeout(copyResetRef.current);
