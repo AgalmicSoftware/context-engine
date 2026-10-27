@@ -3,13 +3,13 @@ import {
   copyFileSync,
   existsSync,
   readFileSync,
-  readdirSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildWorkerBundles } from './worker-bundle.mjs';
+import { buildWorkerThirdPartyNotices } from './lib/worker-third-party-notices.mjs';
 
 const TEMPLATE_RELATIVE_DIR = 'deploy/cloudflare/session-worker';
 const BUNDLE_RELATIVE_PATH = 'dist/sessionCorsWorker.bundle.js';
@@ -26,42 +26,6 @@ const TEMPLATE_INPUT_FILES = Object.freeze([
 ]);
 
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
-
-// Follow the installed package owning each esbuild input, including nested
-// dependencies and package subdirectories with type-only package.json files.
-export const buildWorkerThirdPartyNotices = ({ rootDir, metafile }) => {
-  if (!metafile?.inputs) throw new Error('Worker bundle metafile is required for third-party notices.');
-  const packages = new Map();
-  for (const input of Object.keys(metafile.inputs)) {
-    let directory = dirname(resolve(rootDir, input));
-    if (!directory.includes('/node_modules/')) continue;
-    let found = false;
-    while (directory.includes('/node_modules/')) {
-      const manifestPath = resolve(directory, 'package.json');
-      const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : null;
-      if (manifest?.name && manifest?.version) {
-        packages.set(directory, manifest);
-        found = true;
-        break;
-      }
-      directory = dirname(directory);
-    }
-    if (!found) throw new Error(`Missing package metadata for bundled input: ${input}`);
-  }
-  const notices = [];
-  for (const [directory, manifest] of packages) {
-    const identity = `${manifest.name}@${manifest.version}`;
-    const license = typeof manifest.license === 'string' ? manifest.license : manifest.license?.type;
-    if (!license) throw new Error(`Missing license identifier for ${identity}`);
-    const licenseFiles = readdirSync(directory, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && /^(licen[cs]e|copying)([.-]|$)/i.test(entry.name))
-      .map((entry) => entry.name).sort();
-    if (!licenseFiles.length) throw new Error(`Missing license text for ${identity}`);
-    const texts = licenseFiles.map((name) => `### ${name}\n\n${readFileSync(resolve(directory, name), 'utf8').replace(/\r\n/g, '\n').trim()}`);
-    notices.push(`## ${identity}\n\nLicense: ${license}\n\n${texts.join('\n\n')}`);
-  }
-  return `# Third-party notices\n\nGenerated from the Session Worker bundle inputs. These packages retain their own licenses.\n\n${notices.sort().join('\n\n---\n\n')}\n`;
-};
 
 const readRequiredFile = (path, label) => {
   if (!existsSync(path)) throw new Error(`${label} is missing: ${path}`);

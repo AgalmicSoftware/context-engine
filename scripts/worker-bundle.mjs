@@ -1,4 +1,5 @@
 import { build } from 'esbuild';
+import { buildWorkerThirdPartyNotices } from './lib/worker-third-party-notices.mjs';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -60,6 +61,7 @@ export const buildWorkerBundles = async ({
   targetKeys = Object.keys(WORKER_BUNDLE_TARGETS),
   assertWorkerDeps = assertWorkerDependencyVersions,
   esbuildImpl = build,
+  buildNoticesImpl = buildWorkerThirdPartyNotices,
   mkdirSyncImpl = mkdirSync,
   readFileSyncImpl = readFileSync,
   writeFileSyncImpl = writeFileSync,
@@ -86,7 +88,10 @@ export const buildWorkerBundles = async ({
       ...(target.mainFields ? { mainFields: target.mainFields } : {}),
     });
     const bundle = readFileSyncImpl(target.outputFile, 'utf8');
-    const normalizedBundle = normalizeWorkerBundleText(bundle);
+    const notices = buildNoticesImpl({ rootDir, metafile: built?.metafile });
+    // Releases and wizard installs copy only the JS file. Keep full notices in
+    // those exact bytes, escaping comment terminators from third-party text.
+    const normalizedBundle = `${normalizeWorkerBundleText(bundle).trimEnd()}\n/*\n${notices.replace(/\*\//g, '*\\/').trimEnd()}\n*/\n`;
     if (normalizedBundle !== bundle) {
       writeFileSyncImpl(target.outputFile, normalizedBundle);
     }

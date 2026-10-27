@@ -38,6 +38,12 @@ Third-party dependencies retain their own licenses. Package metadata, lockfiles,
 The Session Worker deploy package generates `THIRD_PARTY_NOTICES.md` from its
 esbuild input packages, preserving each package's version, license and full
 license text. Template verification checks these notices against the bundle.
+The released Session Worker, deploy-helper and Agent Bridge JavaScript bundles
+also carry their own generated notices in a trailing comment, so installations
+and copies retain them. Inputs with no local license file must have a full
+license grant in their README, or be an ethers v5 subpackage whose exact version
+and repository match the installed umbrella package's shared license. Missing
+license evidence fails the build.
 The add-on's vendored `ethers.umd.min.js` is ethers 5.7.2 under MIT; its notice
 is kept beside it in `ethers.LICENSE.md`. The add-on's MPL-2.0
 license applies to project-authored code.
