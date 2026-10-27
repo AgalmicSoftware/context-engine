@@ -3368,6 +3368,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     color: var(--ce-panel-text);
   }
 
+  // The global link-button color is a border tone, too faint on the footer surface.
+  :global(.modal-footer) :global(.btn-link) {
+    color: var(--ce-panel-text-muted);
+  }
+
+  :global(.modal-footer) :global(.btn-link):hover,
+  :global(.modal-footer) :global(.btn-link):focus-visible {
+    color: var(--ce-panel-text);
+    text-decoration: underline;
+  }
+
   :global(.modal-header) {
     background: var(--ce-surface-sunken) !important;
     color: var(--ce-panel-text) !important;
