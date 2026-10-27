@@ -1,0 +1,48 @@
+const entry = (methods, access, options = {}) => Object.freeze({ methods: methods.split(','), access, ...options });
+export const AGENT_ROUTES = Object.freeze({
+  '/api/agent/credentials/service': entry('POST', 'operator'),
+  '/api/agent/invite/onboard': entry('POST', 'public', { cors: true }),
+  '/api/agent/client-login/exchange': entry('POST', 'exchange', { cors: true }),
+  '/api/agent/wrapped/member-exchange': entry('POST', 'participant', { cors: true }),
+  '/api/agent/session-meta': entry('GET', 'public', { cors: true, descriptor: true }),
+  '/api/agent/skill': entry('GET', 'public', { descriptor: true }),
+  '/api/agent/skill-version': entry('GET', 'public', { descriptor: true }),
+  '/api/agent/session-wrapped/skill': entry('GET,HEAD', 'public', { descriptor: true }),
+  '/api/agent/session-wrapped/skill-version': entry('GET', 'public', { descriptor: true }),
+  '/api/agent/questions': entry('GET,POST', 'agent', { cors: true }),
+  '/api/agent/tags': entry('GET,POST', 'agent'),
+  '/api/agent/questions/next': entry('GET,POST', 'agent'),
+  '/api/agent/questions/create': entry('POST', 'agent', { authoring: true }),
+  '/api/agent/question-queue': entry('GET,POST', 'operator'),
+  '/api/agent/question-queue/plan': entry('POST', 'admin'),
+  '/api/agent/question-queue/apply': entry('POST', 'admin'),
+  '/api/agent/question-votes/recommend': entry('POST', 'agent'),
+  '/api/agent/question-votes/apply': entry('POST', 'agent'),
+  '/api/agent/actions': entry('GET', 'agent'),
+  '/api/agent/preferences': entry('POST', 'agent', { cors: true }),
+  '/api/agent/onboarding': entry('GET,POST', 'agent'),
+  '/api/agent/groups': entry('GET', 'agent', { hosted: true }),
+  '/api/agent/groups/propose': entry('POST', 'agent', { hosted: true }),
+  '/api/agent/sessions/child': entry('POST', 'operator', { hosted: true }),
+  '/api/agent/results': entry('GET,POST', 'agent', { cors: true, results: true }),
+  '/api/agent/results-image': entry('GET', 'agent', { results: true }),
+  '/api/agent/result-view-cache': entry('GET,POST', 'cache', { cors: true, results: true }),
+  '/api/agent/geo-backlink': entry('GET,POST', 'agent'),
+  '/api/agent/agent-only/start': entry('GET', 'public', { cors: true, descriptor: true }),
+  '/api/agent/agent-only/statements': entry('GET', 'wrapped'),
+  '/api/agent/agent-only/answers/bulk': entry('POST', 'wrapped'),
+  '/api/agent/agent-only/token-votes/bulk': entry('POST', 'wrapped'),
+  '/api/agent/agent-only/wrapped-image': entry('POST', 'wrapped'),
+  '/api/agent/agent-only/wrapped-image/view/:id': entry('GET,HEAD', 'public'),
+  '/api/agent/admin/status': entry('GET,POST', 'status'),
+  '/api/agent/admin/metrics': entry('GET,POST', 'admin', { operatorRead: true }),
+  '/api/agent/admin/questions/delete': entry('POST', 'admin'),
+  '/api/agent/admin/skill-update': entry('GET,POST,DELETE', 'skillAdmin'),
+  '/api/agent/admin/agent-only/config': entry('GET,POST', 'admin'),
+  '/api/agent/admin/agent-only/export': entry('GET', 'admin'),
+});
+export const resolveAgentRoute = (path) => AGENT_ROUTES[path] ? { ...AGENT_ROUTES[path], path } :
+  /^\/api\/agent\/agent-only\/wrapped-image\/view\/[^/]+$/.test(path)
+    ? { ...AGENT_ROUTES['/api/agent/agent-only/wrapped-image/view/:id'], path: '/api/agent/agent-only/wrapped-image/view/:id' } : null;
+export const isAgentPath = path => path === '/api/agent' || path.startsWith('/api/agent/') ||
+  path.startsWith('/telegram/agent/api') || path === '/session-wrapped';

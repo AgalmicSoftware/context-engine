@@ -1,3 +1,6 @@
+jest.mock('../../../../../shared/crypto/recoveryKeyFingerprint.mjs', () => ({
+  recoveryKeyFingerprint: jest.fn(async () => 'b'.repeat(64)),
+}));
 import { ethers } from 'ethers';
 import { setHostedFaucetEnabled } from '../sessionWizardHostedFaucet';
 import { act, renderHook, waitFor } from '@testing-library/react';
@@ -140,6 +143,121 @@ describe('useSessionWizardWorkerDeploy', () => {
     jest.clearAllMocks();
     localStorage.clear();
     global.fetch = originalFetch;
+  });
+
+  it.each([false, true])(
+    'waits for recovery-key custody without persisting key material (operator=%s)',
+    async (operator) => {
+      const options = buildDeployHookOptions();
+      const fetchMock = mockSuccessfulWorkerDeployFetch();
+      const key = 'a'.repeat(64);
+      fetchMock.mockImplementationOnce(
+        async () =>
+          ({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ok: true,
+              workerUrl: 'https://deployed.example.test',
+              configVerified: true,
+              writesSessionConfig: true,
+              envelopeKekSecretSet: true,
+              recoveryKeyFingerprint: 'b'.repeat(64),
+              ...(!operator ? { recoveryKey: key } : {}),
+            }),
+          }) as Response,
+      );
+      const storage = jest.spyOn(Storage.prototype, 'setItem');
+      const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+      if (operator) act(() => result.current.setOperatorRecoveryKey(key));
+      let pending: ReturnType<typeof result.current.handleDeployWorker> | undefined;
+      act(() => {
+        pending = result.current.handleDeployWorker();
+      });
+      await waitFor(() => expect(result.current.recoveryDisplay?.recoveryKey).toBe(key));
+      expect(result.current.operatorRecoveryKey).toBeNull();
+      expect(options.verifyPublicWorkerDeployment).not.toHaveBeenCalled();
+      if (operator) expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).storageEnvelopeKek).toBe(key);
+      act(() => result.current.finishRecoveryDisplay());
+      await act(async () => {
+        expect((await pending)?.ok).toBe(true);
+      });
+      expect(result.current.recoveryDisplay).toBeNull();
+      expect(JSON.stringify(storage.mock.calls)).not.toContain(key);
+      expect(JSON.stringify(options.updateDraftValue.mock.calls)).not.toContain(key);
+      expect(JSON.stringify(options.updateDeploymentState.mock.calls)).not.toContain(key);
+      storage.mockRestore();
+    },
+  );
+
+  it.each(['account', 'slug', 'sessionIdHex'])(
+    'keeps the operator key when %s changes before deployment',
+    async (field) => {
+      const options = buildDeployHookOptions();
+      const fetchMock = mockSuccessfulWorkerDeployFetch();
+      const { result, rerender } = renderHook(() => useSessionWizardWorkerDeploy(options));
+      act(() => result.current.setOperatorRecoveryKey('A'.repeat(64)));
+      const runtime = options.refs.runtimeRef.current;
+      options.refs.runtimeRef.current =
+        field === 'slug'
+          ? { ...runtime, draft: { ...runtime.draft, slug: 'renamed-session' } }
+          : { ...runtime, [field]: field === 'account' ? `0x${'c'.repeat(40)}` : `0x${'d'.repeat(32)}` };
+      rerender();
+      expect(result.current.operatorRecoveryKey).toBe('a'.repeat(64));
+      await act(async () => {
+        expect((await result.current.handleDeployWorker())?.ok).toBe(true);
+      });
+      expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).storageEnvelopeKek).toBe('a'.repeat(64));
+    },
+  );
+
+  it.each(['', 'invalid'])('refuses a chosen but invalid operator key (%s)', async (key) => {
+    const options = buildDeployHookOptions();
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    act(() => result.current.setOperatorRecoveryKey(key));
+    await act(async () => {
+      expect((await result.current.handleDeployWorker())?.ok).toBe(false);
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(
+      expect.objectContaining({ deployStatus: expect.stringMatching(/64 hex/) }),
+    );
+  });
+
+  it('does not label edited input as installed when a replay preserves a different key', async () => {
+    const options = buildDeployHookOptions();
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    fetchMock.mockImplementationOnce(
+      async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            configVerified: true,
+            writesSessionConfig: true,
+            envelopeKekSecretPreserved: true,
+            recoveryKeyFingerprint: 'c'.repeat(64),
+          }),
+        }) as Response,
+    );
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    act(() => result.current.setOperatorRecoveryKey('a'.repeat(64)));
+    let pending: ReturnType<typeof result.current.handleDeployWorker> | undefined;
+    act(() => {
+      pending = result.current.handleDeployWorker();
+    });
+    await waitFor(() => expect(result.current.recoveryDisplay).not.toBeNull());
+    expect(result.current.recoveryDisplay?.recoveryKey).toBeUndefined();
+    expect(result.current.recoveryDisplay?.supplied).toBe(false);
+    expect(result.current.recoveryDisplay?.keyPreserved).toBe(true);
+    expect(result.current.recoveryDisplay?.fingerprint).toBe('c'.repeat(64));
+    act(() => result.current.finishRecoveryDisplay());
+    await act(async () => {
+      await pending;
+    });
   });
 
   it('returns handleDeployWorker function', () => {
@@ -462,11 +580,7 @@ describe('useSessionWizardWorkerDeploy', () => {
       status: 400,
       body: { error: workerError },
     });
-    const {
-      AGENT_BRIDGE_WORKER_BUNDLE_URL,
-      WORKER_BUNDLE_URL,
-      WORKER_RELEASE_MANIFEST_URL,
-    } = require('../../../variables/publicDeploymentConfig.js');
+    const { WORKER_BUNDLE_URL, WORKER_RELEASE_MANIFEST_URL } = require('../../../variables/publicDeploymentConfig.js');
 
     const deployResult = await redeemSponsoredDeploy(options);
 
@@ -477,9 +591,6 @@ describe('useSessionWizardWorkerDeploy', () => {
       expect.objectContaining({
         bundleUrl: WORKER_BUNDLE_URL,
         bundleManifestUrl: WORKER_RELEASE_MANIFEST_URL,
-        agentBridgeBundleUrl: AGENT_BRIDGE_WORKER_BUNDLE_URL,
-        agentBridgeBundleManifestUrl: WORKER_RELEASE_MANIFEST_URL,
-        agentSessionWrappedDeploymentIdentity: expect.any(String),
       }),
     );
     expect(deployPayload).not.toHaveProperty('bundleText');
@@ -530,75 +641,80 @@ describe('useSessionWizardWorkerDeploy', () => {
     );
   });
 
-  it('requests and adopts the dedicated Wrapped capability when surfaces.agentHttp is enabled', async () => {
-    const capability = {
-      version: 1,
-      enabled: true,
-      origin: 'https://ce-wrapped-deploy-storage-session.example.workers.dev',
-      protocolVersion: 'agent-session-wrapped-v1',
-      revision: 'wrapped-0123456789abcdef',
-      verifiedAt: '2026-07-20T18:00:00.000Z',
-    };
-    const deployBodies: Record<string, unknown>[] = [];
-    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
-      if (String(url).endsWith('/deploy')) {
-        deployBodies.push(JSON.parse(String(init?.body || '{}')));
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
+  it.each([true, false])(
+    'accepts a Wrapped deployment capability only for the Session Worker origin (same origin %s)',
+    async (sameOrigin) => {
+      const capability = {
+        version: 1,
+        enabled: true,
+        origin: sameOrigin ? 'https://deployed.example.test' : 'https://retired-bridge.example.test',
+        protocolVersion: 'agent-session-wrapped-v1',
+        revision: 'wrapped-0123456789abcdef',
+        verifiedAt: '2026-07-20T18:00:00.000Z',
+      };
+      const deployBodies: Record<string, unknown>[] = [];
+      global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+        if (String(url).endsWith('/deploy')) {
+          deployBodies.push(JSON.parse(String(init?.body || '{}')));
+          return {
             ok: true,
-            workerUrl: 'https://deployed.example.test',
-            configVerified: true,
-            writesSessionConfig: true,
-            writesSessionSecrets: false,
-            agentSessionWrapped: capability,
-          }),
-        } as Response;
-      }
-      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
-    });
-    const options = buildDeployHookOptions();
-    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    profile.preset = 'custom';
-    profile.surfaces.agentHttp = true;
-    options.refs.runtimeRef.current.draft = {
-      ...options.refs.runtimeRef.current.draft,
-      ai: {
-        models: {
-          fast: { provider: 'openai' },
-          thinking: { provider: 'openai' },
-          transcription: { provider: 'openai' },
+            status: 200,
+            json: async () => ({
+              ok: true,
+              workerUrl: 'https://deployed.example.test',
+              configVerified: true,
+              writesSessionConfig: true,
+              writesSessionSecrets: false,
+              agentSessionWrapped: capability,
+            }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+      });
+      const options = buildDeployHookOptions();
+      const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+      profile.preset = 'custom';
+      profile.surfaces.agentHttp = true;
+      options.refs.runtimeRef.current.draft = {
+        ...options.refs.runtimeRef.current.draft,
+        ai: {
+          models: {
+            fast: { provider: 'openai' },
+            thinking: { provider: 'openai' },
+            transcription: { provider: 'openai' },
+          },
         },
-      },
-      sessionModeProfile: profile,
-    };
-    options.refs.runtimeRef.current.workerSecretsEnabled = true;
-    options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'sk-agent-runtime' });
-    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+        sessionModeProfile: profile,
+      };
+      options.refs.runtimeRef.current.workerSecretsEnabled = true;
+      options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'sk-agent-runtime' });
+      const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
 
-    let deployResult: Record<string, unknown> = {};
-    await act(async () => {
-      deployResult = await result.current.handleDeployWorker();
-    });
+      let deployResult: Record<string, unknown> = {};
+      await act(async () => {
+        deployResult = await result.current.handleDeployWorker();
+      });
 
-    expect(deployResult).toEqual(expect.objectContaining({ ok: true, agentSessionWrapped: capability }));
-    expect(deployBodies).toHaveLength(1);
-    expect(deployBodies[0]).toEqual(
-      expect.objectContaining({
-        agentBridgeBundleUrl: expect.stringContaining('agentBridgeWorker.bundle.js'),
-        agentSessionWrappedDeploymentIdentity: expect.stringContaining('deploy-storage-session'),
-      }),
-    );
-    expect(options.updateDraftValue).toHaveBeenCalledWith(['agentSessionWrapped'], capability);
-    expect(JSON.stringify(deployBodies[0])).not.toContain('TELEGRAM_');
-    expect(
-      resolveSessionWizardWorkerPublishEvidence({
-        runtime: options.refs.runtimeRef.current,
-        workerSecrets: options.getCurrentWorkerSecrets(),
-      }),
-    ).toEqual(expect.objectContaining({ verified: true }));
-  });
+      if (!sameOrigin) {
+        expect(deployResult).toEqual(
+          expect.objectContaining({ ok: false, error: expect.stringMatching(/Session Worker origin/) }),
+        );
+        expect(options.updateDraftValue).not.toHaveBeenCalledWith(['agentSessionWrapped'], expect.anything());
+        return;
+      }
+      expect(deployResult).toEqual(expect.objectContaining({ ok: true, agentSessionWrapped: capability }));
+      expect(deployBodies).toHaveLength(1);
+      expect(deployBodies[0]).toEqual(expect.objectContaining({}));
+      expect(options.updateDraftValue).toHaveBeenCalledWith(['agentSessionWrapped'], capability);
+      expect(JSON.stringify(deployBodies[0])).not.toContain('TELEGRAM_');
+      expect(
+        resolveSessionWizardWorkerPublishEvidence({
+          runtime: options.refs.runtimeRef.current,
+          workerSecrets: options.getCurrentWorkerSecrets(),
+        }),
+      ).toEqual(expect.objectContaining({ verified: true }));
+    },
+  );
 
   it('skips a concurrent worker deploy while the first deploy is still resolving', async () => {
     let resolveAccounts: ((accounts: string[]) => void) | undefined;

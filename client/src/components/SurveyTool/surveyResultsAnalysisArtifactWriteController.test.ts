@@ -23,9 +23,28 @@ const buildPlan = (
 });
 
 describe('surveyResultsAnalysisArtifactWriteController', () => {
-  it('dispatches analysis artifact writes through the injected cache port', async () => {
-    const writeAnalysisArtifact = jest.fn().mockResolvedValue(undefined);
+  it('merges only the target artifact into the saved cache through the atomic port', async () => {
     const plan = buildPlan();
+    plan.payload = {
+      ...plan.payload,
+      staleFlag: true,
+      sessionResultsAnalysis: {
+        ...(plan.payload?.sessionResultsAnalysis as Record<string, unknown>),
+        other: { inputSignature: 'stale-sibling' },
+        removed: { inputSignature: 'removed-in-another-tab' },
+      },
+    };
+    const saved = {
+      latestFlag: true,
+      11155420: { '0x00000000000000000000000000000000000000aa': { profile: { expiresAt: 1000 } } },
+      sessionResultsAnalysis: { other: { inputSignature: 'updated-in-another-tab' } },
+    };
+    let persisted: unknown;
+    const writeAnalysisArtifact = jest.fn(
+      async (_namespace: string, _slug: string, update: (saved: unknown) => Record<string, unknown>) => {
+        persisted = update(saved);
+      },
+    );
 
     await expect(
       runSurveyResultsAnalysisArtifactWriteController({
@@ -39,7 +58,15 @@ describe('surveyResultsAnalysisArtifactWriteController', () => {
       target: plan.target,
     });
 
-    expect(writeAnalysisArtifact).toHaveBeenCalledWith('analysisCache', 'alpha-session', plan.payload);
+    expect(writeAnalysisArtifact).toHaveBeenCalledWith('analysisCache', 'alpha-session', expect.any(Function));
+    expect(persisted).toEqual({
+      ...saved,
+      sessionResultsAnalysis: {
+        other: { inputSignature: 'updated-in-another-tab' },
+        [plan.target.cacheKey]: { inputSignature: 'new-input' },
+      },
+    });
+    expect(saved.sessionResultsAnalysis).toEqual({ other: { inputSignature: 'updated-in-another-tab' } });
   });
 
   it('stays inert when the pure plan is blocked or the write port is missing', async () => {

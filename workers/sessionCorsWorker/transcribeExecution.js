@@ -1,3 +1,4 @@
+import { AI_MODEL_NOT_ALLOWED, isSessionTranscriptionModelAllowed } from './aiRequestPolicy.js';
 import { readTranscribeRequestPayload } from './transcribeRequestNormalization.js';
 import { resolveOpenAiTranscribeUrl } from './endpointConfig.js';
 import { STRICT_HTTPS_NO_CREDENTIALS_POLICY } from './outboundUrlSafetyBinding.js';
@@ -11,6 +12,7 @@ const toTrimmedString = (value, deps) => (
 export const transcribe = async ({
   request,
   secrets,
+  config,
   baseHeaders,
   transcribeRequest = null,
   deps,
@@ -55,6 +57,10 @@ export const transcribe = async ({
   if (provider !== 'custom' && !key) {
     return json?.({ error: 'Server misconfigured: openaiKey is missing.' }, 401, baseHeaders);
   }
+
+  if (provider === 'openai' && !requestApiKey && !isSessionTranscriptionModelAllowed({
+    config, provider, model: normalizedRequest.payload.model || upstreamFormData.get('model') || 'whisper-1',
+  })) return json?.(AI_MODEL_NOT_ALLOWED, 403, baseHeaders);
 
   const headers = {};
   if (key) headers.authorization = `Bearer ${key}`;

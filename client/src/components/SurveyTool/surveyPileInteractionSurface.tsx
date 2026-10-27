@@ -17,6 +17,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import PileHologramAssistant from './PileHologramAssistant';
+import PileQuestionActionMenu from './PileQuestionActionMenu';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SHOW_PILE_HOLOGRAM_TOGGLE } from './surveyToolRuntimeSupport.js';
@@ -280,65 +281,69 @@ const renderPileActionControls = ({
 
   return (
     <div className={`${styles.pileActions} ${styles.pileActionsMenuEligible}`}>
-      <button
-        type="button"
-        className={`${styles.actionButton} ${styles.pileActionMenuToggle}`}
-        title="Question actions"
-        aria-label="Question actions"
-        aria-haspopup="menu"
-        data-ce-control-appearance="frameless"
-      >
-        <FontAwesomeIcon icon={faBars} />
-      </button>
-
-      <div className={styles.pileActionButtonGroup}>
+      <PileQuestionActionMenu>
         <button
-          onClick={toggleFilterModal}
-          className={buildPileFilterButtonClassName(styles, isFilterActive)}
-          style={filterButtonStyle}
-          title="Filter Questions"
-          data-testid={E2E_TESTIDS.SURVEY_FILTER_TOGGLE}
+          type="button"
+          className={`${styles.actionButton} ${styles.pileActionMenuToggle}`}
+          title="Question actions"
+          aria-label="Question actions"
+          aria-haspopup="menu"
           data-ce-control-appearance="frameless"
         >
-          <FontAwesomeIcon icon={faFilter} style={filterIconStyle} />
+          <FontAwesomeIcon icon={faBars} />
         </button>
 
-        <button
-          onClick={toggleCreate}
-          className={styles.actionButton}
-          title={showCreate ? 'Close Create Interface' : 'Create New Question'}
-          data-testid={E2E_TESTIDS.SURVEY_CREATE_TOGGLE_PILE}
-          data-ce-control-appearance="frameless"
-        >
-          <FontAwesomeIcon icon={showCreate ? faMinus : faPlus} />
-        </button>
-
-        {showVoiceModeControl ? (
+        <div className={styles.pileActionButtonGroup}>
           <button
-            onClick={toggleVoiceModeModal}
-            className={`${styles.actionButton} ${voiceModeActive ? styles.actionButtonActive : ''}`}
-            title={voiceModeActive ? 'Close voice mode' : 'Open voice mode'}
-            aria-label="Open voice mode"
-            aria-pressed={voiceModeActive}
-            data-testid={E2E_TESTIDS.SESSION_LISTENING_TOGGLE}
+            onClick={toggleFilterModal}
+            className={buildPileFilterButtonClassName(styles, isFilterActive)}
+            style={filterButtonStyle}
+            title="Filter Questions"
+            data-testid={E2E_TESTIDS.SURVEY_FILTER_TOGGLE}
             data-ce-control-appearance="frameless"
           >
-            <FontAwesomeIcon icon={faMicrophone} />
+            <FontAwesomeIcon icon={faFilter} style={filterIconStyle} />
+            <span className={styles.pileActionLabel}>Filter questions</span>
           </button>
-        ) : null}
 
-        {onViewAllClick && (
           <button
-            onClick={handleViewAllFromPile}
+            onClick={toggleCreate}
             className={styles.actionButton}
-            title="View All Questions"
-            data-testid={E2E_TESTIDS.SURVEY_VIEW_ALL}
+            title={showCreate ? 'Close Create Interface' : 'Create New Question'}
+            data-testid={E2E_TESTIDS.SURVEY_CREATE_TOGGLE_PILE}
             data-ce-control-appearance="frameless"
           >
-            <FontAwesomeIcon icon={faCaretDown} />
+            <FontAwesomeIcon icon={showCreate ? faMinus : faPlus} />
+            <span className={styles.pileActionLabel}>{showCreate ? 'Close question editor' : 'Add questions'}</span>
           </button>
-        )}
-      </div>
+
+          {onViewAllClick && (
+            <button
+              onClick={handleViewAllFromPile}
+              className={styles.actionButton}
+              title="View All Questions"
+              data-testid={E2E_TESTIDS.SURVEY_VIEW_ALL}
+              data-ce-control-appearance="frameless"
+            >
+              <FontAwesomeIcon icon={faCaretDown} />
+              <span className={styles.pileActionLabel}>All questions</span>
+            </button>
+          )}
+        </div>
+      </PileQuestionActionMenu>
+      {showVoiceModeControl ? (
+        <button
+          onClick={toggleVoiceModeModal}
+          className={`${styles.actionButton} ${styles.pileVoiceModeToggle} ${voiceModeActive ? styles.actionButtonActive : ''}`}
+          title={voiceModeActive ? 'Interview in progress' : 'Open voice mode'}
+          aria-label="Open voice mode"
+          aria-pressed={voiceModeActive}
+          data-testid={E2E_TESTIDS.SESSION_LISTENING_TOGGLE}
+          data-ce-control-appearance="frameless"
+        >
+          <FontAwesomeIcon icon={faMicrophone} />
+        </button>
+      ) : null}
     </div>
   );
 };

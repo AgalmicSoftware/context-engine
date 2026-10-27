@@ -9,7 +9,7 @@ const {
 } = require('./lib/passkey-derived-wallet');
 const {
   createGroupPasswordDerivation,
-} = require('../client/src/utilities/crypto/groupPasswordDerivation.cjs');
+} = require('../shared/crypto/groupPasswordDerivation.cjs');
 
 const DEFAULT_CHAIN_ID = Number(loadClientDefaults()?.defaultChainId || 0);
 const DEFAULT_RPC_URL = getPublicRpcUrls(DEFAULT_CHAIN_ID)[0] || '';

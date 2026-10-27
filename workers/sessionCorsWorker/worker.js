@@ -263,6 +263,7 @@ export const createWorkerRuntime = (env, overrides = {}) => {
     workerRouteRuntime,
     workerAuthGateUtils: workerRouteRuntime.workerAuthGateUtils,
     fetch: workerRouteRuntime.fetch,
+    queue: workerRouteRuntime.queue,
   };
 
   return Object.freeze(runtime);
@@ -273,6 +274,9 @@ const defaultWorkerRuntime = createWorkerRuntime();
 export const workerAuthGateUtils = defaultWorkerRuntime.workerAuthGateUtils;
 
 export default {
+  queue(batch, env, ctx) {
+    return createWorkerRuntime(env, { waitUntil: ctx?.waitUntil?.bind(ctx) }).queue(batch, env);
+  },
   fetch(request, env, ctx) {
     initializeWorkerDebugLogs(env);
     const workerRuntime = createWorkerRuntime(env, {

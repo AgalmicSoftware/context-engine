@@ -12,6 +12,8 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'options' };
   }
 
+  if (path === '/capabilities' && method === 'GET') return { kind: 'capabilities' };
+
   if (path === '/auth/nonce' && method === 'POST') {
     return { kind: 'auth-nonce' };
   }
@@ -62,6 +64,7 @@ export const resolveTopLevelRouteSelection = ({
   if (path === '/admin/results-analysis/status' && method === 'GET') {
     return { kind: 'admin-results-analysis-status' };
   }
+  if (path === '/admin/diagnostics' && method === 'GET') return { kind: 'admin-session-diagnostics' };
 
   if (path === '/results-analysis/artifact' && method === 'GET') {
     return { kind: 'results-analysis-artifact' };

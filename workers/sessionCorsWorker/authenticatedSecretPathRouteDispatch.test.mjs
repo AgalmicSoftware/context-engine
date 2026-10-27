@@ -200,6 +200,7 @@ test('dispatchAuthenticatedSecretPathRoute resolves secrets and hands transcribe
       resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets }),
       transcribe: async (value) => {
         assert.deepEqual(value, {
+          config: { allowOrigins: ['https://allowed.example'] },
           request,
           secrets,
           baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example' },

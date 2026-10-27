@@ -320,7 +320,7 @@ describe('SponsorPage', () => {
     );
     expect(guideLink).toHaveAttribute('target', '_blank');
     expect(guideLink.parentElement).toHaveTextContent(
-      'Grant deploys install the release recorded on your session Worker, but only Worker code from 0.6.8 or later enforces this: an older Worker still deploys whatever code the redeemer sends, so update it first. On 0.6.8 or later, every deploy grant needs WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on that Worker. A grant for a session that turns on Agents HTTP also needs AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL; without that pair, only those deploys are refused. See the sponsored deploy release guide.',
+      'Grant deploys install the release recorded on your session Worker, but only Worker code from 0.6.8 or later enforces this: an older Worker still deploys whatever code the redeemer sends, so update it first. On 0.6.8 or later, every deploy grant needs WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on that Worker. Agents HTTP uses that same Session Worker release. See the sponsored deploy release guide.',
     );
   });
 

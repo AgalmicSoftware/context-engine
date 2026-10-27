@@ -407,25 +407,10 @@ const attachBroadcastListenerOnce = (): void => {
     const key = String(data.key || '');
     const parsed = parseStorageKey(key);
     if (!parsed || !isManagedNamespace(parsed.namespace)) return;
-    if (data.action === 'remove') {
-      removeMirrorValue(parsed.namespace, parsed.slug);
-      emitUpdate({
-        action: 'remove',
-        namespace: parsed.namespace,
-        slug: parsed.slug,
-        key,
-        source: 'broadcast',
-      });
-      return;
-    }
-    setMirrorValue(parsed.namespace, parsed.slug, data.value);
-    emitUpdate({
-      action: 'write',
-      namespace: parsed.namespace,
-      slug: parsed.slug,
-      key,
-      value: cloneValue(data.value),
-      source: 'broadcast',
+    // A write or removal message can arrive after a newer write, so reload the
+    // saved value instead: a late message never moves this tab back.
+    void reloadMirrorFromStorage(parsed).catch((e) => {
+      cacheLog.warn('cacheScripts: fallback', e);
     });
   };
   try {
@@ -738,7 +723,7 @@ const readPersistentKey = async (storageKey: string): Promise<CacheValue | null 
   return readLocalStorageKey(storageKey);
 };
 
-const enqueueWriteTaskForStorageKey = <T>(storageKey: string, task: () => Promise<T>): Promise<T> => {
+const enqueueKeyTask = <T>(storageKey: string, task: () => Promise<T>): Promise<T> => {
   const prev = writeQueuesByKey.get(storageKey) || Promise.resolve();
   const run = prev.catch(() => null).then(async () => task());
   writeQueuesByKey.set(storageKey, run);
@@ -753,6 +738,35 @@ const enqueueWriteTaskForStorageKey = <T>(storageKey: string, task: () => Promis
     });
   return run;
 };
+
+// Each persisted write of a key also holds a browser-wide lock on it, so tabs
+// write one at a time and an atomic update reads what the last writer saved.
+// Without the Web Locks API, only this tab's queue orders the writes. Tasks
+// must not wait on another key's write, or two tabs could wait on each other.
+const enqueueWriteTaskForStorageKey = <T>(storageKey: string, task: () => Promise<T>): Promise<T> =>
+  enqueueKeyTask(storageKey, () => {
+    const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+    return typeof locks?.request === 'function'
+      ? (locks.request(`ce-cache:${storageKey}`, task) as Promise<T>)
+      : task();
+  });
+
+const reloadMirrorFromStorage = ({ namespace, slug, key }: StorageKeyParts): Promise<void> =>
+  enqueueKeyTask(key, async () => {
+    // This tab's own pending write lands after this and sets the mirror itself.
+    if (optimisticWriteSeqByKey.has(key)) return;
+    const value = await readPersistentKey(key);
+    if (optimisticWriteSeqByKey.has(key)) return;
+    if (value === READ_FAILED) return;
+    if (value == null) {
+      if (!mirrorByKey.has(key)) return;
+      removeMirrorValue(namespace, slug);
+      emitUpdate({ action: 'remove', namespace, slug, key, source: 'broadcast' });
+      return;
+    }
+    setMirrorValue(namespace, slug, value);
+    emitUpdate({ action: 'write', namespace, slug, key, value: cloneValue(value), source: 'broadcast' });
+  });
 
 const commitManagedWrite = ({ namespace, slug, key, value }: ManagedWriteInput): void => {
   setMirrorValue(namespace, slug, value);
@@ -942,7 +956,10 @@ export const updateCacheAtomic = async <TValue = CacheLegacyNode>(
 
   const key = toStorageKey(ns, sl);
   return enqueueWriteTaskForStorageKey(key, async () => {
-    const current = cloneValue(mirrorByKey.get(key)) as TValue | undefined;
+    // The saved value, not this tab's mirror: another tab may have written since.
+    const persisted = await readPersistentKey(key);
+    const current = (persisted === READ_FAILED ? cloneValue(mirrorByKey.get(key)) : persisted) as
+      TValue | null | undefined;
     const next = await updater(current == null ? null : current);
     const ok = await writeCacheDirect({ namespace: ns, slug: sl, key, value: next });
     if (!ok) {

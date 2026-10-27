@@ -8,6 +8,7 @@ import {
 	SessionWriteCoordinator,
 	executeCoordinatedSponsoredDeploy,
 } from './sessionWriteCoordinator.js';
+import { generateResultsAnalysisDraft, loadAdminSnapshotResultsAnalysisSource } from './resultsAnalysisGeneration.js';
 import { getSessionConfig } from './sessionConfigSecretsStore.js';
 import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 import {
@@ -35,6 +36,7 @@ const createTransactionalState = () => {
 				get: async (key) => staged.get(key),
 				put: async (key, value) => staged.set(key, structuredClone(value)),
 				delete: async (key) => staged.delete(key),
+				list: async ({ prefix = '' } = {}) => new Map([...staged].filter(([key]) => key.startsWith(prefix))),
 			});
 			store.clear();
 			for (const [key, value] of staged) store.set(key, value);
@@ -1717,7 +1719,7 @@ test('SessionWriteCoordinator chooses one payload before concurrent sponsored de
 				return {
 					ok: true,
 					status: 200,
-					body: { ok: true, workerUrl: 'https://winner.example.test' },
+					body: { ok: true, workerUrl: 'https://winner.example.test', envelopeKekSecretSet: true, recoveryKey: 'a'.repeat(64), recoveryKeyFingerprint: 'b'.repeat(64) },
 				};
 			},
 		},
@@ -1748,6 +1750,10 @@ test('SessionWriteCoordinator chooses one payload before concurrent sponsored de
 	const winner = await readResponse(await first);
 	assert.equal(winner.status, 200);
 	assert.equal(winner.body.body.workerUrl, 'https://winner.example.test');
+	assert.equal(winner.body.body.recoveryKey, 'a'.repeat(64));
+	const replay = await readResponse(await coordinator.fetch(createRequest({ requestDigest: 'digest-a' })));
+	assert.equal(replay.body.body.recoveryKey, undefined);
+	assert.doesNotMatch(JSON.stringify([...store.values()]), new RegExp('a'.repeat(64)));
 	assert.equal(calls.length, 1);
 	assert.doesNotMatch(JSON.stringify([...store.values()]), /cf-sponsor-secret|sk-provider-secret/);
 });
@@ -2485,6 +2491,155 @@ test('SessionWriteCoordinator clears failed automatic queues so status surfaces 
 	assert.equal(status.lastFailure.error, 'provider unavailable');
 });
 
+for (const [retryAfterMs, delay] of [[120_000, 120_000], [7_200_000, 1_800_000], [undefined, 60_000]]) {
+	test(`SessionWriteCoordinator honours bounded Retry-After: ${retryAfterMs}`, async () => {
+		const { state } = createTransactionalState();
+		const alarms = [];
+		state.storage.setAlarm = async (time) => alarms.push(time);
+		const coordinator = new SessionWriteCoordinator(state, {}, {
+			now: () => 1_000,
+			runResultsAnalysisAutoJob: async () => ({ ok: false, status: 503, error: 'Busy', retryAfterMs }),
+		});
+		await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'retry-after' });
+		alarms.length = 0;
+		await coordinator.runQueuedResultsAnalysisAutoJob();
+		assert.deepEqual(alarms, [1_000 + delay]);
+		const failure = (await coordinator.readResultsAnalysisStatus()).lastFailure;
+		assert.equal(failure.nextAttemptAtMs, 1_000 + delay);
+		assert.equal(failure.retryAttempt, 1);
+	});
+}
+
+test('SessionWriteCoordinator retries a temporary automatic failure with backoff, then recovers', async () => {
+	let now = 1_000;
+	const alarms = [];
+	const runs = [];
+	const outcomes = [{ ok: false, status: 503, jobState: 'failed', error: 'Provider unavailable.' }, { ok: true, status: 200, jobState: 'succeeded' }];
+	const { state, store } = createTransactionalState();
+	state.storage.setAlarm = async (timestamp) => alarms.push(timestamp);
+	const coordinator = new SessionWriteCoordinator(state, {}, {
+		now: () => now,
+		runResultsAnalysisAutoJob: async ({ job }) => {
+			runs.push(job.requestId);
+			return outcomes.shift();
+		},
+	});
+	const answer = (id) => ({
+		metadata: { id, responder: '0x1111111111111111111111111111111111111111', createdAt: '2026-09-17T00:00:00.000Z' },
+		payload: { sessionSlug: 'session-a', questionId: 'q1', answer: 'a' },
+	});
+	await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-upload:r1', committedResponses: [answer('r1')] });
+	alarms.length = 0;
+	assert.equal((await coordinator.runQueuedResultsAnalysisAutoJob()).status, 503);
+	let status = await coordinator.readResultsAnalysisStatus();
+	assert.equal(status.jobState, 'queued');
+	assert.equal(status.lastFailure.retryAttempt, 1);
+	assert.equal(status.lastFailure.nextAttemptAtMs, 61_000);
+	assert.deepEqual(alarms, [61_000]);
+
+	// A new answer wakes the queue early; it joins the job, which keeps waiting.
+	now = 2_000;
+	await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-upload:r2', committedResponses: [answer('r2')] });
+	alarms.length = 0;
+	assert.equal((await coordinator.runQueuedResultsAnalysisAutoJob()).reason, 'automatic_retry_scheduled');
+	assert.deepEqual(alarms, [61_000]);
+	assert.equal(store.get('results-analysis-auto-job-v1').retryAttempt, 1);
+	assert.deepEqual(runs, ['auto-upload:r1']);
+
+	now = 61_000;
+	assert.equal((await coordinator.runQueuedResultsAnalysisAutoJob()).ok, true);
+	assert.deepEqual(runs, ['auto-upload:r1', 'auto-upload:r2']);
+	assert.equal(store.has('results-analysis-auto-job-v1'), false);
+});
+
+test('SessionWriteCoordinator retries a failure after an upload merges during the run', async () => {
+	const { state, store } = createTransactionalState();
+	const alarms = [];
+	state.storage.setAlarm = async (timestamp) => alarms.push(timestamp);
+	const answer = (id) => ({ metadata: { id, responder: '0x1111111111111111111111111111111111111111' }, payload: { questionId: 'q1', answer: id } });
+	const coordinator = new SessionWriteCoordinator(state, {}, {
+		now: () => 1_000,
+		runResultsAnalysisAutoJob: async () => {
+			await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-new', committedResponses: [answer('r2')] });
+			return { ok: false, status: 503, error: 'Provider unavailable.' };
+		},
+	});
+	await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-old', committedResponses: [answer('r1')] });
+	await coordinator.runQueuedResultsAnalysisAutoJob();
+	const status = await coordinator.readResultsAnalysisStatus();
+	assert.equal(status.lastFailure.retryAttempt, 1);
+	assert.equal(status.lastFailure.nextAttemptAtMs, 61_000);
+	assert.equal(status.lastFailure.retriesExhausted, undefined);
+	assert.equal(alarms.at(-1), 61_000);
+	const queued = store.get('results-analysis-auto-job-v1');
+	assert.equal(queued.requestId, 'auto-new:retry-1');
+	assert.deepEqual(queued.committedResponses.map((entry) => entry.metadata.id), ['r1', 'r2']);
+});
+
+test('SessionWriteCoordinator resets retry attempts after success with a mid-run upload', async () => {
+	const { state, store } = createTransactionalState();
+	let now = 1_000;
+	let run = 0;
+	const coordinator = new SessionWriteCoordinator(state, {}, {
+		now: () => now,
+		runResultsAnalysisAutoJob: async () => {
+			if (++run === 2) {
+				await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-new', committedResponses: [{ metadata: { id: 'r2', responder: '0x1111111111111111111111111111111111111111' }, payload: { answer: 'new' } }] });
+				return { ok: true, jobState: 'succeeded' };
+			}
+			return { ok: false, status: 503, error: 'Provider unavailable.' };
+		},
+	});
+	await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-old', committedResponses: [] });
+	await coordinator.runQueuedResultsAnalysisAutoJob();
+	now = 61_000;
+	await coordinator.runQueuedResultsAnalysisAutoJob();
+	const queued = store.get('results-analysis-auto-job-v1');
+	assert.equal(queued.requestId, 'auto-new');
+	assert.equal(queued.retryAttempt, undefined);
+	assert.equal(queued.committedResponses[0].metadata.id, 'r2');
+	now = 62_000;
+	await coordinator.runQueuedResultsAnalysisAutoJob();
+	assert.equal((await coordinator.readResultsAnalysisStatus()).lastFailure.retryAttempt, 1);
+});
+
+test('SessionWriteCoordinator pauses automatic analysis after its retries or a permanent failure', async () => {
+	let now = 1_000;
+	const alarms = [];
+	let failure = { ok: false, status: 503, jobState: 'failed', error: 'Provider unavailable.' };
+	const { state, store } = createTransactionalState();
+	state.storage.setAlarm = async (timestamp) => alarms.push(timestamp);
+	const coordinator = new SessionWriteCoordinator(state, {}, {
+		now: () => now,
+		runResultsAnalysisAutoJob: async () => failure,
+	});
+	await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-upload:r1', committedResponses: [] });
+	alarms.length = 0;
+	for (const delay of [60_000, 5 * 60_000, 30 * 60_000]) {
+		await coordinator.runQueuedResultsAnalysisAutoJob();
+		assert.equal(alarms.at(-1), now + delay);
+		now += delay;
+	}
+	alarms.length = 0;
+	await coordinator.runQueuedResultsAnalysisAutoJob();
+	assert.equal(store.has('results-analysis-auto-job-v1'), false);
+	assert.deepEqual(alarms, []);
+	let status = await coordinator.readResultsAnalysisStatus();
+	assert.equal(status.jobState, 'failed');
+	assert.equal(status.lastFailure.retriesExhausted, true);
+	assert.equal(status.lastFailure.nextAttemptAtMs, undefined);
+
+	failure = { ok: false, status: 403, jobState: 'unsupported', error: 'AI scope is disabled for this session.' };
+	await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-upload:r2', committedResponses: [] });
+	alarms.length = 0;
+	await coordinator.runQueuedResultsAnalysisAutoJob();
+	assert.equal(store.has('results-analysis-auto-job-v1'), false);
+	assert.deepEqual(alarms, []);
+	status = await coordinator.readResultsAnalysisStatus();
+	assert.equal(status.lastFailure.status, 403);
+	assert.equal(status.lastFailure.retriesExhausted, undefined);
+});
+
 test('SessionWriteCoordinator expires abandoned results-analysis leases and treats failed request replay as terminal', async () => {
 	let now = 1_000;
 	let attempt = 0;
@@ -2558,3 +2713,332 @@ test('hosted faucet quota counts payouts, releases refusals, and caps concurrent
 	now += 24 * 60 * 60 * 1000;
 	assert.equal((await reserve('next-day')).body.allowed, true);
 });
+
+// A thrown KV call during a group mutation is ambiguous; once KV recovers, the
+// next operation on that group or member must settle it, never strand it.
+const createGroupRecoveryHarness = () => {
+	const failures = [];
+	const failNext = (kind, match) => failures.push({ kind, match });
+	const consume = (kind, key) => {
+		const index = failures.findIndex((failure) => failure.kind === kind && failure.match(key));
+		if (index < 0) return false;
+		failures.splice(index, 1);
+		return true;
+	};
+	const kv = createWorkerGroupKv({
+		blockGet: async (key) => { if (consume('get', key)) throw new Error('KV read unavailable'); },
+		blockPut: async (key) => { if (consume('put', key)) throw new Error('KV write unavailable'); },
+	});
+	const put = kv.put.bind(kv);
+	kv.put = async (key, value) => {
+		await put(key, value);
+		if (consume('put-lost', key)) throw new Error('KV write response lost');
+	};
+	const remove = kv.delete.bind(kv);
+	kv.delete = async (key) => {
+		if (consume('delete', key)) throw new Error('KV delete unavailable');
+		await remove(key);
+	};
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, { CE_WORKER_GROUPS_KV: kv, CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2' });
+	const admin = { kind: 'evm_address', address: '0x0000000000000000000000000000000000000abc' };
+	const member = { kind: 'evm_address', address: '0x0000000000000000000000000000000000000def' };
+	const call = async (path, payload) => {
+		const response = await coordinator.fetch(createCoordinatorRequest(path, { slug: 'session-a', ...payload }));
+		return { status: response.status, body: await response.json() };
+	};
+	const mutate = (operation, payload = {}) => call('/worker-groups/mutate', { operation, actorPrincipal: admin, groupId: 'group-alpha', ...payload });
+	const create = () => mutate('create', { input: { groupId: 'group-alpha', label: 'Alpha', joinMode: 'admin_add', memberVisibility: 'members' } });
+	const authorize = () => call('/worker-groups/authorize', { groupId: 'group-alpha', principal: member });
+	const groupPhase = () => store.get('worker-group-capacity-group-v3:group-alpha')?.phase;
+	return { kv, store, failNext, mutate, create, authorize, call, member, groupPhase };
+};
+
+test('SessionWriteCoordinator settles a group update stranded by a transient KV read failure', async () => {
+	const h = createGroupRecoveryHarness();
+	assert.equal((await h.create()).status, 200);
+	assert.equal((await h.mutate('add-member', { principal: h.member })).status, 200);
+
+	h.failNext('get', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	const first = await h.mutate('update', { input: { label: 'Renamed' } });
+	assert.equal(first.status, 503);
+	assert.equal(first.body.reason, 'worker_group_mutation_ambiguous');
+
+	const retry = await h.mutate('update', { input: { label: 'Renamed again' } });
+	assert.equal(retry.status, 200, JSON.stringify(retry.body));
+	assert.equal(retry.body.group.label, 'Renamed again');
+	assert.equal((await h.authorize()).status, 200);
+	assert.equal(h.groupPhase(), 'active');
+	const memberships = await h.call('/worker-groups/memberships', { principal: h.member });
+	assert.equal(memberships.status, 200, JSON.stringify(memberships.body));
+	assert.deepEqual(memberships.body.groups.map((group) => group.groupId), ['group-alpha']);
+});
+
+test('SessionWriteCoordinator keeps an unrecovered group pending and reports it as ambiguous, not missing', async () => {
+	const h = createGroupRecoveryHarness();
+	assert.equal((await h.create()).status, 200);
+	h.failNext('put', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	h.failNext('put', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	assert.equal((await h.mutate('update', { input: { label: 'Renamed' } })).status, 503);
+	const stillDown = await h.authorize();
+	assert.equal(stillDown.status, 503);
+	assert.equal(stillDown.body.reason, 'worker_group_mutation_ambiguous');
+	assert.equal(h.groupPhase(), 'updating');
+	assert.equal((await h.authorize()).status, 403);
+	assert.equal(h.groupPhase(), 'active');
+});
+
+test('SessionWriteCoordinator settles creates, deletes, and member changes whose KV effect may have landed', async () => {
+	const lostCreate = createGroupRecoveryHarness();
+	lostCreate.failNext('put-lost', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	assert.equal((await lostCreate.create()).status, 503);
+	// The retry learns its own create landed, rather than that the group already exists.
+	const sameCreate = await lostCreate.create();
+	assert.equal(sameCreate.status, 200, JSON.stringify(sameCreate.body));
+	assert.equal(sameCreate.body.group.groupId, 'group-alpha');
+	assert.equal(lostCreate.groupPhase(), 'active');
+	assert.equal(lostCreate.store.get('worker-group-capacity-meta-v3').groupCount, 1);
+	assert.equal((await lostCreate.mutate('update', { input: { label: 'Renamed' } })).status, 200);
+
+	const neverCreated = createGroupRecoveryHarness();
+	neverCreated.failNext('put', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	assert.equal((await neverCreated.create()).status, 503);
+	assert.equal((await neverCreated.create()).status, 200);
+	assert.equal(neverCreated.store.get('worker-group-capacity-meta-v3').groupCount, 1);
+
+	const addition = createGroupRecoveryHarness();
+	assert.equal((await addition.create()).status, 200);
+	addition.failNext('put', (key) => key.startsWith('ce-worker-group-member:'));
+	assert.equal((await addition.mutate('add-member', { principal: addition.member })).status, 503);
+	assert.equal((await addition.authorize()).status, 200);
+	assert.equal(addition.store.get('worker-group-capacity-group-v3:group-alpha').memberCount, 1);
+
+	const removal = createGroupRecoveryHarness();
+	assert.equal((await removal.create()).status, 200);
+	assert.equal((await removal.mutate('add-member', { principal: removal.member })).status, 200);
+	removal.failNext('delete', (key) => key.startsWith('ce-worker-group-principal:'));
+	assert.equal((await removal.mutate('remove-member', { principal: removal.member })).status, 503);
+	const removalRetry = await removal.mutate('remove-member', { principal: removal.member });
+	assert.equal(removalRetry.status, 200, JSON.stringify(removalRetry.body));
+	assert.equal(removalRetry.body.memberCount, 0);
+	assert.equal((await removal.authorize()).status, 403);
+	assert.equal(removal.store.get('worker-group-capacity-group-v3:group-alpha').memberCount, 0);
+	assert.equal([...removal.kv.values.keys()].some((key) => key.startsWith('ce-worker-group-principal:')), false);
+
+	const deletion = createGroupRecoveryHarness();
+	assert.equal((await deletion.create()).status, 200);
+	deletion.failNext('delete', (key) => key.startsWith('ce-worker-group-index:'));
+	assert.equal((await deletion.mutate('delete')).status, 503);
+	assert.equal((await deletion.mutate('delete')).status, 200);
+	assert.equal((await deletion.authorize()).status, 404);
+	assert.equal(deletion.groupPhase(), 'deleted');
+	assert.equal(deletion.store.get('worker-group-capacity-meta-v3').groupCount, 0);
+	assert.equal([...deletion.kv.values.keys()].some((key) => key.startsWith('ce-worker-group-index:')), false);
+});
+
+test('SessionWriteCoordinator settles a group update stranded before intents were recorded', async () => {
+	const h = createGroupRecoveryHarness();
+	assert.equal((await h.create()).status, 200);
+	assert.equal((await h.mutate('add-member', { principal: h.member })).status, 200);
+	const key = 'worker-group-capacity-group-v3:group-alpha';
+	h.store.set(key, { ...h.store.get(key), phase: 'updating', joinMode: 'admin_add' });
+	assert.equal((await h.authorize()).status, 200);
+	assert.equal(h.groupPhase(), 'active');
+});
+
+test('SessionWriteCoordinator keeps only the group fields it replays in a pending intent', async () => {
+	const h = createGroupRecoveryHarness();
+	h.failNext('put', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	const create = await h.mutate('create', {
+		input: { groupId: 'group-alpha', label: 'Alpha', joinMode: 'admin_add', memberVisibility: 'members', notes: 'x'.repeat(200_000) },
+	});
+	assert.equal(create.status, 503);
+	assert.deepEqual(Object.keys(h.store.get('worker-group-capacity-group-v3:group-alpha').pending.input).sort(), [
+		'groupId', 'joinMode', 'label', 'memberVisibility',
+	]);
+	const oversized = await h.mutate('update', { input: { description: 'x'.repeat(40_000) } });
+	assert.equal(oversized.status, 400);
+	assert.equal(oversized.body.reason, 'worker_group_input_too_large');
+	assert.equal(h.groupPhase(), 'creating');
+});
+
+
+const receiptRequest = (operation, payload) => new Request(`https://session-coordinator.internal/upload-receipts/${operation}`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+});
+const receiptRef = { backend: 'cloudflare', id: 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA', resource: 'responses' };
+
+test('response upload receipts reserve atomically, replay settled writes and reject digest conflicts', async () => {
+  const { state, store } = createTransactionalState();
+  const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' }, { now: () => 1_000 });
+  const payload = { requestId: 'answer:v1:test', payloadDigest: 'a'.repeat(64) };
+  const responses = await Promise.all([1, 2].map(() => coordinator.fetch(receiptRequest('reserve', payload))));
+  assert.deepEqual(responses.map((response) => response.status).sort(), [200, 503]);
+  const results = await Promise.all(responses.map((response) => response.json()));
+  const reservation = results.find((result) => result.kind === 'execute');
+  assert.equal(results.find((result) => result.reason)?.reason, 'upload_in_progress');
+  assert.equal((await coordinator.fetch(receiptRequest('settle', { requestId: payload.requestId, attemptId: reservation.attemptId, storageRef: receiptRef }))).status, 200);
+  const replay = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  assert.equal(replay.kind, 'replay');
+  assert.equal(replay.storageRef.id, receiptRef.id);
+  const conflict = await coordinator.fetch(receiptRequest('reserve', { ...payload, payloadDigest: 'b'.repeat(64) }));
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).reason, 'upload_request_conflict');
+  assert.equal(store.size, 1);
+  assert.notEqual([...store.values()][0].payloadDigest, payload.payloadDigest);
+  assert.match([...store.keys()][0], /^upload-receipt-v1:[a-f0-9]{64}$/);
+  assert.equal(JSON.stringify([...store]).includes(payload.requestId), false);
+  assert.equal(JSON.stringify([...store]).includes(payload.payloadDigest), false);
+});
+
+test('expired upload leases use a new attempt and cannot be settled by the old attempt', async () => {
+  const { state } = createTransactionalState();
+  let now = 1_000;
+  const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' }, { now: () => now });
+  const payload = { requestId: 'expired', payloadDigest: 'a'.repeat(64) };
+  const first = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  now += 120_001;
+  const second = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  assert.equal(second.kind, 'execute');
+  assert.notEqual(second.attemptId, first.attemptId);
+  const stale = await coordinator.fetch(receiptRequest('settle', { requestId: payload.requestId, attemptId: first.attemptId, storageRef: receiptRef }));
+  assert.equal(stale.status, 409);
+  assert.equal((await coordinator.fetch(receiptRequest('settle', { requestId: payload.requestId, attemptId: second.attemptId, storageRef: receiptRef }))).status, 200);
+});
+
+test('upload receipt writes prune the oldest settlements and expire them after seven days', async () => {
+  const { state, store } = createTransactionalState();
+  let now = 10_000;
+  const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' }, { now: () => now });
+  for (let index = 0; index < 2000; index += 1) store.set(`upload-receipt-v1:old-${index}`, {
+    state: 'settled', payloadDigest: 'a'.repeat(64), storageRef: receiptRef, settledAt: index + 1,
+  });
+  const payload = { requestId: 'new', payloadDigest: 'b'.repeat(64) };
+  const reservation = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  await coordinator.fetch(receiptRequest('settle', { requestId: 'new', attemptId: reservation.attemptId, storageRef: receiptRef }));
+  assert.equal(store.size, 2000);
+  assert.equal(store.has('upload-receipt-v1:old-0'), false);
+  assert.equal(store.has('upload-receipt-v1:old-1'), true);
+  now += 7 * 24 * 60 * 60 * 1000 + 1;
+  const expired = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  assert.equal(expired.kind, 'execute');
+  assert.equal(store.size, 1);
+});
+
+
+test('automatic upload enqueue is idempotent across completion and restarts', async () => {
+  let now = 1_000;
+  const { state, store } = createTransactionalState();
+  let runs = 0;
+  const deps = { now: () => now, runResultsAnalysisAutoJob: async () => { runs += 1; return { ok: true }; } };
+  const first = new SessionWriteCoordinator(state, {}, deps);
+  const restarted = new SessionWriteCoordinator(state, {}, deps);
+  const job = { slug: 'session-a', requestId: 'auto-upload:stored-response' };
+  const results = await Promise.all([first.enqueueResultsAnalysisAutoJob(job), restarted.enqueueResultsAnalysisAutoJob(job)]);
+  assert.equal(results.filter((result) => result.replayed).length, 1);
+  await first.alarm();
+  assert.equal(runs, 1);
+  assert.equal(store.has('results-analysis-auto-job-v1'), false);
+  assert.equal((await restarted.enqueueResultsAnalysisAutoJob(job)).replayed, true);
+  await restarted.alarm();
+  assert.equal(runs, 1);
+  now += 7 * 24 * 60 * 60 * 1000 + 1;
+  await restarted.alarm();
+  assert.equal([...store.keys()].some((key) => key.startsWith('results-analysis-upload-v1:')), false);
+});
+
+
+test('receipt alarms remove expired pending and settled entries without another write', async () => {
+  let now = 1_000;
+  const { state, store } = createTransactionalState();
+  let alarmAt;
+  state.storage.setAlarm = async (time) => { alarmAt = time; };
+  const env = { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' };
+  const coordinator = new SessionWriteCoordinator(state, env, { now: () => now });
+  const payload = { requestId: 'private-answer-request', payloadDigest: 'a'.repeat(64) };
+  const pending = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  assert.equal(pending.kind, 'execute');
+  assert.equal(alarmAt, now + 120_000);
+  now = alarmAt;
+  await new SessionWriteCoordinator(state, env, { now: () => now }).alarm();
+  assert.equal(store.size, 0);
+  const reservation = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  await coordinator.fetch(receiptRequest('settle', { requestId: payload.requestId, attemptId: reservation.attemptId, storageRef: receiptRef }));
+  assert.equal(alarmAt, now + 7 * 24 * 60 * 60 * 1000);
+  now = alarmAt;
+  await new SessionWriteCoordinator(state, env, { now: () => now }).alarm();
+  assert.equal(store.size, 0);
+});
+
+test('receipt identifiers depend on the deployment secret and fail closed without it', async () => {
+  const payload = { requestId: 'private-answer-request', payloadDigest: 'a'.repeat(64) };
+  const stored = [];
+  for (const secret of ['synthetic-receipt-secret-one', 'synthetic-receipt-secret-two', '']) {
+    const { state, store } = createTransactionalState();
+    const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: secret }, { now: () => 1_000 });
+    const response = await coordinator.fetch(receiptRequest('reserve', payload));
+    assert.equal(response.status, secret ? 200 : 503);
+    if (secret) stored.push([...store][0]);
+    else assert.equal(store.size, 0);
+  }
+  assert.notEqual(stored[0][0], stored[1][0]);
+  assert.notEqual(stored[0][1].payloadDigest, stored[1][1].payloadDigest);
+});
+
+for (const concurrent of [false, true]) {
+  test(`duplicate ${concurrent ? 'concurrent' : 'sequential'} alarms call the analysis provider once across restarts`, { timeout: 5_000 }, async () => {
+    const { state, store } = createTransactionalState();
+    state.storage.setAlarm = async () => {};
+    let providerCalls = 0;
+    let releaseProvider;
+    let enteredProvider;
+    const providerStarted = new Promise((resolve) => { enteredProvider = resolve; });
+    const providerGate = new Promise((resolve) => { releaseProvider = resolve; });
+    const config = {
+      sessionIdHex: workerSessionId,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' }, storage: { backend: 'cloudflare' } },
+      resultsAnalysis: { generationMode: 'automatic', views: { circles: false, breakdown: true, riskMatrix: false } },
+    };
+    const loadedSource = await loadAdminSnapshotResultsAnalysisSource({ slug: 'session-a', config,
+      body: { source: { snapshot: {
+        sessionSlug: 'session-a', sessionId: workerSessionId,
+        questions: [{ id: 'q1', type: 'text', prompt: 'Question?' }],
+        responses: [1, 2, 3].map((id) => ({ questionId: 'q1', participantId: `participant-${id}`, answer: `Answer ${id}` })),
+      } } },
+    });
+    assert.equal(loadedSource.ok, true);
+    // Supply the same synthetic source to real generation/reservation code;
+    // only the external provider is held open to overlap the alarm deliveries.
+    const deps = {
+      now: () => 1_000,
+      runResultsAnalysisAutoJob: async ({ job, deps: coordination }) => generateResultsAnalysisDraft({
+        env: {}, slug: job.slug, config, trigger: 'automatic',
+        body: { requestId: job.requestId }, loadedSource,
+        deps: { ...coordination, generateAnalysisArtifact: async () => {
+          providerCalls += 1;
+          enteredProvider();
+          if (concurrent) await providerGate;
+          return { ok: true, value: { breakdown: { summary: { overview: 'Synthetic analysis' }, groups: [] } } };
+        } },
+      }),
+    };
+    const first = new SessionWriteCoordinator(state, {}, deps);
+    const restarted = new SessionWriteCoordinator(state, {}, deps);
+    await first.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'duplicate-alarm' });
+    if (concurrent) {
+      const pending = first.alarm();
+      await providerStarted;
+      await restarted.alarm();
+      releaseProvider();
+      await pending;
+    } else {
+      await first.alarm();
+      await restarted.alarm();
+    }
+    assert.equal(providerCalls, 1);
+    const status = await restarted.readResultsAnalysisStatus();
+    assert.equal(status.jobState, 'succeeded', JSON.stringify(status));
+    assert.equal(status.queued, null);
+    assert.equal(store.has('results-analysis-auto-job-v1'), false);
+  });
+}

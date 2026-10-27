@@ -1497,12 +1497,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   renderAgentTokenLoginPanel = () => {
     if (!this.shouldShowAgentTokenLogin()) return null;
-    const { agentBridgeUrl, sessionId, sessionSlug, workerUrl } = this.getAgentTokenLoginSessionContext();
+    const { agentWorkerUrl, sessionId, sessionSlug, workerUrl } = this.getAgentTokenLoginSessionContext();
     const cachedEnvelope = readAgentClientLoginEnvelope({
       sessionSlug,
       sessionId,
       workerUrl,
-      agentBridgeUrl,
+      agentWorkerUrl,
     });
     return (
       <LoginAgentTokenPanel

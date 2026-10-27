@@ -1,0 +1,97 @@
+.panel {
+  padding: 20px;
+  border: 1px solid var(--ce-authoring-panel-muted);
+  border-radius: 12px;
+  background: var(--ce-authoring-panel-bg);
+  color: var(--ce-authoring-panel-text);
+  box-shadow: var(--ce-card-shadow);
+  font-family: var(--ce-font-mono);
+
+  .panelTitle {
+    color: var(--ce-authoring-panel-text);
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 0 0 12px;
+  }
+
+  .panelSubtitle,
+  label {
+    color: var(--ce-authoring-panel-text);
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  input[type='file'] {
+    background: var(--ce-document-canvas);
+    color: var(--ce-document-text);
+    border: 1px solid var(--ce-authoring-panel-muted);
+    margin: 8px 0 16px;
+  }
+
+  .actionButton {
+    background: var(--ce-action-accent);
+    border: 1px solid var(--ce-action-accent);
+    color: var(--ce-action-accent-text);
+    font-weight: 700;
+    padding: 10px 14px;
+    min-height: 44px;
+    cursor: pointer;
+    margin: 4px 0;
+    opacity: 1;
+
+    &:hover:not(:disabled) {
+      background: var(--ce-action-accent-hover);
+      border-color: var(--ce-action-accent-hover);
+      color: var(--ce-action-accent-text);
+    }
+
+    &:focus-visible {
+      outline: 3px solid var(--ce-focus-ring);
+      outline-offset: 3px;
+    }
+
+    &:disabled {
+      background: var(--ce-authoring-control-bg);
+      border-color: var(--ce-authoring-panel-muted);
+      color: var(--ce-authoring-control-text);
+      cursor: not-allowed;
+      opacity: 1;
+    }
+  }
+}
+
+.formRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.statusNote,
+.warningNote {
+  margin: 12px 0;
+  padding: 12px;
+  border-radius: 6px;
+  color: var(--ce-authoring-panel-text);
+  background: var(--ce-authoring-control-bg);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.warningNote {
+  color: var(--ce-status-danger-text);
+  background: var(--ce-response-disagree-bg);
+}
+
+.panel .adoptLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0;
+
+  input {
+    position: static;
+    flex-shrink: 0;
+    margin: 5px 0 0;
+  }
+}

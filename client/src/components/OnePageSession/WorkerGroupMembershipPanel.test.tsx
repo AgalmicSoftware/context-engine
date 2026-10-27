@@ -16,13 +16,13 @@ const createResponseDeferred = () => {
 };
 
 const envelope: AgentClientLoginEnvelope = {
-  v: 2,
+  v: 3,
   sessionId: SESSION_ID,
   sessionSlug: 'alpha',
   expiresAt: '2027-07-05T00:00:00.000Z',
   address: '0x00000000000000000000000000000000000000aa',
   capabilities: { readGroups: true },
-  bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'bridge-browser-token' },
+  agentCredential: { kind: 'session_agent_browser_token', token: 'bridge-browser-token' },
   workerCredential: { kind: 'session_worker_jwt', token: 'worker-jwt-token' },
   workerUrl: 'https://session-worker.example',
 };
@@ -450,8 +450,8 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.getByRole('heading', { name: 'MORE' })).toBeInTheDocument();
     expect(screen.getByText('Document URLs:')).toBeInTheDocument();
     expect(screen.queryByText('Tags:')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'research' })).toHaveAttribute('href', '/tag/research');
-    expect(screen.getByRole('link', { name: 'reviewers' })).toHaveAttribute('href', '/tag/reviewers');
+    expect(screen.getByRole('link', { name: 'research' })).toHaveAttribute('href', '/tag/research?session=alpha');
+    expect(screen.getByRole('link', { name: 'reviewers' })).toHaveAttribute('href', '/tag/reviewers?session=alpha');
     expect(screen.getByText('25')).toBeInTheDocument();
     const adminLink = screen.getByRole('link', {
       name: 'View admin profile 0x00000000000000000000000000000000000000aa',

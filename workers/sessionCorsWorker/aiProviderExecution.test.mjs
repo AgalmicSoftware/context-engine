@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { corsHeaders } from './corsPrimitives.js';
 
 import {
   CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR,
@@ -14,6 +15,22 @@ const createCustomRpcAuth = (scopes = { ai: true }) => ({
   address: '0xAbC',
   scopes,
 });
+
+for (const proxy of [proxyAnthropic, proxyOpenAI, proxyOpenRouter, proxyCustomRPC]) {
+  test(`${proxy.name} preserves the provider Retry-After header on failure`, async () => {
+    const fetch = async () => Response.json({ error: { message: 'Busy' } }, { status: 429, headers: { 'Retry-After': '120' } });
+    const provider = new Map([[proxyAnthropic, 'anthropic'], [proxyOpenAI, 'openai'], [proxyOpenRouter, 'openrouter'], [proxyCustomRPC, 'custom']]).get(proxy);
+    const result = await proxy({ payload: { prompt: 'Test' }, config: { ai: { mode: provider } },
+      secrets: { anthropicKey: 'synthetic', openaiKey: 'synthetic', openrouterKey: 'synthetic', customRpcUrl: 'https://rpc.example.test', customRpcKey: 'synthetic' },
+      auth: createCustomRpcAuth(), baseHeaders: corsHeaders('https://app.example', ['https://app.example']),
+      deps: { json: (body, status, headers) => Response.json(body, { status, headers }), fetch, safeFetch: fetch, log: () => {} },
+    });
+    assert.equal(result.status, 429);
+    assert.equal(result.headers.get('retry-after'), '120');
+    assert.equal(result.headers.get('Access-Control-Allow-Origin'), 'https://app.example');
+    assert.equal(result.headers.get('Vary'), 'Origin');
+  });
+}
 
 test('proxyAnthropic preserves missing worker anthropicKey failure before upstream fetch', async () => {
   let fetchCalled = false;
@@ -755,11 +772,12 @@ test('proxyCustomRPC allows authenticated requests without custom_rpc scope and 
   ]]);
 });
 
-test('proxyOpenAI sends fast Astra mapping to Responses with low reasoning effort', async () => {
+test('proxyOpenAI sends configured Astra mapping to Responses at the standard tier', async () => {
   let request;
   const result = await proxyOpenAI({
     payload: { model: 'gpt-6-astra', messages: [{ role: 'user', content: 'Map rating four.' }], reasoning_effort: 'low', service_tier: 'fast', temperature: 0.1, max_output_tokens: 8000, response_format: { type: 'json_object' } },
     secrets: { openaiKey: 'worker-test-key' },
+    config: { ai: { models: { fast: 'gpt-6-astra' } } },
     deps: { json: createJsonStub(), fetch: async (url, init) => {
       request = { url, body: JSON.parse(init.body) };
       return new Response(JSON.stringify({ output_text: '{"responses":[{"questionId":"trust","answer":4,"confidence":1}]}' }));
@@ -768,7 +786,7 @@ test('proxyOpenAI sends fast Astra mapping to Responses with low reasoning effor
   assert.equal(result.status, 200);
   assert.equal(request.url, 'https://api.openai.com/v1/responses');
   assert.equal(request.body.model, 'gpt-6-astra');
-  assert.equal(request.body.service_tier, 'fast');
+  assert.equal(request.body.service_tier, 'default');
   assert.deepEqual(request.body.reasoning, { effort: 'low' });
   assert.deepEqual(request.body.text, { format: { type: 'json_object' } });
   assert.equal(request.body.max_output_tokens, 8000);
@@ -791,9 +809,9 @@ test('proxyOpenAI defaults missing model and processing options to standard Terr
   assert.deepEqual(body.reasoning, { effort: 'low' });
 });
 
-test('proxyOpenAI preserves medium reasoning for standard Terra interview mapping', async () => {
+test('proxyOpenAI preserves owner-configured medium reasoning for Terra interview mapping', async () => {
   let body;
-  await proxyOpenAI({ payload: { model: 'gpt-5.6-terra', prompt: 'Map interview evidence.', reasoning_effort: 'medium', service_tier: 'default' }, secrets: { openaiKey: 'test-worker-key' }, deps: {
+  await proxyOpenAI({ config: { ai: { reasoningEffort: 'medium' } }, payload: { model: 'gpt-5.6-terra', prompt: 'Map interview evidence.', reasoning_effort: 'medium', service_tier: 'default' }, secrets: { openaiKey: 'test-worker-key' }, deps: {
     json: createJsonStub(), fetch: async (url, init) => {
       assert.equal(url, 'https://api.openai.com/v1/responses');
       body = JSON.parse(init.body);

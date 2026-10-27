@@ -53,6 +53,8 @@ When parsed, each cache value has the following top-level shape (arrays may be e
 
 ## Notes and compatibility
 
+- Survey, question and SBT bookmark IDs compare case-insensitively through
+  `hasBookmark`; Results stars use the same comparison as add/remove actions.
 - Readers must handle both `users` entry shapes without mutating them.
 - When writing new object entries, store `address` in lowercase; legacy string entries may retain original case.
 - Unknown fields on object entries should be ignored for forward compatibility.

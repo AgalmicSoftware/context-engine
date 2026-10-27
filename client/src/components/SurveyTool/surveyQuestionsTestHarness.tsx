@@ -11,6 +11,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { createStore } from 'redux';
 import { render } from '@testing-library/react';
 import type { RenderResult } from '@testing-library/react';
+import { setWorkerCanonicalCacheReader } from '../../utilities/survey/workerCanonicalCacheReader';
 import { SurveyQuestions } from './SurveyQuestions';
 import { PileViewMode } from './SurveyPileViewMode';
 import type { SurveyQuestionsProps } from './surveyQuestionsTypes';
@@ -54,6 +55,7 @@ declare const afterEach: undefined | ((fn: () => void) => void);
 let harnessUrlToRestore: string | null = null;
 if (typeof afterEach === 'function') {
   afterEach(() => {
+    setWorkerCanonicalCacheReader('');
     if (harnessUrlToRestore !== null) {
       window.history.replaceState({}, '', harnessUrlToRestore);
       harnessUrlToRestore = null;
@@ -102,10 +104,14 @@ const createHarness = (
   syncRoute(options.route);
   const store = options.store ?? createSurveyQuestionsTestStore(options.storeState);
   let currentProps = createDefaultSurveyQuestionsProps(props);
+  // The app passes the store's account down, and the store keeps the Worker
+  // cache reader in step with it. Accounts arrive here as props instead.
+  setWorkerCanonicalCacheReader(currentProps.account);
   const wrap = (nextProps: SurveyQuestionsProps) => <Component {...nextProps} />;
   const result = renderWithSurveyQuestionsWrappers(wrap(currentProps), options, store);
   const rerenderSurveyQuestions = (nextProps: SurveyQuestionsProps): void => {
     currentProps = { ...currentProps, ...nextProps };
+    setWorkerCanonicalCacheReader(currentProps.account);
     result.rerender(
       <Provider store={store}>
         <MemoryRouter initialEntries={[options.route ?? '/']}>{wrap(currentProps)}</MemoryRouter>

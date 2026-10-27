@@ -1,3 +1,4 @@
+import { resolveSessionAiModel } from './aiRequestPolicy.js';
 import { toStr } from './stringCoercion.js';
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 import { applyResultsAnalysisExposurePolicy, normalizeResultsAnalysisArtifact } from './resultsAnalysisArtifactValidation.js';
@@ -9,7 +10,7 @@ import {
   resolveCanonicalWorkerSessionIdHex,
 } from './sessionConfigMutation.js';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
-import { getSessionConfig as getStoredSessionConfig, getSessionSecrets as getStoredSessionSecrets } from './sessionConfigSecretsStore.js';
+import { getSessionSecrets as getStoredSessionSecrets } from './sessionConfigSecretsStore.js';
 import {
   normalizeWorkerSessionSlug,
 } from './sessionSlugResolution.js';
@@ -710,8 +711,9 @@ export const loadWorkerCanonicalResultsAnalysisSource = async (args = {}) => {
       ok: false, status: 503, reason: 'results_analysis_snapshot_unavailable',
       error: 'The complete results snapshot could not be read. No report was generated; the last successful report is unchanged. Retry after storage is available.',
     };
+    // Retrying cannot shrink the session, so automatic runs pause instead.
     return {
-      ok: false, status: 503, reason: 'results_analysis_snapshot_limit',
+      ok: false, status: 503, reason: 'results_analysis_snapshot_limit', retryable: false,
       error: 'The complete results snapshot exceeds the synchronous analysis limit. No report was generated; the last successful report is unchanged. A bounded background snapshot is required for this session.',
     };
   }
@@ -777,37 +779,28 @@ ${sectionShapes}
 Session input:
 ${JSON.stringify(source.aiSnapshot, null, 2)}`;
 
-const normalizeProviderResponse = async (response) => {
+const normalizeProviderResponse = async (response, now = Date.now()) => {
   const data = await response?.json?.().catch?.(() => ({}));
-  if (!response?.ok) return { ok: false, status: response?.status || 502, error: data?.error || 'AI provider request failed.' };
+  if (!response?.ok) {
+    const retryAfter = trim(response?.headers?.get?.('retry-after'));
+    const seconds = Number(retryAfter);
+    const retryAfterMs = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(retryAfter) - now;
+    return { ok: false, status: response?.status || 502, error: data?.error || 'AI provider request failed.',
+      ...(Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? { retryAfterMs } : {}),
+    };
+  }
   const raw = trim(data?.completion || data?.text || data?.content || '');
   try {
     return { ok: true, value: JSON.parse(raw) };
   } catch {
-    return { ok: false, status: 502, error: 'AI provider returned invalid JSON.' };
+    return { ok: false, status: 502, retryable: false, error: 'AI provider returned invalid JSON.' };
   }
-};
-
-const resolveAiTaskEntry = (ai = {}, task = 'thinking') => {
-  const models = isObj(ai.models) ? ai.models : {};
-  const modelProviders = isObj(ai.modelProviders) ? ai.modelProviders : {};
-  const taskEntry = isObj(models[task]) ? models[task] : null;
-  const model = trim(taskEntry?.model || taskEntry?.name || models[task] || models.reasoning || ai.model || '');
-  const provider = lower(
-    taskEntry?.provider ||
-    modelProviders[task] ||
-    modelProviders.reasoning ||
-    ai.provider ||
-    ai.mode ||
-    'openai'
-  ) || 'openai';
-  return { provider, model };
 };
 
 export const resolveAnalysisAiPayload = ({ config, prompt }) => {
   const ai = isObj(config?.ai) ? config.ai : {};
   const providers = isObj(ai.providers) ? ai.providers : {};
-  const { provider, model } = resolveAiTaskEntry(ai, 'thinking');
+  const { provider, model } = resolveSessionAiModel(config, { taskType: 'analysis', modelType: 'thinking' });
   const reasoningEffort = trim(
     ai?.taskReasoningEffort?.analysis || ai?.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || 'low',
   );
@@ -815,6 +808,7 @@ export const resolveAnalysisAiPayload = ({ config, prompt }) => {
   return {
     provider,
     model,
+    taskType: 'analysis',
     prompt,
     messages: [{ role: 'user', content: prompt }],
     response_format: { type: 'json_object' },
@@ -851,7 +845,7 @@ export const callResultsAnalysisProvider = async ({ env, slug, config, prompt, h
     return { ok: false, status: 400, error: 'Model not allowed for provider' };
   }
   const secrets = await (deps?.getSessionSecrets ? deps.getSessionSecrets(env, slug) : getStoredSessionSecrets(env, slug)) || {};
-  const proxyArgs = { payload, secrets, baseHeaders: headers };
+  const proxyArgs = { payload, secrets, config, baseHeaders: headers };
   let response;
   const proxyDeps = { fetch: deps?.fetch || globalThis.fetch?.bind(globalThis), json: deps?.json || jsonResponse };
   const runProvider = async () => {
@@ -861,7 +855,7 @@ export const callResultsAnalysisProvider = async ({ env, slug, config, prompt, h
     return (deps?.proxyOpenAI || ((args) => proxyOpenAIBoundary({ ...args, deps: proxyDeps })))(proxyArgs);
   };
   response = await withTimeout(runProvider(), deps?.resultsAnalysisProviderTimeoutMs, 'AI results analysis generation timed out.');
-  return normalizeProviderResponse(response);
+  return normalizeProviderResponse(response, Number(deps?.now?.() ?? Date.now()));
 };
 
 export const validateGeneratedAnalysisOutput = ({ value, source, sections, generatedAt, model = '' } = {}) => {
@@ -947,6 +941,9 @@ const summarizeFailureState = (failure) => {
     ...(trim(failure.requestId) ? { requestId: trim(failure.requestId) } : {}),
     ...(trim(failure.trigger) ? { trigger: trim(failure.trigger) } : {}),
     ...(Number.isFinite(Number(failure.failedAtMs)) ? { failedAtMs: Number(failure.failedAtMs) } : {}),
+    ...(Number(failure.retryAttempt) > 0 ? { retryAttempt: Number(failure.retryAttempt) } : {}),
+    ...(Number(failure.nextAttemptAtMs) > 0 ? { nextAttemptAtMs: Number(failure.nextAttemptAtMs) } : {}),
+    ...(failure.retriesExhausted === true ? { retriesExhausted: true } : {}),
   };
 };
 
@@ -1060,6 +1057,8 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
       ok: false,
       error: providerResult?.error || 'AI results analysis generation failed.',
       status: providerResult?.status || 502,
+      ...(providerResult?.retryable === false ? { retryable: false } : {}),
+      ...(Number.isFinite(providerResult?.retryAfterMs) && providerResult.retryAfterMs > 0 ? { retryAfterMs: providerResult.retryAfterMs } : {}),
       failedAt: generatedAt,
     };
     await finalize({
@@ -1073,7 +1072,7 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
         receipt: failure,
       },
     });
-    return { ok: false, status: failure.status, jobState: 'failed', reservation: summarizeReservation(reservation, requestId), capability, error: failure.error };
+    return { ...failure, jobState: 'failed', reservation: summarizeReservation(reservation, requestId), capability };
   }
   let artifact;
   try {
@@ -1086,9 +1085,9 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
     });
     artifact = applyCurrentArtifactPolicy(artifact, config);
   } catch (error) {
-    const failure = { ok: false, error: error?.message || 'AI results analysis output failed validation.', status: 502, failedAt: generatedAt };
+    const failure = { ok: false, error: error?.message || 'AI results analysis output failed validation.', status: 502, retryable: false, failedAt: generatedAt };
     await finalize({ env, slug, finalization: { requestId, reservationKey, attemptId: reservation.attemptId, success: false, receipt: failure } });
-    return { ok: false, status: failure.status, jobState: 'failed', reservation: summarizeReservation(reservation, requestId), capability, error: failure.error };
+    return { ...failure, jobState: 'failed', reservation: summarizeReservation(reservation, requestId), capability };
   }
   const draftId = `sha256:${await sha256Hex(stableCanonicalSerialize({ artifact, source: sourceDescriptor.snapshot, sections }))}`;
   const draft = {
@@ -1135,7 +1134,9 @@ export const maybeTriggerAutomaticResultsAnalysis = async ({ env, slug, config, 
   const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
   const status = await readStatus({ env, slug });
   if (!status?.ok) return { ok: false, status: status?.status || 503, jobState: 'failed', error: status?.error || 'Results analysis status is unavailable; retry.' };
-  if (status?.state?.lastFailure?.trigger === 'automatic') {
+  // A failed automatic run pauses these runs, except for the retry the queue scheduled.
+  const failure = status?.state?.lastFailure;
+  if (failure?.trigger === 'automatic' && !(Number(failure.nextAttemptAtMs) <= Number(deps?.now?.() ?? Date.now()))) {
     return { ok: true, skipped: true, reason: 'automatic_paused_after_failure' };
   }
   const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config, committedResponses });
@@ -1163,9 +1164,17 @@ export const maybeTriggerAutomaticResultsAnalysis = async ({ env, slug, config, 
 };
 
 
+// Queued work is admitted against the coordinator's authoritative config, the
+// policy HTTP routes enforce; the KV projection can lag a disabled AI scope.
 export const runQueuedAutomaticResultsAnalysisJob = async ({ env, slug, job = {}, deps } = {}) => {
   const targetSlug = normalizeWorkerSessionSlug(slug || job.slug);
-  const config = job.config || await (deps?.getSessionConfig ? deps.getSessionConfig(env, targetSlug) : getStoredSessionConfig(env, targetSlug));
+  let config;
+  try {
+    if (typeof deps?.getSessionConfig !== 'function') throw new Error('missing authority');
+    config = await deps.getSessionConfig(env, targetSlug);
+  } catch {
+    return { ok: false, status: 503, jobState: 'failed', error: 'Session config authority is unavailable; retry.' };
+  }
   if (!config) return { ok: false, status: 404, jobState: 'failed', error: 'Session config not found.' };
   return maybeTriggerAutomaticResultsAnalysis({
     env,

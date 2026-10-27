@@ -46,6 +46,9 @@ export const createAuthCorsAdminAdaptersWithWorkerDeps = ({
       ...value,
       deps: {
         verifyToken: deps?.verifyToken,
+        readCurrentSessionConfig: deps?.readCurrentSessionConfig,
+        computeScopesForLogin: deps?.computeScopesForLogin,
+        now: deps?.now,
         validateAuthTokenRecord: deps?.validateAuthTokenRecord,
         resolveWorkerRequestSlugContext: deps?.resolveWorkerRequestSlugContext,
         ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),

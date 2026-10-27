@@ -4553,6 +4553,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   --pile-desktop-rail-gap: 24px;
   --pile-desktop-rail-width: 84px;
   --pile-card-top-offset: 30px;
+  --pile-card-height: 400px;
   --pile-card-width: min(550px, 90vw);
   display: flex;
   flex-direction: column;
@@ -4568,14 +4569,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   width: 100%;
   max-width: 100%;
   position: relative;
-  min-height: 400px;
+  min-height: var(--pile-card-height);
   z-index: 1;
 }
 
 /* 3D Depth Card Inner */
 .pileCardInner {
   width: 100%;
-  height: 400px;
+  height: var(--pile-card-height);
   margin-top: var(--pile-card-top-offset, 30px);
   /* Neumorphic 3D Depth */
   border-radius: var(--ce-radius-20);
@@ -4758,6 +4759,16 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   pointer-events: auto;
   /* Add a subtle backing or just alignment */
   padding: 10px;
+}
+
+.pileActionMenu {
+  display: contents;
+}
+
+.pileVoiceModeToggle {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
 }
 
 .actionButton.pileActionMenuToggle {
@@ -5380,13 +5391,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     gap: 16px;
   }
 
+  .pileActionMenu {
+    display: flex;
+    position: relative;
+  }
+
   .pileActionsMenuEligible {
     position: relative;
     flex: 0 0 auto;
     overflow: visible;
   }
 
-  .pileActionsMenuEligible .pileActionMenuToggle {
+  .pileActionsMenuEligible .pileActionMenuToggle,
+  .pileActionsMenuEligible .pileVoiceModeToggle {
     display: flex;
     width: 44px;
     height: 44px;
@@ -5398,7 +5415,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .pileActionsMenuEligible .pileActionMenuToggle:hover,
-  .pileActionsMenuEligible .pileActionMenuToggle:focus-visible {
+  .pileActionsMenuEligible .pileActionMenuToggle:focus-visible,
+  .pileActionsMenuEligible .pileVoiceModeToggle:hover,
+  .pileActionsMenuEligible .pileVoiceModeToggle:focus-visible {
     color: var(--ce-color-accent);
     opacity: 1;
     outline: none;
@@ -5419,11 +5438,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     box-shadow:
       0 18px 36px color-mix(in srgb, var(--ce-overlay-base) 42%, transparent),
       inset 0 0 0 1px color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
-  }
-
-  .pileActionsMenuEligible:focus-within .pileActionButtonGroup,
-  .pileActionsMenuEligible:hover .pileActionButtonGroup {
-    display: flex;
   }
 
   .pileActionsMenuEligible .pileActionButtonGroup .actionButton {
@@ -5552,7 +5566,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     width: auto;
   }
 
-  // Keep the counter in a narrow column between the arrows on phones.
+  // Compact fallback; the navigation container expands this when it has room.
   .pileNavCounterText {
     display: inline-flex;
     flex-direction: column;
@@ -6507,7 +6521,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     min-width: 0;
     min-height: 44px;
     padding: 10px 6px;
-    font-size: clamp(0.75rem, 2.7vw, 1rem);
+    font-size: 1rem;
     border-radius: var(--ce-radius-8);
   }
 }
@@ -6520,7 +6534,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     min-width: 0;
     min-height: 44px;
     padding: 10px 6px;
-    font-size: clamp(0.75rem, 2.7vw, 1rem);
     border-radius: var(--ce-radius-8);
   }
 
@@ -6827,6 +6840,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: inline-block;
 }
 
+.pileCardFooter .convictionToggleStack {
+  .convictionToggleLine {
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .convictionToggleValue {
+    min-width: 0;
+    text-align: left;
+  }
+}
+
 .convictionToggleButton {
   background: transparent;
   border: none;
@@ -7066,6 +7091,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileNavArrow,
   .actionButton,
   .pileActionsMenuEligible .pileActionMenuToggle,
+  .pileActionsMenuEligible .pileVoiceModeToggle,
   .pileCardFooter .pileIconButton,
   .pileCardFooter .iconButton,
   .fullQuestionBody .iconButton,
@@ -7300,6 +7326,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileNavArrow,
   .actionButton,
   .pileActionsMenuEligible .pileActionMenuToggle,
+  .pileActionsMenuEligible .pileVoiceModeToggle,
   .pileCardFooter .pileIconButton,
   .pileCardFooter .iconButton,
   .fullQuestionBody .iconButton,
@@ -7337,4 +7364,365 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 .draftPersistenceStatus:empty {
   margin: 0;
+}
+
+// Match the adjacent controls at rest; a retained interview stays emphasized.
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .pileActions .pileVoiceModeToggle {
+    opacity: 0.45;
+
+    &:hover,
+    &:focus-visible,
+    &[aria-pressed='true'] {
+      color: var(--ce-control-text) !important;
+      opacity: 1;
+      filter: none;
+    }
+  }
+}
+
+.pileActionLabel {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  // Wrap the final navigation group only when the actual controls need the room.
+  // The row gap separates its touch targets from Clear pending changes above.
+  .pileInteractionUnit .pileControls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 8px;
+    margin-top: 20px;
+  }
+
+  .pileInteractionUnit .pileControls > .pileActions {
+    flex: 0 0 auto;
+  }
+
+  .pileInteractionUnit .pileFooter {
+    flex: 1 1 max-content;
+    min-width: max-content;
+    width: auto;
+    gap: 4px;
+  }
+
+  .pileInteractionUnit .pileFooter .pileSubmitButton {
+    width: auto;
+    min-width: max-content;
+    max-width: none;
+    padding-inline: 10px;
+  }
+
+  .pileInteractionUnit .pileControls > .pileNav {
+    container: pile-navigation / inline-size;
+    flex: 1 0 124px;
+    min-width: 124px;
+    max-width: 220px;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  // A wrapped navigation group grows into its spare row. Its own available
+  // width, rather than the phone breakpoint, determines the counter layout.
+  @container pile-navigation (min-width: 160px) {
+    .pileNavCounterText {
+      display: inline-flex;
+      flex-direction: row;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .pileNavCounterSeparator {
+      line-height: inherit;
+    }
+  }
+
+  @media (min-width: 641px) {
+    .pileInteractionUnit .pileControls > .pileNav {
+      flex-basis: 180px;
+      min-width: 180px;
+    }
+  }
+
+  // Keep the shared card height across question types so navigation never moves
+  // with prompt length. Long prompts scroll within the original typography.
+  .pileCardHeader {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 35%;
+    overflow-y: auto;
+  }
+
+  .pileCardFooter {
+    flex-shrink: 0;
+  }
+}
+
+// Flatten the desktop groups into one rail so every visible icon gets an equal
+// share of the card height. The counter overlays the gap between the arrows.
+@media (min-width: 769px) {
+  .pileControls {
+    height: calc(var(--pile-card-height) + var(--pile-card-top-offset));
+    bottom: auto;
+    grid-template-columns: 100% var(--pile-desktop-rail-width);
+    grid-template-rows: none;
+    grid-template-areas: none;
+    grid-auto-rows: 1fr;
+    row-gap: 0;
+    align-content: stretch;
+    align-items: center;
+    justify-items: center;
+  }
+
+  .pileControls > .pileNav,
+  .pileControls > .pileActions,
+  .pileControls .pileActionButtonGroup {
+    display: contents;
+  }
+
+  .pileControls .pileNavArrow,
+  .pileControls .pileActions .actionButton {
+    grid-column: 2;
+    pointer-events: auto;
+  }
+
+  .pileNavArrow:first-child {
+    grid-row: 1;
+  }
+
+  .pileNavArrow:last-child {
+    grid-row: 2;
+  }
+
+  .pileNavCounterText {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    margin: 0;
+    align-self: center;
+    pointer-events: none;
+  }
+}
+
+@media (max-width: 480px) {
+  // Reserve only the space each answer needs; the prompt receives the rest of
+  // the fixed-height card. Its text can fit without moving the navigation.
+  .pileCardInner .pileCardBody,
+  .pileCardInner.pileQuadraticCard .pileCardBody {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .pileCardInner .pileCardHeader,
+  .pileCardInner.pileQuadraticCard .pileCardHeader {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    display: block;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    overscroll-behavior-y: contain;
+  }
+
+  .pileCardInner .pileCardHeader #questionTitle {
+    margin: 0;
+    padding: 0;
+    line-height: 1.4;
+  }
+
+  .pileCardInner .pileCardMainContent {
+    flex: 0 0 64px;
+    padding: 0;
+    scrollbar-gutter: auto;
+  }
+
+  .pileCardMainContent:has(.binaryQuestionContainer) {
+    flex-basis: 44px;
+  }
+
+  .pileCardMainContent:has(.freeformQuestionContainer) {
+    flex-basis: 104px;
+  }
+
+  .pileCardMainContent:has(.multichoiceQuestionContainer) {
+    flex-basis: 176px;
+  }
+
+  .pileCardInner.pileQuadraticCard .pileCardMainContent {
+    flex-basis: 170px;
+  }
+
+  .pileCardInner #binaryChoice {
+    flex-wrap: nowrap;
+    gap: 6px;
+    width: 100%;
+    margin: 0;
+  }
+
+  .pileCardInner #binaryChoice .radioOptionText {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    margin: 0;
+    padding: 6px 4px;
+    font-size: 1rem;
+    line-height: 1.25;
+  }
+
+  .pileCardBody[data-pile-answer-layout='roomy'] {
+    .pileCardHeader {
+      flex: 0 0 auto;
+    }
+
+    .pileCardMainContent {
+      flex: 1 1 auto;
+    }
+
+    #binaryChoice {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+
+      .radioOptionText {
+        flex: 0 0 auto;
+        padding: 0.5rem 1rem;
+        font-size: 1.5rem;
+        line-height: 1.5;
+      }
+    }
+  }
+
+  .pileCardBody[data-pile-answer-layout='centered'] {
+    position: relative;
+
+    .pileCardHeader {
+      flex: 0 0 auto;
+    }
+
+    .pileCardMainContent {
+      position: absolute;
+      top: 50%;
+      right: 16px;
+      left: 16px;
+      height: 64px;
+      transform: translateY(-50%);
+    }
+  }
+
+  .pileCardInner .multichoiceQuestionContainer {
+    padding: 0 0 6px;
+  }
+
+  .pileCardInner .multichoiceQuestionContainer #multiChoice {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    grid-auto-columns: 72%;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 2px;
+  }
+
+  .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
+    height: 100%;
+    min-height: 44px;
+    margin: 0;
+    padding: 4px 10px;
+    align-self: stretch;
+    overflow-y: auto;
+  }
+
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .pileCardInner .pileCardHeader {
+      padding: 8px;
+    }
+
+    .pileCardInner #binaryChoice .radioOptionText {
+      padding-left: 19px;
+      font-size: 0.82rem;
+    }
+
+    .pileCardInner #binaryChoice .radioOptionText::before {
+      left: 4px;
+      width: 11px;
+      height: 11px;
+    }
+
+    .pileCardBody[data-pile-answer-layout='roomy'] #binaryChoice .radioOptionText {
+      padding: 7px 10px 7px 32px;
+      font-size: 0.82rem;
+
+      &::before {
+        left: 9px;
+        width: 13px;
+        height: 13px;
+      }
+    }
+  }
+}
+
+// The portal keeps the backdrop out of transformed question-card stacking contexts.
+.pileActionBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  background: color-mix(in srgb, var(--ce-overlay-base) 16%, transparent);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.pileActionPopover {
+  position: fixed;
+  z-index: 1041;
+  width: min(240px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  padding: 8px;
+  color: var(--ce-control-text);
+  background: var(--ce-surface);
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-14);
+  box-shadow: var(--ce-card-shadow);
+}
+
+.pileActionPopoverButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  .actionButton {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    gap: 12px;
+    justify-content: flex-start;
+    font-size: 1rem;
+    color: var(--ce-control-text) !important;
+    opacity: 1 !important;
+    text-align: left;
+    transform: none;
+    filter: none;
+
+    svg {
+      width: 20px;
+      flex-shrink: 0;
+    }
+
+    &:hover,
+    &:focus-visible {
+      background: var(--ce-surface-subtle);
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: -2px;
+      transform: none;
+    }
+  }
+
+  .pileActionLabel {
+    display: inline;
+  }
 }

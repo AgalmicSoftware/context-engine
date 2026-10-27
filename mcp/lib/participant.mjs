@@ -1,9 +1,12 @@
 import { createTestEthRequester } from './testEth.mjs';
+import { createHash, randomUUID } from 'node:crypto';
 import { createRegistrySession } from './registrySession.mjs';
 import { compareChainOrder } from './registryChain.mjs';
 import { normalizeLabel } from './config.mjs';
+import { describeError } from './mcpServer.mjs';
 import { readAgentState, updateAgentState } from './agentState.mjs';
-import { buildQuestionRecord, buildResponseRecord, generateQuestionId, isLockedQuestion, isSingleSelect, ratingScaleFor } from './records.mjs';
+import { buildQuestionRecord, buildResponseRecord, isLockedQuestion, isSingleSelect, ratingScaleFor } from './records.mjs';
+import { isPreferredStorageVersion } from '../../shared/storage/canonicalStorageVersions.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
 import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
@@ -111,23 +114,10 @@ const sanitizeQuestion = (payload, id) => {
   return question;
 };
 
-const contentId = (question) =>
-  generateQuestionId(question.type, question.prompt, stringOptions(question), isSingleSelect(question), question.voiceCredits ?? 99);
-
 /** Picks the canonical version per question id like the web client does. */
-const chooseQuestionVersion = (versions) => {
-  const admin = versions.filter((version) => version.uploaderIsAdmin);
-  if (admin.length) return admin.sort((left, right) => (left.createdAt < right.createdAt ? 1 : -1))[0];
-  // A version that hashes to its id beats the others; otherwise (including
-  // locked versions, which cannot be checked) the earliest wins.
-  const ranked = [...versions].sort((left, right) => {
-    const leftMatches = left.contentMatches === true ? 0 : 1;
-    const rightMatches = right.contentMatches === true ? 0 : 1;
-    if (leftMatches !== rightMatches) return leftMatches - rightMatches;
-    return left.createdAt < right.createdAt ? -1 : left.createdAt > right.createdAt ? 1 : 0;
-  });
-  return ranked[0];
-};
+const chooseQuestionVersion = (versions) => versions.reduce(
+  (chosen, candidate) => isPreferredStorageVersion(candidate, chosen) ? candidate : chosen, null,
+);
 
 const describeQuestion = (question, myAnswer) => {
   const options = stringOptions(question);
@@ -268,9 +258,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const entry = fresh.sessions[sessionKey(ctx.info)];
       if (!isRecord(entry) || entry.sessionId !== ctx.client.sessionId) return;
       entry.answers = isRecord(entry.answers) ? entry.answers : {};
-      answered.forEach(({ questionId, record, answeredAt, chainOrder }) => {
+      answered.forEach(({ questionId, record, answeredAt, chainOrder, requestId }) => {
         entry.answers[questionId] = { value: record.answer.value, comment: record.additional.value, answeredAt,
           ...(ctx.registry && chainOrder ? chainOrder : {}) };
+        if (requestId && entry.pendingUploads?.[questionId]?.requestId === requestId) delete entry.pendingUploads[questionId];
       });
     });
 
@@ -394,8 +385,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         list.push({
           payload: question,
           createdAt: text(item.metadata?.createdAt),
-          uploaderIsAdmin: item.metadata?.uploaderIsAdmin === true,
-          contentMatches: question.locked ? null : contentId(question) === id,
+          createdAtMs: Date.parse(text(item.metadata?.createdAt)) || 0,
+          storageRefId: text(item.storageRef.id),
+          uploadAuthority: item.metadata?.uploadAuthority,
         });
         versions.set(id, list);
       } catch {
@@ -478,27 +470,32 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     await ensureReady(ctx);
     const scan = await scanMyAnswers(ctx);
     const mine = new Map(scan.answers);
-    const complete = scan.complete;
+    let complete = scan.complete;
+    const blocks = new Map();
     // Add answers this agent recorded locally since the scan (or that it did not reach).
     await loadState();
     const local = sessionState(ctx).sessionId === ctx.client.sessionId && isRecord(sessionState(ctx).answers) ? sessionState(ctx).answers : {};
-    Object.entries(local).forEach(([questionId, answer]) => {
-      if (!isRecord(answer)) return;
+    for (const [questionId, answer] of Object.entries(local)) {
+      if (!isRecord(answer)) continue;
       // An incomplete registry scan cannot establish whether a saved plaintext
       // answer has since been cleared or encrypted by another client.
-      if (ctx.registry && !complete) return;
+      if (ctx.registry && !scan.complete) continue;
       const known = mine.get(questionId);
       const chainOrder = scan.chainOrders?.get(questionId);
-      if (ctx.registry && chainOrder && compareChainOrder(answer, chainOrder) < 0) return;
+      if (ctx.registry && chainOrder && compareChainOrder(answer, chainOrder) < 0) continue;
       const newer = ctx.registry ? !known || compareChainOrder(answer, known) > 0 : !known || text(answer.answeredAt) > known.createdAt;
-      if (newer) {
+      // A remembered answer whose block a reorganization replaced was never answered.
+      if (!newer) continue;
+      const replaced = ctx.registry ? await ctx.registry.replacedWrite(answer, blocks) : false;
+      if (replaced === null) complete = false;
+      if (!replaced) {
         mine.set(questionId, {
           createdAt: text(answer.answeredAt),
           ...(ctx.registry ? { blockNumber: answer.blockNumber, transactionIndex: answer.transactionIndex, logIndex: answer.logIndex } : {}),
           payload: { answer: { value: answer.value }, additional: { value: answer.comment } },
         });
       }
-    });
+    }
     // A cleared answer (the web client uploads '') leaves the question unanswered.
     [...mine.entries()].forEach(([questionId, entry]) => {
       const value = entry?.payload?.answer?.value;
@@ -608,7 +605,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
               }),
             );
           } catch (error) {
-            outcome.sbtClaims.push({ sbt: claim.sbt, status: 'failed', error: error.message });
+            outcome.sbtClaims.push({ sbt: claim.sbt, status: 'failed', error: describeError(error) });
           }
         }
         // Refresh the token so access that depends on the new token applies.
@@ -617,7 +614,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       outcome.testEth = await ctx.client.describeTestEth();
       outcome.signedIn = !loginError;
       if (loginError) {
-        outcome.readOnlyReason = loginError.message;
+        outcome.readOnlyReason = describeError(loginError);
         outcome.note = 'Joined read-only: public questions and results are available, but uploads, answers, statements, and faucet requests need Worker access.';
       }
       const scopes = isRecord(tokenClaims?.scopes) ? tokenClaims.scopes : {};
@@ -629,7 +626,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           await ctx.client.joinGroup(parsed.joinGroupId);
           outcome.joinedGroup = parsed.joinGroupId;
         } catch (error) {
-          outcome.groupJoinError = error.message;
+          outcome.groupJoinError = describeError(error);
         }
       }
       outcome.description = text(sessionConfig.sessionInfo).slice(0, MAX_CONTEXT_LENGTH);
@@ -694,6 +691,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const results = [];
       const answered = [];
       const pendingAnswers = [];
+      const operationId = randomUUID();
       let txHash;
       let reconciliationRequired = false;
       const seen = new Set();
@@ -738,12 +736,26 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           continue;
         }
         try {
-          const storageRef = await ctx.client.upload({ resource: 'responses', data: JSON.stringify(built.record) });
+          const data = JSON.stringify(built.record);
+          const digest = createHash('sha256').update(data).digest('hex');
+          let requestId;
+          // A tool call can time out after storage succeeded. Keep its key before
+          // sending, under the same wallet/session state lock as answer history.
+          await saveState((fresh) => {
+            const entry = fresh.sessions[sessionKey(ctx.info)];
+            if (!isRecord(entry) || entry.sessionId !== ctx.client.sessionId) throw new Error('Session identity changed; join again before answering.');
+            entry.pendingUploads = isRecord(entry.pendingUploads) ? entry.pendingUploads : {};
+            const previous = entry.pendingUploads[questionId];
+            requestId = previous?.payloadDigest === digest && trim(previous.requestId)
+              ? previous.requestId : `answer:v1:${operationId}:${questionId}`;
+            entry.pendingUploads[questionId] = { payloadDigest: digest, requestId };
+          });
+          const storageRef = await ctx.client.upload({ resource: 'responses', data, requestId });
           if (text(storageRef?.id)) cacheRecord(ctx, text(storageRef.id), built.record);
-          answered.push({ questionId, record: built.record, answeredAt: text(storageRef?.createdAt) || new Date(now()).toISOString() });
+          answered.push({ questionId, requestId, record: built.record, answeredAt: text(storageRef?.createdAt) || new Date(now()).toISOString() });
           results.push({ questionId, ok: true, answer: built.record.answer.value });
         } catch (error) {
-          results.push({ questionId, ok: false, error: error.message });
+          results.push({ questionId, ok: false, error: describeError(error) });
         }
       }
       if (pendingAnswers.length) {
@@ -753,15 +765,15 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           txHash = submitted.txHash;
           pendingAnswers.forEach(({ questionId, record }) => {
             answered.push({ questionId, record, answeredAt: new Date(now()).toISOString(), chainOrder: {
-              blockNumber: submitted.receipt.blockNumber, transactionIndex: submitted.receipt.transactionIndex,
-              logIndex: submitted.receipt.logs.at(-1)?.logIndex || 0,
+              blockNumber: submitted.receipt.blockNumber, blockHash: submitted.receipt.blockHash,
+              transactionIndex: submitted.receipt.transactionIndex, logIndex: submitted.receipt.logs.at(-1)?.logIndex || 0,
             } });
             results.push({ questionId, ok: true, answer: record.answer.value });
           });
         } catch (error) {
           if (typeof error.txHash === 'string' && /^0x[0-9a-f]{64}$/i.test(error.txHash)) txHash = error.txHash;
           reconciliationRequired = error.reconciliationRequired === true;
-          pendingAnswers.forEach(({ questionId }) => results.push({ questionId, ok: false, error: error.message }));
+          pendingAnswers.forEach(({ questionId }) => results.push({ questionId, ok: false, error: describeError(error) }));
         }
       }
       let warning;

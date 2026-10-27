@@ -5,13 +5,12 @@ const { chromium } = require("playwright");
 const { normalizeBaseUrl } = require("./vite-navigation-smoke");
 
 const SESSION_SLUG = "agent-token-client-smoke";
-const BRIDGE_PATH = "/__agent-bridge";
 const RAW_TOKEN_RE = /ceagt_[A-Za-z0-9_-]{16,}/;
 const INVALID_FIXTURE_TOKEN = `ceagt_${"x".repeat(28)}`;
 const VALID_FIXTURE_TOKEN = `ceagt_${"y".repeat(28)}`;
 const SESSION_ID = `0x${"64".repeat(16)}`;
 const WORKER_URL = "https://session-worker.example.test";
-const BRIDGE_TOKEN = "agent-smoke-bridge-browser-token-fixture";
+const AGENT_TOKEN = "agent-smoke-browser-token-fixture";
 const WORKER_TOKEN = "agent-smoke-worker-envelope-jwt-fixture";
 const REGISTRY_CACHE_KEY = "dg:sessionRegistryCache:v1";
 const PRIMARY_SESSION_KEY = "ce:primarySessionSlug";
@@ -71,7 +70,7 @@ const aggregateRows = {
   ],
 };
 
-function buildRegistryCache(baseUrl) {
+function buildRegistryCache() {
   const sessionConfig = {
     slug: SESSION_SLUG,
     sessionIdHex: SESSION_ID,
@@ -81,7 +80,6 @@ function buildRegistryCache(baseUrl) {
     contracts: {},
     blockLimits: {},
     defaultTags: ["agent-smoke", "agent"],
-    agentBridgeUrl: `${baseUrl}${BRIDGE_PATH}`,
     corsWorkerUrl: WORKER_URL,
     sessionModeProfile: profile,
     storageProfile: {
@@ -132,7 +130,7 @@ function assertNoRawTokens(snapshot, label) {
     false,
     `${label}: raw ceagt_ token appeared in URL or browser storage`,
   );
-  for (const credential of [BRIDGE_TOKEN, WORKER_TOKEN]) {
+  for (const credential of [AGENT_TOKEN, WORKER_TOKEN]) {
     assert.equal(
       haystacks.some((value) => String(value).includes(credential)),
       false,
@@ -183,11 +181,20 @@ async function waitForAgentQuestions(page) {
   }
 }
 
-async function installAgentBridgeFixture(page) {
+async function installSessionAgentFixture(page) {
   let invalidAttemptSeen = false;
   let validAttemptSeen = false;
   let submissionSeen = false;
   const groupReads = new Set();
+
+  await page.route(`${WORKER_URL}/capabilities**`, async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify({ features: ["agent_http_v1", "agent_client_login_v1"],
+        sessionId: SESSION_ID, sessionSlug: SESSION_SLUG,
+        agentHttp: { enabled: true, configured: true, ready: true },
+        agentSessionWrapped: { origin: WORKER_URL } }) });
+  });
 
   await page.route(`${WORKER_URL}/groups/**`, async (route) => {
     const request = route.request();
@@ -243,15 +250,21 @@ async function installAgentBridgeFixture(page) {
     });
   });
 
-  await page.route(`**${BRIDGE_PATH}/api/agent/**`, async (route) => {
+  await page.route(`${WORKER_URL}/api/agent/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const pathname = url.pathname;
+    if (request.method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: { "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" } });
+      return;
+    }
 
     if (pathname.endsWith("/session-meta")) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
         body: JSON.stringify({
           ok: true,
           sessionSlug: SESSION_SLUG,
@@ -286,6 +299,7 @@ async function installAgentBridgeFixture(page) {
         await route.fulfill({
           status: 401,
           contentType: "application/json",
+          headers: { "Access-Control-Allow-Origin": "*" },
           body: JSON.stringify({ ok: false, reason: "agent_token_not_found" }),
         });
         return;
@@ -295,15 +309,17 @@ async function installAgentBridgeFixture(page) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
         body: JSON.stringify({
           ok: true,
           sessionId: SESSION_ID,
           sessionSlug: SESSION_SLUG,
           accountAddress: "0x3333333333333333333333333333333333333333",
           workerUrl: WORKER_URL,
-          bridgeCredential: {
-            kind: "agent_bridge_browser_token",
-            token: BRIDGE_TOKEN,
+          agentWorkerUrl: WORKER_URL,
+          agentCredential: {
+            kind: "session_agent_browser_token",
+            token: AGENT_TOKEN,
             expiresAt: "2027-07-05T23:59:59.000Z",
           },
           workerCredential: {
@@ -347,8 +363,10 @@ async function installAgentBridgeFixture(page) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
         body: JSON.stringify({
           ok: true,
+          total: 2, hasMore: false, nextCursor: null,
           questions: [
             {
               questionId: "agent-smoke-q1",
@@ -382,6 +400,7 @@ async function installAgentBridgeFixture(page) {
         await route.fulfill({
           status: 403,
           contentType: "application/json",
+          headers: { "Access-Control-Allow-Origin": "*" },
           body: JSON.stringify({
             ok: false,
             reason: "anonymized_groups_admin_disabled",
@@ -393,6 +412,7 @@ async function installAgentBridgeFixture(page) {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
+          headers: { "Access-Control-Allow-Origin": "*" },
           body: JSON.stringify(aggregateRows),
         });
         return;
@@ -401,6 +421,7 @@ async function installAgentBridgeFixture(page) {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
+          headers: { "Access-Control-Allow-Origin": "*" },
           body: JSON.stringify({
             ok: true,
             available: true,
@@ -414,8 +435,8 @@ async function installAgentBridgeFixture(page) {
     if (pathname.endsWith("/preferences")) {
       assert.equal(
         request.headers().authorization,
-        `Bearer ${BRIDGE_TOKEN}`,
-        "submit uses the exchanged Bridge credential",
+        `Bearer ${AGENT_TOKEN}`,
+        "submit uses the exchanged agent credential",
       );
       const payload = request.postDataJSON();
       assert.deepEqual(
@@ -437,6 +458,7 @@ async function installAgentBridgeFixture(page) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
         body: JSON.stringify({ ok: true, submittedCount: 1 }),
       });
       return;
@@ -494,7 +516,7 @@ async function main() {
       },
       {
         cacheKey: REGISTRY_CACHE_KEY,
-        cache: buildRegistryCache(baseUrl),
+        cache: buildRegistryCache(),
         primaryKey: PRIMARY_SESSION_KEY,
         explicitKey: PRIMARY_SESSION_EXPLICIT_KEY,
         scopeKey: SELECTED_SESSION_SCOPE_KEY,
@@ -507,7 +529,7 @@ async function main() {
     page.on("console", (msg) => {
       consoleMessages.push(msg.text());
     });
-    const fixtureState = await installAgentBridgeFixture(page);
+    const fixtureState = await installSessionAgentFixture(page);
 
     await page.goto(`${baseUrl}/session/${SESSION_SLUG}`, {
       waitUntil: "domcontentloaded",
@@ -647,21 +669,21 @@ async function main() {
       "one versioned page-memory envelope is available",
     );
     const envelope = envelopeEntries[0][1];
-    assert.equal(envelope.v, 2, "page-memory envelope is versioned");
+    assert.equal(envelope.v, 3, "page-memory envelope is versioned");
     assert.equal(
       envelope.sessionSlug,
       SESSION_SLUG,
       "page-memory envelope is session-scoped",
     );
     assert.equal(
-      envelope.bridgeCredential?.kind,
-      "agent_bridge_browser_token",
-      "page-memory envelope keeps bridge credential shape",
+      envelope.agentCredential?.kind,
+      "session_agent_browser_token",
+      "page-memory envelope keeps agent credential shape",
     );
     assert.equal(
-      envelope.bridgeCredential?.token,
-      BRIDGE_TOKEN,
-      "page-memory envelope stores the exchanged bridge token",
+      envelope.agentCredential?.token,
+      AGENT_TOKEN,
+      "page-memory envelope stores the exchanged agent token",
     );
     assert.equal(
       envelope.workerCredential?.kind,

@@ -1211,6 +1211,13 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
   });
 
   if (updatePlan.shouldResetContext) {
+    // The pile owns its lifecycle and does not run the full editor's reset.
+    // Upload retry bytes and IDs belong to the old account/session as well.
+    delete engine._submitOperationId;
+    delete engine._submitOperationContextKey;
+    delete engine._submitOperationTimestamp;
+    delete engine._submitOperationPayloads;
+    delete engine._submitUploadRevisions;
     // Props already name the next identity. Cancel pending writes before resetting
     // so decrypted fields cannot be persisted under another account's draft key.
     if (engine._persistTimer) clearTimeout(engine._persistTimer);
@@ -1468,11 +1475,12 @@ const toggleSessionVoiceModeModal = (engine: PileViewModeEngine) => {
     engine.closeSessionVoiceModeModal();
     return;
   }
+  const resumeInterview =
+    engine.state.interviewProgressContext === engine.buildSessionInterviewSubmitContextToken(engine.props);
   engine.setState({
     showVoiceModeModal: true,
-    sessionVoiceMode: null,
-    interviewPrefillPacket: null,
-    interviewPrefillError: '',
+    sessionVoiceMode: resumeInterview ? 'interview' : null,
+    ...(resumeInterview ? {} : { interviewPrefillPacket: null, interviewPrefillError: '' }),
   });
 };
 
@@ -1486,9 +1494,6 @@ const closeSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   engine.setState(
     {
       showVoiceModeModal: false,
-      sessionVoiceMode: null,
-      interviewPrefillPacket: null,
-      interviewPrefillError: '',
     },
     () => {
       engine.syncSessionVoiceModeQuery(null);
@@ -3289,7 +3294,9 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             showListeningPanel,
             toggleListeningPanel: engine.toggleListeningPanel,
             showVoiceModeControl: isInterviewFeatureEnabled(engine.props?.sessionConfig),
-            voiceModeActive: !!showVoiceModeModal || showListeningPanel,
+            voiceModeActive:
+              showListeningPanel ||
+              engine.state.interviewProgressContext === engine.buildSessionInterviewSubmitContextToken(engine.props),
             toggleVoiceModeModal: engine.toggleSessionVoiceModeModal,
             onViewAllClick: engine.props.onViewAllClick,
             handleViewAllFromPile: engine.handleViewAllFromPile,
@@ -3331,6 +3338,13 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             const responseReadinessContextToken = engine.getSessionInterviewResponseReadinessToken(submitContextToken);
             return (
               <LazySessionVoiceModeModal
+                key={submitContextToken}
+                onInterviewProgressChange={(inProgress: boolean) => {
+                  const interviewProgressContext = inProgress ? submitContextToken : '';
+                  if (engine.state.interviewProgressContext !== interviewProgressContext) {
+                    engine.setState({ interviewProgressContext });
+                  }
+                }}
                 questionCreatorProps={{ ...engine.props, ...engine.getAudioInputWorkerProps() }}
                 {...engine.props}
                 {...engine.getAudioInputWorkerProps()}

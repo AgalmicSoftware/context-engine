@@ -20,6 +20,11 @@ The canonical namespace registry is
 the MainSite DG facade, and the direct-localStorage guard all consume that
 registry; a parity test keeps this documentation aligned with it.
 
+`bookmarksCache` and `filters` hold user-authored choices that a refresh cannot
+rebuild. `analysisCache` mixes retained Results analysis artifacts with expiring
+profile summaries; both writers preserve other saved entries. `questionsCache`,
+`surveysCache`, `sbtCache` and `userCache` hold derived remote records and scans.
+
 Logical key format:
 
 ```text
@@ -44,6 +49,13 @@ trailing colon.
 - Cross-tab propagation:
   - IndexedDB mode: `BroadcastChannel`
   - localStorage fallback mode: `storage` events
+- Persisted writes hold a Web Lock per logical key. Atomic updaters read the
+  latest saved value, so disjoint bookmarks, saved filters and analysis entries
+  survive concurrent writes. A toggle applies the add or remove shown by that
+  page; competing changes to the same item resolve in write order.
+  Broadcast receivers reload saved data rather than trusting message order.
+  Without Web Locks (older browsers or insecure origins), writes are ordered
+  only within each tab. Updaters must not wait for another key's write.
 - Fallback behavior:
   - the cache layer does not immediately demote to localStorage on a single IndexedDB error
   - it falls back only after repeated consecutive IDB failures

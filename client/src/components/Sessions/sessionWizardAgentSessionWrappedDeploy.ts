@@ -1,15 +1,8 @@
 import { normalizeAgentSessionWrappedCapability } from '../../utilities/session/agentSessionWrapped.js';
-import { toStr } from '../../utilities/shared/primitives.js';
-import { AGENT_BRIDGE_WORKER_BUNDLE_URL, WORKER_RELEASE_MANIFEST_URL } from '../../variables/publicDeploymentConfig.js';
 import type { AnyRecord, ChainIdLike } from '../shellTypes';
 
 export const resolveSessionWizardAgentSessionWrappedDeployment = ({
   draft,
-  registryChainId,
-  networkChainId,
-  sessionId,
-  sessionIdHex,
-  slug,
 }: {
   draft: AnyRecord;
   registryChainId?: ChainIdLike;
@@ -23,30 +16,34 @@ export const resolveSessionWizardAgentSessionWrappedDeployment = ({
 
   return {
     requested: true,
-    payload: {
-      agentBridgeBundleUrl: AGENT_BRIDGE_WORKER_BUNDLE_URL,
-      agentBridgeBundleManifestUrl: WORKER_RELEASE_MANIFEST_URL,
-      agentSessionWrappedDeploymentIdentity: [
-        'session',
-        Number(registryChainId || networkChainId || 0) || 'worker',
-        toStr(sessionIdHex || sessionId).trim() || 'pending',
-        slug,
-      ].join(':'),
-    },
+    payload: {},
   };
 };
 
 export const requireSessionWizardAgentSessionWrappedCapability = ({
   requested,
   value,
+  workerUrl,
 }: {
   requested: boolean;
   value: unknown;
+  workerUrl?: unknown;
 }) => {
   if (!requested) return null;
   const capability = normalizeAgentSessionWrappedCapability(value);
   if (!capability) {
     throw new Error('Agent Session Wrapped deployment did not return a verified capability.');
+  }
+  let workerOrigin = '';
+  try {
+    workerOrigin = new URL(String(workerUrl)).origin;
+  } catch {
+    /* rejected below */
+  }
+  if (capability.origin !== workerOrigin) {
+    throw new Error(
+      'Agent capability must use the Session Worker origin. Upgrade the deployment helper or sponsor before retrying.',
+    );
   }
   return capability;
 };

@@ -5,10 +5,11 @@ import {
   readFileSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildWorkerBundles } from './worker-bundle.mjs';
+import { buildWorkerThirdPartyNotices } from './lib/worker-third-party-notices.mjs';
 
 const TEMPLATE_RELATIVE_DIR = 'deploy/cloudflare/session-worker';
 const BUNDLE_RELATIVE_PATH = 'dist/sessionCorsWorker.bundle.js';
@@ -21,6 +22,7 @@ const TEMPLATE_INPUT_FILES = Object.freeze([
   '.dev.vars.example',
   'README.md',
   'LICENSE',
+  'THIRD_PARTY_NOTICES.md',
 ]);
 
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
@@ -85,11 +87,12 @@ const buildManifest = ({ rootDir }) => {
 };
 
 const runBundleBuild = async ({ rootDir, buildBundles }) => {
-  await buildBundles({ rootDir, targetKeys: ['sessionCorsWorker'] });
+  const results = await buildBundles({ rootDir, targetKeys: ['sessionCorsWorker'] });
   const bundlePath = resolve(rootDir, BUNDLE_RELATIVE_PATH);
   const bundle = readRequiredFile(bundlePath, 'Generated Session Worker bundle');
   assertDeployableBundle(bundle);
-  return { bundle, bundlePath };
+  const notices = buildWorkerThirdPartyNotices({ rootDir, metafile: results?.find((result) => result.key === 'sessionCorsWorker')?.metafile });
+  return { bundle, bundlePath, notices };
 };
 
 export const buildCloudflareSessionTemplate = async ({
@@ -98,8 +101,9 @@ export const buildCloudflareSessionTemplate = async ({
 } = {}) => {
   const templateDir = resolve(rootDir, TEMPLATE_RELATIVE_DIR);
   const templateBundlePath = resolve(templateDir, TEMPLATE_BUNDLE_FILE);
-  const { bundle, bundlePath } = await runBundleBuild({ rootDir, buildBundles });
+  const { bundle, bundlePath, notices } = await runBundleBuild({ rootDir, buildBundles });
   copyFileSync(bundlePath, templateBundlePath);
+  writeFileSync(resolve(templateDir, 'THIRD_PARTY_NOTICES.md'), notices);
   writeBundleDigestBinding({ templateDir, bundle });
   const manifest = buildManifest({ rootDir });
   writeFileSync(
@@ -118,13 +122,16 @@ export const verifyCloudflareSessionTemplate = async ({
     resolve(templateDir, TEMPLATE_BUNDLE_FILE),
     'Tracked Cloudflare template Worker bundle',
   );
-  const { bundle } = await runBundleBuild({ rootDir, buildBundles });
+  const { bundle, notices } = await runBundleBuild({ rootDir, buildBundles });
   if (!trackedBundle.equals(bundle)) {
     throw new Error(
       'Cloudflare Session Worker deploy package is out of sync; run "npm run worker:cloudflare-template".',
     );
   }
   assertBundleDigestBinding({ templateDir, bundle });
+  if (readRequiredFile(resolve(templateDir, 'THIRD_PARTY_NOTICES.md'), 'Third-party notices').toString('utf8') !== notices) {
+    throw new Error('Cloudflare Session Worker third-party notices are out of sync; run "npm run worker:cloudflare-template".');
+  }
   const expectedManifest = buildManifest({ rootDir });
   const manifestPath = resolve(templateDir, TEMPLATE_MANIFEST_FILE);
   const trackedManifest = JSON.parse(

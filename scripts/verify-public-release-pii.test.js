@@ -140,7 +140,7 @@ test('verify-public-release-pii fails emails, home paths, secrets, PEMs, and pri
   });
 });
 
-test('verify-public-release-pii allows generated JavaScript frozen name arrays', () => {
+test('verify-public-release-pii allows generated JavaScript frozen name collections', () => {
   withFixture((rootDir) => {
     const requiredSecretNames = `${'REQUIRED'}_${'SECRET'}_NAMES = Object.freeze([`;
     const litCredentialFields = `WORKER_LIT_${'CREDENTIAL'}_DESCRIPTOR_FIELDS = Object.freeze([`;
@@ -149,6 +149,9 @@ test('verify-public-release-pii allows generated JavaScript frozen name arrays',
       '  "DEMO_SIGNER_ROOT_SECRET",',
       '  "AGENT_BRIDGE_AGENT_API_TOKEN"',
       ']);',
+      `AGENT_${'CREDENTIAL'}_KINDS = Object.freeze({`,
+      '  member: "member",',
+      '});',
       litCredentialFields,
       '  "litApiBase",',
       '  "litGroupId",',
@@ -165,7 +168,7 @@ test('verify-public-release-pii allows generated JavaScript frozen name arrays',
   });
 });
 
-test('verify-public-release-pii still rejects real assignments near frozen arrays', () => {
+test('verify-public-release-pii still rejects real assignments in frozen collections', () => {
   withFixture((rootDir) => {
     const requiredSecretNames = `${'REQUIRED'}_${'SECRET'}_NAMES = Object.freeze([`;
     const apiTokenAssignment = `${'API'}_${'TOKEN'}=synthetic-live-credential-material`;
@@ -175,6 +178,9 @@ test('verify-public-release-pii still rejects real assignments near frozen array
       `  "${apiTokenAssignment}",`,
       ']);',
       sessionSecretAssignment,
+      `AGENT_${'CREDENTIAL'}_KINDS = Object.freeze({`,
+      `  session_${'secret'}: "synthetic-live-credential-material",`,
+      '});',
       '',
     ].join('\n'));
 
@@ -183,6 +189,7 @@ test('verify-public-release-pii still rejects real assignments near frozen array
     assert.equal(result.status, 1);
     assert.match(result.stderr, /FAIL secret-assignment: deploy\/cloudflare\/session-worker\/worker\.mjs:2/);
     assert.match(result.stderr, /FAIL secret-assignment: deploy\/cloudflare\/session-worker\/worker\.mjs:4/);
+    assert.match(result.stderr, /FAIL secret-assignment: deploy\/cloudflare\/session-worker\/worker\.mjs:6/);
   });
 });
 

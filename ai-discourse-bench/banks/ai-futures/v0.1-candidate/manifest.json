@@ -5,48 +5,48 @@
   "version": "0.1.0-candidate.1",
   "releaseStatus": "candidate",
   "benchmarkId": "ai-discourse-bench-ai-futures-v0.1-candidate",
-  "questionBankHash": "7cf0c1469485a62c676c9db7ab23b791cc8f5a71c68411e792267406cacb0522",
-  "sourceCorpusRevision": "ebbc5130624ac3272cd7ee433075698eb941d13e",
+  "questionBankHash": "cdc77e1eca07fe69fca014b08e481668b9280a5c3a868bc80546facaf13c1cf1",
+  "sourceCorpusRevision": "c662492c80e67511955ea43792e539c032f3ad71",
   "sourceFiles": [
+    {
+      "corpus": "ai-forecasting-economics",
+      "relativePath": "ai-discourse-corpus/corpuses/ai-forecasting-economics-corpus.json",
+      "sha256": "139ca997e8a979ca60837dbb322205d6580f6486ea17edcd42c42360a0877c60"
+    },
     {
       "corpus": "ai-laws-policy",
       "relativePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
-      "sha256": "811d10cdc46590ab7df22762eaded0df9a5607db2c89435bdd8a36e8dcd47e25"
+      "sha256": "d79db8ee12e224755ec18b0bcc64647c8bbe3510a25ad15f9340ce6578a757be"
     },
     {
       "corpus": "ai-scifi-books",
       "relativePath": "ai-discourse-corpus/corpuses/ai-scifi-books-corpus.json",
-      "sha256": "37993c36313764b37bb2a07ef4f0c63f2d3cd54c5246b323de3089f48c007245"
+      "sha256": "162c47d85f71a587fde0f0b47a9305299d5e9a291b373fac706251c6b3ed5b77"
     },
     {
       "corpus": "arxiv-ai-safety",
       "relativePath": "ai-discourse-corpus/corpuses/arxiv-ai-safety-corpus.json",
-      "sha256": "d337d3a95255ff1d55d4969c115319286849871592f4173a104412ccae7d2c6b"
+      "sha256": "ab9128e3a6d5143a4c2e8d657ba251d2a34810eb15be4ab202c1dfd36a8815f5"
     },
     {
       "corpus": "cross-corpus",
       "relativePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-      "sha256": "491f146ecbb1b2ec26aeeb150fc99c51014fed986e136620d5e21d1bd7e9b438"
+      "sha256": "0ff8d0f2f2e5b5adfb006e76c6d09f2877e7c21c1964fa332ae8fc502053329a"
     },
     {
       "corpus": "dwarkesh-lab-insiders",
       "relativePath": "ai-discourse-corpus/corpuses/dwarkesh-lab-insiders-corpus.json",
-      "sha256": "f0e278dcc7e10cad10a839f0c614a4ca3310a7c7c7a52781b9b6868c8eec2134"
-    },
-    {
-      "corpus": "tweets",
-      "relativePath": "ai-discourse-corpus/corpuses/enriched-tweets.json",
-      "sha256": "2e05aeb90c3957e293d49a5b4e2b7c891e11c0fb9d0eaff76ad520afaabba88c"
+      "sha256": "e457c5124e345b274b77379e0bb0f37e4a5cd3e318f417ca9cb67bf11b997d00"
     },
     {
       "corpus": "lab-primary-docs",
       "relativePath": "ai-discourse-corpus/corpuses/lab-primary-docs-corpus.json",
-      "sha256": "be91c64f28a288743c19b9f0e7863e54a05dcc799203ee3235ff908d8cd9dae5"
+      "sha256": "21ce2eeb0d2175c60a1d3dcaf553357a6c5b36716845fa94ce37cbeb3be95b13"
     },
     {
       "corpus": "lesswrong-posts",
       "relativePath": "ai-discourse-corpus/corpuses/lesswrong-posts-corpus.json",
-      "sha256": "b81137e32286d2a48688b06338a04ba77631ab661aa564232dcbd238bd2e39d9"
+      "sha256": "1d52221d701070035dfb375a40d598c6840447ce5349a890fcd70be4949c9e18"
     },
     {
       "corpus": "loophole-historical-cases",
@@ -56,7 +56,7 @@
     {
       "corpus": "metr-evals-metrics",
       "relativePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
-      "sha256": "85723bf956909306d23a9fb228e8e37ca5554c320cd1a4c1d64a264d4de2188e"
+      "sha256": "08ce30efd8f279ccda85f8272520f8c31e3b3a11fd98e8bccccdd37e1a3474cb"
     }
   ],
   "reviewStatus": "pending-human-review"

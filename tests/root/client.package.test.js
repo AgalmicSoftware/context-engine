@@ -158,13 +158,14 @@ const readHeaderRules = () => {
   return rules;
 };
 
-test('client static headers enforce the baseline CSP and report a strict-script policy', () => {
+test('client static headers enforce script and wallet worker CSP with the exact benchmark hash', () => {
   const headers = readHeaderRules()['/*'];
+  const scripts = "'self' 'sha256-mKjUh0E6CnzsRRh0Cq3xv9KzngAwXUZS8Mj9O5EV+d0='";
 
   assert.equal(headers['Referrer-Policy'], 'strict-origin-when-cross-origin');
   assert.equal(
     headers['Content-Security-Policy'],
-    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
+    `frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; script-src ${scripts}; worker-src 'self' blob:`,
   );
   const reportOnly = Object.fromEntries(
     headers['Content-Security-Policy-Report-Only'].split(';').map((directive) => {
@@ -174,7 +175,7 @@ test('client static headers enforce the baseline CSP and report a strict-script 
   );
   assert.deepEqual(reportOnly, {
     'default-src': "'self'",
-    'script-src': "'self'",
+    'script-src': scripts,
     'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com",
     'img-src': "'self' data: blob: https:",
     'font-src': "'self' data: https://fonts.gstatic.com",
@@ -199,20 +200,30 @@ test('client isolation headers come from the host, not ignored meta tags', () =>
   assert.equal(headers['Cross-Origin-Embedder-Policy'], 'unsafe-none');
 });
 
-test('client static headers leave immutable caching to the per-file build rules', () => {
+test('client static headers cache only existing versioned media and leave assets to build rules', () => {
   const rules = readHeaderRules();
 
   // Overlapping Netlify rules combine values, so the catch-all rule must not set caching.
   ['Cache-Control', 'Pragma', 'Expires'].forEach((name) => assert.equal(rules['/*'][name], undefined, name));
   // A wildcard /assets/* rule would also send the year-long header with a missing file's 404.
-  assert.deepEqual(Object.keys(rules), ['/*']);
+  const mediaPaths = [
+    '/media/product-film/v1/context-engine-film-720p.mp4',
+    '/media/product-film/v1/context-engine-og-1200x630.png',
+  ];
+  assert.deepEqual(Object.keys(rules), ['/*', ...mediaPaths]);
+  for (const mediaPath of mediaPaths) {
+    assert.ok(existsSync(resolve(rootDir, 'client/public', mediaPath.slice(1))));
+    assert.equal(rules[mediaPath]['Cache-Control'], 'public, max-age=31536000, immutable');
+    assert.equal(rules[mediaPath]['X-Content-Type-Options'], 'nosniff');
+  }
   // Public files are copied unhashed, so none may be served from the /assets path.
   assert.equal(existsSync(resolve(rootDir, 'client/public/assets')), false);
 });
 
-test('client social preview image lives outside the immutable asset path', () => {
+test('client social preview image uses versioned media and retains the earlier square image', () => {
   const html = readText('client/index.html');
-  const imageUrl = 'https://contextengine.sh/context-engine-social-preview-square.png';
+  const imageUrl = JSON.parse(readText('client/src/variables/publicSocialPreview.json')).image.url;
+  assert.match(imageUrl, /^https:\/\/contextengine\.sh\/media\/product-film\/v\d+\//);
 
   assert.ok(html.includes(`<meta property="og:image" content="${imageUrl}" />`));
   assert.ok(html.includes(`<meta name="twitter:image" content="${imageUrl}" />`));

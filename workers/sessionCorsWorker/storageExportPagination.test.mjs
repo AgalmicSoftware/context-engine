@@ -32,6 +32,63 @@ const fixture = (sizes) => {
   return { env, run, entries, payloads, get reads() { return reads; } };
 };
 
+test('envelope exports round-trip ownership, authority, visibility and group metadata', async () => {
+  const f = fixture([2, 2, 2, 2, 2]);
+  const identityFields = ['responder', 'uploader', 'uploadAuthority', 'resourceId', 'hidden', 'groupIds'];
+  const question = { resource: 'questions', uploader: '0x00000000000000000000000000000000000000aa',
+    uploadAuthority: 'admin', resourceId: 'owned-question', hidden: true };
+  const response = { responder: '0x00000000000000000000000000000000000000bb', groupIds: ['response-group'],
+    payloadAccessControl: { gate: 'group_gate', encryption: 'lit', groupIds: ['nested-group', 'other-group'] } };
+  const empty = { responder: '', uploader: '', uploadAuthority: '', resourceId: '', hidden: false, groupIds: [],
+    payloadAccessControl: { gate: 'none', encryption: 'lit', groupIds: [] } };
+  const nullable = { ...Object.fromEntries(identityFields.map((field) => [field, null])),
+    payloadAccessControl: { gate: 'none', encryption: 'lit', groupIds: null } };
+  const patches = [question, response, {}, empty, nullable];
+  const stored = [...f.entries.entries()].map(([key, raw], i) => {
+    const metadata = { ...JSON.parse(raw), ...patches[i] };
+    f.entries.delete(key);
+    f.entries.set(buildIndexKey({ slug: 'session-a', resource: metadata.resource, id: metadata.id }), JSON.stringify(metadata));
+    return metadata;
+  });
+
+  const exported = await storageRoute({
+    path: '/storage/export-envelopes', method: 'GET', request: new Request('https://worker.example/storage/export-envelopes'),
+    env: f.env, config, slug: 'session-a', authScopes: { admin: true }, deps: {},
+  });
+  assert.equal(exported.status, 200);
+  const archive = await exported.json();
+  assert.equal(archive.manifest.version, 1);
+  assert.equal(archive.manifest.metadataFields, 'identity_v1');
+  assert.equal(archive.payloads.length, stored.length);
+  const byId = new Map(archive.payloads.map((entry) => [entry.storageRef.id, entry]));
+  for (const metadata of stored) {
+    const entry = byId.get(metadata.id);
+    for (const field of identityFields) {
+      assert.equal(Object.hasOwn(entry.metadata, field), Object.hasOwn(metadata, field), `${metadata.id}: ${field} presence`);
+      if (Object.hasOwn(metadata, field)) assert.deepEqual(entry.metadata[field], metadata[field], `${metadata.id}: ${field}`);
+    }
+    assert.equal(Object.hasOwn(entry.metadata.payloadAccessControl, 'groupIds'), Object.hasOwn(metadata.payloadAccessControl, 'groupIds'));
+    if (Object.hasOwn(metadata.payloadAccessControl, 'groupIds')) {
+      assert.deepEqual(entry.metadata.payloadAccessControl.groupIds, metadata.payloadAccessControl.groupIds);
+    }
+    assert.deepEqual(Buffer.from(entry.ciphertextBase64url, 'base64url'), Buffer.from([7, 7]));
+  }
+});
+
+test('envelope exports omit inherited identity and group metadata', async () => {
+  const f = fixture([2]);
+  const [key, raw] = [...f.entries.entries()][0];
+  const inherited = { responder: 'inherited', uploader: 'inherited', uploadAuthority: 'admin', resourceId: 'inherited', hidden: true, groupIds: ['inherited'] };
+  const metadata = Object.assign(Object.create(inherited), JSON.parse(raw));
+  metadata.payloadAccessControl = Object.assign(Object.create({ groupIds: ['inherited'] }), metadata.payloadAccessControl);
+  f.entries.set(key, metadata);
+  const exported = await f.run();
+  assert.equal(exported.ok, true);
+  const projected = exported.payloads[0].metadata;
+  for (const field of Object.keys(inherited)) assert.equal(Object.hasOwn(projected, field), false, field);
+  assert.equal(Object.hasOwn(projected.payloadAccessControl, 'groupIds'), false);
+});
+
 test('exports more than 600 rows in bounded resumable pages without omissions or duplicates', async () => {
   const f = fixture(Array(637).fill(2));
   const ids = [];

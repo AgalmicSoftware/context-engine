@@ -1,4 +1,6 @@
+import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from '../../shared/interviewSettings.mjs';
+import { normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
 import { stableCanonicalSerialize } from '../shared/deployHelperCore.mjs';
 import { isRealtimeInterviewModel, normalizeRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
 import {
@@ -48,6 +50,8 @@ const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
   'allowOrigins',
   'sessionModeProfile',
   'agentSessionWrapped',
+  'agentHttp',
+  'resultsExposure',
   'workerAuthority',
   'workerRoles',
   'roles',
@@ -173,12 +177,7 @@ const validateWorkerCanonicalIncomingFields = ({ incomingConfig, mergedConfig } 
   return { ok: true };
 };
 
-const normalizeCanonicalSessionId = (value) => {
-  const raw = toTrimmedString(value).toLowerCase();
-  if (!raw) return '';
-  const normalized = raw.replace(/^0x/, '').replace(/-/g, '');
-  return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? normalized : '';
-};
+const normalizeCanonicalSessionId = (value) => normalizeSessionIdHex(value).slice(2);
 
 const resolveCanonicalSessionIdentity = (config) => {
   const rawValues = ['sessionId', 'sessionIdHex']
@@ -305,6 +304,11 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       ? mutation.incomingConfig
       : null;
     if (!incomingConfig) return { ok: false, status: 400, error: 'Missing config.' };
+    // Stored records are trimmed on read; new input must satisfy the shared
+    // grammar before merge normalization can hide padding or malformed IDs.
+    if (resolveCanonicalSessionIdentity(incomingConfig).invalid) {
+      return { ok: false, status: 400, error: 'Invalid session identity.' };
+    }
     if (migrateStoredModel && incomingConfig?.interviewMode?.realtimeModel === storedModel) {
       incomingConfig = { ...incomingConfig, interviewMode: { ...incomingConfig.interviewMode, realtimeModel: existing.interviewMode.realtimeModel } };
     }
@@ -327,6 +331,7 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
       return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
     }
+    if (!validSessionAgentConfig(incomingConfig)) return { ok: false, status: 400, error: 'Invalid agent configuration.' };
     if (!validAllowOrigins(incomingConfig)) {
       return { ok: false, status: 400, error: 'Worker CORS allowlists must contain exact origins.' };
     }
@@ -393,6 +398,7 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
     return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
   }
+  if (!validSessionAgentConfig(mergedConfig)) return { ok: false, status: 400, error: 'Invalid agent configuration.' };
   if (!validAllowOrigins(mergedConfig)) {
     return { ok: false, status: 400, error: 'Worker CORS allowlists must contain exact origins.' };
   }

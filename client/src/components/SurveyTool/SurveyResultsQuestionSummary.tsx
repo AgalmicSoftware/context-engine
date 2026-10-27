@@ -1,4 +1,5 @@
 import React from 'react';
+import { hasBookmark } from '../../utilities/cache/bookmarkChanges';
 
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import SingleQuestionResponse from './SingleQuestionResponse';
@@ -174,7 +175,7 @@ export const buildSurveyResultsQuestionSummaryRenderModel = ({
   const resolvedQuestionType = resolveSurveyResultsSummaryQuestionType(question, displayResponses);
 
   return {
-    bookmarked: bookmarkedQuestionIDs.includes(questionId),
+    bookmarked: hasBookmark({ questions: bookmarkedQuestionIDs }, 'questions', questionId),
     displayResponses,
     domId: getSurveyResultsQuestionCardDomId(questionId),
     isActive: !!activeQuestionToggles[questionId],

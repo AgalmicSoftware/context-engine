@@ -18,6 +18,9 @@ Use it for new files, refactors, and cleanup PRs.
 - `foundry/` holds Foundry-specific Solidity entry points; `foundry/script/` and `foundry/test/` intentionally keep Foundry's singular directory names one level below repo root.
 - `docs/` holds canonical implementation and operations documentation.
 - `posts/` holds public Markdown posts and the `/posts` route manifest.
+- `media/` holds editable sources and render tooling for public media such as
+  the product film. Files the site serves are copied into `client/public/media/`;
+  local render output stays in each project's ignored `dist/`.
 - `tests/` holds source-of-truth root Node/Jest test harnesses that are not practical to colocate elsewhere; shared helpers live under `tests/helpers/`.
 - `broadcast/`, `cache/`, `dist/`, `out/`, `release-public/`, and `tmp/` are
   generated or runtime output locations and are not canonical homes for new
@@ -93,3 +96,14 @@ Use it for new files, refactors, and cleanup PRs.
 Public source should follow this contract. Private operator-only compatibility
 tools, when present in the development tree, are tracked separately and are not
 part of the public naming contract.
+
+Group-password derivation lives in `shared/crypto/groupPasswordDerivation.cjs`.
+The client, MCP and local SBT scripts pass their ethers v5 instance into this
+shared WebCrypto implementation.
+
+The SIWE wire format and canonical session-ID normalization live in
+`shared/auth/siweMessage.mjs`, with no ethers dependency. Browser, MCP and Agent
+Bridge adapters supply their own clock and origin defaults. The Session Worker
+also uses the shared ID normalizer; stored configs are trimmed on read while new
+IDs must satisfy the shared grammar. Conformance tests cover all four consumers
+and check message bytes against the Session Worker parser and validator.

@@ -100,3 +100,12 @@ export const summarizeWinningResponseConsistency = (cells = []) => {
     contributingModels,
   };
 };
+
+// A missing mean is absent evidence, never a mixed position. Server labels and the
+// report's tag filters share this; it is a declaration so the embedded copy hoists.
+export function stanceLabel(meanScore) {
+  if (typeof meanScore !== 'number' || !Number.isFinite(meanScore)) return 'no data';
+  if (meanScore > 0.25) return 'net support';
+  if (meanScore < -0.25) return 'net opposition';
+  return 'mixed / unsure';
+}

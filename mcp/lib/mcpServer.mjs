@@ -21,7 +21,21 @@ const isValidId = (id) => typeof id === 'string' || (typeof id === 'number' && N
 const errorResponse = (id, code, message) => ({ jsonrpc: '2.0', id, error: { code, message } });
 const resultResponse = (id, result) => ({ jsonrpc: '2.0', id, result });
 
-const describeError = (error) => String(error?.message || error || 'Unknown error.');
+// Error text reaches both the client and the log, so it is redacted even when
+// it bypassed lib/chainErrors.mjs: ethers appends request bodies, signed
+// transactions and the RPC URL as "(key=…)" details, and API keys ride in URL
+// credentials, paths and queries.
+const MAX_ERROR_LENGTH = 1000;
+const DIAGNOSTICS = /\[ See: |\((?=\w+=)|\b(?:requestBody|body|url|transaction|data|error)=/i;
+const URLS = /\b[a-z][\w+.-]*:\/\/[^\s"'`]+/gi;
+// Example links such as /session/<slug> are not endpoints.
+const hostOnly = (url) => (/<\w+>/.test(url) ? url : url.replace(/^([^:]+:\/\/)(?:[^/?#]*@)?([^/?#]*)[\s\S]*$/, '$1$2'));
+
+export const describeError = (error) => {
+  const text = String(error?.message || error || '').slice(0, MAX_ERROR_LENGTH);
+  const cut = text.search(DIAGNOSTICS);
+  return (cut < 0 ? text : text.slice(0, cut)).trimEnd().replace(URLS, hostOnly) || 'Unknown error.';
+};
 
 // Long enough for an SBT claim that waits for funding, a commit, and a reveal.
 const DEFAULT_TOOL_TIMEOUT_MS = 15 * 60 * 1000;

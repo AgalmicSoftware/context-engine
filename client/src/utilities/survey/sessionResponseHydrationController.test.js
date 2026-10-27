@@ -445,13 +445,16 @@ describe('createSessionResponseHydrationController', () => {
       sessionId: `0x${'8'.repeat(32)}`,
       workerUrl: 'https://alpha-response-worker-b.example.test',
     });
+    // Hydration stamps the account its Worker listing authenticates as.
     const identityA = resolveWorkerCanonicalCacheIdentity({
       sessionConfig: sessionConfigA,
       sessionSlug: SESSION_SLUG,
+      reader: RESPONDER,
     });
     const identityB = resolveWorkerCanonicalCacheIdentity({
       sessionConfig: sessionConfigB,
       sessionSlug: SESSION_SLUG,
+      reader: RESPONDER,
     });
     const delayedA = createDeferred();
     const delayedB = createDeferred();

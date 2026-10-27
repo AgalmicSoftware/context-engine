@@ -1,18 +1,28 @@
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { installClientSecurityHeaders } from './lib/client-security-headers.js';
+import { assertReadable } from './civic-theme-overlay-smoke.mjs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { ethers } from 'ethers';
 import worker from '../workers/sessionCorsWorker/worker.js';
 import { installSessionCoordinatorBinding } from '../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { createWorkerClient } from '../mcp/lib/workerClient.mjs';
 import { buildQuestionRecord } from '../mcp/lib/records.mjs';
+import { buildPasskeyDerivedWallet, toPasskeyEoaSeedRecord } from './lib/passkey-derived-wallet.js';
 
 const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 assert(['127.0.0.1', 'localhost', '[::1]'].includes(new URL(baseUrl).hostname), 'This smoke requires a local client');
 const workerOrigin = 'https://setup-smoke.example.test';
 const outputDir = process.env.OUTPUT_DIR || 'artifacts/session-setup-smoke';
+const startedAt = performance.now();
 await mkdir(outputDir, { recursive: true });
-const admin = ethers.Wallet.createRandom();
+const passkeyFixture = (name) => {
+  const credentialId = Buffer.from(`setup-smoke-${name}`).toString('base64url');
+  const { wallet } = buildPasskeyDerivedWallet(credentialId);
+  return { wallet, seed: toPasskeyEoaSeedRecord({ credentialId, address: wallet.address }) };
+};
+const adminFixture = passkeyFixture('admin');
+const admin = adminFixture.wallet;
 const kv = () => {
   const values = new Map();
   return {
@@ -33,94 +43,101 @@ const env = installSessionCoordinatorBinding({
   LOGIN_TRUSTED_ORIGINS: baseUrl,
   ADMIN_TRUSTED_ORIGINS: baseUrl,
   TOKEN_HMAC_SECRET: 'synthetic-session-setup-token-key',
+  AGENT_MANAGED_ROOT_SECRET: 'synthetic-fresh-session-agent-root-secret',
   CE_STORAGE_ENVELOPE_KEK: 'synthetic-session-setup-envelope-key',
 });
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async () => {
   throw new Error('Session setup smoke must not call an external service');
 };
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  args: [`--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE ${new URL(baseUrl).hostname}`],
+});
 const calls = [];
-const fixtureContext = async (wallet) => {
+const securityPolicyRuns = [];
+const walletWorkerUrls = new Set();
+const fixtureContext = async ({ seed }, { workerEnv = env, failResponseUploadAt = 0, loseResponseUploadAt = 0, deferLostResponseListingUntilReplay = false, unavailableSubmit = false, responseUploads = [] } = {}) => {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
+    serviceWorkers: 'block',
   });
   context.setDefaultTimeout(30000);
-  await context.exposeFunction('__ceSetupWalletRequest', async ({ method, params = [] }) => {
-    if (method === 'eth_accounts' || method === 'eth_requestAccounts') return [wallet.address];
-    if (method === 'eth_chainId') return '0xaa37dc';
-    if (method === 'net_version') return '11155420';
-    if (method === 'eth_getCode') return '0x';
-    if (method === 'wallet_switchEthereumChain' || method === 'wallet_addEthereumChain') return null;
-    if (method === 'personal_sign')
-      return wallet.signMessage(ethers.utils.isHexString(params[0]) ? ethers.utils.arrayify(params[0]) : params[0]);
-    if (method === 'eth_signTypedData_v4' || method === 'eth_signTypedData') {
-      const data = typeof params[1] === 'string' ? JSON.parse(params[1]) : params[1];
-      const types = { ...data.types };
-      delete types.EIP712Domain;
-      return wallet._signTypedData(data.domain, types, data.message);
-    }
-    throw new Error(`Unexpected fixture wallet method: ${method}`);
-  });
   await context.addInitScript(
-    ({ address, appOrigin }) => {
+    ({ seed, appOrigin }) => {
       if (location.origin !== appOrigin) return;
       localStorage.setItem('ce_onboarding_complete', 'true');
-      window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ = (...enhancers) => {
-        const compose = enhancers.length
-          ? enhancers.reduce(
-              (left, right) =>
-                (...args) =>
-                  left(right(...args)),
-            )
-          : (value) => value;
-        return (createStore) =>
-          (...args) => {
-            const store = compose(createStore)(...args);
-            store.dispatch({
-              type: 'LOGIN_ACCOUNT',
-              payload: {
-                account: address,
-                provider: 'web3auth',
-                network: {
-                  chainId: 11155420,
-                  id: 11155420,
-                  name: 'OP Sepolia',
-                },
-              },
-            });
-            store.dispatch({
-              type: 'LOGIN_IN_PROGRESS',
-              payload: {
-                loginComplete: true,
-                loginInProgress: false,
-                provider: 'web3auth',
-              },
-            });
-            return store;
-          };
+      const bytes = (value) => {
+        const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+        return Uint8Array.from(atob(base64 + '='.repeat((4 - base64.length % 4) % 4)), (char) => char.charCodeAt(0));
       };
-      window.web3authProvider = {
-        isWeb3Auth: true,
-        request: (args) => window.__ceSetupWalletRequest(args),
+      const credential = {
+        rawId: bytes(seed.credentialId).buffer,
+        getClientExtensionResults: () => ({ prf: { enabled: true, results: { first: bytes(seed.prfOutput).buffer } } }),
       };
+      Object.defineProperty(navigator, 'credentials', {
+        configurable: true,
+        value: { create: async () => credential, get: async () => credential },
+      });
     },
-    { address: wallet.address, appOrigin: new URL(baseUrl).origin },
+    { seed, appOrigin: new URL(baseUrl).origin },
   );
+  // Playwright answers CORS preflights itself for fulfilled routes. The header
+  // assertion below checks actual replies; direct Worker tests cover OPTIONS.
   await context.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     if (url.origin === new URL(baseUrl).origin) return route.continue();
     if (url.origin !== workerOrigin) return route.abort();
-    const response = await worker.fetch(
+    const upload = url.pathname === '/storage/upload' && request.method() === 'POST'
+      ? request.postDataJSON()
+      : null;
+    const responseUpload = upload?.resource === 'responses'
+      ? { questionId: (typeof upload.data === 'string' ? JSON.parse(upload.data) : upload.data).questionID }
+      : null;
+    if (responseUpload) responseUploads.push(responseUpload);
+    const failUpload = responseUpload && responseUploads.length === failResponseUploadAt;
+    let response = failUpload ? new Response(JSON.stringify({ error: 'Synthetic storage outage (503)' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': baseUrl },
+    }) : await worker.fetch(
       new Request(request.url(), {
         method: request.method(),
         headers: request.headers(),
         body: request.postDataBuffer() || undefined,
       }),
-      env,
+      workerEnv,
       { waitUntil: () => {} },
     );
+    if (!failUpload && request.headers().origin) {
+      assert.equal(response.headers.get('access-control-allow-origin'), request.headers().origin,
+        `Worker CORS header missing for ${request.method()} ${url.pathname}`);
+    }
+    // Receipt replay must also work while KV listings lag the committed upload.
+    // Keep this one fixture stale until replay; reload fixtures use fresh lists.
+    const deferredId = deferLostResponseListingUntilReplay && responseUploads.length === loseResponseUploadAt
+      ? responseUploads[loseResponseUploadAt - 1]?.storedId : '';
+    if (deferredId && response.ok && url.pathname === '/storage/list' && url.searchParams.get('resource') === 'responses') {
+      const listing = await response.json();
+      listing.items = listing.items.filter((entry) => (entry.storageRef?.id || entry.id) !== deferredId);
+      response = new Response(JSON.stringify(listing), { status: 200, headers: response.headers });
+    }
+    if (unavailableSubmit && url.pathname === '/capabilities') {
+      const capabilities = await response.json();
+      capabilities.session.unavailable = [{ operation: 'submit', reason: 'storage_missing' }];
+      response = new Response(JSON.stringify(capabilities), { status: 200, headers: response.headers });
+    }
+    if (loseResponseUploadAt && responseUpload) {
+      const stored = await response.clone().json();
+      Object.assign(responseUpload, { requestId: upload.requestId, storedId: stored.id, replayed: stored.replayed === true });
+      if (responseUploads.length === loseResponseUploadAt) {
+        assert.equal(response.status, 200, 'The lost reply follows a successful Worker upload');
+        response = new Response(JSON.stringify({ error: 'Synthetic lost upload reply (503)' }), {
+          status: 503, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': baseUrl },
+        });
+      }
+    }
+    if (responseUpload) responseUpload.status = response.status;
     calls.push({
       path: url.pathname + url.search,
       method: request.method(),
@@ -133,13 +150,59 @@ const fixtureContext = async (wallet) => {
       body: Buffer.from(await response.arrayBuffer()),
     });
   });
+  securityPolicyRuns.push(await installClientSecurityHeaders(context, baseUrl));
+  context.on('page', (page) => page.on('worker', (walletWorker) => walletWorkerUrls.add(walletWorker.url())));
   return context;
 };
+const login = async (page, wallet) => {
+  await page.getByTestId('ce-account-login-button').click();
+  await page.getByTestId('ce-passkey-wallet-create').click();
+  const display = page.getByTestId('ce-wallet-display');
+  await display.waitFor();
+  assert.equal((await display.getAttribute('data-ce-wallet-address')).toLowerCase(), wallet.address.toLowerCase());
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+};
+const showQuestion = async (page, question, count) => {
+  const card = page.getByTestId('ce-pile-active-question');
+  await card.waitFor();
+  const previous = page.getByRole('button', { name: 'Previous Question', exact: true });
+  for (let index = 0; index < count && await previous.isEnabled(); index += 1) await previous.click();
+  for (let index = 0; index < count; index += 1) {
+    if (await card.getByText(question.record.prompt, { exact: true }).isVisible()) return card;
+    if (index + 1 < count) await page.getByRole('button', { name: 'Next Question', exact: true }).click();
+  }
+  assert.fail(`Question was not shown: ${question.record.prompt}`);
+};
+const showQuestionList = async (page) => {
+  await page.locator('[data-testid="ce-survey-view-all"]:visible, [data-testid="ce-session-questions-full-header"]:visible').first().waitFor();
+  const viewAll = page.getByTestId('ce-survey-view-all');
+  if (await viewAll.isVisible()) await viewAll.click();
+  await page.getByTestId('ce-session-questions-full-header').waitFor();
+};
+const questionCard = (page, question) => page.locator('[class*="fullQuestionCard"]')
+  .filter({ has: page.getByText(question.record.prompt, { exact: true }) });
+const waitForSavedBookmarks = (page, slug, questionIds) => page.waitForFunction(
+  ({ slug, questionIds }) => new Promise((resolve, reject) => {
+    const open = indexedDB.open('ce_cache_v1');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const read = db.transaction('ce_cache_entries_v1').objectStore('ce_cache_entries_v1').get(`dg:bookmarksCache:${slug}`);
+      read.onerror = () => { db.close(); reject(read.error); };
+      read.onsuccess = () => {
+        db.close();
+        resolve(questionIds.every((id) => read.result?.questions?.includes(id.toLowerCase())));
+      };
+    };
+  }),
+  { slug, questionIds },
+);
 let page;
 try {
-  const adminContext = await fixtureContext(admin);
+  const adminContext = await fixtureContext(adminFixture);
   page = await adminContext.newPage();
   await page.goto(`${baseUrl}/new`, { waitUntil: 'domcontentloaded' });
+  await login(page, admin);
   await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').click();
   await page.getByTestId('ce-wizard-session-name').fill('Setup smoke session');
   await page.getByTestId('ce-wizard-session-info').fill('Synthetic publication and participant fixture.');
@@ -147,6 +210,7 @@ try {
   const key = page.getByTestId('ce-wizard-secret-openai-key');
   if (!(await key.isVisible())) await page.getByTestId('ce-wizard-worker-panel-toggle').click();
   await key.fill('synthetic-ai-key-not-a-credential');
+  await page.getByRole('checkbox', { name: 'Agents (HTTP API)', exact: true }).check();
   await page
     .locator('label')
     .filter({ hasText: 'Allowed origins (comma or newline)' })
@@ -168,6 +232,7 @@ try {
   assert(sessionLink, 'Publication returns a portable session link');
   const sessionUrl = new URL(sessionLink, baseUrl);
   const slug = decodeURIComponent(sessionUrl.pathname.split('/').at(-1));
+  env.DEFAULT_SESSION_SLUG = slug;
   const workerFetch = (url, init = {}) => worker.fetch(new Request(url, init), env, { waitUntil: () => {} });
   const adminClient = createWorkerClient({
     workerOrigin,
@@ -180,33 +245,67 @@ try {
   assert.equal(config.sessionName, 'Setup smoke session');
   assert.equal(config.sessionModeProfile.authority.mode, 'worker_canonical');
   assert.equal(config.sessionModeProfile.encryption.mode, 'worker_envelope');
-  assert.equal(config.sessionModeProfile.surfaces.agentHttp, false);
+  assert.equal(config.sessionModeProfile.surfaces.agentHttp, true);
+  const agentCaps = await (await workerFetch(`${workerOrigin}/capabilities?slug=${slug}`)).json();
+  assert.equal(agentCaps.agentHttp.ready, true);
+  assert.equal(agentCaps.agentSessionWrapped.origin, workerOrigin);
+  assert.equal(calls.some(call => call.path === '/deploy'), false);
+  env.GROUP_KV.values.set(`ce-agent:${adminClient.sessionId}:agent:credential:v2:fixture`, 'synthetic-agent-credential-not-exported');
   assert.ok(config.configRevision, 'The published configuration has a readback revision');
-  const question = buildQuestionRecord({
-    type: 'binary',
-    prompt: 'Community decisions should be easier to understand.',
-    creator: admin.address,
-    session: {
-      sessionSlug: slug,
-      sessionId: adminClient.sessionId,
-      sessionName: config.sessionName,
-    },
+  const seedQuestion = async (prompt) => {
+    const question = buildQuestionRecord({
+      type: 'binary', prompt, creator: admin.address,
+      session: { sessionSlug: slug, sessionId: adminClient.sessionId, sessionName: config.sessionName },
+    });
+    assert.equal(question.ok, true);
+    await adminClient.upload({
+      resource: 'questions', data: question.record,
+      tags: [
+        { name: 'CE-SessionId', value: adminClient.sessionId },
+        { name: 'CE-SessionSlug', value: slug },
+        { name: 'CE-Resource', value: 'questions' },
+        { name: 'CE-ResourceId', value: question.id },
+      ],
+    });
+    return question;
+  };
+  const question = await seedQuestion('Community decisions should be easier to understand.');
+  const memberExchange = await adminClient.request('/api/agent/wrapped/member-exchange', {
+    method: 'POST', auth: true, body: { sessionSlug: slug },
   });
-  assert.equal(question.ok, true);
-  await adminClient.upload({
-    resource: 'questions',
-    data: question.record,
-    tags: [
-      { name: 'CE-SessionId', value: adminClient.sessionId },
-      { name: 'CE-SessionSlug', value: slug },
-      { name: 'CE-Resource', value: 'questions' },
-      { name: 'CE-ResourceId', value: question.id },
-    ],
-  });
-  const participant = ethers.Wallet.createRandom();
-  const participantContext = await fixtureContext(participant);
+  const wrappedRequest = async (path, body) => {
+    const response = await workerFetch(`${workerOrigin}${path}?sessionSlug=${encodeURIComponent(slug)}`, {
+      method: body ? 'POST' : 'GET', headers: { authorization: `Bearer ${memberExchange.token}`, 'content-type': 'application/json' },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    assert.equal(response.status, 200, await response.clone().text());
+    return response.json();
+  };
+  const beforeStatements = new Map(env.GROUP_KV.values);
+  const wrapped = await wrappedRequest('/api/agent/agent-only/statements');
+  assert.equal(Object.hasOwn(wrapped, 'window_id'), false);
+  assert.deepEqual(env.GROUP_KV.values, beforeStatements, 'Wrapped reads must not write shared statements');
+  const statement = wrapped.statements.find(row => row.statement_id === question.id);
+  assert.equal(statement.text, question.record.prompt);
+  const answersBeforeWrapped = await adminClient.listAll('responses', { mine: true });
+  const wrappedBody = { run_id: 'continuous-space-smoke', request_id: 'continuous-space-answer',
+    agent_metadata: { model: 'synthetic-smoke-model', scaffold_version: 'smoke-v1' },
+    answers: [{ statement_id: statement.statement_id, statement_version: statement.statement_version,
+      answer: { value: 'agree' }, confidence: 80 }] };
+  assert.equal((await wrappedRequest('/api/agent/agent-only/answers/bulk', wrappedBody)).accepted, 1);
+  assert.equal((await wrappedRequest('/api/agent/agent-only/answers/bulk', wrappedBody)).replay, true);
+  const savedResearch = [...env.GROUP_KV.values].filter(([key]) => key.includes(':answer-event:')).map(([, value]) => JSON.parse(value));
+  assert.equal(savedResearch.length, 1);
+  assert.deepEqual(savedResearch[0].statement, statement);
+  assert.deepEqual(await adminClient.listAll('responses', { mine: true }), answersBeforeWrapped,
+    'Wrapped research must remain separate from ordinary participant responses');
+  console.log('Continuous Wrapped statements, exact saved wording, replay and separate research storage verified.');
+  const participantFixture = passkeyFixture('participant');
+  const participant = participantFixture.wallet;
+  const participantContext = await fixtureContext(participantFixture);
   page = await participantContext.newPage();
   await page.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' });
+  await login(page, participant);
   await page.getByText(question.record.prompt, { exact: true }).first().waitFor();
   const answer = 'Agree';
   await page.getByTestId('ce-pile-active-question').getByText(answer, { exact: true }).click();
@@ -271,6 +370,322 @@ try {
     fullPage: true,
     timeout: 10000,
   });
+
+  const secondQuestion = await seedQuestion('Community proposals should include their expected costs.');
+  const retryFixture = passkeyFixture('partial-submit-participant');
+  const responseUploads = [];
+  const retryContext = await fixtureContext(retryFixture, { failResponseUploadAt: 2, responseUploads });
+  page = await retryContext.newPage();
+  await page.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' });
+  await login(page, retryFixture.wallet);
+  const questions = [question, secondQuestion];
+  for (const entry of questions) {
+    const card = await showQuestion(page, entry, questions.length);
+    await card.getByText(answer, { exact: true }).click();
+  }
+  for (const entry of questions) {
+    const card = await showQuestion(page, entry, questions.length);
+    assert.equal(await card.getByRole('radio', { name: answer, exact: true }).isChecked(), true);
+  }
+  await page.getByTestId('ce-survey-submit').click();
+  const partialError = page.getByText(/Some answers didn't save \(/);
+  await partialError.waitFor();
+  assert.equal(responseUploads.length, 2, 'The first submit attempts both answers once');
+  assert.deepEqual(responseUploads.map(({ status }) => status), [200, 503]);
+  const unsaved = questions.find((entry) => entry.id === responseUploads[1].questionId);
+  assert.ok(unsaved, 'The failed upload names one of the answered questions');
+  assert.ok((await partialError.innerText()).includes(unsaved.record.prompt), 'The error names the unsaved question');
+  assert.equal(await page.getByTestId('ce-survey-submit').isVisible(), true, 'Partial success keeps Submit visible');
+  const retryClient = makeClient(retryFixture.wallet);
+  const partialSaved = await retryClient.listAll('responses', { mine: true });
+  assert.equal(partialSaved.items.length, 1, 'The answer stored before the outage remains saved');
+  await page.getByTestId('ce-survey-submit').click();
+  await partialError.waitFor({ state: 'hidden' });
+  await page.getByTestId('ce-survey-submitted-indicator').first().waitFor();
+  assert.deepEqual(responseUploads.slice(2), [{ questionId: unsaved.id, status: 200 }], 'Retry uploads only the unsaved answer');
+  const retrySaved = await retryClient.listAll('responses', { mine: true });
+  assert.equal(retrySaved.complete, true);
+  assert.equal(retrySaved.items.length, 2, 'The completed retry stores exactly two answers');
+  const retryRecords = await Promise.all(retrySaved.items.map((entry) => retryClient.read(entry.storageRef.id)));
+  assert.deepEqual(retryRecords.map((entry) => entry.questionID).sort(), questions.map((entry) => entry.id).sort());
+  assert.ok(retryRecords.every((entry) => entry.answer.value === answer));
+  console.log('Partial submission kept the first answer and retried only the unsaved answer.');
+
+  for (const prompt of [
+    'Residents should have time to review local proposals.',
+    'Meeting notes should be available in plain language.',
+    'Public feedback should receive a clear response.',
+    'Community projects should report their progress.',
+  ]) questions.push(await seedQuestion(prompt));
+  const tabA = page;
+  const tabB = await retryContext.newPage();
+  await Promise.all([tabA.reload({ waitUntil: 'domcontentloaded' }), tabB.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' })]);
+  for (const tab of [tabA, tabB]) {
+    await tab.getByRole('group', { name: /^Question \d+ of 6$/ }).waitFor();
+    assert.equal(await tab.evaluate(() => typeof navigator.locks?.request), 'function');
+    await showQuestionList(tab);
+  }
+  const bookmarked = [];
+  for (let pair = 0; pair < questions.length; pair += 2) {
+    const cards = [questionCard(tabA, questions[pair]), questionCard(tabB, questions[pair + 1])];
+    await Promise.all(cards.map((card) => card.getByRole('button', { name: 'Bookmark question', exact: true }).click()));
+    bookmarked.push(questions[pair], questions[pair + 1]);
+    await waitForSavedBookmarks(tabA, slug, bookmarked.map((entry) => entry.id));
+    await Promise.all([tabA.reload({ waitUntil: 'domcontentloaded' }), tabB.reload({ waitUntil: 'domcontentloaded' })]);
+    for (const tab of [tabA, tabB]) {
+      page = tab;
+      await showQuestionList(tab);
+      for (const entry of bookmarked) {
+        const card = questionCard(tab, entry);
+        const bookmark = card.getByRole('button', { name: 'Remove bookmark', exact: true });
+        await bookmark.waitFor();
+        assert.equal(await bookmark.getAttribute('aria-pressed'), 'true', 'Both reloaded tabs retain every bookmark');
+      }
+    }
+  }
+  console.log('Two tabs retained all six concurrent bookmarks across three reloads.');
+  await page.screenshot({ path: `${outputDir}/participant-bookmarks.png`, fullPage: true, timeout: 10000 });
+
+  const lostReplyFixture = passkeyFixture('lost-reply-participant');
+  const lostReplyUploads = [];
+  const lostReplyContext = await fixtureContext(lostReplyFixture, { loseResponseUploadAt: 2, deferLostResponseListingUntilReplay: true, responseUploads: lostReplyUploads });
+  page = await lostReplyContext.newPage();
+  await page.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' });
+  await login(page, lostReplyFixture.wallet);
+  for (const entry of questions.slice(0, 2)) {
+    const card = await showQuestion(page, entry, questions.length);
+    await card.getByText(answer, { exact: true }).click();
+  }
+  await page.getByTestId('ce-survey-submit').click();
+  const lostReplyError = page.getByText(/Some answers didn't save \(/);
+  await lostReplyError.waitFor();
+  assert.deepEqual(lostReplyUploads.map(({ status }) => status), [200, 503]);
+  const lostReplyClient = makeClient(lostReplyFixture.wallet);
+  assert.equal((await lostReplyClient.listAll('responses', { mine: true })).items.length, 2, 'Both answers were stored before the reply was lost');
+  await page.getByTestId('ce-survey-submit').click();
+  await lostReplyError.waitFor({ state: 'hidden' });
+  await page.getByTestId('ce-survey-submitted-indicator').first().waitFor();
+  assert.equal(lostReplyUploads.length, 3, 'Only the answer with a lost reply is retried');
+  assert.equal(lostReplyUploads[2].requestId, lostReplyUploads[1].requestId);
+  assert.equal(lostReplyUploads[2].storedId, lostReplyUploads[1].storedId);
+  assert.equal(lostReplyUploads[2].replayed, true, 'The Worker replays its settled receipt');
+  const restoredReplies = await lostReplyClient.listAll('responses', { mine: true });
+  assert.equal(restoredReplies.items.length, 2, 'A lost reply retry creates no duplicate record');
+  const savedReplies = await Promise.all(restoredReplies.items.map((entry) => lostReplyClient.read(entry.storageRef.id)));
+  assert.deepEqual(savedReplies.map((entry) => entry.questionID).sort(), questions.slice(0, 2).map((entry) => entry.id).sort());
+  await page.screenshot({ path: `${outputDir}/participant-lost-reply.png`, fullPage: true, timeout: 10000 });
+  console.log('A lost upload reply replayed the original reference without another stored answer.');
+  const reloadRecoveryStartedAt = performance.now();
+  const reloadRecoveryUploads = {};
+  for (const mode of ['lost', 'failed']) {
+    const fixture = passkeyFixture(`reload-${mode}-participant`);
+    const uploads = [];
+    reloadRecoveryUploads[mode] = uploads;
+    const context = await fixtureContext(fixture, {
+      ...(mode === 'lost' ? { loseResponseUploadAt: 2 } : { failResponseUploadAt: 2 }),
+      responseUploads: uploads,
+    });
+    page = await context.newPage();
+    await page.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' });
+    await login(page, fixture.wallet);
+    for (const entry of questions.slice(0, 2)) {
+      const card = await showQuestion(page, entry, questions.length);
+      await card.getByText(answer, { exact: true }).click();
+    }
+    await page.getByTestId('ce-survey-submit').click();
+    await page.getByText(/Some answers didn't save \(/).waitFor();
+    assert.deepEqual(uploads.map(({ status }) => status), [200, 503]);
+    const client = makeClient(fixture.wallet);
+    assert.equal((await client.listAll('responses', { mine: true })).items.length, mode === 'lost' ? 2 : 1);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    for (const entry of questions.slice(0, 2)) {
+      const card = await showQuestion(page, entry, questions.length);
+      assert.equal(await card.getByRole('radio', { name: answer, exact: true }).isChecked(), true,
+        `${mode}: saved answers and unsaved drafts survive reload`);
+    }
+    if (mode === 'lost') {
+      await page.getByTestId('ce-survey-submit').waitFor({ state: 'hidden' });
+      assert.equal(await page.getByTestId('ce-survey-submit').isVisible(), false, 'Hydrated saved answers offer nothing to resend');
+      assert.equal(uploads.length, 2, 'Reload does not resend either stored answer');
+    } else {
+      await page.getByTestId('ce-survey-submit').click();
+      await page.getByTestId('ce-survey-submitted-indicator').first().waitFor();
+      assert.deepEqual(uploads.slice(2), [{ questionId: uploads[1].questionId, status: 200 }],
+        'After reload, only the unsaved draft uploads');
+    }
+    const stored = await client.listAll('responses', { mine: true });
+    assert.equal(stored.complete, true);
+    assert.equal(stored.items.length, 2, `${mode}: reload recovery leaves exactly two records`);
+    const records = await Promise.all(stored.items.map((entry) => client.read(entry.storageRef.id)));
+    assert.deepEqual(records.map((entry) => entry.questionID).sort(), questions.slice(0, 2).map((entry) => entry.id).sort());
+    await page.screenshot({ path: `${outputDir}/participant-reload-${mode}.png`, fullPage: true, timeout: 10000 });
+    await context.close();
+  }
+  const reloadRecoveryElapsedMs = Math.round(performance.now() - reloadRecoveryStartedAt);
+  console.log(`Reload recovery kept saved answers and retried only the unsaved draft in ${reloadRecoveryElapsedMs}ms.`);
+  const unavailableFixture = passkeyFixture('readiness-participant');
+  const unavailableUploads = [];
+  const unavailableContext = await fixtureContext(unavailableFixture, { unavailableSubmit: true, responseUploads: unavailableUploads });
+  page = await unavailableContext.newPage();
+  await page.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' });
+  await login(page, unavailableFixture.wallet);
+  const unavailableCard = await showQuestion(page, question, questions.length);
+  await unavailableCard.getByText(answer, { exact: true }).click();
+  await page.getByTestId('ce-survey-submit').click();
+  await page.getByText(/The session Worker is missing its storage index/).first().waitFor();
+  assert.equal(unavailableUploads.length, 0, 'Explicit readiness refusal blocks before any answer upload');
+  const retainedCard = await showQuestion(page, question, questions.length);
+  assert.equal(await retainedCard.getByRole('radio', { name: answer, exact: true }).isChecked(), true, 'A readiness refusal retains the draft');
+  page = await adminContext.newPage();
+  const adminUrl = new URL('/admin', baseUrl);
+  adminUrl.searchParams.set('sessionId', adminClient.sessionId);
+  adminUrl.searchParams.set('sessionSlug', slug);
+  adminUrl.searchParams.set('worker', workerOrigin);
+  await page.goto(adminUrl.href, { waitUntil: 'domcontentloaded' });
+  await page.getByTestId('ce-admin-session-backup').waitFor();
+  const diagnostics = page.getByTestId('ce-admin-session-diagnostics');
+  await diagnostics.getByTestId('ce-admin-diagnostics-refresh').click();
+  await diagnostics.getByText('Settled upload receipts', { exact: true }).waitFor();
+  const diagnosticValue = (label) => diagnostics.locator('dt').filter({ hasText: label }).locator('+ dd').innerText();
+  assert.equal(await diagnosticValue('Pending upload leases'), '0');
+  assert.equal(await diagnosticValue('Settled upload receipts'), '9', 'Diagnostics count all nine settled answers across five participants');
+  assert.equal(await diagnosticValue('Config projection repair'), 'Not pending');
+  const downloaded = page.waitForEvent('download', { timeout: 120000 });
+  await page.getByTestId('ce-admin-backup-download').click();
+  const backupPath = `${outputDir}/session-backup.jsonl`;
+  await (await downloaded).saveAs(backupPath);
+  const backupPages = (await readFile(backupPath, 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
+  assert.equal(backupPages.at(-1).manifest.complete, true);
+  assert.equal(JSON.stringify(backupPages).includes('synthetic-agent-credential-not-exported'), false);
+  assert.equal(JSON.stringify(backupPages).includes(env.AGENT_MANAGED_ROOT_SECRET), false);
+  assert.ok(backupPages.flatMap((entry) => entry.entries).some((entry) => entry.kind === 'payload'));
+  await page.getByTestId('ce-admin-backup-file').setInputFiles(backupPath);
+  await page.getByRole('status').filter({ hasText: 'Ready to restore' }).waitFor();
+  await page.getByTestId('ce-admin-backup-restore').click();
+  await page.getByRole('alert').filter({ hasText: 'Restore requires an empty target session' }).waitFor();
+  const sourceAdminPage = page;
+  const restoreEnv = installSessionCoordinatorBinding({
+    GROUP_KV: kv(), CE_STORAGE_INDEX_KV: kv(), DEFAULT_SESSION_SLUG: slug,
+    BOOTSTRAP_ADMIN_ADDRESS: admin.address, LOGIN_TRUSTED_ORIGINS: baseUrl, ADMIN_TRUSTED_ORIGINS: baseUrl,
+    TOKEN_HMAC_SECRET: 'synthetic-fresh-restore-token-key', CE_STORAGE_ENVELOPE_KEK: env.CE_STORAGE_ENVELOPE_KEK,
+  });
+  const restoreContext = await fixtureContext(adminFixture, { workerEnv: restoreEnv });
+  page = await restoreContext.newPage();
+  await page.goto(adminUrl.href, { waitUntil: 'domcontentloaded' });
+  await login(page, admin);
+  await page.getByTestId('ce-admin-session-backup').waitFor();
+  await page.getByTestId('ce-admin-backup-file').setInputFiles(backupPath);
+  await page.getByRole('status').filter({ hasText: 'Ready to restore' }).waitFor();
+  await page.getByLabel('Adopt the backup session ID on a fresh deployment').check();
+  await page.getByTestId('ce-admin-backup-restore').click();
+  await page.getByRole('status').filter({ hasText: 'Restore complete.' }).waitFor({ timeout: 120000 });
+  assert.deepEqual([...restoreEnv.CE_STORAGE_INDEX_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(),
+    [...env.CE_STORAGE_INDEX_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(), 'Fresh restore preserves every metadata record');
+  assert.equal([...restoreEnv.GROUP_KV.values.keys()].some(key => key.startsWith(`ce-agent:${adminClient.sessionId}:`)), false);
+  const restoredAgentCaps = await (await worker.fetch(new Request(`${workerOrigin}/capabilities?slug=${slug}`), restoreEnv)).json();
+  assert.equal(restoredAgentCaps.agentHttp.ready, false, 'Restored session needs fresh agent resources and credentials');
+  await page.getByTestId('ce-admin-session-backup').screenshot({ path: `${outputDir}/admin-backup-restore.png`, timeout: 10000 });
+  await restoreContext.close();
+  page = sourceAdminPage;
+  const originalTheme = await page.evaluate(() => document.documentElement.getAttribute('data-ce-theme'));
+  for (const theme of ['context-engine', 'classic-95', 'civic']) {
+    await page.evaluate((value) => document.documentElement.setAttribute('data-ce-theme', value), theme);
+    await page.getByTestId('ce-admin-session-backup').screenshot({ path: `${outputDir}/admin-backup-${theme}.png` });
+    await diagnostics.screenshot({ path: `${outputDir}/admin-diagnostics-${theme}.png` });
+  }
+  await page.evaluate((value) => value ? document.documentElement.setAttribute('data-ce-theme', value) : document.documentElement.removeAttribute('data-ce-theme'), originalTheme);
+  console.log('Admin downloaded a complete JSONL backup, refused a live target, and restored a fresh target through signed requests.');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByTestId('ce-admin-recovery-key-show').click();
+  await page.getByRole('heading', { name: 'Save your recovery key' }).waitFor();
+  assert.equal(await page.getByLabel('Recovery key', { exact: true }).getAttribute('type'), 'password');
+  await page.waitForFunction(() => { const dialog = document.querySelector('[role=dialog]'); return dialog && getComputedStyle(dialog).opacity === '1'; });
+  await page.getByRole('dialog').locator('.modal-content').screenshot({ path: `${outputDir}/recovery-key-masked.png` });
+  for (const theme of ['context-engine', 'classic-95', 'civic']) {
+    await page.evaluate((value) => document.documentElement.setAttribute('data-ce-theme', value), theme);
+    await page.getByRole('dialog').locator('.modal-content').screenshot({ path: `${outputDir}/recovery-key-${theme}.png` });
+  }
+  await page.evaluate((value) => value ? document.documentElement.setAttribute('data-ce-theme', value) : document.documentElement.removeAttribute('data-ce-theme'), originalTheme);
+  const keyDownload = page.waitForEvent('download');
+  await page.getByTestId('ce-recovery-key-download').click();
+  const keyPath = `${outputDir}/synthetic-recovery-key.txt`;
+  await (await keyDownload).saveAs(keyPath);
+  const keyFile = await readFile(keyPath, 'utf8');
+  assert.ok(keyFile.includes(env.CE_STORAGE_ENVELOPE_KEK));
+  assert.ok(keyFile.includes(slug) && keyFile.includes(workerOrigin) && keyFile.includes('Fingerprint:'));
+  const persisted = await page.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
+  assert.ok(!persisted.includes(env.CE_STORAGE_ENVELOPE_KEK), 'The exported recovery key is not persisted in browser storage');
+  await page.getByTestId('ce-recovery-key-saved').click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  console.log('Admin confirmed recovery-key export and downloaded a private copy without browser persistence.');
+
+  page = await adminContext.newPage();
+  await page.goto(sessionUrl.href, { waitUntil: 'domcontentloaded' });
+  await page.getByTestId('ce-survey-create-toggle-pile').click();
+  const authoring = page.getByTestId('ce-create-panel');
+  await authoring.waitFor();
+  const manual = authoring.getByRole('button', { name: 'Manual', exact: true });
+  if (await manual.isVisible()) await manual.click();
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    window.__ceRestoreDraftStorage = () => { Storage.prototype.setItem = setItem; };
+    Storage.prototype.setItem = function (key, value) {
+      if (key.startsWith('unfinishedSurvey')) throw new DOMException('Synthetic full draft storage', 'QuotaExceededError');
+      return setItem.call(this, key, value);
+    };
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: async (value) => { window.__ceCopiedDraft = value; },
+    } });
+  });
+  await authoring.getByRole('button', { name: 'Add Freeform question', exact: true }).click();
+  const draftPrompt = 'Which local draft should survive a storage outage?';
+  await authoring.getByRole('textbox', { name: 'Question prompt', exact: true }).fill(draftPrompt);
+  const draftNotice = authoring.getByTestId('ce-create-draft-save-notice');
+  await draftNotice.getByText('Draft could not be saved in this browser.', { exact: true }).waitFor();
+  await draftNotice.getByRole('button', { name: 'Copy draft', exact: true }).click();
+  const copiedDraft = JSON.parse(await page.evaluate(() => window.__ceCopiedDraft));
+  assert.equal(copiedDraft.questions[0].prompt, draftPrompt);
+  assert.ok(await draftNotice.isVisible(), 'Copying does not claim the browser save succeeded');
+  await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Synthetic clipboard denial'); }; });
+  const draftDownload = page.waitForEvent('download');
+  await draftNotice.getByRole('button', { name: 'Copy draft', exact: true }).click();
+  const draftPath = `${outputDir}/authoring-draft.json`;
+  await (await draftDownload).saveAs(draftPath);
+  assert.equal(JSON.parse(await readFile(draftPath, 'utf8')).questions[0].prompt, draftPrompt);
+  const draftTheme = await page.evaluate(() => document.documentElement.getAttribute('data-ce-theme'));
+  for (const theme of ['context-engine', 'classic-95', 'civic']) {
+    await page.evaluate((value) => document.documentElement.setAttribute('data-ce-theme', value), theme);
+    await assertReadable(draftNotice);
+    for (const control of ['Retry', 'Copy draft']) {
+      await draftNotice.getByRole('button', { name: control, exact: true }).hover();
+      await assertReadable(draftNotice);
+      await draftNotice.getByRole('button', { name: control, exact: true }).focus();
+      await assertReadable(draftNotice);
+    }
+    await draftNotice.screenshot({ path: `${outputDir}/authoring-draft-${theme}.png` });
+  }
+  await page.evaluate((value) => value ? document.documentElement.setAttribute('data-ce-theme', value) : document.documentElement.removeAttribute('data-ce-theme'), draftTheme);
+  const unloadWarning = page.waitForEvent('dialog');
+  const cancelledReload = page.reload().catch(() => null);
+  const warning = await unloadWarning;
+  assert.equal(warning.type(), 'beforeunload');
+  await warning.dismiss();
+  await cancelledReload;
+  assert.equal(await authoring.getByRole('textbox', { name: 'Question prompt', exact: true }).inputValue(), draftPrompt);
+  await page.evaluate(() => window.__ceRestoreDraftStorage());
+  await draftNotice.getByRole('button', { name: 'Retry', exact: true }).click();
+  await draftNotice.waitFor({ state: 'hidden' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByTestId('ce-survey-create-toggle-pile').click();
+  await authoring.waitFor();
+  assert.equal(await authoring.getByRole('textbox', { name: 'Question prompt', exact: true }).inputValue(), draftPrompt);
+  assert.equal(await draftNotice.count(), 0);
+  console.log('Authoring save failure stayed visible through copy/download, warned on unload, then Retry persisted the draft across reload.');
+
+  assert.deepEqual(securityPolicyRuns.flat(), [], 'Publication, passkey signing and reloads must have no CSP violations');
+  assert.ok([...walletWorkerUrls].some((url) => new URL(url).origin === new URL(baseUrl).origin && /\/assets\/sessionWorker-[^/]+\.js$/.test(new URL(url).pathname)),
+    `The passkey wallet module worker must start under CSP: ${JSON.stringify([...walletWorkerUrls])}`);
+  const elapsedMs = Math.round(performance.now() - startedAt);
   await writeFile(
     `${outputDir}/result.json`,
     JSON.stringify(
@@ -278,16 +693,37 @@ try {
         ok: true,
         baseUrl,
         configRevision: config.configRevision,
+        elapsedMs,
         checks: [
+          'authoring draft failure notice, copy/download, unload warning and successful retry/reload',
+          'real static CSP without violations across the publication journey',
+          'passkey wallet module worker startup and signed requests under CSP',
           'signed Worker verification',
           'wizard publication and config readback',
+          'continuous Wrapped reads without shared writes, exact saved wording, replay and separate research',
           'fresh-context answer submission',
           'reload persistence',
           'participant Results UI',
           'author and admin readback',
           'other-participant and anonymous denial',
           'encrypted storage',
+          'partial submission and unsaved-only retry',
+          'lost upload reply replays the original reference with no duplicate',
+          'lost reply then reload hydrates both saved answers without resending',
+          'failed upload then reload keeps the unsaved draft and uploads it once',
+          'three concurrent two-tab bookmark pairs survive reload',
+          'explicit submit readiness refusal retains the draft without uploading',
+          'admin JSONL download, live-target refusal and signed restore into an empty target',
+          'admin diagnostics across five participant receipt stores',
+          'confirmed masked recovery-key download without browser persistence',
+          'backup and recovery-key screenshots in all three themes',
         ],
+        securityPolicyViolations: securityPolicyRuns.flat(),
+        walletWorkerUrls: [...walletWorkerUrls],
+        responseUploads,
+        lostReplyUploads,
+        reloadRecoveryUploads,
+        reloadRecoveryElapsedMs,
         calls,
       },
       null,
@@ -295,7 +731,7 @@ try {
     ),
   );
   console.log(
-    'Session publication smoke passed: fresh participant, saved answer, Results, encrypted storage, and read permissions.',
+    `Session publication smoke passed in ${elapsedMs}ms: publication, saved answers, partial retry, lost reply, Results, permissions, two-tab bookmarks, backup/restore, and recovery-key custody.`,
   );
 } catch (error) {
   if (page) {

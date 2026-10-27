@@ -57,10 +57,11 @@ export const shouldIgnorePromptCopyEvent = (target: EventTarget | null): boolean
 export const buildResearchPacket = (
   prefillPacket: InterviewPrefillPacket | null,
   sessionSlug: string,
+  modelId: string = DEFAULT_AI_MODEL,
 ): InterviewPrefillPacket =>
   prefillPacket || {
     version: 1,
     sessionSlug,
-    source: { platform: 'other', modelId: DEFAULT_AI_MODEL, verification: 'self_reported' },
+    source: { platform: 'other', modelId, verification: 'self_reported' },
     responderContext: {},
   };

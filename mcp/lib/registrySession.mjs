@@ -5,6 +5,7 @@ import surveysAbi from '../../client/src/contractsABI/SURVEYS_ABI.json' with { t
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import { normalizeWorkerOrigin } from './sessionLinks.mjs';
 import { text, normalizeSessionIdHex } from './workerClient.mjs';
+import { chainRequest } from './chainErrors.mjs';
 import { checkRegistryChain, findStartBlock, scanRegistryLogs, compareChainOrder } from './registryChain.mjs';
 import { readRegistryMetadata, fetchArweaveJson, hexToArweaveId } from './registryPayloads.mjs';
 import { createRegistryWriter } from './registryWrites.mjs';
@@ -59,14 +60,14 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
   const loadConfig = async () => {
     await checkRegistryChain(provider, chainId);
     const slug = info.slug === 'general' ? '' : info.slug;
-    const row = await registry.getSessionBySlug(slug);
+    const row = await chainRequest(() => registry.getSessionBySlug(slug));
     if (normalized(row[0]) !== slug) throw new Error('The registry returned a different session.');
     if (text(row[3])) throw new Error('Encrypted registry metadata is unsupported; use an unencrypted session.');
     if (Number(row[1]) !== chainId) throw new Error('The session uses a different chain from this registry.');
     const metadata = await readRegistryMetadata(row[2], { fetchImpl });
     checkMetadata(metadata);
     // Deliberately never request or use the registry's rpcUrl field.
-    const fields = await registry.getSessionFields(slug, ['corsWorkerUrl']);
+    const fields = await chainRequest(() => registry.getSessionFields(slug, ['corsWorkerUrl']));
     const workerUrl = text(fields[0]) || text(metadata.corsWorkerUrl);
     if (/^\s*(?:\{|enc:|lit:)/i.test(workerUrl)) throw new Error('Encrypted Worker URLs are unsupported; use an unencrypted registry session.');
     const nextOrigin = normalizeWorkerOrigin(workerUrl, { allowLocalWorkers: config.allowLocalWorkers });
@@ -83,7 +84,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
       contracts: { ...metadata.contracts, surveys: { address, chainId } } };
     if (startBlock === undefined) {
       const configured = Number(metadata.blockLimits?.start);
-      const head = await provider.getBlockNumber();
+      const head = await chainRequest(() => provider.getBlockNumber());
       startBlock = metadata.blockLimits?.start !== undefined && Number.isSafeInteger(configured) && configured >= 0
         ? configured : await findStartBlock(provider, Number(row[5]), head);
       questionCursor = { block: startBlock, offset: 0 };
@@ -104,20 +105,66 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
   };
   const filter = (eventName) => ({ address: surveys.address, topics: [surveys.interface.getEventTopic(eventName)] });
 
+  // A block hash commits to every earlier block. Each reader keeps the hash of the
+  // head it scanned under; when that block changes, a reorganization replaced
+  // history the reader already used, and it rebuilds from the session start.
+  const readBlock = (number, blocks) => {
+    if (!blocks.has(number)) blocks.set(number, chainRequest(() => provider.getBlock(number)).catch(() => null));
+    return blocks.get(number);
+  };
+  const readHeadMark = async (number, blocks) => {
+    const block = await readBlock(number, blocks);
+    return block?.hash ? { number, hash: block.hash } : null;
+  };
+  const historyReplaced = async (mark, blocks) => {
+    if (!mark?.hash) return false;
+    const block = await readBlock(mark.number, blocks);
+    // A missing block means this RPC node is behind; it cannot disprove the mark yet.
+    return block?.hash ? block.hash !== mark.hash : null;
+  };
+  /** True if replaced, false if retained, null if the RPC cannot verify it yet. */
+  const replacedWrite = (entry, blocks = new Map()) => historyReplaced(entry?.blockHash ? { number: entry.blockNumber, hash: entry.blockHash } : null, blocks);
+  let questionMark = null;
+  const visibleQuestions = () => {
+    const blocked = new Set((Array.isArray(sessionConfig.BLOCKED_QUESTION_IDS) ? sessionConfig.BLOCKED_QUESTION_IDS : []).map(normalized));
+    return [...questions.values()].filter((entry) => !blocked.has(entry.id));
+  };
+
   const readQuestions = async ({ signal } = {}) => {
     const deadline = now() + 90000;
+    const blocks = new Map();
     let complete = true;
+    const replaced = await historyReplaced(questionMark, blocks);
+    // Advancing a cursor without verifying its prior mark leaves new blocks
+    // uncovered: a later reorg above that old mark would never be noticed.
+    if (replaced === null) return { items: visibleQuestions(), complete: false };
+    if (replaced) {
+      questions.clear();
+      pending.clear();
+      questionCursor = { block: startBlock, offset: 0 };
+      questionMark = null;
+    }
+    for (const [id, entry] of questions) {
+      if (!entry.local) continue;
+      const replaced = await replacedWrite(entry, blocks);
+      if (replaced === null) complete = false;
+      if (replaced) questions.delete(id);
+    }
     if (pending.size < MAX_CACHE && questions.size < MAX_QUESTIONS) {
-      const scanned = await scanRegistryLogs({ provider, filter: filter('QuestionsAdded'), cursor: questionCursor,
-        toBlock: await provider.getBlockNumber(), maxLogs: 1000, deadline, now, signal });
-      questionCursor = scanned.cursor;
-      complete = scanned.complete;
-      for (const log of scanned.logs) {
-        const event = surveys.interface.parseLog(log);
-        event.args.questionIds.forEach((id, index) => {
-          if (event.args.surveyIds[index] === ethers.constants.HashZero && !questions.has(normalized(id))) pending.set(normalized(id), log);
-        });
-      }
+      const head = await readHeadMark(await chainRequest(() => provider.getBlockNumber()), blocks);
+      if (head) {
+        const scanned = await scanRegistryLogs({ provider, filter: filter('QuestionsAdded'), cursor: questionCursor,
+          toBlock: head.number, maxLogs: 1000, deadline, now, signal });
+        questionCursor = scanned.cursor;
+        complete = complete && scanned.complete;
+        if (replaced !== null && (!questionMark || head.number >= questionMark.number)) questionMark = head;
+        for (const log of scanned.logs) {
+          const event = surveys.interface.parseLog(log);
+          event.args.questionIds.forEach((id, index) => {
+            if (event.args.surveyIds[index] === ethers.constants.HashZero && !questions.has(normalized(id))) pending.set(normalized(id), log);
+          });
+        }
+      } else complete = false;
     } else complete = false;
     const work = [...pending.entries()];
     let next = 0;
@@ -125,7 +172,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
       while (next < work.length && now() < deadline && !signal?.aborted && questions.size < MAX_QUESTIONS) {
         const [id, log] = work[next++];
         try {
-          const pointer = await surveys.getQuestionHash(id);
+          const pointer = await chainRequest(() => surveys.getQuestionHash(id));
           const payload = await readPayload(pointer);
           const matches = registryQuestionMatchesSession(payload, sessionConfig);
           if (matches) questions.set(id, { id, payload: { ...payload, id }, createdAt: String(log.blockNumber).padStart(16, '0'), ...log });
@@ -133,8 +180,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
         } catch { complete = false; }
       }
     }));
-    const blocked = new Set((Array.isArray(sessionConfig.BLOCKED_QUESTION_IDS) ? sessionConfig.BLOCKED_QUESTION_IDS : []).map(normalized));
-    return { items: [...questions.values()].filter((entry) => !blocked.has(entry.id)), complete: complete && !pending.size && questions.size < MAX_QUESTIONS };
+    return { items: visibleQuestions(), complete: complete && !pending.size && questions.size < MAX_QUESTIONS };
   };
   const loadQuestions = (args) => {
     if (!loadingQuestions) loadingQuestions = readQuestions(args).finally(() => { loadingQuestions = null; });
@@ -144,19 +190,45 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
   const readAnswers = async ({ questionIds, maxRecords = 10000, mine = false, signal } = {}) => {
     const known = new Set(questionIds);
     const deadline = now() + 90000;
+    const blocks = new Map();
+    let verified = true;
     const responseFilter = filter('ResponsesSubmitted');
     if (mine) responseFilter.topics.push(ethers.utils.hexZeroPad(wallet.address, 32));
-    const head = await provider.getBlockNumber();
+    const head = await chainRequest(() => provider.getBlockNumber());
     const scope = [...known].sort().join(',');
     let state = answerScans.get(mine);
-    if (!state || state.scope !== scope || head < state.head) {
-      state = { scope, head: startBlock - 1, ranges: [], latest: new Map(), capped: false };
+    const replaced = !!state && state.scope === scope && head >= state.head && await historyReplaced(state.mark, blocks);
+    if (replaced === null) {
+      // Keep the previous payloads too; current contract pointers may already
+      // name answers from the unverified blocks we must not scan yet. Confirmed
+      // local writes can fill this gap, but cannot replace a newer chain answer.
+      const held = new Map((state.result?.entries || []).map((entry) =>
+        [`${entry.questionId}:${normalized(entry.responder)}`, entry]));
+      const chainOrders = new Map(state.result?.chainOrders || []);
+      for (const entry of localAnswers.values()) {
+        if (!known.has(entry.questionId)) continue;
+        const key = `${entry.questionId}:${normalized(entry.responder)}`;
+        if ([state.latest.get(key), held.get(key)].some((previous) => previous && compareChainOrder(entry, previous) < 0)) continue;
+        chainOrders.set(entry.questionId, entry);
+        held.delete(key);
+        if (registryResponseMatchesSession(entry.payload, sessionConfig) && entry.payload.answer?.encrypted !== true &&
+            normalized(entry.payload.questionID || entry.payload.questionId) === entry.questionId) held.set(key, entry);
+      }
+      return { entries: [...held.values()].sort((a, b) => compareChainOrder(b, a)).slice(0, maxRecords),
+        complete: false, chainOrders };
+    }
+    if (!state || state.scope !== scope || head < state.head || replaced) {
+      state = { scope, head: startBlock - 1, mark: null, ranges: [], latest: new Map(), capped: false };
     } else state = { ...state, ranges: state.ranges.map((range) => ({ ...range })), latest: new Map(state.latest) };
     // New blocks take priority while older ranges retain their cursor. Restarting
     // from session creation permanently misses answers beyond one scan's budget.
     if (head > state.head) {
-      state.ranges.unshift({ from: Math.max(startBlock, state.head + 1), cursor: { block: head, offset: 0 } });
-      state.head = head;
+      const mark = await readHeadMark(head, blocks);
+      if (mark) {
+        state.ranges.unshift({ from: Math.max(startBlock, state.head + 1), cursor: { block: head, offset: 0 } });
+        state.head = head;
+        if (replaced !== null) state.mark = mark;
+      } else verified = false;
     }
     // Bound pending ranges even if the chain advances faster than RPC scans.
     // Merging old gaps only re-reads events; latest-by-chain-order deduplicates them.
@@ -203,8 +275,12 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     const latest = new Map(state.latest);
     // Confirmed local writes fill propagation gaps, but must not resurrect an
     // older plaintext answer after a newer encrypted or cleared chain answer.
-    for (const entry of localAnswers.values()) {
+    for (const [id, entry] of localAnswers) {
       if (!known.has(entry.questionId)) continue;
+      // A write can land above the last scanned head, or survive a scope reset.
+      const replaced = await replacedWrite(entry, blocks);
+      if (replaced === null) verified = false;
+      if (replaced) { localAnswers.delete(id); continue; }
       if (!scannedAll && entry.blockNumber <= head) continue;
       const key = `${entry.questionId}:${normalized(entry.responder)}`;
       if (!latest.has(key) || compareChainOrder(entry, latest.get(key)) > 0) latest.set(key, { ...entry, local: true });
@@ -213,8 +289,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     const chainOrders = new Map(candidates.filter((entry) => normalized(entry.responder) === normalized(wallet.address))
       .map((entry) => [entry.questionId, entry]));
     const entries = [];
-    const blockTimes = new Map();
-    let complete = scannedAll && candidates.length <= maxRecords;
+    let complete = verified && scannedAll && candidates.length <= maxRecords;
     let next = 0;
     const selected = candidates.slice(0, maxRecords);
     await Promise.all(Array.from({ length: Math.min(6, selected.length) }, async () => {
@@ -222,27 +297,28 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
         if (now() >= deadline || signal?.aborted) { complete = false; break; }
         const entry = selected[next++];
         try {
-          const pointer = entry.local ? entry.storageId : await surveys.getResponse(entry.responder, entry.questionId);
+          const pointer = entry.local ? entry.storageId : await chainRequest(() => surveys.getResponse(entry.responder, entry.questionId));
           const payload = await readPayload(pointer);
           if (!registryResponseMatchesSession(payload, sessionConfig) || payload.answer?.encrypted === true) continue;
           if (normalized(payload.questionID || payload.questionId) !== entry.questionId) continue;
-          if (!blockTimes.has(entry.blockNumber)) blockTimes.set(entry.blockNumber, provider.getBlock(entry.blockNumber));
-          const block = await blockTimes.get(entry.blockNumber);
-          const createdAt = block?.timestamp ? new Date(Number(block.timestamp) * 1000).toISOString() : '';
+          const block = await readBlock(entry.blockNumber, blocks);
+          if (!block) complete = false;
+          const createdAt = block?.timestamp ? new Date(Number(block.timestamp) * 1000).toISOString() : entry.createdAt || '';
           entries.push({ ...entry, storageId: pointer, createdAt, payload });
         } catch { complete = false; }
       }
     }));
-    return { entries, complete, chainOrders };
+    state.result = { entries, complete, chainOrders };
+    return state.result;
   };
 
   const writer = createRegistryWriter({ provider, chainId, wallet, surveys, slug: info.slug, remember: (resource, id, payload, pointer, receipt) => {
     cache(pointer, payload);
     const entry = { id, questionId: id, payload, storageId: pointer, responder: wallet.address,
-      blockNumber: receipt.blockNumber, transactionIndex: receipt.transactionIndex, logIndex: receipt.logs.at(-1)?.logIndex || 0,
-      createdAt: new Date(now()).toISOString() };
-    if (resource === 'questions') questions.set(id, entry);
+      blockNumber: receipt.blockNumber, blockHash: receipt.blockHash, transactionIndex: receipt.transactionIndex,
+      logIndex: receipt.logs.at(-1)?.logIndex || 0, createdAt: new Date(now()).toISOString() };
+    if (resource === 'questions') questions.set(id, { ...entry, local: true });
     else localAnswers.set(id, entry);
   } });
-  return { loadConfig, loadQuestions, readAnswers, ...writer, get config() { return sessionConfig; }, workerOrigin };
+  return { loadConfig, loadQuestions, readAnswers, replacedWrite, ...writer, get config() { return sessionConfig; }, workerOrigin };
 };

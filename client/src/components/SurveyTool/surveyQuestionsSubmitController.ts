@@ -94,6 +94,8 @@ export type RunSurveyQuestionsSubmitSuccessControllerArgs = {
   surveysResponseState?: unknown;
   userAnswers?: unknown;
   submitAttemptId?: unknown;
+  /** Some sent answers did not save; Submit stays available to resend them. */
+  retryPending?: boolean;
   afterStateApplied?: () => void;
   ports?: SurveyQuestionsSubmitCompletionPorts;
 };
@@ -373,6 +375,7 @@ export const runSurveyQuestionsSubmitSuccessController = ({
   surveysResponseState = [],
   userAnswers = null,
   submitAttemptId = 0,
+  retryPending = false,
   afterStateApplied,
   ports = {},
 }: RunSurveyQuestionsSubmitSuccessControllerArgs): SurveyQuestionsSubmitSuccessControllerResult => {
@@ -381,7 +384,10 @@ export const runSurveyQuestionsSubmitSuccessController = ({
     editBaseline,
     hasEncrypted,
     responseUrl,
-    submittedSinceLastEdit: updateSubmittedSinceLastEdit(submittedSinceLastEdit, 'submit_success'),
+    submittedSinceLastEdit: updateSubmittedSinceLastEdit(
+      submittedSinceLastEdit,
+      retryPending ? 'submit_error' : 'submit_success',
+    ),
     surveysResponseState,
     userAnswers,
   });

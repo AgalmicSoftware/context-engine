@@ -10,49 +10,32 @@ credentials.
 
 It also exposes canonical session storage routes for future backend routing: `POST /storage/upload`, `GET|POST /storage/read`, `GET|POST /storage/list`, and the authorization-gated `GET|POST /storage/export-envelopes`. `/arweave/upload` remains supported for compatibility.
 
-## Agent Bridge Client Handoff
+## Agent HTTP client handoff
 
-The agent bridge worker exposes the browser-facing handoff under
-canonical `/api/agent/*` routes:
+Each session has one continuous Wrapped space. There is no opening action,
+weekly rotation, window ID or shared statement snapshot. Statement reads check
+current per-question access and never write shared research data. Every answer
+and vote supplies the returned `statement_version`; a question edit invalidates
+that version and requires a fresh read. Saved research retains the exact
+statement wording and answer schema it used. Later edits or selection changes
+do not rewrite those records, and exports still filter current access.
 
-- `GET /api/agent/session-meta?sessionSlug=<slug>` returns public metadata for
-  the selected session, including the sanctioned `clientSubmitReady` boolean the
-  client uses to decide whether direct submit is deploy-ready.
-- `POST /api/agent/client-login/exchange` accepts a pasted user/install or named
-  service `ceagt_` credential once and returns a short-TTL versioned envelope.
-  That envelope contains a Bridge browser credential for Bridge reads and a
-  distinct session-worker JWT for canonical worker routes. The current
-  agent token client sends the Bridge credential only to Bridge routes and
-  retains the worker JWT separately for direct canonical worker consumers; it
-  never sends the worker JWT to the Bridge. The client keeps the exchanged
-  envelope only in page memory and requires a fresh exchange after reload. It
-  also removes legacy Agent-envelope and Session Worker JWT browser-storage
-  entries at startup. Source credentials and exchanged bearer credentials must
-  not be put in URLs, localStorage, sessionStorage, Redux, or logs.
-- Credentials are bound to one principal, session, audience, scope set, expiry,
-  and revocation slot. A `worker_canonical` Bridge browser credential also
-  carries the normalized canonical 16-byte session ID and exact Worker origin.
-  The Bridge re-resolves current policy before authenticated route dispatch and
-  rejects the credential before route reads or writes after a same-slug Worker
-  identity/origin replacement. Registry-compatible browser credentials retain
-  their existing behavior. `POST /api/agent/invite/onboard` creates an opaque
-  user from a one-time body-only invite; caller-supplied transport identity
-  cannot claim a historical account. The Bridge root token is
-  bootstrap/break-glass authority and can mint named scoped services through
-  `POST /api/agent/credentials/service`.
-- Hosted Agent HTTP session reads and submits use the shared browser components
-  after one page-boundary backend-mode decision. The profile must explicitly
-  enable `surfaces.agentHttp` with `authority.mode=worker_canonical`; explicit
-  HTTP-off overrides stale legacy flags. Profile-less legacy flags remain
-  accepted as HTTP enablement inputs. `/session/demo` keeps its existing demo/off-chain behavior.
+New sessions serve scoped Agent HTTP and optional Session Wrapped in this same
+Worker. Enable `sessionModeProfile.surfaces.agentHttp` and configure a fresh
+`AGENT_MANAGED_ROOT_SECRET`. Public `/capabilities?slug=<slug>` advertises
+`agent_http_v1` and current readiness; `/health` remains authenticated.
 
-Hosted origin allowlists for the bridge live in deploy environment variables,
-not repo source: `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS` controls browser
-token exchange/result cache reads. `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS` is a
-legacy origin alias only. The current first-party set should include the canonical
-`https://contextengine.sh`, `https://www.contextengine.sh` origins and the
-redirect-compatible `https://contextengine.xyz`, `https://www.contextengine.xyz`
-origins.
+Browser exchange returns a distinct agent credential and participant JWT for
+this one origin. Both live only in page memory. Their lifetime is capped by the
+source credential, and source revocation/rotation also invalidates the JWT.
+The client purges historical envelopes and does not follow Bridge URLs. Invites
+use the existing session coordinator's per-invite journal. Operator actions use
+signed Session Worker admin requests. Ordinary browser/MCP access remains
+available when Agent HTTP is disabled. Explicit HTTP-off overrides stale legacy flags.
+
+See [Agent HTTP setup, authority and routes](../workers/sessionCorsWorker/agent/README.md)
+for current scopes, canonical storage, optional queues, AI funding and backups.
+Existing Bridge deployments are neither migrated nor retired by this change.
 
 ## OSS worker model
 
@@ -87,9 +70,8 @@ Public links:
 - Pinned release bundle: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>/sessionCorsWorker.bundle.js` (the selected build commit or `workerReleasePin.json`).
 - Deploy-helper source: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/deploy-helper`
 
-`workers/deploy-helper/` and `workers/agentBridgeWorker/` are separate Worker
-services with different runtime responsibilities. They are not alternate
-Session Worker source trees.
+`workers/deploy-helper/` is an optional separate installer. Agent HTTP lives
+in `workers/sessionCorsWorker/agent/` within the Session Worker.
 
 - Canonical CI publishes each successful public-branch bundle set as an
   immutable, commit-addressed GitHub release. Automatic publication advances
@@ -123,12 +105,13 @@ For the default **Hosted & Fast** profile, labeled `Centralized (Cloudflare)`
 in the wizard:
 
 1. Context Engine shows the exact session slug, public passkey-derived admin
-   address, and two independently generated Worker runtime secrets.
+   address, and two independently generated Worker runtime secrets. Selecting
+   Agent HTTP adds a third, independent `AGENT_MANAGED_ROOT_SECRET`.
 2. The deploy link opens Cloudflare with an immutable 40-character Git commit
    and the isolated `deploy/cloudflare/session-worker/` package. Cloudflare
    provisions the Worker, KV namespace, and Durable Object in the user's own
    account.
-3. The user copies all four displayed values into Cloudflare, including the two
+3. The user copies all displayed values into Cloudflare, including the
    runtime secrets in Cloudflare's encrypted secret fields, deploys, and
    returns the resulting `workers.dev` URL to the wizard.
 4. The wizard verifies reachability, browser-origin/CORS access, and canonical
@@ -155,8 +138,9 @@ the distinct browser-visible RPC fallback.
 It does not call public `/session-config` for this path: that discovery route
 remains Worker-canonical-only, while the EVM registry and Arweave remain
 authoritative for the decentralized session. Browser CORS acceptance proves
-reachability, not Worker-canonical discovery authority. Lit and Agent Session
-Wrapped profiles retain the manual deploy-helper/bootstrap path.
+reachability, not Worker-canonical discovery authority. Agent HTTP verifies
+current same-origin capabilities after config acceptance. Lit retains its
+additional provisioning requirements.
 
 The signed registry config keeps its session ID immutable once initialized.
 When an unbound Worker authorizes first configuration from the registry, a
@@ -322,81 +306,29 @@ deleted speculatively.
 
 ### Sponsored deploy release
 
-From 0.6.8, a sponsoring session Worker's own code pins every grant-backed
-deploy to the release recorded on that Worker, never code chosen by the person
-who redeems the grant. The pinning is in the Worker's code, not in its
-settings: a sponsoring Worker running code older than 0.6.8 still deploys
-whatever bundle the redeemer sends, whether or not the variables below are
-set. The first-party wizard sends its own build's release with each grant (the
-Worker bundle URL and manifest, plus the Agent Bridge pair for Agents HTTP
-sessions), never an uploaded file or a manual bundle URL. Older sponsoring
-Workers deploy that release; 0.6.8 or later code ignores it. Before issuing
-deploy grants from such a Worker, update it to 0.6.8 or
-later code: replace only its code with a 0.6.8 or later release's
-`sessionCorsWorker.bundle.js` and keep its bindings, variables and secrets.
-The deploy helper cannot do this, because it only creates new Workers
-(in-place redeploy is disabled; see [Self-deploy](#self-deploy)).
-
-The Worker keeps its release in four plain-text variables, where `<release>`
-is
+A sponsoring Worker pins grant-backed deploys to the verified release recorded
+on that Worker. Current code ignores the redeemer's uploaded bytes and bundle
+URLs. The sponsor needs these two plain-text variables, where `<release>` is
 `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>`:
 
-| Variable                           | Value                                                                      |
-| ---------------------------------- | -------------------------------------------------------------------------- |
-| `WORKER_BUNDLE_URL`                | `<release>/sessionCorsWorker.bundle.js`                                    |
-| `WORKER_BUNDLE_MANIFEST_URL`       | `<release>/worker-release-manifest.json`                                   |
-| `AGENT_BRIDGE_BUNDLE_URL`          | `<release>/agentBridgeWorker.bundle.js` (to sponsor Agents HTTP sessions)  |
-| `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` | `<release>/worker-release-manifest.json` (to sponsor Agents HTTP sessions) |
+| Variable | Value |
+| --- | --- |
+| `WORKER_BUNDLE_URL` | `<release>/sessionCorsWorker.bundle.js` |
+| `WORKER_BUNDLE_MANIFEST_URL` | `<release>/worker-release-manifest.json` |
 
-Each sponsored deploy downloads the manifest and bundles again and stops if a
-bundle's SHA-256 differs from the digest the manifest lists.
+The helper records this pair only after fetching and checking the bundle's
+SHA-256 against its release manifest. Uploaded bundle text or a URL without a
+manifest records no sponsor release. Each sponsored deploy rechecks the manifest
+and uses that same verified release. A missing pin fails before consuming the
+grant. Agent HTTP uses the same Session Worker, so it needs no additional bundle
+pin or deployment. Its fresh signing secret is preserved on setup retry, and
+capabilities are published only after the saved configuration and bindings pass
+verification. Failed verification leaves staged resources resumable.
 
-The 0.6.8 or later deploy helper records these variables on each new session
-Worker it deploys:
-
-- The helper sets `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` only
-  when it downloaded the Worker bundle from a URL and the bundle matched its
-  release manifest. An uploaded bundle file (`bundleText`), or a bundle URL
-  without a manifest, records nothing.
-- It sets the Agent Bridge pair only when the new session enables Agents HTTP
-  and the bridge bundle matched its manifest. The helper checks that bundle
-  before it uploads the session Worker: a first attempt stops before creating
-  the session's KV namespace or Worker, and a retry that already staged
-  resources stays pending.
-- The recorded URLs are the ones that deploy used. A release named in the
-  deploy request takes precedence over the helper's own `WORKER_BUNDLE_URL`
-  and `WORKER_BUNDLE_MANIFEST_URL` defaults. A sponsored deploy always uses
-  the sponsoring Worker's variables, so each new Worker records its sponsor's
-  release.
-- The helper writes these variables only into the upload of a Worker it is
-  creating. It never changes an existing Worker, so values set by hand stay
-  as they are.
-- Recording does not change the code a Worker runs. The variables pin grant
-  deploys only once the Worker runs 0.6.8 or later code. Local and self-hosted
-  client builds deploy the release pinned in
-  `client/src/variables/workerReleasePin.json` by default, which can be older
-  (see [Release bundle](#release-bundle)).
-
-A Worker running 0.6.8 or later code can still lack the variables: it was
-deployed by an older deploy helper, from an uploaded bundle file, or from a
-bundle URL without a manifest. It also records the Agent Bridge pair only when
-its own session enabled Agents HTTP at deploy time. Such a Worker refuses
-grant deploys with `400` before using the grant, and refuses Agents HTTP grant
-deploys the same way without the bridge pair, until you set the missing
-variables once:
-
-1. Choose the release new sessions should run, usually the
-   `worker-bundles-<commit>` release the sponsoring Worker itself runs. Check
-   it with `CE_RELEASE_COMMIT=<commit> npm run verify:release-assets`. Its
-   GitHub release page
-   `https://github.com/AgalmicSoftware/context-engine/releases/tag/worker-bundles-<commit>`
-   lists the assets.
-2. In the Cloudflare dashboard, open the sponsoring Worker's **Settings** >
-   **Variables and Secrets**, add `WORKER_BUNDLE_URL` and
-   `WORKER_BUNDLE_MANIFEST_URL` as **Text** variables with the values above,
-   and deploy. If you sponsor sessions that enable Agents HTTP, add the Agent
-   Bridge pair too; both manifest variables use the same
-   `worker-release-manifest.json`, which lists both bundles.
+The helper creates new Workers; it does not update old sponsoring Worker code.
+Older deployed releases retain their own behavior. To verify an existing release
+selection, run `CE_RELEASE_COMMIT=<commit> npm run verify:release-assets`. Updating
+live code or settings is a separate operator action.
 
 ## Sponsored bundle flow (`/sponsor` -> `/new?sponsored=<txId>` + separate key handoff)
 
@@ -446,11 +378,10 @@ variables once:
 - For grant-backed sponsored deploys, the browser posts to the sponsoring `sessionCorsWorker` `/sponsored/redeem-deploy` route, and that source worker must have embedded deploy enabled from its deploy-time `DEPLOY_HELPER_ENABLED` binding. `/sponsor` no longer writes a standalone deploy-helper fallback URL into the bundle or grant.
   - A grant lends the sponsor's Cloudflare token, not a code upload. The
     sponsoring Worker ignores the redeemer's `bundleText`, `bundleUrl`,
-    `bundleSha256`, `bundleManifestUrl`, `deploymentKind` and agent-bridge
+    `bundleSha256`, `bundleManifestUrl`, `deploymentKind` and agent capability
     bundle fields, and deploys only the release recorded on it: the
-    `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` plain-text vars, plus
-    `AGENT_BRIDGE_BUNDLE_URL` and `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` when the
-    new session enables the Agents HTTP surface. The manifest pins the bundle
+    `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` plain-text vars.
+    Agent HTTP uses this same bundle. The manifest pins the bundle
     digest. Without these vars the route returns `400` before the grant is used.
     This pinning is the sponsoring Worker's own code from 0.6.8; a sponsoring
     Worker running older code still deploys the redeemer's bundle, so update
@@ -664,14 +595,24 @@ Admin test panel:
   distinct participants since the last successful run, defaults to threshold
   `10`, and queues SessionWriteCoordinator alarm work. It does not rely on
   browser snapshots, does not use `waitUntil` for provider work, and does not
-  run for registry/Arweave profiles. If automatic generation fails,
-  `automatic`-only sessions allow an explicit admin manual retry as recovery;
-  otherwise repeated submissions do not thrash provider calls. Storage capacity
-  and read failures before provider admission also persist `lastFailure` and
-  pause automatic generation. An ineligible-input `422` does not persist a
-  failure; later responses can make the next automatic run eligible. The pause
+  run for registry/Arweave profiles. A temporary failure (`408`, `425`, `429`,
+  `500`, `502`, `503`, or `504`, including a provider timeout) keeps the job queued and retries it
+  after 1, 5, and then 30 minutes; status shows `retryAttempt` and
+  `nextAttemptAtMs`, and new submissions join the waiting job without resetting
+  its count. A provider's `Retry-After` (seconds or HTTP date) extends the scheduled
+  delay when longer, capped at 30 minutes; the budget remains three retries.
+  Invalid JSON and output validation failures pause immediately without an automatic retry.
+  Any other failure, or a temporary one after those retries
+  (`retriesExhausted`), pauses automatic generation and keeps the last good
+  artifact. The admin Results view states “Automatic retries have stopped”
+  with the failure reason beside the **Retry AI Views** action. `automatic`-only sessions allow an explicit admin manual retry as
+  recovery; otherwise repeated submissions do not thrash provider calls. Storage
+  capacity and read failures before provider admission also persist
+  `lastFailure` under the same rules. An ineligible-input `422` does not persist
+  a failure; later responses can make the next automatic run eligible. The pause
   check happens before scanning storage, so another submission does not repeat
-  a failing history scan.
+  a failing history scan. Each retry reloads the session's authoritative config,
+  so a disabled AI scope or changed policy stops it.
 - Generated-results AI calls inherit the session's existing AI provider/model
   routing, especially the analysis/thinking assignment. They do not hardcode a
   separate provider or model. Inputs are submitted responses only; Circles is
@@ -871,7 +812,7 @@ Authenticated clients can use the worker as the session storage boundary:
     object without a mode returns `400`, including invalid aliases hidden
     behind another supplied policy. Omitted, null, or blank optional policies
     retain the existing fallback behavior.
-  - Request bodies are capped at 25 MiB by default at the route shell, before JSON, text, or multipart parsing. `CE_MAX_UPLOAD_BYTES` configures this cap, including `/storage/upload` and `/arweave/upload`. The Worker counts actual streamed bytes even when `Content-Length` is absent or understated, cancels oversized bodies, and returns `413`. Accepted request bytes remain unchanged for signature validation.
+  - Request bodies are capped at 25 MiB by default at the route shell, before JSON, text, or multipart parsing. `CE_MAX_UPLOAD_BYTES` configures this cap, including `/storage/upload` and `/arweave/upload`. The Worker counts actual streamed bytes even when `Content-Length` is absent or understated, cancels oversized bodies, and returns `413` with the route CORS headers intact. Accepted request bytes remain unchanged for signature validation.
   - Questions, surveys, and responses are small JSON records that every
     reader downloads, so they also have tighter caps: 128 KiB per question,
     256 KiB per survey, and 2 MiB per response upload, with at most 96 KiB per
@@ -1135,11 +1076,138 @@ use the owning session; opening the page does not join the group. A reference
 never creates a duplicate group or copies membership into the referring session.
 Unavailable or mismatched sessions fail closed with a visible error.
 
+### Backup and restore
+
+Admin-signed `POST /admin/export-session-backup` exports version 1
+`ce_session_backup` pages with `Cache-Control: no-store`. Save every response in
+order and pass `nextCursor` in the next signed request. A large group snapshot
+first returns `preparing: true` with a continuation cursor; follow it without
+adding those preparation replies to the archive. Group rows are read once and
+cached in coordinator storage for the archive's seven-day lifetime. Expired
+snapshot chunks are reclaimed in bounded batches on later backup requests.
+Only the last archive page has
+`manifest.complete: true`. The manifest binds the slug and immutable session ID,
+records cumulative counts, and fingerprints the current and optional previous
+KEK with HMAC-SHA256 over `ce-kek-fingerprint-v1`. It contains no recovery key.
+
+Agent auxiliary state is excluded: credentials/slots, drafts, proposals,
+Wrapped records/images, caches, pending submissions, invite admission material
+and journals, and managed signing secrets. Canonical responses and groups retain
+their normal coverage. Restore also rejects existing agent or invite state.
+Reissue credentials and create fresh invites after restore. Session archives do
+not recover managed account keys.
+
+The first page includes config authority, wrapped session keys, encrypted
+session secrets and Worker Group authority, catalog and membership records.
+Very large coordinator snapshots use a `chunked` descriptor and payload/chunk
+entries with `target: "coordinator"`. Storage traversal includes every resource,
+hidden rows, plaintext rows, payloads, owner records and hidden markers. Payload
+headers carry size, SHA-256 and chunk count; 256 KiB chunks span bounded 4 MiB
+pages. Export and import use an 800-operation budget, leaving headroom below
+the 1,000 KV operations per request limit. Wrapped DEKs and stored metadata remain unchanged. Auth nonces, rate
+counters, upload retry receipts and transient analysis jobs are not recovery
+data and are excluded. Legacy plaintext session secrets must first be saved
+through the encrypted secret workflow.
+
+Pause session writes while downloading a backup. Config or group changes
+between pages abort the export with HTTP 409 and `reason: backup_session_changed`.
+Refused or obsolete cursors return `reason: backup_cursor_invalid`. The download
+panel discards partial pages for either reason and offers only Restart. A storage-write revision detects uploads and
+visibility changes during export, returning `complete: false` and
+`backup_session_changed` with an instruction to export again. KV and R2 still
+cannot provide a joint point-in-time snapshot. Keep the complete JSONL archive with the deployment's
+recovery key; a fingerprint cannot decrypt it.
+
+Backup restore reads JSONL as a UTF-8 stream, validating the complete file before
+signing and holding only one page while importing. Resuming reopens the selected
+file and skips completed pages. Restore requires an empty target session: no
+published config, records, payloads, visibility/ownership markers, groups or
+session keys. It never merges an archive into a live session. Rows already
+written by the same in-progress archive are identified by its durable journal
+and may be replayed when resuming. Receipts replay only while their import is
+in progress. Completion removes both coordinators' journals, descriptors,
+progress, page receipts and temporary staged data in bounded, resumable batches,
+keeping only a small completion record. Continue sending the final unchanged
+page while `pageComplete: false`; `complete: true` follows cleanup. A later import
+runs the empty-target check again, even for the same archive.
+
+Restore with admin-signed `POST /admin/import-session-backup`, passing each
+saved response as `page` in its original order. The target must hold the source
+KEK as its current key or `CE_STORAGE_ENVELOPE_PREVIOUS_KEK`. The slug and session
+ID must match. A fresh deployment may pass `adoptSessionId: true`; only its
+trusted bootstrap admin can do this. Config authority is published after the
+last verified page. Config, key and group mutations are held while a restore is
+in progress, so the target cannot become a live session halfway through import.
+On `/admin?sessionSlug=<slug>&worker=<origin>`, a missing canonical config shows
+the restore panel so the bootstrap admin can restore before the session exists.
+After restoration, retry session loading to open the restored Admin page.
+
+Restore uses original payload IDs, verifies chunk sizes and SHA-256, writes to
+R2 when bound (otherwise KV), and then publishes metadata. Identical writes from
+this same archive are skipped; unexpected rows produce conflicts and are never
+overwritten. The response reports cumulative `written`, `skipped`, and
+`conflicts` counts and `complete`. Repeat an unchanged interrupted page to
+resume, or repeat an acknowledged page to receive its saved receipt. A reply
+with `pageComplete: false` requests the same page again to continue bounded
+entry processing, chunk cleanup or group publication; advance only after the
+page is acknowledged. The admin panel follows these continuations automatically. Only one
+archive may be in progress for a session. Conflicted restores remain unfinished
+with `complete: false`; abandon them before starting again. Temporary staging
+expires after seven days; the next restore or status request removes expired
+imports in bounded cleanup batches. Assembled payload chunks are removed immediately.
+Signed `POST /admin/session-backup-status` reports an unfinished restore. Signed
+`POST /admin/abandon-session-backup` with its `archiveId` removes every row that
+restore wrote, including KV/R2 payloads, records, groups, keys and temporary
+staging, using a write-ahead journal. Repeat until `complete: true`; the restore
+lock is released only after cleanup leaves the target empty. The deployment bootstrap admin can perform these
+actions on a fresh target. A completed or config-published restore cannot be
+abandoned.
+The target upload limit still applies, and payloads exceeding KV's encoded
+value limit require an R2 binding. Restore does not migrate the session to a
+different slug, rotate stored keys, or replace newer target policy.
+
+Every backup page carries a KEK-derived HMAC. Import refuses unsigned or altered
+pages before writing backup data. Keep the original downloaded JSONL intact;
+editing participant, ownership or authority fields invalidates authentication.
+Export continuation cursors use a separate KEK-derived HMAC over the session,
+archive identity and full scan position. Altered or unsigned cursors are refused
+before storage scanning; restart an export begun on an older Worker. If the
+session changes during export, the admin panel discards its stale pages and
+offers Restart download. Connection failures keep resumable pages.
+Failed group requests and repeated joins do not invalidate an export. Confirmed
+group changes advance its revision; interrupted group writes hold snapshots
+until replay settles them.
+Deployment-key holders are trusted operators and can create authenticated archives.
+
+The `session_backup_v1` capability advertises the backup and restore actions.
+Session admin settings show **Backup & restore** only when this capability is
+present. Restore controls show the target Worker URL before signing. When a
+missing-config recovery URL differs from a locally pinned Worker origin, the
+client requires explicit trust approval before displaying those controls; it
+does not replace the pin until a canonical bootstrap can be verified.
+**Download backup** collects all pages into one `.jsonl` file; an
+interrupted download can resume or save its completed pages as `.partial.jsonl`.
+The restore control rejects partial files before signing requests. It reports
+progress and conflicts and resumes an interrupted import at the unacknowledged
+page. **Check restore status** offers **Abandon restore** when the Worker reports
+an unfinished restore whose config has not been published. Nonce rate limits pause pagination for a minute before retrying. Backup
+data remains in memory and the downloaded file; the panel does not save it in
+browser storage. To recover into a fresh deployment, set its Worker URL in
+admin settings, connect its bootstrap admin wallet, select the complete file,
+and enable **Adopt the backup session ID on a fresh deployment**.
+
 ### Encrypted Envelope Archive
 
 Admin-signed `POST /admin/export-storage-envelopes` returns an encrypted archival bundle for Cloudflare payloads. The response includes a manifest, ciphertext payload entries, per-payload envelope metadata, and wrapped session-key metadata. For `worker_envelope`, payload entries carry the wrapped DEK, IV, algorithm, key provider, and condition document reference. For Cloudflare `lit` payloads, the worker passes through the ciphertext as stored and does not attempt Lit decrypt.
 
 The export manifest includes `exportScope: "encrypted_envelopes_only"`, `storageBackend`, `encryptedPayloadCount`, `partial`, `readErrors`, `wrappedKeysIncluded`, `keyProvider`, and `deploymentKekContinuityRequired`. That continuity flag is true when the archive actually contains worker-secret-wrapped material and false for pure-Lit or empty exports. Manifest version 1 also retains `rewrapRequiredForNewDeployment` as a deprecated compatibility alias with the same value; it is a warning to preserve the original secret, not an available rewrap operation. Authorized HTTP callers can use `/storage/export-envelopes?resource=responses` with a session export/admin principal; that route packages ciphertext and envelope metadata, omits session KEK material, and skips `/storage/read`.
+
+Manifest version 1 now includes `metadataFields: "identity_v1"`. Each entry's
+`metadata` preserves `responder`, `uploader`, `uploadAuthority`, `resourceId`,
+`hidden`, `groupIds`, and `payloadAccessControl.groupIds` unchanged when present.
+These server-authored fields retain ownership, admin correction precedence,
+visibility and group restrictions for future recovery tooling. Absent fields
+remain absent; older exports without the marker may omit them.
 
 Both export endpoints return one bounded page, with top-level `cursor` and
 `listComplete`. Pass `cursor` back as a GET query parameter or POST body field
@@ -1170,13 +1238,55 @@ next page through the same canonical HTTP route. Authorization is checked for
 every page. The retired bot export commands and receipt ZIP delivery are no
 longer available; encrypted-envelope export remains a Session Worker API.
 
-The export is non-mutating and does not change encryption keys. A worker-envelope
-archive remains tied to the original Worker's `CE_STORAGE_ENVELOPE_KEK`; the
-bundle alone cannot decrypt it. Default and sponsored provisioning deliberately
-do not expose that generated secret, so this release does not claim portable
-cross-Worker recovery. Manual operators who need external disaster recovery must
-preserve their originally supplied secret outside the bundle. The worker does not
-accept a replacement deployment secret in an Admin request.
+The encrypted-envelope export is non-mutating and covers encrypted rows only.
+Its bounded pages still refuse individual oversized rows. For a complete,
+chunked archive and an import route, use the separate **Backup and restore**
+actions above. Both formats retain wrapped keys and require the original KEK.
+
+### Recovery key custody
+
+New helper deployments return a newly installed generated KEK once as
+`recoveryKey`, with `recoveryKeyFingerprint` and `Cache-Control: no-store`.
+Helper, coordinator and sponsored-grant receipts omit the raw key; replays
+cannot recover that first display. Preserved bindings are never returned.
+The wizard pauses with a masked key, reveal and text-file download controls,
+then accepts either **I've saved it** or **Skip, I understand the risk**. Key
+material stays in component memory, outside browser storage, drafts and logs.
+
+Operators can enter exactly 64 hex characters in **Advanced: use my own recovery
+key**, or generate a key locally. The helper accepts it as `storageEnvelopeKek`,
+normalizes it to lowercase before deriving key material, and returns only its
+fingerprint. Identity edits keep the in-memory supplied key; a cleared or invalid
+field in this mode blocks deployment until corrected or generated-key mode is chosen. Manual Cloudflare setup uses the same input and displays the
+fingerprint of the setup key. Regenerate setup values after changing this input.
+Existing bindings are preserved during deployment recovery; a changed input does
+not rotate them. Replayed replies report `keyPreserved: true` and the installed
+key's fingerprint. Before installing a new key, the helper retains its fingerprint
+in the deployment's private KV namespace; it never stores the key there. The
+dialog asks the operator to keep the private copy matching that fingerprint.
+Older deployments without a fingerprint record report preservation without
+claiming that a changed supplied key was installed; use signed admin key export
+to recover their fingerprint. Keys unlock encrypted data and saved service credentials; store
+them privately with the backup. A key alone is not a data backup.
+
+For an existing deployment or a lost first response, the signed admin action
+`export-recovery-key` requires `confirm: 'export-recovery-key'` in its signed
+payload. It returns `{ ok: true, recoveryKey, fingerprint }` with `no-store`.
+Export is available only when `DEFAULT_SESSION_SLUG` pins this Worker to the
+requested session; otherwise the deployment operator retains the key. The pin
+uses the same slug normalization as routing: `general` normalizes to an empty
+slug and therefore never enables recovery-key export on a shared deployment.
+The config coordinator permits three exports per session per UTC day and
+returns `429` / `recovery_key_export_limit` thereafter. When
+`CE_STORAGE_AUDIT_KV` is bound, each export records its time and admin address,
+never the key; an audit-write failure refuses to disclose it. Only the current
+KEK is exported. Preserve a previous KEK separately while older ciphertext
+still needs it. The `recovery_key_export` capability enables **Show recovery
+key** in **Backup & restore**, with a confirmation before signing.
+In-place key rotation is not supported yet.
+If a recovery key leaks, replace the provider API keys saved in the session;
+existing data stays readable to anyone holding both the key and a copy of the
+stored data.
 
 ### Worker-Native Groups
 
@@ -1200,9 +1310,9 @@ those identities cannot yet be matched. Older Workers without the member-directo
 Clearing Group filters restores the unfiltered cohort while retaining other
 selected filters.
 
-Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic
+Groups are canonical in `sessionCorsWorker`; the agent module's research
 research buckets are separate profile data and never grant worker access, and
-the Bridge does not mirror worker group definitions or memberships. A
+research buckets do not mirror Worker group authority. A
 Worker-native Group belongs to one exact identity tuple: the validated Worker
 origin, normalized canonical slug, and canonical session ID. The client pins
 the Worker origin. Worker-canonical nonce/login requests and responses bind the
@@ -1234,10 +1344,8 @@ Group authority and labels the chain-dependent controls separately as
 **Advanced on-chain access**. Registry-canonical sessions retain the existing
 SBT Groups experience. Agent-enabled sessions use the session-worker JWT
 returned by client login to call `/groups/list`, `/groups/my-memberships`,
-`/groups/members`, `/groups/join`, and `/groups/leave` directly. A dedicated Agent Session Wrapped Bridge may also
-validate that same JWT at its deployment-pinned `/groups/my-memberships`
-endpoint before issuing a shorter, session-bound Bridge credential; the Bridge
-does not evaluate the login's SIWE, registry, RPC, SBT, or gate logic. The Admin
+`/groups/members`, `/groups/join`, and `/groups/leave` directly. Session Wrapped exchanges that JWT in-process for a shorter member credential,
+rechecking the current canonical membership and source token on use. The Admin
 page uses the existing signed worker-admin request path for group and member
 management. It labels these controls **Native Worker Groups** for Worker-owned
 participant Groups. A default registry profile does not expose Worker group
@@ -1264,17 +1372,27 @@ the principal. A registry session may use Wrapped only with an already usable
 or newly attached compatible Worker. A permanently locked workerless session
 fails closed because it cannot attach a new `corsWorkerUrl`. After exchange,
 Wrapped answer submission is HTTPS/KV and requires no agent-originated EVM
-transaction. The Bridge member credential expires at the earlier of 24 hours
-or the remaining Worker-JWT lifetime, which is also the maximum propagation
-delay after either authority revokes access.
+transaction. The member credential expires at the earlier of 24 hours or the
+remaining Worker-JWT lifetime. Each request rechecks its source record and
+current membership, so revocation does not wait for credential expiry.
 
-The non-secret version-1 `agentSessionWrapped` session-config record contains
-only `enabled`, the verified dedicated origin, protocol/revision identifiers,
-and `verifiedAt`. `sessionModeProfile.surfaces.agentHttp` is its sole product
-enablement bit. Reserved `telegram` and `miniApp` surface flags are false for
-new configs and cannot reactivate retired transports. The record is written
-only after the dedicated Bridge proves its exact session slug and pinned Worker
-origin. Failed deploy/redeploy attempts preserve the last verified record.
+Wrapped research batches are serialized by the session coordinator. The first
+admission binds the request ID to its exact content, including the original
+statement wording and schema. A retry with changed content returns `409`.
+Concurrent batches preserve both answer summaries; a busy KV projection returns
+retryable `503` with `retryAfterSeconds: 1`. Retry the same request after that
+delay. The coordinator retains a partially projected batch across restarts and
+completes it before admitting another batch for that principal and vote mode.
+Exports include both currently readable question sources, irrespective of the
+source selected for new answers. An unavailable source fails the export rather
+than silently returning incomplete history. Archived proposals are no longer
+readable and their stored research is excluded from these views.
+
+Admin enable/disable uses signed Session Worker configuration and verifies
+current same-origin `/capabilities`. Native and helper setup share this code.
+Capability v1 retains `enabled`, `origin`, `protocolVersion`, `revision` and
+`verifiedAt`; `sessionModeProfile.surfaces.agentHttp` remains the product switch.
+
 
 Group records and membership rows are stored separately in KV and stamped with
 the canonical session ID. A group record has a generated `groupId`, label,
@@ -1513,8 +1631,8 @@ group metadata and member identities, while `session` lets any authenticated
 session principal see both. Self-membership visibility is always allowed, but
 does not grant an `admin_only` identity list. Anonymous discovery never returns
 member identities or counts. `passkey_account` and `evm_address` principals use
-normalized EVM addresses, and `agent` uses the grant id. Retained Agent Bridge
-requests authenticate with SIWE and use their EVM address. Historical explicit
+normalized EVM addresses, and `agent` uses the grant id. Agent HTTP requests use a scoped session-bound credential and the derived
+managed account address. Historical explicit
 `telegram` principals remain readable with their original case-sensitive
 principal IDs and storage keys; obsolete implicit transport scope hints no
 longer select a principal. Malformed principals fail closed.
@@ -1544,7 +1662,7 @@ R2 / Durable Objects:
   credential-redacted deploy/faucet records, normalized public session config,
   revisions, wrapped session-key records, short-lived random nonces, and numeric
   counter windows, plus Worker Group ids, occupancy counts, and hashed member
-  reservation tokens. Auth object names are derived from SHA-256 identity digests;
+  reservation tokens, plus response upload digests and storage references. Auth object names are derived from SHA-256 identity digests;
   their stored records omit slugs, wallet/anonymous identifiers, and route
   names. It never stores deployment
   credentials, raw session keys, deployment KEKs, raw DEKs, request bodies,
@@ -1555,11 +1673,37 @@ R2 / Durable Objects:
   coordinated write. Use signed Admin routes for runtime config changes. The
   deploy helper may seed a new isolated KV namespace before the Worker can run
   and before coordinator authority exists, but it does not whole-replace a
-  compatible live config during resume. Payload-plus-index uploads intentionally
-  retain at-least-once retry semantics: success means both writes completed, while
-  a failed or response-lost attempt may leave an invisible orphan or a readable
-  duplicate. Supplying an upload `requestId` does not deduplicate those writes.
-  There is no upload receipt journal or key-rotation state machine.
+  compatible live config during resume. Authenticated response uploads with a
+  nonempty `requestId` of at most 200 characters use per-participant receipts.
+  Once the payload and index are written and the receipt settles, sending that
+  request id with identical plaintext bytes returns the original `id` and
+  `storageRef` with `replayed: true`, without writing again. A replay also ensures
+  analysis was queued; a durable enqueue receipt prevents duplicate jobs, including
+  after a lost settlement reply or after the first job finished.
+  Different content under a settled request id returns `409 upload_request_conflict`.
+  Payload validation, encryption and serialized KV size checks finish before
+  reserving a receipt, so deterministic failures do not hold a retry lease.
+  Browser upload operations are scoped to the current account and session.
+  Switching either clears their retry state in the pile; a late receipt from
+  the previous account cannot populate the next account's saved answers.
+  An active reservation returns retryable `503 upload_in_progress` for 120 seconds;
+  an expired reservation permits a new attempt with a fresh storage id, so a crashed
+  attempt may leave an orphan. Settled receipts retain HMACs of request IDs and payload digests, derived from
+  `TOKEN_HMAC_SECRET`, plus the reference for seven days, with a maximum of 2,000
+  per participant and session. Coordinator alarms remove expired receipts and
+  abandoned leases even when that participant never writes again.
+  The client retains one submit operation across failed or partial attempts and
+  includes the question id and per-question revision in each receipt key.
+  Within that operation, an unchanged survey container keeps its receipt key
+  even after acknowledgement, so retrying a failed question does not store
+  another identical container. Changed container bytes advance its revision.
+  Payload digests stay in client memory and are not embedded in request IDs. It preserves
+  timestamps and prepared encrypted ratings while the input is unchanged; edits
+  receive a new key. Successful completion or an account/session change clears
+  that in-memory operation. MCP assigns one operation to each answer tool call.
+  A failed coordinator call returns retryable `503`. Deployments without the
+  binding, uploads without a bounded request id, and other resources retain
+  at-least-once semantics. There is no key-rotation state machine.
   Every route that admits work using current session config requires this
   binding, including public, ungated storage reads/lists, interview catalogs,
   and result artifacts. `GET /session-config` remains a public KV projection;
@@ -1611,7 +1755,7 @@ Runtime:
   excluding deployment credentials from saved receipts.
 - Enable `nodejs_compat` and `global_fetch_strictly_public` when deploying from
   the dashboard. The latter routes calls to sibling Workers through their public
-  endpoint; without it, Wrapped health and authority checks on the same account
+  endpoint; without it, public Worker capability checks on the same account
   can fail with Cloudflare error 1042. The native template and API deployment
   metadata include both flags. Existing deployments need these settings applied
   on redeployment; updating source alone does not change a running Worker.
@@ -2459,6 +2603,50 @@ Signed login/bootstrap requests:
   - Success and error responses are `Cache-Control: no-store` and vary on both
     `Origin` and `X-Session-Slug`.
 - `GET /health` (requires Authorization token; does not require session KV config, so it works for newly registered sessions during bootstrap)
+- `GET /capabilities` is public and returns the code-defined feature list, API
+  version and optional bundle hash, cached for 30 seconds. With `?slug=<slug>`,
+  it also reports coordinator, config authority, storage-index and secret-presence
+  readiness, plus fixed reasons for unavailable submit, publication, correction
+  and backup operations. A fresh authority reports `seeding`; legacy config
+  requiring migration reports `migration_required`. It remains reachable during
+  an authority outage and never returns config values, addresses or counts.
+  A missing KEK blocks envelope-encrypted writes and backup, while plaintext
+  writes remain available when their other prerequisites are ready. The client
+  never caches transport failures; unavailable Submit readiness expires within
+  30 seconds and pressing Submit rechecks it immediately. If Submit is ready,
+  other unavailable operations (such as backup without a KEK) keep the normal
+  five-minute client cache. Only a definitive 404 or non-JSON reply identifies a
+  legacy Worker.
+- `GET /admin/diagnostics?sessionSlug=<slug>[&cursor=<cursor>]` requires the same
+  current session token, identity/authorization-epoch checks, CORS policy, and
+  admin authority as the Results-analysis status endpoint. Replies are private,
+  uncached, and contain no secrets, participant addresses, payloads, or request IDs.
+  The Admin page's Session diagnostics card shows pending upload leases, their
+  oldest age, retained settled receipts, the last automatic-analysis success,
+  retry attempt/next attempt/exhaustion, and pending config projection repair
+  with its start time. A missing legacy repair timestamp is reported as unknown.
+  Diagnostics inspect the current durable authority without first repairing its
+  KV projection, so a failed repair remains visible and a removed admin cannot
+  use the stale projection to retain access.
+  Receipt counts are sampled from up to 25 participant coordinators per page;
+  `complete` and `cursor` distinguish partial totals, and the card can load more.
+  Cursors use a deployment-secret-derived HMAC and a private continuation map;
+  they reveal no participant identifier and expire after one day. Refresh
+  diagnostics if a cursor expires. Receipt-store identities remain unchanged.
+  They cover the seven-day retention window, subject to the existing per-store
+  receipt cap, and may change while pages are read. Receipt stores register an
+  opaque coordinator name in a per-session index before reserve, renewing at
+  most daily. Registration has a 250 ms timeout and never runs during settlement.
+  An index outage cannot stall uploads indefinitely or lose a settled receipt.
+  Failed registration backs off for 60 seconds and retries from the participant
+  coordinator's existing alarm, even without another upload. Counts can lag
+  until that retry succeeds; `complete` describes pagination of registered
+  stores, not confirmation that every recent registration has reached the index. An unavailable index or receipt store
+  returns incomplete counts (`complete: false`, `cursor: null`); refresh rather
+  than append these totals when diagnostics recover.
+  Index entries expire after eight days; each alarm step examines at most 100
+  index entries and 100 cursor mappings. Neither the index nor its public
+  counts include answer content.
 - `GET /resource-presence` with `X-Session-Slug`
   - Optional `?interview=1` adds `interview: { ready, reason? }` after checking the voice provider, server-side OpenAI key presence, session lifecycle, and anonymous realtime access. No key values are returned and no OpenAI request is made.
   - Validates the selected session and its browser-origin CORS policy.
@@ -2487,13 +2675,43 @@ Signed login/bootstrap requests:
     the Worker still enforces authentication, scope access, and provider-key
     availability when the request runs.
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
+  - Requests using the session's stored key are bounded at the final provider
+    adapter, for both authenticated and anonymous callers and server-generated
+    interview/Results requests. Exact provider/model pairs must match the
+    session's `ai.models.fast`/`thinking` (including `default`/`reasoning` aliases),
+    legacy `ai.model`, or the named built-in task in `ai.models`. Missing text
+    settings use the shared text-model default. Other models receive HTTP 403
+    with `reason: ai_model_not_allowed` before a provider call.
+  - Per-call output ceilings are 2,048 for unlabelled ordinary chat and 16,000
+    for reasoning models or Responses. The session's configured thinking model
+    is treated as reasoning regardless of its name or provider. Built-in tasks
+    `generate`, `rewrite`, `summarize` (including audio discussions), `rank`,
+    `compare`, and `categorize` each allow up to 16,000 tokens. Smaller fixed
+    ceilings are `analysis`: 7,000 (HTML report sections and Worker Results),
+    `interview-map`: 8,000, and `interview-opening`: 600. The smallest
+    valid requested value among `max_tokens`, `max_completion_tokens`,
+    `max_output_tokens`, `max_tokens_to_sample`, and `maxTokens` is used, bounded
+    by that ceiling. Invalid values cannot remove the ceiling. Task labels can
+    select only these fixed bounds; they do not confer additional authority.
+  - OpenAI processing uses `service_tier: default`. Other adapters do not forward
+    a caller's service tier. Reasoning effort cannot exceed saved task/global
+    `reasoningEffort` (or `reasoning_effort`), defaulting to `low`; analysis also
+    honors its existing `taskReasoningEffort.generate` fallback. Caller tools
+    and Functions are removed. Custom-provider Functions remain available only
+    from the owner's saved `ai.providers.custom.functions` configuration.
+  - Caller-supplied `apiKey` (or custom `rpcKey`) requests retain their existing
+    model/output/tool behavior and existing access/URL rules. Provider rejection
+    never retries with the session's key. These are request limits only: they
+    provide no aggregate allowance, concurrency limit, or total-spend guarantee.
+    Client-delegated live interviews and optional operator-funded Wrapped posters
+    have no new whole-session usage bound.
   - Optional overrides: `apiKey` (all providers), `rpcUrl` (custom provider only).
   - Anonymous `apiKey` + `provider: "custom"` requires `rpcUrl`; worker secret `customRpcUrl` is not used for this bypass path.
   - Anonymous gate-authority checks now route through a shared helper before provider-specific validation:
     route scope disables still fail before request-`apiKey` bypass, and anonymous access without `apiKey`
     still requires on-chain `default` and `ai` gates to be explicitly open.
   - Request parsing/provider inference now routes through the AI helper:
-    omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI.
+    omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI. When both provider and model are omitted on a session-funded request, the Worker selects the saved fast model (or thinking model when `modelType: thinking`), including its provider.
 - `GET /agent/interview-catalog?slug=<slug>&sessionUrl=<https-session-url>`
   (`/agent/interview-brief` remains a compatibility alias)
   - Public, CORS-scoped, and disabled when `interviewModeEnabled=false` or
@@ -2546,13 +2764,14 @@ Signed login/bootstrap requests:
     still verifies the Worker-canonical session config before using that hint.
 - `GET /api/agent/questions` with a session Worker bearer credential returns
   the same public, access-checked question catalog when
-  `sessionModeProfile.surfaces.agentHttp=true`. This is the first canonical
-  Agent API family on the Session Worker; the Agent Bridge compatibility route
+  `sessionModeProfile.surfaces.agentHttp=true`. This is a canonical
+  Agent API family on the Session Worker; the retired Bridge compatibility route
   remains during the staged transport migration.
 - `POST /interview/starter?slug=<slug>`
   - Uses session CORS, anonymous AI eligibility, expiry, and rate limits; never accepts a caller-supplied generation prompt or forced refresh.
-  - Returns `{ openingPrompt, steeringPrompt, source, questionCount?, generatedAt?, warning? }`. Owner mode returns configured text. Auto mode waits for public questions and lazily generates with Worker-held OpenAI credentials using `gpt-5.6-terra`, low reasoning effort, and standard processing. `steeringPrompt` is the normalized owner-authored `interviewMode.steeringPrompt` value and defaults to an empty string.
+  - Returns `{ openingPrompt, steeringPrompt, source, questionCount?, generatedAt?, warning? }`. Owner mode returns configured text. Auto mode waits for public questions and lazily generates with the session's configured fast model/provider and Worker-held credentials, at most 600 output tokens, low reasoning effort, and standard processing. `steeringPrompt` is the normalized owner-authored `interviewMode.steeringPrompt` value and defaults to an empty string.
   - Stores the generated opening and baseline count in `session:<slug>:interview-opening`, separate from owner configuration. Reuses it by default; optional regeneration uses `interviewMode.questionGrowthPercent` (20% by default). Concurrent requests within one Worker isolate share generation; Cloudflare KV remains eventually consistent across isolates.
+  - Custom-provider openings use the same outbound URL and redirect protections as `/ai`, with a ten-second timeout. A missing key for the selected fast provider is named in the error; generation does not switch to another provider's stored key.
   - Failed regeneration preserves the last successful opening; initial failure returns a recoverable error. The client bounds waiting to ten seconds and can start with an existing session question.
 - `POST /admin/refresh-interview-opening`
   - Uses the existing signed admin request body and authority checks. Regenerates the cached opening when `interviewMode.allowManualRefresh` is enabled (default true). Owner-written openings are preserved.
@@ -2584,6 +2803,7 @@ transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
     Worker configuration or secrets. See [Session Voice Modes](session-listening-mode.md)
     for startup, transcript, stop, and review behavior and the official sources.
 - `POST /transcribe` (multipart/form-data, file field `file` or `audio`)
+  - On the stored OpenAI key, the model must equal `ai.models.transcription.model` or `ai.transcription.model` (default `whisper-1`); a swap receives 403 `ai_model_not_allowed`. BYO and custom transcription retain existing behavior. The multipart adapter forwards only file, model, and JSON response format, with no caller token/tier/tool options.
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
   - Optional overrides: `provider` (`openai` or `custom`), `apiKey`, `rpcUrl` (custom only).
   - Upstream size limit: OpenAI currently caps each speech-to-text file upload at 25 MB.
@@ -2757,8 +2977,9 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   `CE_STORAGE_ENVELOPE_KEK` independently with 256 bits from Web Crypto for
   every Session Worker. These
   values are never derived from the Cloudflare API token, account, Worker name,
-  deployment ID, provider keys, or each other, and are never returned to the
-  browser. Stable-request recovery inventories existing secret binding names
+  deployment ID, provider keys, or each other. The recovery KEK is returned once
+  for private custody as described above; the token HMAC secret is never returned.
+  An operator may supply the recovery KEK instead. Stable-request recovery inventories existing secret binding names
   before writing; an ambiguous secret-write response is inventoried again and
   accepted only when the exact binding is present. Otherwise the owned Worker
   and KV namespace remain pending for a later safe replay.
@@ -2824,7 +3045,7 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   and any later non-success remains pending. The helper returns/replays success
   only after the terminal receipt commits and the rejection marker is removed.
 - A same-ID retry whose earlier attempt already staged the KV namespace checks
-  the Worker and Agent Bridge bundles just before upload. If a bundle is
+  the Session Worker bundle just before upload. If a bundle is
   unavailable or does not match its manifest, the request stays pending (`502`
   or `409` with `deploymentRequestPending` and the retained `orphanResources`)
   instead of ending, so a later retry can finish once the bundle is fixed.

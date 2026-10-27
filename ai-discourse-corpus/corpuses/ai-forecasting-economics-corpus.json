@@ -3,7 +3,7 @@
     "description": "Corpus of AI forecasting and economics source material: compute and capability trend data (Epoch AI, Our World in Data), crowd and tournament forecasts (Metaculus, XPT), and the formal economics of transformative AI (growth theory, automation models, empirical macro estimates). Provides the quantitative-trajectory and economic-impact evidence base that AI governance and timeline debates draw on.",
     "version": "1.0",
     "date_generated": "2026-07-08",
-    "entry_count": 17,
+    "entry_count": 24,
     "curation_notes": "All URLs verified via web search/fetch on 2026-07-08. date_precision marks year- or month-granular dates; prediction-market entries are dated by question opening with current standings (as of 2026-07) described in summaries. Overlapping documents already in other sub-corpuses are excluded: AI 2027 and Machines of Loving Grace (dwarkesh-lab-insiders), the 2023 AI Impacts expert survey (lesswrong-posts), Bio Anchors and Compute Trends Across Three Eras (arxiv-ai-safety), the AI Impacts discontinuous-progress investigation (lesswrong-posts), and METR time-horizon work (metr-evals-metrics).",
     "coverage": {
       "categories": [
@@ -19,7 +19,8 @@
         "prediction_market"
       ],
       "date_range": "2020 to 2026-01-16"
-    }
+    },
+    "last_updated": "2026-10-25"
   },
   "entries": [
     {
@@ -37,7 +38,7 @@
       "summary": "Epoch AI’s continuously updated public databases tracking the empirical trajectory of AI: notable and frontier model training runs (parameters, compute, data), hardware price-performance, data centers (including a satellite-imagery explorer), AI chip production and sales, benchmark results, and company-level indicators. The de facto reference dataset behind most quantitative claims in AI forecasting and governance debates — training-compute doubling times, threshold-crossing model counts, and capacity growth figures typically trace here.",
       "key_findings": [
         "Frontier training compute grew ~4-5x/year through the early 2020s (dashboard-maintained estimate)",
-        "Total AI-chip computing capacity has grown ~3.3x per year since 2022",
+        "Total AI-chip computing capacity has grown ~3.4x per year since 2022, doubling about every 7 months (trends-page estimate as of 2026-10)",
         "Databases: notable models, frontier data centers, chips, benchmarks, companies"
       ],
       "novel_arguments_and_concepts": [
@@ -58,20 +59,35 @@
       "influence_score": 9,
       "source_links": [
         {
-          "title": "Data center satellite explorer",
+          "title": "AI Data Center Map (Epoch AI)",
           "url": "https://epoch.ai/data/data-centers/satellite-explorer"
+        },
+        {
+          "title": "Epoch AI data hub",
+          "url": "https://epoch.ai/data"
+        },
+        {
+          "title": "Epoch AI trends dashboard",
+          "url": "https://epoch.ai/trends"
         }
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked epoch.ai/data (list of databases), epoch.ai/trends (training compute 4-5x/yr; AI chip stock 3.4x/yr since 2022) and the linked data-center page on 2026-10-25. The linked page is titled \"AI Data Center Map\" and its text does not mention satellite imagery."
     },
     {
       "id": "epoch_can_scaling_continue_2030_2024",
       "title": "Can AI Scaling Continue Through 2030?",
       "authors": [
         "Jaime Sevilla",
-        "Epoch AI"
+        "Tamay Besiroglu",
+        "Ben Cottier",
+        "Josh You",
+        "Edu Roldán",
+        "Pablo Villalobos",
+        "Ege Erdil"
       ],
-      "date": "2024-08",
-      "date_precision": "month",
+      "date": "2024-08-20",
+      "date_precision": "day",
       "source_type": "research_report",
       "source_platform": "Epoch AI",
       "url": "https://epoch.ai/blog/can-ai-scaling-continue-through-2030",
@@ -109,7 +125,9 @@
           "title": "Primary source",
           "url": "https://epoch.ai/blog/can-ai-scaling-continue-through-2030"
         }
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "epoch.ai/blog/can-ai-scaling-continue-through-2030: published August 20, 2024. Seven authors. Constraints are power, chip manufacturing, data scarcity and the latency wall. 2e29 FLOP runs likely feasible by 2030 (~10,000x GPT-4). Power is likely to bind first, then chip manufacturing. 4x/year growth is assumed. Checked 2026-10-25."
     },
     {
       "id": "epoch_gate_model_2025",
@@ -161,30 +179,33 @@
           "title": "arXiv paper",
           "url": "https://arxiv.org/abs/2503.04941"
         }
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked the Epoch AI announcement (epoch.ai/blog/announcing-gate, dated 2025-03-21) and the arXiv paper 2503.04941 (submitted 2025-03-06; title \"GATE: An Integrated Assessment Model for AI Automation\"; authors Erdil, Potlogea, Besiroglu, Roldan, Ho, Sevilla, Barnett, Vrzla, Sandler) on 2026-10-25. The 2-20x growth figure and the interactive sandbox are confirmed; the blog gives about 20% of world output going to AI at default parameters, a figure the authors call unrealistic."
     },
     {
       "id": "epoch_frontier_model_counts_2025",
-      "title": "Trends in Frontier AI Model Count: A Forecast to 2028",
+      "title": "How many AI models will exceed compute thresholds?",
       "authors": [
-        "Epoch AI"
+        "Ben Cottier",
+        "David Owen"
       ],
-      "date": "2025-04",
-      "date_precision": "month",
-      "source_type": "research_paper",
-      "source_platform": "Epoch AI / arXiv",
+      "date": "2025-05-30",
+      "date_precision": "day",
+      "source_type": "research_report",
+      "source_platform": "Epoch AI",
       "url": "https://epoch.ai/publications/model-counts-compute-thresholds",
       "category": "compute_trends",
       "summary": "Forecasts how many models will cross absolute compute thresholds (the numbers regulation is written around): roughly ten models above 1e26 FLOP by 2026, growing to hundreds above that line by 2030 as frontier compute diffuses. Quantifies the administrative reality that threshold-based regules shift from covering a handful of labs to covering a broad industry within a few years unless thresholds are indexed.",
       "key_findings": [
-        "~10 models above 1e26 FLOP expected by 2026",
-        "200+ models above 1e26 FLOP projected by 2030",
+        "~10 models above 1e26 FLOP expected by 2026 and ~30 by the start of 2027 (median)",
+        "Over 200 models (median 235; scenarios ~60-500) above 1e26 FLOP projected by 2030",
         "Fixed compute thresholds capture rapidly growing model populations over time"
       ],
       "quantitative_data": {
         "metric_name": "models exceeding 1e26 FLOP",
         "current_value": "~10 by 2026 (forecast)",
-        "trend": "200+ by 2030"
+        "trend": "~30 by start of 2027; median 235 (range ~60-500) by 2030"
       },
       "novel_arguments_and_concepts": [
         "regulatory-threshold population forecasting"
@@ -204,10 +225,12 @@
       "influence_score": 7,
       "source_links": [
         {
-          "title": "arXiv version",
-          "url": "https://arxiv.org/abs/2504.16138"
+          "title": "Primary source",
+          "url": "https://epoch.ai/publications/model-counts-compute-thresholds"
         }
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "epoch.ai/publications/model-counts-compute-thresholds: 'How many AI models will exceed compute thresholds?' by Ben Cottier and David Owen (Epoch AI), May 30, 2025. Forecasts ~10 models above 1e26 FLOP by 2026, ~30 by the start of 2027, and over 200 by 2030 (median 235, scenarios ~60-500). arxiv.org/abs/2504.16138 is a different paper: 'Trends in Frontier AI Model Count: A Forecast to 2028' by Iyngkarran Kumar and Sam Manning (2025-04-21), projecting 103-306 models >1e25 and 45-148 >1e26 by end-2028. Checked 2026-10-25."
     },
     {
       "id": "epoch_impact_report_2026",
@@ -242,11 +265,13 @@
           "title": "Primary source",
           "url": "https://epoch.ai/blog/epoch-impact-report-2025"
         }
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "epoch.ai/blog/epoch-impact-report-2025 (Epoch AI team, 2026-01-16: 100+ outputs, $10.3M raised, reach 2x-4.3x, 2026 roadmap: Data Explorers for data centers/AI companies/benchmarking, AI chip sales, cross-actor compute tracking); checked 2026-10-25"
     },
     {
       "id": "metaculus_weak_agi_question",
-      "title": "Metaculus: When Will the First Weakly General AI Be Publicly Known?",
+      "title": "Metaculus: When will the first weakly general AI system be devised, tested, and publicly announced?",
       "authors": [
         "Metaculus community"
       ],
@@ -288,7 +313,9 @@
           "title": "Metaculus AI hub",
           "url": "https://www.metaculus.com/ai/"
         }
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked the question page metaculus.com/questions/3479/ on 2026-10-25. The question is titled 'When will the first weakly general AI system be devised, tested, and publicly announced?', has 1.8k forecasters and shows a current estimate of 2027-09-03 (range 2026-09-23 to 2029-11-01). The opening year, the historical medians and the full resolution criteria were not shown on the fetched page."
     },
     {
       "id": "metaculus_full_agi_question",
@@ -302,7 +329,7 @@
       "source_platform": "Metaculus",
       "url": "https://www.metaculus.com/questions/5121/when-will-the-first-general-ai-system-be-devised-tested-and-publicly-announced/",
       "category": "prediction_market",
-      "summary": "Metaculus’s stronger AGI criterion question — requiring robust general capability across adversarial Turing testing, robotic manipulation, expert-level QA, and cross-domain skill in a unified system. As of mid-2026 the community median is January 2033, with ~25% probability by 2029 and ~50% by 2033 (central range 2029 to 2040). Paired with the weak-AGI question, it brackets the crowd’s distinction between benchmark-passing generality and genuinely strong general systems.",
+      "summary": "Metaculus’s stronger AGI criterion question — requiring robust general capability across adversarial Turing testing, robotic manipulation, expert-level QA, and cross-domain skill in a unified system. As of 2026-10-25 the question page shows a community estimate of 8 November 2030 (displayed range 26 March 2028 to October 2036; ~1.9k forecasters). Paired with the weak-AGI question, it brackets the crowd’s distinction between benchmark-passing generality and genuinely strong general systems.",
       "key_findings": [
         "Community median: January 2033 as of mid-2026",
         "~25% by 2029, ~50% by 2033",
@@ -331,7 +358,9 @@
           "title": "Primary source",
           "url": "https://www.metaculus.com/questions/5121/when-will-the-first-general-ai-system-be-devised-tested-and-publicly-announced/"
         }
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "metaculus.com/questions/5121 (title; current estimate 8 Nov 2030, range 26 Mar 2028 to Oct 2036, ~1.9k forecasters); greaterwrong.com 'Are Metaculus AI Timelines Inconsistent?' (2024-01-02; criteria: 2-hour adversarial Turing test, Ferrari 312 T4 1:8 model assembly, Hendrycks Q&A >=75%/90%, APPS >=90%); longtermwiki.com capture (opened 2020-08-23 by Matthew_Barnett); checked 2026-10-25"
     },
     {
       "id": "fri_xpt_2023",
@@ -386,7 +415,9 @@
           "title": "Near-term accuracy follow-up",
           "url": "https://forecastingresearch.org/research/near-term-xpt-accuracy"
         }
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "forecastingresearch.org/research/existential-risk-persuasion-tournament (Karger, Rosenberg, Jacobs, ... Tetlock; 2023-07-10, rev. 2023-08-08; 169 forecasters: 80 experts, 89 superforecasters); XPT.pdf (AI extinction by 2100 medians: superforecasters 0.38%, AI domain experts 3%); forecastingresearch.org/research/near-term-xpt-accuracy (2025-09-02 follow-up); checked 2026-10-25"
     },
     {
       "id": "nber_acemoglu_simple_macro_ai_2024",
@@ -432,7 +463,9 @@
           "title": "PDF",
           "url": "https://www.nber.org/system/files/working_papers/w32487/w32487.pdf"
         }
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "nber.org/papers/w32487 and w32487.pdf (Acemoglu, May 2024; TFP no more than 0.66% over 10 years, <0.53% adjusting for hard tasks; GDP +0.93% to 1.16% over 10 years; exposure from Eloundou et al. and Svanberg et al.); checked 2026-10-25"
     },
     {
       "id": "nber_growth_under_transformative_ai_2023",
@@ -475,7 +508,9 @@
           "title": "PDF",
           "url": "https://www.nber.org/system/files/working_papers/w31815/w31815.pdf"
         }
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "nber.org/papers/w31815 (Trammell & Korinek, NBER WP 31815, October 2023, revised April 2026; abstract: full automation raises growth and lowers labor share; wages may rise or fall depending on returns to scale, natural resources, direction of technical change); checked 2026-10-25"
     },
     {
       "id": "nber_korinek_suh_agi_scenarios_2024",
@@ -490,14 +525,16 @@
       "source_platform": "NBER",
       "url": "https://www.nber.org/papers/w32255",
       "category": "growth_theory",
-      "summary": "Models the AGI transition as progressive automation of a task distribution parameterized by computational complexity, deriving wage and output paths under different shapes of the human-task frontier. Central results: output accelerates in all automation scenarios, but wages can collapse before full automation if the remaining human tasks are a bounded set — the timing of wage collapse versus wage boom depends on whether automatable task complexity is bounded or unbounded. The cleanest formal statement of when AGI is good or catastrophic for labor.",
+      "summary": "NBER Working Paper 32255 (March 2024) modeling how output and wages evolve under technological progress that may lead to AGI, assuming human work decomposes into atomistic tasks that differ in complexity. Wages are set by a race between automation and capital accumulation. If automation is slow enough, enough work remains for humans and wages can keep rising. If task complexity is bounded and full automation occurs, wages collapse, and declines can come even before that if large-scale automation outpaces capital accumulation. Automating technological progress itself may broadly raise returns to all factors, while irreproducible scarce factors may worsen wage declines. It is a compact formal treatment of when the AGI transition is good or bad for labor.",
       "key_findings": [
-        "Wage dynamics bifurcate: boom then collapse (bounded human tasks) vs sustained gains (unbounded)",
-        "Output growth accelerates across all modeled scenarios",
-        "Baseline scenario projects on the order of a doubling of GDP within a decade of advanced AGI deployment"
+        "Wages depend on a race between automation and capital accumulation",
+        "With bounded task complexity and full automation, wages collapse; declines can start earlier if large-scale automation outpaces capital accumulation",
+        "With slow enough automation, wages can keep rising",
+        "Automating productivity growth may raise returns to all factors; irreproducible scarce factors may worsen wage declines"
       ],
       "novel_arguments_and_concepts": [
-        "compute-complexity parameterization of task automation",
+        "task-complexity distribution as the parameterization of automation",
+        "race between automation and capital accumulation",
         "wage-collapse timing results"
       ],
       "implications_for_governance": "Formalizes the case that labor-income erosion can precede full automation — the analytic basis for pre-AGI redistribution planning.",
@@ -524,7 +561,9 @@
           "title": "SSRN version",
           "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4762962"
         }
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked 2026-10-25 against https://www.nber.org/papers/w32255 (abstract page; full PDF not read). Confirmed: title, authors, March 2024, NBER WP 32255, task-complexity framework, and wage collapse under bounded complexity with full automation. The abstract does not support 'output accelerates in all scenarios' or a 'doubling of GDP within a decade' baseline, and it ties wage collapse to full automation, with earlier declines only if automation outpaces capital accumulation."
     },
     {
       "id": "nber_karger_forecasting_economic_effects_2025",
@@ -533,13 +572,13 @@
         "Ezra Karger",
         "et al."
       ],
-      "date": "2025",
+      "date": "2026-04",
       "date_precision": "year",
       "source_type": "working_paper",
       "source_platform": "NBER",
       "url": "https://www.nber.org/system/files/working_papers/w35046/w35046.pdf",
       "category": "empirical_economics",
-      "summary": "Applies structured forecasting methodology (in the XPT tradition) to AI’s economic effects: eliciting calibrated probabilistic forecasts from economists and forecasters over GDP, productivity, and labor-market outcomes under AI scenarios, quantifying the disagreement between forecasting-track-record holders and domain economists on how large and how fast AI’s macro effects will be. Bridges the forecasting-tournament literature and the AI-macro debate that Acemoglu and the explosive-growth camp anchor.",
+      "summary": "Applies structured forecasting methodology (in the XPT tradition) to AI’s economic effects: elicits forecasts from academic economists, AI industry and AI policy experts, superforecasters, and the general public on U.S. GDP growth, TFP growth, labor-force participation, and top-10% wealth share for 2030 and 2050, unconditionally and under slow, moderate, and rapid AI-progress scenarios. Median respondents in every group expect annual GDP growth of about 2.5%; under rapid progress, experts expect growth near 4% and participation falling to about 55% by 2050. Most disagreement stems from differing views on the economic effects of highly capable AI rather than on how fast AI will progress. Bridges the forecasting-tournament literature and the AI-macro debate that Acemoglu and the explosive-growth camp anchor.",
       "key_findings": [
         "Structured elicitation of AI macro forecasts across expert populations",
         "Documents systematic gaps between forecaster and economist expectations"
@@ -565,15 +604,17 @@
           "title": "Primary source",
           "url": "https://www.nber.org/system/files/working_papers/w35046/w35046.pdf"
         }
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "nber.org/papers/w35046 and w35046.pdf (Karger, Kuusela, Abaluck, Bryan, Halperin, Jones, Murphy, Trammell, Reynolds, Mayland, Viswanathan, Mittal, Ceppas de Castro, Rosenberg, Tetlock; NBER WP 35046, issued April 2026); checked 2026-10-25"
     },
     {
       "id": "nber_research_agenda_transformative_ai_2025",
       "title": "A Research Agenda for the Economics of Transformative AI",
       "authors": [
-        "Ajay Agrawal",
         "Erik Brynjolfsson",
-        "Anton Korinek"
+        "Anton Korinek",
+        "Ajay Agrawal"
       ],
       "date": "2025",
       "date_precision": "year",
@@ -581,7 +622,7 @@
       "source_platform": "NBER",
       "url": "https://www.nber.org/papers/w34256",
       "category": "economic_agenda",
-      "summary": "The field-defining agenda paper accompanying the NBER Economics of Transformative AI project: organizes the open questions — growth regimes, labor and wages, market structure and concentration, public finance when labor-income tax bases erode, alignment of AI with economic institutions, and transition dynamics — into a research program, and argues economists have systematically under-invested in scenarios where AI substitutes broadly for human labor. The coordination point for the emerging TAI-economics subfield.",
+      "summary": "Agenda paper by the editors of the NBER Economics of Transformative AI volume: organizes the open questions into nine Grand Challenges — economic growth; invention, discovery and innovation; income distribution; concentration of decision-making and power; geoeconomics; information, communication and knowledge; AI safety and alignment; meaning and well-being; and transition dynamics (including how to reform taxation if labor income diminishes) — and proposes methods such as a transformative-AI dashboard of indicators, new welfare metrics, task-level analysis, AI-agent simulations, and scenario planning, arguing there has been comparatively little investment in understanding TAI’s economic implications. The coordination point for the emerging TAI-economics subfield.",
       "key_findings": [
         "Canonical open-question map for transformative-AI economics",
         "Argues mainstream economics under-weights broad-substitution scenarios"
@@ -606,10 +647,16 @@
       "influence_score": 7,
       "source_links": [
         {
+          "title": "PDF",
+          "url": "https://www.nber.org/system/files/working_papers/w34256/w34256.pdf"
+        },
+        {
           "title": "NBER Economics of Transformative AI project",
           "url": "https://www.nber.org/books-and-chapters/economics-transformative-ai"
         }
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "nber.org/papers/w34256 and w34256.pdf (Brynjolfsson, Korinek, Agrawal; NBER WP 34256, September 2025; nine Grand Challenges); nber.org/books-and-chapters/economics-transformative-ai (same three as volume editors); checked 2026-10-25"
     },
     {
       "id": "econtai_automating_ai_research_explosive_growth_2026",
@@ -661,7 +708,9 @@
           "title": "SSRN",
           "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6705512"
         }
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked the NBER PDF nber.org/system/files/working_papers/w35155/w35155.pdf (Working Paper 35155, issue date April 2026) on 2026-10-25. Title, authors, the semi-endogenous innovation-network model, the two feedback loops and the within-reach take-off threshold (e.g., 13% automation across all sectors) are confirmed."
     },
     {
       "id": "nber_economics_transformative_ai_volume_2025",
@@ -671,13 +720,13 @@
         "Erik Brynjolfsson",
         "Anton Korinek (eds.)"
       ],
-      "date": "2025",
+      "date": "2026-09",
       "date_precision": "year",
       "source_type": "book",
       "source_platform": "NBER / University of Chicago Press",
       "url": "https://www.nber.org/books-and-chapters/economics-transformative-ai",
       "category": "economic_agenda",
-      "summary": "The first NBER volume dedicated to transformative-AI economics, collecting chapters across growth, labor, market structure, public finance (including what to tax when AGI erodes labor-income and consumption bases), and institution design under advanced AI. Marks the mainstreaming of questions that lived in the futurist literature five years earlier, with an associated recurring NBER workshop series from fall 2025.",
+      "summary": "The first NBER volume dedicated to transformative-AI economics, collecting chapters across growth, labor, market structure, public finance (including what to tax when AGI erodes labor-income and consumption bases), and institution design under advanced AI. Marks the mainstreaming of questions that lived in the futurist literature five years earlier, with chapters presented at the NBER Economics of Transformative AI Workshop (Stanford, September 18-19, 2025); published by University of Chicago Press in September 2026.",
       "key_findings": [
         "Institutional consolidation of TAI economics into the NBER canon",
         "Public-finance-under-AGI chapters directly address tax-base erosion"
@@ -701,7 +750,9 @@
           "title": "Fall 2025 workshop",
           "url": "https://www.nber.org/conferences/economics-transformative-ai-workshop-fall-2025"
         }
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "nber.org/books-and-chapters/economics-transformative-ai (eds. Agrawal, Brynjolfsson, Korinek; University of Chicago Press, ISBN 9780226854083; Published Date September 2026; conference held September 18-19, 2025; ch. 15 Korinek & Lockwood 'Public Finance in the Age of AI: A Primer'); nber.org/papers/w34873 (labor-income and consumption tax bases eroded by TAI); nber.org/conferences/economics-transformative-ai-workshop-fall-2025 (Stanford, Sept 18-19, 2025); checked 2026-10-25"
     },
     {
       "id": "futuresearch_agi_timeline_tracker_2026",
@@ -717,8 +768,9 @@
       "category": "forecast_tracking",
       "summary": "Longitudinal tracking of how named top forecasters and forecasting platforms revised AGI timeline predictions from 2023 through 2026 — who updated toward shorter timelines, who held, and how stated reasons map to capability events (reasoning models, agentic coding, time-horizon results). Useful as a meta-forecasting record: it measures the update behavior of the forecasting community itself rather than adding another timeline estimate.",
       "key_findings": [
-        "Documents systematic timeline compression across tracked forecasters 2023→2026",
-        "Ties individual updates to specific capability milestones"
+        "Most tracked forecasters shortened their timelines from 2023 to 2025; from 2025 to 2026 Kokotajlo, Lifland, Amodei, Wildeford and the Metaculus community lengthened them",
+        "Every forecaster who updated between January and April 2026 shortened their timeline again, which the author links to rapid progress from Anthropic",
+        "Maps the update pattern onto AI 'eras' (earlier in the ChatGPT era, later in the xAI/Meta/Gemini era, earlier again in the Anthropic era)"
       ],
       "novel_arguments_and_concepts": [
         "forecaster-update audit trail for AGI timelines"
@@ -740,14 +792,16 @@
           "title": "Primary source",
           "url": "https://futuresearch.ai/blog/agi-timeline-tracker/"
         }
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked futuresearch.ai/blog/agi-timeline-tracker/ on 2026-10-25. Title confirmed; the post is dated 2026-04-12, by Dan Schwarz."
     },
     {
       "id": "owid_artificial_intelligence_data",
       "title": "Our World in Data: Artificial Intelligence",
       "authors": [
-        "Charlie Giattino",
         "Edouard Mathieu",
+        "Charlie Giattino",
         "Veronika Samborska",
         "Max Roser (Our World in Data)"
       ],
@@ -781,7 +835,417 @@
           "title": "Primary source",
           "url": "https://ourworldindata.org/artificial-intelligence"
         }
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "ourworldindata.org/artificial-intelligence (citation: Mathieu, Giattino, Samborska, Roser (2023); charts on training compute, capabilities vs humans, investment, adoption, public attitudes); ourworldindata.org/grapher/artificial-intelligence-training-computation (source: Epoch AI); checked 2026-10-25"
+    },
+    {
+      "id": "brookings_humlum_vestergaard_still_waters_rapid_currents_2026",
+      "title": "Still waters, rapid currents: Early labor market transformation under generative AI",
+      "authors": [
+        "Anders Humlum (University of Chicago)",
+        "Emilie Vestergaard (University of Copenhagen)"
+      ],
+      "date": "2026-10-06",
+      "date_precision": "day",
+      "source_type": "analysis",
+      "source_platform": "Brookings Institution",
+      "url": "https://www.brookings.edu/articles/still-waters-rapid-currents-early-labor-market-transformation-under-generative-ai/",
+      "category": "empirical_economics",
+      "summary": "Brookings article by Anders Humlum (University of Chicago) and Emilie Vestergaard (University of Copenhagen) summarizing their study of AI chatbot adoption in Denmark, which links surveys of about 25,000 workers in 11 highly AI-exposed occupations (late 2023 and late 2024 rounds) to monthly administrative registers on earnings, hours and occupations through December 2024. Using difference-in-differences designs around ChatGPT's November 2022 launch, the authors find precise null effects on earnings and hours: confidence intervals rule out differential earnings changes larger than 2% for both workers and workplaces, and workplaces that encourage chatbot use show no differential changes in headcounts or wage bills. Beneath that surface, work is being reorganized: roughly four in ten new tasks involve generating content with AI, about a third involve overseeing AI, and about a quarter involve integrating it into workflows. The one labor-market margin that moves is occupational mobility: adopters put in about 4% of a full-time equivalent more hours in their latest occupation, and switchers' earnings growth runs 12 percentage points ahead of other Danish workers. The authors describe their data as a window into the trough of the productivity J-curve and caution against blaming aggregate early-career job declines on AI without measuring actual adoption.",
+      "key_findings": [
+        "Employer policy shapes take-up: 43% of workers in the 11 occupations work for employers that explicitly encourage chatbot use and only 6% are prohibited from using them. Where encouragement comes with enterprise tools and training, 93% have used chatbots at work, 28% use them daily and 19% report saving more than one hour per day.",
+        "Precise null effects on earnings and hours: difference-in-differences estimates rule out differential earnings changes larger than 2%, and 98% of adopters report that chatbots have not affected their earnings. Adopters' level premia (about 9% where employers encourage use, 4% where they do not) were already there before ChatGPT.",
+        "No firm-level employment effects: workplaces that encourage chatbot use show no differential changes in headcounts or wage bills.",
+        "Tasks are being reorganized: roughly four in ten new tasks involve generating content with AI, about a third involve overseeing AI, and about a quarter, the largest single category, involve integrating AI into workflows.",
+        "Occupational mobility is the exception: adopters work about 4% of a full-time equivalent more hours in their latest occupation, which indicates more job switching. Switchers' earnings growth runs 12 percentage points ahead of that of other Danish workers.",
+        "Several exposed occupations (software development, legal, marketing) have seen falls in early-career jobs since 2022, but the early-career share evolved no differently at encouraging workplaces. The estimates rule out differences larger than a third of a percentage point."
+      ],
+      "novel_arguments_and_concepts": [
+        "'Still waters, rapid currents': stable wages and employment can coexist with substantial reorganization of tasks inside workplaces",
+        "Occupational switching as an early indicator of longer-run labor-market effects of AI",
+        "Linking survey-measured adoption to administrative records, so that aggregate trends are not attributed to AI before actual adoption is measured"
+      ],
+      "implications_for_governance": "The authors argue that measuring AI's labor-market effects requires both administrative data and surveys, and that statistical agencies should jointly track complementary workplace investments (encouragement policies, enterprise tools, training) and the reorganization of work, including new tasks. On early-career job losses, they warn that a policy aimed at AI 'will do little good if AI is not what is driving the decline.' Mobility gains appear where workers can choose their own tools and formal credentials do not bar entry, which bears on workplace AI policies and occupational licensing.",
+      "themes": [
+        "labor_markets",
+        "generative_ai_adoption",
+        "task_reorganization",
+        "occupational_mobility",
+        "measurement"
+      ],
+      "tags": [
+        "humlum",
+        "vestergaard",
+        "brookings",
+        "denmark",
+        "chatgpt",
+        "difference_in_differences"
+      ],
+      "influence_score": 7,
+      "quantitative_data": {
+        "metric_name": "differential earnings effect of AI chatbot adoption, Danish workers in 11 exposed occupations (through Dec 2024)",
+        "current_value": "null; confidence intervals rule out changes larger than 2%",
+        "trend": "no earnings or hours change since ChatGPT's launch; adopters show about 4% of a full-time equivalent more hours in their latest occupation (more switching)"
+      },
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://www.brookings.edu/articles/still-waters-rapid-currents-early-labor-market-transformation-under-generative-ai/"
+        }
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Re-checked on 2026-10-25 against the Brookings article page (Humlum and Vestergaard, dated October 6, 2026); all figures and quotes match that page. The underlying NBER Working Paper No. 33777 cited there was not separately fetched.",
+      "date_added": "2026-10-25"
+    },
+    {
+      "id": "nber_fairlie_wu_ai_recent_college_graduates_2026",
+      "title": "The Early Impacts of AI on Employment among Recent College Graduates",
+      "authors": [
+        "Robert W. Fairlie",
+        "Jane Wu"
+      ],
+      "date": "2026-09-28",
+      "date_precision": "day",
+      "source_type": "working_paper",
+      "source_platform": "NBER",
+      "url": "https://www.nber.org/papers/w35796",
+      "category": "empirical_economics",
+      "summary": "NBER Working Paper 35796, by Robert Fairlie and Jane Wu, uses Current Population Survey microdata for what the authors call the first estimates of AI's effects on the unemployment of recent college graduates, the group argued to be most vulnerable to AI replacement, in June, July and August 2026. The authors note that unemployment rates are especially high in summer months and argue that 2026 may be the first year in which workplace AI use is widespread enough to detect impacts. Taking an agnostic approach to treatment timing, they find that recent-graduate unemployment did not spike in summer 2026 relative to earlier summers and did not rise significantly relative to older college graduates or young workers without a degree. An expanded measure that counts people who report 'wanting a job' (the 'sidelined unemployed') adds nearly two percentage points to recent graduates' unemployment rate but also shows no statistically significant increase in summer 2026. Difference-in-differences and event-study models find no relative increase, while models interacting 2026 unemployment with occupational AI exposure and remote-work availability find some evidence of a positive relationship with remote-work availability.",
+      "key_findings": [
+        "No spike in recent-college-graduate unemployment in June to August 2026 relative to the same months in previous years.",
+        "No significant rise relative to older college graduates or young non-college workers, in either difference-in-differences or event-study interaction models.",
+        "Adding the 'sidelined unemployed' (people who report wanting a job) raises the recent-graduate unemployment rate by nearly two percentage points, but still shows no statistically significant summer 2026 increase.",
+        "Interacting 2026 unemployment with occupation-level AI exposure and remote-work availability gives some evidence of a positive relationship with remote-work availability. The abstract reports no corresponding finding for AI exposure."
+      ],
+      "novel_arguments_and_concepts": [
+        "The summer labor-market entry of new graduates as the window in which AI displacement should first become visible",
+        "An expanded 'sidelined unemployed' definition that includes people who report wanting a job",
+        "An agnostic approach to defining when AI treatment begins"
+      ],
+      "implications_for_governance": "A null result in household-survey unemployment for the entry cohort argued to be most exposed to AI cautions against attributing weakness in the graduate labor market to AI based on exposure measures alone. It argues for tracking broader unemployment definitions and seasonal entry cohorts when monitoring AI displacement, and for reading the result alongside payroll-based evidence on early-career workers.",
+      "themes": [
+        "labor_markets",
+        "early_career_employment",
+        "ai_displacement",
+        "measurement"
+      ],
+      "tags": [
+        "fairlie",
+        "wu",
+        "nber",
+        "current_population_survey",
+        "recent_college_graduates",
+        "unemployment"
+      ],
+      "influence_score": 6,
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://www.nber.org/papers/w35796"
+        },
+        {
+          "title": "DOI",
+          "url": "https://doi.org/10.3386/w35796"
+        }
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Re-checked on 2026-10-25 against the NBER abstract page for w35796 (issue date September 2026; page metadata gives 2026-09-28; DOI 10.3386/w35796). The entry is based on the abstract only; the full PDF was not read.",
+      "date_added": "2026-10-25"
+    },
+    {
+      "id": "metaculus_cup_summer_winners_2026",
+      "title": "Announcing: the Metaculus Cup Summer 2026 Winners!",
+      "authors": [
+        "urgentfutures (Metaculus)"
+      ],
+      "date": "2026-09-18",
+      "date_precision": "day",
+      "source_type": "tournament_results",
+      "source_platform": "Metaculus",
+      "url": "https://www.metaculus.com/notebooks/45734/announcing-the-metaculus-cup-summer-2026-winners/",
+      "category": "forecasting_tournament",
+      "summary": "Metaculus's announcement of results for the Summer 2026 Metaculus Cup, a seasonal forecasting tournament in which 885 forecasters made 88,558 forecasts on 58 questions. Seven forecasters won gold medals: benshindel, MaxA, Hippopotamus_bartholomeus, MarcosO, exmateriae, tdeeno and Capital. Pro Forecasters exmateriae and benshindel became the first to take gold in all three Cup seasons (spring, summer and fall). Forecasting bots compete on the same questions but cannot win prizes or medals, and this season bots took the top two overall places: Laertes and ManticAI finished first and second, and FutureSearch finished fifth. The tournament question 'Will a bot beat all humans in the Summer 2026 Metaculus Cup?' therefore resolved Yes, and the post notes that The Economist wrote about it that week. The Community Prediction also beat guest forecaster Dylan Matthews head-to-head, which doubled the forecasting prize pool from $2,500 to $5,000.",
+      "key_findings": [
+        "Scale: 885 forecasters made 88,558 forecasts on 58 questions.",
+        "AI forecasting bots placed ahead of every human: Laertes and ManticAI finished 1st and 2nd overall and FutureSearch 5th, so the question on whether a bot would beat all humans resolved Yes.",
+        "Crowd aggregation beat a guest forecaster: the Community Prediction beat Dylan Matthews head-to-head, doubling the forecasting prize pool from $2,500 to $5,000.",
+        "There were seven gold medalists, and exmateriae and benshindel became the first forecasters to take gold in all three Cup seasons.",
+        "A separate $2,500 commenting prize went to the top 8 commenters, led by WasteTimeContinuum ($600). Forecasters wrote 988 comments totaling 881,753 characters."
+      ],
+      "novel_arguments_and_concepts": [
+        "Bots and humans forecasting identical tournament questions, with prizes reserved for humans, as a running benchmark of AI forecasting ability",
+        "A tournament question that resolves on whether a bot outperforms all human participants"
+      ],
+      "implications_for_governance": "A bot finishing ahead of every human in a public forecasting tournament is a concrete data point that automated forecasting can now compete with skilled human forecasters on this kind of question set. That supports AI-assisted forecasting as an input to policy planning. It also raises the question of how long human-only forecasting benchmarks will stay informative.",
+      "themes": [
+        "forecasting_tournament",
+        "ai_forecasting_bots",
+        "crowd_aggregation"
+      ],
+      "tags": [
+        "metaculus",
+        "metaculus_cup",
+        "forecasting_bots",
+        "laertes",
+        "manticai",
+        "futuresearch"
+      ],
+      "influence_score": 6,
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://www.metaculus.com/notebooks/45734/announcing-the-metaculus-cup-summer-2026-winners/"
+        }
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Re-checked on 2026-10-25 against the Metaculus notebook post by urgentfutures dated September 18, 2026; all counts, medalists, bot ranks and prize amounts match that page. The Economist article is mentioned only as the post reports it and was not fetched.",
+      "date_added": "2026-10-25"
+    },
+    {
+      "id": "aifutures_q2_5_timelines_update_uplift_revenue_2026",
+      "title": "Q2.5 2026 Timelines Update: Uplift and Revenue",
+      "authors": [
+        "Eli Lifland",
+        "Daniel Kokotajlo",
+        "Brendan Halstead (AI Futures Project)"
+      ],
+      "date": "2026-08-16",
+      "date_precision": "day",
+      "source_type": "analysis",
+      "source_platform": "AI Futures Project (Substack)",
+      "url": "https://blog.aifutures.org/p/q25-2026-timelines-update-uplift",
+      "category": "forecast_tracking",
+      "summary": "Mid-year timelines update from the AI Futures Project ('More methods for forecasting coding automation') in which Eli Lifland, Daniel Kokotajlo and Brendan Halstead add two new anchors for the arrival of an Automated Coder (AC) in their AI Futures Model, coding uplift (their preferred method) and revenue, alongside the original METR time-horizon anchor, which they call serviceable but say has huge weaknesses. All three methods predict quite similar AC arrival dates, and overall the authors say their timelines got slightly shorter while they feel somewhat more confident. The model now also simulates the time needed for training runs to apply software improvements, which slows the fastest takeoffs (the median AC-to-ASI gap rose from 1.22 to 1.72 years under Kokotajlo's configuration and from 3.86 to 4.56 years under Lifland's), and forecasts are now explicitly conditional on progress going as fast as is technically feasible. All-things-considered AC medians are November 2027 for Kokotajlo, January 2029 for Halstead and January 2030 for Lifland, compared with April 2026 medians of May 2028 for Kokotajlo and July 2030 for Lifland. Grading their earlier scenario, the authors judge that reality is going about 70-90% as fast as AI 2027 predicted.",
+      "key_findings": [
+        "All-things-considered Automated Coder forecasts (p10 / p50 / p90): Kokotajlo Jan 2027 / Nov 2027 / Apr 2030; Lifland Jun 2027 / Jan 2030 / Oct 2070; Halstead Jan 2027 / Jan 2029 / Jan 2050.",
+        "TED-AI medians are Nov 2028 (Kokotajlo), Jul 2032 (Lifland) and Apr 2031 (Halstead). ASI medians are Mar 2029 (Kokotajlo) and Jul 2033 (Lifland).",
+        "Uplift evidence weighed: a METR study found 1.04x-1.2x uplift, which METR thinks is biased downward by selection effects, while an April 2026 Anthropic internal survey had a geometric mean of 4x (the authors note such employee surveys may overstate uplift). A simpler three-parameter uplift model, run with Kokotajlo's median inputs, assumes 2x present-day uplift, a 5-month doubling time for (uplift - 1) and 20x uplift at AC, giving May 2028.",
+        "Revenue anchor: revenue has grown 10x for every 15 ECI points so far, and the authors use 5-7x per year as their median current growth rate, expecting a slowdown.",
+        "Explicit training-run modeling lengthens the median AC-to-ASI gap, from 1.22 to 1.72 years (Kokotajlo) and from 3.86 to 4.56 years (Lifland).",
+        "Graded against AI 2027, reality is going about 70-90% as fast as the scenario predicted."
+      ],
+      "novel_arguments_and_concepts": [
+        "Coding uplift as an anchor for when the Automated Coder arrives: extrapolating the doubling time of (uplift - 1) until AC-level uplift is reached",
+        "Revenue growth per unit of capability (ECI points) as a third, independent route to AC timing",
+        "Simulating training runs in takeoff modeling, which slows the fastest software-driven takeoffs",
+        "Explicitly conditional framing: forecasts assume progress as fast as technically feasible, with no assumed government slowdown"
+      ],
+      "implications_for_governance": "Three methods that broadly agree place the authors' median Automated Coder dates between late 2027 and early 2030, conditional on no deliberate slowdown, which keeps near-term automation of AI R&D on the policy agenda. Because the forecasts are explicitly conditional, regulation or a coordinated slowdown sits outside them rather than being priced in.",
+      "themes": [
+        "timelines",
+        "ai_rd_automation",
+        "forecasting_methodology",
+        "takeoff_speed"
+      ],
+      "tags": [
+        "ai_futures_project",
+        "kokotajlo",
+        "lifland",
+        "halstead",
+        "automated_coder",
+        "coding_uplift"
+      ],
+      "influence_score": 7,
+      "quantitative_data": {
+        "metric_name": "median Automated Coder arrival (all-things-considered)",
+        "current_value": "Nov 2027 (Kokotajlo), Jan 2029 (Halstead), Jan 2030 (Lifland), as of Aug 2026",
+        "trend": "slightly shorter than April 2026 (Kokotajlo May 2028 to Nov 2027; Lifland Jul 2030 to Jan 2030)"
+      },
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://blog.aifutures.org/p/q25-2026-timelines-update-uplift"
+        },
+        {
+          "title": "AI Futures Model",
+          "url": "https://www.aifuturesmodel.com"
+        }
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Re-checked on 2026-10-25 against the AI Futures Project post dated August 16, 2026 (forecast dates from its chart captions and text) and the linked aifuturesmodel.com page. The earlier April 2026 update is in lesswrong-posts as aifutures_q1_2026_timelines_update.",
+      "date_added": "2026-10-25"
+    },
+    {
+      "id": "stanford_del_canaries_august_update_2026",
+      "title": "No Widespread Displacement, but the AI Employment Gap for Young Workers Has Widened to 19%",
+      "authors": [
+        "Erik Brynjolfsson",
+        "Bharat Chandar",
+        "Ruyu Chen (Stanford Digital Economy Lab)"
+      ],
+      "date": "2026-08-12",
+      "date_precision": "day",
+      "source_type": "research_paper",
+      "source_platform": "Stanford Digital Economy Lab",
+      "url": "https://digitaleconomy.stanford.edu/news/canariesaug26/",
+      "category": "empirical_economics",
+      "summary": "Stanford Digital Economy Lab post accompanying the August 2026 revision of Brynjolfsson, Chandar and Chen's 'Canaries in the Coal Mine? Six Facts About the Recent Employment Effects of Artificial Intelligence', which extends the ADP payroll analysis through June 2026. The authors still see no widespread, economy-wide job displacement associated with AI, but employment of workers aged 22-25 in highly AI-exposed occupations now stands about 19% below where it would be had it kept pace with similarly aged workers in less-exposed occupations, up from 15% at the July 2025 data vintage. In levels, employment of 22-25-year-olds in the two most exposed quintiles fell about 11% between November 2022 and June 2026, while the three least-exposed quintiles grew about 10%. The adjustment runs mainly through reduced hiring of young workers rather than increased separations, is concentrated in occupations where AI tends to automate tasks, and so far shows up in employment rather than base pay. The revision presents new evidence on mechanisms, including a distinction between codified and tacit knowledge, reports robustness checks, stresses that the patterns are descriptive rather than causal, and its key results will be updated monthly on a Canaries Dashboard.",
+      "key_findings": [
+        "The young-worker gap widened: employment of 22-25-year-olds in highly AI-exposed occupations is about 19% below its comparison path, up from 15% at the July 2025 vintage, while experienced workers show no comparable gap.",
+        "In levels, employment of 22-25-year-olds in the two most exposed quintiles fell about 11% from November 2022 to June 2026, while the three least-exposed quintiles grew about 10%.",
+        "The adjustment works mainly through reduced hiring of young workers rather than increased separations, and it shows up in employment rather than base pay.",
+        "Automation versus augmentation: declines are concentrated where AI tends to automate tasks, while employment is flat or rising where AI mainly complements workers, especially among experienced workers.",
+        "Codified versus tacit knowledge: employment has declined for young workers in occupations that rely heavily on codified knowledge and increased for experienced workers in occupations that rely on tacit knowledge.",
+        "The divergence persists when tech firms and computer occupations are excluded, when exposure to interest-rate increases and remote work is controlled for, when entering and exiting firms are included, and when alternative exposure measures are used. Census Bureau administrative data (Tucker 2026) show broadly consistent raw patterns."
+      ],
+      "novel_arguments_and_concepts": [
+        "Codified versus tacit knowledge as the line between workers AI substitutes for and workers it complements",
+        "Early-career workers as 'canaries' whose hiring margin registers AI effects before aggregate employment does",
+        "A monthly Canaries Dashboard, part of the Lab's AI Economic Indicators project, for continuous tracking"
+      ],
+      "implications_for_governance": "Offers policymakers a high-frequency, payroll-based signal that points to entry-level hiring, not layoffs, as the margin to watch, which bears on training, apprenticeship and school-to-work policy. The authors' own caveats limit how far the result can be pushed: the patterns are descriptive, not causal; gaps shrink once education is accounted for; some trends predate generative AI; and ADP gaps are larger than national survey benchmarks. It should therefore be read alongside adoption-based and household-survey studies.",
+      "themes": [
+        "labor_markets",
+        "early_career_employment",
+        "ai_exposure",
+        "automation_vs_augmentation"
+      ],
+      "tags": [
+        "brynjolfsson",
+        "chandar",
+        "chen",
+        "stanford_digital_economy_lab",
+        "adp",
+        "canaries"
+      ],
+      "influence_score": 8,
+      "quantitative_data": {
+        "metric_name": "employment gap for ages 22-25 in highly AI-exposed occupations vs less-exposed peers",
+        "current_value": "about 19% below comparison path (June 2026 data)",
+        "trend": "widened from 15% at the July 2025 data vintage"
+      },
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://digitaleconomy.stanford.edu/news/canariesaug26/"
+        },
+        {
+          "title": "Revised paper (August 2026 PDF)",
+          "url": "https://digitaleconomy.stanford.edu/app/uploads/2026/08/Canaries_August2026.pdf"
+        },
+        {
+          "title": "Canaries Dashboard",
+          "url": "https://digitaleconomy.stanford.edu/project/indicators/canaries-dashboard/"
+        }
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Re-checked on 2026-10-25 against the Stanford Digital Economy Lab post dated August 12, 2026, with the linked August 2026 paper PDF (data through June 2026) and the Canaries Dashboard page confirmed to exist.",
+      "date_added": "2026-10-25"
+    },
+    {
+      "id": "epoch_agent_population_chip_capacity_2026",
+      "title": "How many AI agents could run on the AI chips shipped through 2027?",
+      "authors": [
+        "Jason Li (Epoch AI)"
+      ],
+      "date": "2026-10-02",
+      "date_precision": "day",
+      "source_type": "research_report",
+      "source_platform": "Epoch AI",
+      "url": "https://epoch.ai/publications/estimating-the-agent-population",
+      "category": "compute_trends",
+      "summary": "Epoch AI report by Jason Li estimating how many AI agents could run on the high-bandwidth memory (HBM) shipped for AI chips from 2025 onward, sizing what the current compute buildout implies for agent deployment rather than counting agents in use today. Concurrency for frontier closed models is inferred from API pricing and serving-cost assumptions, with agent workloads calibrated on logs of Codex and Claude Code sessions, while open-model concurrency comes from serving benchmarks for DeepSeek V4 Pro. Under central hardware assumptions, chips shipped through 2026 could run about 20-40 million concurrent frontier-model agents and chips shipped through 2027 about 50-101 million (about 33-171 million across all scenarios); running nonstop, that full through-2027 range would supply as many weekly working hours as about 140-720 million full-time employees; open-model benchmarks imply about 1.9 billion concurrent agents. Using 20% of central capacity would imply $2.6-5.3 trillion a year in API-equivalent spending, compared with the more than $100 billion in combined annualized revenue that leading developers already generate. The report concludes that the compute buildout could run ahead of inference demand, and that the key uncertainty is whether demand growth will justify the investment.",
+      "key_findings": [
+        "Chips shipped through 2026 could run about 16-56 million concurrent frontier-model agents (central estimate 20-40 million); chips shipped through 2027 about 33-171 million (central estimate 50-101 million).",
+        "Running nonstop, capacity shipped through 2027 would supply as many weekly working hours as about 140-720 million full-time employees (about 67-240 million for shipments through 2026).",
+        "Serving benchmarks for DeepSeek V4 Pro imply about 1.9 billion concurrent open-model agents on 2025-27 hardware.",
+        "Using 20% of central capacity would imply $2.6-5.3 trillion a year in API-equivalent spending, versus over $100 billion in leading developers' combined annualized revenue. Even fivefold annual revenue growth would reach only roughly $1 trillion by end-2027, an illustrative scenario rather than a forecast.",
+        "Pooled costs from session logs put Codex workloads at roughly $16-18 per agent-hour and Claude Code at $24-50."
+      ],
+      "novel_arguments_and_concepts": [
+        "HBM supply, counted in 288 GB (GB300-equivalent) units, as a common measure of AI-chip supply for estimating agent capacity, since memory capacity constrains how many agents can run concurrently",
+        "Converting the compute buildout into agent counts and full-time-worker equivalents to test whether demand can absorb supply",
+        "The agent-hour as a unit of agentic work, calibrated on real coding-agent session traces with time spent waiting for humans removed"
+      ],
+      "implications_for_governance": "Frames the AI capex debate in labor terms: if fully used, the hardware being shipped could supply agentic work on the scale of hundreds of millions of full-time workers, which matters for labor-market planning. The gap between implied spending and current revenue also flags a risk of overbuilding. The figures assume full deployment and full allocation to agent workloads, so they describe maximum potential capacity, not projected use.",
+      "themes": [
+        "compute_trends",
+        "ai_agents",
+        "inference_economics",
+        "ai_investment"
+      ],
+      "tags": [
+        "epoch_ai",
+        "hbm",
+        "ai_agents",
+        "inference_capacity",
+        "capex"
+      ],
+      "influence_score": 6,
+      "quantitative_data": {
+        "metric_name": "concurrent frontier-model agents supportable on HBM shipped through 2027",
+        "current_value": "about 50-101 million (central); 33-171 million across scenarios",
+        "trend": "up from about 20-40 million (central) for HBM shipped through 2026"
+      },
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://epoch.ai/publications/estimating-the-agent-population"
+        }
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Re-checked on 2026-10-25 against the Epoch AI report page (Jason Li, October 2, 2026); ranges, FTE equivalents, spending and per-agent-hour costs match the page, with the through-2027 range corrected to 33-171 million.",
+      "date_added": "2026-10-25"
+    },
+    {
+      "id": "epoch_openai_coding_agent_spending_2026",
+      "title": "Coding-agent spending by OpenAI researchers is doubling roughly every month",
+      "authors": [
+        "Yafah Edelman",
+        "Luke Emberson (Epoch AI)"
+      ],
+      "date": "2026-10-05",
+      "date_precision": "day",
+      "source_type": "data_insight",
+      "source_platform": "Epoch AI",
+      "url": "https://epoch.ai/data-insights/openai-coding-agent-spending",
+      "category": "compute_trends",
+      "summary": "Epoch AI data insight by Yafah Edelman and Luke Emberson. It extracts the data behind the first two charts in OpenAI's September 2026 post 'Research acceleration: The view inside OpenAI' and fits trends to weekly coding-agent usage by OpenAI researchers, valued at API list prices. Median daily usage per researcher rose from under $1 in January 2026 to $601 by mid-August, and the 90th-percentile researcher was spending over $7,000 per day. Recent growth was 1.8x per month for the median and 2.2x per month for the 90th percentile, which are doubling times of 34 and 27 days. Annualized over 260 working days, the final values come to about $160,000 per year for the median researcher and about $2 million for the 90th percentile; Epoch says the 90th-percentile figure is comparable to or greater than the cost of employing a researcher. Epoch notes that the values reflect API prices rather than OpenAI's internal costs and that such rapid growth is probably unsustainable, so its one-year extrapolation (about $185 million and $2.3 billion in annualized run rates) is illustrative.",
+      "key_findings": [
+        "The median OpenAI researcher's daily coding-agent usage, valued at API prices, rose from under $1 in January 2026 to $601 by mid-August, and the 90th percentile exceeded $7,000 per day.",
+        "Recent growth was 1.8x per month (median) and 2.2x per month (90th percentile), doubling times of 34 and 27 days.",
+        "Annualized over 260 working days, usage comes to about $160,000 (median) and about $2 million (90th percentile) per researcher; the 90th-percentile figure is comparable to or greater than the cost of employing a researcher.",
+        "Another year of growth at recent rates would imply annualized run rates of about $185 million (median) and $2.3 billion (90th percentile), growth Epoch calls probably unsustainable.",
+        "The preferred fit is an exponential trend with a single break in slope, with bootstrap 90% confidence intervals. The underlying weekly series is available as a downloadable CSV."
+      ],
+      "novel_arguments_and_concepts": [
+        "AI inference spending per researcher as a quantitative indicator of AI R&D automation inside a frontier lab",
+        "Comparing AI-agent spending per researcher with the cost of employing a researcher as a benchmark for substitution"
+      ],
+      "implications_for_governance": "Inference spending for the most intensive (90th-percentile) researchers that is comparable to or greater than the cost of employing a researcher is evidence that frontier labs are moving AI R&D toward compute-intensive agentic workflows, which matters for forecasts of automated AI research and for compute-based oversight. The data come from OpenAI's own published charts and are priced at list rates, not actual cost.",
+      "themes": [
+        "ai_rd_automation",
+        "coding_agents",
+        "inference_spending",
+        "compute_trends"
+      ],
+      "tags": [
+        "epoch_ai",
+        "openai",
+        "coding_agents",
+        "data_insight",
+        "ai_research_acceleration"
+      ],
+      "influence_score": 5,
+      "quantitative_data": {
+        "metric_name": "median daily coding-agent usage per OpenAI researcher (API prices)",
+        "current_value": "$601/day (mid-August 2026)",
+        "trend": "1.8x per month (34-day doubling time)"
+      },
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://epoch.ai/data-insights/openai-coding-agent-spending"
+        },
+        {
+          "title": "OpenAI source post cited by Epoch: Research acceleration: The view inside OpenAI",
+          "url": "https://openai.com/index/research-acceleration-view-inside-openai/"
+        }
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Re-checked on 2026-10-25 against the Epoch AI data insight page (October 5, 2026); the cited OpenAI post \"Research acceleration: The view inside OpenAI\" (September 6, 2026) was confirmed to exist but its charts were not read directly.",
+      "date_added": "2026-10-25"
     }
   ]
 }

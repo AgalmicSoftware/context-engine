@@ -2624,4 +2624,16 @@
     min-height: 44px;
     padding: 8px 10px;
   }
+
+  @container ce-theme style(--ce-layout-profile: minimal-app) {
+    .sectionsGrid {
+      gap: 0;
+      margin-top: 20px;
+    }
+
+    .sectionsGrid .sectionContainer {
+      border-top: 1px solid var(--ce-card-border);
+      padding-block: 12px;
+    }
+  }
 }

@@ -36,6 +36,7 @@ import { surveyReadsPort } from '../../domains/surveys/surveyChainReadsPort.js';
 import { faucetFundingPort } from '../../domains/worker/faucetFundingPort.js';
 import { clearDecryptCaches, cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { clearSurveyDraftsForAccount } from '../SurveyTool/surveyToolDraftState.js';
+import { purgeWorkerCanonicalCaches } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
 import {
@@ -2752,7 +2753,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   }
 
   componentDidUpdate(prevProps: MainSiteProps, prevState: MainSiteState) {
-    // Decrypted plaintext and Lit content keys are cached for the whole tab.
+    // Decrypted plaintext and Lit content keys are cached for the whole tab, and
+    // Worker cache nodes hold what the previous account was authorized to read.
     // Every logout and account switch reaches the store's account, so drop them here.
     const accountKey = (account: unknown) =>
       String(account || '')
@@ -2761,6 +2763,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     if (accountKey(prevProps.account) !== accountKey(this.props.account)) {
       clearDecryptCaches();
       clearSurveyDraftsForAccount(prevProps.account);
+      void purgeWorkerCanonicalCaches(prevProps.account).catch((e) => mainSiteLog.warn('MainSite: cleanup', e));
     }
 
     this.redirectLegacyDemoPath();
@@ -3019,7 +3022,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
 
     const homeSessionChanged = currPath === '/' && prevProps.activeSessionSlug !== this.props.activeSessionSlug;
-    if ((sessionPathResolutionChanged || homeSessionChanged) && !isStaticNonCacheRoute(currPath)) {
+    // Worker caches belong to their reader; a new account starts from its own reads.
+    const workerReaderChanged = accountKey(prevProps.account) !== accountKey(this.props.account);
+    if (
+      (sessionPathResolutionChanged || homeSessionChanged || workerReaderChanged) &&
+      !isStaticNonCacheRoute(currPath)
+    ) {
       const workerRouteSlug = this.getBootstrapActiveSessionSlug(currPath, currSearch);
       void this.initializeWorkerCanonicalCachesForGroup(workerRouteSlug, { resetReadiness: true });
     }

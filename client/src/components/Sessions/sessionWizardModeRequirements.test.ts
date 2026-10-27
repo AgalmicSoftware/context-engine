@@ -166,22 +166,22 @@ describe('sessionWizardModeRequirements', () => {
     });
   });
 
-  it('adds the Wrapped token without replacing Cloudflare account requirements', () => {
+  it('uses the Session Worker agent signing secret without replacing Cloudflare account requirements', () => {
     const profile = cloudflareProfile();
     profile.preset = 'custom';
     profile.surfaces.agentHttp = true;
 
     const requirements = resolveSessionWizardModeRequirements(profile);
 
-    expect(requirements.requiredRequirementIds).toEqual(['cloudflareAccount', 'cloudflareApiToken', 'aiProviderKey']);
+    expect(requirements.requiredRequirementIds).toEqual(['cloudflareAccount', 'aiProviderKey']);
     expect(requirements.presetKeyChips).toEqual([
       'Cloudflare account',
-      'Request-only Cloudflare API token',
+      'Agent signing secret in Cloudflare',
       'OpenAI API Key',
     ]);
   });
 
-  it('adds the Wrapped token without replacing decentralized requirements', () => {
+  it('uses the Session Worker agent signing secret without replacing decentralized requirements', () => {
     const profile = decentralizedProfile();
     profile.preset = 'custom';
     profile.surfaces.agentHttp = true;
@@ -190,7 +190,6 @@ describe('sessionWizardModeRequirements', () => {
 
     expect(requirements.requiredRequirementIds).toEqual([
       'sessionWorker',
-      'cloudflareApiToken',
       'aiProviderKey',
       'arweaveJwk',
       'rpc',
@@ -199,7 +198,7 @@ describe('sessionWizardModeRequirements', () => {
     ]);
     expect(requirements.presetKeyChips).toEqual([
       'Compatible Session Worker',
-      'Request-only Cloudflare API token',
+      'Agent signing secret in Cloudflare',
       'OpenAI API Key',
       'Arweave wallet/JWK',
       'RPC URL/key',

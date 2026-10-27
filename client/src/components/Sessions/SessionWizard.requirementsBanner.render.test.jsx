@@ -79,7 +79,7 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK)).not.toBeInTheDocument();
   });
 
-  it('adds the Wrapped token without replacing the Cloudflare account or AI key', async () => {
+  it('keeps native agent setup free of an API token while preserving the Cloudflare account and AI key', async () => {
     window.history.replaceState({}, '', '/session/new');
 
     renderSessionWizard();
@@ -90,9 +90,8 @@ describe('SessionWizard new-session requirements banner', () => {
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Agents (HTTP API)' }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK)).toBeInTheDocument();
-    });
+    expect(screen.getByRole('checkbox', { name: 'Agents (HTTP API)' })).toBeChecked();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Cloudflare account' })).toBeInTheDocument();
     const wrappedOpenAiKeyLink = screen.getByRole('link', { name: 'OpenAI key' });
     expect(wrappedOpenAiKeyLink).toHaveAttribute('href', 'https://platform.openai.com/api-keys');

@@ -84,6 +84,17 @@ const renderResolvableComponent = (node) => {
   return rendered;
 };
 
+// Saves run the page's change against the latest saved bookmarks; these record each saved result.
+const spyOnBookmarkSaves = (saved) => {
+  const saves = [];
+  const spy = jest.spyOn(cacheScripts, 'updateCacheAtomic').mockImplementation(async (namespace, slug, update) => {
+    const next = update(JSON.parse(JSON.stringify(saved)));
+    saves.push([namespace, slug, next]);
+    return next;
+  });
+  return { saves, spy };
+};
+
 describe('UserPage bookmark cache controls', () => {
   afterEach(() => {
     jest.clearAllMocks();
@@ -130,7 +141,9 @@ describe('UserPage bookmark cache controls', () => {
       users: [],
       filters: [],
     });
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    // Another tab bookmarked a different user after this page read its bookmarks.
+    const otherUser = '0x00000000000000000000000000000000000000cc';
+    const { saves, spy: writeSpy } = spyOnBookmarkSaves({ users: [otherUser] });
 
     try {
       const tree = instance.render();
@@ -143,12 +156,9 @@ describe('UserPage bookmark cache controls', () => {
       expect(() => bookmarkButtons[0].props.onClick()).not.toThrow();
 
       expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'session-a', { clone: false });
-      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'session-a', {
-        surveys: [],
-        questions: [],
-        users: [viewAddress],
-        filters: [],
-      });
+      expect(saves).toEqual([
+        ['bookmarksCache', 'session-a', { surveys: [], questions: [], users: [otherUser, viewAddress], filters: [] }],
+      ]);
       expect(instance.state.bookmarked).toBe(true);
       expect(instance.state.isEditingNickname).toBe(false);
 
@@ -182,7 +192,7 @@ describe('UserPage bookmark cache controls', () => {
       users: [],
       filters: [],
     });
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const { saves, spy: writeSpy } = spyOnBookmarkSaves({ surveys: [], questions: [], users: [], filters: [] });
 
     try {
       const tree = instance.render();
@@ -196,12 +206,9 @@ describe('UserPage bookmark cache controls', () => {
       expect(() => bookmarkButtons[0].props.onClick({ preventDefault: jest.fn() })).not.toThrow();
 
       expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'session-cache', { clone: false });
-      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'session-cache', {
-        surveys: [],
-        questions: [],
-        users: [viewAddress],
-        filters: [],
-      });
+      expect(saves).toEqual([
+        ['bookmarksCache', 'session-cache', { surveys: [], questions: [], users: [viewAddress], filters: [] }],
+      ]);
       expect(instance.state.bookmarked).toBe(true);
     } finally {
       peekSpy.mockRestore();
@@ -224,17 +231,14 @@ describe('UserPage bookmark cache controls', () => {
       users: [],
       filters: [],
     });
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const { saves, spy: writeSpy } = spyOnBookmarkSaves({ surveys: [], questions: [], users: [], filters: [] });
 
     try {
       expect(instance.getActiveSessionSlug()).toBe('');
       expect(() => instance.toggleBookmark()).not.toThrow();
-      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', '', {
-        surveys: [],
-        questions: [],
-        users: [viewAddress],
-        filters: [],
-      });
+      expect(saves).toEqual([
+        ['bookmarksCache', '', { surveys: [], questions: [], users: [viewAddress], filters: [] }],
+      ]);
       expect(instance.state.bookmarked).toBe(true);
     } finally {
       peekSpy.mockRestore();
@@ -336,17 +340,35 @@ describe('UserPage bookmark cache controls', () => {
 
     instance.toggleBookmark();
 
-    expect(instance.persistBookmarksCache).toHaveBeenCalledWith(
-      {
-        surveys: [],
-        questions: [],
-        users: [],
-        filters: [],
-      },
-      'toggleBookmark',
-    );
+    const [update, source] = instance.persistBookmarksCache.mock.calls[0];
+    expect(source).toBe('toggleBookmark');
+    const saved = {
+      surveys: [],
+      questions: [],
+      users: [{ address: viewAddress.toLowerCase(), nickname: 'Alice' }],
+      filters: [],
+    };
+    expect(update(saved)).toEqual({ surveys: [], questions: [], users: [], filters: [] });
+    // Already removed in another tab: the saved bookmarks stay as they are.
+    const removed = { surveys: [], questions: [], users: [], filters: [] };
+    expect(update(removed)).toEqual({ surveys: [], questions: [], users: [], filters: [] });
+    expect(removed.users).toEqual([]);
     expect(instance.state.bookmarked).toBe(false);
     expect(instance.state.isEditingNickname).toBe(false);
     expect(instance.state.nicknameInput).toBe('');
+  });
+
+  it('keeps a user already bookmarked by another tab when the page clicks bookmark', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const instance = makeInstance({ viewAddress });
+    instance.getBookmarksCache = jest.fn(() => ({ surveys: [], questions: [], users: [], filters: [] }));
+    instance.persistBookmarksCache = jest.fn();
+    instance.toggleBookmark();
+
+    const [update] = instance.persistBookmarksCache.mock.calls[0];
+    const saved = { surveys: ['s1'], questions: ['q1'], users: [viewAddress], filters: [] };
+    expect(update(saved)).toEqual({ surveys: ['s1'], questions: ['q1'], users: [viewAddress], filters: [] });
+    expect(saved.users).toEqual([viewAddress]);
+    expect(instance.state.bookmarked).toBe(true);
   });
 });

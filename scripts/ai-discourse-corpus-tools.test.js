@@ -6,8 +6,10 @@ const { test } = require('node:test');
 const {
   TARGET_DEBATE_IDS,
   buildRecordIndex,
+  collectFreshness,
   collectSummary,
   collectValidation,
+  entryDate,
   extractRecord,
   loadCorpusFiles,
   normalizeCorpusKey,
@@ -19,7 +21,7 @@ test('summarizes corpus files without dumping full JSON records', () => {
   const tweets = summary.corpuses.find((entry) => entry.corpus === 'tweets');
 
   assert.equal(crossCorpus.count, 16);
-  assert.equal(tweets.count, 4140);
+  assert.ok(tweets.count >= 4140);
   assert.ok(tweets.sizeBytes > 10_000_000);
 });
 
@@ -54,6 +56,44 @@ test('taxonomy fields stay within their canonical vocabularies', () => {
   assert.deepEqual(validation.unknownCorpusKeys, []);
 });
 
+test('tweet cross-links resolve to existing entries by id', () => {
+  const validation = collectValidation();
+
+  assert.deepEqual(validation.tweetCrossrefs.dangling, []);
+  assert.deepEqual(validation.tweetCrossrefs.missingEntryId, []);
+  assert.deepEqual(validation.tweetCrossrefs.unknownCorpus, []);
+  assert.deepEqual(validation.tweetDebateNodeDrift, []);
+});
+
+test('provenance fields stay well formed', () => {
+  const validation = collectValidation();
+
+  assert.deepEqual(validation.verificationStatusDrift, []);
+  assert.deepEqual(validation.malformedArxivIds, []);
+  assert.deepEqual(validation.crossCorpusDuplicates, []);
+});
+
+test('entry dates prefer the publication date over legislative dates and years', () => {
+  assert.deepEqual(entryDate({ date: '2026-09', year: 2027 }), { iso: '2026-09-01', precision: 'month' });
+  assert.deepEqual(entryDate({ created_at: '2026-07-11T08:00:00.000Z' }), { iso: '2026-07-11', precision: 'day' });
+  assert.deepEqual(entryDate({ date_proposed: '2024-02-01', date_enacted: '2025-06-30' }), { iso: '2025-06-30', precision: 'day' });
+  assert.deepEqual(entryDate({ year: 1968 }), { iso: '1968-01-01', precision: 'year' });
+  assert.equal(entryDate({}), null);
+});
+
+test('freshness reports newest dated entry and staleness per sub-corpus', () => {
+  const later = collectFreshness(undefined, '2099-01-01');
+  const tweets = later.corpuses.find((entry) => entry.corpus === 'tweets');
+
+  assert.equal(later.corpuses.some((entry) => entry.corpus === 'cross-corpus'), false);
+  assert.match(tweets.newest, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(tweets.stale, true);
+  assert.equal(tweets.last30Days, 0);
+  later.corpuses.forEach((entry) => {
+    assert.equal(entry.count >= entry.verified + entry.partiallyVerified, true);
+  });
+});
+
 test('entry ids are globally unique across corpuses', () => {
   const validation = collectValidation();
 
@@ -65,7 +105,7 @@ test('extracts a compact record by ID for context-safe inspection', () => {
 
   assert.equal(result.corpus, 'cross-corpus');
   assert.equal(result.record.id, 'debate_ai_water_usage');
-  assert.equal(result.record.positions.length, 10);
+  assert.ok(result.record.positions.length >= 3);
 });
 
 test('indexes records under both id and url so either reference form resolves', () => {

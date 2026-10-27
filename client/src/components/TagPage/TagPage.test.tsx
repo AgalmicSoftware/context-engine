@@ -374,6 +374,7 @@ const renderTagModal = ({
   isOpen = true,
   sessionState = {},
   entry = '/demo/corpus-viewer',
+  sessionSlug,
   demoCorpusMode = false,
   demoCorpusRecordsOverride = [],
   toggle = jest.fn(),
@@ -386,6 +387,7 @@ const renderTagModal = ({
             isOpen={isOpen}
             toggle={toggle}
             activeTag={activeTag}
+            sessionSlug={sessionSlug}
             demoCorpusMode={demoCorpusMode}
             demoCorpusRecords={demoCorpusRecordsOverride}
           />
@@ -1031,7 +1033,10 @@ describe('TagPage', () => {
         },
       ],
     });
-    expect(mockCallAI).toHaveBeenCalledWith(expectedPrompt, expect.objectContaining({ sessionSlug: '' }));
+    expect(mockCallAI).toHaveBeenCalledWith(
+      expectedPrompt,
+      expect.objectContaining({ sessionSlug: '', taskType: 'categorize' }),
+    );
     expect(await screen.findByText('Mocked interpretation')).toBeInTheDocument();
   });
 
@@ -1130,6 +1135,7 @@ describe('TagPage', () => {
 
 describe('TagModal', () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1155,6 +1161,98 @@ describe('TagModal', () => {
         }),
       ];
     });
+  });
+
+  it('preselects the originating session instead of the global selection and keeps it through comparisons', () => {
+    renderTagModal({ sessionSlug: 'edge', sessionState: { primarySessionSlug: 'alpha' } });
+    expect(screen.getByRole('combobox', { name: 'Tag explorer session' })).toHaveValue('session:edge');
+    expect(screen.getByText('What changed?')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute('href', '/tag/Google?session=edge');
+    fireEvent.click(screen.getAllByRole('button', { name: /add ai governance tag to comparison/i })[0]);
+    expect(screen.getByRole('combobox', { name: 'Tag explorer session' })).toHaveValue('session:edge');
+    expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute(
+      'href',
+      '/tag/Google+AI%20Governance?session=edge',
+    );
+  });
+
+  it('uses the session route for modal callers without an explicit session', () => {
+    renderTagModal({ entry: '/ce/session/edge', sessionState: { primarySessionSlug: 'alpha' } });
+    expect(screen.getByRole('combobox', { name: 'Tag explorer session' })).toHaveValue('session:edge');
+    expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute('href', '/tag/Google?session=edge');
+  });
+
+  it('preserves a changed session when comparing tags and opening the full page', () => {
+    renderTagModal({ sessionSlug: 'alpha' });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Tag explorer session' }), {
+      target: { value: 'session:edge' },
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: /add ai governance tag to comparison/i })[0]);
+    expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute(
+      'href',
+      '/tag/Google+AI%20Governance?session=edge',
+    );
+  });
+
+  it('preserves the General session and deployment base path in the full-page link', () => {
+    const previous = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce';
+    try {
+      renderTagModal({ sessionSlug: '', entry: '/session/alpha' });
+      expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute(
+        'href',
+        '/ce/tag/Google?session=general',
+      );
+      expect(screen.getByRole('combobox', { name: 'Tag explorer session' })).toHaveValue('session:');
+    } finally {
+      if (previous === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previous;
+    }
+  });
+
+  it('places a labelled dropdown in the top-right header without the old scope badge or gear', () => {
+    renderTagModal({ sessionSlug: 'edge' });
+    const selector = within(screen.getByTestId('tag-modal-top-bar')).getByRole('combobox', {
+      name: 'Tag explorer session',
+    });
+    expect(selector).toHaveValue('session:edge');
+    expect(screen.queryByTestId('tag-page-session-scope')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tag page session selector' })).not.toBeInTheDocument();
+  });
+
+  it('keeps General and the originating session available when the registry has no entries', () => {
+    mockGetAllSessionSlugs.mockReturnValue([]);
+    renderTagModal({ sessionSlug: 'origin-session', sessionState: { primarySessionSlug: 'alpha' } });
+    const selector = screen.getByRole('combobox', { name: 'Tag explorer session' });
+    fireEvent.change(selector, { target: { value: 'session:' } });
+    expect(selector).toHaveValue('session:');
+    expect(within(selector).getByRole('option', { name: 'origin-session' })).toBeInTheDocument();
+    fireEvent.change(selector, { target: { value: 'session:origin-session' } });
+    expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute(
+      'href',
+      '/tag/Google?session=origin-session',
+    );
+  });
+
+  it('can return from a specific session to the global session list', () => {
+    renderTagModal({
+      sessionSlug: 'alpha',
+      sessionState: { selectedSessionScope: 'list', selectedSessionSlugs: ['edge', 'alpha'] },
+    });
+    const selector = screen.getByRole('combobox', { name: 'Tag explorer session' });
+    fireEvent.change(selector, { target: { value: 'global' } });
+    expect(selector).toHaveValue('global');
+    expect(screen.getByText('What changed?')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute('href', '/tag/Google');
+  });
+
+  it('lets modal callers change a session inherited from the URL without changing the host route', () => {
+    renderTagModal({ entry: '/questions?session=alpha' });
+    const selector = screen.getByRole('combobox', { name: 'Tag explorer session' });
+    expect(selector).toHaveValue('session:alpha');
+    fireEvent.change(selector, { target: { value: 'session:edge' } });
+    expect(screen.getByText('What changed?')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open tag page' })).toHaveAttribute('href', '/tag/Google?session=edge');
   });
 
   it('uses dedicated tag-modal shell classes and keeps the demo info cog beside the modal close control', () => {

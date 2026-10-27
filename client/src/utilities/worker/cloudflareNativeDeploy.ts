@@ -46,13 +46,22 @@ const fillWithWebCrypto: FillRandomBytes = (bytes) => {
 
 export const createCloudflareNativeSetupSecrets = (
   fillRandomBytes: FillRandomBytes = fillWithWebCrypto,
-): { tokenHmacSecret: string; storageEnvelopeKek: string } => {
+  operatorRecoveryKey: string | null = null,
+  includeAgentRoot = false,
+): { tokenHmacSecret: string; storageEnvelopeKek: string; agentManagedRootSecret?: string } => {
+  if (operatorRecoveryKey !== null && !/^[a-f0-9]{64}$/i.test(operatorRecoveryKey.trim()))
+    throw new Error('Use exactly 64 hex characters for your recovery key.');
   const first = bytesToHex(fillRandomBytes(new Uint8Array(32)));
-  const second = bytesToHex(fillRandomBytes(new Uint8Array(32)));
-  if (!/^[a-f0-9]{64}$/.test(first) || !/^[a-f0-9]{64}$/.test(second) || first === second) {
+  const second = operatorRecoveryKey?.trim().toLowerCase() ?? bytesToHex(fillRandomBytes(new Uint8Array(32)));
+  if (!/^[a-f0-9]{64}$/.test(first) || !/^[a-f0-9]{64}$/i.test(second) || first === second) {
     throw new Error('Secure setup-secret generation failed. Do not continue this deployment.');
   }
+  const agentRoot = includeAgentRoot ? bytesToHex(fillRandomBytes(new Uint8Array(32))) : '';
+  if (includeAgentRoot && (!/^[a-f0-9]{64}$/.test(agentRoot) || agentRoot === first || agentRoot === second)) {
+    throw new Error('Secure agent signing-secret generation failed. Do not continue this deployment.');
+  }
   return {
+    ...(includeAgentRoot ? { agentManagedRootSecret: agentRoot } : {}),
     tokenHmacSecret: first,
     storageEnvelopeKek: second,
   };

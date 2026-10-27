@@ -1,4 +1,6 @@
+import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
 import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
+import { dispatchWorkerCapabilities } from './workerCapabilities.js';
 import { isModelAllowed } from './aiRequestNormalization.js';
 import {
   dispatchPublicWorkerGroupListRequest as dispatchPublicWorkerGroupListRequestBoundary,
@@ -37,6 +39,8 @@ export const dispatchAnonymousRoute = async ({
     headers,
     env,
   } = anonymousContext || {};
+
+  if (path === '/capabilities') return dispatchWorkerCapabilities({ request, env, headers });
 
   if (path === '/groups/list') {
     const dispatchPublicWorkerGroupListRequest =
@@ -108,6 +112,7 @@ export const dispatchAnonymousRoute = async ({
       secrets,
       baseHeaders: headers,
       transcribeRequest,
+      config,
     });
   }
 
@@ -148,6 +153,7 @@ export const dispatchAnonymousRoute = async ({
   }
 
   const aiRequest = await deps?.readAiRequestPayload?.({
+    config,
     request: typeof request?.clone === 'function' ? request.clone() : request,
   });
   if (!aiRequest?.ok) {
@@ -194,8 +200,8 @@ export const dispatchAnonymousRoute = async ({
   const model = resolveModelForProvider({ payload, provider });
   if (!isModelAllowed(model, provider)) {
     return deps?.json?.(
-      { error: 'Model not allowed for provider' },
-      400,
+      requestApiKey ? { error: 'Model not allowed for provider' } : AI_MODEL_NOT_ALLOWED,
+      requestApiKey ? 400 : 403,
       headers,
     );
   }
@@ -211,13 +217,13 @@ export const dispatchAnonymousRoute = async ({
     ? {}
     : ((await deps?.getSessionSecrets?.(slug)) || {});
   if (provider === 'anthropic') {
-    return deps?.proxyAnthropic?.({ payload, secrets, baseHeaders: headers });
+    return deps?.proxyAnthropic?.({ payload, secrets, config, baseHeaders: headers });
   }
   if (provider === 'openai') {
-    return deps?.proxyOpenAI?.({ payload, secrets, baseHeaders: headers });
+    return deps?.proxyOpenAI?.({ payload, secrets, config, baseHeaders: headers });
   }
   if (provider === 'openrouter') {
-    return deps?.proxyOpenRouter?.({ payload, secrets, baseHeaders: headers });
+    return deps?.proxyOpenRouter?.({ payload, secrets, config, baseHeaders: headers });
   }
 
   return deps?.json?.({ error: `Unsupported provider: ${provider}` }, 400, headers);

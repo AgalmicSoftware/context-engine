@@ -35,7 +35,7 @@ test('session creation docs align mode-specific deployment inputs', () => {
 
   assert.match(
     creationDoc,
-    /\| Cloudflare API token[^\n]*Agent Session Wrapped[^\n]*explicit legacy deploy-helper fallback[^\n]*not the native default/,
+    /\| Cloudflare API token[^\n]*explicit legacy deploy-helper fallback[^\n]*not the native default/,
   );
   assert.match(creationDoc, /\| AI provider key[^\n]*every reachable `\/new` profile/);
   assert.match(creationDoc, /key for every provider used by the selected fast,\s+thinking,\s+and\s+transcription models/i);
@@ -51,7 +51,7 @@ test('canonical docs keep native Hosted deployment separate from token-based fal
   assert.match(readme, /Native setup uses a Cloudflare account\/dashboard login[\s\S]{0,160}does not ask for a Cloudflare API token/);
   assert.doesNotMatch(readme, /default Cloudflare profile needs only a Cloudflare deploy token/i);
   assert.match(architecture, /Native Deploy to Cloudflare[\s\S]{0,80}no API token/);
-  assert.match(architecture, /Legacy deploy-helper \/ Agent Wrapped[\s\S]{0,100}request-only Cloudflare token/);
+  assert.match(architecture, /Legacy deploy-helper[\s\S]{0,100}request-only Cloudflare token/);
   assert.match(overview, /native Deploy to Cloudflare template[\s\S]{0,100}no API token/);
   assert.match(overview, /default `\/new` path[\s\S]{0,160}without requesting an API token/);
   assert.match(spec, /explicit legacy Session[\s\S]{0,160}default Hosted & Fast path uses the native Cloudflare dashboard handoff/);
@@ -131,7 +131,7 @@ test('chain-neutral deployment docs keep deployment separate from supported-chai
   assert.match(foundryDoc, /does not update the client contract\s+manifest or make the target chain supported/i);
 });
 
-test('architecture docs inventory Agent Bridge and encrypted-envelope export boundaries', () => {
+test('architecture docs inventory Session Worker agents and encrypted-envelope export boundaries', () => {
   const overview = read('docs/architecture-overview.md');
   const spec = read('spec.md');
 
@@ -139,7 +139,7 @@ test('architecture docs inventory Agent Bridge and encrypted-envelope export bou
     ['docs/architecture-overview.md', overview],
     ['spec.md', spec],
   ]) {
-    assert.match(source, /workers\/agentBridgeWorker\//, relativePath);
+    assert.match(source, /workers\/sessionCorsWorker\/agent\//, relativePath);
     assert.match(source, /workers\/shared\//, relativePath);
     assert.match(source, /\/storage\/export-envelopes/, relativePath);
   }
@@ -149,20 +149,18 @@ test('architecture docs inventory Agent Bridge and encrypted-envelope export bou
   assert.match(spec, /\/telegram\/agent\/api\/\*/);
   assert.match(spec, /ce-agent-access\/SKILL\.md/);
   assert.match(spec, /\/admin\/abuse-summary/);
-  assert.match(overview, /AgentBridge -.->\|policy-enabled direct submit\| Contracts/);
+  assert.match(overview, /SessionAgent -.->\|policy-enabled direct submit\| Contracts/);
   assert.match(overview, /Surveys contract[\s\S]{0,120}remain canonical/);
 });
 
-test('public Agent Bridge docs keep the current storage-profile split', () => {
-  const bridgeReadme = read('workers/agentBridgeWorker/README.md');
-
-  assert.match(bridgeReadme, /workers\/agentBridgeWorker\//);
-  assert.match(bridgeReadme, /separate from `workers\/sessionCorsWorker\//);
-  assert.match(bridgeReadme, /ships as part of\s+the public\s+worker surface/);
-  assert.match(bridgeReadme, /Hosted &\s+Fast[\s\S]{0,180}default\/recommended[\s\S]{0,180}Cloudflare/i);
-  assert.match(bridgeReadme, /Trustless &\s+Slower[\s\S]{0,180}Arweave/i);
-  assert.match(bridgeReadme, /legacy\/custom drafts[\s\S]{0,180}Arweave\s+fallback/i);
-  assert.doesNotMatch(bridgeReadme, /\barweave\b[^\n]{0,80}\b(?:is|remains)\b[^\n]{0,30}\bdefault\b/i);
+test('public agent docs define fresh single-Worker storage and deployment', () => {
+  const agentReadme = read('workers/sessionCorsWorker/agent/README.md');
+  assert.match(agentReadme, /AGENT_MANAGED_ROOT_SECRET/);
+  assert.match(agentReadme, /Hosted & Fast uses canonical Cloudflare payload storage/);
+  assert.match(agentReadme, /Trustless & Slower/);
+  assert.match(agentReadme, /SessionWriteCoordinator/);
+  assert.match(agentReadme, /Existing Bridge-backed sessions keep their old deployments/);
+  assert.match(agentReadme, /ce-agent:/);
 });
 
 test('architecture docs distinguish Base support policy from active manifest state', () => {
@@ -225,15 +223,14 @@ test('active agent docs preserve HTTP access and distinguish historical review e
   assert.doesNotMatch(architecture, /telegramAgentData\.ts|telegramSessionBackend\.ts/);
   assert.match(workerDoc, /HTTP-off overrides stale legacy flags/);
   assert.match(workerDoc, /historical `telegram`|Historical explicit\s+`telegram`/);
-  assert.match(workerDoc, /retired bot export commands/);
+  assert.match(read('workers/sessionCorsWorker/agent/README.md'), /retired/);
   assert.doesNotMatch(workerDoc, /Telegram-first|Telegram remains independently optional/);
   if (contract) {
-    assert.match(contract, /agentSessionRuntime\.mjs/);
-    assert.match(contract, /agentOnlyMode\.mjs/);
-    assert.match(contract, /humanApproved[\s\S]{0,200}not verified evidence of human review/);
-    assert.match(contract, /Historical verified Mini App confirmation\/edit records/);
-    assert.match(contract, /later explicit operational\s+actions/);
-    assert.match(contract, /not an exactly-once execution guarantee/);
+    assert.match(contract, /Session Worker now owns the canonical authenticated/);
+    assert.match(contract, /humanApproved[\s\S]{0,200}not verified evidence of\s+human review/);
+    assert.match(contract, /Historical verified review labels/);
+    assert.match(contract, /separate explicit operational request/);
+    assert.match(contract, /not an exactly-once\s+execution guarantee/);
     assert.doesNotMatch(contract, /telegramAgentOnlyMode\.mjs|implements the bot-first Telegram flow/);
   }
   if (research) {

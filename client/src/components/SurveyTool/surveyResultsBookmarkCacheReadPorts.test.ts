@@ -49,13 +49,21 @@ describe('surveyResultsBookmarkCacheReadPorts', () => {
     });
   });
 
-  it('requires both survey and question arrays before selecting lists', () => {
+  it('keeps each valid bookmark list when its sibling is missing or malformed', () => {
     expect(selectSurveyResultsBookmarkLists({ surveys: ['survey-only'] })).toEqual({
-      surveys: [],
+      surveys: ['survey-only'],
       questions: [],
     });
     expect(selectSurveyResultsBookmarkLists({ questions: ['question-only'] })).toEqual({
       surveys: [],
+      questions: ['question-only'],
+    });
+    expect(selectSurveyResultsBookmarkLists({ surveys: false, questions: ['question-only'] })).toEqual({
+      surveys: [],
+      questions: ['question-only'],
+    });
+    expect(selectSurveyResultsBookmarkLists({ surveys: ['survey-only'], questions: 'invalid' })).toEqual({
+      surveys: ['survey-only'],
       questions: [],
     });
   });

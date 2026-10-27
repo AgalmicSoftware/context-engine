@@ -1,10 +1,12 @@
+import { chainRequest, safeChainError } from './chainErrors.mjs';
+
 export const compareChainOrder = (a, b) =>
   Number(a.blockNumber || 0) - Number(b.blockNumber || 0) ||
   Number(a.transactionIndex || 0) - Number(b.transactionIndex || 0) ||
   Number(a.logIndex || 0) - Number(b.logIndex || 0);
 
 export const checkRegistryChain = async (provider, chainId) => {
-  const actual = Number(await provider.send('eth_chainId', []));
+  const actual = Number(await chainRequest(() => provider.send('eth_chainId', [])));
   if (actual !== chainId) throw new Error(`The RPC is on a different chain (${actual}); expected ${chainId}.`);
 };
 
@@ -13,7 +15,7 @@ export const findStartBlock = async (provider, createdAt, head) => {
   let high = head;
   while (low < high) {
     const mid = Math.floor((low + high) / 2);
-    const block = await provider.getBlock(mid);
+    const block = await chainRequest(() => provider.getBlock(mid));
     if (!block || !Number.isFinite(Number(block.timestamp))) throw new Error('Could not locate the session creation block.');
     if (Number(block.timestamp) < createdAt) low = mid + 1;
     else high = mid;
@@ -39,11 +41,12 @@ export const scanRegistryLogs = async ({
     requests += 1;
     try { batch = await provider.getLogs({ ...filter, fromBlock: begin, toBlock: end }); }
     catch (error) {
+      // Range limits are recognized from the raw provider text, which must go no further.
       if (range > 1 && /range|too many|limit|response size|query returned/i.test(`${error?.message || ''} ${error?.error?.message || ''}`)) {
         range = Math.max(1, Math.floor((end - begin + 1) / 2));
         continue;
       }
-      throw error;
+      throw safeChainError(error);
     }
     batch = batch.sort((a, b) => descending ? compareChainOrder(b, a) : compareChainOrder(a, b));
     let skipped = 0;

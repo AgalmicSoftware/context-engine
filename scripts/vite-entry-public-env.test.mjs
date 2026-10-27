@@ -17,7 +17,6 @@ const deploymentEnvKeys = [
   'REACT_APP_CE_DEPLOY_HELPER_URL',
   'REACT_APP_CE_SHARED_WORKER_URL',
   'REACT_APP_CE_WORKER_BUNDLE_URL',
-  'REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL',
   'REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL',
   'REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED',
   'REACT_APP_CE_DEFAULT_THEME',
@@ -147,7 +146,6 @@ const evaluateBuiltEntry = async (overrides = {}) => {
 const assertRelease = (config, commit) => {
   assert.equal(config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT, commit);
   assert.equal(config.WORKER_BUNDLE_URL, releaseAsset(commit, 'sessionCorsWorker.bundle.js'));
-  assert.equal(config.AGENT_BRIDGE_WORKER_BUNDLE_URL, releaseAsset(commit, 'agentBridgeWorker.bundle.js'));
   assert.equal(config.WORKER_RELEASE_MANIFEST_URL, releaseAsset(commit, 'worker-release-manifest.json'));
   assert.ok(decodeURIComponent(config.CLOUDFLARE_NATIVE_DEPLOY_URL).includes(`/tree/${commit}/deploy/cloudflare/session-worker`));
   assert.equal(config.processReady, true);

@@ -1,15 +1,15 @@
 import type { SurveyResultsSurveyQuestionBookmarkWritePlan } from './surveyResultsCacheWriteEligibilityPlan';
+import { applyBookmarkChange } from '../../utilities/cache/bookmarkChanges';
 
-type SurveyResultsRecord = Record<string, unknown>;
-
-export type SurveyResultsBookmarksCacheWritePort = (
+/** Saves a change to the latest saved bookmarks (updateCacheAtomic), keeping another tab's. */
+export type SurveyResultsBookmarksCacheUpdatePort = (
   namespace: 'bookmarksCache',
   slug: string,
-  payload: SurveyResultsRecord,
+  update: (saved: unknown) => Record<string, unknown>,
 ) => Promise<unknown> | unknown;
 
 export type SurveyResultsSurveyQuestionBookmarkWriteControllerPorts = {
-  writeBookmarksCache?: SurveyResultsBookmarksCacheWritePort;
+  updateBookmarksCache?: SurveyResultsBookmarksCacheUpdatePort;
 };
 
 export type SurveyResultsSurveyQuestionBookmarkWriteControllerArgs = {
@@ -39,7 +39,8 @@ export const runSurveyResultsSurveyQuestionBookmarkWriteController = async ({
   ports = {},
 }: SurveyResultsSurveyQuestionBookmarkWriteControllerArgs = {}): Promise<SurveyResultsSurveyQuestionBookmarkWriteControllerResult> => {
   const target = plan?.target || EMPTY_TARGET;
-  if (!plan?.shouldWrite || !plan.payload || typeof ports.writeBookmarksCache !== 'function') {
+  const toggled = plan?.toggled;
+  if (!plan?.shouldWrite || !plan.payload || !toggled || typeof ports.updateBookmarksCache !== 'function') {
     return {
       attempted: false,
       error: null,
@@ -51,7 +52,11 @@ export const runSurveyResultsSurveyQuestionBookmarkWriteController = async ({
   }
 
   try {
-    await ports.writeBookmarksCache(plan.target.namespace, plan.target.slug, plan.payload as SurveyResultsRecord);
+    // The toggle follows what this page showed; it applies to the latest saved bookmarks.
+    const list = toggled.bookmarkType === 'survey' ? 'surveys' : 'questions';
+    await ports.updateBookmarksCache(plan.target.namespace, plan.target.slug, (saved) =>
+      applyBookmarkChange(saved, list, toggled.id, toggled.action === 'add'),
+    );
     return {
       attempted: true,
       error: null,

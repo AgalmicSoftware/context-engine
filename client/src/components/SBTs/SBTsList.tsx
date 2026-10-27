@@ -201,6 +201,7 @@ const OnChainSBTsList = ({
   const [globalSessionSelectionRevision, setGlobalSessionSelectionRevision] = useState<number>(0);
   const [sessionConfigRevision, setSessionConfigRevision] = useState<number>(0);
   const [activeTag, setActiveTag] = useState<string>('');
+  const [activeTagSessionSlug, setActiveTagSessionSlug] = useState<string | undefined>();
   const [activeSessionSlug, setActiveGroupSlug] = useState<string>(() =>
     resolveSbtListInitialActiveSessionSlug({
       globalPrimarySessionSlug: readStoredGlobalSessionSelection().primarySessionSlug,
@@ -2450,7 +2451,11 @@ const OnChainSBTsList = ({
         buttonLabel={buttonLabel}
         detailsId={detailsId}
         model={model}
-        onTagClick={handleTagChipClick}
+        onTagClick={(event, tag) => {
+          const slug = resolveSbtSessionSlug(sbt);
+          setActiveTagSessionSlug(isSbtListSyntheticNoSessionSlug(slug) ? undefined : slug);
+          handleTagChipClick(event, tag);
+        }}
         onToggleDetails={() => toggleExpandedSbt(sbt?.sbtAddress)}
         styles={styles}
       />
@@ -2998,7 +3003,12 @@ const OnChainSBTsList = ({
       >
         {expiredListWithoutFeatured.map(renderSBTButton)}
       </SbtListSectionBody>
-      <TagModal isOpen={!!activeTag} toggle={() => setActiveTag('')} activeTag={activeTag || null} />
+      <TagModal
+        sessionSlug={activeTagSessionSlug}
+        isOpen={!!activeTag}
+        toggle={() => setActiveTag('')}
+        activeTag={activeTag || null}
+      />
     </div>
   );
 };

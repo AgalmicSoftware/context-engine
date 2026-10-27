@@ -134,6 +134,7 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
       readCurrentSessionConfig: 'readCurrentSessionConfig',
             resolveTrustedAdminOrigins: 'resolveTrustedAdminOrigins',
             verifyToken: 'verifyToken',
+            computeScopesForLogin: 'computeScopesForLogin',
             validateAuthTokenRecord: 'validateAuthTokenRecord',
             resolveWorkerRequestSlugContext: 'resolveWorkerRequestSlugContext',
             toStr: 'toStr',
@@ -242,6 +243,8 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
         assert.deepEqual(value.deps, {
           log,
           fetch: 'fetch',
+          safeFetch: 'safeFetch',
+          isBlockedOutboundUrl: 'isBlockedOutboundUrl',
           toStr: 'toStr',
           corsHeaders: 'corsHeaders',
           json: 'json',

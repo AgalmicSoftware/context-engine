@@ -139,6 +139,7 @@ const ExperimentalStub = asMainSiteRouteComponent(ExperimentalStubRaw);
 const NotFoundRoute = asMainSiteRouteComponent(NotFoundRouteRaw);
 const AboutPage = asMainSiteRouteComponent(AboutPageRaw);
 const AdminPage = asMainSiteRouteComponent(AdminPageRaw);
+const AdminSessionBackupRecovery = React.lazy(() => import('../Admin/AdminSessionBackupRecovery'));
 const AgentPage = asMainSiteRouteComponent(AgentPageRaw);
 const BenchmarksPage = asMainSiteRouteComponent(BenchmarksPageRaw);
 const DebateMap = asMainSiteRouteComponent(DebateMapRaw);
@@ -353,7 +354,21 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const workerRoute = resolveMainSiteAdminWorkerRoute({ searchStr, controller: workerCanonicalRoutes });
     const workerInterruption =
       renderWorkerCanonicalRouteError(workerRoute) ||
-      renderWorkerCanonicalRouteBootstrap(workerRoute, workerCanonicalRoutes);
+      renderWorkerCanonicalRouteBootstrap(
+        workerRoute,
+        workerCanonicalRoutes,
+        workerRoute.kind === 'bootstrap' && (
+          <Suspense fallback={<LazyFallback label="Loading restore..." />}>
+            <AdminSessionBackupRecovery
+              workerUrl={workerRoute.workerOrigin}
+              sessionSlug={workerRoute.workerSessionSlug}
+              account={typeof host.props.account === 'string' ? host.props.account : undefined}
+              provider={host.props.provider}
+              chainId={host.props.network?.id}
+            />
+          </Suspense>
+        ),
+      );
     if (workerInterruption) return workerInterruption;
     return (
       <InitialRouteBoundary fallback={<LazyFallback label="Loading Admin..." />} resetKey={fullPath}>

@@ -1,3 +1,4 @@
+import { resolveAdminAgentSessionWrappedAvailability } from '../Admin/adminAgentSessionWrapped';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { verifyNativeSessionWorker } from './sessionWizardNativeWorkerVerification';
 import { resolveSessionWizardWorkerPublishEvidence } from './sessionWizardWorkerPublishEvidence';
@@ -11,60 +12,6 @@ describe('verifyNativeSessionWorker', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
-  });
-
-  it.each([
-    ['worker-canonical', SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE],
-    ['decentralized', SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED],
-  ])('rejects a %s Wrapped profile before any mutation or network effect', async (_label, presetId) => {
-    const profile = cloneSessionModePreset(presetId);
-    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    profile.surfaces.agentHttp = true;
-    const fetchMock = jest.fn();
-    global.fetch = fetchMock as typeof fetch;
-    const getCurrentWorkerSecrets = jest.fn(() => ({ openaiKey: 'test-ai-key' }));
-    const getMissingWorkerSecretsForDeploy = jest.fn(() => []);
-    const parseAllowOriginsInput = jest.fn(() => ['https://contextengine.test']);
-    const resolveConnectedAdminAddress = jest.fn(async () => '0x00000000000000000000000000000000000000aa');
-    const resolveWorkerFaucetConfig = jest.fn(() => ({}));
-    const signTypedAdminAction = jest.fn(async () => ({}));
-    const updateDeploymentState = jest.fn();
-    const updateDraftValue = jest.fn();
-
-    await expect(
-      verifyNativeSessionWorker({
-        runtimeRef: {
-          current: {
-            draft: {
-              slug: 'wrapped-session',
-              sessionModeProfile: profile,
-            },
-            loginComplete: true,
-            workerSecretsEnabled: true,
-          } as SessionWizardWorkerDeployRuntime,
-        },
-        sessionSlug: 'wrapped-session',
-        workerQueryValue: 'https://wrapped-session.example.test',
-        getCurrentWorkerSecrets,
-        getMissingWorkerSecretsForDeploy,
-        parseAllowOriginsInput,
-        resolveConnectedAdminAddress,
-        resolveWorkerFaucetConfig,
-        signTypedAdminAction,
-        updateDeploymentState,
-        updateDraftValue,
-      }),
-    ).rejects.toThrow(/Agent Session Wrapped.*legacy\/manual deploy-helper flow/i);
-
-    expect(resolveConnectedAdminAddress).not.toHaveBeenCalled();
-    expect(getCurrentWorkerSecrets).not.toHaveBeenCalled();
-    expect(getMissingWorkerSecretsForDeploy).not.toHaveBeenCalled();
-    expect(parseAllowOriginsInput).not.toHaveBeenCalled();
-    expect(resolveWorkerFaucetConfig).not.toHaveBeenCalled();
-    expect(signTypedAdminAction).not.toHaveBeenCalled();
-    expect(updateDeploymentState).not.toHaveBeenCalled();
-    expect(updateDraftValue).not.toHaveBeenCalled();
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('uses authority-neutral admin guidance for decentralized Worker attachment', async () => {
@@ -140,113 +87,148 @@ describe('verifyNativeSessionWorker', () => {
     expect(updateDeploymentState).not.toHaveBeenCalled();
   });
 
-  it('attaches a decentralized Worker through signed config and secret acceptance', async () => {
-    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
-    const fetchMock = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>(async (input) => {
-      const url = String(input);
-      if (url.endsWith('/admin/set-config') || url.endsWith('/admin/set-secrets')) {
-        return new Response(JSON.stringify({ ok: true }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      throw new Error(`Unexpected decentralized Worker verification request: ${url}`);
-    });
-    global.fetch = fetchMock as typeof fetch;
-    const updateDeploymentState = jest.fn();
-    const updateDraftValue = jest.fn();
-    const signTypedAdminAction = jest.fn<ReturnType<SignTypedAdminAction>, Parameters<SignTypedAdminAction>>(
-      async () => ({
-        address: '0x00000000000000000000000000000000000000aa',
-        signature: '0xsigned',
-      }),
-    );
-
-    await expect(
-      verifyNativeSessionWorker({
-        runtimeRef: {
-          current: {
-            draft: {
-              slug: 'registry-session',
-              sessionModeProfile: profile,
-              networkChainId: 11155420,
-              rpc: {
-                providers: {
-                  path: { rpcUrl: 'https://public-rpc.registry.example.test' },
-                },
+  it.each([false, true])(
+    'attaches a decentralized Worker through signed config and secret acceptance (agent HTTP %s)',
+    async (agentHttp) => {
+      const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+      profile.surfaces.agentHttp = agentHttp;
+      if (agentHttp) profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+      const fetchMock = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>(async (input) => {
+        const url = String(input);
+        if (url.includes('/capabilities?slug=registry-session'))
+          return new Response(
+            JSON.stringify({
+              features: ['agent_http_v1'],
+              agentHttp: { enabled: true, configured: true, ready: true },
+              agentSessionWrapped: {
+                version: 1,
+                origin: 'https://registry-session.example.test',
+                enabled: true,
+                protocolVersion: 'agent-session-wrapped-v1',
+                revision: 'wrapped-fixture',
+                verifiedAt: new Date().toISOString(),
               },
-              ai: {
-                models: {
-                  fast: { provider: 'openai', model: 'gpt-5' },
-                  thinking: { provider: 'openai', model: 'gpt-5' },
-                  transcription: { provider: 'openai', model: 'whisper-1' },
-                },
-              },
-            },
-            loginComplete: true,
-            workerSecretsEnabled: true,
-            registryChainId: 11155420,
-            sessionIdHex: '0x00000000000000000000000000000001',
-          } as SessionWizardWorkerDeployRuntime,
-        },
-        sessionSlug: 'registry-session',
-        workerQueryValue: 'https://registry-session.example.test',
-        getCurrentWorkerSecrets: () => ({
-          openaiKey: 'test-ai-key',
-          arweaveJwk: '{"kty":"RSA","n":"test"}',
-          customRpcUrl: 'https://secret-rpc.registry.example.test',
+            }),
+          );
+        if (url.endsWith('/admin/set-config') || url.endsWith('/admin/set-secrets')) {
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        throw new Error(`Unexpected decentralized Worker verification request: ${url}`);
+      });
+      global.fetch = fetchMock as typeof fetch;
+      const updateDeploymentState = jest.fn();
+      const updateDraftValue = jest.fn();
+      const signTypedAdminAction = jest.fn<ReturnType<SignTypedAdminAction>, Parameters<SignTypedAdminAction>>(
+        async () => ({
+          address: '0x00000000000000000000000000000000000000aa',
+          signature: '0xsigned',
         }),
-        getMissingWorkerSecretsForDeploy: () => [],
-        parseAllowOriginsInput: () => ['http://localhost'],
-        resolveConnectedAdminAddress: async () => '0x00000000000000000000000000000000000000aa',
-        resolveWorkerFaucetConfig: () => ({ rpcUrl: 'https://secret-rpc.registry.example.test' }),
-        signTypedAdminAction,
-        updateDeploymentState,
-        updateDraftValue,
-      }),
-    ).resolves.toEqual(
-      expect.objectContaining({
-        configRevision: '',
-        sessionId: '0x00000000000000000000000000000001',
-        sessionSlug: 'registry-session',
-        workerOrigin: 'https://registry-session.example.test',
-      }),
-    );
+      );
 
-    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/session-config'))).toBe(false);
-    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
-    const configSignInput = signTypedAdminAction.mock.calls.find(([input]) => input?.action === 'set-config')?.[0];
-    expect(configSignInput?.body?.config?.rpcUrl).toBe('https://public-rpc.registry.example.test');
-    expect(configSignInput?.body?.config?.rpcUrlsByChainId?.['11155420']).toEqual(
-      expect.arrayContaining(['https://public-rpc.registry.example.test']),
-    );
-    expect(configSignInput?.body?.config?.faucet?.rpcUrl).toBe('https://public-rpc.registry.example.test');
-    expect(JSON.stringify(configSignInput?.body?.config)).not.toContain('secret-rpc.registry.example.test');
-    const secretsRequest = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
-    expect(JSON.parse(String(secretsRequest?.[1]?.body || '{}')).secrets).toEqual(
-      expect.objectContaining({ customRpcUrl: 'https://secret-rpc.registry.example.test' }),
-    );
-    expect(signTypedAdminAction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'set-config',
-        targetSlug: 'registry-session',
-      }),
-    );
-    expect(signTypedAdminAction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'set-secrets',
-        targetSlug: 'registry-session',
-      }),
-    );
-    expect(updateDraftValue).toHaveBeenCalledWith(['corsWorkerUrl'], 'https://registry-session.example.test');
-    expect(updateDeploymentState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        deployComplete: true,
-        deployStatus: 'Session Worker verified.',
-        workerRequirementProof: expect.objectContaining({ version: 1 }),
-      }),
-    );
-  });
+      await expect(
+        verifyNativeSessionWorker({
+          runtimeRef: {
+            current: {
+              draft: {
+                slug: 'registry-session',
+                sessionModeProfile: profile,
+                networkChainId: 11155420,
+                rpc: {
+                  providers: {
+                    path: { rpcUrl: 'https://public-rpc.registry.example.test' },
+                  },
+                },
+                ai: {
+                  models: {
+                    fast: { provider: 'openai', model: 'gpt-5' },
+                    thinking: { provider: 'openai', model: 'gpt-5' },
+                    transcription: { provider: 'openai', model: 'whisper-1' },
+                  },
+                },
+              },
+              loginComplete: true,
+              workerSecretsEnabled: true,
+              registryChainId: 11155420,
+              sessionIdHex: '0x00000000000000000000000000000001',
+            } as SessionWizardWorkerDeployRuntime,
+          },
+          sessionSlug: 'registry-session',
+          workerQueryValue: 'https://registry-session.example.test',
+          getCurrentWorkerSecrets: () => ({
+            openaiKey: 'test-ai-key',
+            arweaveJwk: '{"kty":"RSA","n":"test"}',
+            customRpcUrl: 'https://secret-rpc.registry.example.test',
+          }),
+          getMissingWorkerSecretsForDeploy: () => [],
+          parseAllowOriginsInput: () => ['http://localhost'],
+          resolveConnectedAdminAddress: async () => '0x00000000000000000000000000000000000000aa',
+          resolveWorkerFaucetConfig: () => ({ rpcUrl: 'https://secret-rpc.registry.example.test' }),
+          signTypedAdminAction,
+          updateDeploymentState,
+          updateDraftValue,
+        }),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          configRevision: '',
+          sessionId: '0x00000000000000000000000000000001',
+          sessionSlug: 'registry-session',
+          workerOrigin: 'https://registry-session.example.test',
+        }),
+      );
+
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/session-config'))).toBe(false);
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/capabilities?slug='))).toBe(agentHttp);
+      expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
+      const configSignInput = signTypedAdminAction.mock.calls.find(([input]) => input?.action === 'set-config')?.[0];
+      expect(configSignInput?.body?.config?.rpcUrl).toBe('https://public-rpc.registry.example.test');
+      expect(configSignInput?.body?.config?.rpcUrlsByChainId?.['11155420']).toEqual(
+        expect.arrayContaining(['https://public-rpc.registry.example.test']),
+      );
+      expect(configSignInput?.body?.config?.faucet?.rpcUrl).toBe('https://public-rpc.registry.example.test');
+      expect(JSON.stringify(configSignInput?.body?.config)).not.toContain('secret-rpc.registry.example.test');
+      const secretsRequest = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
+      expect(JSON.parse(String(secretsRequest?.[1]?.body || '{}')).secrets).toEqual(
+        expect.objectContaining({ customRpcUrl: 'https://secret-rpc.registry.example.test' }),
+      );
+      expect(signTypedAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'set-config',
+          targetSlug: 'registry-session',
+        }),
+      );
+      expect(signTypedAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'set-secrets',
+          targetSlug: 'registry-session',
+        }),
+      );
+      expect(updateDraftValue).toHaveBeenCalledWith(['corsWorkerUrl'], 'https://registry-session.example.test');
+      if (agentHttp) {
+        const saved = updateDraftValue.mock.calls.find(([path]) => path.join('.') === 'agentSessionWrapped')?.[1];
+        expect(saved).toEqual(
+          expect.objectContaining({ enabled: true, origin: 'https://registry-session.example.test' }),
+        );
+        expect(
+          resolveAdminAgentSessionWrappedAvailability({
+            canAdminWorker: true,
+            sessionWorkerUrl: 'https://registry-session.example.test',
+            sessionConfig: { sessionModeProfile: profile, agentSessionWrapped: saved },
+          }).message,
+        ).toBe('Wrapped access is enabled.');
+      }
+
+      expect(updateDeploymentState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deployComplete: true,
+          deployStatus: 'Session Worker verified.',
+          workerRequirementProof: expect.objectContaining({ version: 1 }),
+        }),
+      );
+    },
+  );
 
   it.each([
     ['deployed from the template', true, false],

@@ -89,7 +89,7 @@ describe('SurveyResultsQuestionSummary', () => {
     const model = buildSurveyResultsQuestionSummaryRenderModel({
       activeQuestionToggles: { q1: true },
       applyDecryptedOverrideToResponse,
-      bookmarkedQuestionIDs: ['q1'],
+      bookmarkedQuestionIDs: ['Q1'],
       getLockedResponseKey,
       networkQuestions: {
         q1: {
@@ -143,7 +143,7 @@ describe('SurveyResultsQuestionSummary', () => {
           ...(response as Record<string, unknown>),
           answer: { value: 'Decrypted answer' },
         })}
-        bookmarkedQuestionIDs={['q1']}
+        bookmarkedQuestionIDs={['Q1']}
         bookmarkIconStyle={{ cursor: 'pointer' }}
         getFallbackQuestion={(questionId) => ({ id: questionId, prompt: 'Unknown question' })}
         getLockedResponseKey={() => 'locked-key'}

@@ -1,4 +1,5 @@
 import { build } from 'esbuild';
+import { buildWorkerThirdPartyNotices } from './lib/worker-third-party-notices.mjs';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -20,16 +21,6 @@ export const WORKER_BUNDLE_TARGETS = Object.freeze({
     entryRelativePath: 'workers/deploy-helper/worker.js',
     outputRelativePath: 'dist/deployHelper.bundle.js',
     enforceWorkerDependencyGuard: false,
-  }),
-  agentBridgeWorker: Object.freeze({
-    key: 'agentBridgeWorker',
-    label: 'agentBridgeWorker',
-    entryRelativePath: 'workers/agentBridgeWorker/worker.js',
-    outputRelativePath: 'dist/agentBridgeWorker.bundle.js',
-    enforceWorkerDependencyGuard: false,
-    target: 'es2022',
-    legalComments: 'eof',
-    mainFields: ['browser', 'module', 'main'],
   }),
 });
 
@@ -60,6 +51,7 @@ export const buildWorkerBundles = async ({
   targetKeys = Object.keys(WORKER_BUNDLE_TARGETS),
   assertWorkerDeps = assertWorkerDependencyVersions,
   esbuildImpl = build,
+  buildNoticesImpl = buildWorkerThirdPartyNotices,
   mkdirSyncImpl = mkdirSync,
   readFileSyncImpl = readFileSync,
   writeFileSyncImpl = writeFileSync,
@@ -72,23 +64,29 @@ export const buildWorkerBundles = async ({
   const results = [];
   for (const target of targets) {
     mkdirSyncImpl(dirname(target.outputFile), { recursive: true });
-    await esbuildImpl({
+    const built = await esbuildImpl({
+      absWorkingDir: rootDir,
       entryPoints: [target.entryPoint],
       outfile: target.outputFile,
       bundle: true,
       platform: 'browser',
       format: 'esm',
       preserveSymlinks: true,
+      metafile: true,
       target: [target.target || 'es2020'],
       ...(target.legalComments ? { legalComments: target.legalComments } : {}),
       ...(target.mainFields ? { mainFields: target.mainFields } : {}),
     });
     const bundle = readFileSyncImpl(target.outputFile, 'utf8');
-    const normalizedBundle = normalizeWorkerBundleText(bundle);
+    const notices = buildNoticesImpl({ rootDir, metafile: built?.metafile });
+    // Releases and wizard installs copy only the JS file. Keep full notices in
+    // those exact bytes, escaping comment terminators from third-party text.
+    const normalizedBundle = `${normalizeWorkerBundleText(bundle).trimEnd()}\n/*\n${notices.replace(/\*\//g, '*\\/').trimEnd()}\n*/\n`;
     if (normalizedBundle !== bundle) {
       writeFileSyncImpl(target.outputFile, normalizedBundle);
     }
-    results.push(target);
+    if (built?.metafile) writeFileSyncImpl(target.outputFile.replace(/\.js$/, '.metafile.json'), `${JSON.stringify(built.metafile, null, 2)}\n`);
+    results.push({ ...target, metafile: built?.metafile });
   }
   return results;
 };
@@ -124,12 +122,10 @@ const printUsage = () => {
     '  npm run worker:bundle',
     '  node scripts/worker-bundle.mjs --target sessionCorsWorker',
     '  node scripts/worker-bundle.mjs --target deployHelper',
-    '  node scripts/worker-bundle.mjs --target agentBridgeWorker',
     '',
     'Output:',
     '  dist/sessionCorsWorker.bundle.js',
     '  dist/deployHelper.bundle.js',
-    '  dist/agentBridgeWorker.bundle.js',
   ].join('\n'));
 };
 

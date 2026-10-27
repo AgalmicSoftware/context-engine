@@ -188,23 +188,23 @@ describe('CreateSBTGroup deploy and persistence flows', () => {
     expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
   });
 
-  it('reads bookmark cache with clone:false before mutating sbt bookmarks', async () => {
+  it('applies an sbt bookmark to the latest saved bookmarks', async () => {
     const instance = makeInstance({ sessionSlug: 'edge' });
     instance.state.bookmarkedSbtsSet = new Set();
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ sbts: ['0xaaa'] });
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    // Another tab saved 0xaaa after this page loaded its bookmarks.
+    let saved = { sbts: ['0xaaa'], questions: ['q1'] };
+    const updateSpy = jest
+      .spyOn(cacheScripts, 'updateCacheAtomic')
+      .mockImplementation(async (_namespace, _slug, update) => {
+        saved = update(saved);
+        return saved;
+      });
 
-    instance.bookmarkSBT('0xbbb');
+    instance.bookmarkSBT('0xBBB');
     await Promise.resolve();
 
-    expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
-    expect(writeSpy).toHaveBeenCalledWith(
-      'bookmarksCache',
-      'edge',
-      expect.objectContaining({
-        sbts: expect.arrayContaining(['0xaaa', '0xbbb']),
-      }),
-    );
+    expect(updateSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', expect.any(Function));
+    expect(saved).toEqual({ sbts: ['0xaaa', '0xbbb'], questions: ['q1'] });
   });
 
   it('componentWillUnmount clears countdown interval and tracked reset timers', () => {

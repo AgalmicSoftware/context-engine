@@ -269,7 +269,11 @@ export const resolveAdminRequestAuthority = async ({
       response: deps?.json?.({ error: 'Admin request body mismatch.' }, 400, headers),
     };
   }
-  const initializingConfig = (
+  const restoringFreshSession = !corsState?.config && (
+    (action === 'import-session-backup' && body?.adoptSessionId === true) ||
+    ['session-backup-status', 'abandon-session-backup'].includes(action)
+  );
+  const initializingConfig = restoringFreshSession ? null : (
     !corsState?.config &&
     action === 'set-config' &&
     body?.config &&
@@ -333,8 +337,12 @@ export const resolveAdminRequestAuthority = async ({
 
   const existingConfig = corsState.config;
   let adminOk = false;
-  if (!existingConfig && action === 'set-config') {
-    adminOk = await deps?.validateBootstrapAdmin?.({ env, slug: targetSlug, address, body });
+  if (!existingConfig && (action === 'set-config' || restoringFreshSession)) {
+    // Restore adopts an identity only for the deployment's trusted bootstrap
+    // admin. The backup cannot choose its own bootstrap actor or audience.
+    const bootstrapBody = restoringFreshSession ? { ...body, config: { adminAddress: address,
+      sessionId: body?.page?.manifest?.sessionId } } : body;
+    adminOk = await deps?.validateBootstrapAdmin?.({ env, slug: targetSlug, address, body: bootstrapBody });
   }
   if (!adminOk) {
     adminOk = await deps?.validateAdmin?.({

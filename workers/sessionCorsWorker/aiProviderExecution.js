@@ -1,3 +1,4 @@
+import { boundSessionAiRequest } from './aiRequestPolicy.js';
 import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
 import {
   applyChatCompletionBudget,
@@ -72,6 +73,7 @@ const resolveJson = (deps) => deps?.json || jsonResponse;
 export const proxyAnthropic = async ({
   payload,
   secrets,
+  config,
   baseHeaders,
   deps,
   constants,
@@ -83,6 +85,10 @@ export const proxyAnthropic = async ({
   if (!key) {
     return json({ error: 'Server misconfigured: anthropicKey is missing.' }, 401, baseHeaders);
   }
+
+  const policy = boundSessionAiRequest({ payload, provider: 'anthropic', config, requestKey: payloadKey });
+  if (!policy.ok) return json({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+  payload = policy.payload;
 
   const {
     model,
@@ -117,7 +123,11 @@ export const proxyAnthropic = async ({
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    return json({ error: data?.error?.message || 'Anthropic error', details: data }, response.status, baseHeaders);
+    const retryAfter = response.headers?.get?.('retry-after');
+    const responseHeaders = new Headers(baseHeaders);
+    if (retryAfter) responseHeaders.set('retry-after', retryAfter);
+    return json({ error: data?.error?.message || 'Anthropic error', details: data }, response.status,
+      retryAfter ? responseHeaders : baseHeaders);
   }
 
   const completion = data?.content?.[0]?.text || '';
@@ -127,6 +137,7 @@ export const proxyAnthropic = async ({
 export const proxyOpenAI = async ({
   payload,
   secrets,
+  config,
   baseHeaders,
   deps,
   constants,
@@ -138,6 +149,10 @@ export const proxyOpenAI = async ({
   if (!key) {
     return json({ error: 'Server misconfigured: openaiKey is missing.' }, 401, baseHeaders);
   }
+
+  const policy = boundSessionAiRequest({ payload, provider: 'openai', config, requestKey: payloadKey });
+  if (!policy.ok) return json({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+  payload = policy.payload;
 
   const {
     model,
@@ -212,7 +227,11 @@ export const proxyOpenAI = async ({
   );
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    return json({ error: data?.error?.message || 'OpenAI error', details: data }, response.status, baseHeaders);
+    const retryAfter = response.headers?.get?.('retry-after');
+    const responseHeaders = new Headers(baseHeaders);
+    if (retryAfter) responseHeaders.set('retry-after', retryAfter);
+    return json({ error: data?.error?.message || 'OpenAI error', details: data }, response.status,
+      retryAfter ? responseHeaders : baseHeaders);
   }
   const completion = extractOpenAiCompletion(data, useResponses);
   return json({ completion, raw: data }, 200, baseHeaders);
@@ -221,6 +240,7 @@ export const proxyOpenAI = async ({
 export const proxyOpenRouter = async ({
   payload,
   secrets,
+  config,
   baseHeaders,
   deps,
   constants,
@@ -232,6 +252,10 @@ export const proxyOpenRouter = async ({
   if (!key) {
     return json({ error: 'Server misconfigured: openrouterKey is missing.' }, 401, baseHeaders);
   }
+
+  const policy = boundSessionAiRequest({ payload, provider: 'openrouter', config, requestKey: payloadKey });
+  if (!policy.ok) return json({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+  payload = policy.payload;
 
   const {
     model,
@@ -279,7 +303,11 @@ export const proxyOpenRouter = async ({
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    return json({ error: data?.error?.message || 'OpenRouter error', details: data }, response.status, baseHeaders);
+    const retryAfter = response.headers?.get?.('retry-after');
+    const responseHeaders = new Headers(baseHeaders);
+    if (retryAfter) responseHeaders.set('retry-after', retryAfter);
+    return json({ error: data?.error?.message || 'OpenRouter error', details: data }, response.status,
+      retryAfter ? responseHeaders : baseHeaders);
   }
 
   const completion = data?.choices?.[0]?.message?.content || '';
@@ -289,6 +317,7 @@ export const proxyOpenRouter = async ({
 export const proxyCustomRPC = async ({
   payload,
   secrets,
+  config,
   baseHeaders,
   deps,
   auth,
@@ -335,6 +364,12 @@ export const proxyCustomRPC = async ({
   if (isBlockedOutboundUrl(rpcUrl)) {
     return json({ error: 'Custom RPC URL target is not allowed' }, 403, baseHeaders);
   }
+
+  const policy = !payloadKey && secretKey
+    ? boundSessionAiRequest({ payload, provider: 'custom', config, requestKey: payloadKey })
+    : { ok: true, payload };
+  if (!policy.ok) return json({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+  payload = policy.payload;
 
   const {
     model,
@@ -384,7 +419,11 @@ export const proxyCustomRPC = async ({
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    return json({ error: data?.error?.message || 'Custom RPC error', details: data }, response.status, baseHeaders);
+    const retryAfter = response.headers?.get?.('retry-after');
+    const responseHeaders = new Headers(baseHeaders);
+    if (retryAfter) responseHeaders.set('retry-after', retryAfter);
+    return json({ error: data?.error?.message || 'Custom RPC error', details: data }, response.status,
+      retryAfter ? responseHeaders : baseHeaders);
   }
 
   const completion =

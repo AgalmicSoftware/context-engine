@@ -3,6 +3,7 @@ import { Card, CardBody } from 'reactstrap';
 
 import styles from './SurveyTool.module.scss';
 import { QuadraticScrollControlsProvider } from './QuadraticScrollControls';
+import PileQuestionPrompt from './PileQuestionPrompt';
 
 export type PileActiveQuestionLike = {
   [key: string]: unknown;
@@ -42,7 +43,7 @@ export const renderPileCardShell = ({
   <QuadraticScrollControlsProvider>
     <Card className={`${styles.pileCardInner} ${questionType === 'quadratic' ? styles.pileQuadraticCard : ''}`}>
       <CardBody className={styles.pileCardBody}>
-        <div className={styles.pileCardHeader}>{promptHeader}</div>
+        <PileQuestionPrompt>{promptHeader}</PileQuestionPrompt>
 
         <div className={styles.pileCardMainContent}>
           <div className={questionContainerClass}>{questionComponent}</div>

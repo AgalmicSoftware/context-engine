@@ -1,6 +1,6 @@
 import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
-import { buildAgentBridgeAuthHeaders } from './agentClientLogin';
+import { buildSessionAgentAuthHeaders } from './agentClientLogin';
 import {
   buildAgentPolisDataset,
   fetchAgentQuestions,
@@ -52,8 +52,12 @@ const normalizeAnswerValue = (value: unknown): string => {
   return lower || raw;
 };
 
-const resolveAgentBridgeUrl = (envelope: AgentClientLoginEnvelope | null, agentBridgeUrl?: unknown): string =>
-  toStr(agentBridgeUrl || envelope?.agentBridgeUrl).replace(/\/+$/g, '');
+const resolveAgentWorkerUrl = (envelope: AgentClientLoginEnvelope | null, agentWorkerUrl?: unknown): string =>
+  envelope?.workerUrl &&
+  envelope.agentWorkerUrl === envelope.workerUrl &&
+  (!agentWorkerUrl || toStr(agentWorkerUrl).replace(/\/+$/g, '') === envelope.workerUrl)
+    ? envelope.workerUrl
+    : '';
 
 export const buildAgentPreferenceAnswer = (
   question: AgentQuestion,
@@ -106,19 +110,19 @@ export const loadGroups = (envelope: AgentClientLoginEnvelope | null): AgentBuck
 
 export const submitAnswer = async ({
   envelope,
-  agentBridgeUrl,
+  agentWorkerUrl,
   question,
   answer,
   fetchImpl = fetch,
 }: {
   envelope: AgentClientLoginEnvelope | null;
-  agentBridgeUrl?: unknown;
+  agentWorkerUrl?: unknown;
   question: AgentQuestion;
   answer: AgentAnswerInput | string | number | string[];
   fetchImpl?: typeof fetch;
 }): Promise<AgentSubmitAnswerResult> => {
-  const base = resolveAgentBridgeUrl(envelope, agentBridgeUrl);
-  if (!envelope?.bridgeCredential?.token || !base) return { ok: false, status: 0, reason: 'agent_credentials_missing' };
+  const base = resolveAgentWorkerUrl(envelope, agentWorkerUrl);
+  if (!envelope?.agentCredential?.token || !base) return { ok: false, status: 0, reason: 'agent_credentials_missing' };
   const questionId = toStr(question.questionId);
   if (!questionId) return { ok: false, status: 0, reason: 'agent_question_id_missing' };
   const url = `${base}/api/agent/preferences`;
@@ -137,7 +141,7 @@ export const submitAnswer = async ({
     const response = await fetchImpl(url, {
       method: 'POST',
       headers: {
-        ...buildAgentBridgeAuthHeaders(envelope),
+        ...buildSessionAgentAuthHeaders(envelope),
         'content-type': 'application/json',
       },
       body: JSON.stringify(payload),

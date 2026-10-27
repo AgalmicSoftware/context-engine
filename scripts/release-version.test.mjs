@@ -494,6 +494,7 @@ test('the Worker source pathspec covers every local input of the release bundles
     'deploy/cloudflare/session-worker/wrangler.jsonc',
     'deploy/cloudflare/session-worker/package.json',
     'scripts/cloudflare-session-template.mjs',
+    'scripts/lib/worker-third-party-notices.mjs',
   ]) {
     assert.ok(covered.has(templateInput), `${templateInput} is not in the Worker source pathspec`);
   }
@@ -501,9 +502,7 @@ test('the Worker source pathspec covers every local input of the release bundles
   for (const nonInput of [
     'shared/encryption/envelopeV1Core.mjs',
     'shared/encryption/envelopeWriterFixtures.mjs',
-    'workers/agentBridgeWorker/agentOnlyLoadTest.mjs',
-    'workers/agentBridgeWorker/deployHelperApply.mjs',
-    'workers/agentBridgeWorker/deployHelperPlan.mjs',
+    'shared/questions/questionId.mjs',
   ]) {
     assert.ok(!covered.has(nonInput), `${nonInput} is not a bundle input`);
   }

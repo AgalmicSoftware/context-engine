@@ -8,6 +8,7 @@ import { buildReportAnswerQuestions, buildReportResponseStats } from '../../clie
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../client/src/utilities/session/sessionModeProfile';
 import { loadWorkerResponses } from '../../client/src/utilities/survey/workerResponseHydration';
 import { loadWorkerCanonicalQuestions } from '../../client/src/domains/surveys/workerCanonicalMetadataHydrationPort';
+import { questionIdFixtures } from '../helpers/questionIdFixtures.mjs';
 
 // Records written by the Context Engine MCP agent participant must load
 // through the web client's own Worker hydration, like a passkey participant's.
@@ -47,15 +48,10 @@ const storageDeps = (resource, records) => ({
 
 describe('agent participant records in web client hydration', () => {
   it('derives the same question ids as the web client', () => {
-    const cases = [
-      ['binary', '  Agents should disclose they are agents. ', [], false, 99],
-      ['rating', 'How cooperative is the town?', [], false, 99],
-      ['multichoice', 'Pick one', [' Courts', 'Assembly ', 'Ledger'], true, 99],
-      ['multichoice', 'Pick any', ['A', 'B'], false, 99],
-      ['quadratic', 'Fund first', ['Labels', 'Appeals'], false, 50],
-      ['freeform', 'Propose a rule', [], false, 99],
-    ];
-    cases.forEach((args) => expect(agentQuestionId(...args)).toBe(generateQuestionId(...args)));
+    questionIdFixtures.forEach(({ args, preimage }) => {
+      expect(agentQuestionId(...args)).toBe(ethers.utils.id(preimage));
+      expect(generateQuestionId(...args)).toBe(ethers.utils.id(preimage));
+    });
   });
 
   it('reads SBT invite codes and group passwords like the web client', () => {

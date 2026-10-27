@@ -19,7 +19,11 @@ const runtimeProducedHelpers = (source: string) => {
 
 describe('surveyQuestionsRuntimeMethods helper wiring', () => {
   const methods = read('surveyQuestionsRuntimeMethods.tsx');
-  const runtimes = [...methods.matchAll(/\} = (create[A-Za-z]+Runtime)\(\{/g)].map((match) => match[1]);
+  // Factories with a typed deps object are checked by the compiler; this guards
+  // the runtimes that still receive the shared context by spread.
+  const runtimes = [...methods.matchAll(/\} = (create[A-Za-z]+Runtime)\(\{\n {4}\.\.\.context,/g)].map(
+    (match) => match[1],
+  );
   it.each(runtimes)('passes every runtime-created helper that %s uses', (factory) => {
     const stem = factory.replace(/^createS/, 's');
     const extension = fs.existsSync(path.join(__dirname, `${stem}.tsx`)) ? 'tsx' : 'ts';

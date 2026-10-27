@@ -1,3 +1,4 @@
+import { buildSiweMessage as buildSharedSiweMessage } from '@ce-shared/auth/siweMessage.mjs';
 /**
  * @file workerAuth.ts
  * @module workerAuth
@@ -462,13 +463,19 @@ export const buildSiweMessage = ({
   const issued = issuedAt || new Date().toISOString();
   const exp = expirationTime || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const note = statement || 'Sign in to Context Engine.';
-  const id = toStr(sessionId).trim().toLowerCase();
-  const sessionResource = id
-    ? `urn:context-engine:session:id:${encodeURIComponent(id)}`
-    : `urn:context-engine:session:slug:${encodeURIComponent(normalizeSessionSlug(sessionSlug))}`;
-  const resources = workerUrl ? `\nResources:\n- ${new URL(toStr(workerUrl)).origin}\n- ${sessionResource}` : '';
-
-  return `${host} wants you to sign in with your Ethereum account:\n${addr}\n\n${note}\n\nURI: ${origin}\nVersion: 1\nChain ID: ${chain}\nNonce: ${nonce}\nIssued At: ${issued}\nExpiration Time: ${exp}${resources}`;
+  return buildSharedSiweMessage({
+    address: addr,
+    nonce,
+    chainId: chain,
+    domain: host,
+    uri: origin,
+    statement: note,
+    issuedAt: issued,
+    expirationTime: exp,
+    workerUrl,
+    sessionId: toStr(sessionId),
+    sessionSlug: normalizeSessionSlug(sessionSlug),
+  });
 };
 
 const signMessage = async ({

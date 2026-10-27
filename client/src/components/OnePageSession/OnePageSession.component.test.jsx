@@ -296,16 +296,24 @@ describe('OnePageSession view gating', () => {
     const agentProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     agentProfile.surfaces.agentHttp = true;
     writeAgentClientLoginEnvelope({
-      v: 2,
+      v: 3,
       sessionId,
       sessionSlug: 'edge',
       expiresAt: '2027-07-05T00:00:00.000Z',
       address: '0x3333333333333333333333333333333333333333',
       capabilities: { readQuestions: true, readResults: true, readGroups: true, submitAnswers: false },
-      bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'bridge-browser-token' },
-      workerCredential: { kind: 'session_worker_jwt', token: 'jwt-session-token' },
+      agentCredential: {
+        kind: 'session_agent_browser_token',
+        token: 'agent-browser-token',
+        expiresAt: '2027-07-05T00:00:00.000Z',
+      },
+      workerCredential: {
+        kind: 'session_worker_jwt',
+        token: 'jwt-session-token',
+        expiresAt: '2027-07-05T00:00:00.000Z',
+      },
       workerUrl: 'https://worker.example',
-      agentBridgeUrl: 'https://bridge.example',
+      agentWorkerUrl: 'https://worker.example',
     });
     Object.defineProperty(global, 'fetch', {
       writable: true,
@@ -374,6 +382,9 @@ describe('OnePageSession view gating', () => {
           return new Response(
             JSON.stringify({
               ok: true,
+              total: 1,
+              hasMore: false,
+              nextCursor: null,
               questions: [
                 {
                   questionId: 'q1',
@@ -432,7 +443,7 @@ describe('OnePageSession view gating', () => {
           ...buildProps().sessionConfig,
           sessionId,
           corsWorkerUrl: 'https://worker.example',
-          agentBridgeUrl: 'https://bridge.example',
+          agentWorkerUrl: 'https://worker.example',
           sessionModeProfile: agentProfile,
         }}
       />,

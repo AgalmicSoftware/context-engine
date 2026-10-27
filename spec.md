@@ -38,7 +38,7 @@ deliberation and coordination, centered on:
   roles, and gated access.
 - A per-session Cloudflare Worker for canonical Hosted & Fast sessions and for
   profile-enabled AI, transcription, storage, fetch, and chain/Arweave helpers.
-- An optional Agent Bridge Worker that exposes scoped `/api/agent/*` requests
+- An optional Session Agent HTTP that exposes scoped `/api/agent/*` requests
   and Session Wrapped without replacing session authority.
 
 Primary storage and authority split:
@@ -47,7 +47,7 @@ Primary storage and authority split:
   storage; it does not require EVM or Arweave.
 - Trustless & Slower: public EVM contracts anchor identity and gate state, while
   Arweave stores durable metadata and payloads.
-- Agent Bridge: a separately deployed adapter that delegates canonical session
+- Agent HTTP: Session Worker domain modules that enforce canonical session
   membership, gates, and storage to the configured Session Worker when needed.
 - Browser IndexedDB/local storage: caches, encrypted wallet records, and user
   settings for performance and usability, never shared authority.
@@ -303,7 +303,7 @@ Deep-dive docs:
 - `docs/session-cors-worker.md`
 - `docs/resource-keys.md`
 
-### 6a) Agent Bridge (Optional Separate Worker)
+### 6a) Agent HTTP (Optional Session Worker Surface)
 
 What integrations can do:
 - Use scoped credentials with the canonical `/api/agent/*` HTTP contract for
@@ -312,19 +312,19 @@ What integrations can do:
 - Log in to the browser with an agent token for Hosted & Fast sessions with
   `authority.mode=worker_canonical` and `surfaces.agentHttp=true`. Explicit
   Agent HTTP disablement overrides legacy enablement flags.
-- Exchange an authorized Session Worker identity for a bridge credential on the
+- Exchange an authorized Session Worker identity for a scoped member credential on the
   implemented wrapped-member handoff.
 
 What the system does:
-- Deploys `workers/agentBridgeWorker/` separately from each Session Worker.
+- Runs `workers/sessionCorsWorker/agent/` inside the Session Worker.
 - Delegates canonical membership, gates, storage, and chain operations to the
-  configured Session Worker or contract boundary when required. Bridge-local
+  configured Session Worker or contract boundary when required. Auxiliary agent
   indexes are not presented as canonical session state.
 - Keeps reusable worker modules under `workers/shared/`; that directory is not a
   deployable Worker.
 
 Deep-dive docs:
-- `workers/agentBridgeWorker/README.md`
+- `workers/sessionCorsWorker/agent/README.md`
 - `docs/session-cors-worker.md`
 
 ### 7) Wallet and Login Options
@@ -443,11 +443,11 @@ Primary runtime worker:
 
 Optional legacy/sponsored helper:
 - `workers/deploy-helper/`: Trusted endpoint for the explicit legacy Session
-  Wizard fallback, sponsored deployment, and Agent Wrapped provisioning; the
+  Wizard fallback, sponsored deployment, and same-Worker agent setup; the
   default Hosted & Fast path uses the native Cloudflare dashboard handoff.
 
 Optional agent sidecar:
-- `workers/agentBridgeWorker/`: Scoped Agent HTTP API, submission queue, and
+- `workers/sessionCorsWorker/agent/`: Scoped Agent HTTP API, submission queue, and
   Session Wrapped. It delegates canonical session authority rather than
   duplicating it.
 - `workers/shared/`: Reusable modules bundled into worker packages; not a
@@ -506,15 +506,14 @@ Worker API (selected endpoints):
   number of coordinator windows.
 - `POST /`: Authenticated action-style requests using an `action` field: `request_test_eth` (testnet faucet), `fetch_url`, `fetch_image`.
 
-Agent Bridge API families (selected):
+Agent HTTP API families (selected):
 - `/api/agent/*`: Canonical scoped agent contract; supported routes and
-  credential requirements are listed in the Agent Bridge reference.
+  credential requirements are listed in the Session Agent HTTP reference.
 - `/api/agent/skill`: Current runtime instructions from
-  `workers/agentBridgeWorker/skills/ce-agent-access/SKILL.md`. The old
-  `/telegram/agent/api/*` prefix remains an HTTP compatibility alias.
-- Bot webhook, command, and Mini App routes are retired. Legacy persisted
-  principal keys and historical review evidence remain readable; they do not
-  enable a chat transport.
+  `workers/sessionCorsWorker/agent/skills/ce-agent-access/SKILL.md`. The old
+  `/telegram/agent/api/*` prefix is retired and returns 404.
+- Bot webhook, command, and Mini App routes are retired. New sessions use fresh
+  session-namespaced agent state; existing Bridge data is not imported.
 
 ### Storage and Data
 

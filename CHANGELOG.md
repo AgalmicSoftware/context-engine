@@ -4,6 +4,227 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Agents and MCP
+
+- Serialize Wrapped research batches in the session coordinator. Bind retries
+  to their original content, preserve concurrent answer summaries, and return a
+  retryable response while KV is busy. Export both readable question sources
+  and report source outages instead of silently dropping history.
+- Retry unexpected queue-processing failures instead of acknowledging an
+  unprocessed submission.
+
+- Use one continuous Wrapped space per session. Remove weekly windows and their
+  opening action; saved answers retain their exact statement wording and schema,
+  with current access checked on reads and exports.
+- Project completed direct agent submissions to KV once and repair delayed
+  projections with a durable alarm. Queued successes retain their outcome while
+  an accepted persistence-only message repairs KV. Keep successful outcomes successful, retain uploaded
+  payload IDs on retry, validate before admission, and use server timestamps.
+- Surface Wrapped config/state read failures and proposal outages. Keep the
+  first 2,000 proposals with an explicit incomplete marker instead of dropping
+  them or reporting complete aggregates.
+
+- Apply participant upload preflight to agent writes, retain submission outcomes
+  across authority changes, and retry pre-send failures without duplicate uploads.
+- Preserve Wrapped history across selection and visibility changes; fail closed
+  on incomplete KV reads and invalid export cursors. Bind signed operator writes
+  to their HTTP method and body, and bound registry RPC response bodies.
+- Persist native verification capabilities for Admin and reject deployment
+  capabilities whose origin differs from the Session Worker.
+
+- Serve new-session Agent HTTP and Session Wrapped from the Session Worker,
+  including scoped credentials, atomic invites, source-bound browser exchange,
+  managed testnet submissions and optional queue processing. Remove separate
+  Bridge deployment and release bundles without migrating or retiring existing resources.
+- Apply canonical session gates and stored-key AI policy to agent workflows.
+  Optional operator-funded posters stay disabled by default. Agent auxiliary
+  state and signing keys are excluded from session archives.
+
+- Prepare MCP 0.1.2 with the updated agent behavior and automated release workflow.
+  Default new host configurations to `npx -y --prefer-online @agalmic/contextengine@latest`.
+  Existing users should update their host command once and restart to receive
+  future published updates; exact version pins remain available for reproducible
+  runs. Publication stays disabled until the application release is merged,
+  canonical CI passes and the repository owner enables it.
+- Add opt-in GitHub-to-npm publication of the exact CI-tested MCP tarball using
+  npm Trusted Publishing, with version, source, integrity and stale-run checks.
+
+- Require explicit `session_login` scope when a service credential exchanges
+  into a Session Worker login. Personal user credentials retain login, and exchanged
+  tokens are capped by source expiry and invalidated when the source is revoked.
+- Retain confirmed local answers in incomplete registry reads during a failed
+  block-mark check, while preserving newer canonical answers.
+- Persist pending answer-upload identities so repeating a timed-out tool call
+  replays the settled record. Keep complete Worker listings complete after an
+  agent answers, and hold registry scan cursors when a block mark cannot be checked.
+- Verify each remembered registry write against its own block before using it,
+  share block probes within a read, and report incomplete results when RPC
+  history is unavailable without discarding the last verified scan mark.
+- Send response-upload request IDs so a retry within an upload operation can
+  replay the original stored reference.
+- Bind saved agent state to its wallet and stop startup if its key is missing
+  or differs from the recorded identity. Legacy state adopts its existing key.
+- Rebuild registry reads when the scanned block is replaced, and discard local
+  questions and remembered answers from orphaned blocks.
+- Route every MCP registry chain call, including reads, log scans and test-ETH
+  checks, through one error sanitizer, and redact URLs and ethers diagnostics
+  from tool errors and logs, so a keyed RPC URL cannot reach a transcript.
+
+### Client — available when the site deploys
+
+- Restart backup downloads after configuration/group changes or invalid cursors.
+  Before restoring into an unpublished session, check the pinned Worker origin
+  and show the target before asking for a signature.
+- Clear authoring draft warnings and unload prompts after Clear form or successful
+  publication, cancelling queued saves of the discarded draft.
+- Keep the license-analysis module inventory outside the published site output.
+
+- Add a versioned product film and 1200×630 poster for site link previews, with
+  crawler HTML for About. Posts keep their own header images and omit the film.
+
+- Show persistent authoring draft save failures with Retry and Copy draft,
+  a JSON download fallback, and an unload warning while failed edits are unsaved.
+- Enforce local scripts and wallet workers through the static CSP, with one
+  exact script hash for the sandboxed benchmark report. Browser smoke tests
+  apply the real headers, reject CSP violations and check blocked injections.
+- Reuse an unchanged survey container on response retries, and refresh cached
+  readiness on Submit only when submission is unavailable.
+- Restart changed-session backups without retaining stale pages. Deployment
+  replay identifies a preserved recovery key and its known fingerprint.
+- Advance saved-answer revisions when edited, including changing an
+  answer back, and discard in-flight submission state when the account changes.
+- Recheck unavailable Worker readiness on Submit and avoid caching transient
+  network failures. Expire near-head numeric RPC reads after two seconds so a
+  recent chain replacement cannot remain cached for ten minutes.
+- Preserve operator-supplied recovery keys through wizard identity changes,
+  normalize hex case and distinguish supplied from generated keys. Stream JSONL
+  restore files and let admins abandon an unfinished restore.
+- Show automatic-analysis retry exhaustion beside manual recovery controls.
+  Add private admin diagnostics for upload receipts, automatic-analysis retries
+  and pending configuration repair, with bounded pages and explicit refresh.
+- Keep a submission's operation ID across failed and partial attempts, so an
+  unchanged answer can recover a lost upload reply without another stored copy.
+- Gate admin corrections on Worker authority-stamp support and explain known
+  submission readiness failures. Show Worker API/bundle details and upgrade hints.
+- Add complete session backup and resumable restore to admin settings, with
+  generated or operator-supplied recovery keys during setup and confirmed key
+  export for existing sessions. Key dialogs offer a private download and keep
+  their raw values out of browser persistence.
+- Preserve the bookmark action the page showed, match Results bookmark IDs
+  case-insensitively, and keep optimistic writes that start during a tab reload.
+- Extend required browser coverage to lost upload replies, backup/import and
+  recovery-key downloads; pin previous-minor records across canonical readers.
+- Keep successfully stored Worker answers saved after a later upload fails,
+  name the unsaved drafts, and keep Submit available to retry only those drafts.
+- Serialize persisted cache writes across tabs and reload saved values on
+  cross-tab notifications. Bookmark changes preserve other tabs' additions.
+- Merge saved filters, SBT bookmarks and analysis results into current local
+  storage, and retain valid bookmark lists when another list is missing.
+- Require browser checks for hosted publication, reload, Results, permissions,
+  partial-submit retry and concurrent two-tab bookmarks in CI.
+- Scope cached Worker questions and answers to the signed-in reader. Account
+  switches and logouts purge Worker cache nodes, a load started under another
+  account is discarded, and a complete listing drops answers the reader can no
+  longer read.
+- Load Interview saved answers after a full survey submission, whose stored
+  survey container previously failed the whole load.
+- Resume capped response listings on the next refresh, so sessions above
+  10,000 answers eventually load every row.
+- Give multichoice questions that the old delimiter encoding conflated, such as
+  options containing `,` or `:`, a versioned id. Every other id is unchanged,
+  and either form verifies in the web client, MCP and CE-CC.
+
+### Workers — requires redeployment
+
+- Clear completed restore journals and page receipts in resumable steps, retaining
+  a small completion record. A later import must pass the empty-target check.
+- Bound upload diagnostics registration to 250 ms, back off failed attempts for
+  60 seconds, and retry through the existing alarm; counts can lag until retry.
+- Apply outbound URL checks and timeouts to interview openings, and name a missing
+  provider key when refusing a request.
+- Recognize configured thinking models regardless of name and preserve inventoried
+  built-in output budgets with fixed ceilings up to 16,000 tokens. Caller limits
+  can only lower them; aggregate AI usage policy remains separate.
+- Preserve Headers inputs in Bridge replies and deploy-helper requests; expand
+  the source guard to fallback spreads, optional chains and Object.assign targets.
+
+- Bound session-funded AI requests to configured models, per-operation output
+  limits, standard processing, and configured reasoning effort. Remove caller
+  tools while preserving saved custom-provider Functions. BYO keys keep their
+  existing behavior; interview text generation now follows session settings.
+  These limits do not provide aggregate AI budgets.
+- Add `GET /admin/diagnostics` with incomplete-count reporting and opaque,
+  expiring pagination tokens. Uploads now register their receipt stores in the
+  diagnostics index on a best-effort basis; this requires a Worker redeploy.
+- Preserve CORS headers on deployment, recovery and provider-backoff replies.
+- Authenticate backup cursors before building signed pages, and advance group
+  backup revisions only when a successful operation changes state. Upload-limit
+  errors retain CORS headers, including their 413 responses.
+- Restore R2 resource metadata, authenticate backup pages and refuse archives
+  when any required recovery key is missing. Detect writes during export,
+  require an empty restore target and keep backup/import pages within their
+  storage-operation budget. Abandoning a restore removes all imported rows
+  through a resumable cleanup journal before releasing the target.
+- Protect receipt identifiers and payload digests with keyed MACs, expire them
+  by alarm and validate deterministic upload failures before reserving a lease.
+  Replayed settled uploads also recover a missed automatic-analysis enqueue.
+- Retry transient automatic-analysis failures after 1, 5 and 30 minutes before
+  marking retries exhausted. Honor Retry-After up to 30 minutes, preserve uploads
+  merged during a run, and pause invalid output without another billed retry.
+- Preserve ownership, authority, visibility and group fields in encrypted
+  envelope exports. Add complete paginated session backups and signed imports
+  covering chunked payloads, config, ownership, groups, wrapped keys and encrypted
+  service secrets. Restore requires the matching recovery keys; a hermetic fresh
+  deployment drill verifies recovered reads and access rules.
+- Deduplicate settled response uploads by participant and request ID for seven
+  days, returning the original reference without another storage write and
+  enqueueing automatic analysis idempotently.
+  An expired attempt can leave an orphan; legacy Workers retain their old behavior.
+- Advertise public capabilities and non-sensitive session readiness categories.
+- Return newly generated recovery keys only with the fresh deployment response,
+  exclude them from saved receipts, and allow confirmed signed admin export at
+  most three times per session per UTC day on single-session deployments.
+  Multi-session deployment keys remain with the operator.
+- Settle Worker Group mutations stranded by a KV failure: the next operation on
+  that group or member replays the recorded intent instead of answering
+  not-found, and memberships no longer fail for every member.
+- Admit queued automatic analysis against the coordinator's authoritative
+  config, so disabling AI also stops jobs already queued.
+- Walk every question page in the interview catalog and the Agent Bridge before
+  choosing versions, and present one current version per question in the Bridge.
+
+### Verification and shared rules
+
+- Verify recovery of saved answers and unsaved drafts after reload without
+  resending saved records.
+- Exercise current MCP and browser readers against the unchanged previous
+  released Worker bundle. Add duplicate-alarm, account-switch, reload-recovery
+  and same-height/higher-head registry convergence regressions.
+- Pin previous-release tests to an immutable Worker tag and require that tag in
+  CI. Include the Agent Bridge and Worker in shared session-ID/sign-in vectors.
+- Share group-password derivation, sign-in message/session-ID rules and admin
+  typed-data construction while preserving the client/MCP ethers-v5 and Session
+  Worker ethers-v6 package boundary.
+- Check installed production dependencies and actual client, MCP, Session Worker,
+  Agent Bridge and deploy-helper bundle inputs in CI, including bundled development
+  packages. Released Worker bundles must carry complete notices; reviewed license
+  exceptions fail when their package versions are no longer installed.
+
+### License
+
+- Project-authored code is MPL-2.0 throughout, including Workers, the generated
+  deployment package, contracts/Foundry sources and the CC add-on. Earlier
+  releases keep the licenses they shipped with. Corpus data remains CC0-1.0;
+  third-party dependencies and assets keep their own licenses and notices.
+- Ship full generated third-party notices inside all three released Worker bundles
+  and with the standalone Worker deploy package, plus the MIT notice beside the
+  add-on's bundled ethers library. Release hashes include the appended notices.
+
+### Benchmark reports
+
+- File questions without valid answers under "no data" in the report's tag
+  filter instead of "mixed / unsure".
+
 ## [0.7.0] - 2026-10-21
 
 ### Agents and MCP

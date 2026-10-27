@@ -47,3 +47,28 @@ test('admin results-analysis status uses existing admin auth, accepts sessionSlu
   assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
   assert.deepEqual(await readJson(response), { ok: true, includeDraft: false });
 });
+
+test('admin status preserves the reason and exhaustion flag after automatic retries stop', async () => {
+  const response = await dispatchAdminResultsAnalysisStatusRequest({
+    request: new Request('https://worker.example/admin/results-analysis/status?sessionSlug=session-a'),
+    env: {}, baseHeaders: {}, slug: 'session-a',
+    deps: {
+      json,
+      requireAuth: async () => ({ ok: true, slug: 'session-a', payload: { sub: '0xabc' } }),
+      getSessionConfig: async () => ({ slug: 'session-a', resultsAnalysis: { generationMode: 'automatic' } }),
+      getCorsContext: async () => ({ ok: true, headers: {} }),
+      validateAdmin: async () => true,
+      readCoordinatedResultsAnalysisStatus: async () => ({ ok: true, state: {
+        jobState: 'failed', queued: null,
+        lastFailure: { trigger: 'automatic', status: 503, error: 'Provider failed.', retriesExhausted: true },
+      } }),
+    },
+  });
+  assert.equal(response.status, 200);
+  const body = await readJson(response);
+  assert.equal(body.state.jobState, 'failed');
+  assert.equal(body.state.active, null);
+  assert.equal(body.state.lastFailure.retriesExhausted, true);
+  assert.equal(body.state.lastFailure.error, 'Provider failed.');
+  assert.equal(body.state.lastFailure.nextAttemptAtMs, undefined);
+});

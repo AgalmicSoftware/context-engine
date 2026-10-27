@@ -13,7 +13,7 @@ import { ethers } from 'ethers';
 import { createSbtClaimer } from '../mcp/lib/sbtClaims.mjs';
 
 const require = createRequire(import.meta.url);
-const { createGroupPasswordDerivation } = require('../client/src/utilities/crypto/groupPasswordDerivation.cjs');
+const { createGroupPasswordDerivation } = require('../shared/crypto/groupPasswordDerivation.cjs');
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const chainId = 11155420;

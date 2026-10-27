@@ -22,7 +22,7 @@ flowchart LR
 
   Hosted --> NativeDeploy["Native Deploy to Cloudflare<br/>dashboard handoff; no API token"]
   NativeDeploy --> Worker["Creator-owned per-session Worker<br/>worker_canonical authority"]
-  Hosted -.-> LegacyHelper["Legacy deploy-helper / Agent Wrapped<br/>request-only Cloudflare token"]
+  Hosted -.-> LegacyHelper["Legacy deploy-helper<br/>request-only Cloudflare token"]
   LegacyHelper -.-> Worker
   Worker --> Cloudflare["Worker KV / Cloudflare payload storage<br/>worker_envelope by default"]
   Worker --> AI["Selected AI provider"]
@@ -36,7 +36,7 @@ flowchart LR
 
 Hosted & Fast needs a creator Cloudflare account/dashboard login and one
 AI-provider key. Its native handoff does not ask for a Cloudflare API token; a
-request-only token belongs only to Agent Session Wrapped or the explicit legacy
+request-only token belongs only to the explicit legacy
 deploy-helper fallback. The passkey-derived EOA signs canonical Worker config
 without an EVM transaction, so public EVM, registry, RPC, gas, Arweave, and Lit
 are not default dependencies. Trustless & Slower preserves the public EVM,
@@ -72,7 +72,7 @@ architecture.
 |-------|-------------|--------------|-----------------|
 | **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | Shared across implemented profiles | `client/src/` |
 | **Session Worker** | Auth, canonical config, AI proxy, transcription, storage routes, controlled URL/image fetch, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
-| **Agent Bridge Worker** | Scoped Agent HTTP, submission queue, Session Wrapped, and atomically coordinated one-time invite exchange | Transitional adapter; session authority is being consolidated into the Session Worker | `workers/agentBridgeWorker/` |
+| **Session Agent HTTP** | Scoped Agent HTTP, submission queue, Session Wrapped, and atomically coordinated one-time invite exchange | Integrated domain modules using canonical Session Worker authority | `workers/sessionCorsWorker/agent/` |
 | **Cloudflare storage** | Worker KV config, secrets, encrypted payload envelopes/indexes, and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
 | **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
 | **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
@@ -225,8 +225,8 @@ unchanged.
 | Worker | Purpose |
 |--------|---------|
 | `sessionCorsWorker/worker.js` | Canonical config/auth/storage for Hosted & Fast, plus profile-enabled AI, Arweave, fetch, transcription, and faucet routes |
-| `deploy-helper/worker.js` | Explicit legacy/sponsored Worker-deployment fallback and Agent Wrapped provisioning; not the native `/new` default |
-| `agentBridgeWorker/worker.js` | Scoped Agent HTTP and Session Wrapped; `agentHttp.mjs` routes to `agentSessionRuntime.mjs` and `agentOnlyMode.mjs` while the Session Worker owns canonical session authority |
+| `deploy-helper/worker.js` | Explicit legacy/sponsored Worker-deployment fallback including optional Agent HTTP setup; not the native `/new` default |
+| `sessionCorsWorker/agent/` | Scoped Agent HTTP, credential exchange, optional registry queue and Session Wrapped under canonical Session Worker authority |
 
 ### Verification
 
@@ -273,7 +273,7 @@ stores only `keccak256(signer address)` as `groupPasswordHash`. Because the salt
 is the group's own address, group-password groups deploy through
 `SBTFactory.createSBTDeterministicConfigured` at their predicted CREATE2
 address, and the factory sets `groupPasswordHash` once during that deployment.
-See `client/src/utilities/crypto/groupPasswordDerivation.cjs`.
+See `shared/crypto/groupPasswordDerivation.cjs`.
 
 The current CustomSBT source uses one mutable `admin`, rotated with `changeAdmin`.
 It exposes no transferable collection ownership. Zero admin permanently disables

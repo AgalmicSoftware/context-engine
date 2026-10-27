@@ -1,3 +1,4 @@
+import { resolveSessionAiModel } from './aiRequestPolicy.js';
 import { toTrimmedString } from './stringCoercion.js';
 
 export const ANONYMOUS_CUSTOM_RPC_URL_REQUIRED_ERROR =
@@ -44,17 +45,19 @@ export const resolveAiProvider = (payload) => {
   return inferAiProviderFromModel(payload?.model) || 'openai';
 };
 
-export const normalizeAiRequestPayload = ({ payload } = {}) => ({
-  ok: true,
-  status: 200,
-  error: '',
-  payload,
-  provider: resolveAiProvider(payload),
-  requestApiKey: toTrimmedString(payload?.apiKey),
-  requestRpcUrl: toTrimmedString(payload?.rpcUrl),
-});
+export const normalizeAiRequestPayload = ({ payload, config } = {}) => {
+  if (!toTrimmedString(payload?.provider) && !toTrimmedString(payload?.model) && !toTrimmedString(payload?.apiKey || payload?.rpcKey)) {
+    payload = { ...payload, ...resolveSessionAiModel(config, { taskType: payload?.taskType, modelType: payload?.modelType }) };
+  }
+  return {
+    ok: true, status: 200, error: '', payload,
+    provider: resolveAiProvider(payload),
+    requestApiKey: toTrimmedString(payload?.apiKey),
+    requestRpcUrl: toTrimmedString(payload?.rpcUrl),
+  };
+};
 
-export const readAiRequestPayload = async ({ request } = {}) => {
+export const readAiRequestPayload = async ({ request, config } = {}) => {
   const contentType = request?.headers?.get('content-type') || '';
   if (!contentType.includes('application/json')) {
     return {
@@ -83,7 +86,7 @@ export const readAiRequestPayload = async ({ request } = {}) => {
     };
   }
 
-  return normalizeAiRequestPayload({ payload });
+  return normalizeAiRequestPayload({ payload, config });
 };
 
 export const validateAnonymousAiRequest = ({

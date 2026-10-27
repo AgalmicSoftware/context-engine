@@ -100,8 +100,8 @@ const workerFetch = (env, seen = []) => async (url, init = {}) => {
   return sessionCorsWorker.fetch(request, env, { waitUntil: () => {}, passThroughOnException: () => {} });
 };
 
-const createAgent = async (env, displayName, seen, fetchImpl = null, { now, sbt, createProvider, wallet: existingWallet } = {}) => {
-  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-agent-'));
+const createAgent = async (env, displayName, seen, fetchImpl = null, { now, sbt, createProvider, wallet: existingWallet, stateDir: existingStateDir } = {}) => {
+  const stateDir = existingStateDir || await fs.mkdtemp(path.join(os.tmpdir(), 'ce-agent-'));
   const wallet = existingWallet || ethers.Wallet.createRandom();
   const participant = createParticipant({
     ...(now ? { now } : {}),
@@ -203,6 +203,29 @@ test('first encrypted question uploads preserve the authorization checked before
     assert.equal(listed.items.length, 2);
     for (const item of listed.items) assert.match((await client.read(item.storageRef.id)).prompt, /^Synthetic first encrypted statement/);
   }
+});
+
+test('agent answer uploads omit content digests and use fresh keys after success', async () => {
+  const env = createEnv([sessionConfig()]);
+  const uploads = [];
+  const fetchWorker = workerFetch(env);
+  const { participant } = await createAgent(env, 'synthetic-agent', [], async (url, init) => {
+    if (new URL(url).pathname === '/storage/upload') {
+      const body = JSON.parse(init.body);
+      if (body.resource === 'responses') uploads.push(body);
+    }
+    return fetchWorker(url, init);
+  });
+  await participant.joinSession({ link: LINK });
+  const first = await participant.addStatement({ prompt: 'Should the pilot run on weekdays?' });
+  const second = await participant.addStatement({ prompt: 'Should the pilot run on weekends?' });
+  const answers = [first, second].map(({ questionId }) => ({ questionId, value: 'Agree' }));
+  assert.equal((await participant.answer({ answers })).submitted, 2);
+  assert.ok(uploads.every(({ requestId }) => /^answer:v1:[^:]+:0x[a-f0-9]{64}$/.test(requestId)));
+  assert.equal(uploads[0].requestId.split(':')[2], uploads[1].requestId.split(':')[2]);
+  for (const upload of uploads) assert.equal(upload.requestId.includes(ethers.utils.sha256(ethers.utils.toUtf8Bytes(upload.data)).slice(2)), false);
+  assert.equal((await participant.answer({ answers })).submitted, 2);
+  assert.notEqual(uploads[0].requestId.split(':')[2], uploads[2].requestId.split(':')[2]);
 });
 
 test('agents join a public hosted session, add statements, answer, and read results like web participants', async () => {
@@ -393,6 +416,27 @@ test('locked questions are listed as locked and cannot be answered', async () =>
   assert.equal(storedRecords(env, 'responses').filter((row) => row.resource === 'responses').length, 0);
 });
 
+test('an earlier stored version wins even when a later upload hashes to either id encoding', async () => {
+  const env = createEnv([sessionConfig()]);
+  const { participant: author } = await createAgent(env, 'author', []);
+  await author.joinSession({ link: LINK });
+  await author.addStatement({ prompt: 'A seed statement.' });
+  const genuine = { type: 'multichoice', prompt: 'Which budget?', options: ['$1,000', '$2,000'], sessionSlug: SLUG, sessionId: SESSION_ID };
+  // The legacy id published for these comma options, and the id they get now.
+  const ids = [
+    ethers.utils.id('multichoice:which budget?:$1,000,$2,000'),
+    ethers.utils.id('["ce-question-id",2,"multichoice","which budget?",["$1,000","$2,000"],false]'),
+  ];
+  for (const id of ids) {
+    plantRecord(env, 'questions', { ...genuine, id, prompt: 'Rewritten budget?' }, { createdAt: '2026-01-01T00:00:00.000Z', uploaderIsAdmin: false });
+    plantRecord(env, 'questions', { ...genuine, id }, { createdAt: '2026-02-01T00:00:00.000Z', uploaderIsAdmin: false });
+  }
+  const { participant } = await createAgent(env, 'reader', []);
+  await participant.joinSession({ link: LINK });
+  const { questions } = await participant.listQuestions({ filter: 'all' });
+  for (const id of ids) assert.equal(questions.find((question) => question.id === id)?.prompt, 'Rewritten budget?');
+});
+
 test('a long-running agent picks up admin changes to the session', async () => {
   const env = createEnv([sessionConfig()]);
   let clock = Date.now();
@@ -501,6 +545,33 @@ test('sessions whose config uses a UUID session id can be joined', async () => {
   assert.equal((await participant.answer({ answers: [{ questionId, value: 'Agree' }] })).submitted, 1);
 });
 
+test('Worker own-answer scans remain complete while the cached listing precedes a new answer', async () => {
+  const env = createEnv([sessionConfig()]);
+  const fetch = workerFetch(env);
+  let ownReads = 0;
+  const { participant } = await createAgent(env, 'own-scan-cache', [], async (url, init) => {
+    const parsed = new URL(url);
+    if (parsed.pathname === '/storage/list' && parsed.searchParams.get('resource') === 'responses') {
+      ownReads++;
+      return Response.json({ items: [], listComplete: true, cursor: null });
+    }
+    return fetch(url, init);
+  });
+  await participant.joinSession({ link: LINK });
+  const { questionId } = await participant.addStatement({ prompt: 'A newly saved answer stays complete.' });
+  assert.notEqual((await participant.listQuestions({ filter: 'all' })).myAnswersComplete, false);
+  assert.equal((await participant.answer({ answers: [{ questionId, value: 'Agree' }] })).submitted, 1);
+  const listed = await participant.listQuestions({ filter: 'all' });
+  const before = ownReads;
+  const cached = await participant.listQuestions({ filter: 'all' });
+  assert.equal(ownReads, before, 'The own-answer scan is still cached');
+  assert.notEqual(cached.myAnswersComplete, false);
+  assert.equal(listed.answeredByMe, 1);
+  assert.equal(listed.questions[0].myAnswer.value, 'Agree');
+  assert.notEqual(listed.myAnswersComplete, false);
+  assert.doesNotMatch(listed.note || '', /large/);
+});
+
 test('own answers are found by paging the Worker alone, without the local record', async () => {
   const env = createEnv([sessionConfig()]);
   const first = await createAgent(env, 'paged', []);
@@ -577,6 +648,67 @@ test('a stopped answer call sends nothing', async () => {
 
 test('a hosted answer remains submitted when saving its local history fails after upload', async (t) => {
   const env = createEnv([sessionConfig()]);
+  let agent;
+  const fetchWorker = workerFetch(env);
+  agent = await createAgent(env, 'state-fixture', [], async (url, init) => {
+    const response = await fetchWorker(url, init);
+    if (new URL(url).pathname === '/storage/upload' && JSON.parse(init.body).resource === 'responses') {
+      await fs.rename(path.join(agent.stateDir, 'state.json'), path.join(agent.stateDir, 'state.saved.json'));
+      await fs.mkdir(path.join(agent.stateDir, 'state.json'));
+    }
+    return response;
+  });
+  t.after(() => fs.rm(agent.stateDir, { recursive: true, force: true }));
+  await agent.participant.joinSession({ link: LINK });
+  const { questionId } = await agent.participant.addStatement({ prompt: STATEMENT });
+  const result = await agent.participant.answer({ answers: [{ questionId, value: 'Agree' }] });
+  assert.equal(result.submitted, 1);
+  assert.equal(result.failed, 0);
+  assert.match(result.warning, /submitted.*local answer history.*not.*saved/i);
+});
+
+
+test('a timed-out answer reuses its persisted request after an agent restart', async (t) => {
+  const env = createEnv([sessionConfig()]);
+  const fetchWorker = workerFetch(env);
+  let agent;
+  let loseReply = true;
+  const uploads = [];
+  const fetchImpl = async (url, init) => {
+    const body = init.body ? JSON.parse(init.body) : {};
+    if (new URL(url).pathname === '/storage/upload' && body.resource === 'responses') {
+      uploads.push(body);
+      const saved = JSON.parse(await fs.readFile(path.join(agent.stateDir, 'state.json'), 'utf8'));
+      const pending = Object.values(saved.sessions)[0].pendingUploads?.[JSON.parse(body.data).questionID];
+      assert.equal(pending?.requestId, body.requestId, 'the retry key is durable before sending');
+      assert.equal(pending?.payloadDigest, ethers.utils.sha256(ethers.utils.toUtf8Bytes(body.data)).slice(2));
+      const result = await fetchWorker(url, init);
+      if (loseReply) { loseReply = false; throw new DOMException('Timed out', 'TimeoutError'); }
+      return result;
+    }
+    return fetchWorker(url, init);
+  };
+  agent = await createAgent(env, 'retry-fixture', [], fetchImpl);
+  t.after(() => fs.rm(agent.stateDir, { recursive: true, force: true }));
+  await agent.participant.joinSession({ link: LINK });
+  const { questionId } = await agent.participant.addStatement({ prompt: STATEMENT });
+  const answers = [{ questionId, value: 'Agree' }];
+  assert.equal((await agent.participant.answer({ answers })).failed, 1);
+  assert.equal(storedRecords(env, 'responses').length, 1);
+  const restarted = await createAgent(env, 'retry-fixture', [], fetchImpl, { wallet: agent.wallet, stateDir: agent.stateDir });
+  assert.equal((await restarted.participant.answer({ answers })).submitted, 1);
+  assert.equal(uploads[0].requestId, uploads[1].requestId);
+  assert.equal(storedRecords(env, 'responses').length, 1);
+  const saved = JSON.parse(await fs.readFile(path.join(agent.stateDir, 'state.json'), 'utf8'));
+  assert.deepEqual(Object.values(saved.sessions)[0].pendingUploads, {});
+  assert.equal((await restarted.participant.answer({ answers })).submitted, 1);
+  assert.notEqual(uploads[1].requestId, uploads[2].requestId);
+  assert.equal(storedRecords(env, 'responses').length, 2);
+});
+
+
+test('an answer is not sent when its retry key cannot be persisted', async (t) => {
+  const env = createEnv([sessionConfig()]);
   const agent = await createAgent(env, 'state-fixture');
   t.after(() => fs.rm(agent.stateDir, { recursive: true, force: true }));
   await agent.participant.joinSession({ link: LINK });
@@ -584,7 +716,7 @@ test('a hosted answer remains submitted when saving its local history fails afte
   await fs.rename(path.join(agent.stateDir, 'state.json'), path.join(agent.stateDir, 'state.saved.json'));
   await fs.mkdir(path.join(agent.stateDir, 'state.json'));
   const result = await agent.participant.answer({ answers: [{ questionId, value: 'Agree' }] });
-  assert.equal(result.submitted, 1);
-  assert.equal(result.failed, 0);
-  assert.match(result.warning, /submitted.*local answer history.*not.*saved/i);
+  assert.equal(result.submitted, 0);
+  assert.equal(result.failed, 1);
+  assert.equal(storedRecords(env, 'responses').length, 0);
 });

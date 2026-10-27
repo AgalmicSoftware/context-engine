@@ -1,0 +1,29 @@
+{
+  "abitype@0.1.8": {
+    "declaredLicense": "WAGMIT",
+    "license": "MIT",
+    "evidence": {
+      "source": "client/node_modules/@wagmi/connectors/node_modules/abitype/LICENSE",
+      "reviewed": "2026-10-26",
+      "note": "The installed LICENSE contains the full MIT grant, copyright 2022-present weth, LLC; package metadata declares WAGMIT."
+    }
+  },
+  "wildemitter@1.2.1": {
+    "declaredLicense": null,
+    "license": "MIT",
+    "evidence": {
+      "source": "client/node_modules/wildemitter/LICENSE",
+      "reviewed": "2026-10-26",
+      "note": "The installed LICENSE contains the full MIT grant, copyright 2019 Henrik Joreteg; package metadata omits license."
+    }
+  },
+  "@metamask/eth-json-rpc-provider@1.0.1": {
+    "declaredLicense": null,
+    "license": "ISC",
+    "evidence": {
+      "source": "npm registry metadata: @metamask/eth-json-rpc-provider@1.0.1; repository https://github.com/MetaMask/eth-json-rpc-provider",
+      "reviewed": "2026-10-26",
+      "note": "Owner-supplied evidence from npm view @metamask/eth-json-rpc-provider@1.0.1 license repository.url reports ISC. The installed package has neither license metadata nor a LICENSE file."
+    }
+  }
+}

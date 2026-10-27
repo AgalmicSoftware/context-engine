@@ -19,7 +19,7 @@ Starter files shipped in this folder:
 - `.dev.vars.example`
   - copy to `.dev.vars` for local `wrangler dev` testing or secret placeholders you do not want in `wrangler.toml`
 - `LICENSE`
-  - mirrors the worker-subtree MIT notice for this package
+  - points to the project MPL-2.0 license for this package
 
 ## Supported Local Outputs
 
@@ -151,4 +151,4 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
 - Canonical source: `workers/deploy-helper/worker.js`
 - Shared implementation: `workers/shared/deployHelperCore.mjs`
 - Canonical docs: `docs/session-cors-worker.md`
-- License boundary: worker subtree MIT, documented in `workers/README.md` and `LICENSING.md`
+- License: project MPL-2.0, documented in `workers/README.md` and `LICENSING.md`

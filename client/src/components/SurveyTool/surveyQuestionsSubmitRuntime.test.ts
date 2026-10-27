@@ -1,4 +1,5 @@
 import { createSurveyQuestionsSubmitRuntime } from './surveyQuestionsSubmitRuntime';
+import { ethers } from 'ethers';
 import type { SurveyQuestionsLegacyRecord } from './surveyQuestionsTypes';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
@@ -45,6 +46,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}): SurveyQuest
   },
   deepClone: jest.fn((value) => JSON.parse(JSON.stringify(value))),
   ethers: {
+    utils: ethers.utils,
     constants: {
       HashZero: '0x0',
     },
@@ -163,6 +165,48 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}): SurveyQuest
 });
 
 describe('surveyQuestionsSubmitRuntime', () => {
+  it('keeps the operation across failed and partial attempts and clears it after saving everything', async () => {
+    const context = createContext();
+    const receipt = { __ceQuestionResponses: [{ questionID: 'q1' }], __ceSubmissionGroupKey: 'draft-edge' };
+    context.submitSurveyResponse
+      .mockRejectedValueOnce(new Error('reply lost'))
+      .mockResolvedValueOnce({ ...receipt, retryPending: true })
+      .mockResolvedValueOnce(receipt);
+    const runtime = createSurveyQuestionsSubmitRuntime(context);
+    await runtime.encryptAndUpload();
+    const operation = context.inst._submitOperationId;
+    const revisions = context.inst._submitUploadRevisions;
+    expect(revisions).toBeInstanceOf(Map);
+    expect(operation).toEqual(expect.any(String));
+    await runtime.encryptAndUpload();
+    expect(context.inst._submitOperationId).toBe(operation);
+    expect(context.inst._submitUploadRevisions).toBe(revisions);
+    await runtime.encryptAndUpload();
+    expect(
+      context.submitSurveyResponse.mock.calls.map(
+        (call: unknown[]) => (call[2] as { operationId: string }).operationId,
+      ),
+    ).toEqual([operation, operation, operation]);
+    expect(context.inst._submitOperationId).toBeUndefined();
+    expect(context.inst._submitUploadRevisions).toBeUndefined();
+  });
+
+  it('starts a new operation when the account or session changes after a failed attempt', async () => {
+    const context = createContext();
+    context.submitSurveyResponse.mockRejectedValue(new Error('reply lost'));
+    const runtime = createSurveyQuestionsSubmitRuntime(context);
+    await runtime.encryptAndUpload();
+    const first = context.inst._submitOperationId;
+    context.propsRef.current.account = '0xdef';
+    await runtime.encryptAndUpload();
+    const second = context.inst._submitOperationId;
+    expect(second).toEqual(expect.any(String));
+    expect(second).not.toBe(first);
+    context.inst._getEffectiveDraftSlug.mockReturnValue('different-session');
+    await runtime.encryptAndUpload();
+    expect(context.inst._submitOperationId).not.toBe(second);
+  });
+
   it('builds Lit encryption options from recipient gates and current hooks', () => {
     const context = createContext();
     const runtime = createSurveyQuestionsSubmitRuntime(context);

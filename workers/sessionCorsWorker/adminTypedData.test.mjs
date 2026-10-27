@@ -54,7 +54,7 @@ const EXPECTED_AUTH_FIELDS = Object.freeze([
   'expiration',
 ]);
 
-test('client v5 and Worker v6 admin typed-data twins share constants and build semantics', () => {
+test('client v5 and Worker v6 admin typed-data wrappers share constants and build semantics', () => {
   assert.deepEqual(CLIENT_DOMAIN, EXPECTED_DOMAIN);
   assert.deepEqual(WORKER_DOMAIN, EXPECTED_DOMAIN);
   assert.deepEqual(CLIENT_TYPES, EXPECTED_TYPES);
@@ -95,7 +95,7 @@ test('client v5 and Worker v6 admin typed-data twins share constants and build s
   assert.equal(buildWorkerTypedData({ ...params, expiration: 'invalid' }).message.expiration, 0);
 });
 
-test('client v5 and Worker v6 admin typed-data twins strip and hash the same body bytes', () => {
+test('client v5 and Worker v6 admin typed-data wrappers strip and hash the same body bytes', () => {
   const body = {
     address: '0x0000000000000000000000000000000000000001',
     signature: '0xsig',
@@ -163,4 +163,19 @@ test('an ethers-v5 client signature verifies in the ethers-v6 Worker and rejects
     valid: false,
     error: 'Invalid admin action expiration.',
   });
+});
+
+test('injected v5 and v6 utilities produce identical EIP-712 digests', () => {
+  for (const body of [{}, { config: { allowOrigins: ['https://app.example.test'] } }, { label: 'Unicode: café', enabled: false, count: 7 }]) {
+    const params = {
+      action: 'set-config', slug: 'digest-fixture', nonce: 'nonce-fixture',
+      audience: 'https://app.example.test', expiration: 2_000_000_000,
+    };
+    const client = buildClientTypedData({ ...params, bodyHash: buildClientBodyHash(body) });
+    const worker = buildWorkerTypedData({ ...params, bodyHash: buildWorkerBodyHash(body) });
+    assert.equal(
+      clientEthers.utils._TypedDataEncoder.hash(client.domain, CLIENT_TYPES, client.message),
+      workerEthers.TypedDataEncoder.hash(worker.domain, WORKER_TYPES, worker.message),
+    );
+  }
 });

@@ -2,10 +2,15 @@ const QUESTIONS_ADDED_TOPIC0 = '0x3b584fb360a325f39352e75bd13458807d8e31735ef4da
 const GET_QUESTION_HASH_SELECTOR = '0x24b9f713';
 const ZERO_BYTES32 = `0x${'00'.repeat(32)}`;
 const MAX_QUESTIONS = 100;
-// Room for re-uploads of the same id: the canonical version may sit beyond
-// the first 100 stored rows.
-const MAX_CLOUDFLARE_QUESTION_ROWS = MAX_QUESTIONS * 2;
-const MAX_CLOUDFLARE_LIST_PAGES = 10;
+// Payload reads across legacy rows and chosen versions, with room for rows
+// that turn out unreadable or restricted.
+const MAX_PAYLOAD_READS = MAX_QUESTIONS * 2;
+// One Worker invocation may make 1,000 KV operations, some spent before the
+// catalog runs. A listed page costs about MAX_QUESTIONS + 2 (index list,
+// hidden-id list, one metadata read per row) and a payload read about one, so
+// the walk stops early enough to leave room for its reads.
+const CATALOG_KV_OPERATION_BUDGET = 800;
+const MAX_CLOUDFLARE_LIST_PAGES = Math.floor((CATALOG_KV_OPERATION_BUDGET - MAX_PAYLOAD_READS) / (MAX_QUESTIONS + 2));
 const MAX_SCAN_BLOCKS = 2_000_000;
 const RPC_CHUNK_SIZE = 100_000;
 import { normalizePublicInterviewQuestions, hasRestrictedPrompt, hasRatingScaleMetadata, normalizeRatingScale, normalizeQuestion } from '../../shared/interviewQuestionCatalog.mjs';
@@ -14,6 +19,8 @@ const trim = (value) => String(value == null ? '' : value).trim();
 const lower = (value) => trim(value).toLowerCase();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
+// The id normalizeQuestion will serve the payload under.
+const payloadQuestionId = (payload) => lower(payload?.id || payload?.questionId);
 
 const readJsonResponse = async (response) => {
   if (!response || Number(response.status || 0) < 200 || Number(response.status || 0) >= 300) return null;
@@ -26,6 +33,27 @@ const readJsonResponse = async (response) => {
       return null;
     }
   }
+};
+
+// A walk that cannot finish (the page cap above, a failed page) may miss a later
+// admin correction. Without a current-version index it still chooses among
+// every row it listed, which covers more rows than the former 200-row window.
+const listQuestionRows = async (callStorage) => {
+  const items = [];
+  const seenCursors = new Set();
+  let cursor = '';
+  for (let page = 0; page < MAX_CLOUDFLARE_LIST_PAGES; page += 1) {
+    const query = new URLSearchParams({ resource: 'questions', limit: String(MAX_QUESTIONS), ...(cursor ? { cursor } : {}) });
+    const listing = await readJsonResponse(await callStorage('/storage/list', query.toString()));
+    if (!Array.isArray(listing?.items)) break;
+    items.push(...listing.items);
+    if (listing.listComplete === true) break;
+    // A filtered page can be empty; only a fresh cursor continues the walk.
+    cursor = trim(listing.cursor);
+    if (!cursor || seenCursors.has(cursor)) break;
+    seenCursors.add(cursor);
+  }
+  return items;
 };
 
 const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
@@ -41,43 +69,55 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
     uploaderAddress: '',
     baseHeaders: {},
   });
-  const items = [];
-  let cursor = '';
-  for (let page = 0; page < MAX_CLOUDFLARE_LIST_PAGES && items.length < MAX_CLOUDFLARE_QUESTION_ROWS; page += 1) {
-    const query = new URLSearchParams({ resource: 'questions', limit: String(MAX_QUESTIONS), ...(cursor ? { cursor } : {}) });
-    const listing = await readJsonResponse(await callStorage('/storage/list', query.toString()));
-    items.push(...(Array.isArray(listing?.items) ? listing.items : []));
-    cursor = trim(listing?.cursor);
-    if (!cursor || listing?.listComplete === true) break;
-  }
+  const items = await listQuestionRows(callStorage);
   // Hidden ids arrive as markers without a storage reference.
   const hiddenIds = new Set(items
     .filter((item) => item?.hidden === true || item?.metadata?.hidden === true)
     .map((item) => lower(item?.metadata?.resourceId))
     .filter(Boolean));
-  const candidates = [];
-  for (const item of items.slice(0, MAX_CLOUDFLARE_QUESTION_ROWS)) {
-    const id = trim(item?.storageRef?.id || item?.metadata?.id || item?.id);
-    if (!id || item?.hidden === true) continue;
-    // Deliberately sequential and bounded. Each read reuses the storage route's
-    // per-item access checks, so this endpoint cannot widen question visibility.
-    const payload = await readJsonResponse(await callStorage('/storage/read', `id=${encodeURIComponent(id)}`));
-    const questionId = lower(payload?.id || payload?.questionId);
-    if (!isObj(payload) || !questionId || hiddenIds.has(questionId)) continue;
-    candidates.push({
-      resourceId: questionId,
+  // Deliberately sequential and bounded. Each read reuses the storage route's
+  // per-item access checks, so this endpoint cannot widen question visibility.
+  const readPayload = async (storageRefId) => {
+    const payload = await readJsonResponse(await callStorage('/storage/read', `id=${encodeURIComponent(storageRefId)}`));
+    return isObj(payload) ? payload : null;
+  };
+  const versions = [];
+  const legacyVersions = [];
+  for (const item of items) {
+    const storageRefId = trim(item?.storageRef?.id || item?.metadata?.id || item?.id);
+    if (!storageRefId || item?.hidden === true) continue;
+    const version = {
+      resourceId: lower(item?.metadata?.resourceId),
       createdAtMs: Date.parse(trim(item?.metadata?.createdAt)) || 0,
-      storageRefId: id,
+      storageRefId,
       uploader: trim(item?.metadata?.uploader),
       uploadAuthority: item?.metadata?.uploadAuthority,
-      payload,
-    });
+    };
+    (version.resourceId ? versions : legacyVersions).push(version);
+  }
+  // Rows stored before resourceId was recorded name their question only in the
+  // payload. They predate admin stamps, so the earliest wins: read oldest first.
+  legacyVersions.sort((left, right) => left.createdAtMs - right.createdAtMs);
+  // Legacy reads leave at least MAX_QUESTIONS reads for the chosen versions.
+  const legacyReads = legacyVersions.slice(0, MAX_PAYLOAD_READS - MAX_QUESTIONS);
+  for (const version of legacyReads) {
+    const payload = await readPayload(version.storageRefId);
+    const resourceId = payloadQuestionId(payload);
+    if (resourceId) versions.push({ ...version, resourceId, payload });
   }
   // Only an upload-time admin stamp can replace the earliest ordinary version.
-  return dedupeQuestions(
-    selectCanonicalStorageVersions(candidates)
-      .map((candidate) => candidate.payload),
-  );
+  const chosen = selectCanonicalStorageVersions(versions)
+    .filter((version) => !hiddenIds.has(version.resourceId))
+    .slice(0, MAX_PAYLOAD_READS - legacyReads.length);
+  const questions = [];
+  for (const version of chosen) {
+    if (questions.length >= MAX_QUESTIONS) break;
+    const payload = version.payload || await readPayload(version.storageRefId);
+    // A payload naming another question must not stand in for this one, and
+    // falling back to another version could serve someone else's copy.
+    if (payloadQuestionId(payload) === version.resourceId && normalizeQuestion(payload)) questions.push(payload);
+  }
+  return dedupeQuestions(questions);
 };
 
 const pickContractAddress = (config = {}) => {

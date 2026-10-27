@@ -2,7 +2,7 @@ import { resolveConsentFlags, summarizeConsentChoice, type InterviewConsentOverr
 import { useInterviewSavedAnswers, type InterviewSavedAnswerLoader } from './useInterviewSavedAnswers';
 import { verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
-import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
+import { getSessionAiSettings } from '../../utilities/ai/aiSettings';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { appendInterviewTranscript, mergeInterviewReview } from './sessionInterviewReviewState';
 import { useInterviewReadiness } from './useInterviewReadiness';
@@ -21,7 +21,7 @@ import {
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
 import { useInterviewOpening } from './useInterviewOpening';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Input, Label, Modal, ModalBody, ModalHeader } from 'reactstrap';
+import { Button, Input, Label, Modal, ModalBody, ModalHeader, ModalFooter } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
@@ -112,6 +112,7 @@ type SessionInterviewPanelBaseProps = InterviewDraftApplicationProps & {
 
 type SessionVoiceModeModalProps = SessionInterviewPanelBaseProps & {
   isOpen: boolean;
+  onInterviewProgressChange?: (inProgress: boolean) => void;
   mode: SessionVoiceMode | null;
   onSelectMode: (mode: SessionVoiceMode) => void;
   questionPool?: unknown[];
@@ -119,11 +120,13 @@ type SessionVoiceModeModalProps = SessionInterviewPanelBaseProps & {
 
 type SessionInterviewPanelProps = SessionInterviewPanelBaseProps & {
   questions: InterviewQuestion[];
+  isOpen: boolean;
   onReviewStateChange: (dirty: boolean) => void;
 };
 
 function SessionInterviewPanel({
   questions: initialQuestions,
+  isOpen,
   sessionSlug = '',
   sessionConfig = null,
   context,
@@ -208,7 +211,11 @@ function SessionInterviewPanel({
   const hasPredictionRevisions = drafts.some((draft) => (draft.revisions?.length || 0) > 1);
   const hasAiGeneratedReview = drafts.length > 0 && !isDirectUserContextPrefill;
   const researchAvailable = hasAiPrefill || hasPredictionRevisions || hasAiGeneratedReview;
-  const researchPacket = buildResearchPacket(prefillPacket, sessionSlug);
+  const mappingModelId = useMemo(
+    () => getSessionAiSettings(sessionSlug, sessionConfig).models.thinking,
+    [sessionSlug, sessionConfig],
+  );
+  const researchPacket = buildResearchPacket(prefillPacket, sessionSlug, mappingModelId);
   const [includeProvenance, setIncludeProvenance] = useState(true);
   const [researchSharingChoice, setResearchSharingChoice] = useState<{
     contextToken: string;
@@ -266,6 +273,19 @@ function SessionInterviewPanel({
     onTranscript: receiveTranscript,
   });
   const { audioRef, mediaStreamRef, recordingState, recordingElapsedSeconds } = recorder;
+  const suspendRecorder = recorder.suspend;
+  const closeGenerationRef = useRef(0);
+  useEffect(() => {
+    if (isOpen) return;
+    closeGenerationRef.current += 1;
+    const captured = suspendRecorder();
+    if (captured.trim()) {
+      const combined = appendInterviewTranscript(roundBaseTranscriptRef.current, captured);
+      transcriptRef.current = combined;
+      setTranscript(combined);
+    }
+    setStatus('Ready');
+  }, [isOpen, suspendRecorder]);
   const reviewRef = useRef<HTMLElement | null>(null);
   const statusRef = useRef<HTMLButtonElement | null>(null);
   const stopControlRef = useRef<HTMLButtonElement | null>(null);
@@ -558,7 +578,7 @@ function SessionInterviewPanel({
           selected,
           mapped,
           (id) => !hasDraftValue(responseFieldValue(existingResponsesRef.current, 'answers', id)),
-          importedDrafts ? prefillPacket?.source.modelId : DEFAULT_AI_MODEL,
+          importedDrafts ? prefillPacket?.source.modelId : mappingModelId,
           (id) => responseCommentValue(existingResponsesRef.current, id),
         );
         for (const draft of review.drafts) {
@@ -609,6 +629,7 @@ function SessionInterviewPanel({
       editedDrafts,
       selected,
       suggestedQuestions,
+      mappingModelId,
       prefillPacket,
       questions,
       resolveWorkerUrl,
@@ -662,6 +683,7 @@ function SessionInterviewPanel({
       return;
     }
     setMappingNotice('');
+    setSubmitSucceeded(false);
     roundBaseTranscriptRef.current = transcriptRef.current;
     setShowTranscript(false);
     const validatedPrefillPacket =
@@ -698,9 +720,10 @@ function SessionInterviewPanel({
   };
 
   const endInterview = async () => {
+    const closeGeneration = closeGenerationRef.current;
     try {
       const result = await recorder.stop();
-      if (!result || disposedRef.current) return;
+      if (!result || disposedRef.current || closeGeneration !== closeGenerationRef.current) return;
       const combined = appendInterviewTranscript(roundBaseTranscriptRef.current, result.transcript);
       transcriptRef.current = combined;
       setTranscript(combined);
@@ -895,15 +918,19 @@ function SessionInterviewPanel({
         : 'ready';
   useEffect(() => {
     onReviewStateChange(
-      !submitSucceeded &&
-        !isInterviewBusy &&
-        Boolean(
-          transcript.trim() || drafts.length || prefillPacket || responderContext.trim() || suggestedQuestions.length,
-        ),
+      isInterviewBusy ||
+        mapping ||
+        applying ||
+        (!submitSucceeded &&
+          Boolean(
+            transcript.trim() || drafts.length || prefillPacket || responderContext.trim() || suggestedQuestions.length,
+          )),
     );
   }, [
     submitSucceeded,
     isInterviewBusy,
+    mapping,
+    applying,
     transcript,
     drafts.length,
     prefillPacket,
@@ -1238,22 +1265,24 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   const { isOpen, mode, onSelectMode, onClose, questionPool = [] } = props;
   const [hasUnsavedReview, setHasUnsavedReview] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [interviewVersion, setInterviewVersion] = useState(0);
+  const [discardedPrefill, setDiscardedPrefill] = useState<InterviewPrefillPacket | null>(null);
+  const prefillPacket = props.prefillPacket === discardedPrefill ? null : props.prefillPacket;
+  // Closing retains this review, but importing different evidence starts a new
+  // review. Equivalent packet objects must not erase the participant's edits.
+  const prefillIdentity = useMemo(() => JSON.stringify(prefillPacket || null), [prefillPacket]);
+  const onInterviewProgressChange = props.onInterviewProgressChange;
   useEffect(() => {
-    if (!isOpen || mode !== 'interview') {
-      setHasUnsavedReview(false);
-      setConfirmDiscard(false);
-    }
-  }, [isOpen, mode]);
-  const requestClose = () => {
-    if (hasUnsavedReview) setConfirmDiscard(true);
-    else onClose();
-  };
+    onInterviewProgressChange?.(hasUnsavedReview);
+  }, [hasUnsavedReview, onInterviewProgressChange]);
+  const requestClose = onClose;
   const questions = useMemo(() => normalizeInterviewQuestions(questionPool), [questionPool]);
   const title = mode === 'interview' ? 'Interview' : mode === 'recordGroup' ? 'Group Conversation' : 'Voice mode';
   return (
     <>
       <Modal
         isOpen={isOpen}
+        unmountOnClose={mode !== 'interview'}
         toggle={requestClose}
         size="lg"
         centered
@@ -1263,14 +1292,23 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_MODAL}
       >
         {mode === 'interview' ? (
-          isOpen ? (
+          <>
             <SessionInterviewPanel
+              key={`${interviewVersion}:${prefillIdentity}`}
               {...props}
+              prefillPacket={prefillPacket}
               onClose={requestClose}
               questions={questions}
               onReviewStateChange={setHasUnsavedReview}
             />
-          ) : null
+            {hasUnsavedReview ? (
+              <ModalFooter>
+                <Button color="link" onClick={() => setConfirmDiscard(true)}>
+                  Discard interview
+                </Button>
+              </ModalFooter>
+            ) : null}
+          </>
         ) : (
           <>
             <ModalHeader id="ce-session-voice-mode-title" toggle={requestClose}>
@@ -1296,6 +1334,9 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         onCancel={() => setConfirmDiscard(false)}
         onConfirm={() => {
           setConfirmDiscard(false);
+          setHasUnsavedReview(false);
+          setDiscardedPrefill(props.prefillPacket || null);
+          setInterviewVersion((version) => version + 1);
           onClose();
         }}
         testId="ce-interview-discard"

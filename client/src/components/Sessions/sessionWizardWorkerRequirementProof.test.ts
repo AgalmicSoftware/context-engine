@@ -361,6 +361,7 @@ describe('sessionWizardWorkerRequirementProof', () => {
           configRevision: 'other-draft-revision',
           workerCanonicalPublicationRevision: 'other-published-revision',
           workerGroupsBootstrap: { state: 'migrated' },
+          agentSessionWrapped: { version: 1, enabled: true, origin: workerUrl, verifiedAt: '2026-10-27T12:00:00.000Z' },
         },
       }),
     ).toEqual(expect.objectContaining({ verified: true }));

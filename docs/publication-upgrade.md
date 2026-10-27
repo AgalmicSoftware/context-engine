@@ -7,6 +7,20 @@ migration, or republication runs automatically during an upgrade or read.
 
 ## Rollout order and mixed versions
 
+The client reads public `GET /capabilities?slug=<slug>` lazily and caches it for
+five minutes per Worker origin and session. Admin settings show the reported
+API version and bundle hash, with an upgrade recommendation for missing
+features. A 404, invalid response or network error is treated as a legacy
+Worker. Normal submission continues unless a valid response explicitly lists
+`submit` as unavailable; that refusal preserves unsaved drafts.
+
+Admin re-uploads of existing question or survey IDs require
+`upload_authority_stamps`. With an older Worker the client permits a new
+admin-authored ID only after a complete authenticated listing establishes its
+absence; incomplete or unreadable history cannot establish that. Upgrade the
+Worker to make a correction. These checks guide the UI; the Worker's
+authorization remains authoritative.
+
 Old Workers do not write the explicit admin publication stamp. A new client
 reading an old Worker's unstamped history can therefore select the original
 version while old interview or results readers still select a later correction
@@ -22,6 +36,31 @@ readers all select the same intended versions before reopening traffic. Rolling
 back only one reader can restore the disagreement; preserve the inventory and
 coordinate any rollback across the affected surfaces. No deployment ordering or
 traffic restriction is applied automatically.
+
+## Supported client and Worker versions
+
+The supported window is the current client with the current or immediately
+previous minor Worker. Within that window, support is feature-specific:
+
+| Client | Worker | Supported behavior |
+| --- | --- | --- |
+| Current | Current, API 1 | Advertised operations, subject to session readiness |
+| Current | Previous minor, no capabilities endpoint | Existing stored records, normal creation and submission; no admin corrections, backup/import or recovery-key UI without the corresponding feature |
+| Current | Older than previous minor | Best effort reads only; upgrade before relying on writes |
+
+Release numbers alone do not prove support: the 0.6.14 fallback bundle also
+predates authority stamps and capabilities. A current client can safely read
+its records, but cannot change historical correction intent. An old Worker's
+own results/interview implementation may still apply its old selection rule;
+the coordinated upgrade procedure above remains necessary for agreement across
+all deployed readers.
+
+`tests/fixtures/worker-compat/previous-minor.json` pins synthetic stored-format
+compatibility: unstamped admin corrections, legacy rows without resource IDs,
+equal-time versions, and repeated answer uploads without receipts. Browser
+hydration, the current Worker results and interview readers, and MCP all choose
+the same versions before and after adding a new stamped correction. The fixture
+tests stored-format compatibility, not an executable copy of an old release.
 
 ## Legacy config preflight
 
@@ -109,8 +148,11 @@ Publication now rechecks the admitted revision and authorization epoch after
 external payload storage. A stale completion returns `409` before its index or
 initial owner record is written. Its bytes may remain orphaned; they are absent
 from listing and canonical version selection. A KV-only orphan remains readable
-by its opaque ID under current access rules. Upload retries are not deduplicated
-and may create another reference; do not treat a failed upload as published.
+by its opaque ID under current access rules. Question and survey upload retries
+are not deduplicated and may create another reference; do not treat a failed
+upload as published. Answer uploads with a stable request ID use bounded
+coordinator receipts when supported; see the storage retry contract in
+`session-cors-worker.md`.
 
 ## Hosted faucet compatibility
 

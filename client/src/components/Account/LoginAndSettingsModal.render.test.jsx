@@ -1824,27 +1824,37 @@ describe('LoginAndSettingsModal agent token login', () => {
     window.sessionStorage.clear();
     clearAgentClientLoginEnvelope('alpha');
     window.history.replaceState({}, '', '/session/alpha');
-    global.fetch = jest.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            sessionSlug: 'alpha',
-            sessionId: '0x00112233445566778899aabbccddeeff',
-            accountAddress: '0x3333333333333333333333333333333333333333',
-            workerUrl: 'https://session-worker.example',
-            bridgeCredential: {
-              kind: 'agent_bridge_browser_token',
-              token: 'bridge-browser-token',
-            },
-            workerCredential: {
-              kind: 'session_worker_jwt',
-              token: 'jwt-session-token',
-            },
-            expiresAt: '2027-07-05T00:00:00.000Z',
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
+    global.fetch = jest.fn(async (url) =>
+      new URL(url).pathname === '/capabilities'
+        ? new Response(
+            JSON.stringify({
+              ok: true,
+              features: ['agent_http_v1'],
+              agentHttp: { ready: true },
+              agentSessionWrapped: { origin: 'https://session-worker.example' },
+            }),
+          )
+        : new Response(
+            JSON.stringify({
+              ok: true,
+              sessionSlug: 'alpha',
+              sessionId: '0x00112233445566778899aabbccddeeff',
+              accountAddress: '0x3333333333333333333333333333333333333333',
+              workerUrl: 'https://session-worker.example',
+              agentCredential: {
+                kind: 'session_agent_browser_token',
+                token: 'bridge-browser-token',
+                expiresAt: '2027-07-05T00:00:00.000Z',
+              },
+              workerCredential: {
+                kind: 'session_worker_jwt',
+                token: 'jwt-session-token',
+                expiresAt: '2027-07-05T00:00:00.000Z',
+              },
+              expiresAt: '2027-07-05T00:00:00.000Z',
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
     );
   });
 
@@ -1856,54 +1866,51 @@ describe('LoginAndSettingsModal agent token login', () => {
     delete global.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__;
   });
 
-  it.each(['legacy', 'hosted HTTP'])(
-    'supports %s agent-token login and clears raw tokens after exchange',
-    async (kind) => {
-      const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-      profile.surfaces.agentHttp = true;
-      const props = buildProps({
-        activeSessionSlug: 'alpha',
-        sessionConfig:
-          kind === 'legacy'
-            ? { slug: 'alpha', telegramOnly: true, sessionMode: 'telegram_only' }
-            : {
-                slug: 'alpha',
-                sessionId: '0x00112233445566778899aabbccddeeff',
-                corsWorkerUrl: 'https://session-worker.example',
-                sessionModeProfile: profile,
-              },
-      });
-      render(<LoginAndSettingsModal {...props} />);
+  it.each(['hosted HTTP'])('supports %s agent-token login and clears raw tokens after exchange', async (kind) => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.surfaces.agentHttp = true;
+    const props = buildProps({
+      activeSessionSlug: 'alpha',
+      sessionConfig:
+        kind === 'legacy'
+          ? { slug: 'alpha', telegramOnly: true, sessionMode: 'telegram_only' }
+          : {
+              slug: 'alpha',
+              sessionId: '0x00112233445566778899aabbccddeeff',
+              corsWorkerUrl: 'https://session-worker.example',
+              sessionModeProfile: profile,
+            },
+    });
+    render(<LoginAndSettingsModal {...props} />);
 
-      fireEvent.click(screen.getByTestId('ce-agent-token-login-toggle'));
-      const input = screen.getByTestId('ce-agent-token-login-input');
-      fireEvent.change(input, { target: { value: RAW_AGENT_TOKEN } });
+    fireEvent.click(screen.getByTestId('ce-agent-token-login-toggle'));
+    const input = screen.getByTestId('ce-agent-token-login-input');
+    fireEvent.change(input, { target: { value: RAW_AGENT_TOKEN } });
 
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('ce-agent-token-login-submit'));
-        await Promise.resolve();
-        await Promise.resolve();
-      });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('ce-agent-token-login-submit'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
-      await waitFor(() => {
-        expect(props.updateLoginInfo).toHaveBeenCalledWith(
-          expect.objectContaining({
-            loginComplete: true,
-            provider: 'agent_token',
-          }),
-        );
-      });
+    await waitFor(() => {
+      expect(props.updateLoginInfo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          loginComplete: true,
+          provider: 'agent_token',
+        }),
+      );
+    });
 
-      expect(input).toHaveValue('');
-      expect(window.location.href).not.toContain(RAW_AGENT_TOKEN);
-      expect(JSON.stringify(window.localStorage)).not.toContain(RAW_AGENT_TOKEN);
-      expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_AGENT_TOKEN);
-      expect(Object.values(window.sessionStorage).join('\n')).not.toContain('bridge-browser-token');
-      expect(Object.values(window.sessionStorage).join('\n')).not.toContain('jwt-session-token');
-      expect(JSON.stringify(props.changeAccount.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
-      expect(JSON.stringify(props.updateLoginInfo.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
-    },
-  );
+    expect(input).toHaveValue('');
+    expect(window.location.href).not.toContain(RAW_AGENT_TOKEN);
+    expect(JSON.stringify(window.localStorage)).not.toContain(RAW_AGENT_TOKEN);
+    expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_AGENT_TOKEN);
+    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('bridge-browser-token');
+    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('jwt-session-token');
+    expect(JSON.stringify(props.changeAccount.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
+    expect(JSON.stringify(props.updateLoginInfo.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
+  });
 
   it('keeps token login hidden when the hosted profile explicitly disables HTTP despite legacy flags', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);

@@ -847,6 +847,11 @@ export default function OnePageSessionStandardShell({
           </div>
           {showResults && (
             <div className={styles.miniSectionContent}>
+              {generatedState.adminAuthorized === true && generatedState.lastFailure ? (
+                <div className={styles.generatedResultsStatus} role="status">
+                  {String(generatedState.lastFailure)}
+                </div>
+              ) : null}
               <div>
                 {showTopicPreview && effectiveResultsViewMode === 'debateAtlas' && <ReverseAlignmentTopicMap />}
                 {effectiveResultsViewMode === 'polis' && (
@@ -923,7 +928,6 @@ export default function OnePageSessionStandardShell({
                   <div className={styles.generatedResultsPanel} data-testid="ce-session-generated-results-panel">
                     <div className={styles.generatedResultsStatus}>
                       <span>{String(generatedState.statusLabel || '')}</span>
-                      {generatedState.lastFailure ? <span>{String(generatedState.lastFailure)}</span> : null}
                     </div>
                     {generatedState.artifact ? (
                       <Suspense fallback={<LazyFallback label="Loading generated AI view..." minHeight="30vh" />}>

@@ -2,14 +2,14 @@
  * @file rpcReadCache.ts
  * @module rpcReadCache
  * @description RPC response caching layer — wraps ethers JsonRpcProvider.send() with
- *              in-flight dedup, short TTL caching for "latest" reads, and immutable caching for block-range queries.
+ *              in-flight dedup, short TTL caching near the head, and longer caching for older block-range queries.
  *
  * Key exports: wrapEthersJsonRpcSend
  */
 // Wrap Ethers JsonRpcProvider `.send()` with:
 // - in-flight dedupe for safe read methods
 // - short TTL caching for "latest" reads (blockNumber, eth_call, getLogs)
-// - immutable caching for numeric block ranges / blockTags
+// - longer caching for numeric block ranges / blockTags more than 64 blocks behind the observed head
 //
 // Correctness notes:
 // - Never caches write methods.
@@ -26,6 +26,7 @@ type RpcCacheMethod = 'eth_call' | 'eth_getLogs' | 'eth_blockNumber' | 'eth_chai
 type ProviderSend = (methodIn: string, paramsIn: unknown[]) => Promise<unknown>;
 
 interface RpcCacheEntry {
+  cachedAt: number;
   expiresAt: number;
   value: unknown;
 }
@@ -51,6 +52,7 @@ interface RpcReadCacheState {
   cacheByMethod: RpcCacheByMethod;
   rateLimits: Map<string, RpcRateLimitState>;
   rateLimitTails: Map<string, Promise<void>>;
+  heads: Map<string, number>;
 }
 
 interface ProviderDebugContext extends LooseObject {
@@ -114,6 +116,7 @@ const createGlobalCacheState = (): RpcReadCacheState => ({
   cacheByMethod: createCacheByMethod(),
   rateLimits: new Map<string, RpcRateLimitState>(),
   rateLimitTails: new Map<string, Promise<void>>(),
+  heads: new Map<string, number>(),
 });
 
 const getGlobalObject = (): RpcCacheGlobals =>
@@ -350,9 +353,12 @@ const buildMethodKeyPart = (methodIn: unknown, paramsIn: unknown): string => {
   return `${method}:${stableKeyStringify(params)}`;
 };
 
-const resolveTtlMs = (methodIn: unknown, paramsIn: unknown): number => {
+const resolveTtlMs = (methodIn: unknown, paramsIn: unknown, head: number | undefined): number => {
   const method = toStr(methodIn).trim();
   const params: RpcParams = Array.isArray(paramsIn) ? paramsIn : [];
+  // A numeric block can still be replaced. Unknown heads are conservative too.
+  const numericTtl = (block: string): number =>
+    head !== undefined && Number(block) < head - 64 ? 10 * 60 * 1000 : 2000;
 
   if (method === 'eth_chainId') return 60 * 60 * 1000;
   if (method === 'eth_blockNumber') return 2000;
@@ -360,7 +366,7 @@ const resolveTtlMs = (methodIn: unknown, paramsIn: unknown): number => {
   if (method === 'eth_call') {
     const blockTag = normalizeBlockTag(params[1]);
     if (blockTag === 'latest' || blockTag === 'pending') return 2000;
-    if (isNumericHex(blockTag)) return 10 * 60 * 1000;
+    if (isNumericHex(blockTag)) return numericTtl(blockTag);
     return 2000;
   }
 
@@ -370,8 +376,7 @@ const resolveTtlMs = (methodIn: unknown, paramsIn: unknown): number => {
     const toBlock = normalizeBlockTag(filter.toBlock);
     const isLatest = fromBlock === 'latest' || fromBlock === 'pending' || toBlock === 'latest' || toBlock === 'pending';
     if (isLatest) return 2000;
-    // Treat numeric ranges as immutable (hash includes range).
-    if ((isNumericHex(fromBlock) || fromBlock === 'earliest') && isNumericHex(toBlock)) return 10 * 60 * 1000;
+    if ((isNumericHex(fromBlock) || fromBlock === 'earliest') && isNumericHex(toBlock)) return numericTtl(toBlock);
     return 2000;
   }
 
@@ -408,6 +413,9 @@ const getGlobalCache = (): RpcReadCacheState => {
   }
   if (!(g.__CE_RPC_READ_CACHE__.rateLimitTails instanceof Map)) {
     g.__CE_RPC_READ_CACHE__.rateLimitTails = new Map<string, Promise<void>>();
+  }
+  if (!(g.__CE_RPC_READ_CACHE__.heads instanceof Map)) {
+    g.__CE_RPC_READ_CACHE__.heads = new Map<string, number>();
   }
   return g.__CE_RPC_READ_CACHE__;
 };
@@ -732,7 +740,8 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
     }
 
     const cacheOff = isCacheDisabled();
-    const ttlMs = !cacheOff && wantsTtl ? resolveTtlMs(method, params) : 0;
+    const globalCache = getGlobalCache();
+    const ttlMs = !cacheOff && wantsTtl ? resolveTtlMs(method, params, globalCache.heads.get(providerInstanceId)) : 0;
     const shouldDedupe = !cacheOff && wantsDedupe;
     const isDebug = isRpcDebugEnabled();
 
@@ -753,7 +762,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
     if (ttlMs > 0) {
       const cacheMap = getCacheMapForMethod(method);
       const cached = cacheMap ? cacheLruGet(cacheMap, keyHash) : null;
-      if (cached && typeof cached === 'object' && Number(cached.expiresAt || 0) > nowMs()) {
+      if (cached && Math.min(cached.expiresAt, cached.cachedAt + ttlMs) > nowMs()) {
         if (isDebug) {
           rpcDebugRecord({
             chainId,
@@ -793,7 +802,6 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
       throw backoffError;
     }
 
-    const globalCache = getGlobalCache();
     if (shouldDedupe) {
       const inflight = globalCache.inflight.get(keyHash);
       if (inflight) {
@@ -822,12 +830,27 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
 
     try {
       const result = await run;
+      const observedHead =
+        method === 'eth_blockNumber'
+          ? Number(result)
+          : method === 'eth_getBlockByNumber' && normalizeBlockTag(params[0]) === 'latest' && isObj(result)
+            ? Number(result.number)
+            : NaN;
+      if (Number.isSafeInteger(observedHead) && observedHead >= 0) {
+        cacheLruSet(
+          globalCache.heads,
+          providerInstanceId,
+          Math.max(observedHead, globalCache.heads.get(providerInstanceId) ?? 0),
+          50,
+        );
+      }
       const elapsed = nowMs() - t0;
       if (ttlMs > 0) {
         const cacheMap = getCacheMapForMethod(method);
         const limit = METHOD_CACHE_LIMITS[method as RpcCacheMethod] || 0;
         if (cacheMap) {
-          cacheLruSet(cacheMap, keyHash, { value: result, expiresAt: nowMs() + ttlMs }, limit);
+          const cachedAt = nowMs();
+          cacheLruSet(cacheMap, keyHash, { value: result, cachedAt, expiresAt: cachedAt + ttlMs }, limit);
         }
       }
       if (isDebug) {
@@ -891,6 +914,7 @@ export const __test__resetRpcReadCache = (): void => {
       g.__CE_RPC_READ_CACHE__.cacheByMethod = createCacheByMethod();
       g.__CE_RPC_READ_CACHE__.rateLimits = new Map<string, RpcRateLimitState>();
       g.__CE_RPC_READ_CACHE__.rateLimitTails = new Map<string, Promise<void>>();
+      g.__CE_RPC_READ_CACHE__.heads = new Map<string, number>();
     } catch (e) {
       log.warn('rpcReadCache: fallback', e);
     }

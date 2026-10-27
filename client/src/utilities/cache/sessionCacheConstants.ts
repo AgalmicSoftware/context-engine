@@ -6,6 +6,9 @@ import managedCacheNamespaces from './managedCacheNamespaces.json';
 
 export const SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX = 'dg:sessionFallbackRedirectSeen:';
 
+// bookmarksCache and filters hold user-authored data. analysisCache mixes retained
+// Results artifacts with expiring generated profile summaries; preserve both on writes.
+// questionsCache, surveysCache, sbtCache and userCache contain rebuildable remote data.
 export const DG_MANAGED_CACHE_NAMESPACE_LIST = Object.freeze([...managedCacheNamespaces.managedNamespaces]);
 
 export const DG_MANAGED_CACHE_NAMES = new Set(DG_MANAGED_CACHE_NAMESPACE_LIST);

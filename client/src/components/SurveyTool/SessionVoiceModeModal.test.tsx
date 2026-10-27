@@ -148,30 +148,73 @@ describe('SessionVoiceModeModal', () => {
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'idle', recommendations: [] });
   });
 
-  it('keeps imported review edits until discard is explicitly confirmed', async () => {
+  it('retains review edits and progress through close/reopen, and clears them only on discard', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'Draft answer' }]);
-    render(
-      <SessionVoiceModeModal
-        {...baseProps}
-        mode="interview"
-        prefillPacket={{
-          version: 1,
-          sessionSlug: 'demo',
-          source: { platform: 'other', modelId: 'unknown', verification: 'self_reported' },
-          responderContext: { summary: 'Synthetic context' },
-        }}
-      />,
-    );
+    const onInterviewProgressChange = jest.fn();
+    const props = {
+      ...baseProps,
+      mode: 'interview' as const,
+      onInterviewProgressChange,
+      prefillPacket: {
+        version: 1 as const,
+        sessionSlug: 'demo',
+        source: { platform: 'other' as const, modelId: 'unknown', verification: 'self_reported' as const },
+        responderContext: { summary: 'Synthetic context' },
+      },
+    };
+    const view = render(<SessionVoiceModeModal {...props} />);
     await editReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
+    await waitFor(() => expect(onInterviewProgressChange).toHaveBeenLastCalledWith(true));
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(baseProps.onClose).not.toHaveBeenCalled();
+    expect(baseProps.onClose).toHaveBeenCalledTimes(1);
+    view.rerender(<SessionVoiceModeModal {...props} isOpen={false} />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(onInterviewProgressChange).toHaveBeenLastCalledWith(true);
+    view.rerender(<SessionVoiceModeModal {...props} />);
+    await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
+    expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Discard interview' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Keep reviewing' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Keep reviewing' })).not.toBeInTheDocument());
     await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Discard interview' }));
-    expect(baseProps.onClose).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Discard interview' }));
+    const confirmation = await screen.findByRole('dialog', { name: 'Discard this interview?' });
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Discard interview' }));
+    await waitFor(() => expect(onInterviewProgressChange).toHaveBeenLastCalledWith(false));
+    expect(baseProps.onClose).toHaveBeenCalledTimes(2);
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+    expect(screen.queryByText('My unsaved edit')).not.toBeInTheDocument();
+  });
+
+  it('retains edits for the same packet but starts a new review for replacement evidence', async () => {
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      source: { platform: 'other' as const, modelId: 'fixture', verification: 'self_reported' as const },
+      responderContext: {},
+      responses: [{ questionId: 'q1', answer: 'First imported answer', confidence: 0.8 }],
+    };
+    const props = { ...baseProps, mode: 'interview' as const, prefillPacket };
+    const view = render(<SessionVoiceModeModal {...props} />);
+    await editReadableDraftText('Draft answer for What matters?', 'My retained edit');
+    view.rerender(<SessionVoiceModeModal {...props} isOpen={false} />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    view.rerender(<SessionVoiceModeModal {...props} prefillPacket={{ ...prefillPacket }} />);
+    await expectReadableDraftText('Draft answer for What matters?', 'My retained edit');
+    view.rerender(<SessionVoiceModeModal {...props} isOpen={false} />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    view.rerender(
+      <SessionVoiceModeModal
+        {...props}
+        prefillPacket={{
+          ...prefillPacket,
+          responses: [{ questionId: 'q1', answer: 'Replacement answer', confidence: 0.8 }],
+        }}
+      />,
+    );
+    await expectReadableDraftText('Draft answer for What matters?', 'Replacement answer');
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+    expect(mockedMapInterviewEvidenceToResponses).not.toHaveBeenCalled();
   });
 
   it('reports unusable voice context before starting the recorder', async () => {
@@ -377,6 +420,7 @@ describe('SessionVoiceModeModal', () => {
   });
 
   it('submits reviewed values and retains edited unselected predictions only as consented metadata', async () => {
+    const onInterviewProgressChange = jest.fn();
     const prefillPacket = {
       version: 1 as const,
       sessionSlug: 'demo',
@@ -393,6 +437,7 @@ describe('SessionVoiceModeModal', () => {
       <SessionVoiceModeModal
         {...baseProps}
         mode="interview"
+        onInterviewProgressChange={onInterviewProgressChange}
         prefillPacket={prefillPacket}
         questionPool={[...baseProps.questionPool, { id: 'q2', prompt: 'Second question?', type: 'freeform' }]}
         renderFieldLock={(id, field) => <button type="button" aria-label={`Privacy ${id} ${field}`} />}
@@ -442,8 +487,10 @@ describe('SessionVoiceModeModal', () => {
     ).not.toBeInTheDocument();
     expect(metadata).toHaveTextContent('1 selected draft and 1 unselected draft');
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+    expect(onInterviewProgressChange).toHaveBeenLastCalledWith(true);
     fireEvent.click(screen.getByRole('button', { name: 'Submit responses' }));
     await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onInterviewProgressChange).toHaveBeenLastCalledWith(false));
     expect(baseProps.onApplyAnswer).toHaveBeenCalledTimes(1);
     expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Edited one');
     expect(baseProps.onApplyAdditional).toHaveBeenCalledWith('q1', 'Edited explanation');
@@ -1174,6 +1221,35 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId('mock-group-listening')).toHaveAttribute('data-embedded', 'true');
   });
 
+  it('stops audio on close while retaining the transcript for continuing the interview', async () => {
+    const stop = jest.fn(async () => ({ transcript: 'Responder: Synthetic retained answer.', turns: [] }));
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      options.onRecordingState?.('recording');
+      options.onTranscript?.('Responder: Synthetic retained answer.', []);
+      return {
+        mediaStream: { getTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream,
+        pause: jest.fn(),
+        resume: jest.fn(),
+        stop,
+        getTranscript: () => 'Responder: Synthetic retained answer.',
+      };
+    });
+    const onInterviewProgressChange = jest.fn();
+    const props = { ...baseProps, mode: 'interview' as const, onInterviewProgressChange };
+    const view = render(<SessionVoiceModeModal {...props} />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    await waitFor(() => expect(onInterviewProgressChange).toHaveBeenLastCalledWith(true));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    view.rerender(<SessionVoiceModeModal {...props} isOpen={false} />);
+    await waitFor(() => expect(stop).toHaveBeenCalledTimes(1));
+    expect(onInterviewProgressChange).toHaveBeenLastCalledWith(true);
+    view.rerender(<SessionVoiceModeModal {...props} />);
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveTextContent('Continue interview');
+    expect(mockedMapInterviewEvidenceToResponses).not.toHaveBeenCalled();
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+  });
+
   it('prevents duplicate realtime sessions and stops a late connection after the modal closes', async () => {
     const stop = jest.fn(async () => ({ transcript: '', turns: [] }));
     let resolveSession: ((session: Awaited<ReturnType<typeof startSessionRealtimeInterview>>) => void) | null = null;
@@ -1200,7 +1276,7 @@ describe('SessionVoiceModeModal', () => {
     });
     expect(baseProps.onClose).toHaveBeenCalledTimes(1);
 
-    view.unmount();
+    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" isOpen={false} />);
     await act(async () => {
       resolveSession?.({
         mediaStream: { getTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream,

@@ -394,20 +394,30 @@
 
 // Only a quadratic footer with visible navigation needs the compact row.
 .footerRow:has(.scrollControls) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
 
   > :global([class*='importanceSlider']) {
-    flex: 0 0 auto;
+    grid-column: 1;
+    grid-row: 1;
     width: auto;
     min-width: 0;
     margin-bottom: 0;
 
+    // Expanded ratings occupy their own row below the centered option arrows.
     &:has(input[type='range']) {
-      flex-basis: 100%;
+      grid-column: 1 / -1;
+      grid-row: 2;
       width: 100%;
     }
+  }
+
+  > :last-child:not(.scrollSlot):not(:global([class*='importanceSlider'])) {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
   }
 
   :global([class*='convictionToggleStack']) {
@@ -430,6 +440,8 @@
   }
 
   .scrollControls {
+    grid-column: 2;
+    grid-row: 1;
     grid-template-columns: 32px 32px;
     gap: 4px;
   }

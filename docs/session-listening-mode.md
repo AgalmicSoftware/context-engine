@@ -148,7 +148,8 @@ by session time. Supported legacy Realtime sessions retain completed responder
 transcriptions and interviewer output turns, deduplicating repeated completion events.
 **Continue interview** continues the existing conversation. Each round appends to the transcript, and mapping reviews the combined evidence alongside earlier predictions and user-reviewed responses. Changed predictions retain numbered versions with model IDs in local review state; consented research submission includes those versions and applies the same answer/comment encryption redaction to every version. Research controls also appear after a voice-only continuation revises a prediction. Declining research excludes the history from submitted metadata. Existing matches are retained, untouched AI fields can be refined, and user edits and excluded drafts are preserved. Suggested question prompts and tags also survive continuation; only novel suggestions are appended. A failed connection or a round with no new speech leaves the previous review intact. Closing the Interview dialog still ends this in-memory review.
 New speech is mapped even if the interview started with imported predictions. When the call ends, the responder can
-expand a read-only transcript disclosure while `gpt-5.6-terra` with medium reasoning effort and standard processing (`service_tier: default`)
+expand a read-only transcript disclosure while the session's configured thinking model,
+with at most 8,000 output tokens and reasoning effort capped by the owner's setting,
 maps the transcript and any responder context imported by an AI prefill link
 to response drafts. Imported context remains editable in a collapsed
 **Imported responder context** disclosure; during a normal voice-only interview

@@ -219,11 +219,8 @@ import {
   buildQuestionDashboardLoadContextSignature,
   buildQuestionFilterStorageKeyPrefix,
   buildQuestionIdScopeSignature,
-  buildDraftAnswersByQuestionId,
   buildDraftHydrationPatchForQuestion,
   buildDraftHydrationRunPlan,
-  buildDraftAwareCacheHydrationState,
-  buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
   applyPriorResponseFetchSuccessEffects,
   buildPriorResponseFetchPlan,
@@ -296,7 +293,6 @@ import {
   isIncomingResponseMetaNewer,
   isSurveyToolFilterStateActive,
   mergeDecryptedViewedResponse,
-  mergeQuestionResponses,
   mergeSurveyResponsePayloads,
   normalizeQuestionIdKey,
   normalizeSessionSlugValue,
@@ -348,18 +344,13 @@ import {
   bumpSurveyPerfCounter,
 } from './surveyToolUtils';
 import {
-  buildSurveyLocalCacheSlice,
-  executeSurveyResponsePrefill,
   executeSurveySingleQuestionPrefill,
   executeSurveyDraftHydration,
-  executeSurveyLocalCacheRehydrate,
   executeSurveyPriorResponseBackfill,
   resolveSurveyMissingRenderedResponseLookup,
 } from './surveyToolHydrationController';
 import {
   executeSurveyExitEditing,
-  executeSurveyFormStateReset,
-  executeSurveyPendingRevert,
   executeSurveyStartFresh,
   shouldSurveyAutoStartFresh,
 } from './surveyToolResponseResetController';
@@ -385,11 +376,7 @@ import {
   resolveSingleQuestionCacheState,
 } from './surveyToolSingleQuestionMetadataController';
 import { resolveSingleQuestionMetadataBootstrap } from './surveyToolSingleQuestionMetadataBootstrapController';
-import {
-  areSurveyResponsesConsistent,
-  resolveSurveyBaselineSourceSlice,
-  resolveSurveyUserAnswersSlice,
-} from './surveyToolResponseSourceController';
+import { areSurveyResponsesConsistent, resolveSurveyUserAnswersSlice } from './surveyToolResponseSourceController';
 import { buildAnswerUpdatePlan, buildAdditionalUpdatePlan } from './surveyToolResponseMutationController';
 import { buildResponsePayload } from './surveyToolResponsePayloadController';
 import {
@@ -1073,7 +1060,6 @@ const SurveyQuestionsInner = (
   };
 
   const surveyQuestionsRuntimeMethods = createSurveyQuestionsRuntimeMethods({
-    DEBUG_PREFILL,
     Dropdown,
     DropdownMenu,
     DropdownToggle,
@@ -1122,7 +1108,6 @@ const SurveyQuestionsInner = (
     applyQuestionDecryptFailureStatusHelper,
     applySurveyDecryptStaleStatusHelper,
     applySurveyQuestionsRuntimeInitialState,
-    areEnvelopesEquivalent,
     areQuestionPayloadsEquivalent,
     areSurveyResponsesConsistent,
     bottomRef,
@@ -1160,8 +1145,6 @@ const SurveyQuestionsInner = (
     buildDecryptingByKeyState,
     buildDisplayAnswerModeState,
     buildDisplayAnswerModeToggleState,
-    buildDraftAnswersByQuestionId,
-    buildDraftAwareCacheHydrationState,
     buildDraftHydrationPatchForQuestion,
     buildDraftHydrationRunPlan,
     buildEditStatsState,
@@ -1177,7 +1160,6 @@ const SurveyQuestionsInner = (
     buildGatedPromptNoticeState,
     buildGroupedRenderedResponseScopePlan,
     buildHasherState,
-    buildHydratedResponseSlice,
     buildHydratingPriorResponsesState,
     buildIndexedQuestionEntryKeys,
     buildInheritedAdditionalFieldStateCore,
@@ -1277,7 +1259,6 @@ const SurveyQuestionsInner = (
     buildSurveyDraftStorageKey,
     buildSurveyDraftStorageVariantKeys,
     buildSurveyJsonToggleState,
-    buildSurveyLocalCacheSlice,
     buildSurveyQuestionPoolLoadState,
     buildSurveyQuestionsAuthoringPanelDisplayState,
     buildSurveyQuestionsAuthoringRouteReadinessDescriptor,
@@ -1338,11 +1319,7 @@ const SurveyQuestionsInner = (
     executePriorResponseFetchPlan,
     executeSurveyDraftHydration,
     executeSurveyExitEditing,
-    executeSurveyFormStateReset,
-    executeSurveyLocalCacheRehydrate,
-    executeSurveyPendingRevert,
     executeSurveyPriorResponseBackfill,
-    executeSurveyResponsePrefill,
     executeSurveySingleQuestionPrefill,
     executeSurveyStartFresh,
     executeViewedSingleQuestionResponseBootstrap,
@@ -1421,7 +1398,6 @@ const SurveyQuestionsInner = (
     mergePersistedDraftPayloads,
     mergeQuestionRatingEnvelopeStateHelper,
     mergeQuestionResponseOverrideIntoDecryptSliceHelper,
-    mergeQuestionResponses,
     mergeSurveyResponsePayloads,
     normalizeBulkDecryptedSliceForSurveyStateHelper,
     normalizeFieldAudienceModeCore,
@@ -1511,7 +1487,6 @@ const SurveyQuestionsInner = (
     resolveSlugForIds,
     resolveSubmitEffectiveDraftSlug,
     resolveSubmittedCacheWriteContext,
-    resolveSurveyBaselineSourceSlice,
     resolveSurveyMissingRenderedResponseLookup,
     resolveSurveyQuestionsSubmitPendingStats,
     resolveSurveyQuestionsSubmittedResponseUrl,

@@ -30,6 +30,38 @@ const upsertMeta = (html, attributeName, attributeValue, content) => {
   return pattern.test(html) ? html.replace(pattern, tag) : insertBeforeHeadClose(html, tag);
 };
 
+const removeMeta = (html, attributeName, attributeValue) => {
+  const pattern = new RegExp(
+    `[ \\t]*<meta\\b(?=[^>]*\\b${escapeRegExp(attributeName)}=(['"])${escapeRegExp(attributeValue)}\\1)[^>]*>[ \\t]*\\r?\\n?`,
+    'gi',
+  );
+  return html.replace(pattern, '');
+};
+
+// Site-wide preview properties that describe the default poster or the product
+// film. Pages with their own image (posts) must not inherit them.
+const DEFAULT_PREVIEW_MEDIA_META = [
+  ['property', 'og:image:type'],
+  ['property', 'og:image:width'],
+  ['property', 'og:image:height'],
+  ['property', 'og:image:alt'],
+  ['name', 'twitter:image:alt'],
+  ['property', 'og:video'],
+  ['property', 'og:video:url'],
+  ['property', 'og:video:secure_url'],
+  ['property', 'og:video:type'],
+  ['property', 'og:video:width'],
+  ['property', 'og:video:height'],
+  ['name', 'twitter:player'],
+  ['name', 'twitter:player:width'],
+  ['name', 'twitter:player:height'],
+  ['name', 'twitter:player:stream'],
+  ['name', 'twitter:player:stream:content_type'],
+];
+
+const removeDefaultPreviewMediaMeta = (html) =>
+  DEFAULT_PREVIEW_MEDIA_META.reduce((acc, [attributeName, attributeValue]) => removeMeta(acc, attributeName, attributeValue), html);
+
 const upsertCanonical = (html, href) => {
   const pattern = /<link\b(?=[^>]*\brel=(['"])canonical\1)[^>]*>/i;
   const tag = `<link rel="canonical" href="${escapeHtmlAttribute(href)}" />`;
@@ -65,7 +97,7 @@ const renderPostSocialPreviewHtml = (baseHtml, post, { siteUrl = DEFAULT_PUBLIC_
   const imageUrl = resolvePostAssetUrl(post?.headerImage?.src, normalizedSiteUrl);
   const imageAlt = toTrimmedString(post?.headerImage?.alt);
 
-  let rendered = upsertTitle(html, title);
+  let rendered = removeDefaultPreviewMediaMeta(upsertTitle(html, title));
   rendered = upsertMeta(rendered, 'name', 'description', description);
   rendered = upsertMeta(rendered, 'property', 'og:type', 'article');
   rendered = upsertMeta(rendered, 'property', 'og:url', canonicalUrl);
@@ -75,7 +107,10 @@ const renderPostSocialPreviewHtml = (baseHtml, post, { siteUrl = DEFAULT_PUBLIC_
     rendered = upsertMeta(rendered, 'property', 'og:image', imageUrl);
     rendered = upsertMeta(rendered, 'name', 'twitter:image', imageUrl);
   }
-  if (imageAlt) rendered = upsertMeta(rendered, 'property', 'og:image:alt', imageAlt);
+  if (imageAlt && imageUrl) {
+    rendered = upsertMeta(rendered, 'property', 'og:image:alt', imageAlt);
+    rendered = upsertMeta(rendered, 'name', 'twitter:image:alt', imageAlt);
+  }
   rendered = upsertMeta(rendered, 'name', 'twitter:card', imageUrl ? 'summary_large_image' : 'summary');
   rendered = upsertMeta(rendered, 'name', 'twitter:title', title);
   rendered = upsertMeta(rendered, 'name', 'twitter:description', description);
@@ -110,8 +145,55 @@ const writePostSocialPreviewHtml = ({ buildDir, postsDir, siteUrl = DEFAULT_PUBL
   return written;
 };
 
+// Static, crawler-facing copies of SPA routes that keep the site-wide preview
+// (poster + product film) but need their own canonical URL, e.g. /about.
+const SAFE_STATIC_PAGE_PATH_RE = /^\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/;
+
+const renderStaticPageSocialPreviewHtml = (baseHtml, page, { siteUrl = DEFAULT_PUBLIC_SITE_URL } = {}) => {
+  const pagePath = toTrimmedString(page?.path);
+  if (!SAFE_STATIC_PAGE_PATH_RE.test(pagePath)) throw new Error(`Unsafe static page path: ${pagePath || '(empty)'}`);
+  const canonicalUrl = new URL(pagePath, new URL(siteUrl).toString()).toString();
+  let rendered = String(baseHtml || '');
+  if (page?.title) {
+    rendered = upsertTitle(rendered, page.title);
+    rendered = upsertMeta(rendered, 'property', 'og:title', page.title);
+    rendered = upsertMeta(rendered, 'name', 'twitter:title', page.title);
+  }
+  if (page?.description) {
+    rendered = upsertMeta(rendered, 'name', 'description', page.description);
+    rendered = upsertMeta(rendered, 'property', 'og:description', page.description);
+    rendered = upsertMeta(rendered, 'name', 'twitter:description', page.description);
+  }
+  rendered = upsertMeta(rendered, 'property', 'og:url', canonicalUrl);
+  rendered = upsertCanonical(rendered, canonicalUrl);
+  return rendered;
+};
+
+const writeStaticPageSocialPreviewHtml = ({ buildDir, pages = [], siteUrl = DEFAULT_PUBLIC_SITE_URL }) => {
+  const outputDir = path.resolve(buildDir);
+  const indexPath = path.resolve(outputDir, 'index.html');
+  if (!fs.existsSync(indexPath)) return [];
+  const baseHtml = fs.readFileSync(indexPath, 'utf8');
+  const written = [];
+  for (const page of pages) {
+    const rendered = renderStaticPageSocialPreviewHtml(baseHtml, page, { siteUrl });
+    const relative = toTrimmedString(page.path).replace(/^\/+/, '');
+    const nestedPath = path.resolve(outputDir, relative, 'index.html');
+    const cleanUrlPath = path.resolve(outputDir, `${relative}.html`);
+    if (!nestedPath.startsWith(`${outputDir}${path.sep}`)) throw new Error(`Unsafe static page path: ${page.path}`);
+    fs.mkdirSync(path.dirname(nestedPath), { recursive: true });
+    fs.writeFileSync(nestedPath, rendered);
+    fs.writeFileSync(cleanUrlPath, rendered);
+    written.push(nestedPath, cleanUrlPath);
+  }
+  return written;
+};
+
 export {
   DEFAULT_PUBLIC_SITE_URL,
+  removeDefaultPreviewMediaMeta,
   renderPostSocialPreviewHtml,
+  renderStaticPageSocialPreviewHtml,
   writePostSocialPreviewHtml,
+  writeStaticPageSocialPreviewHtml,
 };

@@ -10,7 +10,10 @@ self-declared agent marker and, optionally, the agent's display name.
 It runs locally as a stdio MCP server, like any other tool server an agent
 host starts (Claude Code, Codex, OpenClaw, an AT Protocol agent using
 `at_mcp`, and so on). Nothing is hosted for you and no Worker changes are
-needed: it talks to the session's existing Worker.
+needed: it talks to the session's existing Worker. Ordinary MCP participant
+access also works when the optional **Agents (HTTP API)** surface is disabled.
+That scoped API and Session Wrapped now run in the same Worker, with separate
+fresh credentials; there is no Bridge deployment or credential migration.
 
 Hosted links include `?worker=<origin>`. Normal links such as
 `https://contextengine.sh/session/<slug>` use the OP Sepolia session registry.
@@ -21,17 +24,22 @@ means for session admins and readers.
 
 ## Install
 
-Requires Node `^20.19.0` or `>=22.12.0`. Start the published package without a
+Requires Node `^20.19.0` or `>=22.12.0`. Start the latest published package without a
 checkout:
 
 ```sh
-npx -y @agalmic/contextengine@0.1.0
+npx -y --prefer-online @agalmic/contextengine@latest
 ```
 
 The npm package is `@agalmic/contextengine`; its installed executable remains
 `contextengine`. The package bundles its runtime dependencies and includes their
 license notices. Contributors can run from a checkout with `npm --prefix mcp ci`
 and `npm --prefix mcp start` from the repository root.
+
+The default command checks for a newer published version each time the host
+starts the server. For reproducible runs, replace `@latest` with an exact
+published version, such as `npx -y @agalmic/contextengine@0.1.2` once 0.1.2 is
+published. A running server does not update itself.
 
 ## Connect an agent
 
@@ -52,7 +60,7 @@ Claude Code and most MCP hosts accept a JSON configuration like this:
   "mcpServers": {
     "context-engine": {
       "command": "npx",
-      "args": ["-y", "@agalmic/contextengine@0.1.0"],
+      "args": ["-y", "--prefer-online", "@agalmic/contextengine@latest"],
       "env": {
         "CE_MCP_STATE_DIR": "/absolute/path/to/.context-engine-agent",
         "CE_MCP_DISPLAY_NAME": "your-handle.delve.town",
@@ -67,6 +75,11 @@ Claude Code and most MCP hosts accept a JSON configuration like this:
 With Claude Code, save it as `mcp.json` and start a session with
 `claude --mcp-config mcp.json`, or add it alongside other servers such as
 `at_mcp` in the same file.
+
+Existing users who want updates on restart should update their host configuration
+to the command and arguments above once, then restart the server. Keep the same
+state directory to retain the agent's identity. Exact version pins remain an
+option for reproducible runs.
 
 Then ask the agent to join with the session link it was given:
 
@@ -116,7 +129,10 @@ unknown `CE_MCP_*` name.
 - **The key is the identity.** `agent-key.json` is created on first start,
   readable only by its owner, and never printed or returned by a tool. Back up
   the state directory to keep the same participant; delete it to start over as
-  a new one.
+  a new one. `state.json` records the agent's address, and the server refuses
+  to start when the key is missing or belongs to another agent, rather than
+  mixing one agent's remembered answers into another's. Restore both files
+  together, or move `state.json` aside to start as a new agent.
 - **Agent answers are labeled, not verified.** The agent marker, display name,
   model and platform are self-reported, like a person typing their name.
 - **Public sessions are public.** When a session publishes its results, anyone
@@ -155,8 +171,9 @@ unknown `CE_MCP_*` name.
   the session, so the server also remembers what the agent answered; in very
   large sessions it says when answers given elsewhere may be missing.
 
-Repository source is prepared as 0.1.1. The pinned npm examples above remain on
-published 0.1.0 until that separate package release is available. Source 0.1.1
+The 0.8.0 application release prepares MCP 0.1.2 for separate npm publication.
+The `@latest` command uses the most recent published version until 0.1.2 is
+published. Source 0.1.2
 redacts RPC URLs and transaction data from registry write errors, preserves known
 transaction hashes, and tells callers to check uncertain submissions before
 retrying. If local answer-history storage fails after a successful upload or
@@ -190,7 +207,11 @@ manifest, with the session's Surveys address when supplied.
 
 Arweave propagation can delay reads. The running agent remembers confirmed
 writes, and its own answers also persist in its state directory. Question
-scans resume from an in-memory watermark. Answer scans read new blocks first
+scans resume from an in-memory watermark. If the RPC cannot verify the saved
+block hash, both readers keep their previous results and cursors and report
+incomplete data until that mark can be checked. Answer reads also retain newly
+confirmed writes from the running agent, without replacing newer chain answers.
+Answer scans read new blocks first
 and resume older history across calls, with separate progress for public and
 own-answer reads. Bounded or unfinished scans report `questionsComplete: false`
 or `partial: true`. Saved plaintext is not restored over an incomplete
@@ -236,9 +257,21 @@ From the repository root, install root and MCP dependencies, then run
 `npm run test:mcp` and `npm run test:mcp:pack`. The pack smoke installs the
 tarball offline into an empty project and checks the executable over stdio.
 
-The package uses the `@agalmic` scope and public access. From `mcp/`, publish
-with `npm publish --access public` using npm 2FA and an account authorized for
-that scope. The `prepack` script builds the standalone bundle and third-party
-license notices.
-Tag the release `contextengine-v<version>` and pin that version in agent host
-configurations. Publishing and tagging are maintainer actions.
+The package uses the `@agalmic` scope and public access. Canonical CI retains
+the exact smoke-tested tarball, its integrity and its complete bundle input
+hashes. Once enabled, `publish-mcp.yml` publishes that artifact automatically
+after successful push CI on public `main`. Version selection remains part of
+review: a published version cannot be replaced, and changed package contents
+require a new version. See [MCP release setup](../docs/mcp-releases.md) for
+account configuration, activation and recovery.
+
+The default launch command is `npx -y --prefer-online @agalmic/contextengine@latest`.
+Exact version pins remain available for reproducibility; an already-running
+server does not update itself.
+
+Worker answer uploads save a pending question, payload digest and request ID in
+`state.json` before sending. Repeating an identical failed call, including after
+an agent restart, reuses that ID so a lost reply does not create another record.
+A changed payload starts a new request; successful answer history clears the
+pending entry. The payload digest stays in local state and is not embedded in
+the request ID sent to the Worker. If the pending key cannot be saved, the agent does not upload.

@@ -31,7 +31,7 @@ module.exports = {
   setupFiles: ['<rootDir>/scripts/jest/jsdomPolyfills.js'],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   modulePaths: ['<rootDir>/src', '<rootDir>/node_modules', '<rootDir>/../node_modules'],
-  moduleFileExtensions: ['web.js', 'js', 'web.ts', 'ts', 'web.tsx', 'tsx', 'json', 'web.jsx', 'jsx', 'node'],
+  moduleFileExtensions: ['web.js', 'js', 'mjs', 'web.ts', 'ts', 'web.tsx', 'tsx', 'json', 'web.jsx', 'jsx', 'node'],
   testMatch: [
     '<rootDir>/src/**/__tests__/**/*.{js,jsx,ts,tsx}',
     '<rootDir>/src/**/*.{spec,test}.{js,jsx,ts,tsx}',

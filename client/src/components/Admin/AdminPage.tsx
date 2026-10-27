@@ -52,6 +52,9 @@ import AdminAgentSessionWrappedPanel from './AdminAgentSessionWrappedPanel';
 import { resolveAdminAgentSessionWrappedWorkerOrigin } from './adminAgentSessionWrapped';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
 import AdminStorageVisibilityPanel from './AdminStorageVisibilityPanel';
+import AdminWorkerCapabilities from './AdminWorkerCapabilities';
+import AdminSessionDiagnostics from './AdminSessionDiagnostics';
+import AdminSessionBackupPanel from './AdminSessionBackupPanel';
 import {
   getBackgroundResultsAnalysisUnsupportedReason,
   supportsBackgroundResultsAnalysis,
@@ -2903,6 +2906,27 @@ const AdminPageRuntime = ({
             postSignedRequest={postSignedAdminRequest}
           />
         ) : null}
+
+        <AdminWorkerCapabilities
+          workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
+          sessionSlug={normalizeSlug(selectedSlug)}
+        />
+        <AdminSessionDiagnostics
+          workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
+          sessionSlug={normalizeSlug(selectedSlug)}
+          sessionId={signedWorkerSessionId}
+          account={account}
+          canAdminWorker={canAdminWorker}
+          workerAuthContext={testContext}
+        />
+        <AdminSessionBackupPanel
+          key={JSON.stringify([baseWorkerUrl || selectedConfigWorkerUrl, selectedSlug, signedWorkerSessionId, account])}
+          workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
+          sessionSlug={normalizeSlug(selectedSlug)}
+          account={account}
+          canAdminWorker={canAdminWorker}
+          postSignedRequest={postSignedAdminRequest}
+        />
 
         <AdminPageWorkerSecretsPanel
           workerSecretsOpen={workerSecretsOpen}

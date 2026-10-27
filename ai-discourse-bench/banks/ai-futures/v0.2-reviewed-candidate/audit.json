@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "kind": "ai_discourse_bench_question_bank_audit",
   "benchmarkId": "model-opinions-bench-ai-futures-v0.2-reviewed-candidate",
-  "questionBankHash": "6c86cec578b211b301d7a5b413345b521adf0da6616114ad44f70a073709d852",
+  "questionBankHash": "84cbc64d1f2290b4f7d956e307e0448a5a9b3208f1551b243ced8e791466c536",
   "scope": {
     "questionsReviewed": 50,
     "checks": [

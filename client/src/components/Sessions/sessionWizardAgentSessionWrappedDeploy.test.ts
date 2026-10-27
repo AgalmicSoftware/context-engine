@@ -15,7 +15,7 @@ describe('sessionWizardAgentSessionWrappedDeploy', () => {
     ).toEqual({ requested: false, payload: {} });
   });
 
-  it('derives stable dedicated deployment input from session identity', () => {
+  it('uses the single Session Worker deployment for agent access', () => {
     expect(
       resolveSessionWizardAgentSessionWrappedDeployment({
         draft: { sessionModeProfile: { surfaces: { agentHttp: true } } },
@@ -25,11 +25,7 @@ describe('sessionWizardAgentSessionWrappedDeploy', () => {
       }),
     ).toEqual({
       requested: true,
-      payload: {
-        agentBridgeBundleUrl: expect.stringContaining('agentBridgeWorker.bundle.js'),
-        agentBridgeBundleManifestUrl: expect.stringContaining('worker-release-manifest.json'),
-        agentSessionWrappedDeploymentIdentity: 'session:11155420:0x07:sample-session',
-      },
+      payload: {},
     });
   });
 
@@ -39,4 +35,29 @@ describe('sessionWizardAgentSessionWrappedDeploy', () => {
     );
     expect(requireSessionWizardAgentSessionWrappedCapability({ requested: false, value: null })).toBeNull();
   });
+});
+
+const capability = {
+  version: 1,
+  enabled: true,
+  origin: 'https://session.example',
+  protocolVersion: 'agent-session-wrapped-v1',
+  revision: 'fixture',
+  verifiedAt: '2026-10-27T00:00:00.000Z',
+};
+test('rejects a helper or sponsor capability from a foreign origin', () => {
+  expect(() =>
+    requireSessionWizardAgentSessionWrappedCapability({
+      requested: true,
+      value: capability,
+      workerUrl: 'https://other.example',
+    }),
+  ).toThrow(/Session Worker origin/);
+  expect(
+    requireSessionWizardAgentSessionWrappedCapability({
+      requested: true,
+      value: capability,
+      workerUrl: 'https://session.example/',
+    }),
+  ).toEqual(capability);
 });

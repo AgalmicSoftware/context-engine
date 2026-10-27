@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import { describeTestEthOffer } from '../../shared/sessions/testEthOffer.mjs';
+import { chainRequest } from './chainErrors.mjs';
 
 const amount = (value) => typeof value === 'string' && /^\d+(?:\.\d{1,18})?$/.test(value) ? value : null;
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -27,9 +28,9 @@ export const createTestEthRequester = ({
   await ctx.client.ensureToken();
   if (ctx.client.tokenClaims?.scopes?.faucet !== true) throw new Error('This session does not offer test ETH to you.');
   const provider = suppliedProvider || createProvider(chainId);
-  const reported = Number(await provider.send('eth_chainId', []));
+  const reported = Number(await chainRequest(() => provider.send('eth_chainId', [])));
   if (reported !== chainId) throw new Error(`The RPC for chain ${chainId} reports chain ${reported}; refusing the faucet request.`);
-  const before = await provider.getBalance(wallet.address);
+  const before = await chainRequest(() => provider.getBalance(wallet.address));
   checkpoint();
   let paid;
   try {
@@ -62,7 +63,7 @@ export const createTestEthRequester = ({
     try {
       // A slow or unavailable RPC must not hide an already-broadcast transfer.
       observed = await Promise.race([
-        provider.getBalance(wallet.address).catch(() => null),
+        chainRequest(() => provider.getBalance(wallet.address)).catch(() => null),
         new Promise((resolve) => { timer = setTimeout(() => resolve(null), Math.max(0, deadline - now())); }),
       ]);
     } finally {

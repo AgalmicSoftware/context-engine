@@ -2,6 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const { ethers } = require('ethers');
+const registryAbi = require('../client/src/contractsABI/SESSION_REGISTRY_ABI.json');
+const contracts = require('../client/src/variables/contracts.json');
 
 const {
   DEFAULT_ROUTE_PROBES,
@@ -11,6 +15,7 @@ const {
   dismissOnboardingIfPresent,
   findMissingExpectedText,
   installDemoWorkerFixtureRoutes,
+  installLocalSmokeFixtureRoutes,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
   isDemoReadyInterviewRoute,
@@ -178,6 +183,112 @@ test('setup fixture preserves live Worker checks and unrelated session routes', 
   await installDemoWorkerFixtureRoutes(page, 'http://127.0.0.1:4173', '/session/new-project');
 });
 
+test('local navigation fixtures allow app assets and fail unmatched external requests', async () => {
+  let handler;
+  await installLocalSmokeFixtureRoutes({ addInitScript: async () => {}, route: async (pattern, callback) => {
+    assert.equal(pattern, '**/*');
+    handler = callback;
+  } }, 'http://127.0.0.1:4173');
+  for (const [url, expected] of [
+    ['http://127.0.0.1:4173/assets/app.js', 'continue'],
+    ['https://unconfigured.example.test/asset.png', 'blockedbyclient'],
+    ['https://sepolia.optimism.io/unconfigured', 'blockedbyclient'],
+    ['https://fonts.googleapis.com/css2?family=Unexpected', 'blockedbyclient'],
+    ['https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/unconfigured', 'blockedbyclient'],
+  ]) {
+    let action;
+    await handler({
+      request: () => ({ url: () => url, method: () => 'GET' }),
+      continue: async () => { action = 'continue'; },
+      abort: async (reason) => { action = reason; },
+      fulfill: async () => assert.fail(`unconfigured fixture: ${url}`),
+    });
+    assert.equal(action, expected, url);
+  }
+  await installLocalSmokeFixtureRoutes({ route: async () => assert.fail('remote smoke remains live') }, 'https://app.example.test');
+});
+
+test('local navigation uses explicit asset fixtures and ABI-valid registry reads', async () => {
+  let handler;
+  await installLocalSmokeFixtureRoutes({ addInitScript: async () => {}, route: async (_pattern, callback) => { handler = callback; } }, 'http://127.0.0.1:4173');
+  const request = async (url, method = 'GET', payload) => {
+    let result;
+    await handler({
+      request: () => ({ url: () => url, method: () => method, postDataJSON: () => payload }),
+      continue: async () => assert.fail('fixtures must never access the network'),
+      abort: async (reason) => { result = { aborted: reason }; },
+      fulfill: async (response) => { result = response; },
+    });
+    return result;
+  };
+  for (const fontUrl of [
+    'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Poppins:wght@400;600;700;800&display=swap',
+    'https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800',
+    'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,500;1,500;1,600&display=swap',
+  ]) {
+    const font = await request(fontUrl);
+    assert.equal(font.contentType, 'text/css', fontUrl);
+  }
+  const logo = await request('https://ethereum.org/images/assets/eth-diamond-glyph.png');
+  assert.equal(logo.contentType, 'image/png');
+  assert.match(logo.path, /client\/public\/favicon-32x32\.png$/);
+
+  const capabilitiesUrl = 'https://demo-worker-030226.agalmic.workers.dev/capabilities?slug=';
+  const capabilities = await request(capabilitiesUrl);
+  assert.equal(capabilities.json.type, 'ce_worker_capabilities');
+  assert.deepEqual(capabilities.json.features, []);
+  assert.deepEqual(await request(capabilitiesUrl, 'POST'), { aborted: 'blockedbyclient' });
+  assert.deepEqual(await request(capabilitiesUrl.replace('slug=', 'slug=private')), { aborted: 'blockedbyclient' });
+  assert.deepEqual(await request(capabilitiesUrl.replace('demo-worker-030226', 'unknown-worker')), { aborted: 'blockedbyclient' });
+
+  const registry = new ethers.utils.Interface(registryAbi);
+  const to = contracts.sessionRegistryAddresses['11155420'];
+  const rpcUrl = 'https://sepolia.optimism.io/';
+  const read = async (name, args) => request(rpcUrl, 'POST', {
+    jsonrpc: '2.0', id: 7, method: 'eth_call', params: [{ to, data: registry.encodeFunctionData(name, args) }, 'latest'],
+  });
+  const session = await read('getSessionBySlug', ['pe4']);
+  assert.equal(session.json.id, 7);
+  const tuple = registry.decodeFunctionResult('getSessionBySlug', session.json.result);
+  assert.equal(tuple[0], 'pe4');
+  assert.equal(tuple[1].toNumber(), 11155420);
+  assert.deepEqual(JSON.parse(decodeURIComponent(tuple[2].split(',')[1])), { blockLimits: { start: 1 } });
+  const gate = await read('getResourceGate', ['pe4', 'questionResponses']);
+  assert.deepEqual(registry.decodeFunctionResult('getResourceGate', gate.json.result)[0], []);
+  const fields = await read('getSessionFields', ['pe4', ['corsWorkerUrl', 'rpcUrl']]);
+  assert.deepEqual(registry.decodeFunctionResult('getSessionFields', fields.json.result)[0], ['', '']);
+
+  for (const payload of [
+    { method: 'eth_sendRawTransaction', params: ['0x1234'] },
+    { method: 'eth_call', params: [{ to: ethers.constants.AddressZero, data: registry.encodeFunctionData('getSessionCount') }] },
+    { method: 'eth_getLogs', params: [{ address: ethers.constants.AddressZero }] },
+    null,
+  ]) {
+    assert.equal((await request(rpcUrl, 'POST', payload)).aborted, 'blockedbyclient');
+  }
+  assert.equal((await read('getSessionBySlug', ['unconfigured-session'])).aborted, 'blockedbyclient');
+});
+
+test('local service-worker guard tolerates opaque frames and blocks registration elsewhere', async () => {
+  let initScript;
+  await installLocalSmokeFixtureRoutes({
+    addInitScript: async (callback) => { initScript = callback; },
+    route: async () => {},
+  }, 'http://127.0.0.1:4173');
+  const source = `(${initScript.toString()})();`;
+  const opaqueNavigator = Object.defineProperty({}, 'serviceWorker', {
+    get: () => { throw new Error('Service worker is disabled because the context is sandboxed'); },
+  });
+  assert.doesNotThrow(() => vm.runInNewContext(source, { navigator: opaqueNavigator }));
+  assert.doesNotThrow(() => vm.runInNewContext(source, { navigator: {} }));
+
+  let registered = false;
+  const serviceWorker = { register: async () => { registered = true; } };
+  vm.runInNewContext(source, { navigator: { serviceWorker } });
+  await assert.rejects(serviceWorker.register('/worker.js'), /registration is disabled in local navigation smoke/);
+  assert.equal(registered, false);
+});
+
 test('normalizeLayoutProbeSelectors keeps default browser layout checks and accepts overrides', () => {
   assert.ok(normalizeLayoutProbeSelectors().includes('[data-testid="ce-survey-submit"]'));
   assert.deepEqual(
@@ -337,6 +448,10 @@ test('summarizeFailures catches Vite-sensitive render, style, and asset failures
       }],
       unexpectedConsoleIssues: [{ type: 'error', text: 'TypeError: boom' }],
       pageErrors: ['ReferenceError: boom'],
+      securityPolicyViolations: [
+        { disposition: 'enforce', effectiveDirective: 'script-src-elem', blockedURI: 'inline', documentURI: 'about:srcdoc' },
+        { disposition: 'report', effectiveDirective: 'connect-src', blockedURI: 'http://outside.example.test/', documentURI: '/session/demo' },
+      ],
       routeProbeFailures: ['results did not hydrate'],
       layoutIssues: ['ce-survey-submit: visible text appears clipped'],
     },
@@ -351,6 +466,8 @@ test('summarizeFailures catches Vite-sensitive render, style, and asset failures
     '/session/demo: failed script http://127.0.0.1:3000/src/main.tsx (net::ERR_FAILED)',
     '/session/demo: console error: TypeError: boom',
     '/session/demo: page error: ReferenceError: boom',
+    '/session/demo: CSP enforce script-src-elem: inline in about:srcdoc',
+    '/session/demo: CSP report connect-src: http://outside.example.test/ in /session/demo',
     '/session/demo: route probe: results did not hydrate',
     '/session/demo: layout issue: ce-survey-submit: visible text appears clipped',
   ]);
@@ -392,10 +509,12 @@ test('compactSmokeSummary keeps success output focused on route health', () => {
       unexpectedFailedRequests: 0,
       unexpectedConsoleIssues: 0,
       pageErrors: 0,
+      securityPolicyViolations: 0,
       routeProbeFailures: 0,
       layoutIssues: 0,
       missingText: [],
     }],
     failures: [],
+    scriptInjection: undefined,
   });
 });

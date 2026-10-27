@@ -2,6 +2,7 @@ import {
   buildSurveyResultsAnalysisArtifactCacheTarget,
   type SurveyResultsAnalysisArtifactCacheTarget,
 } from './surveyResultsAnalysisArtifactCachePorts';
+import { hasBookmark } from '../../utilities/cache/bookmarkChanges';
 
 type SurveyResultsRecord = Record<string, unknown>;
 
@@ -167,12 +168,12 @@ export const buildSurveyResultsSurveyQuestionBookmarkWritePlan = ({
   const bookmarksCacheRecord = toRecord(bookmarksCache);
   const surveys = Array.isArray(bookmarksCacheRecord.surveys) ? [...bookmarksCacheRecord.surveys] : [];
   const questions = Array.isArray(bookmarksCacheRecord.questions) ? [...bookmarksCacheRecord.questions] : [];
-  const targetList = bookmarkType === 'survey' ? surveys : questions;
-  const bookmarkIndex = targetList.indexOf(bookmarkId);
-  const action = bookmarkIndex > -1 ? 'remove' : 'add';
+  let targetList = bookmarkType === 'survey' ? surveys : questions;
+  const bookmarked = hasBookmark(bookmarksCacheRecord, bookmarkType === 'survey' ? 'surveys' : 'questions', bookmarkId);
+  const action = bookmarked ? 'remove' : 'add';
 
-  if (bookmarkIndex > -1) {
-    targetList.splice(bookmarkIndex, 1);
+  if (bookmarked) {
+    targetList = targetList.filter((id) => String(id).toLowerCase() !== String(bookmarkId).toLowerCase());
   } else {
     targetList.push(bookmarkId);
   }

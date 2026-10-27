@@ -8,7 +8,7 @@ import {
 import { dispatchAnonymousRoute } from './anonymousRouteDispatch.js';
 
 const json = (body, status = 200, headers = {}) =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
+  new Response(JSON.stringify(body), { status, headers: new Headers([['content-type', 'application/json'], ...new Headers(headers)]) });
 
 test('readRealtimeCallRequestPayload accepts bounded SDP and rejects missing instructions', async () => {
   const accepted = await readRealtimeCallRequestPayload({

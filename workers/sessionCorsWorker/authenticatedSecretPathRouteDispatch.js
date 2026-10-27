@@ -215,6 +215,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     return {
       handled: true,
       response: await deps?.transcribe?.({
+        config,
         request,
         secrets,
         baseHeaders: headers,

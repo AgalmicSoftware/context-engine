@@ -355,7 +355,7 @@ describe('SessionModeProfileSections', () => {
     expect(screen.getByRole('checkbox', { name: 'Website' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Agents (HTTP API)' })).not.toBeChecked();
     expect(screen.getByRole('button', { name: 'About Agents (HTTP API)' })).toHaveTextContent(
-      /additional per-session service/i,
+      /run in this session’s Worker/i,
     );
   });
 
@@ -368,7 +368,7 @@ describe('SessionModeProfileSections', () => {
 
       expect(screen.getByRole('status')).toHaveTextContent('Agent API access: On after deployment');
       expect(screen.getByRole('status')).toHaveTextContent(/authorized agents.*HTTP API/i);
-      expect(screen.getByRole('status')).toHaveTextContent(/deployed and verified/i);
+      expect(screen.getByRole('status')).toHaveTextContent(/configured and verified/i);
       expect(screen.queryByRole('checkbox', { name: /^Telegram/ })).not.toBeInTheDocument();
 
       fireEvent.click(agents);

@@ -40,3 +40,23 @@ describe('cloudflareNativeDeploy', () => {
     expect(() => createCloudflareNativeSetupSecrets((bytes) => bytes.fill(7))).toThrow(/failed/i);
   });
 });
+
+test('manual setup normalizes the operator key and rejects malformed keys', () => {
+  const key = 'A'.repeat(64);
+  expect(createCloudflareNativeSetupSecrets((bytes) => bytes.fill(1), key)).toEqual({
+    tokenHmacSecret: '01'.repeat(32),
+    storageEnvelopeKek: key.toLowerCase(),
+  });
+  expect(() => createCloudflareNativeSetupSecrets(undefined, 'invalid')).toThrow(/64 hex/);
+});
+
+test('agent setup uses a third independent secret and never reuses an operator recovery key', () => {
+  let fill = 0;
+  const secrets = createCloudflareNativeSetupSecrets((bytes) => bytes.fill(++fill), 'aa'.repeat(32), true);
+  expect(secrets.agentManagedRootSecret).toBe('02'.repeat(32));
+  expect(new Set(Object.values(secrets)).size).toBe(3);
+  let calls = 0;
+  expect(() =>
+    createCloudflareNativeSetupSecrets((bytes) => bytes.fill(++calls === 3 ? 1 : calls), null, true),
+  ).toThrow(/agent signing-secret/);
+});

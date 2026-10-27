@@ -33,6 +33,7 @@ type DeployForm = {
 
 export type WorkerPanelProps = {
   allowNativeWorkerVerification?: boolean;
+  agentHttpEnabled?: boolean;
   isNormalMode: boolean;
   t?: (key: string) => string;
   renderSessionWizardInfoTooltip?: (props: {
@@ -94,6 +95,8 @@ export type WorkerPanelProps = {
   toggleLoginModal?: WorkerDeploySectionProps['toggleLoginModal'];
   resolvedActiveSessionSlug?: string;
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
+  operatorRecoveryKey?: WorkerDeploySectionProps['operatorRecoveryKey'];
+  setOperatorRecoveryKey?: WorkerDeploySectionProps['setOperatorRecoveryKey'];
   handleDeployWorker: () => void;
   deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
   showWorkerUrlField: boolean;
@@ -109,6 +112,7 @@ export type WorkerPanelProps = {
 
 const WorkerPanel = ({
   allowNativeWorkerVerification = false,
+  agentHttpEnabled = false,
   isNormalMode,
   t,
   renderSessionWizardInfoTooltip,
@@ -164,6 +168,8 @@ const WorkerPanel = ({
   toggleLoginModal,
   resolvedActiveSessionSlug,
   setDeployForm,
+  operatorRecoveryKey,
+  setOperatorRecoveryKey,
   handleDeployWorker,
   deployStatusDisplayState,
   showWorkerUrlField,
@@ -287,6 +293,7 @@ const WorkerPanel = ({
             defaultAllowedOrigins={defaultAllowedOrigins}
           />
           <WorkerDeploySection
+            agentHttpEnabled={agentHttpEnabled}
             allowNativeWorkerVerification={allowNativeWorkerVerification}
             isNormalMode={isNormalMode}
             renderInfoTooltip={renderInfoTooltip}
@@ -318,6 +325,8 @@ const WorkerPanel = ({
             toggleLoginModal={toggleLoginModal}
             cloudflareTokenSlug={toStr(draft.slug || resolvedActiveSessionSlug).trim()}
             setDeployForm={setDeployForm}
+            operatorRecoveryKey={operatorRecoveryKey}
+            setOperatorRecoveryKey={setOperatorRecoveryKey}
             handleDeployWorker={handleDeployWorker}
             deployStatusDisplayState={deployStatusDisplayState}
             deployVerifiedInUi={deployVerifiedInUi}

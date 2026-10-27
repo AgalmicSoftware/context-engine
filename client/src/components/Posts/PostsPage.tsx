@@ -122,6 +122,8 @@ const PostsPage = ({ enabled = CE_ABOUT_POSTS_ENABLED, fetcher = defaultFetch }:
       title: selectedPostMeta.title,
       description: selectedPostMeta.summary,
       image: buildAbsoluteBrowserUrl(selectedPostMeta.headerImage?.src || ''),
+      imageAlt: selectedPostMeta.headerImage?.alt || '',
+      video: null,
       ogType: 'article',
       twitterCard: selectedPostMeta.headerImage ? 'summary_large_image' : 'summary',
     });

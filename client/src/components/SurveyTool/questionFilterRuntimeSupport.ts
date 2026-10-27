@@ -15,11 +15,6 @@ export type QuestionFilterBookmarkCache = Record<string, unknown> & {
   filters?: unknown[];
 };
 export type QuestionFilterResponsesByQuestion = Record<string, unknown>;
-export type QuestionFilterWriteCache = (
-  namespace: string,
-  slug: string | undefined,
-  value: unknown,
-) => boolean | Promise<boolean>;
 export type QuestionFilterSessionProps = UnknownRecord & {
   account?: string;
   activeSessionSlug?: unknown;

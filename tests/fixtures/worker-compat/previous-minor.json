@@ -1,0 +1,369 @@
+{
+  "description": "Synthetic previous-format stored records: no upload authority stamps or response receipts. upgradedRecords are written after upgrade.",
+  "config": {
+    "slug": "compat-session",
+    "sessionId": "0x33333333333333333333333333333333",
+    "sessionIdHex": "0x33333333333333333333333333333333",
+    "corsWorkerUrl": "https://compat-worker.example.test",
+    "sessionName": "Compatibility fixture",
+    "adminAddress": "0x1111111111111111111111111111111111111111",
+    "allowOrigins": [
+      "https://contextengine.sh"
+    ],
+    "workerAuthority": {
+      "version": 1,
+      "participantScopes": [
+        "storage"
+      ]
+    },
+    "sessionModeProfile": {
+      "profileVersion": 1,
+      "preset": "custom",
+      "authority": {
+        "mode": "worker_canonical"
+      },
+      "evm": {
+        "registryChainId": null
+      },
+      "storage": {
+        "backend": "cloudflare",
+        "payloadAccessControl": {
+          "gate": "none",
+          "encryption": "none"
+        }
+      },
+      "identity": {
+        "default": "passkey",
+        "enabled": [
+          "passkey"
+        ]
+      },
+      "authorization": {
+        "mechanisms": [
+          "worker_roles"
+        ]
+      },
+      "encryption": {
+        "mode": "none"
+      },
+      "surfaces": {
+        "web": true,
+        "telegram": false,
+        "miniApp": false,
+        "agentHttp": false,
+        "mcp": false,
+        "ceCc": false
+      },
+      "results": {
+        "visibility": "public_full_if_storage_public",
+        "exposure": {
+          "aggregateResultsEnabled": true,
+          "anonymizedGroupsEnabled": false,
+          "minGroupSize": 2
+        }
+      },
+      "export": {
+        "scope": "all_session"
+      }
+    },
+    "storageProfile": {
+      "backend": "cloudflare",
+      "resources": {
+        "questions": "active",
+        "surveys": "active",
+        "responses": "active"
+      },
+      "payloadAccessControl": {
+        "gate": "none",
+        "encryption": "none",
+        "mode": "public_read"
+      }
+    },
+    "resultsAnalysis": {
+      "version": 1,
+      "generationMode": "both",
+      "views": {
+        "circles": true
+      },
+      "autoAfter": {
+        "threshold": 2,
+        "unit": "distinctParticipants"
+      },
+      "inputScope": "submitted",
+      "publication": "latest_success_visible"
+    }
+  },
+  "records": [
+    {
+      "metadata": {
+        "id": "cf_hash_later",
+        "resource": "questions",
+        "backend": "cloudflare",
+        "contentType": "application/json",
+        "encrypted": false,
+        "createdAt": "2026-01-02T00:00:00.000Z",
+        "resourceId": "0x7e1bf975877ff3b11f00ae3576063eebe9f6ad9f7903e540a6f3bcd523ee7143",
+        "uploader": "0x2222222222222222222222222222222222222222"
+      },
+      "payload": {
+        "id": "0x7e1bf975877ff3b11f00ae3576063eebe9f6ad9f7903e540a6f3bcd523ee7143",
+        "type": "binary",
+        "prompt": "A later content hash match.",
+        "tags": [],
+        "creator": "0x2222222222222222222222222222222222222222",
+        "associatedSurveyId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "participant": {
+          "kind": "agent",
+          "verification": "self_reported"
+        },
+        "sessionName": "compat-session",
+        "sessionSlug": "compat-session",
+        "sessionId": "0x33333333333333333333333333333333"
+      }
+    },
+    {
+      "metadata": {
+        "id": "cf_earliest",
+        "resource": "questions",
+        "backend": "cloudflare",
+        "contentType": "application/json",
+        "encrypted": false,
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "resourceId": "0x7e1bf975877ff3b11f00ae3576063eebe9f6ad9f7903e540a6f3bcd523ee7143",
+        "uploader": "0x2222222222222222222222222222222222222222"
+      },
+      "payload": {
+        "id": "0x7e1bf975877ff3b11f00ae3576063eebe9f6ad9f7903e540a6f3bcd523ee7143",
+        "type": "binary",
+        "prompt": "First stored version.",
+        "tags": [],
+        "creator": "0x2222222222222222222222222222222222222222",
+        "associatedSurveyId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "participant": {
+          "kind": "agent",
+          "verification": "self_reported"
+        },
+        "sessionName": "compat-session",
+        "sessionSlug": "compat-session",
+        "sessionId": "0x33333333333333333333333333333333"
+      }
+    },
+    {
+      "metadata": {
+        "id": "cf_old_admin",
+        "resource": "questions",
+        "backend": "cloudflare",
+        "contentType": "application/json",
+        "encrypted": false,
+        "createdAt": "2026-01-03T00:00:00.000Z",
+        "resourceId": "0x4444444444444444444444444444444444444444444444444444444444444444",
+        "uploader": "0x1111111111111111111111111111111111111111",
+        "uploaderIsAdmin": true
+      },
+      "payload": {
+        "id": "0x4444444444444444444444444444444444444444444444444444444444444444",
+        "type": "binary",
+        "prompt": "Unstamped admin correction.",
+        "tags": [],
+        "creator": "0x2222222222222222222222222222222222222222",
+        "associatedSurveyId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "participant": {
+          "kind": "agent",
+          "verification": "self_reported"
+        },
+        "sessionName": "compat-session",
+        "sessionSlug": "compat-session",
+        "sessionId": "0x33333333333333333333333333333333"
+      }
+    },
+    {
+      "metadata": {
+        "id": "cf_legacy",
+        "resource": "questions",
+        "backend": "cloudflare",
+        "contentType": "application/json",
+        "encrypted": false,
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "uploader": "0x2222222222222222222222222222222222222222"
+      },
+      "payload": {
+        "id": "0x4444444444444444444444444444444444444444444444444444444444444444",
+        "type": "binary",
+        "prompt": "Legacy original.",
+        "tags": [],
+        "creator": "0x2222222222222222222222222222222222222222",
+        "associatedSurveyId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "participant": {
+          "kind": "agent",
+          "verification": "self_reported"
+        },
+        "sessionName": "compat-session",
+        "sessionSlug": "compat-session",
+        "sessionId": "0x33333333333333333333333333333333"
+      }
+    },
+    {
+      "metadata": {
+        "id": "cf_tie_z",
+        "resource": "questions",
+        "backend": "cloudflare",
+        "contentType": "application/json",
+        "encrypted": false,
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "resourceId": "0x5555555555555555555555555555555555555555555555555555555555555555",
+        "uploader": "0x2222222222222222222222222222222222222222"
+      },
+      "payload": {
+        "id": "0x5555555555555555555555555555555555555555555555555555555555555555",
+        "type": "binary",
+        "prompt": "Later storage id.",
+        "tags": [],
+        "creator": "0x2222222222222222222222222222222222222222",
+        "associatedSurveyId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "participant": {
+          "kind": "agent",
+          "verification": "self_reported"
+        },
+        "sessionName": "compat-session",
+        "sessionSlug": "compat-session",
+        "sessionId": "0x33333333333333333333333333333333"
+      }
+    },
+    {
+      "metadata": {
+        "id": "cf_tie_a",
+        "resource": "questions",
+        "backend": "cloudflare",
+        "contentType": "application/json",
+        "encrypted": false,
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "resourceId": "0x5555555555555555555555555555555555555555555555555555555555555555",
+        "uploader": "0x2222222222222222222222222222222222222222"
+      },
+      "payload": {
+        "id": "0x5555555555555555555555555555555555555555555555555555555555555555",
+        "type": "binary",
+        "prompt": "Earlier storage id.",
+        "tags": [],
+        "creator": "0x2222222222222222222222222222222222222222",
+        "associatedSurveyId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "participant": {
+          "kind": "agent",
+          "verification": "self_reported"
+        },
+        "sessionName": "compat-session",
+        "sessionSlug": "compat-session",
+        "sessionId": "0x33333333333333333333333333333333"
+      }
+    },
+    {
+      "metadata": {
+        "id": "cf_response_old",
+        "resource": "responses",
+        "backend": "cloudflare",
+        "contentType": "application/json",
+        "encrypted": false,
+        "createdAt": "2026-01-04T00:00:00.000Z",
+        "responder": "0x2222222222222222222222222222222222222222"
+      },
+      "payload": {
+        "sessionSlug": "compat-session",
+        "sessionId": "0x33333333333333333333333333333333",
+        "questionID": "0x7e1bf975877ff3b11f00ae3576063eebe9f6ad9f7903e540a6f3bcd523ee7143",
+        "responder": "0x2222222222222222222222222222222222222222",
+        "answer": {
+          "value": "Agree",
+          "encrypted": false
+        },
+        "additional": {
+          "value": "",
+          "encrypted": false
+        }
+      }
+    },
+    {
+      "metadata": {
+        "id": "cf_response_retry",
+        "resource": "responses",
+        "backend": "cloudflare",
+        "contentType": "application/json",
+        "encrypted": false,
+        "createdAt": "2026-01-05T00:00:00.000Z",
+        "responder": "0x2222222222222222222222222222222222222222"
+      },
+      "payload": {
+        "sessionSlug": "compat-session",
+        "sessionId": "0x33333333333333333333333333333333",
+        "questionID": "0x7e1bf975877ff3b11f00ae3576063eebe9f6ad9f7903e540a6f3bcd523ee7143",
+        "responder": "0x2222222222222222222222222222222222222222",
+        "answer": {
+          "value": "Agree",
+          "encrypted": false
+        },
+        "additional": {
+          "value": "",
+          "encrypted": false
+        }
+      }
+    }
+  ],
+  "expectedQuestions": [
+    [
+      "0x4444444444444444444444444444444444444444444444444444444444444444",
+      "Legacy original."
+    ],
+    [
+      "0x5555555555555555555555555555555555555555555555555555555555555555",
+      "Earlier storage id."
+    ],
+    [
+      "0x7e1bf975877ff3b11f00ae3576063eebe9f6ad9f7903e540a6f3bcd523ee7143",
+      "First stored version."
+    ]
+  ],
+  "upgradedRecords": [
+    {
+      "metadata": {
+        "id": "cf_stamped_correction",
+        "resource": "questions",
+        "backend": "cloudflare",
+        "contentType": "application/json",
+        "encrypted": false,
+        "createdAt": "2026-01-06T00:00:00.000Z",
+        "resourceId": "0x4444444444444444444444444444444444444444444444444444444444444444",
+        "uploader": "0x1111111111111111111111111111111111111111",
+        "uploadAuthority": "admin",
+        "uploaderIsAdmin": false
+      },
+      "payload": {
+        "id": "0x4444444444444444444444444444444444444444444444444444444444444444",
+        "type": "binary",
+        "prompt": "Stamped admin correction.",
+        "tags": [],
+        "creator": "0x2222222222222222222222222222222222222222",
+        "associatedSurveyId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "participant": {
+          "kind": "agent",
+          "verification": "self_reported"
+        },
+        "sessionName": "compat-session",
+        "sessionSlug": "compat-session",
+        "sessionId": "0x33333333333333333333333333333333"
+      }
+    }
+  ],
+  "expectedUpgradedQuestions": [
+    [
+      "0x4444444444444444444444444444444444444444444444444444444444444444",
+      "Stamped admin correction."
+    ],
+    [
+      "0x5555555555555555555555555555555555555555555555555555555555555555",
+      "Earlier storage id."
+    ],
+    [
+      "0x7e1bf975877ff3b11f00ae3576063eebe9f6ad9f7903e540a6f3bcd523ee7143",
+      "First stored version."
+    ]
+  ]
+}

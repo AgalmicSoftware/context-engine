@@ -379,7 +379,12 @@ function normalizeProvider(raw: unknown = {}, extras: UnknownRecord = {}): Norma
   };
 }
 
-const normalizeModels = (raw: unknown = {}, fallbackProvider: unknown, providerOverridesRaw: unknown = {}) => {
+const normalizeModels = (
+  raw: unknown = {},
+  fallbackProvider: unknown,
+  providerOverridesRaw: unknown = {},
+  fallbackModel: string = DEFAULT_AI_MODEL,
+) => {
   const obj = asRecord(raw);
   const providerOverrides = asRecord(providerOverridesRaw);
   const fastProviderOverride = toLower(providerOverrides.fast || providerOverrides.default || '');
@@ -396,14 +401,10 @@ const normalizeModels = (raw: unknown = {}, fallbackProvider: unknown, providerO
       provider: toLower(providerFallback || DEFAULT_MODEL_PROVIDERS.fast),
     };
   };
-  const fastEntry = normalizeEntry(
-    obj.fast || obj.default,
-    DEFAULT_MODELS.fast,
-    fastProviderOverride || fallbackProvider,
-  );
+  const fastEntry = normalizeEntry(obj.fast || obj.default, fallbackModel, fastProviderOverride || fallbackProvider);
   const thinkingEntry = normalizeEntry(
     obj.thinking || obj.reasoning,
-    DEFAULT_MODELS.thinking,
+    fallbackModel,
     thinkingProviderOverride || fallbackProvider,
   );
   return {
@@ -526,7 +527,12 @@ export const normalizeAiSettings = (
   const reasoningEffort = normalizeReasoningEffort(obj.reasoningEffort || obj.reasoning_effort);
   const modelsRaw = asRecord(obj.models);
   const modelProvidersRaw = asRecord(obj.modelProviders);
-  const normalizedModels = normalizeModels(modelsRaw, mode, modelProvidersRaw);
+  const normalizedModels = normalizeModels(
+    modelsRaw,
+    mode,
+    modelProvidersRaw,
+    toStr(obj.model).trim() || DEFAULT_AI_MODEL,
+  );
   const transcriptionSource = modelsRaw.transcription || obj.transcription;
   const transcription = normalizeTranscription(transcriptionSource);
   const taskReasoningEffort = normalizeTaskReasoningEffort(obj.taskReasoningEffort);

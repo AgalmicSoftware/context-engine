@@ -2,11 +2,11 @@
   "name": "session-cors-worker",
   "version": "1.0.0",
   "description": "Context Engine session CORS worker tooling package; licensing boundary documented in the repo LICENSING.md",
-  "license": "MIT",
+  "license": "MPL-2.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test *.test.mjs",
+    "test": "node --test *.test.mjs agent/*.test.mjs",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",

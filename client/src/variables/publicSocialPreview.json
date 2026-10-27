@@ -1,0 +1,23 @@
+{
+  "siteName": "Context Engine",
+  "siteUrl": "https://contextengine.sh/",
+  "twitterCard": "summary_large_image",
+  "image": {
+    "url": "https://contextengine.sh/media/product-film/v1/context-engine-og-1200x630.png",
+    "type": "image/png",
+    "width": 1200,
+    "height": 630,
+    "alt": "Context Engine. Discourse and Decision Tools For Humans and Agents. The Context Engine logo: concentric arcs forming a C that resolve into circuit traces."
+  },
+  "video": {
+    "url": "https://contextengine.sh/media/product-film/v1/context-engine-film-720p.mp4",
+    "type": "video/mp4",
+    "width": 1280,
+    "height": 720
+  },
+  "staticPages": [
+    {
+      "path": "/about"
+    }
+  ]
+}

@@ -8,14 +8,15 @@ import {
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
 
 const envelope: AgentClientLoginEnvelope = {
-  v: 2,
+  v: 3,
   sessionSlug: 'alpha',
   expiresAt: '2026-07-05T00:00:00.000Z',
   address: '0x1111111111111111111111111111111111111111',
   capabilities: { readQuestions: true, readResults: true, submitAnswers: true },
-  bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'bridge-browser-token' },
+  agentCredential: { kind: 'session_agent_browser_token', token: 'bridge-browser-token' },
   workerCredential: { kind: 'session_worker_jwt', token: 'jwt-session-token' },
-  agentBridgeUrl: 'https://bridge.example',
+  agentWorkerUrl: 'https://worker.example',
+  workerUrl: 'https://worker.example',
   buckets: {
     categories: [{ categoryId: 'role', label: 'Role', options: [{ optionId: 'builder', label: 'Builder' }] }],
     selections: { role: ['builder'] },
@@ -91,7 +92,7 @@ describe('agentSessionBackend', () => {
 
     expect(result.ok).toBe(true);
     expect(fetchImpl).toHaveBeenCalledWith(
-      'https://bridge.example/api/agent/preferences',
+      'https://worker.example/api/agent/preferences',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ Authorization: 'Bearer bridge-browser-token' }),

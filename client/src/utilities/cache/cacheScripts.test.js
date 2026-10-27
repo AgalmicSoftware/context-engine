@@ -830,6 +830,47 @@ describe('cacheScripts', () => {
     expect(cacheScripts.peekCacheSync('questionsCache', 'hard-fail')).toBeNull();
   });
 
+  it('keeps an optimistic write started while a cross-tab reload is reading storage', async () => {
+    const { cacheScripts, idb, emitBroadcastMessage } = loadCacheScripts({ withBroadcastChannel: true });
+    await cacheScripts.initCacheManager();
+    await cacheScripts.writeCache('filters', 'shared', { value: 'saved' });
+    let releaseRead;
+    let releaseWrite;
+    let readStarted;
+    let writeStarted;
+    const reading = new Promise((resolve) => {
+      readStarted = resolve;
+    });
+    const writing = new Promise((resolve) => {
+      writeStarted = resolve;
+    });
+    const read = new Promise((resolve) => {
+      releaseRead = resolve;
+    });
+    const write = new Promise((resolve) => {
+      releaseWrite = resolve;
+    });
+    idb.get.mockImplementationOnce(async () => {
+      readStarted();
+      return read;
+    });
+    idb.set.mockImplementationOnce(async () => {
+      writeStarted();
+      await write;
+    });
+    emitBroadcastMessage({ _dgCacheScripts: true, sourceId: 'other-tab', action: 'write', key: 'dg:filters:shared' });
+    await reading;
+    const pending = cacheScripts.writeCacheOptimistic('filters', 'shared', { value: 'pending' });
+    releaseRead({ value: 'saved' });
+    await writing;
+    try {
+      expect(cacheScripts.peekCacheSync('filters', 'shared')).toEqual({ value: 'pending' });
+    } finally {
+      releaseWrite();
+      await pending;
+    }
+  });
+
   it('uses storage-only cross-tab handling in fallback mode to avoid duplicate updates', async () => {
     const { cacheScripts, broadcastChannels, emitBroadcastMessage } = loadCacheScripts({
       failProbe: true,
@@ -955,5 +996,107 @@ describe('cacheScripts', () => {
     expect(cacheScripts.listNamespaceSlugsSync('questionsCache')).toEqual(['edge', '']);
     expect(cacheScripts.hasNamespaceEntriesSync('unknownNamespace')).toBe(false);
     expect(cacheScripts.listNamespaceSlugsSync('unknownNamespace')).toEqual([]);
+  });
+
+  describe('two tabs', () => {
+    // Each tab is its own module instance; they share IndexedDB, Web Locks and
+    // BroadcastChannel delivery, which the test releases by hand.
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
+    let sent;
+    afterEach(() => {
+      delete global.navigator.locks;
+    });
+    const openTabs = () => {
+      const stores = new Map();
+      const channels = [];
+      sent = [];
+      const tails = new Map();
+      Object.defineProperty(global.navigator, 'locks', {
+        configurable: true,
+        value: {
+          request: (name, task) => {
+            const run = (tails.get(name) || Promise.resolve()).then(() => task());
+            tails.set(
+              name,
+              run.catch(() => undefined),
+            );
+            return run;
+          },
+        },
+      });
+      global.BroadcastChannel = class {
+        constructor(name) {
+          this.name = name;
+          this.listeners = [];
+          channels.push(this);
+        }
+        addEventListener(_type, handler) {
+          this.listeners.push(handler);
+        }
+        postMessage(data) {
+          sent.push({ from: this, data: deepClone(data) });
+        }
+        close() {}
+      };
+      const store = (name) => {
+        if (!stores.has(name)) stores.set(name, new Map());
+        return stores.get(name);
+      };
+      const open = () => {
+        jest.resetModules();
+        jest.doMock('./cacheScripts.idb.impl.js', () => ({
+          createStore: (dbName, storeName) => `${dbName}::${storeName}`,
+          get: async (key, name) => deepClone(store(name).get(key)),
+          set: async (key, value, name) => {
+            store(name).set(key, deepClone(value));
+          },
+          del: async (key, name) => {
+            store(name).delete(key);
+          },
+          entries: async (name) => Array.from(store(name).entries()).map(([key, value]) => [key, deepClone(value)]),
+        }));
+        jest.doMock('../logging.js', () => ({ createLogger: () => makeLogger() }));
+        return require('./cacheScripts.js');
+      };
+      const tabs = [open(), open()];
+      const deliver = (message) =>
+        channels
+          .filter((channel) => channel !== message.from && channel.name === BROADCAST_CHANNEL_NAME)
+          .forEach((channel) => channel.listeners.forEach((handler) => handler({ data: message.data })));
+      return { tabs, deliver, saved: () => store('ce_cache_v1::ce_cache_entries_v1').get('dg:bookmarksCache:s') };
+    };
+
+    it('keeps disjoint atomic updates from both tabs', async () => {
+      const { tabs, saved } = openTabs();
+      await Promise.all(tabs.map((tab) => tab.initCacheManager()));
+      const add = (id) => (current) => ({ questions: [...(current?.questions || []), id] });
+      let release;
+      const held = new Promise((resolve) => {
+        release = resolve;
+      });
+      const first = tabs[0].updateCacheAtomic('bookmarksCache', 's', async (current) => {
+        await held;
+        return add('q1')(current);
+      });
+      const second = tabs[1].updateCacheAtomic('bookmarksCache', 's', add('q2'));
+      await settle();
+      release();
+      await Promise.all([first, second]);
+      expect(saved()).toEqual({ questions: ['q1', 'q2'] });
+    });
+
+    it('does not move a tab back when an older change arrives late', async () => {
+      const { tabs, deliver, saved } = openTabs();
+      await Promise.all(tabs.map((tab) => tab.initCacheManager()));
+      await tabs[0].writeCache('bookmarksCache', 's', { questions: ['q1'] });
+      await tabs[1].updateCacheAtomic('bookmarksCache', 's', (current) => ({
+        questions: [...(current?.questions || []), 'q2'],
+      }));
+      // The second tab's message arrives first, then the first tab's older one.
+      [...sent].reverse().forEach(deliver);
+      await settle();
+      expect(saved()).toEqual({ questions: ['q1', 'q2'] });
+      tabs.forEach((tab) => expect(tab.peekCacheSync('bookmarksCache', 's')).toEqual({ questions: ['q1', 'q2'] }));
+    });
   });
 });

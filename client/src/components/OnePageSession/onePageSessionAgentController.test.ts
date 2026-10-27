@@ -5,28 +5,31 @@ import {
   buildAgentAuthFailureState,
   cacheAgentClientLoginEnvelope,
   clearAgentEnvelopeMemoryCache,
-  DEFAULT_AGENT_BRIDGE_URL,
   getAgentClientLoginEnvelopeMemoryKey,
   normalizeOnePageSessionSlug,
   isOnePageAgentShellMode,
   resolveAgentClientLoginEnvelopeFromEvent,
   resolveCurrentSessionSlugForProps,
-  resolveSessionAgentBridgeUrl,
+  resolveSessionAgentWorkerUrl,
   resolveAgentResultsAuthFailureReason,
   type AgentClientLoginEnvelopeMemoryGlobal,
 } from './onePageSessionAgentController';
 
 const buildEnvelope = (sessionSlug: string): AgentClientLoginEnvelope => ({
-  v: 2,
+  v: 3,
   sessionId: '0x11111111111111111111111111111111',
   sessionSlug,
   address: '0x0000000000000000000000000000000000000001',
-  bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'ceagt_bridge_test' },
-  workerCredential: { kind: 'session_worker_jwt', token: 'jwt-worker-test' },
-  agentBridgeUrl: 'https://bridge.example',
+  agentCredential: {
+    kind: 'session_agent_browser_token',
+    token: 'ceagt_bridge_test',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+  },
+  workerCredential: { kind: 'session_worker_jwt', token: 'jwt-worker-test', expiresAt: '2099-01-01T00:00:00.000Z' },
+  agentWorkerUrl: 'https://session-worker.example',
   workerUrl: 'https://session-worker.example',
   capabilities: { submitAnswers: true, readGroups: true },
-  expiresAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: '2099-01-01T00:00:00.000Z',
 });
 
 describe('onePageSessionAgentController', () => {
@@ -61,7 +64,7 @@ describe('onePageSessionAgentController', () => {
             },
             sessionId: envelope.sessionId,
             corsWorkerUrl: kind === 'wrong worker' ? 'https://other-worker.example' : envelope.workerUrl,
-            agentBridgeUrl: envelope.agentBridgeUrl,
+            agentWorkerUrl: envelope.agentWorkerUrl,
           },
           sessionSlug: kind === 'wrong session' ? 'beta' : 'alpha',
           agentSessionMeta: null,
@@ -108,21 +111,15 @@ describe('onePageSessionAgentController', () => {
     });
   });
 
-  it('resolves agent bridge URL precedence and trims trailing slashes', () => {
+  it('uses only the canonical Worker URL and ignores retired Bridge settings', () => {
     expect(
-      resolveSessionAgentBridgeUrl({
-        agentBridgeUrl: 'https://primary.example///',
-        telegram: { workerUrl: 'https://telegram.example' },
+      resolveSessionAgentWorkerUrl({
+        corsWorkerUrl: 'https://session.example///',
+        agentBridgeUrl: 'https://old.example',
       }),
-    ).toBe('https://primary.example');
-
-    expect(
-      resolveSessionAgentBridgeUrl({
-        telegram: { workerUrl: 'https://telegram.example/' },
-      }),
-    ).toBe('https://telegram.example');
-
-    expect(resolveSessionAgentBridgeUrl({})).toBe(DEFAULT_AGENT_BRIDGE_URL);
+    ).toBe('https://session.example');
+    expect(resolveSessionAgentWorkerUrl({ telegram: { workerUrl: 'https://old.example' } })).toBe('');
+    expect(resolveSessionAgentWorkerUrl({})).toBe('');
   });
 
   it('builds auth failure state with the current fallback message', () => {
@@ -191,8 +188,8 @@ describe('onePageSessionAgentController', () => {
       detail: {
         envelope: {
           sessionSlug: 'alpha',
-          bridgeCredential: {},
-          workerCredential: { token: 'jwt-worker-test' },
+          agentCredential: {},
+          workerCredential: { token: 'jwt-worker-test', expiresAt: '2099-01-01T00:00:00.000Z' },
         },
       },
     });
@@ -201,7 +198,7 @@ describe('onePageSessionAgentController', () => {
       sessionSlug: 'alpha',
       sessionId: envelope.sessionId,
       workerUrl: envelope.workerUrl,
-      agentBridgeUrl: envelope.agentBridgeUrl,
+      agentWorkerUrl: envelope.agentWorkerUrl,
     };
     expect(resolveAgentClientLoginEnvelopeFromEvent(matching, target)).toBe(envelope);
     expect(resolveAgentClientLoginEnvelopeFromEvent(mismatch, target)).toBeNull();

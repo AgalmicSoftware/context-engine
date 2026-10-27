@@ -100,7 +100,8 @@ export const assertReadable = async (locator, parentLevels = 0) => {
 };
 
 export async function clickQuestionAction(page, name) {
-  const action = page.getByRole('button', { name, exact: true });
+  // Desktop icons and labelled mobile actions share the same title.
+  const action = page.getByTitle(name, { exact: true });
   if (!(await action.isVisible())) await page.getByRole('button', { name: 'Question actions', exact: true }).click();
   await action.click();
 }

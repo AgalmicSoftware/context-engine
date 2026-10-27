@@ -100,3 +100,37 @@ test('finds the SBT chain from session access rules before the session chain', (
   assert.deepEqual(listSessionSbts(config), [{ sbt: ethers.utils.getAddress(SBT), chainId: 11155420 }]);
   assert.deepEqual(listSessionSbts({}), []);
 });
+
+test('claim funding never quotes RPC details from the faucet chain check', async () => {
+  const iface = new ethers.utils.Interface(['function getTokenIdByOwner(address) view returns(uint256)', 'function balanceOf(address) view returns(uint256)',
+    'function mintMode() view returns(uint8)', 'function mintingEndTime() view returns(uint256)', 'function maxTokens() view returns(uint256)',
+    'function mintedTokens() view returns(uint256)', 'function claim()']);
+  const wallet = ethers.Wallet.createRandom();
+  let checks = 0;
+  const provider = {
+    _isProvider: true,
+    // The claim's own chain check passes; the faucet's check then fails like a live keyed RPC.
+    send: async () => {
+      if (checks++ === 0) return '0xaa37dc';
+      throw ethers.logger.makeError('missing response', ethers.errors.SERVER_ERROR, {
+        requestBody: '{"method":"eth_chainId","params":[],"id":42,"jsonrpc":"2.0"}', requestMethod: 'POST', url: 'https://rpc.example.invalid/v2/SYNTHETIC_RPC_SECRET_123',
+      });
+    },
+    call: async (tx) => {
+      const parsed = iface.parseTransaction({ ...tx, data: await tx.data });
+      return iface.encodeFunctionResult(parsed.name, parsed.name === 'claim' ? [] : [0]);
+    },
+    estimateGas: async () => ethers.BigNumber.from(100000),
+    getBlock: async () => ({}),
+    getGasPrice: async () => ethers.utils.parseUnits('1', 'gwei'),
+    getBalance: async () => ethers.constants.Zero,
+  };
+  const client = { config: { networkChainId: 11155420 }, tokenClaims: { scopes: { faucet: true } }, refreshConfig: async () => {}, ensureToken: async () => {},
+    request: async () => assert.fail('no faucet request after a failed chain check') };
+  const claimer = createSbtClaimer({ wallet, createProvider: () => provider });
+  await assert.rejects(claimer.claim({ ctx: { client, info: { slug: 'example' } }, sbtAddress: SBT }), (error) => {
+    assert.match(error.message, new RegExp(`^Your address ${wallet.address} needs about .*; The chain request failed \\(SERVER_ERROR: missing response\\)\\.`));
+    assert.doesNotMatch(error.message, /SYNTHETIC_RPC_SECRET_123|rpc\.example\.invalid|requestBody/);
+    return true;
+  });
+});

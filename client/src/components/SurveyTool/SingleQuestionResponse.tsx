@@ -24,7 +24,8 @@ import { normalizeSessionSlug, resolveSessionSlugFromPathname } from '../../util
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { surveyResponseStoragePort } from '../../domains/storage/surveyResponseStoragePort';
 import GateTooltip from '../Gates/GateTooltip';
-import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
+import { listNamespaceEntriesSync, peekCacheSync, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
+import { applyBookmarkChange, hasBookmark } from '../../utilities/cache/bookmarkChanges';
 import {
   getRatingFillPercent,
   normalizeRatingScale,
@@ -193,16 +194,11 @@ type SingleQuestionMemoMap<Key = unknown> = {
   keys: () => IterableIterator<Key>;
   delete: (key: Key) => boolean;
 };
-type SingleQuestionBookmarkCache = SingleQuestionRecord & {
-  questions: unknown[];
-  surveys: unknown[];
-};
 type SingleQuestionCacheEntry = SingleQuestionRecord & {
   slug?: unknown;
   value?: unknown;
 };
 type SingleQuestionQuestionCacheMap = Record<string, unknown>;
-type SingleQuestionWriteCache = (namespace: string, slug: string | undefined, value: unknown) => Promise<unknown>;
 
 /**
  * SingleQuestionResponse is a component responsible for displaying:
@@ -342,7 +338,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     try {
       const slug = this.resolveGroupSlug();
       const bookmarksCache = peekCacheSync('bookmarksCache', slug, { clone: false });
-      const isBookmarked = bookmarksCache?.questions?.includes(question.id);
+      const isBookmarked = hasBookmark(bookmarksCache, 'questions', question.id);
       const patch = buildSingleQuestionBookmarkStatusPatch(isBookmarked);
       if (this.state.isBookmarked !== patch.isBookmarked) {
         this.setState(patch);
@@ -361,33 +357,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
 
     const questionId = question.id;
     const slug = this.resolveGroupSlug();
-    let bookmarksCache: SingleQuestionBookmarkCache;
-
-    try {
-      const existing = peekCacheSync('bookmarksCache', slug, { clone: false }) || {};
-      const base = typeof existing === 'object' && existing !== null ? (existing as SingleQuestionRecord) : {};
-      bookmarksCache = {
-        ...base,
-        surveys: Array.isArray(base.surveys) ? [...base.surveys] : [],
-        questions: Array.isArray(base.questions) ? [...base.questions] : [],
-      };
-    } catch (error) {
-      questionLog.error('[SingleQuestionResponse] Error parsing bookmarksCache:', error);
-      bookmarksCache = { surveys: [], questions: [] }; // Reset on error
-    }
-
-    const questionIndex = bookmarksCache.questions.indexOf(questionId);
-    let nowBookmarked: boolean;
-
-    if (questionIndex > -1) {
-      // Un-bookmark
-      bookmarksCache.questions.splice(questionIndex, 1);
-      nowBookmarked = false;
-    } else {
-      // Bookmark
-      bookmarksCache.questions.push(questionId);
-      nowBookmarked = true;
-    }
+    // The click follows what this card shows; saving applies it to the latest
+    // saved bookmarks, so bookmarks made in another tab are kept.
+    const nowBookmarked = !this.state.isBookmarked;
 
     // Update state immediately for instant UI feedback
     this.setState(buildSingleQuestionBookmarkFeedbackPatch(nowBookmarked));
@@ -399,7 +371,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       this.setState(buildSingleQuestionBookmarkSuccessPatch(false));
     }, 1500); // Feedback for 1.5s
 
-    void (writeCache as SingleQuestionWriteCache)('bookmarksCache', slug, bookmarksCache).catch((error: unknown) => {
+    void updateCacheAtomic<Record<string, unknown>>('bookmarksCache', slug, (saved) =>
+      applyBookmarkChange(saved, 'questions', questionId, nowBookmarked),
+    ).catch((error: unknown) => {
       questionLog.error('[SingleQuestionResponse] Error saving bookmarksCache:', error);
     });
   };

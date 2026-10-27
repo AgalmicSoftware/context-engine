@@ -54,6 +54,14 @@ keep their normal PATH/public fallback order.
 Those fallback URLs come from `shared/rpcDefaults.cjs` through the client
 runtime adapters.
 
+Browser RPC caching treats numeric `eth_call` blocks and `eth_getLogs` ranges
+ending within 64 blocks of the newest observed head like `latest`: they expire
+after two seconds so recent reorganizations are not hidden for ten minutes.
+Older numeric reads retain the ten-minute cache. The wrapper learns the head
+from block-number and latest-block replies, separately for each chain and
+provider endpoint; until it knows the head, numeric reads also expire after
+two seconds.
+
 ## Important bootstrap exception
 
 General client read providers are PATH-first, but session-registry bootstrap reads are not.

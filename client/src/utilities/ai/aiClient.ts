@@ -689,7 +689,7 @@ export async function runCompareToolkit(task: unknown, payload: unknown = {}, op
   try {
     const prompt = buildCompareToolkitPrompt(envelope);
     const { text: raw, generation } = await enqueueAiCallWithRetry(() =>
-      callAICompletion(prompt, { ...aiCallOpts, thinking: true }),
+      callAICompletion(prompt, { ...withAiTaskTypeFallback(aiCallOpts, 'compare'), thinking: true }),
     );
     const parsed = asParsedJsonRecord(parseJsonFlexible(raw));
     // Provenance comes from transport metadata, never from generated JSON.
@@ -733,7 +733,7 @@ export async function generateAudioDiscussionSummary(transcript: unknown, opts: 
     prompt = prompt.replace(/<STYLE>/g, style);
     prompt = prompt.replace(/<SESSION_TITLE\?>/g, sessionTitle);
 
-    const raw = await callAIQueued(prompt, { ...aiCallOpts, thinking: true });
+    const raw = await callAIQueued(prompt, { ...withAiTaskTypeFallback(aiCallOpts, 'summarize'), thinking: true });
     const md = _stripEnclosingMarkdownFences(String(raw || ''));
     if (!md) throw new Error('AI returned an empty summary.');
     return md;

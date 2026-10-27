@@ -173,7 +173,7 @@ const syncWorkerMetadata = async (store) => {
   await hydrateWorkerCanonicalSurveyCache({ ...common, persist: persistTo('surveysCache'), onSuccess: () => {} });
 };
 const syncWorkerResponses = async (store) => {
-  const run = resolveWorkerResponseHydrationRun({ sessionConfig: SESSION_CONFIG, sessionSlug: SLUG });
+  const run = resolveWorkerResponseHydrationRun({ sessionConfig: SESSION_CONFIG, sessionSlug: SLUG, reader: OWNER });
   await hydrateWorkerCanonicalResponses({
     sessionSlug: SLUG,
     sessionConfig: SESSION_CONFIG,
@@ -445,6 +445,29 @@ describe('saved Worker audience changes', () => {
     60000,
   );
 });
+
+it.each([false, true])(
+  'reuses encrypted rating bytes only while the retried input is unchanged (edited: %s)',
+  async (edited) => {
+    const store = createWorkerStore();
+    seedWorkerCatalog(store);
+    await syncWorkerMetadata(store);
+    const h = await mountPile(store);
+    await lockAndAnswer(h, 2, 'self_admin', 'secret retry', [6, 5]);
+    const transport = contractScriptsModule.default.submitResponses.getMockImplementation();
+    contractScriptsModule.default.submitResponses.mockImplementationOnce(async (...args) => {
+      await transport(...args);
+      throw new Error('Reply lost after storing.');
+    });
+    expect((await submit(h)).outcome.status).toBe('failed');
+    if (edited) await act(async () => h.engine().handleImportance(0, qid(2), 9));
+    expect((await submit(h)).outcome.status).toBe('submitted');
+    if (edited) {
+      expect(h.uploads[1].questionResponses).not.toEqual(h.uploads[0].questionResponses);
+      expect(registry.get(h.uploads[1].questionResponses[0].importanceEncrypted)).toBe(9);
+    } else expect(h.uploads[1].questionResponses).toEqual(h.uploads[0].questionResponses);
+  },
+);
 
 it('preserves both encrypted ratings on the second locked edit in one sitting', async () => {
   const store = createWorkerStore();

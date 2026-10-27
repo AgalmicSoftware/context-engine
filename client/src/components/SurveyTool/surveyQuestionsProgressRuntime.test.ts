@@ -41,6 +41,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   shouldSurveyAutoStartFresh: jest.fn(() => false),
   stateRef: {
     current: {
+      bookmarkedQuestions: new Set<string>(),
       encryptedModifiedCount: 0,
       hasEncryptedChanges: false,
       isDirty: false,
@@ -60,7 +61,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
     error: jest.fn(),
     warn: jest.fn(),
   },
-  writeCacheOptimistic: jest.fn(() => Promise.resolve()),
+  updateCacheAtomic: jest.fn(async (_cacheName, _slug, update) => update(null)),
   ...overrides,
 });
 
@@ -81,23 +82,36 @@ describe('surveyQuestionsProgressRuntime', () => {
     expect(context.setState).toHaveBeenCalledWith({ bookmarkedQuestions: new Set(['q1']) });
   });
 
-  it('toggles bookmarks optimistically and persists the updated cache object', () => {
+  it("applies a bookmark toggle to the latest saved bookmarks, keeping another tab's", async () => {
+    // Another tab saved q3 since this page loaded its bookmarks.
+    let saved: unknown = { questions: ['q1', 'q3'] };
     const context = createContext({
-      peekCacheSync: jest.fn(() => ({ questions: ['q1'] })),
+      updateCacheAtomic: jest.fn(async (_cacheName, _slug, update) => {
+        saved = update(saved);
+        return saved;
+      }),
     });
+    context.stateRef.current.bookmarkedQuestions = new Set(['q1']);
     const runtime = createSurveyQuestionsProgressRuntime(context);
 
     runtime.handleBookmarkToggle('q2');
-
-    expect(context.buildBookmarkedQuestionsState).toHaveBeenCalledWith(['q1', 'q2']);
     expect(context.setState).toHaveBeenCalledWith({ bookmarkedQuestions: new Set(['q1', 'q2']) });
-    expect(context.writeCacheOptimistic).toHaveBeenCalledWith('bookmarksCache', 'edge', {
-      questions: ['q1', 'q2'],
-    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(context.updateCacheAtomic).toHaveBeenCalledWith('bookmarksCache', 'edge', expect.any(Function));
+    expect(saved).toEqual({ questions: ['q1', 'q3', 'q2'] });
+    expect(context.setState).toHaveBeenLastCalledWith({ bookmarkedQuestions: new Set(['q1', 'q3', 'q2']) });
+
+    // Removing follows what the page shows, even when the toggle repeats.
+    context.stateRef.current.bookmarkedQuestions = new Set(['q1', 'q3', 'q2']);
+    runtime.handleBookmarkToggle('q1');
+    await Promise.resolve();
+    expect(saved).toEqual({ questions: ['q3', 'q2'] });
   });
 
   it('persists and restores bookmarks for an anonymous visitor', async () => {
-    let persistedBookmarks: { questions: string[] } | null = null;
+    let persistedBookmarks: unknown = null;
     const anonymousContext = createContext({
       peekCacheSync: jest.fn(() => persistedBookmarks),
       propsRef: {
@@ -110,9 +124,9 @@ describe('surveyQuestionsProgressRuntime', () => {
           surveyIndex: 0,
         },
       },
-      writeCacheOptimistic: jest.fn((_cacheName, _slug, value) => {
-        persistedBookmarks = value;
-        return Promise.resolve();
+      updateCacheAtomic: jest.fn(async (_cacheName, _slug, update) => {
+        persistedBookmarks = update(persistedBookmarks);
+        return persistedBookmarks;
       }),
     });
 

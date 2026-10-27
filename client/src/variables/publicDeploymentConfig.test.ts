@@ -9,7 +9,6 @@ const ENV_KEYS = [
   'REACT_APP_CE_SHARED_WORKER_URL',
   'REACT_APP_CE_DEPLOY_HELPER_URL',
   'REACT_APP_CE_WORKER_BUNDLE_URL',
-  'REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL',
   'REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL',
   'REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED',
   'REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT',
@@ -59,7 +58,6 @@ describe('publicDeploymentConfig', () => {
       expect(typeof config.DEFAULT_SHARED_WORKER_URL).toBe('string');
       expect(typeof config.DEPLOY_HELPER_URL).toBe('string');
       expect(typeof config.WORKER_BUNDLE_URL).toBe('string');
-      expect(typeof config.AGENT_BRIDGE_WORKER_BUNDLE_URL).toBe('string');
       expect(typeof config.WORKER_RELEASE_MANIFEST_URL).toBe('string');
       expect(typeof config.DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED).toBe('boolean');
       expect(typeof config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toBe('string');
@@ -80,11 +78,7 @@ describe('publicDeploymentConfig', () => {
     jest.isolateModules(() => {
       const config = require('./publicDeploymentConfig.js');
       expect(config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toMatch(/^[a-f0-9]{40}$/);
-      for (const url of [
-        config.WORKER_BUNDLE_URL,
-        config.AGENT_BRIDGE_WORKER_BUNDLE_URL,
-        config.WORKER_RELEASE_MANIFEST_URL,
-      ]) {
+      for (const url of [config.WORKER_BUNDLE_URL, config.WORKER_RELEASE_MANIFEST_URL]) {
         expect(url).toContain(`/releases/download/worker-bundles-${config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT}/`);
       }
     });
@@ -95,9 +89,6 @@ describe('publicDeploymentConfig', () => {
       const config = require('./publicDeploymentConfig.js');
 
       expect(config.WORKER_BUNDLE_URL).toBe(releaseAssetUrl(workerReleasePin.commit, 'sessionCorsWorker.bundle.js'));
-      expect(config.AGENT_BRIDGE_WORKER_BUNDLE_URL).toBe(
-        releaseAssetUrl(workerReleasePin.commit, 'agentBridgeWorker.bundle.js'),
-      );
       expect(config.WORKER_RELEASE_MANIFEST_URL).toBe(
         releaseAssetUrl(workerReleasePin.commit, 'worker-release-manifest.json'),
       );
@@ -119,7 +110,6 @@ describe('publicDeploymentConfig', () => {
         `/tree/${commit}/deploy/cloudflare/session-worker`,
       );
       expect(config.WORKER_BUNDLE_URL).toBe(releaseAssetUrl(commit, 'sessionCorsWorker.bundle.js'));
-      expect(config.AGENT_BRIDGE_WORKER_BUNDLE_URL).toBe(releaseAssetUrl(commit, 'agentBridgeWorker.bundle.js'));
       expect(config.WORKER_RELEASE_MANIFEST_URL).toBe(releaseAssetUrl(commit, 'worker-release-manifest.json'));
     });
   });
@@ -129,7 +119,6 @@ describe('publicDeploymentConfig', () => {
       expect(config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toBe('');
       expect(config.CLOUDFLARE_NATIVE_DEPLOY_URL).toBe('');
       expect(config.WORKER_BUNDLE_URL).toBe('');
-      expect(config.AGENT_BRIDGE_WORKER_BUNDLE_URL).toBe('');
       expect(config.WORKER_RELEASE_MANIFEST_URL).toBe('');
     };
 
@@ -148,7 +137,6 @@ describe('publicDeploymentConfig', () => {
     process.env.REACT_APP_CE_SHARED_WORKER_URL = 'https://shared.example.test/';
     process.env.REACT_APP_CE_DEPLOY_HELPER_URL = 'https://deploy-helper.example.test';
     process.env.REACT_APP_CE_WORKER_BUNDLE_URL = 'https://assets.example.test/sessionCorsWorker.bundle.js';
-    process.env.REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL = 'https://assets.example.test/agentBridgeWorker.bundle.js';
     process.env.REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL = 'https://assets.example.test/worker-release-manifest.json';
     process.env.REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = 'false';
     process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = 'abcdef0123456789abcdef0123456789abcdef01';
@@ -159,7 +147,6 @@ describe('publicDeploymentConfig', () => {
       expect(config.DEFAULT_SHARED_WORKER_URL).toBe(process.env.REACT_APP_CE_SHARED_WORKER_URL);
       expect(config.DEPLOY_HELPER_URL).toBe(process.env.REACT_APP_CE_DEPLOY_HELPER_URL);
       expect(config.WORKER_BUNDLE_URL).toBe(process.env.REACT_APP_CE_WORKER_BUNDLE_URL);
-      expect(config.AGENT_BRIDGE_WORKER_BUNDLE_URL).toBe(process.env.REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL);
       expect(config.WORKER_RELEASE_MANIFEST_URL).toBe(process.env.REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL);
       expect(config.DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED).toBe(false);
       expect(config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toBe(

@@ -42,6 +42,11 @@ export type SurveyResultsCachePort = {
   ) => unknown;
   readCache: (namespace: SurveyResultsManagedCacheNamespace | string, slug?: string) => Promise<unknown>;
   subscribeCacheUpdates: (handler: SurveyResultsCacheUpdateHandler) => SurveyResultsCacheUnsubscribe;
+  updateCacheAtomic: (
+    namespace: SurveyResultsManagedCacheNamespace | string,
+    slug: string,
+    update: (current: unknown) => unknown,
+  ) => Promise<unknown>;
   writeCache: (
     namespace: SurveyResultsManagedCacheNamespace | string,
     slug?: string,
@@ -62,6 +67,7 @@ export const surveyResultsCachePort: SurveyResultsCachePort = {
   readCache: (namespace, slug) =>
     slug === undefined ? cacheScriptsModule.readCache(namespace) : cacheScriptsModule.readCache(namespace, slug),
   subscribeCacheUpdates: (handler) => cacheScriptsModule.subscribeCacheUpdates(handler),
+  updateCacheAtomic: (namespace, slug, update) => cacheScriptsModule.updateCacheAtomic(namespace, slug, update),
   writeCache: (namespace, slug, value) => {
     const writeCache = cacheScriptsModule.writeCache as SurveyResultsCachePort['writeCache'];
     if (slug === undefined) return writeCache(namespace);

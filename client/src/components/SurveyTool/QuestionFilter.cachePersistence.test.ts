@@ -177,9 +177,14 @@ describe('QuestionFilter cache helpers', () => {
     clearTimeout(instance.bookmarkFeedbackTimeout);
   });
 
-  it('reads filters cache with clone:false before bookmarking current filter', async () => {
+  it.each(['bookmarkedFilters', 'filters'])("keeps another tab's %s when bookmarking a filter", async (listKey) => {
     const slug = 'edge';
     const filterState = { foo: 'bar' };
+    const serialized = serializeFilterState(filterState);
+    const saved = Object.freeze({
+      [listKey]: Object.freeze(['saved-filter', 'other-tab-filter']),
+      questionFilterState_results: Object.freeze({ selectedTags: ['other-tab'] }),
+    });
     const instance = new QuestionFilter({ activeSessionSlug: slug });
     instance._isMounted = true;
     instance.buildFilterState = () => filterState;
@@ -188,23 +193,33 @@ describe('QuestionFilter cache helpers', () => {
       if (typeof cb === 'function') cb();
       return next;
     });
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ bookmarkedFilters: ['saved-filter'] });
+    let persisted: any;
+    const updateSpy = jest
+      .spyOn(cacheScripts, 'updateCacheAtomic')
+      .mockImplementation(async (_namespace, _slug, update) => {
+        persisted = (update as (current: unknown) => unknown)(saved);
+        return persisted;
+      });
 
     instance.handleBookmarkCurrentFilter();
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(peekSpy).toHaveBeenCalledWith('filters', slug, { clone: false });
-    expect(writeSpy).toHaveBeenCalledWith('filters', slug, expect.any(Object));
+    expect(updateSpy).toHaveBeenCalledWith('filters', slug, expect.any(Function));
+    expect(persisted).toEqual({
+      ...saved,
+      bookmarkedFilters: ['saved-filter', 'other-tab-filter', serialized],
+    });
+    expect(saved[listKey]).toEqual(['saved-filter', 'other-tab-filter']);
     peekSpy.mockRestore();
-    writeSpy.mockRestore();
+    updateSpy.mockRestore();
     clearTimeout(instance.bookmarkFeedbackTimeout);
   });
 
-  it('does not show bookmark success feedback when writeCache resolves false', async () => {
+  it('does not show bookmark success feedback when the atomic update returns no saved value', async () => {
     const slug = 'edge';
     const filterState = { foo: 'bar' };
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(false);
+    const updateSpy = jest.spyOn(cacheScripts, 'updateCacheAtomic').mockResolvedValue(null);
 
     const instance = new QuestionFilter({ activeSessionSlug: slug });
     instance._isMounted = true;
@@ -218,11 +233,11 @@ describe('QuestionFilter cache helpers', () => {
     instance.handleBookmarkCurrentFilter();
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(writeSpy).toHaveBeenCalledWith('filters', slug, expect.any(Object));
+    expect(updateSpy).toHaveBeenCalledWith('filters', slug, expect.any(Function));
     expect(instance.checkIfCurrentFilterIsBookmarked).not.toHaveBeenCalled();
     expect(instance.setState).not.toHaveBeenCalledWith(expect.objectContaining({ filterBookmarkedFeedback: true }));
 
-    writeSpy.mockRestore();
+    updateSpy.mockRestore();
   });
 
   it('does not set bookmark state when the computed bookmark match is unchanged', async () => {

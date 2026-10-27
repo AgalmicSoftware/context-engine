@@ -217,7 +217,12 @@ export const resolveGeneratedResultsControllerState = ({
     : viewOptions[0]?.key || SESSION_GENERATED_RESULTS_VIEW_KEYS.CIRCLES;
   const manualMode = settings.generationMode === 'manual' || settings.generationMode === 'both';
   const manualCapability = toRecord(capability.manual);
-  const lastFailure = readError(state.lastFailure);
+  const failure = toRecord(state.lastFailure);
+  const failureReason = readError(failure);
+  const lastFailure =
+    failure.retriesExhausted === true
+      ? `Automatic retries have stopped.${failureReason ? ` ${failureReason}` : ''}`
+      : failureReason;
   const pollExpired = body.pollExpired === true;
   const active = toRecord(state.active);
   const hasActiveJob = jobState === 'running' || jobState === 'queued' || !!active.attemptId || !!active.requestId;

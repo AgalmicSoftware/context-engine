@@ -368,6 +368,7 @@ const WorkerGroupDetailView = ({
                 </CETooltip>
               </div>
               <SbtPageRelevantInfo
+                sessionSlug={sessionSlug}
                 compact
                 documentIDHashes={[]}
                 documentURLs={documentURLs}

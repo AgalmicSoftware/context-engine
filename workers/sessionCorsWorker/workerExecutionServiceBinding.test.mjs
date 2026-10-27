@@ -18,6 +18,7 @@ test('createWorkerExecutionServicesWithWorkerDeps directly owns the five executi
   });
 
   const response = await services.proxyAnthropic({
+    config: { ai: { mode: 'anthropic', models: { fast: 'claude-sonnet-4-6' } } },
     payload: { prompt: 'ping' },
     secrets: { anthropicKey: 'test-key' },
   });

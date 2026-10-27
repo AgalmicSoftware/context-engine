@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { corsHeaders } from './corsPrimitives.js';
 
 import { dispatchSponsoredBootstrapRedeem } from './sponsoredBootstrapRedeemDispatch.js';
 
@@ -120,7 +121,7 @@ test('dispatchSponsoredBootstrapRedeem rejects invalid JSON before reading grant
 });
 
 test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path and stores a safe receipt on success', async () => {
-  const { env, deletes } = createKvEnv({
+  const { env, deletes, store } = createKvEnv({
     type: 'deploy-worker',
     sourceSessionSlug: 'source-session',
     sourceConfig: {
@@ -146,12 +147,14 @@ test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path and 
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
     action: 'deploy',
     deps: createDeployDeps({
+      json: (body, status, headers) => Response.json(body, { status, headers }),
+      getCorsContext: async () => ({ ok: true, headers: corsHeaders('https://allowed.example.test', ['https://allowed.example.test']) }),
       executeDeployHelperRequest: async (value) => {
         embeddedCalls.push(value);
         return {
           ok: true,
           status: 200,
-          body: { ok: true, workerUrl: 'https://fresh-session.example.test' },
+          body: { ok: true, workerUrl: 'https://fresh-session.example.test', envelopeKekSecretSet: true, recoveryKey: 'a'.repeat(64), recoveryKeyFingerprint: 'b'.repeat(64) },
         };
       },
       fetch: async () => {
@@ -182,10 +185,11 @@ test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path and 
     consoleImpl: console,
   }]);
   assert.deepEqual(deletes, []);
-  assert.deepEqual(result, {
-    body: { ok: true, workerUrl: 'https://fresh-session.example.test' },
+  assert.doesNotMatch(JSON.stringify([...store.values()]), new RegExp('a'.repeat(64)));
+  assert.deepEqual({ body: await result.json(), status: result.status, headers: Object.fromEntries(result.headers) }, {
+    body: { ok: true, workerUrl: 'https://fresh-session.example.test', envelopeKekSecretSet: true, recoveryKey: 'a'.repeat(64), recoveryKeyFingerprint: 'b'.repeat(64) },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+    headers: Object.fromEntries(new Headers([...Array.from(corsHeaders('https://allowed.example.test', ['https://allowed.example.test'])), ['Cache-Control', 'no-store'], ['Content-Type', 'application/json']])),
   });
 });
 
@@ -238,8 +242,8 @@ test('dispatchSponsoredBootstrapRedeem deploys only the sponsor-configured relea
   }
   assert.equal(deployed.bundleUrl, SPONSOR_RELEASE_ENV.WORKER_BUNDLE_URL);
   assert.equal(deployed.bundleManifestUrl, SPONSOR_RELEASE_ENV.WORKER_BUNDLE_MANIFEST_URL);
-  assert.equal(deployed.agentBridgeBundleUrl, bridgeRelease.AGENT_BRIDGE_BUNDLE_URL);
-  assert.equal(deployed.agentBridgeBundleManifestUrl, bridgeRelease.AGENT_BRIDGE_BUNDLE_MANIFEST_URL);
+  assert.equal(deployed.agentBridgeBundleUrl, undefined);
+  assert.equal(deployed.agentBridgeBundleManifestUrl, undefined);
 });
 
 test('dispatchSponsoredBootstrapRedeem refuses deploys before using the grant when no release is configured', async () => {
@@ -269,9 +273,7 @@ test('dispatchSponsoredBootstrapRedeem refuses deploys before using the grant wh
     assert.equal(result.status, 400);
     assert.match(result.body.error, /WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL/);
   }
-  const bridge = await attempt({}, { ...payload, sessionModeProfile: { surfaces: { agentHttp: true } } });
-  assert.equal(bridge.status, 400);
-  assert.match(bridge.body.error, /AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL/);
+
 });
 
 test('dispatchSponsoredBootstrapRedeem returns retryable embedded deploy failures directly and keeps the grant', async () => {

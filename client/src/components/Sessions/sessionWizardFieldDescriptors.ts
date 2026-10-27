@@ -73,7 +73,7 @@ const TOP_LEVEL_FIELD_ORDER = [
   'defaultFilterState',
 ];
 
-const WORKER_ONLY_DRAFT_FIELDS = new Set(['embeddedDeployHelperEnabled']);
+const WORKER_ONLY_DRAFT_FIELDS = new Set(['embeddedDeployHelperEnabled', 'agentSessionWrapped']);
 
 const MORE_OPTIONS_FIELDS = new Set([
   'appearance',

@@ -192,7 +192,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/release-version.mjs');
   expectFile('scripts/release-version.test.mjs');
   expectFile('workers/sessionCorsWorker/package.json');
-  expectFile('workers/agentBridgeWorker/package.json');
+  expectFile('workers/sessionCorsWorker/agent/requestBoundary.mjs');
   expectFile('scripts/run-agent-bridge-worker-tests.js');
   expectFile(publishWorkflowPath);
   expectFile(promoteWorkflowPath);
@@ -433,7 +433,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'cancel-in-progress: false',
     'sessionCorsWorker.bundle.js',
     'deployHelper.bundle.js',
-    'agentBridgeWorker.bundle.js',
     'worker-release-manifest.json',
     '--mode automatic',
     'group: worker-bundle-stable-promotion',

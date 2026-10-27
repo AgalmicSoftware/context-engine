@@ -46,6 +46,7 @@ type SessionWizardShellRenderInfoTooltip = (options: {
 export type SessionWizardShellProps = {
   account: WizardModalsProps['account'];
   allowNativeWorkerVerification: WorkerPanelProps['allowNativeWorkerVerification'];
+  agentHttpEnabled?: boolean;
   activeCreateSbtTargetGate: EncryptionPanelBoundaryProps['activeCreateSbtTargetGate'];
   activeCreateSbtTargetGateId: EncryptionPanelBoundaryProps['activeCreateSbtTargetGateId'];
   activeNormalModeIndex: IntroStatusRailProps['activeNormalModeIndex'];
@@ -85,6 +86,9 @@ export type SessionWizardShellProps = {
   handleCopyAdminUrl: PublishSectionProps['onCopyAdminUrl'];
   handleGateAddSbt: EncryptionPanelBoundaryProps['handleGateAddSbt'];
   handleGateRemoveSbt: EncryptionPanelBoundaryProps['handleGateRemoveSbt'];
+  operatorRecoveryKey?: WorkerPanelProps['operatorRecoveryKey'];
+  setOperatorRecoveryKey?: WorkerPanelProps['setOperatorRecoveryKey'];
+  recoveryKeyDialog?: React.ReactNode;
   handleDeployWorker: WorkerPanelProps['handleDeployWorker'];
   verifyNativeWorker?: WorkerPanelProps['verifyNativeWorker'];
   nativeTemplateSetupIdentity?: WorkerPanelProps['nativeTemplateSetupIdentity'];
@@ -228,6 +232,7 @@ export type SessionWizardShellProps = {
 const SessionWizardShell = ({
   account,
   allowNativeWorkerVerification,
+  agentHttpEnabled = false,
   activeCreateSbtTargetGate,
   activeCreateSbtTargetGateId,
   activeNormalModeIndex,
@@ -267,6 +272,9 @@ const SessionWizardShell = ({
   handleCopyAdminUrl,
   handleGateAddSbt,
   handleGateRemoveSbt,
+  operatorRecoveryKey,
+  setOperatorRecoveryKey,
+  recoveryKeyDialog,
   handleDeployWorker,
   verifyNativeWorker,
   nativeTemplateSetupIdentity,
@@ -446,11 +454,17 @@ const SessionWizardShell = ({
   );
 
   if (showSessionModeProfileGate) {
-    return <div className={styles.groupWizard}>{header}</div>;
+    return (
+      <div className={styles.groupWizard}>
+        {recoveryKeyDialog}
+        {header}
+      </div>
+    );
   }
 
   return (
     <div className={styles.groupWizard}>
+      {recoveryKeyDialog}
       {header}
 
       <SessionWizardIntroStatusRail
@@ -537,6 +551,7 @@ const SessionWizardShell = ({
         {(!isNormalMode || (showNormalModeWorkerStep && !collapsedSections.worker)) && (
           <WorkerPanel
             allowNativeWorkerVerification={allowNativeWorkerVerification}
+            agentHttpEnabled={agentHttpEnabled}
             isNormalMode={isNormalMode}
             t={t}
             renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
@@ -598,6 +613,8 @@ const SessionWizardShell = ({
             toggleLoginModal={toggleLoginModal}
             resolvedActiveSessionSlug={resolvedActiveSessionSlug}
             setDeployForm={setDeployForm}
+            operatorRecoveryKey={operatorRecoveryKey}
+            setOperatorRecoveryKey={setOperatorRecoveryKey}
             handleDeployWorker={handleDeployWorker}
             deployStatusDisplayState={deployStatusDisplayState}
             showWorkerUrlField={showWorkerUrlField}

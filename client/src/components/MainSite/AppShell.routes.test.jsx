@@ -1002,12 +1002,18 @@ describe('AppShell route render smoke', () => {
       subject.componentDidUpdate(prevProps, subject.state);
     };
     const start = getDecryptCacheGeneration();
+    // Worker caches belong to their reader, so a real account change reloads them.
+    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
 
     update(ACCOUNT_A, ACCOUNT_A.toUpperCase().replace('0X', '0x'));
     expect(getDecryptCacheGeneration()).toBe(start);
+    expect(subject.initializeWorkerCanonicalCachesForGroup).not.toHaveBeenCalled();
 
     update(ACCOUNT_A, ACCOUNT_B);
     expect(getDecryptCacheGeneration()).toBe(start + 1);
+    expect(subject.initializeWorkerCanonicalCachesForGroup).toHaveBeenCalledWith(expect.anything(), {
+      resetReadiness: true,
+    });
 
     // Logout clears the store account.
     update(ACCOUNT_B, undefined);

@@ -10,7 +10,6 @@ import { fileURLToPath } from 'node:url';
 
 export const VERIFIED_RELEASE_FILES = Object.freeze([
   'sessionCorsWorker.bundle.js',
-  'agentBridgeWorker.bundle.js',
   'deployHelper.bundle.js',
   'worker-release-manifest.json',
 ]);

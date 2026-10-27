@@ -1042,25 +1042,27 @@ describe('workerCanonicalMetadataHydrationPort', () => {
           expect(matches(question())).toBe(false);
         }
 
-        // Multichoice options are joined with commas in the hash, so a re-split
-        // list shares the id but is a different question.
+        // Legacy ids joined multichoice options with commas, so the id published
+        // for comma options is also the id of their re-split list. New ids keep
+        // them apart; both ids still verify, and the matcher needs exact inputs.
         const MULTI_PROMPT = 'Which budget?';
         const realOptions = ['$1,000', '$2,000'];
         const splitOptions = ['$1', '000', '$2', '000'];
-        const multiId = String(generateQuestionId('multichoice', MULTI_PROMPT, realOptions, false, 99)).toLowerCase();
-        expect(String(generateQuestionId('multichoice', MULTI_PROMPT, splitOptions, false, 99)).toLowerCase()).toBe(
-          multiId,
-        );
-        const multi = (options: string[]) =>
-          question({ id: multiId, type: 'multichoice', prompt: MULTI_PROMPT, options });
+        const legacyId = String(generateQuestionId('multichoice', MULTI_PROMPT, splitOptions, false, 99)).toLowerCase();
+        const currentId = String(generateQuestionId('multichoice', MULTI_PROMPT, realOptions, false, 99)).toLowerCase();
+        expect(currentId).not.toBe(legacyId);
+        const multi = (id: string, options: string[]) =>
+          question({ id, type: 'multichoice', prompt: MULTI_PROMPT, options });
         const resplit = await loadMatcher([listedItem('cf_multi', '2026-10-01T00:00:00.000Z', ATTACKER)], {
-          cf_multi: multi(splitOptions),
+          cf_multi: multi(legacyId, splitOptions),
         });
-        expect(resplit(multi(realOptions))).toBe(false);
-        const same = await loadMatcher([listedItem('cf_multi', '2026-10-01T00:00:00.000Z', AUTHOR)], {
-          cf_multi: multi(realOptions),
-        });
-        expect(same(multi(realOptions))).toBe(true);
+        expect(resplit(multi(legacyId, realOptions))).toBe(false);
+        for (const id of [legacyId, currentId]) {
+          const same = await loadMatcher([listedItem('cf_multi', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+            cf_multi: multi(id, realOptions),
+          });
+          expect(same(multi(id, realOptions))).toBe(true);
+        }
       });
 
       it('ignores surrounding spaces and voice credits written as text, but not case', async () => {

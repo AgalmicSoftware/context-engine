@@ -489,6 +489,184 @@ describe('error paths', () => {
     ]);
   });
 
+  it('replays an unchanged settled survey container and revises it only when its bytes change', async () => {
+    window.ethereum = makeRpcProvider();
+    const stored = new Map();
+    let failQuestion = true;
+    uploadDataToSessionStorage.mockImplementation(async (data, _format, options) => {
+      const payload = typeof data === 'string' ? JSON.parse(data) : data;
+      const isSurvey = Array.isArray(payload.responses);
+      if (!isSurvey && failQuestion) {
+        failQuestion = false;
+        throw new Error('Question upload interrupted');
+      }
+      if (!stored.has(options.requestId)) stored.set(options.requestId, { isSurvey, id: `cf_saved_${stored.size}` });
+      return { storageRef: { backend: 'cloudflare', id: stored.get(options.requestId).id, resource: 'responses' } };
+    });
+    const options = { operationId: 'survey-retry', uploadRevisions: new Map() };
+    const submit = (value) => {
+      const answers = [{ questionID: QUESTION_ID, answer: { value } }];
+      return submitResponses(
+        'wagmi',
+        [QUESTION_ID],
+        answers,
+        SURVEY_ID,
+        { surveyID: SURVEY_ID, responses: answers },
+        WORKER_CANONICAL_GROUP_CFG,
+        options,
+      );
+    };
+    await expect(submit('Yes')).rejects.toThrow('Question upload interrupted');
+    await expect(submit('Yes')).resolves.toMatchObject({ workerCanonicalSubmission: true });
+    const surveyCalls = () =>
+      uploadDataToSessionStorage.mock.calls.filter(([data]) =>
+        Array.isArray((typeof data === 'string' ? JSON.parse(data) : data).responses),
+      );
+    const first = surveyCalls()[0];
+    expect(surveyCalls()[1][0]).toEqual(first[0]);
+    expect(surveyCalls()[1][2].requestId).toBe(first[2].requestId);
+    expect([...stored.values()].filter((row) => row.isSurvey)).toHaveLength(1);
+    await submit('No');
+    await submit('Yes');
+    const keys = surveyCalls().map(([, , upload]) => upload.requestId);
+    expect(new Set(keys)).toHaveProperty('size', 3);
+    expect([...stored.values()].filter((row) => row.isSurvey)).toHaveLength(3);
+  });
+
+  it('reuses unchanged answer keys after a lost reply and changes keys for edited answers', async () => {
+    window.ethereum = makeRpcProvider();
+    const stored = new Map();
+    let lost = false;
+    uploadDataToSessionStorage.mockImplementation(async (data, _format, options) => {
+      const key = options.requestId || `missing-${stored.size}`;
+      if (!stored.has(key)) stored.set(key, { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' });
+      if (!lost) {
+        lost = true;
+        throw new Error('Reply lost after storing the answer.');
+      }
+      return { storageRef: stored.get(key), replayed: true };
+    });
+    const retained = { operationId: 'same-operation', uploadRevisions: new Map() };
+    const submit = (answer, options = retained) =>
+      submitResponses(
+        'wagmi',
+        [QUESTION_ID],
+        [{ questionID: QUESTION_ID, answer }],
+        ethers.constants.HashZero,
+        null,
+        WORKER_CANONICAL_GROUP_CFG,
+        options,
+      );
+    await expect(submit('yes')).rejects.toThrow('Reply lost');
+    await expect(submit('yes')).resolves.toEqual(expect.objectContaining({ workerCanonicalSubmission: true }));
+    const key = uploadDataToSessionStorage.mock.calls[0][2].requestId;
+    expect(key).toMatch(/^answer:v1:same-operation:0x[a-f0-9]{64}:0$/);
+    expect(key.length).toBeLessThanOrEqual(200);
+    expect(uploadDataToSessionStorage.mock.calls[1][2].requestId).toBe(key);
+    expect(stored.size).toBe(1);
+    await submit('edited');
+    expect(uploadDataToSessionStorage.mock.calls[2][2].requestId).not.toBe(key);
+    expect(stored.size).toBe(2);
+    await submit('yes', {});
+    await submit('yes', {});
+    expect(stored.size).toBe(4);
+  });
+
+  it('stores Yes, No, Yes as three revisions while another question remains unsaved', async () => {
+    window.ethereum = makeRpcProvider();
+    const question2 = ethers.utils.id('held-back-question');
+    const stored = new Map();
+    uploadDataToSessionStorage.mockImplementation(async (data, _format, options) => {
+      const payload = typeof data === 'string' ? JSON.parse(data) : data;
+      if (payload.questionID === question2) throw new Error('Second question held back');
+      if (!stored.has(options.requestId))
+        stored.set(options.requestId, {
+          payload,
+          createdAt: stored.size + 1,
+          responder: TEST_ADDRESS,
+          storageId: `cf_revision_${stored.size + 1}`,
+        });
+      return {
+        storageRef: { backend: 'cloudflare', id: stored.get(options.requestId).storageId, resource: 'responses' },
+      };
+    });
+    const options = { operationId: 'held-back-operation', uploadRevisions: new Map() };
+    for (const value of ['Yes', 'No', 'Yes']) {
+      await expect(
+        submitResponses(
+          'wagmi',
+          [QUESTION_ID, question2],
+          [
+            { questionID: QUESTION_ID, answer: { value } },
+            { questionID: question2, answer: { value: 'pending' } },
+          ],
+          ethers.constants.HashZero,
+          null,
+          WORKER_CANONICAL_GROUP_CFG,
+          options,
+        ),
+      ).rejects.toMatchObject({
+        partialReceipt: { questionResponseRefs: [expect.objectContaining({ questionId: QUESTION_ID })] },
+      });
+    }
+    expect(stored.size).toBe(3);
+    const { latestAnswersByQuestion, summarizeQuestion } = require('../../../../mcp/lib/results.mjs');
+    const entries = [...stored.values()];
+    const latest = latestAnswersByQuestion(entries, {
+      sessionSlug: entries[0].payload.sessionSlug,
+      sessionId: entries[0].payload.sessionId,
+    }).get(QUESTION_ID);
+    expect(latest.get(TEST_ADDRESS).payload.answer.value).toBe('Yes');
+    expect(summarizeQuestion({ id: QUESTION_ID, type: 'freeform' }, latest).recentAnswers).toEqual(['Yes']);
+  });
+
+  it('reports the Worker answers stored before a later upload failed', async () => {
+    window.ethereum = makeRpcProvider();
+    const question2 = `0x${'9'.repeat(64)}`;
+    const stored = { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' };
+    uploadDataToSessionStorage
+      .mockResolvedValueOnce({ storageRef: stored })
+      .mockRejectedValueOnce(new Error('Worker storage is unavailable.'));
+
+    const failure = await submitResponses(
+      'wagmi',
+      [QUESTION_ID, question2],
+      [
+        { questionID: QUESTION_ID, answer: 'yes' },
+        { questionID: question2, answer: 'no' },
+      ],
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+    ).catch((error) => error);
+
+    expect(failure.message).toBe('Worker storage is unavailable.');
+    expect(failure.partialReceipt).toEqual(
+      expect.objectContaining({
+        workerCanonicalSubmission: true,
+        questionResponseRefs: [{ questionId: QUESTION_ID, storageRef: expect.objectContaining(stored) }],
+        storageRefs: [expect.objectContaining(stored)],
+      }),
+    );
+  });
+
+  it('reports no stored answers when the first Worker upload fails', async () => {
+    window.ethereum = makeRpcProvider();
+    uploadDataToSessionStorage.mockRejectedValueOnce(new Error('Worker storage is unavailable.'));
+
+    const failure = await submitResponses(
+      'wagmi',
+      [QUESTION_ID],
+      [{ questionID: QUESTION_ID, answer: 'yes' }],
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+    ).catch((error) => error);
+
+    expect(failure.message).toBe('Worker storage is unavailable.');
+    expect(failure.partialReceipt).toBeUndefined();
+  });
+
   it('persists worker-canonical responses without broadcasting an on-chain transaction', async () => {
     const rpcProvider = makeRpcProvider();
     window.ethereum = rpcProvider;

@@ -23,6 +23,7 @@ describe('sessionWizardFieldDescriptors', () => {
     const orderedEntries = getSessionWizardOrderedDraftEntries({
       defaultTags: 'governance,ai',
       embeddedDeployHelperEnabled: true,
+      agentSessionWrapped: { enabled: true, origin: 'https://worker.example.test' },
       extraField: 'custom',
       sessionInfo: 'Details',
       appearance: { colorSchemeId: 'ocean' },

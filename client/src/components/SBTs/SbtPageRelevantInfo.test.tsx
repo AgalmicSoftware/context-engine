@@ -3,6 +3,18 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 
+jest.mock('../TagPage/TagModal', () => ({
+  __esModule: true,
+  default: ({ activeTag, sessionSlug, toggle }: { activeTag: string; sessionSlug: string; toggle: () => void }) => (
+    <div role="dialog" aria-label="Tag explorer">
+      <span>
+        {activeTag}: {sessionSlug}
+      </span>
+      <button onClick={toggle}>Close tag explorer</button>
+    </div>
+  ),
+}));
+
 const createProps = (overrides: Partial<React.ComponentProps<typeof SbtPageRelevantInfo>> = {}) => ({
   documentIDHashes: ['doc hash'],
   documentURLs: ['https://doc.example.test/public'],
@@ -15,6 +27,27 @@ const createProps = (overrides: Partial<React.ComponentProps<typeof SbtPageRelev
 });
 
 describe('SbtPageRelevantInfo', () => {
+  it('opens tags in a dismissible modal with their session and preserves a scoped link', async () => {
+    render(<SbtPageRelevantInfo {...createProps({ sessionSlug: 'alpha' })} />);
+    const tag = screen.getByRole('link', { name: 'AI Policy' });
+    expect(tag).toHaveAttribute('href', '/tag/AI%20Policy?session=alpha');
+    fireEvent.click(tag);
+    expect(await screen.findByRole('dialog', { name: 'Tag explorer' })).toHaveTextContent('AI Policy: alpha');
+    fireEvent.click(screen.getByRole('button', { name: 'Close tag explorer' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('keeps modified clicks available for direct navigation and explicitly links the General session', () => {
+    render(<SbtPageRelevantInfo {...createProps({ sessionSlug: '' })} />);
+    const tag = screen.getByRole('link', { name: 'AI Policy' });
+    expect(tag).toHaveAttribute('href', '/tag/AI%20Policy?session=general');
+    // Cancel browser navigation after the component has handled the modified click.
+    tag.addEventListener('click', (event) => event.preventDefault());
+    fireEvent.click(tag, { ctrlKey: true });
+    fireEvent.click(tag, { metaKey: true });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('renders public document URLs, document IDs, and tags from explicit props', () => {
     render(<SbtPageRelevantInfo {...createProps()} />);
 

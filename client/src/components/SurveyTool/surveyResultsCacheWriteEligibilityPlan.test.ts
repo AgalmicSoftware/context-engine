@@ -350,6 +350,20 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
     });
   });
 
+  it.each(['survey', 'question'])('removes mixed-case %s bookmarks from the saved list', (bookmarkType) => {
+    const list = bookmarkType === 'survey' ? 'surveys' : 'questions';
+    const bookmarksCache = { [list]: ['0xABC', '0xAbC', '0xDEF'] };
+    const plan = buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+      bookmarkId: '0xabc',
+      bookmarkType,
+      bookmarksCache,
+    });
+    expect(plan.toggled?.action).toBe('remove');
+    expect(plan.payload?.[list]).toEqual(['0xDEF']);
+    expect(plan.statePatch?.value).toEqual(['0xDEF']);
+    expect(bookmarksCache[list]).toEqual(['0xABC', '0xAbC', '0xDEF']);
+  });
+
   it('plans question bookmark removals and preserves current empty-slug identity', () => {
     expect(
       buildSurveyResultsSurveyQuestionBookmarkWritePlan({

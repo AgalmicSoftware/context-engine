@@ -19,6 +19,14 @@ and AI tools, plus the fastest post-deploy crawl steps.
   - Plain-text summary for AI tools with the current deployment-profile model,
     the interactive `/docs` page, the canonical repo, latest-branch reference
     URLs, and safe automation guidance.
+- `client/src/variables/publicSocialPreview.json`
+  - Site-wide link preview: a 1200×630 poster and the product film
+    (`og:video`, 1280×720 MP4, with `og:type` `video.other` so compatible
+    platforms can offer inline playback) served from `client/public/media/product-film/v1/`.
+    `client/index.html` carries the same tags in raw HTML, `syncPublicPageHead()`
+    keeps the runtime head identical, and production builds write `about.html`
+    and `about/index.html` with the `/about` canonical URL. See
+    [`media/product-film/README.md`](../media/product-film/README.md).
 - `client/public/robots.txt`
   - Allows crawling and points bots to the sitemap.
 - `client/public/sitemap.xml`

@@ -1,4 +1,5 @@
 import React from 'react';
+import { hasBookmark } from '../../utilities/cache/bookmarkChanges';
 import { ModalHeader } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
@@ -77,7 +78,7 @@ const SurveyResultsModalHeader = ({
               e.stopPropagation();
               onToggleSurveyBookmark(currentSurveyId);
             }}
-            color={bookmarkedSurveyIDs.includes(currentSurveyId) ? 'gold' : 'grey'}
+            color={hasBookmark({ surveys: bookmarkedSurveyIDs }, 'surveys', currentSurveyId) ? 'gold' : 'grey'}
             style={surveyBookmarkStyle}
             title="Bookmark Survey ID"
           />

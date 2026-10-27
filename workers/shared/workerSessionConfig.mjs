@@ -1,3 +1,4 @@
+import { projectPublicAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import { PUBLIC_WORKER_CONFIG_FIELDS } from '../../shared/workerSessionPublicConfig.mjs';
 
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -25,6 +26,8 @@ const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   'defaultFeaturedSBTs',
   'autoFeatureSBTsBySessionSlug',
   'sessionModeProfile',
+  'agentHttp',
+  'resultsExposure',
   'responseFieldEncryption',
   'workerAuthority',
   'groupCreationPolicy',
@@ -43,6 +46,8 @@ const OPEN_CONFIG_SUBTREE_KEYS = Object.freeze([
   'limits',
   'scopes',
   'sessionModeProfile',
+  'agentHttp',
+  'resultsExposure',
   'storageProfile',
   'workerAuthority',
 ]);
@@ -296,9 +301,11 @@ export const findForbiddenWorkerConfigSecretPath = (config, path = 'config') => 
   return findForbiddenRecursiveSecretAliasPath(recursiveSource, path);
 };
 
-export const projectPublicWorkerSessionConfig = (config) => (
-  selectFields(isObj(config) ? config : {}, PUBLIC_WORKER_CONFIG_FIELDS)
-);
+export const projectPublicWorkerSessionConfig = (config) => {
+  const projected = selectFields(isObj(config) ? config : {}, PUBLIC_WORKER_CONFIG_FIELDS);
+  if (projected.agentHttp) projected.agentHttp = projectPublicAgentConfig(projected.agentHttp);
+  return projected;
+};
 
 const profileUsesOnChainSbt = (profile) => {
   if (profile?.authorization?.mechanisms?.includes?.('sbt_onchain')) return true;

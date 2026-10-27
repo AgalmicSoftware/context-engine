@@ -93,6 +93,7 @@ const loadWorkerCanonicalSurveyMetadata = async (
   };
 };
 
+// Listings are authorized as the host account, so their rows belong to that reader.
 const workerMetadataTargetIsCurrent = (
   options: WorkerMetadataHydrationOptions,
   expected: WorkerCanonicalCacheIdentity,
@@ -101,17 +102,21 @@ const workerMetadataTargetIsCurrent = (
     expected,
     sessionConfig: readWorkerMetadataSessionConfig(options.host, options.sessionSlug),
     sessionSlug: options.sessionSlug,
+    reader: resolveHydrationContext(options.host).account,
   });
+
+export const resolveWorkerMetadataCacheIdentity = (options: WorkerMetadataHydrationOptions) =>
+  resolveWorkerCanonicalCacheIdentity({ ...options, reader: resolveHydrationContext(options.host).account });
 
 const prepareWorkerCanonicalQuestionCache = (
   options: WorkerMetadataHydrationOptions,
 ): WorkerMetadataCachePreparation => {
-  const identity = resolveWorkerCanonicalCacheIdentity(options);
+  const identity = resolveWorkerMetadataCacheIdentity(options);
   return { identity, merge: (current) => mergeWorkerCanonicalQuestionMetadata(current, [], identity) };
 };
 
 const prepareWorkerCanonicalSurveyCache = (options: WorkerMetadataHydrationOptions): WorkerMetadataCachePreparation => {
-  const identity = resolveWorkerCanonicalCacheIdentity(options);
+  const identity = resolveWorkerMetadataCacheIdentity(options);
   return { identity, merge: (current) => mergeWorkerCanonicalSurveyMetadata(current, [], identity) };
 };
 

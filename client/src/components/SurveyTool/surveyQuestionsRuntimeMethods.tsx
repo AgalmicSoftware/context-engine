@@ -101,6 +101,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     resolveSurveyToolResponseGateSessionContext,
     sessionRegistryReadsPort,
     setManagedTimeout,
+    setResponseHydrationState,
     setState,
     shouldRetryMaskedQuestionRefresh,
     startQuestionDecryptAttemptStatusHelper,
@@ -481,19 +482,23 @@ export const createSurveyQuestionsRuntimeMethods = (
     syncViewAllQuestions,
     valuesEqual,
   } = createSurveyQuestionsResponseStateRuntime({
-    ...context,
+    inst,
+    propsRef,
+    stateRef,
+    setState: setState.bind(engine),
+    setResponseHydrationState: setResponseHydrationState.bind(engine),
+    drafts: { load: () => loadDraft(), persist: () => persistDraft(), clear: clearDraft },
+    questionIds: {
+      rendered: getCurrentRenderedQuestionIds,
+      editTracking: () => getEditTrackingQuestionIds(),
+      hydration: () => getHydrationQuestionIds(),
+    },
     buildEmptyResponseFieldState,
-    updateJsonPreview,
     buildLocalCacheHydrationSignature,
-    clearDraft,
     ensurePriorResponsesForRenderedIds,
-    getCurrentRenderedQuestionIds,
-    getEditTrackingQuestionIds: () => getEditTrackingQuestionIds(),
-    getHydrationQuestionIds: () => getHydrationQuestionIds(),
     initializeSurveyResponseState: () => initializeSurveyResponseState(),
-    loadDraft: () => loadDraft(),
-    persistDraft: () => persistDraft(),
     recalculateEditStats: () => recalculateEditStats(),
+    updateJsonPreview,
   });
 
   const {
@@ -808,6 +813,11 @@ export const createSurveyQuestionsRuntimeMethods = (
     const workerTargetChanged =
       resolveWorkerTargetForProps(prevProps).key !== resolveWorkerTargetForProps(propsRef.current).key;
     if (prevProps.account !== propsRef.current.account || workerTargetChanged) {
+      delete inst._submitOperationId;
+      delete inst._submitOperationContextKey;
+      delete inst._submitOperationTimestamp;
+      delete inst._submitOperationPayloads;
+      delete inst._submitUploadRevisions;
       // Props already identify the next account/Worker. Never flush the previous
       // form through its key; dirty-edit guards must not preserve it across authorities.
       if (inst._persistTimer) clearTimeout(inst._persistTimer);
@@ -2121,6 +2131,8 @@ export const createSurveyQuestionsRuntimeMethods = (
 
     // Changed questions upload even when blank: clearing a saved answer is an edit.
     const data: SurveyQuestionsLegacyValue = prepareJsonAndHash(idx, undefined, overrideState, changedSet);
+    // A retry must not change otherwise identical bytes just because time passed.
+    if (context.operationTimestamp && data?.timeStamp) data.timeStamp = context.operationTimestamp;
 
     // A changed question that cannot be uploaded as it is stays unsaved and is named; it never
     // holds back the other edits, and only rows that reach storage are marked saved.
@@ -2132,7 +2144,7 @@ export const createSurveyQuestionsRuntimeMethods = (
       ),
     );
     const submitSlice: SurveyQuestionsLegacyValue = overrideState || stateRef.current.surveysResponseState?.[idx] || {};
-    const heldBack = new Map<string, 'unlisted' | 'locked'>();
+    const heldBack = new Map<string, 'unlisted' | 'locked' | 'unsaved'>();
     Array.from(changedSet as Set<string>).forEach((qid) => {
       if (
         !payloadQids.has(normalizeQuestionIdKey(qid)) &&
@@ -2155,6 +2167,7 @@ export const createSurveyQuestionsRuntimeMethods = (
             ?.prompt || '',
         ).trim();
         const name = prompt && !isMaskedPromptText(prompt) ? `“${prompt}”` : `Question ${qid.slice(0, 10)}…`;
+        if (reason === 'unsaved') return `${name} wasn't saved yet; submit again to send it.`;
         return reason === 'locked'
           ? `${name} still holds a locked value that can't be sent as it is, so it wasn't submitted. Decrypt it, set its lock again and submit.`
           : `${name} isn't in this page's question list, so its change wasn't submitted. If it came from an interview, remove that draft; otherwise reload the page and submit again.`;
@@ -2237,6 +2250,19 @@ export const createSurveyQuestionsRuntimeMethods = (
         }
         return source;
       });
+      // Re-encrypting an unchanged rating would change its bytes and defeat the
+      // upload receipt. Keep prepared bytes only for this operation and input.
+      const retryPayloads = context.operationPayloads instanceof Map ? context.operationPayloads : null;
+      const inputSignatures = new Map<string, string>();
+      const responsesToEncrypt = questionResponses.filter((response: SurveyQuestionsLegacyValue) => {
+        const qid = normalizeQuestionIdKey(response.questionID);
+        const input = JSON.stringify(response);
+        inputSignatures.set(qid, input);
+        const prior = retryPayloads?.get(qid);
+        if (prior?.input !== input) return true;
+        Object.assign(response, deepClone(prior.payload));
+        return false;
+      });
       await processRatingEnvelopesForSubmit(
         {
           sliceForSubmit:
@@ -2250,7 +2276,7 @@ export const createSurveyQuestionsRuntimeMethods = (
                 },
           // A standalone pile may hydrate fields without populating userAnswers.
           userAnswersSource: { responses: ratingSources },
-          questionResponses,
+          questionResponses: responsesToEncrypt,
           changedMapForSubmit,
           encryptionBaseOpts: {
             sessionSlug: submissionGroupKey,
@@ -2285,6 +2311,10 @@ export const createSurveyQuestionsRuntimeMethods = (
           warn: (msg: SurveyQuestionsLegacyValue, err: SurveyQuestionsLegacyValue) => surveyLog.warn(msg, err),
         },
       );
+      questionResponses.forEach((response: SurveyQuestionsLegacyValue) => {
+        const qid = normalizeQuestionIdKey(response.questionID);
+        retryPayloads?.set(qid, { input: inputSignatures.get(qid), payload: deepClone(response) });
+      });
     } catch (e: any) {
       surveyLog.error('Failed to encrypt response rating:', e);
       throw e;
@@ -2333,18 +2363,47 @@ export const createSurveyQuestionsRuntimeMethods = (
       sessionSlug: submissionGroupKey,
       sessionConfig: submissionSessionConfig,
     });
-    const tx: SurveyQuestionsLegacyValue = await surveyResponseSubmitPort.submitResponses(
-      context.provider,
-      hashedQuestionIds,
-      questionResponses,
-      hashedSurveyId,
-      surveyResponse,
-      submissionTarget,
-    );
+    let tx: SurveyQuestionsLegacyValue;
+    let uploadFailure = '';
+    try {
+      tx = await surveyResponseSubmitPort.submitResponses(
+        context.provider,
+        hashedQuestionIds,
+        questionResponses,
+        hashedSurveyId,
+        surveyResponse,
+        submissionTarget,
+        { operationId: context.operationId, uploadRevisions: context.uploadRevisions },
+      );
+    } catch (error: unknown) {
+      // Answers a Worker stored before a later upload failed are saved; the rest keep
+      // their drafts and are named, so the next Submit sends only those.
+      if (!error || typeof error !== 'object' || !('partialReceipt' in error)) throw error;
+      const partialReceipt = error.partialReceipt;
+      if (
+        !partialReceipt ||
+        typeof partialReceipt !== 'object' ||
+        !('questionResponseRefs' in partialReceipt) ||
+        !Array.isArray(partialReceipt.questionResponseRefs) ||
+        !partialReceipt.questionResponseRefs.length
+      )
+        throw error;
+      const savedCount = partialReceipt.questionResponseRefs.length;
+      tx = { ...partialReceipt, retryPending: true };
+      const failureMessage = 'message' in error ? error.message : '';
+      uploadFailure = `Some answers didn't save (${String(failureMessage || 'upload failed').replace(/\.$/, '')}).`;
+      questionResponses
+        .slice(savedCount)
+        .forEach((response: SurveyQuestionsLegacyValue) =>
+          heldBack.set(normalizeQuestionIdKey(response?.questionID), 'unsaved'),
+        );
+      questionResponses = questionResponses.slice(0, savedCount);
+      if (surveyResponse) surveyResponse = { ...surveyResponse, responses: questionResponses };
+    }
 
     if (heldBack.size) {
       inst._heldBackSubmitQids = Array.from(heldBack.keys());
-      inst._heldBackSubmitMessage = describeHeldBack();
+      inst._heldBackSubmitMessage = [uploadFailure, describeHeldBack()].filter(Boolean).join(' ');
       setState({ submissionError: inst._heldBackSubmitMessage });
     }
     return normalizeSubmitReceipt(tx, {

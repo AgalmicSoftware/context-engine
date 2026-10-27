@@ -23,7 +23,13 @@ import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 import { getGlobalLitHooks, litStorage } from 'utilities/crypto/litProtocol.js';
 import { createLogger } from 'utilities/logging.js';
-import { listNamespaceEntriesSync, peekCacheSync, readCache, writeCache } from '../../utilities/cache/cacheScripts.js';
+import {
+  listNamespaceEntriesSync,
+  peekCacheSync,
+  readCache,
+  updateCacheAtomic,
+} from '../../utilities/cache/cacheScripts.js';
+import { applyBookmarkChange } from '../../utilities/cache/bookmarkChanges';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { notify } from '../../utilities/ui/notify.js';
@@ -3536,29 +3542,11 @@ class SBTPage extends Component<any, any> {
         '',
     );
 
-    try {
-      const existingManaged = peekCacheSync('bookmarksCache', bookmarksSlug, { clone: false });
-      const baseManaged = isRecord(existingManaged) ? existingManaged : {};
-      const managedBookmarks: Record<string, unknown> & { sbts: string[] } = {
-        ...baseManaged,
-        sbts: Array.isArray(baseManaged.sbts) ? baseManaged.sbts.map((entry) => String(entry || '')) : [],
-      };
-      const alreadyManaged = managedBookmarks.sbts.some(
-        (entry) => String(entry || '').toLowerCase() === sbtAddressLower,
-      );
-      if (!alreadyManaged) {
-        managedBookmarks.sbts.push(sbtAddressLower);
-        void (writeCache as unknown as (namespace: string, slug?: string, value?: unknown) => Promise<unknown>)(
-          'bookmarksCache',
-          bookmarksSlug,
-          managedBookmarks,
-        ).catch((e: unknown) => {
-          sbtLog.warn('SBTPage: fallback', e);
-        });
-      }
-    } catch (e) {
+    void updateCacheAtomic<Record<string, unknown>>('bookmarksCache', bookmarksSlug, (saved) =>
+      applyBookmarkChange(saved, 'sbts', sbtAddressLower, true),
+    ).catch((e: unknown) => {
       sbtLog.warn('SBTPage: fallback', e);
-    }
+    });
 
     try {
       const bookmarks = this.readQueuedOrStoredLocalStorageJson<BookmarkStorageCache>('bookmarks', {});
@@ -3805,6 +3793,7 @@ class SBTPage extends Component<any, any> {
 
     return (
       <SbtPageRelevantInfo
+        sessionSlug={this.getEffectiveSessionSlug()}
         documentIDHashes={documentIDHashes}
         documentURLs={documentURLs}
         onOpenEncryptedDoc={this.openEncryptedDoc}

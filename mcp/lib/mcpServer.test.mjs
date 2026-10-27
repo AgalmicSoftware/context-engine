@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
+import { ethers } from 'ethers';
 import { createMcpServer, serveStdio, SUPPORTED_PROTOCOL_VERSIONS } from './mcpServer.mjs';
 
 const tools = [
@@ -189,4 +190,50 @@ test('a call past the time limit is signalled to stop and reported as possibly p
   assert.match(slow.result.content[0].text, /time limit.*Check before retrying/);
   const quick = JSON.parse(await srv.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'quick' } })));
   assert.equal(quick.result.isError, undefined);
+});
+
+const failing = (errors, log) => createMcpServer({
+  serverInfo: { name: 't', version: '1' }, log,
+  tools: errors.map((error, index) => ({ name: `fail${index}`, description: '', inputSchema: { type: 'object' }, handler: async () => { throw error; } })),
+});
+const errorTexts = async (srv, count) => {
+  const texts = [];
+  for (let index = 0; index < count; index += 1) {
+    texts.push((await call(srv, { jsonrpc: '2.0', id: index, method: 'tools/call', params: { name: `fail${index}` } })).result.content[0].text);
+  }
+  return texts;
+};
+
+test('error text for the client and the log drops RPC URLs and request data that escaped the chain boundary', async () => {
+  const secret = 'https://rpc.example.invalid/v2/SYNTHETIC_RPC_SECRET_123';
+  const errors = [
+    ethers.logger.makeError('cannot estimate gas; transaction may fail or may require manual gas limit', ethers.errors.UNPREDICTABLE_GAS_LIMIT, {
+      reason: 'execution reverted', transaction: { data: '0xfeedfacecafe' }, error: { url: secret, requestBody: '{"params":["0xfeedfacecafe"]}' },
+    }),
+    new Error(`Faucet check failed: request failed url=${secret} body=0xfeedfacecafe`),
+    // A local hostname preserves synthetic userinfo through public text scrubbing.
+    new Error('Could not reach https://agent:fixture-password@localhost:8545/v2/SYNTHETIC_RPC_SECRET_123?key=SYNTHETIC_RPC_SECRET_123'),
+    new Error('x'.repeat(5000)),
+  ];
+  const logs = [];
+  const texts = await errorTexts(failing(errors, (line) => logs.push(line)), errors.length);
+  assert.deepEqual(texts, [
+    'cannot estimate gas; transaction may fail or may require manual gas limit',
+    'Faucet check failed: request failed',
+    'Could not reach https://localhost:8545',
+    'x'.repeat(1000),
+  ]);
+  assert.deepEqual(logs, texts.map((text, index) => `tool fail${index} failed: ${text}`));
+});
+
+test('deliberate error messages reach the client and the log unchanged', async () => {
+  const messages = [
+    'Join this session first with join_session.',
+    'The RPC is on a different chain (10); expected 11155420.',
+    'This session only allows sign-in from other web apps (https://app.example.org). Ask the session admin to allow https://contextengine.sh.',
+    'Session link must be a full URL, such as https://contextengine.sh/session/<slug>?worker=<origin>.',
+  ];
+  const logs = [];
+  assert.deepEqual(await errorTexts(failing(messages.map((message) => new Error(message)), (line) => logs.push(line)), messages.length), messages);
+  assert.deepEqual(logs, messages.map((message, index) => `tool fail${index} failed: ${message}`));
 });

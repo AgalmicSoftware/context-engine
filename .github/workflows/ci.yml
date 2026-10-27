@@ -208,6 +208,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -276,12 +278,16 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             client/package-lock.json
+            workers/sessionCorsWorker/package-lock.json
 
       - name: Install root dependencies
         run: npm ci
 
       - name: Install client dependencies
         run: npm --prefix client ci
+
+      - name: Install Session Worker dependencies
+        run: npm --prefix workers/sessionCorsWorker ci
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
@@ -295,6 +301,7 @@ jobs:
         env:
           BASE_URL: http://127.0.0.1:4173
           SMOKE_ROUTES: /session/new,/session/pe4,/about,/contracts
+          OUTPUT_DIR: /tmp/context-engine-publication-smoke
         run: |
           set -euo pipefail
           npm --prefix client run preview -- --host 127.0.0.1 --port 4173 > /tmp/context-engine-vite-preview.log 2>&1 &
@@ -314,7 +321,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: e2e-smoke-diagnostics
-          path: /tmp/context-engine-vite-preview.log
+          path: |
+            /tmp/context-engine-vite-preview.log
+            /tmp/context-engine-publication-smoke/
           if-no-files-found: warn
           retention-days: 7
 
@@ -352,6 +361,9 @@ jobs:
       - name: Install Context Engine MCP dependencies
         run: npm --prefix mcp ci
 
+      - name: Build and check production and bundled dependency licenses
+        run: npm run -s license:check
+
 
       - name: Resolve client growth baseline
         id: client-growth-base
@@ -368,7 +380,17 @@ jobs:
       - name: Run Context Engine CC and Node gate
         env:
           CLIENT_LARGE_FILE_BASE_REF: ${{ steps.client-growth-base.outputs.base_sha }}
+          MCP_RELEASE_OUTPUT: ${{ runner.temp }}/mcp-release
         run: npm run ci:gate -- cecc-and-node
+
+      - name: Upload tested MCP package
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mcp-package-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mcp-release
+          if-no-files-found: error
+          retention-days: 30
 
   test:
     name: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'release-staging') && 'release-staging-pr-deduplicated' || 'test' }}

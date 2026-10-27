@@ -10,6 +10,7 @@ import {
 } from '../../utilities/session/sessionWorkerDiscovery';
 import {
   markWorkerCanonicalSessionBootstrapVerified,
+  readSessionWorkerConfigCache,
   upsertWorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerConfigCache.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
@@ -22,6 +23,7 @@ jest.mock('../../utilities/session/sessionWorkerDiscovery', () => ({
 
 jest.mock('../../utilities/session/sessionWorkerConfigCache.js', () => ({
   markWorkerCanonicalSessionBootstrapVerified: jest.fn(),
+  readSessionWorkerConfigCache: jest.fn(),
   upsertWorkerCanonicalSessionBootstrap: jest.fn(),
 }));
 
@@ -83,6 +85,97 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     mockUpsertBootstrap.mockReturnValue(cachedResult);
     mockMarkBootstrapVerified.mockReturnValue(true);
     window.sessionStorage.clear();
+    window.localStorage.clear();
+    jest.mocked(readSessionWorkerConfigCache).mockReturnValue({ v: 3, bySession: {}, slugIndex: {} });
+  });
+
+  it.each(['missing_config', 'identity_mismatch', 'cors'] as const)(
+    'offers empty-deployment recovery only for a missing config (%s)',
+    async (code) => {
+      mockFetchBootstrap.mockRejectedValueOnce(new WorkerSessionBootstrapRequestError('Unavailable', { code }));
+      const onResolved = jest.fn();
+      render(
+        <WorkerCanonicalSessionBootstrapBoundary
+          sessionSlug="worker-session"
+          workerQueryValue={WORKER_ORIGIN}
+          onResolved={onResolved}
+          missingConfigFallback={<div>Restore an empty deployment</div>}
+        />,
+      );
+      await screen.findByRole('alert');
+      expect(Boolean(screen.queryByText('Restore an empty deployment'))).toBe(code === 'missing_config');
+      expect(onResolved).not.toHaveBeenCalled();
+      expect(mockMarkBootstrapVerified).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([false, true])(
+    'checks the pinned origin before offering missing-config recovery (approval=%s)',
+    async (approved) => {
+      const cache = jest.requireActual<typeof import('../../utilities/session/sessionWorkerConfigCache.js')>(
+        '../../utilities/session/sessionWorkerConfigCache.js',
+      );
+      cache.upsertWorkerCanonicalSessionBootstrap({
+        slug: bootstrap.sessionSlug,
+        sessionIdHex: SESSION_ID,
+        workerOrigin: EXISTING_WORKER_ORIGIN,
+        config: { ...bootstrap.config, corsWorkerUrl: EXISTING_WORKER_ORIGIN },
+        configRevision: 'revision-1',
+      });
+      jest.mocked(readSessionWorkerConfigCache).mockReturnValue(cache.readSessionWorkerConfigCache());
+      mockFetchBootstrap.mockRejectedValueOnce(
+        new WorkerSessionBootstrapRequestError('Missing config', { code: 'missing_config', status: 404 }),
+      );
+      const decision = deferred<boolean>();
+      const confirmRepin = jest.fn((_message: string) => decision.promise);
+      render(
+        <WorkerCanonicalSessionBootstrapBoundary
+          sessionSlug="worker-session"
+          workerQueryValue={WORKER_ORIGIN}
+          onResolved={jest.fn()}
+          confirmRepin={confirmRepin}
+          missingConfigFallback={<div>Restore an empty deployment</div>}
+        />,
+      );
+      await waitFor(() => expect(confirmRepin).toHaveBeenCalledTimes(1));
+      expect(confirmRepin.mock.calls[0][0]).toContain(EXISTING_WORKER_ORIGIN);
+      expect(confirmRepin.mock.calls[0][0]).toContain(WORKER_ORIGIN);
+      expect(screen.queryByText('Restore an empty deployment')).not.toBeInTheDocument();
+      await act(async () => decision.resolve(approved));
+      await screen.findByRole('alert');
+      expect(Boolean(screen.queryByText('Restore an empty deployment'))).toBe(approved);
+      expect(mockUpsertBootstrap).not.toHaveBeenCalled();
+      expect(mockMarkBootstrapVerified).not.toHaveBeenCalled();
+    },
+  );
+
+  it('offers missing-config recovery at the pinned origin without requesting a repin', async () => {
+    const cache = jest.requireActual<typeof import('../../utilities/session/sessionWorkerConfigCache.js')>(
+      '../../utilities/session/sessionWorkerConfigCache.js',
+    );
+    cache.upsertWorkerCanonicalSessionBootstrap({
+      slug: bootstrap.sessionSlug,
+      sessionIdHex: SESSION_ID,
+      workerOrigin: WORKER_ORIGIN,
+      config: bootstrap.config,
+      configRevision: 'revision-1',
+    });
+    jest.mocked(readSessionWorkerConfigCache).mockReturnValue(cache.readSessionWorkerConfigCache());
+    mockFetchBootstrap.mockRejectedValueOnce(
+      new WorkerSessionBootstrapRequestError('Missing config', { code: 'missing_config', status: 404 }),
+    );
+    const confirmRepin = jest.fn();
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        onResolved={jest.fn()}
+        confirmRepin={confirmRepin}
+        missingConfigFallback={<div>Restore an empty deployment</div>}
+      />,
+    );
+    expect(await screen.findByText('Restore an empty deployment')).toBeInTheDocument();
+    expect(confirmRepin).not.toHaveBeenCalled();
   });
 
   it('renders loading state, resolves through discovery, caches without repinning, and reports the bootstrap', async () => {

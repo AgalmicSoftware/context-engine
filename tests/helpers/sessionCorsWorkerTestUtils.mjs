@@ -243,12 +243,12 @@ export const createMemoryKv = (seed = {}) => {
 };
 
 const cloneCoordinatorTestValue = (value) => (
-  typeof globalThis.structuredClone === 'function'
+  value == null ? value : typeof globalThis.structuredClone === 'function'
     ? globalThis.structuredClone(value)
     : JSON.parse(JSON.stringify(value))
 );
 
-export const installSessionCoordinatorBinding = (env = {}) => {
+export const installSessionCoordinatorBinding = (env = {}, CoordinatorClass = SessionWriteCoordinator) => {
   if (env.CE_SESSION_COORDINATOR) return env;
   const instances = new Map();
   env.CE_SESSION_COORDINATOR = {
@@ -261,9 +261,12 @@ export const installSessionCoordinatorBinding = (env = {}) => {
           const run = tail.then(async () => {
             const staged = new Map([...values].map(([key, value]) => [key, cloneCoordinatorTestValue(value)]));
             const result = await callback({
-              get: async (key) => staged.get(key),
+              get: async (key) => cloneCoordinatorTestValue(staged.get(key)),
               put: async (key, value) => staged.set(key, cloneCoordinatorTestValue(value)),
               delete: async (key) => staged.delete(key),
+              list: async ({ prefix = '', startAfter = '', limit = 1000 } = {}) => new Map([...staged]
+                .filter(([key]) => key.startsWith(prefix) && key > startAfter)
+                .sort(([a], [b]) => a < b ? -1 : 1).slice(0, limit)),
             });
             values.clear();
             for (const [key, value] of staged) values.set(key, value);
@@ -274,13 +277,16 @@ export const installSessionCoordinatorBinding = (env = {}) => {
         };
         const state = {
           storage: {
-            get: async (key) => values.get(key),
+            get: async (key) => cloneCoordinatorTestValue(values.get(key)),
             put: async (key, value) => values.set(key, cloneCoordinatorTestValue(value)),
             delete: async (key) => values.delete(key),
+            list: async ({ prefix = '', startAfter = '', limit = 1000 } = {}) => new Map([...values]
+              .filter(([key]) => key.startsWith(prefix) && key > startAfter)
+              .sort(([a], [b]) => a < b ? -1 : 1).slice(0, limit)),
             transaction,
           },
         };
-        const coordinator = new SessionWriteCoordinator(state, env);
+        const coordinator = new CoordinatorClass(state, env);
         instances.set(id, {
           fetch: (input, init) => coordinator.fetch(
             input instanceof Request ? input : new Request(input, init),
@@ -362,6 +368,7 @@ export const createSignedSiweBody = async ({
   env,
   wallet,
   sessionSlug,
+  sessionId,
   body = {},
   chainId = 84532,
   adminAction,
@@ -392,6 +399,7 @@ export const createSignedSiweBody = async ({
       makeJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug,
+        ...(sessionId ? { sessionId } : {}),
         adminAction: true,
       }, {
         headers: { Origin: resolvedAudience },
@@ -409,6 +417,7 @@ export const createSignedSiweBody = async ({
     const unsignedBody = {
       address,
       sessionSlug: targetSlug,
+      ...(sessionId ? { sessionId } : {}),
       ...body,
     };
     const expiration = Math.floor(Date.now() / 1000) + 5 * 60;

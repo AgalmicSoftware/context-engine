@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import PileHologramAssistant from './PileHologramAssistant';
 import {
@@ -366,6 +366,59 @@ describe('surveyPileInteractionSurface', () => {
     expect(nodeHasClassName(listeningToggle, 'actionButtonActive')).toBe(true);
     (listeningToggle?.props.onClick as () => void)();
     expect(toggleVoiceModeModal).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps voice mode beside the question menu, with one reachable control and the existing handler', () => {
+    const toggleVoiceModeModal = jest.fn();
+    const { rerender } = render(
+      renderPileInteractionSurface({ ...buildBaseProps(), showVoiceModeControl: true, toggleVoiceModeModal }),
+    );
+    const voice = screen.getByRole('button', { name: 'Open voice mode' });
+    const menu = screen.getByRole('button', { name: 'Question actions' }).parentElement;
+    expect(menu?.parentElement).toBe(voice.parentElement);
+    expect(within(menu!).queryByTestId('ce-session-listening-toggle')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('ce-session-listening-toggle')).toHaveLength(1);
+    expect(voice).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(voice);
+    expect(toggleVoiceModeModal).toHaveBeenCalledTimes(1);
+
+    rerender(renderPileInteractionSurface({ ...buildBaseProps(), showVoiceModeControl: false }));
+    expect(screen.queryByTestId('ce-session-listening-toggle')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Question actions' })).toBeInTheDocument();
+  });
+
+  it('opens labelled question actions over a dismissible backdrop and preserves each action', () => {
+    const toggleFilterModal = jest.fn(),
+      toggleCreate = jest.fn(),
+      handleViewAllFromPile = jest.fn();
+    render(
+      renderPileInteractionSurface({ ...buildBaseProps(), toggleFilterModal, toggleCreate, handleViewAllFromPile }),
+    );
+    const toggle = screen.getByRole('button', { name: 'Question actions' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    const dialog = screen.getByRole('dialog', { name: 'Question actions' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(within(dialog).getByRole('button', { name: 'Filter questions' })).toHaveFocus();
+    expect(within(dialog).getByRole('button', { name: 'Add questions' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'All questions' })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ce-question-actions-backdrop'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(toggle).toHaveFocus();
+    fireEvent.click(toggle);
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(toggle).toHaveFocus();
+    for (const [label, handler] of [
+      ['Filter questions', toggleFilterModal],
+      ['Add questions', toggleCreate],
+      ['All questions', handleViewAllFromPile],
+    ] as const) {
+      fireEvent.click(toggle);
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: label }));
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId('ce-question-actions-backdrop')).not.toBeInTheDocument();
+    }
   });
 
   it('marks every icon-only pile toolbar button as frameless across app themes', () => {

@@ -409,6 +409,18 @@ export const createSurveyQuestionsSubmitRuntime = (
       }
 
       submitContext = buildSubmitContextSnapshot();
+      const operationContextKey = buildSubmitContextKey(submitContext);
+      if (!inst._submitOperationId || inst._submitOperationContextKey !== operationContextKey) {
+        inst._submitOperationId = ethers.utils.hexlify(ethers.utils.randomBytes(16));
+        inst._submitOperationContextKey = operationContextKey;
+        inst._submitOperationTimestamp = Date.now();
+        inst._submitOperationPayloads = new Map();
+        inst._submitUploadRevisions = new Map();
+      }
+      submitContext.operationId = inst._submitOperationId;
+      submitContext.operationTimestamp = inst._submitOperationTimestamp;
+      submitContext.operationPayloads = inst._submitOperationPayloads;
+      submitContext.uploadRevisions = inst._submitUploadRevisions;
       const startResult: SurveyQuestionsSubmitStartControllerResult = runSurveyQuestionsSubmitStartController({
         ports: {
           startSubmitAttempt: () => startSubmitAttempt(),
@@ -704,6 +716,13 @@ export const createSurveyQuestionsSubmitRuntime = (
       invalidateDiffCaches();
       inst._userAnswersSliceCache = { source: null, value: null };
 
+      if (receipt?.retryPending !== true && !inst._heldBackSubmitQids?.length) {
+        delete inst._submitOperationId;
+        delete inst._submitOperationContextKey;
+        delete inst._submitOperationTimestamp;
+        delete inst._submitOperationPayloads;
+        delete inst._submitUploadRevisions;
+      }
       runSurveyQuestionsSubmitSuccessController({
         editBaseline: nextBaseline,
         hasEncrypted,
@@ -712,6 +731,7 @@ export const createSurveyQuestionsSubmitRuntime = (
         submitAttemptId: submitContext.submitAttemptId,
         surveysResponseState: nextSurveysResponseState,
         userAnswers: optimisticUserAnswers,
+        retryPending: receipt?.retryPending === true,
         ports: {
           clearSubmitGuard: () => {
             inst._submitGuard = false;

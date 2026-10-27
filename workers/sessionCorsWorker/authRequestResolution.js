@@ -1,3 +1,4 @@
+import { validateAgentParticipantSource } from './agent/authority.mjs';
 import {
   validateAuthTokenRecord,
 } from './authTokenClaims.js';
@@ -94,5 +95,7 @@ export const resolveAuthenticatedRequest = async ({
     };
   }
 
+  const source = await validateAgentParticipantSource({ request, env, payload, slug, deps });
+  if (!source.ok) return { ok: false, response: deps?.json?.({ error: source.error }, source.status || 401, baseHeaders) };
   return { ok: true, payload, slug };
 };

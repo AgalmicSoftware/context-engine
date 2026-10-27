@@ -61,7 +61,7 @@ Use this matrix when choosing a non-default profile:
 | Passkey account                                            | Supplies the admin identity and signs worker or on-chain actions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Yes; the default path creates it in the app                                  | No                                                                    |
 | Ethereum Gas (TX Fees)                                          | Pays registry/SBT transactions; this is OP Sepolia ETH on the default chain                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Decentralized or other on-chain profiles only                                | Partially                                                             |
 | Session Worker                                             | Hosts the web runtime. For Cloudflare profiles it also owns canonical config, auth, AI, storage, fetch, and optional faucet routes. For decentralized profiles it assists the web runtime while the Ethereum registry and Arweave remain canonical.                                                                                                                                                                                                                                                                                                                             | Yes for every reachable `/new` profile                                       | Yes, if the sponsor gives you a deploy-ready bundle                   |
-| Cloudflare API token                                       | Deploys the dedicated Bridge for Agent Session Wrapped and powers the explicit legacy deploy-helper fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Agent Session Wrapped or explicit legacy fallback only; not the native default | Indirectly, through the separate legacy short-lived deploy-grant path |
+| Cloudflare API token                                       | Powers the explicit legacy deploy-helper fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Explicit legacy fallback only; not the native default | Indirectly, through the separate legacy short-lived deploy-grant path |
 | AI provider key(s)                                         | Powers AI generation, chat, and transcription routes for every provider selected by the session's models                                                                                                                                                                                                                                                                                                                                                                                                                                                              | One or more for every reachable `/new` profile                               | Yes                                                                   |
 | Arweave JWK                                                | Pays for Arweave metadata/payload uploads                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Decentralized or explicitly Arweave-backed profiles only                     | Yes                                                                   |
 | Ethereum RPC URL                                                | Provides chain reads and writes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Decentralized, Lit/on-chain gating, or explicitly chain-backed profiles only | Yes                                                                   |
@@ -265,8 +265,8 @@ Create or sign in to a Cloudflare account at <https://dash.cloudflare.com/>.
 The native deploy button opens Cloudflare's deployment flow for the isolated
 package in `deploy/cloudflare/session-worker/`. Cloudflare provisions the
 Worker, KV namespace, and Durable Object in that account. Paste the slug, public
-admin address, and two generated Worker runtime secrets shown by the wizard;
-then deploy and paste the resulting `workers.dev` URL back into the wizard.
+admin address, and the generated Worker runtime secrets shown by the wizard
+(two normally; three when Agent HTTP is selected); then deploy and paste the resulting `workers.dev` URL back into the wizard.
 
 The deploy URL must pin an exact 40-character commit so the reviewed source is
 immutable. The hosted client uses the public commit it was built from
@@ -416,8 +416,7 @@ custom settings in the draft. Profile settings follow the existing stages:
   until their complete read paths are enforced.
 - Worker offers the website and **Agents (HTTP API)** (Agent Session Wrapped).
   Each channel has a question-mark tooltip explaining its purpose. The website
-  remains enabled. Agent access is off by default and deploys one additional
-  dedicated per-session Bridge. The **Agent API access** status distinguishes
+  remains enabled. Agent access is off by default and uses the same Session Worker. The **Agent API access** status distinguishes
   **Off** from **On after deployment**: authorized agents can use the HTTP API
   once the service is deployed and verified, subject to session access rules.
   Removed bot and Mini App adapters have no setup controls.
@@ -678,7 +677,8 @@ In the default native handoff you provide:
 - one OpenAI / Anthropic / OpenRouter key matching the selected AI models
 
 The wizard generates the session slug, passkey-derived public admin address,
-and two independent Worker runtime secrets. It provides a copy control for each
+and independent Worker runtime secrets: two normally, plus a third agent
+signing secret when Agent HTTP is selected. It provides a copy control for each
 value, opens Cloudflare in a separate tab, and waits for the creator to return
 with the resulting `workers.dev` URL. Advanced profiles may additionally expose
 Arweave, Lit, RPC, faucet, or custom-provider inputs when their selected
@@ -764,33 +764,18 @@ What happens during deploy:
   its ownership marker after upload and stops before hostname/secret activation
   if ownership does not match.
 
-When `Agent Session Wrapped` is selected, the same request-only Cloudflare
-token may also deploy the dedicated Bridge in that setup operation. The Bridge
-receives an explicit one-session policy and the exact paired session-Worker
-origin. Setup does not publish its version-1 `agentSessionWrapped` capability or
-report success until upload, secrets, bindings, activation, health, protocol,
-authority probing, and the durable session-config write have all succeeded.
-Failure preserves the prior verified capability, if any, and leaves the
-session config intact. New configuration keeps retired adapter fields false.
+When Agent Session Wrapped is selected, the same Session Worker serves it.
+The helper creates an independent fresh managed root secret; native setup adds
+`AGENT_MANAGED_ROOT_SECRET` in Cloudflare. Setup verifies same-origin capability
+readiness after saving canonical configuration. Admin enable/disable uses signed
+session configuration without a deployment token.
 
-Compatibility is determined by the paired session Worker:
-
-- Worker-canonical sessions use their canonical Worker directly.
-- Registry-canonical sessions use the same Wrapped flow when their existing
-  `corsWorkerUrl` is usable or when an unlocked registry session can first
-  attach a compatible Worker. The session Worker—not the Bridge—performs SIWE,
-  registry/RPC, chain-gate, and SBT checks.
-- An unlocked workerless registry session must attach a Worker before Wrapped
-  can be enabled. That owner attachment may require an Admin registry
-  transaction.
-- A permanently locked workerless session cannot attach a new Worker and fails
-  closed without a partial Bridge deployment.
-
-After a member has a session-Worker credential, the agent exchanges it for a
-shorter session-bound `ceagt_` credential and submits Wrapped answers over
-HTTPS/KV. The agent performs no EVM transaction. The Bridge credential lasts
-at most 24 hours and never outlives the Worker credential, so access revocation
-propagates no later than that shorter remaining lifetime.
+Worker-canonical and registry sessions use their existing login/membership
+gates. An unlocked workerless registry session must attach a compatible Worker;
+a permanently locked one cannot. Wrapped member credentials are capped by
+24 hours and source-JWT expiry, with source revocation and membership checked
+on every request. Predictions use HTTPS/KV and remain separate from ordinary
+responses. No Bridge resources, identities or invites are transferred.
 
 What gets stored where:
 
@@ -882,10 +867,9 @@ payloads, or a Context Engine-controlled origin. There is no automatic callback
 from Cloudflare, so keep the wizard tab open and return to it manually.
 
 The native return step supports the default Worker-envelope mode, eligible
-decentralized attachment, and optional on-chain SBT checks. Advanced Lit and
-Agent Session Wrapped profiles use the labeled manual bootstrap fallback because
-their Lit action or dedicated Bridge provisioning is not part of the native
-return step.
+decentralized attachment, and optional on-chain SBT checks. Advanced Lit profiles use the labeled manual bootstrap fallback for their Lit
+action. Agent HTTP and Session Wrapped use the native Session Worker after the
+additional managed root secret is configured.
 
 Reference: [session-cors-worker.md](session-cors-worker.md)
 
@@ -1120,7 +1104,7 @@ For the default native handoff, check these first:
 
 - the selected Cloudflare account owns the newly deployed Worker
 - the account has an active `workers.dev` subdomain
-- all four setup values were copied into the matching Cloudflare fields
+- all displayed setup values were copied into the matching Cloudflare fields
 - the returned URL is the HTTPS `workers.dev` origin, without a path
 - the Worker allows the current Context Engine browser origin
 
@@ -1197,3 +1181,49 @@ Retrying queued Group creation compares canonical HTTPS image and document URLs,
 so a host-only URL and the same URL with a trailing slash reuse the saved Group.
 
 The wizard restores custom allowed origins from its tab-scoped draft after reload, including an explicitly empty field. Drafts without a saved origins field use the normal defaults.
+
+### Exploring group tags
+
+Click a tag in a session’s SBT or worker-group details to open the tag explorer
+without leaving the session. The originating session is preselected; you can
+change it using the dropdown in the top-right of the modal, or compare additional tags. **Open tag page** opens the
+full explorer with the selected session included as `?session=<session-slug>`
+(`?session=general` for General). Ctrl/Cmd-click on a tag opens its session-scoped
+link directly.
+
+The question pile’s microphone button sits beside the question-actions menu on
+small screens and remains directly visible in the desktop toolbar. It opens the
+voice-mode chooser when the session supports voice features, or resumes an unfinished
+interview. Its idle appearance matches the adjacent controls; an interview in progress
+keeps the microphone emphasized even after closing the modal. Closing stops audio
+capture and retains the transcript and review edits on the current page. Reopen to
+continue, submit, or explicitly discard the interview. Reloading or leaving the page
+clears this in-memory interview; closing does not submit responses. Importing a different
+prefill packet starts a new review, while reopening the same packet retains review edits.
+On small screens,
+Submit and Clear stay beside the menu and microphone. Submit and its pending count
+retain full-size text on phones. When the controls need more
+width, the navigation arrows wrap onto a right-aligned row below, with extra vertical
+space separating them from Clear. On that separate row, the arrows closely frame a
+horizontal question counter (for example, **5 / 50**). The counter only stacks when
+it needs to fit into a shared control row. Mobile question cards keep the same height
+across question types and prompt lengths, so the navigation stays in place. Long
+prompts use the space left by each answer type and shrink only when they overflow,
+down to the normal body-text size. Longer text remains scrollable. Binary choices
+use their original larger sizing when the full-size prompt and controls fit;
+otherwise they share one compact row. Rating sliders sit at the card's vertical
+center when the prompt and footer leave enough room. Multichoice options use two
+rows with horizontal scrolling.
+These layout adjustments apply only at narrow phone widths (480px and below);
+wider views retain their existing typography, button sizes, and answer layout.
+Above 768px, the navigation arrows and question-action icons form one evenly
+spaced vertical rail alongside the full card height, with the question counter
+between the two arrows.
+
+The compact question-actions menu labels its controls **Filter questions**,
+**Add questions**, and **All questions**. Opening it blurs the page behind it;
+selecting an action, clicking outside, or pressing Escape dismisses the menu.
+
+In the expanded question-card rating controls, Conviction and Importance each
+show their value directly beside the label. For quadratic questions, these
+expanded controls sit below the centered option-scroll arrows.

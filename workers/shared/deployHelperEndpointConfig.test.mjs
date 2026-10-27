@@ -45,6 +45,20 @@ test('cfFetch uses the configured Cloudflare API base URL', async () => {
   assert.equal(calls[0][0], 'https://api.cloudflare.example.test/client/v4/accounts');
 });
 
+test('cfFetch preserves Headers and tuple inputs while retaining the bearer default', async () => {
+  for (const headers of [new Headers({ 'x-test': 'kept' }), [['x-test', 'kept']]]) {
+    const result = await cfFetch('synthetic-token', '/accounts', { headers }, {
+      fetchImpl: async (_url, init) => {
+        const received = new Headers(init.headers);
+        assert.equal(received.get('x-test'), 'kept');
+        assert.equal(received.get('authorization'), 'Bearer synthetic-token');
+        return Response.json({ success: true });
+      },
+    });
+    assert.equal(result.ok, true);
+  }
+});
+
 test('lookupCloudflareAccount passes the configured API base URL to cfFetch', async () => {
   const calls = [];
   const result = await lookupCloudflareAccount({

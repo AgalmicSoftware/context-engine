@@ -4,10 +4,10 @@ import { buildPasskeyWalletNetwork, createLoginPasskeyActions } from './loginAnd
 import { createLoginAgentActions, formatAgentTokenError } from './loginAndSettingsAgentTokenActions';
 
 const envelope: AgentClientLoginEnvelope = {
-  v: 2,
+  v: 3,
   sessionSlug: 'alpha',
   address: '0x0000000000000000000000000000000000000001',
-  bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'ceagt_bridge_test' },
+  agentCredential: { kind: 'session_agent_browser_token', token: 'ceagt_bridge_test' },
   workerCredential: { kind: 'session_worker_jwt', token: 'jwt-worker-test' },
   capabilities: { submitAnswers: true },
   expiresAt: '2026-01-01T00:00:00.000Z',
@@ -123,10 +123,10 @@ describe('loginAndSettings auth controllers', () => {
       getActiveSessionSlug: () => 'alpha',
       getAgentTokenInput: () => '',
       getDemoSessionConfigBySlug: () => ({ slug: 'demo' }),
-      getPropSessionConfig: () => ({ slug: 'alpha', agentBridgeUrl: 'https://bridge.example/' }),
+      getPropSessionConfig: () => ({ slug: 'alpha', agentWorkerUrl: 'https://bridge.example/' }),
       getSessionConfigBySlugOrDefault: () => ({
         slug: 'alpha',
-        agentBridgeUrl: 'https://registry-bridge.example/',
+        agentWorkerUrl: 'https://registry-bridge.example/',
         sponsoredKeys: { ai: true },
       }),
       getTargetNetwork: () => ({ id: 11155420 }),
@@ -145,11 +145,11 @@ describe('loginAndSettings auth controllers', () => {
       sessionSlug: 'alpha',
       sessionConfig: {
         slug: 'alpha',
-        agentBridgeUrl: 'https://registry-bridge.example/',
+        agentWorkerUrl: 'https://registry-bridge.example/',
         sponsoredKeys: { ai: true },
         contracts: {},
       },
-      agentBridgeUrl: 'https://registry-bridge.example',
+      agentWorkerUrl: '',
       sessionId: '',
       workerCanonical: false,
       workerUrl: '',
@@ -163,7 +163,7 @@ describe('loginAndSettings auth controllers', () => {
       sessionId: '0x00112233445566778899aabbccddeeff',
       configRevision: 'route-revision-1',
       corsWorkerUrl: 'https://route-worker.example',
-      agentBridgeUrl: 'https://route-bridge.example',
+      agentWorkerUrl: 'https://route-bridge.example',
       sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     };
     const actions = createLoginAgentActions({
@@ -181,7 +181,7 @@ describe('loginAndSettings auth controllers', () => {
         slug: 'alpha',
         sessionId: '0xffeeddccbbaa99887766554433221100',
         corsWorkerUrl: 'https://registry-worker.example',
-        agentBridgeUrl: 'https://registry-bridge.example',
+        agentWorkerUrl: 'https://registry-bridge.example',
       }),
       getTargetNetwork: () => ({ id: 11155420 }),
       isHostedAgentSessionConfig: () => true,
@@ -200,7 +200,7 @@ describe('loginAndSettings auth controllers', () => {
     expect(context.sessionConfig).toBe(workerConfig);
     expect(context).toMatchObject({
       sessionSlug: 'alpha',
-      agentBridgeUrl: 'https://route-bridge.example',
+      agentWorkerUrl: 'https://route-worker.example',
       sessionId: '0x00112233445566778899aabbccddeeff',
       workerCanonical: true,
       workerUrl: 'https://route-worker.example',

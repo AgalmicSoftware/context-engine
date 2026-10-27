@@ -1,4 +1,5 @@
 import React from 'react';
+import { hasBookmark } from '../../utilities/cache/bookmarkChanges';
 import { Table } from 'reactstrap';
 
 import type { SurveyResultsQuestionTableEntry } from './surveyResultsSummaryModels';
@@ -59,7 +60,7 @@ const SurveyResultsQuestionTable = ({
       </thead>
       <tbody>
         {entries.map((entry) => {
-          const bookmarked = bookmarkedQuestionIDs.includes(entry.questionId);
+          const bookmarked = hasBookmark({ questions: bookmarkedQuestionIDs }, 'questions', entry.questionId);
           return (
             <SurveyResultsQuestionTableRow
               key={entry.questionId}

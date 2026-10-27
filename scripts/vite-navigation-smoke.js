@@ -1,7 +1,14 @@
 'use strict';
 
 const { URL } = require('node:url');
+const path = require('node:path');
+const { installClientSecurityHeaders, verifyBlockedScriptInjection } = require('./lib/client-security-headers');
+const { ethers } = require('ethers');
 const demoSessions = require('../client/src/variables/demo/demo_sessions.json');
+const registryAbi = require('../client/src/contractsABI/SESSION_REGISTRY_ABI.json');
+const contracts = require('../client/src/variables/contracts.json');
+const publicSocialPreview = require('../client/src/variables/publicSocialPreview.json');
+const registryInterface = new ethers.utils.Interface(registryAbi);
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:3000';
 const DEFAULT_ROUTES = Object.freeze([
@@ -38,6 +45,18 @@ const DEMO_READY_WORKER_SOURCE_SLUG = 'demo-sh';
 const DEMO_READY_WORKER_CONFIG = demoSessions[DEMO_READY_WORKER_SOURCE_SLUG] || {};
 const DEMO_READY_WORKER_ORIGIN = normalizeBaseUrl(DEMO_READY_WORKER_CONFIG.corsWorkerUrl || '');
 const DEMO_STORAGE_LIST_FIXTURE_RESOURCES = new Set(['questions', 'responses', 'surveys']);
+const LOCAL_SMOKE_FONT_URLS = new Set([
+  'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Poppins:wght@400;600;700;800&display=swap',
+  'https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800',
+  'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,500;1,500;1,600&display=swap',
+]);
+const LOCAL_SMOKE_IMAGE_URLS = new Set([
+  'https://www.cosmos-institute.org/media/logo.svg',
+  'https://cosmosaccessmemory.b-cdn.net/1777891088662-oaript.png',
+  'https://ethereum.org/images/assets/eth-diamond-glyph.png',
+  'https://images.squarespace-cdn.com/content/v1/631d02b2dfa9482a32db47ec/250a39fb-f2d0-432e-8784-4d2113ba8ae6/favicon.ico?format=100w',
+  'https://cdn.prod.website-files.com/65b2cb5abdecf7cd7747e170/65d5ef08c6a2bf96d1f60a27_favicon.png',
+]);
 
 function isLocalSmokeBaseUrl(rawBaseUrl = '') {
   try {
@@ -69,6 +88,71 @@ function isSessionSetupRoute(route) {
 function shouldInstallDemoWorkerFixture(baseUrl, route) {
   return isLocalSmokeBaseUrl(baseUrl) &&
     (isSessionSetupRoute(route) || String(route || '').startsWith('/session/demo'));
+}
+
+async function installLocalSmokeFixtureRoutes(page, baseUrl) {
+  if (!isLocalSmokeBaseUrl(baseUrl)) return;
+  const appOrigin = new URL(baseUrl).origin;
+  await page.addInitScript(() => {
+    let serviceWorker;
+    // Sandboxed report frames throw when this property is read.
+    try { serviceWorker = navigator.serviceWorker; } catch (_) { return; }
+    if (serviceWorker) serviceWorker.register = async () => {
+      throw new Error('Service worker registration is disabled in local navigation smoke');
+    };
+  });
+  // Keep local CI independent of live RPCs and remote presentation assets.
+  // Later, specific Worker fixtures run first; unmatched requests still fail.
+  await page.route('**/*', async (requestRoute) => {
+    const request = requestRoute.request();
+    const url = new URL(request.url());
+    if (url.origin === appOrigin) return requestRoute.continue();
+    if (request.method() === 'GET' && request.url() === 'https://demo-worker-030226.agalmic.workers.dev/capabilities?slug=') {
+      return requestRoute.fulfill({ json: { type: 'ce_worker_capabilities', version: 1, apiVersion: 1, bundle: null, features: [] } });
+    }
+    if (request.method() === 'GET' && LOCAL_SMOKE_FONT_URLS.has(request.url())) {
+      return requestRoute.fulfill({ contentType: 'text/css', body: '/* Use installed fallback fonts in local smoke. */' });
+    }
+    if (request.method() === 'GET' && LOCAL_SMOKE_IMAGE_URLS.has(request.url())) {
+      return requestRoute.fulfill({ contentType: 'image/png', path: path.join(__dirname, '../client/public/favicon-32x32.png') });
+    }
+    if (request.method() === 'POST' && url.pathname === '/' && ['https://sepolia.optimism.io', 'https://op-sepolia-testnet.api.pocket.network'].includes(url.origin)) {
+      let payload;
+      try { payload = request.postDataJSON(); } catch (_) { return requestRoute.abort('blockedbyclient'); }
+      const results = { eth_blockNumber: '0x1', eth_chainId: '0xaa37dc' };
+      const registryAddress = contracts.sessionRegistryAddresses['11155420'].toLowerCase();
+      const logAddresses = [registryAddress, ...Object.values(contracts.sessionContractsByChain['11155420']).map((address) => address.toLowerCase())];
+      if (payload?.method === 'eth_getLogs' && logAddresses.includes(payload.params?.[0]?.address?.toLowerCase())) results.eth_getLogs = [];
+      if (payload?.method === 'eth_getBlockByNumber' && ['0x1', 'latest'].includes(payload.params?.[0])) {
+        results.eth_getBlockByNumber = {
+          number: '0x1', hash: `0x${'01'.repeat(32)}`, parentHash: ethers.constants.HashZero,
+          timestamp: '0x1', nonce: '0x0000000000000000', difficulty: '0x0', gasLimit: '0x0', gasUsed: '0x0',
+          miner: ethers.constants.AddressZero, extraData: '0x', transactions: [],
+        };
+      }
+      if (Object.hasOwn(results, payload?.method)) {
+        return requestRoute.fulfill({ json: { jsonrpc: '2.0', id: payload.id, result: results[payload.method] } });
+      }
+      if (payload?.method === 'eth_call' && payload.params?.[0]?.to?.toLowerCase() === registryAddress) {
+        try {
+          const call = registryInterface.parseTransaction({ data: payload.params[0].data });
+          let values;
+          if (call.name === 'getSessionCount') values = [0];
+          if (call.name === 'getSessionBySlug' && call.args[0] === 'pe4') {
+            const metadata = `data:application/json,${encodeURIComponent(JSON.stringify({ blockLimits: { start: 1 } }))}`;
+            values = ['pe4', 11155420, metadata, '', ethers.constants.AddressZero, 1, 1, `0x${'12'.repeat(16)}`];
+          }
+          if (call.args[0] === 'pe4') {
+            if (call.name === 'getResourceGate') values = [[], 11155420, 0, 0];
+            if (call.name === 'getSessionFields') values = [call.args[1].map(() => '')];
+            if (call.name === 'getSessionField') values = [''];
+          }
+          if (values) return requestRoute.fulfill({ json: { jsonrpc: '2.0', id: payload.id, result: registryInterface.encodeFunctionResult(call.name, values) } });
+        } catch (_) { /* Unrecognized RPC reads fail below. */ }
+      }
+    }
+    return requestRoute.abort('blockedbyclient');
+  });
 }
 
 function isDemoReadyInterviewRoute(route = '') {
@@ -315,38 +399,53 @@ async function probeBenchmarkReportFrame(page, { timeoutMs } = {}) {
   }
 }
 
+async function probeDefaultPublicPreview(page, { timeoutMs, baseUrl, route } = {}) {
+  const { image, video, twitterCard } = publicSocialPreview;
+  const expected = {
+    'meta[property="og:type"]': 'video.other',
+    'meta[property="og:video"]': video.url,
+    'meta[property="og:video:secure_url"]': video.url,
+    'meta[property="og:video:type"]': video.type,
+    'meta[property="og:video:width"]': String(video.width),
+    'meta[property="og:video:height"]': String(video.height),
+    'meta[property="og:image"]': image.url,
+    'meta[property="og:image:type"]': image.type,
+    'meta[property="og:image:width"]': String(image.width),
+    'meta[property="og:image:height"]': String(image.height),
+    'meta[property="og:image:alt"]': image.alt,
+    'meta[name="twitter:card"]': twitterCard,
+    'meta[name="twitter:image"]': image.url,
+    'meta[name="twitter:image:alt"]': image.alt,
+    'meta[property="og:url"]': routeUrl(baseUrl, route),
+  };
+  await page.waitForFunction((tags) => Object.entries(tags).every(([selector, content]) => {
+    const nodes = document.head.querySelectorAll(selector);
+    return nodes.length === 1 && nodes[0].getAttribute('content') === content;
+  }), expected, { timeout: timeoutMs });
+  return [];
+}
+
 const DEFAULT_ROUTE_PROBES = Object.freeze({
   '/new': probeSessionModePresets,
   '/session/new': probeSessionModePresets,
   '/benchmarks': probeBenchmarkReportFrame,
+  '/about': probeDefaultPublicPreview,
 });
 
 async function inspectRoute(browser, baseUrl, route, options = {}) {
-  const page = await browser.newPage({ viewport: options.viewport || resolveViewport() });
+  const page = await browser.newPage({
+    viewport: options.viewport || resolveViewport(),
+  });
   const consoleIssues = [];
   const pageErrors = [];
   const failedRequests = [];
   const badResponses = [];
 
-  if (isLocalSmokeBaseUrl(baseUrl) && isSessionSetupRoute(route)) {
-    await page.route('https://op-sepolia-testnet.api.pocket.network/**', async (requestRoute) => {
-      const payload = requestRoute.request().postDataJSON();
-      const results = {
-        eth_blockNumber: '0x1',
-        eth_chainId: '0xaa37dc',
-      };
-      if (!payload || !Object.hasOwn(results, payload.method)) {
-        await requestRoute.abort('failed');
-        return;
-      }
-      await requestRoute.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ jsonrpc: '2.0', id: payload.id, result: results[payload.method] }),
-      });
-    });
-  }
+  await installLocalSmokeFixtureRoutes(page, baseUrl);
+
   await installDemoWorkerFixtureRoutes(page, baseUrl, route);
+  const securityPolicyViolations = isLocalSmokeBaseUrl(baseUrl)
+    ? await installClientSecurityHeaders(page, baseUrl) : [];
 
   page.on('console', (msg) => {
     if (msg.type() === 'error' || msg.type() === 'warning') {
@@ -490,6 +589,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
     consoleIssues,
     unexpectedConsoleIssues,
     pageErrors,
+    securityPolicyViolations,
     missingText,
     routeProbeFailures,
   };
@@ -526,6 +626,9 @@ function summarizeFailures(results) {
     result.pageErrors.forEach((error) => {
       failures.push(`${result.route}: page error: ${error}`);
     });
+    (result.securityPolicyViolations || []).forEach((event) => {
+      failures.push(`${result.route}: CSP ${event.disposition} ${event.effectiveDirective}: ${event.blockedURI} in ${event.documentURI}`);
+    });
     (result.routeProbeFailures || []).forEach((failure) => {
       failures.push(`${result.route}: route probe: ${failure}`);
     });
@@ -553,11 +656,13 @@ function compactSmokeSummary(summary) {
       unexpectedFailedRequests: result.unexpectedFailedRequests.length,
       unexpectedConsoleIssues: result.unexpectedConsoleIssues.length,
       pageErrors: result.pageErrors.length,
+      securityPolicyViolations: (result.securityPolicyViolations || []).length,
       routeProbeFailures: (result.routeProbeFailures || []).length,
       layoutIssues: (result.layoutIssues || []).length,
       missingText: result.missingText,
     })),
     failures: summary.failures,
+    scriptInjection: summary.scriptInjection,
   };
 }
 
@@ -572,7 +677,12 @@ async function runSmoke(options = {}) {
     throw new Error(`Unsupported PLAYWRIGHT_BROWSER "${browserName}"`);
   }
 
-  const browser = await browserType.launch({ headless: true });
+  const browser = await browserType.launch({
+    headless: true,
+    ...(browserName === 'chromium' && isLocalSmokeBaseUrl(baseUrl)
+      ? { args: [`--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE ${new URL(baseUrl).hostname}`] }
+      : {}),
+  });
   try {
     const results = [];
     for (const route of routes) {
@@ -592,6 +702,7 @@ async function runSmoke(options = {}) {
       viewport,
       results,
       failures: summarizeFailures(results),
+      scriptInjection: isLocalSmokeBaseUrl(baseUrl) ? await verifyBlockedScriptInjection(browser, baseUrl) : null,
     };
   } finally {
     await browser.close();
@@ -626,6 +737,7 @@ module.exports = {
   findMissingExpectedText,
   inspectRoute,
   installDemoWorkerFixtureRoutes,
+  installLocalSmokeFixtureRoutes,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
   isDemoReadyInterviewRoute,

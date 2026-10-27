@@ -6,6 +6,7 @@ import { renderHtmlReport } from '../src/render-html.mjs';
 import { buildSecondPassAnalysisInput } from '../src/analysis-export.mjs';
 import { buildContextEngineBenchmarkDataset } from '../src/ce-native-export.mjs';
 import { buildContextEnginePolisExport } from '../src/ce-export.mjs';
+import { stanceLabel } from '../src/response-distributions.mjs';
 
 const makeReport = (answersByModel) => buildResultsReport({
   questionBank: { benchmarkId: 'test', questions: [{ id: 'q', canonicalPrompt: 'Test statement.', topic: 'test' }] },
@@ -100,4 +101,34 @@ test('interactive cohort repeat stability keeps wording sensitivity separate', (
   assert.equal(report.polisReport.byQuestion.q.wordingSensitivity.meanAbsoluteShift, 2);
   assert.deepEqual(run(['a']), report.polisReport.byQuestion.q.winningResponseConsistency);
   assert.equal(run([]).rate, null);
+});
+
+// The tag filter runs in the browser. A question without valid answers is missing
+// evidence, so it must be filed under "no data", never under an observed mixed stance.
+test('static and interactive stance labels agree and keep missing means as no data', () => {
+  const browserFunction = (html, name, end = '\n      }') =>
+    html.match(new RegExp(`function ${name}\\([^)]*\\) \\{[\\s\\S]*?${end}`))?.[0] || '';
+  const tagged = (report, tag) => {
+    const html = renderHtmlReport(report);
+    const snapshot = JSON.parse(html.match(/id="ce-ai-discourse-bench-report">([\s\S]*?)<\/script>/)[1]);
+    const source = [browserFunction(html, 'stanceLabel', '\n}'), ...['normalizeTagValue', 'tagsForQuestion', 'questionsForTag'].map((name) => browserFunction(html, name))].join('\n');
+    return vm.runInNewContext(`${source}\nquestionsForTag(tag).map(function (question) { return question.id; })`, { reportSnapshot: snapshot, tag });
+  };
+  const noRuns = makeReport({});
+  const allInvalid = makeReport({ a: [null, null] });
+  const zeroMean = makeReport({ a: ['Agree'], b: ['Disagree'] });
+  for (const report of [noRuns, allInvalid]) {
+    assert.equal(report.polisReport.byQuestion.q.meanScore ?? null, null);
+    assert.deepEqual(tagged(report, 'no data'), ['q']);
+    assert.deepEqual(tagged(report, 'mixed / unsure'), []);
+  }
+  assert.equal(zeroMean.polisReport.byQuestion.q.meanScore, 0);
+  assert.deepEqual(tagged(zeroMean, 'mixed / unsure'), ['q']);
+  assert.deepEqual(tagged(zeroMean, 'no data'), []);
+
+  const html = renderHtmlReport(zeroMean);
+  const embedded = browserFunction(html, 'stanceLabel', '\n}');
+  for (const value of [null, undefined, Number.NaN, Infinity, '0.5', 0, 0.25, 0.2501, -0.25, -0.2501, 1, -1]) {
+    assert.equal(vm.runInNewContext(`${embedded}\nstanceLabel(value)`, { value }), stanceLabel(value), String(value));
+  }
 });

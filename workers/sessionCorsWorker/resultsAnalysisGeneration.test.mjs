@@ -10,6 +10,7 @@ import {
 } from './storageRouteExecution.js';
 import {
   buildResultsAnalysisStatusBody,
+  callResultsAnalysisProvider,
   evaluateResultsAnalysisViewerEligibility,
   generateResultsAnalysisDraft,
   loadAdminSnapshotResultsAnalysisSource,
@@ -829,6 +830,24 @@ test('results-analysis capability fails closed when AI scope is disabled', () =>
   assert.equal(capability.reason, 'ai_scope_disabled');
 });
 
+test('Results generation passes saved model authority to the real provider and retains its 6000-token budget', async () => {
+  let body;
+  const result = await callResultsAnalysisProvider({ env: {}, slug: 'session-a',
+    config: { ...config, ai: { model: 'gpt-4o-mini', reasoningEffort: 'low' } }, prompt: 'Synthetic report',
+    deps: { getSessionSecrets: async () => ({ openaiKey: 'synthetic-key' }), fetch: async (_, init) => {
+      body = JSON.parse(init.body);
+      return Response.json({ choices: [{ message: { content: '{"summary":"Synthetic report"}' } }] });
+    } },
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.equal(body.model, 'gpt-4o-mini');
+  assert.equal(body.max_completion_tokens, 6000);
+  assert.equal(body.max_tokens, undefined);
+  assert.equal(body.service_tier, 'default');
+  assert.equal(body.tools, undefined);
+  assert.deepEqual(result.value, { summary: 'Synthetic report' });
+});
+
 test('viewer eligibility only supports public full results with aggregate exposure', () => {
   const publicFull = {
     ...config,
@@ -1066,6 +1085,83 @@ test('automatic generation carries queued fresh responses into the provider sour
   assert.equal(providerSource.aiSnapshot.responses.length, 3);
 });
 
+for (const completion of ['not JSON', 'null']) test(`invalid analysis output pauses without a billed retry: ${completion}`, async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  await putPayload({ kv, resource: 'questions', id: 'qmeta1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Question?', type: 'text' } });
+  const committedResponses = [1, 2, 3].map((index) => ({
+    metadata: { id: `r${index}`, responder: `0x${String(index).repeat(40)}`, createdAt: '2026-09-17T00:00:00.000Z' },
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: `View ${index}` },
+  }));
+  const values = new Map();
+  const alarms = [];
+  const receipts = [];
+  const storage = { get: async (key) => structuredClone(values.get(key)), put: async (key, value) => values.set(key, structuredClone(value)),
+    list: async ({ prefix = '' } = {}) => new Map([...values].filter(([key]) => key.startsWith(prefix))),
+    delete: async (key) => values.delete(key), transaction: async (callback) => callback(storage), setAlarm: async (time) => alarms.push(time) };
+  const coordinator = new SessionWriteCoordinator({ storage }, env, {
+    now: () => 1_000,
+    runResultsAnalysisAutoJob: async ({ job, deps }) => maybeTriggerAutomaticResultsAnalysis({
+      env, slug: 'session-a', config, requestId: job.requestId, committedResponses: job.committedResponses,
+      deps: { ...deps, getSessionSecrets: async () => ({}), proxyOpenAI: async () => Response.json({ completion }),
+        finalizeCoordinatedResultsAnalysis: async (args) => {
+          receipts.push(args.finalization.receipt);
+          return deps.finalizeCoordinatedResultsAnalysis(args);
+        },
+      },
+    }),
+  });
+  for (const entry of committedResponses) {
+    await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: `invalid-output:${entry.metadata.id}`, committedResponses: [entry] });
+  }
+  alarms.length = 0;
+  const result = await coordinator.runQueuedResultsAnalysisAutoJob();
+  assert.equal(result.status, 502, JSON.stringify(result));
+  assert.equal(result.retryable, false);
+  assert.equal(receipts[0].retryable, false);
+  assert.equal(values.has('results-analysis-auto-job-v1'), false);
+  assert.deepEqual(alarms, []);
+  const status = await coordinator.readResultsAnalysisStatus();
+  assert.equal(status.jobState, 'failed');
+  assert.equal(status.lastFailure.nextAttemptAtMs, undefined);
+  assert.equal(status.lastFailure.retriesExhausted, undefined);
+  const manual = await generateResultsAnalysisDraft({ env, slug: 'session-a', config, body: {
+    requestId: 'manual-recovery', refresh: true, source: { kind: 'worker-canonical' }, committedResponses,
+  }, deps: {
+    reserveCoordinatedResultsAnalysis: async ({ reservation }) => coordinator.reserveResultsAnalysis(reservation),
+    finalizeCoordinatedResultsAnalysis: async ({ finalization }) => coordinator.finalizeResultsAnalysis(finalization),
+    generateAnalysisArtifact: async () => ({ ok: true, value: { breakdown: { summary: { overview: 'Recovered' } } } }),
+  } });
+  assert.equal(manual.ok, true);
+});
+
+for (const [header, expected] of [
+  ['120', 120_000], ['7200', 7_200_000], ['Wed, 01 Jan 2025 00:02:00 GMT', 120_000],
+  [null, undefined], ['invalid', undefined], ['-5', undefined],
+]) test(`analysis provider carries Retry-After through its real proxy: ${header}`, async () => {
+  const now = Date.parse('2025-01-01T00:00:00Z');
+  const receipts = [];
+  const deps = {
+    now: () => now,
+    getSessionSecrets: async () => ({ openaiKey: 'synthetic-key' }),
+    fetch: async () => Response.json({ error: { message: 'Busy' } }, { status: 503, headers: header === null ? {} : { 'Retry-After': header } }),
+    reserveCoordinatedResultsAnalysis: async () => ({ kind: 'execute', attemptId: 'retry-after' }),
+    finalizeCoordinatedResultsAnalysis: async ({ finalization }) => { receipts.push(finalization.receipt); return { ok: true }; },
+  };
+  const provider = await callResultsAnalysisProvider({ env: {}, slug: 'session-a', config, prompt: 'Test', deps });
+  assert.equal(provider.retryAfterMs, expected);
+  const result = await generateResultsAnalysisDraft({ env: {}, slug: 'session-a', config, deps, body: {
+    requestId: 'retry-after', source: { kind: 'admin-snapshot', snapshot: { sessionSlug: 'session-a', sessionId,
+      questions: [{ id: 'q1', prompt: 'Question?', type: 'text' }],
+      responses: [1, 2, 3].map((index) => ({ questionId: 'q1', participantId: `synthetic-${index}`, answer: `View ${index}` })),
+    } },
+  } });
+  assert.equal(result.status, 503);
+  assert.equal(result.retryAfterMs, expected);
+  assert.equal(receipts[0].retryAfterMs, expected);
+});
+
 test('automatic generation pauses after an automatic failure until manual recovery', async () => {
   const kv = createKv();
   const env = { CE_STORAGE_INDEX_KV: kv };
@@ -1101,4 +1197,23 @@ test('automatic generation pauses after an automatic failure until manual recove
   assert.equal(result.skipped, true);
   assert.equal(result.reason, 'automatic_paused_after_failure');
   assert.equal(generated, false);
+
+  // A temporary failure's scheduled retry runs once due, and waits until then.
+  const runRetry = (nextAttemptAtMs) => maybeTriggerAutomaticResultsAnalysis({
+    env,
+    slug: 'session-a',
+    config,
+    requestId: 'auto-retry',
+    deps: {
+      now: () => 10_000,
+      readCoordinatedResultsAnalysisStatus: async () => ({ ok: true, state: { lastFailure: { trigger: 'automatic', status: 503, nextAttemptAtMs } } }),
+      reserveCoordinatedResultsAnalysis: async () => ({ kind: 'execute', attemptId: 'attempt-retry' }),
+      finalizeCoordinatedResultsAnalysis: async () => ({ ok: true }),
+      generateAnalysisArtifact: async () => { generated = true; return { ok: true, value: { breakdown: { summary: { overview: 'ok' } } } }; },
+    },
+  });
+  assert.equal((await runRetry(10_001)).reason, 'automatic_paused_after_failure');
+  assert.equal(generated, false);
+  assert.equal((await runRetry(10_000)).ok, true);
+  assert.equal(generated, true);
 });

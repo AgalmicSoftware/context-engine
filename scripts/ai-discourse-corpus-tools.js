@@ -118,6 +118,20 @@ const TARGET_DEBATE_IDS = Object.freeze([
 ]);
 
 const VALID_PRIMARY_URL_RE = /^https?:\/\//i;
+const ARXIV_ID_RE = /^(\d{4}\.\d{4,5}|[a-z-]+(\.[A-Z]{2})?\/\d{7})(v\d+)?$/;
+const VERIFICATION_STATUSES = Object.freeze(['verified', 'partially_verified']);
+const STALE_AFTER_DAYS = 60;
+
+// Debate-node vocabulary used by enriched tweets (see the bookmark ingestion procedure).
+const TWEET_DEBATE_NODES = Object.freeze([
+  'accelerate-development', 'accountability-required', 'agentic-ai-risks', 'ai-moral-status',
+  'alignment-is-important', 'arms-race-risk', 'autonomous-weapons-ban', 'closed-source-safer',
+  'consciousness-question', 'coordination-necessary', 'democratic-oversight', 'economic-transition-needed',
+  'ethics-framework-needed', 'evaluation-needed', 'existential-risk-real', 'general-ai-discourse',
+  'governance-urgent', 'international-coordination', 'labor-displacement', 'misuse-prevention',
+  'open-source-benefits', 'pause-ai-development', 'positive-trajectory', 'power-concentration-risk',
+  'red-teaming-crucial', 'regulation-needed', 'safety-matters', 'transparency-required', 'urgency-call',
+]);
 const DATE_RANGE_RE = /^\d{4}-\d{4}$/;
 
 // Canonical vocabularies for taxonomy fields that previously drifted across
@@ -162,8 +176,10 @@ const TAXONOMY_ENUMS = Object.freeze({
       'Alignment Forum',
       'Anthropic',
       'Astral Codex Ten',
+      'Book',
       'Bounded Regret',
       'Cold Takes',
+      'Distill',
       'EA Forum',
       'Epoch AI',
       'Google DeepMind',
@@ -204,6 +220,44 @@ const TAXONOMY_ENUMS = Object.freeze({
       'system_card',
       'transparency_report',
     ]),
+  }),
+  'ai-laws-policy': Object.freeze({
+    status: Object.freeze([
+      'active',
+      'decided',
+      'enacted',
+      'failed',
+      'in_committee',
+      'ongoing',
+      'passed_legislature',
+      'passed_one_chamber',
+      'proposed',
+      'published',
+      'repealed',
+      'superseded',
+      'vetoed',
+      'withdrawn',
+    ]),
+    doc_kind: Object.freeze([
+      'agency_enforcement',
+      'agency_guidance',
+      'court_case',
+      'executive_action',
+      'framework',
+      'institution',
+      'international_agreement',
+      'legislation',
+      'national_strategy',
+      'policy_report',
+      'regulation',
+      'standard',
+      'voluntary_commitment',
+    ]),
+    jurisdiction_level: Object.freeze(['international', 'local', 'national', 'subnational', 'supranational']),
+  }),
+  tweets: Object.freeze({
+    sentiment: Object.freeze(['analytical', 'cautionary', 'neutral', 'optimistic', 'satirical', 'urgent']),
+    media_type: Object.freeze(['image', 'link', 'text', 'thread', 'video']),
   }),
   'dwarkesh-lab-insiders': Object.freeze({
     role_category: Object.freeze([
@@ -608,6 +662,63 @@ function collectValidation(rootDir = ROOT_DIR) {
     });
   });
 
+  const tweetCrossrefs = { dangling: [], missingEntryId: [], unknownCorpus: [] };
+  const tweetDebateNodeDrift = [];
+  const malformedArxivIds = [];
+  const verificationStatusDrift = [];
+  const tweetsFile = corpusFilesByKey.get('tweets');
+  const tweetNodeSet = new Set(TWEET_DEBATE_NODES);
+  (tweetsFile ? tweetsFile.entries : []).forEach((tweet) => {
+    const id = getEntryIdentifier(tweet);
+    (tweet.debate_nodes || []).forEach((node) => {
+      if (!tweetNodeSet.has(node)) {
+        tweetDebateNodeDrift.push({ id, value: node });
+      }
+    });
+    (tweet.corpus_crossrefs || []).forEach((ref) => {
+      const corpusKey = normalizeCorpusKey(ref.corpus, index.aliasMap);
+      if (!corpusFilesByKey.has(corpusKey)) {
+        tweetCrossrefs.unknownCorpus.push({ id, corpus: ref.corpus });
+      } else if (!ref.entry_id) {
+        tweetCrossrefs.missingEntryId.push({ id, corpus: ref.corpus, title: ref.title || null });
+      } else if (!resolveRecord(index, corpusKey, ref.entry_id)) {
+        tweetCrossrefs.dangling.push({ id, corpus: ref.corpus, entryId: ref.entry_id });
+      }
+    });
+  });
+
+  const urlOwners = new Map();
+  corpusFiles.forEach((file) => {
+    if (file.corpusKey === 'tweets' || file.corpusKey === 'cross-corpus') {
+      return;
+    }
+    file.entries.forEach((entry) => {
+      const id = getEntryIdentifier(entry);
+      if (Object.prototype.hasOwnProperty.call(entry || {}, 'verification_status')
+        && !VERIFICATION_STATUSES.includes(entry.verification_status)) {
+        verificationStatusDrift.push({ corpus: file.corpusKey, id, value: entry.verification_status });
+      }
+      if (Object.prototype.hasOwnProperty.call(entry || {}, 'arxiv_id') && entry.arxiv_id !== null
+        && !(typeof entry.arxiv_id === 'string' && ARXIV_ID_RE.test(entry.arxiv_id.trim()))) {
+        malformedArxivIds.push({ corpus: file.corpusKey, id, value: entry.arxiv_id });
+      }
+      const urlKey = normalizeUrlKey(entry?.url || entry?.source_url);
+      if (urlKey && new URL(urlKey).pathname !== '/') {
+        if (!urlOwners.has(urlKey)) {
+          urlOwners.set(urlKey, []);
+        }
+        urlOwners.get(urlKey).push({ corpus: file.corpusKey, id, canonicalId: entry.canonical_id || null });
+      }
+    });
+  });
+  // The same work filed in several sub-corpora must share a canonical_id so
+  // evidence counts can treat the copies as one source.
+  const crossCorpusDuplicates = [...urlOwners.entries()]
+    .filter(([, owners]) => new Set(owners.map((owner) => owner.corpus)).size > 1)
+    .filter(([, owners]) => owners.some((owner) => !owner.canonicalId)
+      || new Set(owners.map((owner) => owner.canonicalId)).size > 1)
+    .map(([url, owners]) => ({ url, entries: owners }));
+
   crossCorpusFile.entries.forEach((debate) => {
     const flagUnknown = (field, value) => {
       if (value && !index.aliasMap.has(value) && !index.aliasMap.has(String(value).replaceAll('_', '-'))) {
@@ -635,6 +746,11 @@ function collectValidation(rootDir = ROOT_DIR) {
     invalidPrimaryUrls,
     taxonomyDrift,
     unknownCorpusKeys,
+    verificationStatusDrift,
+    malformedArxivIds,
+    crossCorpusDuplicates,
+    tweetDebateNodeDrift,
+    tweetCrossrefs,
     debateReferences: allReferenceIssues,
     targetDebateReferences: targetReferenceIssues,
     clientSampleMirror: {
@@ -642,6 +758,59 @@ function collectValidation(rootDir = ROOT_DIR) {
       missingEntries: missingClientSampleEntries,
     },
   };
+}
+
+function entryDate(entry) {
+  const parse = (value) => {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    const match = String(value).match(/^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?/);
+    if (!match || match[2] === '00') {
+      return match ? { iso: `${match[1]}-01-01`, precision: 'year' } : null;
+    }
+    return {
+      iso: `${match[1]}-${match[2] || '01'}-${match[3] || '01'}`,
+      precision: match[3] ? 'day' : match[2] ? 'month' : 'year',
+    };
+  };
+  // Prefer the entry's own publication date; fall back to legislative dates, then year.
+  const primary = parse(entry?.date) || parse(entry?.created_at);
+  if (primary) {
+    return primary;
+  }
+  const legislative = [parse(entry?.date_enacted), parse(entry?.date_proposed)].filter(Boolean)
+    .sort((left, right) => right.iso.localeCompare(left.iso));
+  return legislative[0] || parse(entry?.year);
+}
+
+function collectFreshness(rootDir = ROOT_DIR, asOf = new Date().toISOString().slice(0, 10)) {
+  const asOfMs = Date.parse(`${asOf}T00:00:00Z`);
+  const dayMs = 86_400_000;
+  const corpusFiles = loadCorpusFiles(rootDir).filter((file) => file.corpusKey !== 'cross-corpus');
+  const corpuses = corpusFiles.map((file) => {
+    const dated = file.entries.map(entryDate).filter(Boolean);
+    const precise = dated.filter((date) => date.precision !== 'year');
+    const newest = precise.map((date) => date.iso).sort().at(-1) || null;
+    const within = (days) => precise.filter((date) => asOfMs - Date.parse(`${date.iso}T00:00:00Z`) <= days * dayMs).length;
+    const verified = file.entries.filter((entry) => entry?.verification_status === 'verified').length;
+    const partiallyVerified = file.entries.filter((entry) => entry?.verification_status === 'partially_verified').length;
+    const daysSinceNewest = newest ? Math.round((asOfMs - Date.parse(`${newest}T00:00:00Z`)) / dayMs) : null;
+    return {
+      corpus: file.corpusKey,
+      count: file.entries.length,
+      newest,
+      daysSinceNewest,
+      last30Days: within(30),
+      last90Days: within(90),
+      yearOnlyDates: dated.length - precise.length,
+      undated: file.entries.length - dated.length,
+      verified,
+      partiallyVerified,
+      stale: daysSinceNewest === null ? false : daysSinceNewest > STALE_AFTER_DAYS,
+    };
+  });
+  return { asOf, staleAfterDays: STALE_AFTER_DAYS, corpuses };
 }
 
 function compactRecord(record) {
@@ -710,6 +879,16 @@ function main(argv = process.argv.slice(2)) {
     printJson(collectValidation());
     return 0;
   }
+  if (command === 'freshness') {
+    const asOfIndex = argv.indexOf('--as-of');
+    const asOf = asOfIndex >= 0 ? argv[asOfIndex + 1] : undefined;
+    if (asOf !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(asOf || '')) {
+      process.stderr.write('Usage: node scripts/ai-discourse-corpus-tools.js freshness [--as-of YYYY-MM-DD]\n');
+      return 1;
+    }
+    printJson(collectFreshness(ROOT_DIR, asOf));
+    return 0;
+  }
   if (command === 'extract') {
     const id = argv[1];
     if (!id) {
@@ -724,7 +903,7 @@ function main(argv = process.argv.slice(2)) {
     printJson(result);
     return 0;
   }
-  process.stderr.write('Usage: node scripts/ai-discourse-corpus-tools.js <summary|validate|extract>\n');
+  process.stderr.write('Usage: node scripts/ai-discourse-corpus-tools.js <summary|validate|freshness|extract>\n');
   return 1;
 }
 
@@ -738,8 +917,10 @@ module.exports = {
   TARGET_DEBATE_IDS,
   TAXONOMY_ENUMS,
   buildRecordIndex,
+  collectFreshness,
   collectSummary,
   collectValidation,
+  entryDate,
   compactRecord,
   extractRecord,
   loadCorpusFiles,

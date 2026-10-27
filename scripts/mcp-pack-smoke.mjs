@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildTools } from '../mcp/lib/tools.mjs';
+import { stagePackage } from './mcp-release-artifacts.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const temporary = await mkdtemp(join(tmpdir(), 'ce-mcp-pack-'));
@@ -15,7 +16,7 @@ const run = (command, args, options = {}) => execFileSync(command, args, {
 
 try {
   run('npm', ['--prefix', 'mcp', 'run', 'build']);
-  const [packed] = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', temporary], { cwd: join(root, 'mcp') }));
+  const [packed] = JSON.parse(run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', temporary], { cwd: join(root, 'mcp') }));
   const tarball = join(temporary, packed.filename);
   const entries = run('tar', ['-tzf', tarball]).trim().split('\n').sort();
   assert.deepEqual(entries, [
@@ -61,6 +62,10 @@ try {
     buildTools({}).map((tool) => tool.name).sort(),
   );
   console.log(`MCP pack smoke passed: ${manifest.name}@${manifest.version}, ${entries.length} files, no runtime dependencies.`);
+  if (process.env.MCP_RELEASE_OUTPUT) {
+    stagePackage({ root, tarball, output: process.env.MCP_RELEASE_OUTPUT });
+    console.log('Retained the tested tarball and source receipt for release.');
+  }
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }

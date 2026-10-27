@@ -1,3 +1,4 @@
+import { markStorageBackupWrite } from './storageBackupRevision.js';
 import {
   STORAGE_BACKENDS,
   attachStorageRefCompatibilityFields,
@@ -59,7 +60,7 @@ import {
   writeStorageResourceHidden,
   writeStorageResourceOwner,
 } from './storageResourceOwnership.js';
-import { checkCoordinatedLegacyStorageOwner } from './sessionWriteCoordinator.js';
+import { checkCoordinatedLegacyStorageOwner, coordinateResponseUploadReceipt } from './sessionWriteCoordinator.js';
 import { executeCoordinatedStoragePublication, SUPERSEDED_AUTHORITY_ERROR } from './sessionConfigAuthority.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
@@ -476,7 +477,7 @@ const resolveConfiguredStorageBackend = ({ config, requestedBackend, payloadEncr
   return normalizeStorageBackend(requestedBackend, configured);
 };
 
-const resolvePayloadAccessControl = (config = {}) => {
+export const resolvePayloadAccessControl = (config = {}) => {
   const profile = isObj(config?.storageProfile) ? config.storageProfile : {};
   const cloudflare = isObj(profile.cloudflare) ? profile.cloudflare : {};
   const payloadAccessControl = isObj(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
@@ -1473,6 +1474,30 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     }
   }
 
+  const enqueueResponseAnalysis = async (id, metadata, bytesToStore) => {
+    if (resource !== 'responses') return;
+    const enqueueAutomatic = deps?.enqueueResultsAnalysisAutoJob;
+    if (typeof enqueueAutomatic === 'function') {
+      let committedPayload = null;
+      try { committedPayload = JSON.parse(decoder.decode(bytesToStore || new Uint8Array())); } catch { committedPayload = null; }
+      const committedResponses = committedPayload && typeof committedPayload === 'object'
+        ? [{ metadata, payload: committedPayload }]
+        : [];
+      await enqueueAutomatic({
+        env,
+        slug,
+        config,
+        job: {
+          slug,
+          requestId: `auto-upload:${id}`,
+          committedResponses,
+        },
+      }).catch((error) => {
+        deps?.log?.warn?.('[results-analysis] auto enqueue failed', { slug, error: error?.message || String(error || '') });
+      });
+    }
+  };
+
   let id = '';
   try {
     id = buildCloudflareStorageId({
@@ -1574,6 +1599,23 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     return responseJson(deps, { error: kvValueFailure.error }, kvValueFailure.status, baseHeaders);
   }
 
+  // Validation, encryption and serialized KV limits must pass before a retry lease starts.
+  const requestId = trim(payload.requestId);
+  let uploadReceipt = null;
+  if (resource === 'responses' && uploader && requestId && requestId.length <= 200) {
+    const digest = await (deps?.crypto || globalThis.crypto).subtle.digest('SHA-256', payload.bytes || new Uint8Array());
+    const payloadDigest = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve', payload: { requestId, payloadDigest } });
+    if (uploadReceipt?.kind === 'replay') {
+      await enqueueResponseAnalysis(uploadReceipt.storageRef.id);
+      return responseJson(deps, { id: uploadReceipt.storageRef.id, storageRef: uploadReceipt.storageRef, replayed: true }, 200, baseHeaders);
+    }
+    if (uploadReceipt && uploadReceipt.kind !== 'execute') {
+      return responseJson(deps, { error: uploadReceipt.error, reason: uploadReceipt.reason }, uploadReceipt.status || 503, baseHeaders);
+    }
+  }
+
+  await markStorageBackupWrite(env, slug);
   if (canWriteR2) {
     await r2.put(objectKey, bytesToStore, {
       httpMetadata: { contentType: metadata.contentType },
@@ -1598,29 +1640,15 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata);
   }
 
+  await markStorageBackupWrite(env, slug);
   const storageRef = normalizeStorageRef(metadata);
-  if (resource === 'responses') {
-    const enqueueAutomatic = deps?.enqueueResultsAnalysisAutoJob;
-    if (typeof enqueueAutomatic === 'function') {
-      let committedPayload = null;
-      try { committedPayload = JSON.parse(decoder.decode(bytesToStore || new Uint8Array())); } catch { committedPayload = null; }
-      const committedResponses = committedPayload && typeof committedPayload === 'object'
-        ? [{ metadata, payload: committedPayload }]
-        : [];
-      await enqueueAutomatic({
-        env,
-        slug,
-        config,
-        job: {
-          slug,
-          requestId: `auto-upload:${id}`,
-          committedResponses,
-        },
-      }).catch((error) => {
-        deps?.log?.warn?.('[results-analysis] auto enqueue failed', { slug, error: error?.message || String(error || '') });
-      });
-    }
+  if (uploadReceipt) {
+    const settled = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'settle',
+      payload: { requestId, attemptId: uploadReceipt.attemptId, storageRef },
+    });
+    if (!settled?.ok) return responseJson(deps, { error: 'Upload settlement is unavailable; retry.', reason: 'upload_receipt_unavailable' }, 503, baseHeaders);
   }
+  await enqueueResponseAnalysis(id, metadata, bytesToStore);
   return responseJson(deps, {
     id,
     storageRef,
@@ -2364,9 +2392,17 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
                   encrypted: metadata.encrypted === true,
                   createdAt: trim(metadata.createdAt),
                   size: Number(metadata.size || ciphertextBytes.length || 0) || 0,
+                  ...(Object.hasOwn(metadata, 'responder') ? { responder: metadata.responder } : {}),
+                  ...(Object.hasOwn(metadata, 'uploader') ? { uploader: metadata.uploader } : {}),
+                  ...(Object.hasOwn(metadata, 'uploadAuthority') ? { uploadAuthority: metadata.uploadAuthority } : {}),
+                  ...(Object.hasOwn(metadata, 'resourceId') ? { resourceId: metadata.resourceId } : {}),
+                  ...(Object.hasOwn(metadata, 'hidden') ? { hidden: metadata.hidden } : {}),
+                  ...(Object.hasOwn(metadata, 'groupIds') ? { groupIds: metadata.groupIds } : {}),
                   payloadAccessControl: {
                     gate: metadataAccess.gate,
                     encryption: metadataAccess.encryption,
+                    ...(Object.hasOwn(metadata.payloadAccessControl || {}, 'groupIds')
+                      ? { groupIds: metadata.payloadAccessControl.groupIds } : {}),
                   },
                   payloadAccessMode: deriveLegacyPayloadAccessMode(metadataAccess),
                   ...(metadata.accessConditions ? { accessConditions: metadata.accessConditions } : {}),
@@ -2416,6 +2452,7 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
     payloads.some((entry) => entry.keyProvider === 'worker_secret' || entry.keyProvider === 'mixed');
   const manifest = {
     type: 'ce_storage_encrypted_envelopes_export', version: 1, exportScope: 'encrypted_envelopes_only',
+    metadataFields: 'identity_v1',
     storageBackend: STORAGE_BACKENDS.CLOUDFLARE, sessionSlug: sessionSlugStorageKey(slug), resource: trim(resource) || 'all',
     exportedAt: new Date((deps?.now?.() || Date.now())).toISOString(),
     countScope: 'page', scannedRowCount, exportedPayloadCount: payloads.length, encryptedPayloadCount,

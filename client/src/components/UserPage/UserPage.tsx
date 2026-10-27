@@ -203,7 +203,7 @@ import {
   listNamespaceSlugsSync,
   peekCacheSync,
   subscribeCacheUpdates,
-  writeCache,
+  updateCacheAtomic,
 } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
@@ -646,7 +646,6 @@ const globalState = globalThis as UserPageGlobalState;
 const getEffectiveAiConfigTyped = getEffectiveAiConfig as (
   request: UserPageEffectiveAiConfigRequest,
 ) => Promise<UserPageEffectiveAiConfigResult | null | undefined>;
-const writeCacheTyped = writeCache as (namespace: string, slug?: string, value?: unknown) => Promise<unknown>;
 
 const isGateAccessContext = (value: unknown): value is GateAccessContext => isUserPageGateAccessContext(value);
 
@@ -839,20 +838,22 @@ class UserPage extends Component<any, any> {
     }
   };
 
-  persistBookmarksCache = (cacheObj: unknown, source: unknown = ''): void => {
+  // Saving applies the change to the latest saved bookmarks, so changes made in
+  // another tab are kept; listeners hear about it once it is saved.
+  persistBookmarksCache = (
+    update: (saved: UserPageBookmarksCache) => UserPageBookmarksCache,
+    source: unknown = '',
+  ): void => {
     const slug = this.getActiveSessionSlug();
-    void (writeCache as (namespace: string, slug?: string, value?: unknown) => Promise<boolean>)(
-      'bookmarksCache',
-      slug,
-      cacheObj || {},
-    ).catch((error: unknown) => {
-      accountLog.error('UserPage: Error saving bookmarksCache:', error);
-    });
-    try {
-      window.dispatchEvent(new CustomEvent('bookmarksCacheUpdated', { detail: { source: source || 'userpage' } }));
-    } catch (e) {
-      accountLog.warn('UserPage: telemetry', e);
-    }
+    void updateCacheAtomic<UserPageBookmarksCache>('bookmarksCache', slug, (saved) =>
+      update(normalizeUserPageBookmarksCache(saved)),
+    )
+      .then(() => {
+        window.dispatchEvent(new CustomEvent('bookmarksCacheUpdated', { detail: { source: source || 'userpage' } }));
+      })
+      .catch((error: unknown) => {
+        accountLog.error('UserPage: Error saving bookmarksCache:', error);
+      });
   };
 
   stopSpinnerEventPropagation = (event: StoppableEvent): void => {
@@ -1507,17 +1508,17 @@ class UserPage extends Component<any, any> {
     const nickname = (this.state.nicknameInput || '').trim();
     const onchainUsername = this.getOnchainUsername(rawAddr, this.props.network); // returns null for now
 
-    let bookmarksCache = this.getBookmarksCache();
-    const saveResult = applyUserPageBookmarkNicknameSave({
+    const nicknameSave = {
       address: rawAddr,
-      bookmarksCache,
       networkId: this.props.network?.id,
       nickname,
       onchainUsername,
-    });
-    bookmarksCache = saveResult.bookmarksCache;
-
-    this.persistBookmarksCache(bookmarksCache, 'saveNickname');
+    };
+    const saveResult = applyUserPageBookmarkNicknameSave({ ...nicknameSave, bookmarksCache: this.getBookmarksCache() });
+    this.persistBookmarksCache(
+      (saved) => applyUserPageBookmarkNicknameSave({ ...nicknameSave, bookmarksCache: saved }).bookmarksCache,
+      'saveNickname',
+    );
     if (this._isMounted) {
       this.setState(
         buildUserPageNicknameSaveStatePatch({
@@ -2862,19 +2863,19 @@ class UserPage extends Component<any, any> {
 
   toggleBookmark = (optionalMeta: BookmarkToggleMeta | React.MouseEvent<HTMLElement> = {}): void => {
     if (!this.props.viewAddress) return;
-    const bookmarkMeta = optionalMeta as BookmarkToggleMeta;
-    let bookmarksCache = this.getBookmarksCache();
-    const toggleResult = applyUserPageBookmarkToggle({
+    const toggle = {
       address: this.props.viewAddress,
-      bookmarkMeta,
-      bookmarksCache,
+      bookmarkMeta: optionalMeta as BookmarkToggleMeta,
       currentNickname: this.state.nicknameInput,
       networkId: this.props.network?.id,
       onchainUsername: this.getOnchainUsername(this.props.viewAddress, this.props.network),
-    });
-    bookmarksCache = toggleResult.bookmarksCache;
-
-    this.persistBookmarksCache(bookmarksCache, 'toggleBookmark');
+    };
+    const toggleResult = applyUserPageBookmarkToggle({ ...toggle, bookmarksCache: this.getBookmarksCache() });
+    // The toggle follows what this page shows; if the saved bookmarks already match, they stay.
+    this.persistBookmarksCache((saved) => {
+      const latest = applyUserPageBookmarkToggle({ ...toggle, bookmarksCache: normalizeUserPageBookmarksCache(saved) });
+      return latest.bookmarked === toggleResult.bookmarked ? latest.bookmarksCache : saved;
+    }, 'toggleBookmark');
     if (this._isMounted) {
       this.setState(buildUserPageBookmarkToggleStatePatch(toggleResult));
     }
@@ -3121,11 +3122,10 @@ class UserPage extends Component<any, any> {
       cachedAt: Date.now(),
       fingerprint,
       networkId,
-      peekCache: peekCacheSync,
       result,
       sessionSlug,
       ttlMs: USER_ANALYSIS_TTL_MS,
-      writeCache: writeCacheTyped,
+      updateCacheAtomic,
     });
     if (cacheWrite.status === 'error') {
       throw cacheWrite.error;

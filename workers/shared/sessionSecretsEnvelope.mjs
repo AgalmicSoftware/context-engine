@@ -98,7 +98,8 @@ const resolveKek = (env = {}, previous = false, deps = {}) => {
 };
 
 const importKek = async (secret, usages, deps = {}) => {
-  const material = toTrimmedString(secret);
+  const raw = toTrimmedString(secret);
+  const material = /^[a-f0-9]{64}$/i.test(raw) ? raw.toLowerCase() : raw;
   if (!material) throw new Error(`${SESSION_SECRETS_CURRENT_KEK_NAME} is missing.`);
   const cryptoImpl = getCryptoImpl(deps);
   const digest = await cryptoImpl.subtle.digest(

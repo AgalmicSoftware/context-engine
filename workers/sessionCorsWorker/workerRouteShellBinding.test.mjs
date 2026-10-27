@@ -795,12 +795,14 @@ for (const contentLength of [null, '1']) {
       }),
     });
     const shell = createWorkerRouteShellWithWorkerDeps({ deps: {
-      getRouteBaseHeaders: () => ({ 'X-Test': 'cors' }),
+      getRouteBaseHeaders: () => new Headers({ 'Access-Control-Allow-Origin': 'https://app.example', Vary: 'Origin' }),
       dispatchAuthLoginRequest: () => { dispatched = true; return new Response(); },
     } });
     const result = await shell.fetch(request, { CE_MAX_UPLOAD_BYTES: '8' });
     assert.equal(result.status, 413);
-    assert.equal(result.headers.get('X-Test'), 'cors');
+    assert.equal(result.headers.get('Access-Control-Allow-Origin'), 'https://app.example');
+    assert.equal(result.headers.get('Vary'), 'Origin');
+    assert.equal(result.headers.get('Content-Type'), 'application/json');
     assert.equal(dispatched, false);
     assert.equal(cancelled, true);
   });

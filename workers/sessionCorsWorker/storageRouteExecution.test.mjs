@@ -16,7 +16,7 @@ import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
 import { createEthersInterfaceProviderGateHelpersWithWorkerDeps } from './ethersInterfaceProviderGateBinding.js';
 import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
 import { addWorkerGroupMember, createWorkerGroup, deleteWorkerGroup, readWorkerGroupMembershipProjection } from './workerGroups.js';
-import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
+import { SessionWriteCoordinator, enqueueCoordinatedResultsAnalysisAutoJob } from './sessionWriteCoordinator.js';
 import { resolveWorkerCanonicalLoginScopes } from './workerCanonicalAuthority.js';
 import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
 
@@ -78,7 +78,7 @@ const createCryptoDecryptSpy = () => {
 const json = (body, status = 200, headers = {}) =>
 	new Response(JSON.stringify(body), {
 		status,
-		headers: { ...headers, 'Content-Type': 'application/json' },
+		headers: new Headers([...new Headers(headers), ['Content-Type', 'application/json']]),
 	});
 
 const readJson = async (response) => JSON.parse(await response.text());
@@ -163,7 +163,9 @@ const attachSessionCoordinator = (env, setConfig, coordinatorDeps = {}) => {
 				const values = new Map();
 				let tail = Promise.resolve();
 				const storage = {
+					list: async ({ prefix = '' } = {}) => new Map([...values].filter(([key]) => key.startsWith(prefix))),
 					get: async (key) => structuredClone(values.get(key)),
+					put: async (key, value) => values.set(key, structuredClone(value)),
 					transaction: (callback) => {
 						const run = tail.then(async () => {
 							const staged = new Map([...values].map(([key, value]) => [key, structuredClone(value)]));
@@ -172,6 +174,8 @@ const attachSessionCoordinator = (env, setConfig, coordinatorDeps = {}) => {
 								put: async (key, value) => {
 									staged.set(key, structuredClone(value));
 								},
+								delete: async (key) => staged.delete(key),
+								list: async ({ prefix = '' } = {}) => new Map([...staged].filter(([key]) => key.startsWith(prefix))),
 							});
 							values.clear();
 							for (const [key, value] of staged) values.set(key, value);
@@ -4788,4 +4792,123 @@ test('hide requests validate the resource, id, and flag', async () => {
 		assert.equal(result.status, 400);
 		assert.match(result.error, error);
 	}
+});
+
+
+const createResponseReceiptFixture = ({ binding = true, maxKvValueBytes } = {}) => {
+  const kv = createMockKv();
+  const env = { CE_STORAGE_INDEX_KV: kv, TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' };
+  const config = { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
+  let now = 1_000;
+  if (binding) attachSessionCoordinator(env, () => {}, { now: () => now });
+  const queued = [];
+  const deps = { json, randomBytes: createSequenceRandomBytes(), now: () => now, maxKvValueBytes,
+    enqueueResultsAnalysisAutoJob: async (args) => {
+      if (!binding) { queued.push(args); return; }
+      const result = await enqueueCoordinatedResultsAnalysisAutoJob(args);
+      if (result.ok && !result.replayed) queued.push(args);
+      return result;
+    },
+  };
+  const upload = (requestId = 'answer:v1:operation:q1', data = { questionID: 'q1', answer: { value: 'Agree' } }, address = '0x1111111111111111111111111111111111111111') => storageRoute({
+    path: '/storage/upload', method: 'POST', env, config, slug: 'session-a', uploaderAddress: address, authScopes: { storage: true }, baseHeaders: {}, deps,
+    request: new Request('https://worker.example/storage/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resource: 'responses', requestId, data }),
+    }),
+  });
+  return { kv, env, queued, upload, advance: (ms) => { now += ms; } };
+};
+
+test('response receipts replay the stored reference without writes or another analysis job', async () => {
+  const f = createResponseReceiptFixture();
+  const first = await (await f.upload()).json();
+  const snapshot = [...f.kv.store];
+  const response = await f.upload();
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ...first, replayed: true });
+  assert.deepEqual([...f.kv.store], snapshot);
+  assert.equal(f.queued.length, 1);
+  const conflict = await f.upload(undefined, { questionID: 'q1', answer: { value: 'Edited' } });
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).reason, 'upload_request_conflict');
+  assert.deepEqual([...f.kv.store], snapshot);
+  const other = await (await f.upload(undefined, undefined, '0x2222222222222222222222222222222222222222')).json();
+  assert.notEqual(other.id, first.id, 'receipt scope belongs to the authenticated participant');
+});
+
+test('pending response uploads wait, and an expired attempt gets a fresh storage id', async () => {
+  const f = createResponseReceiptFixture();
+  const put = f.kv.put;
+  let failed = false;
+  f.kv.put = async (key, value) => {
+    if (!failed && key.startsWith('ce-storage:')) { failed = true; throw new Error('index unavailable'); }
+    return put(key, value);
+  };
+  await assert.rejects(f.upload(), /index unavailable/);
+  const orphanKey = [...f.kv.store.keys()][0];
+  const pending = await f.upload();
+  assert.equal(pending.status, 503);
+  assert.equal((await pending.json()).reason, 'upload_in_progress');
+  f.advance(120_001);
+  const retried = await f.upload();
+  assert.equal(retried.status, 200);
+  const saved = await retried.json();
+  assert.notEqual(orphanKey, `ce-storage-payload:session-a:${saved.id}`);
+  assert.equal(f.kv.store.has(orphanKey), true);
+  assert.equal(f.queued.length, 1);
+});
+
+test('response upload receipts fail closed when coordination is unavailable', async () => {
+  const f = createResponseReceiptFixture();
+  f.env.CE_SESSION_COORDINATOR.get = () => ({ fetch: async () => { throw new Error('coordinator unavailable'); } });
+  const response = await f.upload();
+  assert.equal(response.status, 503);
+  assert.equal(f.kv.store.size, 0);
+  assert.equal(f.queued.length, 0);
+});
+
+test('a lost settlement reply retries to the original saved response', async () => {
+  const f = createResponseReceiptFixture();
+  const get = f.env.CE_SESSION_COORDINATOR.get;
+  let lost = false;
+  f.env.CE_SESSION_COORDINATOR.get = (id) => {
+    const stub = get(id);
+    return { fetch: async (url, init) => {
+      const response = await stub.fetch(url, init);
+      if (!lost && new URL(url).pathname.endsWith('/settle')) { lost = true; throw new Error('lost reply'); }
+      return response;
+    } };
+  };
+  assert.equal((await f.upload()).status, 503);
+  const snapshot = [...f.kv.store];
+  const replay = await (await f.upload()).json();
+  assert.equal(replay.replayed, true);
+  assert.deepEqual([...f.kv.store], snapshot);
+  assert.equal(f.queued.length, 1, 'the replay queues the saved response for analysis');
+  assert.equal((await f.upload()).status, 200);
+  assert.equal(f.queued.length, 1, 'another replay does not enqueue again');
+});
+
+test('legacy response uploads without a binding or a bounded request id retain their behavior', async () => {
+  for (const [binding, requestId] of [[false, 'same-request'], [true, ''], [true, 'x'.repeat(201)]]) {
+    const f = createResponseReceiptFixture({ binding });
+    const first = await (await f.upload(requestId)).json();
+    const second = await (await f.upload(requestId)).json();
+    assert.notEqual(first.id, second.id);
+    assert.equal(second.replayed, undefined);
+    assert.equal(f.queued.length, 2);
+  }
+});
+
+
+test('oversize response retries return the same validation failure without reserving a lease', async () => {
+  const f = createResponseReceiptFixture({ maxKvValueBytes: 1024 });
+  const data = { questionID: 'q1', answer: { value: 'x'.repeat(2000) } };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await f.upload(undefined, data);
+    assert.equal(response.status, 413);
+  }
+  assert.equal(f.kv.store.size, 0);
+  assert.equal(f.queued.length, 0);
+  assert.equal(f.env.CE_SESSION_COORDINATOR.instances.size, 0);
 });

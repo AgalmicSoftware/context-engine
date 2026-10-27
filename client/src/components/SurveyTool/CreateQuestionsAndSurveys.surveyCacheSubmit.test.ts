@@ -109,6 +109,66 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     }
   });
 
+  it.each([false, true])('clears a failed draft save after successful publish (standalone=%s)', async (standalone) => {
+    const latestBlock = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(123);
+    const survey = jest
+      .spyOn(contractScripts, 'addSurveyWithQuestions')
+      .mockResolvedValue({ uploadedQuestions: [], receipt: { status: 1 } });
+    const questions = jest
+      .spyOn(contractScripts, 'addQuestions')
+      .mockResolvedValue({ uploadedQuestions: [], receipt: { status: 1 } });
+    const key = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({
+      arweaveJwk: '',
+      source: 'session',
+      sessionConfigSource: 'none',
+      status: 'missing',
+      preferLocal: false,
+      sessionStatus: 'missing',
+      groupStatus: 'missing',
+      localStatus: 'missing',
+    });
+    const upload = jest.spyOn(arweaveClient, 'uploadDataToArweave').mockResolvedValue('survey-arweave-tx');
+    const writeFailure = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked write');
+    });
+    writeCacheOptimisticMock.mockImplementation(async () => undefined);
+    peekCacheSyncMock.mockReturnValue({});
+    try {
+      const instance = makeInstance({
+        loginComplete: true,
+        provider: 'web3auth',
+        account: '0xabc',
+        activeSessionSlug: 'edge',
+        network: { id: 84532 },
+      });
+      instance.ensureResolvedSessionConfigForSubmit = jest
+        .fn()
+        .mockResolvedValue({ slug: 'edge', networkChainId: 84532, contracts: { surveys: { chainId: 84532 } } });
+      instance.resolveGateOptions = jest.fn(() => ({ gateMap: {}, gateOptions: [], defaultGateId: '' }));
+      instance.startCacheWatch = jest.fn();
+      instance.state = {
+        ...instance.state,
+        showAutoTool: false,
+        isStandaloneQuestion: standalone,
+        title: 'Draft to publish',
+        surveyHash: '0xsurvey',
+        questions: [{ id: 'q1', type: 'freeform', prompt: 'Question 1', tags: [] }],
+      };
+      instance.saveToLocalStorage({ immediate: true });
+      expect(instance.state.draftSaveFailed).toBe(true);
+      await instance.createSurvey();
+      expect(standalone ? questions : survey).toHaveBeenCalled();
+      expect(instance.state.submissionError).toBe('');
+      expect(instance._lastSavedUnfinishedSurveyJson).toBeNull();
+      expect(treeHasText(instance.render(), 'Draft could not be saved in this browser.')).toBe(false);
+      const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+      instance.handleDraftBeforeUnload(event);
+      expect(event.defaultPrevented).toBe(false);
+    } finally {
+      for (const spy of [latestBlock, survey, questions, key, upload, writeFailure]) spy.mockRestore();
+    }
+  });
+
   it('forces direct Arweave for survey metadata when the effective key is local', async () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const latestBlockSpy = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(123);

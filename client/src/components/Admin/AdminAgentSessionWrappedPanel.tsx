@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, FormGroup, FormText, Input, Label } from 'reactstrap';
-import { DEPLOY_HELPER_URL } from '../../variables/publicDeploymentConfig.js';
+import { useEffect, useMemo, useState } from 'react';
+import { Button } from 'reactstrap';
 import type { AgentSessionWrappedCapability } from '../../utilities/session/agentSessionWrapped.js';
 import {
   applyAdminAgentSessionWrappedChange,
@@ -23,14 +22,6 @@ export type AdminAgentSessionWrappedPanelProps = {
     configPatch: AdminRecord;
     workerUrl: string;
   }) => void;
-  deployHelperUrl?: string;
-  requestIdFactory?: () => string;
-};
-
-const defaultRequestIdFactory = (): string => {
-  const uuid = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : '';
-  const suffix = uuid || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-  return `wrapped-admin-${suffix}`;
 };
 
 const AdminAgentSessionWrappedPanel = ({
@@ -41,14 +32,10 @@ const AdminAgentSessionWrappedPanel = ({
   postSignedRequest,
   ensureSessionWorkerAttached,
   onConfigUpdated,
-  deployHelperUrl = DEPLOY_HELPER_URL,
-  requestIdFactory = defaultRequestIdFactory,
 }: AdminAgentSessionWrappedPanelProps) => {
-  const [apiToken, setApiToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [localCapability, setLocalCapability] = useState<AgentSessionWrappedCapability | null>(null);
-  const pendingRequestRef = useRef<{ key: string; requestId: string } | null>(null);
   const effectiveConfig = useMemo(
     () =>
       localCapability && sessionConfig && typeof sessionConfig === 'object'
@@ -68,27 +55,18 @@ const AdminAgentSessionWrappedPanel = ({
   const capability = localCapability || availability.capability;
 
   useEffect(() => {
-    setApiToken('');
     setBusy(false);
     setStatus('');
     setLocalCapability(null);
-    pendingRequestRef.current = null;
   }, [sessionSlug, sessionWorkerUrl]);
 
-  const runChange = async ({ accessEnabled, operation }: { accessEnabled: boolean; operation: string }) => {
+  const runChange = async ({ accessEnabled }: { accessEnabled: boolean }) => {
     if (!availability.manageable || busy) return;
-    const operationKey = `${sessionSlug}:${sessionWorkerUrl}:${operation}:${accessEnabled}`;
-    if (!pendingRequestRef.current || pendingRequestRef.current.key !== operationKey) {
-      pendingRequestRef.current = { key: operationKey, requestId: requestIdFactory() };
-    }
     setBusy(true);
-    setStatus(accessEnabled ? 'Deploying and verifying Wrapped…' : 'Disabling Wrapped access…');
+    setStatus(accessEnabled ? 'Saving and verifying Wrapped access…' : 'Disabling Wrapped access…');
     try {
       const result = await applyAdminAgentSessionWrappedChange({
         accessEnabled,
-        apiToken,
-        deployHelperUrl,
-        deploymentRequestId: pendingRequestRef.current.requestId,
         sessionConfig: effectiveConfig,
         sessionSlug,
         sessionWorkerUrl,
@@ -101,17 +79,14 @@ const AdminAgentSessionWrappedPanel = ({
         configPatch: result.configPatch,
         workerUrl: sessionWorkerUrl,
       });
-      pendingRequestRef.current = null;
       setStatus(
         result.capability.enabled
           ? 'Wrapped access enabled and published.'
           : 'Wrapped access disabled; deployed resources were retained.',
       );
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Wrapped deployment failed.');
+      setStatus(error instanceof Error ? error.message : 'Wrapped configuration failed.');
     } finally {
-      // The token is request-only and never survives an operation in component state.
-      setApiToken('');
       setBusy(false);
     }
   };
@@ -126,6 +101,7 @@ const AdminAgentSessionWrappedPanel = ({
         sessionSlug,
         sessionWorkerUrl,
       });
+      setLocalCapability(result.capability);
       setStatus(
         result.accessEnabled ? 'Wrapped is healthy and access is enabled.' : 'Wrapped is healthy; access is disabled.',
       );
@@ -142,8 +118,8 @@ const AdminAgentSessionWrappedPanel = ({
         <div className={styles.panelTitleGroup}>
           <div className={styles.panelTitle}>Agent Session Wrapped</div>
           <div className={styles.panelHint}>
-            One dedicated Bridge delegates membership checks to this session’s paired Worker. Agent answers use HTTPS/KV
-            and require no agent-originated EVM transaction.
+            The Session Worker handles agent access and membership checks. Wrapped answers are separate from ordinary
+            responses.
           </div>
         </div>
       </div>
@@ -161,35 +137,24 @@ const AdminAgentSessionWrappedPanel = ({
       {capability && (
         <div className={styles.statusNote}>
           {capability.enabled ? 'Enabled' : 'Access disabled'} · {capability.protocolVersion} ·{' '}
-          <a href={`${capability.origin}/health`} target="_blank" rel="noreferrer">
+          <a
+            href={`${capability.origin}/capabilities?slug=${encodeURIComponent(sessionSlug)}`}
+            target="_blank"
+            rel="noreferrer"
+          >
             {capability.origin}
           </a>
         </div>
       )}
       {availability.manageable && (
         <>
-          <FormGroup>
-            <Label for="admin-agent-session-wrapped-token">Cloudflare API token</Label>
-            <Input
-              id="admin-agent-session-wrapped-token"
-              type="password"
-              autoComplete="off"
-              value={apiToken}
-              onChange={(event) => setApiToken(event.target.value)}
-              disabled={busy}
-            />
-            <FormText>
-              Request-only: this token is sent only to the deploy helper for this operation and is never stored.
-              Attaching a new registry Worker prompts an admin transaction; agent answers do not.
-            </FormText>
-          </FormGroup>
           <div className={styles.formRow}>
             {!capability?.enabled && (
               <Button
                 color="primary"
                 className={styles.actionButton}
-                onClick={() => void runChange({ accessEnabled: true, operation: 'enable' })}
-                disabled={busy || !apiToken.trim()}
+                onClick={() => void runChange({ accessEnabled: true })}
+                disabled={busy}
               >
                 Enable Wrapped
               </Button>
@@ -199,8 +164,8 @@ const AdminAgentSessionWrappedPanel = ({
                 color="secondary"
                 outline
                 className={styles.actionButton}
-                onClick={() => void runChange({ accessEnabled: false, operation: 'disable' })}
-                disabled={busy || !apiToken.trim()}
+                onClick={() => void runChange({ accessEnabled: false })}
+                disabled={busy}
               >
                 Disable access
               </Button>
@@ -208,17 +173,6 @@ const AdminAgentSessionWrappedPanel = ({
             {capability && (
               <Button color="secondary" outline className={styles.actionButton} onClick={checkHealth} disabled={busy}>
                 Check health
-              </Button>
-            )}
-            {capability && (
-              <Button
-                color="secondary"
-                outline
-                className={styles.actionButton}
-                onClick={() => void runChange({ accessEnabled: capability.enabled, operation: 'redeploy' })}
-                disabled={busy || !apiToken.trim()}
-              >
-                Redeploy
               </Button>
             )}
           </div>

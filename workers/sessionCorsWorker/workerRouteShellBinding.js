@@ -1,3 +1,6 @@
+import { dispatchSessionAgentQueue } from './agent/queueBoundary.mjs';
+import { isAgentPath } from './agent/routes.mjs';
+import { dispatchSessionAgentRequest } from './agent/requestBoundary.mjs';
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { evaluateAuthenticatedRoutePreflight as evaluateAuthenticatedRoutePreflightBoundary } from './authenticatedRoutePreflight.js';
 import { dispatchInterviewStarterRequest } from './interviewStarter.js';
@@ -133,6 +136,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       deps: { corsHeaders: deps?.corsHeaders },
     });
     try {
+      if (isAgentPath(path)) return await dispatchSessionAgentRequest({ request, env, deps, baseHeaders: routeBaseHeaders });
       if (routeSelection.kind === 'options') {
         if (path === '/arweave/upload') {
           log('[arweave] preflight', {
@@ -150,6 +154,13 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         request = new Request(request, { body: bytes });
       }
       const envSlug = getDefaultWorkerSessionSlug(env);
+
+      // Readiness must remain public when config authority is missing or down.
+      if (routeSelection.kind === 'capabilities') {
+        return await dispatchAnonymousRoute({
+          path, request, anonymousContext: { env, headers: routeBaseHeaders },
+        });
+      }
 
       if (routeSelection.kind === 'session-config') {
         return await dispatchSessionConfigBootstrapRequest({
@@ -182,6 +193,9 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             getCorsContext: deps?.getCorsContext,
             ...(routeSelection.kind === 'interview-starter' ? {
               getSessionSecrets: deps?.getSessionSecrets,
+              safeFetch: deps?.safeFetch,
+              isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
+              log: deps?.log,
               evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
             } : {}),
             resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
@@ -404,8 +418,9 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       });
       }
 
-      if (routeSelection.kind === 'admin-results-analysis-status') {
+      if (routeSelection.kind === 'admin-results-analysis-status' || routeSelection.kind === 'admin-session-diagnostics') {
         return await dispatchAdminResultsAnalysisStatusRequest({
+          diagnostics: routeSelection.kind === 'admin-session-diagnostics',
           request,
           env,
           baseHeaders: routeBaseHeaders,
@@ -696,8 +711,10 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       });
     } catch (error) {
       if (error instanceof BodyByteLimitError) {
+        const responseHeaders = new Headers(routeBaseHeaders);
+        responseHeaders.set('Content-Type', 'application/json');
         return new ResponseCtor(JSON.stringify({ error: error.message }), {
-          status: 413, headers: { ...routeBaseHeaders, 'Content-Type': 'application/json' },
+          status: 413, headers: responseHeaders,
         });
       }
       log?.error?.('[worker] unhandled route error', {
@@ -722,5 +739,6 @@ export const createWorkerRouteShellWithWorkerDeps = ({
 
   return {
     fetch: handleRequest,
+    queue: (batch, env) => dispatchSessionAgentQueue({ batch, env, deps }),
   };
 };

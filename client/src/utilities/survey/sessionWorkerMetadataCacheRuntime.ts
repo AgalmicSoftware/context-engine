@@ -2,14 +2,11 @@ import {
   hydrateWorkerCanonicalQuestionCache,
   hydrateWorkerCanonicalSurveyCache,
   readWorkerMetadataSessionConfig,
+  resolveWorkerMetadataCacheIdentity,
   shouldHydrateWorkerCanonicalMetadata,
   type WorkerMetadataHydrationHost,
 } from './workerCanonicalCacheHydration';
-import {
-  buildWorkerCanonicalCacheRunKey,
-  resolveWorkerCanonicalCacheIdentity,
-  type WorkerCanonicalCacheIdentity,
-} from './workerCanonicalCacheIdentity';
+import { buildWorkerCanonicalCacheRunKey, type WorkerCanonicalCacheIdentity } from './workerCanonicalCacheIdentity';
 
 export type WorkerMetadataHydrationTarget = {
   identity: WorkerCanonicalCacheIdentity | null;
@@ -44,7 +41,7 @@ export const resolveWorkerMetadataHydrationTarget = (
 ): WorkerMetadataHydrationTarget => {
   const sessionConfig = readWorkerMetadataSessionConfig(host, sessionSlug);
   const isWorkerCanonical = shouldHydrateWorkerCanonicalMetadata(sessionConfig);
-  const identity = isWorkerCanonical ? resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug }) : null;
+  const identity = isWorkerCanonical ? resolveWorkerMetadataCacheIdentity({ host, sessionConfig, sessionSlug }) : null;
   return {
     identity,
     isWorkerCanonical,

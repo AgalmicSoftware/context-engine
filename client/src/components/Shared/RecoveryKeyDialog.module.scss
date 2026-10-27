@@ -1,0 +1,45 @@
+.dialog {
+  --ce-surface-raised: var(--ce-authoring-panel-bg);
+  --ce-input-bg: var(--ce-authoring-input-bg);
+  --ce-text: var(--ce-authoring-panel-text);
+  --ce-border-raised: var(--ce-authoring-panel-muted);
+  --ce-border-inset: var(--ce-authoring-panel-muted);
+  background: var(--ce-authoring-panel-bg);
+  color: var(--ce-authoring-panel-text);
+  border: 1px solid var(--ce-authoring-panel-muted);
+  font-family: var(--ce-font-ui);
+  h2,
+  p,
+  label {
+    color: var(--ce-authoring-panel-text);
+  }
+  input {
+    width: 100%;
+    background: var(--ce-authoring-input-bg);
+    color: var(--ce-authoring-input-text);
+    border: 1px solid var(--ce-authoring-panel-muted);
+    padding: 10px;
+  }
+  button {
+    background: var(--ce-authoring-control-bg);
+    color: var(--ce-authoring-control-text);
+    border: 1px solid var(--ce-authoring-panel-muted);
+    padding: 10px 14px;
+    margin: 8px 8px 8px 0;
+    border-radius: 4px;
+  }
+  button:focus-visible,
+  input:focus-visible {
+    outline: 3px solid var(--ce-focus-ring);
+    outline-offset: 3px;
+  }
+  .primary {
+    background: var(--ce-action-accent);
+    color: var(--ce-action-accent-text);
+    font-weight: 700;
+  }
+}
+.fingerprint {
+  overflow-wrap: anywhere;
+  font-family: monospace;
+}

@@ -1,5 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Wallet } from 'ethers';
+import { createWorkerRuntime } from './worker.js';
+import { putSessionSecrets } from './sessionConfigSecretsStore.js';
+import { buildSiweMessage, installSessionCoordinatorBinding, makeJsonRequest } from '../../tests/helpers/sessionCorsWorkerTestUtils.mjs';
+import { buildQuestionRecord } from '../../mcp/lib/records.mjs';
 import { resolveInterviewStarter, dispatchInterviewStarterRequest as boundary } from './interviewStarter.js';
 
 const dispatchInterviewStarterRequest = (args) => boundary({
@@ -43,6 +48,27 @@ const fixture = () => {
     calls: () => calls,
   };
 };
+
+for (const [provider, model, secret] of [
+  ['openai', 'gpt-4o-mini', 'openaiKey'], ['anthropic', 'claude-sonnet-4-6', 'anthropicKey'],
+  ['openrouter', 'openai/gpt-4o-mini', 'openrouterKey'], ['custom', 'owner-model', 'customRpcKey'],
+]) test(`opening generation honors the saved ${provider} model and its 600-token limit`, async () => {
+  const f = fixture();
+  f.args.config.ai = { mode: provider, models: { fast: model } };
+  delete f.args.deps.proxyOpenAI;
+  f.args.deps.getSessionSecrets = async () => ({ [secret]: 'synthetic-key', customRpcUrl: 'https://rpc.example.test' });
+  let body;
+  const fetch = async (_, init) => {
+    body = JSON.parse(init.body);
+    return Response.json({ choices: [{ message: { content: 'What matters to you?' } }], content: [{ text: 'What matters to you?' }] });
+  };
+  Object.assign(f.args.deps, { fetch, safeFetch: fetch, log: () => {} });
+  const result = await resolveInterviewStarter(f.args);
+  assert.equal(result.openingPrompt, 'What matters to you?');
+  assert.equal(body.model, model);
+  assert.equal(body.max_tokens, 600);
+});
+
 test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings().openingMode, 'auto');
   assert.equal(normalizeInterviewSettings().autoRegenerate, false);
@@ -220,3 +246,95 @@ test('starter route resolves anonymous IP daily budgets before generation', asyn
     }, entry.name);
   }
 });
+
+const origin = 'https://client.example.test';
+const BLOCKED = 'https://127.0.0.1/v1/chat/completions';
+
+const runtimeFixture = async (mode) => {
+  const values = new Map();
+  const kv = { get: async k => values.get(k) ?? null, put: async (k, v) => values.set(k, v), delete: async k => values.delete(k),
+    list: async ({ prefix = '' } = {}) => ({ keys: [...values.keys()].filter(k => k.startsWith(prefix)).map(name => ({ name })), list_complete: true }) };
+  const wallet = new Wallet(`0x${'1'.repeat(64)}`);
+  const sessionId = `0x${'a'.repeat(32)}`;
+  const config = { slug: 'fixture', sessionId, adminAddress: wallet.address, allowOrigins: [origin], sessionInfo: 'Topic',
+    scopes: { ai: true, arweave: true }, ai: { mode: 'custom', models: { fast: 'owner-model', thinking: 'owner-model' } },
+    workerAuthority: { version: 1, participantScopes: ['ai', 'storage'], anonymousScopes: ['ai'] },
+    sessionModeProfile: {
+      profileVersion: 1, preset: 'custom', authority: { mode: 'worker_canonical' }, evm: { registryChainId: null },
+      storage: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+      identity: { default: 'passkey', enabled: ['passkey'] }, authorization: { mechanisms: ['worker_roles'] },
+      encryption: { mode: 'none' }, surfaces: { web: true, telegram: false, miniApp: false, agentHttp: false, mcp: false, ceCc: false },
+      results: { visibility: 'public_full_if_storage_public', exposure: { aggregateResultsEnabled: true, anonymizedGroupsEnabled: false, minGroupSize: 2 } },
+      export: { scope: 'all_session' },
+    },
+    storageProfile: { type: 'session_storage_profile', version: 'session-storage-profile-v1', backend: 'cloudflare', sessionOwned: true,
+      resources: { docsContext: 'active', questions: 'active', surveys: 'active', responses: 'active' },
+      payloadAccessControl: { gate: 'none', encryption: 'none', mode: 'public_read', enforcement: 'session_worker_public_read', litRequired: false } },
+  };
+  const env = installSessionCoordinatorBinding({ GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv,
+    TOKEN_HMAC_SECRET: 'synthetic-secret', CE_STORAGE_ENVELOPE_KEK: 'a'.repeat(64), LOGIN_TRUSTED_ORIGINS: origin });
+  await kv.put('session:fixture:config', JSON.stringify(config));
+  await putSessionSecrets(env, 'fixture', { customRpcUrl: mode === 'blocked' ? BLOCKED : 'https://provider.example.test/v1/chat/completions', customRpcKey: 'synthetic-session-key' });
+  const runtimeCalls = [];
+  const worker = createWorkerRuntime(env, { fetch: async (url, init) => {
+    runtimeCalls.push({ url: String(url), init });
+    if (mode === 'redirect') return new Response(null, { status: 302, headers: { location: BLOCKED } });
+    return Response.json({ choices: [{ message: { content: 'What matters to you?' } }] });
+  },
+    rpcFetch: async () => assert.fail('no chain') });
+  const nonceRes = await worker.fetch(makeJsonRequest('/auth/nonce', { address: wallet.address, sessionSlug: 'fixture', sessionId }, { headers: { Origin: origin } }), env);
+  const nonce = await nonceRes.json();
+  const message = buildSiweMessage({ domain: new URL(origin).host, uri: origin, address: wallet.address, nonce: nonce.nonce, sessionSlug: 'fixture', sessionId });
+  const loginRes = await worker.fetch(makeJsonRequest('/auth/login', { address: wallet.address, sessionSlug: 'fixture', sessionId, message, signature: await wallet.signMessage(message) }, { headers: { Origin: origin } }), env);
+  const { token } = await loginRes.json();
+  assert.ok(token);
+  const req = (path, body, auth) => worker.fetch(new Request(`https://worker.example${path}`, { method: 'POST',
+    headers: { Origin: origin, 'X-Session-Slug': 'fixture', 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(body) }), env);
+  // Seed one public question so the starter generates.
+  const session = { sessionSlug: 'fixture', sessionId, sessionName: 'Fixture' };
+  const q = buildQuestionRecord({ creator: wallet.address, type: 'binary', prompt: 'A synthetic question?', session });
+  const up = await req('/storage/upload', { backend: 'cloudflare', resource: 'questions', data: q.record, contentType: 'application/json',
+    tags: [{ name: 'CE-SessionId', value: sessionId }, { name: 'CE-SessionSlug', value: 'fixture' }, { name: 'CE-Resource', value: 'questions' }, { name: 'CE-ResourceId', value: q.id }] }, true);
+  assert.equal(up.status, 200, await up.text());
+  return { req, runtimeCalls };
+};
+
+
+for (const mode of ['blocked', 'redirect', 'allowed']) test(`interview openings use the AI outbound protections (${mode})`, async () => {
+  const f = await runtimeFixture(mode);
+  const globalCalls = [];
+  const savedFetch = globalThis.fetch;
+  globalThis.fetch = async (...args) => {
+    globalCalls.push(args);
+    return Response.json({ choices: [{ message: { content: 'Unsafe fallback' } }] });
+  };
+  try {
+    const ai = await f.req('/ai', { provider: 'custom', model: 'owner-model', prompt: 'Test' }, true);
+    assert.equal(ai.status, mode === 'allowed' ? 200 : 403);
+    f.runtimeCalls.length = 0;
+    const starter = await f.req('/interview/starter', {}, false);
+    assert.equal(starter.status, mode === 'allowed' ? 200 : 503);
+    assert.equal(globalCalls.length, 0, 'Opening generation must never fall through to unguarded global fetch');
+    assert.equal(f.runtimeCalls.length, mode === 'blocked' ? 0 : 1);
+    for (const { url, init } of f.runtimeCalls) {
+      assert.equal(url, 'https://provider.example.test/v1/chat/completions');
+      assert.equal(init.redirect, 'manual');
+      assert.ok(init.signal instanceof AbortSignal, 'Custom opening calls carry the timeout signal');
+      assert.equal(new Headers(init.headers).get('authorization'), 'Bearer synthetic-session-key');
+    }
+  } finally { globalThis.fetch = savedFetch; }
+});
+
+for (const [provider, key] of [['openai', 'openaiKey'], ['anthropic', 'anthropicKey'], ['openrouter', 'openrouterKey'], ['custom', 'customRpcKey']]) {
+  test(`opening refusal names the missing ${key}`, async () => {
+    const f = fixture();
+    f.args.config.ai = { mode: provider, models: { fast: 'owner-fast-model' } };
+    delete f.args.deps.proxyOpenAI;
+    f.args.deps.getSessionSecrets = async () => ({ customRpcUrl: 'https://provider.example.test',
+      ...(provider === 'openai' ? { anthropicKey: 'other-provider-key' } : { openaiKey: 'other-provider-key' }) });
+    f.args.deps.fetch = async () => assert.fail('A missing key must not fall back to a different provider');
+    f.args.deps.safeFetch = f.args.deps.fetch;
+    await assert.rejects(resolveInterviewStarter(f.args), new RegExp(key));
+  });
+}

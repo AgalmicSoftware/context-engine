@@ -9,8 +9,6 @@ import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sess
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import type { AgentResultsDataset } from '../../utilities/session/agentSessionBackend';
 
-export const DEFAULT_AGENT_BRIDGE_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-
 export type UnknownRecord = Record<string, unknown>;
 
 export type OnePageSessionPropsLike = UnknownRecord & {
@@ -96,18 +94,9 @@ export const buildCurrentSessionConfigRequest = (
   contracts: propsIn.contracts,
 });
 
-export const resolveSessionAgentBridgeUrl = (sessionConfig: unknown = null): string => {
+export const resolveSessionAgentWorkerUrl = (sessionConfig: unknown = null): string => {
   const cfg = toRecord(sessionConfig);
-  // Old deployments published these bridge URL aliases. Preserve them on reads.
-  const legacySurfaceConfig = toRecord(cfg.telegram);
-  return toTrimmedString(
-    cfg.agentBridgeUrl ||
-      cfg.agentBridgeWorkerUrl ||
-      cfg.telegramAgentBridgeUrl ||
-      legacySurfaceConfig.agentBridgeUrl ||
-      legacySurfaceConfig.workerUrl ||
-      DEFAULT_AGENT_BRIDGE_URL,
-  ).replace(/\/+$/g, '');
+  return normalizeWorkerUrl(toTrimmedString(cfg.corsWorkerUrl || cfg.sessionWorkerUrl || cfg.workerUrl));
 };
 
 export const resolveAgentClientLoginIdentityTarget = ({
@@ -122,7 +111,7 @@ export const resolveAgentClientLoginIdentityTarget = ({
     sessionSlug: normalizeOnePageSessionSlug(sessionSlug || cfg.slug),
     sessionId: resolveWorkerCanonicalSessionIdHex(cfg),
     workerUrl: normalizeWorkerUrl(toTrimmedString(cfg.sessionWorkerUrl || cfg.workerUrl || cfg.corsWorkerUrl)),
-    agentBridgeUrl: resolveSessionAgentBridgeUrl(cfg),
+    agentWorkerUrl: resolveSessionAgentWorkerUrl(cfg),
   };
 };
 
@@ -198,7 +187,7 @@ export const getAgentClientLoginEnvelopeMemoryKey = (target: unknown | AgentClie
     normalizeOnePageSessionSlug(source.sessionSlug) || 'general',
     resolveWorkerCanonicalSessionIdHex({ sessionId: source.sessionId }) || 'no-session-id',
     normalizeWorkerUrl(toTrimmedString(source.workerUrl)) || 'no-worker-origin',
-    normalizeWorkerUrl(toTrimmedString(source.agentBridgeUrl)) || 'no-bridge-origin',
+    normalizeWorkerUrl(toTrimmedString(source.agentWorkerUrl)) || 'no-bridge-origin',
   ].join('\n');
 };
 
@@ -227,7 +216,7 @@ export const cacheAgentClientLoginEnvelope = (
     sessionSlug: envelope.sessionSlug,
     sessionId: envelope.sessionId,
     workerUrl: envelope.workerUrl,
-    agentBridgeUrl: envelope.agentBridgeUrl,
+    agentWorkerUrl: envelope.agentWorkerUrl,
   });
   if (
     !globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ ||
@@ -250,9 +239,9 @@ export const resolveAgentResultsAuthFailureReason = (result: AgentResultsDataset
 
 const isAgentClientLoginEnvelope = (value: unknown): value is AgentClientLoginEnvelope => {
   const envelope = toRecord(value);
-  const bridgeCredential = toRecord(envelope.bridgeCredential);
+  const agentCredential = toRecord(envelope.agentCredential);
   const workerCredential = toRecord(envelope.workerCredential);
-  return toTrimmedString(bridgeCredential.token).length > 0 && toTrimmedString(workerCredential.token).length > 0;
+  return toTrimmedString(agentCredential.token).length > 0 && toTrimmedString(workerCredential.token).length > 0;
 };
 
 export const resolveAgentClientLoginEnvelopeFromEvent = (

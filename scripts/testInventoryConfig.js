@@ -3,6 +3,7 @@
 const ROOT_NODE_TEST_FILES = Object.freeze([
   'tests/root/agentParticipant.worker.test.mjs',
   'tests/root/protectedResponses.worker.test.mjs',
+  'tests/root/questionId.test.mjs',
   'tests/root/testEthOffer.test.mjs',
   'tests/root/arweave-metadata-uri.test.js',
   'tests/root/client.package.test.js',
@@ -33,6 +34,7 @@ const ROOT_JEST_TEST_FILES = Object.freeze([
   'tests/root/sessionCorsWorker.authenticatedRoutes.test.js',
   'tests/root/sessionCorsWorker.gates.test.js',
   'tests/root/sessionCorsWorker.health.test.js',
+  'tests/root/workerPreviousRelease.compat.test.mjs',
 ]);
 
 const ROOT_LOCAL_CHAIN_TEST_FILES = Object.freeze([

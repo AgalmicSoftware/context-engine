@@ -1,4 +1,6 @@
 import { executeCoordinatedStorageVisibilityMutation } from './sessionConfigAuthority.js';
+import { exportSessionBackup } from './sessionBackup.js';
+import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import {
   ADMIN_SESSION_SECRET_KEYS as ALLOWED_SECRET_KEYS,
   ensureSessionLitAuthorizationSigner,
@@ -391,6 +393,33 @@ export const dispatchAdminRequest = async ({
       mutationResult?.status || 503,
       headers,
     );
+  }
+
+  if (action === 'export-recovery-key') {
+    const responseHeaders = new Headers(headers);
+    responseHeaders.set('Cache-Control', 'no-store');
+    const result = await callSessionConfigCoordinator({ env, slug: targetSlug, path: 'recovery-key/export',
+      expectedAuthority, confirm: body?.confirm });
+    return deps?.json?.(result.body, result.status, responseHeaders);
+  }
+
+  if (action === 'export-session-backup') {
+    const responseHeaders = new Headers(headers);
+    responseHeaders.set('Cache-Control', 'no-store');
+    try {
+      return deps?.json?.(await exportSessionBackup({ env, slug: targetSlug, expectedAuthority, cursor: body?.cursor || '' }),
+        200, responseHeaders);
+    } catch (error) {
+      return deps?.json?.({ error: error.message, ...(error.reason ? { reason: error.reason } : {}) }, error.status || 503, responseHeaders);
+    }
+  }
+
+  if (['import-session-backup', 'session-backup-status', 'abandon-session-backup'].includes(action)) {
+    const responseHeaders = new Headers(headers);
+    responseHeaders.set('Cache-Control', 'no-store');
+    const result = await callSessionConfigCoordinator({ env, slug: targetSlug, path: action === 'import-session-backup' ? 'backup/import' : action === 'session-backup-status' ? 'backup/status' : 'backup/abandon',
+      expectedAuthority, page: body?.page, archiveId: body?.archiveId, adoptSessionId: body?.adoptSessionId === true });
+    return deps?.json?.(result.body, result.status, responseHeaders);
   }
 
   if (action === 'export-storage-envelopes') {

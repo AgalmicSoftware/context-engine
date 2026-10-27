@@ -39,6 +39,7 @@ test('buildCloudflareSessionTemplate copies exact bundle bytes and records deter
   ].join('\n');
   const buildBundles = async () => {
     writeFileSync(join(rootDir, 'dist', 'sessionCorsWorker.bundle.js'), bundle);
+    return [{ key: 'sessionCorsWorker', metafile: { inputs: {} } }];
   };
 
   const manifest = await buildCloudflareSessionTemplate({ rootDir, buildBundles });
@@ -70,6 +71,7 @@ test('verifyCloudflareSessionTemplate rejects source drift without rewriting the
   ].join('\n');
   const buildBundles = async () => {
     writeFileSync(join(rootDir, 'dist', 'sessionCorsWorker.bundle.js'), bundle);
+    return [{ key: 'sessionCorsWorker', metafile: { inputs: {} } }];
   };
   await buildCloudflareSessionTemplate({ rootDir, buildBundles });
   const trackedBundle = readFileSync(join(templateDir, 'worker.mjs'), 'utf8');
@@ -101,4 +103,37 @@ test('buildCloudflareSessionTemplate rejects a bundle without the required Durab
     () => buildCloudflareSessionTemplate({ rootDir, buildBundles }),
     /SessionWriteCoordinator export/i,
   );
+});
+
+test('deploy notices preserve every bundled package license and verification detects a new package', async (t) => {
+  const { rootDir, templateDir } = makeFixture();
+  t.after(() => rmSync(rootDir, { recursive: true, force: true }));
+  const inputs = {};
+  const addPackage = (directory, name, version) => {
+    const folder = join(rootDir, directory);
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(join(folder, 'package.json'), JSON.stringify({ name, version, license: 'MIT' }));
+    writeFileSync(join(folder, 'LICENSE'), `MIT fixture grant for ${name}@${version}\r\nSecond line.\r\n`);
+    inputs[`${directory}/index.js`] = { bytes: 1 };
+  };
+  addPackage('node_modules/synthetic-one', 'synthetic-one', '1.0.0');
+  addPackage('node_modules/synthetic-one/node_modules/@fixture/two', '@fixture/two', '2.0.0');
+  const buildBundles = async () => {
+    writeFileSync(join(rootDir, 'dist/sessionCorsWorker.bundle.js'), 'class SessionWriteCoordinator {}\nconst worker_default = {};\nexport { SessionWriteCoordinator, worker_default as default };\n');
+    return [{ key: 'sessionCorsWorker', metafile: { inputs } }];
+  };
+  const manifest = await buildCloudflareSessionTemplate({ rootDir, buildBundles });
+  const notices = readFileSync(join(templateDir, 'THIRD_PARTY_NOTICES.md'), 'utf8');
+  assert.equal(notices.includes('\r'), false, 'Notices must verify after Git normalizes line endings');
+  for (const identity of ['synthetic-one@1.0.0', '@fixture/two@2.0.0']) {
+    assert.ok(notices.includes(`## ${identity}\n`));
+    assert.ok(notices.includes(`MIT fixture grant for ${identity}`));
+  }
+  assert.ok(manifest.files['THIRD_PARTY_NOTICES.md']);
+  await verifyCloudflareSessionTemplate({ rootDir, buildBundles });
+  addPackage('node_modules/synthetic-three', 'synthetic-three', '3.0.0');
+  await assert.rejects(() => verifyCloudflareSessionTemplate({ rootDir, buildBundles }), /third-party notices.*out of sync/i);
+  assert.equal(readFileSync(join(templateDir, 'THIRD_PARTY_NOTICES.md'), 'utf8'), notices, 'Verification must not rewrite notices');
+  rmSync(join(rootDir, 'node_modules/synthetic-three/LICENSE'));
+  await assert.rejects(() => buildCloudflareSessionTemplate({ rootDir, buildBundles }), /Missing license text.*synthetic-three@3.0.0/);
 });

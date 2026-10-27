@@ -5,6 +5,7 @@ import {
   mergeWorkerQuestionResponses,
   mergeWorkerUserResponses,
 } from './workerResponseHydration.js';
+import { hydrateWorkerCanonicalResponses, resolveWorkerResponseHydrationRun } from './workerResponseHydrationRuntime';
 
 const SESSION_ID = `0x${'5'.repeat(32)}`;
 const WORKER_URL = 'https://demo-sh-worker.example.test';
@@ -447,4 +448,100 @@ it('never considers repeated cursors or malformed own payloads a complete empty 
       readSessionStorageBlob: async () => new Response('invalid json'),
     }),
   ).rejects.toThrow('could not be read');
+});
+
+// A capped listing leaves a continuation, so repeated refreshes of a large
+// session eventually load every row instead of rereading the same prefix.
+// The cap counts pages, so one row per page keeps this fast.
+describe('capped Worker response listings', () => {
+  const ROWS = 120;
+  const createLargeSession = () => {
+    let failCursor = '';
+    const listPage = jest.fn(async ({ cursor }: any) => {
+      if (cursor && cursor === failCursor) throw new Error('Expired cursor');
+      const start = Number(cursor || 0);
+      return {
+        items: [
+          {
+            storageRef: { id: `ref-${start}` },
+            metadata: { responder: `participant-${start}`, createdAt: '2026-10-01T00:00:00.000Z' },
+          },
+        ],
+        cursor: String(start + 1),
+        listComplete: start + 1 >= ROWS,
+      };
+    });
+    const readBlob = async ({ storageRef }: any) =>
+      new Response(
+        JSON.stringify({
+          sessionSlug: 'demo-sh',
+          sessionId: SESSION_ID,
+          questionId: 'q1',
+          answer: { value: storageRef.id },
+        }),
+      );
+    let questions: any = {};
+    let users: any = {};
+    const markReady = jest.fn();
+    const refresh = () =>
+      hydrateWorkerCanonicalResponses({
+        sessionSlug: 'demo-sh',
+        sessionConfig: workerConfig,
+        run: resolveWorkerResponseHydrationRun({ sessionConfig: workerConfig, sessionSlug: 'demo-sh' })!,
+        loadWorkerResponses: (options) =>
+          loadWorkerResponses(options, { listSessionStorageRefsPage: listPage, readSessionStorageBlob: readBlob }),
+        getAccount: () => '',
+        getProviderLike: () => null,
+        getCurrentSessionConfig: () => workerConfig,
+        shouldAbort: () => false,
+        markLoading: () => {},
+        markReady,
+        createPersistenceError: (message) => new Error(message),
+        updateQuestionsCacheAtomic: async (update) => {
+          questions = update(questions);
+          return true;
+        },
+        updateUserCacheAtomic: async (update) => {
+          users = update(users);
+          return true;
+        },
+      });
+    return {
+      refresh,
+      listPage,
+      markReady,
+      failAt: (cursor: string) => {
+        failCursor = cursor;
+      },
+      answered: () => Object.keys(questions.worker.questionResponses.q1 || {}).length,
+      node: () => questions.worker,
+    };
+  };
+
+  it('continues each refresh where the capped one stopped until every row is loaded', async () => {
+    const session = createLargeSession();
+    await session.refresh();
+    expect(session.answered()).toBe(100);
+    expect(session.node().workerResponseListCursor).toBe('100');
+    expect(session.markReady).toHaveBeenLastCalledWith(true);
+
+    await session.refresh();
+    expect(session.listPage).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: '119' }));
+    // The resumed listing returned only the tail; rows from the first run stay.
+    expect(session.answered()).toBe(ROWS);
+    expect(session.node().workerResponseListCursor).toBeUndefined();
+    expect(session.node().workerResponseHydrationStatus).toBe('partial');
+  });
+
+  it('restarts from the first page after a continuation fails', async () => {
+    const session = createLargeSession();
+    await session.refresh();
+    session.failAt('100');
+    await expect(session.refresh()).rejects.toThrow('Expired cursor');
+    expect(session.node().workerResponseListCursor).toBeUndefined();
+    session.failAt('');
+    session.listPage.mockClear();
+    await session.refresh();
+    expect(session.listPage).toHaveBeenNthCalledWith(1, expect.objectContaining({ cursor: null }));
+  });
 });

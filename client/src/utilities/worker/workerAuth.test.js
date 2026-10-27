@@ -892,7 +892,7 @@ describe('workerAuth bootstrap admin signing', () => {
     });
   });
 
-  it('requests explicit identity bootstrap for the first Worker-canonical config write', async () => {
+  it.each(['set-config', 'import-session-backup'])('requests exact identity bootstrap for %s', async (action) => {
     const sessionId = '0x12121212121212121212121212121212';
     global.fetch = jest.fn(async () =>
       jsonResp(200, {
@@ -905,11 +905,12 @@ describe('workerAuth bootstrap admin signing', () => {
 
     await expect(
       buildSignedAdminActionAuth({
-        action: 'set-config',
+        action,
         slug: 'edge',
         body: {
           sessionSlug: 'edge',
           sessionId,
+          ...(action === 'import-session-backup' ? { adoptSessionId: true, page: { manifest: { sessionId } } } : {}),
           config: {
             sessionId,
             sessionModeProfile: { authority: { mode: 'worker_canonical' } },

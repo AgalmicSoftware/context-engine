@@ -1,5 +1,9 @@
 /.github/CODEOWNERS @AgalmicSoftware
 /.github/workflows/ci.yml @AgalmicSoftware
+/.github/workflows/publish-mcp.yml @AgalmicSoftware
+/scripts/mcp-release-artifacts.mjs @AgalmicSoftware
+/scripts/publish-mcp.mjs @AgalmicSoftware
+/scripts/mcp-release.test.mjs @AgalmicSoftware
 /.github/workflows/publish-worker-bundles.yml @AgalmicSoftware
 /.github/workflows/promote-worker-bundles.yml @AgalmicSoftware
 /.github/workflows/public-drift.yml @AgalmicSoftware

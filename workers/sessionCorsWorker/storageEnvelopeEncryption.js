@@ -71,7 +71,8 @@ const importAesKey = async (keyBytes, usages, deps = {}) => (
 );
 
 const deriveDeploymentKeyBytes = async (secret, deps = {}) => {
-  const material = trim(secret);
+  const raw = trim(secret);
+  const material = /^[a-f0-9]{64}$/i.test(raw) ? raw.toLowerCase() : raw;
   if (!material) throw new Error(`${STORAGE_ENVELOPE_KEK_SECRET_NAME} is missing.`);
   const digest = await getCryptoImpl(deps).subtle.digest('SHA-256', textEncoder.encode(material));
   return new Uint8Array(digest);

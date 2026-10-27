@@ -4,6 +4,7 @@ import { arweaveClient } from '../arweave/arweaveClient.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
+import { describeWorkerUnavailable, readWorkerCapabilities } from '../worker/workerCapabilities';
 import { toStr } from '../shared/primitives.js';
 import { STORAGE_BACKENDS, normalizeStorageRef } from './storageRefs.js';
 import {
@@ -24,6 +25,7 @@ interface StorageWorkerOptions {
 }
 
 interface UploadDataToSessionStorageOptions extends StorageWorkerOptions {
+  requestId?: string;
   tags?: unknown;
   contentType?: unknown;
   resource?: unknown;
@@ -59,6 +61,108 @@ export class LegacyOwnResponseListingError extends Error {
 }
 
 const normalizeWorkerBaseUrl = (rawUrl: unknown): string => toStr(rawUrl).trim().replace(/\/+$/, '');
+const asRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
+const listAddresses = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value.flatMap(listAddresses);
+  if (value && typeof value === 'object') return listAddresses(asRecord(value).addresses || asRecord(value).members);
+  return typeof value === 'string' ? [value.trim().toLowerCase()] : [];
+};
+const isConfiguredAdmin = (sessionConfig: unknown, context: unknown): boolean => {
+  const config = asRecord(sessionConfig);
+  const account = toStr(asRecord(context).account).trim().toLowerCase();
+  const roles = [config.workerRoles, config.roles, asRecord(config.authorization).roles];
+  return (
+    !!account &&
+    [
+      config.adminAddress,
+      config.adminAddresses,
+      asRecord(config.admin).addresses,
+      ...roles.map((role) => asRecord(role).admin),
+    ]
+      .flatMap(listAddresses)
+      .includes(account)
+  );
+};
+
+const requireSafeAdminMetadataUpload = async ({
+  data,
+  resource,
+  baseUrl,
+  sessionSlug,
+  sessionConfig,
+  context,
+  credentialToken,
+  fetchImpl,
+}: StorageWorkerOptions & { data: unknown; resource: string; baseUrl: string }): Promise<void> => {
+  const capabilities = await readWorkerCapabilities(baseUrl, toStr(sessionSlug), {
+    fetchImpl,
+    refreshUnavailable: true,
+  });
+  if (capabilities.features.includes('upload_authority_stamps')) return;
+  const refusal = () =>
+    new Error(
+      'This Worker cannot safely record admin corrections. Upgrade the session Worker before re-uploading an existing question or survey id.',
+    );
+  // A legacy Worker can still create a new id. A failed or incomplete listing
+  // is not proof of absence; do not silently publish an unstamped correction.
+  const record = typeof data === 'string' ? asRecord(JSON.parse(data)) : asRecord(data);
+  const id = toStr(record.id || record.questionId || record.surveyID).toLowerCase();
+  if (!id) throw refusal();
+  const read = async (path: string): Promise<UnknownRecord> => {
+    const response = credentialToken
+      ? await (fetchImpl || fetch)(`${baseUrl}${path}`, {
+          headers: {
+            Authorization: `Bearer ${credentialToken}`,
+            'X-Session-Slug': toStr(sessionSlug),
+          },
+        })
+      : await fetchWorkerWithAuth(
+          `${baseUrl}${path}`,
+          { method: 'GET' },
+          {
+            sessionSlug,
+            sessionConfig,
+            context,
+            workerUrl: baseUrl,
+            preferAnonymous: false,
+            allowDemoFallback: defaultStrictAllowDemoFallback(),
+          },
+        );
+    if (!response.ok) throw refusal();
+    return asRecord(await response.json());
+  };
+  try {
+    let cursor = '';
+    const visited = new Set<string>();
+    do {
+      if (visited.has(cursor)) throw refusal();
+      visited.add(cursor);
+      const page = await read(
+        `/storage/list?resource=${resource}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+      );
+      if (!Array.isArray(page.items) || typeof page.listComplete !== 'boolean') throw refusal();
+      for (const item of page.items) {
+        const metadataId = toStr(asRecord(asRecord(item).metadata).resourceId).toLowerCase();
+        if (metadataId === id) throw refusal();
+        if (!metadataId) {
+          const ref = normalizeStorageRef(asRecord(item).storageRef || item);
+          if (!ref) throw refusal();
+          const payload = await read(`/storage/read?id=${encodeURIComponent(ref.id)}`);
+          if (toStr(payload.id || payload.questionId || payload.surveyID).toLowerCase() === id) throw refusal();
+        }
+      }
+      cursor = toStr(page.cursor);
+      if (page.listComplete) {
+        if (cursor) throw refusal();
+        return;
+      }
+      if (!cursor) throw refusal();
+    } while (cursor);
+  } catch {
+    throw refusal();
+  }
+};
 const normalizeTags = (tags: unknown): Array<{ name: string; value: string }> =>
   (Array.isArray(tags) ? tags : [])
     .filter((tag) => tag && typeof tag === 'object')
@@ -117,6 +221,7 @@ export const uploadDataToSessionStorage = async (
     payloadEncrypted = false,
     arweaveJwk = '',
     credentialToken = '',
+    requestId = '',
     fetchImpl = fetch,
   }: UploadDataToSessionStorageOptions = {},
 ): Promise<UnknownRecord> => {
@@ -159,6 +264,26 @@ export const uploadDataToSessionStorage = async (
 
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
   if (!baseUrl) throw new Error('Worker URL is missing for storage upload.');
+  if (resource === 'responses') {
+    const capabilities = await readWorkerCapabilities(baseUrl, toStr(sessionSlug), {
+      fetchImpl,
+      refreshUnavailable: true,
+    });
+    const refusal = capabilities.session?.unavailable.find((item) => item.operation === 'submit');
+    if (refusal) throw new Error(describeWorkerUnavailable(refusal.reason));
+  }
+  if ((resource === 'questions' || resource === 'surveys') && isConfiguredAdmin(sessionConfig, context)) {
+    await requireSafeAdminMetadataUpload({
+      data,
+      resource,
+      baseUrl,
+      sessionSlug,
+      sessionConfig,
+      context,
+      credentialToken,
+      fetchImpl,
+    });
+  }
   const endpoint = `${baseUrl}/storage/upload`;
   const bodyContentType =
     toStr(contentType).trim() ||
@@ -174,6 +299,7 @@ export const uploadDataToSessionStorage = async (
     form.append('resource', resource as string);
     form.append('contentType', bodyContentType);
     form.append('payloadEncrypted', payloadIsEncrypted ? 'true' : 'false');
+    if (requestId) form.append('requestId', requestId);
     if (normalizedTags.length) form.append('tags', JSON.stringify(normalizedTags));
     requestInit = { method: 'POST', body: form };
   } else {
@@ -186,6 +312,7 @@ export const uploadDataToSessionStorage = async (
         contentType: bodyContentType,
         payloadEncrypted: payloadIsEncrypted,
         tags: normalizedTags,
+        ...(requestId ? { requestId } : {}),
         data,
       }),
     };

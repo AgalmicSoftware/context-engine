@@ -62,6 +62,9 @@ test('createAuthCorsAdminAdaptersWithWorkerDeps preserves worker-specific auth/C
         assert.equal(value.slugHint, 'slug-hint');
         assert.deepEqual(value.deps, {
           verifyToken: 'verifyToken',
+          readCurrentSessionConfig: 'readCurrentSessionConfig',
+          computeScopesForLogin: 'computeScopesForLogin',
+          now: 'now',
           validateAuthTokenRecord: 'validateAuthTokenRecord',
           resolveWorkerRequestSlugContext: 'resolveWorkerRequestSlugContext',
           json: 'json',
@@ -95,6 +98,8 @@ test('createAuthCorsAdminAdaptersWithWorkerDeps preserves worker-specific auth/C
       readCurrentSessionConfig: 'readCurrentSessionConfig',
       resolveTrustedAdminOrigins: 'resolveTrustedAdminOrigins',
       verifyToken: 'verifyToken',
+      computeScopesForLogin: 'computeScopesForLogin',
+      now: 'now',
       validateAuthTokenRecord: 'validateAuthTokenRecord',
       resolveWorkerRequestSlugContext: 'resolveWorkerRequestSlugContext',
       toStr: 'toStr',

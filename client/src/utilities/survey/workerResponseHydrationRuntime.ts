@@ -16,7 +16,9 @@ export type WorkerResponseHydrationLoader = (options: {
   sessionSlug: string;
   sessionConfig: CacheRecord;
   cachedStorageRefIds?: ReadonlySet<string>;
-  onPartial?: () => void;
+  startCursor?: string | null;
+  onPartial?: (resumeCursor?: string) => void;
+  onListed?: (storageRefIds: ReadonlySet<string>) => void;
 }) => Promise<WorkerCanonicalResponseRow[]>;
 
 export type WorkerResponseHydrationRun = {
@@ -43,13 +45,19 @@ type WorkerResponseHydrationOptions = {
 export const resolveWorkerResponseHydrationRun = ({
   sessionConfig,
   sessionSlug,
+  reader,
 }: {
   sessionConfig: unknown;
   sessionSlug: string;
+  reader?: unknown;
 }): WorkerResponseHydrationRun | null => {
   const projection = resolveSessionCapabilityProjection(sessionConfig);
   if (!projection.profileValid || !projection.isWorkerCanonical) return null;
-  const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug });
+  const identity = resolveWorkerCanonicalCacheIdentity({
+    sessionConfig,
+    sessionSlug,
+    ...(reader === undefined ? {} : { reader }),
+  });
   return {
     identity,
     key: buildWorkerCanonicalCacheRunKey(identity),
@@ -71,11 +79,13 @@ export const hydrateWorkerCanonicalResponses = async ({
   updateUserCacheAtomic,
   createPersistenceError,
 }: WorkerResponseHydrationOptions): Promise<void> => {
+  // The listing is authorized as getAccount(), so its rows belong to that reader.
   const targetIsCurrent = (): boolean =>
     workerCanonicalSessionTargetMatches({
       expected: run.identity,
       sessionConfig: getCurrentSessionConfig(),
       sessionSlug,
+      reader: getAccount(),
     });
   const shouldStop = (): boolean => shouldAbort() || !targetIsCurrent();
 
@@ -86,13 +96,20 @@ export const hydrateWorkerCanonicalResponses = async ({
 
   let cachedStorageRefIds = new Set<string>();
   let cachedRows: WorkerCanonicalResponseRow[] = [];
+  let startCursor = '';
   const initializedQuestions = await updateQuestionsCacheAtomic((current) => {
     const merged = targetIsCurrent()
       ? workerHydration.mergeWorkerQuestionResponses(current, [], sessionSlug, run.identity)
       : current || {};
     // Only reuse refs after the merge has checked the exact Worker/session identity.
     const worker = (merged as CacheRecord).worker as CacheRecord | undefined;
-    if (targetIsCurrent() && worker) worker.workerResponseHydrationStatus = 'loading';
+    if (targetIsCurrent() && worker) {
+      worker.workerResponseHydrationStatus = 'loading';
+      // Each run consumes the continuation a capped run saved, so a failed
+      // continuation (such as an expired cursor) restarts from the first page.
+      startCursor = typeof worker.workerResponseListCursor === 'string' ? worker.workerResponseListCursor : '';
+      delete worker.workerResponseListCursor;
+    }
     cachedStorageRefIds = new Set(Object.keys((worker?.workerResponseStorageRefs as CacheRecord) || {}));
     const responses = (worker?.questionResponses || {}) as Record<string, Record<string, CacheRecord>>;
     const metadata = (worker?.questionResponsesMeta || {}) as Record<string, Record<string, CacheRecord>>;
@@ -120,25 +137,51 @@ export const hydrateWorkerCanonicalResponses = async ({
   }
   if (shouldStop()) return;
 
-  let partial = false;
-  const rows = await loadRows({
-    account: getAccount(),
-    providerLike: getProviderLike(),
-    sessionSlug,
-    sessionConfig,
-    cachedStorageRefIds,
-    onPartial: () => {
-      partial = true;
-    },
-  });
+  let capped = false;
+  let resumeCursor = '';
+  let listedStorageRefIds = null as ReadonlySet<string> | null;
+  const load = (knownRefIds: ReadonlySet<string>, fromCursor: string) =>
+    loadRows({
+      account: getAccount(),
+      providerLike: getProviderLike(),
+      sessionSlug,
+      sessionConfig,
+      cachedStorageRefIds: knownRefIds,
+      startCursor: fromCursor || null,
+      onPartial: (cursor) => {
+        capped = true;
+        resumeCursor = typeof cursor === 'string' ? cursor : '';
+      },
+      onListed: (storageRefIds) => {
+        listedStorageRefIds = storageRefIds;
+      },
+    });
+  let rows = await load(cachedStorageRefIds, startCursor);
   if (shouldStop()) return;
+  // A complete listing is authoritative for this reader.
+  const listed = listedStorageRefIds as ReadonlySet<string> | null;
+  let staleRefIds = listed ? new Set([...cachedStorageRefIds].filter((refId) => !listed.has(refId))) : undefined;
+  if (staleRefIds?.size) {
+    // An answer this reader could read is gone, so a responder's older version may
+    // be what it can read now. Rebuild from a full read, as a fresh client would.
+    listedStorageRefIds = null;
+    rows = await load(new Set(), '');
+    if (shouldStop()) return;
+    const relisted = listedStorageRefIds as ReadonlySet<string> | null;
+    if (relisted) staleRefIds = cachedStorageRefIds;
+  }
+  // Only one run that lists from the first page to the last sees every row.
+  const partial = capped || !!startCursor;
 
   const questionsPersisted = await updateQuestionsCacheAtomic((current) => {
     if (!targetIsCurrent()) return current || {};
-    const merged = workerHydration.mergeWorkerQuestionResponses(current, rows, sessionSlug, run.identity);
+    const merged = workerHydration.mergeWorkerQuestionResponses(current, rows, sessionSlug, run.identity, staleRefIds);
     // A capped listing is a settled snapshot, not a complete history. Reports
     // may display its new rows while missing-answer checks still remain unready.
-    (merged.worker as CacheRecord).workerResponseHydrationStatus = partial ? 'partial' : 'complete';
+    const worker = merged.worker as CacheRecord;
+    worker.workerResponseHydrationStatus = partial ? 'partial' : 'complete';
+    // The next refresh continues from here instead of rereading the same prefix.
+    if (resumeCursor) worker.workerResponseListCursor = resumeCursor;
     return merged;
   });
   if (!questionsPersisted) {
@@ -147,7 +190,9 @@ export const hydrateWorkerCanonicalResponses = async ({
   if (shouldStop()) return;
 
   const usersPersisted = await updateUserCacheAtomic((current) =>
-    targetIsCurrent() ? workerHydration.mergeWorkerUserResponses(current, rows, run.identity) : current || {},
+    targetIsCurrent()
+      ? workerHydration.mergeWorkerUserResponses(current, rows, run.identity, staleRefIds)
+      : current || {},
   );
   if (!usersPersisted) {
     throw createPersistenceError(`Failed to persist Worker user cache for ${sessionSlug}`);

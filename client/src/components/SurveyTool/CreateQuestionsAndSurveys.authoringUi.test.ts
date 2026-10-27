@@ -24,6 +24,7 @@ import {
   sanitizeDocumentUrls,
   selectManagedNetBucketSnapshot,
 } from './CreateQuestionsAndSurveys.cacheTestUtils';
+import * as aiClient from '../../utilities/ai/aiClient';
 
 type RenderTreeNode = {
   props: Record<string, unknown>;
@@ -44,6 +45,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     try {
       delete (globalThis as any).CE_ARWEAVE_GATEWAY_URL;
     } catch (_) {}
@@ -53,6 +55,27 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     try {
       delete (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO;
     } catch (_) {}
+  });
+
+  it('generates question tags through the selected session AI settings', async () => {
+    const call = jest.spyOn(aiClient, 'callAI').mockResolvedValue('{"tags":["local planning","participation"]}');
+    const instance = makeInstance({ activeSessionSlug: 'fixture' });
+    const save = jest.spyOn(instance, 'saveToLocalStorage').mockImplementation(() => {});
+    instance.setState({
+      questions: [{ id: 'q1', type: 'freeform', prompt: 'How should decisions be made?', tags: [] }],
+    });
+    await instance.suggestTagsForQuestion(0);
+    expect(call).toHaveBeenCalledWith(
+      expect.stringContaining('How should decisions be made?'),
+      expect.objectContaining({ sessionSlug: 'fixture', taskType: 'categorize' }),
+    );
+    const options = call.mock.calls[0][1] as Record<string, unknown>;
+    expect(options).not.toHaveProperty('model');
+    expect(options).not.toHaveProperty('tools');
+    expect(instance.state.questions).toEqual([
+      expect.objectContaining({ tags: ['local planning', 'participation'], isGeneratingTags: false }),
+    ]);
+    expect(save).toHaveBeenCalled();
   });
 
   it('supports the Interview upload label and styling through the existing submit handler', () => {

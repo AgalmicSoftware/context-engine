@@ -193,7 +193,7 @@ function isJavaScriptFile(relativePath) {
 }
 
 function isJavaScriptExpressionInitializer(relativePath, value) {
-  return isJavaScriptFile(relativePath) && value === 'Object.freeze([';
+  return isJavaScriptFile(relativePath) && ['Object.freeze([', 'Object.freeze({'].includes(value);
 }
 
 // Intentionally public addresses (e.g. the SECURITY.md vulnerability-reporting

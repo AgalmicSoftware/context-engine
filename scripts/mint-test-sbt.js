@@ -7,7 +7,7 @@ const { resolveChainDefaults } = require("./lib/network-defaults");
 const { buildPasskeyDerivedWallet } = require("./lib/passkey-derived-wallet");
 const {
   createGroupPasswordDerivation,
-} = require("../client/src/utilities/crypto/groupPasswordDerivation.cjs");
+} = require("../shared/crypto/groupPasswordDerivation.cjs");
 
 const DEFAULT_PASSKEY_RAW_ID_B64URL = "AQIDBAUGBwgJCgsMDQ4PEA";
 const DEFAULT_GROUP_PASSWORD = "browserUse";

@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 import { webcrypto } from 'crypto';
 import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
 import { installSessionCoordinatorBinding } from '../helpers/sessionCorsWorkerTestUtils.mjs';
-import groupPasswordDerivation from '../../client/src/utilities/crypto/groupPasswordDerivation.cjs';
+import groupPasswordDerivation from '../../shared/crypto/groupPasswordDerivation.cjs';
 
 const REGISTRY_ADDRESS = '0x0000000000000000000000000000000000000001';
 const RPC_URL = 'https://rpc.example';

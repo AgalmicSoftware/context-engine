@@ -41,27 +41,26 @@ flowchart TD
   Hosted -.-> DeployHelper["legacy/sponsored deploy-helper fallback<br/>workers/deploy-helper"]
   DeployHelper -.-> HostedWorker
   HostedWorker --> CloudflareStorage["Cloudflare KV payload/index storage<br/>optional existing R2"]
-  AgentClient["Agent/tool client or agent token browser login"] --> AgentBridge["optional agentBridgeWorker<br/>scoped HTTP and Session Wrapped"]
-  AgentBridge --> HostedWorker
+  AgentClient["Agent/tool client or agent token browser login"] --> SessionAgent["Session Worker agent modules<br/>scoped HTTP and Session Wrapped"]
+  SessionAgent --> HostedWorker
   Trustless --> Contracts["Public EVM contracts<br/>SessionRegistry, Surveys, SBTFactory, CustomSBT"]
   Trustless --> Arweave["Arweave metadata and payloads"]
   Trustless --> WorkerServices["profile-enabled session worker services<br/>AI, auth, fetch, Arweave routes"]
-  AgentBridge --> WorkerServices
-  AgentBridge -.->|policy-enabled direct submit| Contracts
+  SessionAgent --> WorkerServices
+  SessionAgent -.->|policy-enabled direct submit| Contracts
   Company -.-> OrgAdapters["Planned IAM, key release/KMS, storage,<br/>AI, networking, observability adapters"]
   PublicRelease["public release tree"] --> Browser
   PublicRelease --> HostedWorker
   PublicRelease --> NativeTemplate
   PublicRelease --> DeployHelper
-  PublicRelease --> AgentBridge
+  PublicRelease --> SessionAgent
   AggregateCI["successful aggregate CI<br/>tested Worker bytes + provenance"] --> ImmutableWorkerRelease["immutable SHA-keyed Worker release"]
   ImmutableWorkerRelease --> AutomaticLatest["automatic verified Latest<br/>current default-branch tip"]
   ImmutableWorkerRelease --> ProtectedPromotion["manual protected stable/previous<br/>and Latest rollback"]
   ProtectedPromotion --> Hosted
 ```
 
-Agent Bridge normally delegates session authority and gated reads to the
-session Worker. When session policy and live testnet contract configuration
+Agent HTTP uses the Session Worker’s canonical authority and gated storage services. When session policy and live testnet contract configuration
 explicitly enable managed-account broadcast, it may submit directly to the
 Surveys contract; the EVM contracts remain canonical for that chain-backed
 write.
@@ -197,10 +196,10 @@ The worker surface is documented in `docs/session-cors-worker.md`.
   authority. Its passkey-derived admin EOA signs config without submitting an
   EVM transaction.
 - `workers/deploy-helper/` is the explicit legacy/sponsored and self-hosted
-  fallback, plus Agent Wrapped provisioning. It calls Cloudflare APIs to create
+  fallback, including optional Agent HTTP setup. It calls Cloudflare APIs to create
   the target Worker and bindings; the default `/new` path instead opens the
   tracked native Cloudflare dashboard template without requesting an API token.
-- `workers/agentBridgeWorker/` is an optional, separately deployed sidecar. It
+- `workers/sessionCorsWorker/agent/` is an optional, separately deployed sidecar. It
   owns the scoped `/api/agent/*` contract, submission queue, and Session Wrapped,
   while delegating session membership, gates, and canonical storage to
   the configured Session Worker when those authorities are required.

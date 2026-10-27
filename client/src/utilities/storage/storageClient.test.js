@@ -6,6 +6,12 @@ import {
 } from './storageClient.js';
 import { normalizeSessionStorageConfig } from './sessionStorageConfig.js';
 import { buildResponsePayload } from '../../components/SurveyTool/surveyToolResponsePayloadController';
+import { readWorkerCapabilities } from '../worker/workerCapabilities';
+
+jest.mock('../worker/workerCapabilities', () => ({
+  ...jest.requireActual('../worker/workerCapabilities'),
+  readWorkerCapabilities: jest.fn(),
+}));
 
 jest.mock('../arweave/arweaveClient.js', () => ({
   arweaveClient: {
@@ -27,6 +33,103 @@ const { getCorsProxyUrlOrThrow } = require('../worker/corsProxy.js');
 const { fetchWorkerWithAuth } = require('../worker/workerAuth.js');
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
+
+describe('Worker capability upload gates', () => {
+  const account = '0x1111111111111111111111111111111111111111';
+  const options = (resource = 'responses') => ({
+    resource,
+    workerUrl: 'https://gate-worker.test',
+    sessionSlug: 'sample',
+    context: { account },
+    sessionConfig: { adminAddress: account, storageProfile: { backend: 'cloudflare' } },
+  });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    readWorkerCapabilities.mockResolvedValue({ legacy: true, features: [] });
+    fetchWorkerWithAuth.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          storageRef: { backend: 'cloudflare', id: 'cf_gate_result' },
+        }),
+      ),
+    );
+  });
+  test('refuses submit only for an explicit unavailable operation', async () => {
+    readWorkerCapabilities.mockResolvedValue({
+      legacy: false,
+      features: [],
+      session: {
+        unavailable: [{ operation: 'submit', reason: 'storage_missing' }],
+      },
+    });
+    await expect(uploadDataToSessionStorage({}, 'json', options())).rejects.toThrow('missing its storage index');
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+  });
+  test('pressing Submit again recovers immediately after a transient coordinator failure', async () => {
+    readWorkerCapabilities.mockImplementation(
+      jest.requireActual('../worker/workerCapabilities').readWorkerCapabilities,
+    );
+    const capabilities = {
+      type: 'ce_worker_capabilities',
+      version: 1,
+      apiVersion: 1,
+      features: [],
+      session: { readiness: {}, unavailable: [{ operation: 'submit', reason: 'coordinator_unavailable' }] },
+    };
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(capabilities)))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ...capabilities, session: { readiness: {}, unavailable: [] } })),
+      );
+    const args = { ...options(), workerUrl: 'https://submit-retry-readiness.test', fetchImpl };
+    await expect(uploadDataToSessionStorage({}, 'json', args)).rejects.toThrow('coordinator is unavailable');
+    await expect(uploadDataToSessionStorage({}, 'json', args)).resolves.toHaveProperty('id', 'cf_gate_result');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+  test('continues submit on a legacy Worker', async () => {
+    await expect(uploadDataToSessionStorage({}, 'json', options())).resolves.toHaveProperty('id', 'cf_gate_result');
+  });
+  test.each(['questions', 'surveys'])('blocks an unstamped admin correction to %s before upload', async (resource) => {
+    fetchWorkerWithAuth.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          items: [{ metadata: { resourceId: '0xABC' } }],
+          listComplete: true,
+          cursor: null,
+        }),
+      ),
+    );
+    await expect(uploadDataToSessionStorage({ id: '0xabc' }, 'json', options(resource))).rejects.toThrow(
+      'Upgrade the session Worker',
+    );
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    expect(fetchWorkerWithAuth.mock.calls[0][0]).toContain('/storage/list');
+  });
+  test('allows a new admin-authored id after a complete previous-version listing', async () => {
+    fetchWorkerWithAuth.mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [], listComplete: true, cursor: null })),
+    );
+    await expect(uploadDataToSessionStorage({ id: '0xabc' }, 'json', options('questions'))).resolves.toHaveProperty(
+      'id',
+      'cf_gate_result',
+    );
+  });
+  test('allows a correction on a Worker that stamps upload authority', async () => {
+    readWorkerCapabilities.mockResolvedValue({ legacy: false, features: ['upload_authority_stamps'] });
+    await expect(uploadDataToSessionStorage({ id: '0xabc' }, 'json', options('questions'))).resolves.toHaveProperty(
+      'id',
+      'cf_gate_result',
+    );
+    expect(fetchWorkerWithAuth.mock.calls[0][0]).toContain('/storage/upload');
+  });
+  test('does not mistake an incomplete or unreadable listing for a new id', async () => {
+    fetchWorkerWithAuth.mockResolvedValue(new Response(JSON.stringify({ items: [] })));
+    await expect(uploadDataToSessionStorage({ id: '0xabc' }, 'json', options('questions'))).rejects.toThrow(
+      'Upgrade the session Worker',
+    );
+  });
+});
 
 const buildSingleQuestionResponsePayload = ({ answer, additional, questionType, options, voiceCredits }) =>
   buildResponsePayload({
@@ -57,6 +160,7 @@ const buildSingleQuestionResponsePayload = ({ answer, additional, questionType, 
 describe('storageClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    readWorkerCapabilities.mockResolvedValue({ legacy: true, features: [] });
     arweaveClient.uploadDataToArweave.mockResolvedValue(TX_ID);
     getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
     fetchWorkerWithAuth.mockResolvedValue(
@@ -114,6 +218,7 @@ describe('storageClient', () => {
       sessionSlug: 'alpha',
       sessionConfig: { storageProfile: { backend: 'cloudflare' } },
       context: { account: '0xabc' },
+      requestId: 'answer:v1:json',
       tags: [{ name: 'CE-DocStorage', value: 'cloudflare' }],
     });
 
@@ -124,6 +229,7 @@ describe('storageClient', () => {
       expect.objectContaining({
         backend: 'cloudflare',
         resource: 'docsContext',
+        requestId: 'answer:v1:json',
       }),
     );
     expect(JSON.stringify(result)).not.toMatch(/account|bucket|token|secret|r2:\/\//i);
@@ -279,6 +385,7 @@ describe('storageClient', () => {
       sessionConfig: { storageProfile: { backend: 'cloudflare' } },
       workerUrl: 'https://worker.example',
       credentialToken: 'existing-worker-token',
+      requestId: 'answer:v1:form',
       fetchImpl,
       resource: 'images',
       contentType: 'image/png',
@@ -294,6 +401,7 @@ describe('storageClient', () => {
       }),
     );
     const requestHeaders = fetchImpl.mock.calls[0][1].headers;
+    expect(fetchImpl.mock.calls[0][1].body.get('requestId')).toBe('answer:v1:form');
     expect(requestHeaders.get('Authorization')).toBe('Bearer existing-worker-token');
     expect(requestHeaders.get('X-Group-Slug')).toBe('alpha');
     expect(result.storageRef.resource).toBe('images');

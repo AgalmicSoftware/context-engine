@@ -1,3 +1,4 @@
+import { recoveryKeyFingerprint } from '../../../../shared/crypto/recoveryKeyFingerprint.mjs';
 /** @file WorkerDeploySection.tsx */
 import React from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
@@ -56,6 +57,7 @@ const buildNativeVerificationIdentity = ({
 
 export type WorkerDeploySectionProps = {
   allowNativeWorkerVerification?: boolean;
+  agentHttpEnabled?: boolean;
   isNormalMode: boolean;
   renderInfoTooltip?: RenderInfoTooltip;
   workerMode: string;
@@ -87,6 +89,8 @@ export type WorkerDeploySectionProps = {
   cloudflareTokenSlug?: string;
   cloudflareNativeDeployUrl?: string;
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
+  operatorRecoveryKey?: string | null;
+  setOperatorRecoveryKey?: (value: string | null) => void;
   handleDeployWorker: () => void;
   deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
   deployVerifiedInUi?: boolean;
@@ -103,6 +107,7 @@ export type WorkerDeploySectionProps = {
 
 const WorkerDeploySection = ({
   allowNativeWorkerVerification = false,
+  agentHttpEnabled = false,
   isNormalMode,
   renderInfoTooltip,
   workerMode,
@@ -134,6 +139,8 @@ const WorkerDeploySection = ({
   cloudflareTokenSlug = '',
   cloudflareNativeDeployUrl = CLOUDFLARE_NATIVE_DEPLOY_URL,
   setDeployForm,
+  operatorRecoveryKey,
+  setOperatorRecoveryKey,
   handleDeployWorker,
   deployStatusDisplayState,
   deployVerifiedInUi,
@@ -143,9 +150,16 @@ const WorkerDeploySection = ({
   nativeTemplateSetupIdentity = '',
   onNativeTemplateSetupGenerated,
 }: WorkerDeploySectionProps) => {
+  const [localOperatorKey, setLocalOperatorKey] = React.useState<string | null>(null);
+  const [revealOperatorKey, setRevealOperatorKey] = React.useState(false);
+  const chosenRecoveryKey = operatorRecoveryKey === undefined ? localOperatorKey : operatorRecoveryKey;
+  const recoveryKeyInput = chosenRecoveryKey || '';
+  const changeRecoveryKey = setOperatorRecoveryKey || setLocalOperatorKey;
+  const [fingerprint, setFingerprint] = React.useState('');
   const [nativeSetupSecrets, setNativeSetupSecrets] = React.useState<{
     tokenHmacSecret: string;
     storageEnvelopeKek: string;
+    agentManagedRootSecret?: string;
   } | null>(null);
   const [nativeSetupSecretsIdentity, setNativeSetupSecretsIdentity] = React.useState('');
   const [nativeSetupError, setNativeSetupError] = React.useState('');
@@ -188,6 +202,21 @@ const WorkerDeploySection = ({
   const currentNativeVerificationIdentityRef = React.useRef(nativeVerificationIdentity);
   currentNativeVerificationIdentityRef.current = nativeVerificationIdentity;
   const currentNativeSetupSecrets = nativeSetupSecretsIdentity === nativeSetupIdentity ? nativeSetupSecrets : null;
+  const fingerprintKey = currentNativeSetupSecrets?.storageEnvelopeKek || recoveryKeyInput;
+  React.useEffect(() => {
+    let active = true;
+    setFingerprint('');
+    if (/^[0-9a-f]{64}$/i.test(fingerprintKey)) {
+      void recoveryKeyFingerprint(fingerprintKey)
+        .then((value: string) => {
+          if (active) setFingerprint(value);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      active = false;
+    };
+  }, [fingerprintKey]);
   const nativeDeployReady = !!(nativeDeployUrl && currentNativeSetupSecrets && nativeSessionSlug && nativeAdminAddress);
   const nativeAttachmentReady = !!(
     nativeVerificationEnabled &&
@@ -238,7 +267,7 @@ const WorkerDeploySection = ({
 
   const generateNativeSetupSecrets = () => {
     try {
-      setNativeSetupSecrets(createCloudflareNativeSetupSecrets());
+      setNativeSetupSecrets(createCloudflareNativeSetupSecrets(undefined, chosenRecoveryKey, agentHttpEnabled));
       setNativeSetupSecretsIdentity(nativeSetupIdentity);
       onNativeTemplateSetupGenerated?.(nativeSetupIdentity);
       setNativeSetupError('');
@@ -246,10 +275,10 @@ const WorkerDeploySection = ({
       setNativeStatus('Setup values generated in this tab. Copy each value into Cloudflare.');
       setCopiedNativeField('');
       setVerifiedNativeIdentity('');
-    } catch {
+    } catch (error) {
       setNativeSetupSecrets(null);
       setNativeSetupSecretsIdentity('');
-      setNativeSetupError('Secure setup-secret generation failed.');
+      setNativeSetupError(error instanceof Error ? error.message : 'Secure setup-secret generation failed.');
     }
   };
   const copyNativeValue = async (label: string, value: string) => {
@@ -357,6 +386,67 @@ const WorkerDeploySection = ({
 
   return (
     <>
+      <details
+        className={styles.cloudflareNativeDeployCard}
+        onToggle={(event) => {
+          if (event.currentTarget.open && chosenRecoveryKey === null) changeRecoveryKey('');
+        }}
+      >
+        <summary>Advanced: use my own recovery key</summary>
+        <p className={styles.helperText}>
+          Optional. Enter 64 hex characters or generate a key in this tab. Keep a private copy before deploying. This
+          value is never saved in a wizard draft.
+        </p>
+        <Label for="ce-wizard-recovery-key-input">Your recovery key</Label>
+        <Input
+          id="ce-wizard-recovery-key-input"
+          data-testid="ce-wizard-recovery-key-input"
+          type={revealOperatorKey ? 'text' : 'password'}
+          autoComplete="off"
+          value={recoveryKeyInput}
+          onChange={(event) => changeRecoveryKey(event.target.value.trim().toLowerCase())}
+        />
+        <Button
+          type="button"
+          className={styles.secondaryButton}
+          onClick={() => setRevealOperatorKey(!revealOperatorKey)}
+        >
+          {revealOperatorKey ? 'Hide supplied key' : 'Reveal supplied key'}
+        </Button>
+        <Button
+          type="button"
+          className={styles.secondaryButton}
+          data-testid="ce-wizard-recovery-key-generate"
+          onClick={() => {
+            try {
+              changeRecoveryKey(createCloudflareNativeSetupSecrets().storageEnvelopeKek);
+              setNativeSetupError('');
+            } catch {
+              setNativeSetupError('Secure key generation is unavailable.');
+            }
+          }}
+        >
+          Generate locally
+        </Button>
+        <Button type="button" className={styles.secondaryButton} onClick={() => changeRecoveryKey(null)}>
+          Use a generated deployment key
+        </Button>
+        {chosenRecoveryKey !== null && !/^[0-9a-f]{64}$/i.test(recoveryKeyInput) && (
+          <p className={styles.errorText}>Use exactly 64 hex characters.</p>
+        )}
+        {currentNativeSetupSecrets &&
+          recoveryKeyInput !== currentNativeSetupSecrets.storageEnvelopeKek &&
+          recoveryKeyInput && (
+            <p className={styles.helperText}>
+              Select Replace setup values to use this key in the manual Cloudflare deployment.
+            </p>
+          )}
+      </details>
+      {fingerprint && (
+        <p className={styles.helperText} style={{ overflowWrap: 'anywhere' }}>
+          Recovery key fingerprint: {fingerprint}
+        </p>
+      )}
       {nativeVerificationEnabled && (
         <section className={styles.cloudflareNativeDeployCard} aria-labelledby="ce-cloudflare-native-deploy-title">
           <div>
@@ -369,6 +459,12 @@ const WorkerDeploySection = ({
               path.
             </p>
           </div>
+          {agentHttpEnabled && (
+            <p className={styles.helperText}>
+              Agent HTTP uses this same Worker. Set its fresh AGENT_MANAGED_ROOT_SECRET in Cloudflare’s encrypted secret
+              fields before verification. Keep it separate from the login and storage secrets.
+            </p>
+          )}
           {nativeDeployUrl ? (
             <Button
               type="button"
@@ -382,7 +478,7 @@ const WorkerDeploySection = ({
           {currentNativeSetupSecrets && (
             <>
               <ol data-testid="ce-wizard-cloudflare-native-checklist">
-                <li>Copy the four setup values below.</li>
+                <li>Copy the {agentHttpEnabled ? 'five' : 'four'} setup values below.</li>
                 <li>Open Cloudflare and complete the dashboard deployment in the new tab.</li>
                 <li>Return here and paste the resulting workers.dev URL into the Worker URL field.</li>
                 <li>
@@ -410,7 +506,17 @@ const WorkerDeploySection = ({
                   currentNativeSetupSecrets.storageEnvelopeKek,
                   E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK,
                 )}
+                {agentHttpEnabled &&
+                  currentNativeSetupSecrets.agentManagedRootSecret &&
+                  renderCopyField(
+                    'AGENT_MANAGED_ROOT_SECRET',
+                    currentNativeSetupSecrets.agentManagedRootSecret,
+                    'ce-wizard-cloudflare-native-agent-root',
+                  )}
               </div>
+              {agentHttpEnabled && !currentNativeSetupSecrets.agentManagedRootSecret && (
+                <p className={styles.helperText}>Replace setup values to generate the agent signing secret.</p>
+              )}
             </>
           )}
           {nativeSetupError && <div className={styles.errorText}>{nativeSetupError}</div>}
@@ -437,7 +543,7 @@ const WorkerDeploySection = ({
           )}
           <div className={styles.helperText}>
             {currentNativeSetupSecrets
-              ? "Paste the four values above into Cloudflare. The two 64-character values are independent Session Worker runtime secrets, not Cloudflare credentials; they stay only in this tab and Cloudflare's encrypted Worker-secret store. After deployment, paste the resulting workers.dev URL into the Worker URL field."
+              ? "Paste the displayed values into Cloudflare. The 64-character secrets stay only in this tab and Cloudflare's encrypted Worker-secret store. After deployment, paste the resulting workers.dev URL into the Worker URL field."
               : 'Already have a compatible Session Worker? Paste its URL into the Worker URL field and verify it without generating replacement setup values.'}
           </div>
           {currentNativeSetupSecrets || nativeAttachmentReady ? (

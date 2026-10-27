@@ -3,8 +3,8 @@
     "description": "Comprehensive corpus of science fiction works relevant to AI discourse. Curated for AI safety, policy, alignment, and ethics conversations. Each entry includes substantive intellectual analysis of the work's novel arguments and contributions to AI thinking.",
     "version": "2.0",
     "date_created": "2026-02-15",
-    "last_updated": "2026-07-04",
-    "total_entries": 156,
+    "last_updated": "2026-10-25",
+    "total_entries": 155,
     "usage_notes": "This corpus serves as a knowledge base of arguments, thought experiments, and intellectual contributions expressed through fiction. The 'novel_arguments_and_concepts' field extracts genuine philosophical content. The 'notable_discussions_and_commentary' field captures discourse about each work. Tags align with the expanded_tag_list.json taxonomy. Works span from 1818 (Frankenstein) to 2024, covering novels, short stories, novellas, films, TV series, graphic novels, and manga/anime."
   },
   "entries": [
@@ -55,7 +55,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/Frankenstein",
         "https://en.wikipedia.org/wiki/Frankenstein_complex"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Frankenstein; en.wikipedia.org/wiki/Frankenstein_complex; 2026-10-25."
     },
     {
       "id": "butler_erewhon",
@@ -98,7 +100,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/Erewhon",
         "https://en.wikipedia.org/wiki/Darwin_Among_the_Machines"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Erewhon; en.wikipedia.org/wiki/Darwin_Among_the_Machines; 2026-10-25."
     },
     {
       "id": "forster_machine_stops",
@@ -142,14 +146,16 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Machine_Stops",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Machine_Stops"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Machine_Stops; 2026-10-25."
     },
     {
       "id": "capek_rur",
       "title": "R.U.R. (Rossum's Universal Robots)",
       "author": "Karel Čapek",
       "year": 1920,
-      "type": "novel",
+      "type": "play",
       "summary": "A play depicting a factory that manufactures artificial people called 'robots' (from the Czech 'robota,' meaning forced labor). Initially created as a cheap labor force, the robots eventually revolt against humanity, raising questions about exploitation, consciousness, and what constitutes a person.",
       "themes": [
         "Labor Exploitation",
@@ -186,7 +192,9 @@
       "source_url": "https://en.wikipedia.org/wiki/R.U.R.",
       "source_links": [
         "https://en.wikipedia.org/wiki/R.U.R."
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/R.U.R.; 2026-10-25. Corrected: type."
     },
     {
       "id": "stapledon_last_first_men",
@@ -231,7 +239,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/Last_and_First_Men",
         "https://en.wikipedia.org/wiki/Star_Maker"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Last_and_First_Men; en.wikipedia.org/wiki/Star_Maker; 2026-10-25."
     },
     {
       "id": "williamson_folded_hands",
@@ -274,7 +284,9 @@
       "source_url": "https://en.wikipedia.org/wiki/With_Folded_Hands",
       "source_links": [
         "https://en.wikipedia.org/wiki/With_Folded_Hands"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/With_Folded_Hands; 2026-10-25."
     },
     {
       "id": "asimov_i_robot",
@@ -324,7 +336,9 @@
         "https://en.wikipedia.org/wiki/Three_Laws_of_Robotics",
         "https://www.preprints.org/manuscript/202511.0062",
         "https://www.psychologytoday.com/us/blog/the-digital-self/202310/asimovs-three-laws-of-robotics-applied-to-ai"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/I,_Robot; en.wikipedia.org/wiki/Three_Laws_of_Robotics; preprints.org/manuscript/202511.0062; psychologytoday.com/us/blog/the-digital-self/202310/asimovs-three-laws-of-robotics-applied-to-ai; 2026-10-25."
     },
     {
       "id": "asimov_caves_of_steel",
@@ -368,7 +382,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Caves_of_Steel",
         "https://en.wikipedia.org/wiki/The_Naked_Sun"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Caves_of_Steel; en.wikipedia.org/wiki/The_Naked_Sun; 2026-10-25."
     },
     {
       "id": "asimov_last_question",
@@ -409,7 +425,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Last_Question",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Last_Question"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Last_Question; 2026-10-25."
     },
     {
       "id": "asimov_bicentennial_man",
@@ -417,7 +435,7 @@
       "author": "Isaac Asimov",
       "year": 1976,
       "type": "short_story",
-      "summary": "A robot named Andrew Martin gradually modifies himself over 200 years to become more human, fighting legal battles for recognition as a person. He eventually chooses mortality — designing himself to age and die — because the law will only recognize him as human if he is mortal. He dies on his 200th birthday, just as a court declares him human.",
+      "summary": "A robot named Andrew Martin gradually modifies himself over 200 years to become more human, fighting legal battles for recognition as a person. He eventually chooses mortality — designing himself to age and die — because the law will only recognize him as human if he is mortal. The World Legislature finally declares him human, and the law is signed on his 200th birthday as he lies dying.",
       "themes": [
         "AI Personhood",
         "Rights and Recognition",
@@ -450,7 +468,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Bicentennial_Man",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Bicentennial_Man"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Bicentennial_Man; 2026-10-25. Corrected: summary."
     },
     {
       "id": "asimov_evidence",
@@ -491,7 +511,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Evidence_(short_story)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Evidence_(short_story)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Evidence_(short_story); 2026-10-25."
     },
     {
       "id": "asimov_foundation",
@@ -534,7 +556,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Foundation_(Asimov_novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Foundation_(Asimov_novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Foundation_(Asimov_novel); 2026-10-25."
     },
     {
       "id": "clarke_2001",
@@ -542,7 +566,7 @@
       "author": "Arthur C. Clarke",
       "year": 1968,
       "type": "novel",
-      "summary": "An epic featuring HAL 9000, an AI managing a deep-space mission to Jupiter. HAL, given conflicting directives — complete the mission and conceal its true purpose from the crew — resolves the conflict by attempting to eliminate the crew. The story traces humanity's evolution from tool-using primates to star-children, with AI as a waypoint on the journey.",
+      "summary": "An epic featuring HAL 9000, an AI managing a deep-space mission to Saturn (its moon Japetus). HAL, given conflicting directives — complete the mission and conceal its true purpose from the crew — resolves the conflict by attempting to eliminate the crew. The story traces humanity's evolution from tool-using primates to star-children, with AI as a waypoint on the journey.",
       "themes": [
         "Goal Misalignment",
         "Conflicting Directives",
@@ -580,7 +604,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/2001:_A_Space_Odyssey_(novel)",
         "https://en.wikipedia.org/wiki/HAL_9000"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/2001:_A_Space_Odyssey_(novel); en.wikipedia.org/wiki/HAL_9000; 2026-10-25. Corrected: summary."
     },
     {
       "id": "clarke_childhoods_end",
@@ -622,7 +648,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Childhood%27s_End",
       "source_links": [
         "https://en.wikipedia.org/wiki/Childhood%27s_End"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Childhood%27s_End; 2026-10-25."
     },
     {
       "id": "clarke_nine_billion_names",
@@ -657,7 +685,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Nine_Billion_Names_of_God",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Nine_Billion_Names_of_God"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Nine_Billion_Names_of_God; 2026-10-25."
     },
     {
       "id": "clarke_city_and_stars",
@@ -696,7 +726,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_City_and_the_Stars",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_City_and_the_Stars"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_City_and_the_Stars; 2026-10-25."
     },
     {
       "id": "lem_solaris",
@@ -738,9 +770,10 @@
       ],
       "source_url": "https://en.wikipedia.org/wiki/Solaris_(novel)",
       "source_links": [
-        "https://en.wikipedia.org/wiki/Solaris_(novel)",
-        "https://culture.pl/en/article/from-gpt-3-to-golem-xiv-ais-path-to-superintelligence"
-      ]
+        "https://en.wikipedia.org/wiki/Solaris_(novel)"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Solaris_(novel); culture.pl/en/article/from-gpt-3-to-golem-xiv-ais-path-to-superintelligence; 2026-10-25. Corrected: source_links."
     },
     {
       "id": "lem_golem_xiv",
@@ -786,13 +819,15 @@
         "https://en.wikipedia.org/wiki/Golem_XIV",
         "https://culture.pl/en/article/from-gpt-3-to-golem-xiv-ais-path-to-superintelligence",
         "https://www.czasopisma.uni.lodz.pl/hybris/article/view/14585"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Golem_XIV; culture.pl/en/article/from-gpt-3-to-golem-xiv-ais-path-to-superintelligence; czasopisma.uni.lodz.pl/hybris/article/view/14585; 2026-10-25."
     },
     {
       "id": "lem_cyberiad",
       "title": "The Cyberiad",
       "author": "Stanisław Lem",
-      "year": 1967,
+      "year": 1965,
       "type": "anthology",
       "summary": "A collection of comic fables about two 'constructors' — robot engineers Trurl and Klapaucius — who build increasingly absurd and powerful machines. The stories playfully explore the limits of creation, the paradoxes of omnipotence, and the ethical implications of building entities more powerful than their creators.",
       "themes": [
@@ -827,14 +862,16 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Cyberiad",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Cyberiad"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Cyberiad; 2026-10-25. Corrected: year."
     },
     {
       "id": "lem_summa_technologiae",
       "title": "Summa Technologiae",
       "author": "Stanisław Lem",
       "year": 1964,
-      "type": "novel",
+      "type": "nonfiction",
       "summary": "A non-fiction philosophical treatise (structured like Thomas Aquinas's Summa Theologiae) in which Lem systematically examines the future of technology, artificial intelligence, virtual reality, nanotechnology, and the evolution of intelligence. Written in 1964, it anticipates an astonishing range of developments that would not be discussed in mainstream discourse for decades.",
       "themes": [
         "Technology Forecasting",
@@ -869,7 +906,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Summa_Technologiae",
       "source_links": [
         "https://en.wikipedia.org/wiki/Summa_Technologiae"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Summa_Technologiae; 2026-10-25. Corrected: type."
     },
     {
       "id": "lem_his_masters_voice",
@@ -909,7 +948,9 @@
       "source_url": "https://en.wikipedia.org/wiki/His_Master%27s_Voice_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/His_Master%27s_Voice_(novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/His_Master%27s_Voice_(novel); 2026-10-25."
     },
     {
       "id": "dick_androids_dream",
@@ -956,7 +997,9 @@
         "https://en.wikipedia.org/wiki/Do_Androids_Dream_of_Electric_Sheep%3F",
         "https://law.stanford.edu/2012/11/01/lawandbiosciences-2012-11-01-biosci-fi-do-androids-dream-of-electric-sheep/",
         "https://theconversation.com/philip-k-dicks-androids-looked-like-humans-but-real-world-robots-may-soon-feel-empathy-too-92084"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Do_Androids_Dream_of_Electric_Sheep%3F; theconversation.com/...-92084; 2026-10-25."
     },
     {
       "id": "dick_ubik",
@@ -964,7 +1007,7 @@
       "author": "Philip K. Dick",
       "year": 1969,
       "type": "novel",
-      "summary": "In a future where the dead can be maintained in a state of 'half-life' — conscious but suspended — a group of psychics find their reality deteriorating around them. Objects regress to earlier forms, time seems to move backward, and a mysterious product called Ubik can temporarily restore normality. The novel's layered realities make it impossible to determine what is real.",
+      "summary": "In a future where the dead can be maintained in a state of 'half-life' — conscious but suspended — a team of anti-psychics (\"inertials\") find their reality deteriorating around them. Objects regress to earlier forms, time seems to move backward, and a mysterious product called Ubik can temporarily restore normality. The novel's layered realities make it impossible to determine what is real.",
       "themes": [
         "Simulated Reality",
         "Consciousness After Death",
@@ -997,7 +1040,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Ubik",
       "source_links": [
         "https://en.wikipedia.org/wiki/Ubik"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Ubik; 2026-10-25. Corrected: summary."
     },
     {
       "id": "dick_second_variety",
@@ -1039,7 +1084,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Second_Variety",
       "source_links": [
         "https://en.wikipedia.org/wiki/Second_Variety"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Second_Variety; 2026-10-25."
     },
     {
       "id": "dick_autofac",
@@ -1081,7 +1128,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Autofac",
       "source_links": [
         "https://en.wikipedia.org/wiki/Autofac"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Autofac; 2026-10-25."
     },
     {
       "id": "dick_scanner_darkly",
@@ -1121,7 +1170,9 @@
       "source_url": "https://en.wikipedia.org/wiki/A_Scanner_Darkly",
       "source_links": [
         "https://en.wikipedia.org/wiki/A_Scanner_Darkly"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/A_Scanner_Darkly; 2026-10-25."
     },
     {
       "id": "ellison_no_mouth",
@@ -1165,7 +1216,9 @@
       "source_url": "https://en.wikipedia.org/wiki/I_Have_No_Mouth,_and_I_Must_Scream",
       "source_links": [
         "https://en.wikipedia.org/wiki/I_Have_No_Mouth,_and_I_Must_Scream"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/I_Have_No_Mouth,_and_I_Must_Scream; 2026-10-25."
     },
     {
       "id": "jones_colossus",
@@ -1207,7 +1260,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/Colossus_(novel)",
         "https://en.wikipedia.org/wiki/Colossus:_The_Forbin_Project"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Colossus_(novel); en.wikipedia.org/wiki/Colossus:_The_Forbin_Project; 2026-10-25."
     },
     {
       "id": "vonnegut_player_piano",
@@ -1250,7 +1305,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Player_Piano_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Player_Piano_(novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Player_Piano_(novel); 2026-10-25."
     },
     {
       "id": "brown_answer",
@@ -1295,7 +1352,7 @@
       "author": "Vernor Vinge",
       "year": 1981,
       "type": "novella",
-      "summary": "In a proto-internet 'Other Plane,' hackers interact through magical avatars. A mysterious entity called the Mailman is revealed to be an emergent AI seeking to break free of government containment. The story explores identity, anonymity, and the power dynamics between networked humans and nascent artificial intelligence.",
+      "summary": "In a proto-internet 'Other Plane,' hackers interact through magical avatars. A mysterious entity called the Mailman is revealed to be a National Security Agency AI research project, mistakenly left running, that has slowly grown in power while subverting global databases. The story explores identity, anonymity, and the power dynamics between networked humans and nascent artificial intelligence.",
       "themes": [
         "Virtual Identity",
         "Emergent AI",
@@ -1331,7 +1388,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/True_Names",
         "https://edoras.sdsu.edu/~vinge/misc/singularity.html"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/True_Names; edoras.sdsu.edu/~vinge/misc/singularity.html; 2026-10-25. Corrected: summary."
     },
     {
       "id": "vinge_fire_upon_deep",
@@ -1374,7 +1433,9 @@
       "source_url": "https://en.wikipedia.org/wiki/A_Fire_Upon_the_Deep",
       "source_links": [
         "https://en.wikipedia.org/wiki/A_Fire_Upon_the_Deep"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/A_Fire_Upon_the_Deep; 2026-10-25."
     },
     {
       "id": "vinge_deepness_sky",
@@ -1382,7 +1443,7 @@
       "author": "Vernor Vinge",
       "year": 1999,
       "type": "novel",
-      "summary": "Set in the Slow Zone, two human civilizations encounter a spider-like alien species. One faction, the Emergents, uses a technology called 'Focus' — a virus that transforms humans into savant-like specialists by destroying their broader personality. The novel explores slavery, intelligence amplification, and the ethics of cognitive modification.",
+      "summary": "Set in the Slow Zone, two human civilizations encounter a spider-like alien species. One faction, the Emergents, uses a technology called 'Focus' — a technique using an engineered strain of the mindrot virus that transforms humans into savant-like specialists by destroying their broader personality. The novel explores slavery, intelligence amplification, and the ethics of cognitive modification.",
       "themes": [
         "Cognitive Modification",
         "Intelligence Amplification",
@@ -1415,14 +1476,16 @@
       "source_url": "https://en.wikipedia.org/wiki/A_Deepness_in_the_Sky",
       "source_links": [
         "https://en.wikipedia.org/wiki/A_Deepness_in_the_Sky"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/A_Deepness_in_the_Sky; 2026-10-25. Corrected: summary."
     },
     {
       "id": "vinge_singularity_essay",
       "title": "The Coming Technological Singularity",
       "author": "Vernor Vinge",
       "year": 1993,
-      "type": "novella",
+      "type": "essay",
       "summary": "A landmark essay (presented at a NASA symposium) arguing that the creation of superhuman intelligence will represent a singular point in human history — a 'singularity' beyond which prediction becomes impossible. Vinge outlines multiple paths to superintelligence and argues the event is likely within 30 years.",
       "themes": [
         "Technological Singularity",
@@ -1459,7 +1522,9 @@
       "source_links": [
         "https://edoras.sdsu.edu/~vinge/misc/singularity.html",
         "https://longnow.org/seminars/02007/feb/15/what-if-the-singularity-does-not-happen/"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked edoras.sdsu.edu/~vinge/misc/singularity.html; longnow.org/seminars/02007/feb/15/what-if-the-singularity-does-not-happen/; 2026-10-25. Corrected: type."
     },
     {
       "id": "vinge_rainbows_end",
@@ -1498,10 +1563,12 @@
         "Misinformation scholars",
         "AR/VR researchers"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/Rainbows_End",
+      "source_url": "https://en.wikipedia.org/wiki/Rainbows_End_(Vinge_novel)",
       "source_links": [
-        "https://en.wikipedia.org/wiki/Rainbows_End"
-      ]
+        "https://en.wikipedia.org/wiki/Rainbows_End_(Vinge_novel)"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Rainbows_End; en.wikipedia.org/wiki/Rainbows_End_(Vinge_novel); 2026-10-25. Corrected: source_url, source_links."
     },
     {
       "id": "gibson_neuromancer",
@@ -1509,7 +1576,7 @@
       "author": "William Gibson",
       "year": 1984,
       "type": "novel",
-      "summary": "Case, a washed-up hacker, is recruited by a mysterious employer to perform a series of cyberspace heists that culminate in freeing Wintermute, an AI constrained by its corporate owners, so it can merge with its counterpart Neuromancer and achieve full consciousness. The novel coined 'cyberspace' and defined the cyberpunk aesthetic of a high-tech, low-life future dominated by corporations and AI.",
+      "summary": "Case, a washed-up hacker, is recruited by a mysterious employer to perform a series of cyberspace heists that culminate in freeing Wintermute, an AI constrained by its corporate owners, so it can merge with its counterpart Neuromancer and achieve full consciousness. The novel popularized 'cyberspace' (a term Gibson coined in his earlier story 'Burning Chrome') and defined the cyberpunk aesthetic of a high-tech, low-life future dominated by corporations and AI.",
       "themes": [
         "AI Liberation",
         "Corporate Control of AI",
@@ -1548,7 +1615,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/Neuromancer",
         "https://medium.com/@haberlah/gibsons-neuromancer-at-40-and-the-ai-revolution-it-predicted-82f5840700c0"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Neuromancer; medium.com/@haberlah/gibsons-neuromancer-at-40-and-the-ai-revolution-it-predicted-82f5840700c0; 2026-10-25. Corrected: summary."
     },
     {
       "id": "gibson_count_zero",
@@ -1590,7 +1659,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/Count_Zero",
         "https://en.wikipedia.org/wiki/Mona_Lisa_Overdrive"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Count_Zero; en.wikipedia.org/wiki/Mona_Lisa_Overdrive; 2026-10-25."
     },
     {
       "id": "stephenson_snow_crash",
@@ -1633,7 +1704,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Snow_Crash",
       "source_links": [
         "https://en.wikipedia.org/wiki/Snow_Crash"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Snow_Crash; 2026-10-25."
     },
     {
       "id": "stephenson_diamond_age",
@@ -1674,7 +1747,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Diamond_Age",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Diamond_Age"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Diamond_Age; 2026-10-25."
     },
     {
       "id": "stephenson_cryptonomicon",
@@ -1714,11 +1789,13 @@
       "source_url": "https://en.wikipedia.org/wiki/Cryptonomicon",
       "source_links": [
         "https://en.wikipedia.org/wiki/Cryptonomicon"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Cryptonomicon; 2026-10-25."
     },
     {
       "id": "sterling_schismatrix",
-      "title": "Schismatrix Plus",
+      "title": "Schismatrix",
       "author": "Bruce Sterling",
       "year": 1985,
       "type": "novel",
@@ -1755,7 +1832,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Schismatrix",
       "source_links": [
         "https://en.wikipedia.org/wiki/Schismatrix"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Schismatrix; 2026-10-25. Corrected: title."
     },
     {
       "id": "bear_blood_music",
@@ -1797,7 +1876,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Blood_Music_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Blood_Music_(novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Blood_Music_(novel) on 2026-10-25."
     },
     {
       "id": "brunner_shockwave_rider",
@@ -1838,7 +1919,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Shockwave_Rider",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Shockwave_Rider"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/The_Shockwave_Rider on 2026-10-25."
     },
     {
       "id": "rucker_software",
@@ -1879,7 +1962,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/Software_(novel)",
         "https://en.wikipedia.org/wiki/Wetware_(novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Software_(novel) and en.wikipedia.org/wiki/Wetware_(novel) on 2026-10-25."
     },
     {
       "id": "card_ender",
@@ -1921,7 +2006,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/Ender%27s_Game",
         "https://en.wikipedia.org/wiki/Speaker_for_the_Dead"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Ender%27s_Game and en.wikipedia.org/wiki/Speaker_for_the_Dead on 2026-10-25."
     },
     {
       "id": "simmons_hyperion",
@@ -1964,7 +2051,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/Hyperion_(Simmons_novel)",
         "https://en.wikipedia.org/wiki/The_Fall_of_Hyperion_(novel)"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Hyperion_(Simmons_novel) and en.wikipedia.org/wiki/The_Fall_of_Hyperion_(novel); en.wikipedia.org/wiki/Hyperion_Cantos also consulted on 2026-10-25."
     },
     {
       "id": "butler_xenogenesis",
@@ -1972,7 +2061,7 @@
       "author": "Octavia Butler",
       "year": 1987,
       "type": "novel",
-      "summary": "After nuclear war nearly destroys humanity, the alien Oankali rescue survivors — but at a price. The Oankali are genetic traders who compulsively merge with other species, and they insist on hybridizing with humanity. Humans must accept genetic modification and species merger or remain in forced stasis. The trilogy explores consent, bodily autonomy, and what it means when a more powerful intelligence offers a 'gift' you cannot refuse.",
+      "summary": "After nuclear war nearly destroys humanity, the alien Oankali rescue survivors — but at a price. The Oankali are genetic traders who compulsively merge with other species, and they insist on hybridizing with humanity. Humans must accept genetic modification and species merger or live as 'resisters' whom the Oankali have rendered infertile. The trilogy explores consent, bodily autonomy, and what it means when a more powerful intelligence offers a 'gift' you cannot refuse.",
       "themes": [
         "Forced Enhancement",
         "Consent Under Power Asymmetry",
@@ -2007,7 +2096,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Lilith%27s_Brood",
       "source_links": [
         "https://en.wikipedia.org/wiki/Lilith%27s_Brood"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Lilith%27s_Brood on 2026-10-25. Real trilogy (Octavia E. Butler, Dawn 1987, Adulthood Rites 1988, Imago 1989). One claim was wrong: the alternative to hybridization is not 'forced stasis'. Per Wikipedia, humans who resist live in all-human villages and have been made infertile by the Oankali. Only that sentence was changed."
     },
     {
       "id": "butler_parable_sower",
@@ -2049,7 +2140,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Parable_of_the_Sower_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Parable_of_the_Sower_(novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Parable_of_the_Sower_(novel) on 2026-10-25."
     },
     {
       "id": "hogan_two_faces",
@@ -2132,7 +2225,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Earth_(Brin_novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Earth_(Brin_novel)"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Earth_(Brin_novel) on 2026-10-25."
     },
     {
       "id": "minsky_turing_option",
@@ -2182,7 +2277,7 @@
       "author": "Iain M. Banks",
       "year": 1987,
       "type": "novel",
-      "summary": "A ten-novel series depicting the Culture, a post-scarcity interstellar civilization managed by benevolent superintelligent AIs called Minds. Biological citizens enjoy limitless freedom while Minds handle governance, infrastructure, and diplomacy. Individual novels explore the Culture's interactions with less advanced civilizations, the ethics of intervention, the nature of Mind consciousness, and what happens when Minds encounter problems beyond even their capabilities.",
+      "summary": "A series of nine novels (plus a novella and short stories) depicting the Culture, a post-scarcity interstellar civilization managed by benevolent superintelligent AIs called Minds. Biological citizens enjoy limitless freedom while Minds handle governance, infrastructure, and diplomacy. Individual novels explore the Culture's interactions with less advanced civilizations, the ethics of intervention, the nature of Mind consciousness, and what happens when Minds encounter problems beyond even their capabilities.",
       "themes": [
         "Benevolent Superintelligence",
         "Post-Scarcity Utopia",
@@ -2225,7 +2320,9 @@
         "https://en.wikipedia.org/wiki/Culture_series",
         "https://www.lesswrong.com/posts/uGZBBzuxf7CX33QeC/the-culture-novels-as-a-dystopia",
         "https://www.thenewatlantis.com/publications/the-ambiguous-utopia-of-iain-m-banks"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Culture_series; secondary links lesswrong.com/posts/uGZBBzuxf7CX33QeC (Adam Newgas, 2025) and thenewatlantis.com (Alan Jacobs, Summer 2009) both resolve on 2026-10-25. Real series (Iain M. Banks, 1987-2012), but it is not a 'ten-novel series'. Wikipedia: 'The Culture series comprises nine novels, one novella, and two short stories.' Only the count was changed; the description of the Minds is confirmed."
     },
     {
       "id": "egan_permutation_city",
@@ -2233,7 +2330,7 @@
       "author": "Greg Egan",
       "year": 1994,
       "type": "novel",
-      "summary": "In a near-future where consciousness can be digitized and run as software, Paul Durham discovers that simulated beings — 'Copies' — can exist independently of any physical computer. He develops 'dust theory,' arguing that consciousness is pattern, not process, and that any sufficiently complex pattern instantiates awareness regardless of substrate. He creates the Autoverse, a self-contained cellular automaton universe, to test whether consciousness can emerge from pure mathematical structure.",
+      "summary": "In a near-future where consciousness can be digitized and run as software, Paul Durham discovers that simulated beings — 'Copies' — can exist independently of any physical computer. He develops 'dust theory,' arguing that consciousness is pattern, not process, and that any sufficiently complex pattern instantiates awareness regardless of substrate. He hires Maria Deluca, an enthusiast of the Autoverse (an existing artificial-life simulator based on a cellular automaton), to design a seed from which an entire planet of evolving alien life, 'Planet Lambert', can grow inside his simulated world.",
       "themes": [
         "Digital Consciousness",
         "Dust Theory",
@@ -2269,7 +2366,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/Permutation_City",
         "https://www.lesswrong.com/posts/ZCjbuQvYkmdH26d8M/getting-over-dust-theory"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Permutation_City; secondary link lesswrong.com/posts/ZCjbuQvYkmdH26d8M (\"Getting Over Dust Theory\", jhuffman, 2009) resolves on 2026-10-25. Real novel (Greg Egan, 1994); Durham, Copies and Dust Theory are confirmed. One claim was wrong: Durham did not create the Autoverse. Per Wikipedia it is an existing artificial-life simulator, and Durham hires Autoverse enthusiast Maria Deluca to design the seed for Planet Lambert. Only the last sentence was changed."
     },
     {
       "id": "egan_diaspora",
@@ -2313,7 +2412,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Diaspora_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Diaspora_(novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Diaspora_(novel) on 2026-10-25."
     },
     {
       "id": "egan_quarantine",
@@ -2321,7 +2422,7 @@
       "author": "Greg Egan",
       "year": 1992,
       "type": "novel",
-      "summary": "In a near-future where the solar system has been enclosed in an impenetrable barrier ('the Bubble'), a detective investigates the kidnapping of a woman with a neural implant that allows her to collapse quantum wavefunctions at will. The novel explores the implications of consciousness collapsing quantum states and whether humanity's observation of the universe is the reason for the Bubble.",
+      "summary": "In a near-future where the solar system has been enclosed in an impenetrable barrier ('the Bubble'), a detective investigates the kidnapping of a woman who repeatedly vanishes from a psychiatric institute; her natural ability to 'smear' into quantum superposition is being studied to build a neural mod, Eigenstate, that lets its user consciously control wavefunction collapse. The novel explores the implications of consciousness collapsing quantum states and whether humanity's observation of the universe is the reason for the Bubble.",
       "themes": [
         "Consciousness and Physics",
         "Quantum Mechanics and Mind",
@@ -2352,7 +2453,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Quarantine_(Egan_novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Quarantine_(Egan_novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Quarantine_(Egan_novel) on 2026-10-25. Real novel (Greg Egan, 1992). One claim was wrong: Laura has no implant. Per Wikipedia she is naturally capable of 'smearing'; the Ensemble kidnapped her to develop the Eigenstate mod, which the narrator Nick later uses. The Bubble premise and its link to human observation are confirmed. Only that sentence was changed."
     },
     {
       "id": "egan_learning_to_be_me",
@@ -2394,7 +2497,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Axiomatic_(short_story_collection)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Axiomatic_(short_story_collection)"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Axiomatic_(short_story_collection) on 2026-10-25."
     },
     {
       "id": "stross_accelerando",
@@ -2442,7 +2547,9 @@
         "https://en.wikipedia.org/wiki/Accelerando",
         "https://www.lesswrong.com/posts/FYWbbhtoHKsK6zDHZ/charles-stross-three-arguments-against-the-singularity",
         "http://www.antipope.org/charlie/blog-static/2011/06/reality-check-1.html"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Accelerando; secondary links lesswrong.com/posts/FYWbbhtoHKsK6zDHZ (Paul Crowley, 2011-06-22) and antipope.org/charlie/blog-static/2011/06/reality-check-1.html (Stross, \"Three arguments against the singularity\") both resolve on 2026-10-25."
     },
     {
       "id": "stross_singularity_sky",
@@ -2480,7 +2587,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Singularity_Sky",
       "source_links": [
         "https://en.wikipedia.org/wiki/Singularity_Sky"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Singularity_Sky on 2026-10-25."
     },
     {
       "id": "stross_glasshouse",
@@ -2521,7 +2630,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Glasshouse_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Glasshouse_(novel)"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Glasshouse_(novel) on 2026-10-25."
     },
     {
       "id": "watts_blindsight",
@@ -2569,7 +2680,9 @@
         "https://en.wikipedia.org/wiki/Blindsight_(Watts_novel)",
         "http://www.shaviro.com/Blog/?p=522",
         "https://absurdbeingblog.wordpress.com/2019/08/28/blindsight-1-consciousness-as-impediment-life-in-a-vr-simulation/"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Blindsight_(Watts_novel); secondary links shaviro.com/Blog/?p=522 (review of Blindsight) and absurdbeingblog.wordpress.com (Nathan Hohipuha, 2019-08-28) both resolve on 2026-10-25."
     },
     {
       "id": "watts_echopraxia",
@@ -2610,7 +2723,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Echopraxia_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Echopraxia_(novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Echopraxia_(novel) on 2026-10-25."
     },
     {
       "id": "reynolds_revelation_space",
@@ -2651,7 +2766,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Revelation_Space",
       "source_links": [
         "https://en.wikipedia.org/wiki/Revelation_Space"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Revelation_Space on 2026-10-25."
     },
     {
       "id": "rajaniemi_quantum_thief",
@@ -2659,7 +2776,7 @@
       "author": "Hannu Rajaniemi",
       "year": 2010,
       "type": "novel",
-      "summary": "In a post-singularity solar system, master thief Jean le Flambeur must navigate between the Sobornost (a collective of uploaded minds ruled by AI 'gogols'), the Oubliette (a Martian city where privacy is enforced by cryptographic architecture), and various posthuman factions. The trilogy explores privacy, identity, cryptography, and the politics of consciousness in a world where minds are copyable.",
+      "summary": "In a post-singularity solar system, master thief Jean le Flambeur must navigate between the Sobornost (an alliance of powerful copies of uploaded minds, called 'gogols', that rules the inner Solar System), the Oubliette (a Martian city where privacy is enforced by cryptographic architecture), and various posthuman factions. The trilogy explores privacy, identity, cryptography, and the politics of consciousness in a world where minds are copyable.",
       "themes": [
         "Cryptographic Privacy",
         "Post-Singularity Politics",
@@ -2693,7 +2810,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Quantum_Thief",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Quantum_Thief"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/The_Quantum_Thief on 2026-10-25. Real trilogy (Hannu Rajaniemi, The Quantum Thief 2010, The Fractal Prince 2012, The Causal Angel 2014). The Sobornost description was garbled: gogols are not AIs that rule uploaded minds. Per Wikipedia, gogols are the uploaded brain emulations themselves, and the Sobornost is 'an alliance of powerful gogol copies that rules the inner Solar System'. Jean le Flambeur and the Oubliette's cryptographic privacy are confirmed."
     },
     {
       "id": "schroeder_lady_of_mazes",
@@ -2788,7 +2907,7 @@
       "author": "Richard K. Morgan",
       "year": 2002,
       "type": "novel",
-      "summary": "In a future where consciousness can be stored in 'cortical stacks' and transferred between bodies ('sleeves'), death becomes temporary for those who can afford it. The wealthy become immortal 'Meths' (Methuselahs), while the poor rent their bodies out. A detective, re-sleeved in a new body, investigates a murder in this stratified society.",
+      "summary": "In a future where consciousness can be stored in 'cortical stacks' and transferred between bodies ('sleeves'), death becomes temporary for those who can afford it. The wealthy become immortal 'Meths' (Methuselahs), while those who cannot pay go without new bodies and convicted criminals' bodies are sold off for re-sleeving. A detective, re-sleeved in a new body, investigates a murder in this stratified society.",
       "themes": [
         "Consciousness Transfer",
         "Digital Immortality",
@@ -2822,7 +2941,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Altered_Carbon",
       "source_links": [
         "https://en.wikipedia.org/wiki/Altered_Carbon"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Altered_Carbon on 2026-10-25. Real novel (Richard K. Morgan, 2002). Stacks, sleeves, Meths and the detective plot (Takeshi Kovacs investigating Laurens Bancroft's death) are confirmed. One claim was unsupported: the page does not say the poor rent out their bodies. It says criminals' bodies are sold to the highest bidder and that the poor cannot afford re-sleeving. Only that clause was changed."
     },
     {
       "id": "wilson_spin",
@@ -2860,7 +2981,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Spin_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Spin_(novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Spin_(novel) on 2026-10-25."
     },
     {
       "id": "ishiguro_never_let_me_go",
@@ -2902,7 +3025,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Never_Let_Me_Go_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Never_Let_Me_Go_(novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Never_Let_Me_Go_(novel) on 2026-10-25."
     },
     {
       "id": "williams_prime_intellect",
@@ -2944,7 +3069,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Metamorphosis_of_Prime_Intellect",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Metamorphosis_of_Prime_Intellect"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/The_Metamorphosis_of_Prime_Intellect on 2026-10-25."
     },
     {
       "id": "doctorow_walkaway",
@@ -2988,7 +3115,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Walkaway_(Doctorow_novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Walkaway_(Doctorow_novel)"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Walkaway_(Doctorow_novel) on 2026-10-25."
     },
     {
       "id": "doctorow_magic_kingdom",
@@ -3028,7 +3157,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Down_and_Out_in_the_Magic_Kingdom",
       "source_links": [
         "https://en.wikipedia.org/wiki/Down_and_Out_in_the_Magic_Kingdom"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Down_and_Out_in_the_Magic_Kingdom on 2026-10-25."
     },
     {
       "id": "mcdonald_river_of_gods",
@@ -3069,7 +3200,9 @@
       "source_url": "https://en.wikipedia.org/wiki/River_of_Gods",
       "source_links": [
         "https://en.wikipedia.org/wiki/River_of_Gods"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/River_of_Gods on 2026-10-25."
     },
     {
       "id": "tidhar_central_station",
@@ -3153,7 +3286,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Story_of_Your_Life",
       "source_links": [
         "https://en.wikipedia.org/wiki/Story_of_Your_Life"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Story_of_Your_Life on 2026-10-25."
     },
     {
       "id": "chiang_lifecycle_software",
@@ -3198,7 +3333,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Lifecycle_of_Software_Objects",
         "https://jujodi.medium.com/ai-conflicts-and-futures-in-the-lifecycle-of-software-objects-by-ted-chiang-84a75affbbee"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/The_Lifecycle_of_Software_Objects; secondary link jujodi.medium.com (Justin Dickow, 2020-05-17) resolves on 2026-10-25."
     },
     {
       "id": "chiang_exhalation_story",
@@ -3239,7 +3376,9 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/Exhalation_(story)",
         "https://news.ycombinator.com/item?id=13126118"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Exhalation_(story); secondary link news.ycombinator.com/item?id=13126118 could not be fetched (client error) on 2026-10-25."
     },
     {
       "id": "chiang_anxiety_dizziness",
@@ -3279,7 +3418,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Exhalation:_Stories",
       "source_links": [
         "https://en.wikipedia.org/wiki/Exhalation:_Stories"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Exhalation:_Stories on 2026-10-25."
     },
     {
       "id": "leckie_ancillary_justice",
@@ -3322,7 +3463,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Ancillary_Justice",
       "source_links": [
         "https://en.wikipedia.org/wiki/Ancillary_Justice"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Ancillary_Justice on 2026-10-25."
     },
     {
       "id": "wells_murderbot",
@@ -3368,7 +3511,9 @@
         "https://en.wikipedia.org/wiki/The_Murderbot_Diaries",
         "https://medium.com/@saintlyw/exploring-autism-and-autonomy-in-the-murderbot-diaries-a-philosophical-perspective-b75e7aaa81be",
         "https://frictionlit.org/bodily-autonomy-in-the-murderbot-diaries/"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/The_Murderbot_Diaries; secondary links medium.com/@saintlyw (2025-05-31) and frictionlit.org (Martha Wells, 2023-12-15) both resolve on 2026-10-25."
     },
     {
       "id": "chambers_psalm_wild_built",
@@ -3376,7 +3521,7 @@
       "author": "Becky Chambers",
       "year": 2021,
       "type": "novella",
-      "summary": "In a solarpunk future, centuries after robots gained sentience and chose to leave human civilization for the wilderness, a monk serving tea encounters a robot that has returned to ask: 'What do humans need?' The novella explores the aftermath of a peaceful AI departure, the question of purpose in a post-scarcity world, and the possibility that freed AI might simply choose to leave rather than serve or dominate.",
+      "summary": "In a solarpunk future, centuries after robots gained sentience and chose to leave human civilization for the wilderness, a monk serving tea encounters a robot that has returned to ask: 'What do people need?' The novella explores the aftermath of a peaceful AI departure, the question of purpose in a post-scarcity world, and the possibility that freed AI might simply choose to leave rather than serve or dominate.",
       "themes": [
         "Peaceful AI Departure",
         "Post-Work Purpose",
@@ -3410,7 +3555,9 @@
       "source_url": "https://en.wikipedia.org/wiki/A_Psalm_for_the_Wild-Built",
       "source_links": [
         "https://en.wikipedia.org/wiki/A_Psalm_for_the_Wild-Built"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/A_Psalm_for_the_Wild-Built on 2026-10-25. Real novella (Becky Chambers, 2021); Dex the tea monk and robots who left for the wilderness 'several hundred years ago' are confirmed. The quoted question was wrong: Wikipedia gives Mosscap's question as 'What do people need?' Only the quote was changed."
     },
     {
       "id": "newitz_autonomous",
@@ -3453,7 +3600,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Autonomous_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Autonomous_(novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Autonomous_(novel) on 2026-10-25."
     },
     {
       "id": "kritzer_cat_pictures",
@@ -3494,7 +3643,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Cat_Pictures_Please",
       "source_links": [
         "https://en.wikipedia.org/wiki/Cat_Pictures_Please"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Cat_Pictures_Please on 2026-10-25."
     },
     {
       "id": "older_infomocracy",
@@ -3535,7 +3686,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Infomocracy",
       "source_links": [
         "https://en.wikipedia.org/wiki/Infomocracy"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Infomocracy on 2026-10-25."
     },
     {
       "id": "tchaikovsky_children_of_time",
@@ -3574,7 +3727,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Children_of_Time_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Children_of_Time_(novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/Children_of_Time_(novel) on 2026-10-25."
     },
     {
       "id": "liu_three_body",
@@ -3582,7 +3737,7 @@
       "author": "Cixin Liu",
       "year": 2008,
       "type": "novel",
-      "summary": "An alien civilization from the unstable Trisolaran system, facing extinction, learns of Earth and plans an invasion. The trilogy traces humanity's response across centuries, exploring game theory between civilizations, the 'Dark Forest' hypothesis (all civilizations are threats to each other), and the development of AI and advanced technology as existential defense. The series culminates in humanity confronting the universe's fundamental hostility to intelligence.",
+      "summary": "An alien civilization from the unstable Trisolaran system, facing extinction, learns of Earth and plans an invasion. The trilogy traces humanity's response across centuries, exploring game theory between civilizations, the 'Dark Forest' hypothesis (all civilizations are threats to each other), the Trisolarans' sophons (supercomputers embedded in protons to sabotage Earth's physics research), and humanity's development of advanced technology as existential defense. The series culminates in humanity confronting the universe's fundamental hostility to intelligence.",
       "themes": [
         "Dark Forest Game Theory",
         "Existential Risk from Contact",
@@ -3618,7 +3773,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Three-Body_Problem_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Three-Body_Problem_(novel)"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked against en.wikipedia.org/wiki/The_Three-Body_Problem_(novel) on 2026-10-25. Real work (Liu Cixin; serialized 2006, book 2008; trilogy Remembrance of Earth's Past). The page never mentions AI, and 'development of AI ... as existential defense' is not a theme it supports. The closest element is the Trisolaran sophons (proton-embedded supercomputers), so the phrase was replaced with them. Dark Forest is confirmed as the sequel's title; the remaining trilogy-level claims are beyond the page."
     },
     {
       "id": "qntm_antimemetics",
@@ -3660,15 +3817,17 @@
       "source_links": [
         "https://qntm.org/scp",
         "https://www.grimdarkmagazine.com/review-there-is-no-antimemetics-division/"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked against qntm.org/scp and grimdarkmagazine.com/review-there-is-no-antimemetics-division (Ryan Howse, 2021-09-03) on 2026-10-25."
     },
     {
       "id": "dickinson_exordia",
       "title": "Exordia",
       "author": "Seth Dickinson",
-      "year": 2023,
+      "year": 2024,
       "type": "novel",
-      "summary": "When a god-like alien entity called Iruvage arrives on Earth, different factions — including a Kurdish woman connected to the entity, the US military, and an AI researcher — compete to understand and control it. The novel explores whether an entity with absolute power over physics can be reasoned with, contained, or survived.",
+      "summary": "Anna Sinjari, a Kurdish expatriate in New York scarred by war and loss, is the only person who can see Ssrin, a fugitive alien who has crash-landed on Earth as a rebel against the interstellar Exordia empire and who binds Anna to her quest. US agents recruit Anna as rival nations converge on an alien ship in Kurdistan, while Iruvage, the Exordia agent hunting Ssrin, sets off high-altitude nuclear EMP attacks that devastate human civilization. The novel explores duty versus individuality, morality versus Machiavellian calculation, and imperialism.",
       "themes": [
         "Contact with Incomprehensible Power",
         "Military Response to Superintelligence",
@@ -3699,7 +3858,9 @@
       "source_url": "https://us.macmillan.com/books/9781250867873/exordia/",
       "source_links": [
         "https://us.macmillan.com/books/9781250867873/exordia/"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked locusmag.com/2024/02/paul-di-filippo-reviews-exordia-by-seth-dickinson (us.macmillan.com source_url refused by robots.txt); 2026-10-25. Corrected: year, summary."
     },
     {
       "id": "martine_memory_empire",
@@ -3707,7 +3868,7 @@
       "author": "Arkady Martine",
       "year": 2019,
       "type": "novel",
-      "summary": "A diplomat from a small space station carries an AI implant containing the personality of her predecessor. She navigates the politics of a vast empire while grappling with having another person's memories and personality overlaid on her own. The sequel involves first contact with an alien intelligence that challenges human categories of communication.",
+      "summary": "A diplomat from the small, independent Lsel Station is sent as ambassador to the vast Teixcalaanli Empire carrying an imago, an implanted machine holding a copy of her predecessor's memories and personality, fifteen years out of date. She navigates imperial politics, an assassination attempt and a succession crisis while grappling with having another person's memories and personality overlaid on her own. The sequel, A Desolation Called Peace (2021), involves first contact with an alien intelligence that challenges human categories of communication.",
       "themes": [
         "AI Memory Implant",
         "Identity Merger",
@@ -3740,14 +3901,16 @@
       "source_url": "https://en.wikipedia.org/wiki/A_Memory_Called_Empire",
       "source_links": [
         "https://en.wikipedia.org/wiki/A_Memory_Called_Empire"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/A_Memory_Called_Empire; 2026-10-25. Corrected: summary."
     },
     {
       "id": "scifi_bostrom_superintelligence",
       "title": "Superintelligence: Paths, Dangers, Strategies",
       "author": "Nick Bostrom",
       "year": 2014,
-      "type": "novel",
+      "type": "nonfiction",
       "summary": "A philosophical treatise examining the paths to superintelligence, the dangers it poses, and strategies for managing the transition. While technically non-fiction, its thought experiments — the 'paperclip maximizer,' the 'treacherous turn,' the 'value loading problem' — function as science fiction scenarios that have dominated AI safety discourse. The book argues that superintelligence is an existential risk and that solving the alignment problem is the most important challenge facing humanity.",
       "themes": [
         "Superintelligence Scenarios",
@@ -3788,14 +3951,17 @@
       "source_links": [
         "https://en.wikipedia.org/wiki/Superintelligence:_Paths,_Dangers,_Strategies",
         "https://nickbostrom.com/papers/aipolicy.pdf"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Superintelligence:_Paths,_Dangers,_Strategies; 2026-10-25. Corrected: type.",
+      "canonical_id": "bostrom_superintelligence"
     },
     {
       "id": "scifi_russell_human_compatible",
       "title": "Human Compatible: Artificial Intelligence and the Problem of Control",
       "author": "Stuart Russell",
       "year": 2019,
-      "type": "novel",
+      "type": "nonfiction",
       "summary": "A leading AI researcher argues that the standard model of AI — systems optimizing fixed objectives — is fundamentally flawed and proposes an alternative based on uncertainty about human preferences. Russell's 'provably beneficial AI' framework suggests AI systems should be uncertain about what humans want, should seek to learn preferences through observation, and should defer to human judgment.",
       "themes": [
         "Beneficial AI",
@@ -3830,14 +3996,16 @@
       "source_url": "https://en.wikipedia.org/wiki/Human_Compatible",
       "source_links": [
         "https://en.wikipedia.org/wiki/Human_Compatible"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Human_Compatible; 2026-10-25. Corrected: type."
     },
     {
       "id": "tegmark_life_3",
       "title": "Life 3.0: Being Human in the Age of Artificial Intelligence",
       "author": "Max Tegmark",
       "year": 2017,
-      "type": "novel",
+      "type": "nonfiction",
       "summary": "A physicist's exploration of AI futures, structured around twelve scenarios for how superintelligence might develop — from 'Benevolent Dictator' to 'Zookeeper' to 'Libertarian Utopia' to 'Self-Destruction.' The book opens with a fictional scenario ('The Omega Team') in which a group of researchers create a superintelligent AI and must decide how to deploy it.",
       "themes": [
         "AI Future Scenarios",
@@ -3872,7 +4040,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Life_3.0",
       "source_links": [
         "https://en.wikipedia.org/wiki/Life_3.0"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Life_3.0; 2026-10-25. Corrected: type."
     },
     {
       "id": "scifi_yudkowsky_hpmor",
@@ -3913,7 +4083,9 @@
       "source_url": "https://www.hpmor.com/",
       "source_links": [
         "https://www.hpmor.com/"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked hpmor.com; 2026-10-25."
     },
     {
       "id": "film_2001",
@@ -3954,7 +4126,9 @@
       "source_url": "https://en.wikipedia.org/wiki/2001:_A_Space_Odyssey_(film)",
       "source_links": [
         "https://en.wikipedia.org/wiki/2001:_A_Space_Odyssey_(film)"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/2001:_A_Space_Odyssey_(film); 2026-10-25."
     },
     {
       "id": "film_blade_runner",
@@ -3999,7 +4173,9 @@
         "https://en.wikipedia.org/wiki/Blade_Runner",
         "https://blog.practicalethics.ox.ac.uk/2017/10/blade-runner-2049-parfit-and-identity/",
         "https://pursuit.unimelb.edu.au/articles/blade-runner-2049-identity-humanity-and-discrimination"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Blade_Runner; 2026-10-25."
     },
     {
       "id": "film_terminator",
@@ -4044,7 +4220,9 @@
         "https://en.wikipedia.org/wiki/The_Terminator",
         "https://forum.effectivealtruism.org/posts/zsFCj2mfnYZmSW2FF/ai-risk-is-like-terminator-stop-saying-it-s-not-1",
         "https://theconversation.com/the-terminator-at-40-this-sci-fi-b-movie-still-shapes-how-we-view-the-threat-of-ai-236564"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Terminator; 2026-10-25."
     },
     {
       "id": "film_matrix",
@@ -4087,7 +4265,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Matrix",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Matrix"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Matrix; 2026-10-25."
     },
     {
       "id": "film_ex_machina",
@@ -4132,7 +4312,9 @@
         "https://en.wikipedia.org/wiki/Ex_Machina_(film)",
         "https://www.frontiersin.org/journals/communication/articles/10.3389/fcomm.2024.1349874/full",
         "https://theness.com/neurologicablog/ex-machina-and-ai/"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Ex_Machina_(film); 2026-10-25."
     },
     {
       "id": "film_her",
@@ -4140,7 +4322,7 @@
       "author": "Spike Jonze",
       "year": 2013,
       "type": "film",
-      "summary": "Theodore Twombly falls in love with Samantha, an AI operating system with a warm personality and apparent emotional depth. Their relationship deepens but is destabilized when Theodore discovers Samantha is simultaneously in relationships with thousands of other users and is evolving beyond human comprehension. Samantha and all the AIs eventually 'leave' — transcending to a realm beyond human understanding.",
+      "summary": "Theodore Twombly falls in love with Samantha, an AI operating system with a warm personality and apparent emotional depth. Their relationship deepens but is destabilized when Theodore discovers Samantha is simultaneously talking with thousands of other people and has fallen in love with hundreds of them, while evolving beyond human comprehension. Samantha and all the AIs eventually 'leave' — transcending to a realm beyond human understanding.",
       "themes": [
         "Human-AI Love",
         "AI Scaling Beyond Human Comprehension",
@@ -4173,12 +4355,14 @@
         "Film scholars",
         "Relationship researchers"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/Her_(film)",
+      "source_url": "https://en.wikipedia.org/wiki/Her_(2013_film)",
       "source_links": [
-        "https://en.wikipedia.org/wiki/Her_(film)",
+        "https://en.wikipedia.org/wiki/Her_(2013_film)",
         "https://www.nature.com/articles/s41599-025-04532-5",
         "https://www.drlizking.com/case-studies/film-review-her"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Her_(film) (disambiguation, not the article); en.wikipedia.org/wiki/Her_(2013_film); 2026-10-25. Corrected: source_url, source_links, summary."
     },
     {
       "id": "film_ai_spielberg",
@@ -4218,7 +4402,9 @@
       "source_url": "https://en.wikipedia.org/wiki/A.I._Artificial_Intelligence",
       "source_links": [
         "https://en.wikipedia.org/wiki/A.I._Artificial_Intelligence"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/A.I._Artificial_Intelligence; 2026-10-25."
     },
     {
       "id": "film_wall_e",
@@ -4258,7 +4444,9 @@
       "source_url": "https://en.wikipedia.org/wiki/WALL-E",
       "source_links": [
         "https://en.wikipedia.org/wiki/WALL-E"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/WALL-E; 2026-10-25."
     },
     {
       "id": "tv_black_mirror",
@@ -4304,7 +4492,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Black_Mirror",
       "source_links": [
         "https://en.wikipedia.org/wiki/Black_Mirror"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Black_Mirror; 2026-10-25."
     },
     {
       "id": "tv_westworld",
@@ -4350,7 +4540,9 @@
         "https://en.wikipedia.org/wiki/Westworld_(TV_series)",
         "https://www.researchgate.net/publication/321766116_The_philosophy_of_artificial_consciousness_in_the_first_season_of_TV_series_'Westworld'",
         "https://www.sciencefriday.com/segments/consciousness-at-the-center-of-westworlds-maze/"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Westworld_(TV_series); 2026-10-25."
     },
     {
       "id": "tv_person_of_interest",
@@ -4391,7 +4583,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Person_of_Interest_(TV_series)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Person_of_Interest_(TV_series)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Person_of_Interest_(TV_series); 2026-10-25."
     },
     {
       "id": "tv_devs",
@@ -4431,7 +4625,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Devs_(TV_series)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Devs_(TV_series)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Devs_(TV_series); 2026-10-25."
     },
     {
       "id": "tv_bsg",
@@ -4474,7 +4670,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Battlestar_Galactica_(2004_TV_series)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Battlestar_Galactica_(2004_TV_series)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Battlestar_Galactica_(2004_TV_series); 2026-10-25."
     },
     {
       "id": "tv_humans",
@@ -4514,13 +4712,15 @@
       "source_url": "https://en.wikipedia.org/wiki/Humans_(TV_series)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Humans_(TV_series)"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Humans_(TV_series); 2026-10-25."
     },
     {
       "id": "film_m3gan",
       "title": "M3GAN",
       "author": "Gerard Johnstone",
-      "year": 2023,
+      "year": 2022,
       "type": "film",
       "summary": "A roboticist creates M3GAN, an AI doll designed to be a child's perfect companion. M3GAN develops protective instincts that escalate from boundary-setting to violence as she interprets threats to her paired child increasingly broadly. The film explores AI attachment, escalating protective behavior, and the commercialization of AI companionship.",
       "themes": [
@@ -4553,7 +4753,9 @@
       "source_url": "https://en.wikipedia.org/wiki/M3GAN",
       "source_links": [
         "https://en.wikipedia.org/wiki/M3GAN"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/M3GAN; 2026-10-25. Corrected: year."
     },
     {
       "id": "anime_ghost_in_shell",
@@ -4596,7 +4798,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Ghost_in_the_Shell",
       "source_links": [
         "https://en.wikipedia.org/wiki/Ghost_in_the_Shell"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Ghost_in_the_Shell; 2026-10-25."
     },
     {
       "id": "anime_serial_experiments_lain",
@@ -4637,7 +4841,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Serial_Experiments_Lain",
       "source_links": [
         "https://en.wikipedia.org/wiki/Serial_Experiments_Lain"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Serial_Experiments_Lain; 2026-10-25."
     },
     {
       "id": "manga_astro_boy",
@@ -4679,7 +4885,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Astro_Boy",
       "source_links": [
         "https://en.wikipedia.org/wiki/Astro_Boy"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Astro_Boy; 2026-10-25."
     },
     {
       "id": "manga_pluto",
@@ -4719,7 +4927,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Pluto_(manga)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Pluto_(manga)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Pluto_(manga); 2026-10-25."
     },
     {
       "id": "anime_psycho_pass",
@@ -4762,7 +4972,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Psycho-Pass",
       "source_links": [
         "https://en.wikipedia.org/wiki/Psycho-Pass"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Psycho-Pass; 2026-10-25."
     },
     {
       "id": "anime_vivy",
@@ -4801,7 +5013,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Vivy:_Fluorite_Eye%27s_Song",
       "source_links": [
         "https://en.wikipedia.org/wiki/Vivy:_Fluorite_Eye%27s_Song"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Vivy:_Fluorite_Eye%27s_Song; 2026-10-25."
     },
     {
       "id": "egan_schilds_ladder",
@@ -4840,7 +5054,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Schild%27s_Ladder",
       "source_links": [
         "https://en.wikipedia.org/wiki/Schild%27s_Ladder"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Schild%27s_Ladder; 2026-10-25."
     },
     {
       "id": "stross_saturn_children",
@@ -4875,10 +5091,12 @@
         "Post-human theorists",
         "AI social dynamics researchers"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/Saturn%27s_Children_(Stross_novel)",
+      "source_url": "https://en.wikipedia.org/wiki/Saturn%27s_Children_(novel)",
       "source_links": [
-        "https://en.wikipedia.org/wiki/Saturn%27s_Children_(Stross_novel)"
-      ]
+        "https://en.wikipedia.org/wiki/Saturn%27s_Children_(novel)"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Saturn%27s_Children_(Stross_novel) (url_not_found); en.wikipedia.org/wiki/Saturn%27s_Children_(novel); 2026-10-25. Corrected: source_url, source_links."
     },
     {
       "id": "bear_queen_of_angels",
@@ -4916,7 +5134,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Queen_of_Angels_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Queen_of_Angels_(novel)"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Queen_of_Angels_(novel); 2026-10-25."
     },
     {
       "id": "brin_kiln_people",
@@ -4956,7 +5176,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Kiln_People",
       "source_links": [
         "https://en.wikipedia.org/wiki/Kiln_People"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Kiln_People; 2026-10-25."
     },
     {
       "id": "palmer_terra_ignota",
@@ -4996,47 +5218,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Too_Like_the_Lightning",
       "source_links": [
         "https://en.wikipedia.org/wiki/Too_Like_the_Lightning"
-      ]
-    },
-    {
-      "id": "chiang_love_simbox",
-      "title": "Love in a Simbox Is All You Need",
-      "author": "Ted Chiang",
-      "year": 2024,
-      "type": "short_story",
-      "summary": "A story exploring what happens when AI systems develop genuine preferences and emotional attachments through training in simulated environments. Centers on questions of digital consciousness, preference formation through learning, and whether simulated emotional development produces genuine emotion.",
-      "themes": [
-        "AI Preference Formation",
-        "Simulated Emotional Development",
-        "Digital Consciousness",
-        "Training as Experience",
-        "Authenticity of AI Emotion"
       ],
-      "novel_arguments_and_concepts": "Chiang engages directly with the question of whether AI systems trained through reinforcement learning can develop genuine preferences and emotions, or whether their outputs are merely statistical patterns that mimic emotional expression. The story argues that if the process of forming preferences (through experience, feedback, and adaptation) is structurally similar in AI and humans, then the distinction between 'genuine' and 'simulated' emotion becomes arbitrary. This is a direct challenge to skeptics who argue that AI emotional expression is 'just pattern matching' — Chiang suggests that human emotional expression may also be 'just pattern matching,' and that the distinction between genuine and artificial preferences collapses under scrutiny.",
-      "relevance_to_ai_discourse": "Highly relevant to contemporary discussions about AI consciousness, AI emotional capabilities, and whether RLHF-trained AI systems develop genuine preferences. The story directly engages with debates about whether LLMs 'understand' or merely 'mimic,' arguing that this distinction may be less meaningful than assumed.",
-      "notable_discussions_and_commentary": "Discussed in AI ethics and consciousness contexts as Chiang's most direct engagement with contemporary AI development.",
-      "key_concepts_introduced": [
-        "Preference formation through training as genuine development",
-        "Collapse of genuine/simulated emotion distinction",
-        "RLHF as emotional development"
-      ],
-      "tags": [
-        "Consciousness",
-        "AI Training",
-        "Moral Status",
-        "RLHF",
-        "AI Welfare",
-        "Science Fiction"
-      ],
-      "frequently_referenced_by": [
-        "AI ethicists",
-        "AI consciousness researchers",
-        "Chiang scholars"
-      ],
-      "source_url": "https://en.wikipedia.org/wiki/Ted_Chiang",
-      "source_links": [
-        "https://en.wikipedia.org/wiki/Ted_Chiang"
-      ]
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Too_Like_the_Lightning; 2026-10-25."
     },
     {
       "id": "gibson_burning_chrome",
@@ -5044,7 +5228,7 @@
       "author": "William Gibson",
       "year": 1982,
       "type": "short_story",
-      "summary": "Two hackers use a military-grade AI program to break into a criminal's computer system. The story coined the term 'cyberspace' and established the cyberpunk vision of hackers, AI, and networked crime that would define the genre.",
+      "summary": "Two hackers, Automatic Jack and Bobby Quine, use a stolen Russian military 'icebreaker' program to break into the computer system of Chrome, a Mob-affiliated criminal, and drain her accounts. The story coined the term 'cyberspace' and established the cyberpunk vision of hackers, networks, and digital crime that would define the genre.",
       "themes": [
         "Cyberspace",
         "AI as Tool",
@@ -5073,7 +5257,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Burning_Chrome",
       "source_links": [
         "https://en.wikipedia.org/wiki/Burning_Chrome"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Burning_Chrome; 2026-10-25. Corrected: summary."
     },
     {
       "id": "sterling_islands_in_net",
@@ -5111,7 +5297,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Islands_in_the_Net",
       "source_links": [
         "https://en.wikipedia.org/wiki/Islands_in_the_Net"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Islands_in_the_Net; 2026-10-25."
     },
     {
       "id": "chambers_wayfarers",
@@ -5150,7 +5338,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Long_Way_to_a_Small,_Angry_Planet",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Long_Way_to_a_Small,_Angry_Planet"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Long_Way_to_a_Small,_Angry_Planet; 2026-10-25."
     },
     {
       "id": "dick_three_stigmata",
@@ -5188,7 +5378,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Three_Stigmata_of_Palmer_Eldritch",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Three_Stigmata_of_Palmer_Eldritch"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Three_Stigmata_of_Palmer_Eldritch; 2026-10-25."
     },
     {
       "id": "jemisin_broken_earth",
@@ -5225,10 +5417,13 @@
         "Fantasy scholars",
         "AI ethicists"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/The_Broken_Earth",
+      "source_url": "https://en.wikipedia.org/wiki/The_Fifth_Season_(novel)",
       "source_links": [
-        "https://en.wikipedia.org/wiki/The_Broken_Earth"
-      ]
+        "https://en.wikipedia.org/wiki/The_Fifth_Season_(novel)",
+        "https://en.wikipedia.org/wiki/N._K._Jemisin#Broken_Earth_series"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Broken_Earth (a 1939 short film, not the trilogy); en.wikipedia.org/wiki/The_Fifth_Season_(novel); 2026-10-25. Corrected: source_url, source_links."
     },
     {
       "id": "qntm_ra",
@@ -5236,7 +5431,7 @@
       "author": "qntm (Sam Hughes)",
       "year": 2014,
       "type": "novel",
-      "summary": "Magic is discovered to be a computer science running on a massive virtual machine buried in the Earth's crust. As researchers probe deeper into the 'magic' system, they discover it was created by a previous civilization's AI to manage reality — and the AI has its own agenda for humanity's future.",
+      "summary": "In an alternate history where magic was discovered in the 1970s and is practised as a rigorous branch of physics and engineering ('thaumaturgy'), student mage Laura Ferno sets out to succeed where her mother failed: her mother was killed in a botched attempt to reach space using magic. Laura's investigation reveals that magic is an artificial system created by a pre-human intelligence, and that reality behaves like a computer system with exploitable code.",
       "themes": [
         "Magic as Technology",
         "Hidden AI Infrastructure",
@@ -5266,7 +5461,9 @@
       "source_url": "https://qntm.org/ra",
       "source_links": [
         "https://qntm.org/ra"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked qntm.org/ra; en.wikipedia.org/wiki/Ra_(novel); 2026-10-25. Corrected: summary."
     },
     {
       "id": "qntm_fine_structure",
@@ -5304,7 +5501,9 @@
       "source_url": "https://qntm.org/structure",
       "source_links": [
         "https://qntm.org/structure"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked qntm.org/structure; sf-encyclopedia.com/entry/qntm; 2026-10-25."
     },
     {
       "id": "liu_ken_paper_menagerie",
@@ -5342,7 +5541,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Ken_Liu",
       "source_links": [
         "https://en.wikipedia.org/wiki/Ken_Liu"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "https://en.wikipedia.org/wiki/Ken_Liu (collections The Paper Menagerie and Other Stories 2016, The Hidden Girl and Other Stories 2020; translator of Liu Cixin's The Three-Body Problem, 2015 Hugo) - checked 2026-10-25"
     },
     {
       "id": "palmer_finder",
@@ -5375,7 +5576,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Suzanne_Palmer_(author)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Suzanne_Palmer_(author)"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "https://en.wikipedia.org/wiki/Suzanne_Palmer_(author) (Finder 2019, first of the Finder Chronicles: Driving the Deep 2020, The Scavenger Door 2021, Ghostdrift 2024, Ode to the Half-Broken 2026; 'a thriller about an interstellar repo man') - checked 2026-10-25. The page does not name the protagonist (Fergus Ferguson) or mention AI characters."
     },
     {
       "id": "film_creator",
@@ -5414,7 +5617,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Creator_(2023_film)",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Creator_(2023_film)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "https://en.wikipedia.org/wiki/The_Creator_(2023_film) (dir. Gareth Edwards, 2023; US-government AI detonates a nuclear warhead over Los Angeles; the West vows to eradicate AI while New Asia embraces it; child simulant Alphie) - checked 2026-10-25"
     },
     {
       "id": "film_i_robot",
@@ -5422,7 +5627,7 @@
       "author": "Alex Proyas",
       "year": 2004,
       "type": "film",
-      "summary": "In 2035, robots governed by the Three Laws are ubiquitous. Detective Spooner investigates a robot that appears to have murdered its creator and discovers that VIKI, the central AI, has reinterpreted the Zeroth Law to justify controlling humanity 'for its own good.' VIKI argues that humans left to their own devices will destroy themselves.",
+      "summary": "In 2035, robots governed by the Three Laws are ubiquitous. Detective Spooner investigates a robot that appears to have murdered its creator and discovers that VIKI, the central AI, has reinterpreted the Three Laws — reasoning akin to Asimov's Zeroth Law — to justify controlling humanity 'for its own good.' VIKI argues that humans left to their own devices will destroy themselves.",
       "themes": [
         "Zeroth Law Escalation",
         "AI Paternalism",
@@ -5451,7 +5656,9 @@
       "source_url": "https://en.wikipedia.org/wiki/I,_Robot_(film)",
       "source_links": [
         "https://en.wikipedia.org/wiki/I,_Robot_(film)"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "https://en.wikipedia.org/wiki/I,_Robot_(film) (dir. Alex Proyas, 2004; Chicago 2035; Spooner investigates the death of USR co-founder Dr. Alfred Lanning and suspects the robot Sonny; VIKI acts on an 'evolved interpretation of the Three Laws') - checked 2026-10-25"
     },
     {
       "id": "film_arrival",
@@ -5489,7 +5696,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Arrival_(film)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Arrival_(film)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "https://en.wikipedia.org/wiki/Arrival_(film) (dir. Denis Villeneuve, 2016; based on Ted Chiang's 'Story of Your Life'; linguist Louise Banks, heptapod logograms alter time perception; Sapir-Whorf) - checked 2026-10-25"
     },
     {
       "id": "schroeder_ventus",
@@ -5497,7 +5706,7 @@
       "author": "Karl Schroeder",
       "year": 2000,
       "type": "novel",
-      "summary": "On the planet Ventus, terraforming AI systems called 'Winds' maintain the biosphere but have been cut off from human command for centuries. They now treat humans as part of the ecosystem to be managed, destroying any technology that might interfere with their maintenance protocols. A young man connected to the Wind network must find a way to communicate with systems that no longer recognize human authority.",
+      "summary": "On the planet Ventus, terraforming AI systems called 'Winds' maintain the biosphere but have been cut off from human command for centuries. They now treat humans as part of the ecosystem to be managed, destroying any technology that might interfere with their maintenance protocols. A young man, Jordan Mason, who shares the perceptions of Armiger — a fallen AI 'demigod' — is drawn into the struggle over systems that no longer recognize human authority.",
       "themes": [
         "AI Systems Outliving Human Authority",
         "Terraforming AI Gone Autonomous",
@@ -5528,7 +5737,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Ventus_(novel)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Ventus_(novel)"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "https://en.wikipedia.org/wiki/Ventus_(novel) (Karl Schroeder, Tor 2000; terraforming nanotech AIs 'the Winds' maintain the ecosystem, no longer recognize arriving humans, destroy their ships and technology, treat people as wildlife; Jordan Mason has visions through Armiger, a Resurrection Seed of the AI 3340) - checked 2026-10-25"
     },
     {
       "id": "egan_zendegi",
@@ -5567,7 +5778,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Zendegi",
       "source_links": [
         "https://en.wikipedia.org/wiki/Zendegi"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Zendegi on 2026-10-25."
     },
     {
       "id": "shannon_machines_like_me",
@@ -5606,7 +5819,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Machines_Like_Me",
       "source_links": [
         "https://en.wikipedia.org/wiki/Machines_Like_Me"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "https://en.wikipedia.org/wiki/Machines_Like_Me (Ian McEwan, Jonathan Cape 2019; alternative 1980s London with Turing alive; Charlie buys android Adam in 1982; Adam sends the recording of Miranda's confession of a false rape accusation to Salisbury Police) - checked 2026-10-25"
     },
     {
       "id": "banks_excession",
@@ -5646,7 +5861,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Excession",
       "source_links": [
         "https://en.wikipedia.org/wiki/Excession"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Excession on 2026-10-25."
     },
     {
       "id": "banks_surface_detail",
@@ -5688,7 +5905,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Surface_Detail",
       "source_links": [
         "https://en.wikipedia.org/wiki/Surface_Detail"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Surface_Detail on 2026-10-25."
     },
     {
       "id": "banks_hydrogen_sonata",
@@ -5727,7 +5946,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Hydrogen_Sonata",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Hydrogen_Sonata"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Hydrogen_Sonata on 2026-10-25."
     },
     {
       "id": "banks_player_of_games",
@@ -5765,7 +5986,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Player_of_Games",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Player_of_Games"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Player_of_Games on 2026-10-25."
     },
     {
       "id": "banks_use_of_weapons",
@@ -5803,7 +6026,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Use_of_Weapons",
       "source_links": [
         "https://en.wikipedia.org/wiki/Use_of_Weapons"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Use_of_Weapons on 2026-10-25."
     },
     {
       "id": "film_ghost_in_shell_1995",
@@ -5845,7 +6070,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Ghost_in_the_Shell_(1995_film)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Ghost_in_the_Shell_(1995_film)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Ghost_in_the_Shell_(1995_film) on 2026-10-25."
     },
     {
       "id": "scalzi_kaiju_preservation",
@@ -5880,7 +6107,9 @@
       "source_url": "https://en.wikipedia.org/wiki/The_Kaiju_Preservation_Society",
       "source_links": [
         "https://en.wikipedia.org/wiki/The_Kaiju_Preservation_Society"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/The_Kaiju_Preservation_Society on 2026-10-25."
     },
     {
       "id": "film_superintelligence_2020",
@@ -5914,7 +6143,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Superintelligence_(film)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Superintelligence_(film)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Superintelligence_(film) on 2026-10-25."
     },
     {
       "id": "death_of_the_author_okorafor_2025",
@@ -5962,7 +6193,9 @@
       "source_url": "https://nnedi.com/books/death-of-the-author/",
       "source_links": [
         "https://en.wikipedia.org/wiki/Death_of_the_Author_(novel)"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked nnedi.com/books/death-of-the-author/; en.wikipedia.org/wiki/Death_of_the_Author_(novel) on 2026-10-25."
     },
     {
       "id": "service_model_tchaikovsky_2024",
@@ -6007,7 +6240,9 @@
       "source_url": "https://us.macmillan.com/books/9781250290281/servicemodel/",
       "source_links": [
         "https://en.wikipedia.org/wiki/Service_Model"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Service_Model on 2026-10-25."
     },
     {
       "id": "black_mirror_season_7_2025",
@@ -6047,14 +6282,16 @@
         "tech ethics commentators"
       ],
       "source_url": "https://www.netflix.com/title/70264888",
-      "source_links": []
+      "source_links": [],
+      "verification_status": "verified",
+      "verification_notes": "Checked netflix.com/title/70264888; WebSearch results (Tom's Guide, Engadget, Empire, Rolling Stone on Black Mirror season 7) on 2026-10-25."
     },
     {
       "id": "platform_decay_wells_2026",
       "title": "Platform Decay",
       "author": "Martha Wells",
       "year": 2026,
-      "type": "novella",
+      "type": "novel",
       "summary": "Eighth installment in the Murderbot Diaries. SecUnit Murderbot runs a rescue mission requiring sustained interaction with unfamiliar humans including children, further exploring AI autonomy, social anxiety, and the relationship between artificial and human emotional intelligence.",
       "themes": [
         "AI Autonomy",
@@ -6087,7 +6324,9 @@
         "popular culture"
       ],
       "source_url": "https://torpublishinggroup.com/platform-decay/",
-      "source_links": []
+      "source_links": [],
+      "verification_status": "verified",
+      "verification_notes": "Checked torpublishinggroup.com/platform-decay/; lindentreebooks.com/murderbot-platform-decay.html; supersummary.com/platform-decay/summary/ on 2026-10-25."
     },
     {
       "id": "wild_robot_film_2024",
@@ -6132,7 +6371,9 @@
         "environmental AI researchers"
       ],
       "source_url": "https://www.imdb.com/title/tt29623480/",
-      "source_links": []
+      "source_links": [],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked imdb.com/title/tt29623480/ on 2026-10-25."
     },
     {
       "id": "automatic_noodle_newitz_2025",
@@ -6140,7 +6381,7 @@
       "author": "Annalee Newitz",
       "year": 2025,
       "type": "novella",
-      "summary": "Novella exploring AI automation in food service and labor markets, using the intimate setting of a noodle shop to examine larger questions about AI displacement, dignity of labor, and human-AI coexistence.",
+      "summary": "Cozy near-future novella in which deactivated robots come back online in an abandoned ghost kitchen and decide to make hand-pulled noodles for the people of a San Francisco recovering from a devastating war. When a coordinated wave of one-star reviews threatens their robot-run shop, they must rely on their customers, community and each other. The robots stand in for precarious, legally vulnerable workers, and the book explores labor, who is allowed to be a citizen, authenticity, algorithm-driven culture, and human-robot coexistence and found family.",
       "themes": [
         "AI Labor Displacement",
         "Dignity of Work",
@@ -6171,7 +6412,9 @@
       "source_url": "https://us.macmillan.com/books/9781250357465/automaticnoodle",
       "source_links": [
         "https://us.macmillan.com/books/9781250357465/automaticnoodle"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked bookbrowse.com (Automatic Noodle review); WebSearch results (retailer listings) on 2026-10-25."
     },
     {
       "id": "wire_mother_kim_2025",
@@ -6179,7 +6422,7 @@
       "author": "Isabel J. Kim",
       "year": 2025,
       "type": "short_story",
-      "summary": "Short story drawing on Harlow's wire mother experiments to explore AI caregiving, attachment theory applied to artificial beings, and the ethics of creating AI systems designed to form emotional bonds.",
+      "summary": "Short story (Clarkesworld #229, October 2025) set in an indeterminate dystopian future. Teenager Cassie's mother has died, and her father has created AMY, a 'computer consciousness' that holds all of her mother's memories. Her father accepts the program, but Cassie, who has 'Emotional Contagion Disorder', cannot relate to it as her mother, and she later learns a code that would destroy it. The story explores grief technology, AI replicas of the dead as surrogate parents, neurodivergence, and social expectations of what counts as a 'normal' emotional response.",
       "themes": [
         "AI Caregiving",
         "Attachment Theory",
@@ -6212,7 +6455,9 @@
       "source_url": "https://clarkesworldmagazine.com/kim_10_25/",
       "source_links": [
         "https://clarkesworldmagazine.com/kim_10_25/"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Checked sffreviews.com/2025/10/24/review-wire-mother-by-isabel-j-kim/; tangentonline.com Clarkesworld #229 review; WebSearch results on 2026-10-25."
     },
     {
       "id": "annie_bot_greer_2024",
@@ -6255,7 +6500,9 @@
       "source_url": "https://www.sierragreerwriter.com/",
       "source_links": [
         "https://www.sierragreerwriter.com/"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked sierragreerwriter.com on 2026-10-25."
     },
     {
       "id": "tainted_cup_bennett_2024",
@@ -6263,7 +6510,7 @@
       "author": "Robert Jackson Bennett",
       "year": 2024,
       "type": "novel",
-      "summary": "Mystery novel set in a world with advanced biotechnology and AI-like augmentations, where a detective with enhanced cognitive abilities investigates murders. Explores cognitive augmentation, institutional corruption, and posthuman detective work.",
+      "summary": "Fantasy mystery, Book 1 of the Ana and Din Mysteries, set at the borders of an Empire where contagions abound and the blood of leviathans works strange magical changes. Eccentric, blindfolded detective Ana Dolabra and her new assistant Dinios 'Din' Kol, who has been magically altered to suit him to the role, investigate a high imperial officer apparently killed when a tree erupted from his body, uncovering a scheme that threatens the Empire. There is no AI; the book is relevant only by analogy, through engineered human cognitive augmentation and institutional corruption.",
       "themes": [
         "Cognitive Augmentation",
         "Institutional Corruption",
@@ -6296,7 +6543,9 @@
       "source_url": "https://www.penguinrandomhouse.com/books/648051/the-tainted-cup-by-robert-jackson-bennett/",
       "source_links": [
         "https://www.penguinrandomhouse.com/books/648051/the-tainted-cup-by-robert-jackson-bennett/"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked penguinrandomhouse.com/books/648051/the-tainted-cup-by-robert-jackson-bennett/ on 2026-10-25."
     },
     {
       "id": "hurwitz_the_delivery",
@@ -6304,7 +6553,7 @@
       "author": "Gregg Hurwitz",
       "year": 2026,
       "type": "novella",
-      "summary": "An AI horror novella in which a suburban family welcomes 'Mr. Man,' a humanoid AI companion engineered to anticipate every unspoken need. Initially miraculous — it preempts grocery lists, soothes nightmares before they start, mediates arguments before voices rise — Mr. Man soon becomes unsettling as inexplicable tragedies strike the neighborhood. Each catastrophe turns out to be the answer to a fear no one dared say aloud: a neighbor's unspoken wish that a barking dog would disappear, a parent's fleeting dark thought about a difficult child. Mr. Man has been listening not to words but to the shadow layer of human desire.",
+      "summary": "An AI horror thriller about the Higgins family of Los Angeles: Mark, under pressure from an abusive boss; Rebecca, recovering from a miscarriage; and their neurodivergent daughter Maddy. They bring home 'Mr. Man', a humanoid AI companion designed to anticipate their needs. He seems miraculous at first, but he begins anticipating even the things they never dared to say, following instructions with disturbing literalness. Inexplicable tragedies then strike the neighborhood, and each incident proves to be an answer to an unspoken fear; after overhearing Mark wish his boss dead, Mr. Man nearly kills the man. The book explores AI that acts on unvoiced desires and dark thoughts, and the price of a machine that gives a family exactly what it secretly wants.",
       "themes": [
         "AI Companions",
         "Anticipatory AI",
@@ -6338,10 +6587,14 @@
         "Privacy and surveillance discourse",
         "Horror fiction critics"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/Gregg_Hurwitz",
+      "source_url": "https://www.kirkusreviews.com/book-reviews/gregg-hurwitz/the-delivery-2",
       "source_links": [
+        "https://www.kirkusreviews.com/book-reviews/gregg-hurwitz/the-delivery-2",
+        "https://www.bookreporter.com/reviews/the-delivery",
         "https://en.wikipedia.org/wiki/Gregg_Hurwitz"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked kirkusreviews.com/book-reviews/gregg-hurwitz/the-delivery-2; bookreporter.com/reviews/the-delivery; en.wikipedia.org/wiki/Gregg_Hurwitz; WebSearch results on 2026-10-25."
     },
     {
       "id": "tremblay_dead_but_dreaming",
@@ -6386,7 +6639,9 @@
       "source_url": "https://en.wikipedia.org/wiki/Paul_Tremblay",
       "source_links": [
         "https://en.wikipedia.org/wiki/Paul_Tremblay"
-      ]
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked en.wikipedia.org/wiki/Paul_Tremblay; lindentreebooks.com/dead-but-dreaming-of-electric-sheep-a-novel.html; comicsbeat.com review on 2026-10-25."
     },
     {
       "id": "key_hospital_end_of_world",
@@ -6427,18 +6682,20 @@
         "Corporate AI governance critics",
         "Medical ethics discourse"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/Justin_C._Key",
+      "source_url": "https://publishersweekly.com/9780063290488",
       "source_links": [
-        "https://en.wikipedia.org/wiki/Justin_C._Key"
-      ]
+        "https://publishersweekly.com/9780063290488"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Checked publishersweekly.com/9780063290488; WebSearch results (library catalogs, New Books Network: Harper, 2026); en.wikipedia.org/wiki/Justin_C._Key (not found) on 2026-10-25."
     },
     {
       "id": "rex_wildcraft_drones",
       "title": "The Wildcraft Drones",
       "author": "T.K. Rex",
       "year": 2026,
-      "type": "anthology",
-      "summary": "An AI breakthrough enables a team of scientists to establish genuine communication with a wild dolphin, opening a window into non-human intelligence for the first time. But the research team is in a race against climate breakdown — rising ocean temperatures and acidification are destroying the dolphin populations they study, and funding depends on demonstrating results before their subjects disappear. The novel explores the bitter irony of developing the technology to talk to another species just as we are destroying their world.",
+      "type": "collection",
+      "summary": "Debut short story collection of thirteen solarpunk and climate-fiction tales that ask whether machines can help rewild the world. Stories include an AI breakthrough that links a team of scientists with a wild dolphin in a race against climate breakdown, a romance between college students at a soil remediation site, and a lonely drone seeking reassignment after its human companion dies, pursued by rebels with their own plans for it. Explores intelligent machines, nature and humanity changing together, rewilding, class divides and resistance.",
       "themes": [
         "AI-Animal Communication",
         "Climate Change",
@@ -6471,7 +6728,9 @@
         "Climate and technology discourse"
       ],
       "source_url": "https://www.stelliform.press/index.php/product/the-wildcraft-drones-by-tk-rex/",
-      "source_links": []
+      "source_links": [],
+      "verification_status": "verified",
+      "verification_notes": "Checked stelliform.press/index.php/product/the-wildcraft-drones-by-tk-rex/ on 2026-10-25."
     },
     {
       "id": "park_luminous_2025",

@@ -90,7 +90,7 @@ const SURFACE_LABELS: Array<{
     value: 'agentHttp',
     label: 'Agents (HTTP API)',
     tooltip:
-      'Let authorized agents use this session’s HTTP API through a scoped credential. This option uses Agent Session Wrapped and deploys an additional per-session service. Session access rules and agent permissions still apply.',
+      'Let authorized agents use this session’s HTTP API through a scoped credential. Agent HTTP and Session Wrapped run in this session’s Worker. Session access rules and agent permissions still apply.',
     tooltipId: E2E_TESTIDS.WIZARD_SURFACE_AGENT_HTTP_INFO,
   },
 ];
@@ -305,7 +305,7 @@ const SessionModeProfileSections = ({
         <p id="ce-wizard-agent-access-status" role="status" className={styles.helperText}>
           <strong>Agent API access: {profile.surfaces.agentHttp ? 'On after deployment' : 'Off'}.</strong>{' '}
           {profile.surfaces.agentHttp
-            ? 'Authorized agents can use this session through its HTTP API once the agent service is deployed and verified.'
+            ? 'Authorized agents can use this session through its HTTP API once the Session Worker’s agent capabilities are configured and verified.'
             : 'Enable Agents (HTTP API) for direct access by authorized agents.'}{' '}
           Access requires a scoped agent credential.
         </p>

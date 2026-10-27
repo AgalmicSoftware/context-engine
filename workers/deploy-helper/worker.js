@@ -31,6 +31,7 @@ const corsHeaders = (origin, allowList) => new Headers({
   'Access-Control-Allow-Origin': origin && allowList.includes(origin) ? origin : '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  Vary: 'Origin',
 });
 
 const json = (data, status, baseHeaders) => {
@@ -127,7 +128,9 @@ const handleResolvedRequest = async ({ request, env, origin, url, allowListInfo,
     requestOrigin: origin,
     consoleImpl: console,
   });
-  return json(deployResult.body, deployResult.status, headers);
+  const responseHeaders = new Headers(headers);
+  responseHeaders.set('Cache-Control', 'no-store');
+  return json(deployResult.body, deployResult.status, responseHeaders);
 };
 
 export default {
