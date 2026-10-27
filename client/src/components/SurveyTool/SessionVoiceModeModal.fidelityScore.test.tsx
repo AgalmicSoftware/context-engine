@@ -99,11 +99,11 @@ it('shows the person how well their AI predicted them after submitting, in place
   submit();
   const score = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_FIDELITY_SCORE);
   expect(onSubmitResponses).toHaveBeenCalled();
-  expect(score).toHaveTextContent('Your AI matched 1 of 2 of your answers.');
+  expect(score).toHaveTextContent('1 of 2 answers matched');
   // One match, one miss and an exact rating: two of three.
-  expect(score).toHaveTextContent('Mirror Score 67%');
-  expect(score).toHaveTextContent('It was 60% sure you’d agree with: Statement two?');
-  expect(score).toHaveTextContent('Only you can see this');
+  expect(score).toHaveTextContent('67% Mirror Score');
+  expect(score).toHaveTextContent('partial credit for close ratings and allocations');
+  expect(score).toHaveTextContent('Statement two? Your AI guessed: Agree · 60% sure You: Disagree');
   expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument();
   // The footer button stays where it was: same test id, after the score.
   const button = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY);
@@ -157,6 +157,9 @@ it('counts every hidden draft, scored on the answer given before the reveal', as
   const statement = hidden.find((id) => id !== 'r1')!;
   renderModal({ interviewMode: { showFidelityScore: true, hiddenDraftShare: 0.5, shareDraftChangesByDefault: true } });
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  // Sharing that starts on opens the submission info before submitting.
+  const submissionInfo = screen.getByText('AI submission info').closest('details')!;
+  expect(submissionInfo).toHaveAttribute('open');
   // Blind, the person disagrees, then switches to the AI's guess once it is shown.
   answerWith(statement, 'Disagree');
   answerWith(statement, 'Agree');
@@ -164,7 +167,9 @@ it('counts every hidden draft, scored on the answer given before the reveal', as
   submit();
   const score = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_FIDELITY_SCORE);
   // Ratings count too, and the switched statement is a miss.
-  expect(score).toHaveTextContent(`It guessed ${hidden.length - 1} of the ${hidden.length} it couldn’t show you.`);
+  expect(score).toHaveTextContent(`${hidden.length - 1} of ${hidden.length} hidden guesses matched`);
+  // Then folds away, so the score has the room.
+  expect(submissionInfo).not.toHaveAttribute('open');
 });
 
 it('keeps the modal height and footer while the score shows, and moves focus to it', async () => {

@@ -67,7 +67,8 @@ export const withoutAiDraft = (edited: InterviewDraftResponse, savedComment = ''
   };
 };
 
-const describeAnswer = (answer: unknown, question?: InterviewQuestion): string => {
+/** An answer as people read it: "Agree", "Parks, Transit", "7 of 10". */
+export const describeInterviewAnswer = (answer: unknown, question?: InterviewQuestion): string => {
   if (question?.type === 'quadratic' && Array.isArray(answer)) {
     const votes = question.options
       .map((option, index) => ({ option, votes: Number(answer[index]) || 0 }))
@@ -87,7 +88,7 @@ export const describeInterviewGuess = (draft: InterviewDraftResponse, question?:
     first.confidence === undefined || !Number.isFinite(confidence)
       ? ''
       : ` · ${Math.round(Math.max(0, Math.min(1, confidence)) * 100)}% sure`;
-  return `Your AI guessed: ${describeAnswer(first.answer, question)}${sure}`;
+  return `Your AI guessed: ${describeInterviewAnswer(first.answer, question)}${sure}`;
 };
 
 type ReviewValues = {

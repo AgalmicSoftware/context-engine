@@ -1,7 +1,7 @@
 // Laid out like a review card, so the score reads as part of the same review.
 .score {
   display: grid;
-  gap: 10px;
+  gap: 14px;
   padding: 16px;
   border: 1px solid var(--ce-card-border);
   border-radius: 14px;
@@ -15,10 +15,28 @@
   }
 }
 
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.intro {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 6px;
+  min-width: 0;
+
+  p {
+    color: var(--ce-panel-text-muted);
+    font-size: 0.9rem;
+  }
+}
+
 .title {
   margin: 0;
   color: var(--ce-panel-text);
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 850;
 }
 
@@ -27,14 +45,166 @@
   outline: none;
 }
 
-.misses {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding-left: 18px;
+.kicker,
+.mirror {
+  color: var(--ce-panel-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.privacy {
-  color: color-mix(in srgb, var(--ce-panel-text) 78%, transparent);
-  font-size: 0.9rem;
+// The Mirror Score as a ring in the session's accent color.
+.mirror {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: center;
+  gap: 4px;
+}
+
+.ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+
+  svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  strong {
+    color: var(--ce-panel-text);
+    font-size: 1.35rem;
+    font-weight: 850;
+    letter-spacing: 0;
+  }
+}
+
+.ringTrack,
+.ringValue {
+  fill: none;
+  stroke-width: 3.5;
+}
+
+.ringTrack {
+  stroke: color-mix(in srgb, var(--ce-panel-text) 14%, transparent);
+}
+
+.ringValue {
+  stroke: var(--ce-session-accent);
+  stroke-linecap: round;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.stat {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ce-panel-text) 4%, transparent);
+
+  strong {
+    font-size: 1.15rem;
+    font-weight: 850;
+  }
+}
+
+.statLabel {
+  color: var(--ce-panel-text-muted);
+  font-size: 0.85rem;
+}
+
+.bar {
+  display: block;
+  height: 6px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ce-panel-text) 14%, transparent);
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--ce-session-accent);
+    transform-origin: left;
+  }
+}
+
+.misses {
+  display: grid;
+  gap: 8px;
+
+  ul {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid var(--ce-card-border);
+    border-radius: 10px;
+  }
+}
+
+.prompt {
+  flex-basis: 100%;
+  font-weight: 700;
+}
+
+// A pill on one line, a rounded box when a long guess wraps.
+.guess,
+.answer {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+
+.guess {
+  background: color-mix(in srgb, var(--ce-session-accent) 16%, transparent);
+}
+
+.answer {
+  border: 1px solid var(--ce-card-border);
+}
+
+// The ring and bars fill in once, unless the person prefers less motion.
+@media (prefers-reduced-motion: no-preference) {
+  .ringValue {
+    animation: fill-ring 700ms ease-out both;
+  }
+
+  .bar span {
+    animation: fill-bar 700ms ease-out both;
+  }
+}
+
+@keyframes fill-ring {
+  from {
+    stroke-dasharray: 0 100;
+  }
+}
+
+@keyframes fill-bar {
+  from {
+    transform: scaleX(0);
+  }
 }

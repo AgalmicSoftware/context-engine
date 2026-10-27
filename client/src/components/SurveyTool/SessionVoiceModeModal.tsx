@@ -1060,6 +1060,7 @@ function SessionInterviewPanel({
   const scoreScreenShown = Boolean(submitSucceeded && fidelityScore);
   useEffect(() => {
     onScoreScreenChange(scoreScreenShown);
+    if (scoreScreenShown) setSubmissionInfoOpen(false); // Settled choices fold away to give the score room.
   }, [onScoreScreenChange, scoreScreenShown]);
   const hasTranscript = !isInterviewBusy && Boolean(transcript.trim());
   const startLabel = interviewOpening.loading

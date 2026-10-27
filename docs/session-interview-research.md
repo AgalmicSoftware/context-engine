@@ -105,7 +105,8 @@ misses. It is worked out in the browser from the submitted drafts and answers
 (`summarizeParticipantFidelity` in `shared/agentFidelity.mjs`); nothing new is
 stored or sent. Voice drafts restate what the person just said, so they aren't
 scored. The modal keeps its height and footer while the score shows, so the
-button that becomes **View results** stays in place.
+button that becomes **View results** stays in place, and folds the AI
+submission info away to give the score room.
 
 The disclosure panel stays within the interview footer width and wraps its text,
 including long model identifiers and question-set hashes.
