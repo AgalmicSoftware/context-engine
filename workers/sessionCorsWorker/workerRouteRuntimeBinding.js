@@ -210,6 +210,8 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
     deps: {
       log: deps?.log,
       fetch: deps?.fetch,
+      safeFetch: deps?.safeFetch,
+      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
       toStr: deps?.toStr,
       corsHeaders: deps?.corsHeaders,
       json: deps?.json,

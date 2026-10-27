@@ -242,6 +242,8 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
         assert.deepEqual(value.deps, {
           log,
           fetch: 'fetch',
+          safeFetch: 'safeFetch',
+          isBlockedOutboundUrl: 'isBlockedOutboundUrl',
           toStr: 'toStr',
           corsHeaders: 'corsHeaders',
           json: 'json',

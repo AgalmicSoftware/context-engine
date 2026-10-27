@@ -189,6 +189,9 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             getCorsContext: deps?.getCorsContext,
             ...(routeSelection.kind === 'interview-starter' ? {
               getSessionSecrets: deps?.getSessionSecrets,
+              safeFetch: deps?.safeFetch,
+              isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
+              log: deps?.log,
               evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
             } : {}),
             resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,

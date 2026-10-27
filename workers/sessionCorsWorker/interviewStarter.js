@@ -52,6 +52,9 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
       openrouter: deps.proxyOpenRouter || proxyOpenRouter, custom: deps.proxyCustomRPC || proxyCustomRPC,
     };
     if (!proxies[provider]) throw new Error('Configured AI provider is unavailable for interview openings.');
+    const keyName = { openai: 'openaiKey', anthropic: 'anthropicKey', openrouter: 'openrouterKey', custom: 'customRpcKey' }[provider];
+    if (!String(secrets?.[keyName] || '').trim())
+      throw new Error(`Interview opening requires the session's ${keyName} for the configured ${provider} model.`);
     const result = await proxies[provider]({
       secrets,
       config,
@@ -59,6 +62,7 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
       deps: {
         ...deps,
         fetch: (url, options) => (deps.fetch || fetch)(url, { ...options, signal: AbortSignal.timeout(10000) }),
+        safeFetch: deps.safeFetch && ((url, options) => deps.safeFetch(url, { ...options, signal: AbortSignal.timeout(10000) })),
       },
       payload: {
         model,
