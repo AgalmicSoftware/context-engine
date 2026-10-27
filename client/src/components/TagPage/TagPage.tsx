@@ -1178,7 +1178,7 @@ export const TagPageView = ({
     const prompt = buildTagInterpretationPromptUntyped({ selectedTags, questions });
 
     try {
-      const result = await callAI(prompt, { sessionSlug: effectiveSingleScopeSlug });
+      const result = await callAI(prompt, { sessionSlug: effectiveSingleScopeSlug, taskType: 'categorize' });
       if (aiRequestKeyRef.current !== aiCacheKey) return;
 
       const nextInterpretation = String(result || '').trim() || 'No interpretation generated.';

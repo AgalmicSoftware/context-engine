@@ -62,7 +62,7 @@ describe('aiClient worker auth options', () => {
     expect(body).not.toHaveProperty('apiKey');
     expect(body).not.toHaveProperty('tools');
     expect(body).not.toHaveProperty('functions');
-    if (feature === 'rewrite') expect(body.taskType).toBe('rewrite');
+    expect(body.taskType).toBe(feature === 'rewrite' ? 'rewrite' : 'summarize');
     expect(getEffectiveAiConfig).toHaveBeenCalledWith(
       expect.objectContaining({ sessionSlug: 'fixture', thinking: feature === 'audio-summary' }),
     );
@@ -602,5 +602,6 @@ describe('aiClient worker auth options', () => {
         sessionSlug: 'general3',
       }),
     );
+    expect(JSON.parse(fetchWorkerWithAuth.mock.calls[0][1].body).taskType).toBe('compare');
   });
 });

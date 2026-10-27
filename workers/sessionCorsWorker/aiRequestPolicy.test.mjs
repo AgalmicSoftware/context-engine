@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { proxyOpenAI, proxyAnthropic, proxyOpenRouter, proxyCustomRPC } from './aiProviderExecution.js';
 import { transcribe } from './transcribeExecution.js';
+import { boundSessionAiRequest } from './aiRequestPolicy.js';
 import { normalizeTranscribeRequestPayload } from './transcribeRequestNormalization.js';
 
 const adapters = [
@@ -10,7 +11,7 @@ const adapters = [
   ['openrouter', proxyOpenRouter, 'openai/gpt-4o-mini', 'openai/gpt-5', 'openrouterKey'],
   ['custom', proxyCustomRPC, 'configured-model', 'other-model', 'customRpcKey'],
 ];
-const configFor = (provider, model) => ({ ai: { mode: provider, models: { fast: model, thinking: model } } });
+const configFor = (provider, model) => ({ ai: { mode: provider, models: { fast: model, thinking: 'configured-thinking-model' } } });
 const invoke = async (adapter, payload = {}, config) => {
   const [provider, proxy, model, , secret] = adapter;
   const calls = [];
@@ -67,7 +68,8 @@ for (const adapter of adapters) {
   test(`${provider}: feature ceilings preserve generation, report, interview and photo requests`, async () => {
     for (const [taskType, requested, expected] of [
       ['generate', 32568, 16000], ['analysis', 7000, 7000], ['interview-map', 8000, 8000],
-      ['summarize', 1200, 1200], ['interview-opening', 600, 600], ['rewrite', 64000, 2048], ['rank', 64000, 2048],
+      ['summarize', 1200, 1200], ['interview-opening', 600, 600], ['rewrite', 64000, 16000], ['rank', 64000, 16000], ['summarize', 32568, 16000],
+      ['compare', 16384, 16000], ['categorize', 16384, 16000], ['unknown-task', 64000, 2048],
     ]) {
       const { calls } = await invoke(adapter, { taskType, max_output_tokens: requested });
       assert.equal(calls[0].body.max_tokens, expected, taskType);
@@ -148,3 +150,23 @@ test('transcription accepts only the configured session model and leaves BYO unc
     }
   }
 });
+
+for (const [provider, model] of [['openrouter', 'openai/gpt-5'], ['openrouter', 'deepseek/deepseek-r1'], ['custom', 'deepseek-r1'], ['custom', 'owner-reasoner']]) {
+  test(`${provider}: the configured thinking model gets a reasoning budget regardless of its name (${model})`, async () => {
+    const adapter = adapters.find(([name]) => name === provider);
+    const config = configFor(provider, adapter[2]);
+    config.ai.models.thinking = model;
+    for (const [requested, expected] of [[64000, 16000], [700, 700]]) {
+      const payload = { model, thinking: false, max_tokens: requested, reasoning_effort: 'high' };
+      const bounded = boundSessionAiRequest({ provider, payload, config });
+      assert.equal(bounded.payload.thinking, true, 'The saved model selection, not a caller flag, determines reasoning');
+      assert.equal(bounded.payload.reasoning_effort, 'low');
+      const { response, calls } = await invoke(adapter, payload, config);
+      assert.equal(response.status, 200);
+      assert.equal(calls[0].body.max_completion_tokens, expected);
+      assert.equal(calls[0].body.max_tokens, undefined);
+    }
+    const photo = await invoke(adapter, { model, taskType: 'summarize', max_tokens: 1200 }, config);
+    assert.equal(photo.calls[0].body.max_completion_tokens, 1200, 'A smaller caller bound still wins');
+  });
+}

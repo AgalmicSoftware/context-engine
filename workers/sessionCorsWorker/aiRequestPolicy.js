@@ -3,7 +3,7 @@ import { isChatReasoningModel, usesOpenAiResponsesApi } from './aiModelParams.js
 
 const trim = (value) => typeof value === 'string' ? value.trim() : '';
 const record = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-const tasks = new Set(['generate', 'rewrite', 'summarize', 'rank', 'analysis', 'interview-map', 'interview-opening']);
+const tasks = new Set(['generate', 'rewrite', 'summarize', 'rank', 'analysis', 'compare', 'categorize', 'interview-map', 'interview-opening']);
 const taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : '';
 const modelEntry = (entry, provider, fallback = DEFAULT_AI_MODEL) => {
   const obj = record(entry);
@@ -43,7 +43,12 @@ export const isSessionTranscriptionModelAllowed = ({ config, provider, model }) 
 
 // These are per-call ceilings, not allowances. Labels are caller-controlled but
 // can select only these bounded operations, never a caller-supplied maximum.
-const operationCeilings = Object.freeze({ generate: 16000, analysis: 7000, 'interview-map': 8000, 'interview-opening': 600 });
+// Built-ins using the common 16,384-token (Anthropic 32,568) transport
+// default retain up to 16,000; reports and interview tasks keep smaller bounds.
+const operationCeilings = Object.freeze({
+  generate: 16000, rewrite: 16000, summarize: 16000, rank: 16000, compare: 16000, categorize: 16000,
+  analysis: 7000, 'interview-map': 8000, 'interview-opening': 600,
+});
 const tokenFields = ['max_tokens', 'max_completion_tokens', 'max_output_tokens', 'max_tokens_to_sample', 'maxTokens'];
 const effortOrder = ['none', 'minimal', 'low', 'medium', 'high'];
 const configuredFunctions = (config) => {
@@ -62,7 +67,8 @@ export const boundSessionAiRequest = ({ payload = {}, provider, config, requestK
   const model = trim(payload.model) || (models.feature?.provider === provider ? models.feature.model : allowed[0]?.model);
   if (!model || !allowed.some((entry) => entry.model === model)) return { ok: false, ...AI_MODEL_NOT_ALLOWED };
 
-  const reasoning = isChatReasoningModel({ model });
+  const reasoning = isChatReasoningModel({ model }) ||
+    (models.thinking.provider === provider && models.thinking.model === model);
   const responses = usesOpenAiResponsesApi({ provider, model, endpoint: payload.endpoint });
   const ceiling = operationCeilings[task] || (reasoning || responses ? 16000 : 2048);
   const requested = tokenFields.filter((key) => Object.hasOwn(payload, key)).map((key) => {

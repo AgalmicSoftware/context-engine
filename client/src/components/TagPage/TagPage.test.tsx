@@ -1033,7 +1033,10 @@ describe('TagPage', () => {
         },
       ],
     });
-    expect(mockCallAI).toHaveBeenCalledWith(expectedPrompt, expect.objectContaining({ sessionSlug: '' }));
+    expect(mockCallAI).toHaveBeenCalledWith(
+      expectedPrompt,
+      expect.objectContaining({ sessionSlug: '', taskType: 'categorize' }),
+    );
     expect(await screen.findByText('Mocked interpretation')).toBeInTheDocument();
   });
 

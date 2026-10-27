@@ -841,8 +841,8 @@ test('Results generation passes saved model authority to the real provider and r
   });
   assert.equal(result.ok, true, result.error);
   assert.equal(body.model, 'gpt-4o-mini');
-  assert.equal(body.max_tokens, 6000);
-  assert.equal(body.max_completion_tokens, undefined);
+  assert.equal(body.max_completion_tokens, 6000);
+  assert.equal(body.max_tokens, undefined);
   assert.equal(body.service_tier, 'default');
   assert.equal(body.tools, undefined);
   assert.deepEqual(result.value, { summary: 'Synthetic report' });

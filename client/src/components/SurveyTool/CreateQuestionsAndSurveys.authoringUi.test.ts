@@ -67,7 +67,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     await instance.suggestTagsForQuestion(0);
     expect(call).toHaveBeenCalledWith(
       expect.stringContaining('How should decisions be made?'),
-      expect.objectContaining({ sessionSlug: 'fixture' }),
+      expect.objectContaining({ sessionSlug: 'fixture', taskType: 'categorize' }),
     );
     const options = call.mock.calls[0][1] as Record<string, unknown>;
     expect(options).not.toHaveProperty('model');

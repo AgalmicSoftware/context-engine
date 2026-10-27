@@ -2736,10 +2736,13 @@ Signed login/bootstrap requests:
     legacy `ai.model`, or the named built-in task in `ai.models`. Missing text
     settings use the shared text-model default. Other models receive HTTP 403
     with `reason: ai_model_not_allowed` before a provider call.
-  - Per-call output ceilings are 2,048 for ordinary chat and 16,000 for reasoning
-    models or Responses. Built-in task exceptions are `generate`: 16,000 (up to
-    50 question drafts), `analysis`: 7,000 (HTML report sections and Worker
-    Results), `interview-map`: 8,000, and `interview-opening`: 600. The smallest
+  - Per-call output ceilings are 2,048 for unlabelled ordinary chat and 16,000
+    for reasoning models or Responses. The session's configured thinking model
+    is treated as reasoning regardless of its name or provider. Built-in tasks
+    `generate`, `rewrite`, `summarize` (including audio discussions), `rank`,
+    `compare`, and `categorize` each allow up to 16,000 tokens. Smaller fixed
+    ceilings are `analysis`: 7,000 (HTML report sections and Worker Results),
+    `interview-map`: 8,000, and `interview-opening`: 600. The smallest
     valid requested value among `max_tokens`, `max_completion_tokens`,
     `max_output_tokens`, `max_tokens_to_sample`, and `maxTokens` is used, bounded
     by that ceiling. Invalid values cannot remove the ceiling. Task labels can

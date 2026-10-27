@@ -2992,7 +2992,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         defaultTagsForAI,
       );
 
-      const rawResponse = await callAI(prompt, this.buildAiRequestOptions());
+      const rawResponse = await callAI(prompt, { ...this.buildAiRequestOptions(), taskType: 'categorize' });
       const match = rawResponse.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('No JSON object found in AI response for tags.');
       const parsedResponse = JSON.parse(match[0]);
