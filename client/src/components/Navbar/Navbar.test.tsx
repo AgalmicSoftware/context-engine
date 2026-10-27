@@ -238,11 +238,12 @@ describe('Navbar logo navigation', () => {
     [768, 80, null],
     [465, 70, 0.9],
   ])('shares the signed-out logo geometry across both states below %spx', (breakpoint, size, scale) => {
+    // Theme-scoped media rules do not replace these shared breakpoint defaults.
     const responsiveLogo = [
       ...compiledNavbarStylesheet.matchAll(
         new RegExp(
-          `@media \\(max-width: ${breakpoint}px\\)\\s*\\{\\s*#navbarContainer,\\s*#navbarContainerLoggedIn\\s*\\{([^}]+)\\}`,
-          'g',
+          `^@media \\(max-width: ${breakpoint}px\\)\\s*\\{\\s*#navbarContainer,\\s*#navbarContainerLoggedIn\\s*\\{([^}]+)\\}`,
+          'gm',
         ),
       ),
     ].at(-1)?.[1];

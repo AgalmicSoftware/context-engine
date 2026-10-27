@@ -186,6 +186,37 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByText('My unsaved edit')).not.toBeInTheDocument();
   });
 
+  it('retains edits for the same packet but starts a new review for replacement evidence', async () => {
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      source: { platform: 'other' as const, modelId: 'fixture', verification: 'self_reported' as const },
+      responderContext: {},
+      responses: [{ questionId: 'q1', answer: 'First imported answer', confidence: 0.8 }],
+    };
+    const props = { ...baseProps, mode: 'interview' as const, prefillPacket };
+    const view = render(<SessionVoiceModeModal {...props} />);
+    await editReadableDraftText('Draft answer for What matters?', 'My retained edit');
+    view.rerender(<SessionVoiceModeModal {...props} isOpen={false} />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    view.rerender(<SessionVoiceModeModal {...props} prefillPacket={{ ...prefillPacket }} />);
+    await expectReadableDraftText('Draft answer for What matters?', 'My retained edit');
+    view.rerender(<SessionVoiceModeModal {...props} isOpen={false} />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    view.rerender(
+      <SessionVoiceModeModal
+        {...props}
+        prefillPacket={{
+          ...prefillPacket,
+          responses: [{ questionId: 'q1', answer: 'Replacement answer', confidence: 0.8 }],
+        }}
+      />,
+    );
+    await expectReadableDraftText('Draft answer for What matters?', 'Replacement answer');
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+    expect(mockedMapInterviewEvidenceToResponses).not.toHaveBeenCalled();
+  });
+
   it('reports unusable voice context before starting the recorder', async () => {
     render(
       <SessionVoiceModeModal
@@ -1194,7 +1225,7 @@ describe('SessionVoiceModeModal', () => {
     const stop = jest.fn(async () => ({ transcript: 'Responder: Synthetic retained answer.', turns: [] }));
     mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
       options.onRecordingState?.('recording');
-      options.onTranscript?.('Responder: Synthetic retained answer.');
+      options.onTranscript?.('Responder: Synthetic retained answer.', []);
       return {
         mediaStream: { getTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream,
         pause: jest.fn(),

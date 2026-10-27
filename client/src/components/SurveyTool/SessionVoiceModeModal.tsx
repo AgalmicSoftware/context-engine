@@ -1267,6 +1267,10 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [interviewVersion, setInterviewVersion] = useState(0);
   const [discardedPrefill, setDiscardedPrefill] = useState<InterviewPrefillPacket | null>(null);
+  const prefillPacket = props.prefillPacket === discardedPrefill ? null : props.prefillPacket;
+  // Closing retains this review, but importing different evidence starts a new
+  // review. Equivalent packet objects must not erase the participant's edits.
+  const prefillIdentity = useMemo(() => JSON.stringify(prefillPacket || null), [prefillPacket]);
   const onInterviewProgressChange = props.onInterviewProgressChange;
   useEffect(() => {
     onInterviewProgressChange?.(hasUnsavedReview);
@@ -1290,9 +1294,9 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         {mode === 'interview' ? (
           <>
             <SessionInterviewPanel
-              key={interviewVersion}
+              key={`${interviewVersion}:${prefillIdentity}`}
               {...props}
-              prefillPacket={props.prefillPacket === discardedPrefill ? null : props.prefillPacket}
+              prefillPacket={prefillPacket}
               onClose={requestClose}
               questions={questions}
               onReviewStateChange={setHasUnsavedReview}

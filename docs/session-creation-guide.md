@@ -1214,7 +1214,9 @@ interview. Its idle appearance matches the adjacent controls; an interview in pr
 keeps the microphone emphasized even after closing the modal. Closing stops audio
 capture and retains the transcript and review edits on the current page. Reopen to
 continue, submit, or explicitly discard the interview. Reloading or leaving the page
-clears this in-memory interview; closing does not submit responses. On small screens,
+clears this in-memory interview; closing does not submit responses. Importing a different
+prefill packet starts a new review, while reopening the same packet retains review edits.
+On small screens,
 Submit and Clear stay beside the menu and microphone. Submit and its pending count
 retain full-size text on phones. When the controls need more
 width, the navigation arrows wrap onto a right-aligned row below, with extra vertical
