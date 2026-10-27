@@ -82,7 +82,7 @@ test('artifact verification binds tarball, version, complete local bundle inputs
   assert.throws(() => collectInputs(root, { inputs: { 'private/fixture.mjs': {} } }), /unsupported/);
   assert.throws(() => collectInputs(root, { inputs: { '../fixture.mjs': {} } }));
   git('init', '-q'); git('add', '.');
-  git('-c', 'user.name=Fixture', '-c', 'user.email=[redacted-email]', 'commit', '-qm', 'fixture');
+  git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', 'commit', '-qm', 'fixture');
   const commit = git('rev-parse', 'HEAD');
   write('source.tgz', archive());
   const directory = join(root, 'output');
