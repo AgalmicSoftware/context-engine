@@ -69,4 +69,3 @@ export const buildWorkerThirdPartyNotices = ({ rootDir, metafile }) => {
   }
   return `# Third-party notices\n\nGenerated from Worker bundle inputs. These packages retain their own licenses.\n\n${notices.sort().join('\n\n---\n\n')}\n`;
 };
-
