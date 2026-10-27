@@ -1,6 +1,6 @@
 # Third-party notices
 
-Generated from the Session Worker bundle inputs. These packages retain their own licenses.
+Generated from Worker bundle inputs. These packages retain their own licenses.
 
 ## @adraffy/ens-normalize@1.10.1
 

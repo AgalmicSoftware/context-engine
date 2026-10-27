@@ -5,12 +5,12 @@
   "generator": "scripts/cloudflare-session-template.mjs",
   "files": {
     "worker.mjs": {
-      "bytes": 3616258,
-      "sha256": "8afc874fc2230557a6a2092830be6880a4cc7ee3df582b262a3ab05abde1528e"
+      "bytes": 3633779,
+      "sha256": "47836f8b0ebd27da48e0e540366a3e9374e0f28fa1a1268d5fa1d1d8b04103ee"
     },
     "wrangler.jsonc": {
       "bytes": 951,
-      "sha256": "d99ed5c9fb68b0d5ce6a0d87a4dd37a3b4fd84661b298a2a71cfcbaac904c4c3"
+      "sha256": "fbbe2196e501e74ff99d79a143e8059e8a53f4295025616fa9b84511110cb636"
     },
     "package.json": {
       "bytes": 1431,
@@ -29,9 +29,9 @@
       "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
     },
     "THIRD_PARTY_NOTICES.md": {
-      "bytes": 11152,
-      "sha256": "274c5794cbdcb22026420032a819629271f3d6212e0591e0ef57102d008a32a2"
+      "bytes": 11140,
+      "sha256": "c42f8978b12334dff7d62f1767182b734be990ad9e5abb960b8e819306166330"
     }
   },
-  "packageSha256": "b8b663e308609bf2ac99247a059d8ec6c5dad1b38224a3c70393a70b63310e6b"
+  "packageSha256": "6954cb0e4897c69fab06edc5b15501ed29266f68d2a12134beab44af7fc36dd6"
 }

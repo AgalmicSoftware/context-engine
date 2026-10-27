@@ -27587,13 +27587,9 @@ var init_deployHelperCore = __esm({
       const cloudflareApiBaseUrl = resolveCloudflareApiBaseUrl({ apiBaseUrl, env });
       let resp;
       try {
-        resp = await fetchImpl(`${cloudflareApiBaseUrl}${path}`, {
-          ...options,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            ...options.headers || {}
-          }
-        });
+        const headers = new Headers({ Authorization: `Bearer ${token}` });
+        new Headers(options.headers).forEach((value, name) => headers.set(name, value));
+        resp = await fetchImpl(`${cloudflareApiBaseUrl}${path}`, { ...options, headers });
       } catch (err) {
         return {
           ok: false,
@@ -64118,7 +64114,7 @@ var init_storageRouteExecution = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupLifecycle.js
-var BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStateKey, backupImportStagePrefix, fail, backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJournal, assertNoActiveBackupImport, cleanup, readActiveBackupImport, controlCoordinatorBackupImport;
+var BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStateKey, backupImportStagePrefix, fail, backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJournal, clearBackupImportMetadata, cleanupCompletedBackupImport, assertNoActiveBackupImport, cleanup, readActiveBackupImport, controlCoordinatorBackupImport;
 var init_sessionBackupLifecycle = __esm({
   "workers/sessionCorsWorker/sessionBackupLifecycle.js"() {
     init_sessionSlugResolution();
@@ -64141,6 +64137,37 @@ var init_sessionBackupLifecycle = __esm({
         await storage.delete(name);
       }
       return { complete: rows.size < 100, operations: rows.size * 2 + 1 };
+    };
+    clearBackupImportMetadata = async (storage, archiveId) => {
+      const rows = await storage.list({ prefix: `${backupImportStateKey(archiveId)}:`, limit: 200 });
+      for (const [key] of rows) await storage.delete(key);
+      return rows.size < 200;
+    };
+    cleanupCompletedBackupImport = async (coordinator, slug, archiveId, progress, budget) => {
+      const { storage } = coordinator.state;
+      if (budget && budget.remaining < 32) return false;
+      const groups = await coordinateWorkerGroupBackup({
+        env: coordinator.env,
+        slug,
+        sessionId: progress.manifest.sessionId,
+        operation: "finish",
+        archiveId
+      });
+      if (!groups.ok) throw Object.assign(new Error(groups.error || "Group restore completion is unavailable."), { status: groups.status || 503 });
+      if (!groups.complete) return false;
+      const rawIndex = getStorageIndexBinding(coordinator.env);
+      const index = budget ? budget.wrap(rawIndex) : rawIndex;
+      const limit = Math.min(100, budget ? budget.remaining - 8 : 100);
+      const staged = await index.list({ prefix: backupImportStagePrefix(slug, archiveId), limit });
+      if (!Array.isArray(staged.keys)) throw new Error("Restore cleanup storage could not be read.");
+      for (const { name } of staged.keys) await index.delete(name);
+      if (staged.list_complete === false || !await clearBackupImportMetadata(storage, archiveId)) return false;
+      await storage.transaction(async (transaction) => {
+        await transaction.put("session-backup-import-completion", { archiveId, completedAt: coordinator.now(), counts: progress.counts });
+        await transaction.delete(backupImportStateKey(archiveId));
+        await transaction.delete(BACKUP_IMPORT_ACTIVE_KEY);
+      });
+      return true;
     };
     assertNoActiveBackupImport = async (coordinator) => {
       const { storage } = coordinator.state;
@@ -64191,7 +64218,11 @@ var init_sessionBackupLifecycle = __esm({
       const archiveId = await storage.get(BACKUP_IMPORT_ACTIVE_KEY);
       if (!archiveId) return null;
       const progress = await storage.get(backupImportStateKey(archiveId));
-      if (!progress || progress.finished) return null;
+      if (!progress) return null;
+      if (progress.finished) {
+        if (await cleanupCompletedBackupImport(coordinator, slug, archiveId, progress, budget)) return null;
+        return { archiveId, progress };
+      }
       const expired = !Number.isFinite(progress.expiresAt) || progress.expiresAt <= coordinator.now();
       if (cleanExpired && (expired || progress.abandoning) && !progress.configPublished) {
         if (await cleanup(coordinator, slug, archiveId, progress, budget)) return null;
@@ -64212,7 +64243,7 @@ var init_sessionBackupLifecycle = __esm({
         archiveId: active.archiveId,
         inProgress: true,
         canAbandon: !active.progress.configPublished,
-        cleaning: active.progress.abandoning === true,
+        cleaning: active.progress.abandoning === true || active.progress.finishing === true || active.progress.finished === true,
         expiresAt: active.progress.expiresAt
       } : null });
     };
@@ -64220,7 +64251,7 @@ var init_sessionBackupLifecycle = __esm({
 });
 
 // workers/sessionCorsWorker/sessionDiagnostics.js
-var DAY_MS, STORE_PREFIX, CURSOR_PREFIX, SWEEP_KEY, REGISTERED_KEY, PAGE_SIZE, SWEEP_SIZE, HASH, json2, unavailable, invalidCursor, opaqueCursor, indexStub, scheduleSweep, registerUploadReceiptStore, dispatchUploadReceiptIndex, sweepUploadReceiptIndex, readSessionDiagnosticsAuthority, readUploadReceiptDiagnostics;
+var DAY_MS, STORE_PREFIX, CURSOR_PREFIX, SWEEP_KEY, REGISTERED_KEY, REGISTRATION_RETRY_KEY, REGISTRATION_BACKOFF_MS, REGISTRATION_TIMEOUT_MS, PAGE_SIZE, SWEEP_SIZE, HASH, json2, unavailable, invalidCursor, opaqueCursor, indexStub, scheduleSweep, registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispatchUploadReceiptIndex, sweepUploadReceiptIndex, readSessionDiagnosticsAuthority, readUploadReceiptDiagnostics;
 var init_sessionDiagnostics = __esm({
   "workers/sessionCorsWorker/sessionDiagnostics.js"() {
     init_deployHelperCore();
@@ -64231,6 +64262,9 @@ var init_sessionDiagnostics = __esm({
     CURSOR_PREFIX = "upload-receipt-cursor-v1:";
     SWEEP_KEY = "upload-receipt-store-sweep-v1";
     REGISTERED_KEY = "upload-receipt-indexed-until-v1";
+    REGISTRATION_RETRY_KEY = "upload-receipt-index-retry-v1";
+    REGISTRATION_BACKOFF_MS = 6e4;
+    REGISTRATION_TIMEOUT_MS = 250;
     PAGE_SIZE = 25;
     SWEEP_SIZE = 100;
     HASH = /^[a-f0-9]{64}$/;
@@ -64257,20 +64291,48 @@ var init_sessionDiagnostics = __esm({
       if ((!current || current > at) && storage.setAlarm) await storage.setAlarm(at);
     };
     registerUploadReceiptStore = async (coordinator, identity) => {
-      if (!identity) return;
-      if (!HASH.test(identity.owner || "") || !resolveCoordinatorSessionSlugStorageKey(identity.slug)) throw unavailable();
       const now = coordinator.now();
       const storage = coordinator.state.storage;
-      if (Number(await storage.get(REGISTERED_KEY)) > now) return;
-      const stub = await indexStub(coordinator.env, identity.slug);
-      if (!stub) throw unavailable();
-      const response3 = await stub.fetch("https://session-coordinator.internal/upload-receipts/index/register", {
-        method: "POST",
-        body: JSON.stringify({ owner: identity.owner })
+      const pending = await storage.transaction(async (transaction) => {
+        const retry = await transaction.get(REGISTRATION_RETRY_KEY);
+        const target = identity || retry?.identity;
+        if (!target) return null;
+        if (!HASH.test(target.owner || "") || !resolveCoordinatorSessionSlugStorageKey(target.slug)) throw unavailable();
+        if (Number(await transaction.get(REGISTERED_KEY)) > now || retry?.retryAtMs > now) return null;
+        const next = { identity: target, retryAtMs: now + REGISTRATION_BACKOFF_MS };
+        await transaction.put(REGISTRATION_RETRY_KEY, next);
+        return next;
       });
-      if (!response3.ok) throw unavailable();
-      await storage.put(REGISTERED_KEY, now + DAY_MS);
+      if (!pending) return;
+      await scheduleSweep(storage, pending.retryAtMs);
+      const controller = new AbortController();
+      let timer;
+      try {
+        const response3 = await Promise.race([
+          (async () => {
+            const stub = await indexStub(coordinator.env, pending.identity.slug);
+            if (!stub) throw unavailable();
+            return stub.fetch("https://session-coordinator.internal/upload-receipts/index/register", {
+              method: "POST",
+              body: JSON.stringify({ owner: pending.identity.owner }),
+              signal: controller.signal
+            });
+          })(),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(unavailable()), REGISTRATION_TIMEOUT_MS);
+          })
+        ]);
+        if (!response3.ok) throw unavailable();
+        await storage.transaction(async (transaction) => {
+          await transaction.put(REGISTERED_KEY, now + DAY_MS);
+          await transaction.delete(REGISTRATION_RETRY_KEY);
+        });
+      } finally {
+        clearTimeout(timer);
+        controller.abort();
+      }
     };
+    readUploadReceiptRegistrationRetryAt = async (coordinator) => Number((await coordinator.state.storage.get(REGISTRATION_RETRY_KEY))?.retryAtMs) || Infinity;
     dispatchUploadReceiptIndex = async (coordinator, path, payload) => {
       const storage = coordinator.state.storage;
       const now = coordinator.now();
@@ -64639,8 +64701,14 @@ var init_sessionBackupCoordinator = __esm({
         if (result.complete) await storage.delete(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
         return json3({ ok: true, ...result });
       }
-      await storage.delete(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
-      return json3({ ok: true });
+      const complete = await clearBackupImportMetadata(storage, archiveId);
+      if (complete) {
+        await storage.transaction(async (transaction) => {
+          await transaction.put("worker-group-backup-import-completion", { archiveId, completedAt: coordinator.now() });
+          await transaction.delete(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
+        });
+      }
+      return json3({ ok: true, complete });
     };
     importWorkerGroupBackup = async (coordinator, payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
@@ -64860,9 +64928,32 @@ var init_sessionBackupImport = __esm({
       const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
       const active = await readActiveBackupImport(coordinator, slug, true, budget);
       if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail4("Another backup restore is in progress. Check restore status to abandon it.", 409, "backup_restore_in_progress");
+      if (active?.progress.finished) {
+        await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
+        fail4("Previous restore cleanup is still in progress. Retry this page.", 503, "backup_cleanup_pending");
+      }
       const pageHash = await sha256Hex2(JSON.stringify(page));
       const receiptKey = `${stateKey}:page:${page.pageNumber}`;
-      const receipt = await storage.get(receiptKey);
+      const complete = async (progress2) => {
+        const done = await cleanupCompletedBackupImport(coordinator, slug, page.archiveId, progress2, budget);
+        return Response.json({
+          ok: true,
+          archiveId: page.archiveId,
+          pageNumber: page.pageNumber,
+          counts: progress2.counts,
+          conflicts: progress2.conflicts,
+          complete: done,
+          ...done ? {} : { pageComplete: false },
+          restore: done ? null : { archiveId: page.archiveId, inProgress: true, canAbandon: false, cleaning: true }
+        });
+      };
+      if (active?.progress.finishing) {
+        if (active.progress.actor !== expectedAuthority.actor || active.progress.pageNumber !== page.pageNumber || active.progress.pageHash !== pageHash) {
+          fail4("Resume completion with the final unchanged backup page.", 409);
+        }
+        return complete(active.progress);
+      }
+      const receipt = active ? await storage.get(receiptKey) : null;
       if (receipt) {
         if (receipt.hash !== pageHash) fail4("This backup page differs from the previously imported page.", 409);
         return Response.json({ ...receipt.result, replayed: true });
@@ -64875,10 +64966,10 @@ var init_sessionBackupImport = __esm({
       const descriptorKey = (id2, target = "") => `${stateKey}:payload:${target || "storage"}:${id2}`;
       const recordKey2 = (id2) => `${stateKey}:record:${id2}`;
       const chunkKey = (id2, n2, target = "") => `${root}chunk:${target || "storage"}:${id2}:${n2}`;
-      let progress = await storage.get(stateKey);
+      let progress = active?.progress;
       if (!progress) {
-        if (page.pageNumber !== 0 || !page.coordinator) fail4("Import must begin with the first backup page.", 409);
         await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
+        if (page.pageNumber !== 0 || !page.coordinator) fail4("Import must begin with the first backup page.", 409);
         progress = {
           actor: expectedAuthority.actor,
           pageNumber: 0,
@@ -65135,13 +65226,13 @@ var init_sessionBackupImport = __esm({
             await coordinator.projectSessionConfigAuthority(authority);
             progress.counts.written += 1;
           }
-          if (progress.configPublished) {
-            await coordinator.repairPendingSessionConfigProjection();
-            const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: "finish", archiveId: page.archiveId });
-            if (!groups.ok) fail4(groups.error || "Group restore completion is unavailable.", groups.status || 503);
-          }
+          if (progress.configPublished) await coordinator.repairPendingSessionConfigProjection();
         }
-        progress.finished = progress.configPublished && !progress.counts.conflicts;
+        if (progress.configPublished && !progress.counts.conflicts) {
+          progress.finishing = true;
+          await storage.put(stateKey, progress);
+          return complete(progress);
+        }
       }
       const result = {
         ok: true,
@@ -65160,10 +65251,6 @@ var init_sessionBackupImport = __esm({
         await transaction.put(stateKey, progress);
         await transaction.put(receiptKey, { hash: pageHash, result });
       });
-      if (progress.finished && progress.chunkedSnapshot) {
-        const header = await storage.get(descriptorKey("coordinator", "coordinator"));
-        for (let n2 = 0; n2 < header.chunkCount && budget.remaining > 8; n2 += 1) await index.delete(chunkKey("coordinator", n2, "coordinator"));
-      }
       return Response.json(result);
     };
   }
@@ -65428,7 +65515,7 @@ var init_aiRequestPolicy = __esm({
     init_aiModelParams();
     trim9 = (value) => typeof value === "string" ? value.trim() : "";
     record = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
-    tasks = /* @__PURE__ */ new Set(["generate", "rewrite", "summarize", "rank", "analysis", "interview-map", "interview-opening"]);
+    tasks = /* @__PURE__ */ new Set(["generate", "rewrite", "summarize", "rank", "analysis", "compare", "categorize", "interview-map", "interview-opening"]);
     taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : "";
     modelEntry = (entry, provider, fallback = DEFAULT_AI_MODEL) => {
       const obj = record(entry);
@@ -65461,7 +65548,17 @@ var init_aiRequestPolicy = __esm({
       const entry = record(ai.models?.transcription || ai.transcription);
       return provider === (trim9(entry.provider).toLowerCase() || "openai") && model === (trim9(entry.model) || "whisper-1");
     };
-    operationCeilings = Object.freeze({ generate: 16e3, analysis: 7e3, "interview-map": 8e3, "interview-opening": 600 });
+    operationCeilings = Object.freeze({
+      generate: 16e3,
+      rewrite: 16e3,
+      summarize: 16e3,
+      rank: 16e3,
+      compare: 16e3,
+      categorize: 16e3,
+      analysis: 7e3,
+      "interview-map": 8e3,
+      "interview-opening": 600
+    });
     tokenFields = ["max_tokens", "max_completion_tokens", "max_output_tokens", "max_tokens_to_sample", "maxTokens"];
     effortOrder = ["none", "minimal", "low", "medium", "high"];
     configuredFunctions = (config) => {
@@ -65480,7 +65577,7 @@ var init_aiRequestPolicy = __esm({
       const allowed = Object.values(models2).filter((entry) => entry?.provider === provider);
       const model = trim9(payload.model) || (models2.feature?.provider === provider ? models2.feature.model : allowed[0]?.model);
       if (!model || !allowed.some((entry) => entry.model === model)) return { ok: false, ...AI_MODEL_NOT_ALLOWED };
-      const reasoning = isChatReasoningModel({ model });
+      const reasoning = isChatReasoningModel({ model }) || models2.thinking.provider === provider && models2.thinking.model === model;
       const responses = usesOpenAiResponsesApi({ provider, model, endpoint: payload.endpoint });
       const ceiling = operationCeilings[task] || (reasoning || responses ? 16e3 : 2048);
       const requested = tokenFields.filter((key) => Object.hasOwn(payload, key)).map((key) => {
@@ -68700,7 +68797,8 @@ ${expiry}`);
       }
       async scheduleUploadReceiptCleanup() {
         const nextExpiry = await this.state.storage.transaction((transaction) => this.pruneUploadReceipts(transaction, Number(this.now()) || Date.now()));
-        if (Number.isFinite(nextExpiry) && typeof this.state.storage.setAlarm === "function") await this.state.storage.setAlarm(nextExpiry);
+        const nextAlarm = Math.min(nextExpiry, await readUploadReceiptRegistrationRetryAt(this));
+        if (Number.isFinite(nextAlarm) && typeof this.state.storage.setAlarm === "function") await this.state.storage.setAlarm(nextAlarm);
       }
       async executeUploadReceipt(payload, settle = false) {
         const requestId = toTrimmedString9(payload?.requestId);
@@ -69136,6 +69234,10 @@ ${expiry}`);
       }
       async alarm() {
         if (await sweepUploadReceiptIndex(this)) return;
+        try {
+          await registerUploadReceiptStore(this);
+        } catch {
+        }
         try {
           await this.runQueuedResultsAnalysisAutoJob();
         } catch (error) {
@@ -80944,13 +81046,17 @@ var resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = f
       custom: deps.proxyCustomRPC || proxyCustomRPC
     };
     if (!proxies[provider]) throw new Error("Configured AI provider is unavailable for interview openings.");
+    const keyName = { openai: "openaiKey", anthropic: "anthropicKey", openrouter: "openrouterKey", custom: "customRpcKey" }[provider];
+    if (!String(secrets?.[keyName] || "").trim())
+      throw new Error(`Interview opening requires the session's ${keyName} for the configured ${provider} model.`);
     const result = await proxies[provider]({
       secrets,
       config,
       auth: { scopes: { ai: true, custom_rpc: true } },
       deps: {
         ...deps,
-        fetch: (url, options) => (deps.fetch || fetch)(url, { ...options, signal: AbortSignal.timeout(1e4) })
+        fetch: (url, options) => (deps.fetch || fetch)(url, { ...options, signal: AbortSignal.timeout(1e4) }),
+        safeFetch: deps.safeFetch && ((url, options) => deps.safeFetch(url, { ...options, signal: AbortSignal.timeout(1e4) }))
       },
       payload: {
         model,
@@ -81668,14 +81774,20 @@ init_storageRouteExecution();
 init_storageScanBudget();
 var encoder8 = new TextEncoder();
 var CHUNK_BYTES = 256 * 1024;
-var fail6 = (message, status = 409) => {
-  throw Object.assign(new Error(message), { status });
+var fail6 = (message, status = 409, reason) => {
+  throw Object.assign(new Error(message), { status, ...reason ? { reason } : {} });
 };
 var digestBytes = async (bytes3) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes3))].map((v) => v.toString(16).padStart(2, "0")).join("");
 var prefixes = (slug) => [null, `ce-storage-hidden:${slug}:`, `ce-storage-owner:${slug}:`, `ce-storage-payload:${slug}:`, `ce-storage:${slug}:`, `sessions/${slug}/storage/`];
 var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) => {
   const keySlug = sessionSlugStorageKey(slug);
-  const authenticatedCursor = cursor ? await authenticateBackupCursor(cursor, env) : "";
+  let authenticatedCursor = "";
+  try {
+    authenticatedCursor = cursor ? await authenticateBackupCursor(cursor, env) : "";
+  } catch (error) {
+    if (error.reason === "backup_cursor_authentication_failed") error.reason = "backup_cursor_invalid";
+    throw error;
+  }
   const budget = createStorageExportBudget();
   const rawIndex = getStorageIndexBinding(env);
   const index = rawIndex ? budget.wrap(rawIndex) : null;
@@ -81686,7 +81798,13 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   const sessionId = resolveCanonicalWorkerSessionIdHex(coordinator.configAuthority.config);
   if (!sessionId) fail6("The session has no canonical identity.");
   const prefix = `ce-backup:${keySlug}:`;
-  const parsed = parseStorageExportCursor({ cursor: authenticatedCursor, prefix, sessionId });
+  let parsed;
+  try {
+    parsed = parseStorageExportCursor({ cursor: authenticatedCursor, prefix, sessionId });
+    if (cursor && !parsed.continuation) throw new Error("Missing backup position.");
+  } catch {
+    fail6("Invalid backup cursor. Restart the export.", 400, "backup_cursor_invalid");
+  }
   const position = parsed.continuation || {
     phase: 0,
     listCursor: "",
@@ -81699,9 +81817,9 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
     counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 }
   };
   const nextCursor = () => signBackupCursor(storageExportCursor({ prefix, sessionId, continuation: position }), env);
-  if (position.configDigest !== await sha256Hex2(JSON.stringify(coordinator))) fail6("Session config changed during backup. Restart the export.");
+  if (position.configDigest !== await sha256Hex2(JSON.stringify(coordinator))) fail6("Session config changed during backup. Restart the export.", 409, "backup_session_changed");
   const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: "export", snapshotId: position.groupSnapshotId });
-  if (!groups.ok) fail6(groups.error || "Group backup is unavailable.", groups.status);
+  if (!groups.ok) fail6(groups.error || "Group backup is unavailable.", groups.status, groups.status === 409 ? "backup_session_changed" : void 0);
   budget.consume(groups.operations || 0);
   position.groupSnapshotId = groups.snapshotId;
   if (groups.preparing) {
@@ -81714,8 +81832,8 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   if (!position.snapshotDigest) position.snapshotDigest = snapshotDigest;
   position.archiveId = await sha256Hex2(`${sessionId}:${position.exportedAt}:${snapshotDigest}`);
   const paths = prefixes(keySlug);
-  if (!Number.isSafeInteger(position.phase) || position.phase < 0 || position.phase > 6 || !Number.isSafeInteger(position.chunk) || position.chunk < -1 || !Number.isSafeInteger(position.pageNumber) || position.pageNumber < 0 || typeof position.listCursor !== "string" || position.listCursor.length > 4096 || typeof position.lastKey !== "string" || position.lastKey && position.phase > 0 && !position.lastKey.startsWith(paths[position.phase]) || !position.counts || !["records", "payloads", "owners", "hidden", "bytes"].every((key) => Number.isSafeInteger(position.counts[key]) && position.counts[key] >= 0) || !Number.isFinite(Date.parse(position.exportedAt))) fail6("Invalid backup cursor.", 400);
-  if (position.snapshotDigest !== snapshotDigest) fail6("Session config or groups changed during backup. Restart the export.");
+  if (!Number.isSafeInteger(position.phase) || position.phase < 0 || position.phase > 6 || !Number.isSafeInteger(position.chunk) || position.chunk < -1 || !Number.isSafeInteger(position.pageNumber) || position.pageNumber < 0 || typeof position.listCursor !== "string" || position.listCursor.length > 4096 || typeof position.lastKey !== "string" || position.lastKey && position.phase > 0 && !position.lastKey.startsWith(paths[position.phase]) || !position.counts || !["records", "payloads", "owners", "hidden", "bytes"].every((key) => Number.isSafeInteger(position.counts[key]) && position.counts[key] >= 0) || !Number.isFinite(Date.parse(position.exportedAt))) fail6("Invalid backup cursor.", 400, "backup_cursor_invalid");
+  if (position.snapshotDigest !== snapshotDigest) fail6("Session config or groups changed during backup. Restart the export.", 409, "backup_session_changed");
   const manifest = {
     type: "ce_session_backup",
     version: 1,
@@ -81826,7 +81944,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
         }
       } else {
         const value = await index.get(key);
-        if (value == null) fail6("A storage record changed during backup. Restart the export.");
+        if (value == null) fail6("A storage record changed during backup. Restart the export.", 409, "backup_session_changed");
         const metadata = position.phase === 4 ? JSON.parse(value) : null;
         const entry = metadata ? { kind: "record", key, id: metadata.id, resource: metadata.resource, metadata } : { kind: position.phase === 1 ? "hidden" : "owner", key, value };
         if (!append(entry)) break outer;
@@ -84064,7 +84182,7 @@ var dispatchAdminRequest = async ({
         responseHeaders
       );
     } catch (error) {
-      return deps?.json?.({ error: error.message }, error.status || 503, responseHeaders);
+      return deps?.json?.({ error: error.message, ...error.reason ? { reason: error.reason } : {} }, error.status || 503, responseHeaders);
     }
   }
   if (["import-session-backup", "session-backup-status", "abandon-session-backup"].includes(action)) {
@@ -86074,6 +86192,9 @@ var createWorkerRouteShellWithWorkerDeps = ({
             getCorsContext: deps?.getCorsContext,
             ...routeSelection.kind === "interview-starter" ? {
               getSessionSecrets: deps?.getSessionSecrets,
+              safeFetch: deps?.safeFetch,
+              isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
+              log: deps?.log,
               evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess
             } : {},
             resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
@@ -86772,6 +86893,8 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
     deps: {
       log: deps?.log,
       fetch: deps?.fetch,
+      safeFetch: deps?.safeFetch,
+      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
       toStr: deps?.toStr,
       corsHeaders: deps?.corsHeaders,
       json: deps?.json,
@@ -88040,4 +88163,289 @@ export {
 aes-js/lib.esm/aes.js:
 aes-js/lib.commonjs/aes.js:
   (*! MIT License. Copyright 2015-2022 Richard Moore <me@ricmoo.com>. See LICENSE.txt. *)
+*/
+/*
+# Third-party notices
+
+Generated from Worker bundle inputs. These packages retain their own licenses.
+
+## @adraffy/ens-normalize@1.10.1
+
+License: MIT
+
+### LICENSE
+
+MIT License
+
+Copyright (c) 2021 Andrew Raffensperger
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## @noble/curves@1.2.0
+
+License: MIT
+
+### LICENSE
+
+The MIT License (MIT)
+
+Copyright (c) 2022 Paul Miller (https://paulmillr.com)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the “Software”), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+---
+
+## @noble/hashes@1.3.2
+
+License: MIT
+
+### LICENSE
+
+The MIT License (MIT)
+
+Copyright (c) 2022 Paul Miller (https://paulmillr.com)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the “Software”), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+---
+
+## aes-js@4.0.0-beta.5
+
+License: MIT
+
+### LICENSE.txt
+
+The MIT License (MIT)
+
+Copyright (c) 2022 Richard Moore
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+---
+
+## arconnect@0.4.2
+
+License: MIT
+
+### LICENSE
+
+MIT License
+
+Copyright (c) 2021 th8ta LLC
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## arweave@1.15.7
+
+License: MIT
+
+### LICENSE.md
+
+Copyright 2020 The Arweave Team
+Copyright 2020 Minimum Spanning Technologies Limited
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---
+
+## base64-js@1.5.1
+
+License: MIT
+
+### LICENSE
+
+The MIT License (MIT)
+
+Copyright (c) 2014 Jameson Little
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+---
+
+## bignumber.js@9.3.1
+
+License: MIT
+
+### LICENCE.md
+
+The MIT License (MIT)
+=====================
+
+Copyright © `<2025>` `Michael Mclaughlin`
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the “Software”), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+---
+
+## ethers@6.15.0
+
+License: MIT
+
+### LICENSE.md
+
+MIT License
+
+Copyright (c) 2016-2025 Richard Moore
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## tslib@2.7.0
+
+License: 0BSD
+
+### LICENSE.txt
+
+Copyright (c) Microsoft Corporation.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
 */
