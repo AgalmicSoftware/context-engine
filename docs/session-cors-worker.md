@@ -822,7 +822,9 @@ Authenticated clients can use the worker as the session storage boundary:
     its comment within 48 KiB (49,152 bytes, counting each as a JSON string in
     UTF-8); that stays under the cap even with answer, comment and ratings
     locked. Oversized uploads return
-    `413`. These records must be JSON objects with a basic shape, or the
+    `413`. Question options, when present, must be an array of strings; a
+    non-string option returns `400`. Client readers ignore malformed legacy
+    options. These records must be JSON objects with a basic shape, or the
     upload returns `400`: a question needs a string `id` (or `questionId` /
     `questionID`) of up to 128 `a-z`, `0-9`, `.`, `_`, `:`, or `-`
     characters and a string `type`, with a text `prompt` and a list of

@@ -68463,6 +68463,9 @@ var init_storageUploadValidation = __esm({
         if (payload.options != null && !Array.isArray(payload.options)) {
           return invalid2(resource, "expected an options array");
         }
+        if (Array.isArray(payload.options) && payload.options.some((option) => typeof option !== "string")) {
+          return invalid2(resource, "expected options to be strings");
+        }
       } else {
         if (typeof payload.title !== "string") return invalid2(resource, "expected a string title");
         if (payload.questionIDs != null && (!Array.isArray(payload.questionIDs) || payload.questionIDs.some((id2) => typeof id2 !== "string"))) {

@@ -164,3 +164,12 @@ test('leaves documents, media, and images to the deployment-wide limit', () => {
     assert.deepEqual(check(resource, 'x'.repeat(STORAGE_RESOURCE_MAX_BYTES.responses + 1)), { ok: true });
   }
 });
+
+for (const option of [null, 7, false, { label: 'North' }, { toString: 'not callable' }, ['North']]) {
+  test(`question options reject non-string ${JSON.stringify(option)}`, () => {
+    const result = check('questions', { ...clientQuestion, options: ['North', option] });
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 400);
+    assert.match(result.error, /options.*strings/);
+  });
+}

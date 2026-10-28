@@ -1,3 +1,4 @@
+import { optionsOf } from '../../../../shared/questions/answerValue.mjs';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts';
 import { questionIdMatchesContent } from '../../utilities/shared/questionUtils.mjs';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext';
@@ -531,7 +532,12 @@ export const mergeWorkerCanonicalQuestionMetadata = (
     items: questions,
     pending,
     refs,
-    toItem: (row, base) => ({ ...base, ...row.payload, id: row.id }),
+    toItem: (row, base) => ({
+      ...base,
+      ...row.payload,
+      id: row.id,
+      ...(Object.hasOwn(row.payload, 'options') ? { options: optionsOf(row.payload) } : {}),
+    }),
     verify: questionPayloadMatchesId,
   });
 

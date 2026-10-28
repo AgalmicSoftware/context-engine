@@ -1315,3 +1315,28 @@ describe.each(['questions', 'surveys'] as const)('complete %s catalog reconcilia
     expect(JSON.stringify(cache)).toBe(before);
   });
 });
+
+it('keeps only string options when merging legacy question metadata', () => {
+  const identity = resolveWorkerCanonicalCacheIdentity({
+    sessionConfig: buildWorkerSessionConfig(),
+    sessionSlug: 'worker-session',
+  });
+  const cache = mergeWorkerCanonicalQuestionMetadata(
+    null,
+    [
+      {
+        id: 'q-options',
+        createdAtMs: 1,
+        storageRefId: 'cf-options',
+        storageRef: { backend: 'cloudflare', id: 'cf-options', resource: 'questions' },
+        payload: {
+          type: 'multichoice',
+          prompt: 'Choose a fixture option',
+          options: ['Alpha', { toString: 'not callable' }, 7, null, 'Beta'],
+        },
+      },
+    ],
+    identity,
+  );
+  expect(cache).toMatchObject({ worker: { questions: { 'q-options': { options: ['Alpha', 'Beta'] } } } });
+});

@@ -104,3 +104,13 @@ describe('MultichoiceQuestionInput', () => {
     ).toBe('option');
   });
 });
+
+it('ignores non-string legacy options without converting hostile objects', () => {
+  const options = ['Alpha', { toString: 'not callable' }, null, 7, ['Beta'], 'Beta'];
+  expect(findDuplicateMultichoiceOptionLabels(options)).toEqual([]);
+  const onChange = jest.fn();
+  render(<MultichoiceQuestionInput questionId="q-options" options={options} onChange={onChange} />);
+  expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Beta' }));
+  expect(onChange).toHaveBeenCalledWith(['Beta']);
+});

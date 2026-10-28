@@ -1,3 +1,4 @@
+import { optionsOf } from '../../../../shared/questions/answerValue.mjs';
 import { FormGroup, Input, Label } from 'reactstrap';
 import styles from './SurveyTool.module.scss';
 
@@ -24,8 +25,8 @@ export const buildMultichoiceOptionClassName = ({
 export const findDuplicateMultichoiceOptionLabels = (options: unknown[] = []): string[] => {
   const seen = new Set<string>();
   const duplicates = new Set<string>();
-  options.forEach((option) => {
-    const label = String(option ?? '').trim();
+  optionsOf({ options }).forEach((option) => {
+    const label = option.trim();
     const key = label.toLowerCase();
     if (!key) return;
     if (seen.has(key)) duplicates.add(label);
@@ -42,7 +43,7 @@ const MultichoiceQuestionInput = ({
   disabled = false,
   onChange = null,
 }: MultichoiceQuestionInputProps) => {
-  const normalizedOptions = Array.isArray(options) ? options : [];
+  const normalizedOptions = optionsOf({ options });
   const normalizedSelectedValues = Array.isArray(selectedValues) ? selectedValues : [];
   const duplicateLabels = findDuplicateMultichoiceOptionLabels(normalizedOptions);
 
@@ -57,7 +58,7 @@ const MultichoiceQuestionInput = ({
   return (
     <FormGroup id={styles.multiChoice}>
       {normalizedOptions.map((option, optionIndex) => {
-        const optionLabel = String(option);
+        const optionLabel = option;
         const isSelected = normalizedSelectedValues.includes(option);
 
         return (

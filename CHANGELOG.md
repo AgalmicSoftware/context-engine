@@ -196,6 +196,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Reject question options that are not strings; client cache and input readers
+  ignore malformed legacy options without converting untrusted objects.
+
 - Resume interrupted response uploads at their reserved storage ID and timestamp,
   retaining pending receipts and avoiding duplicate published answers after a crash.
 

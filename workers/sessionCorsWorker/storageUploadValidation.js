@@ -110,6 +110,9 @@ export const validateStorageUploadPayload = ({ resource, bytes, payloadEncrypted
     if (payload.options != null && !Array.isArray(payload.options)) {
       return invalid(resource, 'expected an options array');
     }
+    if (Array.isArray(payload.options) && payload.options.some((option) => typeof option !== 'string')) {
+      return invalid(resource, 'expected options to be strings');
+    }
   } else {
     if (typeof payload.title !== 'string') return invalid(resource, 'expected a string title');
     if (payload.questionIDs != null && (
