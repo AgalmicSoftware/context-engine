@@ -483,3 +483,58 @@ describe('interview multiple-choice review', () => {
     else expect(screen.getByRole('checkbox', { name: 'Parks' })).toBeChecked();
   });
 });
+
+describe('SessionInterviewDraftCard earlier answers', () => {
+  const question = (type: string, extra: Record<string, unknown> = {}) => ({
+    id: 'q1',
+    prompt: 'Which?',
+    type,
+    options: ['Parks', 'Transit', 'Housing'],
+    ...extra,
+  });
+  const renderCard = (
+    type: string,
+    answer: unknown,
+    earlierAnswer: unknown,
+    extra: Record<string, unknown> = {},
+    selected = true,
+  ) => {
+    const draft = { questionId: 'q1', answer };
+    render(
+      <SessionInterviewDraftCard
+        draft={draft}
+        edited={draft}
+        question={question(type, extra)}
+        selected={selected}
+        existing={earlierAnswer !== undefined}
+        earlierAnswer={earlierAnswer}
+        disabled={false}
+        onSelect={jest.fn()}
+        onEdit={jest.fn()}
+      />,
+    );
+  };
+
+  it.each([
+    ['binary', 'Disagree', 'Agree', {}, 'Changes your earlier answer: Agree'],
+    ['multichoice', 'Transit', 'Parks', { singleSelect: true }, 'Changes your earlier answer: Parks'],
+    ['multichoice', ['Housing'], ['Parks', 'Transit'], {}, 'Changes your earlier answer: Parks, Transit'],
+    ['rating', 3, 7, { scale: { min: 0, max: 10 } }, 'Changes your earlier answer: 7 of 10'],
+    ['quadratic', [1, 0, -1], [0, 1, 0], {}, 'Changes your earlier answer'],
+    ['freeform', 'New view', 'Old view', {}, 'Changes your earlier answer'],
+    // A locked earlier answer can't be read, so it is only mentioned.
+    ['binary', 'Disagree', '*', {}, 'Changes your earlier answer'],
+  ])('says a %s draft changes the earlier answer', (type, answer, earlier, extra, note) => {
+    renderCard(type, answer, earlier, extra);
+    expect(screen.getByText(note, { exact: true })).toBeInTheDocument();
+  });
+
+  it('says nothing when there is no earlier answer or the draft repeats it, and still says it when not chosen', () => {
+    renderCard('binary', 'Agree', undefined);
+    renderCard('multichoice', ['Transit', 'Parks'], ['Parks', 'Transit']);
+    expect(screen.queryByText(/Changes your earlier answer/)).not.toBeInTheDocument();
+    renderCard('binary', 'Disagree', 'Agree', {}, false);
+    expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replace with draft' })).toBeEnabled();
+  });
+});

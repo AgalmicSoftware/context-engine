@@ -6,6 +6,7 @@ import {
 } from './sessionInterviewConsent';
 import {
   buildSessionInterviewActiveSubmitContextToken,
+  buildSessionInterviewResponseSlice,
   buildSessionInterviewSubmitContextToken,
   collectSubmitQuestionIds,
   ensureSessionInterviewCachedAnswers,
@@ -3359,6 +3360,10 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
           {(() => {
             const submitContextToken = engine.buildSessionInterviewSubmitContextToken(engine.props);
             const responseReadinessContextToken = engine.getSessionInterviewResponseReadinessToken(submitContextToken);
+            const interviewQuestions =
+              Array.isArray(engine.state.allQuestionsForFilter) && engine.state.allQuestionsForFilter.length > 0
+                ? engine.state.allQuestionsForFilter
+                : fallbackQuestionPool;
             return (
               <LazySessionVoiceModeModal
                 key={submitContextToken}
@@ -3378,13 +3383,13 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                 mode={(sessionVoiceMode as SessionVoiceMode | null) || null}
                 onSelectMode={engine.selectSessionVoiceMode}
                 onClose={engine.closeSessionVoiceModeModal}
-                questionPool={
-                  Array.isArray(engine.state.allQuestionsForFilter) && engine.state.allQuestionsForFilter.length > 0
-                    ? engine.state.allQuestionsForFilter
-                    : fallbackQuestionPool
-                }
+                questionPool={interviewQuestions}
                 existingResponseSlice={{
-                  ...engine.state.surveysResponseState?.[0],
+                  // Answers outside the pile's card window count too, so drafts never silently replace them.
+                  ...buildSessionInterviewResponseSlice(
+                    engine,
+                    interviewQuestions.map((question: { id?: unknown }) => normalizeQuestionIdKey(question?.id)),
+                  ),
                   interviewProvenance: {
                     ...engine.state.editBaseline?.interviewProvenance,
                     ...readPlainRecord(engine.state.surveysResponseState?.[0]?.interviewProvenance),

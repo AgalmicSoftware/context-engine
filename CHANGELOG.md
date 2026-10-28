@@ -156,6 +156,12 @@ All notable changes to this project will be documented in this file.
   over the drafts, with every sharing choice listed before the prefill metadata.
   The metadata no longer repeats what an unticked box leaves out, and is hidden
   when nothing is shared.
+- Leave questions people have already answered out of interview and AI-prefill
+  drafts, and say how many were left out. A voice or typed interview that gives
+  a different answer still shows that draft, noting the answer it changes.
+  Answers saved earlier but not yet loaded on the page now count too, so an
+  interview no longer replaces them unasked. While questions remain open, the
+  voice interviewer asks only about those.
 - Scope cached Worker questions and answers to the signed-in reader. Account
   switches and logouts purge Worker cache nodes, a load started under another
   account is discarded, and a complete listing drops answers the reader can no

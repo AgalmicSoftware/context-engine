@@ -1,4 +1,6 @@
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
+import { responseValuesEqual } from './responseValueEquality';
+import { hasDraftValue } from './sessionInterviewModalState';
 import type { InterviewDraftResponse } from './sessionInterview';
 
 // Review seeds '' for drafts that arrive without a comment, so an empty
@@ -6,19 +8,49 @@ import type { InterviewDraftResponse } from './sessionInterview';
 export const interviewDraftFieldValue = (field: string, value: unknown) =>
   field === 'additionalComments' ? String(value ?? '') : value;
 
+// Chosen options in another order are the same answer; quadratic votes stay in option order.
+const comparable = (value: unknown) =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string') ? [...value].sort() : value;
+
+/** Whether two answers to one question say the same thing, compared as the form compares answers. */
+export const sameInterviewAnswer = (left: unknown, right: unknown) =>
+  responseValuesEqual(comparable(left), comparable(right), true);
+
+// New evidence overrules an answer only when it gives a different one. A locked ("*")
+// answer can't be compared, so it stands.
+export const overrulesSavedAnswer = (draftAnswer: unknown, answer: unknown) =>
+  answer !== '*' && !sameInterviewAnswer(draftAnswer, answer);
+
+/** Whether submitting this answer would change an earlier one; a locked earlier answer might. */
+export const changesEarlierAnswer = (answer: unknown, earlier: unknown) =>
+  hasDraftValue(earlier) && (earlier === '*' || !sameInterviewAnswer(answer, earlier));
+
+// Which drafts join review. A question the person has already answered gets no new draft,
+// unless the person's own words in this interview (`ownEvidence`; an AI prefill's prediction
+// never counts) give a different answer: that draft joins like any other, and its card says
+// which answer it changes. A draft already under review keeps updating, including after the
+// person submits it. `leftOut` lists the drafts not added, so review can say why.
 export function mergeInterviewReview(
   previous: InterviewDraftResponse[],
   edited: Record<string, InterviewDraftResponse>,
   selected: Record<string, boolean>,
   incoming: InterviewDraftResponse[],
-  isInitiallySelected: (id: string) => boolean,
+  currentAnswer: (id: string) => unknown,
   modelId: string = DEFAULT_AI_MODEL,
   savedComment: (id: string) => string = () => '',
+  ownEvidence: (draft: InterviewDraftResponse) => boolean = () => false,
 ) {
   const drafts = new Map(previous.map((draft) => [draft.questionId, draft]));
   const nextEdited = { ...edited };
   const nextSelected = { ...selected };
+  const leftOut: string[] = [];
   for (const incomingDraft of incoming) {
+    const answer = drafts.has(incomingDraft.questionId) ? undefined : currentAnswer(incomingDraft.questionId);
+    const answered = hasDraftValue(answer);
+    if (answered && !(ownEvidence(incomingDraft) && overrulesSavedAnswer(incomingDraft.answer, answer))) {
+      leftOut.push(incomingDraft.questionId);
+      continue;
+    }
     const draft = { ...incomingDraft };
     const prior = drafts.get(draft.questionId);
     const snapshot = (value: InterviewDraftResponse) => ({
@@ -60,9 +92,9 @@ export function mergeInterviewReview(
     if (userEditedFields.size) reviewed.userEditedFields = [...userEditedFields];
     drafts.set(draft.questionId, draft);
     nextEdited[draft.questionId] = reviewed;
-    if (!(draft.questionId in nextSelected)) nextSelected[draft.questionId] = isInitiallySelected(draft.questionId);
+    if (!(draft.questionId in nextSelected)) nextSelected[draft.questionId] = true;
   }
-  return { drafts: [...drafts.values()], edited: nextEdited, selected: nextSelected };
+  return { drafts: [...drafts.values()], edited: nextEdited, selected: nextSelected, leftOut };
 }
 
 export const appendInterviewTranscript = (previous: string, current: string) =>

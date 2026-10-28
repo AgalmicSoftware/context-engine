@@ -54,7 +54,8 @@
   line-height: 1.38;
 }
 
-// A hidden draft's status, tucked under the prompt and muted like the evidence text.
+// A note under the prompt (a hidden draft's status, or the earlier answer a draft changes),
+// muted like the evidence text.
 .blindNote {
   margin: -8px 0 0;
   color: color-mix(in srgb, var(--ce-panel-text) 78%, transparent);

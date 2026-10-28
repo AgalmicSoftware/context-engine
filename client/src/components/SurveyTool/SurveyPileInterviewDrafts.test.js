@@ -5,7 +5,10 @@ import { surveyQuestionReadsPort } from '../../domains/surveys/surveyQuestionRea
 import * as workerHydration from '../../utilities/survey/workerResponseHydration';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
+import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { mapInterviewEvidenceToResponses } from './sessionInterview';
+import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 
@@ -47,6 +50,7 @@ const SESSION_CONFIG = {
   corsWorkerUrl: 'https://worker.example',
   __registry: { registryChainId: 11155420, sessionIdHex: '0x00112233445566778899aabbccddeeff' },
 };
+let sessionConfig = SESSION_CONFIG;
 const packet = (responses) => ({
   version: 1,
   sessionSlug: 'edge',
@@ -83,16 +87,29 @@ const savedNamedQ1 = {
 };
 const DEFAULT_QUESTION_IDS = ['q1', 'q3'];
 let questionIds = DEFAULT_QUESTION_IDS;
-const mockSession = (saved = []) => {
+// The interview leaves out drafts for answered questions, so a draft for a saved answer is
+// reviewed only when the person edits it before that answer loads. With `late`, neither the
+// response cache nor the own-answer read returns the saved rows until answerBeforeSavedAnswersLoad().
+let savedLoaded = true;
+let releaseOwnRead = () => {};
+let ownRead = Promise.resolve();
+const mockSession = (saved = [], { late = false } = {}) => {
+  savedLoaded = !late;
+  ownRead = late
+    ? new Promise((resolve) => {
+        releaseOwnRead = resolve;
+      })
+    : Promise.resolve();
   jest
     .spyOn(contractScriptsModule, 'getSessionConfigBySlug')
-    .mockImplementation((slug) => (slug === 'edge' ? SESSION_CONFIG : null));
+    .mockImplementation((slug) => (slug === 'edge' ? sessionConfig : null));
+  const known = () => (savedLoaded ? saved : []);
   const cache = () => ({
     11155420: {
       questions: Object.fromEntries(questionIds.map((id) => [id, { id, type: 'binary', prompt: id.toUpperCase() }])),
-      questionResponses: Object.fromEntries(saved.map((row) => [row.questionID, { [A]: JSON.stringify(row) }])),
+      questionResponses: Object.fromEntries(known().map((row) => [row.questionID, { [A]: JSON.stringify(row) }])),
       questionResponsesMeta: Object.fromEntries(
-        saved.map((row) => [row.questionID, { [A]: { ts: 1000, storageRefId: `ref-${row.questionID}` } }]),
+        known().map((row) => [row.questionID, { [A]: { ts: 1000, storageRefId: `ref-${row.questionID}` } }]),
       ),
       pendingQuestionMetadata: {},
     },
@@ -100,15 +117,16 @@ const mockSession = (saved = []) => {
   jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (ns) => (ns === 'questionsCache' ? cache() : {}));
   jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((ns) => (ns === 'questionsCache' ? cache() : null));
   jest.spyOn(workerHydration, 'isWorkerCanonicalSessionConfig').mockReturnValue(true);
-  jest.spyOn(workerHydration, 'loadWorkerResponses').mockResolvedValue(
-    saved.map((row) => ({
+  jest.spyOn(workerHydration, 'loadWorkerResponses').mockImplementation(async () => {
+    await ownRead;
+    return saved.map((row) => ({
       questionId: row.questionID,
       responder: A,
       timestamp: 1000,
       storageRefId: `ref-${row.questionID}`,
       response: row,
-    })),
-  );
+    }));
+  });
   jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected network access'));
   jest.spyOn(surveyQuestionReadsPort, 'getResponse').mockResolvedValue(null);
   jest.spyOn(surveyQuestionReadsPort, 'getSurveyResponse').mockResolvedValue(null);
@@ -122,6 +140,9 @@ const mockSession = (saved = []) => {
 const settle = (ms = 600) => act(async () => new Promise((resolve) => setTimeout(resolve, ms)));
 afterEach(() => {
   questionIds = DEFAULT_QUESTION_IDS;
+  sessionConfig = SESSION_CONFIG;
+  savedLoaded = true;
+  ownRead = Promise.resolve();
   jest.restoreAllMocks();
   sessionStorage.clear();
   localStorage.clear();
@@ -153,7 +174,7 @@ const mountWithInterview = async (prefill, edit = null) => {
     questionsCacheNonce: 2,
     onFilterChange: jest.fn(),
     runtimeStrategy: strategy,
-    sessionConfig: SESSION_CONFIG,
+    sessionConfig,
     sessionSlug: 'edge',
     activeSessionSlug: 'edge',
     toggleLoginModal: jest.fn(),
@@ -191,6 +212,19 @@ const typeInPile = (fields) => (engine) =>
       ),
     Promise.resolve(),
   );
+// The person changes the AI's drafts before their saved answers load, so the drafts stay in review,
+// chosen, each saying which saved answer it changes.
+const answerBeforeSavedAnswersLoad = async (answers) => {
+  for (const [questionId, answer] of Object.entries(answers)) {
+    const card = screen
+      .getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)
+      .find((element) => element.dataset.ceQuestionId === questionId);
+    fireEvent.click(within(card).getByRole('radio', { name: answer }));
+  }
+  savedLoaded = true;
+  await act(async () => releaseOwnRead());
+  await settle();
+};
 const submitDrafts = async () => {
   await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)));
   await settle();
@@ -201,6 +235,37 @@ const draftText = () =>
     .map((key) => sessionStorage.getItem(key))
     .join('\n');
 const uploadedRows = (upload, call) => upload.mock.calls[call][2].map((row) => [row.questionID, row.answer?.value]);
+const draftIds = () =>
+  screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT).map((card) => card.getAttribute('data-ce-question-id'));
+const openInterview = async (pile) => {
+  await act(async () => pile.engine().setState({ showVoiceModeModal: true, sessionVoiceMode: 'interview' }));
+  await settle();
+};
+// One voice round whose mapper returns these drafts; resolves to the interviewer's instructions.
+const speak = async (drafts) => {
+  const transcript = 'Responder: Here is what I think now.';
+  let instructions = '';
+  jest.mocked(mapInterviewEvidenceToResponses).mockResolvedValue(drafts);
+  jest.mocked(startSessionRealtimeInterview).mockImplementation(async (options) => {
+    instructions = options.instructions;
+    options.onRecordingState?.('recording');
+    options.onTranscript?.(transcript, []);
+    return {
+      mediaStream: {},
+      stop: jest.fn(async () => ({ transcript, turns: [] })),
+      pause: jest.fn(),
+      resume: jest.fn(),
+      getTranscript: () => transcript,
+    };
+  });
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+  await screen.findByLabelText('Pause interview');
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  await settle();
+  return instructions;
+};
+const savedQ1 = { ...savedNamedQ1, responderName: undefined, interviewProvenance: undefined };
 
 it('does not upload a draft removed after a failed interview submit', async () => {
   const upload = mockSession();
@@ -245,27 +310,40 @@ it('keeps an unsaved pile comment when the AI proposes no comment', async () => 
   expect(row.additional.value).toBe('My unsaved note');
 });
 
-it('treats an unsaved pile answer as existing, so its draft is not preselected', async () => {
+it('treats an unsaved pile answer as answered, so the interview leaves its draft out', async () => {
   const upload = mockSession();
   await mountWithInterview(
-    packet([{ questionId: 'q1', answer: 'Agree', confidence: 0.8 }]),
+    packet([
+      { questionId: 'q1', answer: 'Agree', confidence: 0.8 },
+      { questionId: 'q3', answer: 'Agree', confidence: 0.8 },
+    ]),
     typeInPile({ answer: 'Disagree' }),
   );
 
-  expect(screen.getByRole('button', { name: 'Replace with draft' })).toBeEnabled();
-  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
-  expect(upload).not.toHaveBeenCalled();
+  expect(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT).map((card) => card.dataset.ceQuestionId)).toEqual([
+    'q3',
+  ]);
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+    'Left out 1 draft for a question you’ve already answered.',
+  );
+  await submitDrafts();
+  // The page answer goes up as the person typed it, not replaced by the AI's draft.
+  expect(uploadedRows(upload, 0)).toEqual([
+    ['q1', 'Disagree'],
+    ['q3', 'Agree'],
+  ]);
 });
 
 it('names every submitted response once the saved name box is ticked', async () => {
-  const upload = mockSession([savedNamedQ1]);
+  const upload = mockSession([savedNamedQ1], { late: true });
   await mountWithInterview(
     packet([
-      { questionId: 'q1', answer: 'Disagree', confidence: 0.8 },
+      { questionId: 'q1', answer: 'Unsure', confidence: 0.8 },
       { questionId: 'q3', answer: 'Agree', confidence: 0.8 },
     ]),
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+  await answerBeforeSavedAnswersLoad({ q1: 'Disagree' });
+  expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
   fireEvent.click(screen.getByText('AI submission info'));
   const name = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
   expect(name).toHaveAttribute('aria-checked', 'mixed');
@@ -284,10 +362,11 @@ it('names every submitted response once the saved name box is ticked', async () 
 });
 
 it('undoes a rejected draft but keeps its name withdrawal for the next pile Submit', async () => {
-  const upload = mockSession([savedNamedQ1]);
+  const upload = mockSession([savedNamedQ1], { late: true });
   upload.mockRejectedValueOnce(new Error('User rejected the request.'));
-  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Disagree', confidence: 0.8 }]));
-  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Unsure', confidence: 0.8 }]));
+  await answerBeforeSavedAnswersLoad({ q1: 'Disagree' });
+  expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
   fireEvent.click(screen.getByText('AI submission info'));
   const name = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
   expect(name).toBeChecked();
@@ -314,10 +393,11 @@ it('undoes a rejected draft but keeps its name withdrawal for the next pile Subm
 
 it('keeps a saved comment that loads during a rejected interview upload', async () => {
   const saved = { ...savedNamedQ1, responderName: undefined, interviewProvenance: undefined };
-  const upload = mockSession([saved]);
+  const upload = mockSession([saved], { late: true });
   upload.mockRejectedValueOnce(new Error('User rejected the request.'));
-  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Disagree', confidence: 0.8 }]));
-  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Unsure', confidence: 0.8 }]));
+  await answerBeforeSavedAnswersLoad({ q1: 'Disagree' });
+  expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
   // Another device saves a comment while this upload waits for its own-answer read.
   const newer = { ...saved, additional: field('Note from another device') };
   workerHydration.loadWorkerResponses.mockResolvedValue([
@@ -335,9 +415,12 @@ it('keeps a saved comment that loads during a rejected interview upload', async 
 
 it('keeps omitted saved fields after the pile resets to another window during interview review', async () => {
   questionIds = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8'];
-  const upload = mockSession([{ ...savedNamedQ1, additional: field('Keep this saved comment'), importance: 7 }]);
-  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Disagree', confidence: 0.8 }]));
-  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+  const upload = mockSession([{ ...savedNamedQ1, additional: field('Keep this saved comment'), importance: 7 }], {
+    late: true,
+  });
+  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Unsure', confidence: 0.8 }]));
+  await answerBeforeSavedAnswersLoad({ q1: 'Disagree' });
+  expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
 
   // Rebuilding a different card window leaves the reviewed question outside the form.
   await act(async () => pile.engine().setState({ activePileIndex: 7 }));
@@ -357,12 +440,12 @@ it('keeps omitted saved fields after the pile resets to another window during in
 it.each(['', 'My edited comment'])(
   'keeps an explicit comment edit %j when an imported question needs hydration',
   async (comment) => {
-    const upload = mockSession([{ ...savedNamedQ1, additional: field('Saved comment') }]);
+    // A saved comment on a question without an answer, so its draft is offered.
+    const upload = mockSession([{ ...savedNamedQ1, answer: field(''), additional: field('Saved comment') }]);
     const pile = await mountWithInterview(
       packet([{ questionId: 'q1', answer: 'Disagree', confidence: 0.8 }]),
       typeInPile({ comment }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
     pile.engine()._savedAnswersLoadedQids.clear();
 
     await submitDrafts();
@@ -373,10 +456,11 @@ it.each(['', 'My edited comment'])(
 );
 
 it('keeps a withdrawal from a rejected interview upload through Clear changes', async () => {
-  const upload = mockSession([savedNamedQ1]);
+  const upload = mockSession([savedNamedQ1], { late: true });
   upload.mockRejectedValueOnce(new Error('User rejected the request.'));
-  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Disagree', confidence: 0.8 }]));
-  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Unsure', confidence: 0.8 }]));
+  await answerBeforeSavedAnswersLoad({ q1: 'Disagree' });
+  expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
   fireEvent.click(screen.getByText('AI submission info'));
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
   await submitDrafts();
@@ -405,12 +489,16 @@ it('keeps a withdrawal from a rejected interview upload through Clear changes', 
 
 it('stores every kept withdrawal on Clear changes, not only the cards near the current one', async () => {
   questionIds = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8'];
-  const upload = mockSession(questionIds.map((id) => ({ ...savedNamedQ1, questionID: id, prompt: id.toUpperCase() })));
+  const upload = mockSession(
+    questionIds.map((id) => ({ ...savedNamedQ1, questionID: id, prompt: id.toUpperCase() })),
+    { late: true },
+  );
   upload.mockRejectedValueOnce(new Error('User rejected the request.'));
   const pile = await mountWithInterview(
-    packet(questionIds.map((questionId) => ({ questionId, answer: 'Disagree', confidence: 0.8 }))),
+    packet(questionIds.map((questionId) => ({ questionId, answer: 'Unsure', confidence: 0.8 }))),
   );
-  screen.queryAllByRole('button', { name: 'Replace with draft' }).forEach((button) => fireEvent.click(button));
+  await answerBeforeSavedAnswersLoad(Object.fromEntries(questionIds.map((id) => [id, 'Disagree'])));
+  expect(screen.getAllByText('Changes your earlier answer: Agree')).toHaveLength(questionIds.length);
   fireEvent.click(screen.getByText('AI submission info'));
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
   await submitDrafts();
@@ -442,12 +530,16 @@ it('stores every kept withdrawal on Clear changes, not only the cards near the c
 
 it('makes every stored withdrawal pending after a reload, and uploads them all', async () => {
   questionIds = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8'];
-  const upload = mockSession(questionIds.map((id) => ({ ...savedNamedQ1, questionID: id, prompt: id.toUpperCase() })));
+  const upload = mockSession(
+    questionIds.map((id) => ({ ...savedNamedQ1, questionID: id, prompt: id.toUpperCase() })),
+    { late: true },
+  );
   upload.mockRejectedValueOnce(new Error('User rejected the request.'));
   const pile = await mountWithInterview(
-    packet(questionIds.map((questionId) => ({ questionId, answer: 'Disagree', confidence: 0.8 }))),
+    packet(questionIds.map((questionId) => ({ questionId, answer: 'Unsure', confidence: 0.8 }))),
   );
-  screen.queryAllByRole('button', { name: 'Replace with draft' }).forEach((button) => fireEvent.click(button));
+  await answerBeforeSavedAnswersLoad(Object.fromEntries(questionIds.map((id) => [id, 'Disagree'])));
+  expect(screen.getAllByText('Changes your earlier answer: Agree')).toHaveLength(questionIds.length);
   fireEvent.click(screen.getByText('AI submission info'));
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
   await submitDrafts();
@@ -510,3 +602,86 @@ it('loads a card that scrolls into view after a Submit, before a rating-only cha
   });
   expect(row.importance).toBe(7);
 }, 60000);
+
+it('leaves out an AI draft for an answer saved outside the card window when the Worker lists no own answers', async () => {
+  questionIds = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8'];
+  const upload = mockSession([savedQ1]);
+  jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockResolvedValue(null);
+  const pile = await mountWithInterview(
+    packet([
+      { questionId: 'q1', answer: 'Disagree', confidence: 0.8 },
+      { questionId: 'q2', answer: 'Agree', confidence: 0.8 },
+    ]),
+  );
+  // The pile puts answered questions last, so q1's saved answer sits outside its card window.
+  expect(pile.engine().state.surveysResponseState[0].answers.q1).toBeUndefined();
+  expect(draftIds()).toEqual(['q2']);
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+    'Left out 1 draft for a question you’ve already answered.',
+  );
+
+  await submitDrafts();
+
+  expect(uploadedRows(upload, 0)).toEqual([['q2', 'Agree']]);
+}, 40000);
+
+it('reads answers saved outside a rebuilt card window for the voice interviewer, its drafts and the upload', async () => {
+  questionIds = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8'];
+  const upload = mockSession([savedQ1, { ...savedQ1, questionID: 'q2', prompt: 'Q2' }]);
+  const pile = await mountWithInterview(null);
+  await openInterview(pile);
+  // Moving the card window drops the saved answers the interview loaded from the form.
+  await act(async () => pile.engine().setState({ activePileIndex: 3 }));
+  await run(() => new Promise((resolve) => pile.engine().initializeResponseState(resolve)));
+  const form = pile.engine().state.surveysResponseState[0].answers;
+  expect([form.q1?.value ?? '', form.q2?.value ?? '']).toEqual(['', '']);
+
+  const instructions = await speak([
+    { questionId: 'q1', answer: 'Agree', confidence: 0.9 },
+    { questionId: 'q2', answer: 'Disagree', confidence: 0.9 },
+    { questionId: 'q3', answer: 'Agree', confidence: 0.9 },
+  ]);
+
+  expect(instructions).toContain('[q3]');
+  expect(instructions).not.toContain('[q1]');
+  expect(instructions).not.toContain('[q2]');
+  // Repeating the saved q1 adds nothing; the new q2 answer says what it changes.
+  expect(draftIds()).toEqual(['q2', 'q3']);
+  expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
+  await submitDrafts();
+  expect(uploadedRows(upload, 0).sort()).toEqual([
+    ['q2', 'Disagree'],
+    ['q3', 'Agree'],
+  ]);
+}, 40000);
+
+it.each([
+  ['full', ['q3']],
+  ['minimal', undefined],
+])(
+  'records a voice draft that changes a saved answer as shown, and a dismissed one only at %s detail',
+  async (researchDetail, unselected) => {
+    sessionConfig = { ...SESSION_CONFIG, interviewMode: { researchDetail, shareDraftChangesByDefault: true } };
+    const upload = mockSession([savedQ1, { ...savedQ1, questionID: 'q3', prompt: 'Q3' }]);
+    const pile = await mountWithInterview(null);
+    await openInterview(pile);
+    await speak([
+      { questionId: 'q1', answer: 'Disagree', confidence: 0.9 },
+      { questionId: 'q3', answer: 'Disagree', confidence: 0.9 },
+    ]);
+    expect(screen.getAllByText('Changes your earlier answer: Agree')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Q3' }));
+    // The earlier answer kept its own research choice, so sharing this one is an explicit choice.
+    const sharing = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
+    expect(sharing).not.toBeChecked();
+    fireEvent.click(sharing);
+
+    await submitDrafts();
+
+    const rows = upload.mock.calls[0][2];
+    expect(rows.map((row) => [row.questionID, row.answer.value])).toEqual([['q1', 'Disagree']]);
+    expect(rows[0].interviewProvenance).toMatchObject({ predictionCondition: 'shown', draftOrigin: 'voice_interview' });
+    expect(rows[0].interviewProvenance.unselectedPredictions?.map((entry) => entry.questionId)).toEqual(unselected);
+  },
+  40000,
+);

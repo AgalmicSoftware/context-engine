@@ -10,6 +10,7 @@ import {
   type InterviewSavedSlice,
 } from './sessionInterviewSavedAnswers';
 import type { SurveyQuestionsRuntimeEngine } from './surveyQuestionsTypes';
+import { hasMeaningfulFieldValue } from './surveyToolDraftState';
 import { buildRatingEnvelopeQidSetFromUserAnswers } from './surveyToolResponseState';
 import { resolveEffectiveSlug } from './surveyToolScope';
 import { normalizeQuestionIdKey } from './surveyToolSignatures';
@@ -114,6 +115,52 @@ const mergeSavedAnswersIntoForm = async (
   );
   if (!isCurrent()) throw new Error('The signed-in account or session changed.');
   questionIds.forEach((id) => engine._savedAnswersLoadedQids?.add(normalizeQuestionIdKey(id)));
+};
+
+const savedInterviewAnswers = new WeakMap<object, { key: string; userAnswers: unknown; slice: RecordValue }>();
+
+// The person's saved answers and comments for these questions: their own saved-answer reads
+// over the response cache. Rebuilt only when either changes.
+const readSavedInterviewAnswers = (engine: SurveyQuestionsRuntimeEngine, questionIds: string[]) => {
+  const { props, state } = engine;
+  const key = JSON.stringify([
+    props.account,
+    resolveEffectiveSlug(props),
+    props.questionsCacheNonce,
+    props.questionResponsesNonce,
+    questionIds,
+  ]);
+  const memo = savedInterviewAnswers.get(engine);
+  if (memo && memo.key === key && memo.userAnswers === state.userAnswers) return memo.slice;
+  const cached = readPlainRecord(engine.buildSliceFromLocalCache?.(questionIds));
+  const own = readPlainRecord(state.userAnswers ? engine.buildSliceFromUserAnswers(state.userAnswers) : null);
+  const slice = Object.fromEntries(
+    ['answers', 'additionalComments'].map((field) => [
+      field,
+      { ...readPlainRecord(cached[field]), ...readPlainRecord(own[field]) },
+    ]),
+  );
+  savedInterviewAnswers.set(engine, { key, userAnswers: state.userAnswers, slice });
+  return slice;
+};
+
+/**
+ * The person's answers as the interview reads them. The form holds only the pile's card window,
+ * so a question with no answer there takes the saved one. Comments are only shown, so one the
+ * person cleared stays cleared.
+ */
+export const buildSessionInterviewResponseSlice = (engine: SurveyQuestionsRuntimeEngine, questionIds: string[]) => {
+  const form = readPlainRecord(engine.state.surveysResponseState?.[0]);
+  const saved = readSavedInterviewAnswers(engine, questionIds);
+  const answers = { ...readPlainRecord(form.answers) };
+  for (const [id, entry] of Object.entries(readPlainRecord(saved.answers))) {
+    if (!hasMeaningfulFieldValue(readPlainRecord(answers[id]))) answers[id] = entry;
+  }
+  return {
+    ...form,
+    answers,
+    additionalComments: { ...readPlainRecord(saved.additionalComments), ...readPlainRecord(form.additionalComments) },
+  };
 };
 
 /** Imported questions can sit outside the pile's hydrated card window. */

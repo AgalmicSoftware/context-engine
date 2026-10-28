@@ -1,5 +1,5 @@
 // Saved consent displayed by the real pile interview and submitted through its callbacks.
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
 import * as workerHydration from '../../utilities/survey/workerResponseHydration';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -81,15 +81,28 @@ const packet = (responderContext, answer = 'Agree') => ({
   responses: [{ questionId: 'q1', answer, confidence: 0.8 }],
 });
 
+// The interview leaves out drafts for answered questions, so a draft shows saved consent only
+// when its saved answer loads after the person edited the draft. Until
+// editDraftBeforeSavedAnswerLoads(), neither the response cache nor the own-answer read returns it.
+let savedLoaded = false;
+let releaseOwnRead = () => {};
+let ownRead = Promise.resolve();
+const holdSavedAnswers = () => {
+  savedLoaded = false;
+  ownRead = new Promise((resolve) => {
+    releaseOwnRead = resolve;
+  });
+};
 const mockCaches = () => {
+  holdSavedAnswers();
   jest
     .spyOn(contractScriptsModule, 'getSessionConfigBySlug')
     .mockImplementation((slug) => (slug === 'edge' ? SESSION_CONFIG : null));
   const cache = () => ({
     84532: {
       questions: { q1: { id: 'q1', type: 'binary', prompt: 'Q1' } },
-      questionResponses: { q1: { [A]: JSON.stringify(savedNamedAi) } },
-      questionResponsesMeta: { q1: { [A]: { ts: 1000, storageRefId: 'ref-a' } } },
+      questionResponses: savedLoaded ? { q1: { [A]: JSON.stringify(savedNamedAi) } } : {},
+      questionResponsesMeta: savedLoaded ? { q1: { [A]: { ts: 1000, storageRefId: 'ref-a' } } } : {},
       pendingQuestionMetadata: {},
     },
   });
@@ -168,10 +181,19 @@ const consentControls = () => {
     aiAria: ai ? ai.getAttribute('aria-checked') : null,
   };
 };
-const selectDraft = () => {
-  // A draft for an answered question starts deselected; "Replace with draft" selects it.
-  const replace = screen.queryByText(/Replace with draft|Restore draft/);
-  if (replace) fireEvent.click(replace);
+// The person changes the q1 draft before its saved answer loads, so the draft stays in review.
+const editDraftBeforeSavedAnswerLoads = async (getEngine, answer) => {
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  await settle();
+  const card = screen
+    .getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)
+    .find((element) => element.dataset.ceQuestionId === 'q1');
+  fireEvent.click(within(card).getByRole('radio', { name: answer }));
+  savedLoaded = true;
+  releaseOwnRead();
+  // Without an own-answer listing, the pile finds the saved answer when its response cache refreshes.
+  await act(async () => getEngine.view.rerenderSurveyQuestions({ questionResponsesNonce: 3 }));
+  await settle();
 };
 const submitAndCapture = async (submitResponses) => {
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
@@ -182,21 +204,17 @@ const submitAndCapture = async (submitResponses) => {
 
 it('shows the saved name when own answers load', async () => {
   mockCaches();
-  jest.spyOn(workerHydration, 'isWorkerCanonicalSessionConfig').mockReturnValue(true);
-  jest
-    .spyOn(workerHydration, 'loadWorkerResponses')
-    .mockResolvedValue([
-      { questionId: 'q1', responder: A, timestamp: 1000, storageRefId: 'ref-a', response: savedNamedAi },
-    ]);
+  mockOwnAnswerListing(true);
   const submitResponses = mockSubmit();
   const getEngine = await mountPileEngine();
-  await renderModal(getEngine, packet({}, 'Disagree'));
-  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-  await settle();
-  selectDraft();
+  await renderModal(getEngine, packet({}));
+  await editDraftBeforeSavedAnswerLoads(getEngine, 'Disagree');
+  // The edited draft stays chosen and says which saved answer it changes.
+  expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
   const controls = consentControls();
   const uploaded = await submitAndCapture(submitResponses);
   expect(controls.nameShown && controls.nameChecked).toBe(true);
+  expect(uploaded.answer.value).toBe('Disagree');
   expect(uploaded.responderName).toBe('Participant A');
   expect(uploaded.interviewProvenance).toMatchObject({
     source: { modelId: 'new-model' },
@@ -207,13 +225,11 @@ it('shows the saved name when own answers load', async () => {
 
 it('shows saved consent from the pile baseline when own-answer loading is unavailable', async () => {
   mockCaches();
-  jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockResolvedValue(null);
+  mockOwnAnswerListing(false);
   const submitResponses = mockSubmit();
   const getEngine = await mountPileEngine();
-  await renderModal(getEngine, packet({}, 'Disagree'));
-  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-  await settle();
-  selectDraft();
+  await renderModal(getEngine, packet({}));
+  await editDraftBeforeSavedAnswerLoads(getEngine, 'Disagree');
   const controls = consentControls();
   const uploaded = await submitAndCapture(submitResponses);
   // A name may only be submitted when the modal shows a ticked (or mixed) name control.
@@ -233,10 +249,8 @@ it.each([false, true])(
     mockOwnAnswerListing(available);
     const submitResponses = mockSubmit();
     const getEngine = await mountPileEngine();
-    await renderModal(getEngine, packet({ name: 'Fixture Responder' }, 'Disagree'));
-    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-    await settle();
-    selectDraft();
+    await renderModal(getEngine, packet({ name: 'Fixture Responder' }));
+    await editDraftBeforeSavedAnswerLoads(getEngine, 'Disagree');
     const controls = consentControls();
     const uploaded = await submitAndCapture(submitResponses);
     expect(controls.nameChecked).toBe(true);
@@ -258,17 +272,15 @@ const mockOwnAnswerListing = (available) => {
     return;
   }
   jest.spyOn(workerHydration, 'isWorkerCanonicalSessionConfig').mockReturnValue(true);
-  jest
-    .spyOn(workerHydration, 'loadWorkerResponses')
-    .mockResolvedValue([
-      { questionId: 'q1', responder: A, timestamp: 1000, storageRefId: 'ref-a', response: savedNamedAi },
-    ]);
+  jest.spyOn(workerHydration, 'loadWorkerResponses').mockImplementation(async () => {
+    await ownRead;
+    return [{ questionId: 'q1', responder: A, timestamp: 1000, storageRefId: 'ref-a', response: savedNamedAi }];
+  });
 };
+// Opens review on a q1 draft the person changed to `answer` before q1's saved answer loaded.
 const openReplacementDraft = async (getEngine, answer) => {
-  await renderModal(getEngine, packet({}, answer));
-  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-  await settle();
-  selectDraft();
+  await renderModal(getEngine, packet({}));
+  await editDraftBeforeSavedAnswerLoads(getEngine, answer);
   consentControls();
 };
 
@@ -297,13 +309,39 @@ it.each([
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(1));
     await settle();
-    if (reload) {
-      getEngine.view.unmount();
-      getEngine = await mountPileEngine();
-    } else {
+    if (!reload) {
+      // Reopened on the same page, the interview leaves out the draft for the answered question,
+      // so the withdrawal goes up with the next pile Submit, alongside the saved answer.
       await act(async () => getEngine().closeSessionVoiceModeModal());
       await settle(300);
+      await renderModal(getEngine, packet({}, 'Unsure'));
+      expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+        'You’ve already answered the question this draft covers.',
+      );
+      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument();
+      await act(async () => getEngine().closeSessionVoiceModeModal());
+      await settle(300);
+      await act(async () => {
+        await getEngine().handlePileSubmitClick();
+      });
+      await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(2));
+      await settle();
+      // The undone draft takes its own attribution with it; the saved answer keeps the saved one.
+      const row = submitResponses.mock.calls[1][2][0];
+      expect(row.answer.value).toBe('Agree');
+      if (choice === 'name') {
+        expect(row).not.toHaveProperty('responderName');
+        expect(row.interviewProvenance).toMatchObject({ source: { modelId: 'saved-model' } });
+      } else {
+        expect(row).not.toHaveProperty('interviewProvenance');
+        expect(row.responderName).toBe('Participant A');
+      }
+      return;
     }
+    // After a reload, the saved answer again loads after the person edits the draft.
+    holdSavedAnswers();
+    getEngine.view.unmount();
+    getEngine = await mountPileEngine();
     await openReplacementDraft(getEngine, 'Unsure');
     if (choice === 'name') {
       expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)).not.toBeInTheDocument();
@@ -402,10 +440,8 @@ it.each([false, true])(
     mockOwnAnswerListing(available);
     const submitResponses = mockSubmit();
     const getEngine = await mountPileEngine();
-    await renderModal(getEngine, packet({ name: 'Fixture Responder' }, 'Disagree'));
-    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-    await settle();
-    selectDraft();
+    await renderModal(getEngine, packet({ name: 'Fixture Responder' }));
+    await editDraftBeforeSavedAnswerLoads(getEngine, 'Disagree');
     consentControls();
     const checkbox = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
     fireEvent.click(checkbox);

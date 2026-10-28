@@ -124,15 +124,22 @@ const showUnrevealed = (current: HiddenDrafts, questionIds: string[]) => {
   return shown.length ? Object.fromEntries(Object.entries(current).filter(([id]) => !shown.includes(id))) : current;
 };
 
-type Options = ReviewValues & { questions: InterviewQuestion[]; researchOn: boolean };
+type Options = ReviewValues & {
+  questions: InterviewQuestion[];
+  researchOn: boolean;
+  // Told which still-hidden drafts' questions now have an answer, so review can drop them.
+  onAnswered: (questionIds: string[]) => void;
+};
 
 /** Hidden-draft state for one review: which drafts are hidden, and each one's blind answer once revealed. */
-export function useInterviewHiddenDrafts({ questions, editedDrafts, savedResponses, researchOn }: Options) {
+export function useInterviewHiddenDrafts({ questions, editedDrafts, savedResponses, researchOn, onAnswered }: Options) {
   const [hidden, setHidden] = useState<HiddenDrafts>({});
   const assignedRef = useRef(false);
   // Read by the stable callbacks below, which the modal's memoized callbacks depend on.
   const latest = useRef<ReviewValues & { hidden: HiddenDrafts }>({ editedDrafts, savedResponses, hidden });
   latest.current = { editedDrafts, savedResponses, hidden };
+  const onAnsweredRef = useRef(onAnswered);
+  onAnsweredRef.current = onAnswered;
   const questionFor = (questionId: string) => questions.find((question) => question.id === questionId);
 
   // Unticking research sharing shows every draft: answered ones reveal their guess,
@@ -145,13 +152,18 @@ export function useInterviewHiddenDrafts({ questions, editedDrafts, savedRespons
     });
   }, [researchOn]);
 
-  // Saved answers can load after drafts were hidden. Those questions were answered
-  // before, so their drafts become ordinary ones and are never measured as blind.
+  // Saved answers can load after drafts were hidden. Those questions were answered before,
+  // so their drafts stop being hidden and are never measured as blind. An answered question
+  // gets no suggestion, so review drops each one the person hasn't answered here.
   useEffect(() => {
-    const answered = Object.keys(latest.current.hidden).filter((id) =>
-      hasDraftValue(responseFieldValue(savedResponses, 'answers', id)),
+    const answered = Object.keys(latest.current.hidden).filter(
+      (id) =>
+        latest.current.hidden[id].revealedAt === undefined &&
+        hasDraftValue(responseFieldValue(savedResponses, 'answers', id)),
     );
-    if (answered.length) setHidden((current) => showUnrevealed(current, answered));
+    if (!answered.length) return;
+    setHidden((current) => showUnrevealed(current, answered));
+    onAnsweredRef.current(answered);
   }, [savedResponses]);
 
   /** Hides these drafts and returns those it hid. Only the first call in a review counts, so nothing already shown is hidden. */

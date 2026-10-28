@@ -274,7 +274,7 @@ it("never applies the AI's comment to a hidden draft, so a locked comment surviv
   expect(props.onApplyAdditional).toHaveBeenCalledWith(shownStatement, 'AI note');
 });
 
-it('shows a hidden draft once a saved answer for its question loads', async () => {
+it('drops a hidden draft once a saved answer for its question loads', async () => {
   const view = renderReview();
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   expect(card(hiddenStatement)).toHaveTextContent(HIDDEN_DRAFT_NOTE);
@@ -284,6 +284,30 @@ it('shows a hidden draft once a saved answer for its question loads', async () =
     importance: {},
     conviction: {},
   });
-  await waitFor(() => expect(card(hiddenStatement)).not.toHaveTextContent(HIDDEN_DRAFT_NOTE));
+  await waitFor(() => expect(card(hiddenStatement)).toBeUndefined());
+  // An answered question gets no suggestion, so its guess is never shown.
+  expect(screen.queryByText(/Your AI guessed/)).not.toBeInTheDocument();
   expect(screen.getAllByText(HIDDEN_DRAFT_NOTE)).toHaveLength(hiddenIds.length - 1);
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+    'Left out 1 draft for a question you’ve already answered.',
+  );
+});
+
+it('keeps a hidden draft the person already answered, as an ordinary draft, when a saved answer loads', async () => {
+  const view = renderReview();
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  // A rating stays hidden until the person moves on, so this answer is still blind.
+  answerWith('r1', '4');
+  expect(card('r1')).toHaveTextContent(HIDDEN_DRAFT_NOTE);
+  view.rerenderWithSaved({ answers: { r1: { value: 6 } }, additionalComments: {}, importance: {}, conviction: {} });
+  await waitFor(() => expect(card('r1')).not.toHaveTextContent(HIDDEN_DRAFT_NOTE));
+  expect(answer('r1')).toHaveValue('4');
+  expect(screen.getAllByText(HIDDEN_DRAFT_NOTE)).toHaveLength(hiddenIds.length - 1);
+  // It stays chosen with the person's own answer, which Submit sends.
+  expect(
+    within(card('r1')).queryByRole('button', { name: /Replace with draft|Restore draft/ }),
+  ).not.toBeInTheDocument();
+  submit();
+  await waitFor(() => expect(view.onSubmitResponses).toHaveBeenCalled());
+  expect(view.onApplyAnswer).toHaveBeenCalledWith('r1', 4);
 });
