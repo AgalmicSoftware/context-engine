@@ -104,7 +104,7 @@ export const buildTools = (participant) => [
     name: 'answer',
     title: 'Answer questions',
     description:
-      'Submit answers. Values by type: binary "Agree" | "Unsure" | "Disagree"; rating a whole number on the question’s scale; multichoice the option text (an array when several are allowed); quadratic one signed whole-number vote per option whose squares sum within the credit budget; freeform text. Answering again replaces your previous answer.',
+      'Submit answers. Values by type: binary "Agree" | "Unsure" | "Disagree"; rating a number on the question’s scale and step grid (default step 1); multichoice the option text (an array when several are allowed); quadratic one signed whole-number vote per option whose squares sum within the credit budget; freeform text. Answering again replaces your previous answer.',
     inputSchema: {
       type: 'object',
       properties: {

@@ -1,3 +1,4 @@
+import { normalizeRatingAnswer, normalizeRatingScale, ratingStepFor } from '../../../shared/questions/ratingScale.mjs';
 import { validateQuadraticAllocation } from '../../../shared/questions/quadraticAllocation.mjs';
 import { safeString, lower, safeJsonParse, stableJson, kvKeySafePart, nowIsoOrCurrent as nowIso, sanitizeSessionSlug, sha256Hex } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
@@ -18,7 +19,12 @@ export function normalizeAnswerForSchema(answer = {}, schema = {}) {
     if (validateQuadraticAllocation(value, schema)) return { ok: false, reason: 'answer_quadratic_invalid' };
     return { ok: true, answer: { value } };
   }
-  if (schema.kind === 'choice' || schema.kind === 'rating') {
+  if (schema.kind === 'rating') {
+    const raw = Object.hasOwn(source, 'value') ? source.value : (source.answer ?? source.rating);
+    const value = normalizeRatingAnswer(raw, schema);
+    return value === null ? { ok: false, reason: 'answer_rating_invalid' } : { ok: true, answer: { value } };
+  }
+  if (schema.kind === 'choice') {
     const raw = Object.hasOwn(source, 'value') ? source.value : (source.answer ?? source.rating);
     const scaleValues = Array.isArray(schema.values) && schema.values.length
       ? schema.values
@@ -57,13 +63,12 @@ export function normalizeAnswerForSchema(answer = {}, schema = {}) {
 }
 
 export function ratingValuesFromSchema(schema = {}) {
-  const min = Math.floor(Number(schema.min));
-  const max = Math.floor(Number(schema.max));
-  const step = Math.max(1, Math.floor(Number(schema.step)) || 1);
-  if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) return [];
-  const values = [];
-  for (let value = min; value <= max && values.length < 50; value += step) values.push(value);
-  return values;
+  const scale = normalizeRatingScale(schema);
+  if (!scale) return [];
+  const step = ratingStepFor(schema);
+  const lastIndex = Math.floor((scale.max - scale.min) / step + 1e-9);
+  return Array.from({ length: Math.min(50, lastIndex + 1) }, (_, index) =>
+    normalizeRatingAnswer(Number((scale.min + index * step).toPrecision(12)), schema));
 }
 
 export function validateAnswerRows(rows = [], space = {}) {

@@ -61612,7 +61612,7 @@ var init_transport = __esm({
 });
 
 // shared/questions/ratingScale.mjs
-var trim4, isObj9, RATING_SCALE_METADATA_KEYS, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, hasRatingScaleMetadata, toFiniteNumber, normalizeRatingLabel, normalizeRatingScale;
+var trim4, isObj9, RATING_SCALE_METADATA_KEYS, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, hasRatingScaleMetadata, toFiniteNumber, normalizeRatingLabel, normalizeRatingScale, DEFAULT_RATING_SCALE2, ratingStepFor, decimalPlaces, normalizeRatingAnswer;
 var init_ratingScale = __esm({
   "shared/questions/ratingScale.mjs"() {
     trim4 = (value) => String(value == null ? "" : value).trim();
@@ -61668,29 +61668,44 @@ var init_ratingScale = __esm({
         )
       };
     };
+    DEFAULT_RATING_SCALE2 = Object.freeze({ min: 0, max: 10, minLabel: "0", maxLabel: "10" });
+    ratingStepFor = (question = {}) => {
+      const source = [question.scale, question.ratingScale].find((record3) => isObj9(record3) && recordHasRatingScaleMetadata(record3)) || question;
+      const step = Number(source.step);
+      return Number.isFinite(step) && step > 0 ? step : 1;
+    };
+    decimalPlaces = (value) => {
+      const [coefficient, exponent = "0"] = String(value).split("e");
+      return Math.max(0, (coefficient.split(".")[1]?.length || 0) - Number(exponent));
+    };
+    normalizeRatingAnswer = (value, question = {}) => {
+      if (typeof value !== "number" && typeof value !== "string") return null;
+      if (typeof value === "string" && value.trim() === "") return null;
+      const number2 = Number(value);
+      const { min, max } = normalizeRatingScale(question) || DEFAULT_RATING_SCALE2;
+      const step = ratingStepFor(question);
+      const index = (number2 - min) / step;
+      if (!Number.isFinite(number2) || number2 < min || number2 > max || !Number.isFinite(index) || Math.abs(index - Math.round(index)) > 1e-9) return null;
+      const precision = Math.min(100, Math.max(decimalPlaces(step), decimalPlaces(min)));
+      return Number((min + Math.round(index) * step).toFixed(precision));
+    };
   }
 });
 
 // workers/sessionCorsWorker/agent/ratingScale.mjs
 function normalizeAgentRatingScale(question = {}) {
-  const record3 = question?.rating_scale && !question?.ratingScale ? { ...question, ratingScale: question.rating_scale } : question || {};
-  const shared = normalizeRatingScale(record3) || DEFAULT_RATING_SCALE;
-  const stepSource = [record3.scale, record3.ratingScale].find((value) => value && typeof value === "object" && !Array.isArray(value) && hasRatingScaleMetadata(value)) || record3;
-  const storedStep = Number(stepSource.step);
-  const step = Number.isFinite(storedStep) && storedStep > 0 ? storedStep : Math.max(1, Math.ceil((shared.max - shared.min) / 20));
-  return { min: shared.min, max: shared.max, step };
+  const record3 = withLegacyScale(question);
+  const { min, max } = normalizeRatingScale(record3) || DEFAULT_RATING_SCALE2;
+  return { min, max, step: ratingStepFor(record3) };
 }
 function normalizeAgentRatingAnswer(value, question = {}) {
-  if (value == null || String(value).trim() === "") return null;
-  const numeric = Number(value);
-  const { min, max, step } = normalizeAgentRatingScale(question);
-  const index = (numeric - min) / step;
-  return Number.isFinite(numeric) && numeric >= min && numeric <= max && Math.abs(index - Math.round(index)) < 1e-8 ? numeric : null;
+  return normalizeRatingAnswer(value, withLegacyScale(question));
 }
+var withLegacyScale;
 var init_ratingScale2 = __esm({
   "workers/sessionCorsWorker/agent/ratingScale.mjs"() {
     init_ratingScale();
-    init_constants2();
+    withLegacyScale = (question) => question?.rating_scale && !question?.ratingScale ? { ...question, ratingScale: question.rating_scale } : question || {};
   }
 });
 
@@ -80088,8 +80103,8 @@ var require_ar = __commonJS({
         let b2 = this.stringToBigNum(winstonStringB);
         return a.minus(winstonStringB).toFixed(0);
       }
-      stringToBigNum(stringValue, decimalPlaces = 12) {
-        return this.BigNum(stringValue, decimalPlaces);
+      stringToBigNum(stringValue, decimalPlaces2 = 12) {
+        return this.BigNum(stringValue, decimalPlaces2);
       }
     };
     exports.default = Ar;
@@ -88328,6 +88343,7 @@ init_redaction();
 init_wrappedCore();
 
 // workers/sessionCorsWorker/agent/wrappedAnswers.mjs
+init_ratingScale();
 init_quadraticAllocation();
 init_runtimePrimitives();
 init_redaction();
@@ -89333,7 +89349,12 @@ function normalizeAnswerForSchema(answer = {}, schema = {}) {
     if (validateQuadraticAllocation(value, schema)) return { ok: false, reason: "answer_quadratic_invalid" };
     return { ok: true, answer: { value } };
   }
-  if (schema.kind === "choice" || schema.kind === "rating") {
+  if (schema.kind === "rating") {
+    const raw = Object.hasOwn(source, "value") ? source.value : source.answer ?? source.rating;
+    const value = normalizeRatingAnswer(raw, schema);
+    return value === null ? { ok: false, reason: "answer_rating_invalid" } : { ok: true, answer: { value } };
+  }
+  if (schema.kind === "choice") {
     const raw = Object.hasOwn(source, "value") ? source.value : source.answer ?? source.rating;
     const scaleValues = Array.isArray(schema.values) && schema.values.length ? schema.values : ratingValuesFromSchema(schema);
     const matched = scaleValues.find((value) => String(value) === String(raw));
@@ -89364,13 +89385,11 @@ function normalizeAnswerForSchema(answer = {}, schema = {}) {
   return { ok: false, reason: "answer_schema_unsupported" };
 }
 function ratingValuesFromSchema(schema = {}) {
-  const min = Math.floor(Number(schema.min));
-  const max = Math.floor(Number(schema.max));
-  const step = Math.max(1, Math.floor(Number(schema.step)) || 1);
-  if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) return [];
-  const values = [];
-  for (let value = min; value <= max && values.length < 50; value += step) values.push(value);
-  return values;
+  const scale = normalizeRatingScale(schema);
+  if (!scale) return [];
+  const step = ratingStepFor(schema);
+  const lastIndex = Math.floor((scale.max - scale.min) / step + 1e-9);
+  return Array.from({ length: Math.min(50, lastIndex + 1) }, (_, index) => normalizeRatingAnswer(Number((scale.min + index * step).toPrecision(12)), schema));
 }
 function validateAnswerRows(rows = [], space = {}) {
   if (!Array.isArray(rows) || rows.length < 1 || rows.length > MAX_BULK_ROWS) {
@@ -97533,6 +97552,7 @@ async function handleActionsRequest({ env = {}, context = {}, input = {} } = {})
 }
 
 // workers/sessionCorsWorker/agent/participation.mjs
+init_ratingScale2();
 init_agentAnswerSchema();
 init_quadraticAllocation();
 init_runtimePrimitives();
@@ -97596,8 +97616,8 @@ function normalizeDraftForQuestion(answer = {}, question = {}) {
     };
   }
   if (questionType === "rating") {
-    const value = Number(firstValue2(source.value, source.rating, source.answer, source.label));
-    if (!Number.isFinite(value)) return null;
+    const value = normalizeAgentRatingAnswer(firstValue2(source.value, source.rating, source.answer, source.label), question);
+    if (value === null) return null;
     return {
       label: String(value),
       value: { questionType: "rating", value, comments },

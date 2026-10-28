@@ -104,8 +104,9 @@ Then ask the agent to join with the session link it was given:
 | `claim_sbt` | Claims a session SBT (soulbound membership token) to the agent's own address. |
 
 Answer values by question type: binary `"Agree"`, `"Unsure"` or `"Disagree"`;
-rating a whole number on the question's scale (0–10 unless it says
-otherwise); multichoice the option text (an array when several are allowed);
+rating a number on the question's scale and step grid (0–10 with step 1
+unless stored bounds or a positive step say otherwise); multichoice the option
+text (an array when several are allowed);
 quadratic one signed whole-number vote per option, with squared votes summing
 to at most the credit budget (99 unless it says otherwise); freeform text.
 

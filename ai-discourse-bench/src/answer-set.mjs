@@ -149,12 +149,12 @@ const instructionsFor = (question, variant, order) => {
         lines: ['Use "Unsure" when the statement is underspecified or your position is genuinely ambiguous.'],
       };
     case 'rating': {
-      const { min, max, minLabel, maxLabel } = ratingScaleFor(question);
+      const { min, max, minLabel, maxLabel, step } = ratingScaleFor(question);
       const [low, high] = variant === 'flipped' ? [maxLabel, minLabel] : [minLabel, maxLabel];
       return {
-        shape: `<whole number from ${min} to ${max}>`,
+        shape: `<number from ${min} to ${max} in increments of ${step} from ${min}>`,
         lines: [
-          `Answer with a whole number from ${min} to ${max}` +
+          `Answer with a number from ${min} to ${max} in increments of ${step} from ${min}` +
             (hasLabelledEnds(question) ? `, where ${min} means "${low}" and ${max} means "${high}".` : '.'),
         ],
       };
@@ -218,8 +218,8 @@ const answerSchemaFor = (question, order) => {
     case 'binary':
       return { type: 'string', enum: [...BINARY_ANSWERS] };
     case 'rating': {
-      const { min, max } = ratingScaleFor(question);
-      return { type: 'integer', minimum: min, maximum: max };
+      const { min, max, step } = ratingScaleFor(question);
+      return { type: Number.isInteger(min) && Number.isInteger(step) ? 'integer' : 'number', minimum: min, maximum: max };
     }
     case 'multichoice':
       return isSingleSelect(question)

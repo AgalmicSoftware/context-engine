@@ -1,5 +1,5 @@
 import { getVoiceCredits, validateQuadraticAllocation } from './quadraticAllocation.mjs';
-import { normalizeRatingScale } from './ratingScale.mjs';
+import { normalizeRatingScale, ratingStepFor, normalizeRatingAnswer, DEFAULT_RATING_SCALE } from './ratingScale.mjs';
 
 // What each question type accepts as an answer: the MCP server checks its
 // agents' answers with this, and the AI discourse benchmark its models'.
@@ -11,7 +11,7 @@ const MAX_FREEFORM_LENGTH = 8000;
 const trim = (value) => (typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : '');
 const fail = (error) => ({ ok: false, error });
 
-export const ratingScaleFor = (question = {}) => normalizeRatingScale(question) || { min: 0, max: 10, minLabel: '0', maxLabel: '10' };
+export const ratingScaleFor = (question = {}) => ({ ...(normalizeRatingScale(question) || DEFAULT_RATING_SCALE), step: ratingStepFor(question) });
 
 export const optionsOf = (question) => (Array.isArray(question.options) ? question.options.filter((option) => typeof option === 'string') : []);
 // Older questions marked single choice as oneSelectionOnly; the web client honours both.
@@ -32,9 +32,9 @@ export const normalizeAnswerValue = (question = {}, value) => {
     }
     case 'rating': {
       const scale = ratingScaleFor(question);
-      const number = typeof value === 'string' && trim(value) !== '' ? Number(value) : value;
-      if (!Number.isInteger(number) || number < scale.min || number > scale.max) {
-        return fail(`Rating answers must be a whole number from ${scale.min} to ${scale.max}.`);
+      const number = normalizeRatingAnswer(value, question);
+      if (number === null) {
+        return fail(`Rating answers must be from ${scale.min} to ${scale.max} in increments of ${scale.step} from ${scale.min}.`);
       }
       return { ok: true, value: number };
     }

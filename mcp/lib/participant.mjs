@@ -77,7 +77,7 @@ const finiteNumber = (value) => {
   return undefined;
 };
 
-const SCALE_KEYS = ['min', 'minimum', 'max', 'maximum', 'minLabel', 'lowLabel', 'maxLabel', 'highLabel'];
+const SCALE_KEYS = ['step', 'min', 'minimum', 'max', 'maximum', 'minLabel', 'lowLabel', 'maxLabel', 'highLabel'];
 
 // Keeps only plain numbers and strings, so later scale helpers never touch untrusted objects.
 const cleanScale = (record) => {

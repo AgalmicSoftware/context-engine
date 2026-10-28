@@ -782,3 +782,23 @@ test('a missing stored mark holds both scans until new blocks can be covered by 
   assert.equal(questions.complete, true);
   assert.equal(answers.complete, true);
 });
+
+test('participant question reads retain stored rating steps for answer validation', async (t) => {
+  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-rating-participant-'));
+  t.after(() => fs.rm(stateDir, { recursive: true, force: true }));
+  const f = fixture();
+  const participant = createParticipant({ config: readConfig({ CE_MCP_STATE_DIR: stateDir }), wallet, registry: f.options,
+    fetchImpl: async (url, init) => {
+      if (new URL(url).hostname !== 'w.example.dev') return f.fetchImpl(url, init);
+      const pathname = new URL(url).pathname;
+      if (pathname === '/resource-presence') return Response.json({ resources: { txGas: false } });
+      if (pathname === '/auth/nonce') return Response.json({ nonce: 'nonce123456' });
+      if (pathname === '/auth/login') return Response.json({ error: 'fixture read only' }, { status: 403 });
+      throw new Error(`Unexpected Worker read ${pathname}`);
+    },
+  });
+  await participant.joinSession({ link: 'https://contextengine.sh/session/town' });
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'A fractional rating', type: 'rating', scale: { min: -0.5, max: 0.5, step: 0.1 } });
+  const question = (await participant.listQuestions()).questions[0];
+  assert.equal(question.scale.step, 0.1);
+});

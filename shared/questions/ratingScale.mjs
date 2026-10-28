@@ -63,3 +63,32 @@ export const normalizeRatingScale = (question = {}) => {
     ),
   };
 };
+
+export const DEFAULT_RATING_SCALE = Object.freeze({ min: 0, max: 10, minLabel: '0', maxLabel: '10' });
+
+export const ratingStepFor = (question = {}) => {
+  // A step-only record cannot override the record supplying the bounds.
+  const source = [question.scale, question.ratingScale].find((record) =>
+    isObj(record) && recordHasRatingScaleMetadata(record)) || question;
+  const step = Number(source.step);
+  return Number.isFinite(step) && step > 0 ? step : 1;
+};
+
+const decimalPlaces = (value) => {
+  const [coefficient, exponent = '0'] = String(value).split('e');
+  return Math.max(0, (coefficient.split('.')[1]?.length || 0) - Number(exponent));
+};
+
+export const normalizeRatingAnswer = (value, question = {}) => {
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  const number = Number(value);
+  const { min, max } = normalizeRatingScale(question) || DEFAULT_RATING_SCALE;
+  const step = ratingStepFor(question);
+  const index = (number - min) / step;
+  if (!Number.isFinite(number) || number < min || number > max || !Number.isFinite(index) ||
+      Math.abs(index - Math.round(index)) > 1e-9) return null;
+  // Preserve the grid's origin as well as its step, removing floating point noise.
+  const precision = Math.min(100, Math.max(decimalPlaces(step), decimalPlaces(min)));
+  return Number((min + Math.round(index) * step).toFixed(precision));
+};

@@ -29,10 +29,10 @@ describe('ratingValue', () => {
 
   it('normalizes per-question rating scales and clamps values against them', () => {
     const scale = normalizeRatingScale({
-      scale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' },
+      scale: { min: 1, max: 10, minLabel: '1', maxLabel: '10', step: 1 },
     });
 
-    expect(scale).toEqual({ min: 1, max: 10, minLabel: '1', maxLabel: '10' });
+    expect(scale).toEqual({ min: 1, max: 10, minLabel: '1', maxLabel: '10', step: 1 });
     expect(normalizeRatingValue(0, scale.min, scale)).toBe(1);
     expect(normalizeRatingValue(11, scale.min, scale)).toBe(10);
     expect(getRatingFillPercent(5.5, scale.min, scale)).toBe(50);
@@ -49,6 +49,7 @@ describe('ratingValue', () => {
       max: 10,
       minLabel: 'Strongly oppose',
       maxLabel: 'Strongly support',
+      step: 1,
     });
   });
 
@@ -58,6 +59,7 @@ describe('ratingValue', () => {
       max: 10,
       minLabel: '0',
       maxLabel: '10',
+      step: 1,
     });
   });
 });

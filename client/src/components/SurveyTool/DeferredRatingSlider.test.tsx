@@ -49,3 +49,23 @@ describe('DeferredRatingSlider', () => {
     expect(resolveDeferredRatingSliderStyle()).toEqual({ width: '200px' });
   });
 });
+
+import { ratingConformance } from '../../../../shared/questions/ratingConformance.mjs';
+import { normalizeRatingScale, normalizeRatingValue } from '../../utilities/survey/ratingValue.js';
+
+it.each(ratingConformance)('uses the shared slider step: $name', ({ scale, expected }) => {
+  const normalized = normalizeRatingScale({ scale });
+  const onCommit = jest.fn();
+  render(<DeferredRatingSlider value={expected ?? scale.min} scale={normalized} onCommit={onCommit} />);
+  expect(screen.getByRole('slider')).toHaveAttribute('step', String(scale.step ?? 1));
+  expect(onCommit).not.toHaveBeenCalled();
+});
+
+it('keeps a displayed historical answer that is off the current grid', () => {
+  const scale = normalizeRatingScale({ scale: { min: 0, max: 10, step: 2 } });
+  const onCommit = jest.fn();
+  expect(normalizeRatingValue(3, null, scale)).toBe(3);
+  render(<DeferredRatingSlider value={3} scale={scale} onCommit={onCommit} />);
+  expect(screen.getByLabelText('Current rating')).toHaveTextContent('3');
+  expect(onCommit).not.toHaveBeenCalled();
+});

@@ -110,7 +110,7 @@ test('prompts show options in the order asked, and the scale the way round asked
   assert.match(allocation, /You have 16 credits/);
   assert.match(buildAnswerPrompt({ question: questions.qr, variant: 'scale' }), /0 means "Very pessimistic" and 10 means "Very optimistic"/);
   // The JSON shape shows placeholders, not answers a model could copy.
-  assert.match(buildAnswerPrompt({ question: questions.qn, variant: 'scale' }), /\{"answer":<whole number from 0 to 40>,/);
+  assert.match(buildAnswerPrompt({ question: questions.qn, variant: 'scale' }), /\{"answer":<number from 0 to 40 in increments of 1 from 0>,/);
   assert.match(choice, /\{"answer":"<exact text of one option>",/);
   assert.match(allocation, /\{"answer":\[<vote for option 1>, <vote for option 2>, <vote for option 3>\],/);
   assert.match(buildAnswerPrompt({ question: questions.qr, variant: 'flipped' }), /0 means "Very optimistic" and 10 means "Very pessimistic"/);
@@ -136,7 +136,7 @@ test('replies are mapped back to the question and checked like a person’s answ
   assert.match(read(questions.qq, 'shuffled', [4, 1, 0], [0, 1, 2]).parseError, /exceeds the voice-credit budget/);
   assert.equal(read(questions.qr, 'scale', 2).answer, 2);
   assert.equal(read(questions.qr, 'flipped', 2).answer, 8, 'a 2 on the flipped scale is an 8 on the question’s own');
-  assert.match(read(questions.qr, 'scale', 11).parseError, /whole number from 0 to 10/);
+  assert.match(read(questions.qr, 'scale', 11).parseError, /from 0 to 10 in increments of 1/);
   assert.equal(read(questions.qf, 'as-asked', 'Evidence of deception.').answer, 'Evidence of deception.');
   const reversed = parseAnswerOutput({
     rawText: reply('Agree'),
@@ -204,7 +204,7 @@ test('a reply that fails the checks is asked again, then kept as unanswered', as
   });
   assert.equal(calls, 4, 'two attempts for each way of asking');
   assert.equal(result.unanswered, 2);
-  assert.match(result.rows[0].parseError, /whole number from 0 to 10/);
+  assert.match(result.rows[0].parseError, /from 0 to 10 in increments of 1/);
 });
 
 test('the answer command writes rows for a session’s questions', async () => {
@@ -229,4 +229,20 @@ test('the answer command writes rows for a session’s questions', async () => {
     runCli(['answer', '--questions', questionsPath, '--models', rosterPath]),
     /Missing --out/,
   );
+});
+
+import { ratingConformance } from '../../shared/questions/ratingConformance.mjs';
+for (const { name, scale, input, expected } of ratingConformance) {
+  test(`benchmark rating conformance: ${name}`, () => {
+    const question = readQuestionSet([{ id: 'q-rating', prompt: 'A fixture rating', type: 'rating', scale }]).questions[0];
+    const result = parseAnswerOutput({ rawText: JSON.stringify({ answer: input }), question, variant: 'scale', order: [] });
+    assert.equal(result.parseError === '', expected !== null);
+    assert.equal(result.answer, expected);
+  });
+}
+
+test('fractional rating prompts and schema accept the shared scale', () => {
+  const question = { type: 'rating', scale: { min: -0.5, max: 0.5, step: 0.1 } };
+  assert.match(buildAnswerPrompt({ question, variant: 'scale', order: [] }), /increments of 0.1/);
+  assert.equal(answerJsonSchema({ question, variant: 'scale', order: [] }).schema.properties.answer.type, 'number');
 });

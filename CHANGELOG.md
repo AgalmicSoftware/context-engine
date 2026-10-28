@@ -258,6 +258,9 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Use one rating bounds and step rule across browser sliders, agent drafts and
+  submissions, Wrapped, MCP and benchmark answers; suggested buttons are display hints.
+
 - Verify recovery of saved answers and unsaved drafts after reload without
   resending saved records.
 - Exercise current MCP and browser readers against the unchanged previous
