@@ -1209,3 +1209,109 @@ describe('Worker metadata tombstones', () => {
     },
   );
 });
+
+describe.each(['questions', 'surveys'] as const)('complete %s catalog reconciliation', (resource) => {
+  const sessionConfig = buildWorkerSessionConfig();
+  const identity = resolveWorkerCanonicalCacheIdentity({
+    sessionConfig,
+    sessionSlug: 'worker-session',
+    reader: 'participant',
+  });
+  const merge = resource === 'questions' ? mergeWorkerCanonicalQuestionMetadata : mergeWorkerCanonicalSurveyMetadata;
+  const load = resource === 'questions' ? loadWorkerCanonicalQuestions : loadWorkerCanonicalSurveys;
+  const refsField = resource === 'questions' ? 'workerQuestionMetadataRefs' : 'workerSurveyMetadataRefs';
+  const pendingField = resource === 'questions' ? 'pendingQuestionMetadata' : 'pendingSurveyMetadata';
+  const now = Date.parse('2026-10-28T12:00:00Z');
+  const entry = (id: string, storageRefId: string, createdAtMs: number): WorkerCanonicalMetadataEntry => ({
+    id,
+    storageRefId,
+    createdAtMs,
+    uploadAuthority: 'admin',
+    storageRef: { backend: 'cloudflare', id: storageRefId, resource },
+    payload: { id, title: storageRefId, prompt: storageRefId, sessionSlug: 'worker-session', sessionId: SESSION_ID },
+  });
+  beforeEach(() => {
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    (peekCacheSync as jest.Mock).mockReturnValue(null);
+  });
+
+  it.each([
+    ['stale', 600001, false, false],
+    ['recent', 599999, false, true],
+    ['boundary', 600000, false, true],
+    ['pending', 600001, true, true],
+  ] as const)('reconciles an omitted %s entry', (_label, age, pending, keep) => {
+    const cache = merge(null, [entry('q1', 'cf_saved', now - age)], identity) as any;
+    if (pending) cache.worker[pendingField].q1 = { attempts: 1 };
+    const next = merge(cache, { rows: [], listedStorageRefIds: new Set() }, identity) as any;
+    expect(Boolean(next.worker[resource].q1)).toBe(keep);
+    expect(Boolean(next.worker[refsField].q1)).toBe(keep);
+    expect(cache.worker[resource].q1).toBeDefined();
+  });
+
+  it('replaces an omitted preferred version with an older accessible version', async () => {
+    const cache = merge(null, [entry('q1', 'cf_preferred', now - 700000)], identity) as any;
+    (peekCacheSync as jest.Mock).mockReturnValue(cache);
+    const listing = await load(
+      { sessionConfig, sessionSlug: 'worker-session', account: 'participant' },
+      {
+        listSessionStorageRefsPage: async () => ({
+          items: [buildListedItem('cf_older', resource, new Date(now - 800000).toISOString())],
+          cursor: null,
+          listComplete: true,
+        }),
+        readSessionStorageBlob: async () =>
+          ({
+            json: async () => ({
+              id: 'q1',
+              title: 'Older',
+              prompt: 'Older',
+              sessionSlug: 'worker-session',
+              sessionId: SESSION_ID,
+            }),
+          }) as Response,
+      },
+    );
+    const next = merge(cache, listing, identity) as any;
+    expect(next.worker[refsField].q1.storageRefId).toBe('cf_older');
+    expect(next.worker[resource].q1.prompt).toBe('Older');
+  });
+
+  it('includes cached refs in the complete set without reading their blobs again', async () => {
+    const cache = merge(null, [entry('q1', 'cf_cached', now - 700000)], identity);
+    (peekCacheSync as jest.Mock).mockReturnValue(cache);
+    const readSessionStorageBlob = jest.fn();
+    const listing = await load(
+      { sessionConfig, sessionSlug: 'worker-session', account: 'participant' },
+      {
+        listSessionStorageRefsPage: async () => ({
+          items: [buildListedItem('cf_cached', resource, new Date(now - 700000).toISOString())],
+          cursor: null,
+          listComplete: true,
+        }),
+        readSessionStorageBlob,
+      },
+    );
+    expect(listing.rows).toEqual([]);
+    expect(listing.listedStorageRefIds).toEqual(new Set(['cf_cached']));
+    expect(readSessionStorageBlob).not.toHaveBeenCalled();
+    expect((merge(cache, listing, identity) as any).worker[resource].q1).toBeDefined();
+  });
+
+  it('leaves cached items and tombstones alone when any listing page fails', async () => {
+    const cache = merge(null, [entry('q1', 'cf_saved', now - 700000), { hidden: true, id: 'hidden' }], identity);
+    (peekCacheSync as jest.Mock).mockReturnValue(cache);
+    const before = JSON.stringify(cache);
+    const listSessionStorageRefsPage = jest
+      .fn()
+      .mockResolvedValueOnce({ items: [], cursor: 'next', listComplete: false })
+      .mockRejectedValueOnce(new Error('listing failed'));
+    await expect(
+      load({ sessionConfig, sessionSlug: 'worker-session', account: 'participant' }, { listSessionStorageRefsPage }),
+    ).rejects.toThrow('listing failed');
+    expect(JSON.stringify(cache)).toBe(before);
+  });
+});

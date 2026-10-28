@@ -242,3 +242,8 @@ Worker catalog merges retain `workerQuestionMetadataTombstones` and
 `worker` node. Hidden ids lose their cached item, ref and pending metadata, and
 answer hydration cannot recreate their placeholder questions. A complete catalog
 that no longer marks an id hidden clears its tombstone; local merges do not.
+
+Complete Worker catalogs also remove cached items and refs omitted from the
+listing, before selecting among the versions still accessible to the reader.
+Locally pending metadata and writes created within ten minutes are retained to
+allow for KV listing lag. A failed or incomplete listing never reconciles items.

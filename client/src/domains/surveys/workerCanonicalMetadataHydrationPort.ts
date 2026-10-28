@@ -90,6 +90,7 @@ const MAX_METADATA_LIST_PAGES = 50;
 const METADATA_LIST_PAGE_SIZE = 100;
 const MAX_METADATA_ITEMS = MAX_METADATA_LIST_PAGES * METADATA_LIST_PAGE_SIZE;
 const METADATA_READ_CONCURRENCY = 8;
+const METADATA_LISTING_GRACE_MS = 10 * 60 * 1000;
 
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -456,6 +457,25 @@ const mergeMetadataEntries = ({
   if (!Array.isArray(listing)) {
     Object.keys(tombstones).forEach((id) => {
       if (!hiddenIds.has(id)) delete tombstones[id];
+    });
+    const oldestRecentWrite = Date.now() - METADATA_LISTING_GRACE_MS;
+    // Remove inaccessible winners before comparing incoming versions, so an
+    // older accessible upload can become current. KV may lag recent writes.
+    new Set([...Object.keys(items), ...Object.keys(refs)]).forEach((id) => {
+      const ref = isRecord(refs[id]) ? refs[id] : {};
+      const item = isRecord(items[id]) ? items[id] : {};
+      const storageRef = isRecord(item.storageRef) ? item.storageRef : {};
+      const storageRefId = readString(ref.storageRefId || storageRef.id);
+      const createdAtMs = Number(ref.createdAtMs || item.createdAtMs || Date.parse(readString(storageRef.createdAt)));
+      if (
+        !storageRefId ||
+        listing.listedStorageRefIds.has(storageRefId) ||
+        Object.prototype.hasOwnProperty.call(pending, id) ||
+        createdAtMs >= oldestRecentWrite
+      )
+        return;
+      delete items[id];
+      delete refs[id];
     });
   }
   hiddenIds.forEach((id) => {

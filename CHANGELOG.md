@@ -72,6 +72,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Reconcile Worker question and survey caches against complete catalogs, keeping
+  pending writes and a ten-minute grace period for new records.
+
 - Keep hidden Worker questions and surveys hidden in the reader cache, including
   when saved answers carry their question text. Clear hides only after a complete catalog refresh.
 
