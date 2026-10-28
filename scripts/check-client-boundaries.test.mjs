@@ -585,13 +585,14 @@ test('type-only and deferred edges, comments and string literals cannot form eag
       import { type C } from './c';
       export { type C } from './c';
       type D = import('./d').D;
-      const lazy = () => import('./lazy');
+      type QueriedModule = typeof import('./queried');
+      const lazy = import('./lazy');
       function load() { return require('./deferred'); }
       // import './comment';
       const message = "import './literal'";
       export const a = 1;
     `);
-    for (const name of ['b', 'c', 'd', 'comment', 'literal', 'lazy', 'deferred']) {
+    for (const name of ['b', 'c', 'd', 'comment', 'literal', 'lazy', 'deferred', 'queried']) {
       writeFile(rootDir, `client/src/${name}.ts`, "import { a } from './a';");
     }
     assert.deepEqual(collectClientBoundaryViolations({ rootDir }), []);

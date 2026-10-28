@@ -58,7 +58,7 @@ const SHARED_RUNTIME_COMPONENT_FILES = Object.freeze([
 export const CLIENT_BOUNDARY_RULES = Object.freeze({
   noRuntimeImportCycles: {
     id: 'no-runtime-import-cycles',
-    description: 'client/src eager runtime imports must not form cycles',
+    description: 'client/src eager runtime imports must not form cycles; deferred loads are excluded because they do not create module-initialization edges',
   },
   domainsNoComponents: {
     id: 'domains-no-components',
