@@ -1,3 +1,5 @@
+import { loadSubmittedResultRecords, selectCurrentSubmittedAnswers } from './agent/submittedResults.mjs';
+import { buildOpaqueActionId, buildSubmitIdempotencyKey } from './agent/opaqueActions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ethers } from 'ethers';
@@ -13,13 +15,13 @@ import { deriveManagedDemoAccount } from './agent/managedAccounts.mjs';
 import { issueAgentCredential } from './agent/agentCredentials.mjs';
 import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 import { submitAgentResponseOnChain } from './agent/onChainResponses.mjs';
-import { SUBMITTED_RESULT_STATUSES } from './agent/agentSubmitQueue.mjs';
+import { persistAgentSubmitRecord, SUBMITTED_RESULT_STATUSES } from './agent/agentSubmitQueue.mjs';
 
 const pointer = Buffer.alloc(32, 3).toString('base64url');
 const requestRecords = f => [...f.records.entries()].filter(([key]) => key.startsWith(`ce-agent:${sessionId}:telegram:submit-request:`)).map(([, value]) => JSON.parse(value));
 const storedResponses = f => [...f.records.keys()].filter(key => /responses/.test(key) && !key.startsWith('ce-agent:')).length;
 async function submissionFixture({ registry = false, queued = false } = {}) {
-  const state = { revision: 1, uploads: 0, broadcasts: 0, rpcDown: false, bump: false, pending: false, payloads: [], messages: [], messageOptions: [] };
+  const state = { revision: 1, uploads: 0, broadcasts: 0, rpcDown: false, bump: false, pending: false, payloads: [], uploadRequestIds: [], messages: [], messageOptions: [] };
   let config;
   const f = fixture({
     readCurrentSessionConfig: async () => ({ config, revision: state.revision }),
@@ -30,7 +32,7 @@ async function submissionFixture({ registry = false, queued = false } = {}) {
         if (input.path !== '/storage/upload') return real.storageRoute(input);
         const payload = await input.request.clone().json();
         if (payload.resource !== 'responses') return real.storageRoute(input);
-        state.uploads++; state.payloads.push(payload.data);
+        state.uploads++; state.payloads.push(payload.data); state.uploadRequestIds.push(payload.requestId);
         if (state.pending) { state.pending = false; return Response.json({ reason: 'upload_in_progress' }, { status: 503 }); }
         const response = registry ? Response.json({ id: pointer, backend: 'arweave', storageRef: { backend: 'arweave', id: pointer } }) : await real.storageRoute(input);
         if (!registry && state.bump) { state.bump = false; state.revision++; }
@@ -116,6 +118,8 @@ test('direct RPC preparation failures retry without duplicating the retained upl
   assert.equal(state.broadcasts, 0);
   state.rpcDown = false;
   const retry = await submit(); assert.equal(retry.status, 200, await retry.clone().text());
+  assert.equal((await retry.json()).submitted[0].requestId, failed.requestId);
+  assert.equal(requestRecords(f)[0].answerRevision, 1);
   assert.equal(state.uploads, 1); assert.equal(state.broadcasts, 1);
 });
 
@@ -452,4 +456,95 @@ test('a queued success does not claim durable repair when both KV and the recove
   assert.equal(result.results[0].reason, 'submit_result_persistence_failed');
   assert.equal(result.results[0].onChain.ok, true, 'the known effect is still retained in the diagnostic outcome');
   assert.equal(state.uploads, 1); assert.equal(state.broadcasts, 1);
+});
+
+
+for (const queued of [false, true]) test(`${queued ? 'queued' : 'hosted'} A-B-A edits get distinct revisions and each retry replays`, async () => {
+  const { f, state, submit, qid, coordinated } = await submissionFixture({ registry: queued, queued });
+  const ids = [];
+  for (const [index, value] of ['agree', 'disagree', 'agree'].entries()) {
+    const input = { preferences: [{ questionId: qid, value }] };
+    const first = await submit(input);
+    assert.equal(first.status, 200, await first.clone().text());
+    const result = (await first.json()).submitted[0];
+    assert.equal(result.replayed, false);
+    ids.push(result.requestId);
+    if (queued) {
+      const delivery = state.messages.at(-1);
+      const consumed = await f.queue({ messages: [{ body: delivery, attempts: 1, ack() {}, retry() { assert.fail('successful edit'); } }] });
+      assert.equal(consumed.ok, true, JSON.stringify(consumed));
+    }
+    const retry = await submit(input);
+    assert.equal(retry.status, 200, await retry.clone().text());
+    const replay = (await retry.json()).submitted[0];
+    assert.equal(replay.replayed, true);
+    assert.equal(replay.requestId, result.requestId);
+    assert.equal(state.uploads, index + 1);
+    assert.equal(requestRecords(f).find(record => record.requestId === result.requestId).answerRevision, index + 1);
+  }
+  assert.equal(new Set(ids).size, 3);
+  assert.equal(new Set(state.uploadRequestIds).size, 3);
+  assert.ok(state.uploadRequestIds.every(id => id.length <= 200 && /^[A-Za-z0-9_-]{1,160}$/.test(id)));
+  const canonical = [...f.records.entries()].filter(([key]) => key.includes(':telegram:canonical-answer:v1:')).map(([, value]) => JSON.parse(value));
+  assert.deepEqual(canonical.map(record => record.answerRevision).sort(), [1, 2, 3]);
+  const current = selectCurrentSubmittedAnswers(await loadSubmittedResultRecords(f.agentEnv, 'fixture'));
+  assert.equal(current.length, 1); assert.equal(current[0].label, 'Agree'); assert.equal(current[0].answerRevision, 3);
+  const heads = [...coordinated.durable.entries()].filter(([key]) => key.startsWith('ce-agent-answer-head:')).map(([, head]) => head);
+  assert.equal(heads.length, 1); assert.equal(heads[0].revision, 3); assert.equal(heads[0].requestId, ids[2]);
+});
+
+test('concurrent answer claims serialize different content and retain retries at the current head', async () => {
+  const { coordinated, qid } = await submissionFixture();
+  const claim = contentDigest => coordinated.coordinator.fetch(new Request('https://session-coordinator.internal/session-config/agent-submit/claim', {
+    method: 'POST', body: JSON.stringify({ slug: 'fixture', expectedAuthority: { actor: wallet.address.toLowerCase(), revision: 1, authzEpoch: 1 },
+      record: { sessionId, sessionSlug: 'fixture', principalId: 'fixture-agent', questionId: qid, transport: 'telegram_bot_submit', contentDigest } }),
+  }));
+  const responses = await Promise.all([claim('content-a'), claim('content-b')]);
+  const claims = [];
+  for (const response of responses) { assert.equal(response.status, 200, await response.clone().text()); claims.push((await response.json()).head); }
+  assert.deepEqual(claims.map(head => head.revision), [1, 2]);
+  assert.notEqual(claims[0].requestId, claims[1].requestId);
+  assert.deepEqual((await (await claim('content-b')).json()).head, claims[1]);
+  const third = (await (await claim('content-a')).json()).head;
+  assert.equal(third.revision, 3); assert.notEqual(third.requestId, claims[0].requestId);
+});
+
+test('legacy answers without a head start at revision one and remain in history', async () => {
+  const { f, submit, qid } = await submissionFixture();
+  const idempotencyKey = buildSubmitIdempotencyKey({ transport: 'telegram_bot_submit', principal: 'fixture-agent', sessionSlug: 'fixture', questionId: qid,
+    answer: { answerLabel: 'Agree', answerValue: 'Agree', controlType: 'binary' } });
+  const requestId = buildOpaqueActionId(idempotencyKey);
+  await persistAgentSubmitRecord({ env: f.agentEnv, record: { requestId, idempotencyKey, sessionSlug: 'fixture', questionId: qid,
+    telegramUserId: 'fixture-agent', status: 'direct_submitted', createdAt: '2099-01-01T00:00:00Z', answer: { label: 'Disagree', value: 'Disagree' } } });
+  const response = await submit();
+  assert.equal(response.status, 200, await response.clone().text());
+  const result = (await response.json()).submitted[0];
+  assert.equal(result.replayed, false); assert.notEqual(result.requestId, requestId);
+  const history = await loadSubmittedResultRecords(f.agentEnv, 'fixture');
+  assert.equal(history.length, 2);
+  assert.equal(selectCurrentSubmittedAnswers(history)[0].answerRevision, 1);
+  assert.equal(selectCurrentSubmittedAnswers(history)[0].label, 'Agree');
+});
+
+
+test('a lost claim reply resumes the durable answer identity before any effect', async () => {
+  const { f, state, submit, coordinated } = await submissionFixture();
+  const get = f.env.CE_SESSION_COORDINATOR.get;
+  let lose = true;
+  f.env.CE_SESSION_COORDINATOR.get = id => {
+    const stub = get(id);
+    return { fetch: async (url, init) => {
+      const response = await stub.fetch(url, init);
+      if (lose && url.endsWith('/agent-submit/claim') && response.ok) {
+        lose = false; return Response.json({ ok: false }, { status: 503 });
+      }
+      return response;
+    } };
+  };
+  assert.equal((await submit()).status, 422); assert.equal(state.uploads, 0);
+  const head = [...coordinated.durable.entries()].find(([key]) => key.startsWith('ce-agent-answer-head:'))[1];
+  const response = await submit();
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.equal((await response.json()).submitted[0].requestId, head.requestId);
+  assert.equal(requestRecords(f)[0].answerRevision, 1); assert.equal(state.uploads, 1);
 });

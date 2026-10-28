@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Give each agent answer edit a durable revision and request identity, so changing
+  back to an earlier answer submits the edit while retries remain idempotent.
+
 - Count one current answer per participant and question in agent results and
   answered-state views, using a shared deterministic revision order.
 

@@ -136,6 +136,7 @@ export function buildCanonicalAnswerRecord(record = {}, {
     questionId,
     questionIdShort: safeString(record.questionIdShort),
     answerFingerprint: safeString(record.answerFingerprint),
+    ...(Number.isSafeInteger(record.answerRevision) ? { answerRevision: record.answerRevision } : {}),
     answer: objectOrNull(record.answer),
     onChainAnswer: objectOrNull(record.onChainAnswer),
     answerRef: objectOrNull(record.answerRef),

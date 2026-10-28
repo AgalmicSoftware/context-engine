@@ -61356,6 +61356,36 @@ var require_lib2 = __commonJS({
   }
 });
 
+// workers/sessionCorsWorker/agent/opaqueActions.mjs
+function stableHash(seed = "") {
+  const digest2 = ethers_exports.sha256(ethers_exports.toUtf8Bytes(String(seed || "agent-bridge-action")));
+  return BigInt(digest2).toString(36).padStart(50, "0");
+}
+function buildSubmitIdempotencyKey({ transport, principal, sessionSlug, questionId: questionId4, answer }) {
+  const fingerprint = stableHash(stableJson({ questionId: questionId4, answer }));
+  return `${transport}:${principal}:${sessionSlug}:${fingerprint}`;
+}
+function buildId(prefix, pattern, seed) {
+  assertNoSecretShape(String(seed || ""), "Opaque action seeds must not contain secrets.");
+  const id2 = `${prefix}${stableHash(seed)}`;
+  if (!pattern.test(id2)) {
+    throw new Error("Invalid opaque action id.");
+  }
+  return id2;
+}
+function buildOpaqueActionId(seed = "") {
+  return buildId("ceab_", ACTION_ID_RE, seed);
+}
+var ACTION_ID_RE;
+var init_opaqueActions = __esm({
+  "workers/sessionCorsWorker/agent/opaqueActions.mjs"() {
+    init_lib2();
+    init_runtimePrimitives();
+    init_redaction();
+    ACTION_ID_RE = /^ceab_[a-z0-9]{10,50}$/;
+  }
+});
+
 // workers/sessionCorsWorker/agent/sessionPolicy.mjs
 function sessionAuthorityMode(session = {}) {
   return safeString(session.sessionModeProfile?.authority?.mode);
@@ -64858,36 +64888,6 @@ var init_sessionQuestions = __esm({
   }
 });
 
-// workers/sessionCorsWorker/agent/opaqueActions.mjs
-function stableHash(seed = "") {
-  const digest2 = ethers_exports.sha256(ethers_exports.toUtf8Bytes(String(seed || "agent-bridge-action")));
-  return BigInt(digest2).toString(36).padStart(50, "0");
-}
-function buildSubmitIdempotencyKey({ transport, principal, sessionSlug, questionId: questionId4, answer }) {
-  const fingerprint = stableHash(stableJson({ questionId: questionId4, answer }));
-  return `${transport}:${principal}:${sessionSlug}:${fingerprint}`;
-}
-function buildId(prefix, pattern, seed) {
-  assertNoSecretShape(String(seed || ""), "Opaque action seeds must not contain secrets.");
-  const id2 = `${prefix}${stableHash(seed)}`;
-  if (!pattern.test(id2)) {
-    throw new Error("Invalid opaque action id.");
-  }
-  return id2;
-}
-function buildOpaqueActionId(seed = "") {
-  return buildId("ceab_", ACTION_ID_RE, seed);
-}
-var ACTION_ID_RE;
-var init_opaqueActions = __esm({
-  "workers/sessionCorsWorker/agent/opaqueActions.mjs"() {
-    init_lib2();
-    init_runtimePrimitives();
-    init_redaction();
-    ACTION_ID_RE = /^ceab_[a-z0-9]{10,50}$/;
-  }
-});
-
 // workers/sessionCorsWorker/agent/agentQuestionNumbers.mjs
 function normalizeQuestionId(value = "") {
   return safeString(value).slice(0, 256);
@@ -66334,8 +66334,18 @@ async function executeAgentSubmitRequest({
     return { ok: false, reason: "submit_request_incomplete" };
   }
   const answerFingerprint = answerDraftFingerprint(draft);
-  const idempotencyKey = submissionIdentity(normalized, draft, slug, qid);
-  const requestId = buildOpaqueActionId(idempotencyKey);
+  const principal = env.AGENT_CONTEXT.auth.delegation?.principal || env.AGENT_CONTEXT.auth.principal;
+  const claimed = await env.AGENT_SERVICES.claimAnswerSubmission({
+    sessionId: env.AGENT_CONTEXT.sessionId,
+    sessionSlug: slug,
+    workerOrigin: env.AGENT_CONTEXT.origin,
+    principalId: principal.principalId,
+    questionId: qid,
+    transport: "telegram_bot_submit",
+    contentDigest: answerFingerprint
+  });
+  if (!claimed.ok) return claimed;
+  const { idempotencyKey, requestId, revision: answerRevision2 } = claimed.head;
   const kvKey = submitRequestKvKey(requestId);
   let existing;
   try {
@@ -66347,7 +66357,6 @@ async function executeAgentSubmitRequest({
   } catch (error) {
     return { ok: false, reason: "submit_request_read_failed", requestId, retryable: true, error: safeString(error?.message || error) };
   }
-  const principal = env.AGENT_CONTEXT.auth.delegation?.principal || env.AGENT_CONTEXT.auth.principal;
   const journal = await env.AGENT_SERVICES.readSubmitRecord({
     sessionId: env.AGENT_CONTEXT.sessionId,
     sessionSlug: slug,
@@ -66356,7 +66365,8 @@ async function executeAgentSubmitRequest({
     principalId: principal.principalId,
     questionId: qid,
     requestId,
-    idempotencyKey
+    idempotencyKey,
+    answerRevision: answerRevision2
   });
   if (!journal.ok) return { ...journal, requestId, idempotencyKey };
   if (journal.record) existing = journal.record;
@@ -66434,6 +66444,7 @@ async function executeAgentSubmitRequest({
         requestId,
         idempotencyKey,
         answerFingerprint,
+        answerRevision: answerRevision2,
         lane: LEGACY_TRANSPORT_LANES.PRIVATE_ACCOUNT,
         telegramUserId,
         username: safeString(normalized.user?.username),
@@ -66487,6 +66498,7 @@ async function executeAgentSubmitRequest({
     requestId,
     idempotencyKey,
     answerFingerprint,
+    answerRevision: answerRevision2,
     sessionId: env.AGENT_CONTEXT.sessionId,
     workerOrigin: env.AGENT_CONTEXT.origin,
     sourceCredentialHash: env.AGENT_CONTEXT.auth.delegation.tokenHash,
@@ -66801,6 +66813,7 @@ function buildCanonicalAnswerRecord(record3 = {}, {
     questionId: questionId4,
     questionIdShort: safeString(record3.questionIdShort),
     answerFingerprint: safeString(record3.answerFingerprint),
+    ...Number.isSafeInteger(record3.answerRevision) ? { answerRevision: record3.answerRevision } : {},
     answer: objectOrNull(record3.answer),
     onChainAnswer: objectOrNull(record3.onChainAnswer),
     answerRef: objectOrNull(record3.answerRef),
@@ -67385,6 +67398,7 @@ async function repairAgentSubmitProjections(coordinator) {
 var PROJECTION_PREFIX, reply, sameRequest, journalRecord, dispatchAgentSubmissionJournal;
 var init_submissionJournal = __esm({
   "workers/sessionCorsWorker/agent/submissionJournal.mjs"() {
+    init_opaqueActions();
     init_sessionConfigMutation();
     init_sessionConfigAuthority();
     init_storage();
@@ -67400,6 +67414,23 @@ var init_submissionJournal = __esm({
     };
     dispatchAgentSubmissionJournal = (coordinator, operation, payload) => coordinator.serializeSessionConfigOperation(async () => {
       const record3 = payload?.record;
+      if (operation === "claim") {
+        if (!record3 || record3.sessionSlug !== payload.slug || ["principalId", "questionId", "transport", "contentDigest"].some((key3) => typeof record3[key3] !== "string" || !record3[key3])) {
+          return reply({ ok: false, reason: "submit_journal_record_invalid" }, 400);
+        }
+        const authority2 = await coordinator.readSessionConfigAuthority(payload.slug);
+        if (resolveCanonicalWorkerSessionIdHex(authority2?.config) !== record3.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
+        const key2 = `ce-agent-answer-head:${record3.sessionId}:${await sha256Hex2(stableJson([record3.principalId, record3.questionId]))}`;
+        const head = await coordinator.state.storage.get(key2);
+        if (head?.contentDigest === record3.contentDigest) return reply({ ok: true, head });
+        assertExpectedSessionAuthority(authority2, payload.expectedAuthority, payload.slug);
+        const revision = (head?.revision || 0) + 1;
+        if (!Number.isSafeInteger(revision)) return reply({ ok: false, reason: "submit_revision_exhausted" }, 409);
+        const idempotencyKey = buildOpaqueActionId(await sha256Hex2(stableJson([record3.transport, record3.principalId, record3.sessionId, record3.questionId, revision])));
+        const next2 = { revision, contentDigest: record3.contentDigest, requestId: buildOpaqueActionId(idempotencyKey), idempotencyKey };
+        await coordinator.state.storage.put(key2, next2);
+        return reply({ ok: true, head: next2 });
+      }
       if (!["begin", "finish", "read"].includes(operation) || !record3 || !/^[A-Za-z0-9_-]{1,160}$/.test(record3.requestId || "") || !record3.idempotencyKey || record3.sessionSlug !== payload.slug || operation !== "read" && !record3.onChain?.submissionAttemptId) {
         return reply({ ok: false, reason: "submit_journal_record_invalid" }, 400);
       }
@@ -87614,7 +87645,7 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
       slug: ctx.slug,
       path: `agent-submit/${operation}`,
       record: record3,
-      ...operation === "begin" ? { expectedAuthority: expectedAuthority() } : {}
+      ...["begin", "claim"].includes(operation) ? { expectedAuthority: expectedAuthority() } : {}
     });
     if (!result.ok) return { ok: false, retryable: true, reason: result.body?.reason || "submit_coordinator_unavailable" };
     return result.body;
@@ -87632,6 +87663,7 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
       });
       return result.body || { ok: false, status: 503, reason: "wrapped_coordinator_unavailable", retryable: true };
     },
+    claimAnswerSubmission: (record3) => submitJournal("claim", record3),
     readSubmitRecord: (record3) => submitJournal("read", record3),
     async persistSubmitIntent(record3) {
       await current();

@@ -69,8 +69,13 @@ Consensus, difference, groups, Polis and topic maps use this same selection;
 submission records retain history.
 
 `/preferences` saves drafts unless an explicitly authorized submit is requested.
-Hosted submission uses canonical upload receipts; duplicate requests replay one
-stored response. Direct-submission admission and outcomes live in the coordinator. Finished
+The coordinator retains an answer head per session, principal and question.
+Resubmitting its current content reuses the same request; changing content claims
+the next revision, including when changing back to a previous answer. Claims
+serialize concurrent edits before direct or queued effects. Legacy answers have
+revision zero; the first new claim starts at one. Answer heads and submission
+journals are excluded from session backups, so restored sessions start fresh heads.
+Hosted submission uses canonical upload receipts; retries replay one stored response. Direct-submission admission and outcomes live in the coordinator. Finished
 outcomes project to KV once; a failed projection does not change a committed
 success. A durable alarm repairs it at least one second after the last attempt,
 without sleeping in the session lock. Reads consult the journal while KV is

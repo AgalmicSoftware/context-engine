@@ -2,7 +2,7 @@ import { safeString, nowIso, safeEnvJsonParse as safeJsonParse, sanitizeSessionS
 import { AGENT_EVENT_TYPES, AGENT_ACTIONS, LEGACY_TRANSPORT_LANES } from './constants.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { submitAgentResponseOnChain, buildAgentResponsePayload } from './onChainResponses.mjs';
-import { buildOpaqueActionId, buildSubmitIdempotencyKey } from './opaqueActions.mjs';
+import { buildSubmitIdempotencyKey } from './opaqueActions.mjs';
 import { normalizeAgentRatingScale } from './ratingScale.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { resolveSessionInvocation } from './sessionPolicy.mjs';
@@ -57,8 +57,13 @@ async function executeAgentSubmitRequest({
     return { ok: false, reason: 'submit_request_incomplete' };
   }
   const answerFingerprint = answerDraftFingerprint(draft);
-  const idempotencyKey = submissionIdentity(normalized, draft, slug, qid);
-  const requestId = buildOpaqueActionId(idempotencyKey);
+  const principal = (env.AGENT_CONTEXT.auth.delegation?.principal || env.AGENT_CONTEXT.auth.principal);
+  const claimed = await env.AGENT_SERVICES.claimAnswerSubmission({
+    sessionId: env.AGENT_CONTEXT.sessionId, sessionSlug: slug, workerOrigin: env.AGENT_CONTEXT.origin,
+    principalId: principal.principalId, questionId: qid, transport: 'telegram_bot_submit', contentDigest: answerFingerprint,
+  });
+  if (!claimed.ok) return claimed;
+  const { idempotencyKey, requestId, revision: answerRevision } = claimed.head;
   const kvKey = submitRequestKvKey(requestId);
   let existing;
   try {
@@ -72,11 +77,10 @@ async function executeAgentSubmitRequest({
   }
   // A durable intent/outcome may not have reached KV yet. Consult its owner
   // before validating a new effect, so a replay does not depend on stale indexes.
-  const principal = (env.AGENT_CONTEXT.auth.delegation?.principal || env.AGENT_CONTEXT.auth.principal);
   const journal = await env.AGENT_SERVICES.readSubmitRecord({
     sessionId: env.AGENT_CONTEXT.sessionId, sessionSlug: slug, workerOrigin: env.AGENT_CONTEXT.origin,
     accountAddress: env.AGENT_CONTEXT.address, principalId: principal.principalId,
-    questionId: qid, requestId, idempotencyKey,
+    questionId: qid, requestId, idempotencyKey, answerRevision,
   });
   if (!journal.ok) return { ...journal, requestId, idempotencyKey };
   if (journal.record) existing = journal.record;
@@ -156,6 +160,7 @@ async function executeAgentSubmitRequest({
         requestId,
         idempotencyKey,
         answerFingerprint,
+        answerRevision,
         lane: LEGACY_TRANSPORT_LANES.PRIVATE_ACCOUNT,
         telegramUserId,
         username: safeString(normalized.user?.username),
@@ -208,7 +213,7 @@ async function executeAgentSubmitRequest({
     createdAt,
   });
   const baseRecord = {
-    version: 1, submissionJournal: true, requestId, idempotencyKey, answerFingerprint,
+    version: 1, submissionJournal: true, requestId, idempotencyKey, answerFingerprint, answerRevision,
     sessionId: env.AGENT_CONTEXT.sessionId, workerOrigin: env.AGENT_CONTEXT.origin,
     sourceCredentialHash: env.AGENT_CONTEXT.auth.delegation.tokenHash,
     principalId: principal.principalId, accountAddress: env.AGENT_CONTEXT.address,

@@ -44,7 +44,7 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
   const submitJournal = async (operation, record) => {
     if (record.sessionId !== ctx.sessionId || record.sessionSlug !== ctx.slug || record.workerOrigin !== ctx.origin) throw authorityError('submit_outcome_identity_mismatch');
     const result = await callSessionConfigCoordinator({ env, slug: ctx.slug, path: `agent-submit/${operation}`, record,
-      ...(operation === 'begin' ? { expectedAuthority: expectedAuthority() } : {}) });
+      ...(['begin', 'claim'].includes(operation) ? { expectedAuthority: expectedAuthority() } : {}) });
     if (!result.ok) return { ok: false, retryable: true, reason: result.body?.reason || 'submit_coordinator_unavailable' };
     return result.body;
   };
@@ -56,6 +56,7 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
         expectedAuthority: expectedAuthority(), record: { ...record, sessionId: ctx.sessionId, sessionSlug: ctx.slug } });
       return result.body || { ok: false, status: 503, reason: 'wrapped_coordinator_unavailable', retryable: true };
     },
+    claimAnswerSubmission: record => submitJournal('claim', record),
     readSubmitRecord: record => submitJournal('read', record),
     async persistSubmitIntent(record) {
       await current();
