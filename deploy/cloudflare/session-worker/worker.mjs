@@ -63198,7 +63198,7 @@ function dedupeSubmitRecords(records = []) {
     const requestId = safeString(record3.requestId || record3.idempotencyKey || record3.key);
     if (!requestId) return;
     const existing = byId.get(requestId);
-    if (!existing || compareAnswers(existing, record3) < 0) {
+    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record3.createdAt)) <= 0) {
       byId.set(requestId, record3);
     }
   });

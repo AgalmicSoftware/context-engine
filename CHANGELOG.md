@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Keep canonical submitted answers when a stale submission-index copy has the
+  same timestamp. Newer timestamps still take precedence when deduplicating copies.
+
 - Keep the CC package's shipped rating-scale module synchronized with the shared
   rating validation rules.
 

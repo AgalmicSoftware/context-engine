@@ -41,7 +41,9 @@ export function dedupeSubmitRecords(records = []) {
     const requestId = safeString(record.requestId || record.idempotencyKey || record.key);
     if (!requestId) return;
     const existing = byId.get(requestId);
-    if (!existing || compareAnswers(existing, record) < 0) {
+    // Canonical copies follow index copies and must win equal-time ties before
+    // status filtering can discard a stale index entry.
+    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record.createdAt)) <= 0) {
       byId.set(requestId, record);
     }
   });
