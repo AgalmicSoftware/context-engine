@@ -4958,3 +4958,15 @@ for (const encrypted of [false, true]) for (const interrupted of ['index', 'sett
     assert.equal(f.queued.length, 1);
   });
 }
+
+test('stored payload byte reads distinguish empty strings from missing payloads', async () => {
+  const { readStoredCloudflarePayloadBytes } = await import('./storageRouteExecution.js');
+  const index = createMockKv();
+  const metadata = { id: CF_ID, resource: 'docsContext' };
+  for (const payloadBase64url of ['', null, 7, undefined]) {
+    await index.put(`ce-storage-payload:session-a:${CF_ID}`, JSON.stringify({ metadata, payloadBase64url }));
+    const bytes = await readStoredCloudflarePayloadBytes({ env: {}, index, slug: 'session-a', metadata, strict: true });
+    if (payloadBase64url === '') assert.deepEqual(bytes, new Uint8Array());
+    else assert.equal(bytes, null);
+  }
+});

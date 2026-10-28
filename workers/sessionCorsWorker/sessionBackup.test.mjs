@@ -1132,3 +1132,41 @@ test('agent-enabled backup restores canonical records but excludes credentials, 
   assert.equal(restored.agentHttp.managedAccountSubmitAllowed, true);
   assert.equal([...target.kv.values.keys()].some(key => key.startsWith(`ce-agent:${sessionId}:`)), false);
 });
+
+const uploadBackupDocument = async (source, { data = '', tags = [] } = {}) => storageRoute({
+  path: '/storage/upload', method: 'POST', env: source.env, slug,
+  config: JSON.parse(await source.kv.get(`session:${slug}:config`)), uploaderAddress: admin,
+  expectedAuthority, request: makeJsonRequest('/storage/upload', { resource: 'docsContext', data, tags, contentType: 'text/plain' }),
+  baseHeaders: new Headers(),
+});
+
+for (const mode of ['plaintext-kv', 'encrypted-kv', 'plaintext-r2']) {
+  test(`accepted empty ${mode} documents export, import and remain readable`, async () => {
+    const source = fixture();
+    const config = JSON.parse(await source.kv.get(`session:${slug}:config`));
+    config.storageProfile = { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: mode === 'encrypted-kv' ? 'worker_envelope' : 'none' } };
+    await source.kv.put(`session:${slug}:config`, JSON.stringify(config));
+    if (mode === 'plaintext-r2') source.env.CE_STORAGE_R2 = memoryR2();
+    const response = await uploadBackupDocument(source);
+    assert.equal(response.status, 200, await response.clone().text());
+    const { id } = await response.json();
+    const pages = await allPages(source.env);
+    assert.equal(pages.at(-1).manifest.complete, true);
+    assert.equal(pages.at(-1).manifest.counts.payloads, 1);
+    const target = fixture();
+    target.kv.values.delete(`session:${slug}:config`);
+    if (mode === 'plaintext-r2') target.env.CE_STORAGE_R2 = memoryR2();
+    for (const page of pages) {
+      const imported = await importPage(target.env, page);
+      assert.equal(imported.ok, true, JSON.stringify(imported));
+    }
+    assert.deepEqual(JSON.parse(await target.kv.get(`ce-storage:${slug}:docsContext:${id}`)),
+      JSON.parse(await source.kv.get(`ce-storage:${slug}:docsContext:${id}`)));
+    const read = await storageRoute({ path: '/storage/read', method: 'GET', env: target.env, slug,
+      config: JSON.parse(await target.kv.get(`session:${slug}:config`)), uploaderAddress: admin,
+      request: new Request(`https://worker.example/storage/read?id=${id}`), baseHeaders: new Headers(),
+    });
+    assert.equal(read.status, 200, await read.clone().text());
+    assert.equal(await read.text(), '');
+  });
+}

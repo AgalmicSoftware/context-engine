@@ -70651,7 +70651,7 @@ var init_storageRouteExecution = __esm({
       }
       budget?.operation();
       const envelope = await readKvPayloadEnvelope({ index, slug, id: id2, strict, maxBytes: limit });
-      if (!envelope?.payloadBase64url) return null;
+      if (typeof envelope?.payloadBase64url !== "string") return null;
       if (Math.floor(envelope.payloadBase64url.length * 3 / 4) > limit) throw new StorageReadLimitError("payloadBytes");
       try {
         const bytes3 = base64urlToBytes2(envelope.payloadBase64url);

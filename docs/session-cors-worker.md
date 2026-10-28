@@ -1103,7 +1103,8 @@ The first page includes config authority, wrapped session keys, encrypted
 session secrets and Worker Group authority, catalog and membership records.
 Very large coordinator snapshots use a `chunked` descriptor and payload/chunk
 entries with `target: "coordinator"`. Storage traversal includes every resource,
-hidden rows, plaintext rows, payloads, owner records and hidden markers. Payload
+hidden rows, plaintext rows, payloads, owner records and hidden markers. Empty
+documents are preserved in both KV and R2, including envelope-encrypted documents. Payload
 headers carry size, SHA-256 and chunk count; 256 KiB chunks span bounded 4 MiB
 pages. Export and import use an 800-operation budget, leaving headroom below
 the 1,000 KV operations per request limit. Wrapped DEKs and stored metadata remain unchanged. Auth nonces, rate

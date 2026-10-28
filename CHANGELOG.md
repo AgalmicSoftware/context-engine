@@ -196,6 +196,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Preserve zero-byte documents through backup and restore, treating an empty KV
+  payload as valid bytes rather than a missing object.
+
 - Reject question options that are not strings; client cache and input readers
   ignore malformed legacy options without converting untrusted objects.
 

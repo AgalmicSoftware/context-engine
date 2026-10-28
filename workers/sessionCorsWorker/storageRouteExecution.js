@@ -2074,7 +2074,7 @@ export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metad
   }
   budget?.operation();
   const envelope = await readKvPayloadEnvelope({ index, slug, id, strict, maxBytes: limit });
-  if (!envelope?.payloadBase64url) return null;
+  if (typeof envelope?.payloadBase64url !== 'string') return null;
   // Check encoded length before decoding a whole KV payload. R2 uses its size
   // and a bounded stream above; neither path relies only on index size hints.
   if (Math.floor(envelope.payloadBase64url.length * 3 / 4) > limit) throw new StorageReadLimitError('payloadBytes');
