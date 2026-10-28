@@ -119,6 +119,10 @@ Similarity between a prediction and an answer runs from 0 to 1:
   same rule to its groups.
   - Withheld groups are not named at all, since a group can be a single
     invite link.
+- The overall calibration figure counts every confidence band, including bands
+  withheld for having fewer than 5 people. When every other band is shown, a
+  withheld band's keep rate can sometimes be worked out from it. That reveals
+  how often those few people kept their AI's drafts, never what they answered.
 - Each person is the responder the Worker or the chain recorded for the
   response; a payload's own claim counts only for raw payloads, so one account
   can't pose as several people. The self-reported platform counts as ChatGPT,
