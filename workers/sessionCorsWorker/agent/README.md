@@ -65,8 +65,9 @@ source with 503.
 Current agent results and the participant's answered state select one answer per
 session, participant and question: highest `answerRevision` (legacy records use
 zero), then `createdAt`, then `requestId`, with deterministic content tie-breaking.
-Consensus, difference, groups, Polis and topic maps use this same selection;
-submission records retain history.
+Selected answers are ordered chronologically by `createdAt`, then `requestId`;
+revisions do not order different participants or questions. Consensus, difference,
+groups, Polis and topic maps use this same selection; submission records retain history.
 
 `/preferences` saves drafts unless an explicitly authorized submit is requested.
 The coordinator retains an answer head per session, principal and question.

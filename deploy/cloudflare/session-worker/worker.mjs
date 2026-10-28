@@ -63190,7 +63190,7 @@ function selectCurrentSubmittedAnswers(records = []) {
     const existing = byParticipantQuestion.get(key);
     if (!existing || compareAnswers(existing, record3) < 0) byParticipantQuestion.set(key, record3);
   }
-  return [...byParticipantQuestion.values(), ...anonymous].sort(compareAnswers);
+  return [...byParticipantQuestion.values(), ...anonymous].sort(compareAnswerChronology);
 }
 function dedupeSubmitRecords(records = []) {
   const byId = /* @__PURE__ */ new Map();
@@ -63319,7 +63319,7 @@ function summarizeQuestionResults(records = [], questions = []) {
     };
   }).sort((left, right) => right.differenceScore - left.differenceScore || right.total - left.total || left.prompt.localeCompare(right.prompt));
 }
-var compareText, answerRevision, compareAnswers;
+var compareText, answerRevision, compareAnswerChronology, compareAnswers;
 var init_submittedResults = __esm({
   "workers/sessionCorsWorker/agent/submittedResults.mjs"() {
     init_runtimePrimitives();
@@ -63328,7 +63328,8 @@ var init_submittedResults = __esm({
     init_runtimeCore();
     compareText = (left, right) => left === right ? 0 : left < right ? -1 : 1;
     answerRevision = (record3) => Number.isSafeInteger(record3.answerRevision) && record3.answerRevision >= 0 ? record3.answerRevision : 0;
-    compareAnswers = (left, right) => answerRevision(left) - answerRevision(right) || compareText(safeString(left.createdAt), safeString(right.createdAt)) || compareText(safeString(left.requestId), safeString(right.requestId)) || compareText(stableJson(left), stableJson(right));
+    compareAnswerChronology = (left, right) => compareText(safeString(left.createdAt), safeString(right.createdAt)) || compareText(safeString(left.requestId), safeString(right.requestId)) || compareText(stableJson(left), stableJson(right));
+    compareAnswers = (left, right) => answerRevision(left) - answerRevision(right) || compareAnswerChronology(left, right);
   }
 });
 

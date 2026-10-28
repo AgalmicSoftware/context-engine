@@ -14,10 +14,10 @@ export function normalizeResultAnswerLabel(value = '') {
 
 const compareText = (left, right) => left === right ? 0 : left < right ? -1 : 1;
 const answerRevision = record => Number.isSafeInteger(record.answerRevision) && record.answerRevision >= 0 ? record.answerRevision : 0;
-const compareAnswers = (left, right) => answerRevision(left) - answerRevision(right) ||
-  compareText(safeString(left.createdAt), safeString(right.createdAt)) ||
+const compareAnswerChronology = (left, right) => compareText(safeString(left.createdAt), safeString(right.createdAt)) ||
   compareText(safeString(left.requestId), safeString(right.requestId)) ||
   compareText(stableJson(left), stableJson(right));
+const compareAnswers = (left, right) => answerRevision(left) - answerRevision(right) || compareAnswerChronology(left, right);
 
 export function selectCurrentSubmittedAnswers(records = []) {
   const byParticipantQuestion = new Map();
@@ -31,7 +31,8 @@ export function selectCurrentSubmittedAnswers(records = []) {
     // content tie-break also makes legacy equal-time records order-independent.
     if (!existing || compareAnswers(existing, record) < 0) byParticipantQuestion.set(key, record);
   }
-  return [...byParticipantQuestion.values(), ...anonymous].sort(compareAnswers);
+  // Revisions are local to a participant/question, not a global result order.
+  return [...byParticipantQuestion.values(), ...anonymous].sort(compareAnswerChronology);
 }
 
 export function dedupeSubmitRecords(records = []) {

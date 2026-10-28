@@ -34,6 +34,17 @@ test('current answer selection orders revisions, timestamps, request ids and exa
   assert.deepEqual(current([...rows].reverse()), current(rows));
 });
 
+test('revisions select within a participant question while selected answers stay chronological', () => {
+  const selected = answer({ requestId: 'first', answerRevision: 3, createdAt: '2026-10-28T00:00:01.000Z' });
+  const superseded = answer({ requestId: 'old', answerRevision: 2, createdAt: '2026-10-28T00:00:04.000Z' });
+  const otherQuestion = answer({ questionId: 'other', requestId: 'a', answerRevision: 1, createdAt: '2026-10-28T00:00:02.000Z' });
+  const otherParticipant = answer({ telegramUserId: 'other', requestId: 'b', createdAt: '2026-10-28T00:00:02.000Z' });
+  const rows = [otherParticipant, superseded, otherQuestion, selected];
+  const expected = [selected, otherQuestion, otherParticipant];
+  assert.deepEqual(current(rows), expected);
+  assert.deepEqual(current([...rows].reverse()), expected);
+});
+
 test('one current answer agrees across summary, Polis and participant graph', () => {
   const rows = [answer(), answer({ requestId: 'second', label: 'Disagree' })];
   const sourceQuestions = [{ questionId: 'question', questionType: 'binary', prompt: 'A fixture question' }];

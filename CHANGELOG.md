@@ -13,7 +13,8 @@ All notable changes to this project will be documented in this file.
   back to an earlier answer submits the edit while retries remain idempotent.
 
 - Count one current answer per participant and question in agent results and
-  answered-state views, using a shared deterministic revision order.
+  answered-state views, using a shared deterministic revision order within each
+  participant/question and chronological order across the selected answers.
 
 - Serialize Wrapped research batches in the session coordinator. Bind retries
   to their original content, preserve concurrent answer summaries, and return a
