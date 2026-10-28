@@ -2,6 +2,7 @@
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -12,12 +13,12 @@ export const DEFAULT_ROOT_DIR = path.resolve(__dirname, '..');
 export const SOURCE_ROOT = 'client/src';
 export const BASELINE_PATH = 'scripts/client-boundaries-baseline.json';
 
-const SOURCE_FILE_PATTERN = /\.(?:js|jsx|ts|tsx)$/;
+const SOURCE_FILE_PATTERN = /\.(?:js|jsx|mjs|cjs|ts|tsx)$/;
 const DECLARATION_FILE_PATTERN = /\.d\.ts$/;
-const TEST_FILE_PATTERN = /\.(?:test|spec)\.(?:js|jsx|ts|tsx)$/;
+const TEST_FILE_PATTERN = /\.(?:test|spec)\.(?:js|jsx|mjs|cjs|ts|tsx)$/;
 const TEST_UTILITY_FILE_PATTERN =
   /(?:^|[._-])(?:test-?utils?|testing|fixtures?)(?:[._-]|\.)|(?:testFixtures|testUtils|testingUtils)/i;
-const TEST_HARNESS_FILE_PATTERN = /harness\.(?:js|jsx|ts|tsx)$/i;
+const TEST_HARNESS_FILE_PATTERN = /harness\.(?:js|jsx|mjs|cjs|ts|tsx)$/i;
 
 const IMPORT_PATTERNS = Object.freeze([
   /\bimport\s+(?:type\s+)?(?:[^'";]+?\s+from\s*)?['"]([^'"]+)['"]/g,
@@ -55,6 +56,10 @@ const SHARED_RUNTIME_COMPONENT_FILES = Object.freeze([
 ]);
 
 export const CLIENT_BOUNDARY_RULES = Object.freeze({
+  noRuntimeImportCycles: {
+    id: 'no-runtime-import-cycles',
+    description: 'client/src eager runtime imports must not form cycles',
+  },
   domainsNoComponents: {
     id: 'domains-no-components',
     description: 'client/src/domains/** must not import client/src/components/**',
@@ -176,6 +181,97 @@ export function extractImportSpecifiers(source) {
   return [...new Set(specifiers)].sort();
 }
 
+let typescript;
+const require = createRequire(import.meta.url);
+
+function extractRuntimeImportSpecifiers(sourceText, sourceFile = 'source.tsx') {
+  // Use the installed client compiler so comments, strings and type queries are not runtime edges.
+  typescript ||= require(path.join(DEFAULT_ROOT_DIR, 'client/node_modules/typescript/lib/typescript.js'));
+  const ts = typescript;
+  const source = ts.createSourceFile(sourceFile, sourceText, ts.ScriptTarget.Latest, true);
+  const specifiers = new Set();
+  const add = (node) => {
+    if (node && ts.isStringLiteralLike(node)) specifiers.add(node.text);
+  };
+  const visit = (node) => {
+    if (ts.isTypeNode(node) || ts.isFunctionLike(node)) return;
+    if (ts.isImportDeclaration(node)) {
+      const clause = node.importClause;
+      const names = clause?.namedBindings;
+      const onlyNamedTypes = names && ts.isNamedImports(names) && names.elements.length > 0
+        && names.elements.every((entry) => entry.isTypeOnly) && !clause.name;
+      if (!clause?.isTypeOnly && !onlyNamedTypes) add(node.moduleSpecifier);
+      return;
+    }
+    if (ts.isExportDeclaration(node)) {
+      const names = node.exportClause;
+      const onlyNamedTypes = names && ts.isNamedExports(names) && names.elements.length > 0
+        && names.elements.every((entry) => entry.isTypeOnly);
+      if (!node.isTypeOnly && !onlyNamedTypes) add(node.moduleSpecifier);
+      return;
+    }
+    if (ts.isImportEqualsDeclaration(node)) {
+      if (!node.isTypeOnly && ts.isExternalModuleReference(node.moduleReference)) add(node.moduleReference.expression);
+      return;
+    }
+    // Deferred import() calls intentionally break initialization cycles.
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+      && node.expression.text === 'require') add(node.arguments[0]);
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return [...specifiers].sort();
+}
+
+function collectRuntimeImportCycles(sources) {
+  const fileIds = new Map([...sources.keys()].map((file) => [
+    resolveClientImport(file, `./${path.posix.basename(file)}`), file,
+  ]));
+  const graph = new Map([...sources].map(([file, sourceText]) => [
+    file,
+    extractRuntimeImportSpecifiers(sourceText, file).flatMap((specifier) => {
+      const resolved = resolveClientImport(file, specifier);
+      const target = fileIds.get(resolved) || fileIds.get(`${resolved}/`);
+      return target ? [target] : [];
+    }),
+  ]));
+  const indices = new Map();
+  const lowLinks = new Map();
+  const stack = [];
+  const onStack = new Set();
+  const violations = [];
+  const visit = (file) => {
+    indices.set(file, indices.size);
+    lowLinks.set(file, indices.get(file));
+    stack.push(file);
+    onStack.add(file);
+    for (const target of graph.get(file)) {
+      if (!indices.has(target)) {
+        visit(target);
+        lowLinks.set(file, Math.min(lowLinks.get(file), lowLinks.get(target)));
+      } else if (onStack.has(target)) {
+        lowLinks.set(file, Math.min(lowLinks.get(file), indices.get(target)));
+      }
+    }
+    if (lowLinks.get(file) !== indices.get(file)) return;
+    const members = [];
+    let member;
+    do {
+      member = stack.pop();
+      onStack.delete(member);
+      members.push(member);
+    } while (member !== file);
+    if (members.length > 1 || graph.get(file).includes(file)) {
+      members.sort();
+      violations.push(buildViolation(
+        CLIENT_BOUNDARY_RULES.noRuntimeImportCycles, members[0], '<runtime-cycle>', members.join(', '),
+      ));
+    }
+  };
+  for (const file of graph.keys()) if (!indices.has(file)) visit(file);
+  return violations;
+}
+
 export function resolveClientImport(sourceFile, specifier) {
   const normalizedSource = normalizePath(sourceFile);
   const normalizedSpecifier = normalizePath(specifier);
@@ -203,7 +299,7 @@ export function resolveClientImport(sourceFile, specifier) {
     return null;
   }
 
-  return resolved.replace(/\.(?:js|jsx|ts|tsx)$/, '').replace(/\/index$/, '/');
+  return resolved.replace(/\.(?:js|jsx|mjs|cjs|ts|tsx)$/, '').replace(/\/index$/, '/');
 }
 
 const isComponentsPath = (filePath) => hasPathPrefix(filePath, 'client/src/components/');
@@ -537,6 +633,7 @@ export function collectClientBoundaryViolations({
 } = {}) {
   const files = listFiles(rootDir).filter(isProductionClientSourceFile).sort();
   const violations = [];
+  const sources = new Map();
 
   for (const source of files) {
     const absolutePath = path.join(rootDir, source);
@@ -545,6 +642,7 @@ export function collectClientBoundaryViolations({
     }
 
     const sourceText = fs.readFileSync(absolutePath, 'utf8');
+    sources.set(source, sourceText);
     const importSpecifiers = extractImportSpecifiers(sourceText);
     violations.push(...evaluatePassthroughFacade({ source, sourceText }));
 
@@ -562,6 +660,7 @@ export function collectClientBoundaryViolations({
     }
   }
 
+  violations.push(...collectRuntimeImportCycles(sources));
   return violations.sort(compareViolations);
 }
 
@@ -608,7 +707,9 @@ export function compareToBaseline(currentViolations, baselineViolations) {
   const currentIds = new Set(currentViolations.map(violationId));
 
   return {
-    newViolations: currentViolations.filter((violation) => !baselineIds.has(violationId(violation))),
+    newViolations: currentViolations.filter((violation) => (
+      violation.rule === CLIENT_BOUNDARY_RULES.noRuntimeImportCycles.id || !baselineIds.has(violationId(violation))
+    )),
     resolvedViolations: baselineViolations.filter((violation) => !currentIds.has(violationId(violation))),
   };
 }

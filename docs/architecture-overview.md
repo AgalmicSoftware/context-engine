@@ -169,6 +169,10 @@ The tracked checks work together:
 
 - `npm run client-boundaries:check` runs
   `scripts/check-client-boundaries.mjs` and the zero-entry boundary baseline.
+  It rejects cycles among eager runtime imports and re-exports, including
+  top-level CommonJS requires. Type-only imports/exports and deferred loads
+  (`import()` and requires inside functions) are excluded. The cycle rule always
+  has a zero baseline; saved entries cannot grandfather a cycle.
 - `npm run type-debt:check` runs `scripts/check-type-debt-ratchet.mjs` against
   `scripts/type-debt-baseline.json`.
 - CI runs baseline monotonicity in `.github/workflows/ci.yml`; baselines may

@@ -556,3 +556,47 @@ test('new violation output includes rule, source, import, and resolved path', ()
     );
   });
 });
+
+test('eager runtime import cycles are rejected across extensions, barrels and require', () => {
+  withTempRoot((rootDir) => {
+    writeFile(rootDir, 'client/src/cycle/a.ts', "import { b } from './b.js';\nexport const a = b;");
+    writeFile(rootDir, 'client/src/cycle/b.ts', "export { a as b } from './a';");
+    writeFile(rootDir, 'client/src/lazy.tsx', "export { value } from './barrel';");
+    writeFile(rootDir, 'client/src/barrel/index.mjs', "const lazy = require('../lazy');");
+    writeFile(rootDir, 'client/src/self.cjs', "require('./self.cjs');");
+    const cycles = collectClientBoundaryViolations({ rootDir }).filter(({ rule }) => rule === 'no-runtime-import-cycles');
+    assert.equal(cycles.length, 3);
+    assert.deepEqual(cycles.map(({ source }) => source), [
+      'client/src/barrel/index.mjs', 'client/src/cycle/a.ts', 'client/src/self.cjs',
+    ]);
+    const stdout = [];
+    assert.equal(runClientBoundaryCheck({ rootDir, argv: [], stdout: (line) => stdout.push(line), stderr: () => {} }), 1);
+    // This rule always has a zero baseline, even if a saved baseline contains a cycle.
+    writeBoundaryBaseline(cycles, rootDir);
+    assert.equal(runClientBoundaryCheck({ rootDir, argv: [], stdout: () => {}, stderr: () => {} }), 1);
+  });
+});
+
+test('type-only and deferred edges, comments and string literals cannot form eager cycles', () => {
+  withTempRoot((rootDir) => {
+    writeFile(rootDir, 'client/src/a.ts', `
+      import type { B } from './b';
+      export type { B } from './b';
+      import { type C } from './c';
+      export { type C } from './c';
+      type D = import('./d').D;
+      const lazy = () => import('./lazy');
+      function load() { return require('./deferred'); }
+      // import './comment';
+      const message = "import './literal'";
+      export const a = 1;
+    `);
+    for (const name of ['b', 'c', 'd', 'comment', 'literal', 'lazy', 'deferred']) {
+      writeFile(rootDir, `client/src/${name}.ts`, "import { a } from './a';");
+    }
+    assert.deepEqual(collectClientBoundaryViolations({ rootDir }), []);
+    writeFile(rootDir, 'client/src/b.ts', "import { type C, a } from './a';");
+    writeFile(rootDir, 'client/src/a.ts', "export { a } from './b';");
+    assert.equal(collectClientBoundaryViolations({ rootDir }).filter(({ rule }) => rule === 'no-runtime-import-cycles').length, 1);
+  });
+});

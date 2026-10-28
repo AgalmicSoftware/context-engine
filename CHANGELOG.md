@@ -273,6 +273,9 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Reject eager client runtime import cycles in the wiring gate, with a zero
+  baseline and exclusions for type-only imports and deferred loads.
+
 - Use one rating bounds and step rule across browser sliders, agent drafts and
   submissions, Wrapped, MCP and benchmark answers; suggested buttons are display hints.
 
