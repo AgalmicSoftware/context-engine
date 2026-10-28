@@ -60,6 +60,9 @@ Notes:
   - Arweave URI: `ar://<txId>`
   - Bare txId: `<txId>` (43-char base64url)
   The client normalizes `ar://` and bare txIds to a gateway URL via `normalizeArweaveUrl` (`client/src/utilities/arweave/arweaveUrls.ts`).
+  URL normalization records diagnostic context in an independent transaction-label
+  registry. Loading `arweaveClient` installs the resource-error listener; its
+  diagnostic labels and URL formats are unchanged.
 - Debugging: if you see browser console errors like `Failed to load resource ... (<txId>, line 0)`, check the Network tab for the full URL:
   - If the request is to your app origin (for example `http://localhost:3000/<txId>`), some UI is rendering a bare txId as a relative URL.
     Normalize before rendering.

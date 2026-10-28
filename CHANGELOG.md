@@ -78,6 +78,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Remove circular session-parser and Arweave imports while preserving resource
+  diagnostics and gateway URL normalization.
+
 - Validate wallet transaction quantities before policy checks and sign that same
   normalized transaction in both the Worker and in-memory fallback.
 

@@ -9,12 +9,6 @@ import {
   toSafeLinkHref,
 } from './arweaveUrls';
 
-jest.mock('./arweaveClient.js', () => ({
-  arweaveClient: {
-    registerTxContext: jest.fn(),
-  },
-}));
-
 describe('arweaveUrls helpers', () => {
   const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
   const testArIoGateway = 'https://ar-io.example.test';

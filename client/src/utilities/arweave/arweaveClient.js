@@ -427,6 +427,8 @@ const ensureArweaveResourceErrorListener = () => {
   }
 };
 
+ensureArweaveResourceErrorListener();
+
 const checkArweaveTxExistsViaGraphql = async (txId, opts = {}, debugContext = null) => {
   const normalizedTxId = String(txId || '').trim();
   if (!normalizedTxId) return null;
