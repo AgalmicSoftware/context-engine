@@ -236,3 +236,9 @@ These are documented centrally in [`docs/cache/README.md`](README.md):
 - `dg:sbt:partialReady:<slug>`
 - `dg:sbt:deferredFullScanNeeded:<slug>`
 - `dg:sbt:fullScanInProgress:<slug>`
+
+Worker catalog merges retain `workerQuestionMetadataTombstones` and
+`workerSurveyMetadataTombstones` beside their metadata refs in the identity-scoped
+`worker` node. Hidden ids lose their cached item, ref and pending metadata, and
+answer hydration cannot recreate their placeholder questions. A complete catalog
+that no longer marks an id hidden clears its tombstone; local merges do not.

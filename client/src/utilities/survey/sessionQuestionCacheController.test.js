@@ -78,6 +78,8 @@ jest.mock('./questionRouting.js', () => ({
   pickBetterQuestionPayload: jest.fn(),
 }));
 
+const metadataListing = (rows) => ({ rows, listedStorageRefIds: new Set(rows.map((row) => row.storageRefId)) });
+
 const {
   createSessionQuestionCacheController,
   mayHaveTemporaryDemoQuestionFixtures,
@@ -503,24 +505,26 @@ describe('createSessionQuestionCacheController', () => {
   describe('initializeQuestionCacheForGroup', () => {
     it('hydrates fresh Worker/SBT question metadata before the chain-scan no-op without RPC calls', async () => {
       const sessionCfg = createWorkerCanonicalSessionConfig({ hybrid: true });
-      const loadQuestions = jest.fn().mockResolvedValue([
-        {
-          id: '0xworkerquestion',
-          createdAtMs: 123,
-          storageRefId: 'cf_question_fresh',
-          storageRef: {
-            backend: 'cloudflare',
-            id: 'cf_question_fresh',
-            resource: 'questions',
-          },
-          payload: {
+      const loadQuestions = jest.fn().mockResolvedValue(
+        metadataListing([
+          {
             id: '0xworkerquestion',
-            prompt: 'Fresh Worker question',
-            sessionId: WORKER_SESSION_ID,
-            sessionSlug: SESSION_SLUG,
+            createdAtMs: 123,
+            storageRefId: 'cf_question_fresh',
+            storageRef: {
+              backend: 'cloudflare',
+              id: 'cf_question_fresh',
+              resource: 'questions',
+            },
+            payload: {
+              id: '0xworkerquestion',
+              prompt: 'Fresh Worker question',
+              sessionId: WORKER_SESSION_ID,
+              sessionSlug: SESSION_SLUG,
+            },
           },
-        },
-      ]);
+        ]),
+      );
       const host = createMockHost({
         sessionCfg,
         chainId: null,
@@ -625,26 +629,28 @@ describe('createSessionQuestionCacheController', () => {
         workerCanonicalIdentity: identityB,
       });
 
-      delayedB.resolve([]);
+      delayedB.resolve(metadataListing([]));
       await runB;
-      delayedA.resolve([
-        {
-          id: 'question-a-delayed',
-          createdAtMs: 789,
-          storageRefId: 'cf_question_a_delayed',
-          storageRef: {
-            backend: 'cloudflare',
-            id: 'cf_question_a_delayed',
-            resource: 'questions',
-          },
-          payload: {
+      delayedA.resolve(
+        metadataListing([
+          {
             id: 'question-a-delayed',
-            prompt: 'Delayed Session A question',
-            sessionId: sessionConfigA.sessionId,
-            sessionSlug: SESSION_SLUG,
+            createdAtMs: 789,
+            storageRefId: 'cf_question_a_delayed',
+            storageRef: {
+              backend: 'cloudflare',
+              id: 'cf_question_a_delayed',
+              resource: 'questions',
+            },
+            payload: {
+              id: 'question-a-delayed',
+              prompt: 'Delayed Session A question',
+              sessionId: sessionConfigA.sessionId,
+              sessionSlug: SESSION_SLUG,
+            },
           },
-        },
-      ]);
+        ]),
+      );
       await runA;
 
       expect(host.getStored('questionsCache', SESSION_SLUG).worker).toMatchObject({

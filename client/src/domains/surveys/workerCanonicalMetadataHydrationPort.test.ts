@@ -136,7 +136,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       return { json: async () => payload } as Response;
     });
 
-    const rows = await loadWorkerCanonicalQuestions(
+    const { rows } = await loadWorkerCanonicalQuestions(
       {
         account: 'passkey-account',
         providerLike: 'passkey-provider',
@@ -240,7 +240,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         }) as Response,
     );
 
-    const rows = await loadWorkerCanonicalQuestions(
+    const { rows } = await loadWorkerCanonicalQuestions(
       {
         sessionConfig,
         sessionSlug: 'worker-session',
@@ -305,7 +305,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       }),
     });
 
-    const rows = await loadWorkerCanonicalSurveys(
+    const { rows } = await loadWorkerCanonicalSurveys(
       {
         account: 'gated-account',
         providerLike: 'gated-provider',
@@ -462,7 +462,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         async ({ storageRef }: any) => ({ json: async () => payloads[storageRef.id] }) as Response,
       );
       const load = resource === 'questions' ? loadWorkerCanonicalQuestions : loadWorkerCanonicalSurveys;
-      const rows = await load(
+      const { rows } = await load(
         { sessionConfig, sessionSlug: 'worker-session' },
         {
           listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
@@ -758,7 +758,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         return { json: async () => question({ id: `0xq${index}`, prompt: `Question ${index}` }) } as Response;
       });
 
-      const rows = await loadWorkerCanonicalQuestions(
+      const { rows } = await loadWorkerCanonicalQuestions(
         { sessionConfig, sessionSlug: 'worker-session' },
         {
           listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
@@ -846,7 +846,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         const merge =
           resource === 'questions' ? mergeWorkerCanonicalQuestionMetadata : mergeWorkerCanonicalSurveyMetadata;
         for (const adminAddress of ['', ADMIN, AUTHOR, ATTACKER]) {
-          const rows = await load(
+          const { rows } = await load(
             { sessionConfig: { ...sessionConfig, adminAddress }, sessionSlug: 'worker-session' },
             {
               listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
@@ -1167,4 +1167,45 @@ describe('workerCanonicalMetadataHydrationPort', () => {
     expect(surveyCacheB.worker.workerCanonicalIdentity).toEqual(identityB);
     expect(surveyCacheB['11155420']).toEqual(registryCache['11155420']);
   });
+});
+
+describe('Worker metadata tombstones', () => {
+  it.each(['questions', 'surveys'] as const)(
+    'retains hidden %s until a complete unhidden listing',
+    async (resource) => {
+      const sessionConfig = buildWorkerSessionConfig();
+      const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: 'worker-session' });
+      const merge =
+        resource === 'questions' ? mergeWorkerCanonicalQuestionMetadata : mergeWorkerCanonicalSurveyMetadata;
+      const load = resource === 'questions' ? loadWorkerCanonicalQuestions : loadWorkerCanonicalSurveys;
+      const field = resource === 'questions' ? 'workerQuestionMetadataTombstones' : 'workerSurveyMetadataTombstones';
+      const hidden = merge(null, [{ hidden: true, id: 'q1' }], identity) as any;
+      expect(hidden.worker[field]).toEqual({ q1: true });
+      expect((merge(hidden, [], identity) as any).worker[field]).toEqual({ q1: true });
+      const listing = await load(
+        { sessionConfig, sessionSlug: 'worker-session' },
+        {
+          listSessionStorageRefsPage: async () => ({
+            items: [buildListedItem('cf_ref1', resource, '2026-01-01T00:00:00Z')],
+            listComplete: true,
+            cursor: null,
+          }),
+          readSessionStorageBlob: async () =>
+            ({
+              json: async () => ({
+                id: 'q1',
+                title: 'Survey',
+                prompt: 'Question',
+                sessionSlug: 'worker-session',
+                sessionId: SESSION_ID,
+              }),
+            }) as Response,
+        },
+      );
+      const unhidden = merge(hidden, listing, identity) as any;
+      expect(unhidden.worker[field]).toEqual({});
+      expect(unhidden.worker[resource].q1).toBeDefined();
+      expect(hidden.worker[field]).toEqual({ q1: true });
+    },
+  );
 });

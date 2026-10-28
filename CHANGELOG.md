@@ -72,6 +72,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep hidden Worker questions and surveys hidden in the reader cache, including
+  when saved answers carry their question text. Clear hides only after a complete catalog refresh.
+
 - Add a **Measure how well AI represents participants** switch to Interview
   settings, in the wizard and `/admin` (needs a Session Worker newer than
   0.8.0). It turns on research sharing by default, hidden drafts for 1 in 5

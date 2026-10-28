@@ -254,6 +254,7 @@ export const mergeWorkerQuestionResponses = (
   }
   network.workerResponseCacheVersion = WORKER_RESPONSE_CACHE_VERSION;
   const questions = isRecord(network.questions) ? { ...network.questions } : {};
+  const tombstones = isRecord(network.workerQuestionMetadataTombstones) ? network.workerQuestionMetadataTombstones : {};
   let responses = isRecord(network.questionResponses) ? { ...network.questionResponses } : {};
   let responseMeta = isRecord(network.questionResponsesMeta) ? { ...network.questionResponsesMeta } : {};
   const seenRefs = isRecord(network.workerResponseStorageRefs) ? { ...network.workerResponseStorageRefs } : {};
@@ -287,7 +288,7 @@ export const mergeWorkerQuestionResponses = (
     metaByResponder[responder] = incoming;
     responses[questionId] = byResponder;
     responseMeta[questionId] = metaByResponder;
-    if (!isRecord(questions[questionId])) {
+    if (!isRecord(questions[questionId]) && tombstones[questionId] !== true) {
       const prompt = readString(row.response.prompt || row.response.questionPrompt || row.response.questionText);
       if (prompt) {
         questions[questionId] = {
