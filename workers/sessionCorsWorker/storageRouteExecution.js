@@ -29,6 +29,8 @@ import {
   resolveWorkerGroupPrincipal,
 } from './workerGroups.js';
 import {
+  MAX_STORAGE_METADATA_BYTES,
+  STORAGE_METADATA_TAG_LIMITS,
   rejectBytesOverLimit,
   rejectContentLengthOverLimit,
   rejectKvValueOverLimit,
@@ -1405,6 +1407,11 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (canWriteR2 && !canUseR2Index) {
     return responseJson(deps, { error: 'Cloudflare R2 storage requires an index KV binding.' }, 501, baseHeaders);
   }
+  const tags = payload.tags || [];
+  if (tags.length > STORAGE_METADATA_TAG_LIMITS.count || tags.some((tag) =>
+    tag.name.length > STORAGE_METADATA_TAG_LIMITS.nameChars || tag.value.length > STORAGE_METADATA_TAG_LIMITS.valueChars)) {
+    return responseJson(deps, { error: `Upload tags exceed metadata limits: at most ${STORAGE_METADATA_TAG_LIMITS.count} tags, ${STORAGE_METADATA_TAG_LIMITS.nameChars}-character names and ${STORAGE_METADATA_TAG_LIMITS.valueChars}-character values.` }, 413, baseHeaders);
+  }
   const access = await authorizeCloudflareStorageAccess({
     env,
     config,
@@ -1586,6 +1593,9 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     });
 
     const serializedMetadata = JSON.stringify(metadata);
+    if (jsonByteLength(serializedMetadata) > MAX_STORAGE_METADATA_BYTES) {
+      return { response: responseJson(deps, { error: `Upload metadata exceeds ${MAX_STORAGE_METADATA_BYTES} bytes.` }, 413, baseHeaders) };
+    }
     const serializedKvPayload = canWriteR2
       ? ''
       : JSON.stringify({

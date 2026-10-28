@@ -1170,3 +1170,48 @@ for (const mode of ['plaintext-kv', 'encrypted-kv', 'plaintext-r2']) {
     assert.equal(await read.text(), '');
   });
 }
+
+test('maximum upload metadata fits a backup header and round-trips unchanged', async () => {
+  const source = fixture();
+  const config = JSON.parse(await source.kv.get(`session:${slug}:config`));
+  config.storageProfile = { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } };
+  await source.kv.put(`session:${slug}:config`, JSON.stringify(config));
+  const tags = Array.from({ length: 32 }, (_, index) => ({ name: `tag-${index}`, value: index < 31 ? 'é'.repeat(1024) : 'x' }));
+  const probe = await uploadBackupDocument(source, { data: 'small', tags });
+  assert.equal(probe.status, 200, await probe.clone().text());
+  const probeId = (await probe.json()).id;
+  const limit = 64 * 1024;
+  tags[31].value = 'x'.repeat(limit - Buffer.byteLength(await source.kv.get(`ce-storage:${slug}:docsContext:${probeId}`)) + 1);
+  assert.ok(tags[31].value.length > 0 && tags[31].value.length <= 1024);
+  const response = await uploadBackupDocument(source, { data: 'small', tags });
+  assert.equal(response.status, 200, await response.clone().text());
+  const { id } = await response.json();
+  const recordKey = `ce-storage:${slug}:docsContext:${id}`;
+  const metadata = JSON.parse(await source.kv.get(recordKey));
+  assert.equal(Buffer.byteLength(JSON.stringify(metadata)), limit);
+  const { MAX_STORAGE_METADATA_BYTES } = await import('./uploadSizeLimits.js');
+  assert.equal(MAX_STORAGE_METADATA_BYTES, limit);
+  const header = { kind: 'payload', id, size: 25 * 1024 * 1024, sha256: 'f'.repeat(64), chunkCount: 100, metadata: null };
+  assert.ok(MAX_STORAGE_METADATA_BYTES + Buffer.byteLength(JSON.stringify(header)) < STORAGE_EXPORT_PAGE_LIMITS.encodedBytes - 16384);
+  const pages = await allPages(source.env);
+  const target = fixture(); target.kv.values.delete(`session:${slug}:config`);
+  for (const page of pages) {
+    const result = await importPage(target.env, page);
+    assert.equal(result.ok, true, JSON.stringify(result));
+  }
+  assert.deepEqual(JSON.parse(await target.kv.get(recordKey)), metadata);
+  const read = await storageRoute({ path: '/storage/read', method: 'GET', env: target.env, slug,
+    config: JSON.parse(await target.kv.get(`session:${slug}:config`)), uploaderAddress: admin,
+    request: new Request(`https://worker.example/storage/read?id=${id}`), baseHeaders: new Headers(),
+  });
+  assert.equal(read.status, 200); assert.equal(await read.text(), 'small');
+});
+
+test('legacy metadata that exceeds the backup entry limit reports the stored id', async () => {
+  const source = fixture();
+  const id = 'legacy-oversized-metadata';
+  const metadata = { id, resource: 'docsContext', storageLayer: 'kv', tags: [{ name: 'legacy', value: 'x'.repeat(STORAGE_EXPORT_PAGE_LIMITS.encodedBytes) }] };
+  source.kv.values.set(`ce-storage:${slug}:docsContext:${id}`, JSON.stringify(metadata));
+  source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('small').toString('base64url') }));
+  await assert.rejects(allPages(source.env), (error) => error.status === 409 && error.message.includes(id));
+});

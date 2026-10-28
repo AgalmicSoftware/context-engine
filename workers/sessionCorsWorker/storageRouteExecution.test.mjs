@@ -4970,3 +4970,39 @@ test('stored payload byte reads distinguish empty strings from missing payloads'
     else assert.equal(bytes, null);
   }
 });
+
+for (const useR2 of [false, true]) test(`metadata upload limits include encoded bytes and tag caps (R2 ${useR2})`, async () => {
+  const kv = createMockKv();
+  const env = { CE_STORAGE_INDEX_KV: kv, ...(useR2 ? { CE_STORAGE_R2: createMockR2() } : {}) };
+  const config = { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
+  const upload = (tags) => storageRoute({ path: '/storage/upload', method: 'POST', env, config, slug: 'session-a',
+    uploaderAddress: '0x00000000000000000000000000000000000000aa', baseHeaders: {},
+    deps: { json, randomBytes: fixedRandomBytes, now: () => Date.parse('2026-10-28T00:00:00Z') },
+    request: new Request('https://worker.example/storage/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resource: 'docsContext', data: 'small', contentType: 'text/plain', tags }) }),
+  });
+  const limit = 64 * 1024;
+  const tags = Array.from({ length: 32 }, (_, index) => ({ name: `tag-${index}`, value: index < 31 ? 'é'.repeat(1024) : 'x' }));
+  assert.equal((await upload(tags)).status, 200);
+  const key = `ce-storage:session-a:docsContext:${CF_ID}`;
+  tags[31].value = 'x'.repeat(limit - Buffer.byteLength(kv.store.get(key)) + 1);
+  assert.ok(tags[31].value.length > 0 && tags[31].value.length <= 1024);
+  assert.equal((await upload(tags)).status, 200);
+  assert.equal(Buffer.byteLength(kv.store.get(key)), limit);
+  const before = [...kv.store];
+  const tooLarge = await upload(tags.map((tag, index) => index === 31 ? { ...tag, value: `${tag.value}x` } : tag));
+  assert.equal(tooLarge.status, 413);
+  assert.match((await tooLarge.json()).error, /metadata/i);
+  assert.deepEqual([...kv.store], before);
+  for (const invalidTags of [
+    Array.from({ length: 33 }, () => ({ name: 'tag', value: 'value' })),
+    [{ name: 'n'.repeat(65), value: 'value' }],
+    [{ name: 'tag', value: 'v'.repeat(1025) }],
+  ]) {
+    const response = await upload(invalidTags);
+    assert.equal(response.status, 413);
+    assert.match((await response.json()).error, /tags/i);
+    assert.deepEqual([...kv.store], before);
+  }
+  assert.equal((await upload([{ name: 'n'.repeat(64), value: 'v'.repeat(1024) }])).status, 200);
+});

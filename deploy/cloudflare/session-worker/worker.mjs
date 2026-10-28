@@ -68326,11 +68326,13 @@ var init_storageEnvelopeEncryption = __esm({
 });
 
 // workers/sessionCorsWorker/uploadSizeLimits.js
-var DEFAULT_MAX_UPLOAD_BYTES, DEFAULT_MAX_KV_VALUE_BYTES, MAX_UPLOAD_BYTES_ENV, UPLOAD_TOO_LARGE_ERROR, KV_VALUE_TOO_LARGE_ERROR, toFinitePositiveInteger, resolveMaxUploadBytes, resolveMaxKvValueBytes, tooLarge, rejectContentLengthOverLimit, rejectBytesOverLimit, rejectKvValueOverLimit;
+var DEFAULT_MAX_UPLOAD_BYTES, DEFAULT_MAX_KV_VALUE_BYTES, MAX_STORAGE_METADATA_BYTES, STORAGE_METADATA_TAG_LIMITS, MAX_UPLOAD_BYTES_ENV, UPLOAD_TOO_LARGE_ERROR, KV_VALUE_TOO_LARGE_ERROR, toFinitePositiveInteger, resolveMaxUploadBytes, resolveMaxKvValueBytes, tooLarge, rejectContentLengthOverLimit, rejectBytesOverLimit, rejectKvValueOverLimit;
 var init_uploadSizeLimits = __esm({
   "workers/sessionCorsWorker/uploadSizeLimits.js"() {
     DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
     DEFAULT_MAX_KV_VALUE_BYTES = 24 * 1024 * 1024;
+    MAX_STORAGE_METADATA_BYTES = 64 * 1024;
+    STORAGE_METADATA_TAG_LIMITS = Object.freeze({ count: 32, nameChars: 64, valueChars: 1024 });
     MAX_UPLOAD_BYTES_ENV = "CE_MAX_UPLOAD_BYTES";
     UPLOAD_TOO_LARGE_ERROR = "Upload payload too large.";
     KV_VALUE_TOO_LARGE_ERROR = "KV storage payload too large after encoding.";
@@ -70026,6 +70028,10 @@ var init_storageRouteExecution = __esm({
       if (canWriteR2 && !canUseR2Index) {
         return responseJson(deps, { error: "Cloudflare R2 storage requires an index KV binding." }, 501, baseHeaders);
       }
+      const tags = payload.tags || [];
+      if (tags.length > STORAGE_METADATA_TAG_LIMITS.count || tags.some((tag) => tag.name.length > STORAGE_METADATA_TAG_LIMITS.nameChars || tag.value.length > STORAGE_METADATA_TAG_LIMITS.valueChars)) {
+        return responseJson(deps, { error: `Upload tags exceed metadata limits: at most ${STORAGE_METADATA_TAG_LIMITS.count} tags, ${STORAGE_METADATA_TAG_LIMITS.nameChars}-character names and ${STORAGE_METADATA_TAG_LIMITS.valueChars}-character values.` }, 413, baseHeaders);
+      }
       const access = await authorizeCloudflareStorageAccess({
         env,
         config,
@@ -70198,6 +70204,9 @@ var init_storageRouteExecution = __esm({
           payloadAccessControl: metadata2.payloadAccessControl
         });
         const serializedMetadata2 = JSON.stringify(metadata2);
+        if (jsonByteLength(serializedMetadata2) > MAX_STORAGE_METADATA_BYTES) {
+          return { response: responseJson(deps, { error: `Upload metadata exceeds ${MAX_STORAGE_METADATA_BYTES} bytes.` }, 413, baseHeaders) };
+        }
         const serializedKvPayload2 = canWriteR2 ? "" : JSON.stringify({
           metadata: metadata2,
           payloadBase64url: bytesToBase64url2(bytesToStore2 || new Uint8Array())
@@ -99496,7 +99505,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   let rows = 0;
   const append = (entry2) => {
     const size = jsonByteLength(entry2) + 1;
-    if (size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes - 16384) fail6("A backup metadata record exceeds the page limit.");
+    if (size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes - 16384) fail6(`Backup metadata record ${entry2.id || entry2.key || "unknown"} exceeds the page limit.`);
     if (used + size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes) return false;
     page.entries.push(entry2);
     used += size;

@@ -196,6 +196,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Cap Cloudflare upload metadata at 64 KiB with bounded tags so accepted records
+  fit backup entries; legacy oversized export errors name the affected storage ID.
+
 - Preserve zero-byte documents through backup and restore, treating an empty KV
   payload as valid bytes rather than a missing object.
 

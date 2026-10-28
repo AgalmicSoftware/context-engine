@@ -100,7 +100,7 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
   let rows = 0;
   const append = (entry) => {
     const size = jsonByteLength(entry) + 1;
-    if (size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes - 16384) fail('A backup metadata record exceeds the page limit.');
+    if (size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes - 16384) fail(`Backup metadata record ${entry.id || entry.key || 'unknown'} exceeds the page limit.`);
     if (used + size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes) return false;
     page.entries.push(entry);
     used += size;

@@ -834,6 +834,11 @@ Authenticated clients can use the worker as the session storage boundary:
     responses are only size-checked; questions and surveys must be plaintext
     JSON so the Worker can check their ids.
   - URL fetches and image fetches count actual response bytes up to 10 MiB before parsing or returning content. Oversized responses return `413`; image responses are buffered within this limit so they cannot return a partial success before detecting oversize.
+  - Serialized Cloudflare index metadata is capped at 64 KiB so every accepted
+    record fits a backup entry, including its repeated payload-header metadata.
+    Uploads accept at most 32 tags, with names up to 64 characters and values up
+    to 1,024 characters; metadata and tag overflow return `413` before publication.
+    Older oversized metadata still fails export with the affected storage ID.
   - KV-only payloads have a separate hard ceiling after base64/envelope JSON
     encoding: the serialized value must be at most 24 MiB, leaving 1 MiB below
     Cloudflare KV's 25 MiB value limit. Oversized encoded media/images and other
