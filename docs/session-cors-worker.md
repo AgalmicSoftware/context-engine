@@ -1680,18 +1680,27 @@ R2 / Durable Objects:
   `storageRef` with `replayed: true`, without writing again. A replay also ensures
   analysis was queued; a durable enqueue receipt prevents duplicate jobs, including
   after a lost settlement reply or after the first job finished.
-  Different content under a settled request id returns `409 upload_request_conflict`.
+  Different content under a settled or retained expired-pending request id returns
+  `409 upload_request_conflict`.
   Payload validation, encryption and serialized KV size checks finish before
   reserving a receipt, so deterministic failures do not hold a retry lease.
   Browser upload operations are scoped to the current account and session.
   Switching either clears their retry state in the pile; a late receipt from
   the previous account cannot populate the next account's saved answers.
   An active reservation returns retryable `503 upload_in_progress` for 120 seconds;
-  an expired reservation permits a new attempt with a fresh storage id, so a crashed
-  attempt may leave an orphan. Settled receipts retain HMACs of request IDs and payload digests, derived from
-  `TOKEN_HMAC_SECRET`, plus the reference for seven days, with a maximum of 2,000
-  per participant and session. Coordinator alarms remove expired receipts and
-  abandoned leases even when that participant never writes again.
+  an expired reservation resumes with a new attempt ID at the original storage ID
+  and metadata timestamp. Pending targets are retained for seven days from the
+  first reservation. A retry rebuilds encryption and metadata for that target, or
+  skips storage writes if its index entry was already published, then settles the
+  same reference. Interruptions between payload, index and settlement writes cannot
+  publish a second storage ID while the receipt is retained.
+  Receipts retain HMACs of request IDs and payload digests, derived from
+  `TOKEN_HMAC_SECRET`. Settled references remain for seven days from settlement.
+  Pending and settled receipts together have a maximum of 2,000 per participant
+  and session; cleanup evicts the oldest inactive receipts and never an active
+  lease. Full active capacity returns a retryable response. Coordinator alarms
+  remove expired receipts even without another write. Older pending receipts
+  without a recorded target retain the previous lease-expiration behavior.
   The client retains one submit operation across failed or partial attempts and
   includes the question id and per-question revision in each receipt key.
   Within that operation, an unchanged survey container keeps its receipt key

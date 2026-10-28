@@ -9,7 +9,7 @@ import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
 import { assertExpectedSessionAuthority } from './sessionConfigAuthority.js';
 import { exportCoordinatorBackup, exportWorkerGroupBackup, importWorkerGroupBackup, controlWorkerGroupBackupImport, BACKUP_GROUP_IMPORT_ACTIVE_KEY } from './sessionBackupCoordinator.js';
 import { importCoordinatorBackupPage } from './sessionBackupImport.js';
-import { normalizeStorageRef } from './storageRefNormalization.js';
+import { normalizeStorageRef, isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
 import {
   executeDeployHelperRequest,
   lookupCloudflareAccount,
@@ -79,6 +79,11 @@ const RESULTS_ANALYSIS_UPLOAD_PREFIX = 'results-analysis-upload-v1:';
 const UPLOAD_RECEIPT_PREFIX = 'upload-receipt-v1:';
 const UPLOAD_RECEIPT_LEASE_MS = 120_000;
 const UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const uploadReceiptExpiresAt = record => record.state === 'settled'
+  ? record.settledAt + UPLOAD_RECEIPT_RETENTION_MS
+  : record.state === 'pending'
+    ? record.storageId && Number.isFinite(record.reservedAt) ? record.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : record.leaseUntil
+    : 0;
 const MAX_UPLOAD_RECEIPTS = 2000;
 const MAX_RESULTS_ANALYSIS_REQUESTS = 24;
 const RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24_000;
@@ -430,18 +435,19 @@ export class SessionWriteCoordinator {
 
   async pruneUploadReceipts(transaction, nowMs) {
     const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
-    const settled = [];
-    let nextExpiry = Infinity;
+    const retained = [];
     for (const [key, record] of records) {
-      if (record.state === 'settled' && nowMs - record.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settled.push([key, record]);
-      else if (record.state !== 'pending' || record.leaseUntil <= nowMs) await transaction.delete(key);
-      else nextExpiry = Math.min(nextExpiry, record.leaseUntil);
+      const live = record.state === 'pending' && record.leaseUntil > nowMs;
+      const expiresAt = uploadReceiptExpiresAt(record);
+      if (!live && !(expiresAt > nowMs)) await transaction.delete(key);
+      else retained.push({ key, live, expiresAt: Math.max(expiresAt, live ? record.leaseUntil : 0) });
     }
-    settled.sort((a, b) => a[1].settledAt - b[1].settledAt);
-    const excess = Math.max(0, settled.length - MAX_UPLOAD_RECEIPTS);
-    for (const [key] of settled.slice(0, excess)) await transaction.delete(key);
-    for (const [, record] of settled.slice(excess)) nextExpiry = Math.min(nextExpiry, record.settledAt + UPLOAD_RECEIPT_RETENTION_MS);
-    return nextExpiry;
+    // Pending targets count toward the cap, but an in-flight writer must never
+    // lose its lease to cleanup. Evict only the oldest inactive receipts.
+    const removable = retained.filter(record => !record.live).sort((a, b) => a.expiresAt - b.expiresAt);
+    const evicted = new Set(removable.slice(0, Math.max(0, retained.length - MAX_UPLOAD_RECEIPTS)).map(record => record.key));
+    for (const key of evicted) await transaction.delete(key);
+    return retained.reduce((next, record) => evicted.has(record.key) ? next : Math.min(next, record.expiresAt), Infinity);
   }
 
   async scheduleUploadReceiptCleanup() {
@@ -455,6 +461,11 @@ export class SessionWriteCoordinator {
     let payloadDigest = toTrimmedString(payload?.payloadDigest);
     if (!requestId || requestId.length > 200 || (!settle && !/^[a-f0-9]{64}$/.test(payloadDigest))) {
       return jsonResponse({ error: 'Invalid upload receipt request.' }, 400);
+    }
+    const storageId = toTrimmedString(payload?.storageId);
+    const createdAt = toTrimmedString(payload?.createdAt);
+    if (!settle && (storageId || createdAt) && (!isSafeCloudflareStorageRefId(storageId) || !Number.isFinite(Date.parse(createdAt)))) {
+      return jsonResponse({ error: 'Invalid upload receipt target.' }, 400);
     }
     let storageRef;
     if (settle) {
@@ -482,11 +493,13 @@ export class SessionWriteCoordinator {
     if (!settle) payloadDigest = await mac('payload', payloadDigest);
     const nowMs = Number(this.now()) || Date.now();
     const result = await this.state.storage.transaction(async (transaction) => {
+      if (!settle) await this.pruneUploadReceipts(transaction, nowMs);
       const record = await transaction.get(key);
       if (settle) {
         if (record?.state !== 'pending' || record.attemptId !== payload.attemptId) {
           return { status: 409, error: 'Upload attempt no longer owns this receipt.', reason: 'upload_attempt_superseded' };
         }
+        if (record.storageId && record.storageId !== storageRef.id) return { status: 409, error: 'Upload target does not match this receipt.', reason: 'upload_receipt_target_mismatch' };
         await transaction.put(key, { state: 'settled', payloadDigest: record.payloadDigest, storageRef, settledAt: nowMs });
         await this.pruneUploadReceipts(transaction, nowMs);
         return { status: 200, ok: true };
@@ -499,10 +512,20 @@ export class SessionWriteCoordinator {
       if (record?.state === 'pending' && record.leaseUntil > nowMs) {
         return { status: 503, error: 'This upload is still in progress; retry shortly.', reason: 'upload_in_progress' };
       }
+      const resumed = record?.state === 'pending' && !!record.storageId && uploadReceiptExpiresAt(record) > nowMs;
+      if (resumed && !equalText(record.payloadDigest, payloadDigest)) {
+        return { status: 409, error: 'This upload request id already reserved different content.', reason: 'upload_request_conflict' };
+      }
+      const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
+      if ([...records.values()].filter(record => record.state === 'pending' && record.leaseUntil > nowMs).length >= MAX_UPLOAD_RECEIPTS) {
+        return { status: 503, error: 'Upload receipt capacity is busy; retry shortly.', reason: 'upload_in_progress' };
+      }
+      const target = resumed ? { storageId: record.storageId, createdAt: record.createdAt, reservedAt: record.reservedAt }
+        : storageId ? { storageId, createdAt, reservedAt: nowMs } : {};
       const attemptId = createAttemptId(this.crypto);
-      await transaction.put(key, { state: 'pending', attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS });
+      await transaction.put(key, { state: 'pending', attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS, ...target });
       await this.pruneUploadReceipts(transaction, nowMs);
-      return { status: 200, kind: 'execute', attemptId };
+      return { status: 200, kind: 'execute', attemptId, ...(target.storageId ? { storageId: target.storageId, createdAt: target.createdAt, resumed } : {}) };
     });
     await this.scheduleUploadReceiptCleanup();
     const { status, ...body } = result;
@@ -3154,6 +3177,8 @@ export const coordinateResponseUploadReceipt = async ({ env, slug, responder, op
     if (!isObjectRecord(body) || (!response.ok && ![409, 503].includes(response.status))) return unavailable;
     if (response.ok && (operation === 'settle' ? body.ok !== true
       : !(body.kind === 'execute' && toTrimmedString(body.attemptId)) && !(body.kind === 'replay' && body.storageRef?.id))) return unavailable;
+    if (response.ok && body.kind === 'execute' && body.storageId != null &&
+        (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)))) return unavailable;
     return { ...body, status: response.status };
   } catch {
     return unavailable;

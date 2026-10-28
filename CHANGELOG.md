@@ -196,6 +196,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Resume interrupted response uploads at their reserved storage ID and timestamp,
+  retaining pending receipts and avoiding duplicate published answers after a crash.
+
 - Clear completed restore journals and page receipts in resumable steps, retaining
   a small completion record. A later import must pass the empty-target check.
 - Bound upload diagnostics registration to 250 ms, back off failed attempts for

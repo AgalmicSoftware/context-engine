@@ -4795,12 +4795,12 @@ test('hide requests validate the resource, id, and flag', async () => {
 });
 
 
-const createResponseReceiptFixture = ({ binding = true, maxKvValueBytes } = {}) => {
+const createResponseReceiptFixture = ({ binding = true, maxKvValueBytes, encrypted = false } = {}) => {
   const kv = createMockKv();
-  const env = { CE_STORAGE_INDEX_KV: kv, TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' };
-  const config = { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
+  const env = { CE_STORAGE_INDEX_KV: kv, TOKEN_HMAC_SECRET: 'synthetic-receipt-secret', CE_STORAGE_ENVELOPE_KEK: 'fixture envelope key' };
+  let config = encrypted ? createEnvelopeConfig() : { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
   let now = 1_000;
-  if (binding) attachSessionCoordinator(env, () => {}, { now: () => now });
+  if (binding) attachSessionCoordinator(env, next => { config = next; }, { now: () => now });
   const queued = [];
   const deps = { json, randomBytes: createSequenceRandomBytes(), now: () => now, maxKvValueBytes,
     enqueueResultsAnalysisAutoJob: async (args) => {
@@ -4816,7 +4816,9 @@ const createResponseReceiptFixture = ({ binding = true, maxKvValueBytes } = {}) 
       body: JSON.stringify({ resource: 'responses', requestId, data }),
     }),
   });
-  return { kv, env, queued, upload, advance: (ms) => { now += ms; } };
+  const read = id => storageRoute({ path: '/storage/read', method: 'GET', env, config, slug: 'session-a', uploaderAddress: '', baseHeaders: {}, deps,
+    request: new Request(`https://worker.example/storage/read?id=${id}`) });
+  return { kv, env, queued, upload, read, advance: (ms) => { now += ms; } };
 };
 
 test('response receipts replay the stored reference without writes or another analysis job', async () => {
@@ -4836,7 +4838,7 @@ test('response receipts replay the stored reference without writes or another an
   assert.notEqual(other.id, first.id, 'receipt scope belongs to the authenticated participant');
 });
 
-test('pending response uploads wait, and an expired attempt gets a fresh storage id', async () => {
+test('pending response uploads wait, and an expired attempt reuses its storage id', async () => {
   const f = createResponseReceiptFixture();
   const put = f.kv.put;
   let failed = false;
@@ -4853,7 +4855,7 @@ test('pending response uploads wait, and an expired attempt gets a fresh storage
   const retried = await f.upload();
   assert.equal(retried.status, 200);
   const saved = await retried.json();
-  assert.notEqual(orphanKey, `ce-storage-payload:session-a:${saved.id}`);
+  assert.equal(orphanKey, `ce-storage-payload:session-a:${saved.id}`);
   assert.equal(f.kv.store.has(orphanKey), true);
   assert.equal(f.queued.length, 1);
 });
@@ -4912,3 +4914,47 @@ test('oversize response retries return the same validation failure without reser
   assert.equal(f.queued.length, 0);
   assert.equal(f.env.CE_SESSION_COORDINATOR.instances.size, 0);
 });
+
+
+for (const encrypted of [false, true]) for (const interrupted of ['index', 'settle']) {
+  test(`${encrypted ? 'encrypted' : 'plaintext'} upload resumes after interruption before ${interrupted}`, async () => {
+    const f = createResponseReceiptFixture({ encrypted });
+    let fail = true;
+    if (interrupted === 'index') {
+      const put = f.kv.put;
+      f.kv.put = async (key, value) => {
+        if (fail && key.startsWith('ce-storage:session-a:responses:')) { fail = false; throw new Error('interrupted index'); }
+        return put(key, value);
+      };
+      await assert.rejects(f.upload(), /interrupted index/);
+    } else {
+      const get = f.env.CE_SESSION_COORDINATOR.get;
+      f.env.CE_SESSION_COORDINATOR.get = id => {
+        const stub = get(id);
+        return { fetch: async (url, init) => {
+          if (fail && url.endsWith('/settle')) { fail = false; throw new Error('interrupted settlement'); }
+          return stub.fetch(url, init);
+        } };
+      };
+      assert.equal((await f.upload()).status, 503);
+    }
+    const payloadKeys = () => [...f.kv.store.keys()].filter(key => key.startsWith('ce-storage-payload:session-a:'));
+    const indexKeys = () => [...f.kv.store.keys()].filter(key => key.startsWith('ce-storage:session-a:responses:'));
+    const firstKey = payloadKeys()[0];
+    const firstMetadata = JSON.parse(f.kv.store.get(firstKey)).metadata;
+    const firstId = firstMetadata.id;
+    const before = [...f.kv.store];
+    f.advance(120001);
+    const retried = await f.upload();
+    assert.equal(retried.status, 200, await retried.clone().text());
+    const result = await retried.json();
+    assert.equal(result.id, firstId);
+    assert.equal(payloadKeys().length, 1); assert.equal(indexKeys().length, 1);
+    assert.equal(JSON.parse(f.kv.store.get(indexKeys()[0])).createdAt, firstMetadata.createdAt);
+    if (interrupted === 'settle') assert.deepEqual([...f.kv.store], before, 'published payloads are not rewritten');
+    const read = await f.read(result.id);
+    assert.equal(read.status, 200, await read.clone().text());
+    assert.deepEqual(await read.json(), { questionID: 'q1', answer: { value: 'Agree' } });
+    assert.equal(f.queued.length, 1);
+  });
+}

@@ -70107,98 +70107,137 @@ var init_storageRouteExecution = __esm({
       if (!isSafeCloudflareStorageRefId(id2)) {
         return responseJson(deps, { error: "Failed to create safe Cloudflare storage reference." }, 500, baseHeaders);
       }
-      const createdAt = new Date(deps?.now?.() || Date.now()).toISOString();
-      const objectKey = buildObjectKey({ slug, id: id2 });
-      const storageLayer = canWriteR2 ? "r2" : "kv";
-      let bytesToStore = payload.bytes || new Uint8Array();
-      let envelope = null;
-      let accessConditions = payload.accessConditions || null;
-      let conditionRef = accessConditions?.conditions?.length ? "payload" : "gate_fallback";
-      if (!accessConditions?.conditions?.length && payloadAccess.conditions?.conditions?.length) {
-        accessConditions = payloadAccess.conditions;
-        conditionRef = "session";
-      }
-      if (payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE) {
-        try {
-          const encrypted = await encryptPayloadWithStorageEnvelope({
-            env,
-            config,
-            slug,
-            payloadId: id2,
-            plaintextBytes: bytesToStore,
-            contentType: payload.contentType,
-            accessConditions,
-            conditionRef,
-            deps
-          });
-          bytesToStore = encrypted.ciphertextBytes;
-          envelope = encrypted.envelope;
-        } catch (error) {
-          return responseJson(deps, { error: error?.message || "Cloudflare worker envelope encryption failed." }, 500, baseHeaders);
+      let createdAt = new Date(deps?.now?.() || Date.now()).toISOString();
+      const prepareStorageWrite = async (id3, createdAt2) => {
+        const objectKey2 = buildObjectKey({ slug, id: id3 });
+        const storageLayer = canWriteR2 ? "r2" : "kv";
+        let bytesToStore2 = payload.bytes || new Uint8Array();
+        let envelope = null;
+        let accessConditions = payload.accessConditions || null;
+        let conditionRef = accessConditions?.conditions?.length ? "payload" : "gate_fallback";
+        if (!accessConditions?.conditions?.length && payloadAccess.conditions?.conditions?.length) {
+          accessConditions = payloadAccess.conditions;
+          conditionRef = "session";
         }
-      }
-      const effectiveGroupIds = normalizeGroupIdList([
-        ...normalizeGroupIdList(payload.groupIds),
-        ...normalizeGroupIdList(uploadPolicy.groupIds),
-        ...normalizeGroupIdList(payloadAccess.groupIds)
-      ]);
-      const metadata = {
-        id: id2,
-        backend: STORAGE_BACKENDS.CLOUDFLARE,
-        resource,
-        contentType: trim9(payload.contentType) || "application/octet-stream",
-        encrypted: payload.payloadEncrypted === true || payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE,
-        gate: trim9(payload.gate),
-        tags: payload.tags,
-        groupIds: effectiveGroupIds,
-        uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : void 0,
-        size: bytesToStore?.length || 0,
-        createdAt,
-        ...resource === "responses" && trim9(uploaderAddress) ? { responder: trim9(uploaderAddress).toLowerCase() } : {},
-        // Authorship and precedence are server-authored; payload fields cannot grant
-        // admin correction authority, and later role changes cannot withdraw it.
-        ...owned ? { resourceId, uploadAuthority: uploaderIsAdmin ? "admin" : "author", ...uploader ? { uploader } : {}, ...hidden ? { hidden: true } : {} } : {},
-        payloadAccessMode: payloadAccess.mode,
-        payloadAccessControl: {
-          gate: payloadAccess.gate,
-          encryption: payloadAccess.encryption,
-          ...effectiveGroupIds.length ? { groupIds: effectiveGroupIds } : {}
-        },
-        ...accessConditions?.conditions?.length ? { accessConditions } : {},
-        ...envelope ? { envelope } : {},
-        storageLayer
+        if (payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE) {
+          try {
+            const encrypted = await encryptPayloadWithStorageEnvelope({
+              env,
+              config,
+              slug,
+              payloadId: id3,
+              plaintextBytes: bytesToStore2,
+              contentType: payload.contentType,
+              accessConditions,
+              conditionRef,
+              deps
+            });
+            bytesToStore2 = encrypted.ciphertextBytes;
+            envelope = encrypted.envelope;
+          } catch (error) {
+            return { response: responseJson(deps, { error: error?.message || "Cloudflare worker envelope encryption failed." }, 500, baseHeaders) };
+          }
+        }
+        const effectiveGroupIds = normalizeGroupIdList([
+          ...normalizeGroupIdList(payload.groupIds),
+          ...normalizeGroupIdList(uploadPolicy.groupIds),
+          ...normalizeGroupIdList(payloadAccess.groupIds)
+        ]);
+        const metadata2 = {
+          id: id3,
+          backend: STORAGE_BACKENDS.CLOUDFLARE,
+          resource,
+          contentType: trim9(payload.contentType) || "application/octet-stream",
+          encrypted: payload.payloadEncrypted === true || payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE,
+          gate: trim9(payload.gate),
+          tags: payload.tags,
+          groupIds: effectiveGroupIds,
+          uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : void 0,
+          size: bytesToStore2?.length || 0,
+          createdAt: createdAt2,
+          ...resource === "responses" && trim9(uploaderAddress) ? { responder: trim9(uploaderAddress).toLowerCase() } : {},
+          // Authorship and precedence are server-authored; payload fields cannot grant
+          // admin correction authority, and later role changes cannot withdraw it.
+          ...owned ? { resourceId, uploadAuthority: uploaderIsAdmin ? "admin" : "author", ...uploader ? { uploader } : {}, ...hidden ? { hidden: true } : {} } : {},
+          payloadAccessMode: payloadAccess.mode,
+          payloadAccessControl: {
+            gate: payloadAccess.gate,
+            encryption: payloadAccess.encryption,
+            ...effectiveGroupIds.length ? { groupIds: effectiveGroupIds } : {}
+          },
+          ...accessConditions?.conditions?.length ? { accessConditions } : {},
+          ...envelope ? { envelope } : {},
+          storageLayer
+        };
+        assertNoCloudflarePrivateMaterial({
+          id: id3,
+          backend: metadata2.backend,
+          resource,
+          contentType: metadata2.contentType,
+          gate: metadata2.gate,
+          createdAt: createdAt2,
+          payloadAccessMode: payloadAccess.mode,
+          payloadAccessControl: metadata2.payloadAccessControl
+        });
+        const serializedMetadata2 = JSON.stringify(metadata2);
+        const serializedKvPayload2 = canWriteR2 ? "" : JSON.stringify({
+          metadata: metadata2,
+          payloadBase64url: bytesToBase64url2(bytesToStore2 || new Uint8Array())
+        });
+        const kvValueFailure = !canWriteR2 && rejectKvValueOverLimit({ serializedValue: serializedKvPayload2, deps }) || index && rejectKvValueOverLimit({ serializedValue: serializedMetadata2, deps });
+        if (kvValueFailure) {
+          return { response: responseJson(deps, { error: kvValueFailure.error }, kvValueFailure.status, baseHeaders) };
+        }
+        return { objectKey: objectKey2, bytesToStore: bytesToStore2, metadata: metadata2, serializedMetadata: serializedMetadata2, serializedKvPayload: serializedKvPayload2 };
       };
-      assertNoCloudflarePrivateMaterial({
-        id: id2,
-        backend: metadata.backend,
-        resource,
-        contentType: metadata.contentType,
-        gate: metadata.gate,
-        createdAt,
-        payloadAccessMode: payloadAccess.mode,
-        payloadAccessControl: metadata.payloadAccessControl
-      });
-      const serializedMetadata = JSON.stringify(metadata);
-      const serializedKvPayload = canWriteR2 ? "" : JSON.stringify({
-        metadata,
-        payloadBase64url: bytesToBase64url2(bytesToStore || new Uint8Array())
-      });
-      const kvValueFailure = !canWriteR2 && rejectKvValueOverLimit({ serializedValue: serializedKvPayload, deps }) || index && rejectKvValueOverLimit({ serializedValue: serializedMetadata, deps });
-      if (kvValueFailure) {
-        return responseJson(deps, { error: kvValueFailure.error }, kvValueFailure.status, baseHeaders);
-      }
+      let prepared = await prepareStorageWrite(id2, createdAt);
+      if (prepared.response) return prepared.response;
       const requestId = trim9(payload.requestId);
       let uploadReceipt = null;
       if (resource === "responses" && uploader && requestId && requestId.length <= 200) {
         const digest2 = await (deps?.crypto || globalThis.crypto).subtle.digest("SHA-256", payload.bytes || new Uint8Array());
         const payloadDigest = Array.from(new Uint8Array(digest2), (byte) => byte.toString(16).padStart(2, "0")).join("");
-        uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: "reserve", payload: { requestId, payloadDigest } });
+        uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: "reserve", payload: { requestId, payloadDigest, storageId: id2, createdAt } });
         if (uploadReceipt?.kind === "replay") {
           await enqueueResponseAnalysis(uploadReceipt.storageRef.id);
           return responseJson(deps, { id: uploadReceipt.storageRef.id, storageRef: uploadReceipt.storageRef, replayed: true }, 200, baseHeaders);
         }
         if (uploadReceipt && uploadReceipt.kind !== "execute") {
           return responseJson(deps, { error: uploadReceipt.error, reason: uploadReceipt.reason }, uploadReceipt.status || 503, baseHeaders);
+        }
+      }
+      if (uploadReceipt?.storageId && (uploadReceipt.storageId !== id2 || uploadReceipt.createdAt !== createdAt)) {
+        id2 = uploadReceipt.storageId;
+        createdAt = uploadReceipt.createdAt;
+        prepared = await prepareStorageWrite(id2, createdAt);
+        if (prepared.response) return prepared.response;
+      }
+      const { objectKey, bytesToStore, metadata, serializedMetadata, serializedKvPayload } = prepared;
+      const finishUpload = async (storageRef, publishedMetadata, publishedBytes, replayed = false) => {
+        if (uploadReceipt) {
+          const settled = await coordinateResponseUploadReceipt({
+            env,
+            slug,
+            responder: uploader,
+            operation: "settle",
+            payload: { requestId, attemptId: uploadReceipt.attemptId, storageRef }
+          });
+          if (!settled?.ok) return responseJson(deps, { error: "Upload settlement is unavailable; retry.", reason: "upload_receipt_unavailable" }, 503, baseHeaders);
+        }
+        await enqueueResponseAnalysis(storageRef.id, publishedMetadata, publishedBytes);
+        return responseJson(deps, { id: storageRef.id, storageRef, ...replayed ? { replayed: true } : {} }, 200, baseHeaders);
+      };
+      if (uploadReceipt?.resumed) {
+        const stored = await index.get(buildIndexKey({ slug, resource, id: id2 }));
+        if (stored != null) {
+          let published;
+          try {
+            published = typeof stored === "string" ? JSON.parse(stored) : stored;
+          } catch {
+          }
+          const storageRef = published?.id === id2 && published?.resource === resource && published?.responder === uploader ? normalizeStorageRef(published) : null;
+          if (!storageRef) return responseJson(deps, { error: "Stored upload metadata is unavailable; retry." }, 503, baseHeaders);
+          return finishUpload(storageRef, void 0, void 0, true);
         }
       }
       await markStorageBackupWrite(env, slug);
@@ -70225,22 +70264,7 @@ var init_storageRouteExecution = __esm({
         await index.put(buildIndexKey({ slug, resource, id: id2 }), serializedMetadata);
       }
       await markStorageBackupWrite(env, slug);
-      const storageRef = normalizeStorageRef(metadata);
-      if (uploadReceipt) {
-        const settled = await coordinateResponseUploadReceipt({
-          env,
-          slug,
-          responder: uploader,
-          operation: "settle",
-          payload: { requestId, attemptId: uploadReceipt.attemptId, storageRef }
-        });
-        if (!settled?.ok) return responseJson(deps, { error: "Upload settlement is unavailable; retry.", reason: "upload_receipt_unavailable" }, 503, baseHeaders);
-      }
-      await enqueueResponseAnalysis(id2, metadata, bytesToStore);
-      return responseJson(deps, {
-        id: id2,
-        storageRef
-      }, 200, baseHeaders);
+      return finishUpload(normalizeStorageRef(metadata), metadata, bytesToStore);
     };
     readRequestId = async ({ request, url }) => {
       const fromQuery = trim9(url.searchParams.get("id") || url.searchParams.get("storageId"));
@@ -75535,7 +75559,7 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, MAX_UPLOAD_RECEIPTS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_submissionJournal();
@@ -75586,6 +75610,7 @@ var init_sessionWriteCoordinator = __esm({
     UPLOAD_RECEIPT_PREFIX = "upload-receipt-v1:";
     UPLOAD_RECEIPT_LEASE_MS = 12e4;
     UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1e3;
+    uploadReceiptExpiresAt = (record3) => record3.state === "settled" ? record3.settledAt + UPLOAD_RECEIPT_RETENTION_MS : record3.state === "pending" ? record3.storageId && Number.isFinite(record3.reservedAt) ? record3.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : record3.leaseUntil : 0;
     MAX_UPLOAD_RECEIPTS = 2e3;
     MAX_RESULTS_ANALYSIS_REQUESTS = 24;
     RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24e3;
@@ -75860,18 +75885,17 @@ ${expiry}`);
       }
       async pruneUploadReceipts(transaction, nowMs) {
         const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
-        const settled = [];
-        let nextExpiry = Infinity;
+        const retained = [];
         for (const [key, record3] of records) {
-          if (record3.state === "settled" && nowMs - record3.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settled.push([key, record3]);
-          else if (record3.state !== "pending" || record3.leaseUntil <= nowMs) await transaction.delete(key);
-          else nextExpiry = Math.min(nextExpiry, record3.leaseUntil);
+          const live = record3.state === "pending" && record3.leaseUntil > nowMs;
+          const expiresAt = uploadReceiptExpiresAt(record3);
+          if (!live && !(expiresAt > nowMs)) await transaction.delete(key);
+          else retained.push({ key, live, expiresAt: Math.max(expiresAt, live ? record3.leaseUntil : 0) });
         }
-        settled.sort((a, b2) => a[1].settledAt - b2[1].settledAt);
-        const excess = Math.max(0, settled.length - MAX_UPLOAD_RECEIPTS);
-        for (const [key] of settled.slice(0, excess)) await transaction.delete(key);
-        for (const [, record3] of settled.slice(excess)) nextExpiry = Math.min(nextExpiry, record3.settledAt + UPLOAD_RECEIPT_RETENTION_MS);
-        return nextExpiry;
+        const removable = retained.filter((record3) => !record3.live).sort((a, b2) => a.expiresAt - b2.expiresAt);
+        const evicted = new Set(removable.slice(0, Math.max(0, retained.length - MAX_UPLOAD_RECEIPTS)).map((record3) => record3.key));
+        for (const key of evicted) await transaction.delete(key);
+        return retained.reduce((next, record3) => evicted.has(record3.key) ? next : Math.min(next, record3.expiresAt), Infinity);
       }
       async scheduleUploadReceiptCleanup() {
         const nextExpiry = await this.state.storage.transaction((transaction) => this.pruneUploadReceipts(transaction, Number(this.now()) || Date.now()));
@@ -75883,6 +75907,11 @@ ${expiry}`);
         let payloadDigest = toTrimmedString9(payload?.payloadDigest);
         if (!requestId || requestId.length > 200 || !settle && !/^[a-f0-9]{64}$/.test(payloadDigest)) {
           return jsonResponse2({ error: "Invalid upload receipt request." }, 400);
+        }
+        const storageId = toTrimmedString9(payload?.storageId);
+        const createdAt = toTrimmedString9(payload?.createdAt);
+        if (!settle && (storageId || createdAt) && (!isSafeCloudflareStorageRefId(storageId) || !Number.isFinite(Date.parse(createdAt)))) {
+          return jsonResponse2({ error: "Invalid upload receipt target." }, 400);
         }
         let storageRef;
         if (settle) {
@@ -75913,11 +75942,13 @@ ${expiry}`);
         if (!settle) payloadDigest = await mac("payload", payloadDigest);
         const nowMs = Number(this.now()) || Date.now();
         const result = await this.state.storage.transaction(async (transaction) => {
+          if (!settle) await this.pruneUploadReceipts(transaction, nowMs);
           const record3 = await transaction.get(key);
           if (settle) {
             if (record3?.state !== "pending" || record3.attemptId !== payload.attemptId) {
               return { status: 409, error: "Upload attempt no longer owns this receipt.", reason: "upload_attempt_superseded" };
             }
+            if (record3.storageId && record3.storageId !== storageRef.id) return { status: 409, error: "Upload target does not match this receipt.", reason: "upload_receipt_target_mismatch" };
             await transaction.put(key, { state: "settled", payloadDigest: record3.payloadDigest, storageRef, settledAt: nowMs });
             await this.pruneUploadReceipts(transaction, nowMs);
             return { status: 200, ok: true };
@@ -75928,10 +75959,19 @@ ${expiry}`);
           if (record3?.state === "pending" && record3.leaseUntil > nowMs) {
             return { status: 503, error: "This upload is still in progress; retry shortly.", reason: "upload_in_progress" };
           }
+          const resumed = record3?.state === "pending" && !!record3.storageId && uploadReceiptExpiresAt(record3) > nowMs;
+          if (resumed && !equalText(record3.payloadDigest, payloadDigest)) {
+            return { status: 409, error: "This upload request id already reserved different content.", reason: "upload_request_conflict" };
+          }
+          const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
+          if ([...records.values()].filter((record4) => record4.state === "pending" && record4.leaseUntil > nowMs).length >= MAX_UPLOAD_RECEIPTS) {
+            return { status: 503, error: "Upload receipt capacity is busy; retry shortly.", reason: "upload_in_progress" };
+          }
+          const target = resumed ? { storageId: record3.storageId, createdAt: record3.createdAt, reservedAt: record3.reservedAt } : storageId ? { storageId, createdAt, reservedAt: nowMs } : {};
           const attemptId = createAttemptId(this.crypto);
-          await transaction.put(key, { state: "pending", attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS });
+          await transaction.put(key, { state: "pending", attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS, ...target });
           await this.pruneUploadReceipts(transaction, nowMs);
-          return { status: 200, kind: "execute", attemptId };
+          return { status: 200, kind: "execute", attemptId, ...target.storageId ? { storageId: target.storageId, createdAt: target.createdAt, resumed } : {} };
         });
         await this.scheduleUploadReceiptCleanup();
         const { status, ...body } = result;
@@ -78322,6 +78362,7 @@ ${expiry}`);
         const body = await response2.json();
         if (!isObjectRecord(body) || !response2.ok && ![409, 503].includes(response2.status)) return unavailable3;
         if (response2.ok && (operation === "settle" ? body.ok !== true : !(body.kind === "execute" && toTrimmedString9(body.attemptId)) && !(body.kind === "replay" && body.storageRef?.id))) return unavailable3;
+        if (response2.ok && body.kind === "execute" && body.storageId != null && (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)))) return unavailable3;
         return { ...body, status: response2.status };
       } catch {
         return unavailable3;

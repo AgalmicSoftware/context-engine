@@ -3042,3 +3042,44 @@ for (const concurrent of [false, true]) {
     assert.equal(store.has('results-analysis-auto-job-v1'), false);
   });
 }
+
+test('expired pending receipts resume the recorded target and reject different bytes', async () => {
+  const { state, store } = createTransactionalState();
+  let now = 1000;
+  const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'fixture-receipt-secret' }, { now: () => now });
+  const payload = { requestId: 'resume-target', payloadDigest: 'a'.repeat(64), storageId: receiptRef.id, createdAt: new Date(now).toISOString() };
+  const first = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  assert.equal(first.storageId, payload.storageId);
+  now += 120001;
+  await coordinator.scheduleUploadReceiptCleanup();
+  assert.equal(store.size, 1);
+  const conflict = await coordinator.fetch(receiptRequest('reserve', { ...payload, payloadDigest: 'b'.repeat(64) }));
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).reason, 'upload_request_conflict');
+  const next = await (await coordinator.fetch(receiptRequest('reserve', { ...payload, storageId: 'different-target', createdAt: new Date(now).toISOString() }))).json();
+  assert.equal(next.kind, 'execute'); assert.equal(next.resumed, true);
+  assert.equal(next.storageId, payload.storageId); assert.equal(next.createdAt, payload.createdAt);
+  assert.notEqual(next.attemptId, first.attemptId);
+  const stale = await coordinator.fetch(receiptRequest('settle', { requestId: payload.requestId, attemptId: first.attemptId, storageRef: receiptRef }));
+  assert.equal(stale.status, 409);
+  now = 1000 + 7 * 24 * 60 * 60 * 1000;
+  await coordinator.scheduleUploadReceiptCleanup();
+  assert.equal(store.size, 0, 'retention starts at the original reservation');
+});
+
+test('receipt cap counts retained pending records and never evicts a live lease', async () => {
+  const { state, store } = createTransactionalState();
+  const now = 200000;
+  const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'fixture-receipt-secret' }, { now: () => now });
+  for (let index = 0; index < 1999; index++) store.set(`upload-receipt-v1:settled-${index}`, { state: 'settled', settledAt: index + 10 });
+  store.set('upload-receipt-v1:expired', { state: 'pending', storageId: receiptRef.id, createdAt: new Date(1).toISOString(), reservedAt: 1, leaseUntil: 120001 });
+  store.set('upload-receipt-v1:live', { state: 'pending', storageId: receiptRef.id, createdAt: new Date(1).toISOString(), reservedAt: 1, leaseUntil: now + 120000 });
+  await coordinator.scheduleUploadReceiptCleanup();
+  assert.equal(store.size, 2000);
+  assert.equal(store.has('upload-receipt-v1:expired'), false);
+  assert.equal(store.has('upload-receipt-v1:live'), true);
+  store.clear();
+  for (let index = 0; index < 2000; index++) store.set(`upload-receipt-v1:live-${index}`, { state: 'pending', leaseUntil: now + 120000 });
+  const response = await coordinator.fetch(receiptRequest('reserve', { requestId: 'full', payloadDigest: 'a'.repeat(64), storageId: receiptRef.id, createdAt: new Date(now).toISOString() }));
+  assert.equal(response.status, 503); assert.equal(store.size, 2000);
+});

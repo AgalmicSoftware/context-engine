@@ -1510,94 +1510,99 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (!isSafeCloudflareStorageRefId(id)) {
     return responseJson(deps, { error: 'Failed to create safe Cloudflare storage reference.' }, 500, baseHeaders);
   }
-  const createdAt = new Date((deps?.now?.() || Date.now())).toISOString();
-  const objectKey = buildObjectKey({ slug, id });
-  const storageLayer = canWriteR2 ? 'r2' : 'kv';
-  let bytesToStore = payload.bytes || new Uint8Array();
-  let envelope = null;
-  let accessConditions = payload.accessConditions || null;
-  let conditionRef = accessConditions?.conditions?.length ? 'payload' : 'gate_fallback';
-  if (!accessConditions?.conditions?.length && payloadAccess.conditions?.conditions?.length) {
-    accessConditions = payloadAccess.conditions;
-    conditionRef = 'session';
-  }
-  if (payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
-    try {
-      const encrypted = await encryptPayloadWithStorageEnvelope({
-        env,
-        config,
-        slug,
-        payloadId: id,
-        plaintextBytes: bytesToStore,
-        contentType: payload.contentType,
-        accessConditions,
-        conditionRef,
-        deps,
-      });
-      bytesToStore = encrypted.ciphertextBytes;
-      envelope = encrypted.envelope;
-    } catch (error) {
-      return responseJson(deps, { error: error?.message || 'Cloudflare worker envelope encryption failed.' }, 500, baseHeaders);
+  let createdAt = new Date((deps?.now?.() || Date.now())).toISOString();
+  const prepareStorageWrite = async (id, createdAt) => {
+    const objectKey = buildObjectKey({ slug, id });
+    const storageLayer = canWriteR2 ? 'r2' : 'kv';
+    let bytesToStore = payload.bytes || new Uint8Array();
+    let envelope = null;
+    let accessConditions = payload.accessConditions || null;
+    let conditionRef = accessConditions?.conditions?.length ? 'payload' : 'gate_fallback';
+    if (!accessConditions?.conditions?.length && payloadAccess.conditions?.conditions?.length) {
+      accessConditions = payloadAccess.conditions;
+      conditionRef = 'session';
     }
-  }
-  const effectiveGroupIds = normalizeGroupIdList([
-    ...normalizeGroupIdList(payload.groupIds),
-    ...normalizeGroupIdList(uploadPolicy.groupIds),
-    ...normalizeGroupIdList(payloadAccess.groupIds),
-  ]);
-  const metadata = {
-    id,
-    backend: STORAGE_BACKENDS.CLOUDFLARE,
-    resource,
-    contentType: trim(payload.contentType) || 'application/octet-stream',
-    encrypted: payload.payloadEncrypted === true || payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE,
-    gate: trim(payload.gate),
-    tags: payload.tags,
-    groupIds: effectiveGroupIds,
-    uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : undefined,
-    size: bytesToStore?.length || 0,
-    createdAt,
-    ...(resource === 'responses' && trim(uploaderAddress)
-      ? { responder: trim(uploaderAddress).toLowerCase() }
-      : {}),
-    // Authorship and precedence are server-authored; payload fields cannot grant
-    // admin correction authority, and later role changes cannot withdraw it.
-    ...(owned ? { resourceId, uploadAuthority: uploaderIsAdmin ? 'admin' : 'author', ...(uploader ? { uploader } : {}), ...(hidden ? { hidden: true } : {}) } : {}),
-    payloadAccessMode: payloadAccess.mode,
-    payloadAccessControl: {
-      gate: payloadAccess.gate,
-      encryption: payloadAccess.encryption,
-      ...(effectiveGroupIds.length ? { groupIds: effectiveGroupIds } : {}),
-    },
-    ...(accessConditions?.conditions?.length ? { accessConditions } : {}),
-    ...(envelope ? { envelope } : {}),
-    storageLayer,
-  };
-  assertNoCloudflarePrivateMaterial({
-    id,
-    backend: metadata.backend,
-    resource,
-    contentType: metadata.contentType,
-    gate: metadata.gate,
-    createdAt,
-    payloadAccessMode: payloadAccess.mode,
-    payloadAccessControl: metadata.payloadAccessControl,
-  });
+    if (payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
+      try {
+        const encrypted = await encryptPayloadWithStorageEnvelope({
+          env,
+          config,
+          slug,
+          payloadId: id,
+          plaintextBytes: bytesToStore,
+          contentType: payload.contentType,
+          accessConditions,
+          conditionRef,
+          deps,
+        });
+        bytesToStore = encrypted.ciphertextBytes;
+        envelope = encrypted.envelope;
+      } catch (error) {
+        return { response: responseJson(deps, { error: error?.message || 'Cloudflare worker envelope encryption failed.' }, 500, baseHeaders) };
+      }
+    }
+    const effectiveGroupIds = normalizeGroupIdList([
+      ...normalizeGroupIdList(payload.groupIds),
+      ...normalizeGroupIdList(uploadPolicy.groupIds),
+      ...normalizeGroupIdList(payloadAccess.groupIds),
+    ]);
+    const metadata = {
+      id,
+      backend: STORAGE_BACKENDS.CLOUDFLARE,
+      resource,
+      contentType: trim(payload.contentType) || 'application/octet-stream',
+      encrypted: payload.payloadEncrypted === true || payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE,
+      gate: trim(payload.gate),
+      tags: payload.tags,
+      groupIds: effectiveGroupIds,
+      uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : undefined,
+      size: bytesToStore?.length || 0,
+      createdAt,
+      ...(resource === 'responses' && trim(uploaderAddress)
+        ? { responder: trim(uploaderAddress).toLowerCase() }
+        : {}),
+      // Authorship and precedence are server-authored; payload fields cannot grant
+      // admin correction authority, and later role changes cannot withdraw it.
+      ...(owned ? { resourceId, uploadAuthority: uploaderIsAdmin ? 'admin' : 'author', ...(uploader ? { uploader } : {}), ...(hidden ? { hidden: true } : {}) } : {}),
+      payloadAccessMode: payloadAccess.mode,
+      payloadAccessControl: {
+        gate: payloadAccess.gate,
+        encryption: payloadAccess.encryption,
+        ...(effectiveGroupIds.length ? { groupIds: effectiveGroupIds } : {}),
+      },
+      ...(accessConditions?.conditions?.length ? { accessConditions } : {}),
+      ...(envelope ? { envelope } : {}),
+      storageLayer,
+    };
+    assertNoCloudflarePrivateMaterial({
+      id,
+      backend: metadata.backend,
+      resource,
+      contentType: metadata.contentType,
+      gate: metadata.gate,
+      createdAt,
+      payloadAccessMode: payloadAccess.mode,
+      payloadAccessControl: metadata.payloadAccessControl,
+    });
 
-  const serializedMetadata = JSON.stringify(metadata);
-  const serializedKvPayload = canWriteR2
-    ? ''
-    : JSON.stringify({
-        metadata,
-        payloadBase64url: bytesToBase64url(bytesToStore || new Uint8Array()),
-      });
-  const kvValueFailure = (
-    (!canWriteR2 && rejectKvValueOverLimit({ serializedValue: serializedKvPayload, deps })) ||
-    (index && rejectKvValueOverLimit({ serializedValue: serializedMetadata, deps }))
-  );
-  if (kvValueFailure) {
-    return responseJson(deps, { error: kvValueFailure.error }, kvValueFailure.status, baseHeaders);
-  }
+    const serializedMetadata = JSON.stringify(metadata);
+    const serializedKvPayload = canWriteR2
+      ? ''
+      : JSON.stringify({
+          metadata,
+          payloadBase64url: bytesToBase64url(bytesToStore || new Uint8Array()),
+        });
+    const kvValueFailure = (
+      (!canWriteR2 && rejectKvValueOverLimit({ serializedValue: serializedKvPayload, deps })) ||
+      (index && rejectKvValueOverLimit({ serializedValue: serializedMetadata, deps }))
+    );
+    if (kvValueFailure) {
+      return { response: responseJson(deps, { error: kvValueFailure.error }, kvValueFailure.status, baseHeaders) };
+    }
+    return { objectKey, bytesToStore, metadata, serializedMetadata, serializedKvPayload };
+  };
+  let prepared = await prepareStorageWrite(id, createdAt);
+  if (prepared.response) return prepared.response;
 
   // Validation, encryption and serialized KV limits must pass before a retry lease starts.
   const requestId = trim(payload.requestId);
@@ -1605,13 +1610,44 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (resource === 'responses' && uploader && requestId && requestId.length <= 200) {
     const digest = await (deps?.crypto || globalThis.crypto).subtle.digest('SHA-256', payload.bytes || new Uint8Array());
     const payloadDigest = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-    uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve', payload: { requestId, payloadDigest } });
+    uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve', payload: { requestId, payloadDigest, storageId: id, createdAt } });
     if (uploadReceipt?.kind === 'replay') {
       await enqueueResponseAnalysis(uploadReceipt.storageRef.id);
       return responseJson(deps, { id: uploadReceipt.storageRef.id, storageRef: uploadReceipt.storageRef, replayed: true }, 200, baseHeaders);
     }
     if (uploadReceipt && uploadReceipt.kind !== 'execute') {
       return responseJson(deps, { error: uploadReceipt.error, reason: uploadReceipt.reason }, uploadReceipt.status || 503, baseHeaders);
+    }
+  }
+
+  if (uploadReceipt?.storageId && (uploadReceipt.storageId !== id || uploadReceipt.createdAt !== createdAt)) {
+    id = uploadReceipt.storageId;
+    createdAt = uploadReceipt.createdAt;
+    // Envelope AAD, metadata and serialized sizes all belong to the reserved
+    // target, never to the retry's unused provisional id.
+    prepared = await prepareStorageWrite(id, createdAt);
+    if (prepared.response) return prepared.response;
+  }
+  const { objectKey, bytesToStore, metadata, serializedMetadata, serializedKvPayload } = prepared;
+  const finishUpload = async (storageRef, publishedMetadata, publishedBytes, replayed = false) => {
+    if (uploadReceipt) {
+      const settled = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'settle',
+        payload: { requestId, attemptId: uploadReceipt.attemptId, storageRef },
+      });
+      if (!settled?.ok) return responseJson(deps, { error: 'Upload settlement is unavailable; retry.', reason: 'upload_receipt_unavailable' }, 503, baseHeaders);
+    }
+    await enqueueResponseAnalysis(storageRef.id, publishedMetadata, publishedBytes);
+    return responseJson(deps, { id: storageRef.id, storageRef, ...(replayed ? { replayed: true } : {}) }, 200, baseHeaders);
+  };
+  if (uploadReceipt?.resumed) {
+    const stored = await index.get(buildIndexKey({ slug, resource, id }));
+    if (stored != null) {
+      let published;
+      try { published = typeof stored === 'string' ? JSON.parse(stored) : stored; } catch { /* fail closed below */ }
+      const storageRef = published?.id === id && published?.resource === resource && published?.responder === uploader
+        ? normalizeStorageRef(published) : null;
+      if (!storageRef) return responseJson(deps, { error: 'Stored upload metadata is unavailable; retry.' }, 503, baseHeaders);
+      return finishUpload(storageRef, undefined, undefined, true);
     }
   }
 
@@ -1641,18 +1677,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   }
 
   await markStorageBackupWrite(env, slug);
-  const storageRef = normalizeStorageRef(metadata);
-  if (uploadReceipt) {
-    const settled = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'settle',
-      payload: { requestId, attemptId: uploadReceipt.attemptId, storageRef },
-    });
-    if (!settled?.ok) return responseJson(deps, { error: 'Upload settlement is unavailable; retry.', reason: 'upload_receipt_unavailable' }, 503, baseHeaders);
-  }
-  await enqueueResponseAnalysis(id, metadata, bytesToStore);
-  return responseJson(deps, {
-    id,
-    storageRef,
-  }, 200, baseHeaders);
+  return finishUpload(normalizeStorageRef(metadata), metadata, bytesToStore);
 };
 
 const readRequestId = async ({ request, url }) => {
