@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Keep the CC package's shipped rating-scale module synchronized with the shared
+  rating validation rules.
+
 - Give each agent answer edit a durable revision and request identity, so changing
   back to an earlier answer submits the edit while retries remain idempotent.
 
