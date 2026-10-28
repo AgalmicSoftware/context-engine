@@ -538,5 +538,22 @@
         "registryChainId": null
       }
     }
+  },
+  "rxc-ra-test-2": {
+    "slug": "rxc-ra-test-2",
+    "sessionId": "0xe173bc2edbe4d8e82e81553d651812c0",
+    "sessionName": "Reverse Alignment — RxC",
+    "corsWorkerUrl": "https://ce-rxc-ra-test-2-e14873da7c8f.agalmic.workers.dev/",
+    "workerCanonicalCleanRoute": true,
+    "sessionModeProfile": {
+      "profileVersion": 1,
+      "preset": "custom",
+      "authority": {
+        "mode": "worker_canonical"
+      },
+      "evm": {
+        "registryChainId": null
+      }
+    }
   }
 }

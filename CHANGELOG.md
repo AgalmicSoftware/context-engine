@@ -72,6 +72,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Resolve the `rxc-ra-test-2` session from its short URL through bundled Worker
+  discovery, without requiring a `worker` query parameter.
 - Restart backup downloads after configuration/group changes or invalid cursors.
   Before restoring into an unpublished session, check the pinned Worker origin
   and show the target before asking for a signature.
