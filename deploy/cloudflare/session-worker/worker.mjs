@@ -63132,13 +63132,28 @@ function normalizeResultAnswerLabel(value = "") {
   if (normalized === "unsure" || normalized === "unknown") return "Unsure";
   return label || "Response";
 }
+function selectCurrentSubmittedAnswers(records = []) {
+  const byParticipantQuestion = /* @__PURE__ */ new Map();
+  const anonymous = [];
+  for (const record3 of Array.isArray(records) ? records : []) {
+    const participant = safeString(record3.telegramUserId);
+    if (!participant) {
+      anonymous.push(record3);
+      continue;
+    }
+    const key = JSON.stringify([sanitizeSessionSlug(record3.sessionSlug) || safeString(record3.sessionId), participant, safeString(record3.questionId)]);
+    const existing = byParticipantQuestion.get(key);
+    if (!existing || compareAnswers(existing, record3) < 0) byParticipantQuestion.set(key, record3);
+  }
+  return [...byParticipantQuestion.values(), ...anonymous].sort(compareAnswers);
+}
 function dedupeSubmitRecords(records = []) {
   const byId = /* @__PURE__ */ new Map();
   (Array.isArray(records) ? records : []).forEach((record3) => {
     const requestId = safeString(record3.requestId || record3.idempotencyKey || record3.key);
     if (!requestId) return;
     const existing = byId.get(requestId);
-    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record3.createdAt)) <= 0) {
+    if (!existing || compareAnswers(existing, record3) < 0) {
       byId.set(requestId, record3);
     }
   });
@@ -63158,6 +63173,8 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = "") {
       key: safeString(record3.key),
       requestId: safeString(record3.requestId),
       createdAt: safeString(record3.createdAt),
+      sessionSlug: slug,
+      answerRevision: answerRevision(record3),
       telegramUserId: safeString(record3.telegramUserId),
       questionId: safeString(record3.questionId),
       label: normalizeResultAnswerLabel(firstAnswerValue(
@@ -63257,12 +63274,16 @@ function summarizeQuestionResults(records = [], questions = []) {
     };
   }).sort((left, right) => right.differenceScore - left.differenceScore || right.total - left.total || left.prompt.localeCompare(right.prompt));
 }
+var compareText, answerRevision, compareAnswers;
 var init_submittedResults = __esm({
   "workers/sessionCorsWorker/agent/submittedResults.mjs"() {
     init_runtimePrimitives();
     init_kvReadHelpers();
     init_agentSubmitQueue();
     init_runtimeCore();
+    compareText = (left, right) => left === right ? 0 : left < right ? -1 : 1;
+    answerRevision = (record3) => Number.isSafeInteger(record3.answerRevision) && record3.answerRevision >= 0 ? record3.answerRevision : 0;
+    compareAnswers = (left, right) => answerRevision(left) - answerRevision(right) || compareText(safeString(left.createdAt), safeString(right.createdAt)) || compareText(safeString(left.requestId), safeString(right.requestId)) || compareText(stableJson(left), stableJson(right));
   }
 });
 
@@ -91541,6 +91562,7 @@ async function handleServiceCredentialBootstrapRequest({ request, env = {}, crea
 }
 
 // workers/sessionCorsWorker/agent/questions.mjs
+init_submittedResults();
 init_authority();
 init_runtimePrimitives();
 init_agentSessionRuntime();
@@ -91592,18 +91614,6 @@ async function listHandoffKvRecordsByPrefix(env = {}, prefix = "", { limit = 1e4
     if (record3) records.push({ ...record3, key: entry2.key });
   }
   return records;
-}
-function dedupeSubmitRecordsByRequestId(records = []) {
-  const byId = /* @__PURE__ */ new Map();
-  (Array.isArray(records) ? records : []).forEach((record3) => {
-    const requestId = safeString(record3?.requestId || record3?.idempotencyKey || record3?.key);
-    if (!requestId) return;
-    const existing = byId.get(requestId);
-    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record3.createdAt)) <= 0) {
-      byId.set(requestId, record3);
-    }
-  });
-  return Array.from(byId.values());
 }
 function sessionFromSessionFirstKey(key = "", prefix = "") {
   const rest = safeString(key).startsWith(prefix) ? safeString(key).slice(prefix.length) : "";
@@ -91826,15 +91836,13 @@ async function loadAgentQuestionAnswerState({ env = {}, context = {}, questions 
       }) : [];
     })
   );
-  const records = dedupeSubmitRecordsByRequestId(indexedRecordGroups.flat());
+  const records = selectCurrentSubmittedAnswers(indexedRecordGroups.flat().filter((record3) => safeString(record3.telegramUserId) === telegramUserId && submittedStatuses.has(safeString(record3.status))));
   const answeredByRef = /* @__PURE__ */ new Map();
   records.forEach((record3) => {
     if (safeString(record3.telegramUserId) !== telegramUserId) return;
     if (!submittedStatuses.has(safeString(record3.status))) return;
     const ref = agentQuestionAnswerRef(record3.sessionSlug, record3.questionId);
     if (!questionByRef.has(ref)) return;
-    const existing = answeredByRef.get(ref);
-    if (existing && safeString(existing.answeredAt).localeCompare(safeString(record3.createdAt)) >= 0) return;
     answeredByRef.set(ref, {
       answeredByUser: true,
       answeredAt: safeString(record3.createdAt),
@@ -94797,6 +94805,7 @@ async function handleChildSessionRequest({ env = {}, context = {}, input = {} } 
 }
 
 // workers/sessionCorsWorker/agent/results.mjs
+init_submittedResults();
 init_sessionPolicyLoader();
 init_runtimePrimitives();
 init_agentSessionRuntime();
@@ -96344,7 +96353,7 @@ async function loadAgentResultsDataset({ env = {}, context = {}, input = {} } = 
   const visibleIds = new Set(questions.map((q) => q.questionId));
   const demo = agentBoolean(input.demo);
   const sourceQuestions = demo ? demoAgentResultsQuestions(questions) : questions;
-  const sourceRecords = demo ? demoAgentResultsRecords(sourceQuestions) : await loadSubmittedResultRecords(env, sessionSlug).then((rows) => rows.filter((row) => visibleIds.has(row.questionId)));
+  const sourceRecords = demo ? demoAgentResultsRecords(sourceQuestions) : await loadSubmittedResultRecords(env, sessionSlug).then((rows) => selectCurrentSubmittedAnswers(rows.filter((row) => visibleIds.has(row.questionId))));
   return {
     sessionSlug,
     questions,
@@ -96362,11 +96371,7 @@ function buildAgentPolisDataset({ sessionSlug = "", sourceRecords = [], sourceQu
   const records = (Array.isArray(sourceRecords) ? sourceRecords : []).filter(
     (record3) => binaryQuestionIds.has(safeString(record3.questionId)) && AGENT_POLIS_BINARY_LABELS.has(safeString(record3.label)) && safeString(record3.telegramUserId)
   );
-  const latestByParticipantQuestion = /* @__PURE__ */ new Map();
-  for (const record3 of records) {
-    latestByParticipantQuestion.set(`${safeString(record3.telegramUserId)}|${safeString(record3.questionId)}`, record3);
-  }
-  const latestRecords = Array.from(latestByParticipantQuestion.values());
+  const latestRecords = demo ? records : selectCurrentSubmittedAnswers(records);
   const participants = Array.from(new Set(latestRecords.map((record3) => safeString(record3.telegramUserId))));
   const aliasById = new Map(participants.map((id2, index) => [id2, `P${index + 1}`]));
   const responses = {};
@@ -96436,7 +96441,7 @@ async function buildAgentTopicMap2({ env = {}, context = {}, input = {} } = {}) 
   const loaded = await loadPublicQuestionsForHandoff({ env, context });
   const questions = loaded.questions.filter((q) => q.answerable !== false && !q.locked && !q.encrypted);
   const visibleIds = new Set(questions.map((q) => q.questionId));
-  const records = await loadSubmittedResultRecords(env, sessionSlug).then((rows) => rows.filter((row) => visibleIds.has(row.questionId)));
+  const records = await loadSubmittedResultRecords(env, sessionSlug).then((rows) => selectCurrentSubmittedAnswers(rows.filter((row) => visibleIds.has(row.questionId))));
   const demo = agentBoolean(input.demo);
   const sourceQuestions = demo ? [
     {

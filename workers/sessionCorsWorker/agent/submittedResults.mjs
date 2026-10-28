@@ -1,4 +1,4 @@
-import { safeString, lower, safeEnvJsonParse as safeJsonParse, sanitizeSessionSlug } from './runtimePrimitives.mjs';
+import { safeString, lower, safeEnvJsonParse as safeJsonParse, sanitizeSessionSlug, stableJson } from './runtimePrimitives.mjs';
 import { listKvRecordsByPrefix } from './kvReadHelpers.mjs';
 import { canonicalAnswerSessionKvPrefix, submitRequestSessionKvPrefix } from './agentSubmitQueue.mjs';
 import { safeAnswerString, firstAnswerValue, questionText, questionId, shortQuestionId } from './runtimeCore.mjs';
@@ -12,13 +12,35 @@ export function normalizeResultAnswerLabel(value = '') {
   return label || 'Response';
 }
 
+const compareText = (left, right) => left === right ? 0 : left < right ? -1 : 1;
+const answerRevision = record => Number.isSafeInteger(record.answerRevision) && record.answerRevision >= 0 ? record.answerRevision : 0;
+const compareAnswers = (left, right) => answerRevision(left) - answerRevision(right) ||
+  compareText(safeString(left.createdAt), safeString(right.createdAt)) ||
+  compareText(safeString(left.requestId), safeString(right.requestId)) ||
+  compareText(stableJson(left), stableJson(right));
+
+export function selectCurrentSubmittedAnswers(records = []) {
+  const byParticipantQuestion = new Map();
+  const anonymous = [];
+  for (const record of Array.isArray(records) ? records : []) {
+    const participant = safeString(record.telegramUserId);
+    if (!participant) { anonymous.push(record); continue; }
+    const key = JSON.stringify([sanitizeSessionSlug(record.sessionSlug) || safeString(record.sessionId), participant, safeString(record.questionId)]);
+    const existing = byParticipantQuestion.get(key);
+    // A later claim wins even when its upload finishes first. The final
+    // content tie-break also makes legacy equal-time records order-independent.
+    if (!existing || compareAnswers(existing, record) < 0) byParticipantQuestion.set(key, record);
+  }
+  return [...byParticipantQuestion.values(), ...anonymous].sort(compareAnswers);
+}
+
 export function dedupeSubmitRecords(records = []) {
   const byId = new Map();
   (Array.isArray(records) ? records : []).forEach((record) => {
     const requestId = safeString(record.requestId || record.idempotencyKey || record.key);
     if (!requestId) return;
     const existing = byId.get(requestId);
-    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record.createdAt)) <= 0) {
+    if (!existing || compareAnswers(existing, record) < 0) {
       byId.set(requestId, record);
     }
   });
@@ -49,6 +71,8 @@ export async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
         key: safeString(record.key),
         requestId: safeString(record.requestId),
         createdAt: safeString(record.createdAt),
+        sessionSlug: slug,
+        answerRevision: answerRevision(record),
         telegramUserId: safeString(record.telegramUserId),
         questionId: safeString(record.questionId),
         label: normalizeResultAnswerLabel(firstAnswerValue(

@@ -1,3 +1,4 @@
+import { selectCurrentSubmittedAnswers } from './submittedResults.mjs';
 import { loadSessionPolicy } from './sessionPolicyLoader.mjs';
 import { loadPublicQuestionsForHandoff } from './questions.mjs';
 import { safeString, lower, safeJsonParse, stableFingerprint, sanitizeSessionSlug, sha256Hex } from './runtimePrimitives.mjs';
@@ -379,7 +380,7 @@ export async function loadAgentResultsDataset({ env = {}, context = {}, input = 
   const sourceQuestions = demo ? demoAgentResultsQuestions(questions) : questions;
   const sourceRecords = demo
     ? demoAgentResultsRecords(sourceQuestions)
-    : await loadSubmittedResultRecords(env, sessionSlug).then(rows => rows.filter(row => visibleIds.has(row.questionId)));
+    : await loadSubmittedResultRecords(env, sessionSlug).then(rows => selectCurrentSubmittedAnswers(rows.filter(row => visibleIds.has(row.questionId))));
   return {
     sessionSlug,
     questions,
@@ -406,12 +407,7 @@ export function buildAgentPolisDataset({ sessionSlug = '', sourceRecords = [], s
       AGENT_POLIS_BINARY_LABELS.has(safeString(record.label)) &&
       safeString(record.telegramUserId),
   );
-  // Latest answer per participant+question wins (records arrive createdAt-sorted).
-  const latestByParticipantQuestion = new Map();
-  for (const record of records) {
-    latestByParticipantQuestion.set(`${safeString(record.telegramUserId)}|${safeString(record.questionId)}`, record);
-  }
-  const latestRecords = Array.from(latestByParticipantQuestion.values());
+  const latestRecords = demo ? records : selectCurrentSubmittedAnswers(records);
   const participants = Array.from(new Set(latestRecords.map((record) => safeString(record.telegramUserId))));
   const aliasById = new Map(participants.map((id, index) => [id, `P${index + 1}`]));
   const responses = {};
@@ -494,7 +490,7 @@ export async function buildAgentTopicMap({ env = {}, context = {}, input = {} } 
   const loaded = await loadPublicQuestionsForHandoff({ env, context });
   const questions = loaded.questions.filter(q => q.answerable !== false && !q.locked && !q.encrypted);
   const visibleIds = new Set(questions.map(q => q.questionId));
-  const records = await loadSubmittedResultRecords(env, sessionSlug).then(rows => rows.filter(row => visibleIds.has(row.questionId)));
+  const records = await loadSubmittedResultRecords(env, sessionSlug).then(rows => selectCurrentSubmittedAnswers(rows.filter(row => visibleIds.has(row.questionId))));
   const demo = agentBoolean(input.demo);
   const sourceQuestions = demo
     ? [

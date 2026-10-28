@@ -62,6 +62,12 @@ proposals produce a capped question list with `complete: false` and
 `questionSourceReason: "agent_proposals_capped"`; aggregates reject that partial
 source with 503.
 
+Current agent results and the participant's answered state select one answer per
+session, participant and question: highest `answerRevision` (legacy records use
+zero), then `createdAt`, then `requestId`, with deterministic content tie-breaking.
+Consensus, difference, groups, Polis and topic maps use this same selection;
+submission records retain history.
+
 `/preferences` saves drafts unless an explicitly authorized submit is requested.
 Hosted submission uses canonical upload receipts; duplicate requests replay one
 stored response. Direct-submission admission and outcomes live in the coordinator. Finished

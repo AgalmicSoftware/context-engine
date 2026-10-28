@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Count one current answer per participant and question in agent results and
+  answered-state views, using a shared deterministic revision order.
+
 - Serialize Wrapped research batches in the session coordinator. Bind retries
   to their original content, preserve concurrent answer summaries, and return a
   retryable response while KV is busy. Export both readable question sources
