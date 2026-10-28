@@ -59,6 +59,7 @@
     "test:client": "npm --prefix client run test:coverage:full-universe",
     "test:root:jest": "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../tests/root/deployHelper.worker.test.js' '<rootDir>/../tests/root/sessionCorsWorker.admin.test.js' '<rootDir>/../tests/root/sessionCorsWorker.arweave.test.js' '<rootDir>/../tests/root/sessionCorsWorker.auth.test.js' '<rootDir>/../tests/root/sessionCorsWorker.authenticatedActions.test.js' '<rootDir>/../tests/root/sessionCorsWorker.authenticatedRoutes.test.js' '<rootDir>/../tests/root/sessionCorsWorker.gates.test.js' '<rootDir>/../tests/root/sessionCorsWorker.health.test.js' '<rootDir>/../tests/root/agentParticipant.hydration.test.js' '<rootDir>/../tests/root/agentParticipant.registryHydration.test.js' '<rootDir>/../tests/root/workerPreviousRelease.compat.test.mjs'",
     "test:worker:session-cors": "npm --prefix workers/sessionCorsWorker test",
+    "test:worker:agent": "node scripts/run-agent-bridge-worker-tests.js",
     "test:worker:agent-bridge": "node scripts/run-agent-bridge-worker-tests.js",
     "test:mcp": "npm --prefix mcp test",
     "test:mcp:pack": "node scripts/mcp-pack-smoke.mjs",
@@ -112,8 +113,7 @@
     "ai:test-session:closeout-smoke": "npm run -s ai:test-agent-token:client-login && npm run -s ai:test-session:publish-smoke && npm run -s ai:test-session:keyboard-smoke",
     "lint": "cd client && npm run lint",
     "lint:workers": "node scripts/run-workers-lint.js",
-    "test:cache-guard": "bash ./scripts/check-managed-cache-localstorage.sh",
-    "test:worker:agent": "node scripts/run-agent-bridge-worker-tests.js"
+    "test:cache-guard": "bash ./scripts/check-managed-cache-localstorage.sh"
   },
   "devDependencies": {
     "@openzeppelin/contracts": "5.4.0",

@@ -573,6 +573,11 @@ What gets stored where:
 
 Important:
 
+- A newly deployed Worker-canonical session needs the `worker=` URL parameter
+  for first-time visitors unless its slug and Worker origin are included in
+  the site's bundled discovery map. Deployment alone does not register a
+  slug-only URL. Bundled entries take effect when the website deploys; the
+  Worker still supplies the session's verified settings and permissions.
 - `blockLimits.start` is required for chain-scanned profiles. The default
   worker-canonical profile does not require a chain scan window. After its
   canonical worker config is verified, reloads keep that session out of EVM

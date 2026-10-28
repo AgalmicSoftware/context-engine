@@ -193,7 +193,7 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     expect(classifySessionModeProfileSupport(config.sessionModeProfile).status).toBe('reachable');
   });
 
-  it.each(['rxc-test', 'rxc-ra-test'])('discovers %s without seeding demo questions', (slug) => {
+  it.each(['rxc-test', 'rxc-ra-test', 'rxc-ra-test-2'])('discovers %s without seeding demo questions', (slug) => {
     const config = (demoSessions as Record<string, any>)[slug];
     expect(getTemporaryDemoSessionQuestionFixtures(slug, config)).toEqual([]);
     expect(config).toMatchObject({

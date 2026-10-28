@@ -91,6 +91,8 @@ All notable changes to this project will be documented in this file.
   comes first without an AI call, hidden AI drafts stay out until shown, and
   suggestions never join anyone. A join started before sign-in now survives
   it, and suggestions no longer reload, with an AI call, on every render.
+- Resolve the `rxc-ra-test-2` session from its short URL through bundled Worker
+  discovery, without requiring a `worker` query parameter.
 - Restart backup downloads after configuration/group changes or invalid cursors.
   Before restoring into an unpublished session, check the pinned Worker origin
   and show the target before asking for a signature.
