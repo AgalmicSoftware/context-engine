@@ -142,7 +142,7 @@ const memoryKv = (seed = {}) => {
     const submitted = await submitFromBrowser();
     expect((await client.read(submitted.id)).answer.value).toBe('Agree');
     expect((await client.listAll('responses')).items).toHaveLength(1);
-    const questions = await loadWorkerCanonicalQuestions({ sessionSlug: slug, sessionConfig: config });
+    const { rows: questions } = await loadWorkerCanonicalQuestions({ sessionSlug: slug, sessionConfig: config });
     expect(questions.map(row => row.id)).toEqual([question.id]);
     const answers = await loadWorkerResponses({ sessionSlug: slug, sessionConfig: config });
     expect(answers).toHaveLength(1);

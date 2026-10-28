@@ -77,7 +77,7 @@ describe('agent participant records in web client hydration', () => {
     // Hydration fills sessionId in, so check the stored record carries it itself.
     expect(built.record).toEqual(expect.objectContaining({ sessionSlug: SLUG, sessionId: SESSION_ID }));
 
-    const rows = await loadWorkerCanonicalQuestions({ sessionSlug: SLUG, sessionConfig }, storageDeps('questions', [built.record]));
+    const { rows } = await loadWorkerCanonicalQuestions({ sessionSlug: SLUG, sessionConfig }, storageDeps('questions', [built.record]));
     const row = rows.find((entry) => !entry.hidden);
     expect(row).toEqual(expect.objectContaining({ id: built.id }));
     expect(row.payload).toEqual(
