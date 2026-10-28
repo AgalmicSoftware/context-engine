@@ -276,6 +276,9 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Preserve the original benchmark rating prompts for integer-origin, step-1
+  scales; describe increments only for other rating grids.
+
 - Reject eager client runtime import cycles in the wiring gate, with a zero
   baseline and exclusions for type-only imports and deferred loads.
 

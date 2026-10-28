@@ -358,6 +358,9 @@ Each question is asked in the ways that expose wording and ordering effects:
 - choice and allocation questions with a fresh option order on every repeat,
   recorded in each row, with allocations mapped back to the question's order.
 
+Rating prompts retain their original whole-number wording when the minimum is an
+integer and the step is 1. Other grids state the step and origin explicitly.
+
 The command has the same retry, concurrency, checkpoint and `--resume`
 behavior as stance runs; `--seed` fixes the option orders.
 

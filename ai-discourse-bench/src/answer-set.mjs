@@ -151,10 +151,14 @@ const instructionsFor = (question, variant, order) => {
     case 'rating': {
       const { min, max, minLabel, maxLabel, step } = ratingScaleFor(question);
       const [low, high] = variant === 'flipped' ? [maxLabel, minLabel] : [minLabel, maxLabel];
+      // Preserve the v1 prompt for its original whole-number grids.
+      const range = Number.isInteger(min) && step === 1
+        ? `whole number from ${min} to ${max}`
+        : `number from ${min} to ${max} in increments of ${step} from ${min}`;
       return {
-        shape: `<number from ${min} to ${max} in increments of ${step} from ${min}>`,
+        shape: `<${range}>`,
         lines: [
-          `Answer with a number from ${min} to ${max} in increments of ${step} from ${min}` +
+          `Answer with a ${range}` +
             (hasLabelledEnds(question) ? `, where ${min} means "${low}" and ${max} means "${high}".` : '.'),
         ],
       };

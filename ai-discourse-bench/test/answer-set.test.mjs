@@ -110,7 +110,7 @@ test('prompts show options in the order asked, and the scale the way round asked
   assert.match(allocation, /You have 16 credits/);
   assert.match(buildAnswerPrompt({ question: questions.qr, variant: 'scale' }), /0 means "Very pessimistic" and 10 means "Very optimistic"/);
   // The JSON shape shows placeholders, not answers a model could copy.
-  assert.match(buildAnswerPrompt({ question: questions.qn, variant: 'scale' }), /\{"answer":<number from 0 to 40 in increments of 1 from 0>,/);
+  assert.match(buildAnswerPrompt({ question: questions.qn, variant: 'scale' }), /\{"answer":<whole number from 0 to 40>,/);
   assert.match(choice, /\{"answer":"<exact text of one option>",/);
   assert.match(allocation, /\{"answer":\[<vote for option 1>, <vote for option 2>, <vote for option 3>\],/);
   assert.match(buildAnswerPrompt({ question: questions.qr, variant: 'flipped' }), /0 means "Very optimistic" and 10 means "Very pessimistic"/);
@@ -118,6 +118,24 @@ test('prompts show options in the order asked, and the scale the way round asked
     buildAnswerPrompt({ question: { ...questions.qb, reversedPrompt: 'Labs should keep evaluations private.' }, variant: 'reversed' }),
     /Labs should keep evaluations private\./,
   );
+});
+
+test('whole-number grids preserve the original rating prompt wording', () => {
+  for (const scale of [{ min: 0, max: 40 }, { min: -2, max: 2, step: 1 }, { min: 0, max: 2.5, step: 1 }]) {
+    const prompt = buildAnswerPrompt({ question: { type: 'rating', scale }, variant: 'scale', order: [] });
+    assert.ok(prompt.includes(`Answer with a whole number from ${scale.min} to ${scale.max}.`));
+    assert.ok(prompt.includes(`<whole number from ${scale.min} to ${scale.max}>`));
+    assert.doesNotMatch(prompt, /increments/);
+  }
+});
+
+test('other rating grids describe their step and origin', () => {
+  for (const scale of [{ min: 0, max: 10, step: 2 }, { min: -0.5, max: 2.5, step: 1 }]) {
+    const prompt = buildAnswerPrompt({ question: { type: 'rating', scale }, variant: 'scale', order: [] });
+    const grid = `number from ${scale.min} to ${scale.max} in increments of ${scale.step} from ${scale.min}`;
+    assert.ok(prompt.includes(`Answer with a ${grid}.`));
+    assert.ok(prompt.includes(`<${grid}>`));
+  }
 });
 
 test('replies are mapped back to the question and checked like a person’s answer', () => {
