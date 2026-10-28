@@ -78,6 +78,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Validate wallet transaction quantities before policy checks and sign that same
+  normalized transaction in both the Worker and in-memory fallback.
+
 - Reconcile Worker question and survey caches against complete catalogs, keeping
   pending writes and a ten-minute grace period for new records.
 

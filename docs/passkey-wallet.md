@@ -298,6 +298,11 @@ type SoftSessionPolicy = {
 By default, value-bearing transactions are rejected by local policy, and raw
 transaction signing is not included in the default method grant. Any transaction
 with value should have explicit user confirmation in the calling UI.
+The Worker and in-memory fallback use the same request handler. Transaction
+quantities accept only non-negative safe integers, bigints, decimal/hex strings,
+or genuine ethers BigNumber instances. Invalid quantities fail before signing;
+byte arrays and BigNumber-shaped plain objects are rejected. Both send and raw
+signing apply policy to the exact normalized transaction passed to ethers.
 
 Important: a malicious script running in the same origin may still ask the
 worker to sign. The worker reduces accidental exposure and isolates signing
