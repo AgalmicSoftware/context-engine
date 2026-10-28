@@ -75,7 +75,7 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
     if (!result.ok) throw new Error(result.reason);
     expect(result.snapshot.questions).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'rating', scale }),
+        expect.objectContaining({ id: 'rating', scale: { ...scale, step: 1 } }),
         expect.objectContaining({ id: 'single', singleSelect: true }),
         expect.objectContaining({ id: 'multi', singleSelect: false, maxSelections: 2 }),
         expect.objectContaining({ id: 'quadratic', voiceCredits: 25 }),

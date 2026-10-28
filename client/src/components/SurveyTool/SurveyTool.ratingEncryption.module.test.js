@@ -250,7 +250,7 @@ describe('SurveyTool rating encryption controller', () => {
 
     expect(scaled.type).toBe(DeferredRatingSlider);
     expect(scaled.props.value).toBe(1);
-    expect(scaled.props.scale).toEqual({ min: 1, max: 10, minLabel: '1', maxLabel: '10' });
+    expect(scaled.props.scale).toEqual({ min: 1, max: 10, minLabel: '1', maxLabel: '10', step: 1 });
   });
 
   it('routes full-mode rating commits through the deferred parent update path', () => {

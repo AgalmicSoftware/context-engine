@@ -148,7 +148,7 @@ describe('surveyResultsDataExportRuntime', () => {
           type: 'rating',
           options: [],
           tags: [],
-          scale,
+          scale: { ...scale, step: 1 },
           order: 0,
           benchmarkQuestionId: 'benchmark-1',
           sourceCommentId: 'comment-1',
