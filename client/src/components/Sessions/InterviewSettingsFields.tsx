@@ -24,7 +24,13 @@ const FIDELITY_DEFAULTS = {
   showFidelityScore: DEFAULT_INTERVIEW_SETTINGS.showFidelityScore,
 };
 const FIDELITY_ABOUT =
-  'Turns on voice interviews, which AI prefill uses, research sharing by default and hidden drafts for 1 in 5 of each person’s AI-prefill drafts, and shows people how well their AI predicted them, with an overall section in Results. Turning it off sets the research settings back to their defaults; each can still be changed below.';
+  'Turns on voice interviews, which AI prefill uses, research sharing by default and hidden drafts for 1 in 5 of each person’s AI-prefill drafts, and shows people how well their AI predicted them. Turning it off sets the research settings back to their defaults; each can still be changed below.';
+
+// The smallest group "How well AIs predicted people" reports on; 1 shows every figure.
+const FIDELITY_MINIMUMS = [1, 3, 5, 10];
+const fidelityMinimumLabel = (people: number) => (people === 1 ? 'Off: show every result' : `${people} people`);
+const FIDELITY_MINIMUM_ABOUT =
+  'That Results section hides any figure based on fewer people than this, so no one’s AI score can be singled out. Turn it off only where everyone knows small groups’ figures are visible.';
 
 type Props = {
   value: unknown;
@@ -44,6 +50,7 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
   const measuring = settings.shareDraftChangesByDefault && settings.hiddenDraftShare > 0 && settings.showFidelityScore;
   // Tooltip targets are CSS selectors, which can't contain React's colons.
   const fidelityId = `${id.replace(/:/g, '')}-fidelity`;
+  const minimumId = `${fidelityId}-minimum`;
   return (
     <fieldset disabled={disabled} style={{ minWidth: 0 }}>
       <legend>Interview settings</legend>
@@ -198,6 +205,58 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
           }
         </Label>
       ))}
+      <Label style={{ display: 'block', marginTop: 12 }}>
+        <input
+          type="checkbox"
+          checked={settings.showFidelityResults}
+          data-testid={E2E_TESTIDS.WIZARD_INTERVIEW_FIDELITY_RESULTS}
+          // Turning it off also resets the minimum it hides, so no unseen setting is saved.
+          onChange={(e) =>
+            onChange({
+              ...raw,
+              ...settings,
+              showFidelityResults: e.target.checked,
+              ...(e.target.checked ? {} : { fidelityMinimumPeople: DEFAULT_INTERVIEW_SETTINGS.fidelityMinimumPeople }),
+            })
+          }
+        />{' '}
+        Show “How well AIs predicted people” in Results
+      </Label>
+      {settings.showFidelityResults ? (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}>
+            <Label for={minimumId} style={{ marginBottom: 0 }}>
+              Smallest group shown in “How well AIs predicted people”
+            </Label>
+            <SessionWizardInfoTooltip
+              enabled={tooltipsEnabled}
+              id={`${minimumId}-help`}
+              content={FIDELITY_MINIMUM_ABOUT}
+              placement="top"
+              ariaLabel="About the smallest group shown"
+            />
+          </div>
+          <Input
+            id={minimumId}
+            type="select"
+            data-testid={E2E_TESTIDS.WIZARD_INTERVIEW_FIDELITY_MINIMUM}
+            value={String(settings.fidelityMinimumPeople)}
+            onChange={(e) => change('fidelityMinimumPeople', Number(e.target.value))}
+            aria-describedby={`${minimumId}-about`}
+          >
+            {[...new Set([...FIDELITY_MINIMUMS, settings.fidelityMinimumPeople])]
+              .sort((a, b) => a - b)
+              .map((people) => (
+                <option key={people} value={String(people)}>
+                  {fidelityMinimumLabel(people)}
+                </option>
+              ))}
+          </Input>
+          <span id={`${minimumId}-about`} hidden>
+            {FIDELITY_MINIMUM_ABOUT}
+          </span>
+        </>
+      ) : null}
       {(settings.autoRegenerate || settings.followNewQuestions) && (
         <>
           <Label for={`${id}-growth`}>Question growth threshold (%)</Label>

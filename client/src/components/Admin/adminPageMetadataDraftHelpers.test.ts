@@ -80,6 +80,28 @@ describe('adminPageMetadataDraftHelpers', () => {
     expect(patch.interviewMode).toEqual(expect.objectContaining({ hiddenDraftShare: 0.2 }));
   });
 
+  it.each([1, 5, 10])(
+    'saves a change to the smallest group shown in fidelity results (%s)',
+    (fidelityMinimumPeople) => {
+      const metadata = { interviewMode: { enabled: true, fidelityMinimumPeople: 10 } };
+      const draft = buildAdminMetadataDraft(metadata);
+      expect(draft.interviewMode.fidelityMinimumPeople).toBe(10);
+      // What the settings fields send: the whole interview settings with the new value.
+      draft.interviewMode = { ...draft.interviewMode, fidelityMinimumPeople };
+      const patch = buildWorkerCanonicalMetadataConfigPatch({
+        metadata: applyAdminMetadataDraft(metadata, draft),
+        slug: 'fidelity-minimum',
+        adminAddress: '0x00000000000000000000000000000000000000aa',
+      });
+      // The patch replaces the stored interviewMode, so leaving out the default of 5, which
+      // older Session Workers reject, also clears the earlier 10.
+      expect(patch.interviewMode).toEqual(expect.objectContaining({ enabled: true }));
+      expect((patch.interviewMode as Record<string, unknown>).fidelityMinimumPeople).toBe(
+        fidelityMinimumPeople === 5 ? undefined : fidelityMinimumPeople,
+      );
+    },
+  );
+
   it('round-trips editable metadata and preserves contract chain fallback', () => {
     const draft = buildAdminMetadataDraft({
       networkChainId: 11155420,

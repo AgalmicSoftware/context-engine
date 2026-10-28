@@ -2385,7 +2385,7 @@ it.each([
   });
 });
 
-it('adds how well AIs predicted people below the summary, when the session shows scores', async () => {
+it('adds how well AIs predicted people below the summary, when the session turns it on', async () => {
   // Cached metadata is keyed by question ID, without repeating it inside.
   cacheScripts.peekCacheSync.mockImplementation((namespace) =>
     namespace === 'questionsCache' ? { 84532: { questions: { q1: { type: 'binary', prompt: 'First' } } } } : {},
@@ -2413,7 +2413,7 @@ it('adds how well AIs predicted people below the summary, when the session shows
         {...baseReportProps}
         slug="fidelity-report"
         questionResponses={responses}
-        sessionConfig={{ interviewMode: { showFidelityScore: true } }}
+        sessionConfig={{ interviewMode: { showFidelityResults: true } }}
       />,
     );
     const section = await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);
@@ -2467,7 +2467,7 @@ it("scores only the report's filtered responses", async () => {
         slug="fidelity-filtered"
         questionResponses={{ q1: rows('q1'), q2: rows('q2') }}
         filterState={{ selectedTags: ['kept'] }}
-        sessionConfig={{ interviewMode: { showFidelityScore: true } }}
+        sessionConfig={{ interviewMode: { showFidelityResults: true } }}
       />,
     );
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY)).toHaveTextContent(

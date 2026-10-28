@@ -142,16 +142,19 @@ adds them and drafts for skipped questions. **Hidden AI drafts**
 participant's AI-prefill drafts until they answer, to measure how much seeing
 a draft sways answers; it applies only while they share draft changes. **Show
 participants how well their AI predicted them** (`interviewMode.showFidelityScore`,
-off by default) shows a private score after someone submits AI-prefill drafts,
-and an overall section in the Results report once its responses include
-AI-prefill drafts from 5 people.
+off by default) shows a private score after someone submits AI-prefill drafts.
 **Suggest open groups that fit participants’ answers**
 (`interviewMode.suggestGroups`, off by default) offers the session's open groups
-after an interview or AI prefill, without joining for anyone. Older Session
-Workers reject settings they don't know, so each is saved only when changed from
-its default: the sharing default needs a 0.7.0 or later Session Worker, and
-`full` detail, hidden drafts, the score and group suggestions need one newer
-than 0.7.0. See
+after an interview or AI prefill, without joining for anyone. **Show “How well
+AIs predicted people” in Results** (`interviewMode.showFidelityResults`, off by
+default) adds that section to the Results report once its responses include
+AI-prefill drafts from 5 people; **Smallest group shown in “How well AIs
+predicted people”** (`interviewMode.fidelityMinimumPeople`), under it, changes
+that number, and **Off** shows every figure. Older Session Workers reject
+settings they don't know, so each is saved only when changed from its default:
+the sharing default needs a 0.7.0 or later Session Worker, and `full` detail,
+hidden drafts, the score, group suggestions, the Results section and its
+smallest group need one newer than 0.8.0. See
 [session-interview-research.md](session-interview-research.md) and
 [session-listening-mode.md](session-listening-mode.md).
 Generation waits for public questions and uses the session Worker's OpenAI key.
@@ -1122,7 +1125,7 @@ answers ([agent-fidelity.md](agent-fidelity.md)):
    person's AI-prefill drafts until they answer, and shows people their score.
    AI prefill needs voice interviews, which are on by default; in `/admin` the
    switch also turns them back on if they were off. These settings need a
-   Session Worker newer than 0.7.0.
+   Session Worker newer than 0.8.0.
 2. Before anyone answers, write down the primary measure
    ([Fix the plan before looking](agent-fidelity.md#fix-the-plan-before-looking)).
 3. Share the session link with `?mode=voice`. It opens the microphone's
@@ -1130,12 +1133,18 @@ answers ([agent-fidelity.md](agent-fidelity.md)):
    into ChatGPT or Claude, open the link it returns, and review the drafts
    before submitting.
 4. After submitting, each person sees how well their AI predicted them,
-   whether or not they share their draft changes. Results, the command-line
-   report and hidden drafts use only people who keep research sharing on:
-   once their responses include AI-prefill drafts from 5 people, the Results
-   report adds **How well AIs predicted people**. For the full analysis,
-   download **JSON: Questions + Responses** from Results and run
-   `node scripts/agent-fidelity-report.mjs --export results.json --out reports/`.
+   whether or not they share their draft changes; by default this private
+   score is the session's only fidelity result. Results, the command-line
+   report and hidden drafts use only people who keep research sharing on. To
+   show everyone's results together too, turn on **Show “How well AIs
+   predicted people” in Results**: the section appears once responses include
+   AI-prefill drafts from 5 people. **Smallest group shown in “How well AIs
+   predicted people”**, under that switch, changes the number, and **Off**
+   shows every figure, even one person's, so use it only where everyone knows
+   small groups' figures are visible. For the full analysis, download **JSON:
+   Questions + Responses** from Results and run
+   `node scripts/agent-fidelity-report.mjs --export results.json --out reports/`,
+   adding `--min-participants <n>` if the session changed its smallest group.
 
 ### Share the session URL
 

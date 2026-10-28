@@ -106,23 +106,32 @@ Similarity between a prediction and an answer runs from 0 to 1:
 
 - Intervals are 95% bootstrap intervals that resample people (default 1,000
   samples, seed 1), because rows from one person aren't independent.
-- Any result based on fewer than 5 people is withheld, including calibration
-  and each of its confidence bands, anchoring and each third of the
-  unusual-views table.
+- Any result based on fewer people than the minimum is withheld, including
+  calibration and each of its confidence bands, anchoring and each third of
+  the unusual-views table. The minimum is 5 by default.
+  - In Results it is the session's **Smallest group shown in “How well AIs
+    predicted people”** (`interviewMode.fidelityMinimumPeople`), under
+    Interview settings. **Off** shows every figure, even one person's, so use
+    it only where everyone knows small groups' figures are visible.
+  - The Results export doesn't carry session settings, so the command-line
+    report (`--min-participants`) and the benchmark's `compare-answers`
+    (`--min-people`) take their own; match the session's setting when
+    running them.
   - Per-person rows, listed by pseudonym (`p001`…) and never by address, appear
-    only when the whole report has at least 5 people.
+    only when the whole report reaches the minimum.
 - Breakdowns that divide people (by platform, by where the draft came from,
   and by group) also withhold a row when subtracting it from the total, or
-  from the other rows, would reveal a result for fewer than 5 people: with
-  six people, five on Claude and one on ChatGPT, neither platform is shown.
-  The smallest row goes first. The benchmark's `compare-answers` applies the
-  same rule to its groups.
+  from the other rows, would reveal a result for fewer people than the
+  minimum: with six people, five on Claude and one on ChatGPT, a minimum of 5
+  shows neither platform. The smallest row goes first. The benchmark's
+  `compare-answers` applies the same rule to its groups.
   - Withheld groups are not named at all, since a group can be a single
     invite link.
 - The overall calibration figure counts every confidence band, including bands
-  withheld for having fewer than 5 people. When every other band is shown, a
-  withheld band's keep rate can sometimes be worked out from it. That reveals
-  how often those few people kept their AI's drafts, never what they answered.
+  withheld for having fewer people than the minimum. When every other band is
+  shown, a withheld band's keep rate can sometimes be worked out from it. That
+  reveals how often those few people kept their AI's drafts, never what they
+  answered.
 - Each person is the responder the Worker or the chain recorded for the
   response; a payload's own claim counts only for raw payloads, so one account
   can't pose as several people. The self-reported platform counts as ChatGPT,
@@ -163,18 +172,22 @@ their own result after submitting AI-prefill drafts: matches on choice
 questions, the Mirror Score, hidden-draft guesses and the most confident
 misses. It's computed in their browser and never stored; see
 [session-interview-research.md](session-interview-research.md#score-screen).
+By default this private score is the only fidelity result a session shows:
+the measure is each person's own.
 
-The same setting adds **How well AIs predicted people** to the session's
-Results report, below its summary statistics. It scores the responses the
-report shows, after its filters, with `scoreFidelityOverview`: the overall and
-hidden-draft Mirror Scores, the share of shown choice drafts people changed,
-a chart of stated confidence against the share kept, and the Mirror Score by
-platform. It scores in a background thread, so large sessions don't freeze
-the page, and gives the same numbers as this report's, except that only
-AI-prefill drafts count (voice and typed-context drafts restate what the
-person said). Every cell follows the withholding rules above, and until the
-report's responses include AI-prefill drafts from 5 people it shows a
-one-line note instead. To set a session up for this, see
+A separate setting, **Show “How well AIs predicted people” in Results**
+(`interviewMode.showFidelityResults`, off by default), adds a section with
+that name to the session's Results report, below its summary statistics. It
+scores the responses the report shows, after its filters, with
+`scoreFidelityOverview`: the overall and hidden-draft Mirror Scores, the share
+of shown choice drafts people changed, a chart of stated confidence against
+the share kept, and the Mirror Score by platform. It scores in a background
+thread, so large sessions don't freeze the page, and gives the same numbers as
+this report's, except that only AI-prefill drafts count (voice and
+typed-context drafts restate what the person said). Every cell follows the
+withholding rules above with the session's minimum, and until the report's
+responses include AI-prefill drafts from that many people it shows a one-line
+note instead. To set a session up for this, see
 [session-creation-guide.md](session-creation-guide.md#measure-how-well-ai-represents-participants).
 
 ## Fix the plan before looking

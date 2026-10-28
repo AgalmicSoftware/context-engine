@@ -900,6 +900,41 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.interviewMode.suggestGroups).toBe(suggestGroups || undefined);
   });
 
+  test.each([true, false])('publishes the fidelity section of Results only when on (%s)', (showFidelityResults) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'fidelity-results',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { showFidelityResults },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    // Off is the default, left out so older Session Workers still accept the save.
+    expect(payload.interviewMode.showFidelityResults).toBe(showFidelityResults || undefined);
+  });
+
+  test.each([1, 5, 10])(
+    'publishes the smallest group shown in fidelity results only when changed (%s)',
+    (fidelityMinimumPeople) => {
+      const payload = buildSessionWizardWorkerConfigPayload({
+        slug: 'fidelity-minimum',
+        draft: {
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          interviewMode: { fidelityMinimumPeople },
+        },
+        account: '0x00000000000000000000000000000000000000aa',
+        sessionId: '123e4567-e89b-12d3-a456-426614174000',
+        workerUrl: 'https://worker.example',
+      });
+      // 5 is the default, left out so older Session Workers still accept the save.
+      expect(payload.interviewMode.fidelityMinimumPeople).toBe(
+        fidelityMinimumPeople === 5 ? undefined : fidelityMinimumPeople,
+      );
+    },
+  );
+
   test('write payload builders reject invalid results analysis settings', () => {
     const invalidResultsAnalysis = {
       version: 1,

@@ -470,6 +470,50 @@ test('set-config rejects malformed or unsupported interview mode config', () => 
   }
 });
 
+test('set-config accepts the switch that shows fidelity results in Results only as a boolean', () => {
+  const apply = (showFidelityResults) => applySessionConfigMutation({
+    existingConfig: cloneJson(profileBearingConfig),
+    mutation: { kind: 'set-config', incomingConfig: { interviewMode: { enabled: true, showFidelityResults } } },
+    slug: 'session-a',
+  });
+  for (const showFidelityResults of [true, false]) {
+    const result = apply(showFidelityResults);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.config.interviewMode.showFidelityResults, showFidelityResults);
+  }
+  for (const showFidelityResults of ['true', 1, null]) {
+    const result = apply(showFidelityResults);
+    assert.equal(result.ok, false, String(showFidelityResults));
+    assert.equal(result.status, 400);
+  }
+});
+
+test('set-config accepts a whole number of people from 1 to 50 as the smallest group shown in fidelity results', () => {
+  const apply = (fidelityMinimumPeople) => applySessionConfigMutation({
+    existingConfig: cloneJson(profileBearingConfig),
+    mutation: { kind: 'set-config', incomingConfig: { interviewMode: { enabled: true, fidelityMinimumPeople } } },
+    slug: 'session-a',
+  });
+  for (const fidelityMinimumPeople of [1, 5, 10, 50]) {
+    const result = apply(fidelityMinimumPeople);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.config.interviewMode.fidelityMinimumPeople, fidelityMinimumPeople);
+  }
+  for (const fidelityMinimumPeople of [0, 51, 2.5, '5']) {
+    const result = apply(fidelityMinimumPeople);
+    assert.equal(result.ok, false, String(fidelityMinimumPeople));
+    assert.equal(result.status, 400);
+  }
+  // Clients leave the default out, so a saved interviewMode replaces the stored one whole.
+  const reset = applySessionConfigMutation({
+    existingConfig: apply(1).config,
+    mutation: { kind: 'set-config', incomingConfig: { interviewMode: { enabled: true } } },
+    slug: 'session-a',
+  });
+  assert.equal(reset.ok, true, JSON.stringify(reset));
+  assert.deepEqual(reset.config.interviewMode, { enabled: true });
+});
+
 test('set-config rejects unsafe or unregistered session appearance config', () => {
   for (const appearance of [
     { colorSchemeId: '../remote.css' },

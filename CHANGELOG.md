@@ -74,20 +74,28 @@ All notable changes to this project will be documented in this file.
 
 - Add a **Measure how well AI represents participants** switch to Interview
   settings, in the wizard and `/admin` (needs a Session Worker newer than
-  0.7.0). It turns on research sharing by default, hidden drafts for 1 in 5
+  0.8.0). It turns on research sharing by default, hidden drafts for 1 in 5
   AI-prefill drafts and the participant score together, and in `/admin` turns
   voice interviews back on if they were off; turning it off restores the
   research defaults.
-- Add **How well AIs predicted people** to the Results report of sessions with
-  `interviewMode.showFidelityScore`, once its responses include AI-prefill
-  drafts from 5 people: the overall and hidden-draft Mirror Scores, how often
-  people changed a shown draft, stated confidence against answers kept, and
-  results by platform. Each is withheld below 5 people, and a platform also
-  when subtracting it from the overall score would reveal fewer. It scores in
-  a background thread.
+- Add **How well AIs predicted people** to the Results report of sessions that
+  turn on **Show “How well AIs predicted people” in Results**: the overall and
+  hidden-draft Mirror Scores, how often people changed a shown draft, stated
+  confidence against answers kept, and results by platform. It appears once
+  the responses include AI-prefill drafts from the session's minimum number
+  of people, 5 by default, and withholds any figure from fewer, and a
+  platform also when subtracting it from the overall score would reveal
+  fewer. It scores in a background thread.
+- Add two Interview settings for that section, in the wizard and `/admin`
+  (each needs a Session Worker newer than 0.8.0): **Show “How well AIs
+  predicted people” in Results** (`interviewMode.showFidelityResults`, off by
+  default), which adds it, while the participant score stays private to each
+  person; and under it, **Smallest group shown in “How
+  well AIs predicted people”** (`interviewMode.fidelityMinimumPeople`, 5 by
+  default), whose **Off** shows every figure, even one person's.
 - Suggest the session's open groups after an interview or AI prefill link
   (`interviewMode.suggestGroups`, off by default; needs a Session Worker
-  newer than 0.7.0). A group named like the person's single-choice answer
+  newer than 0.8.0). A group named like the person's single-choice answer
   comes first without an AI call, hidden AI drafts stay out until shown, and
   suggestions never join anyone. A join started before sign-in now survives
   it, and suggestions no longer reload, with an AI call, on every render.
@@ -289,12 +297,12 @@ All notable changes to this project will be documented in this file.
 - Keep shared AI draft comparisons minimal by default: predicted answers, ratings,
   confidence and changed fields, without the AI's notes, drafted text or drafts
   for skipped questions. Owners can choose full detail with
-  `interviewMode.researchDetail`, which needs a Session Worker newer than 0.7.0.
+  `interviewMode.researchDetail`, which needs a Session Worker newer than 0.8.0.
   Records now carry `version: 2`, `researchTier` and `draftOrigin`, and a line
   beside Submit says when sharing is on.
 - Hide a share of AI-prefill drafts until people answer, to measure how much
   seeing a draft sways answers: `interviewMode.hiddenDraftShare`, which needs a
-  Session Worker newer than 0.7.0. Each hidden question shows the AI's guess
+  Session Worker newer than 0.8.0. Each hidden question shows the AI's guess
   after the answer, and research records keep `predictionCondition`, the answer
   from before the reveal and when it was shown. Anchoring now compares hidden
   drafts only with shown drafts from the same source.
@@ -304,7 +312,7 @@ All notable changes to this project will be documented in this file.
   calibrates only confidences with this meaning.
 - Show participants a private score after they submit AI-prefill drafts
   (`interviewMode.showFidelityScore`, which needs a Session Worker newer than
-  0.7.0): how many answers their AI matched, its Mirror Score, its hidden-draft
+  0.8.0): how many answers their AI matched, its Mirror Score, its hidden-draft
   guesses and most confident misses, worked out in the browser. The footer
   button stays in place.
 

@@ -59,7 +59,7 @@ Owners also choose the **AI draft research detail**, `interviewMode.researchDeta
 - `full` keeps everything described in the field reference below.
 
 Settings save `researchDetail` only when it is `full`, for the same reason as
-the sharing default: choosing `full` needs a Session Worker newer than 0.7.0.
+the sharing default: choosing `full` needs a Session Worker newer than 0.8.0.
 
 Either way the record carries `version: 2`, `researchTier` and `draftOrigin`.
 Records submitted before research detail existed keep `version: 1` and their
@@ -73,7 +73,7 @@ the panel.
 `interviewMode.hiddenDraftShare` (0 to 0.5; 0, off, by default) hides that
 share of each person's AI-prefill drafts, so a session can measure how much
 seeing a draft sways answers. Settings save it only above 0, which needs a
-Session Worker newer than 0.7.0. Only drafts from a ChatGPT or Claude prefill
+Session Worker newer than 0.8.0. Only drafts from a ChatGPT or Claude prefill
 packet can be hidden, on agree/disagree, choice, rating and quadratic
 questions the person hasn't already answered. Voice and typed-context drafts,
 freeform questions and anything shown with research sharing off are never

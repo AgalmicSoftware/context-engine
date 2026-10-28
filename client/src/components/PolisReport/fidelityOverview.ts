@@ -10,6 +10,8 @@ export type FidelityOverviewInput = {
   questions: Record<string, unknown>;
   // The report's rows by question, after its filters.
   questionResponses: unknown;
+  // The session's smallest group to report on (interviewMode.fidelityMinimumPeople).
+  minParticipants: number;
 };
 
 /**
@@ -20,6 +22,7 @@ export type FidelityOverviewInput = {
 export const computeFidelityOverview = ({
   questions,
   questionResponses,
+  minParticipants,
 }: FidelityOverviewInput): FidelityOverview | null => {
   // Cached questions are keyed by ID and may not repeat it inside.
   const questionList = Object.entries(questions || {}).map(([id, question]) => ({
@@ -31,5 +34,7 @@ export const computeFidelityOverview = ({
     payloads: resultsResponseRows({ filteredQuestionResponses: questionResponses }),
   });
   const prefill = pairs.filter((pair) => pair.origin === 'external_prefill');
-  return prefill.length ? scoreFidelityOverview({ questions: questionList, pairs: prefill }) : null;
+  return prefill.length
+    ? scoreFidelityOverview({ questions: questionList, pairs: prefill, options: { minParticipants } })
+    : null;
 };

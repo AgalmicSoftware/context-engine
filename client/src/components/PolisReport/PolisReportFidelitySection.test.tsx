@@ -1,14 +1,21 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import PolisReportFidelitySection from './PolisReportFidelitySection';
+import { computeFidelityOverview, type FidelityOverviewInput } from './fidelityOverview';
+import { createFidelityOverviewWorker } from './fidelityOverviewWorkerFactory';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+
+// jsdom has no Worker, so scoring runs on the main thread unless a test provides one.
+jest.mock('./fidelityOverviewWorkerFactory', () => ({ createFidelityOverviewWorker: jest.fn() }));
 
 const questions = {
   qb1: { id: 'qb1', type: 'binary', prompt: 'One' },
   qb2: { id: 'qb2', type: 'binary', prompt: 'Two' },
   qb3: { id: 'qb3', type: 'binary', prompt: 'Three' },
 };
-const sessionConfig = { interviewMode: { showFidelityScore: true } };
+const sessionConfig = { interviewMode: { showFidelityResults: true } };
+// The session's smallest group shown, turned off.
+const minimumOff = { interviewMode: { showFidelityResults: true, fidelityMinimumPeople: 1 } };
 const address = (index: number) => `0x${String(index + 1).padStart(40, '0')}`;
 
 // A stored answer whose AI-prefill draft said "Agree", by default with 80% confidence.
@@ -83,6 +90,58 @@ describe('PolisReportFidelitySection', () => {
     expect(platforms.getByRole('row', { name: /^ChatGPT/ })).toHaveTextContent(/^ChatGPTFewer than 5 people1$/);
   });
 
+  it('shows a platform one person used when the session turns its minimum off, and withholds it by default', async () => {
+    const chatGpt = () => screen.getByRole('row', { name: /^ChatGPT/ });
+    const { unmount } = renderSection(sixPeople().flat(), { sessionConfig: minimumOff });
+    await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);
+    // The ChatGPT user matched two of three drafts; one person has no interval.
+    expect(chatGpt()).toHaveTextContent(/^ChatGPT67%–1$/);
+    expect(screen.getByRole('row', { name: /^Claude/ })).toHaveTextContent(/^Claude87%.*5$/);
+    expect(screen.getByRole('button', { name: 'About platforms' })).toHaveAccessibleDescription(
+      'Which AI drafted the answers, as each prefill reported it.',
+    );
+    unmount();
+
+    renderSection(sixPeople().flat());
+    await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);
+    expect(chatGpt()).toHaveTextContent(/^ChatGPTFewer than 5 people1$/);
+    expect(screen.getByRole('button', { name: 'About platforms' })).toHaveAccessibleDescription(
+      /withheld when fewer than 5 people used it/,
+    );
+  });
+
+  it("shows one person's results when the session turns its minimum off", async () => {
+    renderSection(sixPeople().slice(5).flat(), { sessionConfig: minimumOff });
+    const panel = await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);
+    expect(panel).toHaveTextContent('3 AI-drafted answers from 1 person, compared with what they submitted.');
+    expect(screen.getByRole('group', { name: 'Mirror Score' })).toHaveTextContent(/^Mirror Score.*67%/);
+    expect(panel).toHaveTextContent(
+      'Drafts shown: off by 30 points on average (95% interval –), 2 answers from 1 person',
+    );
+  });
+
+  it('sends the session minimum to the background thread that scores', async () => {
+    const worker = {
+      postMessage: jest.fn(),
+      terminate: jest.fn(),
+      onmessage: null as ((event: { data: unknown }) => void) | null,
+      onerror: null,
+    };
+    jest.mocked(createFidelityOverviewWorker).mockReturnValue(worker as unknown as Worker);
+    const browserWorker = (globalThis as { Worker?: unknown }).Worker;
+    (globalThis as { Worker?: unknown }).Worker = function FakeWorker() {};
+    try {
+      renderSection(sixPeople().flat(), { sessionConfig: minimumOff });
+      await waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(1));
+      const [input] = worker.postMessage.mock.calls[0] as [FidelityOverviewInput];
+      expect(input.minParticipants).toBe(1);
+      act(() => worker.onmessage?.({ data: computeFidelityOverview(input) }));
+      expect(screen.getByRole('row', { name: /^ChatGPT/ })).toHaveTextContent(/^ChatGPT67%–1$/);
+    } finally {
+      (globalThis as { Worker?: unknown }).Worker = browserWorker;
+    }
+  });
+
   it('shows a platform once no one else could be worked out from it', async () => {
     renderSection(sixPeople('claude').flat());
     await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);
@@ -149,16 +208,25 @@ describe('PolisReportFidelitySection', () => {
       />,
     );
     expect(container).toBeEmptyDOMElement();
+    rerender(<PolisReportFidelitySection sessionConfig={sessionConfig} questions={questions} />);
+    expect(container).toBeEmptyDOMElement();
+  });
 
+  it('stays out of Results when only people’s own scores are on', async () => {
+    const rows = byQuestion(sixPeople().flat());
+    const { container, rerender } = render(
+      <PolisReportFidelitySection sessionConfig={sessionConfig} questions={questions} questionResponses={rows} />,
+    );
+    // Scored first, so the next check isn't passing only because scoring hasn't finished.
+    await screen.findByRole('group', { name: 'Mirror Score' });
+    // Showing people their own score doesn't add the section; it has a switch of its own.
     rerender(
       <PolisReportFidelitySection
-        sessionConfig={{ interviewMode: {} }}
+        sessionConfig={{ interviewMode: { showFidelityScore: true } }}
         questions={questions}
-        questionResponses={byQuestion(sixPeople().flat())}
+        questionResponses={rows}
       />,
     );
-    expect(container).toBeEmptyDOMElement();
-    rerender(<PolisReportFidelitySection sessionConfig={sessionConfig} questions={questions} />);
     expect(container).toBeEmptyDOMElement();
   });
 

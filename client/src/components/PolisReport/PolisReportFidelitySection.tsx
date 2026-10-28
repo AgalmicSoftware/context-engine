@@ -37,6 +37,7 @@ const percent = (value: number | null | undefined): string =>
 const percentRange = (interval: [number, number] | null | undefined, unit = '%'): string =>
   interval ? `${whole(interval[0])}–${whole(interval[1])}${unit}` : '–';
 const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`;
+const people = (count: number): string => `${count} ${count === 1 ? 'person' : 'people'}`;
 
 // A PDF can't show tooltips, so the report's PDF mode prints each explanation instead.
 const PdfMode = createContext(false);
@@ -184,7 +185,7 @@ function Calibration({ calibration, minimum }: CalibrationProps) {
             <strong>{label}:</strong>{' '}
             {result.suppressed
               ? `withheld, fewer than ${minimum} people`
-              : `off by ${whole(result.expectedCalibrationError)} points on average (95% interval ${percentRange(result.errorInterval, '')}), ${plural(result.predictions, 'answer')} from ${result.participants} people`}
+              : `off by ${whole(result.expectedCalibrationError)} points on average (95% interval ${percentRange(result.errorInterval, '')}), ${plural(result.predictions, 'answer')} from ${people(result.participants)}`}
           </li>
         ))}
       </ul>
@@ -237,8 +238,8 @@ export type PolisReportFidelitySectionProps = {
 
 /**
  * How well people's AI-prefill drafts predicted their answers, for sessions
- * that show participants their score. It scores the responses the report
- * shows, after its filters, and stays empty until enough people take part.
+ * that turn it on (interviewMode.showFidelityResults). It scores the responses
+ * the report shows, after its filters, and stays empty until enough people take part.
  */
 export default function PolisReportFidelitySection({
   sessionConfig,
@@ -249,10 +250,13 @@ export default function PolisReportFidelitySection({
   const [open, setOpen] = useState(true);
   const bodyId = useId();
   const config = sessionConfig && typeof sessionConfig === 'object' ? (sessionConfig as Record<string, unknown>) : {};
-  const enabled = normalizeInterviewSettings(config.interviewMode).showFidelityScore;
+  // Its own switch: showFidelityScore only shows each person their own score.
+  const { showFidelityResults: enabled, fidelityMinimumPeople: minParticipants } = normalizeInterviewSettings(
+    config.interviewMode,
+  );
   const input = useMemo(
-    () => (enabled && questionResponses ? { questions: questions || {}, questionResponses } : null),
-    [enabled, questions, questionResponses],
+    () => (enabled && questionResponses ? { questions: questions || {}, questionResponses, minParticipants } : null),
+    [enabled, questions, questionResponses, minParticipants],
   );
   const overview = useFidelityOverview(input);
   if (!overview) return null;
@@ -263,13 +267,18 @@ export default function PolisReportFidelitySection({
     if (!isInterviewFeatureEnabled(config)) return null;
     return (
       <p className={styles.pending} data-testid={E2E_TESTIDS.SESSION_RESULTS_FIDELITY}>
-        {TITLE} appears once these results include AI-prefill drafts from at least {minimum} people.
+        {TITLE} appears once these results include AI-prefill drafts from at least {people(minimum)}.
       </p>
     );
   }
   const { coverage, mirrorScore, correctionRate, calibration } = overview;
   const hidden = mirrorScore.byCondition.blind;
   const expanded = open || pdfMode;
+  // A minimum of 1, which Interview settings call off, withholds nothing.
+  const platformWithheld =
+    minimum > 1
+      ? ` A platform is withheld when fewer than ${minimum} people used it, or when showing it would let someone work out the score of fewer than ${minimum} others.`
+      : '';
   return (
     <section
       className={reportStyles.sectionCollapse}
@@ -295,7 +304,7 @@ export default function PolisReportFidelitySection({
       <PdfMode.Provider value={pdfMode}>
         <div id={bodyId} className={`${reportStyles.statsSection} ${styles.body}`} hidden={!expanded}>
           <p className={styles.detail}>
-            {plural(coverage.predictions, 'AI-drafted answer')} from {coverage.participants} people, compared with what
+            {plural(coverage.predictions, 'AI-drafted answer')} from {people(coverage.participants)}, compared with what
             they submitted.
           </p>
           <div className={styles.tiles}>
@@ -342,7 +351,7 @@ export default function PolisReportFidelitySection({
             <div className={styles.sectionHeading}>
               <h3 id="ce-results-fidelity-platforms">By platform</h3>
               <Help id="ce-results-fidelity-platform" label="About platforms">
-                {`Which AI drafted the answers, as each prefill reported it. A platform is withheld when fewer than ${minimum} people used it, or when showing it would let someone work out the score of fewer than ${minimum} others.`}
+                {`Which AI drafted the answers, as each prefill reported it.${platformWithheld}`}
               </Help>
             </div>
             <table className={styles.table}>

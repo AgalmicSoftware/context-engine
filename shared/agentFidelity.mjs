@@ -28,6 +28,18 @@ const DEFAULTS = Object.freeze({
 });
 
 const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+// An option left undefined keeps its default, and a minimum that isn't a whole number of at
+// least 1 does too, so a missing or broken minimum never turns withholding off.
+const settingsFrom = (options) => {
+  const settings = {
+    ...DEFAULTS,
+    ...Object.fromEntries(Object.entries(isRecord(options) ? options : {}).filter(([, value]) => value !== undefined)),
+  };
+  if (!(Number.isInteger(settings.minParticipants) && settings.minParticipants >= 1)) {
+    settings.minParticipants = DEFAULTS.minParticipants;
+  }
+  return settings;
+};
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 const text = (value) =>
   typeof value === 'string' ? value.trim() : typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
@@ -859,7 +871,7 @@ const coreScores = (people, settings) => ({
  * example position groups or the `src` link they arrived through).
  */
 export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], groups = {}, options = {} } = {}) => {
-  const settings = { ...DEFAULTS, ...options };
+  const settings = settingsFrom(options);
   const questionMap = mapQuestions(questions);
   const allowed = allowedBy(settings);
   // Listed groups win; otherwise the `src` link a person arrived through.
@@ -1056,7 +1068,7 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
  * the same parts of scoreAgentFidelity.
  */
 export const scoreFidelityOverview = ({ questions = [], pairs = [], options = {} } = {}) => {
-  const settings = { ...DEFAULTS, ...options };
+  const settings = settingsFrom(options);
   const scored = scorePairs(pairs.filter(allowedBy(settings)), mapQuestions(questions));
   const measured = scored.filter((pair) => pair.similarity !== null);
   const people = peopleOf(measured);

@@ -373,6 +373,16 @@ test('breakdowns that divide people withhold what subtracting them would reveal'
   assert.deepEqual(reportableKeys([['a'], ['a']], 3), [], 'fewer than the minimum in all');
 });
 
+test('a missing or broken minimum keeps the default', () => {
+  // Four ChatGPT users are fewer than the default 5, with or without an explicit undefined.
+  const pairs = pairsFor((person) => person.view, (person) => ({ platform: person.group === 'common' ? 'claude' : 'chatgpt' }));
+  for (const minParticipants of [undefined, null, Number.NaN, 0, 2.5]) {
+    const overview = scoreFidelityOverview({ questions, pairs, options: { bootstrapSamples: 50, minParticipants } });
+    assert.equal(overview.options.minParticipants, 5, `minParticipants ${minParticipants}`);
+    assert.equal(overview.mirrorScore.byPlatform.chatgpt.suppressed, true);
+  }
+});
+
 test('results from fewer people than the minimum are withheld everywhere', () => {
   // Only one person has a hidden draft, so nothing about hidden drafts can be
   // published without revealing that person's answers.

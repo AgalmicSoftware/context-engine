@@ -33,7 +33,7 @@ describe('useFidelityOverview', () => {
   });
 
   it('scores in a worker, and a newer input cancels the older work', async () => {
-    const first: FidelityOverviewInput = { questions: {}, questionResponses: {} };
+    const first: FidelityOverviewInput = { questions: {}, questionResponses: {}, minParticipants: 5 };
     const { result, rerender } = renderHook(({ input }) => useFidelityOverview(input), {
       initialProps: { input: first },
     });
@@ -41,10 +41,11 @@ describe('useFidelityOverview', () => {
     await waitFor(() => expect(workers).toHaveLength(1));
     expect(workers[0].postMessage).toHaveBeenCalledWith(first);
 
-    const second: FidelityOverviewInput = { questions: {}, questionResponses: { q1: [] } };
+    const second: FidelityOverviewInput = { questions: {}, questionResponses: { q1: [] }, minParticipants: 1 };
     rerender({ input: second });
     expect(workers[0].terminate).toHaveBeenCalled();
     await waitFor(() => expect(workers).toHaveLength(2));
+    expect(workers[1].postMessage).toHaveBeenCalledWith(second);
     const overview = { coverage: { participants: 7 } };
     act(() => workers[1].onmessage?.({ data: overview }));
     expect(result.current).toBe(overview);
@@ -52,7 +53,7 @@ describe('useFidelityOverview', () => {
   });
 
   it('scores on the main thread when the worker fails to load', async () => {
-    const input: FidelityOverviewInput = { questions: {}, questionResponses: {} };
+    const input: FidelityOverviewInput = { questions: {}, questionResponses: {}, minParticipants: 5 };
     const { result } = renderHook(() => useFidelityOverview(input));
     await waitFor(() => expect(workers).toHaveLength(1));
     act(() => workers[0].onerror?.());

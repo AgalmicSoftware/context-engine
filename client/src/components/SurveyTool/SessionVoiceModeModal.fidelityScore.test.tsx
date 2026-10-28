@@ -114,8 +114,17 @@ it('shows the person how well their AI predicted them after submitting, in place
   expect(score.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
-it('shows nothing when the session leaves the score off', async () => {
-  const { onSubmitResponses } = renderModal({ interviewMode: {} });
+it('shows the score without the Results section, which has a switch of its own', async () => {
+  renderModal({ interviewMode: { showFidelityScore: true, showFidelityResults: false } });
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  submit();
+  expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_FIDELITY_SCORE)).toHaveTextContent(
+    '2 of 2 answers matched',
+  );
+});
+
+it('shows nothing when the session leaves the score off, even with the Results section on', async () => {
+  const { onSubmitResponses } = renderModal({ interviewMode: { showFidelityResults: true } });
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   submit();
   await waitFor(() => expect(onSubmitResponses).toHaveBeenCalled());

@@ -25410,7 +25410,7 @@ var init_sessionAgentConfig = __esm({
 });
 
 // shared/interviewSettings.mjs
-var DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
+var DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
 var init_interviewSettings = __esm({
   "shared/interviewSettings.mjs"() {
     DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
@@ -25426,9 +25426,12 @@ var init_interviewSettings = __esm({
       researchDetail: "minimal",
       hiddenDraftShare: 0,
       showFidelityScore: false,
-      suggestGroups: false
+      suggestGroups: false,
+      showFidelityResults: false,
+      fidelityMinimumPeople: 5
     });
     MAX_HIDDEN_DRAFT_SHARE = 0.5;
+    MAX_FIDELITY_MINIMUM_PEOPLE = 50;
     normalizeInterviewSettings = (value = {}) => {
       const source = value && typeof value === "object" ? value : {};
       return {
@@ -25448,7 +25451,11 @@ var init_interviewSettings = __esm({
         // After submitting, show the person how well their AI predicted them (private, in the browser).
         showFidelityScore: source.showFidelityScore === true,
         // After an interview or AI prefill, suggest the session's open groups that fit the answers.
-        suggestGroups: source.suggestGroups === true
+        suggestGroups: source.suggestGroups === true,
+        // Add "How well AIs predicted people" to Results, scoring everyone's AI-prefill drafts together.
+        showFidelityResults: source.showFidelityResults === true,
+        // That section hides figures from fewer people than this; 1 shows all.
+        fidelityMinimumPeople: Number.isInteger(source.fidelityMinimumPeople) ? Math.max(1, Math.min(MAX_FIDELITY_MINIMUM_PEOPLE, source.fidelityMinimumPeople)) : DEFAULT_INTERVIEW_SETTINGS.fidelityMinimumPeople
       };
     };
     validInterviewSettings = (value = {}) => {
@@ -25463,6 +25470,8 @@ var init_interviewSettings = __esm({
       if (value.researchDetail !== void 0 && !["minimal", "full"].includes(value.researchDetail)) return false;
       if (value.hiddenDraftShare !== void 0 && (!Number.isFinite(value.hiddenDraftShare) || value.hiddenDraftShare < 0 || value.hiddenDraftShare > MAX_HIDDEN_DRAFT_SHARE))
         return false;
+      if (value.fidelityMinimumPeople !== void 0 && (!Number.isInteger(value.fidelityMinimumPeople) || value.fidelityMinimumPeople < 1 || value.fidelityMinimumPeople > MAX_FIDELITY_MINIMUM_PEOPLE))
+        return false;
       return [
         "autoRegenerate",
         "followNewQuestions",
@@ -25470,7 +25479,8 @@ var init_interviewSettings = __esm({
         "allowManualRefresh",
         "shareDraftChangesByDefault",
         "showFidelityScore",
-        "suggestGroups"
+        "suggestGroups",
+        "showFidelityResults"
       ].every(
         (key) => value[key] === void 0 || typeof value[key] === "boolean"
       );

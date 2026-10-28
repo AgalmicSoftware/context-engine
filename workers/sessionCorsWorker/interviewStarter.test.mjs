@@ -89,6 +89,25 @@ test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings({ showFidelityScore: true }).showFidelityScore, true);
   assert.equal(normalizeInterviewSettings().suggestGroups, false);
   assert.equal(normalizeInterviewSettings({ suggestGroups: true }).suggestGroups, true);
+  assert.equal(normalizeInterviewSettings().showFidelityResults, false);
+  assert.equal(normalizeInterviewSettings({ showFidelityResults: true }).showFidelityResults, true);
+  assert.equal(normalizeInterviewSettings({ showFidelityResults: 'true' }).showFidelityResults, false);
+  // The smallest group shown in "How well AIs predicted people": 1 turns it off.
+  for (const [fidelityMinimumPeople, expected] of [
+    [undefined, 5],
+    [1, 1],
+    [10, 10],
+    [50, 50],
+    [0, 1],
+    [51, 50],
+    [2.5, 5],
+    ['3', 5],
+    [Number.NaN, 5],
+    [null, 5],
+  ])
+    assert.equal(normalizeInterviewSettings({ fidelityMinimumPeople }).fidelityMinimumPeople, expected);
+  for (const fidelityMinimumPeople of [undefined, 1, 5, 50])
+    assert.equal(validInterviewSettings({ fidelityMinimumPeople }), true);
   assert.equal(normalizeInterviewSettings().steeringPrompt, '');
   assert.equal(normalizeInterviewSettings({ steeringPrompt: '  Guide the interview.  ' }).steeringPrompt, 'Guide the interview.');
   assert.equal(
@@ -107,6 +126,13 @@ test('defaults are stable and settings reject invalid values', () => {
     { hiddenDraftShare: '0.2' },
     { showFidelityScore: 'true' },
     { suggestGroups: 'true' },
+    { showFidelityResults: 'true' },
+    { showFidelityResults: 1 },
+    { fidelityMinimumPeople: 0 },
+    { fidelityMinimumPeople: 51 },
+    { fidelityMinimumPeople: 2.5 },
+    { fidelityMinimumPeople: '5' },
+    { fidelityMinimumPeople: null },
     { questionGrowthPercent: 0 },
     { steeringPrompt: 42 },
     { steeringPrompt: 'x'.repeat(3001) },
