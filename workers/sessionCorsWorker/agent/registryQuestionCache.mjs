@@ -38,6 +38,31 @@ export function sessionQuestionCacheKey(env, sessionSlug) {
   return cacheKey(`${sessionId}:${revision}:${address}:${lower(sessionSlug)}`);
 }
 
+export function mergeQuestionRanges(ranges = []) {
+  const sorted = ranges.map(range => ({
+    fromBlock: normalizeBlock(range.fromBlock), toBlock: normalizeBlock(range.toBlock),
+  })).filter(range => range.fromBlock != null && range.toBlock != null && range.fromBlock <= range.toBlock)
+    .sort((a, b) => a.fromBlock - b.fromBlock);
+  const merged = [];
+  for (const range of sorted) {
+    const last = merged.at(-1);
+    if (last && range.fromBlock <= last.toBlock + 1) last.toBlock = Math.max(last.toBlock, range.toBlock);
+    else merged.push(range);
+  }
+  return merged;
+}
+
+export function removeScannedQuestionRange(ranges, fromBlock, toBlock) {
+  if (fromBlock == null) return ranges;
+  return ranges.flatMap(range => {
+    if (range.toBlock < fromBlock || range.fromBlock > toBlock) return [range];
+    return [
+      ...(range.fromBlock < fromBlock ? [{ fromBlock: range.fromBlock, toBlock: fromBlock - 1 }] : []),
+      ...(range.toBlock > toBlock ? [{ fromBlock: toBlock + 1, toBlock: range.toBlock }] : []),
+    ];
+  });
+}
+
 export function normalizeQuestionIndex(value = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   if (!Array.isArray(value.questions)) return null;
@@ -58,6 +83,7 @@ export function normalizeQuestionIndex(value = {}) {
     targetFromBlock: normalizeBlock(value.targetFromBlock),
     targetToBlock: normalizeBlock(value.targetToBlock),
     nextScanToBlock: normalizeBlock(value.nextScanToBlock),
+    unresolvedRanges: mergeQuestionRanges(value.unresolvedRanges || []),
     complete: value.complete === true,
     cached: true,
   };
