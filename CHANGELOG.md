@@ -130,6 +130,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Try another document index after malformed GraphQL replies and retain the
+  current document list when every endpoint fails.
+
 - Compare freeform answers and comments as exact text throughout editing,
   dirty counts, submission differences and interview review; only rating
   answers use numeric equivalence.
