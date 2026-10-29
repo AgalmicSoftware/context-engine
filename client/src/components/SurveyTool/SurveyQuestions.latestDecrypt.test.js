@@ -1,3 +1,4 @@
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, waitFor } from '@testing-library/react';
 
 import { renderSurveyQuestions, renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
@@ -27,8 +28,7 @@ const SESSION_CONFIG = {
   __registry: { registryChainId: 84532, sessionIdHex: '0x00112233445566778899aabbccddeeff' },
 };
 const SURVEY_ID = `0x${'ab'.repeat(32)}`;
-const envelope = (tag, recipients = [{ type: 'self-eip712-v1' }]) =>
-  JSON.stringify({ v: 1, aad: { context: `0x${'aa'.repeat(32)}` }, recipients, ciphertext: tag });
+const envelope = responseEnvelopeFixture;
 const E0 = envelope('ciphertext-of-P0'); // what this tab hydrated (stale cache / older version)
 const E1 = envelope('ciphertext-of-P1'); // the latest saved version (e.g. submitted from another device)
 const E1_ADMIN = envelope('ciphertext-of-P1-admin', [

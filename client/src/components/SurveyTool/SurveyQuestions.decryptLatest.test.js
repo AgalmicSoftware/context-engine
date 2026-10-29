@@ -2,6 +2,7 @@
 // real handleDecryptEdit / encryptAndUpload; only crypto primitives and the upload are mocked.
 // Question: can a resubmit after "Decrypt & edit" upload plaintext, or an envelope that no
 // longer matches the value the owner sees?
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, waitFor } from '@testing-library/react';
 
 import { renderSurveyQuestions } from './surveyQuestionsTestHarness';
@@ -18,13 +19,7 @@ const SESSION_CONFIG = {
   __registry: { registryChainId: 84532, sessionIdHex: '0x00112233445566778899aabbccddeeff' },
 };
 const SURVEY_ID = `0x${'ab'.repeat(32)}`;
-const envelope = (tag) =>
-  JSON.stringify({
-    v: 1,
-    aad: { context: `0x${'aa'.repeat(32)}` },
-    recipients: [{ type: 'self-eip712-v1' }],
-    ciphertext: tag,
-  });
+const envelope = responseEnvelopeFixture;
 const E0 = envelope('ciphertext-of-P0'); // what this tab hydrated (stale cache / older version)
 const E1 = envelope('ciphertext-of-P1'); // the latest saved version (e.g. submitted from another device)
 const FRESH = envelope('fresh-ciphertext');

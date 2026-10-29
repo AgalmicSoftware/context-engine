@@ -1,3 +1,4 @@
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 
 import { renderSurveyQuestions, renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
@@ -28,8 +29,7 @@ const SESSION_CONFIG = {
   __registry: { registryChainId: NET, sessionIdHex: '0x00112233445566778899aabbccddeeff' },
 };
 const SURVEY_ID = `0x${'ab'.repeat(32)}`;
-const envelope = (tag, recipients = [{ type: 'self-eip712-v1' }]) =>
-  JSON.stringify({ v: 1, aad: { context: `0x${'aa'.repeat(32)}` }, recipients, ciphertext: tag });
+const envelope = responseEnvelopeFixture;
 const ADMIN = [{ type: 'self-eip712-v1' }, { type: 'worker-response-field-v1', policy: { audience: 'self_admin' } }];
 const E0 = envelope('ct-P0');
 const E1 = envelope('ct-P1');
@@ -354,7 +354,7 @@ it.each(['full', 'pile'].flatMap((mode) => ['before', 'during'].map((timing) => 
     expect(h.submitResponses).toHaveBeenCalledTimes(1);
     const uploaded = h.submitResponses.mock.calls[0][2][0].answer;
     expect(uploaded).toMatchObject({ value: '*', encryptionAudience: 'self', encryptedPortion: FRESH });
-    expect(JSON.parse(uploaded.encryptedPortion).recipients).toEqual([{ type: 'self-eip712-v1' }]);
+    expect(JSON.parse(uploaded.encryptedPortion).recipients.map(({ type }) => type)).toEqual(['self-eip712-v1']);
   },
   15000,
 );

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Use complete encrypted-envelope fixtures in decrypt-and-resubmit regression tests.
+
 - Verify interview submission leaves unrelated manual answers pending for ordinary Submit.
 
 - Require at least one question type before generation and explain responses with no usable questions.
