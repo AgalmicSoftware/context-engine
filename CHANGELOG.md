@@ -318,6 +318,8 @@ All notable changes to this project will be documented in this file.
 - Refresh the fallback Worker release pin and deploy-helper example to the
   verified 0.8.0 bundles before preparing the next application release.
 
+- Verify authenticated faucet replies against the signed payment hash and amount.
+
 - Preserve the original benchmark rating prompts for integer-origin, step-1
   scales; describe increments only for other rating grids.
 
