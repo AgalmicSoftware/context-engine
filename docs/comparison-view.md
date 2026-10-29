@@ -1,7 +1,10 @@
 # Comparing participants
 
 A comparison keeps the selected session and loads its visible answers before
-analysis. The default result shows a short explanation of shared ground and key
+analysis. General is an explicit session: its comparisons include only General
+cache entries and use General for provenance and AI requests. Comparison URLs
+record `session=general` so an empty internal slug cannot select other sessions.
+The default result shows a short explanation of shared ground and key
 differences alongside a perspective map. On narrow screens these stack vertically.
 Participant letters and shapes connect the single results legend to the map and
 answer details.

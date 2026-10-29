@@ -10,7 +10,7 @@ import RightSideRaw from '../RightSidebar/RightSide';
 import LazyFallbackRaw from '../Shared/LazyFallback';
 import InitialRouteBoundaryRaw, { BootRecoveryReady } from '../ErrorBoundary/InitialRouteBoundary';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { resolveCompareCachesReady, resolveCompareSessionSlug } from '../UserPage/compareSessionRuntime';
+import { resolveCompareCachesReady, resolveCompareSessionScope } from '../UserPage/compareSessionRuntime';
 import { t } from '../../utilities/ui/terminology.js';
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
@@ -283,7 +283,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
 
   _renderCompareRoute: (ctx: RouteRenderCtx) => {
     const { fullPath, defaultSlug, defaultSessionCfg } = ctx;
-    const sessionSlug = resolveCompareSessionSlug({
+    const { slug: sessionSlug } = resolveCompareSessionScope({
       activeSessionSlug: defaultSlug,
       pathname: fullPath,
       search: readRouteLocationSearch().searchStr,

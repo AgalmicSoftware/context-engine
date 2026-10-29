@@ -73,6 +73,15 @@ describe('compare subject route contract', () => {
     );
   });
 
+  it('writes an explicit General session when replacing a previous session', () => {
+    const path = buildCompareSubjectsRoutePath({
+      search: '?session=alpha',
+      sessionSlug: '',
+      subjects: [`wallet:${addressA}`],
+    });
+    expect(new URL(path, 'https://fixture.test').searchParams.get('session')).toBe('general');
+  });
+
   it('only waits for caches or deep-scans subjects that need session-backed evidence', () => {
     const subjects = normalizeCompareSubjects([
       'sim:Franklin',

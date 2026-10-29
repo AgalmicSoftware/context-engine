@@ -39,7 +39,8 @@ import { createLogger } from 'utilities/logging.js';
 import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
 import {
-  resolveCompareSessionSlug,
+  resolveCompareSessionScope,
+  type CompareSessionScope,
   resolveCompareRunLabel,
   runCompareSectionTasks,
   scanCompareAddressesSequentially,
@@ -190,8 +191,8 @@ const EMPTY_SUBJECT_COMPATIBILITY: CompareSubjectCompatibility = {
   summaryComparable: false,
 };
 
-export const readDgObjectValues = (name: string, sessionSlug: string = ''): UnknownRecord[] =>
-  selectCompareCacheValues(listNamespaceEntriesSync(name, { cloneValues: false }), sessionSlug);
+export const readDgObjectValues = (name: string, scope: CompareSessionScope): UnknownRecord[] =>
+  selectCompareCacheValues(listNamespaceEntriesSync(name, { cloneValues: false }), scope);
 
 const CompareAddress = ({
   activeSessionSlug: activeSessionSlugProp,
@@ -224,15 +225,16 @@ const CompareAddress = ({
 
   const navigate = useNavigate();
   const location = useLocation();
-  const activeSessionSlug = useMemo(
+  const activeSessionScope = useMemo(
     () =>
-      resolveCompareSessionSlug({
+      resolveCompareSessionScope({
         activeSessionSlug: activeSessionSlugProp,
         pathname: location.pathname,
         search: location.search,
       }),
     [activeSessionSlugProp, location.pathname, location.search],
   );
+  const activeSessionSlug = activeSessionScope.slug;
   const lastAutoKeyRef = useRef('');
   const deepScanSeenRef = useRef<Set<string>>(new Set());
   const compareRunIdRef = useRef(0);
@@ -500,9 +502,9 @@ const CompareAddress = ({
     if (isStale()) return;
 
     // Read caches via component-level helper (side-effect)
-    const sbtCaches = readDgObjectValues('sbtCache', activeSessionSlug);
-    const questionsCaches = readDgObjectValues('questionsCache', activeSessionSlug);
-    const surveysCaches = readDgObjectValues('surveysCache', activeSessionSlug);
+    const sbtCaches = readDgObjectValues('sbtCache', activeSessionScope);
+    const questionsCaches = readDgObjectValues('questionsCache', activeSessionScope);
+    const surveysCaches = readDgObjectValues('surveysCache', activeSessionScope);
 
     // Normalize cache-backed and simulated subjects into one comparison payload contract.
     const resolution = resolveCompareSubjects({
@@ -532,7 +534,7 @@ const CompareAddress = ({
     setCurrentUsers(users);
 
     // These sections are independent; let each render as soon as its own result is ready.
-    const aiScope = activeSessionSlug ? { sessionSlug: activeSessionSlug } : {};
+    const aiScope = { sessionSlug: activeSessionScope.slug };
     const addrOrder = users.map((u) => u.address);
 
     const bulletsTask = async () => {
