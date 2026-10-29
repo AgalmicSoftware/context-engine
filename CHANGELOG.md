@@ -244,6 +244,8 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Anonymous IPv6 callers in one /64 now share a quota; IPv4-mapped addresses share the corresponding IPv4 quota.
+
 - Extract fetched HTML in linear time, including responses with repeated
   unclosed tags, while preserving ordinary visible text.
 
