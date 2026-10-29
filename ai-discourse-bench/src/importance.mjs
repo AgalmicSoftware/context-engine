@@ -297,6 +297,10 @@ export const buildImportanceRunId = ({ benchmarkId, modelId, repeatIndex }) => (
   [benchmarkId, 'quadratic-importance', modelId, repeatIndex].join(':')
 );
 
+const canonicalImportancePromptRows = (runs) => [...runs]
+  .sort((left, right) => left.modelId.localeCompare(right.modelId) || left.repeatIndex - right.repeatIndex)
+  .map(({ runId, promptHash }) => ({ runId, promptHash }));
+
 export const runImportanceBenchmark = async ({
   questionBank,
   modelRoster,
@@ -335,6 +339,7 @@ export const runImportanceBenchmark = async ({
       });
       return {
         modelEntry,
+        modelId: modelEntry.id,
         repeatIndex,
         orderedQuestionBank,
         questionOrderHash: hashJson(orderedQuestionBank.questions.map((question) => question.id)),
@@ -350,7 +355,7 @@ export const runImportanceBenchmark = async ({
   ));
   const promptHash = tasks.length === 1
     ? tasks[0].promptHash
-    : hashJson(tasks.map((task) => ({ runId: task.runId, promptHash: task.promptHash })));
+    : hashJson(canonicalImportancePromptRows(tasks));
   const expectedRunIds = new Set(tasks.map((task) => task.runId));
   const taskByRunId = new Map(tasks.map((task) => [task.runId, task]));
   const isReusableRun = (run, task) => {
@@ -787,7 +792,7 @@ export const validateReleaseImportanceFile = (file, {
     if (resolvedModel && resolvedModel !== run.model) {
       errors.push(`runs[${index}] resolved model does not match its declared model`);
     }
-    expectedPromptRows.push({ runId: run.runId, promptHash: sha256(prompt) });
+    expectedPromptRows.push({ modelId: run.modelId, repeatIndex: run.repeatIndex, runId: run.runId, promptHash: sha256(prompt) });
   });
   deploymentIdentitiesByModel.forEach((identity, modelId) => {
     if (identity.providers.size > 1 || identity.models.size > 1 || identity.fingerprints.size > 1) {
@@ -796,7 +801,7 @@ export const validateReleaseImportanceFile = (file, {
   });
   const expectedManifestPromptHash = expectedPromptRows.length === 1
     ? expectedPromptRows[0].promptHash
-    : hashJson(expectedPromptRows.sort((left, right) => left.runId.localeCompare(right.runId)));
+    : hashJson(canonicalImportancePromptRows(expectedPromptRows));
   if (manifest.promptHash !== expectedManifestPromptHash) {
     errors.push('manifest.promptHash does not match the release importance runs');
   }

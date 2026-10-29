@@ -342,3 +342,23 @@ test('release importance validation enforces policy repeats and pinned model ide
     requiredRepeats: 1,
   }).some((error) => error.includes('resolved model does not match')));
 });
+
+for (const repeats of [1, 10]) {
+  test(`importance prompt hashes validate unsorted rosters with ${repeats} repeats`, async () => {
+    const roster = { models: [...modelRoster.models].reverse() };
+    const run = (models) => runImportanceBenchmark({ questionBank, modelRoster: { models }, budget: 10, maxAllocations: 2, repeats,
+      callModelImpl: async () => ({ content: '{"allocations":[{"questionId":"q1","votes":2}]}', metadata: {} }),
+    });
+    const artifact = await run(roster.models);
+    artifact.manifest.harnessCommit = 'a'.repeat(40);
+    const validate = (value) => validateReleaseImportanceFile(value, { questionBank, modelRoster: roster, requiredRepeats: repeats });
+    assert.deepEqual(validate(artifact), []);
+    assert.equal(artifact.manifest.promptHash, (await run(modelRoster.models)).manifest.promptHash);
+    const changedPrompt = structuredClone(artifact);
+    changedPrompt.runs[0].promptHash = 'b'.repeat(64);
+    assert.ok(validate(changedPrompt).some((error) => error.includes('promptHash')));
+    const changedCoordinate = structuredClone(artifact);
+    changedCoordinate.runs[0].repeatIndex += 1;
+    assert.ok(validate(changedCoordinate).some((error) => error.includes('run coordinates')));
+  });
+}
