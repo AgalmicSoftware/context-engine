@@ -600,6 +600,7 @@ export const createSessionResponseHydrationController = (
     const slug = normalizeSessionSlug(slugIn || '');
     const suppressUiState = !!(opts && opts.background === true);
     const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
+    const forceFull = opts.forceFull === true;
     const notifyOnCompletion = !!(opts && opts.notifyOnCompletion === true);
     const sessionConfig = getSessionCfg(slug);
     const workerRun = resolveWorkerResponseHydrationRun({ sessionConfig, sessionSlug: slug, reader: getAccount() });
@@ -785,7 +786,10 @@ export const createSessionResponseHydrationController = (
       let lastProcessedQRBlock =
         Number((questionsCache[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock) || 0;
       const floorBlock = initialLastBlockQR;
-      if (lastProcessedQRBlock < floorBlock) lastProcessedQRBlock = floorBlock;
+      if (forceFull || lastProcessedQRBlock < floorBlock) lastProcessedQRBlock = floorBlock;
+      if (forceFull) {
+        (questionsCache[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock = floorBlock;
+      }
 
       const latestBlock = baseTo;
       const responseScanMaxBlockRange = readSessionScanMaxBlockRange(DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE);
@@ -990,10 +994,14 @@ export const createSessionResponseHydrationController = (
         );
         mergeQuestionArweaveCacheBranches(mergedNet, pendingNet);
         mergeResponseMapsByRecency(mergedNet, pendingNet);
-        mergedNet.questionResponsesLatestBlock = Math.max(
-          Number(pendingNet.questionResponsesLatestBlock || 0),
-          Number(freshNet.questionResponsesLatestBlock || 0),
-        );
+        // A forced rescan owns its completion watermark; an older high value
+        // cannot hide retryable payload failures found during that rescan.
+        mergedNet.questionResponsesLatestBlock = forceFull
+          ? Number(pendingNet.questionResponsesLatestBlock || 0)
+          : Math.max(
+              Number(pendingNet.questionResponsesLatestBlock || 0),
+              Number(freshNet.questionResponsesLatestBlock || 0),
+            );
         fresh[networkID] = mergedNet;
         Object.keys(pending).forEach((netKey) => {
           if (!Object.prototype.hasOwnProperty.call(fresh, netKey)) fresh[netKey] = pending[netKey];
@@ -1817,7 +1825,7 @@ export const createSessionResponseHydrationController = (
     });
     // No wallet network required; we use group-aware read providers internally.
     setReadinessStateIfChanged({ isQuestionCacheReady: false, isResponsesCacheReady: false });
-    await fetchQuestionResponsesChunkedForGroup(slug);
+    await fetchQuestionResponsesChunkedForGroup(slug, { forceFull });
     checkAllCachesReady();
     mainSiteLog.log('refreshQuestionResponses() - done');
   };

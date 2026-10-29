@@ -104,6 +104,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Retry chain-backed response payload failures from their event block instead of
+  advancing past them. Forced refreshes rescan from the session's start block.
+
 - Refuse encrypted-key wallet creation when a wallet is already saved for this
   RP ID, preserving its recovery key before any new passkey prompt.
 

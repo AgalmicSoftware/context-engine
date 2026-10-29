@@ -190,7 +190,12 @@ Semantics:
 - `questionsDiscoveryCheckpointBlock`: in-progress checkpoint used for resume-after-refresh behavior
 - `questions[qid].sessionSlugExplicit`: `true` when metadata authoritatively declared the session slug; `false` when the cache derived a slug from legacy name mapping or rebucketed unresolved metadata to general
 - `questions[qid].__ceQuestionMetadataPending`: temporary placeholder marker used when a response has been discovered before its question metadata has hydrated
-- `questionResponsesLatestBlock`: response watermark for the session+network
+- `questionResponsesLatestBlock`: response watermark for the session+network.
+  Chain response scans stop this watermark before the earliest event whose payload
+  failed with a retryable error, so ordinary refreshes revisit it. Invalid pointers
+  and malformed payloads are skipped without holding the watermark. A forced full
+  refresh rescans from the session start and persists that run's completed range,
+  including a lower watermark if it finds a retryable failure.
 - `questionResponsesMeta[qid][responder]`: recency guard used to reject stale response payload writes
 - `pendingQuestionMetadata[qid]`: retry/backoff state for question metadata hydration failures and response-discovered metadata gaps
 - `arweaveTxCache[txId]`: cached raw Arweave payload text

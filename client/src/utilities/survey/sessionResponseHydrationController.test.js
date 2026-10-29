@@ -719,6 +719,32 @@ describe('createSessionResponseHydrationController', () => {
       });
     });
 
+    it('retains a pending forced rescan when another refresh joins the in-flight run', async () => {
+      jest.useFakeTimers();
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const deferred = createDeferred();
+      contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(deferred.promise);
+      const first = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+      const forced = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG, { forceFull: true });
+      const recovery = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG, { forceArweaveFetch: true });
+      deferred.resolve({ fromBlock: 10, toBlock: 12 });
+      await Promise.all([first, forced, recovery]);
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback).toHaveBeenCalledTimes(1);
+      jest.runOnlyPendingTimers();
+      await flushMicrotasks(50);
+      expect(
+        contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls.map((call) => [call[1], call[2]]),
+      ).toEqual([
+        [10, 12],
+        [10, 12],
+      ]);
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls[1][6]).toEqual({
+        forceArweaveFetch: true,
+      });
+      controller.destroy();
+    });
+
     it('aborts when no chainId is available', async () => {
       const host = createMockHost({ chainId: null });
       const controller = createSessionResponseHydrationController(host);
@@ -1670,6 +1696,75 @@ describe('createSessionResponseHydrationController', () => {
   });
 
   describe('refreshQuestionResponses', () => {
+    it.each([false, true])(
+      'retries an incomplete chain scan on the next ordinary refresh (forceFull=%s)',
+      async (forceFull) => {
+        const host = createMockHost({
+          initialStorage: {
+            questionsCache: {
+              [SESSION_SLUG]: {
+                [NETWORK_ID]: createQuestionCacheNetworkNode({ questionResponsesLatestBlock: forceFull ? 12 : 0 }),
+              },
+            },
+          },
+        });
+        contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 12 });
+        let available = false;
+        const payload = { sessionSlug: SESSION_SLUG, answer: 'recovered' };
+        contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementation(
+          async (_provider, _from, to, _onProgress, onPartialData) => {
+            onPartialData(
+              available
+                ? {
+                    [QUESTION_ID_A]: [
+                      {
+                        responder: RESPONDER_LOWER,
+                        questionId: QUESTION_ID_A,
+                        blockNumber: 7,
+                        transactionIndex: 0,
+                        logIndex: 0,
+                        timestamp: 100,
+                        response: payload,
+                      },
+                    ],
+                  }
+                : {},
+              available ? to : 6,
+            );
+          },
+        );
+        const controller = createSessionResponseHydrationController(host);
+        await controller.refreshQuestionResponses(null, { forceFull });
+        expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls[0]?.[1]).toBe(1);
+        expect(host.getStored('questionsCache', SESSION_SLUG)[NETWORK_ID].questionResponsesLatestBlock).toBe(6);
+
+        available = true;
+        contractScripts.getQuestionResponsesChunkedWithCallback.mockClear();
+        await controller.refreshQuestionResponses();
+        expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls[0][1]).toBe(7);
+        const network = host.getStored('questionsCache', SESSION_SLUG)[NETWORK_ID];
+        expect(network.questionResponses[QUESTION_ID_A][RESPONDER_LOWER]).toEqual(payload);
+        expect(network.questionResponsesLatestBlock).toBe(12);
+      },
+    );
+
+    it('rescans from the session start when a forced refresh follows a complete scan', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: {
+              [NETWORK_ID]: createQuestionCacheNetworkNode({ questionResponsesLatestBlock: 12 }),
+            },
+          },
+        },
+      });
+      const controller = createSessionResponseHydrationController(host);
+      await controller.refreshQuestionResponses(null, { forceFull: true });
+      expect(
+        contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls.map((call) => [call[1], call[2]]),
+      ).toEqual([[10, 12]]);
+    });
+
     it('falls back to full refresh when forceFull is true', async () => {
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);

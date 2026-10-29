@@ -267,6 +267,53 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
     ]);
   });
 
+  it('holds the question-response watermark before the earliest retryable payload failure', async () => {
+    const responderA = '0x00000000000000000000000000000000000000aa';
+    const responderB = '0x00000000000000000000000000000000000000bb';
+    mockFetchLogsSmartWithProvider.mockResolvedValue([
+      makeResponsesSubmittedLog(responderA, 9),
+      makeResponsesSubmittedLog(responderB, 7),
+    ]);
+    let available = false;
+    const getResponseSpy = jest
+      .spyOn(contractScripts, 'getResponse')
+      .mockImplementation(async (_provider, _responder, _question, _session, options) => {
+        if (available) return { answer: 'recovered' };
+        if (options?.throwOnError) throw makeResponseReadError('Service unavailable', { status: 503 });
+        return null;
+      });
+    const onPartialData = jest.fn();
+    await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 30, null, onPartialData, GROUP_CFG);
+    expect(onPartialData).toHaveBeenLastCalledWith({}, 6);
+    expect(getResponseSpy.mock.calls.every((call) => call[4].throwOnError === true)).toBe(true);
+
+    available = true;
+    await contractScripts.getQuestionResponsesChunkedWithCallback('none', 7, 30, null, onPartialData, GROUP_CFG);
+    expect(onPartialData).toHaveBeenLastCalledWith(
+      {
+        [QUESTION_ID.toLowerCase()]: expect.arrayContaining([
+          expect.objectContaining({ responder: responderB, response: { answer: 'recovered' } }),
+        ]),
+      },
+      30,
+    );
+  });
+
+  it('does not hold the question-response watermark for an invalid payload', async () => {
+    const responder = '0x00000000000000000000000000000000000000aa';
+    mockFetchLogsSmartWithProvider.mockResolvedValue([makeResponsesSubmittedLog(responder, 7)]);
+    jest.spyOn(contractScripts, 'getResponse').mockRejectedValue(
+      makeResponseReadError('Invalid response JSON', {
+        retryable: false,
+        state: 'terminal_invalid',
+        kind: 'invalid',
+      }),
+    );
+    const onPartialData = jest.fn();
+    await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 30, null, onPartialData, GROUP_CFG);
+    expect(onPartialData).toHaveBeenLastCalledWith({}, 30);
+  });
+
   it('threads forced Arweave recovery into chunked question response reads', async () => {
     const responder = '0x00000000000000000000000000000000000000aa';
     mockFetchLogsSmartWithProvider.mockResolvedValue([makeResponsesSubmittedLog(responder, 7, 0)]);
