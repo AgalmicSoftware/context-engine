@@ -96,3 +96,21 @@ test('stops listing at the item cap and reports the list as incomplete', async (
   assert.equal(complete, false);
   assert.equal(pages, 3);
 });
+
+for (const action of ['upload', 'join', 'faucet', 'arweave']) test(`${action}: cancellation while signing in prevents the write`, async () => {
+  const controller = new AbortController();
+  const writes = [];
+  const client = createWorkerClient({ workerOrigin: 'https://w.example.dev', slug: 's', trustedOrigins: TRUSTED,
+    wallet: ethers.Wallet.createRandom(), fetchImpl: async (url) => {
+      const path = new URL(url).pathname;
+      if (path === '/session-config') return json({ sessionSlug: 's', config: { sessionId: SESSION_ID } });
+      if (path === '/auth/nonce') return json({ nonce: 'n1abcdefgh' });
+      if (path === '/auth/login') { controller.abort(); return json({ token: 'e30.sig', exp: 9999999999 }); }
+      writes.push(path); return json({ id: 'stored' });
+    } });
+  const operation = action === 'upload' ? client.upload({ resource: 'responses', data: {}, signal: controller.signal })
+    : action === 'join' ? client.joinGroup('fixture', { signal: controller.signal })
+      : client.request(action === 'faucet' ? '/' : '/arweave/upload', { method: 'POST', auth: true, body: {}, signal: controller.signal });
+  await assert.rejects(operation, /Stopped/);
+  assert.deepEqual(writes, []);
+});

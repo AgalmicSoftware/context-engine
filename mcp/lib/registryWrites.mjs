@@ -22,7 +22,7 @@ export const createRegistryWriter = ({ provider, chainId, wallet, surveys, slug,
       const offer = await client.describeTestEth();
       if (offer.offered && offer.tokenHasFaucetScope !== false) {
         let funding;
-        try { funding = await fund(); }
+        try { stopped(signal); funding = await fund(); }
         catch (error) { throw new Error(`${shortfall} ${String(error?.message || 'The faucet request failed.').slice(0, 250)}`); }
         if (funding?.sent) fundingNote = ` Faucet transaction ${funding.txHash} was sent; check it before requesting another payout.`;
         else if (funding?.reason === 'balance_high') fundingNote = ' The faucet refused because the balance is above its threshold.';
@@ -37,7 +37,7 @@ export const createRegistryWriter = ({ provider, chainId, wallet, surveys, slug,
 
   const upload = async (client, resource, id, record, signal) => {
     stopped(signal);
-    const result = await client.request('/arweave/upload', { method: 'POST', auth: true, body: {
+    const result = await client.request('/arweave/upload', { method: 'POST', auth: true, signal, body: {
       data: JSON.stringify(record), contentType: 'application/json', requestId: randomUUID(), sessionSlug: slug,
       tags: [{ name: 'CE-SessionSlug', value: slug }, { name: 'CE-Resource', value: resource }, { name: 'CE-ResourceId', value: id }],
     } });
@@ -76,6 +76,7 @@ export const createRegistryWriter = ({ provider, chainId, wallet, surveys, slug,
     for (const record of records) pointers.push(await upload(client, 'responses', record.questionID, record, signal));
     stopped(signal);
     await checkChain();
+    stopped(signal);
     const tx = await chainRequest(() => surveys.connect(wallet.connect(provider)).submitResponses(ids, pointers, ethers.constants.HashZero, ethers.constants.HashZero, fees), { submission: true });
     const receipt = await confirm(tx, 'ResponsesSubmitted', ids);
     records.forEach((record, index) => remember('responses', record.questionID, record, pointers[index], receipt));
@@ -91,6 +92,7 @@ export const createRegistryWriter = ({ provider, chainId, wallet, surveys, slug,
     const pointer = await upload(client, 'questions', record.id, record, signal);
     stopped(signal);
     await checkChain();
+    stopped(signal);
     const tx = await chainRequest(() => surveys.connect(wallet.connect(provider)).addQuestions([record.id], [pointer], [ethers.constants.HashZero], fees), { submission: true });
     const receipt = await confirm(tx, 'QuestionsAdded', [record.id]);
     remember('questions', record.id, record, pointer, receipt);
