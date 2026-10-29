@@ -455,7 +455,9 @@ await contractScripts.createSBT(
 
 A lone `*` is reserved for a locked answer or comment. Enter more text to save
 an asterisk literally; text such as `a * b` is supported in public and encrypted
-responses. Submission refuses a lone asterisk before encryption or upload.
+responses. Submission refuses a newly typed lone asterisk before encryption or
+upload. An invalid saved locked response is held back individually, preserving
+other valid changes in the batch.
 Editing a decrypted response removes its old envelope so the new text receives
 fresh ciphertext. Empty fields are submitted as unencrypted clears.
 

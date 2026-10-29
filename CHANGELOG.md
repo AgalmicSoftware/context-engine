@@ -122,6 +122,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Hold back an invalid saved locked response individually while submitting other
+  valid changes, and keep rejecting newly typed lone asterisks before upload.
+
 - Refuse lone asterisks in answers and comments before upload, require valid
   envelopes for encrypted response fields, and clear old ciphertext on edits.
 
