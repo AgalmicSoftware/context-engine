@@ -1,5 +1,6 @@
 .workspace {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   color: var(--ce-color-dark, var(--ce-compat-dark));
 }
@@ -18,6 +19,35 @@
   border-radius: var(--ce-radius-8, var(--ce-radius-8));
   background: var(--ce-text-inverse);
   box-shadow: 0 2px 4px color-mix(in srgb, var(--ce-compat-dark) 5%, transparent);
+}
+
+.questionSelectorPanel {
+  min-width: 0;
+  display: grid;
+  gap: 0.6rem;
+  color: var(--ce-document-text);
+}
+
+.questionSelect {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.6rem;
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-document-surface);
+  color: var(--ce-document-text);
+  font: inherit;
+
+  &:hover {
+    border-color: var(--ce-status-info);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-status-info);
+    outline-offset: 2px;
+  }
 }
 
 .reportPanel {

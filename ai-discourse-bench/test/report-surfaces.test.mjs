@@ -2248,8 +2248,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /class="breakdownCandleSegment breakdownCandleSegmentAgree"/);
   assert.match(html, /class="breakdownCandleSegment breakdownCandleSegmentUnsure"/);
   assert.match(html, /class="breakdownCandleSegment breakdownCandleSegmentDisagree"/);
-  assert.match(html, /\.workspace \{ display: grid; gap: 1rem; color: var\(--ce-color-dark, #212529\); \}/);
-  assert.match(html, /\.demoAnalysisWorkspace \{ display: grid; gap: 1rem; color: var\(--ce-color-dark, #212529\); \}/);
+  assert.match(html, /\.workspace \{ display: grid; grid-template-columns: minmax\(0, 1fr\); gap: 1rem; color: var\(--ce-color-dark, #212529\); \}/);
+  assert.match(html, /\.demoAnalysisWorkspace \{ display: grid; grid-template-columns: minmax\(0, 1fr\); gap: 1rem; color: var\(--ce-color-dark, #212529\); \}/);
   assert.match(html, /\.primaryGrid,\s*\.secondaryGrid \{ display: grid; gap: 1rem; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); align-items: stretch; \}/);
   assert.match(html, /\.panel \{ padding: 1rem 1\.1rem; border: 1px solid #dee2e6; border-radius: var\(--ce-radius-8, 8px\); background: #ffffff; box-shadow: 0 2px 4px rgba\(0, 0, 0, 0\.05\); \}/);
   assert.match(html, /\.demoPanel \{ padding: 1rem 1\.1rem; border: 1px solid #dee2e6; border-radius: var\(--ce-radius-8, 8px\); background: #ffffff; box-shadow: 0 2px 4px rgba\(0, 0, 0, 0\.05\); \}/);
@@ -2563,4 +2563,19 @@ test('All Questions Invalid is the question aggregate, including models not run 
   assert.match(row, /aria-label="Model vote distribution: Agree 1, Unsure 0, Disagree 0, Invalid 2\. Model answers: Model a: Agree, Model b: Invalid"/);
   // Only a model that ran gets an Invalid marker.
   assert.doesNotMatch(row, /Model c:/);
+});
+
+
+test('Breakdown exposes question selection independently of trait comparisons', () => {
+  const report = buildResultsReport({
+    questionBank: { benchmarkId: 'selector', questions: ['q1', 'q2'].map((id) => ({ id, canonicalPrompt: `Question ${id}`, topic: 'fixture' })) },
+    modelRoster: { models: [{ id: 'model-a', model: 'fixture', provider: 'local', traits: {} }] },
+    runsFile: { repeats: 1, runs: ['q1', 'q2'].map((questionId) => ({ modelId: 'model-a', questionId, normalizedAnswer: 'Agree', polarity: 'canonical' })) },
+  });
+  const html = renderHtmlReport(report);
+  assert.match(html, /<label for="ce-breakdown-question"[^>]*>Question<\/label>/);
+  assert.match(html, /<select id="ce-breakdown-question"[^>]*data-testid="ce-breakdown-question-select"/);
+  assert.match(html, /<option value="q1" selected>Question q1<\/option>/);
+  assert.match(html, /<option value="q2">Question q2<\/option>/);
+  assert.match(html, /breakdownQuestionSelect.addEventListener\('change'/);
 });

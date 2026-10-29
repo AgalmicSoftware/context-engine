@@ -138,6 +138,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Open Breakdown distributions directly and select questions even when no demographic segments exist.
+
 - Include public response explanations in comparison AI input and expanded details.
 
 - Keep pending AI tag suggestions attached to the question that requested them, releasing busy state after edits or removal.
