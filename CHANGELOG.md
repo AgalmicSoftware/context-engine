@@ -110,6 +110,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Survey discovery retains creation blocks from raw event logs and keeps the earliest block for duplicate survey IDs.
+
 - Retry chain-backed response payload failures from their event block instead of
   advancing past them. Forced refreshes rescan from the session's start block.
 
