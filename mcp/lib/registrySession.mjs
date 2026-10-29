@@ -59,7 +59,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
 
   const loadConfig = async () => {
     await checkRegistryChain(provider, chainId);
-    const slug = info.slug === 'general' ? '' : info.slug;
+    const slug = info.slug || 'general';
     const row = await chainRequest(() => registry.getSessionBySlug(slug));
     if (normalized(row[0]) !== slug) throw new Error('The registry returned a different session.');
     if (text(row[3])) throw new Error('Encrypted registry metadata is unsupported; use an unencrypted session.');

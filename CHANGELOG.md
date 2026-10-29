@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Resolve default MCP registry links to the registered `general` session while
+  continuing to reject mismatched session identities.
+
 - Serve every eligible question before repeating, including catalogs larger than
   250 questions. Prune removed questions while preserving sponsored priority.
 
