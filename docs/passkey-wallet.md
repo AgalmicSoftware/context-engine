@@ -370,6 +370,13 @@ After a reload, the navbar restores a saved, connected account from the
 IndexedDB wallet metadata without a passkey prompt; signing still unlocks the
 wallet first.
 
+Logout, deletion, and a replacing create invalidate older wallet operations.
+Late passkey replies cannot save metadata, activate a signer, or retry a signature
+after logout. Logout waits for metadata writes and signer initialization already
+in progress before completing. Cancelled actions do not show a login error.
+TTL/idle expiry still permits one signature re-unlock; it does not cancel the
+operation like logout does.
+
 Disconnect also saves a local disconnected flag with the wallet record. Reloading
 does not restore the account automatically until the user signs in again. Locking
 alone retains account discovery, and disconnect never deletes recovery material.

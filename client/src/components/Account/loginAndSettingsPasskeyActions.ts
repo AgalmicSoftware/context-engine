@@ -10,6 +10,7 @@ export type LoginPasskeyWalletPort = {
   createPasskeyWallet: () => Promise<unknown>;
   getPasskeyWalletChain?: () => unknown;
   isMissingPasskeyWalletRecordError?: (error: unknown) => boolean;
+  isPasskeyWalletOperationCancelledError?: (error: unknown) => boolean;
   setPasskeyWalletChain: (chain: unknown) => void;
   unlockPasskeyWallet: (options?: { selectCredential?: boolean }) => Promise<unknown>;
 };
@@ -139,6 +140,7 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
       _finalizePasskeyWalletLogin(address, passkeyNetwork);
       deps.setActionMode('');
     } catch (error) {
+      if (deps.passkeyWallet.isPasskeyWalletOperationCancelledError?.(error)) return;
       deps.accountLogError(mode === 'create' ? 'Passkey wallet create error:' : 'Passkey wallet sign-in error:', error);
       if (!deps.isCurrentAction(passkeyActionId)) return;
       const isMissingWallet = mode === 'sign-in' && deps.passkeyWallet.isMissingPasskeyWalletRecordError?.(error);

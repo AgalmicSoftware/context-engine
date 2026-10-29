@@ -105,6 +105,44 @@ describe('loginAndSettings auth controllers', () => {
     expect(setActionMode.mock.calls).toEqual([['create'], ['']]);
   });
 
+  it.each(['create', 'sign-in'] as const)('wallet cancellation leaves no %s error banner', async (mode) => {
+    const setStatus = jest.fn();
+    const accountLogError = jest.fn();
+    const changeAccount = jest.fn();
+    const cancelled = Object.assign(new Error('Wallet operation cancelled.'), {
+      code: 'CE_PASSKEY_WALLET_OPERATION_CANCELLED',
+    });
+    const action = jest.fn().mockRejectedValue(cancelled);
+    const actions = createLoginPasskeyActions({
+      accountLogError,
+      changeAccount,
+      clearAllWorkerSessionTokens: jest.fn(),
+      getAccount: () => '',
+      getErrorMessage: () => cancelled.message,
+      getProvider: () => '',
+      getTargetNetwork: () => ({ id: 11155420 }),
+      isCurrentAction: () => true,
+      normalizeAccountForComparison: String,
+      notifyInfo: jest.fn(),
+      passkeyWallet: {
+        createPasskeyWallet: action,
+        unlockPasskeyWallet: action,
+        setPasskeyWalletChain: jest.fn(),
+        isPasskeyWalletOperationCancelledError: (error) => error === cancelled,
+      },
+      setActionMode: jest.fn(),
+      setStatus,
+      startAction: () => 1,
+      updateLoginInfo: jest.fn(),
+    });
+    if (mode === 'create') await actions.handlePasskeyWalletCreate();
+    else await actions.handlePasskeyWalletSignIn();
+    expect(setStatus).toHaveBeenCalledTimes(1);
+    expect(setStatus).toHaveBeenCalledWith({ passkeyWalletStatusMessage: '', passkeyWalletStatusTone: '' });
+    expect(changeAccount).not.toHaveBeenCalled();
+    expect(accountLogError).not.toHaveBeenCalled();
+  });
+
   it('formats agent-token errors with current user-facing copy', () => {
     expect(formatAgentTokenError(new Error('expired'))).toBe(
       'This token is expired. Request a fresh agent token from your session administrator and paste it again.',
