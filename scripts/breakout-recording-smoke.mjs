@@ -44,7 +44,7 @@ try {
     });
     await page.route('**/*', route => {
       const url = new URL(route.request().url());
-      if (url.origin === 'https://worker.example') return route.fulfill({ json: { text: 'Synthetic room transcript.' } });
+      if (url.origin === 'https://worker.example') return route.fulfill({ json: { text: 'Synthetic room transcript.', segments: [{ speaker: 'A', start: 0, end: 1, text: 'Synthetic room transcript.' }] } });
       if (url.origin !== new URL(base).origin) return route.abort();
       if (url.pathname === '/recording-probe') return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html data-ce-theme="${theme}"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="padding:16px;margin:0;background:var(--ce-canvas)"><main id="probe"></main><script type="module">
         import RefreshRuntime from '/@react-refresh'; RefreshRuntime.injectIntoGlobalHook(window);
@@ -62,6 +62,9 @@ try {
     await speaker.waitFor();
     assert.equal(await speaker.isChecked(), false);
     await speaker.check();
+    const labels = page.getByRole('checkbox', { name: 'Label speakers' });
+    assert.equal(await labels.isChecked(), false);
+    await labels.check();
     await readable(speaker.locator('..'));
     await page.getByTestId('ce-session-listening-panel').screenshot({ path: path.join(output, `setup-${theme}-${width}.png`) });
     await page.getByTestId('ce-session-listening-start').click();
@@ -69,12 +72,14 @@ try {
     assert.equal(await page.evaluate(() => window.__captureConstraints.audio.echoCancellation), false);
     await page.waitForFunction(() => window.__wakeHeld === true);
     assert.equal(await speaker.isDisabled(), true);
+    assert.equal(await labels.isDisabled(), true);
     await page.evaluate(() => window.__wakeSentinel.release());
     await page.getByText('Keep this screen on.').waitFor();
     await readable(page.getByText('Keep this screen on.'));
     await page.getByTestId('ce-session-listening-panel').screenshot({ path: path.join(output, `recording-${theme}-${width}.png`) });
     await page.getByRole('button', { name: 'Stop recording' }).click();
     await speaker.waitFor({ state: 'visible' });
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('ce:listening-draft:workshop') || '{}').segments?.[0]?.speakerTurns?.[0]?.speaker === 'A');
     assert.equal(await page.evaluate(() => window.__wakeHeld), false);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     console.log(`PASS Breakout recording ${theme} ${width}`);

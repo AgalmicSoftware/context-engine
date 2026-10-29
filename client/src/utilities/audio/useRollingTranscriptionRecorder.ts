@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { transcribeAudio } from '../ai/aiClient.js';
+import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
 import { requestPreferredSpeechMicrophone } from './microphoneSelection';
 import { useRecordingWakeLock } from './useRecordingWakeLock';
 import {
@@ -19,6 +19,7 @@ type UseRollingTranscriptionRecorderOptions = {
   chunkMs?: number;
   retainRawAudio?: boolean;
   recordSpeakerAudio?: boolean;
+  labelSpeakers?: boolean;
 };
 
 type FinalizeRecordingOptions = {
@@ -46,6 +47,7 @@ export const useRollingTranscriptionRecorder = ({
   chunkMs = DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
   retainRawAudio = false,
   recordSpeakerAudio = false,
+  labelSpeakers = false,
 }: UseRollingTranscriptionRecorderOptions = {}) => {
   const [status, setStatus] = useState<RollingRecorderStatus>('idle');
   const { wakeLockHeld } = useRecordingWakeLock(status === 'recording' || status === 'paused');
@@ -165,12 +167,14 @@ export const useRollingTranscriptionRecorder = ({
           );
 
           try {
-            const text = await transcribeAudio(blob, {
+            const options = {
               sessionSlug,
               sessionConfig,
               context,
               workerUrl,
-            });
+            };
+            const labeled = labelSpeakers ? await transcribeGroupAudio(blob, options) : null;
+            const text = labeled ? labeled.text : await transcribeAudio(blob, options);
             if (!mountedRef.current) return;
             const cleanedText = String(text || '').trim();
             if (cleanedText) {
@@ -183,6 +187,7 @@ export const useRollingTranscriptionRecorder = ({
                       ...entry,
                       status: 'complete',
                       text: cleanedText,
+                      ...(labeled ? { speakerTurns: labeled.segments } : {}),
                       completedAt: Date.now(),
                     }
                   : entry,
@@ -203,7 +208,7 @@ export const useRollingTranscriptionRecorder = ({
           }
         });
     },
-    [context, retainRawAudio, sessionConfig, sessionSlug, updateSegments, workerUrl],
+    [context, labelSpeakers, retainRawAudio, sessionConfig, sessionSlug, updateSegments, workerUrl],
   );
 
   const stopRecorder = useCallback((recorder: MediaRecorder | null, endSession: boolean): boolean => {

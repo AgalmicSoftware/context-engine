@@ -70,6 +70,8 @@ import {
 import {
   resolveTranscriptionWorkerEndpoint,
   uploadAudioForTranscription,
+  uploadAudioForDiarizedTranscription,
+  type DiarizedTranscription,
 } from './aiClientTranscriptionWorkerTransport.js';
 import { enqueueAiCallWithRetry } from './aiClientQueue.js';
 
@@ -468,6 +470,18 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
       signal,
     },
   );
+}
+
+/** Structured group capture keeps labels local to one three-minute upload. */
+export async function transcribeGroupAudio(audio: AudioUploadBlob, opts: unknown = {}): Promise<DiarizedTranscription> {
+  if (!audio) throw new Error('No audio provided');
+  const { signal } = resolveTranscriptionUploadOptions(opts, { defaultMaxUploadBytes: TRANSCRIBE_MAX_UPLOAD_BYTES });
+  // Splitting a large background capture would reset labels again inside a single displayed chunk.
+  if (audio.size > TRANSCRIBE_MAX_UPLOAD_BYTES)
+    throw new Error(
+      'This speaker-label chunk is too large. Keep the recording page visible and record a shorter segment.',
+    );
+  return uploadAudioForDiarizedTranscription(audio, await resolveTranscriptionTransport(opts), { signal });
 }
 
 const resolveTranscriptionTransport = async (opts: unknown = {}) => {

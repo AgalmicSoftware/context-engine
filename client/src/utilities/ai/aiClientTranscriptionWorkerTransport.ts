@@ -1,3 +1,4 @@
+import { normalizeSpeakerTurns, type SpeakerTranscriptTurn } from '../audio/speakerTranscript';
 import { createNamedAudioFile } from './aiClientAudioTranscription';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
@@ -62,11 +63,12 @@ const parseTranscriptionErrorMessage = (data: unknown, status: unknown): string 
   );
 };
 
-export const uploadAudioForTranscription = async (
+const requestAudioTranscription = async (
   audioFileOrBlob: unknown,
   transport: TranscriptionWorkerTransport,
   { fileName = '', signal, onJsonParseError }: TranscriptionUploadOptions = {},
-): Promise<string> => {
+  groupSpeakerLabels = false,
+): Promise<UnknownRecord> => {
   const maybeBlob = typeof Blob !== 'undefined' && audioFileOrBlob instanceof Blob ? audioFileOrBlob : null;
   const sourceName = stringValue(asRecord(audioFileOrBlob).name);
   const sourceType = stringValue(asRecord(audioFileOrBlob).type);
@@ -77,6 +79,10 @@ export const uploadAudioForTranscription = async (
   const form = new FormData();
   form.append('file', fileLike as Blob, resolvedName);
   appendTranscriptionConfig(form, transport?.transcriptionCfg);
+  if (groupSpeakerLabels) {
+    form.append('purpose', 'group-conversation');
+    form.append('labelSpeakers', 'true');
+  }
 
   const resp = await fetchWorkerWithAuth(
     transport.endpoint,
@@ -105,6 +111,34 @@ export const uploadAudioForTranscription = async (
     throw new Error(parseTranscriptionErrorMessage(data, resp.status));
   }
 
-  const text = asRecord(data).text;
-  return typeof text === 'string' ? text : '';
+  return asRecord(data);
+};
+
+export const uploadAudioForTranscription = async (
+  audioFileOrBlob: unknown,
+  transport: TranscriptionWorkerTransport,
+  options: TranscriptionUploadOptions = {},
+): Promise<string> => stringValue((await requestAudioTranscription(audioFileOrBlob, transport, options)).text);
+
+export type DiarizedTranscription = { text: string; segments: SpeakerTranscriptTurn[] };
+
+export const uploadAudioForDiarizedTranscription = async (
+  audioFileOrBlob: unknown,
+  transport: TranscriptionWorkerTransport,
+  options: TranscriptionUploadOptions = {},
+): Promise<DiarizedTranscription> => {
+  const config = transport.transcriptionCfg || {};
+  if (config.provider && config.provider !== 'openai') throw new Error('Speaker labels require OpenAI transcription.');
+  const data = await requestAudioTranscription(
+    audioFileOrBlob,
+    {
+      ...transport,
+      transcriptionCfg: { ...config, provider: 'openai', model: 'gpt-4o-transcribe-diarize' },
+    },
+    options,
+    true,
+  );
+  if (!Array.isArray(data.segments))
+    throw new Error('This Worker does not support speaker labels. Update it or turn off Label speakers.');
+  return { text: stringValue(data.text), segments: normalizeSpeakerTurns(data.segments) };
 };

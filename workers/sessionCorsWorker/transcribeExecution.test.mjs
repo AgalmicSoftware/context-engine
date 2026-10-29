@@ -347,3 +347,36 @@ test('transcribe preserves upstream error message precedence for string and obje
     headers: baseHeaders,
   });
 });
+
+test('group speaker labels use the bounded diarization model and normalize turns', async () => {
+  const run = async (reply, { label = true, status = 200 } = {}) => {
+    const form = new FormData();
+    form.append('file', new File(['synthetic'], 'room.webm', { type: 'audio/webm' }));
+    form.append('model', label ? 'gpt-4o-transcribe-diarize' : 'whisper-1');
+    if (label) { form.append('purpose', 'group-conversation'); form.append('labelSpeakers', 'true'); }
+    return transcribe({
+      request: { formData: async () => form }, secrets: { openaiKey: crypto.randomUUID() },
+      deps: {
+        json: createJsonStub(),
+        safeFetch: async (_url, options) => {
+          assert.equal(options.body.get('response_format'), label ? 'diarized_json' : 'json');
+          assert.equal(options.body.get('chunking_strategy'), label ? 'auto' : null);
+          assert.equal(options.body.get('purpose'), null);
+          return Response.json(reply, { status });
+        },
+      },
+    });
+  };
+  const reply = { text: ' A room question. ', segments: [
+    { speaker: ' A ', start: 0, end: 2, text: ' A room question. ', id: 'ignored' },
+    { speaker: 'B', start: 2, end: 3, text: '   ' },
+    { speaker: 'C', start: -1, end: 2, text: 'invalid' },
+    { speaker: 'D', start: 3, end: 1, text: 'invalid' },
+  ] };
+  assert.deepEqual((await run(reply)).body, { text: reply.text, segments: [{ speaker: 'A', start: 0, end: 2, text: 'A room question.' }] });
+  assert.deepEqual((await run({ text: '', segments: [] })).body, { text: '', segments: [] });
+  assert.deepEqual((await run(reply, { label: false })).body, { text: reply.text });
+  const failed = await run({ error: { message: 'Synthetic provider error' } }, { status: 429 });
+  assert.equal(failed.status, 429);
+  assert.equal(failed.body.error, 'Synthetic provider error');
+});

@@ -35,9 +35,12 @@ export const AI_MODEL_NOT_ALLOWED = Object.freeze({
   reason: 'ai_model_not_allowed',
 });
 
-export const isSessionTranscriptionModelAllowed = ({ config, provider, model }) => {
+export const isSessionTranscriptionModelAllowed = ({ config, provider, model, groupSpeakerLabels = false }) => {
   const ai = record(config?.ai);
   const entry = record(ai.models?.transcription || ai.transcription);
+  // The caller may opt into this one bounded group operation, never an arbitrary model.
+  if (groupSpeakerLabels && provider === 'openai' && model === 'gpt-4o-transcribe-diarize' &&
+      (trim(entry.provider).toLowerCase() || 'openai') === 'openai') return true;
   return provider === (trim(entry.provider).toLowerCase() || 'openai') && model === (trim(entry.model) || 'whisper-1');
 };
 

@@ -652,3 +652,15 @@ it('remembers the optional speaker-audio setting and locks it while recording', 
   expect(screen.getByRole('checkbox', { name: 'Record speaker audio' })).toBeChecked();
   window.localStorage.removeItem('ce:record-speaker-audio:v1');
 });
+
+it('only offers optional speaker labels for Group Conversation', () => {
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
+  const { rerender } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+  const toggle = screen.getByRole('checkbox', { name: 'Label speakers' });
+  expect(toggle).not.toBeChecked();
+  fireEvent.click(toggle);
+  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+  rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="listening" />);
+  expect(screen.queryByRole('checkbox', { name: 'Label speakers' })).not.toBeInTheDocument();
+  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+});

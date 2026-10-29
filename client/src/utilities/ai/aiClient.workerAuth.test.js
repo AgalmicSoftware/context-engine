@@ -8,6 +8,7 @@ import {
   requestAiRewrite,
   generateAudioDiscussionSummary,
   transcribeAudio,
+  transcribeGroupAudio,
 } from './aiClient.js';
 import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSettings.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
@@ -604,4 +605,23 @@ describe('aiClient worker auth options', () => {
     );
     expect(JSON.parse(fetchWorkerWithAuth.mock.calls[0][1].body).taskType).toBe('compare');
   });
+});
+
+it('bounds group uploads and keeps custom-provider credentials off OpenAI', async () => {
+  jest.clearAllMocks();
+  const large = new Blob(['audio'], { type: 'audio/webm' });
+  Object.defineProperty(large, 'size', { value: 25 * 1024 * 1024 });
+  await expect(transcribeGroupAudio(large)).rejects.toThrow('too large');
+  expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+  getEffectiveTranscriptionConfig.mockResolvedValue({ provider: 'custom', apiKey: 'synthetic-key' });
+  await expect(transcribeGroupAudio(new Blob(['audio']), { workerUrl: 'https://worker.example' })).rejects.toThrow(
+    'require OpenAI',
+  );
+  expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+  getEffectiveTranscriptionConfig.mockResolvedValue({ provider: 'openai', model: 'whisper-1' });
+  fetchWorkerWithAuth.mockResolvedValue({ ok: true, json: async () => ({ text: '', segments: [] }) });
+  await expect(
+    transcribeGroupAudio(new Blob(['audio']), { sessionSlug: 'workshop', workerUrl: 'https://worker.example' }),
+  ).resolves.toEqual({ text: '', segments: [] });
+  expect(fetchWorkerWithAuth.mock.lastCall[1].body.get('model')).toBe('gpt-4o-transcribe-diarize');
 });

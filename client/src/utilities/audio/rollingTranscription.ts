@@ -1,3 +1,4 @@
+import { normalizeSpeakerTurns, type SpeakerTranscriptTurn } from './speakerTranscript';
 export const DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS = 3 * 60 * 1000;
 export const LISTENING_MODE_QUERY_VALUE = 'listening';
 export const LISTENING_DRAFT_STORAGE_PREFIX = 'ce:listening-draft:';
@@ -12,6 +13,7 @@ export type RollingTranscriptSegment = {
   error?: string;
   startedAt: number;
   completedAt?: number;
+  speakerTurns?: SpeakerTranscriptTurn[];
 };
 
 export type ListeningDraft = {
@@ -32,6 +34,7 @@ const normalizeDraftSegment = (segment: Partial<RollingTranscriptSegment>): Roll
     index: Number(segment.index || 0),
     status,
     text: String(segment.text || ''),
+    ...(Array.isArray(segment.speakerTurns) ? { speakerTurns: normalizeSpeakerTurns(segment.speakerTurns) } : {}),
     startedAt: Number(segment.startedAt || 0),
     ...(status === 'error' && rawStatus !== 'error'
       ? { error: 'Recording interrupted before transcription completed.', completedAt }

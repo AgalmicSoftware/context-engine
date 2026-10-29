@@ -116,3 +116,48 @@ describe('aiClientTranscriptionWorkerTransport', () => {
     ).rejects.toThrow('Too large');
   });
 });
+
+it('opts group transcription into speaker labels without changing the text-only caller', async () => {
+  const transport = { endpoint: 'https://worker.example/transcribe', baseUrl: 'https://worker.example' };
+  const turns = [{ speaker: 'A', start: 0, end: 2, text: 'Room question.' }];
+  mockedFetchWorkerWithAuth.mockResolvedValue({
+    ok: true,
+    json: async () => ({ text: 'Room question.', segments: turns }),
+  } as Response);
+  const { uploadAudioForDiarizedTranscription } = await import('./aiClientTranscriptionWorkerTransport');
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).resolves.toEqual({
+    text: 'Room question.',
+    segments: turns,
+  });
+  const form = mockedFetchWorkerWithAuth.mock.lastCall?.[1]?.body as FormData;
+  expect(form.get('model')).toBe('gpt-4o-transcribe-diarize');
+  expect(form.get('purpose')).toBe('group-conversation');
+  expect(form.get('labelSpeakers')).toBe('true');
+  await expect(uploadAudioForTranscription(new Blob(['audio']), transport)).resolves.toBe('Room question.');
+  expect((mockedFetchWorkerWithAuth.mock.lastCall?.[1]?.body as FormData).get('labelSpeakers')).toBeNull();
+});
+
+it('handles silent labeled clips, old Workers, and provider errors explicitly', async () => {
+  const { uploadAudioForDiarizedTranscription } = await import('./aiClientTranscriptionWorkerTransport');
+  const transport = { endpoint: 'https://worker.example/transcribe', baseUrl: 'https://worker.example' };
+  mockedFetchWorkerWithAuth.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ text: '', segments: [] }),
+  } as Response);
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).resolves.toEqual({
+    text: '',
+    segments: [],
+  });
+  mockedFetchWorkerWithAuth.mockResolvedValueOnce({ ok: true, json: async () => ({ text: 'Plain text' }) } as Response);
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).rejects.toThrow(
+    'does not support speaker labels',
+  );
+  mockedFetchWorkerWithAuth.mockResolvedValueOnce({
+    ok: false,
+    status: 429,
+    json: async () => ({ error: 'Synthetic capacity error' }),
+  } as Response);
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).rejects.toThrow(
+    'Synthetic capacity error',
+  );
+});

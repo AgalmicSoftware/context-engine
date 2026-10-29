@@ -1,9 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
 import { useRollingTranscriptionRecorder } from './useRollingTranscriptionRecorder';
-import { transcribeAudio } from '../ai/aiClient.js';
+import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
 
 jest.mock('../ai/aiClient.js', () => ({
   transcribeAudio: jest.fn(),
+  transcribeGroupAudio: jest.fn(),
 }));
 
 const flushPromises = async () => {
@@ -298,5 +299,27 @@ describe('useRollingTranscriptionRecorder', () => {
     expect(result.current.pendingSegmentCount).toBe(0);
     expect(result.current.elapsedSeconds).toBe(45 * 60);
     unmount();
+  });
+  it('keeps speaker labels scoped to each independently transcribed chunk', async () => {
+    const turns = [{ speaker: 'A', start: 0, end: 1, text: 'Room question.' }];
+    (transcribeGroupAudio as jest.Mock).mockImplementation(async () => ({ text: 'Room question.', segments: turns }));
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'workshop', labelSpeakers: true }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    for (let i = 0; i < 2; i++)
+      await act(async () => {
+        jest.advanceTimersByTime(180000);
+        await flushPromises();
+      });
+    expect(transcribeGroupAudio).toHaveBeenCalledTimes(2);
+    expect(transcribeAudio).not.toHaveBeenCalled();
+    expect(result.current.segments.map((segment) => segment.speakerTurns)).toEqual([turns, turns]);
+    unmount();
+    const restored = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'workshop' }));
+    expect(restored.result.current.segments.map((segment) => segment.speakerTurns)).toEqual([turns, turns]);
+    restored.unmount();
   });
 });

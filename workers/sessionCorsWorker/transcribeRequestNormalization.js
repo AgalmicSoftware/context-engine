@@ -19,6 +19,8 @@ export const normalizeTranscribeRequestPayload = ({ formData } = {}) => {
   const apiKey = toTrimmedString(form.get('apiKey'));
   const rpcUrl = toTrimmedString(form.get('rpcUrl'));
   const file = form.get('file') || form.get('audio');
+  const groupSpeakerLabels = provider === 'openai' && model === 'gpt-4o-transcribe-diarize' &&
+    form.get('purpose') === 'group-conversation' && form.get('labelSpeakers') === 'true';
   if (!file) {
     return {
       ok: false,
@@ -47,7 +49,8 @@ export const normalizeTranscribeRequestPayload = ({ formData } = {}) => {
   const upstreamFormData = new FormData();
   upstreamFormData.append('file', file, file.name || 'audio.mp3');
   upstreamFormData.append('model', model);
-  upstreamFormData.append('response_format', 'json');
+  upstreamFormData.append('response_format', groupSpeakerLabels ? 'diarized_json' : 'json');
+  if (groupSpeakerLabels) upstreamFormData.append('chunking_strategy', 'auto');
 
   return {
     ok: true,
@@ -58,6 +61,7 @@ export const normalizeTranscribeRequestPayload = ({ formData } = {}) => {
       file,
       model,
       provider,
+      groupSpeakerLabels,
       requestApiKey: apiKey,
       requestRpcUrl: rpcUrl,
       upstreamFormData,

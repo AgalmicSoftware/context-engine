@@ -72676,9 +72676,10 @@ var init_aiRequestPolicy = __esm({
       error: "This model is not allowed on the session's AI key. Use the session model or your own key.",
       reason: "ai_model_not_allowed"
     });
-    isSessionTranscriptionModelAllowed = ({ config, provider, model }) => {
+    isSessionTranscriptionModelAllowed = ({ config, provider, model, groupSpeakerLabels = false }) => {
       const ai = record2(config?.ai);
       const entry2 = record2(ai.models?.transcription || ai.transcription);
+      if (groupSpeakerLabels && provider === "openai" && model === "gpt-4o-transcribe-diarize" && (trim11(entry2.provider).toLowerCase() || "openai") === "openai") return true;
       return provider === (trim11(entry2.provider).toLowerCase() || "openai") && model === (trim11(entry2.model) || "whisper-1");
     };
     operationCeilings = Object.freeze({
@@ -87285,6 +87286,7 @@ var normalizeTranscribeRequestPayload = ({ formData } = {}) => {
   const apiKey = toTrimmedString2(form.get("apiKey"));
   const rpcUrl = toTrimmedString2(form.get("rpcUrl"));
   const file = form.get("file") || form.get("audio");
+  const groupSpeakerLabels = provider === "openai" && model === "gpt-4o-transcribe-diarize" && form.get("purpose") === "group-conversation" && form.get("labelSpeakers") === "true";
   if (!file) {
     return {
       ok: false,
@@ -87312,7 +87314,8 @@ var normalizeTranscribeRequestPayload = ({ formData } = {}) => {
   const upstreamFormData = new FormData();
   upstreamFormData.append("file", file, file.name || "audio.mp3");
   upstreamFormData.append("model", model);
-  upstreamFormData.append("response_format", "json");
+  upstreamFormData.append("response_format", groupSpeakerLabels ? "diarized_json" : "json");
+  if (groupSpeakerLabels) upstreamFormData.append("chunking_strategy", "auto");
   return {
     ok: true,
     status: 200,
@@ -87322,6 +87325,7 @@ var normalizeTranscribeRequestPayload = ({ formData } = {}) => {
       file,
       model,
       provider,
+      groupSpeakerLabels,
       requestApiKey: apiKey,
       requestRpcUrl: rpcUrl,
       upstreamFormData
@@ -87354,6 +87358,13 @@ var resolveOpenAiTranscribeUrl = ({
 
 // workers/sessionCorsWorker/transcribeExecution.js
 init_outboundUrlSafetyBinding();
+var normalizeSpeakerSegments = (segments) => (Array.isArray(segments) ? segments : []).flatMap((segment) => {
+  const speaker = typeof segment?.speaker === "string" ? segment.speaker.trim().slice(0, 128) : "";
+  const text = typeof segment?.text === "string" ? segment.text.trim() : "";
+  const { start, end } = segment || {};
+  if (!speaker || !text || !Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) return [];
+  return [{ speaker, start, end, text }];
+});
 var toTrimmedString13 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
 var transcribe = async ({
   request,
@@ -87373,7 +87384,8 @@ var transcribe = async ({
     provider,
     requestApiKey,
     requestRpcUrl,
-    upstreamFormData
+    upstreamFormData,
+    groupSpeakerLabels
   } = normalizedRequest.payload || {};
   let targetUrl = resolveOpenAiTranscribeUrl({ constants });
   let key = requestApiKey || toTrimmedString13(secrets?.openaiKey, deps);
@@ -87404,6 +87416,7 @@ var transcribe = async ({
   if (provider === "openai" && !requestApiKey && !isSessionTranscriptionModelAllowed({
     config,
     provider,
+    groupSpeakerLabels,
     model: normalizedRequest.payload.model || upstreamFormData.get("model") || "whisper-1"
   })) return json6?.(AI_MODEL_NOT_ALLOWED, 403, baseHeaders);
   const headers2 = {};
@@ -87428,7 +87441,10 @@ var transcribe = async ({
     const message = typeof data?.error === "string" ? data.error : data?.error?.message || data?.message || (response2.status === 401 ? "Unauthorized: invalid API key on server." : "Transcription failed.");
     return json6?.({ error: String(message), details: data }, response2.status, baseHeaders);
   }
-  return json6?.({ text: data?.text || "" }, 200, baseHeaders);
+  return json6?.({
+    text: data?.text || "",
+    ...groupSpeakerLabels ? { segments: normalizeSpeakerSegments(data?.segments) } : {}
+  }, 200, baseHeaders);
 };
 
 // workers/sessionCorsWorker/workerExecutionServiceBinding.js

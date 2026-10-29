@@ -3190,3 +3190,10 @@ per-question contract pointer reads, also in batches of eight. A zero pointer
 proves there is no saved answer; RPC or payload-read failures do not. This covers
 both decentralized Arweave payloads and chain-authoritative Cloudflare payloads
 without changing a contract interface.
+
+
+### Group transcription speaker labels
+
+`POST /transcribe` accepts an opt-in multipart group operation: `provider=openai`, `model=gpt-4o-transcribe-diarize`, `purpose=group-conversation`, and `labelSpeakers=true`. Existing authentication, origin, session, gate and quota checks still apply. This adds only the curated diarization model to the configured OpenAI transcription policy. It does not grant arbitrary model access or switch custom-provider sessions to OpenAI.
+
+The Worker sends `response_format=diarized_json` and `chunking_strategy=auto`, returning `{ text, segments: [{ speaker, start, end, text }] }`. Times are seconds within that upload; invalid or silent segments are omitted. Ordinary requests still return exactly `{ text }`. See [OpenAI's transcription reference](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create).

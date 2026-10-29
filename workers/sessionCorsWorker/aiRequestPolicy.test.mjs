@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { proxyOpenAI, proxyAnthropic, proxyOpenRouter, proxyCustomRPC } from './aiProviderExecution.js';
 import { transcribe } from './transcribeExecution.js';
-import { boundSessionAiRequest } from './aiRequestPolicy.js';
+import { boundSessionAiRequest, isSessionTranscriptionModelAllowed } from './aiRequestPolicy.js';
 import { normalizeTranscribeRequestPayload } from './transcribeRequestNormalization.js';
 
 const adapters = [
@@ -170,3 +170,11 @@ for (const [provider, model] of [['openrouter', 'openai/gpt-5'], ['openrouter', 
     assert.equal(photo.calls[0].body.max_completion_tokens, 1200, 'A smaller caller bound still wins');
   });
 }
+
+test('only explicit group labeling adds the curated diarization model', () => {
+  const request = { provider: 'openai', model: 'gpt-4o-transcribe-diarize' };
+  assert.equal(isSessionTranscriptionModelAllowed(request), false);
+  assert.equal(isSessionTranscriptionModelAllowed({ ...request, groupSpeakerLabels: true }), true);
+  assert.equal(isSessionTranscriptionModelAllowed({ ...request, model: 'unbounded-model', groupSpeakerLabels: true }), false);
+  assert.equal(isSessionTranscriptionModelAllowed({ ...request, config: { ai: { transcription: { provider: 'custom' } } }, groupSpeakerLabels: true }), false);
+});

@@ -114,3 +114,27 @@ describe('rollingTranscription helpers', () => {
     );
   });
 });
+
+it('restores valid speaker turns without merging labels between chunks', () => {
+  const valid = { speaker: ' A ', start: 0, end: 2, text: ' Room question. ' };
+  window.localStorage.setItem(
+    buildListeningDraftStorageKey('labeled'),
+    JSON.stringify({
+      version: 1,
+      segments: [
+        {
+          id: 'first',
+          index: 0,
+          status: 'complete',
+          text: 'Room question.',
+          speakerTurns: [valid, { ...valid, start: -1 }, null],
+        },
+        { id: 'second', index: 1, status: 'complete', text: 'Room question.', speakerTurns: [valid] },
+      ],
+    }),
+  );
+  expect(readListeningDraft('labeled')?.segments.map((segment) => segment.speakerTurns)).toEqual([
+    [{ speaker: 'A', start: 0, end: 2, text: 'Room question.' }],
+    [{ speaker: 'A', start: 0, end: 2, text: 'Room question.' }],
+  ]);
+});

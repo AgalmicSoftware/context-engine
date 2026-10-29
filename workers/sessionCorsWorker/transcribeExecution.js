@@ -3,6 +3,14 @@ import { readTranscribeRequestPayload } from './transcribeRequestNormalization.j
 import { resolveOpenAiTranscribeUrl } from './endpointConfig.js';
 import { STRICT_HTTPS_NO_CREDENTIALS_POLICY } from './outboundUrlSafetyBinding.js';
 
+const normalizeSpeakerSegments = (segments) => (Array.isArray(segments) ? segments : []).flatMap((segment) => {
+  const speaker = typeof segment?.speaker === 'string' ? segment.speaker.trim().slice(0, 128) : '';
+  const text = typeof segment?.text === 'string' ? segment.text.trim() : '';
+  const { start, end } = segment || {};
+  if (!speaker || !text || !Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) return [];
+  return [{ speaker, start, end, text }];
+});
+
 const toTrimmedString = (value, deps) => (
   deps?.toStr
     ? deps.toStr(value).trim()
@@ -29,6 +37,7 @@ export const transcribe = async ({
     requestApiKey,
     requestRpcUrl,
     upstreamFormData,
+    groupSpeakerLabels,
   } = normalizedRequest.payload || {};
 
   let targetUrl = resolveOpenAiTranscribeUrl({ constants });
@@ -59,7 +68,7 @@ export const transcribe = async ({
   }
 
   if (provider === 'openai' && !requestApiKey && !isSessionTranscriptionModelAllowed({
-    config, provider, model: normalizedRequest.payload.model || upstreamFormData.get('model') || 'whisper-1',
+    config, provider, groupSpeakerLabels, model: normalizedRequest.payload.model || upstreamFormData.get('model') || 'whisper-1',
   })) return json?.(AI_MODEL_NOT_ALLOWED, 403, baseHeaders);
 
   const headers = {};
@@ -93,5 +102,8 @@ export const transcribe = async ({
     return json?.({ error: String(message), details: data }, response.status, baseHeaders);
   }
 
-  return json?.({ text: data?.text || '' }, 200, baseHeaders);
+  return json?.({
+    text: data?.text || '',
+    ...(groupSpeakerLabels ? { segments: normalizeSpeakerSegments(data?.segments) } : {}),
+  }, 200, baseHeaders);
 };

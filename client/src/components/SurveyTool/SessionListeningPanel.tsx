@@ -334,6 +334,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     panelMode = 'listening',
     embeddedInModal = false,
   } = props;
+  const [labelSpeakers, setLabelSpeakers] = useState(false);
   const [recordSpeakerAudio, setRecordSpeakerAudio] = useState(() => {
     try {
       return window.localStorage.getItem('ce:record-speaker-audio:v1') === 'true';
@@ -342,12 +343,14 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     }
   });
   const speakerHelpId = `ce-record-speaker-help-${useId().replace(/:/g, '')}`;
+  const labelsHelpId = `ce-speaker-labels-help-${useId().replace(/:/g, '')}`;
   const recorder = useRollingTranscriptionRecorder({
     sessionSlug,
     sessionConfig,
     context,
     workerUrl,
     chunkMs: DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
+    labelSpeakers: panelMode === 'recordGroup' && labelSpeakers,
     recordSpeakerAudio: panelMode === 'recordGroup' && recordSpeakerAudio,
   });
   const [isGenerating, setIsGenerating] = useState(false);
@@ -583,34 +586,59 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
 
       {panelMode === 'recordGroup' ? (
         <div className={styles.sessionRecordingOptions}>
-          <label>
-            <input
-              type="checkbox"
-              checked={recordSpeakerAudio}
-              disabled={isRecorderSessionActive || recorder.isBusy}
-              onChange={(event) => {
-                setRecordSpeakerAudio(event.target.checked);
-                try {
-                  window.localStorage.setItem('ce:record-speaker-audio:v1', String(event.target.checked));
-                } catch {
-                  /* The option still works when browser storage is unavailable. */
-                }
-              }}
-            />{' '}
-            Record speaker audio
-          </label>
-          <button
-            type="button"
-            id={speakerHelpId}
-            className={styles.sessionInterviewHeaderButton}
-            aria-label="About recording speaker audio"
-          >
-            <FontAwesomeIcon icon={faQuestionCircle} />
-          </button>
-          <UncontrolledTooltip target={speakerHelpId} trigger="hover focus" autohide={false}>
-            Turns off echo cancellation so the mic also records people heard through this device&apos;s speakers. Use
-            speakers, not headphones.
-          </UncontrolledTooltip>
+          <span className={styles.sessionRecordingOption}>
+            <label>
+              <input
+                type="checkbox"
+                checked={recordSpeakerAudio}
+                disabled={isRecorderSessionActive || recorder.isBusy}
+                onChange={(event) => {
+                  setRecordSpeakerAudio(event.target.checked);
+                  try {
+                    window.localStorage.setItem('ce:record-speaker-audio:v1', String(event.target.checked));
+                  } catch {
+                    /* The option still works when browser storage is unavailable. */
+                  }
+                }}
+              />{' '}
+              Record speaker audio
+            </label>
+            <button
+              type="button"
+              id={speakerHelpId}
+              className={styles.sessionInterviewHeaderButton}
+              aria-label="About recording speaker audio"
+            >
+              <FontAwesomeIcon icon={faQuestionCircle} />
+            </button>
+            <UncontrolledTooltip target={speakerHelpId} trigger="hover focus" autohide={false}>
+              Turns off echo cancellation so the mic also records people heard through this device&apos;s speakers. Use
+              speakers, not headphones.
+            </UncontrolledTooltip>
+          </span>
+          <span className={styles.sessionRecordingOption}>
+            <label>
+              <input
+                type="checkbox"
+                checked={labelSpeakers}
+                disabled={isRecorderSessionActive || recorder.isBusy}
+                onChange={(event) => setLabelSpeakers(event.target.checked)}
+              />{' '}
+              Label speakers
+            </label>
+            <button
+              type="button"
+              id={labelsHelpId}
+              className={styles.sessionInterviewHeaderButton}
+              aria-label="About speaker labels"
+            >
+              <FontAwesomeIcon icon={faQuestionCircle} />
+            </button>
+            <UncontrolledTooltip target={labelsHelpId} trigger="hover focus" autohide={false}>
+              Saves speaker turns with the transcript using OpenAI. Labels restart in each three-minute chunk and do not
+              identify people. Speaker review and claiming are not available yet.
+            </UncontrolledTooltip>
+          </span>
         </div>
       ) : null}
       {isRecorderSessionActive && !recorder.wakeLockHeld ? (

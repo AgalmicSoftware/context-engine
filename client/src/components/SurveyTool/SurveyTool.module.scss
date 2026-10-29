@@ -2932,6 +2932,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+.sessionRecordingOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .sessionRecordingWakeNotice {
   width: 100%;
   color: inherit;

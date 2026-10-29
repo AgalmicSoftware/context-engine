@@ -472,3 +472,10 @@ Group Conversation and Interview request a Screen Wake Lock while recording or p
 Group Conversation's **Record speaker audio** option is off by default and remembered on the device. It turns off microphone echo cancellation for people heard through the device's speakers, keeping noise suppression and gain control. Use speakers instead of headphones and test levels before the breakout. The option cannot change during capture.
 
 Foreground recordings rotate into independently decodable three-minute chunks and transcribe serially. Successful text is saved locally. A failed segment is marked; later segments continue. There is no automatic retry or durable raw-audio recovery in this mode, so do not rely on it as the only copy of an important conversation. Background timer suspension, browser termination, storage limits and device battery policies still need device testing.
+
+
+### Optional speaker labels
+
+Group Conversation offers **Label speakers**, off by default. It uses OpenAI `gpt-4o-transcribe-diarize` with `diarized_json` and automatic chunking, retaining normalized speaker turns alongside the ordinary transcript in the existing local draft. An updated Session Worker is required; older Workers fail with an explicit compatibility message. Other transcription callers retain their existing model, request and text response.
+
+Labels restart for each three-minute upload. They do not establish identity and are not merged across uploads. Speaker review, per-speaker mapping and claiming QR codes are not yet available. Labeled chunks exceeding 24 MiB fail explicitly instead of being silently split into additional label namespaces. Keep the page visible during capture. The diarization model is deprecated with removal scheduled for 2027-02-26; replacing it is separate work.
