@@ -518,7 +518,12 @@ node ./bin/ai-discourse-bench.mjs compare-snapshots \
 ```
 
 Comparisons report per-model stance shifts, direction changes, and pairwise
-similarity drift on common models and questions.
+similarity drift on common models and questions. Each model pair recomputes both
+similarities from questions present in both snapshots with usable distributions
+for both models at both times. The pair lists those question IDs and their count;
+new questions or newly available observations cannot change its comparison.
+Pairs covering fewer than half of the questions common to the two snapshots
+(rounded up, at least one) are unavailable and excluded from the summary.
 
 For second-pass AI analysis, export a compact analysis input:
 
