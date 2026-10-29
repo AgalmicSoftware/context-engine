@@ -162,6 +162,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Count every quadratic step in double and triple clicks after pile auto-advance,
+  while still ignoring leftover clicks from the previous question.
+
 - Use session-sponsored AI and viewer authentication for Polis group analysis,
   and show failed requests with a working retry instead of caching a local summary.
 

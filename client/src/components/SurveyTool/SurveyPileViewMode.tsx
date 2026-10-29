@@ -2655,6 +2655,9 @@ const renderPileResponseInput = (
       const repeatedPress = engine._pileAnswerClickCount > 1;
       engine._pileAnswerClickCount = 0;
       if (repeatedPress && engine._pileAdvancedIntoQuestionId === questionId) return;
+      // An accepted interaction starts a new gesture on this card. Retaining the
+      // transition marker would reject later quadratic steps in that gesture.
+      engine._pileAdvancedIntoQuestionId = null;
       const inputType = normalizePileQuestionInputType(question);
       const canAdvance =
         inputType === 'binary' ||
