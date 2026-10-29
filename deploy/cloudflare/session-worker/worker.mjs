@@ -73380,6 +73380,7 @@ var ANTHROPIC_URL, OPENAI_CHAT_URL, OPENAI_RESPONSES_URL, OPENROUTER_CHAT_URL, C
 var init_aiProviderExecution = __esm({
   "workers/sessionCorsWorker/aiProviderExecution.js"() {
     init_aiRequestPolicy();
+    init_outboundUrlSafetyBinding();
     init_aiDefaults();
     init_aiModelParams();
     init_responseKvHelpers();
@@ -73673,7 +73674,7 @@ var init_aiProviderExecution = __esm({
       auth
     } = {}) => {
       const json6 = resolveJson(deps);
-      const safeFetch = deps?.safeFetch || fetch;
+      const safeFetch = deps?.safeFetch;
       const isBlockedOutboundUrl = deps?.isBlockedOutboundUrl || (() => false);
       const payloadRpcUrl = toStr6(payload?.rpcUrl).trim();
       const secretRpcUrl = toStr6(secrets?.customRpcUrl).trim();
@@ -73746,7 +73747,11 @@ var init_aiProviderExecution = __esm({
       const key = payloadKey || secretKey;
       const headers2 = { "content-type": "application/json" };
       if (key) headers2.authorization = `Bearer ${key}`;
+      if (typeof safeFetch !== "function") {
+        return json6({ error: "Custom provider outbound checks are unavailable." }, 503, baseHeaders);
+      }
       const response2 = await safeFetch(rpcUrl, {
+        outboundUrlPolicy: STRICT_HTTPS_NO_CREDENTIALS_POLICY,
         method: "POST",
         headers: headers2,
         body: JSON.stringify(body)
@@ -98426,6 +98431,7 @@ init_sessionConfigAuthority();
 
 // workers/sessionCorsWorker/interviewStarter.js
 init_sessionConfigAuthority();
+init_outboundUrlSafetyBinding();
 
 // workers/sessionCorsWorker/anonymousRateLimitPolicy.js
 var isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -98785,7 +98791,7 @@ var resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = f
       deps: {
         ...deps,
         fetch: (url, options) => (deps.fetch || fetch)(url, { ...options, signal: AbortSignal.timeout(1e4) }),
-        safeFetch: deps.safeFetch && ((url, options) => deps.safeFetch(url, { ...options, signal: AbortSignal.timeout(1e4) }))
+        safeFetch: deps.safeFetch && ((url, options) => deps.safeFetch(url, { ...options, outboundUrlPolicy: STRICT_HTTPS_NO_CREDENTIALS_POLICY, signal: AbortSignal.timeout(1e4) }))
       },
       payload: {
         model,

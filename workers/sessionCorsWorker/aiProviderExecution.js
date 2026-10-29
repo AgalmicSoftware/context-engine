@@ -1,4 +1,5 @@
 import { boundSessionAiRequest } from './aiRequestPolicy.js';
+import { STRICT_HTTPS_NO_CREDENTIALS_POLICY } from './outboundUrlSafetyBinding.js';
 import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
 import {
   applyChatCompletionBudget,
@@ -323,7 +324,7 @@ export const proxyCustomRPC = async ({
   auth,
 } = {}) => {
   const json = resolveJson(deps);
-  const safeFetch = deps?.safeFetch || fetch;
+  const safeFetch = deps?.safeFetch;
   const isBlockedOutboundUrl = deps?.isBlockedOutboundUrl || (() => false);
   const payloadRpcUrl = toStr(payload?.rpcUrl).trim();
   const secretRpcUrl = toStr(secrets?.customRpcUrl).trim();
@@ -408,7 +409,11 @@ export const proxyCustomRPC = async ({
   const headers = { 'content-type': 'application/json' };
   if (key) headers.authorization = `Bearer ${key}`;
 
+  if (typeof safeFetch !== 'function') {
+    return json({ error: 'Custom provider outbound checks are unavailable.' }, 503, baseHeaders);
+  }
   const response = await safeFetch(rpcUrl, {
+    outboundUrlPolicy: STRICT_HTTPS_NO_CREDENTIALS_POLICY,
     method: 'POST',
     headers,
     body: JSON.stringify(body),

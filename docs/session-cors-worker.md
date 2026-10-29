@@ -2754,6 +2754,7 @@ Signed login/bootstrap requests:
     Client-delegated live interviews and optional operator-funded Wrapped posters
     have no new whole-session usage bound.
   - Optional overrides: `apiKey` (all providers), `rpcUrl` (custom provider only).
+  - Custom AI requests and interview openings require HTTPS URLs without embedded credentials on every redirect. Private targets are refused before forwarding the prompt. If the checked outbound fetch helper is unavailable, custom requests fail closed; public HTTPS redirects still work without forwarding authorization headers.
   - Anonymous `apiKey` + `provider: "custom"` requires `rpcUrl`; worker secret `customRpcUrl` is not used for this bypass path.
   - Anonymous gate-authority checks now route through a shared helper before provider-specific validation:
     route scope disables still fail before request-`apiKey` bypass, and anonymous access without `apiKey`
