@@ -399,6 +399,9 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Hash importance prompts in model-id and numeric-repeat order for both generation
+  and release validation, independent of roster order.
+
 - File questions without valid answers under "no data" in the report's tag
   filter instead of "mixed / unsure".
 - Let the AI discourse benchmark answer any session's questions, every type

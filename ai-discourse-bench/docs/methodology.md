@@ -97,7 +97,9 @@ questions can never exceed the budget (`3` votes at the default 100-credit,
 must match when artifacts are merged. To prevent a fixed 200- or 500-question
 listing from favoring early items, every model and repeat receives a
 deterministic hash-shuffled question order. The order method and exact order
-hash are recorded with the artifact and run.
+hash are recorded with the artifact and run. The combined prompt hash uses
+model-id order and numeric repeat order, independent of roster order; generation
+and release validation use the same canonical rows.
 
 At those defaults this is a capped top-ten rating task: at most ten ratings of
 three cost 90 credits, so the 100-credit budget never binds a schema-valid
