@@ -491,3 +491,14 @@ The voice chooser's personal AI-prefill prompt includes the same ordered questio
 ### Reading session results
 
 The session Results Report includes consensus and difference plus the Participants Graph. **Analyze clusters** uses the selected session's Worker configuration and the current viewer's authentication context. It requires that session's AI configuration and access. A political compass is currently available only within curated demo content; arbitrary session responses have no configured compass axes or scoring map.
+
+### Realtime transcript order
+
+Realtime sessions place completed input and interviewer transcripts in conversation
+slots from `conversation.item.created`, `conversation.item.added`, and
+`input_audio_buffer.committed`, using their item IDs and `previous_item_id`.
+Late completions fill their existing slots; repeated completions update the same
+turn. A completion without an ordering event appears after known slots in arrival
+order until its event arrives. The live display and stopped transcript use the
+same order. Live protocol fragments continue to use their timestamps. See the
+[OpenAI server-event reference](https://developers.openai.com/api/reference/resources/realtime/server-events).

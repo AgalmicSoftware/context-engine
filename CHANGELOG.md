@@ -122,6 +122,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep Realtime interview questions and answers in conversation order when
+  transcription completions arrive late or repeat.
+
 - Keep cluster AI explanations on the selected session Worker with the current viewer authentication context.
 
 - Prioritize newer unanswered questions in the voice interview and personal AI-prefill prompt using the browser’s own answer state, preserving public catalog versions and fingerprints.
