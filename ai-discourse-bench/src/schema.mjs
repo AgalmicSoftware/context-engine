@@ -446,6 +446,34 @@ export const validateRuns = (runsFile, {
   return errors;
 };
 
+export const validateRunPromptBindings = (runsFile, { questionBank } = {}) => {
+  const errors = [];
+  const manifest = runsFile?.manifest || {};
+  const mode = manifest.mode || runsFile?.mode || 'self';
+  const personaId = manifest.personaId || runsFile?.personaId || null;
+  const persona = manifest.personaProfile || null;
+  const questionsById = new Map((questionBank?.questions || []).map(question => [question.id, question]));
+  for (const [index, run] of (runsFile?.runs || []).entries()) {
+    const name = `runs[${index}] (question ${run?.questionId || '(missing)'})`;
+    const question = questionsById.get(run?.questionId);
+    if (!question) {
+      errors.push(`${name} is absent from the selected question bank; rerun or restore the matching bank`);
+      continue;
+    }
+    if (!['self', 'persona'].includes(mode) || (run.mode || 'self') !== mode ||
+        (run.personaId || null) !== personaId ||
+        (mode === 'persona' && (!persona || persona.id !== personaId || typeof persona.label !== 'string'))) {
+      errors.push(`${name} has mismatched prompt mode or persona; rerun with the recorded context`);
+      continue;
+    }
+    const expectedPromptHash = sha256(buildQuestionPrompt({ question, mode, persona, polarity: run.polarity }));
+    if (!run.promptHash || run.promptHash !== expectedPromptHash) {
+      errors.push(`${name}.promptHash does not match the selected question and prompt template; rerun or restore the matching bank`);
+    }
+  }
+  return errors;
+};
+
 export const validateReleaseRunFile = (runsFile, {
   questionBankHash,
   requiredRepeats,
@@ -460,6 +488,7 @@ export const validateReleaseRunFile = (runsFile, {
   if (!isRecord(runsFile)) return ['release run file must be an object'];
   const manifest = runsFile.manifest;
   if (!isRecord(manifest)) return ['manifest must be an object for release'];
+  if (questionBank) errors.push(...validateRunPromptBindings(runsFile, { questionBank }));
   if (manifest.kind !== 'ai_discourse_bench_run_manifest') {
     errors.push('manifest.kind must be ai_discourse_bench_run_manifest');
   }
@@ -618,15 +647,6 @@ export const validateReleaseRunFile = (runsFile, {
           errors.push(`runs[${index}].rawAnswer must be Agree, Unsure, or Disagree for release`);
         } else if (run.normalizedAnswer !== expectedNormalizedAnswer) {
           errors.push(`runs[${index}].normalizedAnswer does not match rawAnswer and polarity`);
-        }
-        const expectedPromptHash = sha256(buildQuestionPrompt({
-          question,
-          mode: manifest.mode || run.mode || 'self',
-          persona: manifest.personaProfile || null,
-          polarity: run.polarity,
-        }));
-        if (run.promptHash !== expectedPromptHash) {
-          errors.push(`runs[${index}].promptHash does not match the selected question and prompt template`);
         }
       }
     }

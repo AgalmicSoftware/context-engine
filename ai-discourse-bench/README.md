@@ -722,3 +722,8 @@ the same key handling applies to interactive trait filters and model dictionarie
 Model answer parsing removes inline `<think>` and `<analysis>` reasoning regions
 before recovering final JSON. Conflicting final answers or truncated JSON/reasoning
 are parse errors, so the runner retries them within its configured attempt budget.
+
+Every preview and release report checks each run's prompt hash against the
+selected question wording, polarity, mode and recorded persona. Missing or
+mismatched hashes stop the build and name the question; rerun it or restore the
+matching bank. Preview coverage may still be incomplete.

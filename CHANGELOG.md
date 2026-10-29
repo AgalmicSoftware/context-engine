@@ -540,6 +540,8 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Refuse preview reports with missing or mismatched question prompt hashes before answers can be exported against changed wording.
+
 - Bind longitudinal snapshots to the persona instructions and prompt template actually used, rejecting changed or missing context.
 
 - Parse benchmark answers after removing inline reasoning, and retry conflicting or truncated final answers.

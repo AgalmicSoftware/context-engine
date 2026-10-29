@@ -35,6 +35,7 @@ import {
   validatePersonas,
   validateQuestionBank,
   validateReleaseRunFile,
+  validateRunPromptBindings,
   validateRuns,
 } from './schema.mjs';
 import { runBenchmark } from './runner.mjs';
@@ -334,6 +335,10 @@ const commandBuildReport = async (args) => {
         expectedPromptTemplateVersion: QUESTION_PROMPT_TEMPLATE_VERSION,
         expectedPromptTemplateHash: sha256(buildQuestionPrompt.toString()),
       }));
+    });
+  } else {
+    runsFiles.forEach((runsFile, index) => {
+      throwIfErrors(`preview run file ${runPaths[index]}`, validateRunPromptBindings(runsFile, { questionBank }));
     });
   }
   const runsFile = mergeRunsFiles(runsFiles);
