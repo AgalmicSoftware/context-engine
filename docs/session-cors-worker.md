@@ -3224,3 +3224,8 @@ without changing a contract interface.
 `POST /transcribe` accepts an opt-in multipart group operation: `provider=openai`, `model=gpt-4o-transcribe-diarize`, `purpose=group-conversation`, and `labelSpeakers=true`. Existing authentication, origin, session, gate and quota checks still apply. This adds only the curated diarization model to the configured OpenAI transcription policy. It does not grant arbitrary model access or switch custom-provider sessions to OpenAI.
 
 The Worker sends `response_format=diarized_json` and `chunking_strategy=auto`, returning `{ text, segments: [{ speaker, start, end, text }] }`. Times are seconds within that upload; invalid or silent segments are omitted. Ordinary requests still return exactly `{ text }`. See [OpenAI's transcription reference](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create).
+
+General-session authentication uses one token namespace for the empty slug and
+`general`. Explicit General requests stay General when checked against a token,
+so named-session tokens cannot authorize them. Token persistence, validation and
+revocation share the same session-key conversion; nonce replay remains refused.

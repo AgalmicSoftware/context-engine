@@ -359,6 +359,8 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Store and revoke General-session login tokens under one namespace, preserving explicit session isolation.
+
 - Checkpoint Lit setup resources in encrypted coordinator storage and resume
   failed attempts without recreating completed resources; activate only after
   the complete setup is finalized atomically.

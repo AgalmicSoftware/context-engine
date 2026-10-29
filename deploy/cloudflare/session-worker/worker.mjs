@@ -25450,7 +25450,7 @@ var init_storageRefNormalization = __esm({
 });
 
 // workers/sessionCorsWorker/sessionSlugResolution.js
-var INVALID_SESSION_SLUG_ERROR, SLUG_MISMATCH_ERROR, SLUG_ALIAS_MISMATCH_ERROR, MISSING_SLUG_ERROR, DEFAULT_SESSION_STORAGE_KEY, EMPTY_VALIDATION_RESULT, hasExplicitWorkerSlugInput, canonicalizeReservedWorkerAlias, normalizeWorkerSessionSlug, sessionSlugStorageKey, validateInboundWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey, getDefaultWorkerSessionSlug, hasExplicitDefaultWorkerSessionSlug, resolveWorkerTenantSlug, resolveRequestedWorkerSlugPayload, resolveWorkerBodySlugContext, resolveWorkerRequestSlugContext;
+var INVALID_SESSION_SLUG_ERROR, SLUG_MISMATCH_ERROR, SLUG_ALIAS_MISMATCH_ERROR, MISSING_SLUG_ERROR, DEFAULT_SESSION_STORAGE_KEY, EMPTY_VALIDATION_RESULT, hasExplicitWorkerSlugInput, canonicalizeReservedWorkerAlias, normalizeWorkerSessionSlug, sessionSlugStorageKey, validateInboundWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey, getDefaultWorkerSessionSlug, hasExplicitDefaultWorkerSessionSlug, resolveRequestedWorkerSlugPayload, resolveWorkerBodySlugContext, resolveWorkerRequestSlugContext;
 var init_sessionSlugResolution = __esm({
   "workers/sessionCorsWorker/sessionSlugResolution.js"() {
     init_stringCoercion();
@@ -25500,12 +25500,6 @@ var init_sessionSlugResolution = __esm({
     };
     getDefaultWorkerSessionSlug = (env = {}) => normalizeWorkerSessionSlug(env.DEFAULT_SESSION_SLUG ?? env.DEFAULT_GROUP_SLUG);
     hasExplicitDefaultWorkerSessionSlug = (env = {}) => hasExplicitWorkerSlugInput(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG);
-    resolveWorkerTenantSlug = ({ envSlug, headerSlug, tokenSlug } = {}) => {
-      if (envSlug) return envSlug;
-      if (headerSlug) return headerSlug;
-      if (tokenSlug) return tokenSlug;
-      return "";
-    };
     resolveRequestedWorkerSlugPayload = (body = {}) => {
       const source = body && typeof body === "object" ? body : {};
       const hasSessionSlug = Object.prototype.hasOwnProperty.call(source, "sessionSlug") && source?.sessionSlug != null;
@@ -25594,12 +25588,8 @@ var init_sessionSlugResolution = __esm({
       const normalizedHint = normalizeWorkerSessionSlug(slugHint);
       const resolvedTokenSlug = tokenHasSlug ? tokenSlugResult.slug : "";
       const resolvedHeaderSlug = headerSlugResult.slug;
-      const slug = resolveWorkerTenantSlug({
-        envSlug,
-        headerSlug: resolvedHeaderSlug,
-        tokenSlug: resolvedTokenSlug
-      }) || normalizedHint;
       const explicitHeaderProvided = countEmptyHeaderAsExplicit ? headerPresent : headerHasValue;
+      const slug = hasExplicitDefaultWorkerSessionSlug(env) ? envSlug : explicitHeaderProvided ? resolvedHeaderSlug : tokenHasSlug ? resolvedTokenSlug : normalizedHint;
       return {
         ok: true,
         error: "",
@@ -32671,6 +32661,7 @@ var AUTH_TOKEN_RECORD_VALUE, toTokenPart, toSubjectPart, getAuthTokenKv, fillRan
 var init_authTokenClaims = __esm({
   "workers/sessionCorsWorker/authTokenClaims.js"() {
     init_tokenSigning();
+    init_sessionSlugResolution();
     AUTH_TOKEN_RECORD_VALUE = "1";
     toTokenPart = (value) => String(value ?? "").trim();
     toSubjectPart = (value) => toTokenPart(value).toLowerCase();
@@ -32686,7 +32677,8 @@ var init_authTokenClaims = __esm({
       throw new Error("crypto.getRandomValues unavailable.");
     };
     buildAuthTokenKey = ({ slug, sub, jti } = {}) => {
-      const slugPart = toTokenPart(slug);
+      if (typeof slug !== "string") return "";
+      const slugPart = sessionSlugStorageKey(slug);
       const subPart = toSubjectPart(sub);
       const jtiPart = toTokenPart(jti);
       if (!slugPart || !subPart || !jtiPart) return "";
@@ -32727,7 +32719,7 @@ var init_authTokenClaims = __esm({
       slug
     } = {}) => {
       const key = buildAuthTokenKey({
-        slug: slug || payload?.slug,
+        slug: slug ?? payload?.slug,
         sub: payload?.sub,
         jti: payload?.jti
       });
