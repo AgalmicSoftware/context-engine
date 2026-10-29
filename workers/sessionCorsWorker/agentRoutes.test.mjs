@@ -132,3 +132,47 @@ test('results, deterministic images, shared operator caches and Geo backlinks en
     const hidden = await f.request(route, { token }); assert.equal(hidden.status, 403); assert.ok(!(await hidden.text()).includes(cache.value.label));
   }
 });
+
+for (const approval of [
+  { approved: false, approvalText: 'Do not approve this change.' },
+  { approved: true, confirm: false },
+  { confirm: true, confirmed: false },
+  { approvalText: 'I do not confirm' },
+  { approvalText: 'Maybe yes, but wait for the organizer.' },
+  { approvalText: 'Approve this change' },
+]) {
+  test(`sponsored apply rejects unapproved structured decisions: ${JSON.stringify(approval)}`, async () => {
+    const { f, agent, questions } = await hosted();
+    const writesBefore = f.writes.length;
+    const response = await f.request('/api/agent/question-queue/apply', { method: 'POST', token: agent.token,
+      body: { questionIds: [questions[0].questionId], createQuestions: ['A new sponsored question?'], ...approval } });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).reason, 'sponsored_question_confirmation_required');
+    assert.equal(f.writes.length, writesBefore, 'rejected approval writes neither a question nor a queue');
+  });
+}
+
+test('sponsored plans bind approval to the mode, resolved IDs and draft contents', async () => {
+  const { f, agent, questions } = await hosted();
+  const body = { questionIds: [questions[0].questionId], createQuestions: [{ prompt: 'A new sponsored question?', tags: ['garden'] }] };
+  const plan = await jsonOk(await f.request('/api/agent/question-queue/plan', { method: 'POST', token: agent.token, body }));
+  assert.match(plan.planDigest, /^[a-f0-9]{64}$/);
+  assert.match(plan.confirmation.required, /approved: true/);
+  assert.match(plan.confirmation.required, /planDigest/);
+  for (const change of [
+    { mode: 'replace' },
+    { questionIds: [questions[1].questionId] },
+    { createQuestions: [{ prompt: 'A different sponsored question?', tags: ['garden'] }] },
+    { createQuestions: [{ prompt: 'A new sponsored question?', tags: ['changed'] }] },
+  ]) {
+    const writesBefore = f.writes.length;
+    const response = await f.request('/api/agent/question-queue/apply', { method: 'POST', token: agent.token,
+      body: { ...body, ...change, approved: true, planDigest: plan.planDigest } });
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).reason, 'sponsored_question_plan_changed');
+    assert.equal(f.writes.length, writesBefore);
+  }
+  const applied = await jsonOk(await f.request('/api/agent/question-queue/apply', { method: 'POST', token: agent.token,
+    body: { ...body, approved: true, planDigest: plan.planDigest, approvalText: 'Admin approved this plan.' } }));
+  assert.equal(applied.createdQuestions.length, 1);
+});

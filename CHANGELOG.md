@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
   new answers must follow the stored step (default 1). Existing answers remain
   unchanged. The minor version marks the changed accepted-input behavior.
 
+- Require structured approval for sponsored question changes; text-only approval
+  no longer applies them. Reject an approved plan digest when the plan changes.
+
 - Keep canonical submitted answers when a stale submission-index copy has the
   same timestamp. Newer timestamps still take precedence when deduplicating copies.
 
