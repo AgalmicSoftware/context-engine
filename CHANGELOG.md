@@ -340,6 +340,10 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Checkpoint Lit setup resources in encrypted coordinator storage and resume
+  failed attempts without recreating completed resources; activate only after
+  the complete setup is finalized atomically.
+
 - Count only eligible public questions toward interview discovery's 100-question
   limit, with separate scan budgets and retryable incomplete-discovery errors.
 

@@ -6,6 +6,8 @@ import { ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, u
 import { getSessionConfig, getSessionSecrets, putSessionSecrets } from './sessionConfigSecretsStore.js';
 import { decryptSessionSecretsEnvelope, isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 import worker from './worker.js';
+import * as provisioning from './sessionLitAuthorizationCoordinator.js';
+import { bootstrapLitChipotleSession } from './chipotleClient.js';
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 
 const KEY_A = `0x${'11'.repeat(32)}`;
@@ -53,7 +55,8 @@ const createFixture = () => {
       return run;
     },
   } };
-  let coordinator = new SessionWriteCoordinator(state, env);
+  let now = Date.now();
+  let coordinator = new SessionWriteCoordinator(state, env, { now: () => now });
   const identities = [];
   env.CE_SESSION_COORDINATOR = {
     idFromName: (name) => { identities.push(name); return name; },
@@ -65,7 +68,8 @@ const createFixture = () => {
   };
   return {
     env, kv, store, state, identities, expected,
-    restart: () => { coordinator = new SessionWriteCoordinator(state, env); },
+    restart: () => { coordinator = new SessionWriteCoordinator(state, env, { now: () => now }); },
+    advance: (ms) => { now += ms; },
     failConfig: (value) => { failConfigPut = value; },
     failSecrets: (value) => { failSecretsPut = value; },
     onConfigPut: (callback) => { beforeConfigPut = callback; },
@@ -74,15 +78,28 @@ const createFixture = () => {
       if (!store.has(CONFIG_RECORD)) kv.set(`session:${slug === 'general' ? '' : slug}:config`, JSON.stringify(config));
       return ensureSessionLitAuthorizationSigner({ env, slug, proposedPrivateKey, baseConfig: config, expectedAuthority: env.CE_SESSION_COORDINATOR ? await expected(slug) : null });
     },
-    finalize: async (label, extra = {}) => finalizeSessionLitAuthorization({
-      env, slug: 'fixture', baseConfig, expectedAuthority: await expected(),
+    finalize: async (label, extra = {}) => {
+      let attempt;
+      try { attempt = await provisioning.beginSessionLitProvisioning({ env, slug: 'fixture', baseConfig, expectedAuthority: await expected() }); }
+      catch (error) { return { ok: false, status: error.status }; }
+      const payload = {
+      env, slug: 'fixture', baseConfig, expectedAuthority: await expected(), attemptId: attempt.attemptId,
       litCredentials: {
         litAuthorizationVersion: 'worker-signed-v1', litAuthorizationSigner: SIGNER_A,
         litPkpId: `pkp-${label}`, litGroupId: `group-${label}`, litActionCid: `cid-${label}`,
       },
       secretOutputs: { litAuthorizationPrivateKey: KEY_A, litUsageApiKey: `usage-${label}` },
       ...extra,
-    }),
+      };
+      await provisioning.checkpointSessionLitProvisioning({ env, slug: 'fixture', expectedAuthority: await expected(), attemptId: attempt.attemptId, checkpoint: {
+        litGroupId: payload.litCredentials.litGroupId || 'invalid', litPkpId: payload.litCredentials.litPkpId || 'invalid', litActionCid: payload.litCredentials.litActionCid || 'invalid',
+        litUsageApiKey: payload.secretOutputs.litUsageApiKey, registeredAction: true, addedActionToGroup: true, addedPkpToGroup: true,
+        ...(Object.hasOwn(payload.secretOutputs, 'litAccountApiKey') ? { accountSecretOutput: payload.secretOutputs.litAccountApiKey } : {}),
+      } });
+      const result = await finalizeSessionLitAuthorization(payload);
+      await provisioning.releaseSessionLitProvisioning({ env, slug: 'fixture', attemptId: attempt.attemptId });
+      return result;
+    },
   };
 };
 
@@ -303,14 +320,16 @@ test('explicit Lit secret removal stays removed across later finalization and st
 });
 
 test('finalization rejects a different signer or secret-like public config without overwriting active state', async () => {
-  const fixture = createFixture();
-  await fixture.ensure();
-  assert.equal((await fixture.finalize('active')).ok, true);
-  const previous = fixture.kv.get('session:fixture:secrets');
-  assert.equal((await fixture.finalize('bad', { secretOutputs: { litAuthorizationPrivateKey: KEY_B, litUsageApiKey: 'bad' } })).ok, false);
-  assert.equal((await fixture.finalize('bad', { litCredentials: { litAuthorizationVersion: 'worker-signed-v1', litAuthorizationSigner: SIGNER_A, apiKey: 'forbidden' } })).ok, false);
-  assert.equal(fixture.kv.get('session:fixture:secrets'), previous);
-  assert.equal((await getSessionConfig(fixture.env, 'fixture')).litCredentials.litPkpId, 'pkp-active');
+  for (const bad of [{ secretOutputs: { litAuthorizationPrivateKey: KEY_B, litUsageApiKey: 'bad' } },
+    { litCredentials: { litAuthorizationVersion: 'worker-signed-v1', litAuthorizationSigner: SIGNER_A, apiKey: 'forbidden' } }]) {
+    const fixture = createFixture();
+    await fixture.ensure();
+    assert.equal((await fixture.finalize('active')).ok, true);
+    const previous = fixture.kv.get('session:fixture:secrets');
+    assert.equal((await fixture.finalize('bad', bad)).ok, false);
+    assert.equal(fixture.kv.get('session:fixture:secrets'), previous);
+    assert.equal((await getSessionConfig(fixture.env, 'fixture')).litCredentials.litPkpId, 'pkp-active');
+  }
 });
 
 test('admin secret edits fail before writing while Lit repair is blocked, then survive later repair and restart', async () => {
@@ -441,4 +460,84 @@ test('Lit setup patches the committed full document and later edits retain its k
   assert.deepEqual(await getSessionSecrets(fixture.env, 'fixture'), {
     openaiKey: 'synthetic-new-key', anthropicKey: 'synthetic-other-key', litAuthorizationPrivateKey: KEY_A, litUsageApiKey: 'usage-fresh',
   });
+});
+
+const PROVISIONING_RECORD = 'session-lit-provisioning-v1';
+const setupResourcePaths = ['/new_account', '/add_group', '/create_wallet', '/get_lit_action_ipfs_id', '/add_action', '/add_action_to_group', '/add_pkp_to_group', '/add_usage_api_key'];
+const litRemoteFixture = () => {
+  const calls = new Map();
+  return { calls, fetch: async (url) => {
+    const path = new URL(url).pathname.replace('/core/v1', '');
+    calls.set(path, (calls.get(path) || 0) + 1);
+    const values = { '/new_account': { api_key: 'recoverable-account-key', wallet_address: 'account-address' },
+      '/add_group': { group_id: '7' }, '/create_wallet': { wallet_address: 'wallet-address' },
+      '/get_lit_action_ipfs_id': 'action-cid', '/list_actions': [], '/list_wallets': [], '/list_wallets_in_group': [],
+      '/add_usage_api_key': { usage_api_key: 'fixture-usage-key' }, '/billing/balance': { balance_cents: 0 },
+    };
+    return Response.json(values[path] ?? { success: true });
+  } };
+};
+const beginProvisioning = async (f) => provisioning.beginSessionLitProvisioning({ env: f.env, slug: 'fixture', baseConfig, expectedAuthority: await f.expected(), freshAuthority: false });
+for (const step of ['litAccountApiKey', 'litGroupId', 'litPkpId', 'litActionCid', 'registeredAction', 'addedActionToGroup', 'addedPkpToGroup', 'litUsageApiKey']) {
+  test(`a crash after ${step} resumes the encrypted checkpoint without recreating resources`, async () => {
+    const f = createFixture();
+    const remote = litRemoteFixture();
+    await f.ensure();
+    const first = await beginProvisioning(f);
+    let interrupted = false;
+    const run = async (reservation, interrupt) => bootstrapLitChipotleSession({
+      config: baseConfig, secrets: { litAuthorizationPrivateKey: KEY_A }, sessionSlug: 'fixture',
+      provisioning: reservation.checkpoint, fetchImpl: remote.fetch,
+      checkpointProvisioning: async (checkpoint) => {
+        await provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(), attemptId: reservation.attemptId, checkpoint });
+        if (interrupt && checkpoint[step] && !interrupted) { interrupted = true; throw new Error('simulated process crash'); }
+      },
+    });
+    await assert.rejects(run(first, true), /simulated process crash/);
+    assert.equal(remote.calls.get('/new_account'), 1);
+    const record = f.store.get(PROVISIONING_RECORD);
+    assert.ok(isEncryptedSessionSecretsEnvelope(record.envelope));
+    const recovered = await decryptSessionSecretsEnvelope(record.envelope, { env: f.env, slug: 'fixture' });
+    assert.equal(recovered.litAccountApiKey, 'recoverable-account-key');
+    assert.equal((await getSessionSecrets(f.env, 'fixture'))?.litAccountApiKey, undefined);
+    assert.equal((await getSessionConfig(f.env, 'fixture')).litCredentials, undefined);
+    assert.ok(!JSON.stringify([...f.store]).includes('recoverable-account-key'));
+    f.restart();
+    await assert.rejects(beginProvisioning(f), error => error.status === 409);
+    f.advance(6 * 60_000);
+    const contenders = await Promise.allSettled([beginProvisioning(f), beginProvisioning(f)]);
+    assert.equal(contenders.filter(result => result.status === 'fulfilled').length, 1);
+    const resumed = contenders.find(result => result.status === 'fulfilled').value;
+    await assert.rejects(provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(), attemptId: first.attemptId, checkpoint: {} }), error => error.status === 409);
+    const result = await run(resumed, false);
+    const finalized = await finalizeSessionLitAuthorization({ env: f.env, slug: 'fixture', baseConfig, expectedAuthority: await f.expected(), attemptId: resumed.attemptId, litCredentials: result.litCredentials, secretOutputs: result.secretOutputs });
+    assert.equal(finalized.ok, true);
+    assert.equal(f.store.has(PROVISIONING_RECORD), false);
+    assert.equal((await getSessionSecrets(f.env, 'fixture')).litAccountApiKey, 'recoverable-account-key');
+    for (const path of setupResourcePaths) assert.equal(remote.calls.get(path), 1, path);
+    assert.ok(!JSON.stringify(finalized).includes('recoverable-account-key'));
+  });
+}
+test('a handled setup failure releases its attempt while retaining the checkpoint', async () => {
+  const f = createFixture();
+  const first = await beginProvisioning(f);
+  await provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(), attemptId: first.attemptId, checkpoint: { litAccountApiKey: 'recoverable-key' } });
+  await provisioning.releaseSessionLitProvisioning({ env: f.env, slug: 'fixture', attemptId: first.attemptId });
+  const second = await beginProvisioning(f);
+  assert.equal(second.checkpoint.litAccountApiKey, 'recoverable-key');
+  assert.notEqual(first.attemptId, second.attemptId);
+});
+
+test('unfinished provisioning cannot become active or be consumed by finalization', async () => {
+  const f = createFixture();
+  await f.ensure();
+  const attempt = await beginProvisioning(f);
+  const result = await finalizeSessionLitAuthorization({ env: f.env, slug: 'fixture', baseConfig, expectedAuthority: await f.expected(), attemptId: attempt.attemptId,
+    litCredentials: { litAuthorizationVersion: 'worker-signed-v1', litAuthorizationSigner: SIGNER_A, litPkpId: 'wallet', litGroupId: '7', litActionCid: 'action' },
+    secretOutputs: { litAuthorizationPrivateKey: KEY_A, litAccountApiKey: 'account', litUsageApiKey: 'usage' },
+  });
+  assert.equal(result.status, 409);
+  assert.equal(f.store.has(PROVISIONING_RECORD), true);
+  assert.equal((await getSessionConfig(f.env, 'fixture')).litCredentials, undefined);
+  assert.equal((await getSessionSecrets(f.env, 'fixture'))?.litUsageApiKey, undefined);
 });

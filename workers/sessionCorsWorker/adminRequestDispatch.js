@@ -4,6 +4,9 @@ import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import {
   ADMIN_SESSION_SECRET_KEYS as ALLOWED_SECRET_KEYS,
   ensureSessionLitAuthorizationSigner,
+  beginSessionLitProvisioning,
+  checkpointSessionLitProvisioning,
+  releaseSessionLitProvisioning,
   finalizeSessionLitAuthorization,
   updateSessionSecretsAfterLitRepair,
 } from './sessionLitAuthorizationCoordinator.js';
@@ -332,7 +335,10 @@ export const dispatchAdminRequest = async ({
   }
 
   if (action === 'lit-chipotle-provision' || action === 'lit-chipotle-bootstrap-session') {
+    let attempt;
+    const coordination = { env, slug: targetSlug, baseConfig: existingConfig, expectedAuthority };
     try {
+      attempt = await (deps?.beginSessionLitProvisioning || beginSessionLitProvisioning)({ ...coordination, freshAuthority: body.freshAuthority === true });
       const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
       const options = {
         env,
@@ -340,6 +346,10 @@ export const dispatchAdminRequest = async ({
         secrets: existingSecrets,
         request: body,
         sessionSlug: targetSlug,
+        provisioning: attempt.checkpoint,
+        checkpointProvisioning: checkpoint => (deps?.checkpointSessionLitProvisioning || checkpointSessionLitProvisioning)({
+          ...coordination, attemptId: attempt.attemptId, checkpoint,
+        }),
         persistAuthorizationSecret: async (proposedPrivateKey) => {
           const privateKey = await (deps?.ensureSessionLitAuthorizationSigner || ensureSessionLitAuthorizationSigner)({
             env, slug: targetSlug, proposedPrivateKey, baseConfig: existingConfig, expectedAuthority,
@@ -347,7 +357,14 @@ export const dispatchAdminRequest = async ({
           existingSecrets.litAuthorizationPrivateKey = privateKey;
           return privateKey;
         },
-        fetchImpl: deps?.fetchImpl,
+        fetchImpl: async (url, init) => {
+          // Fence and renew the attempt immediately before every remote call;
+          // individual requests expire well before the five-minute lease.
+          await (deps?.checkpointSessionLitProvisioning || checkpointSessionLitProvisioning)({
+            ...coordination, attemptId: attempt.attemptId, checkpoint: {},
+          });
+          return (deps?.fetchImpl || globalThis.fetch)(url, { ...init, signal: AbortSignal.timeout(30_000) });
+        },
       };
       let result;
       if (action === 'lit-chipotle-provision') {
@@ -362,6 +379,7 @@ export const dispatchAdminRequest = async ({
       // Separate KV writes can mix credentials from concurrent bootstrap completions.
       const finalized = await (deps?.finalizeSessionLitAuthorization || finalizeSessionLitAuthorization)({
         env, slug: targetSlug, baseConfig: existingConfig, expectedAuthority,
+        attemptId: attempt.attemptId,
         litCredentials: result?.litCredentials,
         secretOutputs: result?.secretOutputs,
       });
@@ -373,7 +391,11 @@ export const dispatchAdminRequest = async ({
       delete responseBody.litCredentials;
       return deps?.json?.(responseBody, 200, headers);
     } catch (error) {
-      return deps?.json?.({ error: error?.message || 'Failed to provision Lit authorization.' }, error?.status || 502, headers);
+      return deps?.json?.({ error: 'Lit provisioning did not finish. Retry to resume its saved progress.' }, error?.status || 502, headers);
+    } finally {
+      if (attempt) {
+        try { await (deps?.releaseSessionLitProvisioning || releaseSessionLitProvisioning)({ ...coordination, attemptId: attempt.attemptId }); } catch {}
+      }
     }
   }
 

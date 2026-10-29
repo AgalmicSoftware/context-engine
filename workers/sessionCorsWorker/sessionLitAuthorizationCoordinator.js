@@ -7,6 +7,9 @@ import { resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution
 
 const SIGNER_RECORD = 'session-lit-authorization-signer-v1';
 const SETUP_RECORD = 'session-lit-authorization-pending-v1';
+const PROVISIONING_RECORD = 'session-lit-provisioning-v1';
+const PROVISIONING_LEASE_MS = 5 * 60_000;
+const PROVISIONING_FIELDS = new Set(['litApiBase', 'litAccountApiKey', 'accountSecretOutput', 'accountWalletAddress', 'litGroupId', 'litPkpId', 'litActionCid', 'litUsageApiKey', 'registeredAction', 'addedActionToGroup', 'addedPkpToGroup']);
 export const hasPendingLitAuthorizationSetup = async (storage) => (await storage.get(SETUP_RECORD)) != null;
 const CONFIG_RECORD = 'session-config-authority';
 const PRIVATE_KEY = 'litAuthorizationPrivateKey';
@@ -102,6 +105,58 @@ export const repairPendingLitAuthorizationSetup = async (coordinator) => {
   });
 };
 
+const readProvisioning = async (record, env, slug) => {
+  if (!isRecord(record) || record.version !== 1 || record.slug !== slug) fail();
+  const checkpoint = await decryptSessionSecretsEnvelope(record.envelope, { env, slug });
+  if (!isRecord(checkpoint) || Object.keys(checkpoint).some(key => !PROVISIONING_FIELDS.has(key)) ||
+    Object.values(checkpoint).some(value => typeof value !== 'string' && typeof value !== 'boolean')) fail();
+  return checkpoint;
+};
+
+export const executeLitProvisioning = async (coordinator, payload, operation) => {
+  const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+  if (!slug) return json({ error: COORDINATION_ERROR }, 400);
+  try {
+    if (operation !== 'release') {
+      await coordinator.assertSessionAuthority(payload);
+      await coordinator.repairPendingSessionConfigProjection();
+    }
+    const result = await coordinator.state.storage.transaction(async transaction => {
+      const record = await transaction.get(PROVISIONING_RECORD);
+      const now = coordinator.now();
+      if (operation === 'begin') {
+        if (record && (record.leaseUntilMs > now || record.freshAuthority !== (payload.freshAuthority === true))) fail();
+        const checkpoint = record ? await readProvisioning(record, coordinator.env, slug) : {};
+        const attemptId = crypto.randomUUID();
+        const envelope = record?.envelope || await buildEncryptedSessionSecretsEnvelope(checkpoint, { env: coordinator.env, slug });
+        await transaction.put(PROVISIONING_RECORD, { version: 1, slug, attemptId, freshAuthority: payload.freshAuthority === true,
+          leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
+        return { attemptId, checkpoint };
+      }
+      // A delayed failure must not release a newer attempt's lease.
+      if (operation === 'release') {
+        if (record?.slug === slug && record.attemptId === payload.attemptId)
+          await transaction.put(PROVISIONING_RECORD, { ...record, leaseUntilMs: 0 });
+        return {};
+      }
+      if (operation !== 'checkpoint' || !record || !payload.attemptId || record.attemptId !== payload.attemptId) fail();
+      const previous = await readProvisioning(record, coordinator.env, slug);
+      const checkpoint = payload.checkpoint;
+      if (!isRecord(checkpoint) || Object.keys(checkpoint).some(key => !PROVISIONING_FIELDS.has(key)) ||
+        Object.values(checkpoint).some(value => typeof value !== 'string' && typeof value !== 'boolean')) fail(400);
+      // Already-created resources are immutable within an attempt. Wallet
+      // lookup alone can refine its returned address to the provider's PKP id.
+      for (const [key, value] of Object.entries(previous)) {
+        if (key !== 'litPkpId' && hasOwn(checkpoint, key) && checkpoint[key] !== value) fail();
+      }
+      const envelope = await buildEncryptedSessionSecretsEnvelope({ ...previous, ...checkpoint }, { env: coordinator.env, slug });
+      await transaction.put(PROVISIONING_RECORD, { ...record, leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
+      return {};
+    });
+    return json({ ok: true, ...result });
+  } catch (error) { return json({ error: 'Lit provisioning is pending or in progress; retry.' }, error?.status || 503); }
+};
+
 export const executeLitAuthorizationFinalize = async (coordinator, payload) => {
   const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
   const outputs = payload?.secretOutputs;
@@ -114,6 +169,16 @@ export const executeLitAuthorizationFinalize = async (coordinator, payload) => {
     await coordinator.assertSessionAuthority(payload);
     await coordinator.repairPendingSessionConfigProjection();
     await coordinator.state.storage.transaction(async (transaction) => {
+      const provisioning = await transaction.get(PROVISIONING_RECORD);
+      if (!payload.attemptId || provisioning?.attemptId !== payload.attemptId) fail();
+      const checkpoint = await readProvisioning(provisioning, coordinator.env, slug);
+      if (['litGroupId', 'litPkpId', 'litActionCid', 'litUsageApiKey'].some(key => typeof checkpoint[key] !== 'string' || !checkpoint[key].trim()) ||
+        ['registeredAction', 'addedActionToGroup', 'addedPkpToGroup'].some(key => checkpoint[key] !== true)) fail();
+      for (const key of ['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid']) {
+        if (hasOwn(checkpoint, key) && checkpoint[key] !== payload.litCredentials[key]) fail();
+      }
+      if (hasOwn(checkpoint, 'litUsageApiKey') && checkpoint.litUsageApiKey !== outputs.litUsageApiKey) fail();
+      if (hasOwn(checkpoint, 'accountSecretOutput') && checkpoint.accountSecretOutput !== outputs.litAccountApiKey) fail();
       const record = await transaction.get(SIGNER_RECORD);
       const signerSecrets = await readSignerSecrets(record, coordinator.env, slug);
       const wallet = walletFor(signerSecrets[PRIVATE_KEY]);
@@ -147,6 +212,7 @@ export const executeLitAuthorizationFinalize = async (coordinator, payload) => {
         projectionPendingSinceMs: coordinator.now(),
       });
       await transaction.put(SETUP_RECORD, { version: 1, slug, revision, envelope });
+      await transaction.delete(PROVISIONING_RECORD);
     });
   } catch (error) {
     return json({ error: error?.status ? COORDINATION_ERROR : PENDING_ERROR }, error?.status || 503);
@@ -228,3 +294,12 @@ export const updateSessionSecretsAfterLitRepair = async (args) => {
   const result = await callCoordinator({ ...args, path: 'update-secrets' });
   return { ok: result.ok, status: result.status, body: result.ok ? { ok: true } : { error: 'Session secrets update failed; retry after setup repair.' } };
 };
+
+const provisionCall = async (args, operation) => {
+  const result = await callCoordinator({ ...args, path: `provisioning/${operation}` });
+  if (!result.ok) throw Object.assign(new Error('Lit provisioning is pending or in progress; retry.'), { status: result.status });
+  return result.body;
+};
+export const beginSessionLitProvisioning = args => provisionCall(args, 'begin');
+export const checkpointSessionLitProvisioning = args => provisionCall(args, 'checkpoint');
+export const releaseSessionLitProvisioning = args => provisionCall(args, 'release');
