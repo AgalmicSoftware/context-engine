@@ -110,6 +110,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep SBT history reads on the session chain and retain cached counts when its
+  provider is unavailable, without substituting an injected wallet’s history.
+
 - Separate SBT count-scan coverage from pending live activity. Fill missed history
   without double counting, replace orphaned counts on complete scans, and rebuild
   obsolete cache entries instead of migrating them.

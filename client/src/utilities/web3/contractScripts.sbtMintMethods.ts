@@ -392,21 +392,6 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         const summary = await callWithRetry(() => CustomSBT.getHistorySummary(), 'CustomSBT.getHistorySummary');
         return normalizeSbtHistorySummary(summary);
       } catch {
-        try {
-          if (typeof window !== 'undefined' && window.ethereum) {
-            const provider = new ethers.providers.Web3Provider(window.ethereum as any, 'any');
-            const CustomSBT = new ethers.Contract(
-              SBTAddress,
-              [
-                'function getHistorySummary() view returns (uint256 totalMinted,uint256 totalBurned,uint256 activeSupply,uint256 currentHolderCount,uint256 historicalHolderCount)',
-              ],
-              provider as any,
-            );
-            inviteLog.warn('[INVITE_DEBUG v2] getSbtHistorySummary falling back to injected provider');
-            const summary = await CustomSBT.getHistorySummary();
-            return normalizeSbtHistorySummary(summary);
-          }
-        } catch {}
         return null;
       }
     },

@@ -1507,6 +1507,34 @@ describe('createSessionSbtCacheController', () => {
   });
 
   describe('refreshSbtDataForGroup', () => {
+    it('keeps the session summary when its current history read is unavailable', async () => {
+      const summary = {
+        totalMinted: '4',
+        totalBurned: '1',
+        activeSupply: '3',
+        currentHolderCount: '2',
+        historicalHolderCount: '3',
+      };
+      const host = createMockHost({
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 10,
+                sbtList: { '0xsbt': { sbtInfo: { name: 'Incomplete metadata' }, historySummary: summary } },
+              },
+            },
+          },
+        },
+      });
+      hasCoreSbtMetadata.mockReturnValue(false);
+      contractScripts.getSbtMetadata.mockResolvedValue(createCompleteSbtMetadata());
+      contractScripts.getSbtHistorySummary.mockResolvedValue(null);
+      await createSessionSbtCacheController(host).refreshSbtDataForGroup('alpha', '0xSBT');
+      expect(contractScripts.getSbtHistorySummary).toHaveBeenCalledWith('none', '0xSBT', 'alpha');
+      expect(host.getStored('sbtCache', 'alpha')[11155420].sbtList['0xsbt'].historySummary).toEqual(summary);
+    });
+
     it('fills a gap before a live mint without skipping or double-counting holders', async () => {
       const { buildSbtActivityCacheEntry, mergeSbtActivityCacheEntryCounts } = require('./sbtActivityCacheEntry.js');
       const entry = mergeSbtActivityCacheEntryCounts(

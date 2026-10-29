@@ -109,7 +109,7 @@ Network keys inside cache values are strings such as `"84532"`.
 - `mintedAddresses` / `burnedAddresses`: convenience sets materialized as arrays
 - `mintedCountByAddress` / `burnedCountByAddress`: authoritative holder-count source for newer cache consumers
 - `mintedEventCount` / `burnedEventCount`: total event counts observed for that contract
-- `historySummary`: compressed count-only snapshot sourced from `getHistorySummary()` or derived from a full `SBTActivity` scan
+- `historySummary`: compressed count-only snapshot sourced from `getHistorySummary()` or derived from a full `SBTActivity` scan. Reads use the session provider exclusively; a failed read returns unavailable and preserves the existing summary, counts and holder bounds. The injected wallet is never a history fallback.
 - `countsScanCheckpoint`: resumable single-pass `SBTActivity` checkpoint for holders-modal/history reads
 
 ## Write and merge contract
