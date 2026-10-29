@@ -55,4 +55,15 @@ describe('sbtPageHistorySummaryHelpers', () => {
       ownerLookupUpperBound: '8',
     });
   });
+  it('keeps counts and holder bounds when the session summary is unavailable', () => {
+    expect(
+      applySbtPageHistorySummaryFallback({
+        mintedTokensOverride: '3',
+        mintedTokensSource: 'summary-cache',
+        ownerLookupUpperBound: '8',
+        summaryValue: null,
+        sourceLabel: 'unavailable',
+      }),
+    ).toEqual({ mintedTokensOverride: '3', mintedTokensSource: 'summary-cache', ownerLookupUpperBound: '8' });
+  });
 });
