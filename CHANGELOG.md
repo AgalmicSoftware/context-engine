@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Recheck MCP cancellation after chain validation, token refresh and retry-key
+  persistence before sending writes, preserving results already broadcast.
+
 - Mark MCP results, question lists and own-answer reads incomplete when listed
   payloads are unread, including cached misses, and report unread answer counts.
 

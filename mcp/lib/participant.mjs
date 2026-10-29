@@ -624,7 +624,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         checkpoint();
         try {
           if (ctx.registry) throw new Error('Worker groups are not available in on-chain sessions.');
-          await ctx.client.joinGroup(parsed.joinGroupId);
+          await ctx.client.joinGroup(parsed.joinGroupId, { signal });
           outcome.joinedGroup = parsed.joinGroupId;
         } catch (error) {
           outcome.groupJoinError = describeError(error);
@@ -751,7 +751,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
               ? previous.requestId : `answer:v1:${operationId}:${questionId}`;
             entry.pendingUploads[questionId] = { payloadDigest: digest, requestId };
           });
-          const storageRef = await ctx.client.upload({ resource: 'responses', data, requestId });
+          checkpoint();
+          const storageRef = await ctx.client.upload({ resource: 'responses', data, requestId, signal });
           if (text(storageRef?.id)) cacheRecord(ctx, text(storageRef.id), built.record);
           answered.push({ questionId, requestId, record: built.record, answeredAt: text(storageRef?.createdAt) || new Date(now()).toISOString() });
           results.push({ questionId, ok: true, answer: built.record.answer.value });
@@ -830,7 +831,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       ];
       checkpoint();
       try {
-        const storageRef = await ctx.client.upload({ resource: 'questions', data: built.record, tags: tagList });
+        const storageRef = await ctx.client.upload({ resource: 'questions', data: built.record, tags: tagList, signal });
         if (text(storageRef?.id)) cacheRecord(ctx, text(storageRef.id), built.record);
         return { session: ctx.info.slug, questionId: built.id, created: true, prompt: built.record.prompt };
       } catch (error) {
@@ -922,7 +923,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const id = trim(groupId);
       if (!/^[A-Za-z0-9._:-]{1,128}$/.test(id)) throw new Error('Pass a valid group id.');
       checkpoint();
-      await ctx.client.joinGroup(id);
+      await ctx.client.joinGroup(id, { signal });
       return { session: ctx.info.slug, joinedGroup: id };
     },
 

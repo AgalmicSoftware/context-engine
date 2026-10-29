@@ -193,6 +193,12 @@ retrying. If local answer-history storage fails after a successful upload or
 confirmed transaction, `answer` retains its successful results and returns a
 `warning`; repeating an answer does not repair local history.
 
+Cancellation is checked again after the final chain read and immediately before
+Worker requests, including after sign-in or token refresh. Saving an answer's
+local retry key does not authorize an upload after cancellation. Once a write
+has been sent, its result and any transaction hash remain available for
+reconciliation.
+
 ## Registry sessions
 
 Join with `https://contextengine.sh/session/<slug>` (no `worker=`).

@@ -35,7 +35,7 @@ export const createTestEthRequester = ({
   let paid;
   try {
     paid = await ctx.client.request('/', {
-      method: 'POST', auth: true, headers: { 'X-Session-Slug': ctx.info.slug },
+      method: 'POST', auth: true, signal, headers: { 'X-Session-Slug': ctx.info.slug },
       body: { action: 'request_test_eth', to: wallet.address },
     });
   } catch (error) {

@@ -815,3 +815,26 @@ test('excluded and malformed payloads do not count as unread MCP records', async
   assert.equal(result.questions.length, 1);
   assert.deepEqual(result.questions[0].counts, { Agree: 1, Unsure: 0, Disagree: 0 });
 });
+
+test('cancellation while persisting an answer retry key prevents its upload', async t => {
+  const env = createEnv([sessionConfig()]);
+  const seen = [];
+  const agent = await createAgent(env, 'Fixture', seen);
+  t.after(() => fs.rm(agent.stateDir, { recursive: true, force: true }));
+  await agent.participant.joinSession({ link: LINK });
+  const statement = await agent.participant.addStatement({ prompt: STATEMENT });
+  const controller = new AbortController();
+  const rename = fs.rename.bind(fs);
+  t.mock.method(fs, 'rename', async (from, to) => {
+    await rename(from, to);
+    if (to === path.join(agent.stateDir, 'state.json')) {
+      const saved = JSON.parse(await fs.readFile(to, 'utf8'));
+      if (Object.values(saved.sessions).some(session => Object.keys(session.pendingUploads || {}).length)) controller.abort();
+    }
+  });
+  const uploadsBefore = seen.filter(call => new URL(call.url).pathname === '/storage/upload').length;
+  const result = await agent.participant.answer({ answers: [{ questionId: statement.questionId, value: 'Agree' }] }, { signal: controller.signal });
+  assert.equal(result.submitted, 0);
+  assert.match(result.results[0].error, /Stopped/);
+  assert.equal(seen.filter(call => new URL(call.url).pathname === '/storage/upload').length, uploadsBefore);
+});
