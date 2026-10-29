@@ -194,6 +194,70 @@ describe('WorkerParticipantGroupCreatePanel', () => {
     });
   });
 
+  it('keeps all draft fields through equivalent configs and unrelated settings changes', () => {
+    const props = {
+      sessionId: SESSION_ID,
+      sessionSlug: 'draft',
+      workerUrl: 'https://worker.example',
+      workerToken: 'token',
+    };
+    const config = { defaultGroupTags: 'default-tag' };
+    const { rerender } = render(<WorkerParticipantGroupCreatePanel {...props} sessionConfig={config} />);
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Edited group' } });
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Edited description' } });
+    fireEvent.change(screen.getByLabelText('Image URL'), { target: { value: 'https://images.example/draft.png' } });
+    fireEvent.change(screen.getByLabelText('Member limit'), { target: { value: '23' } });
+    fireEvent.change(screen.getByLabelText('Tag'), { target: { value: 'edited-tag' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add tag' }));
+    for (const replacement of [
+      { ...config },
+      { ...config, unrelated: true },
+      { defaultGroupTags: 'changed-default' },
+    ]) {
+      rerender(<WorkerParticipantGroupCreatePanel {...props} sessionConfig={replacement} />);
+      expect(screen.getByLabelText('Group name')).toHaveValue('Edited group');
+      expect(screen.getByLabelText('Description')).toHaveValue('Edited description');
+      expect(screen.getByLabelText('Image URL')).toHaveValue('https://images.example/draft.png');
+      expect(screen.getByLabelText('Member limit')).toHaveValue(23);
+      expect(screen.getByRole('button', { name: 'Remove edited-tag' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Remove default-tag' })).toBeInTheDocument();
+    }
+  });
+
+  it('updates untouched default tags without resetting the other fields', () => {
+    const props = {
+      sessionId: SESSION_ID,
+      sessionSlug: 'draft',
+      workerUrl: 'https://worker.example',
+      workerToken: 'token',
+    };
+    const { rerender } = render(
+      <WorkerParticipantGroupCreatePanel {...props} sessionConfig={{ defaultGroupTags: 'old' }} />,
+    );
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Edited group' } });
+    rerender(<WorkerParticipantGroupCreatePanel {...props} sessionConfig={{ defaultGroupTags: 'new' }} />);
+    expect(screen.getByLabelText('Group name')).toHaveValue('Edited group');
+    expect(screen.getByRole('button', { name: 'Remove new' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove old' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { sessionId: '0x22222222222222222222222222222222' },
+    { sessionSlug: 'other' },
+    { workerUrl: 'https://other.example' },
+  ])('starts a fresh draft when session identity changes: %j', (change) => {
+    const props = {
+      sessionId: SESSION_ID,
+      sessionSlug: 'draft',
+      workerUrl: 'https://worker.example',
+      workerToken: 'token',
+    };
+    const { rerender } = render(<WorkerParticipantGroupCreatePanel {...props} />);
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Edited group' } });
+    rerender(<WorkerParticipantGroupCreatePanel {...props} {...change} />);
+    expect(screen.getByLabelText('Group name')).toHaveValue('');
+  });
+
   it('prefills Worker-native tag defaults from the selected session', () => {
     render(
       <WorkerParticipantGroupCreatePanel

@@ -1295,3 +1295,7 @@ selecting an action, clicking outside, or pressing Escape dismisses the menu.
 In the expanded question-card rating controls, Conviction and Importance each
 show their value directly beside the label. For quadratic questions, these
 expanded controls sit below the centered option-scroll arrows.
+
+Participant Group drafts remain attached to the session ID, slug and Worker URL.
+Configuration refreshes preserve edited fields. New default tags update only an
+untouched tags field; changing session identity starts a fresh draft.
