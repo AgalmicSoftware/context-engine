@@ -121,6 +121,7 @@ export const readSliceQuestion = (slice: PersistedDraftSliceLike, qid: string) =
 /**
  * The saved answer a draft was written against. Locked fields keep only their
  * envelope, so the draft never stores decrypted plaintext of a saved answer.
+ * A loaded empty answer is `{}`; only an unknown saved slice is `null`.
  * `ratingsEncrypted` says the saved ratings carry envelopes of their own.
  */
 export const buildDraftBaselineEntry = (
@@ -143,7 +144,7 @@ export const buildDraftBaselineEntry = (
     ...(!locked && importance !== null ? { importance } : {}),
     ...(!locked && conviction !== null ? { conviction } : {}),
   };
-  return Object.keys(entry).length ? entry : null;
+  return entry;
 };
 
 /**

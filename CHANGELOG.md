@@ -130,6 +130,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep loaded empty saved answers distinct from unknown baselines, so a newer
+  saved clear drops older draft edits while incomplete loading preserves them.
+
 - Hold back an invalid saved locked response individually while submitting other
   valid changes, and keep rejecting newly typed lone asterisks before upload.
 

@@ -28,7 +28,7 @@ describe('withoutStaleDraftFields', () => {
       ),
     ).toEqual(draft);
     // Saved answers that are not loaded yet cannot conflict.
-    expect(withoutStaleDraftFields(draft, stored, { answers: {}, additionalComments: {} }, 'q1')).toEqual(draft);
+    expect(withoutStaleDraftFields(draft, stored, null, 'q1')).toEqual(draft);
     expect(
       withoutStaleDraftFields(draft, stored, { ...saved, additionalComments: { q1: { value: 'newer note' } } }, 'q1'),
     ).toEqual({ value: '*', answerEncrypted: false });
@@ -107,5 +107,24 @@ describe('buildDraftBaselineEntry', () => {
     };
     expect(buildDraftBaselineEntry(saved, 'q1')).toEqual({ value: 'Public answer', importance: 6, conviction: 5 });
     expect(buildDraftBaselineEntry(saved, 'q1', true)).toEqual({ value: 'Public answer' });
+  });
+});
+
+describe('known empty saved answers', () => {
+  const empty = { answers: {}, additionalComments: {}, importance: {}, conviction: {} };
+  const nonempty = { answers: { q1: { value: 'Saved' } }, additionalComments: { q1: { value: 'Saved note' } } };
+  const draft = { value: 'Draft', additional: 'Draft note' };
+  it('records a loaded empty answer separately from an unknown answer', () => {
+    expect(buildDraftBaselineEntry(empty, 'q1')).toEqual({});
+    expect(buildDraftBaselineEntry(null, 'q1')).toBeNull();
+  });
+  it.each([
+    ['nonempty', nonempty, empty, {}],
+    ['empty', empty, empty, draft],
+    ['unknown', null, empty, draft],
+    ['loading', nonempty, null, draft],
+  ])('restores against a %s baseline with the same writer and reader rule', (_name, saved, current, expected) => {
+    const stored = buildDraftBaselineEntry(saved, 'q1');
+    expect(withoutStaleDraftFields(draft, stored, current, 'q1')).toEqual(expected);
   });
 });
