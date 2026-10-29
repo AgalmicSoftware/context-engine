@@ -160,6 +160,10 @@ smallest group need one newer than 0.8.0. See
 Generation waits for public questions and uses the session Worker's OpenAI key.
 See [Interview settings and lifecycle](session-listening-mode.md#interview).
 
+Results analysis input includes each question prompt once, capped at 900 characters
+(including any response-provided fallback text). Response rows refer to included
+questions by ID; answers for questions outside the input cap are omitted.
+
 **Results AI views** default to manual generation. The shared session setting is
 `resultsAnalysis` with `generationMode` (`manual`, `automatic`, or `both`),
 view toggles for Circles, Breakdown, and Risk Matrix,

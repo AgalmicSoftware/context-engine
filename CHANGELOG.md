@@ -138,6 +138,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Cap question text once in Results analysis input and keep every included response linked to an included question.
+
 - Keep profile analysis, cached results and pending updates bound to their original person, session and inputs.
 
 - Clear all agent and Worker credentials on either logout, cancelling pending logins and requests before resetting mounted views.
