@@ -96,17 +96,23 @@ export type SbtEventStreamsPort = {
 };
 
 export type SbtMintExecutionPort = {
-  claim: (providerName: SbtProviderRef, sbtAddress: string) => Promise<SbtTransactionResult>;
+  claim: (
+    providerName: SbtProviderRef,
+    sbtAddress: string,
+    expectedChainId: string | number,
+  ) => Promise<SbtTransactionResult>;
   claimWithInvite: (
     providerName: SbtProviderRef,
     sbtAddress: string,
     nonce: string | number,
     signature: string,
+    expectedChainId: string | number,
   ) => Promise<SbtTransactionResult>;
   mintWithGroupSignature: (
     providerName: SbtProviderRef,
     sbtAddress: string,
     signature: string,
+    expectedChainId: string | number,
   ) => Promise<SbtTransactionResult>;
 };
 
@@ -115,16 +121,19 @@ export type SbtAdminOpsPort = {
     providerName: SbtProviderRef,
     sbtAddress: string,
     hashedPasswords: string[],
+    expectedChainId: string | number,
   ) => Promise<SbtTransactionResult>;
   burnToken: (
     providerName: SbtProviderRef,
     sbtAddress: string,
     tokenId: SbtTokenIdInput,
+    expectedChainId: string | number,
   ) => Promise<SbtTransactionResult>;
   claimWithPassword: (
     providerName: SbtProviderRef,
     sbtAddress: string,
     password: string,
+    expectedChainId: string | number,
   ) => Promise<SbtTransactionResult>;
   isPasswordValid: (
     providerLike: SbtProviderRef,
@@ -132,7 +141,12 @@ export type SbtAdminOpsPort = {
     hashedPasswordBytes32: string,
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
   ) => Promise<boolean>;
-  startClaim: (providerName: SbtProviderRef, sbtAddress: string, userCommit: string) => Promise<SbtTransactionResult>;
+  startClaim: (
+    providerName: SbtProviderRef,
+    sbtAddress: string,
+    userCommit: string,
+    expectedChainId: string | number,
+  ) => Promise<SbtTransactionResult>;
 };
 
 export type SbtOwnershipReadsPort = {

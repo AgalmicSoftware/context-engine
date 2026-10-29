@@ -317,7 +317,7 @@ describe('SBTPage session routing and holder loading', () => {
     await subject.handleBurn();
 
     expect(tokenIdSpy).toHaveBeenCalledWith('none', sbtAddress, account, '');
-    expect(burnSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '7');
+    expect(burnSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '7', '84532');
     expect(subject.applyLocalBurnSuccess).toHaveBeenCalledWith(account);
     expect(subject.state.burningStatus).toBe('success');
   });
@@ -340,7 +340,7 @@ describe('SBTPage session routing and holder loading', () => {
     await subject.miniBurnHandler();
 
     expect(tokenIdSpy).toHaveBeenCalledWith('none', sbtAddress, account, '');
-    expect(burnSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '8');
+    expect(burnSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '8', '84532');
     expect(subject.applyLocalBurnSuccess).toHaveBeenCalledWith(account);
   });
 

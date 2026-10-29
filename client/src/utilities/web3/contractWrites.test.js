@@ -63,6 +63,7 @@ describe('contractWrites gas override fallbacks', () => {
     };
 
     const result = await sendContractWriteViaProvider({
+      expectedChainId: 11155420,
       signingProvider,
       ethersProvider,
       signer,
@@ -132,6 +133,7 @@ describe('contractWrites gas override fallbacks', () => {
     });
 
     const result = await sendContractWriteViaProvider({
+      expectedChainId: 11155420,
       signingProvider,
       ethersProvider,
       signer,
@@ -175,6 +177,7 @@ describe('contractWrites gas override fallbacks', () => {
 
     await expect(
       sendContractWriteViaProvider({
+        expectedChainId: 11155420,
         signingProvider,
         ethersProvider,
         signer,
@@ -221,6 +224,7 @@ describe('contractWrites gas override fallbacks', () => {
 
     await expect(
       sendContractWriteViaProvider({
+        expectedChainId: 11155420,
         signingProvider,
         ethersProvider,
         signer,
@@ -265,6 +269,7 @@ describe('contractWrites gas override fallbacks', () => {
 
     await expect(
       sendContractWriteViaProvider({
+        expectedChainId: 11155420,
         signingProvider,
         ethersProvider,
         signer,
@@ -311,6 +316,18 @@ describe('raw contract write target checks', () => {
     await expect(sendContractWriteViaProvider(options)).rejects.toThrow(/contract.*deployed|bytecode/i);
     expect(options.signingProvider.request).not.toHaveBeenCalled();
   });
+
+  it.each([undefined, null, '', 0, -1, 1.5, 'bad'])(
+    'rejects a missing or invalid session chain before wallet interaction: %s',
+    async (chainId) => {
+      const options = { ...makeOptions(), expectedChainId: chainId };
+      await expect(sendContractWriteViaProvider(options)).rejects.toThrow(/chain|network/i);
+      expect(options.ethersProvider.getNetwork).not.toHaveBeenCalled();
+      expect(options.ethersProvider.getCode).not.toHaveBeenCalled();
+      expect(options.signer.getAddress).not.toHaveBeenCalled();
+      expect(options.signingProvider.request).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects a different chain before broadcasting', async () => {
     const options = makeOptions();

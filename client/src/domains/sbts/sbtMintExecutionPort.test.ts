@@ -11,9 +11,9 @@ const executeSbtMintFlows = async (
   groupSignature: string,
 ) => {
   const [publicTx, inviteTx, groupTx] = await Promise.all([
-    port.claim(providerName, sbtAddress),
-    port.claimWithInvite(providerName, sbtAddress, nonce, inviteSignature),
-    port.mintWithGroupSignature(providerName, sbtAddress, groupSignature),
+    port.claim(providerName, sbtAddress, 11155420),
+    port.claimWithInvite(providerName, sbtAddress, nonce, inviteSignature, 11155420),
+    port.mintWithGroupSignature(providerName, sbtAddress, groupSignature, 11155420),
   ]);
 
   return {
@@ -28,7 +28,7 @@ describe('SbtMintExecutionPort', () => {
     jest.restoreAllMocks();
   });
 
-  it('supports a fake mint execution port with the legacy call shape', async () => {
+  it('supports a fake mint execution port with an explicit session chain', async () => {
     const fakePort: SbtMintExecutionPort = {
       claim: jest.fn(async () => ({ transactionHash: '0xpublic' })),
       claimWithInvite: jest.fn(async () => ({ transactionHash: '0xinvite' })),
@@ -45,9 +45,9 @@ describe('SbtMintExecutionPort', () => {
       groupTx: { transactionHash: '0xgroup' },
     });
 
-    expect(fakePort.claim).toHaveBeenCalledWith(providerRef, sbtAddress);
-    expect(fakePort.claimWithInvite).toHaveBeenCalledWith(providerRef, sbtAddress, '7', '0xinviteSignature');
-    expect(fakePort.mintWithGroupSignature).toHaveBeenCalledWith(providerRef, sbtAddress, '0xgroupSignature');
+    expect(fakePort.claim).toHaveBeenCalledWith(providerRef, sbtAddress, 11155420);
+    expect(fakePort.claimWithInvite).toHaveBeenCalledWith(providerRef, sbtAddress, '7', '0xinviteSignature', 11155420);
+    expect(fakePort.mintWithGroupSignature).toHaveBeenCalledWith(providerRef, sbtAddress, '0xgroupSignature', 11155420);
   });
 
   it('delegates mint execution through call-time chainGateway property lookup', async () => {
@@ -59,9 +59,9 @@ describe('SbtMintExecutionPort', () => {
       .spyOn(chainGateway, 'mintWithGroupSignature')
       .mockResolvedValue({ transactionHash: '0xsecondGroup' });
 
-    await expect(sbtMintExecutionPort.claim('injected', '0x0000000000000000000000000000000000000001')).resolves.toEqual(
-      { transactionHash: '0xfirstClaim' },
-    );
+    await expect(
+      sbtMintExecutionPort.claim('injected', '0x0000000000000000000000000000000000000001', 11155420),
+    ).resolves.toEqual({ transactionHash: '0xfirstClaim' });
 
     await expect(
       sbtMintExecutionPort.claimWithInvite(
@@ -69,6 +69,7 @@ describe('SbtMintExecutionPort', () => {
         '0x0000000000000000000000000000000000000002',
         '8',
         '0xinviteSignature',
+        11155420,
       ),
     ).resolves.toEqual({ transactionHash: '0xsecondInvite' });
     await expect(
@@ -76,20 +77,23 @@ describe('SbtMintExecutionPort', () => {
         'injected',
         '0x0000000000000000000000000000000000000002',
         '0xgroupSignature',
+        11155420,
       ),
     ).resolves.toEqual({ transactionHash: '0xsecondGroup' });
 
-    expect(claim).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000001');
+    expect(claim).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000001', 11155420);
     expect(claimWithInvite).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',
       '8',
       '0xinviteSignature',
+      11155420,
     );
     expect(mintWithGroupSignature).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',
       '0xgroupSignature',
+      11155420,
     );
   });
 });
