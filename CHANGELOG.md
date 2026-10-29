@@ -536,6 +536,8 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Bind longitudinal snapshots to the persona instructions and prompt template actually used, rejecting changed or missing context.
+
 - Parse benchmark answers after removing inline reasoning, and retry conflicting or truncated final answers.
 
 - Publish rendered previews with the same validated analysis overlay, retaining HTML equality and integrity checks.
