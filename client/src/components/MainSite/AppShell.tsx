@@ -85,7 +85,7 @@ import {
   type SessionResponseHydrationController,
   type SessionResponseHydrationHost,
 } from '../../utilities/survey/sessionResponseHydrationController.js';
-import { isResponseRecencyAtLeast, toResponseRecencyPair } from '../../utilities/survey/responseRecency.js';
+import { isResponseRecencyNewer, toResponseRecencyPair } from '../../utilities/survey/responseRecency.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
 import { initCacheManager, subscribeCacheUpdates, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import { createMainSiteDgStorage, type MainSiteDgStorage } from '../../utilities/cache/mainSiteDgStorage.js';
@@ -461,6 +461,7 @@ type MainSiteSurveyNetworkCache = Record<string, unknown> & {
   surveysLatestBlock?: number;
   surveys: Record<string, SurveyMetadataCacheEntry | unknown>;
   surveyResponses: MainSiteSurveyResponseCache;
+  surveyResponsesMeta?: MainSiteQuestionResponseMetaCache;
   surveyResponsesLatestBlock: MainSiteSurveyResponseBlockCache;
   pendingSurveyMetadata?: Record<string, unknown>;
 };
@@ -496,6 +497,7 @@ const createMainSiteSurveyNetworkCache = (initialLastBlock: number): MainSiteSur
   surveysLatestBlock: initialLastBlock,
   surveys: {},
   surveyResponses: {},
+  surveyResponsesMeta: {},
   surveyResponsesLatestBlock: {},
   pendingSurveyMetadata: {},
 });
@@ -3856,25 +3858,27 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       const eventTimestamp = Number(event?.timestamp || 0);
       let surveyCacheUpdated = false;
       let questionCacheUpdated = false;
+      let surveyResponseData: unknown = null;
+      const fetchedQuestionResponses = new Map<string, Record<string, unknown>>();
+      const bn = Number(eventBlockNumber || 0);
+      const incomingResponseRecency = { bn, txi: eventTransactionIndex, li: eventLogIndex, ts: eventTimestamp };
 
-      // Survey-level responses (preserve watermark logic as-is)
+      // A scan watermark is shared by responders; only this responder's event
+      // position can decide whether its payload is newer.
       if (surveyIdFromEvent && surveyIdFromEvent !== ethers.constants.HashZero.toLowerCase()) {
-        if (eventBlockNumber > (currentSurveyNetworkCache.surveyResponsesLatestBlock[surveyIdFromEvent] || 0)) {
+        const previous =
+          currentSurveyNetworkCache.surveyResponsesMeta?.[surveyIdFromEvent]?.[responderAddressLower] || {};
+        if (isResponseRecencyNewer(incomingResponseRecency, previous)) {
           mainSiteLog.log(
             `Fetching survey response for survey ${surveyIdFromEvent}, responder ${responderAddressLower} due to ResponsesSubmitted event.`,
           );
-          const surveyResponseData = await surveyReadsPort.getSurveyResponse(
+          surveyResponseData = await surveyReadsPort.getSurveyResponse(
             'none',
             responderAddressLower,
             surveyIdFromEvent,
             slug,
           );
           if (surveyResponseData) {
-            if (!currentSurveyNetworkCache.surveyResponses[surveyIdFromEvent]) {
-              currentSurveyNetworkCache.surveyResponses[surveyIdFromEvent] = {};
-            }
-            currentSurveyNetworkCache.surveyResponses[surveyIdFromEvent][responderAddressLower] = surveyResponseData;
-            currentSurveyNetworkCache.surveyResponsesLatestBlock[surveyIdFromEvent] = eventBlockNumber;
             surveyCacheUpdated = true;
             mainSiteLog.log(`Survey response for ${surveyIdFromEvent} by ${responderAddressLower} updated in cache.`);
           } else {
@@ -3884,7 +3888,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           }
         } else {
           mainSiteLog.log(
-            `ResponsesSubmitted event for survey ${surveyIdFromEvent} (block ${eventBlockNumber}) is not newer than last processed block (${currentSurveyNetworkCache.surveyResponsesLatestBlock[surveyIdFromEvent] || 0}). Skipping survey response update.`,
+            `ResponsesSubmitted event for survey ${surveyIdFromEvent} is not newer for responder ${responderAddressLower}. Skipping survey response update.`,
           );
         }
       }
@@ -3900,19 +3904,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         }
       });
 
-      const bn = Number(eventBlockNumber || 0);
-      const incomingResponseRecency = {
-        bn,
-        txi: eventTransactionIndex,
-        li: eventLogIndex,
-        ts: eventTimestamp,
-      };
       const qIdsToFetch: string[] = [];
       questionIdsFromEvent.forEach((qId: string) => {
         const responseMetaByResponder = currentQuestionNetworkCache.questionResponsesMeta[qId] || {};
         const prev = responseMetaByResponder[responderAddressLower] || {};
         const previousResponseRecency = toResponseRecencyPair(prev);
-        const isNewer = isResponseRecencyAtLeast(incomingResponseRecency, prev);
+        const isNewer = isResponseRecencyNewer(incomingResponseRecency, prev);
         if (isNewer) {
           qIdsToFetch.push(qId);
         } else {
@@ -3937,12 +3934,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         let acceptedAny = false;
         results.forEach(({ qId, data }: MainSiteResponseFetchResult) => {
           if (!data) return;
-          const responseByResponder = currentQuestionNetworkCache.questionResponses[qId] || {};
-          currentQuestionNetworkCache.questionResponses[qId] = responseByResponder;
-          responseByResponder[responderAddressLower] = data;
-          const responseMetaByResponder = currentQuestionNetworkCache.questionResponsesMeta[qId] || {};
-          currentQuestionNetworkCache.questionResponsesMeta[qId] = responseMetaByResponder;
-          responseMetaByResponder[responderAddressLower] = incomingResponseRecency;
+          fetchedQuestionResponses.set(qId, data);
           acceptedAny = true;
           mainSiteLog.log(
             `[ResponsesSubmitted][recency-guard] ACCEPTED for qId=${qId}, responder=${responderAddressLower} (bn/tx/li/ts=${bn}/${eventTransactionIndex}/${eventLogIndex}/${eventTimestamp}).`,
@@ -3950,10 +3942,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         });
 
         if (acceptedAny) {
-          // Advance watermark only if at least one response was accepted as newer
-          if (bn > (currentQuestionNetworkCache.questionResponsesLatestBlock || 0)) {
-            currentQuestionNetworkCache.questionResponsesLatestBlock = bn;
-          }
           questionCacheUpdated = true;
         }
         if (shouldForceResponseBackfill) {
@@ -3974,14 +3962,18 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           this.mergeLegacyNumericNetworkKey(next, networkID);
           const targetNet = next[networkID] || createMainSiteSurveyNetworkCache(initialLastBlockDefault);
           if (!isMainSiteRecord(targetNet.surveyResponses)) targetNet.surveyResponses = {};
+          if (!isMainSiteRecord(targetNet.surveyResponsesMeta)) targetNet.surveyResponsesMeta = {};
           if (!isMainSiteRecord(targetNet.surveyResponsesLatestBlock)) targetNet.surveyResponsesLatestBlock = {};
           const currentWatermark = Number(targetNet.surveyResponsesLatestBlock[surveyIdFromEvent]) || 0;
-          if (Number(eventBlockNumber) > currentWatermark) {
+          const existingMeta = targetNet.surveyResponsesMeta?.[surveyIdFromEvent]?.[responderAddressLower] || {};
+          if (isResponseRecencyNewer(incomingResponseRecency, existingMeta)) {
             if (!isMainSiteRecord(targetNet.surveyResponses[surveyIdFromEvent])) {
               targetNet.surveyResponses[surveyIdFromEvent] = {};
             }
-            targetNet.surveyResponses[surveyIdFromEvent]![responderAddressLower] =
-              currentSurveyNetworkCache.surveyResponses[surveyIdFromEvent]?.[responderAddressLower];
+            targetNet.surveyResponses[surveyIdFromEvent]![responderAddressLower] = surveyResponseData;
+            const surveyMeta = targetNet.surveyResponsesMeta![surveyIdFromEvent] || {};
+            surveyMeta[responderAddressLower] = incomingResponseRecency;
+            targetNet.surveyResponsesMeta![surveyIdFromEvent] = surveyMeta;
             targetNet.surveyResponsesLatestBlock[surveyIdFromEvent] = Math.max(
               currentWatermark,
               Number(eventBlockNumber) || 0,
@@ -4000,15 +3992,14 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           const targetNet = next[networkID] || createMainSiteQuestionNetworkCache(initialLastBlockDefault);
           ensureQuestionArweaveCacheBranches(targetNet);
           qIdsToFetch.forEach((qId) => {
-            const incomingResponse = currentQuestionNetworkCache.questionResponses[qId]?.[responderAddressLower];
-            const incomingMeta = currentQuestionNetworkCache.questionResponsesMeta[qId]?.[responderAddressLower];
-            if (!incomingResponse || !incomingMeta) return;
+            const incomingResponse = fetchedQuestionResponses.get(qId);
+            if (!incomingResponse) return;
             if (!isMainSiteRecord(targetNet.questionResponses[qId])) targetNet.questionResponses[qId] = {};
             if (!isMainSiteRecord(targetNet.questionResponsesMeta[qId])) targetNet.questionResponsesMeta[qId] = {};
             const existingMeta = targetNet.questionResponsesMeta[qId]?.[responderAddressLower] || {};
-            if (!isResponseRecencyAtLeast(incomingResponseRecency, existingMeta)) return;
+            if (!isResponseRecencyNewer(incomingResponseRecency, existingMeta)) return;
             targetNet.questionResponses[qId]![responderAddressLower] = incomingResponse;
-            targetNet.questionResponsesMeta[qId]![responderAddressLower] = incomingMeta;
+            targetNet.questionResponsesMeta[qId]![responderAddressLower] = incomingResponseRecency;
             questionResponsePersisted = true;
           });
           if (questionResponsePersisted) {

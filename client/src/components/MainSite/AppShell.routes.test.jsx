@@ -4314,6 +4314,100 @@ describe('AppShell route render smoke', () => {
     expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
   });
 
+  it('caches every survey responder in a block and keeps same-block edits ordered and idempotent', async () => {
+    const surveyId = `0x${'1'.repeat(64)}`;
+    const questionId = `0x${'2'.repeat(64)}`;
+    const first = '0x0000000000000000000000000000000000000001';
+    const second = '0x0000000000000000000000000000000000000002';
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const dg = attachDgStore(subject);
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const next = await updater(dg.read(name, slug) || {});
+      dg.write(name, slug, next);
+      return next;
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 30 });
+    contractScripts.getSurveyResponse
+      .mockResolvedValueOnce({ answer: 'first' })
+      .mockResolvedValueOnce({ answer: 'second' })
+      .mockResolvedValueOnce({ answer: 'edited' });
+    contractScripts.getResponse
+      .mockResolvedValueOnce({ answer: 'first' })
+      .mockResolvedValueOnce({ answer: 'second' })
+      .mockResolvedValueOnce({ answer: 'edited' });
+    const event = { type: 'ResponsesSubmitted', surveyId, questionIds: [questionId], blockNumber: 30, timestamp: 1 };
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      ...event,
+      responder: first,
+      transactionIndex: 1,
+      logIndex: 2,
+    });
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      ...event,
+      responder: second,
+      transactionIndex: 1,
+      logIndex: 3,
+    });
+    const edit = { ...event, responder: first, transactionIndex: 2, logIndex: 0 };
+    await subject.onNewSurveyEventDetectedForGroup('edge', edit);
+    const survey = dg.read('surveysCache', 'edge')['84532'];
+    const questions = dg.read('questionsCache', 'edge')['84532'];
+    expect(survey.surveyResponses[surveyId]).toEqual({ [first]: { answer: 'edited' }, [second]: { answer: 'second' } });
+    expect(questions.questionResponses[questionId]).toEqual(survey.surveyResponses[surveyId]);
+    expect(survey.surveyResponsesLatestBlock[surveyId]).toBe(30);
+    const before = JSON.stringify([...dg.store]);
+    const revisions = subject.queueLocalRevisionUpdate.mock.calls.length;
+    await subject.onNewSurveyEventDetectedForGroup('edge', edit);
+    await subject.onNewSurveyEventDetectedForGroup('edge', { ...edit, transactionIndex: 1, logIndex: 99 });
+    expect(JSON.stringify([...dg.store])).toBe(before);
+    expect(contractScripts.getSurveyResponse).toHaveBeenCalledTimes(3);
+    expect(contractScripts.getResponse).toHaveBeenCalledTimes(3);
+    expect(subject.queueLocalRevisionUpdate).toHaveBeenCalledTimes(revisions);
+  });
+
+  it('rechecks survey responder recency in the atomic write after a concurrent newer response', async () => {
+    const surveyId = `0x${'1'.repeat(64)}`;
+    const responder = '0x0000000000000000000000000000000000000001';
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const dg = attachDgStore(subject);
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const current = {
+        84532: {
+          surveys: {},
+          surveyResponses: { [surveyId]: { [responder]: { answer: 'newer' } } },
+          surveyResponsesMeta: { [surveyId]: { [responder]: { bn: 40, txi: 1, li: 1, ts: 1 } } },
+          surveyResponsesLatestBlock: { [surveyId]: 40 },
+        },
+      };
+      const next = await updater(current);
+      dg.write(name, slug, next);
+      return next;
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 40 });
+    contractScripts.getSurveyResponse.mockResolvedValue({ answer: 'older' });
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'ResponsesSubmitted',
+      surveyId,
+      questionIds: [],
+      responder,
+      blockNumber: 30,
+      transactionIndex: 1,
+      logIndex: 1,
+    });
+    expect(dg.read('surveysCache', 'edge')['84532'].surveyResponses[surveyId][responder]).toEqual({ answer: 'newer' });
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+  });
+
   it('rechecks response-event recency inside the atomic updater before publishing a revision', async () => {
     const questionId = `0x${'8'.repeat(64)}`;
     const responder = '0x00000000000000000000000000000000000000a8';

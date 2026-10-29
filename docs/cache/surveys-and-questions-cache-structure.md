@@ -75,7 +75,8 @@ Per-network shape:
 Semantics:
 
 - `surveysLatestBlock`: watermark for survey discovery for that session+network
-- `surveyResponsesLatestBlock[surveyId]`: per-survey response watermark
+- `surveyResponsesLatestBlock[surveyId]`: per-survey scan progress, never a responder admission guard
+- `surveyResponsesMeta[surveyId][responder]`: live-event recency as `bn`, `txi`, `li`, and `ts`; each responder is ordered independently, including edits within one block
 - `surveys[surveyId]`: hydrated survey payloads
 - `surveys[surveyId].sessionSlugExplicit`: `true` when metadata authoritatively declared the session slug; `false` when the cache derived a slug from legacy name mapping or rebucketed unresolved metadata to general
 - `surveyResponses[surveyId][responder]`: latest known response payload for a survey responder
