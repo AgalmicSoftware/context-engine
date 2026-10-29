@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Read research gold and wide exports from permanent submitted-answer history,
+  preserving revision order and gold answers from before each prediction.
+
 - Count research completion from distinct stored answers and privacy skips, using
   the Wrapped image coverage rule. Retried attempts remain marked as replays.
 

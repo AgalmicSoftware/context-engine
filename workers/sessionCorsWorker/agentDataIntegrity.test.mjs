@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fixture, wallet, sessionId, enforceKvWriteLimit } from './agentTestFixture.mjs';
+import { persistAgentSubmitRecord, canonicalAnswerSessionKvPrefix } from './agent/agentSubmitQueue.mjs';
 import { saveAgentOnlyModeConfig } from './agent/wrappedConfig.mjs';
 import { createWorkerExecutionServicesWithWorkerDeps } from './workerExecutionServiceBinding.js';
 import { signToken } from './tokenSigning.js';
@@ -351,4 +352,51 @@ for (const complete of [false, true]) test(`research completion counts stored an
   const answerAttempts = (await attempts.text()).trim().split('\n').map(JSON.parse).filter(row => row.stage === 'answers_bulk');
   assert.equal(answerAttempts.length, 4);
   assert.equal(answerAttempts.filter(row => row.replay).length, 1);
+});
+
+for (const revised of [false, true]) test(`research exports retain canonical answers after index expiry and obey revision/time ordering (revised=${revised})`, async () => {
+  const { f } = readableFixture();
+  const member = await memberToken(f);
+  const admin = await f.credential({ scopes: ['read_questions'] });
+  const page = await jsonOk(await f.request('/api/agent/agent-only/statements', { token: member }));
+  await jsonOk(await f.request('/api/agent/agent-only/answers/bulk', { method: 'POST', token: member, body: {
+    run_id: 'history-run', request_id: 'history-prediction', agent_metadata: metadata,
+    answers: page.statements.map(q => ({ statement_id: q.statement_id, statement_version: q.statement_version, answer: { value: 'agree' }, confidence: 80 })),
+  } }));
+  const event = JSON.parse(f.records.get([...f.records.keys()].find(key => key.includes(':answer-event:'))));
+  const predictedAt = Date.parse(event.createdAt);
+  const answer = (value, comments) => ({ value, comments, questionType: 'binary' });
+  const prior = answer('agree', 'Prior exact answer');
+  const revision = answer('disagree', 'Current revision before prediction');
+  const later = answer('unsure', 'After prediction');
+  const store = async (requestId, questionId, answerRevision, offset, payload) => {
+    const result = await persistAgentSubmitRecord({ env: f.agentEnv, record: { sessionSlug: 'fixture',
+      telegramUserId: event.telegramUserId, questionId, requestId, answerRevision, status: 'direct_submitted',
+      createdAt: new Date(predictedAt + offset).toISOString(), answer: payload } });
+    assert.equal(result.ok, true);
+  };
+  await store('prior', openQ, 1, -1000, prior);
+  if (revised) await store('revision', openQ, 2, -2000, revision);
+  await store('later', openQ, 3, 1000, later);
+  await store('only-later', gatedQ, 1, 1000, later);
+  const lists = [];
+  const list = f.env.GROUP_KV.list.bind(f.env.GROUP_KV);
+  f.env.GROUP_KV.list = async options => { lists.push(options.prefix); return list(options); };
+  const exported = async view => {
+    lists.length = 0;
+    const response = await f.request(`/api/agent/admin/agent-only/export?view=${view}`, { token: admin.token });
+    assert.equal(response.status, 200, await response.clone().text());
+    const rows = (await response.text()).trim().split('\n').filter(Boolean).map(JSON.parse);
+    assert.equal(lists.filter(prefix => prefix.endsWith(canonicalAnswerSessionKvPrefix('fixture'))).length, 1, 'load canonical history once per export');
+    return rows;
+  };
+  const gold = await exported('gold');
+  assert.equal(gold.length, 1, 'a human answer after the prediction is not gold');
+  assert.deepEqual(gold[0].prior_human_answer, revised ? revision : prior);
+  const wide = await exported('wide');
+  assert.equal(wide.length, 2);
+  assert.ok(wide.every(row => JSON.stringify(row.human_current_answer) === JSON.stringify(later)));
+  for (const key of f.records.keys()) if (key.includes('telegram:submit-request')) f.records.delete(key);
+  assert.deepEqual(await exported('gold'), gold);
+  assert.deepEqual(await exported('wide'), wide);
 });

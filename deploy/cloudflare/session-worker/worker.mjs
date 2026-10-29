@@ -63103,7 +63103,7 @@ function dedupeSubmitRecords(records = []) {
   });
   return Array.from(byId.values());
 }
-async function loadSubmittedResultRecords(env = {}, sessionSlug = "") {
+async function loadSubmittedResultRecords(env = {}, sessionSlug = "", { includeRawAnswer = false } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const indexedPrefix = submitRequestSessionKvPrefix(slug);
   const indexedRecords = indexedPrefix ? await listKvRecordsByPrefix2(env, indexedPrefix, { limit: Infinity, parseJson: safeEnvJsonParse }) : [];
@@ -63136,7 +63136,7 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = "") {
         record3.answerLabel
       )),
       questionType: safeString(answer.questionType || record3.questionType || record3.controlType),
-      ...answer.questionType === "quadratic" ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {},
+      ...includeRawAnswer ? { answer: record3.answer || null } : answer.questionType === "quadratic" ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {},
       text: safeAnswerString(firstAnswerValue(
         answer.text,
         record3.answerText
@@ -90998,7 +90998,7 @@ var quoteCsvCell = (value) => {
 
 // workers/sessionCorsWorker/agent/wrappedExport.mjs
 init_runtimePrimitives();
-init_agentSubmitQueue();
+init_submittedResults();
 init_wrappedCore();
 async function agentOnlyPrincipalId(env = {}, telegramUserId = "") {
   const salt = `${AGENT_ONLY_PRINCIPAL_ID_SALT}:${env.AGENT_CONTEXT.sessionId}`;
@@ -91024,33 +91024,6 @@ function rowsToCsv(rows = []) {
 }
 function rowsToJsonl(rows = []) {
   return rows.map((row) => JSON.stringify(row)).join("\n");
-}
-async function latestSubmittedAnswerFor({
-  env = {},
-  sessionSlug = "",
-  telegramUserId = "",
-  questionId: questionId4 = "",
-  beforeIso = ""
-} = {}) {
-  const slug = sanitizeSessionSlug(sessionSlug);
-  const user = safeString(telegramUserId).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 128);
-  const question = safeString(questionId4).replace(/[^0-9A-Za-z._:-]/g, "").slice(0, 160);
-  if (!slug || !user || !question) return null;
-  const prefix = `${SUBMIT_REQUEST_USER_KV_PREFIX}${slug}:${user}:${question}:`;
-  const entries = await listKvEntriesByPrefix(env, prefix);
-  const beforeMs = Date.parse(safeString(beforeIso));
-  let latest = null;
-  for (const entry2 of entries) {
-    const record3 = await readKvJson2(env, entry2.key);
-    if (!record3 || safeString(record3.questionId) !== safeString(questionId4)) continue;
-    const status = safeString(record3.status);
-    if (status && !SUBMITTED_RESULT_STATUSES.includes(status)) continue;
-    const createdAt = safeString(record3.createdAt || record3.processedAt || record3.updatedAt);
-    const createdMs = Date.parse(createdAt);
-    if (Number.isFinite(beforeMs) && (!Number.isFinite(createdMs) || createdMs >= beforeMs)) continue;
-    if (!latest || Date.parse(safeString(latest.createdAt)) < createdMs) latest = { ...record3, createdAt };
-  }
-  return latest;
 }
 async function exportAgentOnlyData({
   env = {},
@@ -91085,6 +91058,20 @@ async function exportAgentOnlyData({
       const other = await loadWrappedStatements({ env, sessionSlug: slug, readabilityOnly: true, questionSourceMode });
       if (!other.ok) return other;
       for (const statement of other.space.statements) readable.add(statement.statement_id);
+    }
+  }
+  const submittedHistory = /* @__PURE__ */ new Map();
+  const currentSubmitted = /* @__PURE__ */ new Map();
+  const answerKey = (user, question) => JSON.stringify([safeString(user), safeString(question)]);
+  if (view === "gold" || view === "wide" && !compactExport) {
+    const records = await loadSubmittedResultRecords(env, slug, { includeRawAnswer: true });
+    for (const record3 of records) {
+      const key = answerKey(record3.telegramUserId, record3.questionId);
+      if (!submittedHistory.has(key)) submittedHistory.set(key, []);
+      submittedHistory.get(key).push(record3);
+    }
+    for (const record3 of selectCurrentSubmittedAnswers(records)) {
+      currentSubmitted.set(answerKey(record3.telegramUserId, record3.questionId), record3);
     }
   }
   if (["answers", "wide", "calibration", "gold"].includes(view)) {
@@ -91171,13 +91158,9 @@ async function exportAgentOnlyData({
             created_at: safeString(record3.createdAt)
           });
         } else if (safeString(record3.source) === "agent_autofill" && record3.eventKind === "answer") {
-          const prior = await latestSubmittedAnswerFor({
-            env,
-            sessionSlug: slug,
-            telegramUserId: record3.telegramUserId,
-            questionId: record3.questionId,
-            beforeIso: record3.createdAt
-          });
+          const beforeMs = Date.parse(record3.createdAt);
+          const history = submittedHistory.get(answerKey(record3.telegramUserId, record3.questionId)) || [];
+          const [prior] = selectCurrentSubmittedAnswers(history.filter((answer) => Date.parse(answer.createdAt) < beforeMs));
           if (!prior) continue;
           rows.push({
             principal_id: principalId,
@@ -91214,12 +91197,7 @@ async function exportAgentOnlyData({
             sessionSlug: slug,
             questionId: statementId
           });
-          const normal = compactExport ? null : await latestSubmittedAnswerFor({
-            env,
-            sessionSlug: slug,
-            telegramUserId: state.telegramUserId,
-            questionId: statementId
-          });
+          const normal = compactExport ? null : currentSubmitted.get(answerKey(state.telegramUserId, statementId));
           rows.push({
             principal_id: principalId,
             statement_id: safeString(statementId),
