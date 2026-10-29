@@ -1140,17 +1140,19 @@ written by the same in-progress archive are identified by its durable journal
 and may be replayed when resuming. Receipts replay only while their import is
 in progress. Completion removes both coordinators' journals, descriptors,
 progress, page receipts and temporary staged data in bounded, resumable batches,
-keeping only a small completion record. Continue sending the final unchanged
-page while `pageComplete: false`; `complete: true` follows cleanup. A later import
+keeping only a small completion record. The verified authority is first committed
+durably, while the importing admin retains control through cleanup. Continue
+sending the final unchanged page while `pageComplete: false`; `complete: true` follows cleanup. A later import
 runs the empty-target check again, even for the same archive.
 
 Restore with admin-signed `POST /admin/import-session-backup`, passing each
 saved response as `page` in its original order. The target must hold the source
 KEK as its current key or `CE_STORAGE_ENVELOPE_PREVIOUS_KEK`. The slug and session
 ID must match. A fresh deployment may pass `adoptSessionId: true`; only its
-trusted bootstrap admin can do this. Config authority is published after the
-last verified page. Config, key and group mutations are held while a restore is
-in progress, so the target cannot become a live session halfway through import.
+trusted bootstrap admin can do this. After the last page verifies, bounded cleanup
+finishes before a single transaction publishes config authority, writes the
+completion record and releases the restore lock. Only then does the archive admin
+take over. Config, key and group mutations are held while a restore is in progress, so the target cannot become a live session halfway through import.
 On `/admin?sessionSlug=<slug>&worker=<origin>`, a missing canonical config shows
 the restore panel so the bootstrap admin can restore before the session exists.
 After restoration, retry session loading to open the restored Admin page.
@@ -1167,14 +1169,16 @@ page is acknowledged. The admin panel follows these continuations automatically.
 archive may be in progress for a session. Conflicted restores remain unfinished
 with `complete: false`; abandon them before starting again. Temporary staging
 expires after seven days; the next restore or status request removes expired
-imports in bounded cleanup batches. Assembled payload chunks are removed immediately.
-Signed `POST /admin/session-backup-status` reports an unfinished restore. Signed
+uncommitted imports in bounded cleanup batches. Assembled payload chunks are removed immediately.
+Signed `POST /admin/session-backup-status` reports an unfinished restore and
+advances one cleanup batch for a committed restore, without needing the archive
+file again. Only the importing admin can continue a committed restore. Signed
 `POST /admin/abandon-session-backup` with its `archiveId` removes every row that
 restore wrote, including KV/R2 payloads, records, groups, keys and temporary
 staging, using a write-ahead journal. Repeat until `complete: true`; the restore
 lock is released only after cleanup leaves the target empty. The deployment bootstrap admin can perform these
-actions on a fresh target. A completed or config-published restore cannot be
-abandoned.
+actions on a fresh target. A committed restore cannot expire or be abandoned;
+status reads or final-page retries finish it. Completed restores cannot be abandoned.
 The target upload limit still applies, and payloads exceeding KV's encoded
 value limit require an R2 binding. Restore does not migrate the session to a
 different slug, rotate stored keys, or replace newer target policy.

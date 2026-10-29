@@ -71155,6 +71155,7 @@ var init_sessionBackupLifecycle = __esm({
     };
     cleanupCompletedBackupImport = async (coordinator, slug, archiveId, progress, budget) => {
       const { storage } = coordinator.state;
+      if (!progress.committedAuthority) fail2("Only a committed restore can complete.");
       if (budget && budget.remaining < 32) return false;
       const groups = await coordinateWorkerGroupBackup({
         env: coordinator.env,
@@ -71172,18 +71173,22 @@ var init_sessionBackupLifecycle = __esm({
       if (!Array.isArray(staged.keys)) throw new Error("Restore cleanup storage could not be read.");
       for (const { name } of staged.keys) await index.delete(name);
       if (staged.list_complete === false || !await clearBackupImportMetadata(storage, archiveId)) return false;
+      const authority = { ...progress.committedAuthority, projectionPending: true, projectionPendingSinceMs: coordinator.now() };
       await storage.transaction(async (transaction) => {
+        await transaction.put("session-config-authority", authority);
         await transaction.put("session-backup-import-completion", { archiveId, completedAt: coordinator.now(), counts: progress.counts });
         await transaction.delete(backupImportStateKey(archiveId));
         await transaction.delete(BACKUP_IMPORT_ACTIVE_KEY);
       });
+      await coordinator.projectSessionConfigAuthority(authority);
+      await coordinator.repairPendingSessionConfigProjection();
       return true;
     };
     assertNoActiveBackupImport = async (coordinator) => {
       const { storage } = coordinator.state;
       const archiveId = await storage.get(BACKUP_IMPORT_ACTIVE_KEY);
       const progress = archiveId && await storage.get(backupImportStateKey(archiveId));
-      if (progress && !progress.finished) throw Object.assign(
+      if (progress) throw Object.assign(
         new Error("A backup restore is in progress. Resume or abandon it first."),
         { status: 409, reason: "backup_restore_in_progress" }
       );
@@ -71229,31 +71234,31 @@ var init_sessionBackupLifecycle = __esm({
       if (!archiveId) return null;
       const progress = await storage.get(backupImportStateKey(archiveId));
       if (!progress) return null;
-      if (progress.finished) {
-        if (await cleanupCompletedBackupImport(coordinator, slug, archiveId, progress, budget)) return null;
-        return { archiveId, progress };
-      }
       const expired = !Number.isFinite(progress.expiresAt) || progress.expiresAt <= coordinator.now();
-      if (cleanExpired && (expired || progress.abandoning) && !progress.configPublished) {
+      if (cleanExpired && (expired || progress.abandoning) && !progress.committedAuthority) {
         if (await cleanup(coordinator, slug, archiveId, progress, budget)) return null;
       }
       return { archiveId, progress };
     };
     controlCoordinatorBackupImport = async (coordinator, payload, abandon = false) => {
       await coordinator.assertSessionAuthority(payload, { allowRestore: true });
-      const active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
+      let active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
+      if (active?.progress.committedAuthority && active.progress.actor !== payload.expectedAuthority.actor) {
+        fail2("Only the importing admin can finish this restore.");
+      }
       if (abandon) {
-        if (!active || active.archiveId !== payload.archiveId || active.progress.configPublished) {
-          fail2("Only an unfinished restore whose config has not been published can be abandoned.");
+        if (!active || active.archiveId !== payload.archiveId || active.progress.committedAuthority) {
+          fail2("Only an uncommitted restore can be abandoned.");
         }
         const complete = await cleanup(coordinator, payload.slug, active.archiveId, active.progress);
         return Response.json({ ok: true, complete });
       }
+      if (active?.progress.committedAuthority && await cleanupCompletedBackupImport(coordinator, payload.slug, active.archiveId, active.progress)) active = null;
       return Response.json({ ok: true, restore: active ? {
         archiveId: active.archiveId,
         inProgress: true,
-        canAbandon: !active.progress.configPublished,
-        cleaning: active.progress.abandoning === true || active.progress.finishing === true || active.progress.finished === true,
+        canAbandon: !active.progress.committedAuthority,
+        cleaning: active.progress.abandoning === true || !!active.progress.committedAuthority,
         expiresAt: active.progress.expiresAt
       } : null });
     };
@@ -72032,10 +72037,6 @@ var init_sessionBackupImport = __esm({
       const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
       const active = await readActiveBackupImport(coordinator, slug, true, budget);
       if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail6("Another backup restore is in progress. Check restore status to abandon it.", 409, "backup_restore_in_progress");
-      if (active?.progress.finished) {
-        await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
-        fail6("Previous restore cleanup is still in progress. Retry this page.", 503, "backup_cleanup_pending");
-      }
       const pageHash = await sha256Hex(JSON.stringify(page));
       const receiptKey = `${stateKey}:page:${page.pageNumber}`;
       const complete = async (progress2) => {
@@ -72051,7 +72052,7 @@ var init_sessionBackupImport = __esm({
           restore: done ? null : { archiveId: page.archiveId, inProgress: true, canAbandon: false, cleaning: true }
         });
       };
-      if (active?.progress.finishing) {
+      if (active?.progress.committedAuthority) {
         if (active.progress.actor !== expectedAuthority.actor || active.progress.pageNumber !== page.pageNumber || active.progress.pageHash !== pageHash) {
           fail6("Resume completion with the final unchanged backup page.", 409);
         }
@@ -72084,11 +72085,9 @@ var init_sessionBackupImport = __esm({
           conflicts: [],
           observed: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 },
           expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS,
-          configPublished: false,
           pendingPayloads: 0,
           pendingRecords: 0,
-          snapshotReady: false,
-          finished: false
+          snapshotReady: false
         };
         if (page.coordinator.chunked !== true) {
           validateSnapshot({ snapshot: page.coordinator, manifest, ...validators });
@@ -72099,7 +72098,7 @@ var init_sessionBackupImport = __esm({
           await transaction.put(stateKey, progress);
         });
       }
-      if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.finished || progress.nextEntry > 0 && progress.pageHash !== pageHash || !same(progress.manifest, { ...manifest, counts: void 0, complete: void 0 })) fail6("Backup pages must be imported unchanged and in order.", 409);
+      if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.nextEntry > 0 && progress.pageHash !== pageHash || !same(progress.manifest, { ...manifest, counts: void 0, complete: void 0 })) fail6("Backup pages must be imported unchanged and in order.", 409);
       progress.pageHash = pageHash;
       if (!progress.groupsStarted) {
         const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: "begin", archiveId: page.archiveId });
@@ -72161,7 +72160,7 @@ var init_sessionBackupImport = __esm({
           counts: progress.counts,
           conflicts: progress.conflicts,
           complete: false,
-          restore: { archiveId: page.archiveId, inProgress: true, canAbandon: !progress.configPublished }
+          restore: { archiveId: page.archiveId, inProgress: true, canAbandon: !progress.committedAuthority }
         });
       };
       for (let i = progress.nextEntry; i < page.entries.length; i += 1) {
@@ -72332,21 +72331,12 @@ var init_sessionBackupImport = __esm({
               progress.counts.written += 1;
             }
           }
-          if (!progress.counts.conflicts && !progress.configPublished) {
-            progress.configPublished = true;
-            await storage.transaction(async (transaction) => {
-              await transaction.put("session-config-authority", { ...authority, projectionPending: true, projectionPendingSinceMs: coordinator.now() });
-              await transaction.put(stateKey, progress);
-            });
-            await coordinator.projectSessionConfigAuthority(authority);
+          if (!progress.counts.conflicts) {
+            progress.committedAuthority = authority;
             progress.counts.written += 1;
+            await storage.put(stateKey, progress);
+            return complete(progress);
           }
-          if (progress.configPublished) await coordinator.repairPendingSessionConfigProjection();
-        }
-        if (progress.configPublished && !progress.counts.conflicts) {
-          progress.finishing = true;
-          await storage.put(stateKey, progress);
-          return complete(progress);
         }
       }
       const result = {
@@ -72355,8 +72345,8 @@ var init_sessionBackupImport = __esm({
         pageNumber: page.pageNumber,
         counts: progress.counts,
         conflicts: progress.conflicts,
-        complete: progress.finished && !progress.counts.conflicts,
-        restore: progress.finished ? null : { archiveId: page.archiveId, inProgress: true, canAbandon: !progress.configPublished }
+        complete: false,
+        restore: { archiveId: page.archiveId, inProgress: true, canAbandon: true }
       };
       progress.pageNumber += 1;
       progress.nextEntry = 0;
