@@ -1,6 +1,5 @@
 import React from 'react';
-import { analyzeClusterOpinions } from '../../utilities/ai/aiClient.js';
-jest.mock('../../utilities/ai/aiClient.js', () => ({ analyzeClusterOpinions: jest.fn() }));
+import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth.js';
 import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import PolisReport, {
   applyFilterStateToAggregator,
@@ -38,6 +37,11 @@ import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
+
+jest.mock('../../utilities/worker/workerAuth.js', () => ({
+  ...jest.requireActual('../../utilities/worker/workerAuth.js'),
+  fetchWorkerWithAuth: jest.fn(),
+}));
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   peekCacheSync: jest.fn(() => ({})),
@@ -2497,59 +2501,112 @@ it('ranks top questions by importance before conviction', () => {
   expect(Object.keys(out)).toEqual(['highImportance']);
 });
 
-it('analyzes Worker session clusters using the selected config and viewer context', async () => {
-  analyzeClusterOpinions.mockResolvedValue({
-    name: 'Common ground',
-    short: 'Shared priorities',
-    long: 'Synthetic group explanation',
-  });
+describe('Polis sponsored cluster analysis', () => {
+  const account = '0x0000000000000000000000000000000000000001';
+  const provider = { request: jest.fn() };
   const config = {
-    slug: 'cluster-worker',
-    corsWorkerUrl: 'https://cluster-worker.example',
+    slug: 'sponsored-polis',
+    corsWorkerUrl: 'https://sponsored-polis.example.test/',
     sessionId: '0x' + '9'.repeat(32),
     sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    ai: {
+      models: {
+        fast: { provider: 'openai', model: 'gpt-5.6-terra' },
+        thinking: { provider: 'openai', model: 'gpt-5.6-terra' },
+      },
+    },
   };
-  const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: config.slug });
-  cacheScripts.peekCacheSync.mockImplementation((namespace) =>
-    namespace === 'questionsCache'
-      ? {
-          worker: withWorkerCanonicalCacheIdentity(
-            { questions: { seedQuestion: { type: 'binary', prompt: 'Seed prompt' } } },
-            identity,
-          ),
-        }
-      : {},
-  );
-  computePolisConversationMath.mockReturnValue({
-    stats: { nParticipants: 1, nComments: 1, totalVotes: 1 },
-    participantCoords: [{ x: 0, y: 0, index: 0 }],
-    statementCoords: [],
-    commentStats: [],
-    clusterAssignments: [0],
-    clusterCount: 1,
-    repQuestions: { 0: [] },
+  const reply = () => ({
+    ok: true,
+    json: async () => ({
+      completion: JSON.stringify({
+        name: 'Shared infrastructure',
+        short: 'Support shared tools',
+        long: 'The sponsored model described this group from its recorded votes.',
+      }),
+    }),
   });
-  const provider = { request: jest.fn() };
-  render(
-    <PolisReport
-      {...baseReportProps}
-      network={null}
-      networkChainId={null}
-      slug={config.slug}
-      sessionConfig={config}
-      account="synthetic-viewer"
-      provider={provider}
-      questionResponses={seededQuestionResponses}
-    />,
-  );
-  fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
-  fireEvent.click(await screen.findByTestId(E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS));
-  await waitFor(() =>
-    expect(analyzeClusterOpinions).toHaveBeenCalledWith(expect.any(Object), expect.any(Object), {
+  const showReport = async (mode = 'POLIS') => {
+    render(
+      <PolisReport
+        {...baseReportProps}
+        network={null}
+        networkChainId={null}
+        sessionSlug={config.slug}
+        sessionConfig={config}
+        account={account}
+        provider={provider}
+        questionResponses={{
+          seedQuestion: [0, 1, 2].map((index) => ({
+            ...seededQuestionResponses.seedQuestion[0],
+            responder: `0xparticipant${index}`,
+          })),
+        }}
+      />,
+    );
+    if (mode === 'POLIS') fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+    return screen.findByTestId(E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS);
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    fetchWorkerWithAuth.mockReset().mockResolvedValue(reply());
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: config.slug });
+    cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+      namespace === 'questionsCache'
+        ? {
+            worker: withWorkerCanonicalCacheIdentity(
+              { questions: { seedQuestion: { type: 'binary', prompt: 'Seed prompt' } } },
+              identity,
+            ),
+          }
+        : {},
+    );
+    computePolisConversationMath.mockReturnValue({
+      stats: { nParticipants: 3, nComments: 1, totalVotes: 3 },
+      participantCoords: [0, 1, 2].map((index) => ({ x: index, y: index, index })),
+      statementCoords: [],
+      commentStats: [],
+      clusterAssignments: [0, 0, 0],
+      clusterCount: 1,
+      repQuestions: { 0: [] },
+    });
+  });
+
+  it.each(['UMAP', 'POLIS'])('uses the loaded sponsored model and viewer context in %s', async (mode) => {
+    fireEvent.click(await showReport(mode));
+    expect(await screen.findByText('Cluster 0: Shared infrastructure')).toBeInTheDocument();
+    expect(screen.getByText('The sponsored model described this group from its recorded votes.')).toBeInTheDocument();
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    const [url, request, options] = fetchWorkerWithAuth.mock.calls[0];
+    expect(url).toBe('https://sponsored-polis.example.test/ai');
+    expect(JSON.parse(request.body)).toMatchObject({
+      action: 'ai',
+      provider: 'openai',
+      model: 'gpt-5.6-terra',
+      taskType: 'summarize',
+    });
+    expect(JSON.parse(request.body)).not.toHaveProperty('apiKey');
+    expect(options).toMatchObject({
       sessionSlug: config.slug,
       sessionConfig: config,
-      context: { account: 'synthetic-viewer', providerLike: provider, chainId: undefined },
-    }),
-  );
-  expect(await screen.findByText('Cluster 0: Common ground')).toBeInTheDocument();
+      context: { account, providerLike: provider },
+      preferAnonymous: true,
+    });
+    expect(provider.request).not.toHaveBeenCalled();
+  });
+
+  it('shows a sponsored request failure and retries without caching a heuristic as AI output', async () => {
+    fetchWorkerWithAuth.mockResolvedValue({ ok: false, json: async () => ({ error: 'Synthetic AI access denied' }) });
+    const button = await showReport();
+    fireEvent.click(button);
+    expect(await screen.findByText(/Couldn’t analyze this cluster: Synthetic AI access denied/)).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)).toHaveAttribute('data-ce-analysis-state', 'error');
+    await waitFor(() => expect(button).toBeEnabled());
+    fetchWorkerWithAuth.mockResolvedValue(reply());
+    fireEvent.click(button);
+    expect(await screen.findByText('Cluster 0: Shared infrastructure')).toBeInTheDocument();
+    expect(screen.queryByText(/Couldn’t analyze this cluster/)).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)).toHaveAttribute('data-ce-analysis-state', 'ready');
+  });
 });

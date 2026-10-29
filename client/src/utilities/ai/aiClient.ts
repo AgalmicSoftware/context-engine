@@ -580,12 +580,9 @@ export async function analyzeClusterOpinions(
     return { name, short, long };
   } catch (err) {
     aiLog.error('analyzeClusterOpinions error:', err);
-    const fallback = buildHeuristicClusterSummary(clusterData);
-    return {
-      name: deriveFallbackClusterName(clusterData),
-      short: fallback.short,
-      long: fallback.long,
-    };
+    // The report must retain its error/retry state instead of caching a local
+    // heuristic as a successful sponsored AI response.
+    throw err;
   }
 }
 
