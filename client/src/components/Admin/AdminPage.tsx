@@ -43,6 +43,7 @@ import { toStr } from '../../utilities/shared/primitives.js';
 import SBTSelector from '../SBTs/SBTSelector';
 import { JsonPanel } from '../Shared/Json/JsonControls';
 import CETooltip from '../Shared/CETooltip';
+import SessionJoinPanel from '../Sessions/SessionJoinPanel';
 import AdminPageMetadataEditor from './AdminPageMetadataEditor';
 import AdminPageSessionMetadataSummary from './AdminPageSessionMetadataSummary';
 import AdminPageTestsPanel from './AdminPageTestsPanel';
@@ -2425,6 +2426,9 @@ const AdminPageRuntime = ({
                   ) : null}
                 </div>
               </div>
+              {sessionUrl ? (
+                <SessionJoinPanel sessionUrl={sessionUrl} workerUrl={workerUrl} sessionConfig={selectedConfig} />
+              ) : null}
               <div className={styles.heroSessionDetails}>
                 <div className={`${styles.heroSessionDetailRow} ${styles.heroSessionDetailRowAlignStart}`}>
                   <div className={styles.heroCardHeaderWithTooltip}>

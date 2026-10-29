@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
+import SessionJoinPanel from './SessionJoinPanel';
 import type { SessionWizardPublishMetadataDisplayState } from './sessionWizardPublishReadiness';
 import type { PublishedPendingSbtLink } from './sessionWizardPublishLinks';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -114,6 +115,7 @@ const SessionPublishResultLinks = ({
           </a>
         </div>
       ) : null}
+      {sessionUrl ? <SessionJoinPanel sessionUrl={sessionUrl} /> : null}
       {onCreateAnotherSession ? (
         <div className={styles.linkRow}>
           <Button type="button" className={styles.secondaryButton} onClick={handleCreateAnotherSession}>

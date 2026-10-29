@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import CETooltip from '../Shared/CETooltip';
+import SessionJoinPanel from '../Sessions/SessionJoinPanel';
 import SessionTestEthBadge from '../Shared/SessionTestEthBadge';
 import ReverseAlignmentTopicMap, { hasReverseAlignmentTopicPreview } from './ReverseAlignmentTopicMap';
 import { hasReverseAlignmentContext } from './reverseAlignmentTopics';
@@ -503,6 +504,12 @@ export default function OnePageSessionStandardShell({
             {sessionInfoTooltip || 'Share input; your responses help generate a collective intelligence map.'}
           </CETooltip>
         </div>
+
+        <SessionJoinPanel
+          sessionUrl={typeof window !== 'undefined' ? window.location.href : undefined}
+          sessionSlug={effectiveSlug}
+          sessionConfig={resolvedSessionConfig}
+        />
 
         {showQuestions ? (
           <div className={styles.pileHeaderRow} data-testid={E2E_TESTIDS.SESSION_QUESTIONS_FULL_HEADER}>

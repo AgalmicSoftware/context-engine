@@ -460,3 +460,7 @@ network failures remain retryable and closing the modal cancels catalog work.
 ### Live interview context limits
 
 The complete initial/continued voice instructions fit below the Worker’s 32,000-character limit. The client keeps whole question rows, recent role-labelled conversation turns, and bounded background/review data. Participant edits are either included exactly or omitted with their obsolete prediction; they are never shortened into a different answer. Review state also reaches continued voice when no external prefill was imported. A notice explains omitted voice context. The full local transcript and review drafts remain available to final response mapping. If no complete question fits, the client reports an error before opening the microphone; participants can answer manually or ask the owner to shorten the question content.
+
+### Sharing the voice interview
+
+The session page, admin page and publish result include a compact **Join** panel. Its QR code and **Copy link** action open the voice chooser on another device, retaining the session Worker origin. **For your AI** copies the same review-only prompt as the voice launcher after checking catalog compatibility. Join links contain only the session path and Worker origin; admin tokens and prefill fragments are never copied.

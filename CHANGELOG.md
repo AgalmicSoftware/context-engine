@@ -106,6 +106,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Add a compact Join panel with a voice-interview QR code, a copyable session link and the existing review-only AI prompt on session, admin and publish-result pages.
+
 - Preserve every stored survey answer when submitting a partial edit. Read the
   current raw container before uploads, retain unchanged encrypted rows exactly,
   and refuse submission when that snapshot cannot be read.
