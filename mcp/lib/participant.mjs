@@ -159,8 +159,10 @@ const sameAuthoringInputs = (stored, record) => {
 const progressNotes = (questions, mine) => ({
   ...(questions.locked ? { lockedQuestions: questions.locked } : {}),
   ...(questions.complete === false ? { questionsComplete: false } : {}),
+  ...(questions.unread ? { unreadQuestions: questions.unread } : {}),
+  ...(mine.unread ? { unreadMyAnswers: mine.unread } : {}),
   ...(mine.complete === false
-    ? { myAnswersComplete: false, note: 'This session is large: answers made outside this agent may not all be listed.' }
+    ? { myAnswersComplete: false, note: 'Some answers could not be read or the scan is unfinished; the answers shown may be incomplete.' }
     : {}),
 });
 
@@ -309,36 +311,31 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
 
   const readCached = async (ctx, storageId) => {
     if (ctx.records.has(storageId)) return ctx.records.get(storageId);
-    // A record can be briefly missing while the Worker's index catches up, so a miss is retried after a minute.
-    if (now() - (ctx.missing.get(storageId) ?? -Infinity) < MISSING_RECORD_RETRY_MS) return null;
-    let payload = null;
+    // A listed 404 is unread, including during its retry minute. A fetched
+    // malformed/null payload is instead excluded by the normal record rules.
+    if (now() - (ctx.missing.get(storageId) ?? -Infinity) < MISSING_RECORD_RETRY_MS) return undefined;
     try {
-      payload = await ctx.client.read(storageId);
-    } catch (error) {
-      if (!(error instanceof WorkerRequestError) || error.status !== 404) throw error;
-    }
-    if (payload === null) {
-      ctx.missing.set(storageId, now());
-      if (ctx.missing.size > MAX_CACHED_RECORDS) ctx.missing.delete(ctx.missing.keys().next().value);
-    } else {
+      const payload = await ctx.client.read(storageId);
       ctx.missing.delete(storageId);
       cacheRecord(ctx, storageId, payload);
+      return payload;
+    } catch (error) {
+      if (!(error instanceof WorkerRequestError) || error.status !== 404) throw error;
+      ctx.missing.set(storageId, now());
+      if (ctx.missing.size > MAX_CACHED_RECORDS) ctx.missing.delete(ctx.missing.keys().next().value);
+      return undefined;
     }
-    return payload;
   };
 
-  /** Reads records until the per-call deadline; records left unread come back undefined. */
+  /** Records not reached or not readable come back undefined and keep the read incomplete. */
   const readMany = async (ctx, storageIds) => {
     const deadline = now() + READ_DEADLINE_MS;
-    let complete = true;
     const payloads = await mapLimit(storageIds, READ_CONCURRENCY, async (storageId) => {
-      if (!ctx.records.has(storageId) && (now() >= deadline || signal?.aborted)) {
-        complete = false;
-        return undefined;
-      }
-      return readCached(ctx, storageId);
+      if (!ctx.records.has(storageId) && (now() >= deadline || signal?.aborted)) return undefined;
+      return readCached(ctx, storageId).catch(() => undefined);
     });
-    return { payloads, complete };
+    const unread = payloads.filter(payload => payload === undefined).length;
+    return { payloads, complete: unread === 0, unread };
   };
 
   const loadQuestions = async (ctx) => {
@@ -365,9 +362,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     }
     const { items, complete } = await ctx.client.listAll('questions', { maxItems: MAX_QUESTIONS, signal });
     const hidden = new Set(items.filter((item) => item.hidden === true).map((item) => text(item.metadata?.resourceId).toLowerCase()));
-    const rows = items.filter((item) => item.hidden !== true && text(item.storageRef?.id));
-    const { payloads, complete: readComplete } = await readMany(ctx, rows.map((item) => text(item.storageRef.id)));
     const blocked = idList(sessionConfig.BLOCKED_QUESTION_IDS);
+    const rows = items.filter((item) => item.hidden !== true && text(item.storageRef?.id) &&
+      !hidden.has(text(item.metadata?.resourceId).toLowerCase()) && !blocked.has(text(item.metadata?.resourceId).toLowerCase()));
+    const { payloads, complete: readComplete, unread } = await readMany(ctx, rows.map((item) => text(item.storageRef.id)));
     const highlighted = idList(sessionConfig.HIGHLIGHTED_QUESTION_IDS);
     const versions = new Map();
     rows.forEach((item, index) => {
@@ -414,12 +412,13 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     questions.locked = all.length - questions.length;
     questions.lockedIds = new Set(all.filter((question) => isLockedQuestion(question)).map((question) => question.id));
     questions.complete = complete && readComplete;
+    questions.unread = unread;
     return questions;
   };
 
   const toEntries = async (ctx, items) => {
-    const rows = items.filter((item) => text(item.storageRef?.id));
-    const { payloads, complete } = await readMany(ctx, rows.map((item) => text(item.storageRef.id)));
+    const rows = items.filter((item) => item.hidden !== true && text(item.storageRef?.id));
+    const { payloads, complete, unread } = await readMany(ctx, rows.map((item) => text(item.storageRef.id)));
     const entries = rows.map((item, index) => ({
       storageId: text(item.storageRef.id),
       createdAt: text(item.metadata?.createdAt) || text(item.storageRef?.createdAt),
@@ -427,23 +426,24 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       payload: payloads[index],
     }));
     entries.complete = complete;
+    entries.unread = unread;
     return entries;
   };
 
   // Listing your own answers scans the whole session's answer index, so one
   // scan is reused for a while; answers given since come from the local record.
   const scanMyAnswers = async (ctx) => {
-    if (ctx.ownScan && (!ctx.registry || ctx.ownScan.complete) && now() - ctx.ownScan.at < OWN_ANSWER_SCAN_MAX_AGE_MS && ctx.ownScan.sessionId === ctx.client.sessionId) {
+    if (ctx.ownScan && ctx.ownScan.complete && now() - ctx.ownScan.at < OWN_ANSWER_SCAN_MAX_AGE_MS && ctx.ownScan.sessionId === ctx.client.sessionId) {
       return ctx.ownScan;
     }
     if (ctx.registry) {
       const questions = await loadQuestions(ctx);
       const questionIds = new Set(questions.map((question) => question.id));
-      const { entries, complete, chainOrders } = await ctx.registry.readAnswers({ questionIds, maxRecords: MAX_OWN_ANSWER_ITEMS, mine: true, signal });
+      const { entries, complete, chainOrders, unreadAnswers } = await ctx.registry.readAnswers({ questionIds, maxRecords: MAX_OWN_ANSWER_ITEMS, mine: true, signal });
       const latest = latestAnswersByQuestion(entries, { registryConfig: ctx.client.config, questionIds });
       const answers = new Map();
       latest.forEach((byResponder, id) => { if (byResponder.has(wallet.address.toLowerCase())) answers.set(id, byResponder.get(wallet.address.toLowerCase())); });
-      ctx.ownScan = { at: now(), sessionId: ctx.client.sessionId, answers, complete, chainOrders };
+      ctx.ownScan = { at: now(), sessionId: ctx.client.sessionId, answers, complete, chainOrders, unread: unreadAnswers };
       return ctx.ownScan;
     }
     const { items, complete: listed } = await ctx.client.listAll('responses', {
@@ -462,7 +462,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const entry = byResponder.get(self);
       if (entry) answers.set(questionId, entry);
     });
-    ctx.ownScan = { at: now(), sessionId: ctx.client.sessionId, answers, complete };
+    ctx.ownScan = { at: now(), sessionId: ctx.client.sessionId, answers, complete, unread: entries.unread };
     return ctx.ownScan;
   };
 
@@ -502,6 +502,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (value === '' || value === null || value === undefined || (Array.isArray(value) && !value.length)) mine.delete(questionId);
     });
     mine.complete = complete;
+    mine.unread = scan.unread;
     return mine;
   };
 
@@ -876,12 +877,14 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       let entries;
       let complete;
       let listedCount;
+      let unreadAnswers;
       const knownIds = new Set(questions.map((question) => question.id));
       if (ctx.registry) {
         const result = await ctx.registry.readAnswers({ questionIds: knownIds, maxRecords: cap, signal });
         entries = result.entries;
         complete = result.complete;
         listedCount = entries.length;
+        unreadAnswers = result.unreadAnswers;
       } else {
         const result = await ctx.client.listAll('responses', { maxItems: MAX_RESULT_RECORDS, signal });
         const listed = result.items
@@ -890,6 +893,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         entries = await toEntries(ctx, listed.slice(0, cap));
         complete = result.complete;
         listedCount = listed.length;
+        unreadAnswers = entries.unread;
       }
       const latest = latestAnswersByQuestion(entries, {
         sessionSlug: ctx.info.slug,
@@ -903,6 +907,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         resultsPublic: true,
         webUrl: buildSessionWebUrl(ctx.info),
         participants: participants.size,
+        unreadAnswers,
         partial: !complete || listedCount > cap || questions.complete === false || entries.complete === false,
         questions: questions
           .filter((question) => !wanted || wanted.has(question.id))

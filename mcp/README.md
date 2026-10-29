@@ -229,7 +229,15 @@ confirmed writes from the running agent, without replacing newer chain answers.
 Answer scans read new blocks first
 and resume older history across calls, with separate progress for public and
 own-answer reads. Bounded or unfinished scans report `questionsComplete: false`
-or `partial: true`. Saved plaintext is not restored over an incomplete
+or `partial: true`. Hosted reads also stay incomplete while a listed payload is
+unavailable, including during the one-minute 404 retry delay. Results expose
+`unreadAnswers`; the question list exposes `unreadQuestions` and `unreadMyAnswers`
+when nonzero, alongside its completeness flags. An unread hosted answer cannot
+be mapped to a question from its listing, so readable older answers remain in
+partial results until recovery. Successfully read records excluded by visibility,
+session identity or malformed content do not count as unread. An incomplete own-
+answer scan is retried on the next call instead of being cached for ten minutes.
+Saved plaintext is not restored over an incomplete
 own-answer scan, because another client may have cleared or encrypted it.
 Public results include identity-free web answers only for known session
 questions and use chain event ordering to select the latest answer.

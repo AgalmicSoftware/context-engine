@@ -720,3 +720,98 @@ test('an answer is not sent when its retry key cannot be persisted', async (t) =
   assert.equal(result.failed, 1);
   assert.equal(storedRecords(env, 'responses').length, 0);
 });
+
+for (const value of ['Disagree', '']) test(`an unread newer ${value || 'cleared'} answer keeps MCP results and own answers incomplete`, async (t) => {
+  const env = createEnv([sessionConfig()]);
+  const author = await createAgent(env, 'synthetic-author', []);
+  t.after(() => fs.rm(author.stateDir, { recursive: true, force: true }));
+  await author.participant.joinSession({ link: LINK });
+  const { questionId } = await author.participant.addStatement({ prompt: 'Synthetic read-recovery statement.' });
+  await author.participant.answer({ answers: [{ questionId, value: 'Agree' }] });
+  const newerId = plantRecord(env, 'responses', {
+    questionID: questionId, sessionSlug: SLUG, sessionId: SESSION_ID, type: 'binary', answer: { value }, additional: { value: '' },
+  }, { createdAt: new Date(Date.now() + 5000).toISOString() });
+  let unread = true;
+  let reads = 0;
+  let now = Date.now();
+  const fetchWorker = workerFetch(env);
+  const reader = await createAgent(env, 'synthetic-reader', [], async (url, init) => {
+    if (new URL(url).pathname === '/storage/read' && new URL(url).searchParams.get('id') === newerId) {
+      reads++;
+      if (unread) return Response.json({ error: 'Payload is not available yet.' }, { status: 404 });
+    }
+    return fetchWorker(url, init);
+  }, { wallet: author.wallet, now: () => now });
+  t.after(() => fs.rm(reader.stateDir, { recursive: true, force: true }));
+  await reader.participant.joinSession({ link: LINK });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await reader.participant.getResults();
+    assert.equal(result.partial, true);
+    assert.equal(result.unreadAnswers, 1);
+    assert.deepEqual(result.questions[0].counts, { Agree: 1, Unsure: 0, Disagree: 0 });
+    const own = await reader.participant.listQuestions({ filter: 'all' });
+    assert.equal(own.myAnswersComplete, false);
+    assert.equal(own.unreadMyAnswers, 1);
+    assert.equal(own.questions[0].myAnswer.value, 'Agree');
+  }
+  assert.equal(reads, 1, 'the negative-cache minute remains incomplete without another request');
+  unread = false;
+  now += 60001;
+  const result = await reader.participant.getResults();
+  assert.equal(result.partial, false);
+  assert.equal(result.unreadAnswers, 0);
+  assert.deepEqual(result.questions[0].counts, { Agree: 0, Unsure: 0, Disagree: value ? 1 : 0 });
+  const own = await reader.participant.listQuestions({ filter: 'all' });
+  assert.notEqual(own.myAnswersComplete, false);
+  assert.equal(own.answeredByMe, value ? 1 : 0);
+  if (value) assert.equal(own.questions[0].myAnswer.value, value);
+});
+
+test('a listed unread question is incomplete until its payload can be read', async (t) => {
+  const env = createEnv([sessionConfig()]);
+  let now = Date.now();
+  const author = await createAgent(env, 'synthetic-author', []);
+  t.after(() => fs.rm(author.stateDir, { recursive: true, force: true }));
+  await author.participant.joinSession({ link: LINK });
+  await author.participant.addStatement({ prompt: 'Synthetic readable statement.' });
+  const id = plantRecord(env, 'questions', { id: ethers.utils.id('unread-question'), sessionSlug: SLUG, sessionId: SESSION_ID, type: 'binary', prompt: 'Synthetic delayed statement.' });
+  let unread = true;
+  const fetchWorker = workerFetch(env);
+  const reader = await createAgent(env, 'synthetic-reader', [], async (url, init) => {
+    if (unread && new URL(url).pathname === '/storage/read' && new URL(url).searchParams.get('id') === id) return Response.json({}, { status: 404 });
+    return fetchWorker(url, init);
+  }, { now: () => now });
+  t.after(() => fs.rm(reader.stateDir, { recursive: true, force: true }));
+  await reader.participant.joinSession({ link: LINK });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const listed = await reader.participant.listQuestions({ filter: 'all' });
+    assert.equal(listed.questionsComplete, false);
+    assert.equal(listed.unreadQuestions, 1);
+    assert.equal(listed.total, 1);
+    assert.equal((await reader.participant.getResults()).partial, true);
+  }
+  unread = false;
+  now += 60001;
+  const listed = await reader.participant.listQuestions({ filter: 'all' });
+  assert.notEqual(listed.questionsComplete, false);
+  assert.equal(listed.total, 2);
+});
+
+test('excluded and malformed payloads do not count as unread MCP records', async (t) => {
+  const env = createEnv([sessionConfig()]);
+  const { participant, stateDir } = await createAgent(env, 'synthetic-reader', []);
+  t.after(() => fs.rm(stateDir, { recursive: true, force: true }));
+  await participant.joinSession({ link: LINK });
+  const { questionId } = await participant.addStatement({ prompt: 'Synthetic readable statement.' });
+  await participant.answer({ answers: [{ questionId, value: 'Agree' }] });
+  plantRecord(env, 'responses', { questionID: questionId, sessionSlug: 'another-session', sessionId: SESSION_ID, answer: { value: 'Disagree' } });
+  plantRecord(env, 'responses', null);
+  const hidden = plantRecord(env, 'questions', { id: ethers.utils.id('hidden'), sessionSlug: SLUG, type: 'binary', prompt: 'Synthetic hidden statement.' }, { hidden: true });
+  env.CE_STORAGE_INDEX_KV.store.delete(`ce-storage-payload:${SLUG}:${hidden}`);
+  plantRecord(env, 'questions', { id: ethers.utils.id('malformed'), sessionSlug: SLUG });
+  const result = await participant.getResults();
+  assert.equal(result.partial, false);
+  assert.equal(result.unreadAnswers, 0);
+  assert.equal(result.questions.length, 1);
+  assert.deepEqual(result.questions[0].counts, { Agree: 1, Unsure: 0, Disagree: 0 });
+});
