@@ -122,6 +122,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Clear cached registry overrides when their on-chain fields are empty, restoring
+  metadata or defaults while preserving failed and unrequested fields.
+
 - Keep Realtime interview questions and answers in conversation order when
   transcription completions arrive late or repeat.
 

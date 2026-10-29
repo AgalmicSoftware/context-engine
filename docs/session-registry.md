@@ -116,6 +116,14 @@ Resources tracked on-chain:
 - `txGas`
 - `lit` (optional, for key access)
 
+Targeted field refreshes distinguish an empty on-chain value from a failed read.
+An empty value removes that override from both the effective configuration and
+`__registry.fields`; failed reads and keys not requested keep their previous
+values. The client rebuilds the configuration with the full registry-fetch
+builder, using cached source metadata (or fetching it when absent or changed),
+so a cleared Worker URL, RPC override or sponsorship flag restores its metadata
+or default value. Cached source metadata is kept separate from field overrides.
+
 ## Arweave Metadata Schema (v1)
 
 Arweave metadata is designed to look like a `demo_sessions.json` entry so the
