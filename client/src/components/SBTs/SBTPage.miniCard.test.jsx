@@ -1,4 +1,5 @@
 import SBTPage from './SBTPage';
+import * as sessionConfig from '../../domains/sessions/sessionConfig';
 import SbtPageMiniActionArea from './SbtPageMiniActionArea';
 import SbtPageMiniCard from './SbtPageMiniCard';
 import SbtPageMiniCardDisplay from './SbtPageMiniCardDisplay';
@@ -124,6 +125,7 @@ const renderMiniCardNode = (props = {}, stateOverrides = {}, configureSubject = 
 
 describe('SBTPage mini-card', () => {
   beforeEach(() => {
+    jest.spyOn(sessionConfig, 'getSessionChainId').mockReturnValue(84532);
     mockIsCryptoMode.mockReturnValue(true);
   });
 

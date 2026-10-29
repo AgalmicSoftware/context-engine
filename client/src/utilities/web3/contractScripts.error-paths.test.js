@@ -1550,9 +1550,14 @@ describe('error paths', () => {
     });
 
     const hashedPassword = `0x${'11'.repeat(32)}`;
-    const claimReceipt = await contractScripts.claim('wagmi', TEST_ADDRESS);
-    const addPasswordsReceipt = await contractScripts.addHashedPasswords('wagmi', TEST_ADDRESS, [hashedPassword]);
-    const burnReceipt = await contractScripts.burnToken('wagmi', TEST_ADDRESS, 7);
+    const claimReceipt = await contractScripts.claim('wagmi', TEST_ADDRESS, 84532);
+    const addPasswordsReceipt = await contractScripts.addHashedPasswords(
+      'wagmi',
+      TEST_ADDRESS,
+      [hashedPassword],
+      84532,
+    );
+    const burnReceipt = await contractScripts.burnToken('wagmi', TEST_ADDRESS, 7, 84532);
 
     expect(claimReceipt).toEqual(expect.objectContaining({ status: 1, transactionHash: '0xtxhash' }));
     expect(addPasswordsReceipt).toEqual(expect.objectContaining({ status: 1, transactionHash: '0xtxhash' }));

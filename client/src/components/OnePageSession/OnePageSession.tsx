@@ -1845,7 +1845,7 @@ class OnePageSession extends Component<any, any> {
         }
 
         if (path === 'public') {
-          await sbtMintExecutionPort.claim(autoMintProvider, sbtAddr);
+          await sbtMintExecutionPort.claim(autoMintProvider, sbtAddr, mintChainId);
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
@@ -1864,6 +1864,7 @@ class OnePageSession extends Component<any, any> {
             sbtAddr,
             String(payload.nonce),
             String(payload.signature),
+            mintChainId,
           );
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
@@ -1968,7 +1969,7 @@ class OnePageSession extends Component<any, any> {
     assertExpectedAccountCurrent();
 
     this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
-    const tx = await sbtMintExecutionPort.mintWithGroupSignature(provider, sbtAddress, String(sig || ''));
+    const tx = await sbtMintExecutionPort.mintWithGroupSignature(provider, sbtAddress, String(sig || ''), mintChainId);
 
     this.setState({
       mintingStatus: 'success',

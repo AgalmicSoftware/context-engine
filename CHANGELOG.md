@@ -110,6 +110,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Pin all SBT writes to the collection session’s configured chain, reject missing
+  chains and wallet mismatches, and include the chain in the approved transaction.
+
 - Keep SBT history reads on the session chain and retain cached counts when its
   provider is unavailable, without substituting an injected wallet’s history.
 

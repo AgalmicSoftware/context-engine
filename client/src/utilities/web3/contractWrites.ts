@@ -7,6 +7,7 @@
  */
 
 import { ethers } from 'ethers';
+import { getChainById } from '../../variables/chains.js';
 import { createLogger } from '../logging.js';
 import { isExecutionRevertDuringEstimate, extractEstimateErrorMessage } from './errorClassifiers.js';
 
@@ -33,7 +34,7 @@ type ResolveTxGasOverridesOptions = {
   preferFallbackGasLimit?: boolean;
 };
 type SendContractWriteViaProviderOptions = {
-  expectedChainId?: unknown;
+  expectedChainId: unknown;
   expectedEvent?: string;
   signingProvider?: AnyRecord | null;
   ethersProvider?: AnyRecord | null;
@@ -179,7 +180,11 @@ const sendContractWriteViaProvider = async ({
   revertMessage = `${method} transaction reverted on-chain.`,
   sensitiveArgs = false,
   resolveSensitiveErrorMessage = null,
-}: SendContractWriteViaProviderOptions = {}): Promise<{ txHash: unknown; receipt: AnyRecord }> => {
+}: SendContractWriteViaProviderOptions): Promise<{ txHash: unknown; receipt: AnyRecord }> => {
+  const chainId = Number(expectedChainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    throw new Error('The session network must be known before sending a transaction.');
+  }
   const methodName = String(method || '');
   if (!contract?.interface || typeof contract.interface.encodeFunctionData !== 'function') {
     throw new Error(`sendContractWriteViaProvider requires a contract interface for ${methodName}.`);
@@ -192,19 +197,17 @@ const sendContractWriteViaProvider = async ({
     throw new Error(`sendContractWriteViaProvider requires a signer for ${methodName}.`);
   }
 
-  if (!ethersProvider?.getNetwork || !ethersProvider?.getCode || !ethersProvider?.send) {
+  if (!ethersProvider?.getCode || !ethersProvider?.send) {
     throw new Error('Connected wallet provider cannot verify the contract target.');
   }
-  // Pin the configured chain where supplied, otherwise the wallet's current
-  // chain. Include it in the approved transaction to guard a later wallet switch.
-  const chainId = Number(expectedChainId ?? (await ethersProvider.getNetwork()).chainId);
-  if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error('Invalid expected chain ID.');
+  // Include the session chain in the approved transaction to guard a later wallet switch.
+  if (Number(await ethersProvider.send('eth_chainId', [])) !== chainId) {
+    const networkName = getChainById(chainId)?.name || `chain ${chainId}`;
+    throw new Error(`Wrong network for ${methodName}: expected the session network ${networkName} (${chainId}).`);
+  }
   const code = await ethersProvider.getCode(to);
   if (typeof code !== 'string' || !/^0x(?:[0-9a-f]{2})+$/i.test(code)) {
     throw new Error(`No contract bytecode is deployed at ${to}.`);
-  }
-  if (Number(await ethersProvider.send('eth_chainId', [])) !== chainId) {
-    throw new Error(`Wrong network for ${methodName}: expected chain ${chainId}.`);
   }
   const from = await signer.getAddress();
   const data = contract.interface.encodeFunctionData(methodName, args);
