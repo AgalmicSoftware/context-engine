@@ -138,6 +138,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep profile analysis, cached results and pending updates bound to their original person, session and inputs.
+
 - Clear all agent and Worker credentials on either logout, cancelling pending logins and requests before resetting mounted views.
 
 - Generate questions only from extracted source text; name skipped files and stop offering PDF or PowerPoint generation input.

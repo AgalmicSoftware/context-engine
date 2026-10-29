@@ -22,7 +22,10 @@ registry; a parity test keeps this documentation aligned with it.
 
 `bookmarksCache` and `filters` hold user-authored choices that a refresh cannot
 rebuild. `analysisCache` mixes retained Results analysis artifacts with expiring
-profile summaries; both writers preserve other saved entries. Results generation
+profile summaries; both writers preserve other saved entries. Profile analysis owns
+its address, session/network, input fingerprint and request generation. Changing
+that context clears the view and modal; late results can still save to the
+original cache but cannot change the new view, timer or busy state. Results generation
 captures its session and cache key before asynchronous work. A completed section
 may be saved to that original cache, but session, reader, chain or input changes
 prevent it from updating the current view. Exports include analysis only when

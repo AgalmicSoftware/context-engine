@@ -161,6 +161,9 @@ const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 
 describe('UserPage analysis cache and routing', () => {
   beforeEach(() => {
+    analyzeUserOpinions
+      .mockReset()
+      .mockResolvedValue({ summary: 'summary', details: 'details', name: 'name', historicalAlignment: {} });
     checkSponsoredAccess.mockResolvedValue({
       status: 'unknown',
       gate: null,
@@ -876,5 +879,129 @@ describe('UserPage analysis cache and routing', () => {
         localStorage.setItem(REGISTRY_CACHE_KEY, priorRegistryCache);
       }
     }
+  });
+  const switchAnalysisProfile = (instance, patch) => {
+    for (const method of [
+      'loadPersistedUsername',
+      'loadDataFromCache',
+      'checkIfBookmarked',
+      'loadNicknameFromCache',
+      'startProfileDeepScan',
+      '_checkAiAvailability',
+    ]) {
+      jest.spyOn(instance, method).mockImplementation(() => {});
+    }
+    const prevProps = instance.props;
+    const prevState = instance.state;
+    instance.props = { ...prevProps, ...patch };
+    instance.componentDidUpdate(prevProps, prevState);
+  };
+  const deferredAnalysis = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((yes, no) => {
+      resolve = yes;
+      reject = no;
+    });
+    return { promise, resolve, reject };
+  };
+
+  it.each([
+    { viewAddress: '0x00000000000000000000000000000000000000dd' },
+    { activeSessionSlug: 'another-session' },
+    { network: { id: 11155420 } },
+  ])('completed analysis never follows a changed profile context: %j', async (patch) => {
+    const { instance } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({
+      name: 'First profile',
+      summary: 'first-only',
+      details: 'private-to-first',
+    });
+    await instance.analyzeUser();
+    expect(instance.state.analysisDetails).toBe('private-to-first');
+    switchAnalysisProfile(instance, patch);
+    expect(instance.state).toMatchObject({
+      analysisDetails: '',
+      analysisName: '',
+      analysisError: '',
+      analyzing: false,
+      showAnalysisModal: false,
+    });
+    expect(instance.analysisTimer).toBeNull();
+  });
+
+  it('a late profile result stays in its original cache and cannot stop the next request', async () => {
+    const owner = makeAnalysisCacheInstance();
+    const { instance } = owner;
+    const first = deferredAnalysis();
+    const second = deferredAnalysis();
+    analyzeUserOpinions.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const firstRun = instance.analyzeUser();
+    await waitFor(() => expect(analyzeUserOpinions).toHaveBeenCalledTimes(1));
+    switchAnalysisProfile(instance, { viewAddress: '0x00000000000000000000000000000000000000dd' });
+    const secondRun = instance.analyzeUser();
+    await waitFor(() => expect(analyzeUserOpinions).toHaveBeenCalledTimes(2));
+    const secondTimer = instance.analysisTimer;
+    first.resolve({ name: 'First', summary: 'first-only', details: 'first details' });
+    await firstRun;
+    expect(getSingleAnalysisCacheEntry(owner).entry?.result.details).toBe('first details');
+    expect(instance.state).toMatchObject({ analysisDetails: '', analyzing: true });
+    expect(instance.analysisTimer).toBe(secondTimer);
+    second.resolve({ name: 'Second', summary: 'second-only', details: 'second details' });
+    await secondRun;
+    expect(instance.state.analysisDetails).toBe('second details');
+    expect(instance.analysisTimer).toBeNull();
+  });
+
+  it('a superseded request cannot replace a newer result or its cache reuse on the same profile', async () => {
+    const { instance } = makeAnalysisCacheInstance();
+    const first = deferredAnalysis();
+    analyzeUserOpinions.mockReturnValueOnce(first.promise).mockResolvedValueOnce({ details: 'new result' });
+    const firstRun = instance.analyzeUser();
+    await waitFor(() => expect(analyzeUserOpinions).toHaveBeenCalledTimes(1));
+    await instance.analyzeUser(true);
+    first.reject(new Error('obsolete failure'));
+    await firstRun;
+    expect(instance.state).toMatchObject({ analysisDetails: 'new result', analysisError: '' });
+    await instance.analyzeUser();
+    expect(analyzeUserOpinions).toHaveBeenCalledTimes(2);
+    expect(instance.state).toMatchObject({ analysisDetails: 'new result', analysisServedFromCache: true });
+  });
+
+  it('changed analysis inputs invalidate a pending result without applying it', async () => {
+    const { instance } = makeAnalysisCacheInstance();
+    const pending = deferredAnalysis();
+    analyzeUserOpinions.mockReturnValueOnce(pending.promise);
+    const run = instance.analyzeUser();
+    await waitFor(() => expect(analyzeUserOpinions).toHaveBeenCalledTimes(1));
+    const previous = instance.state;
+    instance.state = { ...previous, username: 'Changed input' };
+    instance.componentDidUpdate(instance.props, previous);
+    pending.resolve({ details: 'obsolete input' });
+    await run;
+    expect(instance.state).toMatchObject({ analysisDetails: '', analyzing: false, showAnalysisModal: false });
+    expect(instance.analysisTimer).toBeNull();
+  });
+  it('a delayed cache lookup cannot hydrate a different profile', async () => {
+    const { instance } = makeAnalysisCacheInstance();
+    await instance.analyzeUser();
+    const lookup = deferredAnalysis();
+    const original = instance._buildAnalysisCacheContext.bind(instance);
+    jest.spyOn(instance, '_buildAnalysisCacheContext').mockImplementation(async (args) => {
+      const value = await original(args);
+      await lookup.promise;
+      return value;
+    });
+    const cachedRun = instance.analyzeUser();
+    await waitFor(() => expect(instance._buildAnalysisCacheContext).toHaveBeenCalled());
+    switchAnalysisProfile(instance, { viewAddress: '0x00000000000000000000000000000000000000dd' });
+    lookup.resolve();
+    await cachedRun;
+    expect(instance.state).toMatchObject({
+      analysisDetails: '',
+      analysisServedFromCache: false,
+      showAnalysisModal: false,
+    });
+    expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
   });
 });
