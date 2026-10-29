@@ -165,9 +165,12 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
 
   it('saves queued extra sources into the session doc library before generating questions', async () => {
     const onQuestionsGenerated = jest.fn();
-    mockProcessAdditionalSources.mockResolvedValue(
-      'This additional source content is long enough to drive question generation on its own.',
-    );
+    mockProcessAdditionalSources.mockResolvedValue({
+      text: 'This additional source content is long enough to drive question generation on its own.',
+      extractedCharacters: 'This additional source content is long enough to drive question generation on its own.'
+        .length,
+      skipped: [],
+    });
     mockCallAI.mockResolvedValue(
       JSON.stringify({
         surveyTitle: 'Saved Sources Survey',
@@ -219,9 +222,12 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
 
   it('saves a typed URL source into session context during generation without requiring the add-url click', async () => {
     const onQuestionsGenerated = jest.fn();
-    mockProcessAdditionalSources.mockResolvedValue(
-      'This typed URL source content is long enough to drive question generation on its own.',
-    );
+    mockProcessAdditionalSources.mockResolvedValue({
+      text: 'This typed URL source content is long enough to drive question generation on its own.',
+      extractedCharacters: 'This typed URL source content is long enough to drive question generation on its own.'
+        .length,
+      skipped: [],
+    });
     mockCallAI.mockResolvedValue(
       JSON.stringify({
         surveyTitle: 'Typed URL Saved Sources Survey',
@@ -277,9 +283,12 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
     delete window.__litHooks;
     const scopedSaveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
     const onQuestionsGenerated = jest.fn();
-    mockProcessAdditionalSources.mockResolvedValue(
-      'This additional source content is long enough to drive question generation on its own.',
-    );
+    mockProcessAdditionalSources.mockResolvedValue({
+      text: 'This additional source content is long enough to drive question generation on its own.',
+      extractedCharacters: 'This additional source content is long enough to drive question generation on its own.'
+        .length,
+      skipped: [],
+    });
     mockCallAI.mockResolvedValue(
       JSON.stringify({
         surveyTitle: 'Worker Runtime Survey',
@@ -345,9 +354,12 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
 
   it('keeps raw extra-source URLs when doc-library saving is not enabled', async () => {
     const onQuestionsGenerated = jest.fn();
-    mockProcessAdditionalSources.mockResolvedValue(
-      'This additional source content is long enough to drive question generation on its own.',
-    );
+    mockProcessAdditionalSources.mockResolvedValue({
+      text: 'This additional source content is long enough to drive question generation on its own.',
+      extractedCharacters: 'This additional source content is long enough to drive question generation on its own.'
+        .length,
+      skipped: [],
+    });
     mockCallAI.mockResolvedValue(
       JSON.stringify({
         surveyTitle: 'Raw URL Survey',
@@ -425,9 +437,12 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
     // CreateQuestionsAndSurveys embeds the generator, so a static import here is a cycle.
     expect(source).not.toMatch(/^import .* from '\.\.\/CreateQuestionsAndSurveys';$/m);
 
-    mockProcessAdditionalSources.mockResolvedValue(
-      'This additional source content is long enough to drive question generation on its own.',
-    );
+    mockProcessAdditionalSources.mockResolvedValue({
+      text: 'This additional source content is long enough to drive question generation on its own.',
+      extractedCharacters: 'This additional source content is long enough to drive question generation on its own.'
+        .length,
+      skipped: [],
+    });
     mockCallAI.mockResolvedValue(
       JSON.stringify({
         surveyTitle: 'Standalone generation',
@@ -459,9 +474,12 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
 
   it('blocks question generation when saving queued doc sources fails', async () => {
     mockUploadDocLibraryUrlRecord.mockRejectedValueOnce(new Error('Save failed.'));
-    mockProcessAdditionalSources.mockResolvedValue(
-      'This additional source content is long enough to drive question generation on its own.',
-    );
+    mockProcessAdditionalSources.mockResolvedValue({
+      text: 'This additional source content is long enough to drive question generation on its own.',
+      extractedCharacters: 'This additional source content is long enough to drive question generation on its own.'
+        .length,
+      skipped: [],
+    });
     mockCallAI.mockResolvedValue(
       JSON.stringify({
         surveyTitle: 'Should not render',

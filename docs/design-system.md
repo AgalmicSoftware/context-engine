@@ -549,3 +549,9 @@ HTML Results exports project the selected sections before rendering or embedding
 any snapshot data. Excluded analysis is absent from both interactive and static
 HTML bytes. The Snapshot JSON option adds a download of that same projection;
 when unchecked, the viewer has no snapshot download control.
+
+Question generation accepts text, Markdown, CSV and JSON files, plus supported
+images for analysis. PDF and PowerPoint files are not offered as generation
+sources: paste their text instead. Skipped files and extraction failures are
+named in the generator, and only extracted text counts toward its 50-character
+minimum. The document library's separate file-upload support is unchanged.

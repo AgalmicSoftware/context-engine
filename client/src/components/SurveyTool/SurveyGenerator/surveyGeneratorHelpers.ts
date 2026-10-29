@@ -4,8 +4,8 @@ import { generateQuestionId as generateSharedQuestionId } from '../../../utiliti
 
 export const MIN_QUESTION_COUNT = 5;
 export const MAX_QUESTION_COUNT = 50;
-export const SUPPORTED_SOURCE_FILE_EXTENSIONS = /\.(pdf|md|txt|csv|ppt|pptx|json)$/i;
-export const SUPPORTED_SOURCE_FILE_ACCEPT = '.pdf,.md,.txt,.csv,.ppt,.pptx,.json';
+export const SUPPORTED_SOURCE_FILE_EXTENSIONS = /\.(md|txt|csv|json)$/i;
+export const SUPPORTED_SOURCE_FILE_ACCEPT = '.md,.txt,.csv,.json';
 export const SUPPORTED_PHOTO_EXTENSIONS = /\.(png|jpe?g|webp|gif)$/i;
 export const SUPPORTED_PHOTO_ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif';
 export const SUPPORTED_SOURCE_UPLOAD_ACCEPT = `${SUPPORTED_SOURCE_FILE_ACCEPT},${SUPPORTED_PHOTO_ACCEPT}`;
@@ -259,9 +259,7 @@ export const isSupportedPhotoFile = (file: SourceFileLike | null | undefined) =>
 
 export const isSupportedAdditionalFile = (file: SourceFileLike | null | undefined) =>
   Boolean(file) &&
-  (/^(application\/pdf|text\/markdown|text\/plain|text\/csv|application\/json|application\/vnd\.ms-powerpoint|application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation)$/i.test(
-    String(file?.type || '').trim(),
-  ) ||
+  (/^(text\/markdown|text\/plain|text\/csv|application\/json)$/i.test(String(file?.type || '').trim()) ||
     SUPPORTED_SOURCE_FILE_EXTENSIONS.test(String(file?.name || '').trim()));
 
 export const buildQueuedFileSource = <TFile extends SourceFileLike>(
@@ -385,7 +383,7 @@ export const buildUnsupportedPhotoMessage = (count = 0) =>
   `Skipped ${count} unsupported photo${count === 1 ? '' : 's'}. Use png, jpg, jpeg, webp, or gif.`;
 
 export const buildUnsupportedSourceMessage = (count = 0) =>
-  `Skipped ${count} unsupported file${count === 1 ? '' : 's'}. Use pdf, md, txt, csv, ppt, pptx, json, png, jpg, jpeg, webp, or gif.`;
+  `Skipped ${count} unsupported file${count === 1 ? '' : 's'}. Use md, txt, csv, json, png, jpg, jpeg, webp, or gif.`;
 
 export const getPhotoStatusLabel = (source: PhotoStatusSource = {}) => {
   const status = toStr(source?.analysisStatus || 'queued')

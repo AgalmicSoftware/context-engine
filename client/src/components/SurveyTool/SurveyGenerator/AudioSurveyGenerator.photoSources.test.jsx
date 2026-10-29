@@ -368,7 +368,9 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     );
 
     const fileInput = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}"]`);
-    expect(fileInput.getAttribute('accept')).toContain('.pdf');
+    expect(fileInput.getAttribute('accept')).not.toContain('.pdf');
+    expect(fileInput.getAttribute('accept')).not.toContain('.ppt');
+    expect(fileInput.getAttribute('accept')).toContain('.txt');
     expect(fileInput.getAttribute('accept')).toContain('.jpeg');
     expect(fileInput.getAttribute('accept')).toContain('.jpg');
   });
