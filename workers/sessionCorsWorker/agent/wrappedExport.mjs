@@ -1,6 +1,6 @@
 import { quoteCsvCell } from '../../../shared/csv/quoteCell.mjs';
 import { safeString, lower, safeJsonParse, nowIsoOrCurrent as nowIso, sanitizeSessionSlug } from './runtimePrimitives.mjs';
-import { SUBMIT_REQUEST_USER_KV_PREFIX, SUBMITTED_RESULT_STATUSES } from './agentSubmitQueue.mjs';
+import { loadSubmittedResultRecords, selectCurrentSubmittedAnswers } from './submittedResults.mjs';
 import { AGENT_ONLY_ANSWER_EVENT_KV_PREFIX, AGENT_ONLY_ANSWER_STATE_KV_PREFIX, AGENT_ONLY_VOTE_EVENT_KV_PREFIX, AGENT_ONLY_HUMAN_VOTE_EVENT_KV_PREFIX, AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX, AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX, AGENT_ONLY_PRINCIPAL_ID_SALT, hmacSha256Hex, normalizeAgentOnlyRunId } from './wrappedCore.mjs';
 import { loadWrappedStatements } from './wrappedStatements.mjs';
 import { loadAnswerState } from './wrappedAnswers.mjs';
@@ -40,34 +40,6 @@ export function rowsToJsonl(rows = []) {
   return rows.map((row) => JSON.stringify(row)).join('\n');
 }
 
-export async function latestSubmittedAnswerFor({
-  env = {},
-  sessionSlug = '',
-  telegramUserId = '',
-  questionId = '',
-  beforeIso = '',
-} = {}) {
-  const slug = sanitizeSessionSlug(sessionSlug);
-  const user = safeString(telegramUserId).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 128);
-  const question = safeString(questionId).replace(/[^0-9A-Za-z._:-]/g, '').slice(0, 160);
-  if (!slug || !user || !question) return null;
-  const prefix = `${SUBMIT_REQUEST_USER_KV_PREFIX}${slug}:${user}:${question}:`;
-  const entries = await listKvEntriesByPrefix(env, prefix);
-  const beforeMs = Date.parse(safeString(beforeIso));
-  let latest = null;
-  for (const entry of entries) {
-    const record = await readKvJson(env, entry.key);
-    if (!record || safeString(record.questionId) !== safeString(questionId)) continue;
-    const status = safeString(record.status);
-    if (status && !SUBMITTED_RESULT_STATUSES.includes(status)) continue;
-    const createdAt = safeString(record.createdAt || record.processedAt || record.updatedAt);
-    const createdMs = Date.parse(createdAt);
-    if (Number.isFinite(beforeMs) && (!Number.isFinite(createdMs) || createdMs >= beforeMs)) continue;
-    if (!latest || Date.parse(safeString(latest.createdAt)) < createdMs) latest = { ...record, createdAt };
-  }
-  return latest;
-}
-
 export async function exportAgentOnlyData({
   env = {},
   sessionSlug = '',
@@ -105,6 +77,20 @@ export async function exportAgentOnlyData({
       const other = await loadWrappedStatements({ env, sessionSlug: slug, readabilityOnly: true, questionSourceMode });
       if (!other.ok) return other;
       for (const statement of other.space.statements) readable.add(statement.statement_id);
+    }
+  }
+  const submittedHistory = new Map();
+  const currentSubmitted = new Map();
+  const answerKey = (user, question) => JSON.stringify([safeString(user), safeString(question)]);
+  if (view === 'gold' || view === 'wide' && !compactExport) {
+    const records = await loadSubmittedResultRecords(env, slug, { includeRawAnswer: true });
+    for (const record of records) {
+      const key = answerKey(record.telegramUserId, record.questionId);
+      if (!submittedHistory.has(key)) submittedHistory.set(key, []);
+      submittedHistory.get(key).push(record);
+    }
+    for (const record of selectCurrentSubmittedAnswers(records)) {
+      currentSubmitted.set(answerKey(record.telegramUserId, record.questionId), record);
     }
   }
   if (['answers', 'wide', 'calibration', 'gold'].includes(view)) {
@@ -193,13 +179,9 @@ export async function exportAgentOnlyData({
             created_at: safeString(record.createdAt),
           });
         } else if (safeString(record.source) === 'agent_autofill' && record.eventKind === 'answer') {
-          const prior = await latestSubmittedAnswerFor({
-            env,
-            sessionSlug: slug,
-            telegramUserId: record.telegramUserId,
-            questionId: record.questionId,
-            beforeIso: record.createdAt,
-          });
+          const beforeMs = Date.parse(record.createdAt);
+          const history = submittedHistory.get(answerKey(record.telegramUserId, record.questionId)) || [];
+          const [prior] = selectCurrentSubmittedAnswers(history.filter(answer => Date.parse(answer.createdAt) < beforeMs));
           if (!prior) continue;
           rows.push({
             principal_id: principalId,
@@ -238,12 +220,7 @@ export async function exportAgentOnlyData({
             sessionSlug: slug,
             questionId: statementId,
           });
-          const normal = compactExport ? null : await latestSubmittedAnswerFor({
-            env,
-            sessionSlug: slug,
-            telegramUserId: state.telegramUserId,
-            questionId: statementId,
-          });
+          const normal = compactExport ? null : currentSubmitted.get(answerKey(state.telegramUserId, statementId));
           rows.push({
             principal_id: principalId,
             statement_id: safeString(statementId),

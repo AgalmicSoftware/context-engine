@@ -340,6 +340,11 @@ The Edge2026 agent-village experiment is implemented by `workers/sessionCorsWork
 
 Agent-only records include agent answer events with `source: "agent_autofill"`, `eventKind`, answer payload, required confidence, optional rationale, model/scaffold/instructions metadata, run/request ids, token-usage metadata when available, privacy-protective skips, and a semantic fingerprint produced by `semanticFingerprintForAgentOnlyAnswer()`. Historical verified Mini App human review is preserved as separate explicit `confirm` or `edit` sidecars. Current HTTP routes cannot create those review records; `humanApproved` is a caller assertion authorizing a normal response submission, not verified review evidence. The export path derives `review_status` values such as `human_confirm`, `human_edit`, or `human_stale_confirm`; calibration exports bucket agent confidence into 10-point bands and count predictions, confirms, edits, and edit rate. Wide/gold exports can join current normal answers, prior submitted answers, agent predictions, confidence, eval type, and review status.
 
+Gold and wide exports load the canonical submitted-answer history once per export,
+so expired operational indexes do not remove human answers. Current answers use
+revision order, then timestamp; gold applies that order only to answers saved
+before the prediction.
+
 Research summaries count distinct stored answers and privacy-protective skips for
 each run using the same coverage rule as the Wrapped image gate. Attempts remain
 operational records, with replays marked explicitly; retries and edits add no

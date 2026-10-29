@@ -50,7 +50,7 @@ export function dedupeSubmitRecords(records = []) {
   return Array.from(byId.values());
 }
 
-export async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
+export async function loadSubmittedResultRecords(env = {}, sessionSlug = '', { includeRawAnswer = false } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const indexedPrefix = submitRequestSessionKvPrefix(slug);
   const indexedRecords = indexedPrefix
@@ -93,7 +93,8 @@ export async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
           record.answerLabel,
         )),
         questionType: safeString(answer.questionType || record.questionType || record.controlType),
-        ...(answer.questionType === 'quadratic' ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {}),
+        ...(includeRawAnswer ? { answer: record.answer || null }
+          : answer.questionType === 'quadratic' ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {}),
         text: safeAnswerString(firstAnswerValue(
           answer.text,
           record.answerText,
