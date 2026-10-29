@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Complete mocked Lit provisioning checkpoints before testing atomic configuration writes.
+
 - Give upload-diagnostics fixtures the durable storage targets required by receipts.
 
 - Isolate SBT name tests by clearing their complete cache namespace.
