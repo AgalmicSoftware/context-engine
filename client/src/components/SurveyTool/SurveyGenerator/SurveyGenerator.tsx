@@ -408,6 +408,8 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const [surveyTitle, setSurveyTitle] = useState('');
   const [statementsToUpload, setStatementsToUpload] = useState<GeneratedSurveyStatement[]>([]);
   const [showCreateSurvey, setShowCreateSurvey] = useState(false);
+  const [authoringGeneration, setAuthoringGeneration] = useState(0);
+  const draftEditedRef = React.useRef(false);
   const [documentURLs, setDocumentURLs] = useState<string[]>([]);
 
   // AUDIO summary-first flow state
@@ -741,13 +743,28 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       fallbackTitle,
       generateQuestionId: generateSurveyGeneratorQuestionId,
     });
+    if (!statements.length) {
+      throw new Error(
+        'Generation returned no usable questions. Try a different source or enable another question type.',
+      );
+    }
+    if (
+      draftEditedRef.current &&
+      !window.confirm('Replace your edited questions with the newly generated questions?')
+    ) {
+      return false;
+    }
+    draftEditedRef.current = false;
+    setAuthoringGeneration((generation) => generation + 1);
     setStatementsToUpload(statements);
+    setShowCreateSurvey(true);
     setSurveyTitle(surveyTitle);
     setDocumentURLs(docs);
 
     if (typeof onQuestionsGenerated === 'function') {
       onQuestionsGenerated(statements, docs, surveyTitle);
     }
+    return true;
   }
 
   const queueAdditionalUrlSource = (rawUrl: string) => {
@@ -1200,13 +1217,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    localStorage.removeItem('unfinishedSurvey');
-
     setError('');
-    setShowCreateSurvey(false);
-    setStatementsToUpload([]);
-    setDocumentURLs([]);
-    setSummaryMd('');
     setActiveAction('generate');
 
     let currentDocumentURLs: string[] = [];
@@ -1215,6 +1226,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     const { effectiveSources } = buildEffectiveAdditionalSources();
     const shouldClearAdditionalUrlInput = Boolean(additionalUrlInput && additionalUrlInput.trim());
     let sourceTypeOverride = '';
+    let generatedSummary = '';
 
     try {
       setLoading(true);
@@ -1336,7 +1348,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
           ...aiRequestOptions,
         });
         if (abortedRef.current) return;
-        setSummaryMd((md || '').trim());
+        generatedSummary = (md || '').trim();
 
         sourceForQuestions = md;
 
@@ -1381,9 +1393,10 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
 
       // 5. Spawn Survey Tool
       // This updates state.documentURLs, which CreateQuestionsAndSurveys picks up
-      processAndSetQuestions(aiData, finalDocUrls);
-      if (shouldClearAdditionalUrlInput) setAdditionalUrlInput('');
-      setShowCreateSurvey(true);
+      if (processAndSetQuestions(aiData, finalDocUrls)) {
+        setSummaryMd(generatedSummary);
+        if (shouldClearAdditionalUrlInput) setAdditionalUrlInput('');
+      }
     } catch (err: unknown) {
       if (!abortedRef.current) {
         if ((err as { code?: unknown } | null | undefined)?.code === CONTEXT_SAVE_LOGIN_REQUIRED_CODE) return;
@@ -1408,6 +1421,10 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       <div className={styles.createSurveyContainer}>
         <Suspense fallback={<div className={styles.viewModeEmptyState}>Loading question authoring...</div>}>
           <LazyCreateQuestionsAndSurveys
+            key={authoringGeneration}
+            onDraftEditedChange={(edited: boolean) => {
+              draftEditedRef.current = edited;
+            }}
             miniaturized={minified}
             preformedQuestions={statementsToUpload}
             preformedSurvey={preformedSurvey}
@@ -1423,6 +1440,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             documentURLs={documentURLs}
             litHooks={scopedLitHooks}
             onUploadComplete={(surveyHash: unknown) => {
+              draftEditedRef.current = false;
               setShowCreateSurvey(false);
               setStatementsToUpload([]);
               setSurveyTitle('');
