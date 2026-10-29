@@ -132,10 +132,6 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
   const active = await readActiveBackupImport(coordinator, slug, true, budget);
   if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail('Another backup restore is in progress. Check restore status to abandon it.', 409, 'backup_restore_in_progress');
-  if (active?.progress.finished) {
-    await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
-    fail('Previous restore cleanup is still in progress. Retry this page.', 503, 'backup_cleanup_pending');
-  }
   const pageHash = await sha256Hex(JSON.stringify(page));
   const receiptKey = `${stateKey}:page:${page.pageNumber}`;
   const complete = async (progress) => {
@@ -145,7 +141,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       ...(done ? {} : { pageComplete: false }),
       restore: done ? null : { archiveId: page.archiveId, inProgress: true, canAbandon: false, cleaning: true } });
   };
-  if (active?.progress.finishing) {
+  if (active?.progress.committedAuthority) {
     if (active.progress.actor !== expectedAuthority.actor || active.progress.pageNumber !== page.pageNumber || active.progress.pageHash !== pageHash) {
       fail('Resume completion with the final unchanged backup page.', 409);
     }
@@ -172,8 +168,8 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     if (page.pageNumber !== 0 || !page.coordinator) fail('Import must begin with the first backup page.', 409);
     progress = { actor: expectedAuthority.actor, pageNumber: 0, nextEntry: 0, pageHash, manifest: { ...manifest, counts: undefined, complete: undefined },
       counts: { written: 0, skipped: 0, conflicts: 0 }, conflicts: [], observed: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 },
-      expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS, configPublished: false,
-      pendingPayloads: 0, pendingRecords: 0, snapshotReady: false, finished: false };
+      expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS,
+      pendingPayloads: 0, pendingRecords: 0, snapshotReady: false };
     if (page.coordinator.chunked !== true) {
       validateSnapshot({ snapshot: page.coordinator, manifest, ...validators });
       if (await sha256Hex(JSON.stringify(page.coordinator)) !== page.snapshotDigest) fail('The coordinator snapshot checksum does not match.');
@@ -185,7 +181,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       await transaction.put(stateKey, progress);
     });
   }
-  if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.finished ||
+  if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber ||
       (progress.nextEntry > 0 && progress.pageHash !== pageHash) ||
       !same(progress.manifest, { ...manifest, counts: undefined, complete: undefined })) fail('Backup pages must be imported unchanged and in order.', 409);
   progress.pageHash = pageHash;
@@ -235,7 +231,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     await storage.put(stateKey, progress);
     return Response.json({ ok: true, archiveId: page.archiveId, pageNumber: page.pageNumber, pageComplete: false,
       counts: progress.counts, conflicts: progress.conflicts, complete: false,
-      restore: { archiveId: page.archiveId, inProgress: true, canAbandon: !progress.configPublished } });
+      restore: { archiveId: page.archiveId, inProgress: true, canAbandon: !progress.committedAuthority } });
   };
   for (let i = progress.nextEntry; i < page.entries.length; i += 1) {
     const entry = page.entries[i];
@@ -400,26 +396,20 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
           await storage.put('session-lit-authorization-signer-v1', signer); progress.counts.written += 1;
         }
       }
-      if (!progress.counts.conflicts && !progress.configPublished) {
-        progress.configPublished = true;
-        await storage.transaction(async (transaction) => {
-          await transaction.put('session-config-authority', { ...authority, projectionPending: true, projectionPendingSinceMs: coordinator.now() });
-          await transaction.put(stateKey, progress);
-        });
-        await coordinator.projectSessionConfigAuthority(authority);
+      if (!progress.counts.conflicts) {
+        // Commit the verified authority before reclaiming its staged snapshot.
+        // The importing actor remains authorized until cleanup and handoff end.
+        progress.committedAuthority = authority;
         progress.counts.written += 1;
+        await storage.put(stateKey, progress);
+        return complete(progress);
       }
-      if (progress.configPublished) await coordinator.repairPendingSessionConfigProjection();
-    }
-    if (progress.configPublished && !progress.counts.conflicts) {
-      progress.finishing = true;
-      await storage.put(stateKey, progress);
-      return complete(progress);
     }
   }
+
   const result = { ok: true, archiveId: page.archiveId, pageNumber: page.pageNumber, counts: progress.counts,
-    conflicts: progress.conflicts, complete: progress.finished && !progress.counts.conflicts,
-    restore: progress.finished ? null : { archiveId: page.archiveId, inProgress: true, canAbandon: !progress.configPublished } };
+    conflicts: progress.conflicts, complete: false,
+    restore: { archiveId: page.archiveId, inProgress: true, canAbandon: true } };
   progress.pageNumber += 1;
   progress.nextEntry = 0;
   progress.cleanupIndex = 0;

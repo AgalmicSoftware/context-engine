@@ -33,6 +33,7 @@ export const clearBackupImportMetadata = async (storage, archiveId) => {
 
 export const cleanupCompletedBackupImport = async (coordinator, slug, archiveId, progress, budget) => {
   const { storage } = coordinator.state;
+  if (!progress.committedAuthority) fail('Only a committed restore can complete.');
   if (budget && budget.remaining < 32) return false;
   const groups = await coordinateWorkerGroupBackup({ env: coordinator.env, slug, sessionId: progress.manifest.sessionId,
     operation: 'finish', archiveId });
@@ -45,11 +46,15 @@ export const cleanupCompletedBackupImport = async (coordinator, slug, archiveId,
   if (!Array.isArray(staged.keys)) throw new Error('Restore cleanup storage could not be read.');
   for (const { name } of staged.keys) await index.delete(name);
   if (staged.list_complete === false || !await clearBackupImportMetadata(storage, archiveId)) return false;
+  const authority = { ...progress.committedAuthority, projectionPending: true, projectionPendingSinceMs: coordinator.now() };
   await storage.transaction(async (transaction) => {
+    await transaction.put('session-config-authority', authority);
     await transaction.put('session-backup-import-completion', { archiveId, completedAt: coordinator.now(), counts: progress.counts });
     await transaction.delete(backupImportStateKey(archiveId));
     await transaction.delete(BACKUP_IMPORT_ACTIVE_KEY);
   });
+  await coordinator.projectSessionConfigAuthority(authority);
+  await coordinator.repairPendingSessionConfigProjection();
   return true;
 };
 
@@ -57,7 +62,7 @@ export const assertNoActiveBackupImport = async (coordinator) => {
   const { storage } = coordinator.state;
   const archiveId = await storage.get(BACKUP_IMPORT_ACTIVE_KEY);
   const progress = archiveId && await storage.get(backupImportStateKey(archiveId));
-  if (progress && !progress.finished) throw Object.assign(new Error('A backup restore is in progress. Resume or abandon it first.'),
+  if (progress) throw Object.assign(new Error('A backup restore is in progress. Resume or abandon it first.'),
     { status: 409, reason: 'backup_restore_in_progress' });
 };
 
@@ -98,14 +103,8 @@ export const readActiveBackupImport = async (coordinator, slug, cleanExpired = t
   if (!archiveId) return null;
   const progress = await storage.get(backupImportStateKey(archiveId));
   if (!progress) return null;
-  if (progress.finished) {
-    // Older versions retained completed receipts indefinitely. Reclaim them,
-    // but never let them bypass the next import's empty-target check.
-    if (await cleanupCompletedBackupImport(coordinator, slug, archiveId, progress, budget)) return null;
-    return { archiveId, progress };
-  }
   const expired = !Number.isFinite(progress.expiresAt) || progress.expiresAt <= coordinator.now();
-  if (cleanExpired && (expired || progress.abandoning) && !progress.configPublished) {
+  if (cleanExpired && (expired || progress.abandoning) && !progress.committedAuthority) {
     if (await cleanup(coordinator, slug, archiveId, progress, budget)) return null;
   }
   return { archiveId, progress };
@@ -113,16 +112,21 @@ export const readActiveBackupImport = async (coordinator, slug, cleanExpired = t
 
 export const controlCoordinatorBackupImport = async (coordinator, payload, abandon = false) => {
   await coordinator.assertSessionAuthority(payload, { allowRestore: true });
-  const active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
+  let active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
+  if (active?.progress.committedAuthority && active.progress.actor !== payload.expectedAuthority.actor) {
+    fail('Only the importing admin can finish this restore.');
+  }
   if (abandon) {
-    if (!active || active.archiveId !== payload.archiveId || active.progress.configPublished) {
-      fail('Only an unfinished restore whose config has not been published can be abandoned.');
+    if (!active || active.archiveId !== payload.archiveId || active.progress.committedAuthority) {
+      fail('Only an uncommitted restore can be abandoned.');
     }
     const complete = await cleanup(coordinator, payload.slug, active.archiveId, active.progress);
     return Response.json({ ok: true, complete });
   }
+  if (active?.progress.committedAuthority &&
+      await cleanupCompletedBackupImport(coordinator, payload.slug, active.archiveId, active.progress)) active = null;
   return Response.json({ ok: true, restore: active ? {
-    archiveId: active.archiveId, inProgress: true, canAbandon: !active.progress.configPublished,
-    cleaning: active.progress.abandoning === true || active.progress.finishing === true || active.progress.finished === true, expiresAt: active.progress.expiresAt,
+    archiveId: active.archiveId, inProgress: true, canAbandon: !active.progress.committedAuthority,
+    cleaning: active.progress.abandoning === true || !!active.progress.committedAuthority, expiresAt: active.progress.expiresAt,
   } : null });
 };

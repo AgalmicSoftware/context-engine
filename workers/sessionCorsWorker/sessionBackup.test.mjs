@@ -1081,7 +1081,7 @@ test('completion cleanup resumes after lost session or group journal deletion re
     const interrupted = await importPage(target.env, pages.at(-1));
     assert.equal(interrupted.status, 503, JSON.stringify(interrupted));
     assert.equal(target.env.interruptCleanup, false, 'The fixture must interrupt completion cleanup');
-    const result = await importPage(target.env, pages.at(-1), 1);
+    const result = await importPage(target.env, pages.at(-1));
     assert.equal(result.body.complete, true, JSON.stringify(result));
     assertCompletedRestoreClean(target, pages[0].archiveId);
     assert.equal([...target.kv.values.keys()].filter((key) => key.startsWith(`ce-storage:${slug}:responses:`)).length, 120,
@@ -1090,26 +1090,174 @@ test('completion cleanup resumes after lost session or group journal deletion re
   }
 });
 
-test('legacy completed imports are cleaned in batches without replaying stale receipts', async () => {
-  const { pages } = await completedRestoreSource();
-  const target = fixture();
+const assertRestoredFixtureRows = (source, target) => {
+  for (const [key, value] of source.kv.values) {
+    if (key.startsWith(`ce-storage:${slug}:`) || key.startsWith(`ce-storage-payload:${slug}:`)) {
+      assert.equal(target.kv.values.get(key), value, key);
+    }
+  }
+};
+const restorePageAs = (env, page, actor, revision = 0) => env.GROUP_KV.request(() =>
+  callSessionConfigCoordinator({ env, slug, path: 'backup/import', expectedAuthority: { actor, revision, authzEpoch: 0 },
+    page, adoptSessionId: true }));
+const restartOnEveryRequest = (Base = SessionWriteCoordinator) => class extends Base {
+  async fetch(request) { return new SessionWriteCoordinator(this.state, this.env).fetch(request); }
+};
+const restoreStore = (env) => env.__coordinatorInstances.get(`coordinator:${createHash('sha256').update(`session-config:${slug}`).digest('hex')}`).store;
+
+test('the importing admin keeps authority through cleanup and hands over only when every batch finishes', async () => {
+  const { source, pages } = await completedRestoreSource();
+  const importer = `0x${'2'.repeat(40)}`;
+  const target = fixture(restartOnEveryRequest());
   target.kv.values.delete(`session:${slug}:config`);
-  for (const page of pages) assert.equal((await importPage(target.env, page)).ok, true);
-  const sessionStore = [...target.env.__coordinatorInstances.values()].find(({ store }) => store.has('session-config-authority')).store;
+  let cleanupBatches = 0;
+  let releasedGroupLock = false;
+  for (const page of pages) {
+    for (let attempts = 0; attempts < 50; attempts += 1) {
+      const result = await restorePageAs(target.env, page, importer);
+      assert.equal(result.ok, true, JSON.stringify(result));
+      if (result.body.complete) break;
+      assert.equal(await target.kv.get(`session:${slug}:config`), null, 'Archive admin must not take over during cleanup');
+      const progress = restoreStore(target.env).get(`session-backup-import:${page.archiveId}`);
+      if (progress.committedAuthority) {
+        cleanupBatches += 1;
+        assert.equal(progress.committedAuthority.config.adminAddress, admin);
+        const refused = await restorePageAs(target.env, page, admin);
+        assert.equal(refused.status, 409, 'Only the importing actor continues a committed restore');
+        const groupStore = target.env.__coordinatorInstances.get(`coordinator:worker-groups:${slug}:${sessionId}`).store;
+        if (!groupStore.has('worker-group-backup-import-active')) {
+          releasedGroupLock = true;
+          const mutation = await executeCoordinatedWorkerGroupMutation({ env: target.env, slug, sessionId,
+            expectedAuthority: { actor: importer, revision: 0, authzEpoch: 0 }, operation: 'create',
+            input: { groupId: 'too-early', label: 'Too early', joinMode: 'open' }, actorPrincipal: { kind: 'evm_address', address: importer } });
+          assert.equal(mutation.status, 409);
+          assert.match(mutation.error, /backup restore is in progress/);
+        }
+      }
+      if (result.body.pageComplete !== false) break;
+      assert.ok(attempts < 49, 'Bounded page retries must finish');
+    }
+  }
+  assert.ok(cleanupBatches >= 2, 'The fixture must require several cleanup batches');
+  assert.equal(releasedGroupLock, true, 'The session lock must protect the gap after group cleanup');
+  assert.equal(JSON.parse(await target.kv.get(`session:${slug}:config`)).adminAddress, admin);
+  assertCompletedRestoreClean(target, pages[0].archiveId);
+  assertRestoredFixtureRows(source, target);
+  assert.equal([...target.kv.values.keys()].filter((key) => key.startsWith(`ce-storage:${slug}:responses:`)).length, 120);
+});
+
+test('a committed restore cannot expire or be abandoned and status alone finishes it', async () => {
+  const { source, pages } = await completedRestoreSource();
+  const importer = `0x${'2'.repeat(40)}`;
+  const target = fixture(restartOnEveryRequest());
+  target.kv.values.delete(`session:${slug}:config`);
+  let committed = false;
+  for (const page of pages) {
+    for (let attempts = 0; attempts < 50; attempts += 1) {
+      const result = await restorePageAs(target.env, page, importer);
+      assert.equal(result.ok, true, JSON.stringify(result));
+      committed = !!restoreStore(target.env).get(`session-backup-import:${page.archiveId}`)?.committedAuthority;
+      if (committed || result.body.pageComplete !== false) break;
+      assert.ok(attempts < 49);
+    }
+    if (committed) break;
+  }
+  assert.equal(committed, true, 'Verification must leave a durable committed state before cleanup finishes');
   const archiveId = pages[0].archiveId;
-  sessionStore.set('session-backup-import-active', archiveId);
-  sessionStore.set(`session-backup-import:${archiveId}`, { finished: true, configPublished: true,
-    manifest: pages[0].manifest, counts: { written: 241, skipped: 0, conflicts: 0 } });
-  for (let n = 0; n < 450; n += 1) sessionStore.set(`session-backup-import:${archiveId}:payload:old-${n}`, {});
-  sessionStore.set(`session-backup-import:${archiveId}:page:0`, { hash: createHash('sha256').update(JSON.stringify(pages[0])).digest('hex'),
-    result: { ok: true, complete: true } });
-  const refused = await importPage(target.env, pages[0], 1);
-  assert.equal(refused.status, 409);
-  assert.equal(refused.body.reason, 'backup_target_not_empty');
-  for (let n = 0; n < 10 && sessionStore.has('session-backup-import-active'); n += 1) {
-    assert.equal((await restoreControl(target.env, 'status', archiveId, 1)).ok, true);
+  const progress = restoreStore(target.env).get(`session-backup-import:${archiveId}`);
+  progress.expiresAt = 0;
+  const control = (operation, actor = importer) => callSessionConfigCoordinator({ env: target.env, slug,
+    path: `backup/${operation}`, archiveId, expectedAuthority: { actor, revision: 0, authzEpoch: 0 } });
+  assert.equal((await control('abandon')).status, 409);
+  assert.equal((await control('status', admin)).status, 409);
+  for (let attempts = 0; attempts < 50; attempts += 1) {
+    const result = await control('status');
+    assert.equal(result.ok, true, JSON.stringify(result));
+    if (!result.body.restore) break;
+    assert.equal(result.body.restore.canAbandon, false);
+    assert.equal(result.body.restore.cleaning, true);
+    assert.equal(await target.kv.get(`session:${slug}:config`), null);
+    assert.ok(attempts < 49);
   }
   assertCompletedRestoreClean(target, archiveId);
+  assertRestoredFixtureRows(source, target);
+  assert.equal([...target.kv.values.keys()].filter((key) => key.startsWith(`ce-storage:${slug}:responses:`)).length, 120);
+});
+
+test('lost replies at commit, cleanup, handoff and projection recover after a coordinator restart', async () => {
+  const { source, pages } = await completedRestoreSource();
+  const archiveId = pages[0].archiveId;
+  for (const phase of ['commit', 'cleanup', 'handoff', 'projection']) {
+    class Interrupted extends SessionWriteCoordinator {
+      constructor(state, env) {
+        super(state, env);
+        const put = state.storage.put;
+        state.storage.put = async (key, value) => {
+          const result = await put(key, value);
+          if (env.interruptPhase === 'commit' && key === `session-backup-import:${archiveId}` && value.committedAuthority) {
+            env.interruptPhase = '';
+            throw new Error('Lost committed-state reply');
+          }
+          return result;
+        };
+        const transaction = state.storage.transaction;
+        state.storage.transaction = async (operation) => {
+          const result = await transaction(operation);
+          if (env.interruptPhase === 'handoff' && await state.storage.get('session-backup-import-completion')) {
+            env.interruptPhase = '';
+            throw new Error('Lost durable transition reply');
+          }
+          return result;
+        };
+        const remove = state.storage.delete;
+        state.storage.delete = async (key) => {
+          const result = await remove(key);
+          if (env.interruptPhase === 'cleanup' && key.includes(':journal:index:') &&
+              (await state.storage.get(`session-backup-import:${archiveId}`))?.committedAuthority) {
+            env.interruptPhase = '';
+            throw new Error('Lost cleanup reply');
+          }
+          return result;
+        };
+      }
+    }
+    const importer = `0x${'2'.repeat(40)}`;
+    const target = fixture(restartOnEveryRequest(Interrupted));
+    target.kv.values.delete(`session:${slug}:config`);
+    target.env.interruptPhase = phase;
+    const put = target.kv.put;
+    target.kv.put = async (key, value) => {
+      const result = await put(key, value);
+      if (target.env.interruptPhase === 'projection' && key === `session:${slug}:config`) {
+        target.env.interruptPhase = '';
+        throw new Error('Lost projection reply');
+      }
+      return result;
+    };
+    let lost = false;
+    for (const page of pages) {
+      for (let attempts = 0; attempts < 50; attempts += 1) {
+        const result = await restorePageAs(target.env, page, importer);
+        if (!result.ok) {
+          assert.equal(result.status, 503, JSON.stringify(result));
+          assert.equal(lost, false);
+          lost = true;
+          if (restoreStore(target.env).has('session-backup-import-completion')) {
+            const current = await callSessionConfigCoordinator({ env: target.env, slug, path: 'current' });
+            assert.equal(current.body.config.adminAddress, admin);
+            break;
+          }
+        } else if (result.body.pageComplete !== false) break;
+        assert.ok(attempts < 49);
+      }
+    }
+    assert.equal(lost, true, phase);
+    assert.equal(target.env.interruptPhase, '', phase);
+    assertCompletedRestoreClean(target, archiveId);
+    assertRestoredFixtureRows(source, target);
+    assert.equal([...target.kv.values.keys()].filter((key) => key.startsWith(`ce-storage:${slug}:responses:`)).length, 120, phase);
+    assert.equal(JSON.parse(await target.kv.get(`session:${slug}:config`)).adminAddress, admin);
+  }
 });
 
 

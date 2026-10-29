@@ -275,6 +275,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Keep the importing admin authorized through restore cleanup; publish the restored
+  authority and release its lock atomically, with status reads able to finish cleanup.
+
 - Check each listing group once per request and return a retryable failure when
   membership is unavailable, instead of reporting an incomplete page as complete.
 
