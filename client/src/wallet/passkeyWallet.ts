@@ -105,6 +105,21 @@ export const isMissingPasskeyWalletRecordError = (error: unknown): boolean =>
   error instanceof MissingPasskeyWalletRecordError ||
   (!!error && typeof error === 'object' && (error as { code?: unknown }).code === MISSING_WALLET_CODE);
 
+const CANCELLED_WALLET_OPERATION_CODE = 'CE_PASSKEY_WALLET_OPERATION_CANCELLED';
+
+export class PasskeyWalletOperationCancelledError extends Error {
+  code = CANCELLED_WALLET_OPERATION_CODE;
+
+  constructor() {
+    super('The passkey wallet operation was cancelled.');
+    this.name = 'PasskeyWalletOperationCancelledError';
+  }
+}
+
+export const isPasskeyWalletOperationCancelledError = (error: unknown): boolean =>
+  error instanceof PasskeyWalletOperationCancelledError ||
+  (!!error && typeof error === 'object' && (error as { code?: unknown }).code === CANCELLED_WALLET_OPERATION_CODE);
+
 const isPasskeyWalletLockedError = (error: unknown): boolean =>
   error instanceof Error
     ? error.message === PASSKEY_WALLET_LOCKED_MESSAGE
@@ -221,6 +236,8 @@ export class PasskeyEoaWalletClient {
   private sessionChainId = 0;
   // Bumped on every chain change; a request that sees it move never retries.
   private chainEpoch = 0;
+  private operationGeneration = 0;
+  private mutationTail: Promise<void> = Promise.resolve();
   // Sessions a chain change replaced; each locks once its requests settle.
   private readonly retiringSessions = new Set<SoftSessionClient>();
   private readonly inFlightBySession = new Map<SoftSessionClient, number>();
@@ -271,16 +288,23 @@ export class PasskeyEoaWalletClient {
   }
 
   async createWallet(): Promise<HexString> {
+    const generation = ++this.operationGeneration;
     this.transitionInProgress = true;
     let privateKey: HexString | null = null;
     try {
+      if (this.activeAddress) {
+        await this.mutateWallet(() => this.lock(), generation);
+        this.assertCurrentOperation(generation);
+      }
       if (this.config.walletKeyMode === 'passkey-derived') {
         const saltBytes = await getPasskeyDerivedPrfSalt(this.config);
+        this.assertCurrentOperation(generation);
         const credential = await createPasskeyCredential({
           config: this.config,
           salt: saltBytes,
           credentials: this.credentials,
         });
+        this.assertCurrentOperation(generation);
         const credentialId = bufferToBase64URL(credential.rawId);
         const prfOutput = await resolveCreatedCredentialPrfOutput({
           config: this.config,
@@ -289,7 +313,9 @@ export class PasskeyEoaWalletClient {
           salt: saltBytes,
           credentials: this.credentials,
         });
+        this.assertCurrentOperation(generation);
         privateKey = await deriveEoaPrivateKeyFromPrf({ prfOutput, config: this.config });
+        this.assertCurrentOperation(generation);
         const address = getAddressForPrivateKey(privateKey);
         const record = createPasskeyDerivedWalletRecord({
           config: this.config,
@@ -297,8 +323,10 @@ export class PasskeyEoaWalletClient {
           address,
           prfSalt: saltBytes,
         });
-        await this.writeDerivedMetadata(record);
-        await this.activate(record, privateKey);
+        await this.writeDerivedMetadata(record, generation);
+        this.assertCurrentOperation(generation);
+        await this.activate(record, privateKey, generation);
+        this.assertCurrentOperation(generation);
         return address;
       }
 
@@ -307,12 +335,14 @@ export class PasskeyEoaWalletClient {
       // This mode keeps the only copy of a wallet's key in the saved record,
       // so never mint a replacement passkey on the device that holds it.
       const savedRecord = await this.storage.read();
+      this.assertCurrentOperation(generation);
       const credential = await createPasskeyCredential({
         config: this.config,
         salt: saltBytes,
         credentials: this.credentials,
         excludeCredentialIds: savedRecord?.rpId === this.config.rpId ? [savedRecord.credentialId] : [],
       });
+      this.assertCurrentOperation(generation);
       const credentialId = bufferToBase64URL(credential.rawId);
       const prfOutput = await resolveCreatedCredentialPrfOutput({
         config: this.config,
@@ -321,7 +351,9 @@ export class PasskeyEoaWalletClient {
         salt: saltBytes,
         credentials: this.credentials,
       });
+      this.assertCurrentOperation(generation);
       const aesKey = await deriveAesGcmKeyFromPrf(prfOutput, salt);
+      this.assertCurrentOperation(generation);
       privateKey = this.privateKeyFactory();
       const address = getAddressForPrivateKey(privateKey);
       const record = await encryptPrivateKey({
@@ -332,21 +364,32 @@ export class PasskeyEoaWalletClient {
         address,
         config: this.config,
       });
-      await this.storage.write(record);
-      await this.activate(record, privateKey);
+      this.assertCurrentOperation(generation);
+      await this.mutateWallet(async () => {
+        await this.storage.write(record);
+        this.assertCurrentOperation(generation);
+      }, generation);
+      this.assertCurrentOperation(generation);
+      await this.activate(record, privateKey, generation);
+      this.assertCurrentOperation(generation);
       return address;
+    } catch (error) {
+      this.assertCurrentOperation(generation);
+      throw error;
     } finally {
       privateKey = null;
-      this.transitionInProgress = false;
+      if (this.operationGeneration === generation) this.transitionInProgress = false;
     }
   }
 
   async unlockWallet(options: UnlockOptions = {}): Promise<HexString> {
+    const generation = this.operationGeneration;
     this.transitionInProgress = true;
     let privateKey: HexString | null = null;
     try {
       if (this.config.walletKeyMode === 'passkey-derived') {
         const storedRecord = await this.storage.read();
+        this.assertCurrentOperation(generation);
         if (storedRecord && storedRecord.rpId !== this.config.rpId) {
           throw new Error(`Stored wallet belongs to RP ID "${storedRecord.rpId}", not "${this.config.rpId}".`);
         }
@@ -355,6 +398,7 @@ export class PasskeyEoaWalletClient {
         }
         if (storedRecord) assertExpectedAccount(options.expectedAddress, storedRecord.evmAddress);
         const saltBytes = await getPasskeyDerivedPrfSalt(this.config);
+        this.assertCurrentOperation(generation);
         const selectCredential = options.selectCredential === true;
         const { credential, prfOutput } = await authenticatePasskeyCredential({
           config: this.config,
@@ -362,6 +406,7 @@ export class PasskeyEoaWalletClient {
           salt: saltBytes,
           credentials: this.credentials,
         });
+        this.assertCurrentOperation(generation);
         const credentialId = bufferToBase64URL(credential.rawId);
         // Regression guard: a returning wallet must target its saved credential;
         // omitting allowCredentials reopens the account chooser during mint/sign.
@@ -369,6 +414,7 @@ export class PasskeyEoaWalletClient {
           throw new Error('Passkey assertion does not match the stored wallet credential.');
         }
         privateKey = await deriveEoaPrivateKeyFromPrf({ prfOutput, config: this.config });
+        this.assertCurrentOperation(generation);
         const address = getAddressForPrivateKey(privateKey);
         if (!selectCredential && storedRecord && address.toLowerCase() !== storedRecord.evmAddress.toLowerCase()) {
           throw new Error('Passkey-derived wallet address does not match stored metadata.');
@@ -380,12 +426,15 @@ export class PasskeyEoaWalletClient {
           address,
           prfSalt: saltBytes,
         });
-        await this.writeDerivedMetadata(record);
-        await this.activate(record, privateKey);
+        await this.writeDerivedMetadata(record, generation);
+        this.assertCurrentOperation(generation);
+        await this.activate(record, privateKey, generation);
+        this.assertCurrentOperation(generation);
         return address;
       }
 
       const record = await this.storage.read();
+      this.assertCurrentOperation(generation);
       if (!record) throw new MissingPasskeyWalletRecordError();
       if (record.rpId !== this.config.rpId) {
         throw new Error(`Stored wallet belongs to RP ID "${record.rpId}", not "${this.config.rpId}".`);
@@ -401,24 +450,33 @@ export class PasskeyEoaWalletClient {
         salt: saltBytes,
         credentials: this.credentials,
       });
+      this.assertCurrentOperation(generation);
       const aesKey = await deriveAesGcmKeyFromPrf(prfOutput, record.salt);
+      this.assertCurrentOperation(generation);
       privateKey = await decryptPrivateKey({ record, aesKey });
+      this.assertCurrentOperation(generation);
       const address = getAddressForPrivateKey(privateKey);
       if (address.toLowerCase() !== record.evmAddress.toLowerCase()) {
         throw new Error('Encrypted wallet record address does not match decrypted key.');
       }
-      await this.activate(record, privateKey);
+      await this.activate(record, privateKey, generation);
+      this.assertCurrentOperation(generation);
       return address;
+    } catch (error) {
+      this.assertCurrentOperation(generation);
+      throw error;
     } finally {
       privateKey = null;
-      this.transitionInProgress = false;
+      if (this.operationGeneration === generation) this.transitionInProgress = false;
     }
   }
 
   async restoreSession(options: RestoreOptions = {}): Promise<HexString | null> {
+    const generation = this.operationGeneration;
     if (this.transitionInProgress) return null;
     if (this.isUnlocked() && this.activeAddress) return this.activeAddress;
     const record = await this.storage.read();
+    this.assertCurrentOperation(generation);
     if (!record || (record.disconnected === true && options.requireSigner !== true)) return null;
     if (record.rpId !== this.config.rpId) return null;
     if (this.config.walletKeyMode === 'passkey-derived' && !isPasskeyDerivedWalletRecord(record)) return null;
@@ -534,61 +592,99 @@ export class PasskeyEoaWalletClient {
   }
 
   async disconnect(): Promise<void> {
-    await this.lock();
-    this.activeRecord = null;
-    this.activeAddress = null;
-    const record = await this.storage.read();
-    if (record) await this.storage.write({ ...record, disconnected: true });
+    await this.endWallet(false);
   }
 
   async deleteWallet(): Promise<void> {
-    await this.disconnect();
-    await this.storage.clear();
+    await this.endWallet(true);
   }
 
-  private async writeDerivedMetadata(record: PasskeyDerivedWalletRecord): Promise<void> {
-    const existing = await this.storage.read();
-    if (existing && !isPasskeyDerivedWalletRecord(existing)) return;
-    await this.storage.write(record);
-  }
-
-  private async activate(record: PasskeyWalletRecord, privateKey: HexString): Promise<void> {
-    const chainId = chainIdOf(this.activeChain);
-    const rpcUrl = resolveRpcUrl(this.activeChain);
-    if (!rpcUrl) throw new Error('No RPC URL is configured for the passkey wallet chain.');
-    const expiresAt = this.now() + this.config.unlockTtlSeconds * 1000;
-    const policy = createSoftSessionPolicy({
-      address: record.evmAddress,
-      ttlSeconds: this.config.unlockTtlSeconds,
-      now: this.now(),
-      allowedChainIds: chainId ? [chainId] : undefined,
-      maxTransactionValueWei: '0',
+  private async endWallet(deleteRecord: boolean): Promise<void> {
+    this.operationGeneration += 1;
+    this.transitionInProgress = false;
+    this.activeRecord = null;
+    this.activeAddress = null;
+    await this.mutateWallet(async () => {
+      await this.lock();
+      if (deleteRecord) {
+        await this.storage.clear();
+      } else {
+        const record = await this.storage.read();
+        if (record) await this.storage.write({ ...record, disconnected: true });
+      }
     });
+  }
 
-    // Soft sessions are not a hard security boundary. They keep decrypted EOA
-    // material out of serializable app state and isolate signing code, but any
-    // malicious script executing in this origin can still ask the worker to sign.
-    await this.sessionClient.init({ privateKey, rpcUrl, chainId, policy });
-    if (record.disconnected) {
-      record = { ...record, disconnected: false };
+  private assertCurrentOperation(generation: number): void {
+    if (this.operationGeneration !== generation) throw new PasskeyWalletOperationCancelledError();
+  }
+
+  // Logout queues behind writes/init already in progress. After it resolves,
+  // an older operation cannot finish a write or leave its signer initialized.
+  private mutateWallet<T>(operation: () => Promise<T>, generation?: number): Promise<T> {
+    const result = this.mutationTail.then(() => {
+      if (generation !== undefined) this.assertCurrentOperation(generation);
+      return operation();
+    });
+    this.mutationTail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  private async writeDerivedMetadata(record: PasskeyDerivedWalletRecord, generation: number): Promise<void> {
+    await this.mutateWallet(async () => {
+      const existing = await this.storage.read();
+      this.assertCurrentOperation(generation);
+      if (existing && !isPasskeyDerivedWalletRecord(existing)) return;
+      await this.storage.write(record);
+      this.assertCurrentOperation(generation);
+    }, generation);
+  }
+
+  private async activate(record: PasskeyWalletRecord, privateKey: HexString, generation: number): Promise<void> {
+    await this.mutateWallet(async () => {
+      const chainId = chainIdOf(this.activeChain);
+      const rpcUrl = resolveRpcUrl(this.activeChain);
+      if (!rpcUrl) throw new Error('No RPC URL is configured for the passkey wallet chain.');
+      const expiresAt = this.now() + this.config.unlockTtlSeconds * 1000;
+      const policy = createSoftSessionPolicy({
+        address: record.evmAddress,
+        ttlSeconds: this.config.unlockTtlSeconds,
+        now: this.now(),
+        allowedChainIds: chainId ? [chainId] : undefined,
+        maxTransactionValueWei: '0',
+      });
+
+      // Soft sessions isolate key material, but scripts in this origin can
+      // still request signatures; they are not a hard security boundary.
+      const session = this.sessionClient;
       try {
-        await this.storage.write(record);
+        await session.init({ privateKey, rpcUrl, chainId, policy });
+        this.assertCurrentOperation(generation);
+        if (record.disconnected) {
+          record = { ...record, disconnected: false };
+          await this.storage.write(record);
+          this.assertCurrentOperation(generation);
+        }
       } catch (error) {
-        await this.sessionClient.lock();
+        await session.lock();
         throw error;
       }
-    }
-    this.activeRecord = record;
-    this.activeAddress = record.evmAddress;
-    this.unlockExpiresAt = expiresAt;
-    this.sessionChainId = chainId;
-    if (this.lockTimer) clearTimeout(this.lockTimer);
-    this.lockTimer = setTimeout(
-      () => {
-        void this.lock().catch((error) => walletLog.warn('Passkey wallet auto-lock failed:', error));
-      },
-      Math.max(0, expiresAt - this.now()),
-    );
+      this.activeRecord = record;
+      this.activeAddress = record.evmAddress;
+      this.unlockExpiresAt = expiresAt;
+      this.sessionChainId = chainId;
+      if (this.lockTimer) clearTimeout(this.lockTimer);
+      this.lockTimer = setTimeout(
+        () => {
+          void this.lock().catch((error) => walletLog.warn('Passkey wallet auto-lock failed:', error));
+        },
+        Math.max(0, expiresAt - this.now()),
+      );
+    }, generation);
+    this.assertCurrentOperation(generation);
   }
 
   private assertRequestedAccount(requestedAccount: unknown): void {
@@ -632,28 +728,37 @@ export class PasskeyEoaWalletClient {
 
   // Re-unlocking keeps the account the app already uses; a request naming an
   // account unlocks only that account.
-  private async relockAndUnlock(requestedAccount: unknown): Promise<void> {
+  private async relockAndUnlock(requestedAccount: unknown, generation: number): Promise<void> {
+    this.assertCurrentOperation(generation);
     const expectedAddress = this.activeAddress || (requestedAccount ? String(requestedAccount) : null);
-    if (this.activeAddress) await this.lockCurrentSession();
+    if (this.activeAddress) {
+      await this.mutateWallet(() => this.lockCurrentSession(), generation);
+      this.assertCurrentOperation(generation);
+    }
     await this.unlockWallet({ expectedAddress });
+    this.assertCurrentOperation(generation);
   }
 
   private async requestUnlocked(
     buildArgs: () => { method: string; params?: unknown[] },
     requestedAccount?: unknown,
   ): Promise<unknown> {
-    // A request belongs to the chain it started on: never send or replay it on
-    // another chain. After a lock from TTL or idle expiry a signature re-unlocks
-    // and retries once; a transaction is never sent again.
+    // Expiry permits one signature retry; logout cancels it. A transaction is
+    // never replayed, and a request stays on the chain it started on.
+    const generation = this.operationGeneration;
     const chainEpoch = this.chainEpoch;
     const { method } = buildArgs();
     const assertSameChain = (): void => {
+      this.assertCurrentOperation(generation);
       if (this.chainEpoch !== chainEpoch) throw networkChangedError();
     };
     const send = async (): Promise<unknown> => {
       try {
-        return await this.sendToSession(buildArgs());
+        const result = await this.sendToSession(buildArgs());
+        this.assertCurrentOperation(generation);
+        return result;
       } catch (error) {
+        this.assertCurrentOperation(generation);
         if (!isPasskeyWalletLockedError(error)) throw error;
         if (TRANSACTION_METHODS.has(method)) throw transactionInterruptedError();
         assertSameChain();
@@ -661,17 +766,21 @@ export class PasskeyEoaWalletClient {
       }
     };
     this.assertRequestedAccount(requestedAccount);
-    if (!this.isUnlocked()) await this.relockAndUnlock(requestedAccount);
+    if (!this.isUnlocked()) await this.relockAndUnlock(requestedAccount, generation);
     assertSameChain();
     this.assertRequestedAccount(requestedAccount);
     try {
-      return await send();
+      const result = await send();
+      this.assertCurrentOperation(generation);
+      return result;
     } catch (error) {
+      this.assertCurrentOperation(generation);
       if (!isPasskeyWalletLockedError(error)) throw error;
-
-      await this.relockAndUnlock(requestedAccount);
+      await this.relockAndUnlock(requestedAccount, generation);
       assertSameChain();
-      return send();
+      const result = await send();
+      this.assertCurrentOperation(generation);
+      return result;
     }
   }
 

@@ -89,6 +89,10 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Cancel pending passkey creation, unlocks, and signing on logout or deletion.
+  Late replies cannot restore the signer or connected metadata; expiry still
+  permits one signature re-unlock.
+
 - Remove circular session-parser and Arweave imports while preserving resource
   diagnostics and gateway URL normalization.
 
