@@ -1108,3 +1108,21 @@ describe('gate policy changes use fresh ciphertext', () => {
     },
   );
 });
+
+it('an unselected draft is neither validated nor encrypted nor cleared', async () => {
+  const context = createContext();
+  const slice = context.stateRef.current.surveysResponseState[2];
+  slice.answers.q2 = { value: '*', encrypted: true, encryptionAudience: 'self' };
+  context.getChangedQidsAndFields.mockReturnValue({
+    changedQids: new Set(['q1', 'q2']),
+    changedMap: { q1: { answer: 1 }, q2: { answer: 1 } },
+  });
+  const before = { ...slice.answers.q2 };
+  const runtime = createSurveyQuestionsSubmitRuntime(context);
+  expect(await runtime.encryptAndUpload(new Set(['q1', 'unchanged-question']))).toEqual({ status: 'submitted' });
+  expect(context.verifyEncryption).toHaveBeenCalledWith(new Set(['q1']), expect.anything());
+  expect(context.submitSurveyResponse).toHaveBeenCalledWith(expect.anything(), new Set(['q1']), expect.anything());
+  expect(context.cryptoUtils.encryptMultipleAnswers).not.toHaveBeenCalled();
+  expect(context.clearDraftFor.mock.calls).toEqual([['q1']]);
+  expect(slice.answers.q2).toEqual(before);
+});

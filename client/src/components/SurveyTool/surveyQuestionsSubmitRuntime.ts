@@ -391,7 +391,7 @@ export const createSurveyQuestionsSubmitRuntime = (
     return oversize;
   };
 
-  const encryptAndUpload = async () => {
+  const encryptAndUpload = async (overrideChangedQids: Set<string> | null = null) => {
     let submitContext: SurveyQuestionsLegacyValue = null;
     let heldBackNotice = '';
     try {
@@ -447,7 +447,14 @@ export const createSurveyQuestionsSubmitRuntime = (
 
       // Compute changed set once (used for encrypt + submit)
       const surveyIndex: SurveyQuestionsLegacyValue = submitContext.surveyIndex;
-      const { changedQids, changedMap }: SurveyQuestionsLegacyValue = getChangedQidsAndFields(surveyIndex);
+      const diff: SurveyQuestionsLegacyValue = getChangedQidsAndFields(surveyIndex);
+      const changedMap = diff.changedMap;
+      const changedQids = new Set<string>(
+        Array.from(diff.changedQids as Set<string>).filter(
+          (qid) => !overrideChangedQids || overrideChangedQids.has(qid),
+        ),
+      );
+      if (!changedQids.size) throw new Error('No new or changed responses to submit.');
 
       // Local state tracker to ensure baseline syncs with encrypted data even if React is slow
       let activeSlice: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex] || {
@@ -633,7 +640,7 @@ export const createSurveyQuestionsSubmitRuntime = (
       } catch (_: any) {
         if (propsRef.current.singleQuestionMode && propsRef.current.questionID) {
           clearDraftFor(propsRef.current.questionID.toLowerCase());
-        } else {
+        } else if (!overrideChangedQids) {
           clearDraft();
         }
       }

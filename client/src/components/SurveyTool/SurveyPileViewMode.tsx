@@ -2314,7 +2314,7 @@ const showNoPendingPileSubmitFeedback = (engine: PileViewModeEngine, pileSubmitL
   }, feedbackPlan.initialDelayMs);
 };
 
-const handlePileSubmitClick = async (engine: PileViewModeEngine) => {
+const handlePileSubmitClick = async (engine: PileViewModeEngine, overrideChangedQids: Set<string> | null = null) => {
   const pendingStats = engine.getPendingStatsSnapshot();
   const pileSubmitLabel = (engine.props.computeSubmitLabel || computeSubmitLabel)(engine, {
     pendingStats,
@@ -2331,7 +2331,7 @@ const handlePileSubmitClick = async (engine: PileViewModeEngine) => {
   });
 
   if (!engine.props.loginComplete) {
-    return engine.encryptAndUpload();
+    return engine.encryptAndUpload(overrideChangedQids);
   }
   if (engine.state.isSubmitting) {
     return { status: 'pending' as const, message: 'Responses are already being submitted.' };
@@ -2346,10 +2346,13 @@ const handlePileSubmitClick = async (engine: PileViewModeEngine) => {
     engine.setState({ pileSubmitTempText: 'Loading your saved answers…' });
     return { status: 'pending' as const, message: 'Loading your saved answers…' };
   }
-  return engine.encryptAndUpload();
+  return engine.encryptAndUpload(overrideChangedQids);
 };
 
-const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
+const handlePileSubmitWithOwnAnswers = async (
+  engine: PileViewModeEngine,
+  overrideChangedQids: Set<string> | null = null,
+) => {
   const baseToken = buildSessionInterviewSubmitContextToken(engine.props);
   if (engine._pileOwnAnswersSubmitController) {
     if (!engine.getSessionInterviewResponseReadinessToken(baseToken))
@@ -2366,7 +2369,7 @@ const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
     engine.getSubmitCount() === 0 ||
     engine.getSessionInterviewResponseReadinessToken(baseToken)
   ) {
-    return engine.handlePileSubmitClick();
+    return engine.handlePileSubmitClick(overrideChangedQids);
   }
   const controller = new AbortController();
   engine._pileOwnAnswersSubmitController = controller;
@@ -2375,7 +2378,10 @@ const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
     const outcome = await readOwnAnswersBeforeUpload(
       engine,
       // Navigation can initialize another card while the read is in flight.
-      () => collectSubmitQuestionIds(engine.state.pileQuestions, engine.state.surveysResponseState?.[0]),
+      () =>
+        overrideChangedQids
+          ? Array.from(overrideChangedQids)
+          : collectSubmitQuestionIds(engine.state.pileQuestions, engine.state.surveysResponseState?.[0]),
       controller.signal,
     );
     if (outcome.status === 'stale') return outcome;
@@ -2384,7 +2390,7 @@ const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
       return outcome;
     }
     engine.setState({ pileSubmitTempText: '' });
-    return await engine.encryptAndUpload();
+    return await engine.encryptAndUpload(overrideChangedQids);
   } finally {
     if (engine._pileOwnAnswersSubmitController === controller) engine._pileOwnAnswersSubmitController = null;
     // A context reset may have cleared this controller; a later request still
@@ -2438,7 +2444,10 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
   }
   // Use the same complete own-answer baseline as manual Submit while the
   // public listing is pending or capped; never bypass the saved-answer read.
-  const result = await handlePileSubmitWithOwnAnswers(engine);
+  const result = await handlePileSubmitWithOwnAnswers(
+    engine,
+    new Set(questionIds.map(normalizeQuestionIdKey).filter(Boolean)),
+  );
   // An interview answer held back from the upload is reported, so its draft can be removed.
   const heldBack = new Set<string>(Array.isArray(engine._heldBackSubmitQids) ? engine._heldBackSubmitQids : []);
   if (

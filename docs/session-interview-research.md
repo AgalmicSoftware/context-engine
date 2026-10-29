@@ -352,6 +352,11 @@ coverage. A successful run has full coverage or a successful Wrapped image.
 
 Session interview research is narrower and persists with ordinary submitted response data. When the responder opts in, `interviewProvenance` records the original AI draft, saved draft revisions, reviewed final values, net changed fields, sparse touched-field markers, redacted fields, and rejected draft metadata for that submitted response. It does not create the agent-only KV event stream, does not feed `exportAgentOnlyData()`, and is not automatically exported to the Edge2026 calibration/gold/wide files.
 
+An interview submission sends only the selected questions that actually changed.
+The same set limits preflight checks, encryption, uploaded rows and draft cleanup;
+unselected manual drafts remain pending. The ordinary Submit button still sends
+every changed answer.
+
 The semantics are also different. Edge2026 distinguishes explicit confirm, edit, stale confirm, skips, agent reruns, and prior human answers with semantic fingerprints. Interview research distinguishes selected versus unselected drafts, final submitted values, fields whose final values changed, and instrumented fields the reviewer touched. It does not record keystrokes, edit timing, time-to-review, cursor history, or a semantic agreement score. A no-change submitted value is documented as unchanged, not as scientific agreement with the AI. When a touched marker is captured for a field that is later restored to the original, that field remains in `userEditedFields` but drops out of `changedFields`.
 
 Interview research follows the submitted response's normal visibility and storage path. If answer or additional-comment text is encrypted or locked, the comparison metadata redacts that text and the associated evidence rather than creating a separate plaintext research backend.

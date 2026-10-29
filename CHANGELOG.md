@@ -136,6 +136,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Limit interview submissions to selected changed answers through validation,
+  encryption, upload and draft cleanup; leave unselected manual drafts intact.
+
 - Preserve multilingual speech after overlapping audio chunks by trimming
   only verified transcript offsets in both uploaded and rolling audio.
 
