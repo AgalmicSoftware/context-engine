@@ -4,7 +4,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
-import { buildExternalInterviewKickoff } from './sessionInterview';
+import { sortInterviewQuestionPoolNewestFirst, buildInterviewQuestionPriority } from './sessionInterviewQuestionOrder';
+import { buildExternalInterviewKickoff, normalizeInterviewQuestions } from './sessionInterview';
 import { verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
 import { buildInterviewReturnSessionUrl } from './sessionInterviewReturnUrl';
 import SessionInterviewMemoryKickoffCard from './SessionInterviewMemoryKickoffCard';
@@ -18,10 +19,19 @@ type Props = {
   sessionConfig?: Record<string, unknown> | null;
   context?: unknown;
   workerUrl?: string;
+  questionPool?: unknown[];
+  existingResponseSlice?: Record<string, unknown> | null;
 };
 
 /** The voice chooser's AI-prefill option: a prompt to paste into ChatGPT or Claude, which drafts answers. */
-export default function SessionVoicePrefillCard({ sessionSlug = '', sessionConfig, context, workerUrl }: Props) {
+export default function SessionVoicePrefillCard({
+  sessionSlug = '',
+  sessionConfig,
+  context,
+  workerUrl,
+  questionPool,
+  existingResponseSlice,
+}: Props) {
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState('');
   const [promptCopied, setPromptCopied] = useState(false);
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
@@ -56,7 +66,18 @@ export default function SessionVoicePrefillCard({ sessionSlug = '', sessionConfi
 
   if (!activeWorkerUrl) return null;
   const sessionUrl = buildInterviewReturnSessionUrl();
-  const kickoff = buildExternalInterviewKickoff({ workerUrl: activeWorkerUrl, sessionSlug, sessionUrl });
+  const questionPriority = questionPool
+    ? buildInterviewQuestionPriority(
+        normalizeInterviewQuestions(sortInterviewQuestionPoolNewestFirst(questionPool)),
+        existingResponseSlice,
+      )
+    : undefined;
+  const kickoff = buildExternalInterviewKickoff({
+    workerUrl: activeWorkerUrl,
+    sessionSlug,
+    sessionUrl,
+    questionPriority,
+  });
   const copyPrompt = async () => {
     setPromptCopied(false);
     if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');

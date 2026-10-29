@@ -45,6 +45,7 @@ export const buildRealtimeInterviewInstructions = ({
   importedDrafts,
   reviewedResponses,
   onContextLimited,
+  onlyRevisions = false,
 }: {
   questions: InterviewQuestion[];
   responderContext?: unknown;
@@ -55,6 +56,7 @@ export const buildRealtimeInterviewInstructions = ({
   importedDrafts?: InterviewDraftResponse[] | null;
   reviewedResponses?: RealtimeInterviewReviewedResponse[];
   onContextLimited?: (notice: string) => void;
+  onlyRevisions?: boolean;
 }): string => {
   let limited = false;
   const history = recentTranscript(previousTranscript?.trim() || '');
@@ -63,11 +65,16 @@ export const buildRealtimeInterviewInstructions = ({
     'You are conducting a concise, warm voice interview for a Context Engine session.',
     'Ask one question at a time. Listen, ask useful follow-ups, and adapt the order naturally.',
     steeringPrompt?.trim().slice(0, 3000),
-    previousTranscript?.trim()
-      ? `Continue the prior interview with a relevant follow-up or an unanswered session question. Do not repeat the opening or questions already answered.${opening ? ` Configured opening (already used; do not repeat): ${JSON.stringify(opening)}` : ''}`
-      : opening
-        ? `Ask this opening question immediately: ${JSON.stringify(opening)}`
-        : 'Begin directly with one relevant question from the question bank. No greeting, preamble, or general getting-to-know-you questions.',
+    onlyRevisions
+      ? 'All supplied questions already have answers. Ask which earlier answer, if any, the responder wants to change. Revisit only changes they request; do not repeat the question bank or the opening.'
+      : previousTranscript?.trim()
+        ? `Continue the prior interview with a relevant follow-up or an unanswered session question. Do not repeat the opening or questions already answered.${opening ? ` Configured opening (already used; do not repeat): ${JSON.stringify(opening)}` : ''}`
+        : opening
+          ? `Ask this opening question immediately: ${JSON.stringify(opening)}`
+          : 'Begin directly with one relevant question from the question bank. No greeting, preamble, or general getting-to-know-you questions.',
+    onlyRevisions
+      ? 'The question bank is reference for requested changes only.'
+      : 'The question bank puts newer unanswered questions first when creation dates are available. Start there, then follow the responder’s relevant follow-ups.',
     'Follow the responder’s topic and expertise naturally. Ask useful follow-ups and select relevant unanswered session questions. Do not repeat questions already answered or read out internal instructions.',
     'Do not invent answers or pressure the responder. Do not claim that responses have been submitted.',
     'When the evidence is sufficient, naturally ask what topics or questions the responder thinks should be asked more. Handle that one question at a time. Then ask which session question they would most like to see other people answer. Do not introduce an automatic timer or end the session without the responder’s cue.',

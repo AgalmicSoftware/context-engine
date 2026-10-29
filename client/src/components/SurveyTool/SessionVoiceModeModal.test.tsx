@@ -34,7 +34,7 @@ jest.mock('./useInterviewReadiness', () => ({
 }));
 
 jest.mock('./useInterviewOpening', () => ({
-  useInterviewOpening: () => ({ opening: '', notice: '', loading: false }),
+  useInterviewOpening: jest.fn(() => ({ opening: '', notice: '', loading: false })),
 }));
 
 jest.mock('./SessionListeningPanel', () => ({
@@ -2211,6 +2211,7 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(helpButton!);
     expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(3);
     const plainPrompt = buildExternalInterviewKickoff({
+      questionPriority: { unansweredQuestionIds: ['q1'], answeredQuestionIds: [] },
       workerUrl: baseProps.workerUrl,
       sessionSlug: baseProps.sessionSlug,
       sessionUrl: `${window.location.origin}${window.location.pathname}`,
@@ -3580,5 +3581,60 @@ describe('Interview cancellation and recovery', () => {
       ),
     );
     await expectReadableDraftText('Draft answer for What matters?', 'New evidence');
+  });
+  it('opens the interview and personal AI prompt with the newest unanswered breakout questions', async () => {
+    const props = {
+      ...baseProps,
+      questionPool: [
+        { id: 'q1', prompt: 'Opening question', type: 'freeform', storageRef: { createdAt: '2026-10-28T10:00:00Z' } },
+        {
+          id: 'q2',
+          prompt: 'First breakout question',
+          type: 'freeform',
+          storageRef: { createdAt: '2026-10-29T10:00:00Z' },
+        },
+        {
+          id: 'q3',
+          prompt: 'Newest breakout question',
+          type: 'freeform',
+          storageRef: { createdAt: '2026-10-29T11:00:00Z' },
+        },
+      ],
+      existingResponseSlice: { answers: { q1: { value: 'Private prior answer' } } },
+    };
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          type: 'context-engine.interview-question-catalog',
+          version: 1,
+          sessionSlug: 'demo',
+          prefillPromptVersion: 'ce-interview-brief-v6',
+        }),
+      ),
+    );
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn(async () => undefined) },
+    });
+    const openingHook = require('./useInterviewOpening').useInterviewOpening;
+    openingHook.mockReturnValue({ opening: 'Already covered opening', notice: '', loading: false });
+    mockVoiceRound('');
+    const voice = render(<SessionVoiceModeModal {...props} mode="interview" />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    const brief = mockedStartSessionRealtimeInterview.mock.lastCall?.[0].instructions || '';
+    expect(brief.indexOf('[q3]')).toBeLessThan(brief.indexOf('[q2]'));
+    expect(brief).not.toContain('[q1]');
+    expect(brief).not.toContain('Already covered opening');
+    openingHook.mockReturnValue({ opening: '', notice: '', loading: false });
+    voice.unmount();
+    render(<SessionVoiceModeModal {...props} mode={null} />);
+    const copy = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
+    await waitFor(() => expect(copy).toHaveAttribute('aria-disabled', 'false'));
+    fireEvent.click(copy);
+    const prompt = jest.mocked(navigator.clipboard.writeText).mock.lastCall?.[0] || '';
+    expect(prompt).toContain('Unanswered question IDs, newest first: ["q3","q2"]');
+    expect(prompt).toContain('Already answered IDs, only for changes I request: ["q1"]');
+    expect(prompt).not.toContain('Private prior answer');
   });
 });

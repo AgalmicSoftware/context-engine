@@ -1,3 +1,4 @@
+import { sortInterviewQuestionPoolNewestFirst } from './sessionInterviewQuestionOrder';
 import { resolveConsentFlags, summarizeConsentChoice, type InterviewConsentOverrides } from './sessionInterviewConsent';
 import { useInterviewSavedAnswers, type InterviewSavedAnswerLoader } from './useInterviewSavedAnswers';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
@@ -879,8 +880,9 @@ function SessionInterviewPanel({
     try {
       const instructions = buildRealtimeInterviewInstructions({
         questions: openQuestions.length ? openQuestions : questions,
+        onlyRevisions: !openQuestions.length,
         responderContext,
-        openingPrompt: interviewOpening.opening,
+        openingPrompt: openQuestions.length === questions.length ? interviewOpening.opening : undefined,
         steeringPrompt: interviewOpening.steeringPrompt,
         previousTranscript: transcriptRef.current,
         prefillPacket: validatedPrefillPacket,
@@ -1517,7 +1519,10 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
     onInterviewProgressChange?.(hasUnsavedReview);
   }, [hasUnsavedReview, onInterviewProgressChange]);
   const requestClose = onClose;
-  const questions = useMemo(() => normalizeInterviewQuestions(questionPool), [questionPool]);
+  const questions = useMemo(
+    () => normalizeInterviewQuestions(sortInterviewQuestionPoolNewestFirst(questionPool)),
+    [questionPool],
+  );
   const title = mode === 'interview' ? 'Interview' : mode === 'recordGroup' ? 'Group Conversation' : 'Voice mode';
   return (
     <>
@@ -1551,6 +1556,8 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
               {!mode ? (
                 <SessionVoiceModeChooser onSelectMode={onSelectMode}>
                   <SessionVoicePrefillCard
+                    questionPool={questionPool}
+                    existingResponseSlice={props.existingResponseSlice}
                     sessionSlug={props.sessionSlug}
                     sessionConfig={props.sessionConfig}
                     context={props.context}

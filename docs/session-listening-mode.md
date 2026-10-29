@@ -479,3 +479,10 @@ Foreground recordings rotate into independently decodable three-minute chunks an
 Group Conversation offers **Label speakers**, off by default. It uses OpenAI `gpt-4o-transcribe-diarize` with `diarized_json` and automatic chunking, retaining normalized speaker turns alongside the ordinary transcript in the existing local draft. An updated Session Worker is required; older Workers fail with an explicit compatibility message. Other transcription callers retain their existing model, request and text response.
 
 Labels restart for each three-minute upload. They do not establish identity and are not merged across uploads. Speaker review, per-speaker mapping and claiming QR codes are not yet available. Labeled chunks exceeding 24 MiB fail explicitly instead of being silently split into additional label namespaces. Keep the page visible during capture. The diarization model is deprecated with removal scheduled for 2027-02-26; replacing it is separate work.
+
+
+### Returning after new questions are added
+
+The voice interview starts with unanswered questions, newest first using creation dates already available in the browser. It keeps questions without dates in their existing relative order. If every question has an answer, it asks which answer the person wants to change instead of repeating the opening.
+
+The voice chooser's personal AI-prefill prompt includes the same ordered question IDs and the IDs already answered in that browser. It does not include saved answer text or send progress to the public catalog. The catalog schema, prompt version and question-set fingerprint are unchanged. Generic Join prompts remain shareable and carry no person's progress. Dates and progress unavailable to the browser cannot be inferred; opening on another device before signing in may therefore offer questions already answered elsewhere.
