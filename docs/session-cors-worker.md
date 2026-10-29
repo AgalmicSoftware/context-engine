@@ -1727,8 +1727,10 @@ R2 / Durable Objects:
   Pending and settled receipts together have a maximum of 2,000 per participant
   and session; cleanup evicts the oldest inactive receipts and never an active
   lease. Full active capacity returns a retryable response. Coordinator alarms
-  remove expired receipts even without another write. Older pending receipts
-  without a recorded target retain the previous lease-expiration behavior.
+  remove expired receipts even without another write. Every reservation requires a
+  valid storage ID and creation timestamp; a missing target returns 400 without
+  creating a receipt. An execute reply missing either field fails closed before
+  storage writes.
   The client retains one submit operation across failed or partial attempts and
   includes the question id and per-question revision in each receipt key.
   Within that operation, an unchanged survey container keeps its receipt key

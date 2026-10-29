@@ -1643,7 +1643,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     }
   }
 
-  if (uploadReceipt?.storageId && (uploadReceipt.storageId !== id || uploadReceipt.createdAt !== createdAt)) {
+  if (uploadReceipt && (uploadReceipt.storageId !== id || uploadReceipt.createdAt !== createdAt)) {
     id = uploadReceipt.storageId;
     createdAt = uploadReceipt.createdAt;
     // Envelope AAD, metadata and serialized sizes all belong to the reserved
