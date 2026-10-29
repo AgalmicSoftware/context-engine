@@ -298,7 +298,12 @@ const AdminSessionBackupPanel = ({ workerUrl, sessionSlug, account, canAdminWork
         setStatus(`Restoring page ${position + 1} of ${restoreCount}…`);
         do {
           result = record(
-            await request('import-session-backup', { page, adoptSessionId, sessionId: page.manifest.sessionId }),
+            await request('import-session-backup', {
+              page,
+              adoptSessionId,
+              sessionId: page.manifest.sessionId,
+              workerUrl: new URL(workerUrl).origin,
+            }),
           );
           if (result.ok !== true || !result.counts)
             throw new Error('The Worker did not confirm this restore page. Resume to retry it.');

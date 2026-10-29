@@ -275,6 +275,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Bind restored session Worker URLs to the signed, verified destination origin so
+  recovery at a new Worker passes client discovery without loosening ordinary edits.
+
 - Keep the importing admin authorized through restore cleanup; publish the restored
   authority and release its lock atomically, with status reads able to finish cleanup.
 
