@@ -138,6 +138,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep pending AI tag suggestions attached to the question that requested them, releasing busy state after edits or removal.
+
 - Cap question text once in Results analysis input and keep every included response linked to an included question.
 
 - Keep profile analysis, cached results and pending updates bound to their original person, session and inputs.
