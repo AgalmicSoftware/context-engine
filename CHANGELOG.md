@@ -110,6 +110,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Empty completed filters export zero questions and responses, with report availability based on those same counts. Session totals remain the fallback while filters hydrate.
+
 - Survey discovery retains creation blocks from raw event logs and keeps the earliest block for duplicate survey IDs.
 
 - Retry chain-backed response payload failures from their event block instead of

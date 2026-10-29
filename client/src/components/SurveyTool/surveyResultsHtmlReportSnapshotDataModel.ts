@@ -36,8 +36,8 @@ export const buildSurveyResultsHtmlReportSnapshot = ({
   exportedAt = new Date().toISOString(),
   exporterMetadata = null,
   filterState = {},
-  filteredQuestionsCount = 0,
-  filteredResponsesCount = 0,
+  filteredQuestionsCount = null,
+  filteredResponsesCount = null,
   latestKnownBlock = null,
   networkLabel = '',
   participantCount = 0,
@@ -56,11 +56,11 @@ export const buildSurveyResultsHtmlReportSnapshot = ({
     (sum, count) => sum + Number(count || 0),
     0,
   );
-  const responsesCount = responseCountFromRows || Number(filteredResponsesCount) || Number(totalResponsesCount) || 0;
-  const questionsCount = reportQuestions.length || Number(filteredQuestionsCount) || Number(totalQuestionsCount) || 0;
+  const responsesCount = responseCountFromRows || Number(filteredResponsesCount ?? totalResponsesCount) || 0;
+  const questionsCount = reportQuestions.length || Number(filteredQuestionsCount ?? totalQuestionsCount) || 0;
   const slug = String(sessionSlug || '').trim();
   const name = String(sessionName || slug || 'Session').trim();
-  const hasReportContent = reportQuestions.length > 0 || responsesCount > 0;
+  const hasReportContent = questionsCount > 0 || responsesCount > 0;
   const latestBlock = Number(latestKnownBlock);
 
   return buildRedactedSessionResultsSnapshot({
