@@ -33568,24 +33568,14 @@ async function loadAgentCredentialHash({ env = {}, tokenHash = "", now = null } 
 async function revokeAgentCredentialHash({ env = {}, tokenHash = "" } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   const key = tokenKvKey(tokenHash);
-  if (!key || !kv || typeof kv.get !== "function" || typeof kv.delete !== "function") {
+  if (!key || !kv || typeof kv.delete !== "function") {
     return { ok: false, reason: "agent_token_storage_unavailable" };
   }
-  const loaded = await readKvJson(kv, key);
-  if (!loaded.ok) return { ok: false, reason: loaded.reason };
-  const slotKey = safeString(loaded.value?.slotKey);
-  if (slotKey) {
-    const slot = await readKvJson(kv, slotKey);
-    if (!slot.ok) return { ok: false, reason: slot.reason };
-    if (safeString(slot.value?.tokenHash).toLowerCase() === safeString(tokenHash).toLowerCase()) {
-      try {
-        await kv.delete(slotKey);
-      } catch {
-        return { ok: false, reason: "agent_token_storage_unavailable" };
-      }
-    }
+  try {
+    await kv.delete(key);
+  } catch {
+    return { ok: false, reason: "agent_token_storage_unavailable" };
   }
-  await deleteKvBestEffort(kv, key);
   return { ok: true, tokenHash: safeString(tokenHash).toLowerCase() };
 }
 function agentCredentialHasScope(record3 = {}, scope = "") {

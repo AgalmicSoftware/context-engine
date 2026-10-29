@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Limit failed-issuance credential cleanup to its own token record, preserving
+  newer credentials issued concurrently and reporting failed revocation writes.
+
 - Keep targeted question-vote matches regardless of catalog size or position,
   with stable ordering for equally relevant recommendations.
 
