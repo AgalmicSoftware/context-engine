@@ -6,7 +6,7 @@ import { putSessionSecrets } from './sessionConfigSecretsStore.js';
 import { buildSiweMessage, installSessionCoordinatorBinding, makeJsonRequest } from '../../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 
 const origin = 'https://client.example.test';
-const fixture = async () => {
+const fixture = async ({ outbound } = {}) => {
   const values = new Map();
   const kv = { get: async key => values.get(key) ?? null, put: async (key, value) => values.set(key, value),
     delete: async key => values.delete(key), list: async ({ prefix = '' } = {}) => ({
@@ -31,8 +31,9 @@ const fixture = async () => {
   await putSessionSecrets(env, 'fixture', { openaiKey: 'synthetic-session-key' });
   const calls = [];
   const worker = createWorkerRuntime(env, { fetch: async (url, init) => {
-    assert.equal(new URL(url).origin, 'https://api.openai.com');
+    if (!outbound) assert.equal(new URL(url).origin, 'https://api.openai.com');
     calls.push({ url, body: typeof init.body === 'string' ? JSON.parse(init.body) : init.body, headers: init.headers });
+    if (outbound) return outbound(url, init);
     return Response.json({ choices: [{ message: { content: 'Synthetic output' } }], output_text: 'Synthetic output', text: 'Synthetic transcript' });
   }, rpcFetch: async () => assert.fail('No chain or live provider access is needed') });
   const nonceResponse = await worker.fetch(makeJsonRequest('/auth/nonce', { address: wallet.address, sessionSlug: 'fixture', sessionId: config.sessionId }, { headers: { Origin: origin } }), env);
@@ -95,4 +96,28 @@ for (const authenticated of [false, true]) test(`real ${authenticated ? 'authent
       assert.equal(f.calls.length, 0);
     } else assert.equal(f.calls[0].body.get('model'), model);
   }
+});
+
+for (const target of ['http://redirect.example.test/chat', 'https://user:[redacted-email]/chat', 'https://127.0.0.1/chat']) {
+  test(`authenticated custom AI never sends its prompt to an unsafe redirect: ${target}`, async () => {
+    const f = await fixture({ outbound: async () => new Response(null, { status: 307, headers: { location: target } }) });
+    const response = await f.request('/ai', { provider: 'custom', rpcUrl: 'https://provider.example.test/chat',
+      apiKey: 'synthetic-custom-key', prompt: 'Synthetic private prompt' }, true);
+    assert.equal(response.status, 403, await response.clone().text());
+    assert.equal(f.calls.length, 1, 'the redirect target must never receive a request');
+  });
+}
+
+test('authenticated custom AI follows a public HTTPS redirect without forwarding credentials', async () => {
+  const target = 'https://redirect.example.test/chat';
+  const f = await fixture({ outbound: async url => String(url) === target
+    ? Response.json({ choices: [{ message: { content: 'Synthetic redirected output' } }] })
+    : new Response(null, { status: 307, headers: { location: target } }) });
+  const response = await f.request('/ai', { provider: 'custom', rpcUrl: 'https://provider.example.test/chat',
+    apiKey: 'synthetic-custom-key', prompt: 'Synthetic private prompt' }, true);
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.equal((await response.json()).completion, 'Synthetic redirected output');
+  assert.equal(f.calls.length, 2);
+  assert.equal(new Headers(f.calls[1].headers).get('authorization'), null);
+  assert.deepEqual(f.calls[1].body, f.calls[0].body);
 });

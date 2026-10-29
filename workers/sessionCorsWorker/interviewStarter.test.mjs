@@ -59,6 +59,7 @@ for (const [provider, model, secret] of [
   f.args.deps.getSessionSecrets = async () => ({ [secret]: 'synthetic-key', customRpcUrl: 'https://rpc.example.test' });
   let body;
   const fetch = async (_, init) => {
+    if (provider === 'custom') assert.equal(init.outboundUrlPolicy, 'strict-https-no-credentials');
     body = JSON.parse(init.body);
     return Response.json({ choices: [{ message: { content: 'What matters to you?' } }], content: [{ text: 'What matters to you?' }] });
   };

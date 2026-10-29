@@ -822,3 +822,15 @@ test('proxyOpenAI preserves owner-configured medium reasoning for Terra intervie
   assert.equal(body.service_tier, 'default');
   assert.deepEqual(body.reasoning, { effort: 'medium' });
 });
+
+test('custom AI fails closed when no checked outbound fetch is installed', async t => {
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return Response.json({ choices: [{ message: { content: 'Unsafe fallback' } }] });
+  });
+  const response = await proxyCustomRPC({ payload: { rpcUrl: 'https://provider.example.test/chat', prompt: 'Synthetic prompt' },
+    auth: createCustomRpcAuth({ ai: true }), deps: { json: createJsonStub(), log: () => {} } });
+  assert.equal(response.status, 503);
+  assert.equal(calls, 0);
+});

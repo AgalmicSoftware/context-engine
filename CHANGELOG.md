@@ -298,6 +298,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Require public HTTPS targets without embedded credentials throughout custom AI
+  redirects, and refuse requests when outbound safety checks are unavailable.
+
 - Bind restored session Worker URLs to the signed, verified destination origin so
   recovery at a new Worker passes client discovery without loosening ordinary edits.
 

@@ -1,4 +1,5 @@
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
+import { STRICT_HTTPS_NO_CREDENTIALS_POLICY } from './outboundUrlSafetyBinding.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { normalizeInterviewSettings, hasInterviewQuestionGrowth } from '../../shared/interviewSettings.mjs';
 import { resolveSessionAiModel } from './aiRequestPolicy.js';
@@ -62,7 +63,7 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
       deps: {
         ...deps,
         fetch: (url, options) => (deps.fetch || fetch)(url, { ...options, signal: AbortSignal.timeout(10000) }),
-        safeFetch: deps.safeFetch && ((url, options) => deps.safeFetch(url, { ...options, signal: AbortSignal.timeout(10000) })),
+        safeFetch: deps.safeFetch && ((url, options) => deps.safeFetch(url, { ...options, outboundUrlPolicy: STRICT_HTTPS_NO_CREDENTIALS_POLICY, signal: AbortSignal.timeout(10000) })),
       },
       payload: {
         model,
