@@ -544,3 +544,8 @@ mode chooser/setup. Manual authoring checks cover all five question types, surve
 fields, and JSON/AI prompt panels. It checks rendered text contrast with ancestor opacity, translucent surfaces,
 gradient stops, and text-field fill colors included. It never deploys a session,
 submits responses, or starts recording.
+
+HTML Results exports project the selected sections before rendering or embedding
+any snapshot data. Excluded analysis is absent from both interactive and static
+HTML bytes. The Snapshot JSON option adds a download of that same projection;
+when unchecked, the viewer has no snapshot download control.

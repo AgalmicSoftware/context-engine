@@ -220,6 +220,81 @@ describe('sessionResultsExport utilities', () => {
     expect(html).not.toContain('<h2>Embedded Snapshot JSON</h2>');
   });
 
+  it.each(['viewer', 'single-html'] as const)(
+    'keeps excluded analysis out of all %s bytes and snapshot downloads',
+    (format) => {
+      const snapshot = buildRedactedSessionResultsSnapshot({
+        exportedBy: { address: '0x9999999999999999999999999999999999999999' },
+        sections: {
+          report: {
+            questions: [{ id: 'q1', prompt: 'REPORT_MARKER', options: [], responseCount: 2, tags: [], type: 'binary' }],
+          },
+          argumentMap: { debates: [{ claim: 'ARGUMENT_MARKER' }] },
+          riskMatrix: { categories: [{ label: 'RISK_MARKER' }] },
+          atlas: { nodes: [{ label: 'ATLAS_MARKER' }] },
+        },
+      });
+      for (const snapshotJson of [false, true]) {
+        const html = renderSessionResultsHtmlReport(snapshot, {
+          format,
+          sections: { report: true, argumentMap: false, riskMatrix: false, atlas: false, snapshotJson },
+        });
+        expect(html).toContain('REPORT_MARKER');
+        for (const marker of ['ARGUMENT_MARKER', 'RISK_MARKER', 'ATLAS_MARKER']) expect(html).not.toContain(marker);
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+        const embedded = JSON.parse(parsed.getElementById('ce-session-results-snapshot')?.textContent || '{}');
+        expect(Object.keys(embedded.sections)).toEqual(['report']);
+        expect(parsed.querySelector('[data-ce-download-snapshot]') !== null).toBe(format === 'viewer' && snapshotJson);
+      }
+      const all = renderSessionResultsHtmlReport(snapshot, { format });
+      for (const marker of ['REPORT_MARKER', 'ARGUMENT_MARKER', 'RISK_MARKER', 'ATLAS_MARKER'])
+        expect(all).toContain(marker);
+    },
+  );
+
+  it('downloads precisely the selected snapshot when Snapshot JSON is checked', async () => {
+    const snapshot = buildRedactedSessionResultsSnapshot({
+      exportedBy: { address: '0x9999999999999999999999999999999999999999' },
+      sections: {
+        report: { summary: { marker: 'REPORT_MARKER' } },
+        argumentMap: { debates: [{ claim: 'EXCLUDED_MARKER' }] },
+      },
+    });
+    const html = renderSessionResultsHtmlReport(snapshot, {
+      sections: { report: true, argumentMap: false, riskMatrix: false, atlas: false, snapshotJson: true },
+    });
+    const page = new DOMParser().parseFromString(html, 'text/html');
+    const script = page.querySelector('script:not([type])')?.textContent || '';
+    const blobs: Blob[] = [];
+    const url = {
+      createObjectURL: (blob: Blob) => {
+        blobs.push(blob);
+        return 'blob:fixture';
+      },
+      revokeObjectURL: jest.fn(),
+    };
+    const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      new Function('document', 'URL', 'Blob', script)(page, url, Blob);
+      (page.querySelector('[data-ce-download-snapshot]') as HTMLButtonElement).click();
+      expect(blobs).toHaveLength(1);
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsText(blobs[0]);
+      });
+      expect(JSON.parse(text)).toEqual(
+        JSON.parse(page.getElementById('ce-session-results-snapshot')?.textContent || '{}'),
+      );
+      expect(text).toContain('REPORT_MARKER');
+      expect(text).not.toContain('EXCLUDED_MARKER');
+      expect(url.revokeObjectURL).toHaveBeenCalledWith('blob:fixture');
+    } finally {
+      click.mockRestore();
+    }
+  });
+
   it('keeps standalone HTML deterministic and fixed-light across session color scheme ids', () => {
     const build = (colorSchemeId: string) => {
       const snapshot = buildRedactedSessionResultsSnapshot({

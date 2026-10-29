@@ -468,9 +468,13 @@ const renderReportDimensions = (dimensions: unknown[]): string => {
         .join('')}`;
 };
 
-const renderReportSection = (snapshot: SessionResultsHtmlSnapshot): string => {
+type SelectedResultsSnapshot = Omit<SessionResultsHtmlSnapshot, 'sections'> & {
+  sections: Partial<SessionResultsSnapshotSections>;
+};
+
+const renderReportSection = (snapshot: SelectedResultsSnapshot): string => {
   const { report } = snapshot.sections;
-  if (!report.available) return renderUnavailable('report', report.reason);
+  if (!report?.available) return renderUnavailable('report', report?.reason);
 
   return `
     <section id="report" class="ce-report-section">
@@ -499,9 +503,9 @@ const renderJsonRows = (items: unknown[], emptyText: string): string => {
     .join('');
 };
 
-const renderArgumentMapSection = (snapshot: SessionResultsHtmlSnapshot): string => {
+const renderArgumentMapSection = (snapshot: SelectedResultsSnapshot): string => {
   const { argumentMap } = snapshot.sections;
-  if (!argumentMap.available) return renderUnavailable('argument-map', argumentMap.reason);
+  if (!argumentMap?.available) return renderUnavailable('argument-map', argumentMap?.reason);
   return `
     <section id="argument-map" class="ce-report-section">
       <h2>Argument Map</h2>
@@ -509,9 +513,9 @@ const renderArgumentMapSection = (snapshot: SessionResultsHtmlSnapshot): string 
     </section>`;
 };
 
-const renderRiskMatrixSection = (snapshot: SessionResultsHtmlSnapshot): string => {
+const renderRiskMatrixSection = (snapshot: SelectedResultsSnapshot): string => {
   const { riskMatrix } = snapshot.sections;
-  if (!riskMatrix.available) return renderUnavailable('risk-matrix', riskMatrix.reason);
+  if (!riskMatrix?.available) return renderUnavailable('risk-matrix', riskMatrix?.reason);
   return `
     <section id="risk-matrix" class="ce-report-section">
       <h2>Risk Matrix</h2>
@@ -524,9 +528,9 @@ const renderRiskMatrixSection = (snapshot: SessionResultsHtmlSnapshot): string =
     </section>`;
 };
 
-const renderAtlasSection = (snapshot: SessionResultsHtmlSnapshot): string => {
+const renderAtlasSection = (snapshot: SelectedResultsSnapshot): string => {
   const { atlas } = snapshot.sections;
-  if (!atlas.available) return renderUnavailable('atlas', atlas.reason);
+  if (!atlas?.available) return renderUnavailable('atlas', atlas?.reason);
   return `
     <section id="atlas" class="ce-report-section">
       <h2>Atlas Nodes</h2>
@@ -547,6 +551,26 @@ const resolveRenderSections = (
   snapshotJson: isSelected(sections, 'snapshotJson'),
 });
 
+const projectSelectedSnapshot = (
+  snapshot: SessionResultsHtmlSnapshot,
+  selected: Required<SessionResultsSectionSelection>,
+): SelectedResultsSnapshot => ({
+  ...snapshot,
+  counts: {
+    questions: selected.report ? snapshot.counts.questions : 0,
+    responses: selected.report ? snapshot.counts.responses : 0,
+    participants: selected.report ? snapshot.counts.participants : 0,
+    atlasNodes: selected.atlas ? snapshot.counts.atlasNodes : 0,
+    riskMatrixComments: selected.riskMatrix ? snapshot.counts.riskMatrixComments : 0,
+  },
+  sections: {
+    ...(selected.report ? { report: snapshot.sections.report } : {}),
+    ...(selected.argumentMap ? { argumentMap: snapshot.sections.argumentMap } : {}),
+    ...(selected.riskMatrix ? { riskMatrix: snapshot.sections.riskMatrix } : {}),
+    ...(selected.atlas ? { atlas: snapshot.sections.atlas } : {}),
+  },
+});
+
 const renderNavLinks = (sections: Required<SessionResultsSectionSelection>): string =>
   [
     sections.report ? '<a href="#report">Report</a>' : '',
@@ -559,7 +583,7 @@ const renderNavLinks = (sections: Required<SessionResultsSectionSelection>): str
     .join('\n      ');
 
 const renderSelectedReportSections = (
-  snapshot: SessionResultsHtmlSnapshot,
+  snapshot: SelectedResultsSnapshot,
   sections: Required<SessionResultsSectionSelection>,
 ): string =>
   [
@@ -583,10 +607,10 @@ export const renderSessionResultsHtmlReport = (
   inputSnapshot: SessionResultsHtmlSnapshot,
   options: SessionResultsHtmlReportRenderOptions = {},
 ): string => {
-  const snapshot = buildRedactedSessionResultsSnapshot(inputSnapshot);
+  const sections = resolveRenderSections(options.sections);
+  const snapshot = projectSelectedSnapshot(buildRedactedSessionResultsSnapshot(inputSnapshot), sections);
   const sessionTitle = snapshot.session.name || snapshot.session.slug || 'Session';
   const format = options.format || SESSION_RESULTS_EXPORT_FORMAT_VIEWER;
-  const sections = resolveRenderSections(options.sections);
   const snapshotJson = serializeJsonForHtmlScript(snapshot);
   const isViewer = format === SESSION_RESULTS_EXPORT_FORMAT_VIEWER;
   const isPdf = format === SESSION_RESULTS_EXPORT_FORMAT_PDF;
@@ -671,7 +695,7 @@ export const renderSessionResultsHtmlReport = (
         <span class="ce-report-muted">Search captured rows</span><br>
         <input type="search" data-ce-report-search placeholder="Search questions, argument items, and atlas data">
       </label>
-      <button type="button" data-ce-download-snapshot>Download Snapshot JSON</button>
+      ${sections.snapshotJson ? '<button type="button" data-ce-download-snapshot>Download Snapshot JSON</button>' : ''}
     </div>`
         : ''
     }
