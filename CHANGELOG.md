@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Verify interview submission leaves unrelated manual answers pending for ordinary Submit.
+
 - Require at least one question type before generation and explain responses with no usable questions.
 
 - Allow completed benchmark runs at different repeat depths to share a report while preserving their seeds and strict resume checks.
