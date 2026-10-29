@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   sha256,
+  reportPublicationState,
   validateReleaseValidationReceipt,
 } from '../src/provenance.mjs';
 import { renderHtmlReport } from '../src/render-html.mjs';
@@ -44,11 +45,14 @@ export const buildStaticReportPublication = ({
   requireRelease = false,
 }) => {
   const id = safeId(reportId);
-  const releaseReady = report?.integrity?.releaseReady === true;
+  const publication = reportPublicationState(report);
+  if (publication.status === 'released' && !requireRelease) {
+    throw new Error('official benchmark publication requires --release confirmation');
+  }
   const releaseErrors = requireRelease ? validateReleaseValidationReceipt(report) : [];
-  if (requireRelease && (!releaseReady || releaseErrors.length)) {
+  if (requireRelease && publication.status !== 'released') {
     const warnings = [
-      ...(releaseReady ? [] : (report?.integrity?.warnings || ['report integrity did not declare release readiness'])),
+      ...(report?.integrity?.warnings || []),
       ...releaseErrors,
     ];
     throw new Error(`official benchmark publication blocked:\n- ${warnings.join('\n- ')}`);
@@ -68,7 +72,7 @@ export const buildStaticReportPublication = ({
       id,
       title: title || report?.title || 'Context Engine AI Opinions Benchmark',
       topic,
-      publicationStatus: requireRelease && releaseReady ? 'released' : 'development-preview',
+      publicationStatus: publication.manifestStatus,
       generatedAt: report?.generatedAt || new Date(0).toISOString(),
       questionCount: Number(report?.counts?.questions || report?.questions?.length || 0),
       participantCount: Number(report?.counts?.models || report?.participants?.length || 0),
@@ -78,7 +82,7 @@ export const buildStaticReportPublication = ({
       sha256: sha256(artifactBytes),
       contentBytes: contentBytes.byteLength,
       contentSha256: sha256(contentBytes),
-      releaseReportContentHash: requireRelease
+      releaseReportContentHash: publication.status === 'released'
         ? report.releaseValidationReceipt.reportContentHash
         : null,
     },

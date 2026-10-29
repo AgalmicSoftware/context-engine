@@ -2,7 +2,7 @@ import { buildSecondPassAnalysisInput } from './analysis-export.mjs';
 import { buildContextEnginePolisExport } from './ce-export.mjs';
 import { aggregateResponseDistributions, stanceLabel, summarizeWinningResponseConsistency } from './response-distributions.mjs';
 import { clusterBySimilarity, hasCompleteSimilarity, similarityFor, withOpinionGroupAvailability } from './opinion-groups.mjs';
-import { buildReportFingerprint } from './provenance.mjs';
+import { buildReportFingerprint, reportPublicationState } from './provenance.mjs';
 import {
   WORLD_MAP_GEOGRAPHIES,
   WORLD_MAP_GRATICULE_PATH,
@@ -1817,15 +1817,14 @@ const benchmarkPublicationDescription = (report) => {
   return `A Context Engine AI opinions benchmark mapping agreement, disagreement, uncertainty, and wording sensitivity across ${questionCount} corpus-grounded question${questionCount === 1 ? '' : 's'} answered by ${modelCount} model participant${modelCount === 1 ? '' : 's'}.`;
 };
 
-const renderBenchmarkIntroduction = (report) => {
-  const releaseReady = report.integrity?.releaseReady === true;
+const renderBenchmarkIntroduction = (report, publication) => {
   const modeSummary = report.mode === 'persona'
     ? `Weights-only persona: ${report.personaProfile?.label || report.personaId || 'Unnamed figure'}`
     : 'Models answer as themselves';
   return `<section
     class="aidb-benchmark-intro"
     data-ce-benchmark-intro
-    data-ce-benchmark-publication-status="${releaseReady ? 'release-ready' : 'preview'}"
+    data-ce-benchmark-publication-status="${publication.status}"
     aria-labelledby="aidb-benchmark-intro-title"
   >
     <div class="aidb-benchmark-heading-row">
@@ -1845,8 +1844,8 @@ const renderBenchmarkIntroduction = (report) => {
   </section>`;
 };
 
-const renderIntegrityNotice = (report) => {
-  if (report.integrity?.releaseReady) return '';
+const renderIntegrityNotice = (report, publication) => {
+  if (publication.status === 'released') return '';
   const integrity = report.integrity || {};
   const detailItems = [];
   const bankStatus = formatDisplayLabel(integrity.bankReleaseStatus || 'unvalidated');
@@ -1911,7 +1910,7 @@ const renderIntegrityNotice = (report) => {
   }
   return `<div class="aidb-preview-notice" role="status" data-ce-benchmark-preview>
     <strong>Development preview.</strong>
-    <span>The measurements below are useful for testing the report and methodology, but this is not an official benchmark release.</span>
+    <span>${integrity.releaseReady === true ? 'This report is release-ready, but release validation has not been recorded.' : 'The measurements below are useful for testing the report and methodology, but this is not an official benchmark release.'}</span>
     ${report.summaryCorrection?.method === 'recomputed-from-saved-model-question-counts-v1' ? '<span data-ce-benchmark-saved-correction>Answer summaries were corrected from the saved response counts. The original model runs were not rerun or revalidated.</span>' : ''}
     ${detailItems.length ? `<details><summary>Why this is a development preview</summary><ul>${detailItems.join('')}</ul></details>` : ''}
   </div>`;
@@ -3521,6 +3520,7 @@ const serializeJsonForHtmlScript = (value) => (
 );
 
 export const renderHtmlReport = (inputReport) => {
+  const publication = reportPublicationState(inputReport);
   const sourceReport = withOpinionGroupAvailability(inputReport);
   const overlayHash = sourceReport.analysisOverlay?.provenance?.inputReportHash;
   // Fingerprints bind the saved report, not this display normalization.
@@ -3531,13 +3531,15 @@ export const renderHtmlReport = (inputReport) => {
   // Rendering older files is a read-only view over retained cell counts. Keep
   // original aggregates in Raw Results rather than silently rewriting history.
   const report = withObservedDisplaySummaries(sourceReport);
+  // A released artifact must retain the exact receipt-bound report, before display normalization.
+  const embeddedReport = publication.status === 'released' ? inputReport : sourceReport;
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="${escapeHtml(benchmarkPublicationDescription(report))}" />
-  <meta name="robots" content="${report.integrity?.releaseReady === true ? 'index,follow' : 'noindex,nofollow'}" />
+  <meta name="robots" content="${publication.robots}" />
   <meta name="theme-color" content="#20204e" />
   <meta property="og:type" content="article" />
   <meta property="og:title" content="${escapeHtml(BENCHMARK_PUBLIC_TITLE)}" />
@@ -4899,7 +4901,7 @@ export const renderHtmlReport = (inputReport) => {
   <div data-testid="ce-page-session-root">
   <div class="onePageDemoContainer">
     <div class="sectionsGrid">
-    ${renderBenchmarkIntroduction(report)}
+    ${renderBenchmarkIntroduction(report, publication)}
     <div class="sectionContainer sectionExpanded ce-session-results-section" data-ce-results-section data-ce-results-open="true">
       <div class="sectionHeaderRow">
         <h2 class="sectionHeader" data-ce-results-toggle role="button" tabindex="0" aria-expanded="true">
@@ -4964,7 +4966,7 @@ export const renderHtmlReport = (inputReport) => {
           <div class="reportInner">
             <div class="brandingHeader"></div>
             <h4 class="heading"></h4>
-            ${renderIntegrityNotice(report)}
+            ${renderIntegrityNotice(report, publication)}
             <div class="disclaimerBox">
               <strong>Note:</strong> Only non-encrypted, binary
               (Agree/Disagree/Unsure) responses have been considered in
@@ -5022,7 +5024,7 @@ export const renderHtmlReport = (inputReport) => {
     </div>
   </div>
   <div class="beeTooltip" data-ce-beeswarm-tooltip role="tooltip" hidden></div>
-  <script type="application/json" id="ce-ai-discourse-bench-report">${serializeJsonForHtmlScript(sourceReport)}</script>
+  <script type="application/json" id="ce-ai-discourse-bench-report">${serializeJsonForHtmlScript(embeddedReport)}</script>
   <script type="application/json" id="ce-ai-discourse-bench-polis-export">${serializeJsonForHtmlScript(buildContextEnginePolisExport(sourceReport))}</script>
   <script type="application/json" id="ce-ai-discourse-bench-analysis-input">${serializeJsonForHtmlScript({ ...buildSecondPassAnalysisInput(sourceReport), inputReportHash })}</script>
   <script>

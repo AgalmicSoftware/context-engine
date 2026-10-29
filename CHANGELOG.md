@@ -435,6 +435,9 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Use the validated release receipt for benchmark labels, indexing and publication
+  status. Require explicit release confirmation and verify the embedded report's hash.
+
 - Compare similarity drift over the same usable question set in both snapshots,
   report its IDs and count, and mark insufficient common overlap unavailable.
 
