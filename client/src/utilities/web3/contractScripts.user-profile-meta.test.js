@@ -689,6 +689,66 @@ describe('contractScripts user profile metadata wrappers', () => {
     }
   });
 
+  it.each(['getResponse', 'getResponseHash'])('isolates %s in-flight reads by block tag', async (method) => {
+    const cfg = makeProfileGroupCfg('bounded-read', 1);
+    let finish;
+    const pending = new Promise((resolve) => {
+      finish = resolve;
+    });
+    const read = jest
+      .fn()
+      .mockImplementationOnce(() => pending)
+      .mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(ethers, 'Contract').mockImplementation(() => ({ getResponse: read }));
+    const older = contractScripts[method]('none', TEST_PROFILE_ADDRESS, 'question', cfg, { blockTag: 20 });
+    await Promise.resolve();
+    await Promise.resolve();
+    const latest = contractScripts[method]('none', TEST_PROFILE_ADDRESS, 'question', cfg);
+    await Promise.resolve();
+    await Promise.resolve();
+    finish(ethers.constants.HashZero);
+    await Promise.all([older, latest]);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(read).toHaveBeenCalledWith(TEST_PROFILE_ADDRESS, ethers.utils.id('question'), { blockTag: 20 });
+    expect(read).toHaveBeenCalledWith(TEST_PROFILE_ADDRESS, ethers.utils.id('question'));
+  });
+
+  it('reads the historical pointer for direct bounded response hydration and never substitutes latest on failure', async () => {
+    const cfg = { ...makeProfileGroupCfg('bounded-payload'), blockLimits: { start: 1, end: 20 } };
+    const id = ethers.utils.id('bounded-question');
+    const olderHash = ethers.utils.id('older-payload');
+    const latestHash = ethers.utils.id('latest-payload');
+    const window = { blockTag: 20, laterPairs: new Set([`${TEST_PROFILE_ADDRESS}|${id}`]) };
+    jest.spyOn(contractScripts, 'getBoundedResponseReadWindow').mockResolvedValue(window);
+    const read = jest
+      .fn()
+      .mockImplementation(async (_who, _id, options) => (options?.blockTag === 20 ? olderHash : latestHash));
+    jest.spyOn(ethers, 'Contract').mockImplementation(() => ({ getResponse: read }));
+    const download = jest.spyOn(arweaveClient, 'downloadDataFromArweave').mockImplementation(async (pointer) =>
+      JSON.stringify({
+        type: 'binary',
+        answer: { value: pointer === arweaveClient.hexToBase64url(olderHash) ? 'Agree' : 'Disagree' },
+      }),
+    );
+    const historical = await contractScripts.getResponse('none', TEST_PROFILE_ADDRESS, id, cfg, { throwOnError: true });
+    const latest = await contractScripts.getResponse(
+      'none',
+      TEST_PROFILE_ADDRESS,
+      id,
+      makeProfileGroupCfg('bounded-payload'),
+    );
+    expect(historical.answer.value).toBe('Agree');
+    expect(latest.answer.value).toBe('Disagree');
+    read.mockClear();
+    download.mockClear();
+    read.mockRejectedValue(new Error('missing trie node'));
+    await expect(
+      contractScripts.getResponse('none', TEST_PROFILE_ADDRESS, id, cfg, { throwOnError: true }),
+    ).rejects.toMatchObject({ code: 'RESPONSE_HISTORY_UNAVAILABLE', blockTag: 20, retryable: true });
+    expect(read.mock.calls.every((call) => call[2]?.blockTag === 20)).toBe(true);
+    expect(download).not.toHaveBeenCalled();
+  });
+
   it('uses _resolvedCfg when getResponse is called with an unresolved group reference', async () => {
     const groupCfg = makeProfileGroupCfg('edge', 1000);
     const contractGetResponse = jest.fn().mockResolvedValue(ethers.constants.HashZero);

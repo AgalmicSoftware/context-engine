@@ -223,6 +223,82 @@ describe('contractScripts survey event reads', () => {
     ]);
   });
 
+  it.each(['survey', 'question'])('reads only later-edited %s answers at the configured end', async (kind) => {
+    const edited = '0x00000000000000000000000000000000000000aa';
+    const unchanged = '0x00000000000000000000000000000000000000bb';
+    const cfg = { ...GROUP_CFG, blockLimits: { start: 1, end: 20 } };
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 20 });
+    const head = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(30);
+    mockFetchLogsSmartWithProvider.mockImplementation(async (_provider, _filter, from) =>
+      from > 20
+        ? [makeResponsesSubmittedLog(edited, 25)]
+        : [makeResponsesSubmittedLog(edited, 15), makeResponsesSubmittedLog(unchanged, 16)],
+    );
+    const read = jest
+      .spyOn(contractScripts, kind === 'survey' ? 'getSurveyResponse' : 'getResponse')
+      .mockImplementation(async (_p, responder, _id, _cfg, options) => ({
+        answer: responder === edited && options.blockTag !== 20 ? 'Disagree' : 'Agree',
+      }));
+    const scan = async (config) => {
+      if (kind === 'survey')
+        return (await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 'latest', config)).responses;
+      const partial = jest.fn();
+      await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 'latest', null, partial, config);
+      return partial.mock.calls[0][0][QUESTION_ID];
+    };
+    const rows = await scan(cfg);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ responder: edited, blockNumber: 15, response: { answer: 'Agree' } }),
+        expect.objectContaining({ responder: unchanged, response: { answer: 'Agree' } }),
+      ]),
+    );
+    expect(read.mock.calls.find((call) => call[1] === edited)[4].blockTag).toBe(20);
+    expect(read.mock.calls.find((call) => call[1] === unchanged)[4].blockTag).toBeUndefined();
+    expect(mockFetchLogsSmartWithProvider).toHaveBeenCalledTimes(2);
+    read.mockClear();
+    mockFetchLogsSmartWithProvider.mockClear();
+    head.mockClear();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 30 });
+    mockFetchLogsSmartWithProvider.mockResolvedValue([makeResponsesSubmittedLog(edited, 25)]);
+    expect((await scan(GROUP_CFG))[0]).toMatchObject({ blockNumber: 25, response: { answer: 'Disagree' } });
+    expect(mockFetchLogsSmartWithProvider).toHaveBeenCalledTimes(1);
+    expect(head).not.toHaveBeenCalled();
+  });
+
+  it.each(['survey', 'question'])(
+    'reports an unavailable historical %s answer without a later payload',
+    async (kind) => {
+      const responder = '0x00000000000000000000000000000000000000aa';
+      const cfg = { ...GROUP_CFG, blockLimits: { start: 1, end: 20 } };
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 20 });
+      jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(30);
+      mockFetchLogsSmartWithProvider.mockImplementation(async (_p, _f, from) => [
+        makeResponsesSubmittedLog(responder, from > 20 ? 25 : 15),
+      ]);
+      jest
+        .spyOn(contractScripts, kind === 'survey' ? 'getSurveyResponse' : 'getResponse')
+        .mockImplementation(async (_p, _r, _id, _cfg, options) => {
+          if (options.blockTag === 20) throw new Error('missing trie node');
+          return { answer: 'Disagree' };
+        });
+      const partial = jest.fn();
+      const result =
+        kind === 'survey'
+          ? await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 'latest', cfg)
+          : await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 'latest', null, partial, cfg);
+      expect(result).toMatchObject({
+        hadPartialFailure: true,
+        lowestFailedBlock: 15,
+        failedResponses: [
+          expect.objectContaining({ responder, blockTag: 20, reason: expect.stringContaining('missing trie node') }),
+        ],
+      });
+      if (kind === 'survey') expect(result.responses).toEqual([]);
+      else expect(partial).toHaveBeenCalledWith({}, 14);
+    },
+  );
+
   it('returns successful responses without a partial-failure signal when all reads succeed', async () => {
     const responderA = '0x00000000000000000000000000000000000000aa';
     const responderB = '0x00000000000000000000000000000000000000bb';

@@ -110,6 +110,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Read later-edited answers at the configured scan end, with separate historical
+  requests and partial-failure reasons when archive state is unavailable.
+
 - Apply pending decrypts only to their original response and unchanged viewer,
   profile and source-session context, preserving newer response revisions.
 
