@@ -84,7 +84,7 @@ const UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const uploadReceiptExpiresAt = record => record.state === 'settled'
   ? record.settledAt + UPLOAD_RECEIPT_RETENTION_MS
   : record.state === 'pending'
-    ? record.storageId && Number.isFinite(record.reservedAt) ? record.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : record.leaseUntil
+    ? record.reservedAt + UPLOAD_RECEIPT_RETENTION_MS
     : 0;
 const MAX_UPLOAD_RECEIPTS = 2000;
 const MAX_RESULTS_ANALYSIS_REQUESTS = 24;
@@ -466,7 +466,7 @@ export class SessionWriteCoordinator {
     }
     const storageId = toTrimmedString(payload?.storageId);
     const createdAt = toTrimmedString(payload?.createdAt);
-    if (!settle && (storageId || createdAt) && (!isSafeCloudflareStorageRefId(storageId) || !Number.isFinite(Date.parse(createdAt)))) {
+    if (!settle && (!isSafeCloudflareStorageRefId(storageId) || !Number.isFinite(Date.parse(createdAt)))) {
       return jsonResponse({ error: 'Invalid upload receipt target.' }, 400);
     }
     let storageRef;
@@ -501,7 +501,7 @@ export class SessionWriteCoordinator {
         if (record?.state !== 'pending' || record.attemptId !== payload.attemptId) {
           return { status: 409, error: 'Upload attempt no longer owns this receipt.', reason: 'upload_attempt_superseded' };
         }
-        if (record.storageId && record.storageId !== storageRef.id) return { status: 409, error: 'Upload target does not match this receipt.', reason: 'upload_receipt_target_mismatch' };
+        if (record.storageId !== storageRef.id) return { status: 409, error: 'Upload target does not match this receipt.', reason: 'upload_receipt_target_mismatch' };
         await transaction.put(key, { state: 'settled', payloadDigest: record.payloadDigest, storageRef, settledAt: nowMs });
         await this.pruneUploadReceipts(transaction, nowMs);
         return { status: 200, ok: true };
@@ -514,7 +514,7 @@ export class SessionWriteCoordinator {
       if (record?.state === 'pending' && record.leaseUntil > nowMs) {
         return { status: 503, error: 'This upload is still in progress; retry shortly.', reason: 'upload_in_progress' };
       }
-      const resumed = record?.state === 'pending' && !!record.storageId && uploadReceiptExpiresAt(record) > nowMs;
+      const resumed = record?.state === 'pending' && uploadReceiptExpiresAt(record) > nowMs;
       if (resumed && !equalText(record.payloadDigest, payloadDigest)) {
         return { status: 409, error: 'This upload request id already reserved different content.', reason: 'upload_request_conflict' };
       }
@@ -523,11 +523,11 @@ export class SessionWriteCoordinator {
         return { status: 503, error: 'Upload receipt capacity is busy; retry shortly.', reason: 'upload_in_progress' };
       }
       const target = resumed ? { storageId: record.storageId, createdAt: record.createdAt, reservedAt: record.reservedAt }
-        : storageId ? { storageId, createdAt, reservedAt: nowMs } : {};
+        : { storageId, createdAt, reservedAt: nowMs };
       const attemptId = createAttemptId(this.crypto);
       await transaction.put(key, { state: 'pending', attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS, ...target });
       await this.pruneUploadReceipts(transaction, nowMs);
-      return { status: 200, kind: 'execute', attemptId, ...(target.storageId ? { storageId: target.storageId, createdAt: target.createdAt, resumed } : {}) };
+      return { status: 200, kind: 'execute', attemptId, storageId: target.storageId, createdAt: target.createdAt, resumed };
     });
     await this.scheduleUploadReceiptCleanup();
     const { status, ...body } = result;
@@ -3198,7 +3198,7 @@ export const coordinateResponseUploadReceipt = async ({ env, slug, responder, op
     if (!isObjectRecord(body) || (!response.ok && ![409, 503].includes(response.status))) return unavailable;
     if (response.ok && (operation === 'settle' ? body.ok !== true
       : !(body.kind === 'execute' && toTrimmedString(body.attemptId)) && !(body.kind === 'replay' && body.storageRef?.id))) return unavailable;
-    if (response.ok && body.kind === 'execute' && body.storageId != null &&
+    if (response.ok && body.kind === 'execute' &&
         (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)))) return unavailable;
     return { ...body, status: response.status };
   } catch {

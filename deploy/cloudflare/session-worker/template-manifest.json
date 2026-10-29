@@ -5,12 +5,12 @@
   "generator": "scripts/cloudflare-session-template.mjs",
   "files": {
     "worker.mjs": {
-      "bytes": 4822658,
-      "sha256": "ed391af86cbad1803c9d1595787c4a82ef6b6e57488530d297fbf9e185a7d1b4"
+      "bytes": 4822421,
+      "sha256": "818e161e3dbd1b90fd6e0a6f6a4ccfb80f6a2fa7d9e64d2e11594312fde0df93"
     },
     "wrangler.jsonc": {
       "bytes": 951,
-      "sha256": "d206363ba051bf2aee4c577d382077f13a7c5317089b82dbf8d2d09d5e9c1fe1"
+      "sha256": "86efbde24a7a11ea8feba3bf87dc18ebbf32c673eea8b652447063121a17b133"
     },
     "package.json": {
       "bytes": 1431,
@@ -33,5 +33,5 @@
       "sha256": "c42f8978b12334dff7d62f1767182b734be990ad9e5abb960b8e819306166330"
     }
   },
-  "packageSha256": "0bec0a135baf17fbbeb7cf28149ac73c34efb9a09b58785f1572a24a8c5983ec"
+  "packageSha256": "2b322f753ab620d21da0b38cdcd0ec2adca636f4463d992e8fa3a73f388c9041"
 }

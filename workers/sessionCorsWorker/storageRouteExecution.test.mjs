@@ -4869,6 +4869,27 @@ test('response upload receipts fail closed when coordination is unavailable', as
   assert.equal(f.queued.length, 0);
 });
 
+for (const omitted of [['storageId'], ['createdAt'], ['storageId', 'createdAt']]) {
+  test(`an execute receipt missing ${omitted.join(' and ')} cannot fall back to a provisional target`, async () => {
+    const f = createResponseReceiptFixture();
+    const get = f.env.CE_SESSION_COORDINATOR.get;
+    f.env.CE_SESSION_COORDINATOR.get = id => {
+      const stub = get(id);
+      return { fetch: async (url, init) => {
+        const response = await stub.fetch(url, init);
+        if (!url.endsWith('/reserve') || !response.ok) return response;
+        const body = await response.json();
+        for (const field of omitted) delete body[field];
+        return Response.json(body);
+      } };
+    };
+    const response = await f.upload();
+    assert.equal(response.status, 503);
+    assert.equal(f.kv.store.size, 0);
+    assert.equal(f.queued.length, 0);
+  });
+}
+
 test('a lost settlement reply retries to the original saved response', async () => {
   const f = createResponseReceiptFixture();
   const get = f.env.CE_SESSION_COORDINATOR.get;

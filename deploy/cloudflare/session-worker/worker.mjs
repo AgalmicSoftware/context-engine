@@ -70182,7 +70182,7 @@ var init_storageRouteExecution = __esm({
           return responseJson(deps, { error: uploadReceipt.error, reason: uploadReceipt.reason }, uploadReceipt.status || 503, baseHeaders);
         }
       }
-      if (uploadReceipt?.storageId && (uploadReceipt.storageId !== id2 || uploadReceipt.createdAt !== createdAt)) {
+      if (uploadReceipt && (uploadReceipt.storageId !== id2 || uploadReceipt.createdAt !== createdAt)) {
         id2 = uploadReceipt.storageId;
         createdAt = uploadReceipt.createdAt;
         prepared = await prepareStorageWrite(id2, createdAt);
@@ -75632,7 +75632,7 @@ var init_sessionWriteCoordinator = __esm({
     UPLOAD_RECEIPT_PREFIX = "upload-receipt-v1:";
     UPLOAD_RECEIPT_LEASE_MS = 12e4;
     UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1e3;
-    uploadReceiptExpiresAt = (record3) => record3.state === "settled" ? record3.settledAt + UPLOAD_RECEIPT_RETENTION_MS : record3.state === "pending" ? record3.storageId && Number.isFinite(record3.reservedAt) ? record3.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : record3.leaseUntil : 0;
+    uploadReceiptExpiresAt = (record3) => record3.state === "settled" ? record3.settledAt + UPLOAD_RECEIPT_RETENTION_MS : record3.state === "pending" ? record3.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : 0;
     MAX_UPLOAD_RECEIPTS = 2e3;
     MAX_RESULTS_ANALYSIS_REQUESTS = 24;
     RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24e3;
@@ -75932,7 +75932,7 @@ ${expiry}`);
         }
         const storageId = toTrimmedString9(payload?.storageId);
         const createdAt = toTrimmedString9(payload?.createdAt);
-        if (!settle && (storageId || createdAt) && (!isSafeCloudflareStorageRefId(storageId) || !Number.isFinite(Date.parse(createdAt)))) {
+        if (!settle && (!isSafeCloudflareStorageRefId(storageId) || !Number.isFinite(Date.parse(createdAt)))) {
           return jsonResponse2({ error: "Invalid upload receipt target." }, 400);
         }
         let storageRef;
@@ -75970,7 +75970,7 @@ ${expiry}`);
             if (record3?.state !== "pending" || record3.attemptId !== payload.attemptId) {
               return { status: 409, error: "Upload attempt no longer owns this receipt.", reason: "upload_attempt_superseded" };
             }
-            if (record3.storageId && record3.storageId !== storageRef.id) return { status: 409, error: "Upload target does not match this receipt.", reason: "upload_receipt_target_mismatch" };
+            if (record3.storageId !== storageRef.id) return { status: 409, error: "Upload target does not match this receipt.", reason: "upload_receipt_target_mismatch" };
             await transaction.put(key, { state: "settled", payloadDigest: record3.payloadDigest, storageRef, settledAt: nowMs });
             await this.pruneUploadReceipts(transaction, nowMs);
             return { status: 200, ok: true };
@@ -75981,7 +75981,7 @@ ${expiry}`);
           if (record3?.state === "pending" && record3.leaseUntil > nowMs) {
             return { status: 503, error: "This upload is still in progress; retry shortly.", reason: "upload_in_progress" };
           }
-          const resumed = record3?.state === "pending" && !!record3.storageId && uploadReceiptExpiresAt(record3) > nowMs;
+          const resumed = record3?.state === "pending" && uploadReceiptExpiresAt(record3) > nowMs;
           if (resumed && !equalText(record3.payloadDigest, payloadDigest)) {
             return { status: 409, error: "This upload request id already reserved different content.", reason: "upload_request_conflict" };
           }
@@ -75989,11 +75989,11 @@ ${expiry}`);
           if ([...records.values()].filter((record4) => record4.state === "pending" && record4.leaseUntil > nowMs).length >= MAX_UPLOAD_RECEIPTS) {
             return { status: 503, error: "Upload receipt capacity is busy; retry shortly.", reason: "upload_in_progress" };
           }
-          const target = resumed ? { storageId: record3.storageId, createdAt: record3.createdAt, reservedAt: record3.reservedAt } : storageId ? { storageId, createdAt, reservedAt: nowMs } : {};
+          const target = resumed ? { storageId: record3.storageId, createdAt: record3.createdAt, reservedAt: record3.reservedAt } : { storageId, createdAt, reservedAt: nowMs };
           const attemptId = createAttemptId(this.crypto);
           await transaction.put(key, { state: "pending", attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS, ...target });
           await this.pruneUploadReceipts(transaction, nowMs);
-          return { status: 200, kind: "execute", attemptId, ...target.storageId ? { storageId: target.storageId, createdAt: target.createdAt, resumed } : {} };
+          return { status: 200, kind: "execute", attemptId, storageId: target.storageId, createdAt: target.createdAt, resumed };
         });
         await this.scheduleUploadReceiptCleanup();
         const { status, ...body } = result;
@@ -78402,7 +78402,7 @@ ${expiry}`);
         const body = await response2.json();
         if (!isObjectRecord(body) || !response2.ok && ![409, 503].includes(response2.status)) return unavailable3;
         if (response2.ok && (operation === "settle" ? body.ok !== true : !(body.kind === "execute" && toTrimmedString9(body.attemptId)) && !(body.kind === "replay" && body.storageRef?.id))) return unavailable3;
-        if (response2.ok && body.kind === "execute" && body.storageId != null && (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)))) return unavailable3;
+        if (response2.ok && body.kind === "execute" && (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)))) return unavailable3;
         return { ...body, status: response2.status };
       } catch {
         return unavailable3;

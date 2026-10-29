@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Require the storage target and timestamp on every upload receipt reservation and
+  execute reply, while preserving interrupted uploads at their original target.
+
 - Persist and retry failed question-index ranges, and keep unread question payloads
   incomplete until recovery succeeds.
 
