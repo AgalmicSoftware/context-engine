@@ -106,6 +106,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Apply pending decrypts only to their original response and unchanged viewer,
+  profile and source-session context, preserving newer response revisions.
+
 - Limit General comparisons to General data and carry the same explicit session
   through comparison URLs, provenance and AI requests.
 

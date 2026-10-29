@@ -134,6 +134,7 @@ export {
   applyUserPageDecryptedPatchToResponseField,
   buildUserPageDecryptableResponseField,
   buildUserPageDecryptedResponseStatePatch,
+  getUserPageResponseImmutableIdentity,
   buildUserPageDecryptedResponsePatch,
   buildUserPageEncryptedVisibilityDisplayState,
   buildUserPageEncryptedVisibilityStatusRequestPlan,

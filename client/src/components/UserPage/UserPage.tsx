@@ -44,6 +44,7 @@ import {
   buildUserPageDeepScanTooltipInputSignature,
   buildUserPageDeriveTelemetrySnapshot,
   buildUserPageDecryptedResponseStatePatch,
+  getUserPageResponseImmutableIdentity,
   buildUserPageDecryptedResponsePatch,
   buildUserPageEncryptedVisibilityDisplayState,
   buildUserPageEncryptedVisibilityStatusRequestPlan,
@@ -1823,17 +1824,39 @@ class UserPage extends Component<any, any> {
     // against its source session's verified config, never the profile's active
     // session or a URL supplied inside the encrypted response.
     const surveyId = String(decryptRequestPlan.cryptoOptions.surveyId || '');
-    const sourceInfo =
-      this.state.questionResponseInfo.find((entry: UnknownRecord) => String(entry.id || '').toLowerCase() === qid) ||
-      this.state.surveyResponseInfo.find((entry: UnknownRecord) => String(entry.id || '') === surveyId);
-    const sourceSlug = normalizeSessionSlug(
-      sourceInfo?.sessionSlug ??
-        sourceInfo?.slug ??
-        this.props.activeSessionSlug ??
-        this.props.sessionSlug ??
-        resolveActiveSessionSlug(this.props.sessionConfig || {}) ??
-        '',
-    );
+    const resolveSourceSlug = (state: UnknownRecord): string => {
+      const sourceInfo =
+        (Array.isArray(state.questionResponseInfo) ? state.questionResponseInfo : []).find(
+          (entry: UnknownRecord) => String(entry.id || '').toLowerCase() === qid,
+        ) ||
+        (Array.isArray(state.surveyResponseInfo) ? state.surveyResponseInfo : []).find(
+          (entry: UnknownRecord) => String(entry.id || '') === surveyId,
+        );
+      return normalizeSessionSlug(
+        sourceInfo?.sessionSlug ??
+          sourceInfo?.slug ??
+          this.props.activeSessionSlug ??
+          this.props.sessionSlug ??
+          resolveActiveSessionSlug(this.props.sessionConfig || {}) ??
+          '',
+      );
+    };
+    const sourceSlug = resolveSourceSlug(this.state);
+    const responseIdentity = getUserPageResponseImmutableIdentity(responseOverride);
+    const contextKey = (state: UnknownRecord) =>
+      JSON.stringify([
+        this.props.viewAddress,
+        state.viewAddress,
+        this.props.account,
+        this.props.network?.id ?? this.props.networkChainId,
+        resolveSourceSlug(state),
+        this._responseGateAccessGeneration,
+      ]);
+    const startingContext = contextKey(this.state);
+    const isCurrent = (state: UnknownRecord) =>
+      this._isMounted &&
+      contextKey(state) === startingContext &&
+      getUserPageResponseImmutableIdentity(responseOverride) === responseIdentity;
     const sourceConfig = this._getSessionConfigForSlugExact(sourceSlug);
 
     let decryptedResult: unknown = null;
@@ -1853,6 +1876,7 @@ class UserPage extends Component<any, any> {
       return false;
     }
 
+    if (!isCurrent(this.state)) return false;
     const patchedResponse = buildUserPageDecryptedResponsePatch({
       responseObj: responseOverride,
       questionId: qid,
@@ -1863,7 +1887,9 @@ class UserPage extends Component<any, any> {
 
     let didUpdate = false;
     this.setState((prevState: UnknownRecord) => {
+      if (!isCurrent(prevState)) return null;
       const patchResult = buildUserPageDecryptedResponseStatePatch({
+        responseIdentity,
         patchedResponse,
         previousState: prevState,
         questionId: qid,

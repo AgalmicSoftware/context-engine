@@ -338,6 +338,69 @@ describe('UserPage response decrypt helpers', () => {
     expect(instance.state.detailedSurveyResponses.s1[1].responseData.answer.value).toBe('*');
   });
 
+  it.each(['revision', 'profile', 'viewer', 'session', 'unmount', 'generation'])(
+    'ignores a pending decrypt after its %s changes',
+    async (change) => {
+      const instance = makeInstance({ account: '0x00000000000000000000000000000000000000bb' });
+      const response = {
+        questionID: 'q1',
+        storageRef: { backend: 'cloudflare', id: 'cf_old' },
+        answer: { value: '*', encrypted: true, encryptedPortion: '{"v":2}' },
+      };
+      instance.state.questionResponseInfo = [{ id: 'q1', sessionSlug: 'source' }];
+      instance.state.detailedQuestionResponses = { q1: response };
+      let finish;
+      cryptoUtils.decryptSingleField.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const pending = instance.handleDecryptQuestionAnswer('q1', 'answer', response);
+      if (change === 'revision')
+        instance.state.detailedQuestionResponses = {
+          q1: {
+            ...response,
+            storageRef: { backend: 'cloudflare', id: 'cf_new' },
+            answer: { value: 'new revision' },
+          },
+        };
+      if (change === 'profile')
+        instance.props = { ...instance.props, viewAddress: '0x00000000000000000000000000000000000000cc' };
+      if (change === 'viewer')
+        instance.props = { ...instance.props, account: '0x00000000000000000000000000000000000000cc' };
+      if (change === 'session') instance.state.questionResponseInfo = [{ id: 'q1', sessionSlug: 'another' }];
+      if (change === 'unmount') instance._isMounted = false;
+      if (change === 'generation') instance._resetResponseGateAccess();
+      const current = instance.state.detailedQuestionResponses.q1;
+      finish({ answers: { q1: { value: 'old decrypted answer' } } });
+      await expect(pending).resolves.toBe(false);
+      expect(instance.state.detailedQuestionResponses.q1).toBe(current);
+    },
+  );
+
+  it('still applies a decrypt when a refreshed response has the same immutable identity', async () => {
+    const instance = makeInstance({ account: '0x00000000000000000000000000000000000000bb' });
+    const response = {
+      questionID: 'q1',
+      arweaveTxId: 'immutable-fixture',
+      answer: { value: '*', encrypted: true, encryptedPortion: '{"v":2}' },
+    };
+    instance.state.detailedQuestionResponses = { q1: response };
+    let finish;
+    cryptoUtils.decryptSingleField.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = instance.handleDecryptQuestionAnswer('q1', 'answer', response);
+    instance.state.detailedQuestionResponses = { q1: { ...response } };
+    finish({ answers: { q1: { value: 'clear answer' } } });
+    await expect(pending).resolves.toBe(true);
+    expect(instance.state.detailedQuestionResponses.q1.answer.value).toBe('clear answer');
+  });
+
   it('clones __proto__ payload keys as data without mutating object prototype', () => {
     const instance = makeInstance();
     const payload = '{"__proto__":{"polluted":"yes"},"answer":{"value":"safe"}}';
