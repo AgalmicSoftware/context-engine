@@ -57,6 +57,14 @@ const QUESTION_ID = ethers.utils.id('fetch-all-survey-question');
 const RESPONSES_SUBMITTED_IFACE = new ethers.utils.Interface([
   'event ResponsesSubmitted(address indexed responder,bytes32[] questionIds,bytes32 indexed surveyId)',
 ]);
+const SURVEY_ADDED_IFACE = new ethers.utils.Interface(require('../../contractsABI/SURVEYS_ABI.json'));
+const makeSurveyAddedLog = (surveyId, blockNumber) => ({
+  ...SURVEY_ADDED_IFACE.encodeEventLog(SURVEY_ADDED_IFACE.getEvent('SurveyAdded'), [
+    '0x00000000000000000000000000000000000000aa',
+    surveyId,
+  ]),
+  blockNumber,
+});
 
 const makeResponsesSubmittedLog = (responder, blockNumber, logIndex = 0, transactionIndex = 0) => {
   const encoded = RESPONSES_SUBMITTED_IFACE.encodeEventLog(RESPONSES_SUBMITTED_IFACE.getEvent('ResponsesSubmitted'), [
@@ -162,7 +170,7 @@ describe('isRetryableSurveyResponseReadError', () => {
   });
 });
 
-describe('contractScripts.fetchAllSurveyResponses', () => {
+describe('contractScripts survey event reads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetchLogsSmartWithProvider.mockReset();
@@ -175,6 +183,7 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       return {
         address: GROUP_CFG.contracts.surveys.address,
         filters: {
+          SurveyAdded: jest.fn(() => ({ address: GROUP_CFG.contracts.surveys.address })),
           ResponsesSubmitted: jest.fn((_responder, _questionIds, surveyId) => ({
             address: GROUP_CFG.contracts.surveys.address,
             topics: ['0xtopic', surveyId],
@@ -194,6 +203,24 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it('keeps the raw creation block from an ABI-encoded SurveyAdded event', async () => {
+    mockFetchLogsSmartWithProvider.mockResolvedValue([makeSurveyAddedLog(SURVEY_ID, 5)]);
+    await expect(contractScripts.fetchUserSubmittedSurveyIDs('none', 1, 30, GROUP_CFG)).resolves.toEqual([
+      { surveyId: SURVEY_ID, creationBlock: 5 },
+    ]);
+  });
+
+  it('keeps the earliest creation block when survey logs repeat out of order', async () => {
+    mockFetchLogsSmartWithProvider.mockResolvedValue([
+      makeSurveyAddedLog(SURVEY_ID, 9),
+      makeSurveyAddedLog(SURVEY_ID, 5),
+      makeSurveyAddedLog(SURVEY_ID, 7),
+    ]);
+    await expect(contractScripts.fetchUserSubmittedSurveyIDs('none', 1, 30, GROUP_CFG)).resolves.toEqual([
+      { surveyId: SURVEY_ID, creationBlock: 5 },
+    ]);
   });
 
   it('returns successful responses without a partial-failure signal when all reads succeed', async () => {

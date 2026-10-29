@@ -26,9 +26,6 @@ type ParsedSurveyEvent = {
     surveyId: string;
     questionIds?: string[];
   };
-  blockNumber: number;
-  transactionIndex?: number;
-  logIndex?: number;
 };
 type ContractLogLike = {
   blockNumber?: number | string | null;
@@ -388,17 +385,20 @@ export const createContractScriptsSurveyEventReadMethods = (
         toBlock: toBlockNum,
       });
       const rawLogs = await fetchLogsSmartWithProvider(provider, surveyAddedEventFilter, fromBlockNum, toBlockNum);
-      const events: ParsedSurveyEvent[] = rawLogs.map((log: ContractLogLike) => SURVEYS_INTERFACE.parseLog(log));
+      const events: Pick<ParsedEventWithPosition, 'event' | 'blockNumber'>[] = rawLogs.map((log: ContractLogLike) => ({
+        event: SURVEYS_INTERFACE.parseLog(log),
+        blockNumber: Number(log.blockNumber),
+      }));
 
       // Refactored to return object with creationBlock
       const surveyMap = new Map<string, number>();
-      events.forEach((event: ParsedSurveyEvent) => {
+      events.forEach(({ event, blockNumber }) => {
         const id = event.args.surveyId.toLowerCase();
         if (id && id !== ethers.constants.HashZero.toLowerCase() && !blocklist.has(id)) {
           // Keep the earliest block number if duplicates exist (though unlikely for creation)
           const previousCreationBlock = surveyMap.get(id);
-          if (previousCreationBlock === undefined || event.blockNumber < previousCreationBlock) {
-            surveyMap.set(id, event.blockNumber);
+          if (previousCreationBlock === undefined || blockNumber < previousCreationBlock) {
+            surveyMap.set(id, blockNumber);
           }
         }
       });
