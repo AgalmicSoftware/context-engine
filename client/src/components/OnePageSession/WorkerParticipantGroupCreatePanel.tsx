@@ -39,9 +39,12 @@ const WorkerParticipantGroupCreatePanel = ({
   const normalizedSessionId = normalizeWorkerCanonicalSessionIdHex(sessionId);
   const normalizedSessionSlug = canonicalizeSessionSlug(sessionSlug);
   const normalizedWorkerUrl = normalizeWorkerUrl(workerUrl);
-  const defaultTags = useMemo(() => normalizeWorkerGroupDefaultTags(sessionConfig), [sessionConfig]);
-  const defaultTagsKey = defaultTags.join('\u0000');
-  const draftTargetKey = `${normalizedSessionId}\n${normalizedSessionSlug}\n${normalizedWorkerUrl}\n${defaultTagsKey}`;
+  const defaultTagsKey = JSON.stringify(normalizeWorkerGroupDefaultTags(sessionConfig));
+  const defaultTags = useMemo(() => JSON.parse(defaultTagsKey) as string[], [defaultTagsKey]);
+  const defaultTagsRef = useRef(defaultTags);
+  defaultTagsRef.current = defaultTags;
+  const tagsEditedRef = useRef(false);
+  const draftTargetKey = `${normalizedSessionId}\n${normalizedSessionSlug}\n${normalizedWorkerUrl}`;
   const requestTargetKey = `${draftTargetKey}\n${workerToken}\n${participantAddress.toLowerCase()}`;
   const requestTargetKeyRef = useRef(requestTargetKey);
   requestTargetKeyRef.current = requestTargetKey;
@@ -61,13 +64,18 @@ const WorkerParticipantGroupCreatePanel = ({
     setLabel('');
     setDescription('');
     setImageUrl('');
-    setTags(defaultTags);
+    tagsEditedRef.current = false;
+    setTags(defaultTagsRef.current);
     setDocumentURLs([]);
     setMemberLimit('');
     setJoinEndsAt('');
     setBusy(false);
     setStatus('');
-  }, [defaultTags, draftTargetKey]); // The draft survives authentication changes within one session.
+  }, [draftTargetKey]); // The draft survives config and authentication changes within one session.
+
+  useEffect(() => {
+    if (!tagsEditedRef.current) setTags(defaultTags);
+  }, [defaultTags]);
 
   const createGroup = async (preparedImageUrl?: string) => {
     const nextLabel = label.trim();
@@ -107,6 +115,7 @@ const WorkerParticipantGroupCreatePanel = ({
       setLabel('');
       setDescription('');
       setImageUrl('');
+      tagsEditedRef.current = false;
       setTags(defaultTags);
       setDocumentURLs([]);
       setMemberLimit('');
@@ -167,11 +176,15 @@ const WorkerParticipantGroupCreatePanel = ({
         onLabelChange={setLabel}
         onMemberLimitChange={setMemberLimit}
         onAdminAddressChange={() => {}}
-        onTagsChange={setTags}
+        onTagsChange={(nextTags) => {
+          tagsEditedRef.current = true;
+          setTags(nextTags);
+        }}
         onReset={() => {
           setLabel('');
           setDescription('');
           setImageUrl('');
+          tagsEditedRef.current = false;
           setTags(defaultTags);
           setDocumentURLs([]);
           setMemberLimit('');
