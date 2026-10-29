@@ -68697,7 +68697,7 @@ var init_storageScanBudget = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder6, decoder5, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim10, isObj14, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
+var encoder6, decoder5, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim10, isObj14, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_storageBackupRevision();
@@ -68720,6 +68720,7 @@ var init_storageRouteExecution = __esm({
     encoder6 = new TextEncoder();
     decoder5 = new TextDecoder();
     RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol("resolve-storage-gate-runtime-config");
+    STORAGE_GROUP_MEMBERSHIP_CACHE = Symbol("storage-group-membership-cache");
     STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol("storage-rpc-chain-attestation-cache");
     trim10 = (value) => toStr6(value).trim();
     isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -69290,8 +69291,10 @@ var init_storageRouteExecution = __esm({
       authScopes,
       deps
     }) => {
+      const cache = deps?.[STORAGE_GROUP_MEMBERSHIP_CACHE];
+      if (cache?.has(groupId)) return cache.get(groupId);
       const check = typeof deps?.isWorkerGroupMember === "function" ? deps.isWorkerGroupMember : isWorkerGroupMember;
-      return check({
+      const pending = Promise.resolve().then(() => check({
         env,
         slug,
         sessionId: resolveCanonicalWorkerSessionIdHex(config),
@@ -69299,7 +69302,12 @@ var init_storageRouteExecution = __esm({
         requesterAddress,
         authScopes,
         deps
-      });
+      })).then((result) => {
+        const denied = result?.ok === false && ([400, 401, 403, 404].includes(Number(result.status)) || ["worker_group_membership_denied", "worker_group_not_found", "missing_principal", "invalid_worker_group_id"].includes(result.reason)) && !/unavailable|not_configured|ambiguous/.test(result.reason || "");
+        return result?.ok ? { ...result, outcome: "allowed" } : denied ? { ...result, outcome: "denied" } : { ok: false, outcome: "unavailable", status: 503, reason: "worker_group_membership_unavailable" };
+      }, () => ({ ok: false, outcome: "unavailable", status: 503, reason: "worker_group_membership_unavailable" }));
+      cache?.set(groupId, pending);
+      return pending;
     };
     evaluateWorkerGroupCondition = async ({
       condition,
@@ -69323,6 +69331,7 @@ var init_storageRouteExecution = __esm({
           authScopes,
           deps
         });
+        if (result.outcome === "unavailable") return result;
         if (result?.ok) {
           return {
             ok: true,
@@ -69396,6 +69405,7 @@ var init_storageRouteExecution = __esm({
           authScopes,
           deps
         });
+        if (result.outcome === "unavailable") return result;
         if (result.ok) {
           matched.push(result.matchedCondition || { kind: trim10(condition.kind).toLowerCase() });
           if (match === "any") {
@@ -69450,6 +69460,14 @@ var init_storageRouteExecution = __esm({
           authScopes,
           deps
         });
+        if (result.outcome === "unavailable") return {
+          ok: false,
+          response: responseJson(deps, {
+            error: "Worker group membership is unavailable; retry.",
+            reason: result.reason,
+            retryable: true
+          }, 503, baseHeaders)
+        };
         if (result?.ok) {
           return {
             ok: true,
@@ -69593,8 +69611,9 @@ var init_storageRouteExecution = __esm({
           ok: false,
           response: responseJson(deps, {
             error: "Access denied: Cloudflare storage conditions failed.",
-            reason: conditionResult.reason
-          }, 403, baseHeaders)
+            reason: conditionResult.reason,
+            ...conditionResult.outcome === "unavailable" ? { retryable: true } : {}
+          }, conditionResult.status || 403, baseHeaders)
         };
       }
       if (access.encryption === PAYLOAD_ENCRYPTION_MODES3.LIT) {
@@ -69845,7 +69864,7 @@ var init_storageRouteExecution = __esm({
     };
     createStorageRouteGateDeps = ({ config, env, slug, deps }) => {
       let runtimeConfigPromise = null;
-      const routeDeps = { ...deps || {} };
+      const routeDeps = { ...deps || {}, [STORAGE_GROUP_MEMBERSHIP_CACHE]: /* @__PURE__ */ new Map() };
       Object.defineProperty(routeDeps, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, {
         configurable: false,
         enumerable: false,
@@ -70476,7 +70495,7 @@ var init_storageRouteExecution = __esm({
           deps
         });
         if (!itemAccess.ok) {
-          if (mine) return itemAccess.response;
+          if (mine || itemAccess.response.status >= 500) return itemAccess.response;
           continue;
         }
         const owned = isOwnedStorageResource(storageRef.resource);

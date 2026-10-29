@@ -255,6 +255,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Check each listing group once per request and return a retryable failure when
+  membership is unavailable, instead of reporting an incomplete page as complete.
+
 - Patch the committed encrypted secret document, preserving key replacements
   and removals across stale KV reads, retries, Lit setup and backup restore.
 
