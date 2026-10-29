@@ -11,13 +11,7 @@ import {
   resolveSbtDisplayLabel,
 } from './sbtDisplayNames.js';
 import contractScripts, { getDemoSessionConfigBySlug, getSessionConfigBySlugOrDefault } from '../web3/chainGateway.js';
-import {
-  initCacheManager,
-  listNamespaceEntriesSync,
-  removeCache,
-  writeCache,
-  readCache,
-} from '../cache/cacheScripts.js';
+import { initCacheManager, clearCacheNamespace, writeCache, readCache } from '../cache/cacheScripts.js';
 
 jest.mock('../web3/chainGateway.js', () => ({
   __esModule: true,
@@ -30,9 +24,7 @@ jest.mock('../web3/chainGateway.js', () => ({
 
 const clearSbtCache = async () => {
   await initCacheManager();
-  const entries = listNamespaceEntriesSync('sbtCache');
-  await Promise.all(entries.map((entry) => removeCache('sbtCache', entry?.slug || '')));
-  await removeCache('sbtCache', '');
+  await clearCacheNamespace('sbtCache');
 };
 
 describe('sbtDisplayNames helpers', () => {

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Isolate SBT name tests by clearing their complete cache namespace.
+
 - Use hexadecimal commitments in answer-size regression fixtures.
 
 - Mark the Lit provisioning mock credential as an explicit fixture for release scans.
