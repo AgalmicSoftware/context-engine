@@ -312,6 +312,8 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Include shared answer validation in Worker release source comparisons.
+
 - Check signed payment hashes in proof-authorized faucet integration tests.
 
 - Separate the interview panel from voice-mode navigation while preserving
