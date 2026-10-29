@@ -1,4 +1,5 @@
 // Already-saved consent coverage through the real pile engine and upload boundary.
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, waitFor } from '@testing-library/react';
 import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -217,8 +218,8 @@ it('P3 opt-out: unticking a saved name and AI attribution uploads a version with
 }, 40000);
 
 it('P4 masked encrypted answer + rating envelopes: a consent-only upload re-sends the saved envelopes unchanged', async () => {
-  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer-ct' });
-  const commentEnvelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'comment-ct' });
+  const envelope = responseEnvelopeFixture('answer-ct');
+  const commentEnvelope = responseEnvelopeFixture('comment-ct');
   const saved = savedResponse({
     responderName: undefined,
     interviewProvenance: undefined,
@@ -240,8 +241,8 @@ it('P4 masked encrypted answer + rating envelopes: a consent-only upload re-send
     },
     importance: null,
     conviction: null,
-    importanceEncrypted: 'importance-envelope',
-    convictionEncrypted: 'conviction-envelope',
+    importanceEncrypted: responseEnvelopeFixture('importance-envelope'),
+    convictionEncrypted: responseEnvelopeFixture('conviction-envelope'),
   });
   mockCaches(saved);
   jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockResolvedValue([saved]);
@@ -276,8 +277,8 @@ it('P4 masked encrypted answer + rating envelopes: a consent-only upload re-send
     encryptedPortion: commentEnvelope,
   });
   expect(uploaded).toMatchObject({
-    importanceEncrypted: 'importance-envelope',
-    convictionEncrypted: 'conviction-envelope',
+    importanceEncrypted: responseEnvelopeFixture('importance-envelope'),
+    convictionEncrypted: responseEnvelopeFixture('conviction-envelope'),
     importance: null,
     conviction: null,
     responderName: 'Participant',
