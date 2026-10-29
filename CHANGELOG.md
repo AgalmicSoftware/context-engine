@@ -435,6 +435,9 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Compare similarity drift over the same usable question set in both snapshots,
+  report its IDs and count, and mark insufficient common overlap unavailable.
+
 - Keep benchmark deadlines active through success/error bodies and structured-output
   fallback attempts, cancelling stalled streams so tasks can retry.
 

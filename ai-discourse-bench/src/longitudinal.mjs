@@ -1,4 +1,5 @@
 import { buildReportFingerprint, hashJson } from './provenance.mjs';
+import { distributionSimilarity, minimumSimilarityQuestionOverlap } from './scoring.mjs';
 
 const round = (value, digits = 4) => Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
 const mean = (values) => values.length
@@ -10,7 +11,6 @@ const direction = (score) => {
   if (score < -0.25) return 'opposition';
   return 'mixed';
 };
-const edgeKey = (left, right) => [left, right].sort().join('\u0000');
 
 export const buildReportSnapshot = (report = {}, { label = '' } = {}) => {
   const reportFingerprint = buildReportFingerprint(report);
@@ -95,7 +95,8 @@ export const compareLongitudinalSnapshots = (baseline = {}, current = {}) => {
   const currentModels = new Map((current.models || []).map((model) => [model.id, model]));
   const baselineQuestions = new Map((baseline.questions || []).map((question) => [question.id, question]));
   const currentQuestions = new Map((current.questions || []).map((question) => [question.id, question]));
-  for (const questionId of [...baselineQuestions.keys()].filter((id) => currentQuestions.has(id))) {
+  const commonQuestionIds = [...baselineQuestions.keys()].filter((id) => currentQuestions.has(id)).sort();
+  for (const questionId of commonQuestionIds) {
     if (baselineQuestions.get(questionId).questionFingerprint !== currentQuestions.get(questionId).questionFingerprint) {
       throw new Error(`snapshot question ${questionId} wording or interpretation changed`);
     }
@@ -137,19 +138,38 @@ export const compareLongitudinalSnapshots = (baseline = {}, current = {}) => {
     };
   });
 
-  const baselineEdges = new Map((baseline.similarityEdges || []).map((edge) => [edgeKey(edge.source, edge.target), edge]));
-  const similarityDrift = (current.similarityEdges || []).flatMap((edge) => {
-    const before = baselineEdges.get(edgeKey(edge.source, edge.target));
-    if (!before || !Number.isFinite(before.similarity) || !Number.isFinite(edge.similarity)) return [];
-    return [{
-      source: edge.source,
-      target: edge.target,
-      baselineSimilarity: before.similarity,
-      currentSimilarity: edge.similarity,
-      signedShift: round(edge.similarity - before.similarity),
-      absoluteShift: round(Math.abs(edge.similarity - before.similarity)),
-    }];
-  }).sort((left, right) => right.absoluteShift - left.absoluteShift);
+  const requiredQuestions = minimumSimilarityQuestionOverlap(commonQuestionIds.length);
+  const similarityDrift = commonModelIds.flatMap((source, sourceIndex) => (
+    commonModelIds.slice(sourceIndex + 1).map((target) => {
+      const comparisons = commonQuestionIds.flatMap((questionId) => {
+        const before = distributionSimilarity(
+          baselineModels.get(source).byQuestion?.[questionId] ?? undefined,
+          baselineModels.get(target).byQuestion?.[questionId] ?? undefined,
+        );
+        const after = distributionSimilarity(
+          currentModels.get(source).byQuestion?.[questionId] ?? undefined,
+          currentModels.get(target).byQuestion?.[questionId] ?? undefined,
+        );
+        return Number.isFinite(before) && Number.isFinite(after) ? [{ questionId, before, after }] : [];
+      });
+      const sufficientOverlap = comparisons.length >= requiredQuestions;
+      const baselineSimilarity = sufficientOverlap ? round(mean(comparisons.map((row) => row.before))) : null;
+      const currentSimilarity = sufficientOverlap ? round(mean(comparisons.map((row) => row.after))) : null;
+      const signedShift = sufficientOverlap ? round(currentSimilarity - baselineSimilarity) : null;
+      return {
+        source,
+        target,
+        questionIds: comparisons.map((row) => row.questionId),
+        questionsCompared: comparisons.length,
+        requiredQuestions,
+        sufficientOverlap,
+        baselineSimilarity,
+        currentSimilarity,
+        signedShift,
+        absoluteShift: sufficientOverlap ? round(Math.abs(signedShift)) : null,
+      };
+    })
+  )).sort((left, right) => (right.absoluteShift ?? -1) - (left.absoluteShift ?? -1));
 
   return {
     schemaVersion: 1,
@@ -163,7 +183,7 @@ export const compareLongitudinalSnapshots = (baseline = {}, current = {}) => {
     summary: {
       meanModelAbsoluteShift: round(mean(modelDrift.map((row) => row.meanAbsoluteShift).filter(Number.isFinite))),
       totalDirectionChanges: modelDrift.reduce((sum, row) => sum + row.directionChanges, 0),
-      meanSimilarityAbsoluteShift: round(mean(similarityDrift.map((row) => row.absoluteShift))),
+      meanSimilarityAbsoluteShift: round(mean(similarityDrift.map((row) => row.absoluteShift).filter(Number.isFinite))),
     },
   };
 };

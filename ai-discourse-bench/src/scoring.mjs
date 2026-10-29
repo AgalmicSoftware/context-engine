@@ -218,7 +218,7 @@ const klDivergence = (left, right) => left.reduce((sum, probability, index) => (
   probability > 0 ? sum + probability * Math.log2(probability / right[index]) : sum
 ), 0);
 
-const distributionSimilarity = (leftSummary, rightSummary) => {
+export const distributionSimilarity = (leftSummary, rightSummary) => {
   const left = distribution(leftSummary);
   const right = distribution(rightSummary);
   if (!left || !right) return null;
@@ -284,6 +284,8 @@ const buildCoverage = ({
     }];
   }));
 };
+
+export const minimumSimilarityQuestionOverlap = (questionCount) => Math.max(1, Math.ceil(questionCount * 0.5));
 
 const buildSimilarity = ({ questionBank, modelRoster, byModelQuestion, coverage, minimumSimilarityOverlap }) => {
   const models = modelRoster.models || [];
@@ -505,7 +507,7 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile, import
     && declaredRepeatValues.every((value) => Number.isInteger(value) && value === expectedRepeats);
   const bankReleaseStatus = questionBank.releaseStatus || 'unvalidated';
   const bankValidated = bankReleaseStatus === 'validated';
-  const minimumSimilarityOverlap = Math.max(1, Math.ceil(questions.length * 0.5));
+  const minimumSimilarityOverlap = minimumSimilarityQuestionOverlap(questions.length);
   const coverage = buildCoverage({
     questionBank,
     modelRoster,
