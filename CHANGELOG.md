@@ -138,6 +138,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Include public response explanations in comparison AI input and expanded details.
+
 - Keep pending AI tag suggestions attached to the question that requested them, releasing busy state after edits or removal.
 
 - Cap question text once in Results analysis input and keep every included response linked to an included question.
