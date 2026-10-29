@@ -33962,7 +33962,7 @@ function __addDisposableResource(env, value, async) {
   return value;
 }
 function __disposeResources(env) {
-  function fail8(e) {
+  function fail9(e) {
     env.error = env.hasError ? new _SuppressedError(e, env.error, "An error was suppressed during disposal.") : e;
     env.hasError = true;
   }
@@ -33974,12 +33974,12 @@ function __disposeResources(env) {
         if (r.dispose) {
           var result = r.dispose.call(r.value);
           if (r.async) return s |= 2, Promise.resolve(result).then(next, function(e) {
-            fail8(e);
+            fail9(e);
             return next();
           });
         } else s |= 1;
       } catch (e) {
-        fail8(e);
+        fail9(e);
       }
     }
     if (s === 1) return env.hasError ? Promise.reject(env.error) : Promise.resolve();
@@ -71484,6 +71484,64 @@ var init_recoveryKeyExport = __esm({
   }
 });
 
+// workers/sessionCorsWorker/sessionSecretsAuthority.js
+var SESSION_SECRETS_AUTHORITY_KEY, fail3, readSessionSecretsAuthority, readCommittedSessionSecrets, commitSessionSecrets, repairPendingSessionSecretsProjection;
+var init_sessionSecretsAuthority = __esm({
+  "workers/sessionCorsWorker/sessionSecretsAuthority.js"() {
+    init_sessionSecretsEnvelope();
+    init_sessionSlugResolution();
+    init_responseKvHelpers();
+    SESSION_SECRETS_AUTHORITY_KEY = "session-secrets-authority-v1";
+    fail3 = () => {
+      throw new Error("Invalid session secrets authority.");
+    };
+    readSessionSecretsAuthority = async (coordinator, storage, slug) => {
+      const record3 = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
+      if (record3 != null) {
+        if (record3.version !== 1 || record3.slug !== slug || !Number.isSafeInteger(record3.revision) || record3.revision < 1) fail3();
+        await decryptSessionSecretsEnvelope(record3.envelope, { env: coordinator.env, slug });
+        return record3;
+      }
+      const raw = await coordinator.env.GROUP_KV.get(`session:${normalizeWorkerSessionSlug(slug)}:secrets`);
+      if (raw == null) return null;
+      const envelope = JSON.parse(raw);
+      if (!isEncryptedSessionSecretsEnvelope(envelope)) fail3();
+      await decryptSessionSecretsEnvelope(envelope, { env: coordinator.env, slug });
+      const adopted = { version: 1, slug, revision: 1, envelope, projectionPending: false };
+      await storage.put(SESSION_SECRETS_AUTHORITY_KEY, adopted);
+      return adopted;
+    };
+    readCommittedSessionSecrets = async (coordinator, storage, slug) => {
+      const record3 = await readSessionSecretsAuthority(coordinator, storage, slug);
+      return record3 ? decryptSessionSecretsEnvelope(record3.envelope, { env: coordinator.env, slug }) : {};
+    };
+    commitSessionSecrets = async (coordinator, storage, slug, secrets) => {
+      const previous = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
+      const envelope = await buildEncryptedSessionSecretsEnvelope(secrets, { env: coordinator.env, slug });
+      await storage.put(SESSION_SECRETS_AUTHORITY_KEY, {
+        version: 1,
+        slug,
+        revision: (previous?.revision || 0) + 1,
+        envelope,
+        projectionPending: true
+      });
+      return envelope;
+    };
+    repairPendingSessionSecretsProjection = async (coordinator) => {
+      const record3 = await coordinator.state.storage.get(SESSION_SECRETS_AUTHORITY_KEY);
+      if (!record3?.projectionPending) return;
+      await decryptSessionSecretsEnvelope(record3.envelope, { env: coordinator.env, slug: record3.slug });
+      await putKvJson(coordinator.env, `session:${normalizeWorkerSessionSlug(record3.slug)}:secrets`, record3.envelope);
+      await coordinator.state.storage.transaction(async (transaction) => {
+        const current = await transaction.get(SESSION_SECRETS_AUTHORITY_KEY);
+        if (current?.revision === record3.revision) {
+          await transaction.put(SESSION_SECRETS_AUTHORITY_KEY, { ...current, projectionPending: false });
+        }
+      });
+    };
+  }
+});
+
 // workers/sessionCorsWorker/agent/backup.mjs
 var stripAgentAdmissionFromBackup, assertAgentBackupTargetEmpty;
 var init_backup = __esm({
@@ -71518,11 +71576,11 @@ var init_backup = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupGroupSnapshot.js
-var fail3, pad, readBackupGroupSnapshot;
+var fail4, pad, readBackupGroupSnapshot;
 var init_sessionBackupGroupSnapshot = __esm({
   "workers/sessionCorsWorker/sessionBackupGroupSnapshot.js"() {
     init_storageBackupRevision();
-    fail3 = (message) => {
+    fail4 = (message) => {
       throw Object.assign(new Error(message), { status: 409 });
     };
     pad = (n2) => String(n2).padStart(8, "0");
@@ -71530,7 +71588,7 @@ var init_sessionBackupGroupSnapshot = __esm({
       const { storage } = coordinator.state;
       const { slug, sessionId } = payload;
       if ((await storage.list({ prefix: WORKER_GROUP_BACKUP_PENDING_PREFIX, limit: 1 })).size) {
-        fail3("A group mutation is pending. Retry the backup after it settles.");
+        fail4("A group mutation is pending. Retry the backup after it settles.");
       }
       const snapshots = await storage.list({ prefix: "worker-group-backup-meta:", limit: 100 });
       const expired = [...snapshots].find(([, value]) => value.expiresAt <= coordinator.now());
@@ -71542,16 +71600,16 @@ var init_sessionBackupGroupSnapshot = __esm({
       }
       const revision = await storage.get(STORAGE_BACKUP_REVISION_KEY) || 0;
       const snapshotId = payload.snapshotId || crypto.randomUUID();
-      if (!/^[a-f0-9-]{36}$/.test(snapshotId)) fail3("Invalid group snapshot cursor.");
+      if (!/^[a-f0-9-]{36}$/.test(snapshotId)) fail4("Invalid group snapshot cursor.");
       const root = `worker-group-backup:${snapshotId}`;
       const stateKey = `worker-group-backup-meta:${snapshotId}`;
       let state = await storage.get(stateKey);
       if (!state) {
-        if (payload.snapshotId) fail3("The group snapshot expired; export again.");
+        if (payload.snapshotId) fail4("The group snapshot expired; export again.");
         state = { slug, sessionId, revision, phase: 0, cursor: "", batch: 0, expiresAt: coordinator.now() + 7 * 86400 * 1e3 };
       }
       if (state.slug !== slug || state.sessionId !== sessionId || state.expiresAt <= coordinator.now() || state.revision !== revision) {
-        fail3("Session groups changed or the snapshot expired; export again.");
+        fail4("Session groups changed or the snapshot expired; export again.");
       }
       if (payload.checkOnly) return { ok: true, snapshotId, operations: 0 };
       let operations = 0;
@@ -71564,23 +71622,23 @@ var init_sessionBackupGroupSnapshot = __esm({
         let rows;
         let next;
         if (durable2) {
-          if (!(listed instanceof Map)) fail3("Group authority could not be read.");
+          if (!(listed instanceof Map)) fail4("Group authority could not be read.");
           rows = [...listed];
           for (const [key, value] of rows) validateDurable(key, value);
           next = rows.length === 100 ? rows.at(-1)[0] : "";
         } else {
           rows = [];
           for (const { name } of listed.keys || []) {
-            if (!name.startsWith(prefix)) fail3("Invalid group backup key.");
+            if (!name.startsWith(prefix)) fail4("Invalid group backup key.");
             const value = await store.get(name);
             operations += 1;
-            if (value == null) fail3("Group changed during backup; export again.");
+            if (value == null) fail4("Group changed during backup; export again.");
             rows.push([name, value]);
           }
           next = listed.list_complete === false ? String(listed.cursor || "") : "";
-          if (listed.list_complete === false && !next) fail3("Group backup list cursor is unavailable.");
+          if (listed.list_complete === false && !next) fail4("Group backup list cursor is unavailable.");
         }
-        if (next && next === state.cursor) fail3("Group backup list cursor did not advance.");
+        if (next && next === state.cursor) fail4("Group backup list cursor did not advance.");
         const text2 = `${JSON.stringify({ durable: durable2, rows })}
 `;
         for (let offset = 0, chunk2 = 0; offset < text2.length; offset += 16384, chunk2 += 1) {
@@ -71612,9 +71670,10 @@ var init_sessionBackupGroupSnapshot = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupCoordinator.js
-var json3, fail4, object2, parse, groupPrefixes, BACKUP_GROUP_IMPORT_ACTIVE_KEY, scopedGroupRecords, exportCoordinatorBackup, exportWorkerGroupBackup, controlWorkerGroupBackupImport, importWorkerGroupBackup;
+var json3, fail5, object2, groupPrefixes, BACKUP_GROUP_IMPORT_ACTIVE_KEY, scopedGroupRecords, exportCoordinatorBackup, exportWorkerGroupBackup, controlWorkerGroupBackupImport, importWorkerGroupBackup;
 var init_sessionBackupCoordinator = __esm({
   "workers/sessionCorsWorker/sessionBackupCoordinator.js"() {
+    init_sessionSecretsAuthority();
     init_backup();
     init_sessionBackupGroupSnapshot();
     init_storageBackupRevision();
@@ -71624,11 +71683,10 @@ var init_sessionBackupCoordinator = __esm({
     init_sessionSecretsEnvelope();
     init_sessionBackupLifecycle();
     json3 = (body, status = 200) => Response.json(body, { status });
-    fail4 = (message, status = 503) => {
+    fail5 = (message, status = 503) => {
       throw Object.assign(new Error(message), { status });
     };
     object2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    parse = (raw) => typeof raw === "string" ? JSON.parse(raw) : raw;
     groupPrefixes = (slug) => ["ce-worker-group", "ce-worker-group-index", "ce-worker-group-member", "ce-worker-group-principal"].map((kind) => `${kind}:${slug}:`);
     BACKUP_GROUP_IMPORT_ACTIVE_KEY = "worker-group-backup-import-active";
     scopedGroupRecords = (records, slug, sessionId) => {
@@ -71659,16 +71717,13 @@ var init_sessionBackupCoordinator = __esm({
     };
     exportCoordinatorBackup = async (coordinator, payload) => {
       const authority = await coordinator.assertSessionAuthority(payload);
-      if (!authority) fail4("Session config is not initialized.", 409);
+      if (!authority) fail5("Session config is not initialized.", 409);
       await coordinator.repairPendingSessionConfigProjection();
       const current = await coordinator.state.storage.get("session-config-authority");
       const signer = await coordinator.state.storage.get("session-lit-authorization-signer-v1");
-      const rawSecrets = await coordinator.env.GROUP_KV.get(`session:${normalizeWorkerSessionSlug(current.slug)}:secrets`);
-      const secrets = rawSecrets == null ? null : parse(rawSecrets);
-      if (secrets && !isEncryptedSessionSecretsEnvelope(secrets)) {
-        fail4("Legacy plaintext secrets must be saved through the encrypted secret workflow before backup.", 409);
-      }
-      if (signer && !isEncryptedSessionSecretsEnvelope(signer.envelope)) fail4("Invalid wrapped authorization signer.", 409);
+      const secretAuthority = await coordinator.state.storage.transaction((transaction) => readSessionSecretsAuthority(coordinator, transaction, current.slug));
+      const secrets = secretAuthority?.envelope || null;
+      if (signer && !isEncryptedSessionSecretsEnvelope(signer.envelope)) fail5("Invalid wrapped authorization signer.", 409);
       return json3({ ok: true, writeRevision: await coordinator.state.storage.get(STORAGE_BACKUP_REVISION_KEY) || 0, coordinator: {
         configAuthority: { ...current, config: stripAgentAdmissionFromBackup(current.config) },
         wrappedSessionKeys: {
@@ -71681,9 +71736,9 @@ var init_sessionBackupCoordinator = __esm({
     exportWorkerGroupBackup = async (coordinator, payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
-      if (!slug || !sessionId) fail4("Invalid backup group identity.", 400);
+      if (!slug || !sessionId) fail5("Invalid backup group identity.", 400);
       const kv = resolveWorkerGroupsKv(coordinator.env);
-      if (!kv?.list || !kv?.get) fail4("Worker group storage is unavailable.");
+      if (!kv?.list || !kv?.get) fail5("Worker group storage is unavailable.");
       return json3(await readBackupGroupSnapshot({
         coordinator,
         payload: { ...payload, slug, sessionId, kv },
@@ -71691,9 +71746,9 @@ var init_sessionBackupCoordinator = __esm({
         scopeRecords: scopedGroupRecords,
         validateDurable: (key, value) => {
           if (!object2(value) || value.pending || ["creating", "updating", "deleting", "reserved", "removing"].includes(value.phase || value.state)) {
-            fail4("A group mutation is pending. Retry the backup after it settles.", 409);
+            fail5("A group mutation is pending. Retry the backup after it settles.", 409);
           }
-          if (key === "worker-group-capacity-meta-v3" && (value.slug !== slug || value.sessionId !== sessionId)) fail4("Group backup identity conflict.", 409);
+          if (key === "worker-group-capacity-meta-v3" && (value.slug !== slug || value.sessionId !== sessionId)) fail5("Group backup identity conflict.", 409);
         }
       }));
     };
@@ -71701,12 +71756,12 @@ var init_sessionBackupCoordinator = __esm({
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const { archiveId } = payload;
-      if (!slug || !sessionId || !/^[a-f0-9]{64}$/.test(archiveId || "")) fail4("Invalid group restore identity.", 400);
+      if (!slug || !sessionId || !/^[a-f0-9]{64}$/.test(archiveId || "")) fail5("Invalid group restore identity.", 400);
       const { storage } = coordinator.state;
       const active = await storage.get(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
-      if (active && active !== archiveId) fail4("Another group restore is in progress.", 409);
+      if (active && active !== archiveId) fail5("Another group restore is in progress.", 409);
       const kv = resolveWorkerGroupsKv(coordinator.env);
-      if (!kv?.list || !kv?.delete) fail4("Group restore storage is unavailable.");
+      if (!kv?.list || !kv?.delete) fail5("Group restore storage is unavailable.");
       if (operation === "begin") {
         if (active) return json3({ ok: true, operations: 0 });
         const nonempty = () => {
@@ -71715,7 +71770,7 @@ var init_sessionBackupCoordinator = __esm({
         if ((await storage.list({ prefix: "worker-group-capacity-", limit: 1 })).size) nonempty();
         for (const prefix of groupPrefixes(slug)) {
           const rows = await kv.list({ prefix, limit: 1 });
-          if (!Array.isArray(rows.keys)) fail4("Group restore storage could not be checked.");
+          if (!Array.isArray(rows.keys)) fail5("Group restore storage could not be checked.");
           if (rows.keys.length || rows.list_complete === false) nonempty();
         }
         if (!payload.checkOnly) await storage.put(BACKUP_GROUP_IMPORT_ACTIVE_KEY, archiveId);
@@ -71739,30 +71794,30 @@ var init_sessionBackupCoordinator = __esm({
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const snapshot = payload?.snapshot;
-      if (!slug || !sessionId || !Array.isArray(snapshot?.durable) || !Array.isArray(snapshot?.records)) fail4("Invalid group backup.", 400);
-      if (!payload.archiveId || await coordinator.state.storage.get(BACKUP_GROUP_IMPORT_ACTIVE_KEY) !== payload.archiveId) fail4("The group restore has not reserved an empty target.", 409);
+      if (!slug || !sessionId || !Array.isArray(snapshot?.durable) || !Array.isArray(snapshot?.records)) fail5("Invalid group backup.", 400);
+      if (!payload.archiveId || await coordinator.state.storage.get(BACKUP_GROUP_IMPORT_ACTIVE_KEY) !== payload.archiveId) fail5("The group restore has not reserved an empty target.", 409);
       const scoped = scopedGroupRecords(snapshot.records, slug, sessionId);
-      if (scoped.length !== snapshot.records.length) fail4("Invalid group backup scope.", 400);
+      if (scoped.length !== snapshot.records.length) fail5("Invalid group backup scope.", 400);
       const seen = /* @__PURE__ */ new Set();
       for (const [key, value] of [...snapshot.durable, ...snapshot.records]) {
-        if (typeof key !== "string" || seen.has(key)) fail4("Invalid or duplicate group backup key.", 400);
+        if (typeof key !== "string" || seen.has(key)) fail5("Invalid or duplicate group backup key.", 400);
         seen.add(key);
         if (key.startsWith("worker-group-capacity-")) {
-          if (!/^(worker-group-capacity-meta-v3|worker-group-capacity-(group|member)-v3:.+)$/.test(key) || !object2(value) || value.pending || ["creating", "updating", "deleting", "reserved", "removing"].includes(value.phase || value.state) || key === "worker-group-capacity-meta-v3" && (value.slug !== slug || value.sessionId !== sessionId)) fail4("Invalid group authority backup.", 400);
-        } else if (typeof value !== "string") fail4("Invalid group backup value.", 400);
+          if (!/^(worker-group-capacity-meta-v3|worker-group-capacity-(group|member)-v3:.+)$/.test(key) || !object2(value) || value.pending || ["creating", "updating", "deleting", "reserved", "removing"].includes(value.phase || value.state) || key === "worker-group-capacity-meta-v3" && (value.slug !== slug || value.sessionId !== sessionId)) fail5("Invalid group authority backup.", 400);
+        } else if (typeof value !== "string") fail5("Invalid group backup value.", 400);
       }
       const kv = resolveWorkerGroupsKv(coordinator.env);
-      if (!kv?.get || !kv?.put) fail4("Group restore storage is unavailable.");
+      if (!kv?.get || !kv?.put) fail5("Group restore storage is unavailable.");
       const counts = { written: 0, skipped: 0 };
       const conflicts = [];
       let phase = payload.cursor?.phase || "check";
       let offset = payload.cursor?.offset || 0;
-      if (!["check", "apply"].includes(phase) || !Number.isSafeInteger(offset) || offset < 0) fail4("Invalid group restore cursor.", 400);
+      if (!["check", "apply"].includes(phase) || !Number.isSafeInteger(offset) || offset < 0) fail5("Invalid group restore cursor.", 400);
       const limit = Math.min(700, Math.max(0, Number(payload.operations) || 700));
       let operations = 0;
       while (true) {
         const rows = phase === "check" ? [...snapshot.durable, ...snapshot.records] : [...snapshot.records, ...snapshot.durable];
-        if (offset > rows.length) fail4("Invalid group restore offset.", 400);
+        if (offset > rows.length) fail5("Invalid group restore offset.", 400);
         for (; offset < rows.length; offset += 1) {
           if (operations + 2 > limit) return json3({ ok: true, counts, conflicts, operations, nextCursor: { phase, offset } });
           const [key, value] = rows[offset];
@@ -71838,9 +71893,10 @@ var init_sessionBackupAuthentication = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupImport.js
-var fail5, object3, stable, same, digest, hashPattern, resources, temporary, assertEmptyTarget, validateSnapshot, validatePage, importCoordinatorBackupPage;
+var fail6, object3, stable, same, digest, hashPattern, resources, temporary, assertEmptyTarget, validateSnapshot, validatePage, importCoordinatorBackupPage;
 var init_sessionBackupImport = __esm({
   "workers/sessionCorsWorker/sessionBackupImport.js"() {
+    init_sessionSecretsAuthority();
     init_backup();
     init_sessionBackupLifecycle();
     init_sessionBackupAuthentication();
@@ -71856,7 +71912,7 @@ var init_sessionBackupImport = __esm({
     init_storageScanBudget();
     init_uploadSizeLimits();
     init_storageRouteExecution();
-    fail5 = (message, status = 400, reason) => {
+    fail6 = (message, status = 400, reason) => {
       throw Object.assign(new Error(message), { status, reason });
     };
     object3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -71867,8 +71923,8 @@ var init_sessionBackupImport = __esm({
     resources = /* @__PURE__ */ new Set(["docsContext", "questions", "surveys", "responses", "generatedArtifacts", "media", "images"]);
     temporary = { expirationTtl: 7 * 86400 };
     assertEmptyTarget = async ({ coordinator, current, slug, page, index, budget }) => {
-      const nonempty = () => fail5("Restore requires an empty target session. Abandon any unfinished restore before starting again.", 409, "backup_target_not_empty");
-      if (current || await coordinator.state.storage.get("session-lit-authorization-signer-v1")) nonempty();
+      const nonempty = () => fail6("Restore requires an empty target session. Abandon any unfinished restore before starting again.", 409, "backup_target_not_empty");
+      if (current || await coordinator.state.storage.get("session-lit-authorization-signer-v1") || await coordinator.state.storage.get(SESSION_SECRETS_AUTHORITY_KEY)) nonempty();
       const groupKv = budget.wrap(coordinator.env.GROUP_KV);
       await assertAgentBackupTargetEmpty({ kv: groupKv, storage: coordinator.state.storage, sessionId: page.manifest.sessionId });
       budget.consume(1);
@@ -71877,14 +71933,14 @@ var init_sessionBackupImport = __esm({
       }
       for (const kind of ["ce-storage", "ce-storage-payload", "ce-storage-owner", "ce-storage-hidden"]) {
         const rows = await index.list({ prefix: `${kind}:${slug}:`, limit: 1 });
-        if (!Array.isArray(rows.keys)) fail5("Restore storage could not be checked.", 503);
+        if (!Array.isArray(rows.keys)) fail6("Restore storage could not be checked.", 503);
         if (rows.keys.length || rows.list_complete === false) nonempty();
       }
       const r2 = getStorageR2Binding(coordinator.env);
       if (r2) {
-        if (!r2.list || !r2.delete) fail5("Restore requires an R2 binding that supports listing and cleanup.", 503);
+        if (!r2.list || !r2.delete) fail6("Restore requires an R2 binding that supports listing and cleanup.", 503);
         const rows = await r2.list({ prefix: `sessions/${slug}/storage/`, limit: 1 });
-        if (!Array.isArray(rows.objects)) fail5("Restore object storage could not be checked.", 503);
+        if (!Array.isArray(rows.objects)) fail6("Restore object storage could not be checked.", 503);
         if (rows.objects.length || rows.truncated) nonempty();
       }
       const groups = await coordinateWorkerGroupBackup({
@@ -71895,43 +71951,43 @@ var init_sessionBackupImport = __esm({
         archiveId: page.archiveId,
         checkOnly: true
       });
-      if (!groups.ok) fail5(groups.error || "Group restore storage could not be checked.", groups.status || 503, groups.reason);
+      if (!groups.ok) fail6(groups.error || "Group restore storage could not be checked.", groups.status || 503, groups.reason);
       budget.consume(groups.operations || 0);
     };
     validateSnapshot = ({ snapshot, manifest, normalizeConfig, normalizeSessionKey }) => {
       const authority = snapshot?.configAuthority;
-      if (authority?.config?.agentHttp?.invites !== void 0) fail5("Agent invite admission material is not restorable.");
+      if (authority?.config?.agentHttp?.invites !== void 0) fail6("Agent invite admission material is not restorable.");
       const slug = manifest.sessionSlug;
       if (!object3(authority) || authority.schemaVersion !== 1 || authority.slug !== slug || Object.keys(authority).some((key) => !["schemaVersion", "slug", "revision", "config", "projectionPending", "activeSessionKey"].includes(key)) || !Number.isSafeInteger(authority.revision) || authority.revision < 1 || authority.projectionPending !== false || !normalizeConfig(authority.config, slug) || resolveCanonicalWorkerSessionIdHex(authority.config) !== manifest.sessionId || !object3(snapshot.wrappedSessionKeys) || !same(snapshot.wrappedSessionKeys.activeSessionKey, authority.activeSessionKey || null)) {
-        fail5("Invalid backup config authority.");
+        fail6("Invalid backup config authority.");
       }
-      if (authority.activeSessionKey && !normalizeSessionKey(authority.activeSessionKey, slug)) fail5("Invalid wrapped session key.");
+      if (authority.activeSessionKey && !normalizeSessionKey(authority.activeSessionKey, slug)) fail6("Invalid wrapped session key.");
       const signer = snapshot.wrappedSessionKeys.litAuthorizationSigner;
-      if (signer && (signer.version !== 1 || signer.slug !== slug || Object.keys(signer).some((key) => !["version", "slug", "envelope"].includes(key)) || !isEncryptedSessionSecretsEnvelope(signer.envelope))) fail5("Invalid wrapped authorization signer.");
-      if (snapshot.secrets && !isEncryptedSessionSecretsEnvelope(snapshot.secrets)) fail5("Backup secrets must be ciphertext.");
-      if (!Array.isArray(snapshot.workerGroups?.durable) || !Array.isArray(snapshot.workerGroups?.records)) fail5("Invalid backup groups.");
+      if (signer && (signer.version !== 1 || signer.slug !== slug || Object.keys(signer).some((key) => !["version", "slug", "envelope"].includes(key)) || !isEncryptedSessionSecretsEnvelope(signer.envelope))) fail6("Invalid wrapped authorization signer.");
+      if (snapshot.secrets && !isEncryptedSessionSecretsEnvelope(snapshot.secrets)) fail6("Backup secrets must be ciphertext.");
+      if (!Array.isArray(snapshot.workerGroups?.durable) || !Array.isArray(snapshot.workerGroups?.records)) fail6("Invalid backup groups.");
     };
     validatePage = (page, slug) => {
       const m = page?.manifest;
       if (!object3(m) || m.type !== "ce_session_backup" || m.version !== 1 || m.sessionSlug !== slug || resolveCanonicalWorkerSessionIdHex({ sessionId: m.sessionId }) !== m.sessionId || !hashPattern.test(m.kekFingerprint || "") || m.previousKekFingerprint !== void 0 && !hashPattern.test(m.previousKekFingerprint) || !hashPattern.test(page.archiveId || "") || !hashPattern.test(page.snapshotDigest || "") || !Number.isSafeInteger(page.pageNumber) || page.pageNumber < 0 || typeof m.complete !== "boolean" || !Array.isArray(page.entries) || jsonByteLength(page) > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes || !object3(m.counts) || !["records", "payloads", "owners", "hidden", "bytes"].every((key) => Number.isSafeInteger(m.counts[key]) && m.counts[key] >= 0)) {
-        fail5("Invalid session backup page.");
+        fail6("Invalid session backup page.");
       }
       for (const entry2 of page.entries) {
-        if (!object3(entry2)) fail5("Invalid backup entry.");
+        if (!object3(entry2)) fail6("Invalid backup entry.");
         if (entry2.kind === "record") {
-          if (!resources.has(entry2.resource) || !isSafeCloudflareStorageRefId(entry2.id) || !object3(entry2.metadata) || entry2.metadata.id !== entry2.id || entry2.metadata.resource !== entry2.resource || entry2.key !== buildIndexKey({ slug, resource: entry2.resource, id: entry2.id })) fail5("Invalid backup metadata key.");
+          if (!resources.has(entry2.resource) || !isSafeCloudflareStorageRefId(entry2.id) || !object3(entry2.metadata) || entry2.metadata.id !== entry2.id || entry2.metadata.resource !== entry2.resource || entry2.key !== buildIndexKey({ slug, resource: entry2.resource, id: entry2.id })) fail6("Invalid backup metadata key.");
         } else if (entry2.kind === "owner" || entry2.kind === "hidden") {
           const prefix = `ce-storage-${entry2.kind}:${slug}:`;
           const suffix = typeof entry2.key === "string" ? entry2.key.slice(prefix.length) : "";
           const separator = suffix.indexOf(":");
-          if (typeof entry2.key !== "string" || !entry2.key.startsWith(prefix) || !["questions", "surveys"].includes(suffix.slice(0, separator)) || !isStorageResourceId(suffix.slice(separator + 1)) || typeof entry2.value !== "string" || !object3(JSON.parse(entry2.value))) fail5("Invalid backup ownership key.");
+          if (typeof entry2.key !== "string" || !entry2.key.startsWith(prefix) || !["questions", "surveys"].includes(suffix.slice(0, separator)) || !isStorageResourceId(suffix.slice(separator + 1)) || typeof entry2.value !== "string" || !object3(JSON.parse(entry2.value))) fail6("Invalid backup ownership key.");
         } else if (entry2.kind === "payload" || entry2.kind === "chunk") {
-          if (entry2.target !== void 0 && entry2.target !== "coordinator") fail5("Invalid backup payload target.");
-          if (entry2.target === "coordinator" ? entry2.id !== "coordinator" : !isSafeCloudflareStorageRefId(entry2.id)) fail5("Invalid backup payload id.");
+          if (entry2.target !== void 0 && entry2.target !== "coordinator") fail6("Invalid backup payload target.");
+          if (entry2.target === "coordinator" ? entry2.id !== "coordinator" : !isSafeCloudflareStorageRefId(entry2.id)) fail6("Invalid backup payload id.");
           if (entry2.kind === "payload") {
-            if (!Number.isSafeInteger(entry2.size) || entry2.size < 0 || !hashPattern.test(entry2.sha256 || "") || entry2.chunkCount !== Math.max(1, Math.ceil(entry2.size / (256 * 1024))) || entry2.metadata && (!object3(entry2.metadata) || entry2.metadata.id !== entry2.id)) fail5("Invalid backup payload header.");
-          } else if (!Number.isSafeInteger(entry2.index) || entry2.index < 0 || typeof entry2.base64url !== "string" || entry2.base64url.length > Math.ceil(256 * 1024 * 4 / 3) || !/^[A-Za-z0-9_-]*$/.test(entry2.base64url)) fail5("Invalid backup chunk.");
-        } else fail5("Unknown backup entry kind.");
+            if (!Number.isSafeInteger(entry2.size) || entry2.size < 0 || !hashPattern.test(entry2.sha256 || "") || entry2.chunkCount !== Math.max(1, Math.ceil(entry2.size / (256 * 1024))) || entry2.metadata && (!object3(entry2.metadata) || entry2.metadata.id !== entry2.id)) fail6("Invalid backup payload header.");
+          } else if (!Number.isSafeInteger(entry2.index) || entry2.index < 0 || typeof entry2.base64url !== "string" || entry2.base64url.length > Math.ceil(256 * 1024 * 4 / 3) || !/^[A-Za-z0-9_-]*$/.test(entry2.base64url)) fail6("Invalid backup chunk.");
+        } else fail6("Unknown backup entry kind.");
       }
     };
     importCoordinatorBackupPage = async (coordinator, payload, validators) => {
@@ -71943,23 +71999,23 @@ var init_sessionBackupImport = __esm({
       const fingerprints = await Promise.all([env.CE_STORAGE_ENVELOPE_KEK, env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK].filter(Boolean).map(recoveryKeyFingerprint));
       const required = [manifest.kekFingerprint, manifest.previousKekFingerprint].filter(Boolean);
       const missing = required.filter((fingerprint) => !fingerprints.includes(fingerprint));
-      if (missing.length) fail5(`The target is missing backup recovery keys: ${missing.join(", ")}.`, 409, "recovery_key_mismatch");
-      if (!await verifyBackupPage(page, env)) fail5("Backup page authentication failed. Use the original unmodified archive.", 403, "backup_authentication_failed");
+      if (missing.length) fail6(`The target is missing backup recovery keys: ${missing.join(", ")}.`, 409, "recovery_key_mismatch");
+      if (!await verifyBackupPage(page, env)) fail6("Backup page authentication failed. Use the original unmodified archive.", 403, "backup_authentication_failed");
       const current = await coordinator.assertSessionAuthority(payload, { allowRestore: true });
       const targetId = resolveCanonicalWorkerSessionIdHex(current?.config || {});
-      if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail5("The backup session identity does not match this target.", 409, "backup_session_mismatch");
-      if (page.archiveId !== await sha256Hex(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail5("Invalid backup archive identity.");
+      if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail6("The backup session identity does not match this target.", 409, "backup_session_mismatch");
+      if (page.archiveId !== await sha256Hex(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail6("Invalid backup archive identity.");
       const budget = createStorageExportBudget();
       const rawIndex = getStorageIndexBinding(env);
       const index = rawIndex ? budget.wrap(rawIndex) : null;
-      if (!index?.get || !index?.put || !index?.delete || !index?.list) fail5("Restore storage is unavailable.", 503);
+      if (!index?.get || !index?.put || !index?.delete || !index?.list) fail6("Restore storage is unavailable.", 503);
       const stateKey = `session-backup-import:${page.archiveId}`;
       const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
       const active = await readActiveBackupImport(coordinator, slug, true, budget);
-      if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail5("Another backup restore is in progress. Check restore status to abandon it.", 409, "backup_restore_in_progress");
+      if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail6("Another backup restore is in progress. Check restore status to abandon it.", 409, "backup_restore_in_progress");
       if (active?.progress.finished) {
         await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
-        fail5("Previous restore cleanup is still in progress. Retry this page.", 503, "backup_cleanup_pending");
+        fail6("Previous restore cleanup is still in progress. Retry this page.", 503, "backup_cleanup_pending");
       }
       const pageHash = await sha256Hex(JSON.stringify(page));
       const receiptKey = `${stateKey}:page:${page.pageNumber}`;
@@ -71978,13 +72034,13 @@ var init_sessionBackupImport = __esm({
       };
       if (active?.progress.finishing) {
         if (active.progress.actor !== expectedAuthority.actor || active.progress.pageNumber !== page.pageNumber || active.progress.pageHash !== pageHash) {
-          fail5("Resume completion with the final unchanged backup page.", 409);
+          fail6("Resume completion with the final unchanged backup page.", 409);
         }
         return complete(active.progress);
       }
       const receipt = active ? await storage.get(receiptKey) : null;
       if (receipt) {
-        if (receipt.hash !== pageHash) fail5("This backup page differs from the previously imported page.", 409);
+        if (receipt.hash !== pageHash) fail6("This backup page differs from the previously imported page.", 409);
         return Response.json({ ...receipt.result, replayed: true });
       }
       const root = backupImportStagePrefix(slug, page.archiveId);
@@ -71998,7 +72054,7 @@ var init_sessionBackupImport = __esm({
       let progress = active?.progress;
       if (!progress) {
         await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
-        if (page.pageNumber !== 0 || !page.coordinator) fail5("Import must begin with the first backup page.", 409);
+        if (page.pageNumber !== 0 || !page.coordinator) fail6("Import must begin with the first backup page.", 409);
         progress = {
           actor: expectedAuthority.actor,
           pageNumber: 0,
@@ -72017,18 +72073,18 @@ var init_sessionBackupImport = __esm({
         };
         if (page.coordinator.chunked !== true) {
           validateSnapshot({ snapshot: page.coordinator, manifest, ...validators });
-          if (await sha256Hex(JSON.stringify(page.coordinator)) !== page.snapshotDigest) fail5("The coordinator snapshot checksum does not match.");
-        } else if (page.coordinator.sha256 !== page.snapshotDigest) fail5("Invalid coordinator snapshot descriptor.");
+          if (await sha256Hex(JSON.stringify(page.coordinator)) !== page.snapshotDigest) fail6("The coordinator snapshot checksum does not match.");
+        } else if (page.coordinator.sha256 !== page.snapshotDigest) fail6("Invalid coordinator snapshot descriptor.");
         await storage.transaction(async (transaction) => {
           await transaction.put(activeKey, page.archiveId);
           await transaction.put(stateKey, progress);
         });
       }
-      if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.finished || progress.nextEntry > 0 && progress.pageHash !== pageHash || !same(progress.manifest, { ...manifest, counts: void 0, complete: void 0 })) fail5("Backup pages must be imported unchanged and in order.", 409);
+      if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.finished || progress.nextEntry > 0 && progress.pageHash !== pageHash || !same(progress.manifest, { ...manifest, counts: void 0, complete: void 0 })) fail6("Backup pages must be imported unchanged and in order.", 409);
       progress.pageHash = pageHash;
       if (!progress.groupsStarted) {
         const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: "begin", archiveId: page.archiveId });
-        if (!groups.ok) fail5(groups.error || "Group restore is unavailable.", groups.status || 503, groups.reason);
+        if (!groups.ok) fail6(groups.error || "Group restore is unavailable.", groups.status || 503, groups.reason);
         budget.consume(groups.operations || 0);
         progress.groupsStarted = true;
         await storage.put(stateKey, progress);
@@ -72067,13 +72123,13 @@ var init_sessionBackupImport = __esm({
         let offset = 0;
         for (let n2 = 0; n2 < header.chunkCount; n2 += 1) {
           const raw = await index.get(chunkKey(header.id, n2, header.target));
-          if (raw == null) fail5("A restore chunk is missing. Retry the interrupted page.", 409);
+          if (raw == null) fail6("A restore chunk is missing. Retry the interrupted page.", 409);
           const chunk2 = base64urlToBytes2(raw);
-          if (offset + chunk2.length > bytes3.length) fail5("Backup payload size mismatch.");
+          if (offset + chunk2.length > bytes3.length) fail6("Backup payload size mismatch.");
           bytes3.set(chunk2, offset);
           offset += chunk2.length;
         }
-        if (offset !== header.size || await digest(bytes3) !== header.sha256) fail5("Backup payload checksum mismatch.");
+        if (offset !== header.size || await digest(bytes3) !== header.sha256) fail6("Backup payload checksum mismatch.");
         return bytes3;
       };
       const pending = async () => {
@@ -72099,7 +72155,7 @@ var init_sessionBackupImport = __esm({
           await write(index, entry2.key, entry2.value, true);
           progress.observed[entry2.kind === "owner" ? "owners" : "hidden"] += 1;
         } else if (entry2.kind === "record") {
-          if (await storage.get(recordKey2(entry2.id))) fail5("Duplicate backup metadata id.");
+          if (await storage.get(recordKey2(entry2.id))) fail6("Duplicate backup metadata id.");
           const header = await storage.get(descriptorKey(entry2.id));
           if (header?.done) {
             if (header.payloadOk !== false) await write(index, entry2.key, JSON.stringify(entry2.metadata), true);
@@ -72111,9 +72167,9 @@ var init_sessionBackupImport = __esm({
           }
           progress.observed.records += 1;
         } else if (entry2.kind === "payload") {
-          if (await storage.get(descriptorKey(entry2.id, entry2.target))) fail5("Duplicate backup payload id.");
-          if (entry2.chunkCount > STORAGE_EXPORT_PAGE_LIMITS.operations - 64) fail5("This payload exceeds the bounded restore assembly limit.", 413);
-          if (entry2.size > resolveMaxUploadBytes({ env })) fail5("The backup payload exceeds this target\u2019s configured upload limit.", 413);
+          if (await storage.get(descriptorKey(entry2.id, entry2.target))) fail6("Duplicate backup payload id.");
+          if (entry2.chunkCount > STORAGE_EXPORT_PAGE_LIMITS.operations - 64) fail6("This payload exceeds the bounded restore assembly limit.", 413);
+          if (entry2.size > resolveMaxUploadBytes({ env })) fail6("The backup payload exceeds this target\u2019s configured upload limit.", 413);
           const { metadata } = entry2;
           const header = { id: entry2.id, size: entry2.size, sha256: entry2.sha256, chunkCount: entry2.chunkCount, ...entry2.target ? { target: entry2.target } : {} };
           if (metadata) await stage(`${root}metadata:${entry2.id}`, JSON.stringify(metadata));
@@ -72121,8 +72177,8 @@ var init_sessionBackupImport = __esm({
           progress.pendingPayloads += 1;
         } else {
           const header = await storage.get(descriptorKey(entry2.id, entry2.target));
-          if (!header || header.done || header.nextChunk !== entry2.index || entry2.index >= header.chunkCount) fail5("Backup chunks must follow their payload header in order.");
-          if (bytesToBase64url2(base64urlToBytes2(entry2.base64url)) !== entry2.base64url) fail5("Invalid backup chunk encoding.");
+          if (!header || header.done || header.nextChunk !== entry2.index || entry2.index >= header.chunkCount) fail6("Backup chunks must follow their payload header in order.");
+          if (bytesToBase64url2(base64urlToBytes2(entry2.base64url)) !== entry2.base64url) fail6("Invalid backup chunk encoding.");
           await stage(chunkKey(entry2.id, entry2.index, entry2.target), entry2.base64url);
           header.nextChunk += 1;
           if (header.nextChunk === header.chunkCount) {
@@ -72130,7 +72186,7 @@ var init_sessionBackupImport = __esm({
             if (entry2.target === "coordinator") {
               const snapshot = JSON.parse(new TextDecoder().decode(bytes3));
               validateSnapshot({ snapshot, manifest, ...validators });
-              if (header.sha256 !== page.snapshotDigest) fail5("The coordinator snapshot checksum does not match.");
+              if (header.sha256 !== page.snapshotDigest) fail6("The coordinator snapshot checksum does not match.");
               progress.snapshotReady = true;
               progress.chunkedSnapshot = true;
             } else {
@@ -72163,7 +72219,7 @@ var init_sessionBackupImport = __esm({
                 } else {
                   const value = JSON.stringify({ metadata, payloadBase64url: bytesToBase64url2(bytes3) });
                   const tooLarge2 = rejectKvValueOverLimit({ serializedValue: value });
-                  if (tooLarge2) fail5("This payload needs an R2 binding on the restore target.", 413);
+                  if (tooLarge2) fail6("This payload needs an R2 binding on the restore target.", 413);
                   await journalBackupImportWrite(storage, page.archiveId, "index", buildPayloadKey({ slug, id: entry2.id }));
                   await index.put(buildPayloadKey({ slug, id: entry2.id }), value);
                 }
@@ -72205,7 +72261,7 @@ var init_sessionBackupImport = __esm({
         await storage.put(stateKey, progress);
       }
       if (manifest.complete) {
-        if (!progress.snapshotReady || progress.pendingPayloads || progress.pendingRecords || !same(progress.observed, manifest.counts)) fail5("The backup is incomplete; its records or chunks are missing.", 409);
+        if (!progress.snapshotReady || progress.pendingPayloads || progress.pendingRecords || !same(progress.observed, manifest.counts)) fail6("The backup is incomplete; its records or chunks are missing.", 409);
         const snapshotHeader = progress.chunkedSnapshot ? await storage.get(descriptorKey("coordinator", "coordinator")) : null;
         if (budget.remaining < (snapshotHeader?.chunkCount || 1) + 32) return pending();
         const snapshot = progress.chunkedSnapshot ? JSON.parse(new TextDecoder().decode(await assemble(snapshotHeader))) : JSON.parse(await index.get(`${root}coordinator`) || "null");
@@ -72224,7 +72280,7 @@ var init_sessionBackupImport = __esm({
               cursor: progress.groupCursor,
               operations: budget.remaining - 16
             });
-            if (!groups.ok) fail5(groups.error || "Group restore is unavailable.", groups.status || 503);
+            if (!groups.ok) fail6(groups.error || "Group restore is unavailable.", groups.status || 503);
             budget.consume(groups.operations || 0);
             progress.counts.written += groups.counts.written;
             progress.counts.skipped += groups.counts.skipped;
@@ -72235,6 +72291,17 @@ var init_sessionBackupImport = __esm({
             if (groups.nextCursor) return pending();
           }
           if (snapshot.secrets) await write(budget.wrap(env.GROUP_KV), `session:${normalizeWorkerSessionSlug(slug)}:secrets`, JSON.stringify(snapshot.secrets), true, "group");
+          if (snapshot.secrets) {
+            const restored = { version: 1, slug, revision: 1, envelope: snapshot.secrets, projectionPending: false };
+            const existing = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
+            if (existing && (!await storage.get(backupImportJournalKey(page.archiveId, "durable", SESSION_SECRETS_AUTHORITY_KEY)) || !same(existing, restored))) conflict(SESSION_SECRETS_AUTHORITY_KEY);
+            else if (existing) progress.counts.skipped += 1;
+            else {
+              await journalBackupImportWrite(storage, page.archiveId, "durable", SESSION_SECRETS_AUTHORITY_KEY);
+              await storage.put(SESSION_SECRETS_AUTHORITY_KEY, restored);
+              progress.counts.written += 1;
+            }
+          }
           const signer = snapshot.wrappedSessionKeys.litAuthorizationSigner;
           if (signer) {
             const existing = await storage.get("session-lit-authorization-signer-v1");
@@ -75250,15 +75317,14 @@ async function main(params) {
 });
 
 // workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js
-var SIGNER_RECORD, SETUP_RECORD, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json4, fail6, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair;
+var SIGNER_RECORD, SETUP_RECORD, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json4, fail7, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair;
 var init_sessionLitAuthorizationCoordinator = __esm({
   "workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js"() {
     init_lib2();
     init_litChipotleAction();
     init_deployHelperCore();
     init_sessionSecretsEnvelope();
-    init_sessionConfigSecretsStore();
-    init_responseKvHelpers();
+    init_sessionSecretsAuthority();
     init_sessionSlugResolution();
     SIGNER_RECORD = "session-lit-authorization-signer-v1";
     SETUP_RECORD = "session-lit-authorization-pending-v1";
@@ -75285,35 +75351,35 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       status,
       headers: { "Content-Type": "application/json", "Cache-Control": "private, no-store" }
     });
-    fail6 = (status = 409) => {
+    fail7 = (status = 409) => {
       throw Object.assign(new Error(COORDINATION_ERROR), { status });
     };
     walletFor = (key) => {
-      if (typeof key !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(key)) fail6();
+      if (typeof key !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(key)) fail7();
       try {
         return new ethers_exports.Wallet(key);
       } catch {
-        return fail6();
+        return fail7();
       }
     };
     authorityConfig = (authority, baseConfig, slug) => {
-      if (authority != null && (!isRecord3(authority) || authority.slug !== slug || !isRecord3(authority.config))) fail6();
+      if (authority != null && (!isRecord3(authority) || authority.slug !== slug || !isRecord3(authority.config))) fail7();
       const config = authority?.config || baseConfig;
-      if (!isRecord3(config)) fail6(400);
+      if (!isRecord3(config)) fail7(400);
       return config;
     };
     assertConfiguredSigner = (config, wallet, hasExistingKey) => {
-      if (config?.litCredentials != null && !isRecord3(config.litCredentials)) fail6();
+      if (config?.litCredentials != null && !isRecord3(config.litCredentials)) fail7();
       const credentials = config?.litCredentials || {};
       const signer = credentials.litAuthorizationSigner;
       const version2 = credentials.litAuthorizationVersion;
       if (signer == null && version2 == null) return;
-      if (!hasExistingKey || version2 !== LIT_AUTHORIZATION_VERSION || typeof signer !== "string" || signer.toLowerCase() !== wallet.address.toLowerCase()) fail6();
+      if (!hasExistingKey || version2 !== LIT_AUTHORIZATION_VERSION || typeof signer !== "string" || signer.toLowerCase() !== wallet.address.toLowerCase()) fail7();
     };
     readSignerSecrets = async (record3, env, slug) => {
-      if (!isRecord3(record3) || record3.version !== 1 || record3.slug !== slug) fail6();
+      if (!isRecord3(record3) || record3.version !== 1 || record3.slug !== slug) fail7();
       const secrets = await decryptSessionSecretsEnvelope(record3.envelope, { env, slug });
-      if (!isRecord3(secrets) || Object.keys(secrets).some((key) => !SECRET_KEYS.includes(key)) || Object.values(secrets).some((value) => typeof value !== "string")) fail6();
+      if (!isRecord3(secrets) || Object.keys(secrets).some((key) => !SECRET_KEYS.includes(key)) || Object.values(secrets).some((value) => typeof value !== "string")) fail7();
       walletFor(secrets[PRIVATE_KEY]);
       return secrets;
     };
@@ -75327,7 +75393,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         const privateKey = await coordinator.state.storage.transaction(async (transaction) => {
           const record3 = await transaction.get(SIGNER_RECORD);
           const config = authorityConfig(await transaction.get(CONFIG_RECORD), payload.baseConfig, slug);
-          const secrets = record3 != null ? await readSignerSecrets(record3, coordinator.env, slug) : await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug)) || {};
+          const secrets = record3 != null ? await readSignerSecrets(record3, coordinator.env, slug) : await readCommittedSessionSecrets(coordinator, transaction, slug);
           const hasExistingKey = hasOwn7(secrets, PRIVATE_KEY);
           const chosen = hasExistingKey ? walletFor(secrets[PRIVATE_KEY]) : proposed;
           assertConfiguredSigner(config, chosen, hasExistingKey);
@@ -75347,9 +75413,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       if (pending == null) return;
       const authority = await coordinator.state.storage.get(CONFIG_RECORD);
       const slug = resolveCoordinatorSessionSlugStorageKey(pending.slug);
-      if (!slug || pending.version !== 1 || !Number.isSafeInteger(pending.revision) || authority?.slug !== slug || authority?.revision !== pending.revision) fail6();
+      if (!slug || pending.version !== 1 || !Number.isSafeInteger(pending.revision) || authority?.slug !== slug || authority?.revision !== pending.revision) fail7();
       await decryptSessionSecretsEnvelope(pending.envelope, { env: coordinator.env, slug });
-      await putKvJson(coordinator.env, `session:${normalizeWorkerSessionSlug(slug)}:secrets`, pending.envelope);
+      await repairPendingSessionSecretsProjection(coordinator);
       await coordinator.projectSessionConfigAuthority(authority);
       await coordinator.state.storage.transaction(async (transaction) => {
         const current = await transaction.get(SETUP_RECORD);
@@ -75369,9 +75435,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           const record3 = await transaction.get(SIGNER_RECORD);
           const signerSecrets = await readSignerSecrets(record3, coordinator.env, slug);
           const wallet = walletFor(signerSecrets[PRIVATE_KEY]);
-          if (walletFor(outputs[PRIVATE_KEY]).privateKey !== wallet.privateKey) fail6();
+          if (walletFor(outputs[PRIVATE_KEY]).privateKey !== wallet.privateKey) fail7();
           assertConfiguredSigner({ litCredentials: payload.litCredentials }, wallet, true);
-          if (payload.litCredentials.litAuthorizationVersion !== LIT_AUTHORIZATION_VERSION) fail6();
+          if (payload.litCredentials.litAuthorizationVersion !== LIT_AUTHORIZATION_VERSION) fail7();
           const existing = await transaction.get(CONFIG_RECORD);
           const config = authorityConfig(existing, payload.baseConfig, slug);
           assertConfiguredSigner(config, wallet, true);
@@ -75380,16 +75446,16 @@ var init_sessionLitAuthorizationCoordinator = __esm({
             slug,
             mutation: { kind: "merge-lit-credentials", litCredentials: payload.litCredentials }
           });
-          if (!mutation?.ok) fail6(mutation?.status || 400);
-          const secrets = { ...await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug)) || {}, ...signerSecrets };
+          if (!mutation?.ok) fail7(mutation?.status || 400);
+          const secrets = { ...await readCommittedSessionSecrets(coordinator, transaction, slug), ...signerSecrets };
           for (const [key, value] of Object.entries(outputs)) {
             if (value.trim()) secrets[key] = value.trim();
             else delete secrets[key];
           }
           secrets[PRIVATE_KEY] = wallet.privateKey;
           for (const key of SECRET_KEYS) if (secrets[key] === "") delete secrets[key];
-          const envelope = await buildEncryptedSessionSecretsEnvelope(secrets, { env: coordinator.env, slug });
-          const litSecrets = Object.fromEntries(SECRET_KEYS.map((key) => [key, secrets[key] ?? ""]));
+          const envelope = await commitSessionSecrets(coordinator, transaction, slug, secrets);
+          const litSecrets = Object.fromEntries(SECRET_KEYS.filter((key) => hasOwn7(secrets, key)).map((key) => [key, secrets[key]]));
           const signerEnvelope = await buildEncryptedSessionSecretsEnvelope(litSecrets, { env: coordinator.env, slug });
           const revision = Number(existing?.revision || 0) + 1;
           await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope: signerEnvelope });
@@ -75423,19 +75489,23 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       try {
         await coordinator.assertSessionAuthority(payload);
         await coordinator.repairPendingSessionConfigProjection();
-        const existing = await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug)) || {};
-        const litPatch = Object.fromEntries(Object.entries(patch).filter(([key]) => SECRET_KEYS.includes(key)));
-        const record3 = await coordinator.state.storage.get(SIGNER_RECORD);
-        const litSecrets = record3 == null ? null : await readSignerSecrets(record3, coordinator.env, slug);
-        const envelope = litSecrets && Object.keys(litPatch).length ? await buildEncryptedSessionSecretsEnvelope({ ...litSecrets, ...litPatch }, { env: coordinator.env, slug }) : null;
-        const nextSecrets = { ...existing, ...litSecrets, ...patch };
-        for (const key of SECRET_KEYS) if (litSecrets?.[key] === "" && !hasOwn7(patch, key)) delete nextSecrets[key];
-        await putSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug), nextSecrets);
-        if (envelope) {
-          await coordinator.state.storage.transaction(async (transaction) => {
+        await coordinator.state.storage.transaction(async (transaction) => {
+          const existing = await readCommittedSessionSecrets(coordinator, transaction, slug);
+          const record3 = await transaction.get(SIGNER_RECORD);
+          const litSecrets = record3 == null ? null : await readSignerSecrets(record3, coordinator.env, slug);
+          const nextSecrets = { ...existing, ...litSecrets };
+          for (const [key, value] of Object.entries(patch)) {
+            if (value.trim()) nextSecrets[key] = value.trim();
+            else delete nextSecrets[key];
+          }
+          await commitSessionSecrets(coordinator, transaction, slug, nextSecrets);
+          if (record3 && Object.keys(patch).some((key) => SECRET_KEYS.includes(key))) {
+            const nextLitSecrets = Object.fromEntries(SECRET_KEYS.filter((key) => hasOwn7(nextSecrets, key)).map((key) => [key, nextSecrets[key]]));
+            const envelope = await buildEncryptedSessionSecretsEnvelope(nextLitSecrets, { env: coordinator.env, slug });
             await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope });
-          });
-        }
+          }
+        });
+        await repairPendingSessionSecretsProjection(coordinator);
         return json4({ ok: true });
       } catch (error) {
         return json4({ error: error.status === 409 ? error.message : "Session secrets update is pending; retry after setup repair." }, error.status || 503);
@@ -75517,6 +75587,7 @@ var init_sessionWriteCoordinator = __esm({
     init_resultsAnalysisGeneration();
     init_storageRouteExecution();
     init_sessionConfigMutation();
+    init_sessionSecretsAuthority();
     init_sessionConfigNormalization();
     init_sessionConfigSecretsStore();
     init_sessionLitAuthorizationCoordinator();
@@ -77484,6 +77555,7 @@ ${expiry}`);
       }
       async repairPendingSessionConfigProjection() {
         await repairPendingLitAuthorizationSetup(this);
+        await repairPendingSessionSecretsProjection(this);
         const authority = await this.state.storage.get(SESSION_CONFIG_AUTHORITY_KEY);
         if (authority?.projectionPending !== true) return;
         await this.projectSessionConfigAuthority(authority);
@@ -99405,7 +99477,7 @@ init_storageRouteExecution();
 init_storageScanBudget();
 var encoder9 = new TextEncoder();
 var CHUNK_BYTES = 256 * 1024;
-var fail7 = (message, status = 409, reason) => {
+var fail8 = (message, status = 409, reason) => {
   throw Object.assign(new Error(message), { status, ...reason ? { reason } : {} });
 };
 var digestBytes = async (bytes3) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes3))].map((v) => v.toString(16).padStart(2, "0")).join("");
@@ -99422,19 +99494,19 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   const budget = createStorageExportBudget();
   const rawIndex = getStorageIndexBinding(env);
   const index = rawIndex ? budget.wrap(rawIndex) : null;
-  if (!index?.list || !index?.get) fail7("Backup storage is unavailable.", 503);
+  if (!index?.list || !index?.get) fail8("Backup storage is unavailable.", 503);
   const current = await callSessionConfigCoordinator({ env, slug, path: "backup/export", expectedAuthority });
-  if (!current.ok) fail7(current.body?.error || "Backup authority is unavailable.", current.status);
+  if (!current.ok) fail8(current.body?.error || "Backup authority is unavailable.", current.status);
   const coordinator = current.body.coordinator;
   const sessionId = resolveCanonicalWorkerSessionIdHex(coordinator.configAuthority.config);
-  if (!sessionId) fail7("The session has no canonical identity.");
+  if (!sessionId) fail8("The session has no canonical identity.");
   const prefix = `ce-backup:${keySlug}:`;
   let parsed;
   try {
     parsed = parseStorageExportCursor({ cursor: authenticatedCursor, prefix, sessionId });
     if (cursor && !parsed.continuation) throw new Error("Missing backup position.");
   } catch {
-    fail7("Invalid backup cursor. Restart the export.", 400, "backup_cursor_invalid");
+    fail8("Invalid backup cursor. Restart the export.", 400, "backup_cursor_invalid");
   }
   const position = parsed.continuation || {
     phase: 0,
@@ -99448,9 +99520,9 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
     counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 }
   };
   const nextCursor = () => signBackupCursor(storageExportCursor({ prefix, sessionId, continuation: position }), env);
-  if (position.configDigest !== await sha256Hex(JSON.stringify(coordinator))) fail7("Session config changed during backup. Restart the export.", 409, "backup_session_changed");
+  if (position.configDigest !== await sha256Hex(JSON.stringify(coordinator))) fail8("Session config changed during backup. Restart the export.", 409, "backup_session_changed");
   const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: "export", snapshotId: position.groupSnapshotId });
-  if (!groups.ok) fail7(groups.error || "Group backup is unavailable.", groups.status, groups.status === 409 ? "backup_session_changed" : void 0);
+  if (!groups.ok) fail8(groups.error || "Group backup is unavailable.", groups.status, groups.status === 409 ? "backup_session_changed" : void 0);
   budget.consume(groups.operations || 0);
   position.groupSnapshotId = groups.snapshotId;
   if (groups.preparing) {
@@ -99463,8 +99535,8 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   if (!position.snapshotDigest) position.snapshotDigest = snapshotDigest;
   position.archiveId = await sha256Hex(`${sessionId}:${position.exportedAt}:${snapshotDigest}`);
   const paths = prefixes(keySlug);
-  if (!Number.isSafeInteger(position.phase) || position.phase < 0 || position.phase > 6 || !Number.isSafeInteger(position.chunk) || position.chunk < -1 || !Number.isSafeInteger(position.pageNumber) || position.pageNumber < 0 || typeof position.listCursor !== "string" || position.listCursor.length > 4096 || typeof position.lastKey !== "string" || position.lastKey && position.phase > 0 && !position.lastKey.startsWith(paths[position.phase]) || !position.counts || !["records", "payloads", "owners", "hidden", "bytes"].every((key) => Number.isSafeInteger(position.counts[key]) && position.counts[key] >= 0) || !Number.isFinite(Date.parse(position.exportedAt))) fail7("Invalid backup cursor.", 400, "backup_cursor_invalid");
-  if (position.snapshotDigest !== snapshotDigest) fail7("Session config or groups changed during backup. Restart the export.", 409, "backup_session_changed");
+  if (!Number.isSafeInteger(position.phase) || position.phase < 0 || position.phase > 6 || !Number.isSafeInteger(position.chunk) || position.chunk < -1 || !Number.isSafeInteger(position.pageNumber) || position.pageNumber < 0 || typeof position.listCursor !== "string" || position.listCursor.length > 4096 || typeof position.lastKey !== "string" || position.lastKey && position.phase > 0 && !position.lastKey.startsWith(paths[position.phase]) || !position.counts || !["records", "payloads", "owners", "hidden", "bytes"].every((key) => Number.isSafeInteger(position.counts[key]) && position.counts[key] >= 0) || !Number.isFinite(Date.parse(position.exportedAt))) fail8("Invalid backup cursor.", 400, "backup_cursor_invalid");
+  if (position.snapshotDigest !== snapshotDigest) fail8("Session config or groups changed during backup. Restart the export.", 409, "backup_session_changed");
   const manifest = {
     type: "ce_session_backup",
     version: 1,
@@ -99490,9 +99562,9 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   };
   const finish = async () => {
     const latest = await callSessionConfigCoordinator({ env, slug, path: "backup/export", expectedAuthority });
-    if (!latest.ok) fail7(latest.body?.error || "Backup authority is unavailable.", latest.status);
+    if (!latest.ok) fail8(latest.body?.error || "Backup authority is unavailable.", latest.status);
     const groupCheck = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: "export", snapshotId: position.groupSnapshotId, checkOnly: true });
-    if (!groupCheck.ok && groupCheck.status !== 409) fail7(groupCheck.error || "Group backup is unavailable.", groupCheck.status);
+    if (!groupCheck.ok && groupCheck.status !== 409) fail8(groupCheck.error || "Group backup is unavailable.", groupCheck.status);
     if (!groupCheck.ok || position.writeRevision !== latest.body.writeRevision) {
       manifest.complete = false;
       page.nextCursor = "";
@@ -99506,7 +99578,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   let rows = 0;
   const append = (entry2) => {
     const size = jsonByteLength(entry2) + 1;
-    if (size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes - 16384) fail7(`Backup metadata record ${entry2.id || entry2.key || "unknown"} exceeds the page limit.`);
+    if (size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes - 16384) fail8(`Backup metadata record ${entry2.id || entry2.key || "unknown"} exceeds the page limit.`);
     if (used + size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes) return false;
     page.entries.push(entry2);
     used += size;
@@ -99551,10 +99623,10 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
     }
     const listed = await (r2 || index).list({ prefix: paths[position.phase], ...position.listCursor ? { cursor: position.listCursor } : {}, limit: STORAGE_EXPORT_PAGE_LIMITS.rows });
     const keys = r2 ? listed.objects?.map(({ key }) => key) : listed.keys?.map(({ name }) => name);
-    if (!Array.isArray(keys)) fail7("Backup storage listing is unavailable.", 503);
+    if (!Array.isArray(keys)) fail8("Backup storage listing is unavailable.", 503);
     keys.sort();
     for (const key of keys) {
-      if (!key.startsWith(paths[position.phase])) fail7("Invalid backup storage key.", 503);
+      if (!key.startsWith(paths[position.phase])) fail8("Invalid backup storage key.", 503);
       if (key < position.lastKey || key === position.lastKey && position.chunk === -1) continue;
       if (rows >= STORAGE_EXPORT_PAGE_LIMITS.rows || budget.remaining < 16) break outer;
       if (position.phase === 3 || position.phase === 5) {
@@ -99566,7 +99638,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
         }
         const metadata = raw != null ? JSON.parse(raw).metadata : { id: id2 };
         const bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true });
-        if (!bytes3) fail7("A backup payload is missing or unreadable.", 503);
+        if (!bytes3) fail8("A backup payload is missing or unreadable.", 503);
         const priorKey = position.lastKey;
         position.lastKey = key;
         if (!await payload(id2, bytes3, metadata)) {
@@ -99575,7 +99647,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
         }
       } else {
         const value = await index.get(key);
-        if (value == null) fail7("A storage record changed during backup. Restart the export.", 409, "backup_session_changed");
+        if (value == null) fail8("A storage record changed during backup. Restart the export.", 409, "backup_session_changed");
         const metadata = position.phase === 4 ? JSON.parse(value) : null;
         const entry2 = metadata ? { kind: "record", key, id: metadata.id, resource: metadata.resource, metadata } : { kind: position.phase === 1 ? "hidden" : "owner", key, value };
         if (!append(entry2)) break outer;
@@ -99586,7 +99658,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
     }
     const more = r2 ? listed.truncated === true : listed.list_complete === false;
     if (more) {
-      if (!listed.cursor || listed.cursor === position.listCursor) fail7("Backup list cursor did not advance.", 503);
+      if (!listed.cursor || listed.cursor === position.listCursor) fail8("Backup list cursor did not advance.", 503);
       position.listCursor = listed.cursor;
       position.lastKey = "";
     } else {

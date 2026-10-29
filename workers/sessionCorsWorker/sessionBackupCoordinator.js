@@ -1,3 +1,4 @@
+import { readSessionSecretsAuthority } from './sessionSecretsAuthority.js';
 import { stripAgentAdmissionFromBackup } from './agent/backup.mjs';
 import { readBackupGroupSnapshot } from './sessionBackupGroupSnapshot.js';
 import { STORAGE_BACKUP_REVISION_KEY } from './storageBackupRevision.js';
@@ -10,7 +11,6 @@ import { backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJo
 const json = (body, status = 200) => Response.json(body, { status });
 const fail = (message, status = 503) => { throw Object.assign(new Error(message), { status }); };
 const object = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
-const parse = (raw) => typeof raw === 'string' ? JSON.parse(raw) : raw;
 
 const groupPrefixes = (slug) => ['ce-worker-group', 'ce-worker-group-index', 'ce-worker-group-member', 'ce-worker-group-principal'].map((kind) => `${kind}:${slug}:`);
 export const BACKUP_GROUP_IMPORT_ACTIVE_KEY = 'worker-group-backup-import-active';
@@ -46,11 +46,8 @@ export const exportCoordinatorBackup = async (coordinator, payload) => {
   await coordinator.repairPendingSessionConfigProjection();
   const current = await coordinator.state.storage.get('session-config-authority');
   const signer = await coordinator.state.storage.get('session-lit-authorization-signer-v1');
-  const rawSecrets = await coordinator.env.GROUP_KV.get(`session:${normalizeWorkerSessionSlug(current.slug)}:secrets`);
-  const secrets = rawSecrets == null ? null : parse(rawSecrets);
-  if (secrets && !isEncryptedSessionSecretsEnvelope(secrets)) {
-    fail('Legacy plaintext secrets must be saved through the encrypted secret workflow before backup.', 409);
-  }
+  const secretAuthority = await coordinator.state.storage.transaction((transaction) => readSessionSecretsAuthority(coordinator, transaction, current.slug));
+  const secrets = secretAuthority?.envelope || null;
   if (signer && !isEncryptedSessionSecretsEnvelope(signer.envelope)) fail('Invalid wrapped authorization signer.', 409);
   return json({ ok: true, writeRevision: await coordinator.state.storage.get(STORAGE_BACKUP_REVISION_KEY) || 0, coordinator: {
     configAuthority: { ...current, config: stripAgentAdmissionFromBackup(current.config) },

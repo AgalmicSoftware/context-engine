@@ -255,6 +255,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Patch the committed encrypted secret document, preserving key replacements
+  and removals across stale KV reads, retries, Lit setup and backup restore.
+
 - Recheck group mutation authority in the session config coordinator and order the separate group commit against admin rotation, including participant epoch checks.
 
 - Remove legacy membership reads and migration from group rosters, preserving

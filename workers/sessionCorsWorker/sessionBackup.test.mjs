@@ -13,7 +13,9 @@ import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
 import { selectCanonicalStorageVersions } from '../../shared/storage/canonicalStorageVersions.mjs';
-import { putSessionSecrets } from './sessionConfigSecretsStore.js';
+import { getSessionSecrets, putSessionSecrets } from './sessionConfigSecretsStore.js';
+import { updateSessionSecretsAfterLitRepair } from './sessionLitAuthorizationCoordinator.js';
+import { decryptSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
 
 const slug = 'restore-fixture';
@@ -176,7 +178,7 @@ test('signed backup replies identify config, group, and invalid-cursor restarts'
       assert.equal(updated.ok, true, JSON.stringify(updated));
     }
     if (change === 'groups') {
-      const result = await executeCoordinatedWorkerGroupMutation({ env, slug, sessionId, operation: 'create',
+      const result = await executeCoordinatedWorkerGroupMutation({ env, slug, sessionId, expectedAuthority: authority, operation: 'create',
         input: { groupId: 'new-group', label: 'New group', joinMode: 'open' }, actorPrincipal: { kind: 'evm_address', address: wallet.address } });
       assert.equal(result.ok, true, JSON.stringify(result));
     }
@@ -609,7 +611,7 @@ test('failed and repeated group requests preserve a running backup; successful c
   source.env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
   const principal = { kind: 'evm_address', address: `0x${'7'.repeat(40)}` };
   const mutate = (operation, groupId, extra = {}) => executeCoordinatedWorkerGroupMutation({
-    env: source.env, slug, sessionId, operation, groupId, principal, actorPrincipal: principal, ...extra,
+    env: source.env, slug, sessionId, expectedAuthority, operation, groupId, principal, actorPrincipal: principal, ...extra,
   });
   assert.equal((await mutate('create', 'open', { input: { groupId: 'open', label: 'Open', joinMode: 'open' } })).ok, true);
   assert.equal((await mutate('create', 'closed', { input: { groupId: 'closed', label: 'Closed', joinMode: 'admin_add' } })).ok, true);
@@ -645,7 +647,7 @@ test('an interrupted group write blocks snapshots until replay records its succe
   source.env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
   const principal = { kind: 'evm_address', address: `0x${'7'.repeat(40)}` };
   const mutate = (operation, extra = {}) => executeCoordinatedWorkerGroupMutation({
-    env: source.env, slug, sessionId, operation, groupId: 'open', principal, actorPrincipal: principal, ...extra,
+    env: source.env, slug, sessionId, expectedAuthority, operation, groupId: 'open', principal, actorPrincipal: principal, ...extra,
   });
   await mutate('create', { input: { groupId: 'open', label: 'Open', joinMode: 'open' } });
   const page = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
@@ -675,7 +677,7 @@ test('a lost group finalization reply leaves no orphan backup blocker', async ()
   }
   const source = fixture(InterruptedCoordinator);
   source.env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
-  const result = await executeCoordinatedWorkerGroupMutation({ env: source.env, slug, sessionId, operation: 'create',
+  const result = await executeCoordinatedWorkerGroupMutation({ env: source.env, slug, sessionId, expectedAuthority, operation: 'create',
     input: { groupId: 'open', label: 'Open', joinMode: 'open' }, actorPrincipal: { kind: 'evm_address', address: admin } });
   assert.equal(result.status, 503);
   const pages = await allPages(source.env);
@@ -994,7 +996,7 @@ test('restore refuses live sessions regardless of whether their hidden markers m
 const completedRestoreSource = async () => {
   const source = fixture();
   source.env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
-  const group = await executeCoordinatedWorkerGroupMutation({ env: source.env, slug, sessionId, operation: 'create',
+  const group = await executeCoordinatedWorkerGroupMutation({ env: source.env, slug, sessionId, expectedAuthority, operation: 'create',
     input: { groupId: 'restored', label: 'Restored', joinMode: 'open' }, actorPrincipal: { kind: 'evm_address', address: admin } });
   assert.equal(group.ok, true);
   for (let n = 0; n < 120; n += 1) {
@@ -1214,4 +1216,27 @@ test('legacy metadata that exceeds the backup entry limit reports the stored id'
   source.kv.values.set(`ce-storage:${slug}:docsContext:${id}`, JSON.stringify(metadata));
   source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('small').toString('base64url') }));
   await assert.rejects(allPages(source.env), (error) => error.status === 409 && error.message.includes(id));
+});
+
+
+test('backup and restore retain the authoritative secrets despite stale source and target KV reads', async () => {
+  const source = fixture();
+  await putSessionSecrets(source.env, slug, { openaiKey: 'synthetic-old-key', customRpcKey: 'synthetic-cleared' });
+  const stale = await source.kv.get(`session:${slug}:secrets`);
+  const edit = await updateSessionSecretsAfterLitRepair({ env: source.env, slug, expectedAuthority,
+    incomingSecrets: { openaiKey: 'synthetic-current-key', customRpcKey: '' } });
+  assert.equal(edit.ok, true);
+  const sourceGet = source.kv.get;
+  source.kv.get = (key) => key.endsWith(':secrets') ? stale : sourceGet(key);
+  const pages = await allPages(source.env);
+  assert.deepEqual(await decryptSessionSecretsEnvelope(pages[0].coordinator.secrets, { env: source.env, slug }), { openaiKey: 'synthetic-current-key' });
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  for (const page of pages) assert.equal((await importPage(target.env, page)).ok, true);
+  const targetGet = target.kv.get;
+  target.kv.get = (key) => key.endsWith(':secrets') ? stale : targetGet(key);
+  assert.equal((await updateSessionSecretsAfterLitRepair({ env: target.env, slug, expectedAuthority,
+    incomingSecrets: { anthropicKey: 'synthetic-other-key' } })).ok, true);
+  target.kv.get = targetGet;
+  assert.deepEqual(await getSessionSecrets(target.env, slug), { openaiKey: 'synthetic-current-key', anthropicKey: 'synthetic-other-key' });
 });
