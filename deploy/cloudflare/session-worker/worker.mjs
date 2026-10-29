@@ -90008,6 +90008,7 @@ async function recordAgentOnlyAttemptEvent({
     runId: normalizeAgentOnlyRunId(result?.run_id || result?.runId || runIdFromBody(body)),
     mode: lower2(result?.mode || body.mode || body.image_mode || body.imageMode),
     requestId: safeString(result?.request_id || result?.requestId || body.request_id || body.requestId),
+    replay: result.replay === true,
     counts: attemptCountsFromResult(result),
     createdAt: nowIsoOrCurrent(now)
   };
@@ -91343,6 +91344,7 @@ async function exportAgentOnlyData({
         status: Number(record3.status) || 0,
         reason: safeString(record3.reason),
         request_id: safeString(record3.requestId),
+        replay: record3.replay === true,
         accepted: record3.counts?.accepted ?? null,
         skips_recorded: record3.counts?.skipsRecorded ?? null,
         budget_used: record3.counts?.budgetUsed ?? null,
@@ -91357,6 +91359,7 @@ async function exportAgentOnlyData({
     const entries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX}${slug}:`);
     const principalRows = /* @__PURE__ */ new Map();
     const runRows = /* @__PURE__ */ new Map();
+    const subjects = /* @__PURE__ */ new Map();
     let firstAttemptAt = "";
     let latestAttemptAt = "";
     let includedAttemptEventCount = 0;
@@ -91380,6 +91383,7 @@ async function exportAgentOnlyData({
           latest_attempt_at: createdAt
         });
       }
+      subjects.set(principalId, record3.telegramUserId);
       const principal = principalRows.get(principalId);
       principal.attempt_event_count += 1;
       if (createdAt && (!principal.first_attempt_at || createdAt < principal.first_attempt_at)) principal.first_attempt_at = createdAt;
@@ -91405,20 +91409,27 @@ async function exportAgentOnlyData({
       if (createdAt && (!run.first_attempt_at || createdAt < run.first_attempt_at)) run.first_attempt_at = createdAt;
       if (createdAt && (!run.latest_attempt_at || createdAt > run.latest_attempt_at)) run.latest_attempt_at = createdAt;
       const stage = safeString(record3.stage);
-      const counts = record3.counts && typeof record3.counts === "object" && !Array.isArray(record3.counts) ? record3.counts : {};
-      if (stage === "answers_bulk" && record3.ok === true) {
-        run.accepted_answer_count += Number(counts.accepted || 0) || 0;
-      }
-      run.statement_count = Math.max(run.statement_count, Number(counts.statementCount || 0) || 0);
-      run.agent_response_count = Math.max(run.agent_response_count, Number(counts.agentResponseCount || 0) || 0);
-      run.privacy_skip_count = Math.max(run.privacy_skip_count, Number(counts.privacySkipCount || 0) || 0);
       if (stage === "wrapped_image" && record3.ok === true) run.wrapped_image_ok = true;
     }
+    const states = /* @__PURE__ */ new Map();
+    let space = {};
+    if (runRows.size) {
+      const materialized = await loadWrappedStatements({ env, sessionSlug: slug });
+      if (!materialized.ok) return materialized;
+      space = materialized.space;
+      for (const [principalId, telegramUserId] of subjects) {
+        states.set(principalId, await loadAnswerState({ env, sessionSlug: slug, telegramUserId }));
+      }
+    }
     const runs = [...runRows.values()].map((run) => {
-      const answerTarget = Math.max(Number(run.statement_count || 0), Number(run.agent_response_count || 0));
-      const answerComplete = answerTarget > 0 && Number(run.accepted_answer_count || 0) >= answerTarget;
+      const coverage = agentOnlyResponseCoverage(space, states.get(run.principal_id), { runId: run.run_id });
+      const answerComplete = coverage.allStatementsCovered;
       return {
         ...run,
+        accepted_answer_count: coverage.agentResponseCount,
+        statement_count: coverage.statementCount,
+        agent_response_count: coverage.agentResponseCount,
+        privacy_skip_count: coverage.privacySkipCount,
         answer_complete: answerComplete,
         successful: answerComplete || run.wrapped_image_ok
       };

@@ -3,6 +3,8 @@ import { safeString, lower, safeJsonParse, nowIsoOrCurrent as nowIso, sanitizeSe
 import { SUBMIT_REQUEST_USER_KV_PREFIX, SUBMITTED_RESULT_STATUSES } from './agentSubmitQueue.mjs';
 import { AGENT_ONLY_ANSWER_EVENT_KV_PREFIX, AGENT_ONLY_ANSWER_STATE_KV_PREFIX, AGENT_ONLY_VOTE_EVENT_KV_PREFIX, AGENT_ONLY_HUMAN_VOTE_EVENT_KV_PREFIX, AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX, AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX, AGENT_ONLY_PRINCIPAL_ID_SALT, hmacSha256Hex, normalizeAgentOnlyRunId } from './wrappedCore.mjs';
 import { loadWrappedStatements } from './wrappedStatements.mjs';
+import { loadAnswerState } from './wrappedAnswers.mjs';
+import { agentOnlyResponseCoverage } from './wrappedEvidence.mjs';
 import { WRAPPED_QUESTION_SOURCE_MODES } from './wrappedQuestionSource.mjs';
 import { normalizeTokenCount, normalizeDailyTokenUsage, normalizeTokenUsageDates } from './wrappedMetadata.mjs';
 import { reviewStatusForCurrentAgentAnswer } from './wrappedReview.mjs';
@@ -302,6 +304,7 @@ export async function exportAgentOnlyData({
         status: Number(record.status) || 0,
         reason: safeString(record.reason),
         request_id: safeString(record.requestId),
+        replay: record.replay === true,
         accepted: record.counts?.accepted ?? null,
         skips_recorded: record.counts?.skipsRecorded ?? null,
         budget_used: record.counts?.budgetUsed ?? null,
@@ -316,6 +319,7 @@ export async function exportAgentOnlyData({
     const entries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX}${slug}:`);
     const principalRows = new Map();
     const runRows = new Map();
+    const subjects = new Map();
     let firstAttemptAt = '';
     let latestAttemptAt = '';
     let includedAttemptEventCount = 0;
@@ -339,6 +343,7 @@ export async function exportAgentOnlyData({
           latest_attempt_at: createdAt,
         });
       }
+      subjects.set(principalId, record.telegramUserId);
       const principal = principalRows.get(principalId);
       principal.attempt_event_count += 1;
       if (createdAt && (!principal.first_attempt_at || createdAt < principal.first_attempt_at)) principal.first_attempt_at = createdAt;
@@ -365,22 +370,30 @@ export async function exportAgentOnlyData({
       if (createdAt && (!run.first_attempt_at || createdAt < run.first_attempt_at)) run.first_attempt_at = createdAt;
       if (createdAt && (!run.latest_attempt_at || createdAt > run.latest_attempt_at)) run.latest_attempt_at = createdAt;
       const stage = safeString(record.stage);
-      const counts = record.counts && typeof record.counts === 'object' && !Array.isArray(record.counts)
-        ? record.counts
-        : {};
-      if (stage === 'answers_bulk' && record.ok === true) {
-        run.accepted_answer_count += Number(counts.accepted || 0) || 0;
-      }
-      run.statement_count = Math.max(run.statement_count, Number(counts.statementCount || 0) || 0);
-      run.agent_response_count = Math.max(run.agent_response_count, Number(counts.agentResponseCount || 0) || 0);
-      run.privacy_skip_count = Math.max(run.privacy_skip_count, Number(counts.privacySkipCount || 0) || 0);
+
       if (stage === 'wrapped_image' && record.ok === true) run.wrapped_image_ok = true;
     }
+    const states = new Map();
+    let space = {};
+    if (runRows.size) {
+      const materialized = await loadWrappedStatements({ env, sessionSlug: slug });
+      if (!materialized.ok) return materialized;
+      space = materialized.space;
+      for (const [principalId, telegramUserId] of subjects) {
+        states.set(principalId, await loadAnswerState({ env, sessionSlug: slug, telegramUserId }));
+      }
+    }
     const runs = [...runRows.values()].map((run) => {
-      const answerTarget = Math.max(Number(run.statement_count || 0), Number(run.agent_response_count || 0));
-      const answerComplete = answerTarget > 0 && Number(run.accepted_answer_count || 0) >= answerTarget;
+      // Attempts describe traffic; only the image gate's stored coverage can
+      // establish completion, including accepted privacy-protective skips.
+      const coverage = agentOnlyResponseCoverage(space, states.get(run.principal_id), { runId: run.run_id });
+      const answerComplete = coverage.allStatementsCovered;
       return {
         ...run,
+        accepted_answer_count: coverage.agentResponseCount,
+        statement_count: coverage.statementCount,
+        agent_response_count: coverage.agentResponseCount,
+        privacy_skip_count: coverage.privacySkipCount,
         answer_complete: answerComplete,
         successful: answerComplete || run.wrapped_image_ok,
       };

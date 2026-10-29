@@ -313,3 +313,42 @@ test('more than 2000 proposals remain a capped question list marked incomplete',
   assert.equal((await f.request('/api/agent/results?view=consensus', { token: admin.token })).status, 503,
     'an aggregate must not present the capped source as a complete result');
 });
+
+for (const complete of [false, true]) test(`research completion counts stored answers once across retries, overlaps and edits (complete=${complete})`, async () => {
+  const { f, coordinated } = readableFixture();
+  let time = Date.now();
+  coordinated.coordinator.now = () => time;
+  f.config.agentHttp.wrapped = { posterEnabled: true, posterRenderer: 'local' };
+  const member = await memberToken(f);
+  const admin = await f.credential({ scopes: ['read_questions'] });
+  const page = await jsonOk(await f.request('/api/agent/agent-only/statements', { token: member }));
+  const runId = 'coverage-run';
+  const bodyFor = (requestId, ids, value = 'agree') => ({ run_id: runId, request_id: requestId, agent_metadata: metadata,
+    answers: page.statements.filter(q => ids.includes(q.statement_id)).map(q => ({ statement_id: q.statement_id,
+      statement_version: q.statement_version, answer: { value }, confidence: 80 })) });
+  const send = async body => { time += 1000; return jsonOk(await f.request('/api/agent/agent-only/answers/bulk', { method: 'POST', token: member, body })); };
+  const summary = async () => (await jsonOk(await f.request('/api/agent/admin/agent-only/export?view=summary&format=json', { token: admin.token })));
+  const first = bodyFor('first-batch', [openQ]);
+  await send(first);
+  assert.equal((await send(first)).replay, true);
+  let result = await summary();
+  assert.equal(result.runs[0].accepted_answer_count, 1);
+  assert.equal(result.runs[0].answer_complete, false);
+  assert.equal(result.runs[0].successful, false);
+  const image = await f.request('/api/agent/agent-only/wrapped-image', { method: 'POST', token: member, body: { run_id: runId } });
+  assert.equal(image.status, 409);
+  assert.equal((await image.json()).agent_response_count, 1);
+  await send(bodyFor('overlapping-batch', complete ? [openQ, gatedQ] : [openQ]));
+  await send(bodyFor('edited-answer', [openQ], 'disagree'));
+  result = await summary();
+  assert.equal(result.runs[0].accepted_answer_count, complete ? 2 : 1);
+  assert.equal(result.runs[0].agent_response_count, complete ? 2 : 1);
+  assert.equal(result.runs[0].statement_count, 2);
+  assert.equal(result.runs[0].answer_complete, complete);
+  assert.equal(result.runs[0].successful, complete);
+  const attempts = await f.request('/api/agent/admin/agent-only/export?view=attempts', { token: admin.token });
+  assert.equal(attempts.status, 200);
+  const answerAttempts = (await attempts.text()).trim().split('\n').map(JSON.parse).filter(row => row.stage === 'answers_bulk');
+  assert.equal(answerAttempts.length, 4);
+  assert.equal(answerAttempts.filter(row => row.replay).length, 1);
+});

@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Count research completion from distinct stored answers and privacy skips, using
+  the Wrapped image coverage rule. Retried attempts remain marked as replays.
+
 - Recheck MCP cancellation after chain validation, token refresh and retry-key
   persistence before sending writes, preserving results already broadcast.
 
