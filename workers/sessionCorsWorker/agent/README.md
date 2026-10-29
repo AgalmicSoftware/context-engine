@@ -54,6 +54,12 @@ retains registry/Surveys authority and its configured storage backend (Arweave
 by default). Research buckets and Wrapped predictions do not grant membership
 or become ordinary responses.
 
+Registry question indexes retain their `indexedToBlock` watermark while an expired
+index refreshes in the background. A completed scan still refreshes after its
+five-minute TTL; a fresh completed index does not. Concurrent cached reads share
+one background refresh per session, revision and caller within an isolate.
+Unfinished scans continue separately from freshness checks.
+
 Question reads are bounded and paginated. Follow `nextCursor` until `hasMore`
 is false; cursors bind the caller, session, revision and current question set.
 Locked or unavailable questions cannot be answered. Partial source reads fail

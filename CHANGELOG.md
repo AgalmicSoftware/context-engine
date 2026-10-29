@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Refresh expired registry question indexes even after their historical scan is
+  complete, sharing concurrent background refreshes and preserving the indexed block.
+
 - Publish complete MCP key files atomically on filesystems with hard links, so
   concurrent first launches share one identity without reading a partial key.
 

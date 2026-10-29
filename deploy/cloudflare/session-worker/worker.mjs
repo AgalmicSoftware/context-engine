@@ -64387,7 +64387,7 @@ async function refreshSessionQuestionIndex({
   fetchImpl = globalThis.fetch
 } = {}) {
   const slug = lower2(sessionSlug);
-  const key = cacheKey(`${env.AGENT_CONTEXT.sessionId}:${env.AGENT_CONTEXT.revision}:${env.AGENT_CONTEXT.address}:${slug}`);
+  const key = sessionQuestionCacheKey(env, slug);
   const previous = normalizeQuestionIndex(existingIndex);
   const rpcUrls = resolveRegistryRpcUrls2(env);
   if (!rpcUrls.length) {
@@ -64597,7 +64597,7 @@ async function listCachedSessionQuestions({
 } = {}) {
   const slug = lower2(sessionSlug);
   const ttlSeconds = cacheTtlSeconds(env);
-  const key = cacheKey(`${env.AGENT_CONTEXT.sessionId}:${env.AGENT_CONTEXT.revision}:${env.AGENT_CONTEXT.address}:${slug}`);
+  const key = sessionQuestionCacheKey(env, slug);
   const memory = scopedCachedIndexForReturn(questionMemoryCache.get(key), "memory", slug);
   if (!forceRefresh && memory && isFreshQuestionIndex(memory, ttlSeconds) && !cacheNeedsImmediateScopeRefresh(memory)) {
     if (!hasPayloadUnavailableQuestions(memory)) {
@@ -64617,7 +64617,7 @@ async function listCachedSessionQuestions({
   const durableCached = scopedCachedIndexForReturn(kv || memory, kv ? "kv" : "memory", slug);
   const refreshBaseIndex = cacheNeedsImmediateScopeRefresh(durableCached) ? null : durableCached;
   if (!forceRefresh && refreshBaseIndex && typeof waitUntil === "function" && !hasPayloadUnavailableQuestions(refreshBaseIndex)) {
-    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: refreshBaseIndex, fetchImpl });
+    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: refreshBaseIndex, refreshExpired: true, fetchImpl });
     return authorizeCachedIndex(env, refreshBaseIndex);
   }
   const firstResult = await refreshSessionQuestionIndex({
@@ -64629,13 +64629,7 @@ async function listCachedSessionQuestions({
     fetchImpl
   });
   if (typeof waitUntil === "function" && firstResult.ok && firstResult.complete !== true && firstResult.nextScanToBlock != null) {
-    waitUntil(refreshSessionQuestionIndex({
-      env,
-      sessionSlug: slug,
-      existingIndex: firstResult,
-      mode: "complete",
-      fetchImpl
-    }).catch(() => null));
+    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: firstResult, fetchImpl });
   }
   return authorizeCachedIndex(env, firstResult);
 }
@@ -64671,6 +64665,10 @@ function foregroundPayloadBatchSize(env = {}, questionLimit = 0) {
 }
 function cacheKey(sessionSlug = "") {
   return `${QUESTION_CACHE_PREFIX}${lower2(sessionSlug) || "general"}`;
+}
+function sessionQuestionCacheKey(env, sessionSlug) {
+  const { sessionId, revision, address: address2 } = env.AGENT_CONTEXT;
+  return cacheKey(`${sessionId}:${revision}:${address2}:${lower2(sessionSlug)}`);
 }
 function normalizeQuestionIndex(value = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -64744,17 +64742,24 @@ function scheduleIndexRefresh({
   env = {},
   sessionSlug = "",
   existingIndex = null,
+  refreshExpired = false,
   fetchImpl = globalThis.fetch
 } = {}) {
-  if (typeof waitUntil !== "function") return;
-  if (!existingIndex || existingIndex.complete === true && !hasPayloadUnavailableQuestions(existingIndex)) return;
-  waitUntil(refreshSessionQuestionIndex({
+  if (typeof waitUntil !== "function" || !existingIndex) return;
+  const needsCompletion = existingIndex.complete !== true || hasPayloadUnavailableQuestions(existingIndex);
+  const needsFreshness = refreshExpired && !isFreshQuestionIndex(existingIndex, cacheTtlSeconds(env));
+  if (!needsCompletion && !needsFreshness) return;
+  const key = sessionQuestionCacheKey(env, sessionSlug);
+  if (pendingIndexRefreshes.has(key)) return;
+  const refresh = refreshSessionQuestionIndex({
     env,
     sessionSlug,
     existingIndex,
     mode: "complete",
     fetchImpl
-  }).catch(() => null));
+  }).catch(() => null).finally(() => pendingIndexRefreshes.delete(key));
+  pendingIndexRefreshes.set(key, refresh);
+  waitUntil(refresh);
 }
 async function readKvQuestionIndex(env = {}, key = "") {
   if (!key || !env.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== "function") return null;
@@ -64785,12 +64790,14 @@ function mergeQuestionRecords(existing = [], additions = [], placement = "append
   }
   return merged;
 }
+var pendingIndexRefreshes;
 var init_registryQuestionCache = __esm({
   "workers/sessionCorsWorker/agent/registryQuestionCache.mjs"() {
     init_runtimePrimitives();
     init_registryQuestionCore();
     init_registryQuestionPayloads();
     init_registryQuestions();
+    pendingIndexRefreshes = /* @__PURE__ */ new Map();
   }
 });
 
