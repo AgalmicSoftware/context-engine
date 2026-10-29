@@ -1,3 +1,4 @@
+import { responsePairKey, responseReadWindowOptions, type ResponseReadWindow } from './responseReadWindow.js';
 import type { ContractScriptsMethodMap, ContractScriptsRuntimeDeps } from './contractScripts.runtimeDeps.js';
 
 type SbtReadProviderRef = string | Record<string, unknown>;
@@ -75,6 +76,39 @@ export const createContractScriptsSurveyEventReadMethods = (
   } = deps;
 
   return {
+    async getBoundedResponseReadWindow(
+      groupKeyOrCfg: GroupKeyOrConfig,
+      opts: Record<string, unknown> = {},
+    ): Promise<ResponseReadWindow> {
+      const cfg = opts._resolvedCfg || resolveSession(groupKeyOrCfg || '');
+      const rawEnd = cfg?.blockLimits?.end;
+      if (rawEnd == null || !Number.isFinite(Number(rawEnd))) return null;
+      const end = Math.floor(Number(rawEnd));
+      const head = await this.getLatestBlockNumber('none', groupKeyOrCfg, {
+        _resolvedCfg: cfg,
+        contractKey: 'surveys',
+      });
+      if (end >= head) return null;
+      const gAddrs = getSessionAddresses(cfg);
+      const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, gAddrs.surveys?.chainId);
+      const contract = new ethers.Contract(gAddrs.surveys?.address, SURVEYS, provider);
+      const logs = await fetchLogsSmartWithProvider(
+        provider,
+        contract.filters.ResponsesSubmitted(opts.responder || null, null, null),
+        end + 1,
+        head,
+      );
+      // Current pointers are safe only for pairs with no edits after the configured end.
+      const laterPairs = new Set<string>();
+      for (const log of logs) {
+        const { args } = SURVEYS_INTERFACE.parseLog(log);
+        for (const id of [...(args.questionIds || []), args.surveyId]) {
+          if (id && id !== ethers.constants.HashZero) laterPairs.add(responsePairKey(args.responder, id));
+        }
+      }
+      return { blockTag: end, laterPairs };
+    },
+
     async fetchAllQuestionIDs(
       providerName: ProviderName,
       fromBlock: BlockRangeInput = null,
@@ -232,6 +266,10 @@ export const createContractScriptsSurveyEventReadMethods = (
         });
 
         const uniquePairs = Array.from(latestByPair.values());
+        const readWindow = uniquePairs.length
+          ? await this.getBoundedResponseReadWindow(groupKeyOrCfg, { _resolvedCfg: cfg })
+          : null;
+        const failedResponses: Record<string, unknown>[] = [];
         const fullRangeAggregator: Record<string, unknown[]> = {};
         let lowestRetryableFailedBlock: number | null = null;
         await Promise.all(
@@ -244,15 +282,24 @@ export const createContractScriptsSurveyEventReadMethods = (
               blockTimestamp = Math.floor(Date.now() / 1000);
             }
 
+            const readOptions = responseReadWindowOptions(readWindow, responder, qId);
             let respData = null;
             try {
               respData = await this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
                 _resolvedCfg: cfg,
+                ...readOptions,
                 forceArweaveFetch,
                 throwOnError: true,
               });
             } catch (e: unknown) {
-              const retryable = isRetryableSurveyResponseReadError(e);
+              const retryable = readOptions.blockTag !== undefined || isRetryableSurveyResponseReadError(e);
+              failedResponses.push({
+                responder,
+                id: qId,
+                blockNumber,
+                blockTag: readOptions.blockTag,
+                reason: e instanceof Error ? e.message : String(e),
+              });
               if (retryable) {
                 lowestRetryableFailedBlock =
                   lowestRetryableFailedBlock === null ? blockNumber : Math.min(lowestRetryableFailedBlock, blockNumber);
@@ -298,6 +345,11 @@ export const createContractScriptsSurveyEventReadMethods = (
               : Math.min(resolvedToBlockNum, lowestRetryableFailedBlock - 1);
           onPartialData(fullRangeAggregator, completedToBlock);
         }
+        return {
+          hadPartialFailure: lowestRetryableFailedBlock !== null,
+          lowestFailedBlock: lowestRetryableFailedBlock,
+          failedResponses,
+        };
       } catch (err: unknown) {
         contractsLog.error('Critical Error in getQuestionResponsesChunkedWithCallback:', err);
         if (onPartialData && resolvedFromBlockNum !== undefined) {
@@ -487,6 +539,10 @@ export const createContractScriptsSurveyEventReadMethods = (
       });
 
       const responderEntries = Array.from(latestByResponder.values());
+      const readWindow = responderEntries.length
+        ? await this.getBoundedResponseReadWindow(groupKeyOrCfg, { _resolvedCfg: cfg })
+        : null;
+      const failedResponses: Record<string, unknown>[] = [];
       const responseReadResults = await Promise.all(
         responderEntries.map(async ({ responder, blockNumber, transactionIndex, logIndex }) => {
           let blockTimestamp = 0;
@@ -494,13 +550,22 @@ export const createContractScriptsSurveyEventReadMethods = (
             const blockData = await this.getBlockWithCaching(provider, blockNumber, providerName, String(chId));
             if (blockData) blockTimestamp = blockData.timestamp;
           } catch {}
+          const readOptions = responseReadWindowOptions(readWindow, responder, sId);
           let surveyResponseData = null;
           try {
             surveyResponseData = await this.getSurveyResponse(providerName, responder, sId, groupKeyOrCfg, {
+              ...readOptions,
               throwOnError: true,
             });
           } catch (error: unknown) {
-            const retryable = isRetryableSurveyResponseReadError(error);
+            const retryable = readOptions.blockTag !== undefined || isRetryableSurveyResponseReadError(error);
+            failedResponses.push({
+              responder,
+              id: sId,
+              blockNumber,
+              blockTag: readOptions.blockTag,
+              reason: error instanceof Error ? error.message : String(error),
+            });
             contractsLog.warn('[fetchAllSurveyResponses] individual response read failed; skipping', {
               error: error instanceof Error ? error.message : String(error),
               retryable,
@@ -548,6 +613,7 @@ export const createContractScriptsSurveyEventReadMethods = (
         responses,
         hadPartialFailure,
         lowestFailedBlock,
+        failedResponses,
       };
     },
 
