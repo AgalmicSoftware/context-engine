@@ -3,7 +3,7 @@ import { safeString, lower } from './runtimePrimitives.mjs';
 import { resolveRegistryRpcUrls } from './registrySessions.mjs';
 import { questionMemoryCache, STORAGE_BACKENDS, normalizeChainId, normalizeBlock, resolveQuestionStorageBackend, normalizeHexAddress } from './registryQuestionCore.mjs';
 import { resolveSurveysAddress, buildCloudflareQuestionStorageAuth, fetchSessionConfigForQuestions, currentBlockNumber, resolveScanWindow } from './registryQuestionSource.mjs';
-import { cacheTtlSeconds, foregroundChunks, cacheKey, normalizeQuestionIndex, isFreshQuestionIndex, filterQuestionRecordsForSession, isPayloadUnavailableQuestion, hasPayloadUnavailableQuestions, scopedCachedIndexForReturn, cacheNeedsImmediateScopeRefresh, scheduleIndexRefresh, readKvQuestionIndex, writeKvQuestionIndex, questionIdFromRecord, mergeQuestionRecords } from './registryQuestionCache.mjs';
+import { cacheTtlSeconds, foregroundChunks, sessionQuestionCacheKey, normalizeQuestionIndex, isFreshQuestionIndex, filterQuestionRecordsForSession, isPayloadUnavailableQuestion, hasPayloadUnavailableQuestions, scopedCachedIndexForReturn, cacheNeedsImmediateScopeRefresh, scheduleIndexRefresh, readKvQuestionIndex, writeKvQuestionIndex, questionIdFromRecord, mergeQuestionRecords } from './registryQuestionCache.mjs';
 import { fetchQuestionPayloads, scanQuestionRange, mergeScanSummaries } from './registryQuestionScanning.mjs';
 
 // Cached plaintext is never an authorization decision. Cloudflare payload
@@ -37,7 +37,7 @@ export async function refreshSessionQuestionIndex({
   fetchImpl = globalThis.fetch,
 } = {}) {
   const slug = lower(sessionSlug);
-  const key = cacheKey(`${env.AGENT_CONTEXT.sessionId}:${env.AGENT_CONTEXT.revision}:${env.AGENT_CONTEXT.address}:${slug}`);
+  const key = sessionQuestionCacheKey(env, slug);
   const previous = normalizeQuestionIndex(existingIndex);
   const rpcUrls = resolveRegistryRpcUrls(env);
   if (!rpcUrls.length) {
@@ -279,7 +279,7 @@ export async function listCachedSessionQuestions({
 } = {}) {
   const slug = lower(sessionSlug);
   const ttlSeconds = cacheTtlSeconds(env);
-  const key = cacheKey(`${env.AGENT_CONTEXT.sessionId}:${env.AGENT_CONTEXT.revision}:${env.AGENT_CONTEXT.address}:${slug}`);
+  const key = sessionQuestionCacheKey(env, slug);
   const memory = scopedCachedIndexForReturn(questionMemoryCache.get(key), 'memory', slug);
   if (!forceRefresh && memory && isFreshQuestionIndex(memory, ttlSeconds) && !cacheNeedsImmediateScopeRefresh(memory)) {
     if (!hasPayloadUnavailableQuestions(memory)) {
@@ -299,7 +299,7 @@ export async function listCachedSessionQuestions({
   const durableCached = scopedCachedIndexForReturn(kv || memory, kv ? 'kv' : 'memory', slug);
   const refreshBaseIndex = cacheNeedsImmediateScopeRefresh(durableCached) ? null : durableCached;
   if (!forceRefresh && refreshBaseIndex && typeof waitUntil === 'function' && !hasPayloadUnavailableQuestions(refreshBaseIndex)) {
-    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: refreshBaseIndex, fetchImpl });
+    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: refreshBaseIndex, refreshExpired: true, fetchImpl });
     return authorizeCachedIndex(env, refreshBaseIndex);
   }
 
@@ -317,13 +317,7 @@ export async function listCachedSessionQuestions({
     firstResult.complete !== true &&
     firstResult.nextScanToBlock != null
   ) {
-    waitUntil(refreshSessionQuestionIndex({
-      env,
-      sessionSlug: slug,
-      existingIndex: firstResult,
-      mode: 'complete',
-      fetchImpl,
-    }).catch(() => null));
+    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: firstResult, fetchImpl });
   }
   return authorizeCachedIndex(env, firstResult);
 }

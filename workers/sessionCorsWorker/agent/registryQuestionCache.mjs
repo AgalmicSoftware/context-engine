@@ -3,6 +3,8 @@ import { DEFAULT_CACHE_TTL_SECONDS, DEFAULT_PAYLOAD_CONCURRENCY, DEFAULT_FOREGRO
 import { normalizePayloadSessionSlug } from './registryQuestionPayloads.mjs';
 import { refreshSessionQuestionIndex } from './registryQuestions.mjs';
 
+const pendingIndexRefreshes = new Map();
+
 export function cacheTtlSeconds(env = {}) {
   return DEFAULT_CACHE_TTL_SECONDS;
 }
@@ -29,6 +31,11 @@ export function foregroundPayloadBatchSize(env = {}, questionLimit = 0) {
 
 export function cacheKey(sessionSlug = '') {
   return `${QUESTION_CACHE_PREFIX}${lower(sessionSlug) || 'general'}`;
+}
+
+export function sessionQuestionCacheKey(env, sessionSlug) {
+  const { sessionId, revision, address } = env.AGENT_CONTEXT;
+  return cacheKey(`${sessionId}:${revision}:${address}:${lower(sessionSlug)}`);
 }
 
 export function normalizeQuestionIndex(value = {}) {
@@ -115,17 +122,24 @@ export function scheduleIndexRefresh({
   env = {},
   sessionSlug = '',
   existingIndex = null,
+  refreshExpired = false,
   fetchImpl = globalThis.fetch,
 } = {}) {
-  if (typeof waitUntil !== 'function') return;
-  if (!existingIndex || (existingIndex.complete === true && !hasPayloadUnavailableQuestions(existingIndex))) return;
-  waitUntil(refreshSessionQuestionIndex({
+  if (typeof waitUntil !== 'function' || !existingIndex) return;
+  const needsCompletion = existingIndex.complete !== true || hasPayloadUnavailableQuestions(existingIndex);
+  const needsFreshness = refreshExpired && !isFreshQuestionIndex(existingIndex, cacheTtlSeconds(env));
+  if (!needsCompletion && !needsFreshness) return;
+  const key = sessionQuestionCacheKey(env, sessionSlug);
+  if (pendingIndexRefreshes.has(key)) return;
+  const refresh = refreshSessionQuestionIndex({
     env,
     sessionSlug,
     existingIndex,
     mode: 'complete',
     fetchImpl,
-  }).catch(() => null));
+  }).catch(() => null).finally(() => pendingIndexRefreshes.delete(key));
+  pendingIndexRefreshes.set(key, refresh);
+  waitUntil(refresh);
 }
 
 export async function readKvQuestionIndex(env = {}, key = '') {
