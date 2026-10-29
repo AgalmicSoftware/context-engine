@@ -8,6 +8,18 @@ import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmi
 import type { SurveyQuestionsLegacyRecord } from './surveyQuestionsTypes';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
+const envelopeFixture = (overrides: Record<string, unknown> = {}) =>
+  JSON.stringify({
+    v: 1,
+    cipher: 'aes-gcm-256',
+    iv: btoa('i'.repeat(12)),
+    ciphertext: btoa('synthetic ciphertext'),
+    aad: {},
+    commitments: { keccak256: `0x${'1'.repeat(64)}` },
+    recipients: [{ type: 'self-eip712-v1', wrap_iv: btoa('i'.repeat(12)), wrapped_cek: btoa('k'.repeat(48)) }],
+    ...overrides,
+  });
+
 const makeWorkerConfig = (workerOrigin: string, sessionId: string) => ({
   slug: 'draft-edge',
   sessionId,
@@ -463,7 +475,7 @@ describe('quadratic submission boundary', () => {
     context.stateRef.current.surveysResponseState[2].answers.q1 = {
       value: '*',
       encrypted: true,
-      encryptedPortion: JSON.stringify({ recipients: [{ type: 'self-eip712-v1' }] }),
+      encryptedPortion: envelopeFixture(),
     };
     context.getChangedQidsAndFields.mockReturnValue({
       changedQids: new Set(['q1']),
@@ -725,9 +737,9 @@ describe('answer size budget', () => {
       value: '*',
       encrypted: true,
       encryptionAudience: 'self_admin',
-      encryptedPortion: JSON.stringify({
+      encryptedPortion: envelopeFixture({
         recipients: [
-          { type: 'self-eip712-v1' },
+          { type: 'self-eip712-v1', wrap_iv: btoa('i'.repeat(12)), wrapped_cek: btoa('k'.repeat(48)) },
           { type: 'worker-response-field-v1', policy: { audience: 'self_admin' } },
         ],
         ciphertext: 'a'.repeat(2 * KIB - 150),
@@ -876,6 +888,42 @@ describe('answer size budget', () => {
 
     await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
       status: 'submitted',
+    });
+  });
+});
+
+describe('literal asterisk submission', () => {
+  it.each(['answers', 'additionalComments'] as const)(
+    'refuses a lone asterisk in %s before any upload',
+    async (bucket) => {
+      for (const encrypted of [false, true]) {
+        const context = createContext();
+        context.stateRef.current.surveysResponseState[2][bucket] = {
+          q1: { value: '*', encrypted, encryptionAudience: 'self', encryptedPortion: '' },
+        };
+        const result = await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+        expect(result).toEqual(
+          expect.objectContaining({
+            status: 'failed',
+            message: expect.stringContaining("A lone * can't be saved; add more text."),
+          }),
+        );
+        expect(context.cryptoUtils.encryptMultipleAnswers).not.toHaveBeenCalled();
+        expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it('keeps asterisks inside ordinary public answer and comment text', async () => {
+    const context = createContext();
+    context.stateRef.current.surveysResponseState[2] = {
+      answers: { q1: { value: 'a * b' } },
+      additionalComments: { q1: { value: 'a * b' } },
+    };
+    expect(await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).toEqual({ status: 'submitted' });
+    expect(context.submitSurveyResponse.mock.calls[0][0]).toEqual({
+      answers: { q1: { value: 'a * b' } },
+      additionalComments: { q1: { value: 'a * b' } },
     });
   });
 });
@@ -1040,4 +1088,23 @@ describe('gate policy changes use fresh ciphertext', () => {
       ),
     ).rejects.toThrow(/Decrypt the ratings/);
   });
+  it.each(['answers', 'additionalComments'] as const)(
+    'encrypts and decrypts longer asterisk text in %s with a fresh envelope',
+    async (bucket) => {
+      const f = await fixture(bucket);
+      const old = f.encrypted[bucket]!.q1!.encryptedPortion;
+      const readable = await cryptoUtils.decryptMultipleAnswers(f.encrypted, f.opts.questionPool, f.opts);
+      expect(readable[bucket]!.q1!.value).toBe('Synthetic private text');
+      f.context.stateRef.current.surveysResponseState[2][bucket].q1 = {
+        ...f.encrypted[bucket]!.q1,
+        value: 'a * b',
+        encryptedPortion: '',
+      };
+      expect(await f.runtime.encryptAndUpload()).toEqual({ status: 'submitted' });
+      const saved = f.context.submitSurveyResponse.mock.calls[0][0];
+      expect(saved[bucket].q1.encryptedPortion).not.toBe(old);
+      const decrypted = await cryptoUtils.decryptMultipleAnswers(saved, f.opts.questionPool, f.opts);
+      expect(decrypted[bucket]!.q1!.value).toBe('a * b');
+    },
+  );
 });

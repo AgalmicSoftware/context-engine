@@ -1,3 +1,5 @@
+import { isResponseFieldEnvelope } from '@ce-shared/encryption/envelopeValidation.mjs';
+
 const LOCKED_FIELD_MASK = '[encrypted]';
 
 type UnknownRecord = Record<string, unknown>;
@@ -89,6 +91,9 @@ const assertResponseFieldNoLeak = (field: unknown, path: string): void => {
   }
   if (withEnvelope && !masked) {
     throw new Error(`Locked payload mismatch: ${formatPath(path, 'encryptedPortion')} needs a masked value.`);
+  }
+  if (encrypted && !isResponseFieldEnvelope(field.encryptedPortion)) {
+    throw new Error(`Locked payload mismatch: ${path} requires a valid encrypted envelope.`);
   }
 };
 

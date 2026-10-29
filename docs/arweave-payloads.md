@@ -450,3 +450,15 @@ await contractScripts.createSBT(
   groupCfg, create2Salt, deployOptions
 );
 ```
+
+### Response masks and envelopes
+
+A lone `*` is reserved for a locked answer or comment. Enter more text to save
+an asterisk literally; text such as `a * b` is supported in public and encrypted
+responses. Submission refuses a lone asterisk before encryption or upload.
+Editing a decrypted response removes its old envelope so the new text receives
+fresh ciphertext. Empty fields are submitted as unencrypted clears.
+
+The client upload guard and Session Worker response validator require a valid
+Envelope v1 record, including its author's key recipient, for fields marked
+`encrypted: true`. An encryption flag without ciphertext is rejected.

@@ -122,6 +122,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Refuse lone asterisks in answers and comments before upload, require valid
+  envelopes for encrypted response fields, and clear old ciphertext on edits.
+
 - Re-encrypt response fields and ratings when gate conditions or chains change;
   require decryption before submitting a still-locked field to a different gate.
 
@@ -309,6 +312,8 @@ All notable changes to this project will be documented in this file.
   and either form verifies in the web client, MCP and CE-CC.
 
 ### Workers — requires redeployment
+
+- Reject encrypted response fields without a valid envelope and public lone-asterisk masks.
 
 - Require public HTTPS targets without embedded credentials throughout custom AI
   redirects, and refuse requests when outbound safety checks are unavailable.

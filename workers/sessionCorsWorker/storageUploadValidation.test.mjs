@@ -126,7 +126,7 @@ const lockedField = async (value, kind) => {
   ];
   const envelope = buildEnvelopeObject({
     iv, ciphertextBytes: ciphertext, aadObj: aad, recipients,
-    commitments: { keccak256: hex(32), poseidon: (2n ** 254n).toString() }, kind,
+    commitments: { keccak256: hex(32), poseidon: hex(32) }, kind,
   });
   return JSON.stringify(envelope);
 };
@@ -173,3 +173,24 @@ for (const option of [null, 7, false, { label: 'North' }, { toString: 'not calla
     assert.match(result.error, /options.*strings/);
   });
 }
+
+
+for (const encryptedPortion of [undefined, '', 'not-json', '{}', '{"ciphertext":"fake"}']) {
+  test(`encrypted responses require a valid envelope: ${encryptedPortion}`, () => {
+    for (const key of ['answer', 'additional']) {
+      const item = clientAnswer({ [key]: { value: '*', encrypted: true, encryptedPortion } });
+      for (const payload of [item, { responses: [item] }]) {
+        const result = check('responses', payload);
+        assert.equal(result.status, 400);
+        assert.match(result.error, /valid.*envelope/i);
+      }
+    }
+  });
+}
+
+test('refuses a public lone asterisk but keeps longer text', () => {
+  for (const key of ['answer', 'additional']) {
+    assert.equal(check('responses', clientAnswer({ [key]: { value: '*', encrypted: false } })).status, 400);
+    assert.equal(check('responses', clientAnswer({ [key]: { value: 'a * b', encrypted: false } })).ok, true);
+  }
+});

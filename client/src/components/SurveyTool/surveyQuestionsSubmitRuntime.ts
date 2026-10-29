@@ -1,3 +1,4 @@
+import { isResponseFieldEnvelope } from '@ce-shared/encryption/envelopeValidation.mjs';
 import { buildSavedInterviewConsent } from './sessionInterviewConsent';
 import { getSubmittedWorkerResponseRecency } from '../../utilities/survey/workerResponseRecency';
 import {
@@ -459,6 +460,17 @@ export const createSurveyQuestionsSubmitRuntime = (
       const submitQuestionPool: SurveyQuestionsLegacyValue = stateRef.current.questionPool?.length
         ? stateRef.current.questionPool
         : resolveEditableQuestionList(stateRef.current);
+      for (const qid of changedQids as Set<string>) {
+        for (const field of [activeSlice.answers?.[qid], activeSlice.additionalComments?.[qid]]) {
+          if (
+            typeof field?.value === 'string' &&
+            field.value.trim() === '*' &&
+            !(field.encrypted === true && isResponseFieldEnvelope(field.encryptedPortion))
+          ) {
+            throw new Error("A lone * can't be saved; add more text.");
+          }
+        }
+      }
       for (const question of submitQuestionPool) {
         // The diff and the slice use normalized ids; pool ids may differ in case.
         const qid = normalizeQuestionIdKey(question.id);
