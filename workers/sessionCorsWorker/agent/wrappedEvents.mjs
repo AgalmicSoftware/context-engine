@@ -67,6 +67,7 @@ export async function recordAgentOnlyAttemptEvent({
     runId: normalizeAgentOnlyRunId(result?.run_id || result?.runId || runIdFromBody(body)),
     mode: lower(result?.mode || body.mode || body.image_mode || body.imageMode),
     requestId: safeString(result?.request_id || result?.requestId || body.request_id || body.requestId),
+    replay: result.replay === true,
     counts: attemptCountsFromResult(result),
     createdAt: nowIso(now),
   };
