@@ -193,6 +193,8 @@ confirmed transaction, `answer` retains its successful results and returns a
 ## Registry sessions
 
 Join with `https://contextengine.sh/session/<slug>` (no `worker=`).
+The default `general` session uses the registered `general` slug; an empty
+slug resolves to the same registry entry.
 Config comes from SessionRegistry and its public metadata. Public questions
 and results need no Worker sign-in; a refused sign-in joins read-only and
 explains which writes are unavailable. Uploads require the Worker's `arweave`

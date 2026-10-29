@@ -81,7 +81,7 @@ const fixture = (overrides = {}) => {
     return surveys;
   };
   const fetchImpl = async (url) => Response.json(records.get(new URL(url).pathname.split('/').pop()));
-  const open = () => createRegistrySession({ info: { slug: 'town', chainId: 11155420 }, config: { rpcUrl: '', allowLocalWorkers: false }, wallet, fetchImpl,
+  const open = (slug = 'town') => createRegistrySession({ info: { slug, chainId: 11155420 }, config: { rpcUrl: '', allowLocalWorkers: false }, wallet, fetchImpl,
     options: { provider, addresses: { sessionRegistry: registryAddress, surveys: surveysAddress }, createContract: factory } });
   const addQuestion = (id, payload, block = 1) => {
     const pointer = ethers.utils.id(id);
@@ -105,6 +105,33 @@ const fixture = (overrides = {}) => {
     options: { provider, addresses: { sessionRegistry: registryAddress, surveys: surveysAddress }, createContract: factory },
     setChain: (value) => { chain = value; }, setGasPrice: (value) => { gasPrice = value; }, setBalance: (value) => { balance = value; } };
 };
+
+for (const slug of ['', 'general', 'town']) test(`registry links resolve ${JSON.stringify(slug)} to its registered session`, async () => {
+  const f = fixture();
+  const expected = slug || 'general';
+  const calls = [];
+  const readRow = f.registry.getSessionBySlug;
+  f.registry.getSessionBySlug = async (requested) => {
+    calls.push(['session', requested]);
+    assert.equal(requested, expected);
+    const row = await readRow();
+    row[0] = expected;
+    return row;
+  };
+  f.registry.getSessionFields = async (requested, fields) => {
+    calls.push(['fields', requested]);
+    assert.equal(requested, expected);
+    assert.deepEqual(fields, ['corsWorkerUrl']);
+    return [''];
+  };
+  await f.open(slug);
+  assert.deepEqual(calls, [['session', expected], ['fields', expected]]);
+});
+
+test('a registry link still rejects a row belonging to another session', async () => {
+  const f = fixture();
+  await assert.rejects(f.open('general'), /registry returned a different session/);
+});
 
 test('registry question reads filter sessions and blocked ids, trust chain ids and reuse payloads', async () => {
   const f = fixture({ BLOCKED_QUESTION_IDS: [blockedId] });
