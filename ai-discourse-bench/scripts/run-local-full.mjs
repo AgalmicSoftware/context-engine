@@ -6,7 +6,7 @@ import {
   writeJsonFile,
   writeTextFile,
 } from '../src/io.mjs';
-import { createCheckpointWriter, readCheckpointRuns } from '../src/checkpoint.mjs';
+import { openCheckpoint } from '../src/checkpoint.mjs';
 import { runBenchmark } from '../src/runner.mjs';
 import { buildResultsReport } from '../src/scoring.mjs';
 import { renderHtmlReport } from '../src/render-html.mjs';
@@ -116,8 +116,7 @@ const reportPath = path.join('./results', `${outputPrefix}-report.json`);
 const htmlPath = path.join('./results', `${outputPrefix}-report.html`);
 const resume = /^(1|true|yes)$/i.test(process.env.AIDB_RESUME || '');
 const priorOutput = resume ? await readJsonFileIfExists(runPath, { runs: [] }) : { runs: [] };
-const checkpointRuns = resume ? await readCheckpointRuns(checkpointPath) : [];
-const checkpointWriter = await createCheckpointWriter(checkpointPath, { reset: !resume });
+const { runs: checkpointRuns, write: checkpointWriter } = await openCheckpoint(checkpointPath, { resume });
 
 const runsFile = await runBenchmark({
   questionBank,

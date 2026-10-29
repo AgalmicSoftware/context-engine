@@ -6,7 +6,7 @@ import {
   writeJsonFile,
   writeTextFile,
 } from '../src/io.mjs';
-import { createCheckpointWriter, readCheckpointRuns } from '../src/checkpoint.mjs';
+import { openCheckpoint } from '../src/checkpoint.mjs';
 import { assertWithinEstimatedCostBudget, buildExperimentPlan } from '../src/experiment-plan.mjs';
 import { auditOpenRouterRoster, fetchOpenRouterCatalog } from '../src/openrouter-catalog.mjs';
 import { limitQuestionBank } from '../src/report-inputs.mjs';
@@ -104,8 +104,7 @@ console.log(`models: ${modelRoster.models.map((model) => model.model).join(', ')
 console.log(`repeats per polarity: ${repeats}; concurrency: ${concurrency}; max attempts: ${maxAttempts}`);
 
 const priorOutput = resume ? await readJsonFileIfExists(runPath, { runs: [] }) : { runs: [] };
-const checkpointRuns = resume ? await readCheckpointRuns(checkpointPath) : [];
-const checkpointWriter = await createCheckpointWriter(checkpointPath, { reset: !resume });
+const { runs: checkpointRuns, write: checkpointWriter } = await openCheckpoint(checkpointPath, { resume });
 
 const runsFile = await runBenchmark({
   questionBank,

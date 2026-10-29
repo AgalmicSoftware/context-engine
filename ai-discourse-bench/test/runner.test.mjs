@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { createCheckpointWriter, readCheckpointRuns } from '../src/checkpoint.mjs';
+import { openCheckpoint } from '../src/checkpoint.mjs';
 import { runBenchmark } from '../src/runner.mjs';
 import { buildResultsReport } from '../src/scoring.mjs';
 
@@ -255,17 +255,40 @@ test('runner records provider routing and does not reuse runs after routing chan
 test('checkpoint writer appends durable JSONL records that can be resumed', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'aidb-checkpoint-'));
   const checkpoint = path.join(directory, 'runs.jsonl');
-  const write = await createCheckpointWriter(checkpoint, { reset: true });
+  const { write } = await openCheckpoint(checkpoint);
   await Promise.all([write({ runId: 'a' }), write({ runId: 'b' })]);
-  assert.deepEqual(await readCheckpointRuns(checkpoint), [{ runId: 'a' }, { runId: 'b' }]);
+  assert.deepEqual((await openCheckpoint(checkpoint, { resume: true })).runs, [{ runId: 'a' }, { runId: 'b' }]);
 });
 
-test('checkpoint reader ignores only a truncated final append', async () => {
+test('checkpoint resume repairs only a truncated final append', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'aidb-checkpoint-truncated-'));
   const checkpoint = path.join(directory, 'runs.jsonl');
   await fs.writeFile(checkpoint, '{"runId":"a"}\n{"runId":"partial"');
-  assert.deepEqual(await readCheckpointRuns(checkpoint), [{ runId: 'a' }]);
+  assert.deepEqual((await openCheckpoint(checkpoint, { resume: true })).runs, [{ runId: 'a' }]);
 
   await fs.writeFile(checkpoint, '{broken}\n{"runId":"b"}\n');
-  await assert.rejects(() => readCheckpointRuns(checkpoint), /line 1 is invalid JSON/);
+  await assert.rejects(() => openCheckpoint(checkpoint, { resume: true }), /line 1 is invalid JSON/);
 });
+
+for (const tail of ['{"runId":"partial"', '{"runId":"complete"}']) {
+  test(`checkpoint resume repairs its tail before repeated appends: ${tail}`, async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'aidb-checkpoint-repair-'));
+    const checkpoint = path.join(directory, 'runs.jsonl');
+    const open = () => openCheckpoint(checkpoint, { resume: true });
+    try {
+      await fs.writeFile(checkpoint, '{"runId":"first","text":"☀"}\n' + tail);
+      const first = await open();
+      const expected = tail.endsWith('}') ? ['first', 'complete'] : ['first'];
+      assert.deepEqual(first.runs.map((run) => run.runId), expected);
+      await first.write({ runId: 'resumed' });
+      const second = await open();
+      assert.deepEqual(second.runs.map((run) => run.runId), [...expected, 'resumed']);
+      await second.write({ runId: 'again' });
+      assert.deepEqual((await open()).runs.map((run) => run.runId), [...expected, 'resumed', 'again']);
+      const corrupt = '{bad}\n{"runId":"last"}';
+      await fs.writeFile(checkpoint, corrupt);
+      await assert.rejects(open, /line 1 is invalid JSON/);
+      assert.equal(await fs.readFile(checkpoint, 'utf8'), corrupt);
+    } finally { await fs.rm(directory, { recursive: true, force: true }); }
+  });
+}
