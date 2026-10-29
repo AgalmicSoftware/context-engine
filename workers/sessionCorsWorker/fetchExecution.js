@@ -59,17 +59,36 @@ const readFetchBytes = async (response) => {
   }
 };
 
-const stripHtml = (html) => (
-  String(html || '')
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-    .replace(/<head\b[^<]*(?:(?!<\/head>)<[^<]*)*<\/head>/gi, '')
-    .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, '')
-    .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-);
+const stripHtml = (html) => {
+  const source = String(html || '');
+  const lower = source.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+  const missingClosers = new Set();
+  const text = [];
+  let cursor = 0;
+  while (cursor < source.length) {
+    const start = source.indexOf('<', cursor);
+    const end = start < 0 ? -1 : source.indexOf('>', start + 1);
+    if (end < 0) {
+      text.push(source.slice(cursor));
+      break;
+    }
+    text.push(source.slice(cursor, start));
+    const hidden = /^<(script|style|head|nav|footer)\b/i.exec(source.slice(start, end + 1))?.[1].toLowerCase();
+    if (hidden && !missingClosers.has(hidden)) {
+      const closingTag = `</${hidden}>`;
+      const closing = lower.indexOf(closingTag, end + 1);
+      if (closing >= 0) {
+        cursor = closing + closingTag.length;
+        continue;
+      }
+      // Repeated unclosed elements must not keep scanning the same suffix.
+      missingClosers.add(hidden);
+    }
+    text.push(end === start + 1 ? '<>' : ' ');
+    cursor = end + 1;
+  }
+  return text.join('').replace(/\s+/g, ' ').trim();
+};
 
 export const fetchImage = async ({
   url,

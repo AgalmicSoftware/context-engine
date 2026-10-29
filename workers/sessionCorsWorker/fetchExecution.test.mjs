@@ -269,6 +269,46 @@ test('fetchUrl preserves html stripping success and insufficient-content failure
   });
 });
 
+const extractHtml = (html) => fetchUrl({
+  url: 'https://example.com/page',
+  deps: {
+    json: createJsonStub(),
+    normalizeFetchTargetUrl: () => ({ ok: true, targetUrl: 'https://example.com/page' }),
+    safeFetch: async () => new Response(html, { headers: { 'content-type': 'text/html' } }),
+  },
+});
+
+test('HTML extraction keeps ordinary page text and removes the same hidden elements', async () => {
+  const visible = 'The visible page has enough useful content to be returned by the fetch helper.';
+  const fixtures = [
+    [`<html><head><title>Hidden</title></head><body><h1>Heading</h1><p>${visible}</p></body></html>`, `Heading ${visible}`],
+    [`before<SCRIPT>if (1 < 2) { hidden(); }</SCRIPT>after <p>${visible}</p>`, `beforeafter ${visible}`],
+    [`<STYLE>body { color: red; }</STYLE><NAV><a>Hidden</a></NAV>${visible}<FOOTER>Hidden</FOOTER>`, visible],
+    [`İ <main> ${visible}\n <span>More &amp; text</span></main>`, `İ ${visible} More &amp; text`],
+    [`<script>no closing tag<p>${visible}</p>`, `no closing tag ${visible}`],
+  ];
+  for (const [html, expected] of fixtures) {
+    const response = await extractHtml(html);
+    assert.equal(response.status, 200);
+    assert.equal(response.body.content, expected);
+  }
+});
+
+test('unclosed HTML grows linearly with the response size', async (t) => {
+  const times = [];
+  for (const size of [80, 160, 320]) {
+    const html = '<'.repeat(size * 1024);
+    const start = performance.now();
+    const response = await extractHtml(html);
+    times.push(performance.now() - start);
+    assert.equal(response.status, 200);
+    assert.equal(response.body.content, html);
+  }
+  t.diagnostic(`80/160/320 KiB extraction: ${times.map((ms) => ms.toFixed(1)).join('/')} ms`);
+  assert.ok(times[2] < 750, '320 KiB must finish in well under a second');
+  assert.ok(times[2] < times[0] * 6 + 100, 'doubling input must not repeatedly rescan its suffix');
+});
+
 for (const contentLength of [null, '1']) {
   for (const contentType of ['image/png', 'text/html', 'application/json']) {
     test(`fetch caps actual ${contentType} bytes with content-length=${contentLength}`, async () => {

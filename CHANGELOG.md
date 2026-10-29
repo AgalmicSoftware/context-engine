@@ -240,6 +240,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Extract fetched HTML in linear time, including responses with repeated
+  unclosed tags, while preserving ordinary visible text.
+
 - Sign each faucet payment once and resend the same bytes across RPC fallback.
   Return the transaction hash on uncertain outcomes, including agent requests.
 
