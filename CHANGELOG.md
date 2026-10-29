@@ -19,7 +19,7 @@ All notable changes to this project will be documented in this file.
   freeform, choice and other unscored answers out of agreement counts and averages.
 
 - Require structured approval for sponsored question changes; text-only approval
-  no longer applies them. Reject an approved plan digest when the plan changes.
+  no longer applies them. Require a valid plan digest and reject it when the plan changes.
 
 - Keep canonical submitted answers when a stale submission-index copy has the
   same timestamp. Newer timestamps still take precedence when deduplicating copies.
