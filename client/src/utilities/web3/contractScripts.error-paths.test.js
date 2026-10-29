@@ -848,6 +848,7 @@ describe('error paths', () => {
       address: GROUP_CFG.contracts.surveys.address,
       methods: ['submitResponses'],
     });
+    mockSurveyContract.getResponse = jest.fn(async () => ethers.constants.HashZero);
     jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
       return mockSurveyContract;
     });
@@ -857,7 +858,14 @@ describe('error paths', () => {
     const submitSpy = jest.spyOn(contractScripts, 'submitResponses');
 
     await expect(
-      submitResponses('wagmi', [QUESTION_ID], [{ answer: 'yes' }], SURVEY_ID, { complete: true }, GROUP_CFG),
+      submitResponses(
+        'wagmi',
+        [QUESTION_ID],
+        [{ questionID: QUESTION_ID, answer: 'yes' }],
+        SURVEY_ID,
+        { complete: true },
+        GROUP_CFG,
+      ),
     ).rejects.toBe(timeoutError);
 
     expect(submitSpy).toHaveBeenCalledTimes(1);
@@ -1397,6 +1405,7 @@ describe('error paths', () => {
       address: GROUP_CFG.contracts.surveys.address,
       methods: ['submitResponses'],
     });
+    mockSurveyContract.getResponse = jest.fn(async () => ethers.constants.HashZero);
     jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
       return mockSurveyContract;
     });
@@ -1411,7 +1420,7 @@ describe('error paths', () => {
     await submitResponses(
       'wagmi',
       [QUESTION_ID],
-      [{ answer: 'yes' }],
+      [{ questionID: QUESTION_ID, answer: 'yes' }],
       SURVEY_ID,
       { complete: true },
       CLOUDFLARE_GROUP_CFG,

@@ -148,15 +148,17 @@ export async function normalizeSubmitReceipt(
   },
 ): Promise<NormalizedSubmitReceipt> {
   const { questionResponses, surveyResponse, surveyId, submissionGroupKey, deepClone } = opts;
+  const txRecord = isObjectRecord(tx) ? (tx as SubmitTransaction) : null;
+  const submittedSurveyResponse = isObjectRecord(txRecord?.__ceSurveyResponse)
+    ? txRecord.__ceSurveyResponse
+    : surveyResponse;
 
   const submittedPayloadMeta: SubmitReceiptResult['submittedPayloadMeta'] = {
     __ceQuestionResponses: deepClone(questionResponses || []),
-    __ceSurveyResponse: surveyResponse ? deepClone(surveyResponse) : null,
+    __ceSurveyResponse: submittedSurveyResponse ? deepClone(submittedSurveyResponse) : null,
     __ceSurveyId: surveyId || null,
     __ceSubmissionGroupKey: submissionGroupKey,
   };
-
-  const txRecord = isObjectRecord(tx) ? (tx as SubmitTransaction) : null;
 
   if (txRecord && typeof txRecord.wait === 'function') {
     const receipt = await txRecord.wait();
