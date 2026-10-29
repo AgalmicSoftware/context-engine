@@ -110,6 +110,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Finish question and survey publication in its original session, preserve drafts
+  edited while publishing, and leave newly opened forms and their timers untouched.
+
 - Pin all SBT writes to the collection session’s configured chain, reject missing
   chains and wallet mismatches, and include the chain in the approved transaction.
 
