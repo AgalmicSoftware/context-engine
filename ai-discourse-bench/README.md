@@ -450,6 +450,11 @@ npm run publish:static -- \
   --topic "AI Futures & Policy"
 ```
 
+When rendering with `render-report --analysis`, pass the same `--analysis` file
+to `publish:static`. Publication validates its source-report fingerprint and
+compares the supplied HTML with a rendering of that same report and overlay.
+Altered HTML and mismatched overlays are refused.
+
 This writes a deterministic gzip artifact and updates the route manifest. A
 preview report remains visibly marked and unindexed, including a release-ready
 report built without `build-report --release`. Only a valid release validation

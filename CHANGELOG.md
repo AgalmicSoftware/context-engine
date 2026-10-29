@@ -530,6 +530,8 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Publish rendered previews with the same validated analysis overlay, retaining HTML equality and integrity checks.
+
 - Keep report trait names and values as own dictionary keys, including built-in
   names such as constructor, across grouping, filtering and export.
 
