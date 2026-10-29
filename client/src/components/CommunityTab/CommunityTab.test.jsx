@@ -15,10 +15,9 @@ import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import * as polisReportModule from '../PolisReport/PolisReport';
 import {
   initCacheManager,
-  listNamespaceEntriesSync,
+  clearCacheNamespace,
   peekCacheSync,
   readCache,
-  removeCache,
   writeCache,
 } from '../../utilities/cache/cacheScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -105,9 +104,8 @@ const writeWorkerStatsCaches = async ({
 const clearManagedCaches = async () => {
   await initCacheManager();
   for (const namespace of MANAGED_NAMESPACES) {
-    const entries = listNamespaceEntriesSync(namespace);
-    await Promise.all(entries.map((entry) => removeCache(namespace, entry?.slug || '')));
-    await removeCache(namespace, '');
+    // Namespace invalidation clears the mirror even when this fixture has no IDB.
+    await clearCacheNamespace(namespace);
   }
 };
 
