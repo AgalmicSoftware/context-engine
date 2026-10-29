@@ -121,6 +121,9 @@ All notable changes to this project will be documented in this file.
   from tool errors and logs, so a keyed RPC URL cannot reach a transcript.
 
 ### Client — available when the site deploys
+- Keep Realtime interview questions and answers in conversation order when
+  transcription completions arrive late or repeat.
+
 
 - Preserve every stored survey answer when submitting a partial edit. Read the
   current raw container before uploads, retain unchanged encrypted rows exactly,

@@ -76,6 +76,29 @@ const readRealtimeInterviewerTurn = (event: Record<string, unknown>): RealtimeIn
   };
 };
 
+const orderConversationTurns = (turns: RealtimeInterviewTurn[], slots: Map<string, string | null>) => {
+  const orderedIds: string[] = [];
+  const placed = new Set<string>();
+  const place = (id: string) => {
+    if (placed.has(id)) return;
+    placed.add(id);
+    const previous = slots.get(id);
+    if (previous && slots.has(previous)) place(previous);
+    const after = previous ? orderedIds.indexOf(previous) : -1;
+    if (previous && after === -1) orderedIds.push(id);
+    else orderedIds.splice(after + 1, 0, id);
+  };
+  // Predecessors can arrive later; rebuild slots independently of transcript
+  // completion order. Unknown items retain arrival order after known slots.
+  slots.forEach((_previous, id) => place(id));
+  const positions = new Map(orderedIds.map((id, index) => [id, index]));
+  const position = (turn: RealtimeInterviewTurn) => {
+    const id = turn.role === 'interviewer' ? turn.itemId.replace(/^interviewer:(.*):[^:]+:[^:]+$/, '$1') : turn.itemId;
+    return positions.get(id) ?? Infinity;
+  };
+  return [...turns].sort((a, b) => position(a) - position(b));
+};
+
 export const buildRealtimeInterviewTranscript = (turns: RealtimeInterviewTurn[]): string => {
   const ordered = turns.some((turn) => turn.fragment)
     ? [...turns].sort((a, b) => (a.startMs ?? Infinity) - (b.startMs ?? Infinity))
@@ -171,6 +194,8 @@ export const startSessionRealtimeInterview = async ({
   let started = false;
   let paused = false;
   const turns: RealtimeInterviewTurn[] = [];
+  const conversationSlots = new Map<string, string | null>();
+  const orderedTurns = () => (live ? [...turns] : orderConversationTurns(turns, conversationSlots));
   const sessionEvents = new EventTarget();
   const remoteStreams = new Set<MediaStream>();
   const timeout = setTimeout(
@@ -246,10 +271,36 @@ export const startSessionRealtimeInterview = async ({
           }),
         );
     }
+    let changed = false;
+    if (
+      !live &&
+      ['conversation.item.created', 'conversation.item.added', 'input_audio_buffer.committed'].includes(
+        trim(event.type),
+      )
+    ) {
+      const id = trim(event.item_id || asRecord(event.item).id);
+      const previous = trim(event.previous_item_id) || null;
+      if (id && (!conversationSlots.has(id) || conversationSlots.get(id) !== previous)) {
+        conversationSlots.delete(id);
+        conversationSlots.set(id, previous);
+        changed = true;
+      }
+    }
     const turn = readRealtimeInterviewerTurn(event) || readRealtimeResponderTurn(event);
-    if (!turn || (turn.itemId && turns.some((entry) => entry.itemId === turn.itemId))) return;
-    turns.push({ ...turn, itemId: turn.itemId || `fragment-${turns.length}` });
-    onTranscript(buildRealtimeInterviewTranscript(turns), [...turns]);
+    if (turn) {
+      const existing = turn.itemId ? turns.findIndex((entry) => entry.itemId === turn.itemId) : -1;
+      if (existing === -1) {
+        turns.push({ ...turn, itemId: turn.itemId || `fragment-${turns.length}` });
+        changed = true;
+      } else if (!turn.fragment && turns[existing].text !== turn.text) {
+        turns[existing] = turn;
+        changed = true;
+      }
+    }
+    if (changed) {
+      const ordered = orderedTurns();
+      onTranscript(buildRealtimeInterviewTranscript(ordered), ordered);
+    }
   };
   controller.signal.addEventListener('abort', cleanup, { once: true });
   signal?.addEventListener('abort', externalAbort, { once: true });
@@ -413,7 +464,8 @@ export const startSessionRealtimeInterview = async ({
         } catch {}
         controller.abort();
       }
-      return { transcript: buildRealtimeInterviewTranscript(turns), turns: [...turns] };
+      const ordered = orderedTurns();
+      return { transcript: buildRealtimeInterviewTranscript(ordered), turns: ordered };
     },
     appendInstructions: (content) => {
       if (stopped || paused || channel?.readyState !== 'open' || !content.trim()) return false;
@@ -437,6 +489,6 @@ export const startSessionRealtimeInterview = async ({
         return false;
       }
     },
-    getTranscript: () => buildRealtimeInterviewTranscript(turns),
+    getTranscript: () => buildRealtimeInterviewTranscript(orderedTurns()),
   };
 };

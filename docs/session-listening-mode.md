@@ -460,3 +460,14 @@ network failures remain retryable and closing the modal cancels catalog work.
 ### Live interview context limits
 
 The complete initial/continued voice instructions fit below the Worker’s 32,000-character limit. The client keeps whole question rows, recent role-labelled conversation turns, and bounded background/review data. Participant edits are either included exactly or omitted with their obsolete prediction; they are never shortened into a different answer. Review state also reaches continued voice when no external prefill was imported. A notice explains omitted voice context. The full local transcript and review drafts remain available to final response mapping. If no complete question fits, the client reports an error before opening the microphone; participants can answer manually or ask the owner to shorten the question content.
+
+### Realtime transcript order
+
+Realtime sessions place completed input and interviewer transcripts in conversation
+slots from `conversation.item.created`, `conversation.item.added`, and
+`input_audio_buffer.committed`, using their item IDs and `previous_item_id`.
+Late completions fill their existing slots; repeated completions update the same
+turn. A completion without an ordering event appears after known slots in arrival
+order until its event arrives. The live display and stopped transcript use the
+same order. Live protocol fragments continue to use their timestamps. See the
+[OpenAI server-event reference](https://developers.openai.com/api/reference/resources/realtime/server-events).
