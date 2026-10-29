@@ -30405,7 +30405,7 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, safeKeyPart, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, legacyEncodedMemberKey, legacyCaseFoldedMemberKey, legacyMemberPrefix, legacyEncodedPrincipalPrefix, legacyCaseFoldedPrincipalPrefix, legacyEncodedMemberIndexKey, legacyCaseFoldedMemberIndexKey, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
     init_workerGroupUrl();
@@ -30439,7 +30439,6 @@ var init_workerGroups = __esm({
     MAX_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
     WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL = "fresh-template-v2";
     IMPLEMENTED_JOIN_MODES = /* @__PURE__ */ new Set([WORKER_GROUP_JOIN_MODES.OPEN, WORKER_GROUP_JOIN_MODES.ADMIN_ADD]);
-    safeKeyPart = (value) => trim2(value || "id").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "id";
     normalizeWorkerGroupId = (value) => {
       const normalized = trim2(value).toLowerCase();
       if (!normalized || normalized.length > MAX_WORKER_GROUP_ID_LENGTH) return "";
@@ -30493,7 +30492,7 @@ var init_workerGroups = __esm({
       const encoded = cursor.slice(WORKER_GROUP_MEMBER_CURSOR_PREFIX.length);
       const separatorIndex = encoded.indexOf(":");
       const source = encoded.slice(0, separatorIndex);
-      if (separatorIndex < 0 || source !== "canonical" && source !== "legacy") {
+      if (separatorIndex < 0 || source !== "canonical") {
         throw new Error("Worker group member cursor is invalid.");
       }
       return {
@@ -30538,13 +30537,6 @@ var init_workerGroups = __esm({
     legacyGroupPrefix = ({ slug }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:`;
     legacyGroupIndexKey = ({ slug, groupId }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
     legacyGroupIndexPrefix = ({ slug }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:`;
-    legacyEncodedMemberKey = ({ slug, groupId, principalKey }) => `ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:${encodedPrincipalKeyPart(principalKey)}`;
-    legacyCaseFoldedMemberKey = ({ slug, groupId, principalKey }) => `ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:${safeKeyPart(principalKey)}`;
-    legacyMemberPrefix = ({ slug, groupId }) => `ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:`;
-    legacyEncodedPrincipalPrefix = ({ slug, principalKey }) => `ce-worker-group-principal:${sessionSlugStorageKey(slug)}:${encodedPrincipalKeyPart(principalKey)}:`;
-    legacyCaseFoldedPrincipalPrefix = ({ slug, principalKey }) => `ce-worker-group-principal:${sessionSlugStorageKey(slug)}:${safeKeyPart(principalKey)}:`;
-    legacyEncodedMemberIndexKey = ({ slug, principalKey, groupId }) => `${legacyEncodedPrincipalPrefix({ slug, principalKey })}${normalizeWorkerGroupId(groupId)}`;
-    legacyCaseFoldedMemberIndexKey = ({ slug, principalKey, groupId }) => `${legacyCaseFoldedPrincipalPrefix({ slug, principalKey })}${normalizeWorkerGroupId(groupId)}`;
     jsonResponse = (deps, body, status, headers2) => deps?.json?.(body, status, headers2) || new Response(JSON.stringify(body), { status, headers: headers2 });
     normalizeJoinMode = (value) => {
       const mode = trim2(value || WORKER_GROUP_JOIN_MODES.ADMIN_ADD).toLowerCase();
@@ -31125,233 +31117,57 @@ var init_workerGroups = __esm({
         }
         return canonical;
       }
-      const legacyKeys = [legacyEncodedMemberKey({ slug, groupId, principalKey }), legacyCaseFoldedMemberKey({ slug, groupId, principalKey })];
-      for (const key of new Set(legacyKeys)) {
-        const row = await kvGetLegacyJson(store.store, key);
-        const canonical = canonicalizeMembershipRecord({
-          row,
-          slug,
-          sessionId: canonicalSessionId,
-          groupId,
-          principalKey
-        });
-        if (!canonical) continue;
-        await writeMembershipRecord({
-          store,
-          slug,
-          sessionId: canonicalSessionId,
-          groupId,
-          member: canonical
-        });
-        return canonical;
-      }
       return null;
     };
     listMembershipRecords = async ({ store, slug, sessionId, groupId = "", principalKey = "" }) => {
       const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
       if (!canonicalSessionId) throw new Error("Worker group session identity is invalid.");
-      const sources = groupId ? [
-        {
-          legacy: false,
-          prefix: memberPrefix({
-            slug,
-            sessionId: canonicalSessionId,
-            groupId
-          })
-        },
-        {
-          legacy: true,
-          prefix: legacyMemberPrefix({ slug, groupId })
-        }
-      ] : [
-        {
-          legacy: false,
-          prefix: principalPrefix({
-            slug,
-            sessionId: canonicalSessionId,
-            principalKey
-          })
-        },
-        {
-          legacy: true,
-          prefix: legacyEncodedPrincipalPrefix({ slug, principalKey })
-        },
-        {
-          legacy: true,
-          prefix: legacyCaseFoldedPrincipalPrefix({ slug, principalKey })
-        }
-      ];
-      const keyedSources = /* @__PURE__ */ new Map();
-      for (const source of sources) {
-        const keys = await kvListKeys(store.store, source.prefix);
-        for (const key of keys) {
-          const existing = keyedSources.get(key);
-          if (!existing || existing.legacy && !source.legacy) {
-            keyedSources.set(key, source);
-          }
-        }
-      }
-      const members = /* @__PURE__ */ new Map();
-      for (const [key, source] of keyedSources) {
+      const prefix = groupId ? memberPrefix({ slug, sessionId: canonicalSessionId, groupId }) : principalPrefix({ slug, sessionId: canonicalSessionId, principalKey });
+      const members = [];
+      for (const key of await kvListKeys(store.store, prefix)) {
         let indexedGroupId = groupId;
         if (!indexedGroupId) {
           try {
             indexedGroupId = await store.store.get(key);
           } catch {
-            if (source.legacy) continue;
             throw new Error("Worker group membership index is unavailable.");
           }
         }
-        if (!normalizeWorkerGroupId(indexedGroupId)) {
-          if (source.legacy) continue;
-          throw new Error("Worker group membership index is malformed.");
+        if (!normalizeWorkerGroupId(indexedGroupId)) throw new Error("Worker group membership index is malformed.");
+        if (!groupId && key !== memberIndexKey({ slug, sessionId: canonicalSessionId, principalKey, groupId: indexedGroupId })) {
+          throw new Error("Worker group membership index does not match its key.");
         }
-        if (!groupId) {
-          const validIndexKey = source.legacy ? key === legacyEncodedMemberIndexKey({ slug, principalKey, groupId: indexedGroupId }) || key === legacyCaseFoldedMemberIndexKey({ slug, principalKey, groupId: indexedGroupId }) : key === memberIndexKey({
-            slug,
-            sessionId: canonicalSessionId,
-            principalKey,
-            groupId: indexedGroupId
-          });
-          if (!validIndexKey) {
-            if (source.legacy) continue;
-            throw new Error("Worker group membership index does not match its key.");
-          }
-        }
-        const rawRow = groupId ? source.legacy ? await kvGetLegacyJson(store.store, key) : await kvGetJsonStrict(store.store, key) : await readMembershipRecord({
-          store,
-          slug,
-          sessionId: canonicalSessionId,
-          groupId: indexedGroupId,
-          principalKey
-        });
-        const row = canonicalizeMembershipRecord({
-          row: rawRow,
-          slug,
-          sessionId: canonicalSessionId,
-          groupId: indexedGroupId,
-          principalKey
-        });
-        if (!row && !source.legacy && rawRow) {
-          throw new Error("Worker group membership KV record does not match its key.");
-        }
-        if (row && !row.removedAt && (!groupId || normalizeWorkerGroupId(row.groupId) === normalizeWorkerGroupId(groupId)) && (!principalKey || row.principalKey === principalKey)) {
-          if (source.legacy) {
-            await writeMembershipRecord({
-              store,
-              slug,
-              sessionId: canonicalSessionId,
-              groupId: indexedGroupId,
-              member: row
-            });
-          }
-          members.set(`${row.groupId}
-${row.principalKey}`, row);
-        }
+        const rawRow = groupId ? await kvGetJsonStrict(store.store, key) : await readMembershipRecord({ store, slug, sessionId: canonicalSessionId, groupId: indexedGroupId, principalKey });
+        const row = canonicalizeMembershipRecord({ row: rawRow, slug, sessionId: canonicalSessionId, groupId: indexedGroupId, principalKey });
+        if (!row && rawRow) throw new Error("Worker group membership KV record does not match its key.");
+        if (row && !row.removedAt) members.push(row);
       }
-      return [...members.values()];
+      return members;
     };
     listMembershipRecordPage = async ({ store, slug, sessionId, groupId, cursor, limit }) => {
       const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
       if (!canonicalSessionId) throw new Error("Worker group session identity is invalid.");
       const decodedCursor = decodeWorkerGroupMemberCursor(cursor);
-      const members = /* @__PURE__ */ new Map();
-      const readPage = async ({ source, pageCursor = "", pageLimit }) => {
-        const legacy = source === "legacy";
-        const page = await kvListKeyPage(
-          store.store,
-          legacy ? legacyMemberPrefix({ slug, groupId }) : memberPrefix({ slug, sessionId: canonicalSessionId, groupId }),
-          {
-            cursor: pageCursor,
-            limit: pageLimit
-          }
-        );
-        for (const key of page.keys) {
-          const rawRow = legacy ? await kvGetLegacyJson(store.store, key) : await kvGetJsonStrict(store.store, key);
-          const row = canonicalizeMembershipRecord({
-            row: rawRow,
-            slug,
-            sessionId: canonicalSessionId,
-            groupId
-          });
-          if (!row) {
-            if (!legacy && rawRow) {
-              throw new Error("Worker group membership KV record does not match its key.");
-            }
-            continue;
-          }
-          const validKey = legacy ? key === legacyEncodedMemberKey({
-            slug,
-            groupId,
-            principalKey: row.principalKey
-          }) || key === legacyCaseFoldedMemberKey({
-            slug,
-            groupId,
-            principalKey: row.principalKey
-          }) : key === memberKey({
-            slug,
-            sessionId: canonicalSessionId,
-            groupId,
-            principalKey: row.principalKey
-          });
-          if (!validKey) {
-            if (!legacy) {
-              throw new Error("Worker group membership KV record does not match its key.");
-            }
-            continue;
-          }
-          if (legacy) {
-            await writeMembershipRecord({
-              store,
-              slug,
-              sessionId: canonicalSessionId,
-              groupId,
-              member: row
-            });
-          }
-          if (!row.removedAt) {
-            members.set(`${row.groupId}
-${row.principalKey}`, row);
-          }
+      const page = await kvListKeyPage(store.store, memberPrefix({ slug, sessionId: canonicalSessionId, groupId }), {
+        cursor: decodedCursor.cursor,
+        limit
+      });
+      const members = [];
+      for (const key of page.keys) {
+        const rawRow = await kvGetJsonStrict(store.store, key);
+        const row = canonicalizeMembershipRecord({ row: rawRow, slug, sessionId: canonicalSessionId, groupId });
+        if (!row) {
+          if (rawRow) throw new Error("Worker group membership KV record does not match its key.");
+          continue;
         }
-        return page;
-      };
-      if (decodedCursor.source === "legacy") {
-        const legacyPage2 = await readPage({
-          source: "legacy",
-          pageCursor: decodedCursor.cursor,
-          pageLimit: limit
-        });
-        return {
-          members: [...members.values()],
-          nextCursor: legacyPage2.nextCursor ? encodeWorkerGroupMemberCursor("legacy", legacyPage2.nextCursor) : ""
-        };
+        if (key !== memberKey({ slug, sessionId: canonicalSessionId, groupId, principalKey: row.principalKey })) {
+          throw new Error("Worker group membership KV record does not match its key.");
+        }
+        if (!row.removedAt) members.push(row);
       }
-      const canonicalPage = await readPage({
-        source: "canonical",
-        pageCursor: decodedCursor.cursor,
-        pageLimit: limit
-      });
-      if (canonicalPage.nextCursor) {
-        return {
-          members: [...members.values()],
-          nextCursor: encodeWorkerGroupMemberCursor("canonical", canonicalPage.nextCursor)
-        };
-      }
-      const remainingLimit = limit - members.size;
-      if (remainingLimit <= 0) {
-        return {
-          members: [...members.values()],
-          nextCursor: encodeWorkerGroupMemberCursor("legacy")
-        };
-      }
-      const legacyPage = await readPage({
-        source: "legacy",
-        pageLimit: remainingLimit
-      });
       return {
-        members: [...members.values()],
-        nextCursor: legacyPage.nextCursor ? encodeWorkerGroupMemberCursor("legacy", legacyPage.nextCursor) : ""
+        members,
+        nextCursor: page.nextCursor ? encodeWorkerGroupMemberCursor("canonical", page.nextCursor) : ""
       };
     };
     redactGroupForMember = (group) => ({
