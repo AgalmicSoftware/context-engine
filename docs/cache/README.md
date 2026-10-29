@@ -46,7 +46,7 @@ trailing colon.
 
 ## Shared backend behavior
 
-- Primary backend: IndexedDB via `idb-keyval`
+- Primary backend: IndexedDB via the private key/value helper
   - DB name: `ce_cache_v1`
   - store name: `ce_cache_entries_v1`
 - Synchronous render-safe reads come from the in-memory mirror (`peekCacheSync`, `listNamespaceEntriesSync`)
@@ -63,7 +63,14 @@ trailing colon.
 - Fallback behavior:
   - the cache layer does not immediately demote to localStorage on a single IndexedDB error
   - it falls back only after repeated consecutive IDB failures
-- Legacy localStorage keys are still migrated best-effort for older installs
+- Managed localStorage entries are reconciled after IndexedDB outages.
+- Clearing a namespace first persists a new generation in localStorage. Older
+  entries become unreadable immediately and are removed when IndexedDB recovers,
+  including entries absent from the in-memory mirror. New writes use the current
+  generation; a write interrupted by a clear cannot retry into the new one.
+- Deletes report success only after both stores are cleared. Settings reports
+  incomplete clears and reloads only on success; generation markers keep an
+  outage-time clear effective even when physical cleanup must wait.
 - `npm run test:cache-guard` scans all production client paths, including the
   canonical cache implementation, and rejects direct managed-cache access in
   dot, bracket, or optional-bracket form unless a dynamic namespace is guarded

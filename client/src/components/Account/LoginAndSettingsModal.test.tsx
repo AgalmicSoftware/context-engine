@@ -115,6 +115,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   initCacheManager: jest.fn(async () => undefined),
   listNamespaceEntriesSync: jest.fn(() => []),
   removeCache: jest.fn(async () => true),
+  clearCacheNamespace: jest.fn(async () => true),
 }));
 
 const LoginAndSettingsModalSubject = LoginAndSettingsModal as any;
@@ -704,7 +705,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(subject.loadSponsoredAccess).toHaveBeenCalledTimes(1);
   });
 
-  it('scans managed cache entries without cloning values and de-duplicates slug clears', async () => {
+  it('clears every namespace including entries absent from the mirror', async () => {
     mockedCacheScripts.listNamespaceEntriesSync.mockImplementation((namespace: string) => {
       if (namespace === 'questionsCache') {
         return [
@@ -721,13 +722,29 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     await subject.handleClearAllCaches();
 
-    expect(mockedCacheScripts.listNamespaceEntriesSync).toHaveBeenCalledWith('questionsCache', { cloneValues: false });
-    const edgeCalls = mockedCacheScripts.removeCache.mock.calls.filter(
-      ([namespace, slug]: any[]) => namespace === 'questionsCache' && slug === 'edge',
-    );
-    expect(edgeCalls).toHaveLength(1);
-    expect(mockedCacheScripts.removeCache).toHaveBeenCalledWith('questionsCache', '');
+    expect(mockedCacheScripts.clearCacheNamespace.mock.calls.map(([namespace]: [string]) => namespace)).toEqual([
+      'questionsCache',
+      'surveysCache',
+      'bookmarksCache',
+      'filters',
+      'sbtCache',
+      'userCache',
+    ]);
     expect(subject.reloadPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports an incomplete clear and does not reload', async () => {
+    mockedCacheScripts.clearCacheNamespace.mockResolvedValueOnce(false);
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+    subject.reloadPage = jest.fn();
+    const alert = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    try {
+      await subject.handleClearAllCaches();
+      expect(subject.reloadPage).not.toHaveBeenCalled();
+      expect(alert).toHaveBeenCalledWith(expect.stringMatching(/could not.*clear/i));
+    } finally {
+      alert.mockRestore();
+    }
   });
 
   it('deduplicates in-flight cache clear requests', async () => {

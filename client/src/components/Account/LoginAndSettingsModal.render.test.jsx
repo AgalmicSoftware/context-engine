@@ -137,6 +137,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   initCacheManager: jest.fn(async () => undefined),
   listNamespaceEntriesSync: jest.fn(() => []),
   removeCache: jest.fn(async () => true),
+  clearCacheNamespace: jest.fn(async () => true),
 }));
 
 import { LoginAndSettingsModal, buildBookmarksRoutePath } from './LoginAndSettingsModal';
