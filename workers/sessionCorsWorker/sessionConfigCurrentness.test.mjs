@@ -1,3 +1,4 @@
+import { isWorkerGroupMember, executeCoordinatedWorkerGroupMutation } from './workerGroups.js';
 import { dispatchAdminRequest } from './adminRequestDispatch.js';
 import { executeCoordinatedStorageVisibilityMutation } from './sessionConfigAuthority.js';
 import { createWorkerRouteShellWithWorkerDeps } from './workerRouteShellBinding.js';
@@ -406,6 +407,126 @@ test('a verified admin request delayed by authorization work cannot overwrite a 
   resume();
   assert.equal((await pending).status, 409);
   assert.equal((await f.snapshot()).config.adminAddress, ACTOR_B);
+});
+
+const groupAuthorityFixture = async () => {
+  const sessionId = '0x' + 'ab'.repeat(16);
+  const f = createFixture({ slug: 'fixture', adminAddress: ACTOR_A, sessionId });
+  f.env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
+  f.env.GROUP_KV.delete = async (key) => { f.writes.push(key); f.kv.delete(key); };
+  f.env.GROUP_KV.list = async ({ prefix = '' } = {}) => ({
+    keys: [...f.kv.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })), list_complete: true,
+  });
+  const groupStore = new Map();
+  const storage = {
+    get: async (key) => structuredClone(groupStore.get(key)),
+    put: async (key, value) => groupStore.set(key, structuredClone(value)),
+    delete: async (key) => groupStore.delete(key),
+    list: async ({ prefix = '' } = {}) => new Map([...groupStore].filter(([key]) => key.startsWith(prefix))),
+  };
+  storage.transaction = async (fn) => fn(storage);
+  const groups = new SessionWriteCoordinator({ storage }, f.env);
+  f.env.CE_WORKER_GROUP_COORDINATOR = { idFromName: (name) => name, get: (name) => {
+    assert.equal(name, `worker-groups:fixture:${sessionId}`);
+    return { fetch: (url, init) => groups.fetch(new Request(url, init)) };
+  } };
+  const args = { env: f.env, slug: 'fixture', sessionId, groupId: 'reviewers', principal: { kind: 'evm_address', address: ACTOR_A }, actorPrincipal: { kind: 'evm_address', address: ACTOR_A } };
+  const created = await groups.fetch(new Request('https://session-coordinator.internal/worker-groups/mutate', {
+    method: 'POST', body: JSON.stringify({ ...args, env: undefined, operation: 'create',
+      input: { groupId: 'reviewers', label: 'Reviewers', joinMode: 'open' } }),
+  }));
+  assert.equal(created.status, 200, JSON.stringify(await created.json()));
+  return { ...f, args, groupStore, groups, sessionId };
+};
+
+test('a stale authority proof never changes membership in a separate group coordinator', async () => {
+  const f = await groupAuthorityFixture();
+  let admitted;
+  let resume;
+  const admission = new Promise((resolve) => { admitted = resolve; });
+  const blocked = new Promise((resolve) => { resume = resolve; });
+  const pending = dispatchAdminRequest({ env: f.env, action: 'groups/add-member',
+    request: { json: async () => ({ sessionId: f.sessionId, groupId: 'reviewers', principal: f.args.principal }) },
+    deps: { json, resolveAdminRequestAuthority: async () => {
+      const authority = await adminAuthority(f, ACTOR_A);
+      admitted(); await blocked; return authority;
+    } },
+  });
+  await admission;
+  assert.equal((await f.rotate()).ok, true);
+  const before = { kv: [...f.kv], groups: structuredClone([...f.groupStore]), writes: f.writes.length };
+  resume();
+  assert.equal((await pending).status, 409);
+  assert.deepEqual([...f.kv], before.kv);
+  assert.deepEqual([...f.groupStore], before.groups);
+  assert.equal(f.writes.length, before.writes);
+  const fresh = await dispatchAdminRequest({ env: f.env, action: 'groups/add-member',
+    request: { json: async () => ({ sessionId: f.sessionId, groupId: 'reviewers', principal: f.args.principal }) },
+    deps: { json, resolveAdminRequestAuthority: () => adminAuthority(f, ACTOR_B) },
+  });
+  assert.equal(fresh.status, 200);
+  assert.equal((await isWorkerGroupMember(f.args)).ok, true);
+  assert.equal(f.groupStore.has('session-config-authority'), false, 'only session config owns the authority');
+});
+
+test('rotation waits for an admitted group commit and missing authority never enters the group object', async () => {
+  const f = await groupAuthorityFixture();
+  const before = structuredClone([...f.groupStore]);
+  assert.equal((await executeCoordinatedWorkerGroupMutation({ ...f.args, operation: 'add-member' })).status, 409);
+  assert.deepEqual([...f.groupStore], before);
+  const proof = await f.authorized();
+  const put = f.env.GROUP_KV.put;
+  let entered;
+  let resume;
+  const committing = new Promise((resolve) => { entered = resolve; });
+  const blocked = new Promise((resolve) => { resume = resolve; });
+  f.env.GROUP_KV.put = async (key, value) => { entered(); await blocked; await put(key, value); };
+  const mutation = executeCoordinatedWorkerGroupMutation({ ...f.args, operation: 'add-member', expectedAuthority: proof });
+  await committing;
+  let rotated = false;
+  const rotation = f.rotate().then((result) => { rotated = true; return result; });
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(rotated, false);
+  } finally { resume(); }
+  assert.equal((await mutation).ok, true);
+  assert.equal((await rotation).ok, true);
+  assert.equal((await isWorkerGroupMember(f.args)).ok, true);
+});
+
+test('participant join and leave preserve the admitted epoch through group dispatch', async () => {
+  for (const path of ['/groups/join', '/groups/leave']) {
+    const f = await groupAuthorityFixture();
+    const admitted = await f.authorized();
+    assert.equal((await executeCoordinatedWorkerGroupMutation({ ...f.args, operation: 'join', expectedAuthority: admitted })).ok, true);
+    assert.equal((await f.rotate()).ok, true);
+    const before = structuredClone([...f.groupStore]);
+    const result = await dispatchAuthenticatedSecretPathRoute({ env: f.env, path, method: 'POST',
+      request: new Request(`https://worker.example${path}`, { method: 'POST',
+        body: JSON.stringify({ sessionId: f.sessionId, groupId: 'reviewers' }) }),
+      config: f.config, slug: 'fixture', address: ACTOR_A, expectedAuthority: admitted, scopes: { groups: true },
+      deps: { json, evaluateAuthenticatedRoutePreflight: async () => ({ ok: true }) },
+    });
+    assert.equal(result.response.status, 409, path);
+    assert.deepEqual([...f.groupStore], before);
+  }
+});
+
+test('a committed group intent finishes recovery after the admitting authority changes', async () => {
+  const f = await groupAuthorityFixture();
+  const put = f.env.GROUP_KV.put;
+  let interrupted = false;
+  f.env.GROUP_KV.put = async (key, value) => {
+    await put(key, value);
+    if (!interrupted && key.includes('member')) { interrupted = true; throw new Error('interrupted projection'); }
+  };
+  const started = await executeCoordinatedWorkerGroupMutation({ ...f.args, operation: 'add-member', expectedAuthority: await f.authorized() });
+  assert.equal(started.status, 503);
+  assert.equal(interrupted, true);
+  assert.equal((await f.rotate()).ok, true);
+  assert.equal((await isWorkerGroupMember(f.args)).ok, true);
+  assert.equal(f.groupStore.has('session-config-authority'), false);
+  assert.equal([...f.groupStore.values()].some((value) => value?.pendingMutation), false);
 });
 
 test('Lit provisioning in flight rejects completion after rotation and does not persist its remote outputs', async () => {

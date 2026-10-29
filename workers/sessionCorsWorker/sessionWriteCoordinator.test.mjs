@@ -14,7 +14,7 @@ import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 import {
 	addWorkerGroupMember as addWorkerGroupMemberBoundary,
 	createWorkerGroup as createWorkerGroupBoundary,
-	executeCoordinatedWorkerGroupMutation as executeCoordinatedWorkerGroupMutationBoundary,
+	forwardWorkerGroupMutation as executeCoordinatedWorkerGroupMutationBoundary,
 	isWorkerGroupMember as isWorkerGroupMemberBoundary,
 } from './workerGroups.js';
 

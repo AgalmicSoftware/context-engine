@@ -25182,189 +25182,6 @@ var init_stringCoercion = __esm({
   }
 });
 
-// shared/workerGroupUrl.mjs
-var normalizeWorkerGroupUrl;
-var init_workerGroupUrl = __esm({
-  "shared/workerGroupUrl.mjs"() {
-    normalizeWorkerGroupUrl = (value) => {
-      const raw = String(value ?? "").trim();
-      if (!raw) return "";
-      try {
-        const parsed = new URL(raw);
-        return parsed.protocol === "https:" && !parsed.username && !parsed.password ? parsed.href : null;
-      } catch {
-        return null;
-      }
-    };
-  }
-});
-
-// workers/sessionCorsWorker/sessionSlugResolution.js
-var INVALID_SESSION_SLUG_ERROR, SLUG_MISMATCH_ERROR, SLUG_ALIAS_MISMATCH_ERROR, MISSING_SLUG_ERROR, DEFAULT_SESSION_STORAGE_KEY, EMPTY_VALIDATION_RESULT, hasExplicitWorkerSlugInput, canonicalizeReservedWorkerAlias, normalizeWorkerSessionSlug, sessionSlugStorageKey, validateInboundWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey, getDefaultWorkerSessionSlug, hasExplicitDefaultWorkerSessionSlug, resolveWorkerTenantSlug, resolveRequestedWorkerSlugPayload, resolveWorkerBodySlugContext, resolveWorkerRequestSlugContext;
-var init_sessionSlugResolution = __esm({
-  "workers/sessionCorsWorker/sessionSlugResolution.js"() {
-    init_stringCoercion();
-    INVALID_SESSION_SLUG_ERROR = 'Invalid session slug. Use lowercase letters, numbers, "_" or "-".';
-    SLUG_MISMATCH_ERROR = "sessionSlug does not match worker session.";
-    SLUG_ALIAS_MISMATCH_ERROR = "sessionSlug aliases do not match.";
-    MISSING_SLUG_ERROR = "Missing sessionSlug.";
-    DEFAULT_SESSION_STORAGE_KEY = "general";
-    EMPTY_VALIDATION_RESULT = Object.freeze({
-      ok: true,
-      slug: "",
-      error: ""
-    });
-    hasExplicitWorkerSlugInput = (raw) => raw != null && toStr6(raw).trim().length > 0;
-    canonicalizeReservedWorkerAlias = (slug = "") => {
-      if (!slug) return "";
-      if (slug === "general") return "";
-      if (slug === "debate") return "rxc";
-      return slug;
-    };
-    normalizeWorkerSessionSlug = (raw) => {
-      const slug = toStr6(raw).trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
-      if (!slug) return "";
-      return canonicalizeReservedWorkerAlias(slug);
-    };
-    sessionSlugStorageKey = (raw) => normalizeWorkerSessionSlug(raw) || DEFAULT_SESSION_STORAGE_KEY;
-    validateInboundWorkerSessionSlug = (raw) => {
-      if (raw == null) return EMPTY_VALIDATION_RESULT;
-      const rawStr = toStr6(raw).trim();
-      if (!rawStr) return EMPTY_VALIDATION_RESULT;
-      if (rawStr.toLowerCase() === "general") return EMPTY_VALIDATION_RESULT;
-      const canonicalSlug = rawStr.toLowerCase().replace(/[^a-z0-9_-]/g, "");
-      if (rawStr !== canonicalSlug) {
-        return {
-          ok: false,
-          slug: "",
-          error: INVALID_SESSION_SLUG_ERROR
-        };
-      }
-      return { ok: true, slug: canonicalizeReservedWorkerAlias(canonicalSlug), error: "" };
-    };
-    resolveCoordinatorSessionSlugStorageKey = (raw) => {
-      if (raw == null) return "";
-      const result = validateInboundWorkerSessionSlug(raw);
-      if (!result.ok) return "";
-      return result.slug || DEFAULT_SESSION_STORAGE_KEY;
-    };
-    getDefaultWorkerSessionSlug = (env = {}) => normalizeWorkerSessionSlug(env.DEFAULT_SESSION_SLUG ?? env.DEFAULT_GROUP_SLUG);
-    hasExplicitDefaultWorkerSessionSlug = (env = {}) => hasExplicitWorkerSlugInput(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG);
-    resolveWorkerTenantSlug = ({ envSlug, headerSlug, tokenSlug } = {}) => {
-      if (envSlug) return envSlug;
-      if (headerSlug) return headerSlug;
-      if (tokenSlug) return tokenSlug;
-      return "";
-    };
-    resolveRequestedWorkerSlugPayload = (body = {}) => {
-      const source = body && typeof body === "object" ? body : {};
-      const hasSessionSlug = Object.prototype.hasOwnProperty.call(source, "sessionSlug") && source?.sessionSlug != null;
-      const hasGroupSlug = Object.prototype.hasOwnProperty.call(source, "groupSlug") && source?.groupSlug != null;
-      const sessionSlugResult = hasSessionSlug ? validateInboundWorkerSessionSlug(source?.sessionSlug) : EMPTY_VALIDATION_RESULT;
-      const groupSlugResult = hasGroupSlug ? validateInboundWorkerSessionSlug(source?.groupSlug) : EMPTY_VALIDATION_RESULT;
-      const sessionSlug = hasSessionSlug ? sessionSlugResult.slug : "";
-      const groupSlug = hasGroupSlug ? groupSlugResult.slug : "";
-      const invalidResult = !sessionSlugResult.ok ? sessionSlugResult : null;
-      return {
-        ok: !invalidResult,
-        error: invalidResult?.error || "",
-        hasSessionSlug,
-        hasGroupSlug,
-        hasAnySlug: hasSessionSlug,
-        sessionSlug,
-        groupSlug,
-        requestedSlug: sessionSlug,
-        aliasMismatch: hasSessionSlug && hasGroupSlug && groupSlugResult.ok && sessionSlug !== groupSlug
-      };
-    };
-    resolveWorkerBodySlugContext = ({ body, env, slugHint } = {}) => {
-      const envSlug = getDefaultWorkerSessionSlug(env);
-      const slugPayload = resolveRequestedWorkerSlugPayload(body);
-      const normalizedHint = normalizeWorkerSessionSlug(slugHint);
-      const explicitSlugProvided = hasExplicitDefaultWorkerSessionSlug(env) || slugPayload.hasAnySlug || hasExplicitWorkerSlugInput(slugHint);
-      const targetSlug = envSlug || (slugPayload.hasAnySlug ? slugPayload.requestedSlug : normalizedHint);
-      if (!slugPayload.ok) {
-        return {
-          ok: false,
-          error: slugPayload.error,
-          envSlug,
-          slugPayload,
-          targetSlug,
-          explicitSlugProvided
-        };
-      }
-      if (slugPayload.aliasMismatch) {
-        return {
-          ok: false,
-          error: SLUG_ALIAS_MISMATCH_ERROR,
-          envSlug,
-          slugPayload,
-          targetSlug,
-          explicitSlugProvided
-        };
-      }
-      if (envSlug && slugPayload.requestedSlug && slugPayload.requestedSlug !== envSlug) {
-        return {
-          ok: false,
-          error: SLUG_MISMATCH_ERROR,
-          envSlug,
-          slugPayload,
-          targetSlug,
-          explicitSlugProvided
-        };
-      }
-      return {
-        ok: true,
-        error: "",
-        envSlug,
-        slugPayload,
-        targetSlug,
-        explicitSlugProvided
-      };
-    };
-    resolveWorkerRequestSlugContext = ({
-      tokenSlug,
-      tokenHasSlug = false,
-      headerSlug,
-      env,
-      slugHint,
-      countEmptyHeaderAsExplicit = false
-    } = {}) => {
-      const headerPresent = headerSlug != null;
-      const headerHasValue = headerPresent && toStr6(headerSlug).trim().length > 0;
-      const tokenSlugResult = validateInboundWorkerSessionSlug(tokenSlug);
-      if (tokenHasSlug && !tokenSlugResult.ok) {
-        return { ok: false, error: tokenSlugResult.error };
-      }
-      const headerSlugResult = validateInboundWorkerSessionSlug(headerSlug);
-      if (headerPresent && !headerSlugResult.ok) {
-        return { ok: false, error: headerSlugResult.error };
-      }
-      const envSlug = getDefaultWorkerSessionSlug(env);
-      const normalizedHint = normalizeWorkerSessionSlug(slugHint);
-      const resolvedTokenSlug = tokenHasSlug ? tokenSlugResult.slug : "";
-      const resolvedHeaderSlug = headerSlugResult.slug;
-      const slug = resolveWorkerTenantSlug({
-        envSlug,
-        headerSlug: resolvedHeaderSlug,
-        tokenSlug: resolvedTokenSlug
-      }) || normalizedHint;
-      const explicitHeaderProvided = countEmptyHeaderAsExplicit ? headerPresent : headerHasValue;
-      return {
-        ok: true,
-        error: "",
-        slug,
-        explicitSlugProvided: hasExplicitDefaultWorkerSessionSlug(env) || !!tokenHasSlug || hasExplicitWorkerSlugInput(slugHint) || explicitHeaderProvided,
-        envSlug,
-        tokenSlug: resolvedTokenSlug,
-        headerSlug: resolvedHeaderSlug,
-        headerPresent,
-        headerHasValue
-      };
-    };
-  }
-});
-
 // shared/sessionAgentConfig.mjs
 var record, booleanFields, fields, validSessionAgentConfig, projectPublicAgentConfig;
 var init_sessionAgentConfig = __esm({
@@ -25405,104 +25222,6 @@ var init_sessionAgentConfig = __esm({
     projectPublicAgentConfig = (value) => {
       if (!record(value)) return {};
       return Object.fromEntries(Object.entries(value).filter(([key]) => key !== "invites" && fields.has(key)));
-    };
-  }
-});
-
-// shared/interviewSettings.mjs
-var DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
-var init_interviewSettings = __esm({
-  "shared/interviewSettings.mjs"() {
-    DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
-      openingMode: "auto",
-      openingPrompt: "",
-      steeringPrompt: "",
-      autoRegenerate: false,
-      questionGrowthPercent: 20,
-      followNewQuestions: false,
-      suggestQuestions: false,
-      allowManualRefresh: true,
-      shareDraftChangesByDefault: false,
-      researchDetail: "minimal",
-      hiddenDraftShare: 0,
-      showFidelityScore: false,
-      suggestGroups: false,
-      showFidelityResults: false,
-      fidelityMinimumPeople: 5
-    });
-    MAX_HIDDEN_DRAFT_SHARE = 0.5;
-    MAX_FIDELITY_MINIMUM_PEOPLE = 50;
-    normalizeInterviewSettings = (value = {}) => {
-      const source = value && typeof value === "object" ? value : {};
-      return {
-        openingMode: source.openingMode === "owner" ? "owner" : "auto",
-        openingPrompt: String(source.openingPrompt || "").trim().slice(0, 1200),
-        steeringPrompt: String(source.steeringPrompt || "").trim().slice(0, 3e3),
-        autoRegenerate: source.autoRegenerate === true,
-        questionGrowthPercent: Number.isFinite(source.questionGrowthPercent) ? Math.max(1, Math.min(100, source.questionGrowthPercent)) : 20,
-        followNewQuestions: source.followNewQuestions === true,
-        suggestQuestions: source.suggestQuestions === true,
-        allowManualRefresh: source.allowManualRefresh !== false,
-        shareDraftChangesByDefault: source.shareDraftChangesByDefault === true,
-        // How much an AI draft comparison saves: 'minimal' keeps no AI notes or drafted text.
-        researchDetail: source.researchDetail === "full" ? "full" : "minimal",
-        // Share of a person's AI prefill drafts hidden until they answer, which measures anchoring.
-        hiddenDraftShare: Number.isFinite(source.hiddenDraftShare) ? Math.max(0, Math.min(MAX_HIDDEN_DRAFT_SHARE, source.hiddenDraftShare)) : 0,
-        // After submitting, show the person how well their AI predicted them (private, in the browser).
-        showFidelityScore: source.showFidelityScore === true,
-        // After an interview or AI prefill, suggest the session's open groups that fit the answers.
-        suggestGroups: source.suggestGroups === true,
-        // Add "How well AIs predicted people" to Results, scoring everyone's AI-prefill drafts together.
-        showFidelityResults: source.showFidelityResults === true,
-        // That section hides figures from fewer people than this; 1 shows all.
-        fidelityMinimumPeople: Number.isInteger(source.fidelityMinimumPeople) ? Math.max(1, Math.min(MAX_FIDELITY_MINIMUM_PEOPLE, source.fidelityMinimumPeople)) : DEFAULT_INTERVIEW_SETTINGS.fidelityMinimumPeople
-      };
-    };
-    validInterviewSettings = (value = {}) => {
-      if (value.openingMode !== void 0 && !["auto", "owner"].includes(value.openingMode)) return false;
-      if (value.openingPrompt !== void 0 && (typeof value.openingPrompt !== "string" || value.openingPrompt.length > 1200))
-        return false;
-      if (value.steeringPrompt !== void 0 && (typeof value.steeringPrompt !== "string" || value.steeringPrompt.length > 3e3))
-        return false;
-      if (value.openingMode === "owner" && !value.openingPrompt?.trim()) return false;
-      if (value.questionGrowthPercent !== void 0 && (!Number.isFinite(value.questionGrowthPercent) || value.questionGrowthPercent < 1 || value.questionGrowthPercent > 100))
-        return false;
-      if (value.researchDetail !== void 0 && !["minimal", "full"].includes(value.researchDetail)) return false;
-      if (value.hiddenDraftShare !== void 0 && (!Number.isFinite(value.hiddenDraftShare) || value.hiddenDraftShare < 0 || value.hiddenDraftShare > MAX_HIDDEN_DRAFT_SHARE))
-        return false;
-      if (value.fidelityMinimumPeople !== void 0 && (!Number.isInteger(value.fidelityMinimumPeople) || value.fidelityMinimumPeople < 1 || value.fidelityMinimumPeople > MAX_FIDELITY_MINIMUM_PEOPLE))
-        return false;
-      return [
-        "autoRegenerate",
-        "followNewQuestions",
-        "suggestQuestions",
-        "allowManualRefresh",
-        "shareDraftChangesByDefault",
-        "showFidelityScore",
-        "suggestGroups",
-        "showFidelityResults"
-      ].every(
-        (key) => value[key] === void 0 || typeof value[key] === "boolean"
-      );
-    };
-    hasInterviewQuestionGrowth = (baseline, currentCount, percent) => currentCount >= baseline + Math.max(1, Math.ceil(baseline * percent / 100));
-  }
-});
-
-// shared/auth/siweMessage.mjs
-var normalizeSessionIdHex;
-var init_siweMessage = __esm({
-  "shared/auth/siweMessage.mjs"() {
-    normalizeSessionIdHex = (value) => {
-      if (typeof value !== "string" || value !== value.trim()) return "";
-      const lower9 = value.toLowerCase();
-      const hex = lower9.startsWith("0x") ? lower9.slice(2) : lower9;
-      if (/^[0-9a-f]{32}$/.test(hex) && !/^0+$/.test(hex)) return `0x${hex}`;
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(lower9)) {
-        const uuidHex = lower9.replace(/-/g, "");
-        return /^0+$/.test(uuidHex) ? "" : `0x${uuidHex}`;
-      }
-      return "";
     };
   }
 });
@@ -25726,6 +25445,172 @@ var init_storageRefNormalization = __esm({
         source.arweaveTxId = arweaveTxId;
       }
       return source;
+    };
+  }
+});
+
+// workers/sessionCorsWorker/sessionSlugResolution.js
+var INVALID_SESSION_SLUG_ERROR, SLUG_MISMATCH_ERROR, SLUG_ALIAS_MISMATCH_ERROR, MISSING_SLUG_ERROR, DEFAULT_SESSION_STORAGE_KEY, EMPTY_VALIDATION_RESULT, hasExplicitWorkerSlugInput, canonicalizeReservedWorkerAlias, normalizeWorkerSessionSlug, sessionSlugStorageKey, validateInboundWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey, getDefaultWorkerSessionSlug, hasExplicitDefaultWorkerSessionSlug, resolveWorkerTenantSlug, resolveRequestedWorkerSlugPayload, resolveWorkerBodySlugContext, resolveWorkerRequestSlugContext;
+var init_sessionSlugResolution = __esm({
+  "workers/sessionCorsWorker/sessionSlugResolution.js"() {
+    init_stringCoercion();
+    INVALID_SESSION_SLUG_ERROR = 'Invalid session slug. Use lowercase letters, numbers, "_" or "-".';
+    SLUG_MISMATCH_ERROR = "sessionSlug does not match worker session.";
+    SLUG_ALIAS_MISMATCH_ERROR = "sessionSlug aliases do not match.";
+    MISSING_SLUG_ERROR = "Missing sessionSlug.";
+    DEFAULT_SESSION_STORAGE_KEY = "general";
+    EMPTY_VALIDATION_RESULT = Object.freeze({
+      ok: true,
+      slug: "",
+      error: ""
+    });
+    hasExplicitWorkerSlugInput = (raw) => raw != null && toStr6(raw).trim().length > 0;
+    canonicalizeReservedWorkerAlias = (slug = "") => {
+      if (!slug) return "";
+      if (slug === "general") return "";
+      if (slug === "debate") return "rxc";
+      return slug;
+    };
+    normalizeWorkerSessionSlug = (raw) => {
+      const slug = toStr6(raw).trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+      if (!slug) return "";
+      return canonicalizeReservedWorkerAlias(slug);
+    };
+    sessionSlugStorageKey = (raw) => normalizeWorkerSessionSlug(raw) || DEFAULT_SESSION_STORAGE_KEY;
+    validateInboundWorkerSessionSlug = (raw) => {
+      if (raw == null) return EMPTY_VALIDATION_RESULT;
+      const rawStr = toStr6(raw).trim();
+      if (!rawStr) return EMPTY_VALIDATION_RESULT;
+      if (rawStr.toLowerCase() === "general") return EMPTY_VALIDATION_RESULT;
+      const canonicalSlug = rawStr.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+      if (rawStr !== canonicalSlug) {
+        return {
+          ok: false,
+          slug: "",
+          error: INVALID_SESSION_SLUG_ERROR
+        };
+      }
+      return { ok: true, slug: canonicalizeReservedWorkerAlias(canonicalSlug), error: "" };
+    };
+    resolveCoordinatorSessionSlugStorageKey = (raw) => {
+      if (raw == null) return "";
+      const result = validateInboundWorkerSessionSlug(raw);
+      if (!result.ok) return "";
+      return result.slug || DEFAULT_SESSION_STORAGE_KEY;
+    };
+    getDefaultWorkerSessionSlug = (env = {}) => normalizeWorkerSessionSlug(env.DEFAULT_SESSION_SLUG ?? env.DEFAULT_GROUP_SLUG);
+    hasExplicitDefaultWorkerSessionSlug = (env = {}) => hasExplicitWorkerSlugInput(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG);
+    resolveWorkerTenantSlug = ({ envSlug, headerSlug, tokenSlug } = {}) => {
+      if (envSlug) return envSlug;
+      if (headerSlug) return headerSlug;
+      if (tokenSlug) return tokenSlug;
+      return "";
+    };
+    resolveRequestedWorkerSlugPayload = (body = {}) => {
+      const source = body && typeof body === "object" ? body : {};
+      const hasSessionSlug = Object.prototype.hasOwnProperty.call(source, "sessionSlug") && source?.sessionSlug != null;
+      const hasGroupSlug = Object.prototype.hasOwnProperty.call(source, "groupSlug") && source?.groupSlug != null;
+      const sessionSlugResult = hasSessionSlug ? validateInboundWorkerSessionSlug(source?.sessionSlug) : EMPTY_VALIDATION_RESULT;
+      const groupSlugResult = hasGroupSlug ? validateInboundWorkerSessionSlug(source?.groupSlug) : EMPTY_VALIDATION_RESULT;
+      const sessionSlug = hasSessionSlug ? sessionSlugResult.slug : "";
+      const groupSlug = hasGroupSlug ? groupSlugResult.slug : "";
+      const invalidResult = !sessionSlugResult.ok ? sessionSlugResult : null;
+      return {
+        ok: !invalidResult,
+        error: invalidResult?.error || "",
+        hasSessionSlug,
+        hasGroupSlug,
+        hasAnySlug: hasSessionSlug,
+        sessionSlug,
+        groupSlug,
+        requestedSlug: sessionSlug,
+        aliasMismatch: hasSessionSlug && hasGroupSlug && groupSlugResult.ok && sessionSlug !== groupSlug
+      };
+    };
+    resolveWorkerBodySlugContext = ({ body, env, slugHint } = {}) => {
+      const envSlug = getDefaultWorkerSessionSlug(env);
+      const slugPayload = resolveRequestedWorkerSlugPayload(body);
+      const normalizedHint = normalizeWorkerSessionSlug(slugHint);
+      const explicitSlugProvided = hasExplicitDefaultWorkerSessionSlug(env) || slugPayload.hasAnySlug || hasExplicitWorkerSlugInput(slugHint);
+      const targetSlug = envSlug || (slugPayload.hasAnySlug ? slugPayload.requestedSlug : normalizedHint);
+      if (!slugPayload.ok) {
+        return {
+          ok: false,
+          error: slugPayload.error,
+          envSlug,
+          slugPayload,
+          targetSlug,
+          explicitSlugProvided
+        };
+      }
+      if (slugPayload.aliasMismatch) {
+        return {
+          ok: false,
+          error: SLUG_ALIAS_MISMATCH_ERROR,
+          envSlug,
+          slugPayload,
+          targetSlug,
+          explicitSlugProvided
+        };
+      }
+      if (envSlug && slugPayload.requestedSlug && slugPayload.requestedSlug !== envSlug) {
+        return {
+          ok: false,
+          error: SLUG_MISMATCH_ERROR,
+          envSlug,
+          slugPayload,
+          targetSlug,
+          explicitSlugProvided
+        };
+      }
+      return {
+        ok: true,
+        error: "",
+        envSlug,
+        slugPayload,
+        targetSlug,
+        explicitSlugProvided
+      };
+    };
+    resolveWorkerRequestSlugContext = ({
+      tokenSlug,
+      tokenHasSlug = false,
+      headerSlug,
+      env,
+      slugHint,
+      countEmptyHeaderAsExplicit = false
+    } = {}) => {
+      const headerPresent = headerSlug != null;
+      const headerHasValue = headerPresent && toStr6(headerSlug).trim().length > 0;
+      const tokenSlugResult = validateInboundWorkerSessionSlug(tokenSlug);
+      if (tokenHasSlug && !tokenSlugResult.ok) {
+        return { ok: false, error: tokenSlugResult.error };
+      }
+      const headerSlugResult = validateInboundWorkerSessionSlug(headerSlug);
+      if (headerPresent && !headerSlugResult.ok) {
+        return { ok: false, error: headerSlugResult.error };
+      }
+      const envSlug = getDefaultWorkerSessionSlug(env);
+      const normalizedHint = normalizeWorkerSessionSlug(slugHint);
+      const resolvedTokenSlug = tokenHasSlug ? tokenSlugResult.slug : "";
+      const resolvedHeaderSlug = headerSlugResult.slug;
+      const slug = resolveWorkerTenantSlug({
+        envSlug,
+        headerSlug: resolvedHeaderSlug,
+        tokenSlug: resolvedTokenSlug
+      }) || normalizedHint;
+      const explicitHeaderProvided = countEmptyHeaderAsExplicit ? headerPresent : headerHasValue;
+      return {
+        ok: true,
+        error: "",
+        slug,
+        explicitSlugProvided: hasExplicitDefaultWorkerSessionSlug(env) || !!tokenHasSlug || hasExplicitWorkerSlugInput(slugHint) || explicitHeaderProvided,
+        envSlug,
+        tokenSlug: resolvedTokenSlug,
+        headerSlug: resolvedHeaderSlug,
+        headerPresent,
+        headerHasValue
+      };
     };
   }
 });
@@ -29611,20 +29496,65 @@ var init_deployHelperCore = __esm({
   }
 });
 
-// shared/realtimeInterviewConfig.mjs
-var DEFAULT_REALTIME_INTERVIEW_MODEL, models, isRealtimeInterviewModel, normalizeRealtimeInterviewModel, resolveRealtimeInterviewModel;
-var init_realtimeInterviewConfig = __esm({
-  "shared/realtimeInterviewConfig.mjs"() {
-    DEFAULT_REALTIME_INTERVIEW_MODEL = "gpt-live-1";
-    models = /* @__PURE__ */ new Set(["gpt-live-1", "gpt-realtime-2.1", "gpt-realtime-2.1-mini", "gpt-realtime-2", "gpt-realtime-1.5"]);
-    isRealtimeInterviewModel = (value) => typeof value === "string" && models.has(value);
-    normalizeRealtimeInterviewModel = (value) => {
-      const model = String(value ?? "").trim();
-      return isRealtimeInterviewModel(model) ? model : DEFAULT_REALTIME_INTERVIEW_MODEL;
+// workers/sessionCorsWorker/authorizationScopeFreshness.js
+var AUTHORIZATION_EPOCH_KEY, RESOURCE_GATE_BY_SCOPE, normalizeAuthorizationEpoch, readAuthorizationEpoch, incrementAuthorizationEpoch, selectResourceGateKeysForScopes;
+var init_authorizationScopeFreshness = __esm({
+  "workers/sessionCorsWorker/authorizationScopeFreshness.js"() {
+    AUTHORIZATION_EPOCH_KEY = "authzEpoch";
+    RESOURCE_GATE_BY_SCOPE = Object.freeze({
+      ai: "ai",
+      arweave: "arweave",
+      faucet: "txGas",
+      fetch: "rpc",
+      groups: "default",
+      lit: "lit",
+      storage: "arweave",
+      transcribe: "ai"
+    });
+    normalizeAuthorizationEpoch = (value) => {
+      if (value == null) return 0;
+      return Number.isSafeInteger(value) && value >= 0 ? value : null;
     };
-    resolveRealtimeInterviewModel = (config = {}) => {
-      const interview = config?.interviewMode || config?.interview;
-      return normalizeRealtimeInterviewModel(interview?.realtimeModel || config?.ai?.realtimeModel);
+    readAuthorizationEpoch = (config) => normalizeAuthorizationEpoch(config?.[AUTHORIZATION_EPOCH_KEY]);
+    incrementAuthorizationEpoch = (config) => {
+      const current = readAuthorizationEpoch(config);
+      if (current === null || current >= Number.MAX_SAFE_INTEGER) return null;
+      return current + 1;
+    };
+    selectResourceGateKeysForScopes = (resourceKeys, requestedScopes) => {
+      const keys = Array.isArray(resourceKeys) ? resourceKeys : [];
+      if (!Array.isArray(requestedScopes) || requestedScopes.length === 0) return keys;
+      const required = /* @__PURE__ */ new Set(["default"]);
+      requestedScopes.forEach((scope) => {
+        const resourceKey = RESOURCE_GATE_BY_SCOPE[String(scope || "").trim().toLowerCase()];
+        if (resourceKey) required.add(resourceKey);
+      });
+      return keys.filter((key) => required.has(key));
+    };
+  }
+});
+
+// workers/sessionCorsWorker/responseKvHelpers.js
+var json, getKvJson, putKvJson;
+var init_responseKvHelpers = __esm({
+  "workers/sessionCorsWorker/responseKvHelpers.js"() {
+    json = (data, status, baseHeaders) => {
+      const headers2 = new Headers(baseHeaders);
+      headers2.set("Content-Type", "application/json");
+      return new Response(JSON.stringify(data), { status, headers: headers2 });
+    };
+    getKvJson = async (env, key) => {
+      const raw = await env.GROUP_KV.get(key);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    };
+    putKvJson = async (env, key, value, ttlSeconds) => {
+      const opts = ttlSeconds ? { expirationTtl: ttlSeconds } : {};
+      await env.GROUP_KV.put(key, JSON.stringify(value), opts);
     };
   }
 });
@@ -29970,40 +29900,255 @@ var init_sessionConfigNormalization = __esm({
   }
 });
 
-// workers/sessionCorsWorker/authorizationScopeFreshness.js
-var AUTHORIZATION_EPOCH_KEY, RESOURCE_GATE_BY_SCOPE, normalizeAuthorizationEpoch, readAuthorizationEpoch, incrementAuthorizationEpoch, selectResourceGateKeysForScopes;
-var init_authorizationScopeFreshness = __esm({
-  "workers/sessionCorsWorker/authorizationScopeFreshness.js"() {
-    AUTHORIZATION_EPOCH_KEY = "authzEpoch";
-    RESOURCE_GATE_BY_SCOPE = Object.freeze({
-      ai: "ai",
-      arweave: "arweave",
-      faucet: "txGas",
-      fetch: "rpc",
-      groups: "default",
-      lit: "lit",
-      storage: "arweave",
-      transcribe: "ai"
-    });
-    normalizeAuthorizationEpoch = (value) => {
-      if (value == null) return 0;
-      return Number.isSafeInteger(value) && value >= 0 ? value : null;
+// workers/sessionCorsWorker/sessionConfigSecretsStore.js
+var SESSION_KV_PREFIX, buildSessionConfigKvKey, buildSessionSecretsKvKey, SESSION_CONFIG_MIGRATION_REQUIRED_REASON, SESSION_CONFIG_MIGRATION_REQUIRED_ERROR, legacySessionConfigMigrationError, getLegacySessionConfigForAuthority, getSessionConfig, getSessionSecrets, putSessionConfig, putSessionSecrets;
+var init_sessionConfigSecretsStore = __esm({
+  "workers/sessionCorsWorker/sessionConfigSecretsStore.js"() {
+    init_responseKvHelpers();
+    init_sessionConfigNormalization();
+    init_sessionSecretsEnvelope();
+    init_workerSessionConfig();
+    SESSION_KV_PREFIX = "session";
+    buildSessionConfigKvKey = (slug) => `${SESSION_KV_PREFIX}:${slug}:config`;
+    buildSessionSecretsKvKey = (slug) => `${SESSION_KV_PREFIX}:${slug}:secrets`;
+    SESSION_CONFIG_MIGRATION_REQUIRED_REASON = "session_config_migration_required";
+    SESSION_CONFIG_MIGRATION_REQUIRED_ERROR = "Stored legacy session config requires operator migration before use.";
+    legacySessionConfigMigrationError = () => Object.assign(
+      new Error(SESSION_CONFIG_MIGRATION_REQUIRED_ERROR),
+      { reason: SESSION_CONFIG_MIGRATION_REQUIRED_REASON, status: 503 }
+    );
+    getLegacySessionConfigForAuthority = async (env, slug) => {
+      const raw = await env.GROUP_KV.get(buildSessionConfigKvKey(slug));
+      if (raw == null) return null;
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        throw legacySessionConfigMigrationError();
+      }
+      const config = normalizeWorkerConfigRecord(parsed, { slug });
+      if (!config) throw legacySessionConfigMigrationError();
+      return config;
     };
-    readAuthorizationEpoch = (config) => normalizeAuthorizationEpoch(config?.[AUTHORIZATION_EPOCH_KEY]);
-    incrementAuthorizationEpoch = (config) => {
-      const current = readAuthorizationEpoch(config);
-      if (current === null || current >= Number.MAX_SAFE_INTEGER) return null;
-      return current + 1;
+    getSessionConfig = async (env, slug, deps) => {
+      const getKvJsonFn = typeof deps?.getKvJson === "function" ? deps.getKvJson : getKvJson;
+      const normalizeConfig = typeof deps?.normalizeWorkerConfigRecord === "function" ? deps.normalizeWorkerConfigRecord : normalizeWorkerConfigRecord;
+      const raw = await getKvJsonFn(env, buildSessionConfigKvKey(slug));
+      return normalizeConfig(raw, { slug });
     };
-    selectResourceGateKeysForScopes = (resourceKeys, requestedScopes) => {
-      const keys = Array.isArray(resourceKeys) ? resourceKeys : [];
-      if (!Array.isArray(requestedScopes) || requestedScopes.length === 0) return keys;
-      const required = /* @__PURE__ */ new Set(["default"]);
-      requestedScopes.forEach((scope) => {
-        const resourceKey = RESOURCE_GATE_BY_SCOPE[String(scope || "").trim().toLowerCase()];
-        if (resourceKey) required.add(resourceKey);
+    getSessionSecrets = async (env, slug, deps) => {
+      const getKvJsonFn = typeof deps?.getKvJson === "function" ? deps.getKvJson : getKvJson;
+      const raw = await getKvJsonFn(env, buildSessionSecretsKvKey(slug));
+      if (isEncryptedSessionSecretsEnvelope(raw)) {
+        return decryptSessionSecretsEnvelope(raw, { env, slug, ...deps });
+      }
+      return unwrapSessionSecretsEnvelope(raw);
+    };
+    putSessionConfig = async (env, slug, value, deps) => {
+      const normalizeConfig = typeof deps?.normalizeWorkerConfigRecord === "function" ? deps.normalizeWorkerConfigRecord : normalizeWorkerConfigRecord;
+      const putKvJsonFn = typeof deps?.putKvJson === "function" ? deps.putKvJson : putKvJson;
+      const normalized = normalizeConfig(value, { slug });
+      if (!normalized) throw new Error("Invalid session config.");
+      if (findForbiddenCloudflareDeploymentTokenPath(normalized)) {
+        throw new Error("Cloudflare deployment tokens are not allowed in session config.");
+      }
+      if (findForbiddenWorkerConfigSecretPath(normalized)) {
+        throw new Error("Secret-like values are not allowed in public session config fields.");
+      }
+      await putKvJsonFn(env, buildSessionConfigKvKey(slug), normalized);
+    };
+    putSessionSecrets = async (env, slug, value, deps) => {
+      const putKvJsonFn = typeof deps?.putKvJson === "function" ? deps.putKvJson : putKvJson;
+      const buildEnvelope = typeof deps?.buildEncryptedSessionSecretsEnvelope === "function" ? deps.buildEncryptedSessionSecretsEnvelope : buildEncryptedSessionSecretsEnvelope;
+      const envelope = await buildEnvelope(value, {
+        env,
+        slug,
+        now: deps?.now,
+        crypto: deps?.crypto,
+        randomBytes: deps?.randomBytes,
+        getRandomValues: deps?.getRandomValues,
+        getSessionSecretsKek: deps?.getSessionSecretsKek
       });
-      return keys.filter((key) => required.has(key));
+      await putKvJsonFn(env, buildSessionSecretsKvKey(slug), envelope);
+    };
+  }
+});
+
+// workers/sessionCorsWorker/sessionConfigAuthority.js
+var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, callSessionConfigCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication;
+var init_sessionConfigAuthority = __esm({
+  "workers/sessionCorsWorker/sessionConfigAuthority.js"() {
+    init_deployHelperCore();
+    init_sessionSlugResolution();
+    init_authorizationScopeFreshness();
+    init_sessionConfigSecretsStore();
+    SESSION_CONFIG_COORDINATION_ERROR = "Session config coordination is unavailable; retry.";
+    SUPERSEDED_AUTHORITY_ERROR = "Session authorization changed; retry with current authority.";
+    assertExpectedSessionAuthority = (authority, expected, slug) => {
+      if (!slug || !expected || !/^0x[0-9a-f]{40}$/i.test(expected.actor || "") || !Number.isSafeInteger(expected.revision) || expected.revision < 0 || !Number.isSafeInteger(expected.authzEpoch) || expected.authzEpoch < 0 || authority != null && authority.slug !== slug || expected.revision !== (authority?.revision ?? 0) || expected.authzEpoch !== readAuthorizationEpoch(authority?.config)) {
+        throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
+      }
+    };
+    callSessionConfigCoordinator = async ({ env, slug, path, ...payload }) => {
+      const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+      const binding = env?.CE_SESSION_COORDINATOR;
+      try {
+        if (!normalizedSlug || !binding?.idFromName || !binding?.get) throw new Error();
+        const name = await sha256Hex(`session-config:${normalizedSlug}`);
+        const response2 = await binding.get(binding.idFromName(name)).fetch(
+          `https://session-coordinator.internal/session-config/${path}`,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: normalizedSlug, ...payload }) }
+        );
+        const body = await response2.json();
+        return { ok: response2.ok && body?.ok === true, status: response2.status, body };
+      } catch {
+        return { ok: false, status: 503, body: { error: SESSION_CONFIG_COORDINATION_ERROR } };
+      }
+    };
+    readCurrentSessionConfig = async ({ env, slug }) => {
+      const result = await callSessionConfigCoordinator({ env, slug, path: "current" });
+      if (!result.ok && result.status === 503 && result.body?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON) {
+        throw legacySessionConfigMigrationError();
+      }
+      if (!result.ok || !Number.isSafeInteger(result.body.revision) || result.body.revision < 0 || (result.body.config === null ? result.body.revision !== 0 : !result.body.config || typeof result.body.config !== "object" || Array.isArray(result.body.config) || result.body.revision === 0)) {
+        throw Object.assign(new Error(SESSION_CONFIG_COORDINATION_ERROR), { status: 503 });
+      }
+      return { config: result.body.config, revision: result.body.revision };
+    };
+    executeCoordinatedStorageVisibilityMutation = (args) => callSessionConfigCoordinator({ ...args, path: "storage/set-hidden" });
+    executeCoordinatedStoragePublication = (args) => callSessionConfigCoordinator({ ...args, path: "storage/publish" });
+  }
+});
+
+// shared/workerGroupUrl.mjs
+var normalizeWorkerGroupUrl;
+var init_workerGroupUrl = __esm({
+  "shared/workerGroupUrl.mjs"() {
+    normalizeWorkerGroupUrl = (value) => {
+      const raw = String(value ?? "").trim();
+      if (!raw) return "";
+      try {
+        const parsed = new URL(raw);
+        return parsed.protocol === "https:" && !parsed.username && !parsed.password ? parsed.href : null;
+      } catch {
+        return null;
+      }
+    };
+  }
+});
+
+// shared/interviewSettings.mjs
+var DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
+var init_interviewSettings = __esm({
+  "shared/interviewSettings.mjs"() {
+    DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
+      openingMode: "auto",
+      openingPrompt: "",
+      steeringPrompt: "",
+      autoRegenerate: false,
+      questionGrowthPercent: 20,
+      followNewQuestions: false,
+      suggestQuestions: false,
+      allowManualRefresh: true,
+      shareDraftChangesByDefault: false,
+      researchDetail: "minimal",
+      hiddenDraftShare: 0,
+      showFidelityScore: false,
+      suggestGroups: false,
+      showFidelityResults: false,
+      fidelityMinimumPeople: 5
+    });
+    MAX_HIDDEN_DRAFT_SHARE = 0.5;
+    MAX_FIDELITY_MINIMUM_PEOPLE = 50;
+    normalizeInterviewSettings = (value = {}) => {
+      const source = value && typeof value === "object" ? value : {};
+      return {
+        openingMode: source.openingMode === "owner" ? "owner" : "auto",
+        openingPrompt: String(source.openingPrompt || "").trim().slice(0, 1200),
+        steeringPrompt: String(source.steeringPrompt || "").trim().slice(0, 3e3),
+        autoRegenerate: source.autoRegenerate === true,
+        questionGrowthPercent: Number.isFinite(source.questionGrowthPercent) ? Math.max(1, Math.min(100, source.questionGrowthPercent)) : 20,
+        followNewQuestions: source.followNewQuestions === true,
+        suggestQuestions: source.suggestQuestions === true,
+        allowManualRefresh: source.allowManualRefresh !== false,
+        shareDraftChangesByDefault: source.shareDraftChangesByDefault === true,
+        // How much an AI draft comparison saves: 'minimal' keeps no AI notes or drafted text.
+        researchDetail: source.researchDetail === "full" ? "full" : "minimal",
+        // Share of a person's AI prefill drafts hidden until they answer, which measures anchoring.
+        hiddenDraftShare: Number.isFinite(source.hiddenDraftShare) ? Math.max(0, Math.min(MAX_HIDDEN_DRAFT_SHARE, source.hiddenDraftShare)) : 0,
+        // After submitting, show the person how well their AI predicted them (private, in the browser).
+        showFidelityScore: source.showFidelityScore === true,
+        // After an interview or AI prefill, suggest the session's open groups that fit the answers.
+        suggestGroups: source.suggestGroups === true,
+        // Add "How well AIs predicted people" to Results, scoring everyone's AI-prefill drafts together.
+        showFidelityResults: source.showFidelityResults === true,
+        // That section hides figures from fewer people than this; 1 shows all.
+        fidelityMinimumPeople: Number.isInteger(source.fidelityMinimumPeople) ? Math.max(1, Math.min(MAX_FIDELITY_MINIMUM_PEOPLE, source.fidelityMinimumPeople)) : DEFAULT_INTERVIEW_SETTINGS.fidelityMinimumPeople
+      };
+    };
+    validInterviewSettings = (value = {}) => {
+      if (value.openingMode !== void 0 && !["auto", "owner"].includes(value.openingMode)) return false;
+      if (value.openingPrompt !== void 0 && (typeof value.openingPrompt !== "string" || value.openingPrompt.length > 1200))
+        return false;
+      if (value.steeringPrompt !== void 0 && (typeof value.steeringPrompt !== "string" || value.steeringPrompt.length > 3e3))
+        return false;
+      if (value.openingMode === "owner" && !value.openingPrompt?.trim()) return false;
+      if (value.questionGrowthPercent !== void 0 && (!Number.isFinite(value.questionGrowthPercent) || value.questionGrowthPercent < 1 || value.questionGrowthPercent > 100))
+        return false;
+      if (value.researchDetail !== void 0 && !["minimal", "full"].includes(value.researchDetail)) return false;
+      if (value.hiddenDraftShare !== void 0 && (!Number.isFinite(value.hiddenDraftShare) || value.hiddenDraftShare < 0 || value.hiddenDraftShare > MAX_HIDDEN_DRAFT_SHARE))
+        return false;
+      if (value.fidelityMinimumPeople !== void 0 && (!Number.isInteger(value.fidelityMinimumPeople) || value.fidelityMinimumPeople < 1 || value.fidelityMinimumPeople > MAX_FIDELITY_MINIMUM_PEOPLE))
+        return false;
+      return [
+        "autoRegenerate",
+        "followNewQuestions",
+        "suggestQuestions",
+        "allowManualRefresh",
+        "shareDraftChangesByDefault",
+        "showFidelityScore",
+        "suggestGroups",
+        "showFidelityResults"
+      ].every(
+        (key) => value[key] === void 0 || typeof value[key] === "boolean"
+      );
+    };
+    hasInterviewQuestionGrowth = (baseline, currentCount, percent) => currentCount >= baseline + Math.max(1, Math.ceil(baseline * percent / 100));
+  }
+});
+
+// shared/auth/siweMessage.mjs
+var normalizeSessionIdHex;
+var init_siweMessage = __esm({
+  "shared/auth/siweMessage.mjs"() {
+    normalizeSessionIdHex = (value) => {
+      if (typeof value !== "string" || value !== value.trim()) return "";
+      const lower9 = value.toLowerCase();
+      const hex = lower9.startsWith("0x") ? lower9.slice(2) : lower9;
+      if (/^[0-9a-f]{32}$/.test(hex) && !/^0+$/.test(hex)) return `0x${hex}`;
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(lower9)) {
+        const uuidHex = lower9.replace(/-/g, "");
+        return /^0+$/.test(uuidHex) ? "" : `0x${uuidHex}`;
+      }
+      return "";
+    };
+  }
+});
+
+// shared/realtimeInterviewConfig.mjs
+var DEFAULT_REALTIME_INTERVIEW_MODEL, models, isRealtimeInterviewModel, normalizeRealtimeInterviewModel, resolveRealtimeInterviewModel;
+var init_realtimeInterviewConfig = __esm({
+  "shared/realtimeInterviewConfig.mjs"() {
+    DEFAULT_REALTIME_INTERVIEW_MODEL = "gpt-live-1";
+    models = /* @__PURE__ */ new Set(["gpt-live-1", "gpt-realtime-2.1", "gpt-realtime-2.1-mini", "gpt-realtime-2", "gpt-realtime-1.5"]);
+    isRealtimeInterviewModel = (value) => typeof value === "string" && models.has(value);
+    normalizeRealtimeInterviewModel = (value) => {
+      const model = String(value ?? "").trim();
+      return isRealtimeInterviewModel(model) ? model : DEFAULT_REALTIME_INTERVIEW_MODEL;
+    };
+    resolveRealtimeInterviewModel = (config = {}) => {
+      const interview = config?.interviewMode || config?.interview;
+      return normalizeRealtimeInterviewModel(interview?.realtimeModel || config?.ai?.realtimeModel);
     };
   }
 });
@@ -30405,9 +30550,10 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
+    init_sessionConfigAuthority();
     init_workerGroupUrl();
     init_sessionSlugResolution();
     init_sessionConfigMutation();
@@ -31798,7 +31944,7 @@ var init_workerGroups = __esm({
         }
       });
     };
-    executeCoordinatedWorkerGroupMutation = async ({
+    forwardWorkerGroupMutation = async ({
       env,
       slug,
       sessionId,
@@ -31821,6 +31967,21 @@ var init_workerGroups = __esm({
           actorPrincipal
         }
       });
+    };
+    executeCoordinatedWorkerGroupMutation = async ({ env, slug, expectedAuthority, ...mutation } = {}) => {
+      const result = await callSessionConfigCoordinator({
+        env,
+        slug,
+        expectedAuthority,
+        path: "worker-groups/mutate",
+        ...mutation
+      });
+      return {
+        ...result.body,
+        ok: result.ok,
+        status: result.status,
+        ...!result.ok && !result.body?.reason ? { reason: result.status === 409 ? "session_authority_changed" : "worker_group_coordination_unavailable" } : {}
+      };
     };
     parseRouteBody = async (request) => {
       try {
@@ -31906,7 +32067,7 @@ var init_workerGroups = __esm({
       if (!result.ok) return routeError(deps, result, baseHeaders);
       return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
     };
-    dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, headers: headers2, deps } = {}) => {
+    dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, expectedAuthority, headers: headers2, deps } = {}) => {
       const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
       if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, headers2);
       const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
@@ -31950,6 +32111,7 @@ var init_workerGroups = __esm({
       const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
       if (action === "groups/create") {
         const result = await mutate({
+          expectedAuthority,
           env,
           slug,
           sessionId: sessionIdentity.sessionId,
@@ -31962,6 +32124,7 @@ var init_workerGroups = __esm({
       }
       if (action === "groups/update") {
         const result = await mutate({
+          expectedAuthority,
           env,
           slug,
           sessionId: sessionIdentity.sessionId,
@@ -31975,6 +32138,7 @@ var init_workerGroups = __esm({
       }
       if (action === "groups/delete") {
         const result = await mutate({
+          expectedAuthority,
           env,
           slug,
           sessionId: sessionIdentity.sessionId,
@@ -31998,6 +32162,7 @@ var init_workerGroups = __esm({
       }
       if (action === "groups/add-member") {
         const result = await mutate({
+          expectedAuthority,
           env,
           slug,
           sessionId: sessionIdentity.sessionId,
@@ -32022,6 +32187,7 @@ var init_workerGroups = __esm({
       }
       if (action === "groups/remove-member") {
         const result = await mutate({
+          expectedAuthority,
           env,
           slug,
           sessionId: sessionIdentity.sessionId,
@@ -32121,6 +32287,7 @@ var init_workerGroups = __esm({
       env,
       slug,
       requesterAddress,
+      expectedAuthority,
       authScopes,
       baseHeaders,
       deps
@@ -32278,6 +32445,7 @@ var init_workerGroups = __esm({
         }
         const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
         const result = await mutate({
+          expectedAuthority,
           env,
           slug,
           sessionId: sessionIdentity.sessionId,
@@ -32302,6 +32470,7 @@ var init_workerGroups = __esm({
       if (path === "/groups/join" && method === "POST") {
         const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
         const result = await mutate({
+          expectedAuthority,
           env,
           slug,
           sessionId: sessionIdentity.sessionId,
@@ -32331,6 +32500,7 @@ var init_workerGroups = __esm({
       if (path === "/groups/leave" && method === "POST") {
         const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
         const result = await mutate({
+          expectedAuthority,
           env,
           slug,
           sessionId: sessionIdentity.sessionId,
@@ -32362,151 +32532,6 @@ var init_workerGroups = __esm({
       }
       return jsonResponse(deps, { error: "Not found." }, 404, baseHeaders);
     };
-  }
-});
-
-// workers/sessionCorsWorker/responseKvHelpers.js
-var json, getKvJson, putKvJson;
-var init_responseKvHelpers = __esm({
-  "workers/sessionCorsWorker/responseKvHelpers.js"() {
-    json = (data, status, baseHeaders) => {
-      const headers2 = new Headers(baseHeaders);
-      headers2.set("Content-Type", "application/json");
-      return new Response(JSON.stringify(data), { status, headers: headers2 });
-    };
-    getKvJson = async (env, key) => {
-      const raw = await env.GROUP_KV.get(key);
-      if (!raw) return null;
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    };
-    putKvJson = async (env, key, value, ttlSeconds) => {
-      const opts = ttlSeconds ? { expirationTtl: ttlSeconds } : {};
-      await env.GROUP_KV.put(key, JSON.stringify(value), opts);
-    };
-  }
-});
-
-// workers/sessionCorsWorker/sessionConfigSecretsStore.js
-var SESSION_KV_PREFIX, buildSessionConfigKvKey, buildSessionSecretsKvKey, SESSION_CONFIG_MIGRATION_REQUIRED_REASON, SESSION_CONFIG_MIGRATION_REQUIRED_ERROR, legacySessionConfigMigrationError, getLegacySessionConfigForAuthority, getSessionConfig, getSessionSecrets, putSessionConfig, putSessionSecrets;
-var init_sessionConfigSecretsStore = __esm({
-  "workers/sessionCorsWorker/sessionConfigSecretsStore.js"() {
-    init_responseKvHelpers();
-    init_sessionConfigNormalization();
-    init_sessionSecretsEnvelope();
-    init_workerSessionConfig();
-    SESSION_KV_PREFIX = "session";
-    buildSessionConfigKvKey = (slug) => `${SESSION_KV_PREFIX}:${slug}:config`;
-    buildSessionSecretsKvKey = (slug) => `${SESSION_KV_PREFIX}:${slug}:secrets`;
-    SESSION_CONFIG_MIGRATION_REQUIRED_REASON = "session_config_migration_required";
-    SESSION_CONFIG_MIGRATION_REQUIRED_ERROR = "Stored legacy session config requires operator migration before use.";
-    legacySessionConfigMigrationError = () => Object.assign(
-      new Error(SESSION_CONFIG_MIGRATION_REQUIRED_ERROR),
-      { reason: SESSION_CONFIG_MIGRATION_REQUIRED_REASON, status: 503 }
-    );
-    getLegacySessionConfigForAuthority = async (env, slug) => {
-      const raw = await env.GROUP_KV.get(buildSessionConfigKvKey(slug));
-      if (raw == null) return null;
-      let parsed;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        throw legacySessionConfigMigrationError();
-      }
-      const config = normalizeWorkerConfigRecord(parsed, { slug });
-      if (!config) throw legacySessionConfigMigrationError();
-      return config;
-    };
-    getSessionConfig = async (env, slug, deps) => {
-      const getKvJsonFn = typeof deps?.getKvJson === "function" ? deps.getKvJson : getKvJson;
-      const normalizeConfig = typeof deps?.normalizeWorkerConfigRecord === "function" ? deps.normalizeWorkerConfigRecord : normalizeWorkerConfigRecord;
-      const raw = await getKvJsonFn(env, buildSessionConfigKvKey(slug));
-      return normalizeConfig(raw, { slug });
-    };
-    getSessionSecrets = async (env, slug, deps) => {
-      const getKvJsonFn = typeof deps?.getKvJson === "function" ? deps.getKvJson : getKvJson;
-      const raw = await getKvJsonFn(env, buildSessionSecretsKvKey(slug));
-      if (isEncryptedSessionSecretsEnvelope(raw)) {
-        return decryptSessionSecretsEnvelope(raw, { env, slug, ...deps });
-      }
-      return unwrapSessionSecretsEnvelope(raw);
-    };
-    putSessionConfig = async (env, slug, value, deps) => {
-      const normalizeConfig = typeof deps?.normalizeWorkerConfigRecord === "function" ? deps.normalizeWorkerConfigRecord : normalizeWorkerConfigRecord;
-      const putKvJsonFn = typeof deps?.putKvJson === "function" ? deps.putKvJson : putKvJson;
-      const normalized = normalizeConfig(value, { slug });
-      if (!normalized) throw new Error("Invalid session config.");
-      if (findForbiddenCloudflareDeploymentTokenPath(normalized)) {
-        throw new Error("Cloudflare deployment tokens are not allowed in session config.");
-      }
-      if (findForbiddenWorkerConfigSecretPath(normalized)) {
-        throw new Error("Secret-like values are not allowed in public session config fields.");
-      }
-      await putKvJsonFn(env, buildSessionConfigKvKey(slug), normalized);
-    };
-    putSessionSecrets = async (env, slug, value, deps) => {
-      const putKvJsonFn = typeof deps?.putKvJson === "function" ? deps.putKvJson : putKvJson;
-      const buildEnvelope = typeof deps?.buildEncryptedSessionSecretsEnvelope === "function" ? deps.buildEncryptedSessionSecretsEnvelope : buildEncryptedSessionSecretsEnvelope;
-      const envelope = await buildEnvelope(value, {
-        env,
-        slug,
-        now: deps?.now,
-        crypto: deps?.crypto,
-        randomBytes: deps?.randomBytes,
-        getRandomValues: deps?.getRandomValues,
-        getSessionSecretsKek: deps?.getSessionSecretsKek
-      });
-      await putKvJsonFn(env, buildSessionSecretsKvKey(slug), envelope);
-    };
-  }
-});
-
-// workers/sessionCorsWorker/sessionConfigAuthority.js
-var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, callSessionConfigCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication;
-var init_sessionConfigAuthority = __esm({
-  "workers/sessionCorsWorker/sessionConfigAuthority.js"() {
-    init_deployHelperCore();
-    init_sessionSlugResolution();
-    init_authorizationScopeFreshness();
-    init_sessionConfigSecretsStore();
-    SESSION_CONFIG_COORDINATION_ERROR = "Session config coordination is unavailable; retry.";
-    SUPERSEDED_AUTHORITY_ERROR = "Session authorization changed; retry with current authority.";
-    assertExpectedSessionAuthority = (authority, expected, slug) => {
-      if (!slug || !expected || !/^0x[0-9a-f]{40}$/i.test(expected.actor || "") || !Number.isSafeInteger(expected.revision) || expected.revision < 0 || !Number.isSafeInteger(expected.authzEpoch) || expected.authzEpoch < 0 || authority != null && authority.slug !== slug || expected.revision !== (authority?.revision ?? 0) || expected.authzEpoch !== readAuthorizationEpoch(authority?.config)) {
-        throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
-      }
-    };
-    callSessionConfigCoordinator = async ({ env, slug, path, ...payload }) => {
-      const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
-      const binding = env?.CE_SESSION_COORDINATOR;
-      try {
-        if (!normalizedSlug || !binding?.idFromName || !binding?.get) throw new Error();
-        const name = await sha256Hex(`session-config:${normalizedSlug}`);
-        const response2 = await binding.get(binding.idFromName(name)).fetch(
-          `https://session-coordinator.internal/session-config/${path}`,
-          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: normalizedSlug, ...payload }) }
-        );
-        const body = await response2.json();
-        return { ok: response2.ok && body?.ok === true, status: response2.status, body };
-      } catch {
-        return { ok: false, status: 503, body: { error: SESSION_CONFIG_COORDINATION_ERROR } };
-      }
-    };
-    readCurrentSessionConfig = async ({ env, slug }) => {
-      const result = await callSessionConfigCoordinator({ env, slug, path: "current" });
-      if (!result.ok && result.status === 503 && result.body?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON) {
-        throw legacySessionConfigMigrationError();
-      }
-      if (!result.ok || !Number.isSafeInteger(result.body.revision) || result.body.revision < 0 || (result.body.config === null ? result.body.revision !== 0 : !result.body.config || typeof result.body.config !== "object" || Array.isArray(result.body.config) || result.body.revision === 0)) {
-        throw Object.assign(new Error(SESSION_CONFIG_COORDINATION_ERROR), { status: 503 });
-      }
-      return { config: result.body.config, revision: result.body.revision };
-    };
-    executeCoordinatedStorageVisibilityMutation = (args) => callSessionConfigCoordinator({ ...args, path: "storage/set-hidden" });
-    executeCoordinatedStoragePublication = (args) => callSessionConfigCoordinator({ ...args, path: "storage/publish" });
   }
 });
 
@@ -77134,6 +77159,22 @@ ${expiry}`);
           );
         });
       }
+      async executeAuthorizedWorkerGroupMutation(payload) {
+        return this.serializeSessionConfigOperation(async () => {
+          try {
+            await this.assertSessionAuthority(payload);
+            const { expectedAuthority: _expectedAuthority, ...mutation } = payload;
+            const result = await forwardWorkerGroupMutation({ ...mutation, env: this.env });
+            return jsonResponse2(result, result.status || (result.ok ? 200 : 503));
+          } catch (error) {
+            return jsonResponse2({
+              ok: false,
+              error: error.message || "Worker group request failed.",
+              reason: error.status === 409 ? "session_authority_changed" : "worker_group_coordination_unavailable"
+            }, error.status || 503);
+          }
+        });
+      }
       async executeWorkerGroupMutation(payload) {
         return this.serializeWorkerGroupOperation(async () => {
           if (toTrimmedString9(payload?.operation).toLowerCase() === "create" && isAddressShapedWorkerGroupId(payload?.input?.groupId)) {
@@ -78019,6 +78060,7 @@ ${expiry}`);
             return jsonResponse2({ ok: false, reason: "wrapped_coordinator_unavailable", retryable: true }, error.status || 503);
           }
         }
+        if (url.pathname === "/session-config/worker-groups/mutate") return this.executeAuthorizedWorkerGroupMutation(payload);
         if (url.pathname === "/session-config/current") return this.executeSessionConfigCurrent(payload);
         if (url.pathname === "/session-config/diagnostics") return this.executeSessionDiagnostics(payload);
         if (url.pathname === "/session-config/recovery-key/export") {
@@ -101268,6 +101310,7 @@ var dispatchAdminRequest = async ({
       env,
       slug: targetSlug,
       adminAddress: authorityResult.address || body?.address,
+      expectedAuthority,
       headers: headers2,
       deps: {
         json: deps?.json,
@@ -104434,6 +104477,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
         config,
         slug,
         requesterAddress: address2,
+        expectedAuthority,
         authScopes: scopes,
         baseHeaders: headers2,
         deps: {
