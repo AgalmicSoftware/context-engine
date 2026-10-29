@@ -1294,3 +1294,16 @@ describe('surveyToolDraftState', () => {
     expect(buildSurveyDraftSemanticSignature(next)).not.toBe(buildSurveyDraftSemanticSignature(base));
   });
 });
+
+describe('draft baseline readiness', () => {
+  it.each([true, false])('records an empty baseline only when loaded: %s', (savedAnswersKnown) => {
+    const { baselineObj } = buildPersistedDraftMapsForAllowedIds({
+      allowedQuestionIds: ['q1'],
+      slice: { answers: { q1: { value: 'Draft' } } },
+      baselineSlice: { answers: {} },
+      changedFieldsByQid: { q1: { answer: true } },
+      savedAnswersKnown,
+    });
+    expect(baselineObj).toEqual(savedAnswersKnown ? { q1: {} } : {});
+  });
+});

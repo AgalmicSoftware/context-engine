@@ -488,7 +488,7 @@ export const createSurveyQuestionsResponseStateRuntime = ({
           renderedQuestionIds: restoreIds.filter(present),
           draft,
           prevSlice: loaded.nextSlice,
-          prevBaseline: loaded.nextBaseline,
+          prevBaseline: savedAnswersKnown ? loaded.nextBaseline : null,
           allowOverwrite: true,
           applyDraftEntryToSlice: inst._applyDraftHydrationEntryToSlice,
         });

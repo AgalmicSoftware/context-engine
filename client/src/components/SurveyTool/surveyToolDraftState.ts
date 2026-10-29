@@ -1180,9 +1180,11 @@ export const buildPersistedDraftMapsForAllowedIds = ({
     }
     answersObj[qid] = entry;
     // An empty entry records that nothing was saved; no entry means the saved answer was unknown.
-    const baselineEntry =
-      buildDraftBaselineEntry(normalizedBaselineSlice, qid, !!encryptedRatingQids?.has(qid)) ||
-      (savedAnswersKnown ? {} : null);
+    const baselineEntry = buildDraftBaselineEntry(
+      savedAnswersKnown ? baselineSlice : null,
+      qid,
+      !!encryptedRatingQids?.has(qid),
+    );
     if (baselineEntry) baselineObj[qid] = baselineEntry;
     else delete baselineObj[qid];
   });

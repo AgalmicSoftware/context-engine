@@ -454,7 +454,7 @@ export const executeSurveyDraftHydration = ({
       surveyIndex,
       draft,
       prevSlice,
-      prevBaseline: nextState.editBaseline,
+      prevBaseline: nextProps.isResponsesCacheReady ? nextState.editBaseline : null,
       applyDraftEntryToSlice: applyDraftHydrationEntryToSlice,
     });
     const renderedQuestionIds = Array.isArray(draftRunPlan.renderedQuestionIds) ? draftRunPlan.renderedQuestionIds : [];

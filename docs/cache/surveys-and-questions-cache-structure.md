@@ -262,3 +262,12 @@ Complete Worker catalogs also remove cached items and refs omitted from the
 listing, before selecting among the versions still accessible to the reader.
 Locally pending metadata and writes created within ten minutes are retained to
 allow for KV listing lag. A failed or incomplete listing never reconciles items.
+
+## Saved answers and local response drafts
+
+A draft records the saved answer it was edited against. A loaded empty answer
+has an empty baseline entry; an unknown saved answer has no entry. When a newer
+saved answer clears a field, restoration drops the older conflicting draft
+field. While saved answers are still loading, drafts remain intact. Drafts
+written against an empty answer that remains empty are preserved, as are
+consent withdrawals even when another draft field is stale.

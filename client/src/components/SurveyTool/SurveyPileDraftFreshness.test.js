@@ -215,3 +215,15 @@ it('never writes the plaintext of a decrypted saved answer into drafts', async (
   expect(draftText()).toContain('Disagree');
   expect(draftText()).not.toContain(PLAINTEXT);
 });
+
+it('drops an older draft after the saved answer is cleared elsewhere', async () => {
+  mockCaches();
+  const tabA = await mountPile();
+  await run(() => new Promise((resolve) => tabA.engine().handleAnswerPile('q1', 'Disagree', { afterUpdate: resolve })));
+  await settle();
+  tabA.view.unmount();
+  saved.q1 = { answer: field('') };
+  const reloaded = await mountPile();
+  expect(reloaded.engine().state.surveysResponseState[0].answers.q1.value).toBe('');
+  expect(reloaded.engine().getPendingEditStats().total).toBe(0);
+});
