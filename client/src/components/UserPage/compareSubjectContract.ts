@@ -141,7 +141,7 @@ export const buildCompareSubjectsRoutePath = ({
   params.delete('subjects');
   normalizedSubjects.forEach((subject) => params.append('subject', subject.token));
   const normalizedSessionSlug = normalizeSessionSlug(sessionSlug);
-  if (normalizedSessionSlug) params.set('session', normalizedSessionSlug);
+  params.set('session', normalizedSessionSlug || 'general');
   const query = params.toString();
   return `/compare${query ? `?${query}` : ''}`;
 };

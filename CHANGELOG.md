@@ -110,6 +110,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Limit General comparisons to General data and carry the same explicit session
+  through comparison URLs, provenance and AI requests.
+
 - Treat retired SBT collections as fully hydrated when their admin is the zero
   address, so discovery advances and does not repeatedly fetch their metadata.
 

@@ -7,7 +7,9 @@ type CompareCacheEntry = {
   value?: unknown;
 };
 
-type ResolveCompareSessionSlugOptions = {
+export type CompareSessionScope = { kind: 'session'; slug: string };
+
+type ResolveCompareSessionScopeOptions = {
   activeSessionSlug?: unknown;
   pathname?: unknown;
   search?: unknown;
@@ -46,27 +48,18 @@ export const runCompareSectionTasks = (tasks: CompareSectionTask[] = []): Promis
   return Promise.allSettled(pending);
 };
 
-export const resolveCompareSessionSlug = ({
+export const resolveCompareSessionScope = ({
   activeSessionSlug,
   pathname = '',
   search = '',
-}: ResolveCompareSessionSlugOptions = {}): string => {
+}: ResolveCompareSessionScopeOptions = {}): CompareSessionScope => {
+  const scope = (slug: unknown): CompareSessionScope => ({ kind: 'session', slug: normalizeSessionSlug(slug) });
+  const query = new URLSearchParams(String(search || ''));
   // Comparison URLs carry the profile's session even if the global picker lags behind navigation.
-  if (/^\/compare(?:\/|$)/.test(String(pathname))) {
-    const query = new URLSearchParams(String(search || ''));
-    if (query.has('session')) return normalizeSessionSlug(query.get('session') || '');
-  }
-  const explicit = normalizeSessionSlug(activeSessionSlug ?? '');
-  if (explicit) return explicit;
-
-  try {
-    const querySlug = normalizeSessionSlug(new URLSearchParams(String(search || '')).get('session') || '');
-    if (querySlug) return querySlug;
-  } catch {
-    // Fall through to the path resolver for malformed or unavailable query state.
-  }
-
-  return normalizeSessionSlug(resolveSessionSlugFromPathname(pathname) || '');
+  if (/^\/compare(?:\/|$)/.test(String(pathname)) && query.has('session')) return scope(query.get('session'));
+  if (activeSessionSlug != null) return scope(activeSessionSlug);
+  if (query.has('session')) return scope(query.get('session'));
+  return scope(resolveSessionSlugFromPathname(pathname) || '');
 };
 
 export const resolveCompareCachesReady = ({
@@ -88,11 +81,11 @@ export const resolveCompareCachesReady = ({
 
 export const selectCompareCacheValues = (
   entries: CompareCacheEntry[] = [],
-  sessionSlug: unknown = '',
+  scope: CompareSessionScope = { kind: 'session', slug: '' },
 ): UnknownRecord[] => {
-  const normalizedSessionSlug = normalizeSessionSlug(sessionSlug);
+  const normalizedSessionSlug = normalizeSessionSlug(scope.slug);
   return (Array.isArray(entries) ? entries : [])
-    .filter((entry) => !normalizedSessionSlug || normalizeSessionSlug(entry?.slug ?? '') === normalizedSessionSlug)
+    .filter((entry) => normalizeSessionSlug(entry?.slug ?? '') === normalizedSessionSlug)
     .map((entry) => entry?.value)
     .filter(isUnknownRecord);
 };
