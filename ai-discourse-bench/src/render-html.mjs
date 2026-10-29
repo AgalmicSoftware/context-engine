@@ -2259,7 +2259,7 @@ const renderBreakdown = (report) => {
     if (!map[group.trait]) map[group.trait] = [];
     map[group.trait].push(group);
     return map;
-  }, {});
+  }, Object.create(null));
   const renderBreakdownCandlestick = (summary = {}) => {
     if (summary.distributionUnavailable) return unavailableDistribution();
     const { agree, unsure, disagree } = answerTotals(summary);
@@ -6264,7 +6264,7 @@ export const renderHtmlReport = (inputReport) => {
       function breakdownFilteredParticipantIds(groups) {
         var allIds = (reportSnapshot.participants || []).map(function (participant) { return String(participant.id); });
         if (!groups.length) return allIds;
-        var idsByTrait = {};
+        var idsByTrait = Object.create(null);
         groups.forEach(function (group) {
           if (!idsByTrait[group.trait]) idsByTrait[group.trait] = new Set();
           (group.ids || []).forEach(function (id) { idsByTrait[group.trait].add(String(id)); });

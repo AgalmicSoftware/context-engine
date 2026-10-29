@@ -521,6 +521,9 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Keep report trait names and values as own dictionary keys, including built-in
+  names such as constructor, across grouping, filtering and export.
+
 - Audit every model the full OpenRouter runner will send, using one effective
   roster for preflight, planning and execution.
 
