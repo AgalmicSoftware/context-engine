@@ -28,7 +28,7 @@ numberOfSeedStatementsOrPrompts: <NumSeedStatements> (STRICT — generate exactl
 
 -----
 
-TypeOfQuestionsToInclude: <Types> (of possible binary, multichoice, rating, freeform, quadratic question types). The default is all 5 but the output must follow the specified types.
+TypeOfQuestionsToInclude: <Types> (of possible binary, multichoice, rating, freeform, quadratic question types). Include only the specified types; at least one type must be selected.
 
 -----
 

@@ -52,7 +52,7 @@ it('authors two default option rows, validates definitions and changes identity 
 it('retains a generated custom budget and maps signed interview drafts without matching option labels', () => {
   const statements = buildGeneratedSurveyStatements({
     aiData: { questions: [{ ...question, questionType: 'quadratic' }] },
-    questionTypes: { quadratic: true },
+    selectedTypes: ['quadratic'],
     count: 1,
   }).statements;
   expect(statements[0]).toMatchObject({

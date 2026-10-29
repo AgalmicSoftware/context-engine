@@ -628,7 +628,7 @@ export const mapInterviewEvidenceToResponses = async ({
     onSuggestedQuestions(
       buildGeneratedSurveyStatements({
         aiData: { questions: proposed },
-        questionTypes: { freeform: true, rating: true, multichoice: true, binary: true, quadratic: true },
+        selectedTypes: ['freeform', 'rating', 'multichoice', 'binary', 'quadratic'],
         count: 3,
       }).statements,
     );

@@ -113,6 +113,7 @@ import {
   buildUnsupportedSourceMessage,
   buildPhotoPreviewUrl,
   clampQuestionCount,
+  getSelectedQuestionTypes,
   formatAiPromptModelLabel,
   getSurveyGeneratorErrorMessage,
   getPhotoStatusLabel,
@@ -397,6 +398,8 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     rating: false,
     freeform: false,
   });
+  const selectedQuestionTypes = getSelectedQuestionTypes(questionTypes);
+  const questionTypeHintId = React.useId();
   const [count, setCount] = useState(DEFAULT_QUESTION_COUNT);
 
   const [loading, setLoading] = useState(false);
@@ -702,7 +705,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       promptTemplate: seedGenPrompt,
       sourceDocContent,
       count,
-      questionTypes,
+      selectedTypes: selectedQuestionTypes,
       defaultTags,
       transcriptMode,
       overrides,
@@ -738,7 +741,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   ) {
     const { statements, surveyTitle } = buildGeneratedSurveyStatements({
       aiData,
-      questionTypes,
+      selectedTypes: selectedQuestionTypes,
       count,
       fallbackTitle,
       generateQuestionId: generateSurveyGeneratorQuestionId,
@@ -1217,6 +1220,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!selectedQuestionTypes.length) return;
     setError('');
     setActiveAction('generate');
 
@@ -2137,6 +2141,16 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                   </div>
                 </div>
 
+                {!selectedQuestionTypes.length && (
+                  <div
+                    id={questionTypeHintId}
+                    role="status"
+                    className={styles.error}
+                    style={SURVEY_GENERATOR_ERROR_STYLE}
+                  >
+                    Select at least one question type before generating.
+                  </div>
+                )}
                 <div className={styles.formSection}>
                   <div className={styles.countControlRow} role="group" aria-label="Number of questions">
                     <span className={styles.countInlineLabel} aria-hidden="true">
@@ -2181,7 +2195,12 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             {(shouldShowGenerateButton || shouldShowAddToSessionButton) && (
               <div className={styles.actionRow}>
                 {shouldShowGenerateButton ? (
-                  <Button type="submit" className={styles.generateButton} disabled={loading}>
+                  <Button
+                    type="submit"
+                    className={styles.generateButton}
+                    disabled={loading || !selectedQuestionTypes.length}
+                    aria-describedby={!selectedQuestionTypes.length ? questionTypeHintId : undefined}
+                  >
                     {loading && activeAction === 'generate' ? (
                       <>
                         {isTranscribing ? 'Transcribing... ' : 'Processing... '}
