@@ -136,6 +136,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Limit HTML report files and snapshot downloads to the selected sections; hide the JSON download when unchecked.
+
 - Release participant Group creation after an account change while preserving its draft and ignoring old completions.
 
 - Preserve participant Group drafts across configuration refreshes; update default tags only while untouched.
