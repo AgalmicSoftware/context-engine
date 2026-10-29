@@ -71917,7 +71917,7 @@ var init_sessionBackupAuthentication = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupImport.js
-var fail6, object3, stable, same, digest, hashPattern, resources, temporary, assertEmptyTarget, validateSnapshot, validatePage, importCoordinatorBackupPage;
+var fail6, object3, stable, same, digest, hashPattern, resources, temporary, workerUrlFields, workerOrigin, assertEmptyTarget, validateSnapshot, validatePage, importCoordinatorBackupPage;
 var init_sessionBackupImport = __esm({
   "workers/sessionCorsWorker/sessionBackupImport.js"() {
     init_sessionSecretsAuthority();
@@ -71946,6 +71946,25 @@ var init_sessionBackupImport = __esm({
     hashPattern = /^[a-f0-9]{64}$/;
     resources = /* @__PURE__ */ new Set(["docsContext", "questions", "surveys", "responses", "generatedArtifacts", "media", "images"]);
     temporary = { expirationTtl: 7 * 86400 };
+    workerUrlFields = [
+      "corsWorkerUrl",
+      "corsWorkerURL",
+      "CorsWorkerURL",
+      "workerUrl",
+      "sessionCorsWorkerUrl",
+      "sessionWorkerUrl",
+      "sessionWorkerURL",
+      "workerURL"
+    ];
+    workerOrigin = (value) => {
+      if (typeof value !== "string" || !value || value !== value.trim()) return "";
+      try {
+        const url = new URL(value);
+        return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && url.pathname === "/" && !url.search && !url.hash ? url.origin : "";
+      } catch {
+        return "";
+      }
+    };
     assertEmptyTarget = async ({ coordinator, current, slug, page, index, budget }) => {
       const nonempty = () => fail6("Restore requires an empty target session. Abandon any unfinished restore before starting again.", 409, "backup_target_not_empty");
       if (current || await coordinator.state.storage.get("session-lit-authorization-signer-v1") || await coordinator.state.storage.get(SESSION_SECRETS_AUTHORITY_KEY)) nonempty();
@@ -72018,6 +72037,8 @@ var init_sessionBackupImport = __esm({
       const { env, state: { storage } } = coordinator;
       const { page, expectedAuthority } = payload || {};
       const slug = sessionSlugStorageKey(payload?.slug);
+      const destination = workerOrigin(payload?.workerUrl);
+      if (!destination || destination !== payload?.requestOrigin) fail6("Restore Worker origin must match the receiving request origin.");
       validatePage(page, slug);
       const manifest = page.manifest;
       const fingerprints = await Promise.all([env.CE_STORAGE_ENVELOPE_KEK, env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK].filter(Boolean).map(recoveryKeyFingerprint));
@@ -72026,6 +72047,9 @@ var init_sessionBackupImport = __esm({
       if (missing.length) fail6(`The target is missing backup recovery keys: ${missing.join(", ")}.`, 409, "recovery_key_mismatch");
       if (!await verifyBackupPage(page, env)) fail6("Backup page authentication failed. Use the original unmodified archive.", 403, "backup_authentication_failed");
       const current = await coordinator.assertSessionAuthority(payload, { allowRestore: true });
+      if (current && (!workerOrigin(current.config?.corsWorkerUrl) || workerUrlFields.some((key) => Object.hasOwn(current.config, key) && workerOrigin(current.config[key]) !== destination))) {
+        fail6("The target config Worker origin does not match this restore destination.", 409);
+      }
       const targetId = resolveCanonicalWorkerSessionIdHex(current?.config || {});
       if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail6("The backup session identity does not match this target.", 409, "backup_session_mismatch");
       if (page.archiveId !== await sha256Hex(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail6("Invalid backup archive identity.");
@@ -72036,6 +72060,7 @@ var init_sessionBackupImport = __esm({
       const stateKey = `session-backup-import:${page.archiveId}`;
       const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
       const active = await readActiveBackupImport(coordinator, slug, true, budget);
+      if (active && active.progress.workerUrl !== destination) fail6("Restore Worker origin cannot change between pages.", 409);
       if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail6("Another backup restore is in progress. Check restore status to abandon it.", 409, "backup_restore_in_progress");
       const pageHash = await sha256Hex(JSON.stringify(page));
       const receiptKey = `${stateKey}:page:${page.pageNumber}`;
@@ -72077,6 +72102,7 @@ var init_sessionBackupImport = __esm({
         if (page.pageNumber !== 0 || !page.coordinator) fail6("Import must begin with the first backup page.", 409);
         progress = {
           actor: expectedAuthority.actor,
+          workerUrl: destination,
           pageNumber: 0,
           nextEntry: 0,
           pageHash,
@@ -72284,7 +72310,9 @@ var init_sessionBackupImport = __esm({
         if (budget.remaining < (snapshotHeader?.chunkCount || 1) + 32) return pending();
         const snapshot = progress.chunkedSnapshot ? JSON.parse(new TextDecoder().decode(await assemble(snapshotHeader))) : JSON.parse(await index.get(`${root}coordinator`) || "null");
         validateSnapshot({ snapshot, manifest, ...validators });
-        const authority = snapshot.configAuthority;
+        const config = { ...snapshot.configAuthority.config, corsWorkerUrl: progress.workerUrl };
+        for (const field of workerUrlFields) if (Object.hasOwn(config, field)) config[field] = progress.workerUrl;
+        const authority = { ...snapshot.configAuthority, config };
         if (!progress.counts.conflicts) {
           if (!progress.groupsComplete) {
             if (budget.remaining < 32) return pending();
@@ -83896,8 +83924,8 @@ var validateAdminActionAudience = ({
     config,
     initializingConfig
   );
-  const workerOrigin = normalizeOrigin2(request?.url || env?.WORKER_URL || "");
-  if (!trustedOrigins.includes(normalizedAudience) && !configuredOrigins.includes(normalizedAudience) && (!workerOrigin || workerOrigin !== normalizedAudience)) {
+  const workerOrigin2 = normalizeOrigin2(request?.url || env?.WORKER_URL || "");
+  if (!trustedOrigins.includes(normalizedAudience) && !configuredOrigins.includes(normalizedAudience) && (!workerOrigin2 || workerOrigin2 !== normalizedAudience)) {
     return { ok: false, error: "Untrusted admin audience." };
   }
   return {
@@ -84038,13 +84066,13 @@ var validateSiwe = (siwe, deps) => {
   return { ok: true };
 };
 var validateSiweResources = ({ siwe, request, config, targetSlug } = {}) => {
-  const workerOrigin = normalizeOrigin2(request?.url);
+  const workerOrigin2 = normalizeOrigin2(request?.url);
   const canonical = toStr6(config?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === "worker_canonical";
   const sessionId = resolveCanonicalWorkerSessionIdHex(config);
   const slug = toStr6(targetSlug).trim().toLowerCase();
   const sessionResource = canonical ? `urn:context-engine:session:id:${encodeURIComponent(sessionId)}` : `urn:context-engine:session:slug:${encodeURIComponent(slug === "general" ? "" : slug)}`;
   const resources2 = siwe.resources;
-  if (!workerOrigin || canonical && !sessionId || !Array.isArray(resources2) || resources2.length !== 2 || !resources2.includes(workerOrigin) || !resources2.includes(sessionResource)) {
+  if (!workerOrigin2 || canonical && !sessionId || !Array.isArray(resources2) || resources2.length !== 2 || !resources2.includes(workerOrigin2) || !resources2.includes(sessionResource)) {
     return { ok: false, error: "Signed login resources do not match this Worker and session." };
   }
   return { ok: true };
@@ -101630,7 +101658,9 @@ var dispatchAdminRequest = async ({
       expectedAuthority,
       page: body?.page,
       archiveId: body?.archiveId,
-      adoptSessionId: body?.adoptSessionId === true
+      adoptSessionId: body?.adoptSessionId === true,
+      workerUrl: body?.workerUrl,
+      requestOrigin: new URL(request.url).origin
     });
     return deps?.json?.(result.body, result.status, responseHeaders);
   }
@@ -103299,8 +103329,8 @@ var canonicalizeQuestions = (questions = []) => [...questions].sort(
 );
 var buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
   const url = new URL(sessionUrl);
-  const workerOrigin = safeServedWorkerOrigin(servedWorkerOrigin);
-  if (workerOrigin) url.searchParams.set("worker", workerOrigin);
+  const workerOrigin2 = safeServedWorkerOrigin(servedWorkerOrigin);
+  if (workerOrigin2) url.searchParams.set("worker", workerOrigin2);
   url.searchParams.set("mode", "interview");
   return url.toString();
 };

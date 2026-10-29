@@ -23,6 +23,16 @@ const digest = async (bytes) => [...new Uint8Array(await crypto.subtle.digest('S
 const hashPattern = /^[a-f0-9]{64}$/;
 const resources = new Set(['docsContext', 'questions', 'surveys', 'responses', 'generatedArtifacts', 'media', 'images']);
 const temporary = { expirationTtl: 7 * 86400 };
+const workerUrlFields = ['corsWorkerUrl', 'corsWorkerURL', 'CorsWorkerURL', 'workerUrl',
+  'sessionCorsWorkerUrl', 'sessionWorkerUrl', 'sessionWorkerURL', 'workerURL'];
+const workerOrigin = (value) => {
+  if (typeof value !== 'string' || !value || value !== value.trim()) return '';
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password &&
+      url.pathname === '/' && !url.search && !url.hash ? url.origin : '';
+  } catch { return ''; }
+};
 
 const assertEmptyTarget = async ({ coordinator, current, slug, page, index, budget }) => {
   const nonempty = () => fail('Restore requires an empty target session. Abandon any unfinished restore before starting again.', 409, 'backup_target_not_empty');
@@ -113,6 +123,8 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const { env, state: { storage } } = coordinator;
   const { page, expectedAuthority } = payload || {};
   const slug = sessionSlugStorageKey(payload?.slug);
+  const destination = workerOrigin(payload?.workerUrl);
+  if (!destination || destination !== payload?.requestOrigin) fail('Restore Worker origin must match the receiving request origin.');
   validatePage(page, slug);
   const manifest = page.manifest;
   const fingerprints = await Promise.all([env.CE_STORAGE_ENVELOPE_KEK, env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK].filter(Boolean).map(recoveryKeyFingerprint));
@@ -121,6 +133,10 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   if (missing.length) fail(`The target is missing backup recovery keys: ${missing.join(', ')}.`, 409, 'recovery_key_mismatch');
   if (!await verifyBackupPage(page, env)) fail('Backup page authentication failed. Use the original unmodified archive.', 403, 'backup_authentication_failed');
   const current = await coordinator.assertSessionAuthority(payload, { allowRestore: true });
+  if (current && (!workerOrigin(current.config?.corsWorkerUrl) || workerUrlFields.some(key =>
+    Object.hasOwn(current.config, key) && workerOrigin(current.config[key]) !== destination))) {
+    fail('The target config Worker origin does not match this restore destination.', 409);
+  }
   const targetId = resolveCanonicalWorkerSessionIdHex(current?.config || {});
   if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail('The backup session identity does not match this target.', 409, 'backup_session_mismatch');
   if (page.archiveId !== await sha256Hex(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail('Invalid backup archive identity.');
@@ -131,6 +147,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const stateKey = `session-backup-import:${page.archiveId}`;
   const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
   const active = await readActiveBackupImport(coordinator, slug, true, budget);
+  if (active && active.progress.workerUrl !== destination) fail('Restore Worker origin cannot change between pages.', 409);
   if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail('Another backup restore is in progress. Check restore status to abandon it.', 409, 'backup_restore_in_progress');
   const pageHash = await sha256Hex(JSON.stringify(page));
   const receiptKey = `${stateKey}:page:${page.pageNumber}`;
@@ -166,7 +183,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   if (!progress) {
     await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
     if (page.pageNumber !== 0 || !page.coordinator) fail('Import must begin with the first backup page.', 409);
-    progress = { actor: expectedAuthority.actor, pageNumber: 0, nextEntry: 0, pageHash, manifest: { ...manifest, counts: undefined, complete: undefined },
+    progress = { actor: expectedAuthority.actor, workerUrl: destination, pageNumber: 0, nextEntry: 0, pageHash, manifest: { ...manifest, counts: undefined, complete: undefined },
       counts: { written: 0, skipped: 0, conflicts: 0 }, conflicts: [], observed: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 },
       expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS,
       pendingPayloads: 0, pendingRecords: 0, snapshotReady: false };
@@ -359,7 +376,9 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       ? JSON.parse(new TextDecoder().decode(await assemble(snapshotHeader)))
       : JSON.parse(await index.get(`${root}coordinator`) || 'null');
     validateSnapshot({ snapshot, manifest, ...validators });
-    const authority = snapshot.configAuthority;
+    const config = { ...snapshot.configAuthority.config, corsWorkerUrl: progress.workerUrl };
+    for (const field of workerUrlFields) if (Object.hasOwn(config, field)) config[field] = progress.workerUrl;
+    const authority = { ...snapshot.configAuthority, config };
     if (!progress.counts.conflicts) {
       if (!progress.groupsComplete) {
         if (budget.remaining < 32) return pending();

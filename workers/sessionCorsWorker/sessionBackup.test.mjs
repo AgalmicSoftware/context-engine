@@ -17,6 +17,7 @@ import { getSessionSecrets, putSessionSecrets } from './sessionConfigSecretsStor
 import { updateSessionSecretsAfterLitRepair } from './sessionLitAuthorizationCoordinator.js';
 import { decryptSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
+import { build } from 'esbuild';
 
 const slug = 'restore-fixture';
 const sessionId = `0x${'3'.repeat(32)}`;
@@ -66,7 +67,7 @@ const fixture = (CoordinatorClass) => {
   const env = installSessionCoordinatorBinding({ GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv,
     CE_STORAGE_ENVELOPE_KEK: 'a'.repeat(64), TOKEN_HMAC_SECRET: 'synthetic-hmac',
   }, CoordinatorClass);
-  kv.values.set(`session:${slug}:config`, JSON.stringify({ slug, sessionId, adminAddress: admin,
+  kv.values.set(`session:${slug}:config`, JSON.stringify({ slug, sessionId, adminAddress: admin, corsWorkerUrl: 'https://worker.example',
     chainId: 11155420, registryChainId: 11155420, storageProfile: { mode: 'pure', metadata: 'cloudflare', answers: 'cloudflare',
       payloadAccessControl: { gate: 'public', encryption: 'none' } } }));
   return { env, kv };
@@ -213,10 +214,10 @@ const allPages = async (env) => {
   } while (cursor);
   return pages;
 };
-const importPage = async (env, page, revision = 0) => {
+const importPage = async (env, page, revision = 0, destination = { workerUrl: 'https://worker.example', requestOrigin: 'https://worker.example' }) => {
   for (let tries = 0; tries < 200; tries += 1) {
     const result = await env.GROUP_KV.request(() => callSessionConfigCoordinator({ env, slug, path: 'backup/import',
-      expectedAuthority: { ...expectedAuthority, revision }, page, adoptSessionId: true }));
+      expectedAuthority: { ...expectedAuthority, revision }, page, adoptSessionId: true, ...destination }));
     if (!result.ok || result.body.pageComplete !== false) return result;
     revision = (await callSessionConfigCoordinator({ env, slug, path: 'current' })).body.revision;
   }
@@ -360,7 +361,7 @@ test('fresh signed restore requires the deployment bootstrap admin and explicit 
   const worker = createWorkerRuntime(target.env);
   const call = async (signer, adoptSessionId) => {
     const body = await createSignedSiweBody({ worker, env: target.env, wallet: signer, sessionSlug: slug,
-      adminAction: 'import-session-backup', audience: 'https://app.example', body: { page, adoptSessionId } });
+      adminAction: 'import-session-backup', audience: 'https://app.example', body: { page, adoptSessionId, workerUrl: 'https://worker.example' } });
     return worker.fetch(makeJsonRequest('/admin/import-session-backup', body, { headers: { Origin: 'https://app.example' } }), target.env);
   };
   assert.equal((await call(stranger, true)).status, 403);
@@ -502,7 +503,7 @@ test(`restore drill preserves reads, authority, groups and secrets (R2 ${sourceR
     if (previous) { target.env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK = source.env.CE_STORAGE_ENVELOPE_KEK.toUpperCase(); target.env.CE_STORAGE_ENVELOPE_KEK = 'b'.repeat(64); }
     const b = connect(target);
     for (const page of pages) {
-      const result = await b.signed('import-session-backup', { page, adoptSessionId: true });
+      const result = await b.signed('import-session-backup', { page, adoptSessionId: true, workerUrl: 'https://worker.example' });
       assert.equal(result.complete, page.manifest.complete);
       assert.equal(result.counts.conflicts, 0);
     }
@@ -551,12 +552,12 @@ test(`restore drill preserves reads, authority, groups and secrets (R2 ${sourceR
       Object.assign(next.env, { CE_STORAGE_ENVELOPE_KEK: target.env.CE_STORAGE_ENVELOPE_KEK,
         BOOTSTRAP_ADMIN_ADDRESS: owner.address, ADMIN_TRUSTED_ORIGINS: 'https://app.example' });
       const c = connect(next);
-      const denied = await c.signed('import-session-backup', { page: chainedPages[0], adoptSessionId: true }, 409);
+      const denied = await c.signed('import-session-backup', { page: chainedPages[0], adoptSessionId: true, workerUrl: 'https://worker.example' }, 409);
       assert.equal(denied.reason, 'recovery_key_mismatch');
       assert.ok(denied.error.includes(await recoveryKeyFingerprint(source.env.CE_STORAGE_ENVELOPE_KEK)));
       assert.equal(next.kv.values.size, 0, 'Reject missing keys before staging or importing data');
       next.env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK = source.env.CE_STORAGE_ENVELOPE_KEK;
-      for (const page of chainedPages) await c.signed('import-session-backup', { page, adoptSessionId: true });
+      for (const page of chainedPages) await c.signed('import-session-backup', { page, adoptSessionId: true, workerUrl: 'https://worker.example' });
       assert.equal((await c.clients[1].read(encrypted.id)).answer.value, 'Encrypted answer');
       assert.equal((await c.clients[1].read(newAnswer.id)).answer.value, 'Written after restore');
     }
@@ -564,7 +565,7 @@ test(`restore drill preserves reads, authority, groups and secrets (R2 ${sourceR
   const unrelated = fixture();
   unrelated.kv.values.delete(`session:${slug}:config`);
   Object.assign(unrelated.env, { BOOTSTRAP_ADMIN_ADDRESS: owner.address, ADMIN_TRUSTED_ORIGINS: 'https://app.example', CE_STORAGE_ENVELOPE_KEK: 'c'.repeat(64) });
-  const denied = await connect(unrelated).signed('import-session-backup', { page: pages[0], adoptSessionId: true }, 409);
+  const denied = await connect(unrelated).signed('import-session-backup', { page: pages[0], adoptSessionId: true, workerUrl: 'https://worker.example' }, 409);
   assert.equal(denied.reason, 'recovery_key_mismatch');
   assert.equal([...unrelated.kv.values.keys()].filter((key) => key.startsWith('ce-storage')).length, 0);
 });
@@ -873,7 +874,7 @@ test('fresh restore status and abandonment require a signed deployment admin', a
   const target = fixture();
   target.kv.values.delete(`session:${slug}:config`);
   Object.assign(target.env, { BOOTSTRAP_ADMIN_ADDRESS: wallet.address, ADMIN_TRUSTED_ORIGINS: 'https://app.example' });
-  await callSessionConfigCoordinator({ env: target.env, slug, path: 'backup/import', page, adoptSessionId: true,
+  await callSessionConfigCoordinator({ env: target.env, slug, path: 'backup/import', page, adoptSessionId: true, workerUrl: 'https://worker.example', requestOrigin: 'https://worker.example',
     expectedAuthority: { actor: wallet.address.toLowerCase(), revision: 0, authzEpoch: 0 } });
   const worker = createWorkerRuntime(target.env);
   const call = async (signer, action) => {
@@ -1099,7 +1100,7 @@ const assertRestoredFixtureRows = (source, target) => {
 };
 const restorePageAs = (env, page, actor, revision = 0) => env.GROUP_KV.request(() =>
   callSessionConfigCoordinator({ env, slug, path: 'backup/import', expectedAuthority: { actor, revision, authzEpoch: 0 },
-    page, adoptSessionId: true }));
+    page, adoptSessionId: true, workerUrl: 'https://worker.example', requestOrigin: 'https://worker.example' }));
 const restartOnEveryRequest = (Base = SessionWriteCoordinator) => class extends Base {
   async fetch(request) { return new SessionWriteCoordinator(this.state, this.env).fetch(request); }
 };
@@ -1387,4 +1388,93 @@ test('backup and restore retain the authoritative secrets despite stale source a
     incomingSecrets: { anthropicKey: 'synthetic-other-key' } })).ok, true);
   target.kv.get = targetGet;
   assert.deepEqual(await getSessionSecrets(target.env, slug), { openaiKey: 'synthetic-current-key', anthropicKey: 'synthetic-other-key' });
+});
+
+const workerUrlFields = ['corsWorkerUrl', 'corsWorkerURL', 'CorsWorkerURL', 'workerUrl',
+  'sessionCorsWorkerUrl', 'sessionWorkerUrl', 'sessionWorkerURL', 'workerURL'];
+const loadRealBootstrapValidator = async () => {
+  const bundled = await build({ entryPoints: [new URL('../../client/src/utilities/session/sessionWorkerDiscovery.ts', import.meta.url).pathname],
+    bundle: true, write: false, format: 'esm', platform: 'node',
+    alias: { '@ce-shared': new URL('../../shared', import.meta.url).pathname } });
+  return import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
+};
+
+test('restoring at another origin binds every Worker URL and passes real client bootstrap validation', async () => {
+  const { validateWorkerCanonicalSessionBootstrap } = await loadRealBootstrapValidator();
+  const source = fixture();
+  const config = JSON.parse(await readFile(new URL('../../tests/fixtures/worker-compat/previous-minor.json', import.meta.url))).config;
+  Object.assign(config, { slug, sessionId, sessionIdHex: sessionId, adminAddress: admin, configRevision: 'restore-origin-fixture' },
+    Object.fromEntries(workerUrlFields.map(key => [key, 'https://old-worker.example'])));
+  delete config.resultsAnalysis;
+  await source.kv.put(`session:${slug}:config`, JSON.stringify(config));
+  const pages = await allPages(source.env);
+  for (const destination of ['https://new-worker.example', 'https://old-worker.example']) {
+    const target = fixture();
+    target.kv.values.delete(`session:${slug}:config`);
+    for (const page of pages) {
+      const result = await importPage(target.env, page, 0, { workerUrl: destination, requestOrigin: destination });
+      assert.equal(result.ok, true, JSON.stringify(result));
+    }
+    const stored = JSON.parse(await target.kv.get(`session:${slug}:config`));
+    for (const field of workerUrlFields) assert.equal(stored[field], destination, field);
+    const worker = createWorkerRuntime(target.env);
+    const response = await worker.fetch(new Request(`${destination}/session-config?slug=${slug}`, { headers: { 'X-Session-Slug': slug } }), target.env);
+    assert.equal(response.status, 200, await response.clone().text());
+    assert.equal(validateWorkerCanonicalSessionBootstrap(await response.json(), {
+      expectedSlug: slug, workerOrigin: destination, environment: 'production',
+    }).workerOrigin, destination);
+    const edit = await callSessionConfigCoordinator({ env: target.env, slug, path: 'mutate', expectedAuthority,
+      mutation: { kind: 'set-config', incomingConfig: { ...stored, corsWorkerUrl: 'https://third-worker.example' } } });
+    assert.equal(edit.status, 400, 'An ordinary edit cannot rebind an initialized Worker URL');
+    assert.equal(JSON.parse(await target.kv.get(`session:${slug}:config`)).corsWorkerUrl, destination);
+  }
+});
+
+test('a restore destination is required, must match the receiving origin and cannot change between pages', async () => {
+  const { pages } = await completedRestoreSource();
+  for (const destination of [
+    { workerUrl: 'https://other.example', requestOrigin: 'https://worker.example' },
+    { requestOrigin: 'https://worker.example' },
+    { workerUrl: 'https://worker.example' },
+    { workerUrl: 'https://worker.example/path', requestOrigin: 'https://worker.example' },
+  ]) {
+    const target = fixture();
+    target.kv.values.delete(`session:${slug}:config`);
+    const result = await importPage(target.env, pages[0], 0, destination);
+    assert.equal(result.status, 400, JSON.stringify(destination));
+    assert.equal(target.kv.values.size, 0);
+    assert.equal([...target.env.__coordinatorInstances.values()].every(({ store }) => store.size === 0), true);
+  }
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  assert.equal((await importPage(target.env, pages[0])).ok, true);
+  const before = [...target.kv.values];
+  const changed = await importPage(target.env, pages[1], 0, { workerUrl: 'https://other.example', requestOrigin: 'https://other.example' });
+  assert.equal(changed.status, 409);
+  assert.deepEqual([...target.kv.values], before);
+  const occupied = fixture();
+  const config = JSON.parse(await occupied.kv.get(`session:${slug}:config`));
+  config.corsWorkerUrl = 'https://old-worker.example';
+  occupied.kv.values.set(`session:${slug}:config`, JSON.stringify(config));
+  const refused = await importPage(occupied.env, pages[0], 1);
+  assert.equal(refused.status, 409);
+  assert.match(refused.body.error, /Worker origin/);
+});
+
+test('the signed restore destination is checked against the actual HTTP request origin', async () => {
+  const { ethers } = createRequire(new URL('../../package.json', import.meta.url))('ethers');
+  const wallet = new ethers.Wallet(`0x${'4'.repeat(64)}`);
+  const [page] = await allPages(fixture().env);
+  const target = fixture();
+  target.kv.values.clear();
+  Object.assign(target.env, { BOOTSTRAP_ADMIN_ADDRESS: wallet.address, ADMIN_TRUSTED_ORIGINS: 'https://app.example' });
+  const worker = createWorkerRuntime(target.env);
+  const body = await createSignedSiweBody({ worker, env: target.env, wallet, sessionSlug: slug,
+    adminAction: 'import-session-backup', audience: 'https://app.example',
+    body: { page, adoptSessionId: true, workerUrl: 'https://other.example', requestOrigin: 'https://other.example' } });
+  const response = await worker.fetch(makeJsonRequest('/admin/import-session-backup', body,
+    { headers: { Origin: 'https://app.example' } }), target.env);
+  assert.equal(response.status, 400, await response.clone().text());
+  assert.equal(await target.kv.get(`session:${slug}:config`), null);
+  assert.equal([...target.env.__coordinatorInstances.values()].some(({ store }) => store.has('session-backup-import-active')), false);
 });

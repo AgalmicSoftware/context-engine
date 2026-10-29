@@ -1146,7 +1146,13 @@ sending the final unchanged page while `pageComplete: false`; `complete: true` f
 runs the empty-target check again, even for the same archive.
 
 Restore with admin-signed `POST /admin/import-session-backup`, passing each
-saved response as `page` in its original order. The target must hold the source
+saved response as `page` in its original order and the destination Worker origin as
+`workerUrl`. The signature covers this destination, which must match the HTTP
+request origin on every page. The restore records that origin and binds all
+Worker URL fields in its published config to it; the archive URL is not trusted.
+An existing target config must already name that origin (and restore still
+requires an empty target). Ordinary config edits cannot change the Worker identity.
+The target must hold the source
 KEK as its current key or `CE_STORAGE_ENVELOPE_PREVIOUS_KEK`. The slug and session
 ID must match. A fresh deployment may pass `adoptSessionId: true`; only its
 trusted bootstrap admin can do this. After the last page verifies, bounded cleanup

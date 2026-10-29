@@ -419,7 +419,8 @@ export const dispatchAdminRequest = async ({
     const responseHeaders = new Headers(headers);
     responseHeaders.set('Cache-Control', 'no-store');
     const result = await callSessionConfigCoordinator({ env, slug: targetSlug, path: action === 'import-session-backup' ? 'backup/import' : action === 'session-backup-status' ? 'backup/status' : 'backup/abandon',
-      expectedAuthority, page: body?.page, archiveId: body?.archiveId, adoptSessionId: body?.adoptSessionId === true });
+      expectedAuthority, page: body?.page, archiveId: body?.archiveId, adoptSessionId: body?.adoptSessionId === true,
+      workerUrl: body?.workerUrl, requestOrigin: new URL(request.url).origin });
     return deps?.json?.(result.body, result.status, responseHeaders);
   }
 
