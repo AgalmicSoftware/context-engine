@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Mark the Lit provisioning mock credential as an explicit fixture for release scans.
+
 - Isolate community regression tests by clearing complete cache namespaces.
 
 - Use complete encrypted-envelope fixtures in decrypt-and-resubmit regression tests.
