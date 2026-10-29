@@ -275,6 +275,7 @@ export const sanitizeSessionWizardMetadataPayload = (
   }
 
   if (isObj(next.blockLimits)) {
+    delete next.blockLimits.startDefault;
     const start = Number(next.blockLimits.start);
     const endRaw = next.blockLimits.end;
     const end = endRaw == null || endRaw === '' ? null : Number(endRaw);

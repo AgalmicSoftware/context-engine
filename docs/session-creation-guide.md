@@ -585,6 +585,10 @@ Important:
   worker-canonical profile does not require a chain scan window. After its
   canonical worker config is verified, reloads keep that session out of EVM
   discovery even when the original share URL has been normalized.
+- Restored start blocks remain explicit unless the draft records an automatic
+  default. Blank starts use the current chain head; saved defaults follow a
+  chain change after its new head arrives. The provenance stays in the local
+  draft and is omitted from published metadata and Worker configuration.
 - Chainless worker-canonical profiles do not request testnet faucet funds.
 - The wizard strips secrets and worker-only runtime config out of the Arweave payload before upload.
 - Draft recovery keeps only the stable color-scheme ID. Sponsored setup changes
