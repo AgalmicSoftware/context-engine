@@ -445,6 +445,9 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Validate OpenRouter's transport and serving provider separately. Enforce upstream
+  routing restrictions with normalized comparisons while preserving reported metadata.
+
 - Use the validated release receipt for benchmark labels, indexing and publication
   status. Require explicit release confirmation and verify the embedded report's hash.
 

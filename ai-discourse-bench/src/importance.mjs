@@ -1,4 +1,4 @@
-import { assertConsistentDeployments, deploymentIdentityErrors } from './deployment-identity.mjs';
+import { assertConsistentDeployments, deploymentIdentityErrors, responseIdentityErrors } from './deployment-identity.mjs';
 import {
   DEFAULT_CONCURRENCY,
   DEFAULT_IMPORTANCE_BUDGET,
@@ -752,15 +752,7 @@ export const validateReleaseImportanceFile = (file, {
     if (hashJson(run.modelProvenance || {}) !== hashJson(model.provenance || {})) {
       errors.push(`runs[${index}].modelProvenance does not match manifest.models`);
     }
-    const metadata = run.responseMetadata || {};
-    const resolvedProvider = String(metadata.resolvedProvider || metadata.provider || run.provider || '').trim();
-    const resolvedModel = String(metadata.resolvedModel || run.model || '').trim();
-    if (resolvedProvider && resolvedProvider !== run.provider) {
-      errors.push(`runs[${index}] resolved provider does not match its declared provider`);
-    }
-    if (resolvedModel && resolvedModel !== run.model) {
-      errors.push(`runs[${index}] resolved model does not match its declared model`);
-    }
+    errors.push(...responseIdentityErrors(run, model, index));
     expectedPromptRows.push({ modelId: run.modelId, repeatIndex: run.repeatIndex, runId: run.runId, promptHash: sha256(prompt) });
   });
   errors.push(...deploymentIdentityErrors(file.runs || []));

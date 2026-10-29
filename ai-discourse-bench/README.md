@@ -245,10 +245,16 @@ The full runner refuses an estimated cost above `$10` by default; set
 `AIDB_MAX_ESTIMATED_COST_USD` to an explicit positive ceiling for the run.
 
 OpenRouter roster entries may include a validated `providerRouting` object with
-`order`, `allow_fallbacks`, `require_parameters`, `data_collection`, and `zdr`.
+`order`, `only`, `allow_fallbacks`, `require_parameters`, `data_collection`, and `zdr`.
 The exact policy is sent as OpenRouter's `provider` request field, preserved in
 run provenance, and included in resume/release compatibility checks. The
 observed serving provider and resolved model are recorded from every response.
+Release validation checks the transport against the manifest independently of
+that upstream. An `only` list restricts serving providers; `order` does too when
+`allow_fallbacks` is false. Provider comparison lowercases names and replaces
+spaces or underscores with hyphens, while recorded metadata stays unchanged.
+Unrestricted routing accepts any upstream, but one model must still resolve to
+one deployment identity across its runs.
 
 ## Persona Mode
 
