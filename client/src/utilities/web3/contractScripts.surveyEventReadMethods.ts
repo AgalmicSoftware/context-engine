@@ -236,6 +236,7 @@ export const createContractScriptsSurveyEventReadMethods = (
 
         const uniquePairs = Array.from(latestByPair.values());
         const fullRangeAggregator: Record<string, unknown[]> = {};
+        let lowestRetryableFailedBlock: number | null = null;
         await Promise.all(
           uniquePairs.map(async ({ responder, qId, blockNumber, transactionIndex, logIndex }) => {
             let blockTimestamp = 0;
@@ -251,11 +252,18 @@ export const createContractScriptsSurveyEventReadMethods = (
               respData = await this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
                 _resolvedCfg: cfg,
                 forceArweaveFetch,
+                throwOnError: true,
               });
             } catch (e: unknown) {
+              const retryable = isRetryableSurveyResponseReadError(e);
+              if (retryable) {
+                lowestRetryableFailedBlock =
+                  lowestRetryableFailedBlock === null ? blockNumber : Math.min(lowestRetryableFailedBlock, blockNumber);
+              }
               contractsLog.warn('[getQuestionResponsesFullRange] individual response read failed; skipping', {
                 responder,
                 qId,
+                retryable,
                 error: e instanceof Error ? e.message : String(e),
               });
             }
@@ -287,7 +295,11 @@ export const createContractScriptsSurveyEventReadMethods = (
         }
 
         if (onPartialData) {
-          onPartialData(fullRangeAggregator, resolvedToBlockNum);
+          const completedToBlock =
+            lowestRetryableFailedBlock === null
+              ? resolvedToBlockNum
+              : Math.min(resolvedToBlockNum, lowestRetryableFailedBlock - 1);
+          onPartialData(fullRangeAggregator, completedToBlock);
         }
       } catch (err: unknown) {
         contractsLog.error('Critical Error in getQuestionResponsesChunkedWithCallback:', err);
