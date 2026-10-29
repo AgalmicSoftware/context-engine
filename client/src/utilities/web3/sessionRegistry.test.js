@@ -17,6 +17,7 @@ jest.mock('../crypto/cryptography.js', () => ({
 import {
   __sessionRegistryTestUtils,
   parseSessionRegistryMetadataUri,
+  fetchSessionFromRegistry,
   registerSessionOnChain,
   refreshSessionRegistryFieldsCache,
   setResourceGatesOnChain,
@@ -474,6 +475,9 @@ describe('refreshSessionRegistryFieldsCache', () => {
         __registry: {
           registryChainId: CONFIGURED_REGISTRY_CHAIN_ID,
           sessionIdHex,
+          metadata: { sessionName: 'Demo Session' },
+          metadataURI: 'ar://metadata-tx',
+          encryptedMetadataURI: '',
           gatesByResource: {
             txGas: txGasGate,
           },
@@ -552,6 +556,132 @@ describe('refreshSessionRegistryFieldsCache', () => {
         sessionName: 'Demo Session',
       }),
     );
+  });
+});
+
+describe('targeted registry field clear semantics', () => {
+  afterEach(() => {
+    localStorage.removeItem('dg:sessionRegistryCache:v1');
+    jest.restoreAllMocks();
+    arweaveClient.downloadDataFromArweave.mockReset();
+  });
+
+  const fixture = async ({ batch = true, fallback = false, cacheMetadata = true } = {}) => {
+    const metadata = {
+      sessionName: 'Synthetic field refresh',
+      sessionInfo: 'Retain metadata and gate context.',
+      ...(fallback
+        ? {
+            corsWorkerUrl: 'https://metadata-worker.example',
+            rpc: { providers: { path: { rpcUrl: 'https://metadata-rpc.example' } } },
+            sponsoredKeys: { faucet: false },
+          }
+        : {}),
+    };
+    const fields = {
+      corsWorkerUrl: 'https://field-worker.example',
+      rpcUrl: 'https://field-rpc.example',
+      sponsored_faucet: 'true',
+      sponsored_ai: 'false',
+    };
+    const failures = new Set();
+    const tx = 'M'.repeat(43);
+    arweaveClient.downloadDataFromArweave.mockResolvedValue(JSON.stringify(metadata));
+    installPublicRpcFeeMocks();
+    const contract = {
+      getSessionBySlug: jest
+        .fn()
+        .mockResolvedValue([
+          'field-refresh',
+          CONFIGURED_REGISTRY_CHAIN_ID,
+          `ar://${tx}`,
+          '',
+          TEST_SIGNER_ADDRESS,
+          1,
+          2,
+          '0x' + '34'.repeat(16),
+        ]),
+      getResourceGate: jest.fn().mockResolvedValue([[], 0, 0, 0]),
+      ...(batch ? { getSessionFields: jest.fn(async (_slug, keys) => keys.map((key) => fields[key] || '')) } : {}),
+      getSessionField: jest.fn(async (_slug, key) => {
+        if (failures.has(key)) throw new Error('Synthetic field read failure');
+        return fields[key] || '';
+      }),
+    };
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contract;
+    });
+    const full = () => fetchSessionFromRegistry({ chainId: CONFIGURED_REGISTRY_CHAIN_ID, slug: 'field-refresh' });
+    const initial = await full();
+    if (!cacheMetadata) delete initial.__registry.metadata;
+    upsertSessionRegistryCache({ config: initial });
+    arweaveClient.downloadDataFromArweave.mockClear();
+    return {
+      fields,
+      failures,
+      contract,
+      full,
+      initial,
+      refresh: (fieldKeys) =>
+        refreshSessionRegistryFieldsCache({ chainId: CONFIGURED_REGISTRY_CHAIN_ID, slug: 'field-refresh', fieldKeys }),
+    };
+  };
+
+  it.each([true, false])(
+    'cleared Worker, RPC and sponsorship overrides equal a full fetch (batch=%s)',
+    async (batch) => {
+      const f = await fixture({ batch });
+      for (const key of ['corsWorkerUrl', 'rpcUrl', 'sponsored_faucet']) f.fields[key] = '';
+      const refreshed = await f.refresh();
+      expect(refreshed.corsWorkerUrl).toBeUndefined();
+      expect(refreshed.rpc?.providers?.path?.rpcUrl).toBeUndefined();
+      expect(refreshed.sponsoredKeys?.faucet).toBeUndefined();
+      for (const key of ['corsWorkerUrl', 'rpcUrl', 'sponsored_faucet'])
+        expect(refreshed.__registry.fields).not.toHaveProperty(key);
+      expect(refreshed).toEqual(await f.full());
+    },
+  );
+
+  it.each([true, false])(
+    'a cleared override restores metadata without retaining stale nested values (cached metadata=%s)',
+    async (cacheMetadata) => {
+      const f = await fixture({ fallback: true, cacheMetadata });
+      for (const key of ['corsWorkerUrl', 'rpcUrl', 'sponsored_faucet']) f.fields[key] = '';
+      const refreshed = await f.refresh();
+      expect(refreshed.corsWorkerUrl).toBe('https://metadata-worker.example');
+      expect(refreshed.rpc.providers.path.rpcUrl).toBe('https://metadata-rpc.example');
+      expect(refreshed.sponsoredKeys.faucet).toBe(false);
+      expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(cacheMetadata ? 0 : 1);
+      expect(refreshed).toEqual(await f.full());
+    },
+  );
+
+  it('leaves unrequested fields alone and keeps a previous value after a failed read', async () => {
+    const f = await fixture({ batch: false });
+    f.fields.corsWorkerUrl = '';
+    f.fields.rpcUrl = 'https://unrequested-rpc.example';
+    f.fields.sponsored_faucet = '';
+    f.failures.add('sponsored_faucet');
+    const refreshed = await f.refresh(['corsWorkerUrl', 'sponsored_faucet']);
+    expect(refreshed.corsWorkerUrl).toBeUndefined();
+    expect(refreshed.rpc.providers.path.rpcUrl).toBe('https://field-rpc.example');
+    expect(refreshed.sponsoredKeys.faucet).toBe(true);
+    expect(refreshed.__registry.fields).toEqual({
+      rpcUrl: 'https://field-rpc.example',
+      sponsored_faucet: 'true',
+      sponsored_ai: 'false',
+    });
+    expect(refreshed.sessionName).toBe(f.initial.sessionName);
+    expect(refreshed.__registry.gatesByResource).toEqual(f.initial.__registry.gatesByResource);
+  });
+
+  it('keeps missing batch results distinct from successful empty field reads', async () => {
+    const f = await fixture();
+    f.contract.getSessionFields.mockResolvedValue(['']);
+    const refreshed = await f.refresh(['corsWorkerUrl', 'rpcUrl']);
+    expect(refreshed.corsWorkerUrl).toBeUndefined();
+    expect(refreshed.rpc.providers.path.rpcUrl).toBe('https://field-rpc.example');
+    expect(refreshed.__registry.fields.rpcUrl).toBe('https://field-rpc.example');
   });
 });
 

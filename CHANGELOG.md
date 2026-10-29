@@ -121,6 +121,10 @@ All notable changes to this project will be documented in this file.
   from tool errors and logs, so a keyed RPC URL cannot reach a transcript.
 
 ### Client — available when the site deploys
+
+- Clear cached registry overrides when their on-chain fields are empty, restoring
+  metadata or defaults while preserving failed and unrequested fields.
+
 - Keep Realtime interview questions and answers in conversation order when
   transcription completions arrive late or repeat.
 
