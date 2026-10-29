@@ -39,14 +39,14 @@ type RatingEncryptionBaseOptions = {
 export interface RatingEnvelopeDeps {
   isQuestionLockedForResponse: (qid: string) => boolean;
   resolveFieldEncryptionAudience: (field: ResponseFieldState, qid: string, fieldKey: string) => string;
-  getEffectiveRecipientsForQid: (qid: string) => string[];
+  getEffectiveRecipientsForQid: (qid: string) => unknown[];
   getEffectiveRecipientsForField: (opts: {
     questionId: string;
     fieldKey: string;
     field: ResponseFieldState;
-  }) => string[];
+  }) => unknown[];
   getDefaultResponseEncryptionAudienceForQid: (qid: string) => string;
-  buildLitEncryptionOptionsForRecipients: (recipients: string[]) => UnknownRecord | null;
+  buildLitEncryptionOptionsForRecipients: (recipients: unknown[]) => UnknownRecord | null;
   encryptEnvelopeValue: (value: unknown, opts: RatingEncryptionBaseOptions & UnknownRecord) => Promise<string>;
   getImportanceFromResponse: (r: RatingResponseObject) => number | null;
   getConvictionFromResponse: (r: RatingResponseObject) => number | null;
@@ -151,7 +151,7 @@ export function pickAudienceForRatingEncryption(
   deps: RatingEnvelopeDeps,
 ): {
   audience: string;
-  recipients: string[];
+  recipients: unknown[];
 } {
   const qLower = String(qid || '')
     .trim()
@@ -288,10 +288,14 @@ export async function processRatingEnvelopesForSubmit(
     questionsEncrypted += 1;
 
     const audienceSelection = pickAudienceForRatingEncryption(qid, sliceForSubmit, deps);
+    const currentLit =
+      audienceSelection.audience === 'gate'
+        ? deps.buildLitEncryptionOptionsForRecipients(audienceSelection.recipients)
+        : undefined;
     for (const { fieldKey, envelopeKey } of RATING_FIELD_SPECS) {
       if (
         respObj[envelopeKey] &&
-        responseEnvelopeMatchesAudience(respObj[envelopeKey], audienceSelection.audience) === false
+        responseEnvelopeMatchesAudience(respObj[envelopeKey], audienceSelection.audience, currentLit) === false
       ) {
         if (respObj[fieldKey] === undefined || respObj[fieldKey] === null) {
           throw new Error(`Decrypt the ratings for ${qid} before changing their encryption audience.`);
@@ -315,7 +319,7 @@ export async function processRatingEnvelopesForSubmit(
         if (!Array.isArray(recipients) || recipients.length === 0) {
           throw new Error(`Missing Lit recipients for gated rating encryption (${qid}).`);
         }
-        lit = deps.buildLitEncryptionOptionsForRecipients(recipients);
+        lit = currentLit;
         if (!lit) {
           throw new Error('Lit hooks unavailable; cannot encrypt gated rating.');
         }

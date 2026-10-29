@@ -122,6 +122,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Re-encrypt response fields and ratings when gate conditions or chains change;
+  require decryption before submitting a still-locked field to a different gate.
+
 - Clear cached registry overrides when their on-chain fields are empty, restoring
   metadata or defaults while preserving failed and unrequested fields.
 
