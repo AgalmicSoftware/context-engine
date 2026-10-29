@@ -784,11 +784,11 @@ export const summarizeImportanceRuns = ({ importanceFile, questionBank, modelRos
     if (parsed.parseError) return null;
     return { ...run, allocations: parsed.allocations, spentCredits: parsed.spentCredits };
   }).filter(Boolean);
-  const byModel = {};
+  const byModel = Object.create(null);
   models.forEach((model) => {
     const modelRuns = validRuns.filter((run) => run.modelId === model.id);
     if (!modelRuns.length) return;
-    const byQuestion = {};
+    const byQuestion = Object.create(null);
     questions.forEach((question) => {
       const votes = modelRuns.map((run) => Number(run.allocations.find((entry) => entry.questionId === question.id)?.votes || 0));
       const meanVotes = round(votes.reduce((sum, value) => sum + value, 0) / modelRuns.length);
@@ -810,7 +810,7 @@ export const summarizeImportanceRuns = ({ importanceFile, questionBank, modelRos
     };
   });
   const contributingModelIds = Object.keys(byModel);
-  const byQuestion = {};
+  const byQuestion = Object.create(null);
   questions.forEach((question) => {
     const values = contributingModelIds.map((modelId) => Number(byModel[modelId].byQuestion[question.id]?.meanVotes || 0));
     byQuestion[question.id] = {
@@ -822,7 +822,7 @@ export const summarizeImportanceRuns = ({ importanceFile, questionBank, modelRos
   Object.values(byQuestion).forEach((row) => {
     row.share = totalMeanVotes ? round(row.meanVotes / totalMeanVotes) : 0;
   });
-  const byTopic = {};
+  const byTopic = Object.create(null);
   questions.forEach((question) => {
     const topic = question.topic || 'uncategorized';
     if (!byTopic[topic]) byTopic[topic] = { meanVotes: 0, questionCount: 0, modelCount: contributingModelIds.length };
@@ -846,8 +846,8 @@ export const summarizeImportanceRuns = ({ importanceFile, questionBank, modelRos
     validRuns: validRuns.length,
     contributingModels: contributingModelIds.length,
     totalMeanVotes: round(totalMeanVotes),
-    byModel,
-    byQuestion,
-    byTopic,
+    byModel: Object.fromEntries(Object.entries(byModel).map(([id, row]) => [id, { ...row, byQuestion: { ...row.byQuestion } }])),
+    byQuestion: { ...byQuestion },
+    byTopic: { ...byTopic },
   };
 };

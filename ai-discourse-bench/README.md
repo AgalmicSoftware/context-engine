@@ -703,3 +703,7 @@ participant does not supply a measured distance. Measured edges and raw
 distributions remain available. Remaining groups are exploratory descriptions
 of this sample, with no established stability claim. Missing similarity is never
 filled with maximal disagreement.
+
+Report grouping treats roster trait names and values as data, including names
+such as `constructor` and `__proto__`. Grouped JSON retains them as own properties;
+the same key handling applies to interactive trait filters and model dictionaries.
