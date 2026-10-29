@@ -2,6 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildResultsImage } from './resultImage.mjs';
 
+test('group images skip unmatched participants without inventing membership', () => {
+  const kept = [
+    { participant: 'P1', answers: [{ question: 'Q1', label: 'Agree' }] },
+    { participant: 'P2', answers: [{ question: 'Q1', label: 'Agree' }] },
+  ];
+  const options = { mode: 'group', groups: [{ label: 'Group 1', aliases: ['P1', 'P2'], size: 2 }] };
+  const expected = buildResultsImage({ ...options, participants: kept });
+  const actual = buildResultsImage({ ...options, participants: [
+    { participant: 'P3', answers: [{ question: 'Q2', label: 'Disagree' }] }, ...kept,
+  ] });
+  assert.equal(Buffer.compare(actual.bytes, expected.bytes), 0);
+  const empty = buildResultsImage({ ...options, participants: [] });
+  const unmatched = buildResultsImage({ ...options, participants: [{ participant: 'P3', answers: [] }] });
+  assert.equal(Buffer.compare(empty.bytes, unmatched.bytes), 0);
+});
+
 function readU32(bytes, offset) {
   return (
     (bytes[offset] << 24) |

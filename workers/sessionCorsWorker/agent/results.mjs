@@ -284,9 +284,10 @@ export const AGENT_RESULTS_SUPPORTED_VIEWS = ['topic-map', 'consensus', 'differe
 
 export const AGENT_RESULTS_IMAGE_SUPPORTED_VIEWS = ['topic-map', 'consensus', 'groups'];
 
-export function anonymizeAgentGroups(groups = [], minGroupSize = 2) {
+export function anonymizeAgentGroups(groups = [], minGroupSize = 2, participants = []) {
   const source = Array.isArray(groups) ? groups : [];
   const kept = source.filter((group) => Number(group?.size) >= minGroupSize);
+  const aliases = new Set(kept.flatMap((group) => Array.isArray(group.aliases) ? group.aliases : []));
   const safe = kept.map((group) => ({
     groupId: safeString(group.groupId),
     label: safeString(group.label),
@@ -311,6 +312,9 @@ export function anonymizeAgentGroups(groups = [], minGroupSize = 2) {
   }));
   return {
     groups: safe,
+    imageGroups: kept,
+    participants: (Array.isArray(participants) ? participants : []).filter((participant) => aliases.has(participant.participant)),
+    participantCount: aliases.size,
     suppressedGroupCount: source.length - kept.length,
   };
 }
@@ -666,7 +670,7 @@ export async function handleResultsRequest({
   const loaded = await loadAgentResultsDataset({ env, context, input });
   const graph = buildParticipantGraph(loaded.sourceRecords, loaded.sourceQuestions);
   const minGroupSize = agentResultsMinGroupSize(context.session);
-  const anonymized = anonymizeAgentGroups(graph.groups, minGroupSize);
+  const anonymized = anonymizeAgentGroups(graph.groups, minGroupSize, graph.participants);
   const body = {
     ok: true,
     sessionSlug: loaded.sessionSlug,
@@ -675,7 +679,7 @@ export async function handleResultsRequest({
     minGroupSize,
     groupCount: anonymized.groups.length,
     suppressedGroupCount: anonymized.suppressedGroupCount,
-    participantCount: graph.participantCount,
+    participantCount: anonymized.participantCount,
     questionCount: graph.questionCount,
     groups: anonymized.groups,
   };
@@ -802,9 +806,8 @@ export async function handleResultsImageRequest({
   const loaded = await loadAgentResultsDataset({ env, context, input });
   const graph = buildParticipantGraph(loaded.sourceRecords, loaded.sourceQuestions);
   const minGroupSize = agentResultsMinGroupSize(context.session);
-  const keptGroupIds = new Set(anonymizeAgentGroups(graph.groups, minGroupSize).groups.map((group) => group.groupId));
-  const keptGroups = graph.groups.filter((group) => keptGroupIds.has(group.groupId));
-  if (!loaded.demo && (!loaded.sourceRecords.length || !keptGroups.length)) {
+  const anonymized = anonymizeAgentGroups(graph.groups, minGroupSize, graph.participants);
+  if (!loaded.demo && (!loaded.sourceRecords.length || !anonymized.groups.length)) {
     const body = {
       ok: false,
       reason: 'not_enough_data_for_view',
@@ -819,8 +822,8 @@ export async function handleResultsImageRequest({
     sessionTitle: context.session.sessionName || context.session.sessionSlug,
     responseCount: loaded.sourceRecords.length,
     demo: loaded.demo,
-    participants: graph.participants,
-    groups: keptGroups,
+    participants: anonymized.participants,
+    groups: anonymized.imageGroups,
   });
   return new Response(image.bytes, {
     status: 200,

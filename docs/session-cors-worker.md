@@ -618,6 +618,7 @@ Admin test panel:
   separate provider or model. Inputs are submitted responses only; Circles is
   the DebateMap argument-map plus atlas view, and Risk Matrix axes are generated
   from the session subject matter.
+- Agent groups JSON and images share the minimum-size group projection. The JSON participant count includes only kept groups, and images draw only their listed aliases; unmatched participants are omitted.
 - Generated Breakdown `groups` obey `anonymizedGroupsEnabled` and `minGroupSize`.
   The Worker counts distinct cited participants from the permitted input, applies
   the policy before saving, and reapplies current settings to previously stored

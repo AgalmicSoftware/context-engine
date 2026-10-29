@@ -1,10 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { answerScore, buildParticipantGraph } from './participantResults.mjs';
+import { anonymizeAgentGroups } from './results.mjs';
 
 const rating = { questionId: 'rating', questionType: 'rating', scale: { min: 0, max: 10 } };
 const record = (participant, questionId, value, extra = {}) => ({
   telegramUserId: participant, questionId, label: String(value), value, ...extra,
+});
+
+test('JSON and image group projections contain the same permitted memberships', () => {
+  const graph = buildParticipantGraph([
+    record('first', 'binary', 'Agree'), record('second', 'binary', 'Agree'),
+    record('third', 'binary', 'Disagree'),
+  ], [{ questionId: 'binary', questionType: 'binary' }]);
+  const projected = anonymizeAgentGroups(graph.groups, 2, graph.participants);
+  assert.equal(projected.suppressedGroupCount, 1);
+  assert.deepEqual(projected.groups.map(group => [group.groupId, group.size]), [['group-1', 2]]);
+  assert.deepEqual(projected.participants?.map(participant => participant.participant), ['P1', 'P2']);
+  assert.deepEqual(projected.imageGroups.map(group => group.aliases), [['P1', 'P2']]);
+  assert.deepEqual(projected.imageGroups.map(group => [group.groupId, group.size]),
+    projected.groups.map(group => [group.groupId, group.size]));
 });
 
 test('rating scores increase monotonically across the declared scale', () => {

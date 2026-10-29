@@ -95319,14 +95319,6 @@ function demoBeeswarmRows() {
     { label: "Q3", prompt: "Explain uncertainty", answers: ["Agree", "Agree", "Agree", "Agree", "Unsure", "Agree"] }
   ];
 }
-function demoParticipants() {
-  return [
-    { participant: "P1", answers: [{ question: "Q1", label: "Agree" }, { question: "Q2", label: "Unsure" }, { question: "Q3", label: "Agree" }] },
-    { participant: "P2", answers: [{ question: "Q1", label: "Disagree" }, { question: "Q2", label: "Disagree" }, { question: "Q3", label: "Unsure" }] },
-    { participant: "P3", answers: [{ question: "Q1", label: "Agree" }, { question: "Q2", label: "Agree" }, { question: "Q3", label: "Agree" }] },
-    { participant: "P4", answers: [{ question: "Q1", label: "Unsure" }, { question: "Q2", label: "Disagree" }, { question: "Q3", label: "Agree" }] }
-  ];
-}
 function drawResultsHeader(pixels, width, {
   title = "Consensus",
   sessionTitle = "",
@@ -95421,10 +95413,9 @@ function drawBeeswarm(pixels, width, rows = []) {
   });
   drawLegend(pixels, width, 330, 650);
 }
-function groupForParticipant(participant = {}, groups = [], index = 0) {
-  const alias = String(participant.participant || `P${index + 1}`);
-  const groupIndex = groups.findIndex((group) => Array.isArray(group.aliases) && group.aliases.includes(alias));
-  return groupIndex >= 0 ? groupIndex : index % Math.max(1, groups.length || 1);
+function groupForParticipant(participant = {}, groups = []) {
+  const alias = String(participant.participant || "");
+  return alias ? groups.findIndex((group) => Array.isArray(group.aliases) && group.aliases.includes(alias)) : -1;
 }
 function participantGraphLayout(participants = [], groups = [], centerX = 0, centerY = 0) {
   const groupCount = Math.max(1, groups.length || 2);
@@ -95436,7 +95427,7 @@ function participantGraphLayout(participants = [], groups = [], centerX = 0, cen
     };
   });
   return participants.slice(0, 10).map((participant, index) => {
-    const groupIndex = groupForParticipant(participant, groups, index);
+    const groupIndex = groupForParticipant(participant, groups);
     const answers = Array.isArray(participant.answers) ? participant.answers : [];
     const avg = answers.reduce((sum, answer) => sum + answerPosition(answer.label), 0) / Math.max(1, answers.length);
     const localAngle = index * 2.35 + avg * Math.PI;
@@ -95471,7 +95462,7 @@ function drawParticipantGroupLines(pixels, width, layout = []) {
   }
 }
 function drawParticipantGraph(pixels, width, participants = [], groups = []) {
-  const sourceParticipants = Array.isArray(participants) && participants.length ? participants : demoParticipants();
+  const sourceParticipants = (Array.isArray(participants) ? participants : []).filter((participant) => groupForParticipant(participant, groups) >= 0);
   const questions = Array.from(new Set(sourceParticipants.flatMap((participant) => (participant.answers || []).map((answer) => answer.question).filter(Boolean)))).slice(0, 5);
   const chartX = 58;
   const chartY = 130;
@@ -95505,10 +95496,7 @@ function drawParticipantGraph(pixels, width, participants = [], groups = []) {
   drawText(pixels, width, "PARTICIPANTS", 96, 503, 2, SLATE);
   fillCircle(pixels, width, 252, 512, 7, BLACK);
   drawText(pixels, width, "QUESTIONS", 272, 503, 2, SLATE);
-  const summaryGroups = (Array.isArray(groups) && groups.length ? groups : [
-    { label: "Group 1", theme: "similar answer pattern", aliases: ["P1", "P3"] },
-    { label: "Group 2", theme: "contrasting answer pattern", aliases: ["P2"] }
-  ]).slice(0, 3);
+  const summaryGroups = (Array.isArray(groups) ? groups : []).slice(0, 3);
   summaryGroups.forEach((group, index) => {
     const cardW = summaryGroups.length > 2 ? 300 : 430;
     const x = 58 + index * (cardW + 24);
@@ -96515,9 +96503,10 @@ function normalizeAgentResultsView(value = "") {
 }
 var AGENT_RESULTS_SUPPORTED_VIEWS = ["topic-map", "consensus", "difference", "groups", "polis"];
 var AGENT_RESULTS_IMAGE_SUPPORTED_VIEWS = ["topic-map", "consensus", "groups"];
-function anonymizeAgentGroups(groups = [], minGroupSize = 2) {
+function anonymizeAgentGroups(groups = [], minGroupSize = 2, participants = []) {
   const source = Array.isArray(groups) ? groups : [];
   const kept = source.filter((group) => Number(group?.size) >= minGroupSize);
+  const aliases = new Set(kept.flatMap((group) => Array.isArray(group.aliases) ? group.aliases : []));
   const safe = kept.map((group) => ({
     groupId: safeString(group.groupId),
     label: safeString(group.label),
@@ -96534,6 +96523,9 @@ function anonymizeAgentGroups(groups = [], minGroupSize = 2) {
   }));
   return {
     groups: safe,
+    imageGroups: kept,
+    participants: (Array.isArray(participants) ? participants : []).filter((participant) => aliases.has(participant.participant)),
+    participantCount: aliases.size,
     suppressedGroupCount: source.length - kept.length
   };
 }
@@ -96854,7 +96846,7 @@ async function handleResultsRequest({
   const loaded = await loadAgentResultsDataset({ env, context, input });
   const graph = buildParticipantGraph(loaded.sourceRecords, loaded.sourceQuestions);
   const minGroupSize = agentResultsMinGroupSize(context.session);
-  const anonymized = anonymizeAgentGroups(graph.groups, minGroupSize);
+  const anonymized = anonymizeAgentGroups(graph.groups, minGroupSize, graph.participants);
   const body = {
     ok: true,
     sessionSlug: loaded.sessionSlug,
@@ -96863,7 +96855,7 @@ async function handleResultsRequest({
     minGroupSize,
     groupCount: anonymized.groups.length,
     suppressedGroupCount: anonymized.suppressedGroupCount,
-    participantCount: graph.participantCount,
+    participantCount: anonymized.participantCount,
     questionCount: graph.questionCount,
     groups: anonymized.groups
   };
@@ -96989,9 +96981,8 @@ async function handleResultsImageRequest({
   const loaded = await loadAgentResultsDataset({ env, context, input });
   const graph = buildParticipantGraph(loaded.sourceRecords, loaded.sourceQuestions);
   const minGroupSize = agentResultsMinGroupSize(context.session);
-  const keptGroupIds = new Set(anonymizeAgentGroups(graph.groups, minGroupSize).groups.map((group) => group.groupId));
-  const keptGroups = graph.groups.filter((group) => keptGroupIds.has(group.groupId));
-  if (!loaded.demo && (!loaded.sourceRecords.length || !keptGroups.length)) {
+  const anonymized = anonymizeAgentGroups(graph.groups, minGroupSize, graph.participants);
+  if (!loaded.demo && (!loaded.sourceRecords.length || !anonymized.groups.length)) {
     const body = {
       ok: false,
       reason: "not_enough_data_for_view",
@@ -97006,8 +96997,8 @@ async function handleResultsImageRequest({
     sessionTitle: context.session.sessionName || context.session.sessionSlug,
     responseCount: loaded.sourceRecords.length,
     demo: loaded.demo,
-    participants: graph.participants,
-    groups: keptGroups
+    participants: anonymized.participants,
+    groups: anonymized.imageGroups
   });
   return new Response(image.bytes, {
     status: 200,

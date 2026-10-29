@@ -287,15 +287,6 @@ function demoBeeswarmRows() {
   ];
 }
 
-function demoParticipants() {
-  return [
-    { participant: 'P1', answers: [{ question: 'Q1', label: 'Agree' }, { question: 'Q2', label: 'Unsure' }, { question: 'Q3', label: 'Agree' }] },
-    { participant: 'P2', answers: [{ question: 'Q1', label: 'Disagree' }, { question: 'Q2', label: 'Disagree' }, { question: 'Q3', label: 'Unsure' }] },
-    { participant: 'P3', answers: [{ question: 'Q1', label: 'Agree' }, { question: 'Q2', label: 'Agree' }, { question: 'Q3', label: 'Agree' }] },
-    { participant: 'P4', answers: [{ question: 'Q1', label: 'Unsure' }, { question: 'Q2', label: 'Disagree' }, { question: 'Q3', label: 'Agree' }] },
-  ];
-}
-
 function drawResultsHeader(pixels, width, {
   title = 'Consensus',
   sessionTitle = '',
@@ -395,10 +386,9 @@ function drawBeeswarm(pixels, width, rows = []) {
   drawLegend(pixels, width, 330, 650);
 }
 
-function groupForParticipant(participant = {}, groups = [], index = 0) {
-  const alias = String(participant.participant || `P${index + 1}`);
-  const groupIndex = groups.findIndex((group) => Array.isArray(group.aliases) && group.aliases.includes(alias));
-  return groupIndex >= 0 ? groupIndex : index % Math.max(1, groups.length || 1);
+function groupForParticipant(participant = {}, groups = []) {
+  const alias = String(participant.participant || '');
+  return alias ? groups.findIndex((group) => Array.isArray(group.aliases) && group.aliases.includes(alias)) : -1;
 }
 
 function participantGraphLayout(participants = [], groups = [], centerX = 0, centerY = 0) {
@@ -411,7 +401,7 @@ function participantGraphLayout(participants = [], groups = [], centerX = 0, cen
     };
   });
   return participants.slice(0, 10).map((participant, index) => {
-    const groupIndex = groupForParticipant(participant, groups, index);
+    const groupIndex = groupForParticipant(participant, groups);
     const answers = Array.isArray(participant.answers) ? participant.answers : [];
     const avg = answers.reduce((sum, answer) => sum + answerPosition(answer.label), 0) / Math.max(1, answers.length);
     const localAngle = (index * 2.35) + (avg * Math.PI);
@@ -450,7 +440,8 @@ function drawParticipantGroupLines(pixels, width, layout = []) {
 }
 
 function drawParticipantGraph(pixels, width, participants = [], groups = []) {
-  const sourceParticipants = Array.isArray(participants) && participants.length ? participants : demoParticipants();
+  const sourceParticipants = (Array.isArray(participants) ? participants : [])
+    .filter((participant) => groupForParticipant(participant, groups) >= 0);
   const questions = Array.from(new Set(sourceParticipants.flatMap((participant) => (
     (participant.answers || []).map((answer) => answer.question).filter(Boolean)
   )))).slice(0, 5);
@@ -487,10 +478,7 @@ function drawParticipantGraph(pixels, width, participants = [], groups = []) {
   fillCircle(pixels, width, 252, 512, 7, BLACK);
   drawText(pixels, width, 'QUESTIONS', 272, 503, 2, SLATE);
 
-  const summaryGroups = (Array.isArray(groups) && groups.length ? groups : [
-    { label: 'Group 1', theme: 'similar answer pattern', aliases: ['P1', 'P3'] },
-    { label: 'Group 2', theme: 'contrasting answer pattern', aliases: ['P2'] },
-  ]).slice(0, 3);
+  const summaryGroups = (Array.isArray(groups) ? groups : []).slice(0, 3);
   summaryGroups.forEach((group, index) => {
     const cardW = summaryGroups.length > 2 ? 300 : 430;
     const x = 58 + index * (cardW + 24);
