@@ -46,28 +46,7 @@ jest.mock('../session/sessionNaming.js', () => ({
 jest.mock('../session/mainSiteUtils', () => ({
   __esModule: true,
   emitMainSiteSbtDebug: jest.fn(),
-  hasCoreSbtMetadata: jest.fn((info) => {
-    if (!info || typeof info !== 'object') return false;
-    const hasValue = (value) => value !== undefined && value !== null && String(value).trim() !== '';
-    const tokenUri = info.tokenURI ?? info.tokenUri ?? null;
-    const mintingEndRaw = info.mintingEndTime;
-    const burnAuthRaw = info.burnAuth;
-    const admin = String(info.admin || info.admin_ || '')
-      .trim()
-      .toLowerCase();
-    const mintingEndOk =
-      mintingEndRaw !== undefined && mintingEndRaw !== null && Number.isFinite(Number(mintingEndRaw));
-    const burnAuthOk = burnAuthRaw !== undefined && burnAuthRaw !== null && Number.isFinite(Number(burnAuthRaw));
-    return (
-      hasValue(tokenUri) &&
-      mintingEndOk &&
-      burnAuthOk &&
-      typeof info.hasPasswordMint === 'boolean' &&
-      hasValue(info.maxTokens) &&
-      !!admin &&
-      admin !== '0x0000000000000000000000000000000000000000'
-    );
-  }),
+  hasCoreSbtMetadata: jest.fn(),
   isForcedSbtSelectorDebugEnabled: jest.fn(() => false),
 }));
 
@@ -116,27 +95,7 @@ const createCompleteSbtMetadata = (overrides = {}) => ({
   ...overrides,
 });
 
-const hasMockCoreSbtMetadata = (info) => {
-  if (!info || typeof info !== 'object') return false;
-  const hasValue = (value) => value !== undefined && value !== null && String(value).trim() !== '';
-  const tokenUri = info.tokenURI ?? info.tokenUri ?? null;
-  const mintingEndRaw = info.mintingEndTime;
-  const burnAuthRaw = info.burnAuth;
-  const admin = String(info.admin || info.admin_ || '')
-    .trim()
-    .toLowerCase();
-  const mintingEndOk = mintingEndRaw !== undefined && mintingEndRaw !== null && Number.isFinite(Number(mintingEndRaw));
-  const burnAuthOk = burnAuthRaw !== undefined && burnAuthRaw !== null && Number.isFinite(Number(burnAuthRaw));
-  return (
-    hasValue(tokenUri) &&
-    mintingEndOk &&
-    burnAuthOk &&
-    typeof info.hasPasswordMint === 'boolean' &&
-    hasValue(info.maxTokens) &&
-    !!admin &&
-    admin !== ZERO_ADDRESS
-  );
-};
+const hasMockCoreSbtMetadata = jest.requireActual('../session/mainSiteUtils').hasCoreSbtMetadata;
 
 const deepClone = (value) => (value == null ? value : JSON.parse(JSON.stringify(value)));
 
@@ -1122,6 +1081,25 @@ describe('createSessionSbtCacheController', () => {
           }),
         }),
       );
+    });
+
+    it('finishes retired SBT hydration and does not rehydrate at the same head', async () => {
+      const sbtAddress = '0x0000000000000000000000000000000000000f01';
+      const host = createMockHost();
+      const controller = createSessionSbtCacheController(host);
+      contractScripts.getAllSbtAddressesCached.mockReset().mockResolvedValue([sbtAddress]);
+      contractScripts.getSbtMetadata.mockReset().mockResolvedValue(
+        createCompleteSbtMetadata({
+          admin: ZERO_ADDRESS,
+          description: 'Retired fixture',
+          image: 'ar://fixture',
+          tokenUriMetadataFetched: true,
+        }),
+      );
+      await controller.ensureLightSbtDiscovery('alpha');
+      expect(host.getStored('sbtCache', 'alpha')[11155420].lastBlock).toBe(12);
+      await controller.ensureLightSbtDiscovery('alpha');
+      expect(contractScripts.getSbtMetadata).toHaveBeenCalledTimes(1);
     });
 
     it('keeps light discovery watermark behind failed metadata hydration so later runs retry', async () => {
