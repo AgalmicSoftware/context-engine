@@ -478,10 +478,10 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       excludedCount += 1;
       continue;
     }
-    const answer = validatedAnswer.slice(0, 4000);
+    const answer = Array.isArray(validatedAnswer) ? validatedAnswer : validatedAnswer.slice(0, 4000);
     const additionalLocked = valueLooksEncrypted(additionalValue);
     const additionalComments = additionalLocked ? '' : valueFromAnswerLike(withoutFieldMask(additionalValue)).slice(0, 2000);
-    if (!answer && !additionalComments) {
+    if (!answer.length && !additionalComments) {
       excludedCount += 1;
       if (additionalLocked) lockedCount += 1;
       continue;
@@ -532,7 +532,7 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
   const aiResponses = aiResponseRows
     .map((row) => ({
       ...(row.additionalComments ? { additional: row.additionalComments.slice(0, AI_LIMITS.maxResponseAdditionalChars) } : {}),
-      answer: row.answer.slice(0, AI_LIMITS.maxResponseAnswerChars),
+      answer: (Array.isArray(row.answer) ? row.answer.join('; ') : row.answer).slice(0, AI_LIMITS.maxResponseAnswerChars),
       participantId: participantLabels.get(row.participantKey) || 'participant_000',
       questionId: row.questionId,
       questionPrompt: row.questionPrompt,

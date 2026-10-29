@@ -291,22 +291,6 @@ const addCount = (target: Record<string, number>, key: string, amount = 1) => {
 // chart them; the report and the AI analysis still use them.
 const UNCHARTED_BREAKDOWN_TYPES = new Set(['freeform', 'text', 'quadratic']);
 
-// The Worker joins a multiple-choice answer's option labels with '; '. Known
-// labels are matched first so an option that contains '; ' stays whole.
-const splitMultichoiceAnswer = (answer: string, options: string[]): string[] => {
-  const picks: string[] = [];
-  let rest = answer;
-  while (rest) {
-    const option = options
-      .filter((label) => rest === label || rest.startsWith(`${label}; `))
-      .sort((a, b) => b.length - a.length)[0];
-    if (!option) return uniqueTexts(answer.split('; '));
-    picks.push(option);
-    rest = rest.slice(option.length + 2);
-  }
-  return uniqueTexts(picks);
-};
-
 export const buildGeneratedBreakdownAnalysisData = ({
   questions = [],
   responses = [],
@@ -327,15 +311,21 @@ export const buildGeneratedBreakdownAnalysisData = ({
 
   (Array.isArray(responses) ? responses : []).forEach((response, index) => {
     const questionId = toText(response.questionId);
-    const answer = toText(response.answer ?? response.additional);
-    if (!questionId || !answer) return;
+    if (!questionId) return;
     const question = questionMap.get(questionId);
     if (!question) return;
     // A multiple-choice responder counts once for each option they picked.
     const picks =
       question.sourcePromptType.toLowerCase() === 'multichoice'
-        ? splitMultichoiceAnswer(answer, question.options)
-        : [answer];
+        ? [
+            ...new Set(
+              toArray(response.answer).filter(
+                (pick): pick is string => typeof pick === 'string' && question.options.includes(pick),
+              ),
+            ),
+          ]
+        : [toText(response.answer)];
+    if (!picks.length || !picks[0]) return;
 
     const participantKey = toText(response.participantId) || `response_${index + 1}`;
     const responseKey = `${questionId}::${participantKey}`;

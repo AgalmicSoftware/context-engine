@@ -73979,14 +73979,14 @@ var init_resultsAnalysisAnswerValidation = __esm({
         }
         case "multichoice": {
           const values = Array.isArray(value) ? value : [value];
-          if (!values.length) return "";
+          if (!values.length) return [];
           if (values.some((entry2) => typeof entry2 !== "string" || !entry2.trim())) return null;
           const options = question.options || [];
           const selected = values.map((entry2) => options.find((option) => option.toLowerCase() === entry2.trim().toLowerCase()));
           if (selected.some((entry2) => !entry2)) return null;
           const unique2 = [...new Set(selected)];
           const limit = question.singleSelect ? 1 : question.maxSelections || options.length;
-          return unique2.length <= limit ? unique2.join("; ") : null;
+          return unique2.length <= limit ? unique2 : null;
         }
         case "quadratic":
           return validateQuadraticAllocation(value, question) ? null : formatQuadraticAllocation(value, question.options);
@@ -74379,10 +74379,10 @@ var init_resultsAnalysisGeneration = __esm({
           excludedCount += 1;
           continue;
         }
-        const answer = validatedAnswer.slice(0, 4e3);
+        const answer = Array.isArray(validatedAnswer) ? validatedAnswer : validatedAnswer.slice(0, 4e3);
         const additionalLocked = valueLooksEncrypted(additionalValue);
         const additionalComments = additionalLocked ? "" : valueFromAnswerLike(withoutFieldMask(additionalValue)).slice(0, 2e3);
-        if (!answer && !additionalComments) {
+        if (!answer.length && !additionalComments) {
           excludedCount += 1;
           if (additionalLocked) lockedCount += 1;
           continue;
@@ -74429,7 +74429,7 @@ var init_resultsAnalysisGeneration = __esm({
       });
       const aiResponses = aiResponseRows.map((row) => ({
         ...row.additionalComments ? { additional: row.additionalComments.slice(0, AI_LIMITS.maxResponseAdditionalChars) } : {},
-        answer: row.answer.slice(0, AI_LIMITS.maxResponseAnswerChars),
+        answer: (Array.isArray(row.answer) ? row.answer.join("; ") : row.answer).slice(0, AI_LIMITS.maxResponseAnswerChars),
         participantId: participantLabels.get(row.participantKey) || "participant_000",
         questionId: row.questionId,
         questionPrompt: row.questionPrompt,
