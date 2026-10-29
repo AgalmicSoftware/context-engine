@@ -104,6 +104,10 @@ All notable changes to this project will be documented in this file.
   checks, through one error sanitizer, and redact URLs and ethers diagnostics
   from tool errors and logs, so a keyed RPC URL cannot reach a transcript.
 
+### Local tooling
+
+- Add an in-process participation rehearsal for concurrent invite, Wrapped prediction and signed-in browser response flows, with optional KV write throttling.
+
 ### Client — available when the site deploys
 
 - Keep cluster AI explanations on the selected session Worker with the current viewer authentication context.
