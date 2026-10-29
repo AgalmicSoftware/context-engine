@@ -1,3 +1,4 @@
+import type { ResponseValuesEqual } from './responseValueEquality';
 import type { UnknownRecord } from './surveyToolTypes';
 
 export interface ResponseFieldState {
@@ -23,7 +24,7 @@ export interface MutationDeps {
     answerField: ResponseFieldState,
     qid: string | null,
   ) => ResponseFieldState;
-  valuesEqual: (a: unknown, b: unknown) => boolean;
+  valuesEqual: ResponseValuesEqual;
   getQuestionById: (qid: string) => UnknownRecord | null | undefined;
   computeHash: (value: string) => string;
 }
@@ -109,7 +110,7 @@ export const buildAnswerUpdatePlan = (
   const currentAnswer = prevAnswerState.value;
 
   let finalAnswer = answer;
-  if (isBinaryQuestion && deps.valuesEqual(currentAnswer, answer)) {
+  if (isBinaryQuestion && deps.valuesEqual(currentAnswer, answer, questionId, 'answer')) {
     finalAnswer = '';
   }
 
@@ -123,7 +124,7 @@ export const buildAnswerUpdatePlan = (
 
   const shouldHash = !Array.isArray(finalAnswer) && typeof finalAnswer !== 'number' && !isBinaryQuestion;
   const hasExistingHash = typeof prevAnswerState.hash === 'string' && prevAnswerState.hash.length > 0;
-  const unchangedValue = deps.valuesEqual(currentAnswer, finalAnswer);
+  const unchangedValue = deps.valuesEqual(currentAnswer, finalAnswer, questionId, 'answer');
   const unchangedEncryption =
     !!prevAnswerState.encrypted === !!nextEncrypted &&
     (previousAudience || '') === (resolvedAudience || '') &&
@@ -211,7 +212,7 @@ export const buildAdditionalUpdatePlan = (
     deps,
   );
 
-  const unchangedValue = deps.valuesEqual(currentValue, normalizedAdditional);
+  const unchangedValue = deps.valuesEqual(currentValue, normalizedAdditional, questionId, 'additional');
   const unchangedEncryption =
     !!prevAdditionalState.encrypted === !!nextEncrypted &&
     (previousAudience || '') === (resolvedAudience || '') &&

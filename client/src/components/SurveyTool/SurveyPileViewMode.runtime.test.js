@@ -1743,7 +1743,7 @@ describe('independent interview own-answer hydration', () => {
         surveysResponseState: [{ answers: { q1: encrypted }, importance: {}, conviction: {}, additionalComments: {} }],
         editBaseline: { answers: { q1: plain }, importance: {}, conviction: {}, additionalComments: {} },
       },
-      valuesEqual: (a, b) => responseValuesEqual(a, b, true),
+      valuesEqual: (a, b) => responseValuesEqual(a, b),
       getDefaultResponseEncryptionAudience: () => 'self',
       normalizeResponseEncryptionAudience: (audience) => audience,
       getDefaultResponseEncryptionAudienceForQid: () => 'self',

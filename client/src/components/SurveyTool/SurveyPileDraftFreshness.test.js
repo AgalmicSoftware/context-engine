@@ -30,9 +30,10 @@ const field = (value, extra = {}) => ({
   ...extra,
 });
 let saved = {};
+let questionTypes = {};
 const savedRow = (qid) => ({
   questionID: qid,
-  type: 'binary',
+  type: questionTypes[qid] || 'binary',
   prompt: qid,
   answer: saved[qid].answer,
   additional: saved[qid].additional || field(''),
@@ -46,7 +47,9 @@ const mockCaches = () => {
     .mockImplementation((slug) => (slug === 'edge' ? SESSION_CONFIG : null));
   const cache = () => ({
     84532: {
-      questions: Object.fromEntries(['q1', 'q2', 'q3'].map((id) => [id, { id, type: 'binary', prompt: id }])),
+      questions: Object.fromEntries(
+        ['q1', 'q2', 'q3'].map((id) => [id, { id, type: questionTypes[id] || 'binary', prompt: id }]),
+      ),
       questionResponses: Object.fromEntries(
         Object.keys(saved).map((qid) => [qid, { [ACCOUNT]: JSON.stringify(savedRow(qid)) }]),
       ),
@@ -116,6 +119,7 @@ const draftText = () =>
     .join('\n');
 
 beforeEach(() => {
+  questionTypes = {};
   saved = { q1: { answer: field('Agree') }, q2: { answer: field('Agree') }, q3: { answer: field('Agree') } };
 });
 
@@ -226,4 +230,38 @@ it('drops an older draft after the saved answer is cleared elsewhere', async () 
   const reloaded = await mountPile();
   expect(reloaded.engine().state.surveysResponseState[0].answers.q1.value).toBe('');
   expect(reloaded.engine().getPendingEditStats().total).toBe(0);
+});
+
+it.each([
+  ['0', '00'],
+  ['9007199254740992', '9007199254740993'],
+  ['01', '1'],
+  ['Earlier text', 'Different text'],
+])('keeps text edits from %s to %s in answers, comments and submission differences', async (before, after) => {
+  questionTypes.q1 = 'freeform';
+  saved.q1 = { answer: field(before, { hash: 'saved-hash' }), additional: field(before, { hash: 'saved-note-hash' }) };
+  mockCaches();
+  const pile = await mountPile();
+  await run(() => new Promise((resolve) => pile.engine().handleAnswerPile('q1', after, { afterUpdate: resolve })));
+  await run(() => new Promise((resolve) => pile.engine().handleAdditionalPile('q1', after, { afterUpdate: resolve })));
+  const slice = pile.engine().state.surveysResponseState[0];
+  expect(slice.answers.q1.value).toBe(after);
+  expect(slice.additionalComments.q1.value).toBe(after);
+  expect(pile.engine().computeModifiedQuestionsCount(pile.engine().state.editBaseline, slice)).toBe(1);
+  const diff = pile.engine().getChangedQidsAndFields(0);
+  expect([...diff.changedQids]).toEqual(['q1']);
+  expect(diff.changedMap.q1).toMatchObject({ answer: 1, additional: 1 });
+});
+
+it('treats a numeric rating as unchanged but keeps numeric-looking comments exact', async () => {
+  questionTypes.q1 = 'rating';
+  saved.q1 = { answer: field(5), additional: field('01', { hash: 'saved-note-hash' }) };
+  mockCaches();
+  const pile = await mountPile();
+  await run(() => new Promise((resolve) => pile.engine().handleAnswerPile('q1', '5', { afterUpdate: resolve })));
+  expect(pile.engine().getPendingEditStats().total).toBe(0);
+  await run(() => new Promise((resolve) => pile.engine().handleAdditionalPile('q1', '1', { afterUpdate: resolve })));
+  expect(pile.engine().state.surveysResponseState[0].additionalComments.q1.value).toBe('1');
+  expect(pile.engine().getChangedQidsAndFields(0).changedMap.q1).toMatchObject({ additional: 1 });
+  expect(pile.engine().getChangedQidsAndFields(0).changedMap.q1).not.toHaveProperty('answer');
 });

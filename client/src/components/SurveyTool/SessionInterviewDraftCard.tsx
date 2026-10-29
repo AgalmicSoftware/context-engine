@@ -1,4 +1,4 @@
-import { responseValuesEqual as valuesEqual } from './responseValueEquality';
+import { responseValuesEqual, answerValueType } from './responseValueEquality';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Input } from 'reactstrap';
@@ -216,7 +216,7 @@ const DraftEditableText = ({
 // Earlier answers short enough to quote back; others, and locked ones, are only mentioned.
 const QUOTED_ANSWER_TYPES = new Set(['binary', 'multichoice', 'rating']);
 const describeChangedAnswer = (answer: unknown, earlier: unknown, question?: InterviewQuestion) => {
-  if (!changesEarlierAnswer(answer, earlier)) return '';
+  if (!changesEarlierAnswer(answer, earlier, question?.type)) return '';
   return earlier !== '*' && QUOTED_ANSWER_TYPES.has(String(question?.type))
     ? `Changes your earlier answer: ${describeInterviewAnswer(earlier, question)}`
     : 'Changes your earlier answer';
@@ -269,12 +269,23 @@ function SessionInterviewDraftCardContent({
   // Review shows the saved comment when the AI proposed none, so edits start from it.
   const startingValue = (field: EditableField) =>
     field === 'additionalComments' ? draft.additionalComments || savedComment : draft[field];
+  const valuesEqual = (left: unknown, right: unknown, field: EditableField = 'answer') =>
+    responseValuesEqual(
+      left,
+      right,
+      field === 'answer'
+        ? answerValueType(question?.type)
+        : field === 'importance' || field === 'conviction'
+          ? 'rating'
+          : 'text',
+    );
   const markEdit = (field: EditableField, value: unknown) => {
-    if (valuesEqual(value, edited[field])) return { [field]: value } as Partial<InterviewDraftResponse>;
+    if (valuesEqual(value, edited[field], field)) return { [field]: value } as Partial<InterviewDraftResponse>;
     // A full revert to the starting value returns that field to its unedited state.
     const isEdited = !valuesEqual(
       interviewDraftFieldValue(field, value),
       interviewDraftFieldValue(field, startingValue(field)),
+      field,
     );
     const userEditedFields = withEditedField(edited, field, isEdited);
     return { [field]: value, userEditedFields } as Partial<InterviewDraftResponse>;

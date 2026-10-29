@@ -1,3 +1,4 @@
+import type { ResponseValuesEqual } from './responseValueEquality';
 import { toNumberOrNull } from './surveyToolResponseState.js';
 
 export type PileCacheUpdatePlanAction =
@@ -95,7 +96,7 @@ export const isPileCacheConsistentWithBaseline = ({
   renderedIds?: unknown[] | null;
   questionResponses?: Record<string, Record<string, unknown>> | null;
   account?: string | null;
-  valuesEqual?: (left: unknown, right: unknown) => boolean;
+  valuesEqual?: ResponseValuesEqual;
 } = {}): boolean => {
   const baselineSlice = asPileBaselineSlice(baseline);
   if (!baseline || Object.keys(baselineSlice).length === 0) return false;
@@ -139,14 +140,14 @@ export const isPileCacheConsistentWithBaseline = ({
 
     if (baselineAnswer && baselineAnswer.value !== undefined) {
       const cacheValue = cacheEntry?.answer?.value;
-      if (!valuesEqual(baselineAnswer.value, cacheValue)) {
+      if (!valuesEqual(baselineAnswer.value, cacheValue, questionId, 'answer')) {
         return false;
       }
     }
 
     if (baselineAdditional && baselineAdditional.value !== undefined) {
       const cacheAdditionalValue = cacheEntry?.additional?.value;
-      if (!valuesEqual(baselineAdditional.value, cacheAdditionalValue)) {
+      if (!valuesEqual(baselineAdditional.value, cacheAdditionalValue, questionId, 'additional')) {
         return false;
       }
     }
