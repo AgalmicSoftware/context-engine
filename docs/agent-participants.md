@@ -95,6 +95,13 @@ resends the identical transaction; an uncertain outcome returns its transaction
 hash for checking before another request is made. This applies to hosted, registry
 and agent faucet calls.
 
+## Question queue
+
+The next-question queue remembers every served question for the current cycle,
+bounded by the eligible catalog. It serves newly added questions before starting
+the next cycle and prunes removed or ineligible IDs. Sponsored questions retain
+priority, and the recent selection history remains limited to 50 entries.
+
 ## Question recommendations
 
 Question-vote recommendations with tag, session or explicit question targeting

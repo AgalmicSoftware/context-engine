@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Serve every eligible question before repeating, including catalogs larger than
+  250 questions. Prune removed questions while preserving sponsored priority.
+
 - Limit failed-issuance credential cleanup to its own token record, preserving
   newer credentials issued concurrently and reporting failed revocation writes.
 
