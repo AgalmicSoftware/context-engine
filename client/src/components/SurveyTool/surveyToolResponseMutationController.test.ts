@@ -357,3 +357,23 @@ describe('surveyToolResponseMutationController', () => {
     });
   });
 });
+
+it.each(['answer', 'additional'] as const)('editing a decrypted %s clears its saved ciphertext', (fieldKey) => {
+  const field = {
+    value: 'saved private text',
+    encrypted: true,
+    encryptionAudience: 'self',
+    hash: 'old-hash',
+    encryptedPortion: 'old-envelope',
+    audienceMode: 'explicit',
+  };
+  const source = { answers: { q1: field }, additionalComments: { q1: field } };
+  const deps = defaultDeps({ normalizeFieldAudienceMode: () => 'explicit' });
+  const result =
+    fieldKey === 'answer'
+      ? buildAnswerUpdatePlan('q1', 'a * b', source, deps).nextAnswerState
+      : buildAdditionalUpdatePlan('q1', 'a * b', source, deps).nextAdditionalState;
+  expect(result.value).toBe('a * b');
+  expect(result.encrypted).toBe(true);
+  expect(result.encryptedPortion).toBeUndefined();
+});

@@ -36,10 +36,9 @@ type MutationSourceSlice = {
 const isBlankValue = (value: unknown): boolean =>
   value === undefined || value === null || (Array.isArray(value) ? value.length === 0 : String(value).length === 0);
 
-// A cleared field keeps its lock choice but never the saved envelope, which would
-// otherwise be uploaded again with the old text.
-const withoutStaleEnvelope = (field: ResponseFieldState): ResponseFieldState => {
-  if (!isBlankValue(field.value) || !field.encryptedPortion) return field;
+// An edited field keeps its lock choice but must never reuse the saved ciphertext.
+const withoutStaleEnvelope = (field: ResponseFieldState, valueChanged: boolean): ResponseFieldState => {
+  if ((!valueChanged && !isBlankValue(field.value)) || !field.encryptedPortion) return field;
   const { encryptedPortion: _staleEnvelope, ...cleared } = field;
   return cleared;
 };
@@ -146,15 +145,18 @@ export const buildAnswerUpdatePlan = (
       : String(finalAnswer ?? '');
   const newAnswerHash = shouldHash ? deps.computeHash(answerStr) : '';
 
-  const nextAnswerState: ResponseFieldState = withoutStaleEnvelope({
-    ...prevAnswerState,
-    value: finalAnswer,
-    encrypted: nextEncrypted,
-    encryptionAudience: resolvedAudience,
-    encryptionGateId: resolvedGateId,
-    audienceMode: 'explicit',
-    hash: newAnswerHash,
-  });
+  const nextAnswerState: ResponseFieldState = withoutStaleEnvelope(
+    {
+      ...prevAnswerState,
+      value: finalAnswer,
+      encrypted: nextEncrypted,
+      encryptionAudience: resolvedAudience,
+      encryptionGateId: resolvedGateId,
+      audienceMode: 'explicit',
+      hash: newAnswerHash,
+    },
+    !unchangedValue,
+  );
 
   const prevAdditionalState =
     sourceSlice.additionalComments?.[questionId] || deps.buildEmptyResponseFieldState(questionId, 'additional');
@@ -226,15 +228,18 @@ export const buildAdditionalUpdatePlan = (
   }
 
   const newAdditionalHash = deps.computeHash(normalizedAdditional);
-  const nextAdditionalState: ResponseFieldState = withoutStaleEnvelope({
-    ...prevAdditionalState,
-    value: normalizedAdditional,
-    encrypted: nextEncrypted,
-    encryptionAudience: resolvedAudience,
-    encryptionGateId: resolvedGateId,
-    audienceMode: additionalAudienceMode,
-    hash: newAdditionalHash,
-  });
+  const nextAdditionalState: ResponseFieldState = withoutStaleEnvelope(
+    {
+      ...prevAdditionalState,
+      value: normalizedAdditional,
+      encrypted: nextEncrypted,
+      encryptionAudience: resolvedAudience,
+      encryptionGateId: resolvedGateId,
+      audienceMode: additionalAudienceMode,
+      hash: newAdditionalHash,
+    },
+    !unchangedValue,
+  );
 
   return {
     changed: true,

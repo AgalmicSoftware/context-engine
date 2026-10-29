@@ -5,6 +5,18 @@ import {
   validateNoLockedPlaintextInPayload,
 } from './noLeakPayloads.js';
 
+const envelopeFixture = (overrides: Record<string, unknown> = {}) =>
+  JSON.stringify({
+    v: 1,
+    cipher: 'aes-gcm-256',
+    iv: btoa('i'.repeat(12)),
+    ciphertext: btoa('synthetic ciphertext'),
+    aad: {},
+    commitments: { keccak256: `0x${'1'.repeat(64)}` },
+    recipients: [{ type: 'self-eip712-v1', wrap_iv: btoa('i'.repeat(12)), wrapped_cek: btoa('k'.repeat(48)) }],
+    ...overrides,
+  });
+
 describe('no-leak Arweave payload guards', () => {
   it('rejects locked survey metadata that still carries plaintext', () => {
     expect(() =>
@@ -38,7 +50,7 @@ describe('no-leak Arweave payload guards', () => {
           answer: {
             value: 'private answer',
             encrypted: true,
-            encryptedPortion: '{"ciphertext":"cipher"}',
+            encryptedPortion: envelopeFixture(),
           },
           additional: {
             value: '*',
@@ -59,11 +71,11 @@ describe('no-leak Arweave payload guards', () => {
               answer: {
                 value: '*',
                 encrypted: true,
-                encryptedPortion: '{"ciphertext":"cipher"}',
+                encryptedPortion: envelopeFixture(),
               },
               additional: {
                 value: '',
-                encrypted: true,
+                encrypted: false,
                 encryptedPortion: '',
               },
               importance: null,
@@ -172,3 +184,17 @@ describe('no-leak Arweave payload guards', () => {
     ).toBeNull();
   });
 });
+
+it.each([undefined, '', 'not-json', '{}', '{"ciphertext":"fake"}'])(
+  'refuses encrypted answers and comments without a valid envelope: %s',
+  (encryptedPortion) => {
+    for (const key of ['answer', 'additional']) {
+      expect(() =>
+        validateNoLockedPlaintextInPayload(
+          { questionID: 'q1', [key]: { value: '*', encrypted: true, encryptedPortion } },
+          { family: 'question_response_payload' },
+        ),
+      ).toThrow(/valid.*envelope/i);
+    }
+  },
+);

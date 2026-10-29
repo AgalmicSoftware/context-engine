@@ -34657,7 +34657,7 @@ var require_base64_browser = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.encodeBase64 = exports.decodeBase64 = void 0;
     var data_js_1 = require_data();
-    function decodeBase643(textData) {
+    function decodeBase644(textData) {
       textData = atob(textData);
       const data = new Uint8Array(textData.length);
       for (let i = 0; i < textData.length; i++) {
@@ -34665,7 +34665,7 @@ var require_base64_browser = __commonJS({
       }
       return (0, data_js_1.getBytes)(data);
     }
-    exports.decodeBase64 = decodeBase643;
+    exports.decodeBase64 = decodeBase644;
     function encodeBase642(_data5) {
       const data = (0, data_js_1.getBytes)(_data5);
       let textData = "";
@@ -68310,10 +68310,95 @@ var init_uploadSizeLimits = __esm({
   }
 });
 
+// shared/encryption/envelopeValidation.mjs
+var isObj12, decodeBase643, parseEnvelope, isResponseFieldEnvelope;
+var init_envelopeValidation = __esm({
+  "shared/encryption/envelopeValidation.mjs"() {
+    isObj12 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    decodeBase643 = (value) => {
+      try {
+        return atob(value);
+      } catch {
+        return "";
+      }
+    };
+    parseEnvelope = (jsonStr) => {
+      if (typeof jsonStr !== "string") {
+        throw new Error("envelope must be a JSON string");
+      }
+      let env = null;
+      try {
+        env = JSON.parse(jsonStr);
+      } catch (_) {
+        throw new Error("envelope is not valid JSON");
+      }
+      if (!isObj12(env)) throw new Error("envelope must be a JSON object");
+      if (env.v !== 1) throw new Error("envelope version must be 1");
+      if (env.cipher !== "aes-gcm-256") throw new Error("envelope cipher must be aes-gcm-256");
+      if (typeof env.iv !== "string") throw new Error("envelope iv must be a string");
+      const ivBytes = decodeBase643(env.iv);
+      if (ivBytes.length !== 12) throw new Error(`envelope iv must decode to exactly 12 bytes (got ${ivBytes.length})`);
+      if (!isObj12(env.aad)) throw new Error("envelope aad must be an object");
+      if (typeof env.ciphertext !== "string") throw new Error("envelope ciphertext must be a string");
+      const ciphertextBytes = decodeBase643(env.ciphertext);
+      if (ciphertextBytes.length === 0) throw new Error("envelope ciphertext must decode to non-empty bytes");
+      if (!Array.isArray(env.recipients)) {
+        throw new Error("envelope recipients must be an array");
+      }
+      for (let i = 0; i < env.recipients.length; i++) {
+        const recipient = env.recipients[i];
+        if (!isObj12(recipient) || typeof recipient.type !== "string" || recipient.type.length === 0) {
+          throw new Error("envelope recipient type must be a string");
+        }
+        if (recipient.type === "self-eip712-v1") {
+          const prefix = `envelope recipient[${i}] self-eip712-v1`;
+          if (Object.prototype.hasOwnProperty.call(recipient, "context") && (typeof recipient.context !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(recipient.context))) {
+            throw new Error(`${prefix} context must be 32-byte hex`);
+          }
+          if (typeof recipient.wrap_iv !== "string" || recipient.wrap_iv.length === 0) {
+            throw new Error(`${prefix} is missing wrap_iv`);
+          }
+          const wrapIvBytes = decodeBase643(recipient.wrap_iv);
+          if (wrapIvBytes.length !== 12) {
+            throw new Error(`${prefix} wrap_iv must decode to exactly 12 bytes (got ${wrapIvBytes.length})`);
+          }
+          if (typeof recipient.wrapped_cek !== "string" || recipient.wrapped_cek.length === 0) {
+            throw new Error(`${prefix} is missing wrapped_cek`);
+          }
+          const wrappedCekBytes = decodeBase643(recipient.wrapped_cek);
+          if (wrappedCekBytes.length === 0) {
+            throw new Error(`${prefix} wrapped_cek must decode to non-empty bytes`);
+          }
+          if (recipient.nonce !== void 0 && recipient.nonce !== null && (typeof recipient.nonce !== "string" || recipient.nonce.length === 0)) {
+            throw new Error(`${prefix} nonce must be a non-empty string`);
+          }
+        }
+      }
+      if (!isObj12(env.commitments)) throw new Error("envelope commitments must be an object");
+      if (typeof env.commitments.keccak256 !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(env.commitments.keccak256)) {
+        throw new Error("envelope commitments.keccak256 must be 32-byte hex");
+      }
+      if (typeof env.commitments.poseidon === "string" && env.commitments.poseidon.length > 0 && !/^0x[0-9a-fA-F]{64}$/.test(env.commitments.poseidon)) {
+        throw new Error("envelope commitments.poseidon must be 32-byte hex");
+      }
+      return env;
+    };
+    isResponseFieldEnvelope = (value) => {
+      try {
+        const envelope = parseEnvelope(value);
+        return envelope.recipients.some((recipient) => recipient.type === "self-eip712-v1");
+      } catch {
+        return false;
+      }
+    };
+  }
+});
+
 // workers/sessionCorsWorker/storageUploadValidation.js
-var KIB, decoder3, encoder4, STORAGE_RESOURCE_MAX_BYTES, MAX_RESPONSE_ITEM_BYTES, MAX_RESPONSE_PLAINTEXT_BYTES, RESOURCE_ID_RE, isStorageResourceId, isObj12, isText, jsonBytes, invalid2, readStoragePayloadResourceId, validateResponseItem, validateStorageUploadPayload;
+var KIB, decoder3, encoder4, STORAGE_RESOURCE_MAX_BYTES, MAX_RESPONSE_ITEM_BYTES, MAX_RESPONSE_PLAINTEXT_BYTES, RESOURCE_ID_RE, isStorageResourceId, isObj13, isText, jsonBytes, invalid2, readStoragePayloadResourceId, validateResponseItem, validateStorageUploadPayload;
 var init_storageUploadValidation = __esm({
   "workers/sessionCorsWorker/storageUploadValidation.js"() {
+    init_envelopeValidation();
     init_uploadSizeLimits();
     KIB = 1024;
     decoder3 = new TextDecoder();
@@ -68329,7 +68414,7 @@ var init_storageUploadValidation = __esm({
     MAX_RESPONSE_PLAINTEXT_BYTES = 48 * KIB;
     RESOURCE_ID_RE = /^[a-z0-9][a-z0-9._:-]{0,127}$/;
     isStorageResourceId = (value) => typeof value === "string" && RESOURCE_ID_RE.test(value);
-    isObj12 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj13 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     isText = (value) => typeof value === "string" && value.trim() !== "";
     jsonBytes = (value) => encoder4.encode(JSON.stringify(value)).byteLength;
     invalid2 = (resource, detail) => ({ ok: false, status: 400, error: `Invalid ${resource} payload: ${detail}.` });
@@ -68338,7 +68423,7 @@ var init_storageUploadValidation = __esm({
       return typeof raw === "string" ? raw.trim().toLowerCase() : "";
     };
     validateResponseItem = (item, label) => {
-      if (!isObj12(item) || !isText(item.questionID || item.questionId)) {
+      if (!isObj13(item) || !isText(item.questionID || item.questionId)) {
         return invalid2("responses", `${label} needs a questionID`);
       }
       if (jsonBytes(item) > MAX_RESPONSE_ITEM_BYTES) {
@@ -68347,6 +68432,16 @@ var init_storageUploadValidation = __esm({
           status: 413,
           error: `${UPLOAD_TOO_LARGE_ERROR} Each answer may use at most ${MAX_RESPONSE_ITEM_BYTES} bytes.`
         };
+      }
+      for (const key of ["answer", "additional"]) {
+        const field = item[key];
+        if (!isObj13(field)) continue;
+        if (field.encrypted === true && !isResponseFieldEnvelope(field.encryptedPortion)) {
+          return invalid2("responses", `${label}.${key} requires a valid encrypted envelope`);
+        }
+        if (typeof field.value === "string" && field.value.trim() === "*" && field.encrypted !== true) {
+          return invalid2("responses", `${label}.${key}: A lone * can't be saved; add more text`);
+        }
       }
       return null;
     };
@@ -68369,7 +68464,7 @@ var init_storageUploadValidation = __esm({
       } catch {
         return invalid2(resource, "expected JSON");
       }
-      if (!isObj12(payload)) return invalid2(resource, "expected a JSON object");
+      if (!isObj13(payload)) return invalid2(resource, "expected a JSON object");
       if (resource === "responses") {
         if (payload.responses !== void 0) {
           if (!Array.isArray(payload.responses) || !payload.responses.length) {
@@ -68410,7 +68505,7 @@ var init_storageUploadValidation = __esm({
 });
 
 // workers/sessionCorsWorker/storageResourceOwnership.js
-var OWNED_STORAGE_RESOURCES, trim9, lower5, isObj13, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, listHiddenStorageResourceIds;
+var OWNED_STORAGE_RESOURCES, trim9, lower5, isObj14, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, listHiddenStorageResourceIds;
 var init_storageResourceOwnership = __esm({
   "workers/sessionCorsWorker/storageResourceOwnership.js"() {
     init_sessionSlugResolution();
@@ -68419,7 +68514,7 @@ var init_storageResourceOwnership = __esm({
     OWNED_STORAGE_RESOURCES = Object.freeze(["questions", "surveys"]);
     trim9 = (value) => toStr6(value).trim();
     lower5 = (value) => trim9(value).toLowerCase();
-    isObj13 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     isOwnedStorageResource = (resource) => OWNED_STORAGE_RESOURCES.includes(trim9(resource));
     recordKey = (kind, { slug, resource, resourceId = "" }) => `ce-storage-${kind}:${sessionSlugStorageKey(slug)}:${trim9(resource)}:${lower5(resourceId)}`;
     readJsonRecord = async (index, key) => {
@@ -68427,7 +68522,7 @@ var init_storageResourceOwnership = __esm({
       if (raw == null || raw === "") return null;
       try {
         const value = typeof raw === "string" ? JSON.parse(raw) : raw;
-        return isObj13(value) ? value : null;
+        return isObj14(value) ? value : null;
       } catch {
         return null;
       }
@@ -68716,7 +68811,7 @@ var init_storageScanBudget = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder6, decoder5, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim10, isObj14, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
+var encoder6, decoder5, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim10, isObj15, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_storageBackupRevision();
@@ -68742,7 +68837,7 @@ var init_storageRouteExecution = __esm({
     STORAGE_GROUP_MEMBERSHIP_CACHE = Symbol("storage-group-membership-cache");
     STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol("storage-rpc-chain-attestation-cache");
     trim10 = (value) => toStr6(value).trim();
-    isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     isJsonContentType = (contentType) => {
       const mediaType = trim10(contentType).split(";", 1)[0].trim().toLowerCase();
       return mediaType === "application/json" || mediaType.endsWith("+json");
@@ -68820,7 +68915,7 @@ var init_storageRouteExecution = __esm({
       }
       try {
         const envelope = JSON.parse(raw || "null");
-        return envelope && isObj14(envelope?.metadata) ? envelope : null;
+        return envelope && isObj15(envelope?.metadata) ? envelope : null;
       } catch {
         return null;
       }
@@ -68845,9 +68940,9 @@ var init_storageRouteExecution = __esm({
           raw = null;
         }
       }
-      if (!isObj14(raw)) return null;
+      if (!isObj15(raw)) return null;
       const match = trim10(raw.match).toLowerCase() === "all" ? "all" : "any";
-      const conditions = (Array.isArray(raw.conditions) ? raw.conditions : []).filter(isObj14).map((condition) => ({ ...condition, kind: trim10(condition.kind).toLowerCase() })).filter((condition) => condition.kind);
+      const conditions = (Array.isArray(raw.conditions) ? raw.conditions : []).filter(isObj15).map((condition) => ({ ...condition, kind: trim10(condition.kind).toLowerCase() })).filter((condition) => condition.kind);
       return { match, conditions };
     };
     invalidUploadPolicy = (field, detail) => {
@@ -68893,7 +68988,7 @@ var init_storageRouteExecution = __esm({
         }
       }
       if (raw === null) return null;
-      if (!isObj14(raw)) return invalidUploadPolicy("accessConditions", "expected an object");
+      if (!isObj15(raw)) return invalidUploadPolicy("accessConditions", "expected an object");
       if (raw.match !== void 0 && (typeof raw.match !== "string" || !["any", "all"].includes(raw.match.trim().toLowerCase()))) {
         return invalidUploadPolicy("accessConditions.match", "expected any or all");
       }
@@ -68909,7 +69004,7 @@ var init_storageRouteExecution = __esm({
         return fields2.some((field) => typeof condition[field] === "string" && condition[field].trim());
       };
       const conditions = raw.conditions.map((condition) => {
-        if (!isObj14(condition) || typeof condition.kind !== "string") {
+        if (!isObj15(condition) || typeof condition.kind !== "string") {
           return invalidUploadPolicy("accessConditions.conditions", "expected a rule with a kind");
         }
         const kind = condition.kind.trim().toLowerCase();
@@ -68957,7 +69052,7 @@ var init_storageRouteExecution = __esm({
           raw = { mode: raw };
         }
       }
-      if (!isObj14(raw)) return null;
+      if (!isObj15(raw)) return null;
       const mode = trim10(raw.mode || raw.kind || raw.type).toLowerCase();
       if (!mode) return null;
       return {
@@ -68996,7 +69091,7 @@ var init_storageRouteExecution = __esm({
             }
           }
           if (raw === null) return null;
-          if (!isObj14(raw)) return invalidUploadPolicy("uploadPolicy", "expected an object");
+          if (!isObj15(raw)) return invalidUploadPolicy("uploadPolicy", "expected an object");
           for (const field of ["mode", "kind", "type"]) {
             if (raw[field] !== void 0 && (typeof raw[field] !== "string" || !["group_allowlist", "sbt_allowlist"].includes(raw[field].trim().toLowerCase()))) {
               return invalidUploadPolicy(`uploadPolicy.${field}`, "expected group_allowlist or sbt_allowlist");
@@ -69022,7 +69117,7 @@ var init_storageRouteExecution = __esm({
       } catch {
         return { ok: false, error: "Invalid JSON." };
       }
-      if (!isObj14(raw)) return { ok: false, error: "Invalid JSON." };
+      if (!isObj15(raw)) return { ok: false, error: "Invalid JSON." };
       const data = Object.prototype.hasOwnProperty.call(raw, "data") ? raw.data : "";
       const contentType = trim10(raw.contentType) || (typeof data === "string" ? "text/plain" : "application/json");
       const serialized = isJsonContentType(contentType) && typeof data !== "string" ? JSON.stringify(data) : toStr6(data);
@@ -69101,8 +69196,8 @@ var init_storageRouteExecution = __esm({
       return { ok: false, error: "Unsupported Content-Type." };
     };
     readConfiguredStorageBackendCandidate = (config = {}) => {
-      const storageProfile = isObj14(config?.storageProfile) ? config.storageProfile : {};
-      const docLibrary = isObj14(config?.docLibrary) ? config.docLibrary : {};
+      const storageProfile = isObj15(config?.storageProfile) ? config.storageProfile : {};
+      const docLibrary = isObj15(config?.docLibrary) ? config.docLibrary : {};
       return storageProfile.backend || config?.storageBackend || docLibrary.provider || docLibrary.backend || docLibrary.storageBackend;
     };
     resolveConfiguredStorageBackend = ({ config, requestedBackend, payloadEncrypted } = {}) => {
@@ -69112,14 +69207,14 @@ var init_storageRouteExecution = __esm({
       return normalizeStorageBackend(requestedBackend, configured);
     };
     resolvePayloadAccessControl = (config = {}) => {
-      const profile = isObj14(config?.storageProfile) ? config.storageProfile : {};
-      const cloudflare = isObj14(profile.cloudflare) ? profile.cloudflare : {};
-      const payloadAccessControl = isObj14(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
+      const profile = isObj15(config?.storageProfile) ? config.storageProfile : {};
+      const cloudflare = isObj15(profile.cloudflare) ? profile.cloudflare : {};
+      const payloadAccessControl = isObj15(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
       const legacyMode = normalizeLegacyPayloadAccessMode(
         payloadAccessControl.mode || cloudflare.payloadAccessMode || profile.payloadAccessMode || profile.accessControlMode
       );
       const accessControl = Object.prototype.hasOwnProperty.call(payloadAccessControl, "gate") || Object.prototype.hasOwnProperty.call(payloadAccessControl, "encryption") ? normalizePayloadAccessControl2(payloadAccessControl, legacyMode) : normalizePayloadAccessControl2(legacyMode);
-      const resourceGates = isObj14(payloadAccessControl.resources) ? payloadAccessControl.resources : {};
+      const resourceGates = isObj15(payloadAccessControl.resources) ? payloadAccessControl.resources : {};
       const conditions = normalizeAccessConditionDocument(
         payloadAccessControl.accessConditions || payloadAccessControl.conditions || cloudflare.accessConditions || profile.accessConditions
       );
@@ -69137,7 +69232,7 @@ var init_storageRouteExecution = __esm({
     };
     normalizeGateMode2 = (mode) => mode === 1 || trim10(mode).toLowerCase() === "1" || trim10(mode).toLowerCase() === "all" ? "all" : "any";
     normalizeDirectGate = (gate) => {
-      if (!isObj14(gate)) return null;
+      if (!isObj15(gate)) return null;
       const sbtAddresses = Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses.filter(Boolean) : [];
       return {
         sbtAddresses,
@@ -69176,7 +69271,7 @@ var init_storageRouteExecution = __esm({
     normalizeAddress = (value) => trim10(value).toLowerCase();
     listRoleAddresses = (value) => {
       if (Array.isArray(value)) return value.map(normalizeAddress).filter(Boolean);
-      if (isObj14(value)) {
+      if (isObj15(value)) {
         if (Array.isArray(value.addresses)) return value.addresses.map(normalizeAddress).filter(Boolean);
         if (Array.isArray(value.members)) return value.members.map(normalizeAddress).filter(Boolean);
       }
@@ -69191,7 +69286,7 @@ var init_storageRouteExecution = __esm({
         listRoleAddresses(config.adminAddresses).forEach((address2) => addresses.add(address2));
         listRoleAddresses(config.admin?.addresses).forEach((address2) => addresses.add(address2));
       }
-      const roleMaps = [config.workerRoles, config.roles, config.authorization?.roles].filter(isObj14);
+      const roleMaps = [config.workerRoles, config.roles, config.authorization?.roles].filter(isObj15);
       roleMaps.forEach((roles) => {
         listRoleAddresses(roles[normalizedRole]).forEach((address2) => addresses.add(address2));
       });
@@ -69213,7 +69308,7 @@ var init_storageRouteExecution = __esm({
       return addresses;
     };
     isEnvelopeExportAuthorized = ({ config, requesterAddress, authScopes }) => {
-      const scopes = isObj14(authScopes) ? authScopes : {};
+      const scopes = isObj15(authScopes) ? authScopes : {};
       if (scopes.admin === true || scopes.responseExport === true || scopes.response_export === true || scopes.encryptedEnvelopeExport === true) {
         return true;
       }
@@ -69234,7 +69329,7 @@ var init_storageRouteExecution = __esm({
     evaluateAgentGrantScopeCondition = ({ condition, authScopes }) => {
       const scope = trim10(condition.scope || condition.value);
       if (!scope) return { ok: false, reason: "missing_agent_grant_scope" };
-      const scopes = isObj14(authScopes) ? authScopes : {};
+      const scopes = isObj15(authScopes) ? authScopes : {};
       const scopeLists = [
         scopes.agent_grant,
         scopes.agentGrant,
@@ -69509,9 +69604,9 @@ var init_storageRouteExecution = __esm({
       };
     };
     resolveBareRoleGateCondition = (config = {}) => {
-      const profile = isObj14(config?.storageProfile) ? config.storageProfile : {};
-      const cloudflare = isObj14(profile.cloudflare) ? profile.cloudflare : {};
-      const payloadAccessControl = isObj14(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
+      const profile = isObj15(config?.storageProfile) ? config.storageProfile : {};
+      const cloudflare = isObj15(profile.cloudflare) ? profile.cloudflare : {};
+      const payloadAccessControl = isObj15(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
       return {
         kind: "worker_role",
         role: trim10(
@@ -69548,7 +69643,7 @@ var init_storageRouteExecution = __esm({
     };
     canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
       if (operation === "upload" || !hasPrivateResponsePolicy({ config, resource })) return true;
-      const scopes = isObj14(authScopes) ? authScopes : {};
+      const scopes = isObj15(authScopes) ? authScopes : {};
       const address2 = normalizeAddress(requesterAddress);
       if (address2 && resolveRoleAddressSet2({ config, role: "admin" }).has(address2)) return true;
       const delegatedScopes = [scopes.agent_grant, scopes.agentGrant, scopes.delegationScopes].filter(Array.isArray);
@@ -70290,7 +70385,7 @@ var init_storageRouteExecution = __esm({
       } catch {
         return { ok: false, error: "Invalid JSON." };
       }
-      if (!isObj14(body)) return { ok: false, error: "Invalid JSON." };
+      if (!isObj15(body)) return { ok: false, error: "Invalid JSON." };
       return {
         ok: true,
         resource: queryResource || trim10(body.resource) || "docsContext",
@@ -70343,7 +70438,7 @@ var init_storageRouteExecution = __esm({
               baseHeaders
             );
           }
-          if (!isObj14(metadata) || trim10(metadata.id) !== id2 || (trim10(metadata.resource) || "docsContext") !== indexedResource) {
+          if (!isObj15(metadata) || trim10(metadata.id) !== id2 || (trim10(metadata.resource) || "docsContext") !== indexedResource) {
             return responseJson(
               deps,
               { error: "Cloudflare storage index metadata is unavailable." },
@@ -70355,7 +70450,7 @@ var init_storageRouteExecution = __esm({
       }
       if (!object4 && canReadKvPayload) {
         const envelope = await readKvPayloadEnvelope({ index, slug, id: id2 });
-        if (!envelope || !isObj14(envelope?.metadata)) {
+        if (!envelope || !isObj15(envelope?.metadata)) {
           return responseJson(deps, { error: "Storage object not found." }, 404, baseHeaders);
         }
         metadata = envelope.metadata;
@@ -70579,7 +70674,7 @@ var init_storageRouteExecution = __esm({
             const raw = await index.get(key);
             if (raw != null) budget?.metadata(raw);
             const metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
-            if (isObj14(metadata) && trim10(metadata.id)) rows.push({ key, metadata });
+            if (isObj15(metadata) && trim10(metadata.id)) rows.push({ key, metadata });
             else if (strict) throw new Error("Storage metadata is missing or invalid.");
           } catch (error) {
             if (strict || isStorageReadLimitError(error)) throw error;
@@ -70625,7 +70720,7 @@ var init_storageRouteExecution = __esm({
       try {
         let bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata });
         if (!bytes3) return null;
-        if (isObj14(metadata?.envelope)) {
+        if (isObj15(metadata?.envelope)) {
           bytes3 = await decryptPayloadWithStorageEnvelope({
             env,
             config,
@@ -70637,7 +70732,7 @@ var init_storageRouteExecution = __esm({
           });
         }
         const payload = JSON.parse(decoder5.decode(await toUint8Array(bytes3)));
-        return isObj14(payload) ? payload : null;
+        return isObj15(payload) ? payload : null;
       } catch {
         return null;
       }
@@ -70653,11 +70748,11 @@ var init_storageRouteExecution = __esm({
     readLegacyRowResourceId = async ({ env, index, slug, config, resource, metadata, deps }) => {
       const recorded = normalizeAddress(metadata.resourceId);
       if (recorded) return recorded;
-      if (metadata.encrypted === true && !isObj14(metadata.envelope)) return "";
+      if (metadata.encrypted === true && !isObj15(metadata.envelope)) return "";
       let bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true });
       if (!bytes3) return "";
       try {
-        if (isObj14(metadata.envelope)) {
+        if (isObj15(metadata.envelope)) {
           bytes3 = await decryptPayloadWithStorageEnvelope({
             env,
             config,
@@ -70669,7 +70764,7 @@ var init_storageRouteExecution = __esm({
           });
         }
         const payload = JSON.parse(decoder5.decode(await toUint8Array(bytes3)));
-        const resourceId = isObj14(payload) ? readStoragePayloadResourceId(resource, payload) : "";
+        const resourceId = isObj15(payload) ? readStoragePayloadResourceId(resource, payload) : "";
         return isStorageResourceId(resourceId) ? resourceId : "";
       } catch {
         return "";
@@ -70711,7 +70806,7 @@ var init_storageRouteExecution = __esm({
           } catch {
             continue;
           }
-          if (!isObj14(metadata) || !trim10(metadata.id) || normalizeAddress(metadata.uploader)) continue;
+          if (!isObj15(metadata) || !trim10(metadata.id) || normalizeAddress(metadata.uploader)) continue;
           const resourceId = await readLegacyRowResourceId({ env, index, slug, config, resource, metadata, deps });
           if (resourceId) ids.add(resourceId);
           else skippedRows += 1;
@@ -70751,7 +70846,7 @@ var init_storageRouteExecution = __esm({
             } catch {
               metadata = null;
             }
-            rows.push({ key, metadata: isObj14(metadata) && trim10(metadata.id) ? metadata : null });
+            rows.push({ key, metadata: isObj15(metadata) && trim10(metadata.id) ? metadata : null });
           }
           yield rows;
         }
@@ -70929,7 +71024,7 @@ var init_storageRouteExecution = __esm({
             metadata = null;
           }
           let deferred = false;
-          if (!isObj14(metadata) || !trim10(metadata.id)) {
+          if (!isObj15(metadata) || !trim10(metadata.id)) {
             readErrors.push({ key, error: "invalid_metadata" });
           } else {
             const metadataAccess = normalizePayloadAccessControl2(metadata.payloadAccessControl || metadata.payloadAccessMode || resolvePayloadAccessControl(config));
@@ -70964,7 +71059,7 @@ var init_storageRouteExecution = __esm({
                       payloadAccessMode: deriveLegacyPayloadAccessMode2(metadataAccess),
                       ...metadata.accessConditions ? { accessConditions: metadata.accessConditions } : {}
                     },
-                    envelope: isObj14(metadata.envelope) ? metadata.envelope : null,
+                    envelope: isObj15(metadata.envelope) ? metadata.envelope : null,
                     ciphertextBase64url: bytesToBase64url2(ciphertextBytes),
                     keyProvider: keyProvider2,
                     wrappedKeysIncluded: !!trim10(metadata.envelope?.dek?.wrappedKey)
@@ -71001,7 +71096,7 @@ var init_storageRouteExecution = __esm({
         storageListError = { reason: trim10(error?.message || "storage_list_failed").slice(0, 500) };
         nextCursor || (nextCursor = resume(position.pageCursor, position.lastKey));
       }
-      const sessionEnvelope = includeSessionEnvelope && isObj14(config?.storageEnvelope) ? JSON.parse(JSON.stringify(config.storageEnvelope)) : null;
+      const sessionEnvelope = includeSessionEnvelope && isObj15(config?.storageEnvelope) ? JSON.parse(JSON.stringify(config.storageEnvelope)) : null;
       const keyProvider = resolveEnvelopeExportManifestKeyProvider({ sessionEnvelope, payloads });
       const deploymentKekContinuityRequired = !!trim10(sessionEnvelope?.sessionKey?.wrappedKey) || payloads.some((entry2) => entry2.keyProvider === "worker_secret" || entry2.keyProvider === "mixed");
       const manifest = {
@@ -72757,7 +72852,7 @@ var init_aiRequestPolicy = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisArtifactValidation.js
-var ARTIFACT_KIND, ARTIFACT_VERSION, SECTION_ORDER, SEVERITY_LEVELS, WALLET_TEXT_RE, WALLET_ID_RE, LIMITS, isObj15, toArray, hasOwn5, toPrimitiveStr, compactWhitespace, cleanText, cleanId, slugId, unique, sectionRecord, normalizeSections, unavailable2, defaultSection, buildAllowedSourceIds, normalizeParticipants, normalizeIdRefs, normalizeSourceFields, normalizeSummaryRecord, normalizeArgumentMap, hasCycle, normalizeAtlas, normalizeBreakdown, normalizeSeverity, DEFAULT_RISK_AXES, normalizeRiskAxis, normalizeRiskAxes, normalizeRiskAssessments, normalizeDynamicRiskMatrix, normalizeLegacyRiskMatrix, normalizeRiskMatrix, normalizeGeneratedAt, normalizeModel, normalizeSection, normalizeResultsAnalysisArtifact, applyResultsAnalysisExposurePolicy;
+var ARTIFACT_KIND, ARTIFACT_VERSION, SECTION_ORDER, SEVERITY_LEVELS, WALLET_TEXT_RE, WALLET_ID_RE, LIMITS, isObj16, toArray, hasOwn5, toPrimitiveStr, compactWhitespace, cleanText, cleanId, slugId, unique, sectionRecord, normalizeSections, unavailable2, defaultSection, buildAllowedSourceIds, normalizeParticipants, normalizeIdRefs, normalizeSourceFields, normalizeSummaryRecord, normalizeArgumentMap, hasCycle, normalizeAtlas, normalizeBreakdown, normalizeSeverity, DEFAULT_RISK_AXES, normalizeRiskAxis, normalizeRiskAxes, normalizeRiskAssessments, normalizeDynamicRiskMatrix, normalizeLegacyRiskMatrix, normalizeRiskMatrix, normalizeGeneratedAt, normalizeModel, normalizeSection, normalizeResultsAnalysisArtifact, applyResultsAnalysisExposurePolicy;
 var init_resultsAnalysisArtifactValidation = __esm({
   "workers/sessionCorsWorker/resultsAnalysisArtifactValidation.js"() {
     ARTIFACT_KIND = "ce_session_results_analysis_artifact";
@@ -72786,7 +72881,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       summaryChars: 900,
       modelChars: 180
     });
-    isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     toArray = (value) => Array.isArray(value) ? value : [];
     hasOwn5 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
     toPrimitiveStr = (value) => {
@@ -72816,8 +72911,8 @@ var init_resultsAnalysisArtifactValidation = __esm({
     };
     unique = (values) => [...new Set(values.filter(Boolean))];
     sectionRecord = (value) => {
-      const raw = isObj15(value?.sections) ? value.sections : value;
-      return isObj15(raw) ? raw : {};
+      const raw = isObj16(value?.sections) ? value.sections : value;
+      return isObj16(raw) ? raw : {};
     };
     normalizeSections = (sections) => {
       const requested = /* @__PURE__ */ new Set();
@@ -72903,10 +72998,10 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeSummaryRecord = (value) => {
-      const record3 = isObj15(value) ? value : {};
+      const record3 = isObj16(value) ? value : {};
       const overview = cleanText(record3.overview || record3.summary || record3.interpretation || record3.narrative);
       const themes = toArray(record3.themes || record3.keyFindings || record3.findings).slice(0, LIMITS.breakdownThemes).map((entry2, index) => {
-        const item = isObj15(entry2) ? entry2 : { summary: entry2 };
+        const item = isObj16(entry2) ? entry2 : { summary: entry2 };
         const label = cleanText(item.label || item.name || item.title || `Theme ${index + 1}`, LIMITS.labelChars);
         const summary = cleanText(item.summary || item.description || item.finding || item.body);
         if (!label && !summary) return null;
@@ -72922,14 +73017,14 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeArgumentMap = (rawSection, allowed) => {
-      if (!isObj15(rawSection)) return defaultSection("argumentMap", "AI generation did not return argument-map data.");
+      if (!isObj16(rawSection)) return defaultSection("argumentMap", "AI generation did not return argument-map data.");
       const errors = [];
       const debates = toArray(rawSection.debates).slice(0, LIMITS.debates).map((debate, debateIndex) => {
-        if (!isObj15(debate)) return null;
+        if (!isObj16(debate)) return null;
         const title = cleanText(debate.title || debate.label || debate.question || debate.summary, LIMITS.labelChars);
         if (!title) return null;
         const claims = toArray(debate.claims).slice(0, LIMITS.claimsPerDebate).map((claim, claimIndex) => {
-          if (!isObj15(claim)) return null;
+          if (!isObj16(claim)) return null;
           const label = cleanText(claim.label || claim.claim || claim.title || claim.summary, LIMITS.labelChars);
           if (!label) return null;
           const summary2 = cleanText(claim.summary || claim.description || claim.evidence);
@@ -72978,11 +73073,11 @@ var init_resultsAnalysisArtifactValidation = __esm({
       return nodes.some((node) => visit(node.id));
     };
     normalizeAtlas = (rawSection, allowed) => {
-      if (!isObj15(rawSection)) return defaultSection("atlas", "AI generation did not return atlas data.");
+      if (!isObj16(rawSection)) return defaultSection("atlas", "AI generation did not return atlas data.");
       const errors = [];
       const seenIds = /* @__PURE__ */ new Set();
       const nodes = toArray(rawSection.nodes).slice(0, LIMITS.atlasNodes).map((node, index) => {
-        if (!isObj15(node)) return null;
+        if (!isObj16(node)) return null;
         const label = cleanText(node.label || node.name || node.title || node.summary, LIMITS.labelChars);
         if (!label) return null;
         let id2 = slugId(node.id || label, `atlas_${index + 1}`);
@@ -72998,7 +73093,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       }).filter(Boolean);
       const nodeIds = new Set(nodes.map((node) => node.id));
       const edges = toArray(rawSection.edges).slice(0, LIMITS.atlasEdges).map((edge, index) => {
-        if (!isObj15(edge)) return null;
+        if (!isObj16(edge)) return null;
         const source = slugId(edge.source || edge.sourceId, "");
         const target = slugId(edge.target || edge.targetId, "");
         if (!source || !target || source === target || !nodeIds.has(source) || !nodeIds.has(target)) {
@@ -73018,16 +73113,16 @@ var init_resultsAnalysisArtifactValidation = __esm({
       return { available: true, nodes, edges };
     };
     normalizeBreakdown = (rawSection, allowed) => {
-      if (!isObj15(rawSection)) return defaultSection("breakdown", "AI generation did not return breakdown data.");
+      if (!isObj16(rawSection)) return defaultSection("breakdown", "AI generation did not return breakdown data.");
       const errors = [];
       const summary = normalizeSummaryRecord(rawSection.summary);
       const dimensions = toArray(rawSection.dimensions).slice(0, LIMITS.breakdownDimensions).map((dimension, index) => {
-        if (!isObj15(dimension)) return null;
+        if (!isObj16(dimension)) return null;
         const label = cleanText(dimension.label || dimension.name || dimension.dimension, LIMITS.labelChars);
         if (!label) return null;
         const description = cleanText(dimension.summary || dimension.description || dimension.interpretation);
         const values = toArray(dimension.values).slice(0, LIMITS.breakdownDimensionValues).map((value, valueIndex) => {
-          const item = isObj15(value) ? value : { label: value };
+          const item = isObj16(value) ? value : { label: value };
           const valueLabel = cleanText(item.label || item.value || item.name, LIMITS.labelChars);
           if (!valueLabel) return null;
           const valueSummary = cleanText(item.summary || item.description || item.interpretation);
@@ -73045,7 +73140,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
         };
       }).filter(Boolean);
       const groups = toArray(rawSection.groups).slice(0, LIMITS.breakdownGroups).map((group, index) => {
-        if (!isObj15(group)) return null;
+        if (!isObj16(group)) return null;
         const label = cleanText(group.label || group.name || group.title || group.group, LIMITS.labelChars);
         const summaryText = cleanText(group.summary || group.description || group.interpretation || group.insight);
         if (!label && !summaryText) return null;
@@ -73088,7 +73183,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       }
     });
     normalizeRiskAxis = (axis, fallback) => {
-      if (!isObj15(axis)) return null;
+      if (!isObj16(axis)) return null;
       const record3 = axis;
       const label = cleanText(record3.label || record3.name, LIMITS.labelChars);
       if (!label) return null;
@@ -73096,7 +73191,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       const rawLevels = toArray(record3.levels);
       const seen = /* @__PURE__ */ new Set();
       const levels = rawLevels.slice(0, LIMITS.riskAxisLevels).map((level, index) => {
-        const levelRecord = isObj15(level) ? level : { label: level, id: level };
+        const levelRecord = isObj16(level) ? level : { label: level, id: level };
         const levelLabel = cleanText(levelRecord.label || levelRecord.name || levelRecord.id, LIMITS.labelChars);
         if (!levelLabel) return null;
         let levelId = slugId(levelRecord.id || levelLabel, `level_${index + 1}`);
@@ -73109,7 +73204,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       return { id: id2, label, levels };
     };
     normalizeRiskAxes = (rawAxes) => {
-      const axes = isObj15(rawAxes) ? rawAxes : {};
+      const axes = isObj16(rawAxes) ? rawAxes : {};
       const x = normalizeRiskAxis(axes.x || axes.columns || axes.horizontal, DEFAULT_RISK_AXES.x);
       const y = normalizeRiskAxis(axes.y || axes.rows || axes.vertical, DEFAULT_RISK_AXES.y);
       return x && y ? { x, y } : null;
@@ -73118,7 +73213,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       const xLevelIds = new Set(axes.x.levels.map((level) => level.id));
       const yLevelIds = new Set(axes.y.levels.map((level) => level.id));
       return toArray(rawAssessments).slice(0, LIMITS.riskAssessments).map((assessment, index) => {
-        if (!isObj15(assessment)) return null;
+        if (!isObj16(assessment)) return null;
         const label = cleanText(assessment.label || assessment.category || assessment.name || assessment.title, LIMITS.labelChars);
         const summary = cleanText(assessment.summary || assessment.description || assessment.rationale || assessment.evidence);
         const xLevelId = slugId(assessment.xLevelId || assessment.x || assessment.columnLevelId || assessment.likelihood, "");
@@ -73161,16 +73256,16 @@ var init_resultsAnalysisArtifactValidation = __esm({
     };
     normalizeLegacyRiskMatrix = (rawSection, allowed) => {
       const errors = [];
-      const rawHeatmap = isObj15(rawSection.heatmap) ? rawSection.heatmap : {};
+      const rawHeatmap = isObj16(rawSection.heatmap) ? rawSection.heatmap : {};
       const categoryEntries = [];
       const heatmap = {};
       const assessments = [];
       toArray(rawSection.categories).slice(0, LIMITS.riskCategories).forEach((category, index) => {
-        if (!isObj15(category)) return;
+        if (!isObj16(category)) return;
         const label = cleanText(category.label || category.name || category.title, LIMITS.labelChars);
         if (!label) return;
         const id2 = slugId(category.id || label, `risk_${index + 1}`);
-        const heat = isObj15(rawHeatmap[id2]) ? rawHeatmap[id2] : {};
+        const heat = isObj16(rawHeatmap[id2]) ? rawHeatmap[id2] : {};
         const likelihood = normalizeSeverity(category.likelihood || heat.likelihood);
         const impact = normalizeSeverity(category.impact || heat.impact);
         if (!likelihood || !impact) {
@@ -73197,7 +73292,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       });
       const categoryIds = new Set(categoryEntries.map((category) => category.id));
       const comments = toArray(rawSection.comments).slice(0, LIMITS.riskComments).map((comment, index) => {
-        if (!isObj15(comment)) return null;
+        if (!isObj16(comment)) return null;
         const categoryId = slugId(comment.categoryId || comment.category || comment.id, "");
         if (!categoryId || !categoryIds.has(categoryId)) {
           errors.push(`unknown risk category for comment ${index + 1}`);
@@ -73225,8 +73320,8 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeRiskMatrix = (rawSection, allowed) => {
-      if (!isObj15(rawSection)) return defaultSection("riskMatrix", "AI generation did not return risk matrix data.");
-      if (isObj15(rawSection.axes) || Array.isArray(rawSection.assessments)) return normalizeDynamicRiskMatrix(rawSection, allowed);
+      if (!isObj16(rawSection)) return defaultSection("riskMatrix", "AI generation did not return risk matrix data.");
+      if (isObj16(rawSection.axes) || Array.isArray(rawSection.assessments)) return normalizeDynamicRiskMatrix(rawSection, allowed);
       return normalizeLegacyRiskMatrix(rawSection, allowed);
     };
     normalizeGeneratedAt = (value) => {
@@ -73269,9 +73364,9 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     applyResultsAnalysisExposurePolicy = ({ artifact, exposure, sections = SECTION_ORDER } = {}) => {
-      if (!isObj15(artifact?.sections)) return artifact;
+      if (!isObj16(artifact?.sections)) return artifact;
       const enabled = new Set(sections);
-      const groupPolicy = isObj15(exposure) && (hasOwn5(exposure, "anonymizedGroupsEnabled") || hasOwn5(exposure, "minGroupSize"));
+      const groupPolicy = isObj16(exposure) && (hasOwn5(exposure, "anonymizedGroupsEnabled") || hasOwn5(exposure, "minGroupSize"));
       const minGroupSize = Number.isSafeInteger(exposure?.minGroupSize) && exposure.minGroupSize >= 2 ? exposure.minGroupSize : 2;
       const participants = new Set(toArray(artifact.participants).map((participant) => participant.syntheticId));
       const projected = {};
@@ -73279,7 +73374,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
         const section = artifact.sections[key];
         if (!enabled.has(key)) {
           projected[key] = defaultSection(key, "This generated view is disabled for the session.");
-        } else if (key === "breakdown" && isObj15(section) && section.available !== false && groupPolicy) {
+        } else if (key === "breakdown" && isObj16(section) && section.available !== false && groupPolicy) {
           projected[key] = { ...section, groups: toArray(section.groups).filter((group) => exposure.anonymizedGroupsEnabled !== false && unique(toArray(group?.participantIds).filter((id2) => participants.has(id2))).length >= minGroupSize) };
         } else {
           projected[key] = section;
@@ -73914,7 +74009,7 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder6, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj16, hasOwn6, trim12, lower6, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId3, normalizeQuestionPrompt, normalizeQuestionType5, RATING_SCALE_METADATA_KEYS2, safeNumber, hasMetadataValue2, recordHasRatingScaleMetadata2, pickRatingScaleRecord2, normalizeRatingLabel2, normalizeRatingScale3, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder6, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj17, hasOwn6, trim12, lower6, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId3, normalizeQuestionPrompt, normalizeQuestionType5, RATING_SCALE_METADATA_KEYS2, safeNumber, hasMetadataValue2, recordHasRatingScaleMetadata2, pickRatingScaleRecord2, normalizeRatingLabel2, normalizeRatingScale3, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_aiRequestPolicy();
@@ -73955,7 +74050,7 @@ var init_resultsAnalysisGeneration = __esm({
     SOURCE_VERSION = "1";
     RESULT_SECTION_ORDER = ["argumentMap", "atlas", "breakdown", "riskMatrix"];
     DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS = 8 * 60 * 1e3;
-    isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     hasOwn6 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
     trim12 = (value) => toStr6(value).trim();
     lower6 = (value) => trim12(value).toLowerCase();
@@ -73964,7 +74059,7 @@ var init_resultsAnalysisGeneration = __esm({
     );
     getCanonicalSessionId = (config = {}) => normalizeSessionIdHex2(resolveCanonicalWorkerSessionIdHex(config));
     publicDraft = (draft, config) => {
-      if (!isObj16(draft)) return null;
+      if (!isObj17(draft)) return null;
       const {
         participantWatermark,
         participantDigests,
@@ -74006,14 +74101,14 @@ var init_resultsAnalysisGeneration = __esm({
       if (value == null || value === false) return false;
       if (typeof value === "string") return trim12(value) !== "";
       if (Array.isArray(value)) return value.length > 0;
-      if (isObj16(value)) return Object.keys(value).length > 0;
+      if (isObj17(value)) return Object.keys(value).length > 0;
       return true;
     };
-    isBlankFieldValue = (value) => value == null || typeof value === "string" && !trim12(value) || Array.isArray(value) && value.length === 0 || isObj16(value) && Object.keys(value).length === 0;
+    isBlankFieldValue = (value) => value == null || typeof value === "string" && !trim12(value) || Array.isArray(value) && value.length === 0 || isObj17(value) && Object.keys(value).length === 0;
     isClearedFieldWithLockFlag = (value) => hasOwn6(value, "value") && isBlankFieldValue(value.value) && !["envelope", ...ENCRYPTED_ENVELOPE_KEYS].some((key) => encryptedEnvelopeValueHasContent(value[key]));
     valueLooksEncrypted = (value, depth = 0) => {
       if (depth > 5) return false;
-      if (!isObj16(value)) return false;
+      if (!isObj17(value)) return false;
       if (value.locked === true || value.payloadEncrypted === true) return true;
       if (value.encrypted === true && !isClearedFieldWithLockFlag(value)) return true;
       if (Object.entries(value).some(([key, entry2]) => ENCRYPTED_ENVELOPE_KEYS.has(key) && encryptedEnvelopeValueHasContent(entry2))) return true;
@@ -74023,16 +74118,16 @@ var init_resultsAnalysisGeneration = __esm({
       if (value == null) return "";
       if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return trim12(value);
       if (Array.isArray(value)) return value.map(valueFromAnswerLike).filter((entry2) => entry2 !== "").join("; ");
-      if (isObj16(value) && hasOwn6(value, "value")) return valueFromAnswerLike(value.value);
+      if (isObj17(value) && hasOwn6(value, "value")) return valueFromAnswerLike(value.value);
       return "";
     };
     FIELD_MASKS = /* @__PURE__ */ new Set(["*", "[encrypted]"]);
     withoutFieldMask = (value) => {
-      const raw = isObj16(value) && hasOwn6(value, "value") ? value.value : value;
+      const raw = isObj17(value) && hasOwn6(value, "value") ? value.value : value;
       return typeof raw === "string" && FIELD_MASKS.has(raw.trim()) ? "" : value;
     };
     rowLooksLocked = (row) => {
-      if (!isObj16(row)) return true;
+      if (!isObj17(row)) return true;
       if (row.encrypted === true || row.payloadEncrypted === true || row.locked === true) return true;
       return valueLooksEncrypted(hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response);
     };
@@ -74057,9 +74152,9 @@ var init_resultsAnalysisGeneration = __esm({
     hasMetadataValue2 = (value) => value !== void 0 && value !== null && trim12(value) !== "";
     recordHasRatingScaleMetadata2 = (record3 = {}) => RATING_SCALE_METADATA_KEYS2.some((key) => hasMetadataValue2(record3[key]));
     pickRatingScaleRecord2 = (question = {}) => {
-      const scale = isObj16(question.scale) ? question.scale : null;
+      const scale = isObj17(question.scale) ? question.scale : null;
       if (scale && recordHasRatingScaleMetadata2(scale)) return scale;
-      const ratingScale = isObj16(question.ratingScale) ? question.ratingScale : null;
+      const ratingScale = isObj17(question.ratingScale) ? question.ratingScale : null;
       if (ratingScale && recordHasRatingScaleMetadata2(ratingScale)) return ratingScale;
       return scale || ratingScale || question;
     };
@@ -74148,12 +74243,12 @@ var init_resultsAnalysisGeneration = __esm({
       return true;
     };
     parseAccessRecord = (value) => {
-      if (isObj16(value)) return value;
+      if (isObj17(value)) return value;
       const raw = trim12(value);
       if (!raw || raw[0] !== "{") return {};
       try {
         const parsed = JSON.parse(raw);
-        return isObj16(parsed) ? parsed : {};
+        return isObj17(parsed) ? parsed : {};
       } catch {
         return {};
       }
@@ -74172,7 +74267,7 @@ var init_resultsAnalysisGeneration = __esm({
       };
     };
     metadataAccessMatchesPublishedAudience = (metadata = {}, config = {}) => {
-      if (!isObj16(metadata?.payloadAccessControl) && !trim12(metadata?.payloadAccessMode)) return true;
+      if (!isObj17(metadata?.payloadAccessControl) && !trim12(metadata?.payloadAccessMode)) return true;
       const expectedValue = resolveConfiguredPayloadAccessValue(config);
       const actualValue = metadata.payloadAccessControl || metadata.payloadAccessMode;
       const expected = normalizePayloadAccessControl2(expectedValue);
@@ -74184,7 +74279,7 @@ var init_resultsAnalysisGeneration = __esm({
     };
     participantDigest = async (sourceKey) => sha256Hex(`participant:${trim12(sourceKey).toLowerCase()}`);
     normalizeQuestionRecord = (question) => {
-      if (!isObj16(question)) return null;
+      if (!isObj17(question)) return null;
       const questionId4 = normalizeQuestionId3(question.questionId || question.questionID || question.id);
       if (!questionId4) return null;
       const type = normalizeQuestionType5(question.type || question.questionType);
@@ -74236,7 +74331,7 @@ var init_resultsAnalysisGeneration = __esm({
       let excludedCount = 0;
       let lockedCount = 0;
       for (const row of Array.isArray(rows) ? rows : []) {
-        if (!isObj16(row)) {
+        if (!isObj17(row)) {
           excludedCount += 1;
           continue;
         }
@@ -74404,9 +74499,9 @@ var init_resultsAnalysisGeneration = __esm({
       const candidates = [];
       for (const row of questionRows) {
         const metadata = row?.metadata;
-        if (!isObj16(metadata) || metadata.hidden === true || metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) continue;
+        if (!isObj17(metadata) || metadata.hidden === true || metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) continue;
         const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget }));
-        if (!isObj16(payload)) continue;
+        if (!isObj17(payload)) continue;
         if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
         const payloadId = trim12(payload.id || payload.questionId || payload.questionID);
         const trustedId = lower6(metadata.resourceId);
@@ -74434,7 +74529,7 @@ var init_resultsAnalysisGeneration = __esm({
         budget.payload(jsonByteLength(committed));
         const metadata = committed?.metadata;
         const payload = committed?.payload;
-        if (!isObj16(metadata) || !isObj16(payload) || !trim12(metadata.responder)) {
+        if (!isObj17(metadata) || !isObj17(payload) || !trim12(metadata.responder)) {
           excludedCount += 1;
           continue;
         }
@@ -74460,7 +74555,7 @@ var init_resultsAnalysisGeneration = __esm({
       }
       for (const row of rows) {
         const metadata = row?.metadata;
-        if (!isObj16(metadata)) {
+        if (!isObj17(metadata)) {
           excludedCount += 1;
           continue;
         }
@@ -74479,7 +74574,7 @@ var init_resultsAnalysisGeneration = __esm({
         }
         const bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
         const payload = parseJsonBytes(bytes3);
-        if (!isObj16(payload)) {
+        if (!isObj17(payload)) {
           excludedCount += 1;
           continue;
         }
@@ -74526,7 +74621,7 @@ var init_resultsAnalysisGeneration = __esm({
     };
     loadAdminSnapshotResultsAnalysisSource = async ({ body, slug, config } = {}) => {
       const snapshot = body?.source?.snapshot;
-      if (!isObj16(snapshot)) return { ok: false, status: 400, error: "Missing admin results-analysis snapshot." };
+      if (!isObj17(snapshot)) return { ok: false, status: 400, error: "Missing admin results-analysis snapshot." };
       if (!compareIdentity({ slug, config, suppliedSlug: snapshot.sessionSlug, suppliedSessionId: snapshot.sessionId || snapshot.sessionIdHex })) {
         return { ok: false, status: 400, error: "Snapshot session identity does not match the target session." };
       }
@@ -74600,13 +74695,13 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       }
     };
     resolveAnalysisAiPayload = ({ config, prompt }) => {
-      const ai = isObj16(config?.ai) ? config.ai : {};
-      const providers = isObj16(ai.providers) ? ai.providers : {};
+      const ai = isObj17(config?.ai) ? config.ai : {};
+      const providers = isObj17(ai.providers) ? ai.providers : {};
       const { provider, model } = resolveSessionAiModel(config, { taskType: "analysis", modelType: "thinking" });
       const reasoningEffort = trim12(
         ai?.taskReasoningEffort?.analysis || ai?.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || "low"
       );
-      const providerEntry = isObj16(providers[provider]) ? providers[provider] : {};
+      const providerEntry = isObj17(providers[provider]) ? providers[provider] : {};
       return {
         provider,
         model,
@@ -74686,12 +74781,12 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
     filterDraftForStatus = (draft, includeDraft, config) => {
       const safe = publicDraft(draft, config);
       if (includeDraft) return safe;
-      if (!isObj16(safe)) return null;
+      if (!isObj17(safe)) return null;
       const { artifact, snapshot, ...rest } = safe;
       return rest;
     };
     summarizeReservation = (reservation, requestId = "") => {
-      if (!isObj16(reservation)) return null;
+      if (!isObj17(reservation)) return null;
       return {
         kind: trim12(reservation.kind),
         ...requestId ? { requestId } : {}
@@ -74706,7 +74801,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       return { eligible: reasons.length === 0, reasons };
     };
     summarizeActiveState = (active) => {
-      if (!isObj16(active)) return null;
+      if (!isObj17(active)) return null;
       return {
         ...trim12(active.requestId) ? { requestId: trim12(active.requestId) } : {},
         ...trim12(active.trigger) ? { trigger: trim12(active.trigger) } : {},
@@ -74714,7 +74809,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       };
     };
     summarizeFailureState = (failure) => {
-      if (!isObj16(failure)) return null;
+      if (!isObj17(failure)) return null;
       return {
         ok: false,
         error: trim12(failure.error) || "Results analysis generation failed.",
@@ -74953,7 +75048,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
     };
     normalizedResultsProfile = (config = {}) => {
       const normalizedConfig = normalizeWorkerConfigRecord(config || {}, { slug: normalizeWorkerSessionSlug(config?.slug) });
-      return isObj16(normalizedConfig?.sessionModeProfile?.results) ? normalizedConfig.sessionModeProfile.results : {};
+      return isObj17(normalizedConfig?.sessionModeProfile?.results) ? normalizedConfig.sessionModeProfile.results : {};
     };
     resolveResultsVisibility = (config = {}) => lower6(normalizedResultsProfile(config).visibility);
     aggregateResultsEnabled = (config = {}) => normalizedResultsProfile(config)?.exposure?.aggregateResultsEnabled === true;
@@ -98517,10 +98612,10 @@ init_sessionConfigAuthority();
 init_outboundUrlSafetyBinding();
 
 // workers/sessionCorsWorker/anonymousRateLimitPolicy.js
-var isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isNonNegativeInteger = (value) => Number.isInteger(value) && value >= 0;
 var resolveAnonymousIpDailyLimit = (config = {}) => {
-  const limits = isObj17(config?.limits) ? config.limits : {};
+  const limits = isObj18(config?.limits) ? config.limits : {};
   if (Object.prototype.hasOwnProperty.call(limits, "perAnonymousIpPerDay")) {
     const explicitLimit = limits.perAnonymousIpPerDay;
     if (isNonNegativeInteger(explicitLimit)) return explicitLimit;
@@ -98538,7 +98633,7 @@ init_ratingScale();
 var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
 var trim13 = (value) => String(value == null ? "" : value).trim();
 var lower7 = (value) => trim13(value).toLowerCase();
-var isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj19 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var hasRestrictedPrompt = (question = {}) => {
   const visibility = lower7(question.visibility || question.access || question.questionVisibility);
   return Boolean(
@@ -98546,7 +98641,7 @@ var hasRestrictedPrompt = (question = {}) => {
   );
 };
 var normalizeQuestion = (value = {}) => {
-  const question = isObj18(value) ? value : {};
+  const question = isObj19(value) ? value : {};
   const id2 = lower7(question.id || question.questionId);
   const prompt = trim13(question.prompt || question.question || question.title);
   if (!id2 || !prompt || hasRestrictedPrompt(question) || /^(?:\[encrypted\]|encrypted prompt[.!]?(?:\s*connect.+decrypt[.!]?)?|connect(?: wallet)? to decrypt(?: encrypted prompt)?[.!]?)$/i.test(
@@ -98555,7 +98650,7 @@ var normalizeQuestion = (value = {}) => {
     return null;
   const type = lower7(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
-  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry2) => trim13(isObj18(entry2) ? entry2.label || entry2.value : entry2)).filter(Boolean);
+  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry2) => trim13(isObj19(entry2) ? entry2.label || entry2.value : entry2)).filter(Boolean);
   const ratingScale = type === "rating" ? normalizeRatingScale(question) : null;
   return {
     id: id2,
@@ -98590,7 +98685,7 @@ var MAX_SCAN_BLOCKS = 2e6;
 var RPC_CHUNK_SIZE = 1e5;
 var trim14 = (value) => String(value == null ? "" : value).trim();
 var lower8 = (value) => trim14(value).toLowerCase();
-var isObj19 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj20 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
 var payloadQuestionId = (payload) => lower8(payload?.id || payload?.questionId);
 var readJsonResponse = async (response2) => {
@@ -98638,7 +98733,7 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const hiddenIds = new Set(items.filter((item) => item?.hidden === true || item?.metadata?.hidden === true).map((item) => lower8(item?.metadata?.resourceId)).filter(Boolean));
   const readPayload = async (storageRefId) => {
     const payload = await readJsonResponse(await callStorage("/storage/read", `id=${encodeURIComponent(storageRefId)}`));
-    return isObj19(payload) ? payload : null;
+    return isObj20(payload) ? payload : null;
   };
   const versions = [];
   const legacyVersions = [];
@@ -98671,15 +98766,15 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   return dedupeQuestions(questions);
 };
 var pickContractAddress = (config = {}) => {
-  const contracts = isObj19(config.contracts) ? config.contracts : {};
-  const surveys = isObj19(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
+  const contracts = isObj20(config.contracts) ? config.contracts : {};
+  const surveys = isObj20(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
   return trim14(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
 };
 var pickRpcUrls = (config = {}) => {
   const chainId = trim14(config.networkChainId || config.registryChainId || config.chainId || "11155420");
-  const rpcConfig = isObj19(config.rpc) ? config.rpc : {};
-  const pathProvider = isObj19(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj19(rpcConfig.path) ? rpcConfig.path : {};
-  const byChainMap = isObj19(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj19(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
+  const rpcConfig = isObj20(config.rpc) ? config.rpc : {};
+  const pathProvider = isObj20(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj20(rpcConfig.path) ? rpcConfig.path : {};
+  const byChainMap = isObj20(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj20(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
   const byChain = byChainMap[chainId];
   const source = [
     ...Array.isArray(byChain) ? byChain : [byChain],
@@ -98731,7 +98826,7 @@ var base64urlFromHex = (hex = "") => {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 var payloadSessionSlug = (payload = {}) => {
-  const session = isObj19(payload.session) ? payload.session : {};
+  const session = isObj20(payload.session) ? payload.session : {};
   for (const candidate of [
     payload.sessionSlug,
     payload.session_slug,
@@ -98753,7 +98848,7 @@ var fetchArweaveQuestion = async (pointer, fetchImpl) => {
       const response2 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
       if (!response2.ok) continue;
       const payload = await response2.json();
-      if (isObj19(payload)) return payload;
+      if (isObj20(payload)) return payload;
     } catch {
     }
   }
@@ -99125,9 +99220,9 @@ init_realtimeInterviewConfig();
 var OPENAI_LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 var trim15 = (value) => String(value == null ? "" : value).trim();
-var isObj20 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj21 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewModeEnabled = (config = {}) => {
-  const interview = isObj20(config?.interviewMode || config?.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj21(config?.interviewMode || config?.interview) ? config.interviewMode || config.interview : {};
   return config?.interviewModeEnabled !== false && interview.enabled !== false;
 };
 var buildRealtimeMultipartBody = ({ sdp, session }) => {
@@ -99157,7 +99252,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   } catch {
     return { ok: false, status: 400, error: "Invalid JSON." };
   }
-  if (!isObj20(body)) return { ok: false, status: 400, error: "Invalid JSON." };
+  if (!isObj21(body)) return { ok: false, status: 400, error: "Invalid JSON." };
   const sdp = String(body.sdp == null ? "" : body.sdp);
   const instructions = trim15(body.instructions);
   if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
@@ -99168,7 +99263,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   return { ok: true, payload: { sdp, instructions } };
 };
 var resolveRealtimeConfig = (config = {}) => {
-  const interview = isObj20(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj21(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   const provider = trim15(interview.provider || "openai").toLowerCase();
   const model = resolveRealtimeInterviewModel(config);
   return { provider, model };
@@ -100002,7 +100097,7 @@ var DEFAULT_PAGE_SIZE = 100;
 var { getPathRpcUrl: getPathRpcUrl2, getPublicRpcUrls: getPublicRpcUrls2 } = import_rpcDefaults4.default;
 var ethersUtils2 = ethers_exports?.utils || ethers_exports;
 var toTrimmedString15 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var isObj21 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj22 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var normalizeChipotleRpcCandidateList = (value = []) => {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
@@ -100141,7 +100236,7 @@ var parseJsonIfPossible = (value) => {
 };
 var extractChipotleErrorMessage = (status, body, fallback) => {
   if (typeof body === "string" && body.trim()) return body.trim();
-  if (isObj21(body)) {
+  if (isObj22(body)) {
     const nestedError = toTrimmedString15(body.error || body.message || body.detail);
     if (nestedError) return nestedError;
   }
@@ -100190,7 +100285,7 @@ var fetchChipotleJson = async ({
   if (!response2.ok) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
-  if (isObj21(parsed) && toTrimmedString15(parsed.error || "").trim()) {
+  if (isObj22(parsed) && toTrimmedString15(parsed.error || "").trim()) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
   return parsed;
@@ -100201,8 +100296,8 @@ var resolveLitChipotleRuntime = ({
   secrets = {},
   body = {}
 } = {}) => {
-  const litCredentials = isObj21(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj21(body) ? body : {};
+  const litCredentials = isObj22(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj22(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const envApiKey = toTrimmedString15(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
   const requestApiKey = toTrimmedString15(requestBody.litUsageApiKey || requestBody.apiKey);
@@ -100234,8 +100329,8 @@ var resolveLitChipotleProvisioningRuntime = ({
   secrets = {},
   body = {}
 } = {}) => {
-  const litCredentials = isObj21(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj21(body) ? body : {};
+  const litCredentials = isObj22(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj22(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const secretManagementApiKey = toTrimmedString15(secrets?.litAccountApiKey);
   const envManagementApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
@@ -100469,7 +100564,7 @@ var resolveConfigMappedChipotleRpcUrls = ({
 } = {}) => {
   const normalizedChainId = toChainId(chainId);
   if (!normalizedChainId) return [];
-  const map = isObj21(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
+  const map = isObj22(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
   const mapped = normalizeChipotleRpcCandidateList(
     map[normalizedChainId] || map[String(normalizedChainId)] || []
   );
@@ -100492,7 +100587,7 @@ var resolveSessionChipotleRpcUrl = ({
   chainId = 0,
   op = ""
 } = {}) => {
-  const requestBody = isObj21(request) ? request : {};
+  const requestBody = isObj22(request) ? request : {};
   const normalizedChainId = toChainId(chainId);
   const requestRpcUrl = toTrimmedString15(requestBody.rpcUrl || requestBody.customRpcUrl);
   const candidates = normalizeChipotleRpcCandidateList([
@@ -100533,7 +100628,7 @@ var buildSessionBootstrapMetadata = ({
   request = {},
   sessionSlug = ""
 } = {}) => {
-  const requestBody = isObj21(request) ? request : {};
+  const requestBody = isObj22(request) ? request : {};
   const slugSegment = normalizeSessionScopedNameSegment(
     requestBody.sessionSlug || requestBody.slug || sessionSlug,
     "session"
@@ -100560,7 +100655,7 @@ var createLitChipotleAccount = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-  const requestBody = isObj21(request) ? request : {};
+  const requestBody = isObj22(request) ? request : {};
   const response2 = await fetchChipotleJson({
     apiBase,
     allowLocalApiBase,
@@ -100833,9 +100928,9 @@ var bootstrapLitChipotleSessionCore = async ({
   buildActionCode,
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const litCredentials = isObj21(config?.litCredentials) ? config.litCredentials : {};
+  const litCredentials = isObj22(config?.litCredentials) ? config.litCredentials : {};
   const secretAccountApiKey = toTrimmedString15(secrets?.litAccountApiKey);
-  const requestBody = isObj21(request) ? request : {};
+  const requestBody = isObj22(request) ? request : {};
   const requestAccountApiKey = toTrimmedString15(requestBody.litAccountApiKey);
   const envAccountApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY);
   const existingAccountApiKey = secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
@@ -101125,7 +101220,7 @@ var executeLitChipotleAction = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   ensureChipotleApiKey(runtime);
-  const actionRequest = isObj21(request) ? request : {};
+  const actionRequest = isObj22(request) ? request : {};
   const code = toTrimmedString15(actionRequest.code);
   const ipfsId = toTrimmedString15(
     actionRequest.ipfsId || actionRequest.ipfs_id || runtime.litActionCid
@@ -101175,8 +101270,8 @@ var executeSessionLitChipotleAction = async ({
   sessionSlug = "",
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const litCredentials = isObj21(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj21(request) ? request : {};
+  const litCredentials = isObj22(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj22(request) ? request : {};
   const runtime = resolveLitChipotleRuntime({
     env,
     config,
@@ -103306,9 +103401,9 @@ var dispatchSessionConfigBootstrapRequest = async ({
 init_sessionConfigAuthority();
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v6";
 var trim16 = (value) => String(value == null ? "" : value).trim();
-var isObj22 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj23 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
-  const interview = isObj22(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj23(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   return config.interviewModeEnabled !== false && interview.enabled !== false;
 };
 var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry2) => {
