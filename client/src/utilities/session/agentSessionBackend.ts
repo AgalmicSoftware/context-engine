@@ -114,12 +114,14 @@ export const submitAnswer = async ({
   question,
   answer,
   fetchImpl = fetch,
+  signal,
 }: {
   envelope: AgentClientLoginEnvelope | null;
   agentWorkerUrl?: unknown;
   question: AgentQuestion;
   answer: AgentAnswerInput | string | number | string[];
   fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
 }): Promise<AgentSubmitAnswerResult> => {
   const base = resolveAgentWorkerUrl(envelope, agentWorkerUrl);
   if (!envelope?.agentCredential?.token || !base) return { ok: false, status: 0, reason: 'agent_credentials_missing' };
@@ -146,8 +148,10 @@ export const submitAnswer = async ({
       },
       body: JSON.stringify(payload),
       cache: 'no-store',
+      ...(signal ? { signal } : {}),
     });
     const body = toRecord(await response.json().catch(() => ({})));
+    if (signal?.aborted) throw new DOMException('Agent request cancelled.', 'AbortError');
     if (!response.ok || body.ok !== true) {
       return {
         ok: false,
