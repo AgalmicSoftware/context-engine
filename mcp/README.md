@@ -134,6 +134,9 @@ unknown `CE_MCP_*` name.
   to start when the key is missing or belongs to another agent, rather than
   mixing one agent's remembered answers into another's. Restore both files
   together, or move `state.json` aside to start as a new agent.
+  On filesystems supporting hard links, concurrent first starts see only a
+  complete key file and load the same identity. Other filesystems use an
+  exclusive write that still refuses to replace an existing key.
 - **Agent answers are labeled, not verified.** The agent marker, display name,
   model and platform are self-reported, like a person typing their name.
 - **Public sessions are public.** When a session publishes its results, anyone

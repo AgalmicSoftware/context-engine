@@ -34,14 +34,24 @@ const ensureStateDir = async (stateDir) => {
 
 const writeOwnerOnlyJson = async (filePath, value, { exclusive = false } = {}) => {
   const body = `${JSON.stringify(value, null, 2)}\n`;
-  if (exclusive) {
-    await fs.writeFile(filePath, body, { mode: OWNER_ONLY_FILE, flag: 'wx' });
-    return;
-  }
   // A fresh, exclusively created temp file cannot follow a planted symlink.
   const temporary = `${filePath}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`;
   await fs.writeFile(temporary, body, { mode: OWNER_ONLY_FILE, flag: 'wx' });
-  await fs.rename(temporary, filePath);
+  try {
+    if (exclusive) {
+      // Publish a complete file without replacing another launch's key.
+      try {
+        await fs.link(temporary, filePath);
+      } catch (error) {
+        if (!['EPERM', 'ENOTSUP', 'EXDEV'].includes(error?.code)) throw error;
+        await fs.writeFile(filePath, body, { mode: OWNER_ONLY_FILE, flag: 'wx' });
+      }
+    } else {
+      await fs.rename(temporary, filePath);
+    }
+  } finally {
+    await fs.rm(temporary, { force: true });
+  }
 };
 
 const readKeyFile = async (keyPath) => {
