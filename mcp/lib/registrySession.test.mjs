@@ -34,6 +34,7 @@ const fixture = (overrides = {}) => {
   const records = new Map();
   const hashes = new Map();
   const responseHashes = new Map();
+  const unavailable = new Set();
   // A reorganization gives each replaced block a new hash.
   const generations = new Map();
   const blockHash = (number) => ethers.utils.id(`block ${number} ${generations.get(number) || 0}`);
@@ -80,7 +81,10 @@ const fixture = (overrides = {}) => {
     };
     return surveys;
   };
-  const fetchImpl = async (url) => Response.json(records.get(new URL(url).pathname.split('/').pop()));
+  const fetchImpl = async (url) => {
+    const id = new URL(url).pathname.split('/').pop();
+    return unavailable.has(id) ? new Response('', { status: 404 }) : Response.json(records.get(id));
+  };
   const open = (slug = 'town') => createRegistrySession({ info: { slug, chainId: 11155420 }, config: { rpcUrl: '', allowLocalWorkers: false }, wallet, fetchImpl,
     options: { provider, addresses: { sessionRegistry: registryAddress, surveys: surveysAddress }, createContract: factory } });
   const addQuestion = (id, payload, block = 1) => {
@@ -101,7 +105,7 @@ const fixture = (overrides = {}) => {
     const event = surveys.interface.encodeEventLog(surveys.interface.getEvent('ResponsesSubmitted'), [wallet.address, [id], ethers.constants.HashZero]);
     logs.push({ ...event, blockNumber, transactionIndex: 0, logIndex: logs.length });
   };
-  return { open, addQuestion, addResponse, hashes, responseHashes, logs, reorg, uploaded, writes, faults, client, fetchImpl, registry,
+  return { open, addQuestion, addResponse, hashes, responseHashes, unavailable, logs, reorg, uploaded, writes, faults, client, fetchImpl, registry,
     options: { provider, addresses: { sessionRegistry: registryAddress, surveys: surveysAddress }, createContract: factory },
     setChain: (value) => { chain = value; }, setGasPrice: (value) => { gasPrice = value; }, setBalance: (value) => { balance = value; } };
 };
@@ -828,4 +832,24 @@ test('participant question reads retain stored rating steps for answer validatio
   f.addQuestion(qid, { sessionSlug: 'town', prompt: 'A fractional rating', type: 'rating', scale: { min: -0.5, max: 0.5, step: 0.1 } });
   const question = (await participant.listQuestions()).questions[0];
   assert.equal(question.scale.step, 0.1);
+});
+
+for (const value of ['Disagree', '']) test(`an unread registry ${value || 'cleared'} answer is counted until its payload recovers`, async () => {
+  const f = fixture();
+  const session = await f.open();
+  f.addResponse(qid, { questionID: qid, answer: { value: 'Agree' } }, 1);
+  f.addResponse(qid, { questionID: qid, answer: { value } }, 2);
+  const pointer = Buffer.from(f.responseHashes.get(qid).slice(2), 'hex').toString('base64url');
+  f.unavailable.add(pointer);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await session.readAnswers({ questionIds: [qid] });
+    assert.equal(result.complete, false);
+    assert.equal(result.unreadAnswers, 1);
+    assert.deepEqual(result.entries, []);
+  }
+  f.unavailable.clear();
+  const recovered = await session.readAnswers({ questionIds: [qid] });
+  assert.equal(recovered.complete, true);
+  assert.equal(recovered.unreadAnswers, 0);
+  assert.equal(recovered.entries[0].payload.answer.value, value);
 });

@@ -215,7 +215,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
             normalized(entry.payload.questionID || entry.payload.questionId) === entry.questionId) held.set(key, entry);
       }
       return { entries: [...held.values()].sort((a, b) => compareChainOrder(b, a)).slice(0, maxRecords),
-        complete: false, chainOrders };
+        complete: false, chainOrders, unreadAnswers: state.result?.unreadAnswers || 0 };
     }
     if (!state || state.scope !== scope || head < state.head || replaced) {
       state = { scope, head: startBlock - 1, mark: null, ranges: [], latest: new Map(), capped: false };
@@ -290,6 +290,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
       .map((entry) => [entry.questionId, entry]));
     const entries = [];
     let complete = verified && scannedAll && candidates.length <= maxRecords;
+    let unreadAnswers = 0;
     let next = 0;
     const selected = candidates.slice(0, maxRecords);
     await Promise.all(Array.from({ length: Math.min(6, selected.length) }, async () => {
@@ -305,10 +306,11 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
           if (!block) complete = false;
           const createdAt = block?.timestamp ? new Date(Number(block.timestamp) * 1000).toISOString() : entry.createdAt || '';
           entries.push({ ...entry, storageId: pointer, createdAt, payload });
-        } catch { complete = false; }
+        } catch { complete = false; unreadAnswers++; }
       }
     }));
-    state.result = { entries, complete, chainOrders };
+    unreadAnswers += selected.length - next;
+    state.result = { entries, complete, chainOrders, unreadAnswers };
     return state.result;
   };
 

@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Mark MCP results, question lists and own-answer reads incomplete when listed
+  payloads are unread, including cached misses, and report unread answer counts.
+
 - Require the storage target and timestamp on every upload receipt reservation and
   execute reply, while preserving interrupted uploads at their original target.
 
