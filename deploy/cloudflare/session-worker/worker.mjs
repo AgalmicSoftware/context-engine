@@ -92945,6 +92945,8 @@ async function buildSponsoredQuestionPlan({ env = {}, context = {}, input = {}, 
     sessionSlug: context.session.sessionSlug
   });
   const existingSponsoredQuestionIds = Array.isArray(queueConfig.sponsoredQuestionIds) ? queueConfig.sponsoredQuestionIds : [];
+  const mode = input.replace === true || lower2(input.mode) === "replace" ? "replace" : "append";
+  const planDigest = await sha256Hex2(stableJson({ mode, sponsoredQuestionIds, draftQuestions: drafts }));
   return {
     ok: true,
     sessionSlug: context.session.sessionSlug,
@@ -92956,7 +92958,8 @@ async function buildSponsoredQuestionPlan({ env = {}, context = {}, input = {}, 
     questionSource: loaded.source || "",
     questionSourceReason: loaded.reason || "",
     existingSponsoredQuestionIds,
-    mode: input.replace === true || lower2(input.mode) === "replace" ? "replace" : "append",
+    mode,
+    planDigest,
     resolvedExistingQuestions: resolved.matches,
     draftQuestions: drafts,
     sponsoredQuestionIds,
@@ -92965,14 +92968,13 @@ async function buildSponsoredQuestionPlan({ env = {}, context = {}, input = {}, 
     requiresConfirmation: true,
     confirmation: {
       endpoint: "/api/agent/question-queue/apply",
-      required: "Show resolvedExistingQuestions and draftQuestions to the admin, then call apply only after explicit approval."
+      required: "Show resolvedExistingQuestions and draftQuestions to the admin, then send approved: true and this planDigest to apply only after explicit approval."
     }
   };
 }
 function hasExplicitSponsoredQueueApproval(input = {}) {
-  if (input.approved === true || input.confirm === true || input.confirmed === true) return true;
-  const text = lower2(input.approvalText || input.confirmationText || input.userApproval);
-  return /\b(approve|approved|confirm|confirmed|yes|go ahead|do it|ship it|make.+sponsored)\b/.test(text);
+  const flags = [input.approved, input.confirm, input.confirmed];
+  return !flags.includes(false) && flags.includes(true);
 }
 async function handleQuestionQueuePlanRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
   const plan = await buildSponsoredQuestionPlan({
@@ -93018,6 +93020,12 @@ async function handleQuestionQueueApplyRequest({ env = {}, context = {}, input =
         reason: "sponsored_question_confirmation_required"
       },
       { status: 400 }
+    );
+  }
+  if (Object.hasOwn(input, "planDigest") && input.planDigest !== plan.planDigest) {
+    return json5(
+      { ...plan, ok: false, reason: "sponsored_question_plan_changed" },
+      { status: 409 }
     );
   }
   const createdQuestions = [];

@@ -95,6 +95,16 @@ resends the identical transaction; an uncertain outcome returns its transaction
 hash for checking before another request is made. This applies to hosted, registry
 and agent faucet calls.
 
+## Sponsored question approval
+
+Admins preview sponsored question changes through `/api/agent/question-queue/plan`.
+After approval, send the same inputs with `approved: true` and the returned
+`planDigest` to `/api/agent/question-queue/apply`. A changed mode, resolved question
+ID list or draft content returns `409 sponsored_question_plan_changed` before any
+question or queue is written. `confirm: true` and `confirmed: true` are also accepted;
+any explicit `false` rejects the request. Approval prose is retained as audit context
+and never authorizes a change by itself.
+
 ## Limits
 
 - Registry participation uses OP Sepolia and standalone questions; encrypted
