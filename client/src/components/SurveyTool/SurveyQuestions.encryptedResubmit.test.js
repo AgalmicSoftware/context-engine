@@ -1,5 +1,6 @@
 // After "Decrypt & edit", the owner changes only the public comment
 // of a question whose answer is encrypted. What does the real submit path upload?
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, waitFor } from '@testing-library/react';
 
 import { renderSurveyQuestions } from './surveyQuestionsTestHarness';
@@ -22,18 +23,13 @@ const SESSION_CONFIG = {
   __registry: { registryChainId: 84532, sessionIdHex: '0x00112233445566778899aabbccddeeff' },
 };
 const SURVEY_ID = `0x${'ab'.repeat(32)}`;
-const OLD_ENVELOPE = JSON.stringify({
-  v: 1,
-  aad: { context: `0x${'aa'.repeat(32)}` },
-  recipients: [
-    { type: 'self-eip712-v1' },
-    {
-      type: 'worker-response-field-v1',
-      policy: { audience: 'self_admin', owner: OWNER, sessionSlug: 'example', sessionId: 'x', context: 'y' },
-    },
-  ],
-  ciphertext: 'old-ciphertext',
-});
+const OLD_ENVELOPE = responseEnvelopeFixture('old-ciphertext', [
+  { type: 'self-eip712-v1' },
+  {
+    type: 'worker-response-field-v1',
+    policy: { audience: 'self_admin', owner: OWNER, sessionSlug: 'example', sessionId: 'x', context: 'y' },
+  },
+]);
 const ownMaskedResponse = () => ({
   responses: [
     {

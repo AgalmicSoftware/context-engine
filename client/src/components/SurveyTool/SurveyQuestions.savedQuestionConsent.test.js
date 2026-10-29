@@ -1,3 +1,4 @@
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, waitFor } from '@testing-library/react';
 import { renderSurveyQuestions } from './surveyQuestionsTestHarness';
 import { surveyQuestionReadsPort } from '../../domains/surveys/surveyQuestionReadsPort.js';
@@ -25,7 +26,7 @@ const AI = {
   appliedAt: 1,
 };
 const plain = (value) => ({ value, encrypted: false, encryptionAudience: 'self', audienceMode: 'explicit', hash: '' });
-const ENVELOPE = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'saved-answer' });
+const ENVELOPE = responseEnvelopeFixture('saved-answer');
 const response = (id, named = false) => ({
   questionID: id,
   type: 'freeform',

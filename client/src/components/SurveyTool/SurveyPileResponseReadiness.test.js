@@ -1,3 +1,4 @@
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, waitFor } from '@testing-library/react';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
@@ -301,13 +302,7 @@ it.each(['submit-first', 'sync-first-comment', 'sync-first-answer'])(
 it('keeps saved Worker rating envelopes on a comment-only resubmit from a new device', async () => {
   const store = createWorkerStore();
   const firstSitting = await mountWhileResponsesLoad(store, true);
-  const envelope = (tag) =>
-    JSON.stringify({
-      v: 1,
-      aad: { context: `0x${'aa'.repeat(32)}` },
-      recipients: [{ type: 'self-eip712-v1' }],
-      ciphertext: tag,
-    });
+  const envelope = responseEnvelopeFixture;
   jest.spyOn(cryptoUtils, 'encryptEnvelopeValue').mockImplementation(async (value) => envelope(`rating-${value}`));
   jest.spyOn(cryptoUtils, 'encryptMultipleAnswers').mockImplementation(async (slice) => ({
     answers: Object.fromEntries(

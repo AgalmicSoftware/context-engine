@@ -1,4 +1,5 @@
 // Saved consent regression coverage through the real pile engine.
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, waitFor } from '@testing-library/react';
 import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -330,7 +331,7 @@ it('P11 legacy Worker: re-sending the same saved name on an unchanged answer is 
 it('P8 legacy Worker: a consent-only submit of a decrypted encrypted answer passes the upload no-leak guard', async () => {
   const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
   const { applySessionInterviewAnswer } = require('./SurveyPileViewMode');
-  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer-ct' });
+  const envelope = responseEnvelopeFixture('answer-ct');
   const saved = savedResponse({
     responderName: undefined,
     interviewProvenance: undefined,
@@ -400,7 +401,7 @@ it('P8 legacy Worker: a consent-only submit of a decrypted encrypted answer pass
 it('P9 current Worker: stray consent restored after reload + Decrypt in the pile + pile Submit passes the upload no-leak guard', async () => {
   const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
   const { applySessionInterviewAnswer } = require('./SurveyPileViewMode');
-  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer-ct' });
+  const envelope = responseEnvelopeFixture('answer-ct');
   const saved = savedResponse({
     responderName: undefined,
     interviewProvenance: undefined,
@@ -487,7 +488,7 @@ it('P9 current Worker: stray consent restored after reload + Decrypt in the pile
 }, 40000);
 it('P12 PRE-EXISTING control (base code paths unchanged): decrypted encrypted answer + plaintext comment edit, pile Submit', async () => {
   const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
-  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer-ct' });
+  const envelope = responseEnvelopeFixture('answer-ct');
   const saved = savedResponse({
     responderName: undefined,
     interviewProvenance: undefined,

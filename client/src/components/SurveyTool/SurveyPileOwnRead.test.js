@@ -1,3 +1,4 @@
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
@@ -134,16 +135,10 @@ const fixture = async () => {
   jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(CONFIG);
   jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
   const encrypt = (value, audience = 'self') => {
-    const envelope = JSON.stringify({
-      v: 1,
-      ciphertext: `cipher-${envelopes.size}`,
-      recipients: [
-        { type: 'self-eip712-v1' },
-        ...(audience === 'self_admin'
-          ? [{ type: 'worker-response-field-v1', policy: { audience: 'self_admin' } }]
-          : []),
-      ],
-    });
+    const envelope = responseEnvelopeFixture(`cipher-${envelopes.size}`, [
+      { type: 'self-eip712-v1' },
+      ...(audience === 'self_admin' ? [{ type: 'worker-response-field-v1', policy: { audience: 'self_admin' } }] : []),
+    ]);
     envelopes.set(envelope, { value, audience });
     return envelope;
   };
