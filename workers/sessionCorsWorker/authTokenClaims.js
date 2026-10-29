@@ -1,4 +1,5 @@
 import { base64UrlEncode } from './tokenSigning.js';
+import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 
 const AUTH_TOKEN_RECORD_VALUE = '1';
 
@@ -20,7 +21,8 @@ const fillRandomValues = (bytes, deps) => {
 };
 
 export const buildAuthTokenKey = ({ slug, sub, jti } = {}) => {
-  const slugPart = toTokenPart(slug);
+  if (typeof slug !== 'string') return '';
+  const slugPart = sessionSlugStorageKey(slug);
   const subPart = toSubjectPart(sub);
   const jtiPart = toTokenPart(jti);
   if (!slugPart || !subPart || !jtiPart) return '';
@@ -68,7 +70,7 @@ export const validateAuthTokenRecord = async ({
   slug,
 } = {}) => {
   const key = buildAuthTokenKey({
-    slug: slug || payload?.slug,
+    slug: slug ?? payload?.slug,
     sub: payload?.sub,
     jti: payload?.jti,
   });

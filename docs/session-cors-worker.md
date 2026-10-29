@@ -3217,3 +3217,8 @@ per-question contract pointer reads, also in batches of eight. A zero pointer
 proves there is no saved answer; RPC or payload-read failures do not. This covers
 both decentralized Arweave payloads and chain-authoritative Cloudflare payloads
 without changing a contract interface.
+
+General-session authentication uses one token namespace for the empty slug and
+`general`. Explicit General requests stay General when checked against a token,
+so named-session tokens cannot authorize them. Token persistence, validation and
+revocation share the same session-key conversion; nonce replay remains refused.
