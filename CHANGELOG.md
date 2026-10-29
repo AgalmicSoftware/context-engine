@@ -341,6 +341,8 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Keep the analysis session-switch regression mock compatible with typed Jest.
+
 - Preserve the Session Worker's isolated dependencies in public replay checks.
 
 - Include shared answer validation in Worker release source comparisons.
