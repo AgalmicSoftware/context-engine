@@ -154,6 +154,12 @@ faucet permission still requires the gas gate. Otherwise its operator funds
 the reported address. The MCP uses its configured or public RPC, never one
 provided by session metadata or registry fields.
 
+Registry question and answer scans respect the session's validated start/end
+block window, capped at the chain head. Changing either limit discards excluded
+cached data and remembered writes. With an end block, answer pointers are read
+at that block, and unavailable historical state leaves results partial without
+substituting a later answer. The client and MCP share the bounded-pointer rule.
+
 Arweave reads can lag after a transaction. The agent remembers confirmed
 writes and reports partial scans when limits are reached. Answer scans prioritize
 recent blocks and resume older history across calls; incomplete own-answer scans
