@@ -115,7 +115,7 @@ describe('arweaveClient.downloadDataFromArweave direct routing', () => {
     const text = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       debugContext: { category: 'question_response_payload' },
     });
@@ -138,7 +138,7 @@ describe('arweaveClient.downloadDataFromArweave direct routing', () => {
     const text = await arweaveClient.downloadDataFromArweave('session-meta-ar-io', {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       debugContext: { category: 'session_registry_metadata' },
     });
@@ -159,7 +159,7 @@ describe('arweaveClient.downloadDataFromArweave direct routing', () => {
       arweaveClient.downloadDataFromArweave('ar-io-html-fallback', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-        bypassCache: true,
+        cacheBypass: true,
         disableExistencePrecheck: true,
         debugContext: { category: 'question_response_payload' },
       }),
@@ -198,7 +198,7 @@ describe('arweaveClient.downloadDataFromArweave direct routing', () => {
       gateways: [TEST_ARWEAVE_GATEWAY, TEST_IRYS_GATEWAY],
       retries: 1,
       retryDelayMs: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       debugContext: { category: 'question_response_payload' },
     });
@@ -229,7 +229,7 @@ describe('arweaveClient.downloadDataFromArweave direct routing', () => {
     await expect(
       arweaveClient.downloadDataFromArweave('default-gateway-fanout', {
         retries: 0,
-        bypassCache: true,
+        cacheBypass: true,
         disableExistencePrecheck: true,
       }),
     ).rejects.toMatchObject({
@@ -267,7 +267,7 @@ describe('arweaveClient.downloadDataFromArweave direct routing', () => {
     const text = await arweaveClient.downloadDataFromArweave('response-gateway-fanout', {
       directToArIo: false,
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       debugContext: { category: 'question_response_payload' },
     });
@@ -296,7 +296,7 @@ describe('arweaveClient.downloadDataFromArweave direct routing', () => {
       arweaveClient.downloadDataFromArweave('ar-io-no-tx-data', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-        bypassCache: true,
+        cacheBypass: true,
         disableExistencePrecheck: true,
         debugContext: { category: 'question_response_payload' },
       }),

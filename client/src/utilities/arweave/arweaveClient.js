@@ -1104,11 +1104,11 @@ async function uploadDataToArweave(data, format, opts = {}) {
   });
 }
 
+/** @param {string} txID @param {import('./arweaveFetchPolicy').ArweaveFetchOptions} opts */
 async function downloadDataFromArweave(txID, opts = {}) {
   if (!txID) throw new Error('Missing Arweave txID');
   const normalizedTxId = normalizeArweaveUploadId(txID);
-  const cacheBypass = !!opts?.bypassCache;
-  const bypassFailureCache = cacheBypass || !!opts?.bypassFailureCache;
+  const cacheBypass = opts.cacheBypass === true;
   const debugContext = normalizeArweaveDebugContext(opts?.debugContext);
   const stopOnFirst404 = shouldStopOnFirstNotFound(opts, debugContext);
   const preflightDecision = resolvePreflightTxExistenceDecision(opts, debugContext);
@@ -1147,7 +1147,7 @@ async function downloadDataFromArweave(txID, opts = {}) {
     }
   }
 
-  if (!bypassFailureCache) {
+  if (!cacheBypass) {
     const failureEntry = getFailureCacheEntry(normalizedTxId);
     if (failureEntry && Number(failureEntry.nextRetryAtMs || 0) > Date.now()) {
       const cooldownErr = buildFailureCacheError({
@@ -1241,8 +1241,8 @@ async function downloadDataFromArweave(txID, opts = {}) {
               opts,
               debugContext,
             );
-            if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, arIoOnlyResult.text);
-            if (!bypassFailureCache) clearFailureCacheEntry(normalizedTxId);
+            setArweaveTextCacheEntry(normalizedTxId, arIoOnlyResult.text);
+            clearFailureCacheEntry(normalizedTxId);
             return arIoOnlyResult.text;
           }
           if (arIoOnlyResult?.error && arIoOnlyResult.error.name === 'ArweaveFetchError') {
@@ -1368,8 +1368,8 @@ async function downloadDataFromArweave(txID, opts = {}) {
                     opts,
                     debugContext,
                   );
-                  if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, gatewayPayload.text);
-                  if (!bypassFailureCache) clearFailureCacheEntry(normalizedTxId);
+                  setArweaveTextCacheEntry(normalizedTxId, gatewayPayload.text);
+                  clearFailureCacheEntry(normalizedTxId);
                   return gatewayPayload.text;
                 }
                 lastStatus = resp.status;
@@ -1518,8 +1518,8 @@ async function downloadDataFromArweave(txID, opts = {}) {
             opts,
             debugContext,
           );
-          if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, wayfinderResult.text);
-          if (!bypassFailureCache) clearFailureCacheEntry(normalizedTxId);
+          setArweaveTextCacheEntry(normalizedTxId, wayfinderResult.text);
+          clearFailureCacheEntry(normalizedTxId);
           return wayfinderResult.text;
         }
         if (wayfinderResult?.error && wayfinderResult.error.name === 'ArweaveFetchError') {
@@ -1574,7 +1574,7 @@ async function downloadDataFromArweave(txID, opts = {}) {
         cause: lastError,
       });
     } catch (error) {
-      if (!bypassFailureCache && error && error.name === 'ArweaveFetchError') {
+      if (!cacheBypass && error && error.name === 'ArweaveFetchError') {
         const entry = recordFailureCacheEntry(normalizedTxId, error, {
           useShortNotFoundCooldown: shouldUseShortNotFoundCooldown(debugContext),
         });

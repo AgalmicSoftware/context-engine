@@ -509,7 +509,7 @@ const useSponsoredBundleLifecycle = ({
               caller: 'SessionWizard.sponsoredBundle',
               source: 'session_wizard',
             },
-            ...(sponsoredBundleRetryNonce > 0 ? { bypassFailureCache: true } : {}),
+            ...(sponsoredBundleRetryNonce > 0 ? { cacheBypass: true } : {}),
           },
         });
         if (cancelled) return;

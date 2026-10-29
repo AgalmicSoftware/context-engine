@@ -28,9 +28,14 @@ Arweave payload reads are now cache-first in the client:
 - Concurrent reads for the same tx id are coalesced before hitting gateways.
 - Doc library fallback blob reads no longer force `cache: 'no-store'`.
 
-If needed, callers can bypass the in-memory Arweave text cache with:
+The shared `ArweaveFetchPolicy.cacheBypass` option bypasses positive and failure
+caches and in-flight reuse at every download layer:
 
-- `downloadDataFromArweave(txId, { bypassCache: true })`
+- `downloadDataFromArweave(txId, { cacheBypass: true })`
+
+Readers that detect invalid JSON evict that reply from both text caches and
+clear its failure cooldown. The next ordinary read fetches again; successful
+ordinary reads continue to use the cache.
 
 ## Locked-field no-leak contract
 

@@ -699,7 +699,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     expect(arweaveSpy).toHaveBeenCalledWith(rawTxId, expect.any(Object));
     expect(arweaveOpts).toEqual(
       expect.objectContaining({
-        bypassFailureCache: true,
+        cacheBypass: true,
         debugContext: expect.objectContaining({
           category: 'sbt_metadata',
         }),
