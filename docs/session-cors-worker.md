@@ -1968,6 +1968,11 @@ Runtime:
 - `authToken:{slug}:{sub}:{jti}` → "1" for minted login tokens (TTL 4h)
 - route and auth-nonce counters are authoritative only in `CE_SESSION_COORDINATOR`; no KV counter fallback is accepted
 
+Storage listing authorization reuses each distinct group membership result only
+within the current request. A real denial omits the record; an unavailable
+membership service fails the entire page with a retryable 503 and no completeness
+claim. Later requests check membership again.
+
 ## Session authority model
 
 The session config resolution follows a strict authority matrix that determines which

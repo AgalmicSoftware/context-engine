@@ -75,6 +75,7 @@ import {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol('resolve-storage-gate-runtime-config');
+const STORAGE_GROUP_MEMBERSHIP_CACHE = Symbol('storage-group-membership-cache');
 const STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol('storage-rpc-chain-attestation-cache');
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -717,16 +718,21 @@ const checkWorkerGroupMembership = async ({
   authScopes,
   deps,
 }) => {
+  const cache = deps?.[STORAGE_GROUP_MEMBERSHIP_CACHE];
+  if (cache?.has(groupId)) return cache.get(groupId);
   const check = typeof deps?.isWorkerGroupMember === 'function' ? deps.isWorkerGroupMember : isWorkerGroupMember;
-  return check({
-    env,
-    slug,
-    sessionId: resolveCanonicalWorkerSessionIdHex(config),
-    groupId,
-    requesterAddress,
-    authScopes,
-    deps,
-  });
+  const pending = Promise.resolve().then(() => check({
+    env, slug, sessionId: resolveCanonicalWorkerSessionIdHex(config), groupId, requesterAddress, authScopes, deps,
+  })).then((result) => {
+    const denied = result?.ok === false &&
+      ([400, 401, 403, 404].includes(Number(result.status)) ||
+        ['worker_group_membership_denied', 'worker_group_not_found', 'missing_principal', 'invalid_worker_group_id'].includes(result.reason)) &&
+      !/unavailable|not_configured|ambiguous/.test(result.reason || '');
+    return result?.ok ? { ...result, outcome: 'allowed' } : denied ? { ...result, outcome: 'denied' }
+      : { ok: false, outcome: 'unavailable', status: 503, reason: 'worker_group_membership_unavailable' };
+  }, () => ({ ok: false, outcome: 'unavailable', status: 503, reason: 'worker_group_membership_unavailable' }));
+  cache?.set(groupId, pending);
+  return pending;
 };
 
 const evaluateWorkerGroupCondition = async ({
@@ -751,6 +757,7 @@ const evaluateWorkerGroupCondition = async ({
       authScopes,
       deps,
     });
+    if (result.outcome === 'unavailable') return result;
     if (result?.ok) {
       return {
         ok: true,
@@ -828,6 +835,7 @@ const evaluateAccessConditionDocument = async ({
       authScopes,
       deps,
     });
+    if (result.outcome === 'unavailable') return result;
     if (result.ok) {
       matched.push(result.matchedCondition || { kind: trim(condition.kind).toLowerCase() });
       if (match === 'any') {
@@ -884,6 +892,10 @@ const authorizeWorkerGroupAccess = async ({
       authScopes,
       deps,
     });
+    if (result.outcome === 'unavailable') return {
+      ok: false, response: responseJson(deps, { error: 'Worker group membership is unavailable; retry.',
+        reason: result.reason, retryable: true }, 503, baseHeaders),
+    };
     if (result?.ok) {
       return {
         ok: true,
@@ -1051,7 +1063,8 @@ const authorizeCloudflareStorageGate = async ({
       response: responseJson(deps, {
         error: 'Access denied: Cloudflare storage conditions failed.',
         reason: conditionResult.reason,
-      }, 403, baseHeaders),
+        ...(conditionResult.outcome === 'unavailable' ? { retryable: true } : {}),
+      }, conditionResult.status || 403, baseHeaders),
     };
   }
   if (access.encryption === PAYLOAD_ENCRYPTION_MODES.LIT) {
@@ -1316,7 +1329,7 @@ const resolveStorageGateRuntimeConfig = async ({ config, deps }) => {
 
 const createStorageRouteGateDeps = ({ config, env, slug, deps }) => {
   let runtimeConfigPromise = null;
-  const routeDeps = { ...(deps || {}) };
+  const routeDeps = { ...(deps || {}), [STORAGE_GROUP_MEMBERSHIP_CACHE]: new Map() };
   Object.defineProperty(routeDeps, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, {
     configurable: false,
     enumerable: false,
@@ -1979,7 +1992,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     });
     // A denied own answer is not evidence of an empty answer history.
     if (!itemAccess.ok) {
-      if (mine) return itemAccess.response;
+      if (mine || itemAccess.response.status >= 500) return itemAccess.response;
       continue;
     }
     const owned = isOwnedStorageResource(storageRef.resource);

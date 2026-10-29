@@ -5006,3 +5006,59 @@ for (const useR2 of [false, true]) test(`metadata upload limits include encoded 
   }
   assert.equal((await upload([{ name: 'n'.repeat(64), value: 'v'.repeat(1024) }])).status, 200);
 });
+
+const membershipListingFixture = ({ count = 100, groups, check, conditions = false }) => {
+  const rows = new Map(Array.from({ length: count }, (_, i) => {
+    const id = `cf_membership_${i}`;
+    const groupIds = groups(i);
+    return [`ce-storage:session-a:docsContext:${id}`, JSON.stringify({ id, backend: 'cloudflare', resource: 'docsContext',
+      ...(conditions ? { accessConditions: { match: 'any', conditions: [{ kind: 'worker_group', groupIds }] } } : { groupIds }) })];
+  }));
+  let calls = 0;
+  const env = {
+    CE_STORAGE_INDEX_KV: { get: async (key) => rows.get(key), list: async () => ({ keys: [...rows.keys()].map((name) => ({ name })), list_complete: true }) },
+    CE_SESSION_COORDINATOR: { idFromName: (name) => name, get: () => ({ fetch: async (_url, init) => {
+      calls += 1;
+      const result = check(JSON.parse(init.body).groupId);
+      return Response.json(result, { status: result.status || 200 });
+    } }) },
+  };
+  return { calls: () => calls, run: () => storageRoute({ path: '/storage/list', method: 'GET',
+    request: new Request('https://worker.example/storage/list?resource=docsContext&limit=100'), env,
+    config: { sessionId: WORKER_GROUP_SESSION_ID, storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } },
+    slug: 'session-a', uploaderAddress: '0x0000000000000000000000000000000000000def', deps: { json },
+  }) };
+};
+
+test('a listing checks each distinct group once across one hundred records and groups', async () => {
+  const groupIds = Array.from({ length: 100 }, (_, i) => `group-${i}`);
+  const fixture = membershipListingFixture({ groups: () => groupIds,
+    check: (groupId) => groupId === 'group-99' ? { ok: true } : { ok: false, reason: 'worker_group_membership_denied' } });
+  const response = await fixture.run();
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).items.length, 100);
+  assert.equal(fixture.calls(), 100);
+  await fixture.run();
+  assert.equal(fixture.calls(), 200, 'a later request must check current memberships again');
+});
+
+for (const conditions of [false, true]) test(`unavailable membership fails the entire listing page (conditions=${conditions})`, async () => {
+  const fixture = membershipListingFixture({ count: 5, conditions, groups: (i) => [`group-${i}`],
+    check: (groupId) => groupId === 'group-2' ? { ok: false, status: 503, reason: 'worker_group_coordination_unavailable' } : { ok: true } });
+  const response = await fixture.run();
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.equal(body.retryable, true);
+  assert.equal(body.listComplete, undefined);
+  assert.equal(body.items, undefined);
+});
+
+test('a real membership denial still omits its record', async () => {
+  const fixture = membershipListingFixture({ count: 2, groups: (i) => [`group-${i}`],
+    check: (groupId) => groupId === 'group-0' ? { ok: false, reason: 'worker_group_membership_denied' } : { ok: true } });
+  const response = await fixture.run();
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.items.map((item) => item.storageRef.id), ['cf_membership_1']);
+  assert.equal(body.listComplete, true);
+});
