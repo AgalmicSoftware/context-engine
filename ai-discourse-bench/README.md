@@ -712,3 +712,7 @@ filled with maximal disagreement.
 Report grouping treats roster trait names and values as data, including names
 such as `constructor` and `__proto__`. Grouped JSON retains them as own properties;
 the same key handling applies to interactive trait filters and model dictionaries.
+
+Model answer parsing removes inline `<think>` and `<analysis>` reasoning regions
+before recovering final JSON. Conflicting final answers or truncated JSON/reasoning
+are parse errors, so the runner retries them within its configured attempt budget.

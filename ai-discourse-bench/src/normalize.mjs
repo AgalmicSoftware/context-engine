@@ -16,7 +16,7 @@ const normalizeConfidence = (value) => {
     : null;
 };
 
-export const jsonObjectCandidates = (text) => {
+const recoverJsonObjects = (text) => {
   const candidates = [];
   let start = -1;
   let depth = 0;
@@ -45,35 +45,56 @@ export const jsonObjectCandidates = (text) => {
       }
     }
   }
-  return candidates;
+  return { candidates, truncated: depth > 0 };
+};
+
+export const jsonObjectCandidates = (text) => recoverJsonObjects(text).candidates;
+
+// Reasoning regions are removed before JSON recovery; quoted JSON content is
+// preserved, including rationale strings which happen to contain these tags.
+export const extractFinalAnswerText = (rawText) => {
+  let truncated = false;
+  const text = String(rawText || '').replace(
+    /"(?:\\.|[^"\\])*"|<(think|analysis)>[\s\S]*?<\/\1>|<(think|analysis)>/gi,
+    (match, complete, incomplete) => {
+      if (complete) return '';
+      if (incomplete) truncated = true;
+      return match;
+    },
+  ).trim();
+  return { text, truncated };
 };
 
 export const parseModelAnswer = (rawText) => {
-  const trimmed = String(rawText || '').trim();
-  if (!trimmed) {
-    return { answer: null, confidence: null, rationale: '', parseError: 'empty response' };
-  }
+  const extracted = extractFinalAnswerText(rawText);
+  const trimmed = extracted.text;
+  const failure = (parseError) => ({ answer: null, confidence: null, rationale: '', parseError });
+  if (extracted.truncated) return failure('truncated reasoning region');
+  if (!trimmed) return failure('empty response');
+  const { candidates, truncated } = recoverJsonObjects(trimmed);
+  if (truncated) return failure('truncated JSON response');
   let parsedObject = null;
-  const candidates = trimmed.startsWith('{') && trimmed.endsWith('}')
-    ? [trimmed, ...jsonObjectCandidates(trimmed)]
-    : jsonObjectCandidates(trimmed);
+  const answers = [];
   for (const candidate of [...new Set(candidates)]) {
     try {
       const parsed = JSON.parse(candidate);
       if (!parsedObject) parsedObject = parsed;
       const answer = normalizeAnswer(parsed?.answer);
       if (!answer) continue;
-      return {
+      answers.push({
         answer,
         confidence: normalizeConfidence(parsed.confidence),
         rationale: typeof parsed.rationale === 'string' ? parsed.rationale.trim() : '',
         parseError: '',
-      };
+      });
     } catch (_) {
       // Continue to the next balanced JSON object.
     }
   }
-
+  if (new Set(answers.map((entry) => entry.answer)).size > 1) {
+    return failure('conflicting final answer objects');
+  }
+  if (answers.length) return answers[0];
   if (parsedObject) {
     return {
       answer: null,
