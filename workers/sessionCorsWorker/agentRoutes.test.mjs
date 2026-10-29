@@ -58,9 +58,9 @@ test('question selection, queue planning, voting and auxiliary groups retain the
   const jwt = await participant(f);
   await jsonOk(await f.request('/api/agent/question-queue', { token: jwt }));
   await jsonOk(await signed(f, '/api/agent/question-queue', { sponsoredQuestionIds: [questions[0].questionId] }));
-  await jsonOk(await f.request('/api/agent/question-queue/plan', { method: 'POST', token, body: { questionIds: [questions[0].questionId] } }));
+  const queuePlan = await jsonOk(await f.request('/api/agent/question-queue/plan', { method: 'POST', token, body: { questionIds: [questions[0].questionId] } }));
   assert.equal((await f.request('/api/agent/question-queue/apply', { method: 'POST', token, body: { questionIds: [questions[0].questionId] } })).status, 400);
-  await jsonOk(await f.request('/api/agent/question-queue/apply', { method: 'POST', token, body: { questionIds: [questions[0].questionId], approved: true } }));
+  await jsonOk(await f.request('/api/agent/question-queue/apply', { method: 'POST', token, body: { questionIds: [questions[0].questionId], approved: true, planDigest: queuePlan.planDigest } }));
   await jsonOk(await f.request('/api/agent/question-votes/recommend', { method: 'POST', token, body: {} }));
   await jsonOk(await f.request('/api/agent/question-votes/apply', { method: 'POST', token,
     body: { decisions: [{ questionId: questions[0].questionId, vote: 'up' }], approvalText: 'Approve this vote' } }));
@@ -143,9 +143,11 @@ for (const approval of [
 ]) {
   test(`sponsored apply rejects unapproved structured decisions: ${JSON.stringify(approval)}`, async () => {
     const { f, agent, questions } = await hosted();
+    const body = { questionIds: [questions[0].questionId], createQuestions: ['A new sponsored question?'] };
+    const plan = await jsonOk(await f.request('/api/agent/question-queue/plan', { method: 'POST', token: agent.token, body }));
     const writesBefore = f.writes.length;
     const response = await f.request('/api/agent/question-queue/apply', { method: 'POST', token: agent.token,
-      body: { questionIds: [questions[0].questionId], createQuestions: ['A new sponsored question?'], ...approval } });
+      body: { ...body, planDigest: plan.planDigest, ...approval } });
     assert.equal(response.status, 400);
     assert.equal((await response.json()).reason, 'sponsored_question_confirmation_required');
     assert.equal(f.writes.length, writesBefore, 'rejected approval writes neither a question nor a queue');
@@ -175,4 +177,14 @@ test('sponsored plans bind approval to the mode, resolved IDs and draft contents
   const applied = await jsonOk(await f.request('/api/agent/question-queue/apply', { method: 'POST', token: agent.token,
     body: { ...body, approved: true, planDigest: plan.planDigest, approvalText: 'Admin approved this plan.' } }));
   assert.equal(applied.createdQuestions.length, 1);
+});
+
+test('sponsored apply requires a plan digest even with explicit approval and writes nothing without it', async () => {
+  const { f, agent, questions } = await hosted();
+  const writesBefore = f.writes.length;
+  const response = await f.request('/api/agent/question-queue/apply', { method: 'POST', token: agent.token,
+    body: { questionIds: [questions[0].questionId], createQuestions: ['A new sponsored question?'], approved: true } });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).reason, 'sponsored_question_confirmation_required');
+  assert.equal(f.writes.length, writesBefore);
 });

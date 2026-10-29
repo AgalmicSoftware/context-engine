@@ -396,7 +396,7 @@ export async function handleQuestionQueueApplyRequest({ env = {}, context = {}, 
       { status: plan.status || 403 },
     );
   }
-  if (!hasExplicitSponsoredQueueApproval(input)) {
+  if (!hasExplicitSponsoredQueueApproval(input) || typeof input.planDigest !== 'string' || !/^[a-f0-9]{64}$/.test(input.planDigest)) {
     return json(
       {
         ...plan,
@@ -406,7 +406,7 @@ export async function handleQuestionQueueApplyRequest({ env = {}, context = {}, 
       { status: 400 },
     );
   }
-  if (Object.hasOwn(input, 'planDigest') && input.planDigest !== plan.planDigest) {
+  if (input.planDigest !== plan.planDigest) {
     return json(
       { ...plan, ok: false, reason: 'sponsored_question_plan_changed' },
       { status: 409 },
