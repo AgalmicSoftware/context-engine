@@ -188,7 +188,7 @@ export type ClusterPointsFn = (points: PolisPoint[], clusterCount: number, rando
 export type AnalyzeClusterOpinionsFn = (
   payload: UnknownRecord,
   allClustersData: UnknownRecord,
-  options: { sessionSlug: string },
+  options: { sessionSlug: string; sessionConfig?: unknown; context?: UnknownRecord },
 ) => Promise<Partial<PolisClusterAnalysisResult>>;
 
 export type D3LinearScale = {

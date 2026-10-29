@@ -162,6 +162,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Use session-sponsored AI and viewer authentication for Polis group analysis,
+  and show failed requests with a working retry instead of caching a local summary.
+
 - Preserve edited questions and saved drafts on failed regeneration, asking before a usable replacement overwrites edits.
 
 - Count distinct demo personas separately from their modeled responses, omitting unknown persona counts.

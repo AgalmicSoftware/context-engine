@@ -20,6 +20,12 @@ show the percentage agreeing (or disagreeing) in the cluster alongside the overa
 percentage. Both use responses to that question, including Unsure and excluding
 missing answers, within the current report filters; overall includes the cluster.
 
+**Analyze clusters** uses the loaded session's AI model and Worker configuration,
+including sponsored AI, together with the current viewer's authentication context.
+Participants do not need a personal API key when the session sponsors analysis.
+If both model attempts fail, the affected cluster displays the error and can be
+retried; a failed request is not cached as a successful AI summary.
+
 **Summary and Statistics** counts participants, answered questions, responses,
 and average responses per participant across all five question types. Each value
 shows its binary subset in parentheses only when the displayed values differ,

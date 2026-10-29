@@ -4,7 +4,7 @@ import { assertReadable } from './civic-theme-overlay-smoke.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { ethers } from 'ethers';
-import worker from '../workers/sessionCorsWorker/worker.js';
+import { createWorkerRuntime } from '../workers/sessionCorsWorker/worker.js';
 import { installSessionCoordinatorBinding } from '../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { createWorkerClient } from '../mcp/lib/workerClient.mjs';
 import { buildQuestionRecord } from '../mcp/lib/records.mjs';
@@ -50,6 +50,23 @@ const originalFetch = globalThis.fetch;
 globalThis.fetch = async () => {
   throw new Error('Session setup smoke must not call an external service');
 };
+const aiProviderCalls = [];
+let failSponsoredAnalysis = false;
+const worker = createWorkerRuntime(env, {
+  fetch: async (url, init) => {
+    assert.equal(url, 'https://api.openai.com/v1/responses');
+    assert.equal(init.headers.authorization, 'Bearer synthetic-ai-key-not-a-credential');
+    const body = JSON.parse(init.body);
+    assert.equal(body.model, 'gpt-5.6-terra');
+    aiProviderCalls.push({ model: body.model, failed: failSponsoredAnalysis });
+    if (failSponsoredAnalysis) return Response.json({ error: { message: 'Synthetic sponsored analysis outage' } }, { status: 503 });
+    return Response.json({ output_text: JSON.stringify({
+      name: 'Shared infrastructure', short: 'Support shared tools',
+      long: 'The sponsored model described this group from its recorded votes.',
+    }) });
+  },
+  rpcFetch: async () => assert.fail('Session setup smoke must not call an external RPC'),
+});
 const browser = await chromium.launch({
   headless: true,
   args: [`--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE ${new URL(baseUrl).hostname}`],
@@ -89,6 +106,12 @@ const fixtureContext = async ({ seed }, { workerEnv = env, failResponseUploadAt 
     const url = new URL(request.url());
     if (url.origin === new URL(baseUrl).origin) return route.continue();
     if (url.origin !== workerOrigin) return route.abort();
+    if (url.pathname === '/ai') {
+      const payload = request.postDataJSON();
+      assert.equal(payload.provider, 'openai');
+      assert.equal(payload.model, 'gpt-5.6-terra');
+      assert.equal(Object.hasOwn(payload, 'apiKey'), false, 'Polis uses the sponsored Worker key');
+    }
     const upload = url.pathname === '/storage/upload' && request.method() === 'POST'
       ? request.postDataJSON()
       : null;
@@ -327,6 +350,22 @@ try {
     .getByTestId('ce-polis-all-questions')
     .getByText(/^Agree: 1\s*\/\s*Unsure: 0\s*\/\s*Disagree: 0\s*\/\s*Responses: 1$/)
     .waitFor();
+  const showReportSettings = page.getByRole('button', { name: 'Show report settings', exact: true });
+  if (await showReportSettings.isVisible()) await showReportSettings.click();
+  await page.getByRole('combobox').filter({ has: page.locator('option[value="POLIS"]') }).selectOption('POLIS');
+  const analyze = page.getByTestId('ce-polis-analyze-clusters');
+  failSponsoredAnalysis = true;
+  await analyze.click();
+  await page.getByText(/Couldn’t analyze this cluster: Synthetic sponsored analysis outage/).waitFor();
+  assert.ok(aiProviderCalls.length >= 2, 'Both thinking and fast attempts reached the sponsored Worker provider');
+  assert.ok(aiProviderCalls.every((call) => call.failed));
+  failSponsoredAnalysis = false;
+  await analyze.click();
+  await page.getByText('Cluster 0: Shared infrastructure', { exact: true }).waitFor();
+  await page.getByText('The sponsored model described this group from its recorded votes.', { exact: true }).waitFor();
+  assert.equal(aiProviderCalls.at(-1).failed, false);
+  assert.equal(await page.getByText(/Couldn’t analyze this cluster/).count(), 0);
+  console.log('Polis group analysis used the sponsored Worker key and recovered from a provider failure.');
   const makeClient = (wallet) =>
     createWorkerClient({
       workerOrigin,
@@ -704,6 +743,7 @@ try {
           'fresh-context answer submission',
           'reload persistence',
           'participant Results UI',
+          'Polis sponsored group analysis, visible provider failure and successful retry without a personal key',
           'author and admin readback',
           'other-participant and anonymous denial',
           'encrypted storage',
@@ -720,6 +760,7 @@ try {
         ],
         securityPolicyViolations: securityPolicyRuns.flat(),
         walletWorkerUrls: [...walletWorkerUrls],
+        aiProviderCalls,
         responseUploads,
         lostReplyUploads,
         reloadRecoveryUploads,
