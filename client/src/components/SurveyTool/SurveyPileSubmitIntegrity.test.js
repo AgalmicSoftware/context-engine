@@ -1152,7 +1152,7 @@ describe('an answer held back for size', () => {
     expect(row.interviewProvenance?.source).toBeUndefined();
   });
 
-  it('keeps a withdrawal made in the interview window when the other edits upload', async () => {
+  it('keeps a withdrawal made in the interview window and leaves other edits pending', async () => {
     const h = await mountWithSavedConsent();
     const engine = () => h.engine();
     await act(async () => engine().handleAnswerPile(BINARY_QID, 'Yes'));
@@ -1177,9 +1177,11 @@ describe('an answer held back for size', () => {
     await settle();
 
     expect(outcome.status).toBe('failed');
-    expect(h.savedRows(BINARY_QID)).toHaveLength(1);
+    expect(h.savedRows(BINARY_QID)).toHaveLength(0);
     expect(consentOf(engine)).toEqual({ name: '', ai: false });
-    expect(Array.from(engine().getChangedQidsAndFields(0).changedQids)).toEqual([FREEFORM_QID]);
+    expect(Array.from(engine().getChangedQidsAndFields(0).changedQids).sort()).toEqual(
+      [BINARY_QID, FREEFORM_QID].sort(),
+    );
 
     const row = await submitShortened(h);
     expect(row.responderName).toBeUndefined();
@@ -1236,3 +1238,37 @@ it('keeps a late account A receipt out of account B and starts B with a new oper
   expect(operationB).not.toBe(operationA);
   expect(h.submitResponses.mock.calls[1][2][0].responder).toBe(nextAccount);
 });
+
+it.each([
+  ['interview with a manual draft', true, true, false],
+  ['interview after loading own answers', true, true, true],
+  ['interview without another draft', true, false, false],
+  ['ordinary Submit with both drafts', false, true, false],
+])(
+  '%s submits only its scope and preserves every unselected draft',
+  async (_label, interview, otherDraft, pendingOwnRead) => {
+    const h = await fixture();
+    if (!pendingOwnRead) await act(async () => h.sync());
+    await h.mount();
+    await act(async () => h.engine().handleAnswerPile(BINARY_QID, 'Yes'));
+    if (otherDraft) await act(async () => h.engine().handleAnswerPile(FREEFORM_QID, 'Unselected manual draft'));
+    await settle();
+    const untouched = JSON.parse(JSON.stringify(h.engine().state.surveysResponseState[0].answers[FREEFORM_QID]));
+    if (interview)
+      expect(await run(() => submitSessionInterviewResponses(h.engine(), [BINARY_QID]))).toEqual({
+        status: 'submitted',
+      });
+    else await h.click();
+    await settle();
+    expect(h.submitResponses).toHaveBeenCalledTimes(1);
+    expect(h.submitResponses.mock.calls[0][1].sort()).toEqual(
+      (!interview && otherDraft ? [BINARY_QID, FREEFORM_QID] : [BINARY_QID]).sort(),
+    );
+    expect(h.savedRows(FREEFORM_QID)).toHaveLength(!interview && otherDraft ? 1 : 0);
+    if (interview && otherDraft) {
+      expect(h.engine().state.surveysResponseState[0].answers[FREEFORM_QID]).toEqual(untouched);
+      expect(draftHolds(FREEFORM_QID)).toBe(true);
+      expect(Array.from(h.engine().getChangedQidsAndFields(0).changedQids)).toEqual([FREEFORM_QID]);
+    }
+  },
+);
