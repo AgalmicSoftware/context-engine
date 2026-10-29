@@ -698,6 +698,7 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
     expect(instance.ensureResolvedSessionConfigForSubmit).not.toHaveBeenCalled();
     expect(instance.resolveSessionChainId).toHaveBeenCalledWith(
       expect.objectContaining({ sessionModeProfile: sessionConfig.sessionModeProfile }),
+      expect.objectContaining({ account: instance.props.account }),
     );
     expect(fetchRegistry).not.toHaveBeenCalled();
     expect(addQuestions).not.toHaveBeenCalled();
