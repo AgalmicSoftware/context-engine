@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Persist and retry failed question-index ranges, and keep unread question payloads
+  incomplete until recovery succeeds.
+
 - Refresh expired registry question indexes even after their historical scan is
   complete, sharing concurrent background refreshes and preserving the indexed block.
 

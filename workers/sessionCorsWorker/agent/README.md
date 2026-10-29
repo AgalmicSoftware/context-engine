@@ -58,7 +58,10 @@ Registry question indexes retain their `indexedToBlock` watermark while an expir
 index refreshes in the background. A completed scan still refreshes after its
 five-minute TTL; a fresh completed index does not. Concurrent cached reads share
 one background refresh per session, revision and caller within an isolate.
-Unfinished scans continue separately from freshness checks.
+Unfinished scans continue separately from freshness checks. Failed log chunks are
+saved as merged `unresolvedRanges` and retried on each refresh, including after
+a restart. Index bounds alone do not imply completion: the whole session window
+must be covered, with no failed ranges or unread question payloads remaining.
 
 Question reads are bounded and paginated. Follow `nextCursor` until `hasMore`
 is false; cursors bind the caller, session, revision and current question set.

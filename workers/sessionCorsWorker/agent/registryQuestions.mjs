@@ -3,7 +3,7 @@ import { safeString, lower } from './runtimePrimitives.mjs';
 import { resolveRegistryRpcUrls } from './registrySessions.mjs';
 import { questionMemoryCache, STORAGE_BACKENDS, normalizeChainId, normalizeBlock, resolveQuestionStorageBackend, normalizeHexAddress } from './registryQuestionCore.mjs';
 import { resolveSurveysAddress, buildCloudflareQuestionStorageAuth, fetchSessionConfigForQuestions, currentBlockNumber, resolveScanWindow } from './registryQuestionSource.mjs';
-import { cacheTtlSeconds, foregroundChunks, sessionQuestionCacheKey, normalizeQuestionIndex, isFreshQuestionIndex, filterQuestionRecordsForSession, isPayloadUnavailableQuestion, hasPayloadUnavailableQuestions, scopedCachedIndexForReturn, cacheNeedsImmediateScopeRefresh, scheduleIndexRefresh, readKvQuestionIndex, writeKvQuestionIndex, questionIdFromRecord, mergeQuestionRecords } from './registryQuestionCache.mjs';
+import { cacheTtlSeconds, foregroundChunks, sessionQuestionCacheKey, normalizeQuestionIndex, isFreshQuestionIndex, filterQuestionRecordsForSession, isPayloadUnavailableQuestion, hasPayloadUnavailableQuestions, scopedCachedIndexForReturn, cacheNeedsImmediateScopeRefresh, scheduleIndexRefresh, readKvQuestionIndex, writeKvQuestionIndex, questionIdFromRecord, mergeQuestionRecords, mergeQuestionRanges, removeScannedQuestionRange } from './registryQuestionCache.mjs';
 import { fetchQuestionPayloads, scanQuestionRange, mergeScanSummaries } from './registryQuestionScanning.mjs';
 
 // Cached plaintext is never an authorization decision. Cloudflare payload
@@ -110,9 +110,8 @@ export async function refreshSessionQuestionIndex({
   let nextScanToBlock = previous?.nextScanToBlock;
   let complete = previous?.complete === true;
   let aggregateScan = previous?.scan || {};
-  let payloadFailureCount = Number(previous?.payloadFailureCount || 0) || 0;
+  let unresolvedRanges = previous?.unresolvedRanges || [];
   let skippedSessionMismatchCount = Number(previous?.skippedSessionMismatchCount || 0) || 0;
-  let partial = false;
 
   if (retryQuestionIds.length) {
     const retryPayloads = await fetchQuestionPayloads({
@@ -127,12 +126,8 @@ export async function refreshSessionQuestionIndex({
       env,
       fetchImpl,
     });
-    payloadFailureCount += retryPayloads.payloadFailureCount;
     skippedSessionMismatchCount += Number(retryPayloads.skippedSessionMismatchCount || 0) || 0;
-    const recoveredIds = new Set(retryPayloads.questions.map(questionIdFromRecord).filter(Boolean));
-    const stillUnavailable = retryUnavailableQuestions
-      .filter((question) => !recoveredIds.has(questionIdFromRecord(question)));
-    questions = mergeQuestionRecords(questions, [...retryPayloads.questions, ...stillUnavailable], 'append');
+    questions = mergeQuestionRecords(questions, retryPayloads.questions, 'append');
   }
 
   const ranges = [];
@@ -145,6 +140,7 @@ export async function refreshSessionQuestionIndex({
       label: 'delta',
     });
   }
+  ranges.push(...unresolvedRanges.map(range => ({ ...range, placement: 'append', label: 'retry' })));
   if (!hasCoverage) {
     ranges.push({
       fromBlock: scanWindow.fromBlock,
@@ -186,58 +182,35 @@ export async function refreshSessionQuestionIndex({
       fetchImpl,
     });
     questions = mergeQuestionRecords(questions, rangeResult.questions, range.placement);
-    payloadFailureCount += rangeResult.payloadFailureCount;
     skippedSessionMismatchCount += Number(rangeResult.skippedSessionMismatchCount || 0) || 0;
     aggregateScan = mergeScanSummaries(aggregateScan, rangeResult.scan);
+    // The bounds describe attempted coverage; saved gaps prevent it from
+    // becoming complete until every failed chunk has actually succeeded.
+    unresolvedRanges = mergeQuestionRanges([
+      ...removeScannedQuestionRange(unresolvedRanges, rangeResult.lowestScannedBlock, range.toBlock),
+      ...rangeResult.unresolvedRanges,
+    ]);
     if (rangeResult.lowestScannedBlock != null) {
-      if (range.placement === 'prepend') {
-        indexedToBlock = Math.max(indexedToBlock ?? rangeResult.lowestScannedBlock, range.toBlock);
-        indexedFromBlock = indexedFromBlock ?? rangeResult.lowestScannedBlock;
-      } else {
-        indexedToBlock = indexedToBlock ?? range.toBlock;
-        indexedFromBlock = indexedFromBlock == null
-          ? rangeResult.lowestScannedBlock
-          : Math.min(indexedFromBlock, rangeResult.lowestScannedBlock);
-      }
+      indexedToBlock = Math.max(indexedToBlock ?? range.toBlock, range.toBlock);
+      indexedFromBlock = Math.min(indexedFromBlock ?? rangeResult.lowestScannedBlock, rangeResult.lowestScannedBlock);
     }
     nextScanToBlock = rangeResult.nextScanToBlock;
-    if (rangeResult.nextScanToBlock != null) {
-      partial = true;
-      complete = false;
-      break;
-    }
-    if (rangeResult.completed !== true) {
-      partial = true;
-      complete = false;
-    }
+    if (nextScanToBlock != null) break;
   }
 
-  if (!ranges.length) {
-    complete = true;
-  } else if (!partial) {
-    complete = indexedFromBlock != null &&
-      indexedFromBlock <= scanWindow.fromBlock &&
-      (indexedToBlock ?? 0) >= scanWindow.toBlock &&
-      aggregateScan.chunksFailed === 0 &&
-      payloadFailureCount === 0;
-    nextScanToBlock = complete ? null : nextScanToBlock;
-  }
-
-  const hadReadFailures = Number(aggregateScan.chunksFailed || 0) > 0 || payloadFailureCount > 0;
+  const payloadFailureCount = questions.filter(isPayloadUnavailableQuestion).length;
+  complete = indexedFromBlock != null && indexedFromBlock <= scanWindow.fromBlock &&
+    indexedToBlock != null && indexedToBlock >= scanWindow.toBlock &&
+    nextScanToBlock == null && unresolvedRanges.length === 0 && payloadFailureCount === 0;
+  const hadReadFailures = unresolvedRanges.length > 0 || payloadFailureCount > 0;
   const ok = questions.length > 0 || !hadReadFailures;
   const reason = questions.length
-    ? complete
-      ? 'live_questions_indexed'
-      : 'live_questions_index_partial'
-    : !complete && !hadReadFailures
-        ? 'live_questions_indexing'
-        : Number(aggregateScan.chunksAttempted || 0) > 0 && Number(aggregateScan.chunksSucceeded || 0) === 0
-        ? 'question_log_scan_failed'
-        : Number(aggregateScan.chunksFailed || 0) > 0
-        ? 'question_log_scan_partial_failed'
-          : payloadFailureCount > 0
-            ? 'question_payload_load_failed'
-            : 'live_questions_empty';
+    ? complete ? 'live_questions_indexed' : 'live_questions_index_partial'
+    : !complete && !hadReadFailures ? 'live_questions_indexing'
+      : unresolvedRanges.length > 0
+        ? Number(aggregateScan.chunksSucceeded || 0) === 0 ? 'question_log_scan_failed' : 'question_log_scan_partial_failed'
+        : payloadFailureCount > 0 ? 'question_payload_load_failed' : 'live_questions_empty';
+
   const result = {
     ok,
     reason,
@@ -254,6 +227,7 @@ export async function refreshSessionQuestionIndex({
     targetFromBlock: scanWindow.fromBlock,
     targetToBlock: scanWindow.toBlock,
     nextScanToBlock,
+    unresolvedRanges,
     complete,
     scan: aggregateScan,
     discoveredCount: aggregateScan.ids?.length || 0,
@@ -262,10 +236,8 @@ export async function refreshSessionQuestionIndex({
     questionCount: questions.length,
     questions,
   };
-  if (ok) {
-    questionMemoryCache.set(key, result);
-    await writeKvQuestionIndex(env, key, result);
-  }
+  questionMemoryCache.set(key, result);
+  await writeKvQuestionIndex(env, key, result);
   return result;
 }
 

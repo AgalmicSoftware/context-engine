@@ -64186,10 +64186,9 @@ async function fetchQuestionPayloads({
       }).catch(() => null);
       if (isSkippedQuestionPayload(question)) {
         skippedSessionMismatchCount += 1;
-      } else if (question) {
-        results[index] = question;
       } else {
-        payloadFailureCount += 1;
+        results[index] = question || lockedQuestionPlaceholder({ questionId: id2, sessionSlug, pointerBackend });
+        if (isPayloadUnavailableQuestion(results[index])) payloadFailureCount += 1;
       }
     }
   });
@@ -64226,6 +64225,7 @@ async function scanQuestionRange({
     order: "newest_first"
   };
   const questions = [];
+  const unresolvedRanges = [];
   let payloadFailureCount = 0;
   let skippedSessionMismatchCount = 0;
   let lowestScannedBlock = null;
@@ -64238,7 +64238,8 @@ async function scanQuestionRange({
       payloadFailureCount,
       skippedSessionMismatchCount,
       lowestScannedBlock,
-      nextScanToBlock
+      nextScanToBlock,
+      unresolvedRanges
     };
   }
   const chunkSize = DEFAULT_LOG_CHUNK_SIZE;
@@ -64260,8 +64261,11 @@ async function scanQuestionRange({
     });
     if (!result.ok) {
       summary.chunksFailed += 1;
+      unresolvedRanges.push({ fromBlock: from, toBlock: to });
+      lowestScannedBlock = from;
       if (summary.errors.length < 3) summary.errors.push(result.error || "eth_getLogs failed");
       to = from - 1;
+      nextScanToBlock = to >= fromBlock ? to : null;
       continue;
     }
     summary.chunksSucceeded += 1;
@@ -64311,6 +64315,7 @@ async function scanQuestionRange({
       break;
     }
     to = from - 1;
+    nextScanToBlock = to >= fromBlock ? to : null;
     if (to >= fromBlock && summary.chunksAttempted >= maxChunkCount) {
       nextScanToBlock = to;
       break;
@@ -64323,7 +64328,8 @@ async function scanQuestionRange({
     payloadFailureCount,
     skippedSessionMismatchCount,
     lowestScannedBlock,
-    nextScanToBlock
+    nextScanToBlock,
+    unresolvedRanges
   };
 }
 function mergeScanSummaries(left = {}, right = {}) {
@@ -64453,9 +64459,8 @@ async function refreshSessionQuestionIndex({
   let nextScanToBlock = previous?.nextScanToBlock;
   let complete = previous?.complete === true;
   let aggregateScan = previous?.scan || {};
-  let payloadFailureCount = Number(previous?.payloadFailureCount || 0) || 0;
+  let unresolvedRanges = previous?.unresolvedRanges || [];
   let skippedSessionMismatchCount = Number(previous?.skippedSessionMismatchCount || 0) || 0;
-  let partial = false;
   if (retryQuestionIds.length) {
     const retryPayloads = await fetchQuestionPayloads({
       rpcUrls,
@@ -64469,11 +64474,8 @@ async function refreshSessionQuestionIndex({
       env,
       fetchImpl
     });
-    payloadFailureCount += retryPayloads.payloadFailureCount;
     skippedSessionMismatchCount += Number(retryPayloads.skippedSessionMismatchCount || 0) || 0;
-    const recoveredIds = new Set(retryPayloads.questions.map(questionIdFromRecord).filter(Boolean));
-    const stillUnavailable = retryUnavailableQuestions.filter((question) => !recoveredIds.has(questionIdFromRecord(question)));
-    questions = mergeQuestionRecords(questions, [...retryPayloads.questions, ...stillUnavailable], "append");
+    questions = mergeQuestionRecords(questions, retryPayloads.questions, "append");
   }
   const ranges = [];
   const hasCoverage = indexedFromBlock != null && indexedToBlock != null;
@@ -64485,6 +64487,7 @@ async function refreshSessionQuestionIndex({
       label: "delta"
     });
   }
+  ranges.push(...unresolvedRanges.map((range) => ({ ...range, placement: "append", label: "retry" })));
   if (!hasCoverage) {
     ranges.push({
       fromBlock: scanWindow.fromBlock,
@@ -64525,38 +64528,24 @@ async function refreshSessionQuestionIndex({
       fetchImpl
     });
     questions = mergeQuestionRecords(questions, rangeResult.questions, range.placement);
-    payloadFailureCount += rangeResult.payloadFailureCount;
     skippedSessionMismatchCount += Number(rangeResult.skippedSessionMismatchCount || 0) || 0;
     aggregateScan = mergeScanSummaries(aggregateScan, rangeResult.scan);
+    unresolvedRanges = mergeQuestionRanges([
+      ...removeScannedQuestionRange(unresolvedRanges, rangeResult.lowestScannedBlock, range.toBlock),
+      ...rangeResult.unresolvedRanges
+    ]);
     if (rangeResult.lowestScannedBlock != null) {
-      if (range.placement === "prepend") {
-        indexedToBlock = Math.max(indexedToBlock ?? rangeResult.lowestScannedBlock, range.toBlock);
-        indexedFromBlock = indexedFromBlock ?? rangeResult.lowestScannedBlock;
-      } else {
-        indexedToBlock = indexedToBlock ?? range.toBlock;
-        indexedFromBlock = indexedFromBlock == null ? rangeResult.lowestScannedBlock : Math.min(indexedFromBlock, rangeResult.lowestScannedBlock);
-      }
+      indexedToBlock = Math.max(indexedToBlock ?? range.toBlock, range.toBlock);
+      indexedFromBlock = Math.min(indexedFromBlock ?? rangeResult.lowestScannedBlock, rangeResult.lowestScannedBlock);
     }
     nextScanToBlock = rangeResult.nextScanToBlock;
-    if (rangeResult.nextScanToBlock != null) {
-      partial = true;
-      complete = false;
-      break;
-    }
-    if (rangeResult.completed !== true) {
-      partial = true;
-      complete = false;
-    }
+    if (nextScanToBlock != null) break;
   }
-  if (!ranges.length) {
-    complete = true;
-  } else if (!partial) {
-    complete = indexedFromBlock != null && indexedFromBlock <= scanWindow.fromBlock && (indexedToBlock ?? 0) >= scanWindow.toBlock && aggregateScan.chunksFailed === 0 && payloadFailureCount === 0;
-    nextScanToBlock = complete ? null : nextScanToBlock;
-  }
-  const hadReadFailures = Number(aggregateScan.chunksFailed || 0) > 0 || payloadFailureCount > 0;
+  const payloadFailureCount = questions.filter(isPayloadUnavailableQuestion).length;
+  complete = indexedFromBlock != null && indexedFromBlock <= scanWindow.fromBlock && indexedToBlock != null && indexedToBlock >= scanWindow.toBlock && nextScanToBlock == null && unresolvedRanges.length === 0 && payloadFailureCount === 0;
+  const hadReadFailures = unresolvedRanges.length > 0 || payloadFailureCount > 0;
   const ok = questions.length > 0 || !hadReadFailures;
-  const reason = questions.length ? complete ? "live_questions_indexed" : "live_questions_index_partial" : !complete && !hadReadFailures ? "live_questions_indexing" : Number(aggregateScan.chunksAttempted || 0) > 0 && Number(aggregateScan.chunksSucceeded || 0) === 0 ? "question_log_scan_failed" : Number(aggregateScan.chunksFailed || 0) > 0 ? "question_log_scan_partial_failed" : payloadFailureCount > 0 ? "question_payload_load_failed" : "live_questions_empty";
+  const reason = questions.length ? complete ? "live_questions_indexed" : "live_questions_index_partial" : !complete && !hadReadFailures ? "live_questions_indexing" : unresolvedRanges.length > 0 ? Number(aggregateScan.chunksSucceeded || 0) === 0 ? "question_log_scan_failed" : "question_log_scan_partial_failed" : payloadFailureCount > 0 ? "question_payload_load_failed" : "live_questions_empty";
   const result = {
     ok,
     reason,
@@ -64573,6 +64562,7 @@ async function refreshSessionQuestionIndex({
     targetFromBlock: scanWindow.fromBlock,
     targetToBlock: scanWindow.toBlock,
     nextScanToBlock,
+    unresolvedRanges,
     complete,
     scan: aggregateScan,
     discoveredCount: aggregateScan.ids?.length || 0,
@@ -64581,10 +64571,8 @@ async function refreshSessionQuestionIndex({
     questionCount: questions.length,
     questions
   };
-  if (ok) {
-    questionMemoryCache.set(key, result);
-    await writeKvQuestionIndex(env, key, result);
-  }
+  questionMemoryCache.set(key, result);
+  await writeKvQuestionIndex(env, key, result);
   return result;
 }
 async function listCachedSessionQuestions({
@@ -64670,6 +64658,29 @@ function sessionQuestionCacheKey(env, sessionSlug) {
   const { sessionId, revision, address: address2 } = env.AGENT_CONTEXT;
   return cacheKey(`${sessionId}:${revision}:${address2}:${lower2(sessionSlug)}`);
 }
+function mergeQuestionRanges(ranges = []) {
+  const sorted = ranges.map((range) => ({
+    fromBlock: normalizeBlock(range.fromBlock),
+    toBlock: normalizeBlock(range.toBlock)
+  })).filter((range) => range.fromBlock != null && range.toBlock != null && range.fromBlock <= range.toBlock).sort((a, b2) => a.fromBlock - b2.fromBlock);
+  const merged = [];
+  for (const range of sorted) {
+    const last = merged.at(-1);
+    if (last && range.fromBlock <= last.toBlock + 1) last.toBlock = Math.max(last.toBlock, range.toBlock);
+    else merged.push(range);
+  }
+  return merged;
+}
+function removeScannedQuestionRange(ranges, fromBlock, toBlock) {
+  if (fromBlock == null) return ranges;
+  return ranges.flatMap((range) => {
+    if (range.toBlock < fromBlock || range.fromBlock > toBlock) return [range];
+    return [
+      ...range.fromBlock < fromBlock ? [{ fromBlock: range.fromBlock, toBlock: fromBlock - 1 }] : [],
+      ...range.toBlock > toBlock ? [{ fromBlock: toBlock + 1, toBlock: range.toBlock }] : []
+    ];
+  });
+}
 function normalizeQuestionIndex(value = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   if (!Array.isArray(value.questions)) return null;
@@ -64689,6 +64700,7 @@ function normalizeQuestionIndex(value = {}) {
     targetFromBlock: normalizeBlock(value.targetFromBlock),
     targetToBlock: normalizeBlock(value.targetToBlock),
     nextScanToBlock: normalizeBlock(value.nextScanToBlock),
+    unresolvedRanges: mergeQuestionRanges(value.unresolvedRanges || []),
     complete: value.complete === true,
     cached: true
   };
