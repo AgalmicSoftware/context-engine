@@ -1,3 +1,4 @@
+import { mergeTranscriptOverlap } from './transcriptOverlap';
 export const DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS = 3 * 60 * 1000;
 export const LISTENING_MODE_QUERY_VALUE = 'listening';
 export const LISTENING_DRAFT_STORAGE_PREFIX = 'ce:listening-draft:';
@@ -41,52 +42,8 @@ const normalizeDraftSegment = (segment: Partial<RollingTranscriptSegment>): Roll
   };
 };
 
-const normalizeTranscriptTokens = (value: string) =>
-  String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-export const mergeRollingTranscriptText = (previous: string, next: string): string => {
-  const a = String(previous || '').trim();
-  const b = String(next || '').trim();
-  if (!a) return b;
-  if (!b) return a;
-
-  const left = normalizeTranscriptTokens(a);
-  const right = normalizeTranscriptTokens(b);
-  let bestOverlap = 0;
-  const maxOverlap = Math.min(left.length, right.length, 80);
-
-  for (let size = maxOverlap; size >= 1; size -= 1) {
-    let matches = true;
-    for (let i = 0; i < size; i += 1) {
-      if (left[left.length - size + i] !== right[i]) {
-        matches = false;
-        break;
-      }
-    }
-    if (matches) {
-      bestOverlap = size;
-      break;
-    }
-  }
-
-  if (bestOverlap > 0 && right.slice(0, bestOverlap).join(' ').length < 8) {
-    bestOverlap = 0;
-  }
-
-  let trimmedNext = b;
-  if (bestOverlap > 0) {
-    const leadingTokenPattern = new RegExp(`^(([\\s\\W]*\\w+[\\s\\W]*){${bestOverlap}})`);
-    trimmedNext = b.replace(leadingTokenPattern, '').trim();
-  }
-
-  if (!trimmedNext) return a;
-  return `${a}${/\s$/.test(a) ? '' : ' '}${trimmedNext}`.trim();
-};
+export const mergeRollingTranscriptText = (previous: string, next: string): string =>
+  mergeTranscriptOverlap(previous, next, 80);
 
 export const stitchRollingTranscriptSegments = (segments: RollingTranscriptSegment[] = []): string =>
   [...segments]

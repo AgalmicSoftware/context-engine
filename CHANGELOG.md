@@ -130,6 +130,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Preserve multilingual speech after overlapping audio chunks by trimming
+  only verified transcript offsets in both uploaded and rolling audio.
+
 - Try another document index after malformed GraphQL replies and retain the
   current document list when every endpoint fails.
 

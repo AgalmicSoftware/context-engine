@@ -403,7 +403,9 @@ only after the user clicks Record so microphone permission follows a user
 gesture. Capture requests echo cancellation, noise suppression, automatic gain
 control, and mono audio. A fresh `MediaRecorder` segment rotates every three
 minutes, and completed chunks are sent to the session Worker `/transcribe`
-route. Returned transcripts are stitched with overlap deduplication.
+route. Returned transcripts are stitched with overlap deduplication. Rolling
+and uploaded audio share Unicode letter/digit matching with original-text
+offsets, so trimming an overlap preserves new speech in every script.
 
 The visible transcript is collapsed by default. Generated questions are drafts
 rendered through the existing `CreateQuestionsAndSurveys` review surface and

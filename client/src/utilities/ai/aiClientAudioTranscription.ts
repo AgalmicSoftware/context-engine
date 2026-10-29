@@ -1,3 +1,4 @@
+import { mergeTranscriptOverlap } from '../audio/transcriptOverlap';
 import { createLogger } from '../logging.js';
 
 const audioLog = createLogger('ai');
@@ -182,51 +183,7 @@ const decodeAudioToMonoFloat32 = async (
   }
 };
 
-export const mergeTranscriptText = (prev: unknown, next: unknown): string => {
-  const a = String(prev || '').trim();
-  const b = String(next || '').trim();
-  if (!a) return b;
-  if (!b) return a;
-
-  const tokenize = (s: string): string[] =>
-    s
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-
-  const A = tokenize(a);
-  const B = tokenize(b);
-  let bestK = 0;
-  const maxK = Math.min(A.length, B.length);
-  for (let k = maxK; k >= 1; k -= 1) {
-    let ok = true;
-    for (let i = 0; i < k; i += 1) {
-      if (A[A.length - k + i] !== B[i]) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok) {
-      bestK = k;
-      break;
-    }
-  }
-
-  if (bestK > 0) {
-    const overlappedChars = B.slice(0, bestK).join(' ').length;
-    if (overlappedChars < 8) bestK = 0;
-  }
-
-  let bTrimmed = b;
-  if (bestK > 0) {
-    const re = new RegExp(`^(([\\s\\W]*\\w+[\\s\\W]*){${bestK}})`);
-    bTrimmed = b.replace(re, '');
-  }
-
-  return `${a}${a && bTrimmed && !/\s$/.test(a) ? ' ' : ''}${bTrimmed}`.trim();
-};
+export const mergeTranscriptText = (previous: unknown, next: unknown): string => mergeTranscriptOverlap(previous, next);
 
 export const splitAudioBlobToWavChunks = async (
   inputBlob: AudioBlobLike,
