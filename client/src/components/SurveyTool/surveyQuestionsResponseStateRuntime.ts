@@ -1,5 +1,5 @@
 import { isWorkerCanonicalSessionConfig } from '../../utilities/survey/workerResponseHydration';
-import { responseValuesEqual } from './responseValueEquality';
+import { responseValuesEqual, answerValueType, type ResponseValuesEqual } from './responseValueEquality';
 import type {
   SurveyQuestionsInstanceFields,
   SurveyQuestionsSetStateCallback,
@@ -64,6 +64,7 @@ export type SurveyQuestionsResponseStateDeps = {
   setResponseHydrationState: SetSurveyQuestionsState;
   drafts: { load: () => SurveyQuestionsLegacyValue; persist: () => void; clear: () => void };
   questionIds: { rendered: () => string[]; editTracking: () => Set<string>; hydration: () => string[] };
+  getQuestionById: (questionId: string) => { type?: unknown } | null | undefined;
   buildEmptyResponseFieldState: (questionId?: string, fieldKey?: string) => unknown;
   buildLocalCacheHydrationSignature: (surveyIndex: number, questionIds: string[]) => string;
   ensurePriorResponsesForRenderedIds: () => Promise<unknown>;
@@ -86,7 +87,7 @@ export type SurveyQuestionsResponseStateRuntime = {
   resetFormStateForAccountChange: (callback: SurveyQuestionsLegacyValue, persistCurrentIdentity?: boolean) => void;
   resolveDiffBaselineSlice: (allowLocalCache?: boolean) => SurveyQuestionsLegacyValue;
   syncViewAllQuestions: (options?: { restoreAll?: boolean }) => void;
-  valuesEqual: (a: unknown, b: unknown) => boolean;
+  valuesEqual: ResponseValuesEqual;
 };
 
 export const createSurveyQuestionsResponseStateRuntime = ({
@@ -101,6 +102,7 @@ export const createSurveyQuestionsResponseStateRuntime = ({
     editTracking: getEditTrackingQuestionIds,
     hydration: getHydrationQuestionIds,
   },
+  getQuestionById,
   buildEmptyResponseFieldState,
   buildLocalCacheHydrationSignature,
   ensurePriorResponsesForRenderedIds,
@@ -143,7 +145,12 @@ export const createSurveyQuestionsResponseStateRuntime = ({
     }
   };
 
-  const valuesEqual = (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) => responseValuesEqual(a, b, true);
+  const valuesEqual: ResponseValuesEqual = (a, b, questionId, field = 'answer') =>
+    responseValuesEqual(
+      a,
+      b,
+      field === 'answer' && questionId ? answerValueType(getQuestionById(questionId)?.type) : 'text',
+    );
 
   const computeModifiedQuestionsCount = (
     baselineSlice: SurveyQuestionsLegacyValue,
@@ -213,8 +220,8 @@ export const createSurveyQuestionsResponseStateRuntime = ({
       const cConv: SurveyQuestionsLegacyValue = pickNumber(currentSlice.conviction, qId);
 
       let changed: SurveyQuestionsLegacyValue = false;
-      if (!valuesEqual(bAns.value, cAns.value)) changed = true;
-      if (!valuesEqual(bAdd.value, cAdd.value)) changed = true;
+      if (!valuesEqual(bAns.value, cAns.value, qId, 'answer')) changed = true;
+      if (!valuesEqual(bAdd.value, cAdd.value, qId, 'additional')) changed = true;
       if (bImp !== cImp) changed = true;
       if (bConv !== cConv) changed = true;
       if (!!bAns.encrypted !== !!cAns.encrypted) changed = true;

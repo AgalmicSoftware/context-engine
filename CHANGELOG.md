@@ -130,6 +130,10 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Compare freeform answers and comments as exact text throughout editing,
+  dirty counts, submission differences and interview review; only rating
+  answers use numeric equivalence.
+
 - Keep loaded empty saved answers distinct from unknown baselines, so a newer
   saved clear drops older draft edits while incomplete loading preserves them.
 

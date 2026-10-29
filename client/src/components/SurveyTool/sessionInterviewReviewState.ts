@@ -1,5 +1,5 @@
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
-import { responseValuesEqual } from './responseValueEquality';
+import { responseValuesEqual, answerValueType } from './responseValueEquality';
 import { hasDraftValue } from './sessionInterviewModalState';
 import type { InterviewDraftResponse } from './sessionInterview';
 
@@ -13,17 +13,17 @@ const comparable = (value: unknown) =>
   Array.isArray(value) && value.every((item) => typeof item === 'string') ? [...value].sort() : value;
 
 /** Whether two answers to one question say the same thing, compared as the form compares answers. */
-export const sameInterviewAnswer = (left: unknown, right: unknown) =>
-  responseValuesEqual(comparable(left), comparable(right), true);
+export const sameInterviewAnswer = (left: unknown, right: unknown, questionKind?: unknown) =>
+  responseValuesEqual(comparable(left), comparable(right), answerValueType(questionKind));
 
 // New evidence overrules an answer only when it gives a different one. A locked ("*")
 // answer can't be compared, so it stands.
-export const overrulesSavedAnswer = (draftAnswer: unknown, answer: unknown) =>
-  answer !== '*' && !sameInterviewAnswer(draftAnswer, answer);
+export const overrulesSavedAnswer = (draftAnswer: unknown, answer: unknown, questionKind?: unknown) =>
+  answer !== '*' && !sameInterviewAnswer(draftAnswer, answer, questionKind);
 
 /** Whether submitting this answer would change an earlier one; a locked earlier answer might. */
-export const changesEarlierAnswer = (answer: unknown, earlier: unknown) =>
-  hasDraftValue(earlier) && (earlier === '*' || !sameInterviewAnswer(answer, earlier));
+export const changesEarlierAnswer = (answer: unknown, earlier: unknown, questionKind?: unknown) =>
+  hasDraftValue(earlier) && (earlier === '*' || !sameInterviewAnswer(answer, earlier, questionKind));
 
 // Which drafts join review. A question the person has already answered gets no new draft,
 // unless the person's own words in this interview (`ownEvidence`; an AI prefill's prediction
@@ -39,6 +39,7 @@ export function mergeInterviewReview(
   modelId: string = DEFAULT_AI_MODEL,
   savedComment: (id: string) => string = () => '',
   ownEvidence: (draft: InterviewDraftResponse) => boolean = () => false,
+  questionKind: (id: string) => unknown = () => 'freeform',
 ) {
   const drafts = new Map(previous.map((draft) => [draft.questionId, draft]));
   const nextEdited = { ...edited };
@@ -47,7 +48,13 @@ export function mergeInterviewReview(
   for (const incomingDraft of incoming) {
     const answer = drafts.has(incomingDraft.questionId) ? undefined : currentAnswer(incomingDraft.questionId);
     const answered = hasDraftValue(answer);
-    if (answered && !(ownEvidence(incomingDraft) && overrulesSavedAnswer(incomingDraft.answer, answer))) {
+    if (
+      answered &&
+      !(
+        ownEvidence(incomingDraft) &&
+        overrulesSavedAnswer(incomingDraft.answer, answer, questionKind(incomingDraft.questionId))
+      )
+    ) {
       leftOut.push(incomingDraft.questionId);
       continue;
     }

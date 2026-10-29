@@ -271,3 +271,8 @@ saved answer clears a field, restoration drops the older conflicting draft
 field. While saved answers are still loading, drafts remain intact. Drafts
 written against an empty answer that remains empty are preserved, as are
 consent withdrawals even when another draft field is stale.
+
+Response change detection uses the question's declared type. Freeform answers
+and comments compare as exact text, including leading zeros and large integer
+strings. Only rating answers compare numerically. Editing, pending counts,
+submission differences and interview review share this policy.

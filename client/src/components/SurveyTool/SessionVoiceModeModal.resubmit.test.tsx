@@ -80,14 +80,14 @@ const createPileEngine = () => {
     stateRef,
     updateSubmittedSinceLastEdit: () => false,
     utils: { keccak256: () => '0xhash', toUtf8Bytes: (value: string) => value },
-    valuesEqual: (a: unknown, b: unknown) => responseValuesEqual(a, b, true),
+    valuesEqual: (a: unknown, b: unknown) => responseValuesEqual(a, b),
   });
   const engine = {
     props: {},
     get state() {
       return stateRef.current;
     },
-    valuesEqual: (a: unknown, b: unknown) => responseValuesEqual(a, b, true),
+    valuesEqual: (a: unknown, b: unknown) => responseValuesEqual(a, b),
     handleAnswerPile: (questionId: string, answer: unknown, options?: object) =>
       runtime.handleAnswer(0, questionId, answer, options),
   } as unknown as PileViewModeEngine;

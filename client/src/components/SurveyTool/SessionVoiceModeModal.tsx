@@ -401,7 +401,12 @@ function SessionInterviewPanel({
       const kept = conflicts.filter(
         (draft) =>
           participantOwned(draft.questionId) ||
-          (ownEvidenceIdsRef.current.has(draft.questionId) && overrulesSavedAnswer(draft.answer, saved(draft))),
+          (ownEvidenceIdsRef.current.has(draft.questionId) &&
+            overrulesSavedAnswer(
+              draft.answer,
+              saved(draft),
+              questions.find((question) => question.id === draft.questionId)?.type,
+            )),
       );
       const dropped = conflicts.filter((draft) => !kept.includes(draft));
       dropDrafts(dropped.map((draft) => draft.questionId));
@@ -409,7 +414,13 @@ function SessionInterviewPanel({
       pendingSubmitActiveContextRef.current = '';
       setPendingSubmitAfterLogin(false);
       setStatus(
-        kept.some((draft) => changesEarlierAnswer(editedDrafts[draft.questionId]?.answer ?? draft.answer, saved(draft)))
+        kept.some((draft) =>
+          changesEarlierAnswer(
+            editedDrafts[draft.questionId]?.answer ?? draft.answer,
+            saved(draft),
+            questions.find((question) => question.id === draft.questionId)?.type,
+          ),
+        )
           ? 'Saved answers loaded. Check drafts that change an earlier answer, then submit.'
           : drafts.length > dropped.length || suggestedQuestions.length
             ? 'Review drafts'
@@ -417,7 +428,7 @@ function SessionInterviewPanel({
       );
       return true;
     },
-    [drafts, dropDrafts, editedDrafts, participantOwned, suggestedQuestions.length],
+    [drafts, dropDrafts, editedDrafts, participantOwned, questions, suggestedQuestions.length],
   );
   const ownAnswers = useInterviewSavedAnswers({
     load: onLoadSavedResponses,
@@ -694,7 +705,12 @@ function SessionInterviewPanel({
         const ownEvidence = (draft: InterviewDraftResponse) =>
           importedDrafts
             ? !hasAiPrefill
-            : !predicted.has(draft.questionId) || !sameInterviewAnswer(draft.answer, predicted.get(draft.questionId));
+            : !predicted.has(draft.questionId) ||
+              !sameInterviewAnswer(
+                draft.answer,
+                predicted.get(draft.questionId),
+                questions.find((question) => question.id === draft.questionId)?.type,
+              );
         const review = mergeInterviewReview(
           latest.drafts,
           latest.editedDrafts,
@@ -704,6 +720,7 @@ function SessionInterviewPanel({
           importedDrafts ? prefillPacket?.source.modelId : mappingModelId,
           (id) => responseCommentValue(existingResponsesRef.current, id),
           ownEvidence,
+          (id) => questions.find((question) => question.id === id)?.type,
         );
         for (const draft of mapped) {
           if (review.leftOut.includes(draft.questionId)) continue;

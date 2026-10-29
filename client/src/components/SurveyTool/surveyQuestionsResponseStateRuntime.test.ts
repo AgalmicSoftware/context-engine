@@ -62,6 +62,7 @@ const createDeps = ({
     editTracking: jest.fn(() => new Set<string>()),
     hydration: jest.fn(() => hydrationIds),
   },
+  getQuestionById: jest.fn(() => ({ type: 'rating' })),
   buildEmptyResponseFieldState: jest.fn(() => ({})),
   buildLocalCacheHydrationSignature: jest.fn(() => 'sig'),
   ensurePriorResponsesForRenderedIds: jest.fn(async () => undefined),
@@ -79,8 +80,8 @@ describe('surveyQuestionsResponseStateRuntime', () => {
       expect(runtime.valuesEqual(empty, 0)).toBe(false);
       expect(runtime.valuesEqual(0, empty)).toBe(false);
     }
-    expect(runtime.valuesEqual('0', 0)).toBe(true);
-    expect(runtime.valuesEqual('4', 4)).toBe(true);
+    expect(runtime.valuesEqual('0', 0, 'q1')).toBe(true);
+    expect(runtime.valuesEqual('4', 4, 'q1')).toBe(true);
     expect(runtime.valuesEqual(['a', 'b'], ['a', 'b'])).toBe(true);
     expect(runtime.valuesEqual(['a', 'b'], ['b', 'a'])).toBe(false);
   });

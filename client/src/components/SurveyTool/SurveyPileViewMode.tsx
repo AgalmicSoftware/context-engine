@@ -2169,7 +2169,7 @@ export const applySessionInterviewAnswer = async (engine: PileViewModeEngine, qu
     const current = readPlainRecord(
       engine.state.surveysResponseState?.[0]?.answers?.[normalizeQuestionIdKey(questionId)],
     ).value;
-    if (engine.valuesEqual(current, answer)) {
+    if (engine.valuesEqual(current, answer, questionId, 'answer')) {
       resolve();
       return;
     }
@@ -2423,7 +2423,12 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
         return (
           Object.hasOwn(saved?.answers || {}, id) &&
           (['answers', 'additionalComments', 'importance', 'conviction'] as const).every((field) =>
-            engine.valuesEqual(fieldValue(saved?.[field]?.[id]), fieldValue(current?.[field]?.[id])),
+            engine.valuesEqual(
+              fieldValue(saved?.[field]?.[id]),
+              fieldValue(current?.[field]?.[id]),
+              id,
+              field === 'answers' ? 'answer' : 'additional',
+            ),
           )
         );
       })

@@ -94,6 +94,7 @@ it('adds the person’s own differing answer and leaves out one that repeats the
     undefined,
     undefined,
     () => true,
+    (id) => (id === 'sameNumber' ? 'rating' : 'freeform'),
   );
   expect(result.drafts.map(({ questionId }) => questionId)).toEqual(['changed', 'changedVotes', 'open']);
   expect(result.selected).toEqual({ changed: true, changedVotes: true, open: true });
@@ -131,7 +132,7 @@ it('says when submitting an answer would change an earlier one', () => {
 
 it('compares answers the way the form does, and never against a locked answer', () => {
   expect(overrulesSavedAnswer('Disagree', 'Agree')).toBe(true);
-  expect(overrulesSavedAnswer(7, '7')).toBe(false);
+  expect(overrulesSavedAnswer(7, '7', 'rating')).toBe(false);
   expect(overrulesSavedAnswer(['Parks'], ['Parks', 'Transit'])).toBe(true);
   expect(overrulesSavedAnswer([1, -1], [1, -1])).toBe(false);
   // The same choices in another order are the same answer; votes are per option, so order counts.
@@ -184,4 +185,13 @@ it('treats an untouched empty comment as the AI draft without one', () => {
   );
   expect(result.edited.q1.additionalComments).toBe('New AI note');
   expect(result.edited.q1.userEditedFields).toBeUndefined();
+});
+
+test.each([
+  ['0', '00'],
+  ['01', '1'],
+  ['9007199254740992', '9007199254740993'],
+])('review keeps distinct freeform text %s and %s', (before, after) => {
+  expect(overrulesSavedAnswer(after, before)).toBe(true);
+  expect(changesEarlierAnswer(after, before)).toBe(true);
 });

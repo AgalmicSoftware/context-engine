@@ -92,7 +92,7 @@ const slice = ({
 }: Record<string, Record<string, unknown>> = {}) => ({ answers, additionalComments, importance, conviction });
 const diff: InterviewSavedAnswerDiffDeps = {
   normalizeQuestionIdKey: (questionId: string) => questionId.trim().toLowerCase(),
-  valuesEqual: (a: unknown, b: unknown) => responseValuesEqual(a, b, true),
+  valuesEqual: (a: unknown, b: unknown) => responseValuesEqual(a, b),
   getDefaultResponseEncryptionAudience: () => 'self',
   normalizeResponseEncryptionAudience: (audience: unknown) => audience,
   getDefaultResponseEncryptionAudienceForQid: () => 'self',

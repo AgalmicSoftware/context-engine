@@ -1,3 +1,4 @@
+import type { ResponseValuesEqual } from './responseValueEquality';
 import { createLazyPoseidonHasher } from '../../utilities/crypto/poseidonHasher.js';
 import type {
   SurveyQuestionsLegacyRecord,
@@ -429,7 +430,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     resolveFieldEncryptionGateId,
     scheduleJsonPreviewUpdate: () => scheduleJsonPreviewUpdate(),
     updateJsonPreview: () => updateJsonPreview(),
-    valuesEqual: (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) => valuesEqual(a, b),
+    valuesEqual: (...args: Parameters<ResponseValuesEqual>) => valuesEqual(...args),
   });
 
   const {
@@ -493,6 +494,7 @@ export const createSurveyQuestionsRuntimeMethods = (
       editTracking: () => getEditTrackingQuestionIds(),
       hydration: () => getHydrationQuestionIds(),
     },
+    getQuestionById,
     buildEmptyResponseFieldState,
     buildLocalCacheHydrationSignature,
     ensurePriorResponsesForRenderedIds,
