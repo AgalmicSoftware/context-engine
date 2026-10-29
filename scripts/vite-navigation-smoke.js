@@ -25,6 +25,8 @@ const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/session/new': ['Session Setup'],
   '/session/demo': ['Session'],
   '/session/pe4': ['Groups', 'Results'],
+  '/rxc-ra-test': ['Groups', 'Results'],
+  '/session/rxc-ra-test': ['Groups', 'Results'],
   '/admin': ['Session Admin'],
   '/about': ['Context Engine'],
   '/docs': ['Docs'],
@@ -90,9 +92,13 @@ function shouldInstallDemoWorkerFixture(baseUrl, route) {
     (isSessionSetupRoute(route) || String(route || '').startsWith('/session/demo'));
 }
 
-async function installLocalSmokeFixtureRoutes(page, baseUrl) {
+async function installLocalSmokeFixtureRoutes(page, baseUrl, route = '') {
   if (!isLocalSmokeBaseUrl(baseUrl)) return;
   const appOrigin = new URL(baseUrl).origin;
+  const pinnedSlug = 'rxc-ra-test';
+  const pinnedSession = demoSessions[pinnedSlug];
+  const pinnedOrigin = new URL(pinnedSession.corsWorkerUrl).origin;
+  const pinnedRoute = [`/${pinnedSlug}`, `/session/${pinnedSlug}`].includes(String(route).split(/[?#]/, 1)[0]);
   await page.addInitScript(() => {
     let serviceWorker;
     // Sandboxed report frames throw when this property is read.
@@ -107,6 +113,20 @@ async function installLocalSmokeFixtureRoutes(page, baseUrl) {
     const request = requestRoute.request();
     const url = new URL(request.url());
     if (url.origin === appOrigin) return requestRoute.continue();
+    if (pinnedRoute && request.method() === 'GET' && url.origin === pinnedOrigin) {
+      if (url.pathname === '/session-config' && url.searchParams.get('slug') === pinnedSlug) {
+        return requestRoute.fulfill({ json: {
+          ok: true, sessionSlug: pinnedSlug,
+          config: { ...pinnedSession, configRevision: 'local-navigation-smoke', sessionModeProfile: DEMO_READY_WORKER_CONFIG.sessionModeProfile },
+        } });
+      }
+      if (url.pathname === '/storage/list' && DEMO_STORAGE_LIST_FIXTURE_RESOURCES.has(url.searchParams.get('resource'))) {
+        return requestRoute.fulfill({ json: { items: [], listComplete: true } });
+      }
+      if (url.pathname === '/resource-presence' && !url.search) {
+        return requestRoute.fulfill({ json: { ok: true, interview: { ready: false } } });
+      }
+    }
     if (request.method() === 'GET' && request.url() === 'https://demo-worker-030226.agalmic.workers.dev/capabilities?slug=') {
       return requestRoute.fulfill({ json: { type: 'ce_worker_capabilities', version: 1, apiVersion: 1, bundle: null, features: [] } });
     }
@@ -441,7 +461,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
   const failedRequests = [];
   const badResponses = [];
 
-  await installLocalSmokeFixtureRoutes(page, baseUrl);
+  await installLocalSmokeFixtureRoutes(page, baseUrl, route);
 
   await installDemoWorkerFixtureRoutes(page, baseUrl, route);
   const securityPolicyViolations = isLocalSmokeBaseUrl(baseUrl)
