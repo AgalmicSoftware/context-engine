@@ -220,6 +220,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Sign each faucet payment once and resend the same bytes across RPC fallback.
+  Return the transaction hash on uncertain outcomes, including agent requests.
+
 - Cap Cloudflare upload metadata at 64 KiB with bounded tags so accepted records
   fit backup entries; legacy oversized export errors name the affected storage ID.
 

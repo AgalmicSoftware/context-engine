@@ -123,7 +123,8 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
       const response = await deps.faucet({ payload: { to: ctx.address }, secrets, config: ctx.config, slug: ctx.slug,
         requesterAddress: ctx.address, tokenHasFaucetScope: true, baseHeaders: {} });
       const body = await response.json();
-      return response.ok ? { ok: true, ...body } : { ok: false, reason: 'faucet_request_failed', status: response.status };
+      return response.ok ? { ok: true, ...body } : { ok: false, reason: 'faucet_request_failed', status: response.status,
+        ...(body.txHash ? { txHash: body.txHash } : {}) };
     },
     async uploadArweave(payload) {
       await current();
