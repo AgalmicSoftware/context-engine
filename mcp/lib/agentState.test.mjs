@@ -101,6 +101,57 @@ test('creates an owner-only key once and reloads the same address', async () => 
   }
 });
 
+test('concurrent first launches never read a partially written key', async (t) => {
+  const dir = await tempDir();
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  let release;
+  let started;
+  const paused = new Promise((resolve) => { release = resolve; });
+  const writing = new Promise((resolve) => { started = resolve; });
+  const writeFile = fs.writeFile.bind(fs);
+  let intercepted = false;
+  t.mock.method(fs, 'writeFile', async (file, body, options) => {
+    if (!intercepted && path.basename(file).startsWith('agent-key.json')) {
+      intercepted = true;
+      await writeFile(file, '', options);
+      started();
+      await paused;
+      return writeFile(file, body, { ...options, flag: 'w' });
+    }
+    return writeFile(file, body, options);
+  });
+  const first = loadOrCreateWallet(dir).catch((error) => error);
+  await writing;
+  let second;
+  try {
+    second = await loadOrCreateWallet(dir).catch((error) => error);
+  } finally {
+    release();
+  }
+  const result = await first;
+  assert.equal(second instanceof Error, false, second?.message);
+  assert.equal(result instanceof Error, false, result?.message);
+  assert.equal(result.wallet.address, second.wallet.address);
+  assert.equal([result.created, second.created].filter(Boolean).length, 1);
+  assert.deepEqual((await fs.readdir(dir)).sort(), ['agent-key.json', 'state.json']);
+});
+
+for (const code of ['EPERM', 'ENOTSUP', 'EXDEV']) test(`key creation retains an exclusive fallback when linking fails with ${code}`, async (t) => {
+  const dir = await tempDir();
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const link = t.mock.method(fs, 'link', async () => { throw Object.assign(new Error('links unavailable'), { code }); });
+  const keyPath = path.join(dir, 'agent-key.json');
+  const first = await loadOrCreateWallet(dir);
+  const saved = await fs.readFile(keyPath, 'utf8');
+  const second = await loadOrCreateWallet(dir);
+  assert.equal(link.mock.callCount(), 1);
+  assert.equal(first.created, true);
+  assert.equal(second.created, false);
+  assert.equal(second.wallet.address, first.wallet.address);
+  assert.equal(await fs.readFile(keyPath, 'utf8'), saved);
+  assert.deepEqual((await fs.readdir(dir)).sort(), ['agent-key.json', 'state.json']);
+});
+
 test('refuses a key file other users can read', { skip: process.platform === 'win32' }, async () => {
   const dir = await tempDir();
   await loadOrCreateWallet(dir);

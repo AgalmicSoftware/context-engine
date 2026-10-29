@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Publish complete MCP key files atomically on filesystems with hard links, so
+  concurrent first launches share one identity without reading a partial key.
+
 - Resolve default MCP registry links to the registered `general` session while
   continuing to reject mismatched session identities.
 
