@@ -1,3 +1,5 @@
+import { AI_PRESET_CONFIGS, AI_PROVIDERS } from './aiModelPresets';
+export { AI_PRESET_CONFIGS, AI_PROVIDERS } from './aiModelPresets';
 import { DEFAULT_AI_MODEL, DEFAULT_AI_MODELS } from '../../../../shared/aiDefaults.mjs';
 /**
  * @module aiSettings
@@ -54,10 +56,6 @@ type NormalizedAiSettings = UnknownRecord & {
   _sessionName?: string;
   _sessionConfigSource?: string;
 };
-type AiPresetConfig = {
-  provider: string;
-  models: Record<string, string>;
-};
 type AiSettingsEnvelopeMetadata = UnknownRecord & {
   encryptedAvailable?: boolean;
   legacyPlaintextDetected?: boolean;
@@ -106,14 +104,6 @@ const asProviderEntry = (value: unknown): NormalizedAiProviderSettings => normal
 const getErrorMessage = (error: unknown): string =>
   isRecord(error) && typeof error.message === 'string' ? error.message : toStr(error);
 
-export const AI_PROVIDERS = Object.freeze({
-  ANTHROPIC: 'anthropic',
-  OPENAI: 'openai',
-  OPENROUTER: 'openrouter',
-  CUSTOM: 'custom',
-  LOCAL: 'local',
-});
-
 export const AI_MODEL_TYPES = Object.freeze({
   FAST: 'fast',
   THINKING: 'thinking',
@@ -142,38 +132,6 @@ const DEFAULT_TRANSCRIPTION = Object.freeze({
 const DEFAULT_PROVIDER = Object.freeze({
   apiKey: '',
   encryptedApiKey: '',
-});
-
-export const AI_PRESET_CONFIGS: Record<string, AiPresetConfig> = Object.freeze({
-  [DEFAULT_AI_MODEL]: Object.freeze({ provider: AI_PROVIDERS.OPENAI, models: DEFAULT_AI_MODELS }),
-  'gpt-5': Object.freeze({
-    provider: AI_PROVIDERS.OPENAI,
-    models: Object.freeze({
-      fast: 'gpt-5',
-      thinking: 'gpt-5',
-    }),
-  }),
-  'gpt-4o': Object.freeze({
-    provider: AI_PROVIDERS.OPENAI,
-    models: Object.freeze({
-      fast: 'gpt-4o',
-      thinking: 'gpt-4o',
-    }),
-  }),
-  'claude-sonnet': Object.freeze({
-    provider: AI_PROVIDERS.ANTHROPIC,
-    models: Object.freeze({
-      fast: 'claude-sonnet-4-6',
-      thinking: 'claude-sonnet-4-6',
-    }),
-  }),
-  'claude-opus': Object.freeze({
-    provider: AI_PROVIDERS.ANTHROPIC,
-    models: Object.freeze({
-      fast: 'claude-opus-4-6',
-      thinking: 'claude-opus-4-6',
-    }),
-  }),
 });
 
 const PRELOGIN_PROVIDER_PRESETS: Record<string, string> = Object.freeze({

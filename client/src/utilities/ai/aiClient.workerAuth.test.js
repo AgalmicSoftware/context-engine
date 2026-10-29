@@ -240,6 +240,47 @@ describe('aiClient worker auth options', () => {
     expect(body.max_tokens).toBeUndefined();
   });
 
+  it('declares image support for every built-in preset', () => {
+    const { AI_PRESET_CONFIGS } = jest.requireActual('./aiSettings.js');
+    for (const preset of Object.values(AI_PRESET_CONFIGS)) expect(typeof preset.supportsImages).toBe('boolean');
+  });
+
+  const { AI_PRESET_CONFIGS: photoPresets } = jest.requireActual('./aiSettings.js');
+  const photoCases = [
+    ...Object.entries(photoPresets)
+      .filter(([, preset]) => preset.supportsImages)
+      .flatMap(([name, preset]) =>
+        Object.entries(preset.models).map(([mode, model]) => [name + ':' + mode, preset.provider, model]),
+      ),
+    ['custom family-first Claude', 'anthropic', 'claude-haiku-4-5'],
+    ['custom version-first Claude', 'anthropic', 'claude-3-5-sonnet'],
+    ['OpenRouter custom family-first Claude', 'openrouter', 'anthropic/claude-haiku-4-5'],
+    ['OpenRouter family-first Claude', 'openrouter', 'anthropic/claude-sonnet-4-6'],
+    ['OpenRouter version-first Claude', 'openrouter', 'anthropic/claude-3-5-sonnet'],
+  ];
+  it.each(photoCases)('carries the photo through the multimodal request for %s', async (_name, provider, model) => {
+    getEffectiveAiConfig.mockResolvedValue({ provider, model, apiKeySource: 'worker' });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example.test');
+    fetchWorkerWithAuth.mockResolvedValue({ ok: true, json: async () => ({ completion: 'Photo description' }) });
+    const result = await analyzePhotoForQuestionGeneration(
+      new File(['photo-bytes'], 'fixture.png', { type: 'image/png' }),
+      { sessionSlug: 'fixture' },
+    );
+    expect(result).toMatchObject({ provider, model, text: 'Photo description' });
+    const body = JSON.parse(fetchWorkerWithAuth.mock.calls[0][1].body);
+    expect(body).toMatchObject({ provider, model });
+    const content = body.messages[0].content;
+    const image = content.find((part) => ['image', 'image_url', 'input_image'].includes(part.type));
+    const encoded = btoa('photo-bytes');
+    if (provider === 'anthropic') {
+      expect(image).toEqual({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: encoded } });
+    } else if (result.requestFormat === 'openai-responses') {
+      expect(image).toEqual({ type: 'input_image', image_url: `data:image/png;base64,${encoded}` });
+    } else {
+      expect(image).toEqual({ type: 'image_url', image_url: { url: `data:image/png;base64,${encoded}` } });
+    }
+  });
+
   it('fails closed for photo analysis when the configured provider/model is not vision-capable', async () => {
     getEffectiveAiConfig.mockResolvedValue({
       provider: 'custom',
