@@ -365,6 +365,8 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Seed encrypted provisioned secrets in admin integration fixtures.
+
 - Align integration assertions with explicit General comparison links and scanned
   SBT mint totals.
 

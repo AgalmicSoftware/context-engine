@@ -3,7 +3,7 @@ import { webcrypto } from 'crypto';
 import sessionCorsWorker, {
   SessionWriteCoordinator,
 } from '../../workers/sessionCorsWorker/worker.js';
-import { getSessionSecrets } from '../../workers/sessionCorsWorker/sessionConfigSecretsStore.js';
+import { getSessionSecrets, putSessionSecrets } from '../../workers/sessionCorsWorker/sessionConfigSecretsStore.js';
 import {
   buildRpcFetchMock,
   createMemoryKv,
@@ -623,9 +623,9 @@ describe('sessionCorsWorker admin routes', () => {
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify({
         adminAddress: adminWallet.address,
       }),
-      [SESSION_SECRETS_KEY(sessionSlug)]: JSON.stringify(existingSecrets),
     });
     const env = createCoordinatorEnv(kv);
+    await putSessionSecrets(env, sessionSlug, existingSecrets);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
