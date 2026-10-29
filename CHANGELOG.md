@@ -138,6 +138,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Preserve edited questions and saved drafts on failed regeneration, asking before a usable replacement overwrites edits.
+
 - Count distinct demo personas separately from their modeled responses, omitting unknown persona counts.
 
 - Accept photo sources with the built-in Claude presets using explicit preset image capabilities.

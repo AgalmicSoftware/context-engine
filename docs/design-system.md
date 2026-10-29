@@ -558,6 +558,8 @@ minimum. The document library's separate file-upload support is unchanged.
 
 Photo generation sources use the image capability declared by each built-in AI preset. Custom Anthropic and OpenRouter Claude names accept both family-first (`claude-sonnet-4-6`) and version-first (`claude-3-5-sonnet`) forms. Unsupported models keep the existing vision-capability error before a request is sent.
 
+Generated-question editors stay mounted while regeneration runs. Failed or unusable generations preserve the edited questions, document links and saved drafts. Once usable replacement questions arrive, edited drafts require confirmation; cancelling keeps the current editor. Unedited drafts are replaced directly.
+
 ### Breakdown question selection
 
 Demo comparison cards count distinct personas separately from modeled responses. When persona counts are absent, they show only the response count.

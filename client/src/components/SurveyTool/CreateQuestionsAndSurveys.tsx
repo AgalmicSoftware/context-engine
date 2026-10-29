@@ -1,3 +1,4 @@
+import { createSurveyDraftContentKey } from './createSurveyDraftContent';
 import { suggestTagsForQuestion, invalidateQuestionTagRequest } from './createSurveyQuestionTagActions';
 /** @file CreateQuestionsAndSurveys.tsx */
 
@@ -502,6 +503,7 @@ interface CreateQuestionsAndSurveysProps {
   submitClassName?: string;
   miniaturized?: boolean;
   onUploadComplete?: (surveyHash: string | null) => void;
+  onDraftEditedChange?: (edited: boolean) => void;
   hideSurveyQuestionToggleUntilAuthoring?: boolean;
   [key: string]: unknown;
 }
@@ -688,6 +690,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   _promptRefs: Record<string, FocusablePromptElement | null> = {};
   _tagInputRefs: Record<string, FocusablePromptElement | null> = {};
   _lastSavedUnfinishedSurveyJson: string | null = null;
+  _initialDraftContent = '';
 
   constructor(props: CreateQuestionsAndSurveysProps) {
     super(props);
@@ -788,6 +791,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       nextState.docURLInput = '';
     }
     (this.state as CreateQuestionsAndSurveysState).questions = initialQuestions;
+    this._initialDraftContent = createSurveyDraftContentKey(this.state);
     this._copySuccessResetTimers = {
       copySurveyIdSuccess: null,
       copySurveyLinkSuccess: null,
@@ -1110,6 +1114,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   componentDidUpdate(prevProps: CreateQuestionsAndSurveysProps, prevState: CreateQuestionsAndSurveysState) {
+    this.props.onDraftEditedChange?.(createSurveyDraftContentKey(this.state) !== this._initialDraftContent);
     if (prevProps.account !== this.props.account) this.updateSurveyHash();
     const shouldAppendPreformedQuestions = this.props.interviewQuestionReview || this.props.appendPreformedQuestions;
     if (shouldAppendPreformedQuestions && prevProps.preformedQuestions !== this.props.preformedQuestions) {
