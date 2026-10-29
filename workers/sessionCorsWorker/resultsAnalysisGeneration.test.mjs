@@ -264,7 +264,7 @@ test('admin snapshots validate and label answers like the worker-canonical sourc
   assert.equal(source.ok, true);
   assert.deepEqual(
     source.snapshot.responses.map((row) => [row.questionId, row.answer]).sort(),
-    [['binary', 'Agree'], ['multi', 'Bus'], ['quadratic', 'A: +3; B: -4'], ['rating', '7']],
+    [['binary', 'Agree'], ['multi', ['Bus']], ['quadratic', 'A: +3; B: -4'], ['rating', '7']],
   );
   assert.equal(source.aiSnapshot.responses.find((row) => row.questionId === 'quadratic').answer, 'A: +3; B: -4');
   assert.equal(source.counts.excludedCount, 5);
@@ -396,7 +396,7 @@ test('public text that looks like a lock marker is analysed; only encryption fla
   assert.equal(source.ok, true);
   assert.deepEqual(
     source.snapshot.responses.map((row) => [row.questionId, row.answer, row.additional || '']).sort(),
-    [['q1', '***', ''], ['q1', 'Redacted', ''], ['q1', '[locked]', ''], ['q1', 'plain', '***'], ['q2', 'Locked', '']],
+    [['q1', '***', ''], ['q1', 'Redacted', ''], ['q1', '[locked]', ''], ['q1', 'plain', '***'], ['q2', ['Locked'], '']],
   );
   assert.deepEqual([source.counts.excludedCount, source.counts.lockedCount], [2, 0]);
 

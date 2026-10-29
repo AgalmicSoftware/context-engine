@@ -638,6 +638,10 @@ Admin test panel:
   such as polls, as text. Invalid answers are excluded even when accompanied by
   a comment; genuinely unanswered comment-only rows remain supported. This does
   not change opaque storage admission or the historical admin-snapshot format.
+- Normalized analysis snapshots keep multiple-choice answers as arrays of exact
+  option labels, including single-select answers. Breakdown counts those selections
+  directly; only model prose joins labels. Regenerate previously built snapshots
+  from their source responses; joined choice strings are not parsed into selections.
 - Every generated argument-map claim requires nonempty `participantIds` and
   `questionIds`. Whenever a generated record cites both arrays, every cited
   participant must have an included response to a cited question, and every

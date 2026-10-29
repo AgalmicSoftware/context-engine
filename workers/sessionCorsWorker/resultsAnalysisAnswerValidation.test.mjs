@@ -12,6 +12,7 @@ const config = {
   resultsAnalysis: { version: 1, generationMode: 'both', views: { breakdown: true }, autoAfter: { threshold: 2, unit: 'distinctParticipants' } },
 };
 const questions = [
+  { id: 'punctuated', type: 'multichoice', options: ['Workshop', 'Coaching', 'Workshop; Coaching'] },
   { id: 'rating', type: 'rating', scale: { min: 1, max: 10 } },
   { id: 'zero-rating', type: 'rating', scale: { min: 0, max: 100 } },
   { id: 'single', type: 'multichoice', options: ['A', 'B'], singleSelect: true },
@@ -92,7 +93,7 @@ test('empty choice without a comment is excluded, while a comment-only choice su
   const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config });
   assert.equal(source.counts.responseCount, 1);
   assert.equal(source.counts.excludedCount, 1);
-  assert.equal(source.snapshot.responses[0].answer, '');
+  assert.deepEqual(source.snapshot.responses[0].answer, []);
   assert.equal(source.snapshot.responses[0].additional, 'A relevant comment');
 });
 
@@ -138,4 +139,20 @@ test('canonical analysis publishes no rating for unrated answers and scales lega
       { answer: 'answer 3', importance: undefined, conviction: 4 },
     ],
   );
+});
+
+
+test('canonical multiple-choice selections stay distinct until prose formatting', async () => {
+  const env = await fixture([
+    ['punctuated', ['Workshop', 'Coaching'], ''],
+    ['punctuated', ['Workshop; Coaching'], ''],
+    ['single', 'A', ''],
+  ]);
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config });
+  assert.equal(source.ok, true);
+  assert.deepEqual(source.snapshot.responses.filter((row) => row.questionId === 'punctuated').map((row) => row.answer).sort(),
+    [['Workshop', 'Coaching'], ['Workshop; Coaching']].sort());
+  assert.deepEqual(source.snapshot.responses.find((row) => row.questionId === 'single').answer, ['A']);
+  assert.deepEqual(source.aiSnapshot.responses.filter((row) => row.questionId === 'punctuated').map((row) => row.answer),
+    ['Workshop; Coaching', 'Workshop; Coaching']);
 });

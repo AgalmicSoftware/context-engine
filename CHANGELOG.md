@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Preserve multiple-choice selections in generated results so options containing semicolons count correctly.
+
 ### Arweave
 
 - Use one forced-refresh option across payload caches and in-flight requests.

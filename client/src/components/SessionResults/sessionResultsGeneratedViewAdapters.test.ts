@@ -127,10 +127,10 @@ describe('sessionResultsGeneratedViewAdapters', () => {
         { id: 'q4', prompt: 'Allocate', type: 'quadratic', options: ['A', 'B'] },
       ],
       responses: [
-        { questionId: 'q1', participantId: 'participant_001', answer: 'A' },
-        { questionId: 'q1', participantId: 'participant_002', answer: 'A; B' },
-        { questionId: 'q1', participantId: 'participant_003', answer: 'B' },
-        { questionId: 'q2', participantId: 'participant_001', answer: 'Alpha; Beta; Gamma' },
+        { questionId: 'q1', participantId: 'participant_001', answer: ['A'] },
+        { questionId: 'q1', participantId: 'participant_002', answer: ['A', 'B'] },
+        { questionId: 'q1', participantId: 'participant_003', answer: ['B'] },
+        { questionId: 'q2', participantId: 'participant_001', answer: ['Alpha; Beta', 'Gamma'] },
         { questionId: 'q3', participantId: 'participant_001', answer: 'Some written answer' },
         { questionId: 'q4', participantId: 'participant_001', answer: 'A: +3; B: -1' },
       ],
@@ -155,6 +155,35 @@ describe('sessionResultsGeneratedViewAdapters', () => {
         responses: [{ questionId: 'q3', participantId: 'participant_001', answer: 'Text' }],
       }).unavailableReason,
     ).toBe('Breakdown charts binary, rating, and multiple-choice questions only.');
+  });
+
+  it('counts exact selections when an option contains the selection separator', () => {
+    const result = buildGeneratedBreakdownAnalysisData({
+      questions: [
+        {
+          id: 'q1',
+          prompt: 'Pick services',
+          type: 'multichoice',
+          options: ['Workshop', 'Coaching', 'Workshop; Coaching'],
+        },
+      ],
+      responses: [
+        { questionId: 'q1', participantId: 'p1', answer: ['Workshop', 'Coaching'] },
+        { questionId: 'q1', participantId: 'p2', answer: ['Workshop; Coaching'] },
+      ],
+    });
+    expect(
+      result.analysisData?.flatResponses.map(({ responseText, count, participantCount, rate }) => [
+        responseText,
+        count,
+        participantCount,
+        rate,
+      ]),
+    ).toEqual([
+      ['Workshop', 1, 2, 0.5],
+      ['Coaching', 1, 2, 0.5],
+      ['Workshop; Coaching', 1, 2, 0.5],
+    ]);
   });
 
   it('rejects generated atlas graphs that would render recursively', () => {

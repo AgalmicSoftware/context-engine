@@ -26,14 +26,14 @@ export const formatValidAnalysisAnswer = (raw, question) => {
     }
     case 'multichoice': {
       const values = Array.isArray(value) ? value : [value];
-      if (!values.length) return '';
+      if (!values.length) return [];
       if (values.some((entry) => typeof entry !== 'string' || !entry.trim())) return null;
       const options = question.options || [];
       const selected = values.map((entry) => options.find((option) => option.toLowerCase() === entry.trim().toLowerCase()));
       if (selected.some((entry) => !entry)) return null;
       const unique = [...new Set(selected)];
       const limit = question.singleSelect ? 1 : question.maxSelections || options.length;
-      return unique.length <= limit ? unique.join('; ') : null;
+      return unique.length <= limit ? unique : null;
     }
     case 'quadratic':
       return validateQuadraticAllocation(value, question) ? null : formatQuadraticAllocation(value, question.options);
