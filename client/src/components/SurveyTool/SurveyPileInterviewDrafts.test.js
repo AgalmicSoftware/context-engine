@@ -312,7 +312,7 @@ it('keeps an unsaved pile comment when the AI proposes no comment', async () => 
 
 it('treats an unsaved pile answer as answered, so the interview leaves its draft out', async () => {
   const upload = mockSession();
-  await mountWithInterview(
+  const pile = await mountWithInterview(
     packet([
       { questionId: 'q1', answer: 'Agree', confidence: 0.8 },
       { questionId: 'q3', answer: 'Agree', confidence: 0.8 },
@@ -327,11 +327,15 @@ it('treats an unsaved pile answer as answered, so the interview leaves its draft
     'Left out 1 draft for a question you’ve already answered.',
   );
   await submitDrafts();
-  // The page answer goes up as the person typed it, not replaced by the AI's draft.
-  expect(uploadedRows(upload, 0)).toEqual([
-    ['q1', 'Disagree'],
-    ['q3', 'Agree'],
-  ]);
+  // Only the selected interview draft is uploaded; the page answer stays pending.
+  expect(uploadedRows(upload, 0)).toEqual([['q3', 'Agree']]);
+  expect(pile.engine().state.surveysResponseState[0].answers.q1.value).toBe('Disagree');
+  expect(pile.engine().getPendingEditStats().total).toBe(1);
+  await act(async () => {
+    await pile.engine().handlePileSubmitClick();
+  });
+  expect(uploadedRows(upload, 1)).toEqual([['q1', 'Disagree']]);
+  expect(pile.engine().getPendingEditStats().total).toBe(0);
 });
 
 it('names every submitted response once the saved name box is ticked', async () => {
