@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Include catalog completeness in the interview compatibility fixture.
+
 - Complete mocked Lit provisioning checkpoints before testing atomic configuration writes.
 
 - Give upload-diagnostics fixtures the durable storage targets required by receipts.
