@@ -365,6 +365,9 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Align integration assertions with explicit General comparison links and scanned
+  SBT mint totals.
+
 - Keep the analysis session-switch regression mock compatible with typed Jest.
 
 - Preserve the Session Worker's isolated dependencies in public replay checks.

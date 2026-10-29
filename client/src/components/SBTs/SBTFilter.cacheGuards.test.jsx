@@ -247,7 +247,7 @@ describe('SBTFilter holder cache guards', () => {
               burnedAddresses: [],
               mintedCountByAddress: { '0xa': 1 },
               burnedCountByAddress: {},
-              mintedEventCount: 0,
+              mintedEventCount: 1,
               burnedEventCount: 0,
               blockNumber: 99,
               countsLoaded: true,
