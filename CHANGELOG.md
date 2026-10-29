@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Allow completed benchmark runs at different repeat depths to share a report while preserving their seeds and strict resume checks.
+
 - Preserve multiple-choice selections in generated results so options containing semicolons count correctly.
 
 ### Arweave

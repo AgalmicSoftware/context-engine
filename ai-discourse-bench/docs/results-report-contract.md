@@ -500,7 +500,9 @@ backdrop, a copyable deep link, clickable tags, benchmark metrics, collapsible
 analysis, and linked question rows. Each question row shows the participant-level
 Agree, Unsure, and Disagree counts with a stacked model-vote bar, preserving the
 one-model-one-vote report aggregation even when models have different repeat
-counts. Questions are expanded by default; generated analysis sections appear
+counts. Report composition permits different source schedule seeds and repeat
+depths while retaining each source manifest unchanged; resume compatibility still
+requires the exact schedule and request contract. Questions are expanded by default; generated analysis sections appear
 only when the overlay provides content, with no empty analysis placeholder. The
 overview must list the models with valid answers without attaching per-model
 coverage or average-score summaries. Aggregate values pair with plain-language

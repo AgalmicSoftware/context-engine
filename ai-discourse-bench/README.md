@@ -375,6 +375,12 @@ integer and the step is 1. Other grids state the step and origin explicitly.
 The command has the same retry, concurrency, checkpoint and `--resume`
 behavior as stance runs; `--seed` fixes the option orders.
 
+Completed stance runs can be combined with `build-report --runs file1.json,file2.json`
+when the bank, prompt template, harness, mode, and persona identity agree.
+Different repeat depths and schedule seeds are allowed, and every source manifest
+keeps its recorded seed and repeat count. Resuming a run is stricter: changed
+schedule or request contracts cause saved rows to be rerun, never reused.
+
 ## Compare Models With People
 
 `compare-answers` reads an `answer` file and the same session's Results export,
