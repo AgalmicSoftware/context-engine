@@ -139,6 +139,12 @@ available at unlock time.
    when browser storage is available.
 6. The app initializes the worker-held soft session.
 
+In `encrypted-private-key` compatibility mode, Create refuses before opening a
+passkey prompt if this browser already stores an encrypted wallet for the RP ID.
+Sign in to that wallet, or explicitly delete it before creating another. This
+protects its only stored key even when a different authenticator is selected.
+Passkey-derived creation remains available because its key can be re-derived.
+
 While registration is pending, the account modal labels the operation
 `creating passkey...` so it is distinguishable from the separate sign-in flow.
 

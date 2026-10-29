@@ -85,6 +85,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Refuse encrypted-key wallet creation when a wallet is already saved for this
+  RP ID, preserving its recovery key before any new passkey prompt.
+
 - Cancel pending passkey creation, unlocks, and signing on logout or deletion.
   Late replies cannot restore the signer or connected metadata; expiry still
   permits one signature re-unlock.
