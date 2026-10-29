@@ -77,6 +77,12 @@ const WorkerParticipantGroupCreatePanel = ({
     if (!tagsEditedRef.current) setTags(defaultTags);
   }, [defaultTags]);
 
+  useEffect(() => {
+    requestIdRef.current += 1;
+    setBusy(false);
+    setStatus('');
+  }, [requestTargetKey]);
+
   const createGroup = async (preparedImageUrl?: string) => {
     const nextLabel = label.trim();
     if (!nextLabel) {
