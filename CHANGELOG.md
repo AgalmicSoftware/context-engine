@@ -399,6 +399,9 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Repair incomplete checkpoint tails and missing final newlines before any
+  benchmark resume appends new records; reject corrupt middle lines.
+
 - Bind importance resume to its recorded endpoint and reject mixed endpoints
   using the deployment identity check shared with stance runs.
 

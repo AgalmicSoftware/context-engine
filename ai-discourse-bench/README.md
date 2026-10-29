@@ -144,7 +144,10 @@ node ./bin/ai-discourse-bench.mjs run \
 If your local server requires a key, set `AIDB_LOCAL_API_KEY`.
 The runner writes a JSONL checkpoint beside the output. Re-run the same command
 with `--resume` after an interruption; deterministic run ids prevent completed
-model/question/polarity/repeat cells from being launched again.
+model/question/polarity/repeat cells from being launched again. All resume commands
+repair an incomplete final JSONL record before appending, or add a missing newline
+after a complete final record. Corrupt middle lines stop resume without changing
+the checkpoint.
 
 `data/model-roster.local-environment.json` records the five local model
 participants used by the checked-in development preview, including quantization

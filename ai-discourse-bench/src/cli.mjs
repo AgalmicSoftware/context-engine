@@ -6,7 +6,7 @@ import {
   writeJsonFile,
   writeTextFile,
 } from './io.mjs';
-import { createCheckpointWriter, readCheckpointRuns } from './checkpoint.mjs';
+import { openCheckpoint } from './checkpoint.mjs';
 import { renderHtmlReport } from './render-html.mjs';
 import { buildContextEnginePolisExport } from './ce-export.mjs';
 import { attachAnalysisOverlay, buildSecondPassAnalysisInput } from './analysis-export.mjs';
@@ -146,9 +146,8 @@ const commandRun = async (args) => {
   const inputs = await readInputs(args, { personasOptional: mode !== 'persona' });
   const checkpointPath = args.checkpoint || `${args.out}.jsonl`;
   const priorOutput = args.resume ? await readJsonFileIfExists(args.out, { runs: [] }) : { runs: [] };
-  const checkpointRuns = args.resume ? await readCheckpointRuns(checkpointPath) : [];
+  const { runs: checkpointRuns, write: checkpointWriter } = await openCheckpoint(checkpointPath, { resume: !!args.resume });
   const existingRuns = [...(priorOutput?.runs || []), ...checkpointRuns];
-  const checkpointWriter = await createCheckpointWriter(checkpointPath, { reset: !args.resume });
   const result = await runBenchmark({
     ...inputs,
     providerOverride: provider,
@@ -204,8 +203,7 @@ const commandAnswer = async (args) => {
   const modelRoster = mergeModelRosters(modelRosters);
   const checkpointPath = args.checkpoint || `${args.out}.jsonl`;
   const priorOutput = args.resume ? await readJsonFileIfExists(args.out, { rows: [] }) : { rows: [] };
-  const checkpointRows = args.resume ? await readCheckpointRuns(checkpointPath) : [];
-  const checkpointWriter = await createCheckpointWriter(checkpointPath, { reset: !args.resume });
+  const { runs: checkpointRows, write: checkpointWriter } = await openCheckpoint(checkpointPath, { resume: !!args.resume });
   const result = await runAnswerSet({
     questionSet,
     modelRoster,
@@ -264,8 +262,7 @@ const commandRunImportance = async (args) => {
   const inputs = await readInputs(args);
   const checkpointPath = args.checkpoint || `${args.out}.jsonl`;
   const priorOutput = args.resume ? await readJsonFileIfExists(args.out, { runs: [] }) : { runs: [] };
-  const checkpointRuns = args.resume ? await readCheckpointRuns(checkpointPath) : [];
-  const checkpointWriter = await createCheckpointWriter(checkpointPath, { reset: !args.resume });
+  const { runs: checkpointRuns, write: checkpointWriter } = await openCheckpoint(checkpointPath, { resume: !!args.resume });
   const result = await runImportanceBenchmark({
     questionBank: inputs.questionBank,
     modelRoster: inputs.modelRoster,
