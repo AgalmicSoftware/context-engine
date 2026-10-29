@@ -22,7 +22,7 @@ const shouldFail = (counterMap = {}, key = '') => {
 };
 
 const waitForCondition = async (predicate, label = 'condition') => {
-  for (let i = 0; i < 20; i += 1) {
+  for (let i = 0; i < 100; i += 1) {
     if (predicate()) return;
     await Promise.resolve();
   }
@@ -536,6 +536,110 @@ describe('cacheScripts', () => {
         }),
       ]),
     );
+  });
+
+  it('clears all namespace stores while preserving other namespaces', async () => {
+    const { cacheScripts, idbState } = loadCacheScripts();
+    await cacheScripts.writeCache('questionsCache', 'clear-healthy', { old: true });
+    await cacheScripts.writeCache('surveysCache', 'keep', { keep: true });
+    localStorage.setItem('dg:questionsCache:hidden-local', JSON.stringify({ old: true }));
+    idbState.set('dg:questionsCache:hidden-idb', { old: true });
+    await expect(cacheScripts.clearCacheNamespace('questionsCache')).resolves.toBe(true);
+    expect(cacheScripts.listNamespaceEntriesSync('questionsCache')).toEqual([]);
+    expect([...idbState.keys()].some((key) => key.startsWith('dg:questionsCache:'))).toBe(false);
+    expect(localStorage.getItem('dg:questionsCache:hidden-local')).toBeNull();
+    expect(await cacheScripts.readCache('surveysCache', 'keep')).toEqual({ keep: true });
+  });
+
+  it('does not retry a pre-clear write into the new cache generation', async () => {
+    const { cacheScripts, idb, idbState } = loadCacheScripts();
+    await cacheScripts.initCacheManager();
+    const baseSet = idb.set.getMockImplementation();
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    let started = false;
+    idb.set.mockImplementation(async (...args) => {
+      if (args[0] === 'dg:questionsCache:pending-clear') {
+        started = true;
+        await gate;
+      }
+      return baseSet(...args);
+    });
+    const pending = cacheScripts.writeCache('questionsCache', 'pending-clear', { old: true });
+    await waitForCondition(() => started, 'write start');
+    await cacheScripts.clearCacheNamespace('questionsCache');
+    release();
+    await expect(pending).resolves.toBe(false);
+    expect(await cacheScripts.readCache('questionsCache', 'pending-clear')).toBeNull();
+    expect([...idbState.keys()].some((key) => key.startsWith('dg:questionsCache:'))).toBe(false);
+  });
+
+  it('keeps all cleared namespaces empty when IndexedDB recovers', async () => {
+    const namespaces = ['questionsCache', 'surveysCache', 'bookmarksCache'];
+    const { cacheScripts, idb, idbState } = loadCacheScripts();
+    for (const namespace of namespaces) {
+      await cacheScripts.writeCache(namespace, 'clear-outage', { old: true });
+    }
+    const baseDel = idb.del.getMockImplementation();
+    idb.del.mockImplementation(async () => {
+      throw new Error('IDB offline');
+    });
+    for (const namespace of namespaces) {
+      await expect(cacheScripts.clearCacheNamespace(namespace)).resolves.toBe(false);
+      expect(cacheScripts.peekCacheSync(namespace, 'clear-outage')).toBeNull();
+    }
+    idb.del.mockImplementation(baseDel);
+    for (const namespace of namespaces) {
+      expect(await cacheScripts.readCache(namespace, 'clear-outage')).toBeNull();
+      expect(cacheScripts.listNamespaceEntriesSync(namespace)).toEqual([]);
+      expect(idbState.has(`dg:${namespace}:clear-outage`)).toBe(false);
+    }
+    await expect(cacheScripts.writeCache('questionsCache', 'clear-outage', { fresh: true })).resolves.toBe(true);
+    expect(await cacheScripts.readCache('questionsCache', 'clear-outage')).toEqual({ fresh: true });
+  });
+
+  it('clears IDB-only entries after an outage hides them from the mirror', async () => {
+    const { cacheScripts, idb, idbState } = loadCacheScripts({ failProbe: true });
+    idbState.set('dg:questionsCache:hidden', { stale: true });
+    await cacheScripts.initCacheManager();
+    await expect(cacheScripts.clearCacheNamespace('questionsCache')).resolves.toBe(false);
+    const baseSet = idb.set.getMockImplementation();
+    idb.set.mockImplementation(async (key, value, store) => {
+      if (key === '__dg_cache_probe__') return;
+      return baseSet(key, value, store);
+    });
+    expect(await cacheScripts.readCache('questionsCache', 'hidden')).toBeNull();
+    expect(idbState.has('dg:questionsCache:hidden')).toBe(false);
+  });
+
+  it('reports a failed local deletion even when the IndexedDB delete succeeds', async () => {
+    const { cacheScripts } = loadCacheScripts();
+    await cacheScripts.writeCache('questionsCache', 'clear-local-failure', { old: true });
+    localStorage.setItem('dg:questionsCache:clear-local-failure', JSON.stringify({ old: true }));
+    const remove = jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage locked');
+    });
+    try {
+      await expect(cacheScripts.removeCache('questionsCache', 'clear-local-failure')).resolves.toBe(false);
+    } finally {
+      remove.mockRestore();
+    }
+  });
+
+  it('reports a generation marker failure without claiming the namespace was cleared', async () => {
+    const { cacheScripts } = loadCacheScripts();
+    await cacheScripts.writeCache('questionsCache', 'clear-marker-failure', { old: true });
+    const set = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage locked');
+    });
+    try {
+      await expect(cacheScripts.clearCacheNamespace('questionsCache')).resolves.toBe(false);
+      expect(await cacheScripts.readCache('questionsCache', 'clear-marker-failure')).toEqual({ old: true });
+    } finally {
+      set.mockRestore();
+    }
   });
 
   it('retries transient IDB failures once and keeps IDB active', async () => {

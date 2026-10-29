@@ -136,6 +136,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep cleared cache namespaces empty after storage recovery and report incomplete clears without reloading.
+
 - Limit interview submissions to selected changed answers through validation,
   encryption, upload and draft cleanup; leave unselected manual drafts intact.
 

@@ -83,7 +83,7 @@ import {
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
-import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../utilities/cache/cacheScripts.js';
+import { clearCacheNamespace, initCacheManager } from '../../utilities/cache/cacheScripts.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import {
   derivePrimarySessionSlugFromList,
@@ -1101,14 +1101,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const managedNamespaces = ['questionsCache', 'surveysCache', 'bookmarksCache', 'filters', 'sbtCache', 'userCache'];
     try {
       await initCacheManager();
-      for (const namespace of managedNamespaces) {
-        const entries = listNamespaceEntriesSync(namespace, { cloneValues: false });
-        const slugs: any = new Set(entries.map((entry: any) => String(entry?.slug || '')).filter((slug: any) => slug));
-        await Promise.all(Array.from(slugs).map((slug: any) => removeCache(namespace, slug)));
-        await removeCache(namespace, '');
-      }
+      const results = await Promise.all(managedNamespaces.map((namespace) => clearCacheNamespace(namespace)));
+      if (results.some((cleared) => !cleared)) throw new Error('A cache store could not be cleared');
     } catch (error) {
       accountLog.warn('[LoginAndSettingsModal] Failed to clear managed caches:', error);
+      this._cacheClearInFlight = false;
+      window.alert('Could not completely clear caches. Please try again when browser storage is available.');
+      return;
     }
     try {
       localStorage.removeItem('cacheHasLoaded');
@@ -1127,6 +1126,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       }
     } catch (e) {
       accountLog.warn('LoginAndSettingsModal: fallback', e);
+      this._cacheClearInFlight = false;
+      window.alert('Could not completely clear caches. Please try again when browser storage is available.');
+      return;
     }
     this._cacheClearInFlight = false;
     this.reloadPage();
