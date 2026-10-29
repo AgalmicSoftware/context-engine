@@ -2529,6 +2529,12 @@ const renderBreakdown = (report) => {
     className: 'aidb-demo-analysis-pane',
     bodyClassName: 'graphSection aidb-breakdown-section',
     body: `<div class="workspace demoAnalysisWorkspace aidb-breakdown-workspace" data-testid="demo-analysis-workspace" data-ce-demo-analysis-workspace>
+      <section class="panel demoPanel questionSelectorPanel">
+        <label for="ce-breakdown-question" class="panelTitle">Question</label>
+        <select id="ce-breakdown-question" data-testid="ce-breakdown-question-select" class="questionSelect" data-ce-breakdown-question-select>
+          ${getQuestions(report).map((question) => `<option value="${escapeHtml(question.id)}"${question.id === selectedQuestion?.id ? ' selected' : ''}>${escapeHtml(question.prompt || question.id)}</option>`).join('')}
+        </select>
+      </section>
       <section class="panel demoPanel filterPanel" data-testid="demo-analysis-demographic-selector">
         <div class="panelHeader">
           <div>
@@ -4309,8 +4315,8 @@ export const renderHtmlReport = (inputReport) => {
     .debateMap .atlasTopicBubble strong { color: rgba(204, 251, 241, 0.96); text-shadow: 0 2px 10px rgba(11, 17, 32, 0.55); }
     .debateMap .atlasTopicBubble span { color: rgba(226, 232, 240, 0.78); }
     .debateMap .atlasTopicCircle p { color: #94a3b8; }
-    .workspace { display: grid; gap: 1rem; color: var(--ce-color-dark, #212529); }
-    .demoAnalysisWorkspace { display: grid; gap: 1rem; color: var(--ce-color-dark, #212529); }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; color: var(--ce-color-dark, #212529); }
+    .demoAnalysisWorkspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; color: var(--ce-color-dark, #212529); }
     .primaryGrid,
     .secondaryGrid { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
     .panel { padding: 1rem 1.1rem; border: 1px solid #dee2e6; border-radius: var(--ce-radius-8, 8px); background: #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }
@@ -4321,6 +4327,10 @@ export const renderHtmlReport = (inputReport) => {
     .suggestionPanel { background: #fdfdea; border-color: #f0e68c; }
     .demoPanel.suggestionPanel { background: #fdfdea; border-color: #f0e68c; }
     .suggestionFilterStatus { margin: 0 0 0.75rem; color: #657083; font-size: 0.88rem; line-height: 1.45; }
+    .questionSelectorPanel { min-width: 0; display: grid; gap: 0.6rem; color: #1f2733; }
+    .questionSelect { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: 0.6rem; border: 1px solid #ced4da; border-radius: var(--ce-radius-8, 8px); background: #f8fbff; color: #1f2733; font: inherit; }
+    .questionSelect:hover { border-color: #0f5ec7; }
+    .questionSelect:focus-visible { outline: 2px solid #0f5ec7; outline-offset: 2px; }
     .selectedQuestionBanner { padding: 0; border: 0; background: transparent; box-shadow: none; }
     .selectedQuestionFrame { background: linear-gradient(145deg, #f8fbff 0%, #edf4ff 100%); border: 1px solid rgba(15, 94, 199, 0.14); border-radius: var(--ce-radius-8, 8px); box-shadow: 0 16px 38px rgba(15, 94, 199, 0.14); padding: 1.25rem 1.35rem 1.1rem; }
     .selectedQuestionCard { margin-bottom: 0; background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
@@ -5186,6 +5196,7 @@ export const renderHtmlReport = (inputReport) => {
       var breakdownTraitMenus = Array.from(document.querySelectorAll('[data-ce-breakdown-trait]'));
       var breakdownClearButton = document.querySelector('[data-ce-breakdown-clear]');
       var breakdownAutoButton = document.querySelector('[data-ce-breakdown-auto]');
+      var breakdownQuestionSelect = document.querySelector('[data-ce-breakdown-question-select]');
       var breakdownFilterEmpty = document.querySelector('[data-ce-breakdown-filter-empty]');
       var atlasTopDebatesButton = document.querySelector('[data-ce-atlas-top-debates-toggle]');
       var atlasTopDebatesOverlay = document.querySelector('[data-ce-atlas-top-debates-overlay]');
@@ -6554,6 +6565,7 @@ export const renderHtmlReport = (inputReport) => {
         var groups = breakdownActiveSuggestion ? breakdownActiveSuggestion.groups : filterGroups;
         var question = breakdownQuestionById(breakdownCurrentQuestionId) || (reportSnapshot.questions || [])[0] || null;
         if (question) breakdownCurrentQuestionId = String(question.id);
+        if (breakdownQuestionSelect) breakdownQuestionSelect.value = breakdownCurrentQuestionId;
         if (breakdownQuestionBanner && question) breakdownQuestionBanner.setAttribute('data-ce-breakdown-question-id', question.id);
         if (breakdownSelectedPrompt && question) breakdownSelectedPrompt.textContent = question.prompt || question.id;
         if (breakdownSelectedTension && question) breakdownSelectedTension.textContent = question.disagreementAxis || question.whyIncluded || 'Model cohorts diverge on this benchmark statement.';
@@ -6845,6 +6857,13 @@ export const renderHtmlReport = (inputReport) => {
         breakdownClearButton.addEventListener('click', function (event) {
           event.preventDefault();
           breakdownSelectedGroupKeys.clear();
+          breakdownActiveSuggestion = null;
+          updateInteractiveBreakdown(null);
+        });
+      }
+      if (breakdownQuestionSelect) {
+        breakdownQuestionSelect.addEventListener('change', function () {
+          breakdownCurrentQuestionId = breakdownQuestionSelect.value;
           breakdownActiveSuggestion = null;
           updateInteractiveBreakdown(null);
         });

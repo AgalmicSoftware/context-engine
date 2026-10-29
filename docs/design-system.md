@@ -555,3 +555,7 @@ images for analysis. PDF and PowerPoint files are not offered as generation
 sources: paste their text instead. Skipped files and extraction failures are
 named in the generator, and only extracted text counts toward its 50-character
 minimum. The document library's separate file-upload support is unchanged.
+
+### Breakdown question selection
+
+Breakdown provides a labeled Question selector independently of demographic comparisons and opens the first question with response distributions. Sessions without segments show overall distributions; segment controls and comparison reports appear only when segment data exists. The selector uses document-surface contrast tokens and a visible keyboard focus outline. Standalone benchmark reports expose the same question control alongside model cohort filters.

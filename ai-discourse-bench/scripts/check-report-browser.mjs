@@ -92,7 +92,20 @@ try {
     assert.equal(await tooltip.isVisible(), true);
     assert.match(await tooltip.textContent(), /Agree:.*Unsure:.*Disagree:/);
     await page.screenshot({ path: path.join(outDir, `${name}-beeswarm-hover.png`) });
+    await page.locator('[data-ce-report-view-mode="breakdown"]').click();
+    const questionSelect = page.getByTestId('ce-breakdown-question-select');
+    const options = await questionSelect.locator('option').evaluateAll((items) => items.map((option) => ({ value: option.value, text: option.textContent })));
+    for (const option of [options[options.length - 1], options[0]]) {
+      await questionSelect.selectOption(option.value);
+      assert.equal(await page.getByTestId('demo-analysis-selected-question').innerText(), option.text);
+    }
+    await questionSelect.focus();
+    const selectorBounds = await questionSelect.boundingBox();
+    const panelBounds = await questionSelect.locator('..').boundingBox();
+    assert.ok(selectorBounds && panelBounds && selectorBounds.x >= panelBounds.x && selectorBounds.x + selectorBounds.width <= Math.min(width, panelBounds.x + panelBounds.width), `${name}: question selector fits its panel and viewport`);
+    await page.screenshot({ path: path.join(outDir, `${name}-breakdown-selector.png`) });
     checks.push({ viewport: name, width, ...geometry });
+    await page.locator('[data-ce-report-view-mode="report"]').click();
   }
   await page.setViewportSize({ width: 1280, height: 900 });
   const participant = page.locator('[data-ce-graph-participant-point]').first();

@@ -117,15 +117,21 @@ const DemoAnalysisWorkspace = ({
     [analysisData.questions],
   );
 
+  const hasSegments = Object.values(analysisData.demographics).some((options) => options.length > 0);
+  const firstQuestionWithResponses = useMemo(() => {
+    const answeredIds = new Set(analysisData.flatResponses.map((response) => response.questionId));
+    return analysisData.questions.find((question) => answeredIds.has(question.id))?.id || '';
+  }, [analysisData.flatResponses, analysisData.questions]);
+
   const [selectedSegmentKeys, setSelectedSegmentKeys] = useState<string[]>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState('');
   const [selectedReportTagIDs, setSelectedReportTagIDs] = useState<string[]>([]);
 
   useEffect(() => {
-    if (selectedQuestionId && !questionMap.has(selectedQuestionId)) {
-      setSelectedQuestionId('');
+    if (!selectedQuestionId || !questionMap.has(selectedQuestionId)) {
+      setSelectedQuestionId(firstQuestionWithResponses);
     }
-  }, [questionMap, selectedQuestionId]);
+  }, [firstQuestionWithResponses, questionMap, selectedQuestionId]);
 
   const comparisonGroups = useMemo(
     () => selectedSegmentKeys.map((segmentKey) => getComparisonGroup(segmentKey)),
@@ -222,15 +228,38 @@ const DemoAnalysisWorkspace = ({
 
   return (
     <div className={styles.workspace} data-testid="demo-analysis-workspace">
-      <DemographicSelector
-        demographics={analysisData.demographics}
-        selectedSegmentKeys={selectedSegmentKeys}
-        onToggleSegment={toggleSegment}
-        onCategoryChange={handleCategoryChange}
-        onClearAll={() => setSelectedSegmentKeys([])}
-        onAutoSelectCorrelation={() => handleAutoSelectCorrelation()}
-        onSuggestFromSegment={handleAutoSelectCorrelation}
-      />
+      {analysisData.questions.length > 0 ? (
+        <section className={`${styles.panel} ${styles.questionSelectorPanel}`}>
+          <label htmlFor="ce-breakdown-question" className={styles.panelTitle}>
+            Question
+          </label>
+          <select
+            id="ce-breakdown-question"
+            data-testid="ce-breakdown-question-select"
+            className={styles.questionSelect}
+            value={selectedQuestionId}
+            onChange={(event) => setSelectedQuestionId(event.target.value)}
+          >
+            {!selectedQuestionId ? <option value="">Select a question</option> : null}
+            {analysisData.questions.map((question) => (
+              <option key={question.id} value={question.id}>
+                {question.text}
+              </option>
+            ))}
+          </select>
+        </section>
+      ) : null}
+      {hasSegments ? (
+        <DemographicSelector
+          demographics={analysisData.demographics}
+          selectedSegmentKeys={selectedSegmentKeys}
+          onToggleSegment={toggleSegment}
+          onCategoryChange={handleCategoryChange}
+          onClearAll={() => setSelectedSegmentKeys([])}
+          onAutoSelectCorrelation={() => handleAutoSelectCorrelation()}
+          onSuggestFromSegment={handleAutoSelectCorrelation}
+        />
+      ) : null}
 
       {selectedQuestion ? (
         <section className={styles.selectedQuestionBanner} data-testid="demo-analysis-question-banner">
@@ -278,18 +307,20 @@ const DemoAnalysisWorkspace = ({
         </section>
       ) : null}
 
-      <div className={styles.primaryGrid}>
-        <ComparisonSuggestions
-          suggestions={suggestions}
-          onSuggestionClick={handleSuggestionClick}
-          activeSuggestionKey={activeSuggestionKey}
-        />
-        <WorldResultsMap
-          question={selectedQuestion}
-          responses={analysisData.flatResponses}
-          focusedCountries={focusedCountries}
-        />
-      </div>
+      {hasSegments ? (
+        <div className={styles.primaryGrid}>
+          <ComparisonSuggestions
+            suggestions={suggestions}
+            onSuggestionClick={handleSuggestionClick}
+            activeSuggestionKey={activeSuggestionKey}
+          />
+          <WorldResultsMap
+            question={selectedQuestion}
+            responses={analysisData.flatResponses}
+            focusedCountries={focusedCountries}
+          />
+        </div>
+      ) : null}
 
       <QuestionBreakdownChart
         question={selectedQuestion}
@@ -297,14 +328,16 @@ const DemoAnalysisWorkspace = ({
         comparisonGroups={comparisonGroups}
       />
 
-      <ComparisonReport
-        flatResponses={analysisData.flatResponses}
-        questions={analysisData.questions}
-        comparisonGroups={comparisonGroups}
-        questionTagsData={analysisData.questionTagsData}
-        selectedTagIDs={selectedReportTagIDs}
-        onSelectedTagIDsChange={setSelectedReportTagIDs}
-      />
+      {hasSegments ? (
+        <ComparisonReport
+          flatResponses={analysisData.flatResponses}
+          questions={analysisData.questions}
+          comparisonGroups={comparisonGroups}
+          questionTagsData={analysisData.questionTagsData}
+          selectedTagIDs={selectedReportTagIDs}
+          onSelectedTagIDsChange={setSelectedReportTagIDs}
+        />
+      ) : null}
     </div>
   );
 };
