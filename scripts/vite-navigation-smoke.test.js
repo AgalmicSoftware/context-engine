@@ -208,6 +208,55 @@ test('local navigation fixtures allow app assets and fail unmatched external req
   await installLocalSmokeFixtureRoutes({ route: async () => assert.fail('remote smoke remains live') }, 'https://app.example.test');
 });
 
+test('the pinned worker route renders from read-only local smoke fixtures', async () => {
+  const sessions = require('../client/src/variables/demo/demo_sessions.json');
+  const origin = new URL(sessions['rxc-ra-test'].corsWorkerUrl).origin;
+  for (const route of ['/rxc-ra-test', '/session/rxc-ra-test?mode=questions']) {
+    let handler;
+    await installLocalSmokeFixtureRoutes({ addInitScript: async () => {}, route: async (_pattern, callback) => { handler = callback; } },
+      'http://127.0.0.1:4173', route);
+    const request = async (pathname, method = 'GET') => {
+      let result;
+      await handler({
+        request: () => ({ url: () => origin + pathname, method: () => method }),
+        continue: async () => assert.fail('the fixture must not read a deployed Worker'),
+        abort: async (reason) => { result = { aborted: reason }; },
+        fulfill: async (response) => { result = response.json; },
+      });
+      return result;
+    };
+    const bootstrap = await request('/session-config?slug=rxc-ra-test');
+    assert.equal(bootstrap.ok, true);
+    assert.equal(bootstrap.sessionSlug, 'rxc-ra-test');
+    assert.equal(bootstrap.config.slug, 'rxc-ra-test');
+    assert.equal(bootstrap.config.corsWorkerUrl, origin + '/');
+    assert.deepEqual(bootstrap.config.sessionModeProfile, sessions['demo-sh'].sessionModeProfile);
+    assert.deepEqual(await request('/storage/list?resource=questions'), { items: [], listComplete: true });
+    assert.deepEqual(await request('/resource-presence'), { ok: true, interview: { ready: false } });
+    assert.deepEqual(await request('/session-config?slug=another-session'), { aborted: 'blockedbyclient' });
+    assert.deepEqual(await request('/storage/list?resource=private'), { aborted: 'blockedbyclient' });
+    assert.deepEqual(await request('/session-config?slug=rxc-ra-test', 'POST'), { aborted: 'blockedbyclient' });
+  }
+  assert.deepEqual(DEFAULT_ROUTE_TEXT['/rxc-ra-test'], ['Groups', 'Results']);
+});
+
+test('pinned Worker fixtures do not mask reads from unrelated routes', async () => {
+  const origin = new URL(require('../client/src/variables/demo/demo_sessions.json')['rxc-ra-test'].corsWorkerUrl).origin;
+  for (const route of ['/about', '/rxc-ra-test-2']) {
+    let handler;
+    await installLocalSmokeFixtureRoutes({ addInitScript: async () => {}, route: async (_pattern, callback) => { handler = callback; } },
+      'http://127.0.0.1:4173', route);
+    let aborted;
+    await handler({
+      request: () => ({ url: () => origin + '/session-config?slug=rxc-ra-test', method: () => 'GET' }),
+      continue: async () => assert.fail('external requests remain isolated'),
+      abort: async (reason) => { aborted = reason; },
+      fulfill: async () => assert.fail('unrelated routes must not use the fixture'),
+    });
+    assert.equal(aborted, 'blockedbyclient');
+  }
+});
+
 test('local navigation uses explicit asset fixtures and ABI-valid registry reads', async () => {
   let handler;
   await installLocalSmokeFixtureRoutes({ addInitScript: async () => {}, route: async (_pattern, callback) => { handler = callback; } }, 'http://127.0.0.1:4173');

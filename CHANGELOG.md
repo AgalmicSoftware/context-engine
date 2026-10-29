@@ -384,6 +384,9 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Cover the pinned Worker session route with read-only navigation fixtures and
+  loaded-session assertions while keeping unmatched network requests blocked.
+
 - Seed encrypted provisioned secrets in admin integration fixtures.
 
 - Align integration assertions with explicit General comparison links and scanned
