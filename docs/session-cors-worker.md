@@ -1979,8 +1979,17 @@ Runtime:
     durable storage. It adopts the provisioned KV envelope once, applies later
     edits to the committed document, and records cleared fields as absent keys.
     KV is a repairable projection: a failed write is retried from durable state,
-    including after a restart, before accepting a later edit. Lit setup and
-    backup restore update the same document; backup export reads it directly.
+    including after a restart, before accepting a later edit. Lit provisioning
+    first reserves an encrypted pending record in the same coordinator. It saves
+    the management key immediately after account creation, then each group,
+    wallet, Action, permission and usage-key result. A handled failure releases
+    the attempt; a crashed attempt becomes resumable after its five-minute lease
+    expires. Competing attempts receive 409. Every upstream request renews and
+    checks ownership, with a 30-second request timeout. Pending resources never
+    authorize requests; finalization commits their matching secrets and public
+    descriptor and clears the pending record in one transaction. Provider errors
+    and checkpoint secrets are not included in admin responses.
+    Lit setup and backup restore update the same document; backup export reads it directly.
   - The Cloudflare API token is never a session secret. A direct `/new` token is
     consumed only by the deploy helper and is not written to either KV record.
 

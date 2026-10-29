@@ -181,6 +181,9 @@ const createAdminDeps = (overrides = {}) => {
       return { ok: true, status: 200, body: { ok: true } };
     };
   }
+  deps.beginSessionLitProvisioning ||= async () => ({ attemptId: 'fixture-attempt', checkpoint: {} });
+  deps.checkpointSessionLitProvisioning ||= async () => ({});
+  deps.releaseSessionLitProvisioning ||= async () => ({});
   if (!Object.prototype.hasOwnProperty.call(overrides, 'ensureSessionLitAuthorizationSigner')) {
     deps.ensureSessionLitAuthorizationSigner = async ({ proposedPrivateKey }) => proposedPrivateKey;
   }
@@ -2426,4 +2429,29 @@ test('manual Lit provisioning strips generated secret outputs and persists only 
   assert.deepEqual((await getSessionConfig(env, 'session-a')).litCredentials, credentials);
   assert.equal((await getSessionSecrets(env, 'session-a')).litAuthorizationPrivateKey, privateKey);
   assert.equal((await getSessionSecrets(env, 'session-a')).litUsageApiKey, 'fresh-key');
+});
+
+test('the admin Lit route resumes only its reserved checkpoint and releases failures without exposing keys', async () => {
+  const checkpoint = { litAccountApiKey: 'private-recovery-key', litGroupId: '7' };
+  let released = 0;
+  let saved = 0;
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody() }, env: { GROUP_KV: {} }, baseHeaders: {}, slug: '', action: 'lit-chipotle-bootstrap-session',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig: { adminAddress: '0xabc' }, headers: {}, targetSlug: 'session-a' }),
+      getSessionSecrets: async () => ({}),
+      beginSessionLitProvisioning: async () => ({ attemptId: 'reserved', checkpoint }),
+      checkpointSessionLitProvisioning: async args => { assert.equal(args.attemptId, 'reserved'); saved++; },
+      bootstrapLitChipotleSession: async options => {
+        assert.deepEqual(options.provisioning, checkpoint);
+        await options.checkpointProvisioning({ ...checkpoint, litPkpId: 'wallet' });
+        throw new Error('upstream echoed private-recovery-key');
+      },
+      releaseSessionLitProvisioning: async args => { assert.equal(args.attemptId, 'reserved'); released++; },
+    }),
+  });
+  assert.equal(result.status, 502);
+  assert.equal(saved, 1);
+  assert.equal(released, 1);
+  assert.ok(!JSON.stringify(result).includes('private-recovery-key'));
 });
