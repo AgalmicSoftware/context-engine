@@ -138,6 +138,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Clear all agent and Worker credentials on either logout, cancelling pending logins and requests before resetting mounted views.
+
 - Generate questions only from extracted source text; name skipped files and stop offering PDF or PowerPoint generation input.
 
 - Limit HTML report files and snapshot downloads to the selected sections; hide the JSON download when unchecked.

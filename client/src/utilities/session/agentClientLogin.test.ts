@@ -1,3 +1,4 @@
+import { clearAllWorkerSessionTokens } from '../worker/workerAuth';
 import {
   clearAgentClientLoginEnvelope,
   exchangeAgentClientLogin,
@@ -109,4 +110,23 @@ test('does not restore credentials across a same-slug identity change', () => {
   writeAgentClientLoginEnvelope(envelope());
   expect(readAgentClientLoginEnvelope({ ...target, sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' })).toBeNull();
   expect(readAgentClientLoginEnvelope(target)).toMatchObject(envelope());
+});
+
+test('a login finishing after auth teardown cannot restore credentials; a fresh login works', async () => {
+  let release!: (response: Response) => void;
+  const response = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  const fetchImpl = jest.fn(async (url: RequestInfo | URL) =>
+    String(url).includes('/capabilities?') ? new Response(JSON.stringify(capability()), { status: 200 }) : response,
+  );
+  const login = exchange(fetchImpl);
+  for (let index = 0; index < 10; index++) await Promise.resolve();
+  expect(fetchImpl).toHaveBeenCalledTimes(2);
+  clearAllWorkerSessionTokens();
+  release(new Response(JSON.stringify(envelope()), { status: 200 }));
+  await expect(login).rejects.toMatchObject({ name: 'AbortError' });
+  expect(readAgentClientLoginEnvelope(target)).toBeNull();
+  await exchange(mockFetch());
+  expect(readAgentClientLoginEnvelope(target)).not.toBeNull();
 });

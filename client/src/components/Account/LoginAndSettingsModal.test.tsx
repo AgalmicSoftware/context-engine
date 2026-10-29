@@ -1,3 +1,5 @@
+import { readAgentClientLoginEnvelope, writeAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
+import { cacheAgentClientLoginEnvelope } from '../OnePageSession/onePageSessionAgentController';
 import { ethers } from 'ethers';
 import { LoginAndSettingsModal } from './LoginAndSettingsModal';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -1902,4 +1904,29 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(readWorkerResourcePresence).toHaveBeenCalledTimes(1);
     expect(readWorkerResourcePresence).toHaveBeenCalledWith(expect.objectContaining({ sessionSlug: 'demo-1' }));
   });
+});
+
+test('settings logout clears every session agent credential before a later visit', async () => {
+  const expiry = '2035-01-01T00:00:00.000Z';
+  const envelopes = ['alpha', 'beta'].map((sessionSlug) => ({
+    v: 3 as const,
+    sessionSlug,
+    address: '0x1111111111111111111111111111111111111111',
+    expiresAt: expiry,
+    capabilities: { readQuestions: true },
+    workerUrl: 'https://worker.example',
+    agentWorkerUrl: 'https://worker.example',
+    agentCredential: { kind: 'session_agent_browser_token', token: `agent-${sessionSlug}`, expiresAt: expiry },
+    workerCredential: { kind: 'session_worker_jwt', token: `worker-${sessionSlug}`, expiresAt: expiry },
+  }));
+  for (const envelope of envelopes) {
+    writeAgentClientLoginEnvelope(envelope);
+    cacheAgentClientLoginEnvelope(envelope);
+  }
+  const subject = new LoginAndSettingsModalSubject(buildProps({ provider: 'agent_token' }));
+  await subject.handleLogout();
+  for (const envelope of envelopes) expect(readAgentClientLoginEnvelope(envelope)).toBeNull();
+  expect((globalThis as { __CE_AGENT_CLIENT_LOGIN_ENVELOPES__?: unknown }).__CE_AGENT_CLIENT_LOGIN_ENVELOPES__).toEqual(
+    {},
+  );
 });

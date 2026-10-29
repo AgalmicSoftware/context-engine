@@ -1,3 +1,4 @@
+import { getClientAuthGeneration } from './clientAuthGeneration';
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 import { normalizeWorkerCanonicalSessionIdHex } from './sessionWorkerDiscovery.js';
 import { normalizeSessionSlugAlias as normalizeSessionSlug, sessionSlugStorageKey } from './sessionSlug';
@@ -120,26 +121,25 @@ export const agentClientLoginEnvelopeMatchesIdentity = (
   return true;
 };
 
-const sessionStorageSafe = (): Storage | null => {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.sessionStorage || null;
-  } catch (_) {
-    return null;
+const purgePersistedAgentClientLoginEnvelopes = (): void => {
+  if (typeof window === 'undefined') return;
+  for (const storageName of ['sessionStorage', 'localStorage'] as const) {
+    try {
+      const storage = window[storageName];
+      for (let index = storage.length - 1; index >= 0; index -= 1) {
+        const key = storage.key(index);
+        if (key?.startsWith('ce:agentClientLogin:')) storage.removeItem(key);
+      }
+    } catch (_) {}
   }
 };
 
-const purgePersistedAgentClientLoginEnvelopes = (): void => {
-  const storage = sessionStorageSafe();
-  if (!storage) return;
-  try {
-    for (let index = storage.length - 1; index >= 0; index -= 1) {
-      const key = storage.key(index);
-      if (key && key.startsWith('ce:agentClientLogin:')) {
-        storage.removeItem(key);
-      }
-    }
-  } catch (_) {}
+export const clearAllAgentClientLoginEnvelopes = (): void => {
+  purgePersistedAgentClientLoginEnvelopes();
+  agentClientLoginMemoryCache.clear();
+  (
+    globalThis as { __CE_AGENT_CLIENT_LOGIN_ENVELOPES__?: Record<string, unknown> }
+  ).__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ = {};
 };
 
 // Purge historical tab-persistent credentials on startup.
@@ -354,6 +354,11 @@ export const exchangeAgentClientLogin = async ({
   workerUrl: expectedWorkerUrlRaw,
   fetchImpl = fetch,
 }: ExchangeAgentClientLoginArgs): Promise<AgentClientLoginEnvelope> => {
+  const generation = getClientAuthGeneration();
+  const assertCurrent = () => {
+    if (generation !== getClientAuthGeneration())
+      throw new DOMException('Agent login cancelled by logout.', 'AbortError');
+  };
   const bridge = normalizeWorkerUrl(agentWorkerUrl);
   if (!bridge) throw new Error('agent_client_login_worker_missing');
   if (expectedWorkerUrlRaw && normalizeWorkerUrl(toStr(expectedWorkerUrlRaw)) !== bridge)
@@ -367,6 +372,7 @@ export const exchangeAgentClientLogin = async ({
     cache: 'no-store',
   });
   const capability = toRecord(await capabilityResponse.json().catch(() => ({})));
+  assertCurrent();
   if (
     !capabilityResponse.ok ||
     !Array.isArray(capability.features) ||
@@ -386,6 +392,7 @@ export const exchangeAgentClientLogin = async ({
     cache: 'no-store',
   });
   const body = toRecord(await response.json().catch(() => ({})));
+  assertCurrent();
   if (!response.ok || body.ok === false) {
     throw new Error(normalizeClientLoginFailureReason(body.reason, response.status));
   }
@@ -414,6 +421,7 @@ export const exchangeAgentClientLogin = async ({
     throw new Error('agent_client_login_session_identity_mismatch');
   }
   if (isAgentClientLoginEnvelopeExpired(envelope)) throw new Error('agent_client_login_expired');
+  assertCurrent();
   writeAgentClientLoginEnvelope(envelope);
   return envelope;
 };

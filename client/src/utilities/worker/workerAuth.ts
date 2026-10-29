@@ -1,3 +1,4 @@
+import { getClientAuthGeneration, invalidateClientAuthGeneration } from '../session/clientAuthGeneration';
 import { buildSiweMessage as buildSharedSiweMessage } from '@ce-shared/auth/siweMessage.mjs';
 /**
  * @file workerAuth.ts
@@ -195,7 +196,6 @@ const getWalletContext = (overrideIn: unknown = {}) => {
 };
 
 const inFlightTokenRequests = new Map<string, InFlightTokenRequest>();
-let workerAuthEpoch = 0;
 // A token carries the scopes its sign-in granted. Tokens issued since access
 // last changed reflect current access, so their scope denials are final; a
 // token issued before the change gets one fresh sign-in on a scope denial.
@@ -279,29 +279,29 @@ const abortInFlightTokenRequests = () => {
 };
 
 const invalidateWorkerAuthState = ({ nextAddress = '' } = {}) => {
-  workerAuthEpoch += 1;
+  invalidateClientAuthGeneration();
   abortInFlightTokenRequests();
   clearAllTokenCaches();
   // Access noted for the previous sign-in says nothing about the next one's tokens.
   workerAccessChangedAtMs = 0;
   tokensIssuedForCurrentAccess.clear();
   trackedWorkerAuthAddress = normalizeAddress(nextAddress);
-  return workerAuthEpoch;
+  return getClientAuthGeneration();
 };
 
 const syncWorkerAuthAddress = (address: unknown): number => {
   const normalizedAddress = normalizeAddress(address);
-  if (!normalizedAddress) return workerAuthEpoch;
+  if (!normalizedAddress) return getClientAuthGeneration();
   // The Redux store is the active-account source of truth. Stale request
   // context must not be able to re-adopt a logged-out or switched account.
   if (!doesWorkerAuthAddressMatchStore(normalizedAddress)) {
-    return workerAuthEpoch;
+    return getClientAuthGeneration();
   }
   if (trackedWorkerAuthAddress && trackedWorkerAuthAddress !== normalizedAddress) {
     return invalidateWorkerAuthState({ nextAddress: normalizedAddress });
   }
   trackedWorkerAuthAddress = normalizedAddress;
-  return workerAuthEpoch;
+  return getClientAuthGeneration();
 };
 
 const assertWorkerAuthRequestCurrent = (
@@ -312,7 +312,7 @@ const assertWorkerAuthRequestCurrent = (
   if (signal?.aborted) {
     throw createAbortError();
   }
-  if (requestAuthEpoch !== workerAuthEpoch) {
+  if (requestAuthEpoch !== getClientAuthGeneration()) {
     throw createAbortError('Worker auth request invalidated.');
   }
   const normalizedRequestAddress = normalizeAddress(requestAddress);
@@ -996,7 +996,7 @@ export const fetchWorkerWithAuth = async (
   const bodyIsStream = isStreamBody(options?.body);
   const anonymousOnly = opts.anonymousOnly === true;
   const startedSignedOut = !getCurrentWorkerAuthStoreAddress();
-  const startingAuthEpoch = workerAuthEpoch;
+  const startingAuthEpoch = getClientAuthGeneration();
   const canAttemptAnonymous = (opts.preferAnonymous || anonymousOnly) && (!bodyIsStream || anonymousOnly);
   let anonymousResponse: Response | null = null;
   if (canAttemptAnonymous) {
@@ -1038,7 +1038,7 @@ export const fetchWorkerWithAuth = async (
     anonymousResponse &&
     startedSignedOut &&
     !getCurrentWorkerAuthStoreAddress() &&
-    startingAuthEpoch === workerAuthEpoch
+    startingAuthEpoch === getClientAuthGeneration()
   ) {
     return anonymousResponse;
   }

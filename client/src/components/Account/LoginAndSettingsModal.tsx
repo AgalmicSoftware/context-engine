@@ -1,3 +1,5 @@
+import { logoutClientAuth, CLIENT_AUTH_LOGOUT_EVENT } from '../../utilities/session/clientAuthLogout';
+import { getClientAuthGeneration } from '../../utilities/session/clientAuthGeneration';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 /** @file LoginAndSettingsModal.tsx */
 import React, { Component, Suspense } from 'react';
@@ -584,6 +586,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   async componentDidMount() {
     this._isMounted = true;
+    window.addEventListener(CLIENT_AUTH_LOGOUT_EVENT, this.resetClientAuthState);
     this.applyLoginModalFocus(this.props.loginModalFocus);
     this.checkAndSendTestFundsIfNeeded();
 
@@ -615,6 +618,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   }
 
   componentWillUnmount() {
+    window.removeEventListener(CLIENT_AUTH_LOGOUT_EVENT, this.resetClientAuthState);
     this._isMounted = false;
     this._sponsoredReqId += 1;
     this._testFundsRequestId += 1;
@@ -862,13 +866,26 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   isCurrentPasskeyWalletAction = (actionId: number): boolean =>
     this._isMounted && actionId === this._passkeyWalletActionId;
 
-  handleLogout = async () => {
+  _lastAuthResetGeneration = -1;
+  resetClientAuthState = () => {
+    const generation = getClientAuthGeneration();
+    if (this._lastAuthResetGeneration === generation) return;
+    this._lastAuthResetGeneration = generation;
     this._passkeyWalletActionId += 1;
+    this._passkeyWalletRestoreReqId += 1;
     this._purposefulPasskeyActionId = null;
+    this.setStateIfMounted({ agentTokenInput: '', agentTokenStatus: '', agentTokenError: '' });
+    this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
+    this.props.changeAccount({});
+  };
+
+  handleLogout = async () => {
     // Disconnect a saved passkey wallet on every logout, not only a passkey one,
     // so the start-up restore cannot sign the visitor back in as that account.
     try {
-      await passkeyWallet.logoutPasskeyWallet();
+      const disconnected = logoutClientAuth();
+      this.resetClientAuthState();
+      await disconnected;
     } catch (error) {
       if (this.props.provider === 'passkey_eoa') throw error;
       accountLog.warn('Saved passkey wallet disconnect failed during logout:', error);
@@ -882,14 +899,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         accountLog.error('wagmiDisconnect failed:', e);
       }
     }
-
-    this.props.updateLoginInfo({
-      loginInProgress: false,
-      loginComplete: false,
-      provider: null,
-    });
-    this.props.changeAccount({});
-    clearAllWorkerSessionTokens();
   };
 
   componentDidUpdate(prevProps: Readonly<LoginAndSettingsModalProps>, prevState: Readonly<LoginAndSettingsModalState>) {

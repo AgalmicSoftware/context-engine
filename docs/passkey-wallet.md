@@ -376,6 +376,12 @@ After a reload, the navbar restores a saved, connected account from the
 IndexedDB wallet metadata without a passkey prompt; signing still unlocks the
 wallet first.
 
+Both Settings logout and agent logout share client-auth teardown: Worker tokens
+and all session agent credentials are cleared, pending requests/logins are
+invalidated, mounted views and account state reset, and the saved passkey wallet
+is disconnected. Returning to a session cannot restore authorization until a
+fresh login. This local cleanup does not revoke server tokens.
+
 Logout, deletion, and a replacing create invalidate older wallet operations.
 Late passkey replies cannot save metadata, activate a signer, or retry a signature
 after logout. Logout waits for metadata writes and signer initialization already

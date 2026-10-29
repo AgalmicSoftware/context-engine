@@ -89,12 +89,14 @@ export const fetchAgentQuestions = async ({
   agentWorkerUrl,
   limit = 30,
   fetchImpl = fetch,
+  signal,
 }: {
   envelope: AgentClientLoginEnvelope | null;
   sessionSlug?: unknown;
   agentWorkerUrl?: unknown;
   limit?: number;
   fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
 }): Promise<AgentQuestionsResult> => {
   const base = resolveAgentWorkerUrl(envelope, agentWorkerUrl);
   if (!envelope?.agentCredential?.token || !base) {
@@ -109,12 +111,15 @@ export const fetchAgentQuestions = async ({
     let answerState: UnknownRecord = {};
     let expectedTotal: number | undefined;
     for (let page = 0; page < 1000; page++) {
+      if (signal?.aborted) throw new DOMException('Agent request cancelled.', 'AbortError');
       const response = await fetchImpl(url.toString(), {
         method: 'GET',
         headers: buildSessionAgentAuthHeaders(envelope),
         cache: 'no-store',
+        ...(signal ? { signal } : {}),
       });
       const body = toRecord(await response.json().catch(() => ({})));
+      if (signal?.aborted) throw new DOMException('Agent request cancelled.', 'AbortError');
       if (!response.ok || body.ok !== true) {
         return {
           ok: false,
@@ -513,11 +518,13 @@ export const fetchAgentResults = async ({
   sessionSlug,
   agentWorkerUrl,
   fetchImpl = fetch,
+  signal,
 }: {
   envelope: AgentClientLoginEnvelope | null;
   sessionSlug?: unknown;
   agentWorkerUrl?: unknown;
   fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
 }): Promise<AgentResultsResult> => {
   const base = resolveAgentWorkerUrl(envelope, agentWorkerUrl);
   if (!envelope?.agentCredential?.token || !base) {
@@ -532,8 +539,10 @@ export const fetchAgentResults = async ({
         method: 'GET',
         headers: buildSessionAgentAuthHeaders(envelope),
         cache: 'no-store',
+        ...(signal ? { signal } : {}),
       });
       const body = toRecord(await response.json().catch(() => ({})));
+      if (signal?.aborted) throw new DOMException('Agent request cancelled.', 'AbortError');
       if (response.ok && body.ok === true) {
         if (key === 'polis') return { status: 'ready', data: normalizePolisDataset(body) };
         if (key === 'groups') return { status: 'ready', data: normalizeGroups(body) };
