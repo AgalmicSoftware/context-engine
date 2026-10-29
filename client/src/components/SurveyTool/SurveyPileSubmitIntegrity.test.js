@@ -1,3 +1,4 @@
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderSurveyPileViewMode, renderSurveyQuestions } from './surveyQuestionsTestHarness';
 import {
@@ -399,7 +400,7 @@ it('names an interview answer held back from the upload and undoes only its draf
 });
 
 it('holds back only a question whose locked value cannot be sent and names it', async () => {
-  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'old-secret' });
+  const envelope = responseEnvelopeFixture('old-secret');
   const h = await fixture();
   await act(async () => h.sync());
   await h.mount();
@@ -495,7 +496,7 @@ it('uploads a cleared saved answer as an explicit blank', async () => {
 
 it('never re-sends the envelope of a cleared locked answer', async () => {
   const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
-  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'old-secret' });
+  const envelope = responseEnvelopeFixture('old-secret');
   const h = await fixture();
   h.add(
     'responses',
@@ -542,7 +543,7 @@ it('never re-sends the envelope of a cleared locked answer', async () => {
 
 it('keeps the lock when a decrypted answer would publish its still-masked Match Answer comment', async () => {
   const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
-  const envelope = (tag) => JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: tag });
+  const envelope = responseEnvelopeFixture;
   const h = await fixture();
   h.add(
     'responses',
@@ -629,7 +630,7 @@ it.each([
   ['an answer', { value: 'Public note', encrypted: false, audienceMode: 'explicit' }],
   ['an answer and its Match Answer comment', 'locked comment'],
 ])('keeps %s unlocked after Decrypt locked after a reload, without blocking other edits', async (_label, comment) => {
-  const envelope = (tag) => JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: tag });
+  const envelope = responseEnvelopeFixture;
   const lockedComment =
     comment === 'locked comment'
       ? {
@@ -695,7 +696,7 @@ it.each([
 });
 
 it('holds back a question whose new audience needs its decrypted text, and names it', async () => {
-  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer' });
+  const envelope = responseEnvelopeFixture('answer');
   const h = await fixture();
   h.add(
     'responses',
@@ -1036,7 +1037,7 @@ describe('View all editor after a reload', () => {
   });
 
   it('says when a reload could not keep an unlock', async () => {
-    const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer' });
+    const envelope = responseEnvelopeFixture('answer');
     const h = await fixture();
     h.add(
       'responses',
