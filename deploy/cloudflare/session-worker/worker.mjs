@@ -83383,6 +83383,24 @@ var evaluateAnonymousRouteAccess = async ({
   return { ok: true, reason: "open-default-ai-gates", defaultOpen, aiOpen };
 };
 
+// workers/sessionCorsWorker/callerIpNormalization.js
+var ipv6Prefix64 = (ip) => {
+  const halves = ip.split("::");
+  if (halves.length > 2) return "";
+  const head = halves[0] ? halves[0].split(":") : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const missing = 8 - head.length - tail.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return "";
+  const groups = [...head, ...Array(halves.length === 2 ? missing : 0).fill("0"), ...tail];
+  if (!groups.every((group) => /^[0-9a-f]{1,4}$/.test(group))) return "";
+  return `${groups.slice(0, 4).map((group) => parseInt(group, 16).toString(16)).join(":")}::/64`;
+};
+var normalizeCallerIp = (ip) => {
+  const mappedIpv4 = ip.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (mappedIpv4) return mappedIpv4[1];
+  return ip.includes(":") ? ipv6Prefix64(ip) || ip : ip;
+};
+
 // workers/sessionCorsWorker/anonymousRateIdentityNormalization.js
 init_stringCoercion();
 var resolveAnonymousRateIdentity = ({ request, deps, constants } = {}) => {
@@ -83391,7 +83409,7 @@ var resolveAnonymousRateIdentity = ({ request, deps, constants } = {}) => {
   const isCloudflareRuntime = !!(request?.cf && typeof request.cf === "object");
   if (isCloudflareRuntime) {
     const cfIp = toTrimmedString2(request?.headers?.get("CF-Connecting-IP"), deps).toLowerCase();
-    if (cfIp) return `anon:${cfIp}`;
+    if (cfIp) return `anon:${normalizeCallerIp(cfIp)}`;
   }
   const anonClientId = toTrimmedString2(request?.headers?.get(anonymousRateIdHeader), deps).toLowerCase();
   if (/^[a-z0-9_-]{8,128}$/.test(anonClientId)) {
@@ -102059,22 +102077,6 @@ var dispatchResultsAnalysisArtifactRequest = async ({
 
 // workers/sessionCorsWorker/authNonceRequestDispatch.js
 init_sessionConfigMutation();
-var ipv6Prefix64 = (ip) => {
-  const halves = ip.split("::");
-  if (halves.length > 2) return "";
-  const head = halves[0] ? halves[0].split(":") : [];
-  const tail = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
-  const missing = 8 - head.length - tail.length;
-  if (halves.length === 1 ? missing !== 0 : missing < 1) return "";
-  const groups = [...head, ...Array(halves.length === 2 ? missing : 0).fill("0"), ...tail];
-  if (!groups.every((group) => /^[0-9a-f]{1,4}$/.test(group))) return "";
-  return `${groups.slice(0, 4).map((group) => parseInt(group, 16).toString(16)).join(":")}::/64`;
-};
-var normalizeCallerIp = (ip) => {
-  const mappedIpv4 = ip.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
-  if (mappedIpv4) return mappedIpv4[1];
-  return ip.includes(":") ? ipv6Prefix64(ip) || ip : ip;
-};
 var resolveAuthNonceSharedNetworkIdentity = ({ request, deps } = {}) => {
   const isCloudflareRuntime = !!(request?.cf && typeof request.cf === "object");
   if (isCloudflareRuntime) {
