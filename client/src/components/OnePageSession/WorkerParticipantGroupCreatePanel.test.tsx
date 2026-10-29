@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import WorkerParticipantGroupCreatePanel from './WorkerParticipantGroupCreatePanel';
 
 const SESSION_ID = '0x11111111111111111111111111111111';
@@ -88,6 +88,102 @@ describe('WorkerParticipantGroupCreatePanel', () => {
     expect(await screen.findByText('Group created. It is open to session participants.')).toBeInTheDocument();
     expect(onGroupsChanged).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('ce-session-worker-participant-group-label')).toHaveValue('');
+  });
+
+  it.each([200, 500])('releases an old account create without losing the draft (status %s)', async (status) => {
+    let finish!: (response: Response) => void;
+    const fetchImpl = jest.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const onGroupsChanged = jest.fn();
+    const props = {
+      sessionId: SESSION_ID,
+      sessionSlug: 'draft',
+      workerUrl: 'https://worker.example',
+      fetchImpl,
+      onGroupsChanged,
+    };
+    const { rerender } = render(
+      <WorkerParticipantGroupCreatePanel {...props} participantAddress={ADDRESS} workerToken="first-token" />,
+    );
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Kept draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    expect(screen.getByRole('button', { name: 'Creating…' })).toBeDisabled();
+    rerender(
+      <WorkerParticipantGroupCreatePanel
+        {...props}
+        participantAddress="0x00000000000000000000000000000000000000bb"
+        workerToken="second-token"
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Create Group' })).toBeEnabled();
+    expect(screen.getByLabelText('Group name')).toHaveValue('Kept draft');
+    await act(async () =>
+      finish(
+        new Response(
+          JSON.stringify({
+            ok: status === 200,
+            error: 'Old failure',
+            sessionId: SESSION_ID,
+            sessionSlug: 'draft',
+            group: {
+              groupId: 'created',
+              label: 'Kept draft',
+              sessionSlug: 'draft',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+          }),
+          { status },
+        ),
+      ),
+    );
+    expect(screen.getByRole('button', { name: 'Create Group' })).toBeEnabled();
+    expect(screen.getByLabelText('Group name')).toHaveValue('Kept draft');
+    expect(onGroupsChanged).not.toHaveBeenCalled();
+    expect(screen.queryByText('Old failure')).not.toBeInTheDocument();
+  });
+
+  it('an old completion cannot clear a newer create busy state', async () => {
+    const completions: Array<(response: Response) => void> = [];
+    const fetchImpl = jest.fn(() => new Promise<Response>((resolve) => completions.push(resolve)));
+    const props = {
+      sessionId: SESSION_ID,
+      sessionSlug: 'draft',
+      workerUrl: 'https://worker.example',
+      participantAddress: ADDRESS,
+      fetchImpl,
+    };
+    const { rerender } = render(<WorkerParticipantGroupCreatePanel {...props} workerToken="first-token" />);
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Kept draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    rerender(<WorkerParticipantGroupCreatePanel {...props} workerToken="second-token" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    const response = () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'draft',
+          group: {
+            groupId: 'created',
+            sessionSlug: 'draft',
+            label: 'Kept draft',
+            joinMode: 'open',
+            memberVisibility: 'session',
+          },
+        }),
+        { status: 200 },
+      );
+    await act(async () => completions[0](response()));
+    expect(screen.getByRole('button', { name: 'Creating…' })).toBeDisabled();
+    expect(screen.getByLabelText('Group name')).toHaveValue('Kept draft');
+    await act(async () => completions[1](response()));
+    expect(screen.getByRole('button', { name: 'Create Group' })).toBeEnabled();
+    expect(screen.getByLabelText('Group name')).toHaveValue('');
   });
 
   it('does not issue a request without a group label', () => {

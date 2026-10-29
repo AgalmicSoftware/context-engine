@@ -136,6 +136,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Release participant Group creation after an account change while preserving its draft and ignoring old completions.
+
 - Preserve participant Group drafts across configuration refreshes; update default tags only while untouched.
 
 - Keep cleared cache namespaces empty after storage recovery and report incomplete clears without reloading.

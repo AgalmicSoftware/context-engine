@@ -1299,3 +1299,7 @@ expanded controls sit below the centered option-scroll arrows.
 Participant Group drafts remain attached to the session ID, slug and Worker URL.
 Configuration refreshes preserve edited fields. New default tags update only an
 untouched tags field; changing session identity starts a fresh draft.
+
+Changing the signed-in account or credential during Group creation releases
+the busy state and keeps the draft. A superseded request cannot apply its result
+or clear the busy state of a newer request.
