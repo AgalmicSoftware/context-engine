@@ -384,4 +384,16 @@ describe('userPageHelpers response decrypt helpers', () => {
       statePatch: null,
     });
   });
+  it('never replaces a different response merely because its question id matches', () => {
+    const oldResponse = { answer: { value: '*' } };
+    const current = { answer: { value: 'new revision' } };
+    expect(
+      buildUserPageDecryptedResponseStatePatch({
+        questionId: 'q1',
+        responseOverride: oldResponse,
+        patchedResponse: { answer: { value: 'old answer' } },
+        previousState: { detailedQuestionResponses: { q1: current } },
+      }),
+    ).toEqual({ didUpdate: false, statePatch: null });
+  });
 });
