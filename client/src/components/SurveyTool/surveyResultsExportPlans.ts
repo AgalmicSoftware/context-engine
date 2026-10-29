@@ -1,3 +1,4 @@
+import { quoteCsvCell } from '../../../../shared/csv/quoteCell.mjs';
 import { readStoredRating } from '../../utilities/survey/storedRating';
 import { formatTsForCsv, pickTimestampMs } from './surveyResultsHelpers.js';
 
@@ -303,17 +304,6 @@ export const buildSurveyResultsExportBaseFileName = ({
   }
 
   return questionsOnly ? 'contextEngine_filteredQuestions' : 'contextEngine_questionResults';
-};
-
-// Spreadsheet apps run a cell that starts with one of these characters as a
-// formula. Participant text must stay text, so it gets a leading apostrophe.
-const CSV_FORMULA_START = /^[=+\-@\t\r]/;
-const CSV_PLAIN_NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
-
-const quoteCsvCell = (value: unknown): string => {
-  const text = String(value !== undefined && value !== null ? value : '');
-  const safeText = CSV_FORMULA_START.test(text) && !CSV_PLAIN_NUMBER.test(text) ? `'${text}` : text;
-  return `"${safeText.replace(/"/g, '""')}"`;
 };
 
 const quoteResponseCsvCell = (value: unknown): string => {

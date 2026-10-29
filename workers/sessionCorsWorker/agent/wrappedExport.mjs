@@ -1,3 +1,4 @@
+import { quoteCsvCell } from '../../../shared/csv/quoteCell.mjs';
 import { safeString, lower, safeJsonParse, nowIsoOrCurrent as nowIso, sanitizeSessionSlug } from './runtimePrimitives.mjs';
 import { SUBMIT_REQUEST_USER_KV_PREFIX, SUBMITTED_RESULT_STATUSES } from './agentSubmitQueue.mjs';
 import { AGENT_ONLY_ANSWER_EVENT_KV_PREFIX, AGENT_ONLY_ANSWER_STATE_KV_PREFIX, AGENT_ONLY_VOTE_EVENT_KV_PREFIX, AGENT_ONLY_HUMAN_VOTE_EVENT_KV_PREFIX, AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX, AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX, AGENT_ONLY_PRINCIPAL_ID_SALT, hmacSha256Hex, normalizeAgentOnlyRunId } from './wrappedCore.mjs';
@@ -21,14 +22,14 @@ export async function readKvJson(env = {}, key = '') {
 
 export function csvEscape(value) {
   const text = typeof value === 'string' ? value : JSON.stringify(value ?? '');
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  return quoteCsvCell(text);
 }
 
 export function rowsToCsv(rows = []) {
   if (!rows.length) return '';
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
   return [
-    columns.join(','),
+    columns.map(quoteCsvCell).join(','),
     ...rows.map((row) => columns.map((column) => csvEscape(row[column])).join(',')),
   ].join('\n');
 }

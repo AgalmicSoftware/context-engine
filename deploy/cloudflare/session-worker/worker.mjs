@@ -90871,6 +90871,15 @@ async function buildAgentOnlyMetrics({
   return totals;
 }
 
+// shared/csv/quoteCell.mjs
+var CSV_FORMULA_START = /^[=+\-@\t\r]/;
+var CSV_PLAIN_NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
+var quoteCsvCell = (value) => {
+  const text = String(value !== void 0 && value !== null ? value : "");
+  const safeText = CSV_FORMULA_START.test(text) && !CSV_PLAIN_NUMBER.test(text) ? `'${text}` : text;
+  return `"${safeText.replace(/"/g, '""')}"`;
+};
+
 // workers/sessionCorsWorker/agent/wrappedExport.mjs
 init_runtimePrimitives();
 init_agentSubmitQueue();
@@ -90887,13 +90896,13 @@ async function readKvJson2(env = {}, key = "") {
 }
 function csvEscape(value) {
   const text = typeof value === "string" ? value : JSON.stringify(value ?? "");
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  return quoteCsvCell(text);
 }
 function rowsToCsv(rows = []) {
   if (!rows.length) return "";
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
   return [
-    columns.join(","),
+    columns.map(quoteCsvCell).join(","),
     ...rows.map((row) => columns.map((column) => csvEscape(row[column])).join(","))
   ].join("\n");
 }
