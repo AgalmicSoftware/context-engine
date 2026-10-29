@@ -308,6 +308,8 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Include shared answer validation in Worker release source comparisons.
+
 - Check signed payment hashes in proof-authorized faucet integration tests.
 
 - Verify authenticated faucet replies against the signed payment hash and amount.
