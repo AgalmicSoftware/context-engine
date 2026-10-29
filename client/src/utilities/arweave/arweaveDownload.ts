@@ -7,6 +7,9 @@
 
 import { createLogger } from '../logging.js';
 import { arweaveClient } from './arweaveClient.js';
+import type { ArweaveFetchOptions, ArweaveFetchPolicy } from './arweaveFetchPolicy';
+import { clearArweaveTextCacheEntry } from './arweaveClientCaches';
+import { clearFailureCacheEntry } from './arweaveFailureCache';
 import {
   isTerminalArweaveFailureState,
   normalizeArweaveFailureMeta,
@@ -22,6 +25,7 @@ export interface ArweaveDownloadOpsDeps {
     groupKeyOrCfg: unknown;
     txId: string;
   }) => Promise<{ text?: string; [key: string]: unknown } | null>;
+  clearArweaveTxCacheEntry: (opts: { groupKeyOrCfg: unknown; txId: string }) => Promise<void>;
   writeArweaveTxCacheEntry: (opts: { groupKeyOrCfg: unknown; txId: string; text: string }) => Promise<void>;
   readArweaveTxFailureCacheEntry: (opts: {
     groupKeyOrCfg: unknown;
@@ -33,12 +37,13 @@ export interface ArweaveDownloadOpsDeps {
     entry: Record<string, unknown>;
   }) => Promise<void>;
   clearArweaveTxFailureCacheEntry: (opts: { groupKeyOrCfg: unknown; txId: string }) => Promise<void>;
-  runArweaveTxFetchCoalesced: (opts: {
-    chainId: number;
-    txId: string;
-    forceFetch?: boolean;
-    task: () => Promise<string>;
-  }) => Promise<string>;
+  runArweaveTxFetchCoalesced: (
+    opts: ArweaveFetchPolicy & {
+      chainId: number;
+      txId: string;
+      task: () => Promise<string>;
+    },
+  ) => Promise<string>;
   buildArweaveDebugContext?: (...args: unknown[]) => unknown;
 }
 
@@ -52,7 +57,7 @@ export interface ArweaveDownloadOps {
   downloadArweaveTextForGroup: (opts?: {
     txId?: unknown;
     groupKeyOrCfg?: unknown;
-    arweaveOpts?: Record<string, unknown>;
+    arweaveOpts?: ArweaveFetchOptions;
   }) => Promise<string>;
 }
 
@@ -63,6 +68,7 @@ export function createArweaveDownloadOps({
   resolveReadContext,
   readArweaveTxCacheEntry,
   writeArweaveTxCacheEntry,
+  clearArweaveTxCacheEntry,
   readArweaveTxFailureCacheEntry,
   writeArweaveTxFailureCacheEntry,
   clearArweaveTxFailureCacheEntry,
@@ -95,11 +101,11 @@ export function createArweaveDownloadOps({
       message: String(message || 'Arweave payload parse failed'),
     };
 
-    await writeArweaveTxFailureCacheEntry({
-      groupKeyOrCfg,
-      txId: normalizedTxId,
-      entry: failureEntry,
-    });
+    // A parse failure describes this reply, not the immutable transaction itself.
+    clearArweaveTextCacheEntry(normalizedTxId);
+    clearFailureCacheEntry(normalizedTxId);
+    await clearArweaveTxCacheEntry({ groupKeyOrCfg, txId: normalizedTxId });
+    await clearArweaveTxFailureCacheEntry({ groupKeyOrCfg, txId: normalizedTxId });
 
     return buildArweaveFailureError({
       txId: normalizedTxId,
@@ -123,27 +129,25 @@ export function createArweaveDownloadOps({
     if (!normalizedTxId) return '';
 
     const { chainId } = resolveReadContext(groupKeyOrCfg);
-    const forceArweaveFetch = !!(
-      arweaveOpts?.forceRetry ||
-      arweaveOpts?.bypassFailureCache ||
-      arweaveOpts?.cacheBypass
-    );
+    const cacheBypass = arweaveOpts.cacheBypass === true;
 
     return runArweaveTxFetchCoalesced({
       chainId,
       txId: normalizedTxId,
-      forceFetch: forceArweaveFetch,
+      cacheBypass,
       task: async () => {
-        const cached = await readArweaveTxCacheEntry({ groupKeyOrCfg, txId: normalizedTxId });
-        if (!forceArweaveFetch && cached && typeof cached.text === 'string' && cached.text.length > 0) {
+        const cached = cacheBypass ? null : await readArweaveTxCacheEntry({ groupKeyOrCfg, txId: normalizedTxId });
+        if (!cacheBypass && cached && typeof cached.text === 'string' && cached.text.length > 0) {
           contractsLog.debug('[arweave-cache] tx-cache-hit', { txId: normalizedTxId });
           return cached.text;
         }
         contractsLog.debug('[arweave-cache] tx-cache-miss', { txId: normalizedTxId });
 
-        const failureEntry = await readArweaveTxFailureCacheEntry({ groupKeyOrCfg, txId: normalizedTxId });
+        const failureEntry = cacheBypass
+          ? null
+          : await readArweaveTxFailureCacheEntry({ groupKeyOrCfg, txId: normalizedTxId });
         const now = Date.now();
-        if (!forceArweaveFetch && failureEntry && isTerminalArweaveFailureState(failureEntry.state)) {
+        if (!cacheBypass && failureEntry && isTerminalArweaveFailureState(failureEntry.state)) {
           const terminalState = String(failureEntry.state || '');
           const terminalRetryAtMs = Number(failureEntry.nextRetryAtMs || 0);
           const isNotFoundTerminal = terminalState === 'terminal_not_found';
@@ -175,7 +179,7 @@ export function createArweaveDownloadOps({
           }
         }
 
-        if (!forceArweaveFetch && failureEntry && Number(failureEntry.nextRetryAtMs || 0) > now) {
+        if (!cacheBypass && failureEntry && Number(failureEntry.nextRetryAtMs || 0) > now) {
           contractsLog.debug('[arweave-cache] tx-failure-cooldown-hit', {
             txId: normalizedTxId,
             nextRetryAtMs: Number(failureEntry.nextRetryAtMs || 0),

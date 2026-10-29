@@ -1,3 +1,4 @@
+import type { ArweaveFetchPolicy } from '../arweave/arweaveFetchPolicy';
 import { readCache, updateCacheAtomic } from './cacheScripts.js';
 import { ensureQuestionArweaveCacheBranches } from '../arweave/arweaveRetryHelpers.js';
 import { normalizeArweaveFailureEntry as normalizeFailureEntry } from '../arweave/arweaveFailureClassifiers.js';
@@ -138,10 +139,9 @@ type ArweaveWriteCacheInput = ArweaveTxInput & {
   text?: unknown;
   contentType?: unknown;
 };
-type ArweaveInflightKeyInput = {
+type ArweaveInflightKeyInput = ArweaveFetchPolicy & {
   chainId?: unknown;
   txId?: unknown;
-  forceFetch?: boolean;
 };
 type ArweaveInflightRunInput<T> = ArweaveInflightKeyInput & {
   task: () => Promise<T> | T;
@@ -676,6 +676,18 @@ export const createContractScriptsCache = ({
     return entry;
   };
 
+  const clearArweaveTxCacheEntry = async ({ groupKeyOrCfg, txId }: ArweaveTxInput) => {
+    const normalizedTxId = String(txId || '').trim();
+    const { slug, chainId } = resolveReadContext(groupKeyOrCfg);
+    if (!normalizedTxId || !chainId) return;
+    await updateCacheAtomic('questionsCache', slug, (current: unknown) => {
+      const cache = isRecord(current) ? current : {};
+      const net = ensureQuestionsNetworkNode(cache, String(chainId));
+      delete net.arweaveTxCache[normalizedTxId];
+      return cache;
+    });
+  };
+
   const readArweaveTxFailureCacheEntry = async ({
     groupKeyOrCfg,
     txId,
@@ -775,16 +787,17 @@ export const createContractScriptsCache = ({
     });
   };
 
-  const buildArweaveTxFetchInflightKey = ({ chainId, txId, forceFetch = false }: ArweaveInflightKeyInput) =>
-    `${Number(chainId || 0)}|${String(txId || '').trim()}|force:${forceFetch ? '1' : '0'}`;
+  const buildArweaveTxFetchInflightKey = ({ chainId, txId, cacheBypass = false }: ArweaveInflightKeyInput) =>
+    `${Number(chainId || 0)}|${String(txId || '').trim()}|force:${cacheBypass ? '1' : '0'}`;
 
   const runArweaveTxFetchCoalesced = async <T>({
     chainId,
     txId,
-    forceFetch = false,
+    cacheBypass = false,
     task,
   }: ArweaveInflightRunInput<T>) => {
-    const inflightKey = buildArweaveTxFetchInflightKey({ chainId, txId, forceFetch });
+    if (cacheBypass) return task();
+    const inflightKey = buildArweaveTxFetchInflightKey({ chainId, txId, cacheBypass });
     if (ARWEAVE_TX_FETCH_INFLIGHT.has(inflightKey)) {
       return ARWEAVE_TX_FETCH_INFLIGHT.get(inflightKey);
     }
@@ -830,6 +843,7 @@ export const createContractScriptsCache = ({
     isLatestSbtMemoRun,
     resolveSessionStartFromRegistry,
     readArweaveTxCacheEntry,
+    clearArweaveTxCacheEntry,
     readArweaveTxFailureCacheEntry,
     writeArweaveTxFailureCacheEntry,
     clearArweaveTxFailureCacheEntry,

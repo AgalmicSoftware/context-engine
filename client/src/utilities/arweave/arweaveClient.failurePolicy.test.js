@@ -191,7 +191,7 @@ describe('arweaveClient failure policy', () => {
       arweaveClient.downloadDataFromArweave('badtx', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 1,
-        bypassCache: true,
+        cacheBypass: true,
       }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',

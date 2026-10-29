@@ -989,7 +989,7 @@ describe('SessionWizard sponsored bundle flow', () => {
           caller: 'SessionWizard.sponsoredBundle',
           source: 'session_wizard',
         }),
-        bypassFailureCache: true,
+        cacheBypass: true,
       }),
     ]);
   });

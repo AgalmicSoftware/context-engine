@@ -29,6 +29,10 @@ export const getArweaveTextCacheEntry = (txId: unknown): ArweaveTextCacheEntry |
   return entry;
 };
 
+export const clearArweaveTextCacheEntry = (txId: unknown): void => {
+  arweaveTextCache.delete(String(txId || '').trim());
+};
+
 export const setArweaveTextCacheEntry = (txId: unknown, text: unknown): void => {
   const key = String(txId || '').trim();
   if (!key || String(text ?? '').trim().length === 0) return;

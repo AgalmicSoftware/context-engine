@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Arweave
+
+- Use one forced-refresh option across payload caches and in-flight requests.
+  Evict malformed JSON replies so ordinary reads can retry immediately.
+
 ### Agents and MCP
 
 - Recheck MCP cancellation after chain validation, token refresh and retry-key

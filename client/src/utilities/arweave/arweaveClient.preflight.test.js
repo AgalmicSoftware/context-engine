@@ -106,7 +106,7 @@ describe('arweaveClient.downloadDataFromArweave preflight routing', () => {
     const text = await arweaveClient.downloadDataFromArweave('skip-preflight-explicit', {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       preflightTxExistence: false,
       debugContext: { category: 'question_response_payload' },
     });
@@ -127,7 +127,7 @@ describe('arweaveClient.downloadDataFromArweave preflight routing', () => {
     const text = await arweaveClient.downloadDataFromArweave('session-meta-no-preflight', {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       debugContext: { category: 'session_registry_metadata' },
     });
 
@@ -148,7 +148,7 @@ describe('arweaveClient.downloadDataFromArweave preflight routing', () => {
       arweaveClient.downloadDataFromArweave('session-meta-with-preflight', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-        bypassCache: true,
+        cacheBypass: true,
         debugContext: { category: 'session_registry_metadata' },
       }),
     ).rejects.toMatchObject({
@@ -171,7 +171,7 @@ describe('arweaveClient.downloadDataFromArweave preflight routing', () => {
     const text = await arweaveClient.downloadDataFromArweave('sbt-meta-no-preflight', {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       debugContext: { category: 'sbt_metadata' },
     });
 
@@ -191,7 +191,7 @@ describe('arweaveClient.downloadDataFromArweave preflight routing', () => {
     const text = await arweaveClient.downloadDataFromArweave('response-meta-no-preflight', {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       debugContext: { category: 'survey_response_payload' },
     });
 
@@ -212,7 +212,7 @@ describe('arweaveClient.downloadDataFromArweave preflight routing', () => {
       arweaveClient.downloadDataFromArweave('graphql-primary-health-check', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-        bypassCache: true,
+        cacheBypass: true,
         debugContext: { category: 'sbt_metadata' },
       }),
     ).rejects.toMatchObject({
@@ -244,7 +244,7 @@ describe('arweaveClient.downloadDataFromArweave preflight routing', () => {
       arweaveClient.downloadDataFromArweave('graphql-secondary-fallback', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-        bypassCache: true,
+        cacheBypass: true,
         debugContext: { category: 'sbt_metadata' },
       }),
     ).rejects.toMatchObject({

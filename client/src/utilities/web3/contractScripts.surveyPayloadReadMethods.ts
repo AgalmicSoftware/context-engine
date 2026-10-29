@@ -111,9 +111,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
             arweaveOpts: {
               disableExistencePrecheck: true,
               preflightTxExistence: false,
-              forceRetry: forceArweaveFetch,
               cacheBypass: forceArweaveFetch,
-              bypassFailureCache: forceArweaveFetch,
               debugContext: buildArweaveDebugContext(groupKeyOrCfg, 'survey_metadata', {
                 fn: 'getSurveyDataById',
                 surveyId: sId,
@@ -403,9 +401,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
               gatewayTimeoutMs: Number.isFinite(Number(opts?.arweaveGatewayTimeoutMs))
                 ? Number(opts.arweaveGatewayTimeoutMs)
                 : 4500,
-              forceRetry: forceArweaveFetch,
               cacheBypass: forceArweaveFetch,
-              bypassFailureCache: forceArweaveFetch,
             },
           });
           const arweaveData = storageRead?.text;
@@ -700,9 +696,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
             arweaveOpts: {
               disableExistencePrecheck: true,
               preflightTxExistence: false,
-              forceRetry: forceArweaveFetch,
               cacheBypass: forceArweaveFetch,
-              bypassFailureCache: forceArweaveFetch,
               ...(Number.isFinite(Number(opts?.arweaveRetries))
                 ? { retries: Math.max(0, Number(opts.arweaveRetries)) }
                 : {}),

@@ -568,6 +568,7 @@ const {
   isLatestSbtMemoRun,
   resolveSessionStartFromRegistry,
   readArweaveTxCacheEntry,
+  clearArweaveTxCacheEntry,
   readArweaveTxFailureCacheEntry,
   writeArweaveTxFailureCacheEntry,
   clearArweaveTxFailureCacheEntry,
@@ -592,6 +593,7 @@ const {
 const { recordTerminalArweaveInvalidFailure, downloadArweaveTextForGroup } = createArweaveDownloadOps({
   resolveReadContext,
   readArweaveTxCacheEntry,
+  clearArweaveTxCacheEntry,
   writeArweaveTxCacheEntry,
   readArweaveTxFailureCacheEntry,
   writeArweaveTxFailureCacheEntry: writeArweaveTxFailureCacheEntry as any,
@@ -999,6 +1001,7 @@ export const __test__contractScriptsArweaveCache: any = {
   resolveReadContext,
   downloadArweaveTextForGroup,
   readArweaveTxCacheEntry,
+  clearArweaveTxCacheEntry,
   writeArweaveTxCacheEntry,
   readArweaveTxFailureCacheEntry,
   writeArweaveTxFailureCacheEntry,
