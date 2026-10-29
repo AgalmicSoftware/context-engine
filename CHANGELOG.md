@@ -106,6 +106,10 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Preserve every stored survey answer when submitting a partial edit. Read the
+  current raw container before uploads, retain unchanged encrypted rows exactly,
+  and refuse submission when that snapshot cannot be read.
+
 - Finish question and survey publication in its original session, preserve drafts
   edited while publishing, and leave newly opened forms and their timers untouched.
 

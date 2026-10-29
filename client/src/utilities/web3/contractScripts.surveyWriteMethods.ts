@@ -2,6 +2,7 @@ import type { ContractScriptsMethodMap, ContractScriptsRuntimeDeps } from './con
 import { resolveSessionCapabilityProjection } from '../session/sessionCapabilityProjection';
 import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
 import { readStoredAnswersUploadProblem } from '../survey/answerSizeBudget';
+import { mergeSurveyResponseSnapshot } from '../survey/surveyResponseSnapshot';
 
 type SbtReadProviderRef = string | Record<string, unknown>;
 type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
@@ -605,6 +606,25 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES);
       const workerCanonicalStorage =
         sessionProjection.profileValid && sessionProjection.isWorkerCanonical && canUseSessionStorage;
+      if (!workerCanonicalStorage && surveyResponse) {
+        try {
+          const stored = await this.getSurveyResponse('none', userAddress, hashedSurveyId, cfg, {
+            throwOnError: true,
+            rawPayload: true,
+            forceArweaveFetch: true,
+            blockTag: 'latest',
+          });
+          surveyResponse = mergeSurveyResponseSnapshot(stored, surveyResponse, questionResponses);
+        } catch (cause: unknown) {
+          throw Object.assign(
+            new Error('Unable to read the complete stored survey response. Please retry submission.'),
+            {
+              cause,
+              retryable: true,
+            },
+          );
+        }
+      }
       const workerSubmissionReceipt = (uploads: PayloadPointerUpload[]) => ({
         workerCanonicalSubmission: true,
         questionResponseRefs: uploads.map((upload, index) => ({
@@ -768,7 +788,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           revertMessage: 'submitResponses transaction reverted on-chain.',
         });
         clearReadCachesForGroup(groupKeyOrCfg);
-        return receipt;
+        return surveyResponse ? { ...receipt, __ceSurveyResponse: surveyResponse } : receipt;
       } catch (error: unknown) {
         notifyUserFacingTransactionError(error);
         contractsLog.error('Error sending transaction with provider.request:', error);

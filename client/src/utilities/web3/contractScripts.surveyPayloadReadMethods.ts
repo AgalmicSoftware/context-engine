@@ -280,6 +280,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
           ? 'survey_response_payload'
           : 'question_response_payload';
       const forceArweaveFetch = !!opts?.forceArweaveFetch;
+      const rawPayload = opts?.rawPayload === true;
       let blockTag = opts?.blockTag;
       if (blockTag == null && cfg?.blockLimits?.end != null) {
         try {
@@ -294,6 +295,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
       }
       const { baseKey } = resolveReadContext(groupKeyOrCfg);
       const inflightKey = `${baseKey}|${responderLower}|${idB32}|block:${blockTag ?? 'latest'}|strict:${throwOnError ? '1' : '0'}|force:${forceArweaveFetch ? '1' : '0'}`;
+      const payloadInflightKey = `${inflightKey}|raw:${rawPayload ? '1' : '0'}`;
       const readE2EMockedViewedResponse = () => {
         if (typeof window === 'undefined') return null;
         if (globalThis.CE_E2E_LIT_MOCK !== true) return null;
@@ -323,7 +325,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
         return null;
       };
       try {
-        const result = await runInFlightCoalesced(READ_INFLIGHT.response, inflightKey, async () => {
+        const result = await runInFlightCoalesced(READ_INFLIGHT.response, payloadInflightKey, async () => {
           rpcLog('RPC Call:', {
             function: 'getResponse',
             method: 'SurveyContract.getResponse',
@@ -342,6 +344,10 @@ export const createContractScriptsSurveyPayloadReadMethods = (
             }
           }, 'SurveyContract.getResponse');
 
+          if (rawPayload && arweaveHash === ethers.constants.HashZero) return null;
+          if (rawPayload && !utils.isHexString(arweaveHash, 32)) {
+            throw new Error('Invalid response pointer returned by the contract.');
+          }
           if (!arweaveHash || arweaveHash === ethers.constants.HashZero) {
             if (throwOnError && ARWEAVE_ACTIVE) {
               throw buildHashUnavailableMetadataError(
@@ -352,7 +358,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
             return null;
           }
           const payloadPointerId = arweaveClient.hexToBase64url(arweaveHash);
-          const mockedResponse = readE2EMockedViewedResponse();
+          const mockedResponse = rawPayload ? null : readE2EMockedViewedResponse();
           if (mockedResponse) {
             normalizeSessionNameFields(mockedResponse);
             const mockedStorageRef = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES)
@@ -375,6 +381,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
             );
           }
           if (!ARWEAVE_ACTIVE && !isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES)) {
+            if (rawPayload) throw new Error('Response payload storage is unavailable.');
             return null;
           }
           const storageRead = await readPayloadPointerTextForGroup({
@@ -412,6 +419,12 @@ export const createContractScriptsSurveyPayloadReadMethods = (
               message: `Invalid response JSON for pointer ${payloadPointerId}`,
               cause: parseErr,
             });
+          }
+          if (rawPayload) {
+            if (!responseJson || typeof responseJson !== 'object' || Array.isArray(responseJson)) {
+              throw new Error('The stored response payload is not an object.');
+            }
+            return responseJson;
           }
           normalizeSessionNameFields(responseJson);
           return normalizeConvictionImportance(
