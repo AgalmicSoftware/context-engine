@@ -399,6 +399,9 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Keep benchmark deadlines active through success/error bodies and structured-output
+  fallback attempts, cancelling stalled streams so tasks can retry.
+
 - Repair incomplete checkpoint tails and missing final newlines before any
   benchmark resume appends new records; reject corrupt middle lines.
 
