@@ -284,6 +284,9 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Separate the interview panel from voice-mode navigation while preserving
+  review, consent, and submission behavior.
+
 - Refresh the fallback Worker release pin and deploy-helper example to the
   verified 0.8.0 bundles before preparing the next application release.
 
