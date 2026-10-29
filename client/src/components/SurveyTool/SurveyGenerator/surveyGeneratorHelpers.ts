@@ -212,7 +212,7 @@ export type GeneratedSurveyStatement = {
 
 export type GeneratedSurveyStatementsInput = {
   aiData: GeneratedAiQuestionPayload;
-  questionTypes: QuestionTypeSelection;
+  selectedTypes: string[];
   count: number;
   fallbackTitle?: unknown;
   generateQuestionId?: (
@@ -238,7 +238,7 @@ export type BuildSingleGenerationPromptInput = {
   promptTemplate: string;
   sourceDocContent: unknown;
   count: number;
-  questionTypes: QuestionTypeSelection;
+  selectedTypes: string[];
   defaultTags?: string | Array<string | null | undefined | false | ''> | null;
   transcriptMode?: boolean;
   overrides?: GenerationPromptOverrides;
@@ -507,15 +507,14 @@ const isUsableGeneratedQuestion = (question: unknown): question is GeneratedAiQu
 
 export const buildGeneratedSurveyStatements = ({
   aiData,
-  questionTypes,
+  selectedTypes,
   count,
   fallbackTitle = '',
   generateQuestionId = generateSharedQuestionId,
 }: GeneratedSurveyStatementsInput): GeneratedSurveyStatementsResult => {
-  const wantedTypes = getSelectedQuestionTypes(questionTypes);
   const questions = (Array.isArray(aiData?.questions) ? aiData.questions : [])
     .filter(isUsableGeneratedQuestion)
-    .filter((question) => wantedTypes.includes(question.questionType))
+    .filter((question) => selectedTypes.includes(question.questionType))
     .slice(0, count);
 
   questions.forEach((question) => {
@@ -550,7 +549,7 @@ export const buildSingleGenerationPrompt = ({
   promptTemplate,
   sourceDocContent,
   count,
-  questionTypes,
+  selectedTypes,
   defaultTags,
   transcriptMode = false,
   overrides = {},
@@ -559,8 +558,8 @@ export const buildSingleGenerationPrompt = ({
   const allowed = normalizeTags(defaultTags);
   const defaultTagsStr = allowed.length > 0 ? allowed.join(', ') : '';
 
-  const selectedTypes = getSelectedQuestionTypes(questionTypes);
-  const typesStr = selectedTypes.length > 0 ? selectedTypes.join(',') : 'binary,rating,freeform,multichoice,quadratic';
+  if (!selectedTypes.length) throw new Error('Select at least one question type before generating.');
+  const typesStr = selectedTypes.join(',');
 
   const sourceType = overrides.sourceTypeOverride || (transcriptMode ? 'transcript' : 'text');
 

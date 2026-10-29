@@ -136,3 +136,54 @@ it('checks edits made while a replacement request is pending', async () => {
   await waitFor(() => expect(window.confirm).toHaveBeenCalledTimes(1));
   expect(screen.getByDisplayValue('Edited while waiting?')).toBeVisible();
 });
+
+it('requires a selected question type before a request can start', () => {
+  render(<SurveyGenerator account="" loginComplete={false} demoSurfaceMode={false} />);
+  fireEvent.change(screen.getByLabelText('Source text'), { target: { value: source } });
+  fireEvent.click(screen.getByText('Binary', { exact: true }));
+  fireEvent.click(screen.getByText('Multichoice', { exact: true }));
+  const button = screen.getByRole('button', { name: 'Generate Questions' });
+  expect(button).toBeDisabled();
+  expect(button).toHaveAccessibleDescription('Select at least one question type before generating.');
+  fireEvent.click(button);
+  fireEvent.submit(button.closest('form'));
+  expect(callAI).not.toHaveBeenCalled();
+});
+
+it('uses the one selected type for both the prompt and the resulting questions', async () => {
+  const onQuestionsGenerated = jest.fn();
+  callAI.mockResolvedValueOnce(
+    JSON.stringify({
+      questions: [
+        { prompt: 'Keep the binary question?', questionType: 'binary' },
+        { prompt: 'Drop the other type?', questionType: 'multichoice', options: ['A', 'B'] },
+      ],
+    }),
+  );
+  render(
+    <SurveyGenerator
+      account=""
+      loginComplete={false}
+      demoSurfaceMode={false}
+      onQuestionsGenerated={onQuestionsGenerated}
+    />,
+  );
+  fireEvent.change(screen.getByLabelText('Source text'), { target: { value: source } });
+  fireEvent.click(screen.getByText('Multichoice', { exact: true }));
+  generate();
+  await screen.findByDisplayValue('Keep the binary question?');
+  expect(screen.queryByDisplayValue('Drop the other type?')).not.toBeInTheDocument();
+  expect(onQuestionsGenerated.mock.calls[0][0].map((question) => question.type)).toEqual(['binary']);
+  expect(callAI.mock.calls[0][0]).toContain('TypeOfQuestionsToInclude: binary');
+});
+
+it('explains when a model response has no usable questions', async () => {
+  callAI.mockResolvedValueOnce(JSON.stringify({ questions: [{ prompt: ' ', questionType: 'binary' }] }));
+  render(<SurveyGenerator account="" loginComplete={false} demoSurfaceMode={false} />);
+  fireEvent.change(screen.getByLabelText('Source text'), { target: { value: source } });
+  generate();
+  expect(
+    await screen.findByText(/no usable questions.*Try a different source or enable another question type/i),
+  ).toBeVisible();
+  expect(screen.queryByTestId('authoring-editor')).not.toBeInTheDocument();
+});

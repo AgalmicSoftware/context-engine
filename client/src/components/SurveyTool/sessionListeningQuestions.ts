@@ -4,6 +4,7 @@ import { generateQuestionId as generateSharedQuestionId } from '../../utilities/
 import {
   buildGeneratedSurveyStatements,
   buildSingleGenerationPrompt,
+  getSelectedQuestionTypes,
   GeneratedAiQuestionPayload,
   GeneratedSurveyStatement,
   QuestionTypeSelection,
@@ -82,7 +83,7 @@ export const buildListeningQuestionPrompt = (
     promptTemplate: seedGenPrompt,
     sourceDocContent: transcript,
     count,
-    questionTypes,
+    selectedTypes: getSelectedQuestionTypes(questionTypes),
     defaultTags,
     transcriptMode: true,
     overrides: {
@@ -121,7 +122,7 @@ export const buildListeningQuestionStatements = (
 ) =>
   buildGeneratedSurveyStatements({
     aiData: payload,
-    questionTypes,
+    selectedTypes: getSelectedQuestionTypes(questionTypes),
     count,
     fallbackTitle: 'Listening Session Questions',
     generateQuestionId: generateListeningQuestionId,
