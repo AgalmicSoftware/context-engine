@@ -155,7 +155,7 @@ describe('SurveyResults HTML report analysis cache controls', () => {
 
   it('does not apply old analysis when the session changes during cache persistence', async () => {
     const pending = createDeferred<Record<string, unknown>>();
-    (callAI as jest.Mock).mockResolvedValue(BREAKDOWN_ANALYSIS_JSON);
+    (callAI as jest.Mock).mockImplementation(async () => BREAKDOWN_ANALYSIS_JSON);
     seedAnalysisEligibleSession('old-session');
     seedAnalysisEligibleSession('new-session');
     const harness = mountSurveyResults({
