@@ -1307,3 +1307,7 @@ untouched tags field; changing session identity starts a fresh draft.
 Changing the signed-in account or credential during Group creation releases
 the busy state and keeps the draft. A superseded request cannot apply its result
 or clear the busy state of a newer request.
+
+AI tag suggestions belong to the question ID, text and request generation that
+started them. Removing or editing that question discards its pending result and
+releases its busy state; moving another row cannot redirect tags or add a row.

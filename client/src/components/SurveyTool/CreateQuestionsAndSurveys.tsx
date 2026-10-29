@@ -1,3 +1,4 @@
+import { suggestTagsForQuestion, invalidateQuestionTagRequest } from './createSurveyQuestionTagActions';
 /** @file CreateQuestionsAndSurveys.tsx */
 
 import React, { Component } from 'react';
@@ -40,7 +41,6 @@ import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js'
 import { sessionRegistryStore, sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { ethers } from 'ethers';
 import AudioSurveyGenerator from './SurveyGenerator/SurveyGenerator';
-import { callAI } from '../../utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from '../../utilities/ai/aiSettings.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
@@ -126,7 +126,6 @@ import {
   buildCreateSurveyValidationErrorPatch,
   combineLitRecipientAccessControlConditions,
   formatAiPromptModelLabel,
-  generateSingleQuestionTagsPrompt,
   getErrorCode,
   getErrorMessage,
   getCreateSurveyValidationError,
@@ -1573,6 +1572,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   handleQuestionChange = (index: number, key: string, value: unknown): void => {
+    invalidateQuestionTagRequest(this, index);
     const updatedQuestions = buildCreateSurveyQuestionFieldUpdateList({
       generateQuestionId: this.generateQuestionId,
       key,
@@ -1587,6 +1587,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   handleOptionChange = (qIdx: number, optIdx: number, val: unknown): void => {
+    invalidateQuestionTagRequest(this, qIdx);
     const updatedQuestions = buildCreateSurveyQuestionOptionList({
       generateQuestionId: this.generateQuestionId,
       operation: 'change',
@@ -1599,6 +1600,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   addOption = (questionIndex: number): void => {
+    invalidateQuestionTagRequest(this, questionIndex);
     const updatedQuestions = buildCreateSurveyQuestionOptionList({
       generateQuestionId: this.generateQuestionId,
       operation: 'add',
@@ -1609,6 +1611,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   removeOption = (questionIndex: number, optionIndex: number): void => {
+    invalidateQuestionTagRequest(this, questionIndex);
     const updatedQuestions = buildCreateSurveyQuestionOptionList({
       generateQuestionId: this.generateQuestionId,
       operation: 'remove',
@@ -1620,6 +1623,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   removeQuestion = (index: number): void => {
+    invalidateQuestionTagRequest(this, index);
     const updated = this.state.questions.filter((_, i) => i !== index);
     this.setState(buildCreateSurveyQuestionListPatch(updated), () => {
       this.updateSurveyHash();
@@ -3032,62 +3036,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }, this.saveToLocalStorage);
   };
 
-  suggestTagsForQuestion = async (qIndex: number): Promise<void> => {
-    const question = this.state.questions[qIndex];
-    if (!question || question.isGeneratingTags) return;
-
-    this.setState((prevState: CreateQuestionsAndSurveysState) => {
-      const updatedQuestions = [...prevState.questions];
-      updatedQuestions[qIndex] = { ...updatedQuestions[qIndex], isGeneratingTags: true };
-      return { questions: updatedQuestions };
-    });
-
-    try {
-      const defaultTagsRaw = this.props.defaultTags;
-      let defaultTagsForAI: string[] = [];
-      if (Array.isArray(defaultTagsRaw)) {
-        defaultTagsForAI = defaultTagsRaw.filter(Boolean).map((t) => t.trim());
-      } else if (typeof defaultTagsRaw === 'string') {
-        defaultTagsForAI = defaultTagsRaw
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean);
-      }
-
-      const prompt = generateSingleQuestionTagsPrompt(
-        String(question.prompt || ''),
-        String(question.type || ''),
-        Array.isArray(question.options) ? question.options : [],
-        defaultTagsForAI,
-      );
-
-      const rawResponse = await callAI(prompt, { ...this.buildAiRequestOptions(), taskType: 'categorize' });
-      const match = rawResponse.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('No JSON object found in AI response for tags.');
-      const parsedResponse = JSON.parse(match[0]);
-      const newAiTags = (parsedResponse.tags || []).map((tag: unknown) => String(tag || '').trim()).filter(Boolean);
-
-      this.setState((prevState: CreateQuestionsAndSurveysState) => {
-        const updated = [...prevState.questions];
-        updated[qIndex] = {
-          ...updated[qIndex],
-          aiGeneratedTagsFromSource: newAiTags,
-          tags: [...newAiTags],
-          isGeneratingTags: false,
-        };
-        return { questions: updated };
-      }, this.saveToLocalStorage);
-    } catch (_error: unknown) {
-      this.setState((prevState: CreateQuestionsAndSurveysState) => {
-        const updated = [...prevState.questions];
-        updated[qIndex] = { ...updated[qIndex], isGeneratingTags: false };
-        return { questions: updated };
-      });
-      alert(
-        `Failed to generate tags for question "${(question?.prompt || '').substring(0, 30)}...". Please try again.`,
-      );
-    }
-  };
+  suggestTagsForQuestion = suggestTagsForQuestion.bind(this);
 
   removeTagFromQuestion = (qIndex: number, tagIndexToRemove: number): void => {
     this.setState((prevState: CreateQuestionsAndSurveysState) => {

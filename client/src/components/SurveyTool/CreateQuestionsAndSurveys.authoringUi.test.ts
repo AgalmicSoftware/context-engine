@@ -78,6 +78,108 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(save).toHaveBeenCalled();
   });
 
+  const pendingTags = () => {
+    let resolve!: (value: string) => void;
+    let reject!: (error: Error) => void;
+    const promise = new Promise<string>((yes, no) => {
+      resolve = yes;
+      reject = no;
+    });
+    return { promise, resolve, reject };
+  };
+  const tagDraft = () => {
+    const instance = makeInstance();
+    jest.spyOn(instance, 'saveToLocalStorage').mockImplementation(() => {});
+    jest.spyOn(instance, 'updateSurveyHash').mockImplementation(() => {});
+    jest.spyOn(window, 'alert').mockImplementation(() => {});
+    instance.setState({
+      showAutoTool: false,
+      isStandaloneQuestion: true,
+      questions: [
+        { id: 'q1', uiKey: 'row-one', type: 'freeform', prompt: 'First question?', tags: ['first'] },
+        { id: 'q2', uiKey: 'row-two', type: 'freeform', prompt: 'Second question?', tags: ['second'] },
+      ],
+    });
+    return instance;
+  };
+  const expectTagSubmitEnabled = (instance: ReturnType<typeof makeInstance>) => {
+    const [submit] = collectTreeNodes(
+      instance.render(),
+      (node) => node.props?.['data-testid'] === E2E_TESTIDS.CREATE_SUBMIT,
+    );
+    expect(asRenderTreeNode(submit).props.disabled).toBe(false);
+  };
+  it.each([
+    [0, false],
+    [1, false],
+    [0, true],
+    [1, true],
+  ] as const)(
+    'tag request for row %s remains with its question after removal (failure=%s)',
+    async (requestIndex, fails) => {
+      const pending = pendingTags();
+      jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);
+      const instance = tagDraft();
+      const run = instance.suggestTagsForQuestion(requestIndex);
+      instance.removeQuestion(0);
+      if (fails) pending.reject(new Error('model failed'));
+      else pending.resolve('{"tags":["own-result"]}');
+      await run;
+      expect(instance.state.questions).toHaveLength(1);
+      expect(instance.state.questions[0]).toMatchObject({
+        id: 'q2',
+        prompt: 'Second question?',
+        tags: requestIndex === 1 && !fails ? ['own-result'] : ['second'],
+      });
+      expect(instance.state.questions[0].isGeneratingTags).not.toBe(true);
+      expectTagSubmitEnabled(instance);
+    },
+  );
+  it('editing a question discards pending tags and releases its busy state', async () => {
+    const pending = pendingTags();
+    jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);
+    const instance = tagDraft();
+    const run = instance.suggestTagsForQuestion(0);
+    instance.handleQuestionChange(0, 'prompt', 'Edited first question?');
+    pending.resolve('{"tags":["stale"]}');
+    await run;
+    expect(instance.state.questions[0]).toMatchObject({ prompt: 'Edited first question?', tags: ['first'] });
+    expect(instance.state.questions[0].isGeneratingTags).not.toBe(true);
+    expectTagSubmitEnabled(instance);
+  });
+  it('an older tag generation cannot clear a newer request after editing back to the same text', async () => {
+    const first = pendingTags();
+    const second = pendingTags();
+    jest.spyOn(aiClient, 'callAI').mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const instance = tagDraft();
+    instance.handleQuestionChange(0, 'prompt', 'Original question?');
+    const firstRun = instance.suggestTagsForQuestion(0);
+    instance.handleQuestionChange(0, 'prompt', 'Edited question?');
+    instance.handleQuestionChange(0, 'prompt', 'Original question?');
+    const secondRun = instance.suggestTagsForQuestion(0);
+    first.resolve('{"tags":["stale"]}');
+    await firstRun;
+    expect(instance.state.questions[0].isGeneratingTags).toBe(true);
+    expect(instance.state.questions[0].tags).toEqual(['first']);
+    second.resolve('{"tags":["current"]}');
+    await secondRun;
+    expect(instance.state.questions[0].tags).toEqual(['current']);
+    expectTagSubmitEnabled(instance);
+  });
+
+  it('tag completion survives repeated React state-updater evaluation', async () => {
+    jest.spyOn(aiClient, 'callAI').mockResolvedValue('{"tags":["current"]}');
+    const instance = tagDraft();
+    jest.spyOn(instance, 'setState').mockImplementation((update, callback) => {
+      if (typeof update === 'function') update(instance.state, instance.props);
+      const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
+      if (patch && typeof patch === 'object') instance.state = { ...instance.state, ...patch };
+      callback?.();
+    });
+    await instance.suggestTagsForQuestion(0);
+    expect(instance.state.questions[0]).toMatchObject({ tags: ['current'], isGeneratingTags: false });
+  });
+
   it('supports the Interview upload label and styling through the existing submit handler', () => {
     const instance = makeInstance({
       interviewQuestionReview: true,

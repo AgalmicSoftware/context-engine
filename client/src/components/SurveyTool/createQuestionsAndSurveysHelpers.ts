@@ -284,6 +284,7 @@ export const buildCreateSurveyQuestionOptionList = ({
     nextOptions[optionIndex as number] = value;
   }
 
+  if (questionToUpdate.isGeneratingTags) questionToUpdate.isGeneratingTags = false;
   questionToUpdate.options = nextOptions;
   questionToUpdate.id = generateQuestionId(
     questionToUpdate.type,
@@ -309,6 +310,7 @@ export const buildCreateSurveyQuestionFieldUpdateList = ({
     ...(updatedQuestions[qIndex] as Record<string, unknown> | null | undefined),
   };
   const fieldKey = key as string;
+  if (questionToUpdate.isGeneratingTags) questionToUpdate.isGeneratingTags = false;
   questionToUpdate[fieldKey] = value;
   if (fieldKey === 'prompt' || fieldKey === 'type' || fieldKey === 'singleSelect' || fieldKey === 'voiceCredits') {
     questionToUpdate.id = generateQuestionId(
