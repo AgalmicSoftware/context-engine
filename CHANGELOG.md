@@ -518,6 +518,9 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Audit every model the full OpenRouter runner will send, using one effective
+  roster for preflight, planning and execution.
+
 - Validate OpenRouter's transport and serving provider separately. Enforce upstream
   routing restrictions with normalized comparisons while preserving reported metadata.
 

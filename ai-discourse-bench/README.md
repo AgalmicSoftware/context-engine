@@ -226,7 +226,9 @@ npm run openrouter:plan
 
 The sample roster uses valid OpenRouter request ids while recording their dated
 canonical revisions and per-million-token prices as of `2026-07-13`. The full
-runner fetches OpenRouter's current model catalog before making any completion
+runner resolves every model to its effective OpenRouter provider once, then uses
+that same roster for catalog audit, plan and execution, including entries declared
+as local. It fetches OpenRouter's current model catalog before making any completion
 calls and fails if a revision, price, expiration, or structured-output
 capability has drifted. It also requests routes that support every submitted
 parameter without provider fallback.

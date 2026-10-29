@@ -46,7 +46,12 @@ const questionLimit = process.env.AIDB_LIMIT_QUESTIONS
   : 0;
 
 const questionBank = limitQuestionBank(await readJsonFile(questionBankPath), questionLimit);
-const modelRoster = await readJsonFile(modelRosterPath);
+const declaredRoster = await readJsonFile(modelRosterPath);
+throwIfErrors('model roster', validateModelRoster(declaredRoster));
+const modelRoster = {
+  ...declaredRoster,
+  models: declaredRoster.models.map(model => ({ ...model, provider: 'openrouter' })),
+};
 const personasFile = mode === 'persona' ? await readJsonFile(personasPath) : { personas: [] };
 const persona = mode === 'persona'
   ? personasFile.personas.find((entry) => entry.id === personaId)
@@ -85,7 +90,6 @@ const plan = {
   modelRoster,
   mode,
   persona,
-  providerOverride: 'openrouter',
   repeats,
   }),
   openRouterCatalogAudit: catalogAudit,
@@ -110,7 +114,6 @@ const runsFile = await runBenchmark({
   questionBank,
   modelRoster,
   personasFile,
-  providerOverride: 'openrouter',
   mode,
   personaId,
   repeats,
