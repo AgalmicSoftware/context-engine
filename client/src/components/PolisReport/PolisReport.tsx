@@ -1544,6 +1544,8 @@ export default function PolisReport({
 
           const aiRes = await analyzeClusterOpinionsTyped(payload, allClustersDataWithNames, {
             sessionSlug: activeReportSlug,
+            sessionConfig,
+            context: { account, providerLike: provider, chainId: networkChainId || network?.id || network?.chainId },
           });
 
           // Enforce uniqueness in UI even if AI repeats a name

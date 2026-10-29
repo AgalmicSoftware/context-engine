@@ -1,4 +1,6 @@
 import React from 'react';
+import { analyzeClusterOpinions } from '../../utilities/ai/aiClient.js';
+jest.mock('../../utilities/ai/aiClient.js', () => ({ analyzeClusterOpinions: jest.fn() }));
 import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import PolisReport, {
   applyFilterStateToAggregator,
@@ -2493,4 +2495,61 @@ it('ranks top questions by importance before conviction', () => {
     '',
   );
   expect(Object.keys(out)).toEqual(['highImportance']);
+});
+
+it('analyzes Worker session clusters using the selected config and viewer context', async () => {
+  analyzeClusterOpinions.mockResolvedValue({
+    name: 'Common ground',
+    short: 'Shared priorities',
+    long: 'Synthetic group explanation',
+  });
+  const config = {
+    slug: 'cluster-worker',
+    corsWorkerUrl: 'https://cluster-worker.example',
+    sessionId: '0x' + '9'.repeat(32),
+    sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  };
+  const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: config.slug });
+  cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+    namespace === 'questionsCache'
+      ? {
+          worker: withWorkerCanonicalCacheIdentity(
+            { questions: { seedQuestion: { type: 'binary', prompt: 'Seed prompt' } } },
+            identity,
+          ),
+        }
+      : {},
+  );
+  computePolisConversationMath.mockReturnValue({
+    stats: { nParticipants: 1, nComments: 1, totalVotes: 1 },
+    participantCoords: [{ x: 0, y: 0, index: 0 }],
+    statementCoords: [],
+    commentStats: [],
+    clusterAssignments: [0],
+    clusterCount: 1,
+    repQuestions: { 0: [] },
+  });
+  const provider = { request: jest.fn() };
+  render(
+    <PolisReport
+      {...baseReportProps}
+      network={null}
+      networkChainId={null}
+      slug={config.slug}
+      sessionConfig={config}
+      account="synthetic-viewer"
+      provider={provider}
+      questionResponses={seededQuestionResponses}
+    />,
+  );
+  fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+  fireEvent.click(await screen.findByTestId(E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS));
+  await waitFor(() =>
+    expect(analyzeClusterOpinions).toHaveBeenCalledWith(expect.any(Object), expect.any(Object), {
+      sessionSlug: config.slug,
+      sessionConfig: config,
+      context: { account: 'synthetic-viewer', providerLike: provider, chainId: undefined },
+    }),
+  );
+  expect(await screen.findByText('Cluster 0: Common ground')).toBeInTheDocument();
 });

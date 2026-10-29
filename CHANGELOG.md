@@ -106,6 +106,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep cluster AI explanations on the selected session Worker with the current viewer authentication context.
+
 - Prioritize newer unanswered questions in the voice interview and personal AI-prefill prompt using the browser’s own answer state, preserving public catalog versions and fingerprints.
 
 - Add optional Group Conversation speaker labels, stored per recording chunk in the local transcript draft. Requires the matching Worker template; speaker review and claiming remain unavailable.

@@ -486,3 +486,8 @@ Labels restart for each three-minute upload. They do not establish identity and 
 The voice interview starts with unanswered questions, newest first using creation dates already available in the browser. It keeps questions without dates in their existing relative order. If every question has an answer, it asks which answer the person wants to change instead of repeating the opening.
 
 The voice chooser's personal AI-prefill prompt includes the same ordered question IDs and the IDs already answered in that browser. It does not include saved answer text or send progress to the public catalog. The catalog schema, prompt version and question-set fingerprint are unchanged. Generic Join prompts remain shareable and carry no person's progress. Dates and progress unavailable to the browser cannot be inferred; opening on another device before signing in may therefore offer questions already answered elsewhere.
+
+
+### Reading session results
+
+The session Results Report includes consensus and difference plus the Participants Graph. **Analyze clusters** uses the selected session's Worker configuration and the current viewer's authentication context. It requires that session's AI configuration and access. A political compass is currently available only within curated demo content; arbitrary session responses have no configured compass axes or scoring map.
