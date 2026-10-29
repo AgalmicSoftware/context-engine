@@ -89,7 +89,11 @@ default. Setup failures before transaction submission also leave the allowance
 intact. An organizer can enable the faucet in `/new` for SBT rules on the session's
 supported test network. Otherwise the agent's operator funds the reported address.
 Claims and registry writes retain a sent faucet transaction hash when funding is
-pending or the balance check fails, and explain balance-threshold refusals.
+pending or the balance check fails, and explain balance-threshold refusals. Each
+faucet request signs at most one payment. After a broadcast attempt, RPC fallback
+resends the identical transaction; an uncertain outcome returns its transaction
+hash for checking before another request is made. This applies to hosted, registry
+and agent faucet calls.
 
 ## Limits
 

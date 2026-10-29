@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Wallet } from 'ethers';
+import { Wallet, keccak256 } from 'ethers';
+import { createAgentEnvironment } from './agent/authority.mjs';
+import { createAgentServices } from './agent/services.mjs';
 
 import { faucet } from './faucetExecution.js';
 import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretActionRouteDispatch.js';
@@ -76,7 +78,7 @@ test('hosted quotas retain ambiguous broadcasts and never submit a second payout
     statuses.push(result.response.status);
   }
   assert.deepEqual(statuses, [502, 502, 502, 429, 429]);
-  assert.equal(submissions, 3);
+  assert.equal(submissions, 6);
 });
 
 test('hosted quotas release failures that occur before any transaction is submitted', async () => {
@@ -141,7 +143,7 @@ const createWalletCtor = ({ signTransaction, capturePrivateKey } = {}) => class 
   }
 
   async signTransaction(txRequest) {
-    return signTransaction ? signTransaction(txRequest) : '0xsigned';
+    return signTransaction ? signTransaction(txRequest) : '0x1234';
   }
 };
 
@@ -543,7 +545,7 @@ test('faucet preserves gas price fallback to 0x3b9aca00 on successful send', asy
       },
       signTransaction: async (txRequest) => {
         capturedTxRequest = txRequest;
-        return '0xsigned-fallback-gas';
+        return '0x5678';
       },
     }),
     rpcRequest: async (value) => {
@@ -558,7 +560,7 @@ test('faucet preserves gas price fallback to 0x3b9aca00 on successful send', asy
         case 'eth_gasPrice':
           throw new Error('gas price unavailable');
         case 'eth_sendRawTransaction':
-          assert.deepEqual(value.params, ['0xsigned-fallback-gas']);
+          assert.deepEqual(value.params, ['0x5678']);
           return '0xtxhash-fallback-gas';
         default:
           throw new Error(`Unexpected method: ${value.method}`);
@@ -579,7 +581,7 @@ test('faucet preserves gas price fallback to 0x3b9aca00 on successful send', asy
   });
   assert.deepEqual(result, {
     body: {
-      txHash: '0xtxhash-fallback-gas',
+      txHash: keccak256('0x5678'),
       status: null,
       to: RECIPIENT,
       amountEth: '0.0002',
@@ -689,7 +691,8 @@ test('faucet redacts private RPC provenance and raw downstream errors from send 
 
   assert.deepEqual(result, {
     body: {
-      error: 'RPC transaction submission failed.',
+      error: `Transaction submission outcome is unknown; check transaction ${keccak256('0x1234')} before retrying.`,
+      txHash: keccak256('0x1234'),
       rpcUrl: PRIVATE_SESSION_RPC_LABEL,
       chainId: 31337,
       registryChainId: 0,
@@ -729,4 +732,88 @@ test('faucet redacts private RPC provenance and raw downstream errors from send 
   assert.equal(serialized.includes('TENANT_SECRET'), false);
   assert.equal(serialized.includes('ALCHEMY_SECRET'), false);
   assert.equal(serialized.includes('rpcError'), false);
+});
+
+for (const agentPath of [false, true]) {
+  for (const uncertain of [false, true]) {
+    test(`${agentPath ? 'agent' : 'direct'} faucet signs once after a lost reply (${uncertain ? 'all sends uncertain' : 'fallback succeeds'})`, async () => {
+      const signed = [];
+      const sends = [];
+      const nonceReads = [];
+      const privateKey = Wallet.createRandom().privateKey;
+      const deps = createDeps({
+        Wallet: class CountingWallet extends Wallet {
+          async signTransaction(tx) {
+            const raw = await super.signTransaction(tx);
+            signed.push(raw);
+            return raw;
+          }
+        },
+        json: (body, status, headers) => Response.json(body, { status, headers }),
+        normalizeFaucetRequest: () => createNormalizedResult({ normalized: {
+          ...createNormalizedResult().normalized, privateKey, rpcUrls: [PRIMARY_RPC, SECONDARY_RPC, 'https://rpc-3.example'],
+        } }),
+        rpcRequest: async ({ rpcUrl, method, params }) => {
+          if (method === 'eth_getTransactionCount') {
+            nonceReads.push(rpcUrl);
+            return rpcUrl === PRIMARY_RPC ? '0x1' : '0x2';
+          }
+          if (method === 'eth_sendRawTransaction') {
+            sends.push(params[0]);
+            if (rpcUrl === PRIMARY_RPC) throw new Error('Accepted but connection closed before reply');
+            if (uncertain) throw new Error(rpcUrl === SECONDARY_RPC ? 'already known' : 'nonce too low');
+            return keccak256(params[0]);
+          }
+          return createDeps().rpcRequest({ method });
+        },
+      });
+      let result;
+      if (agentPath) {
+        const config = { sessionId: `0x${'ab'.repeat(16)}`, authzEpoch: 0,
+          sessionModeProfile: { surfaces: { agentHttp: true } }, agentHttp: { sponsoredFaucetAllowed: true } };
+        const env = { TOKEN_HMAC_SECRET: 'local-test-only' };
+        const agentEnv = createAgentEnvironment({ env, config, revision: 1, slug: 'example', origin: 'https://worker.example' });
+        agentEnv.AGENT_CONTEXT.address = RECIPIENT;
+        const services = createAgentServices({ env, agentEnv, deps: {
+          readCurrentSessionConfig: async () => ({ config, revision: 1 }),
+          computeScopesForLogin: async () => ({ faucet: true }),
+          getSessionSecrets: async () => ({}),
+          faucet: args => runFaucet(deps, args),
+        } });
+        result = await services.faucet();
+        assert.equal(result.ok, !uncertain);
+      } else {
+        const response = await runFaucet(deps);
+        assert.equal(response.status, uncertain ? 502 : 200);
+        result = await response.json();
+      }
+      assert.equal(signed.length, 1, 'one request signs only one payment');
+      assert.deepEqual(nonceReads, [PRIMARY_RPC], 'a lost reply cannot cause a new nonce lookup');
+      assert.deepEqual(sends, Array(uncertain ? 3 : 2).fill(signed[0]));
+      assert.equal(result.txHash, keccak256(signed[0]));
+      if (uncertain && !agentPath) assert.ok(result.error.includes(result.txHash));
+    });
+  }
+}
+
+test('a pre-broadcast balance read failure still falls back before signing', async () => {
+  const signed = [];
+  const sends = [];
+  const deps = createDeps({
+    Wallet: class CountingWallet extends Wallet {
+      async signTransaction(tx) { signed.push(tx); return super.signTransaction(tx); }
+    },
+    normalizeFaucetRequest: () => createNormalizedResult({ normalized: {
+      ...createNormalizedResult().normalized, privateKey: Wallet.createRandom().privateKey, rpcUrls: [PRIMARY_RPC, SECONDARY_RPC],
+    } }),
+    rpcRequest: async ({ rpcUrl, method, params }) => {
+      if (rpcUrl === PRIMARY_RPC && method === 'eth_getBalance') throw new Error('RPC unavailable');
+      if (method === 'eth_sendRawTransaction') { sends.push(rpcUrl); return keccak256(params[0]); }
+      return createDeps().rpcRequest({ method });
+    },
+  });
+  const result = await runFaucet(deps);
+  assert.equal(result.status, 200);
+  assert.equal(signed.length, 1);
+  assert.deepEqual(sends, [SECONDARY_RPC]);
 });

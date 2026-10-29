@@ -128,7 +128,6 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
         tokenHasFaucetScope: preflight.tokenHasScope,
         ...(hosted ? {
           onSubmissionAttempt: () => { submissionAttempted = true; },
-          retryAfterSubmissionFailure: false,
         } : {}),
       });
     } catch (error) {

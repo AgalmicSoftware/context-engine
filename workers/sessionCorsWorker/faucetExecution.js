@@ -1,3 +1,4 @@
+import { keccak256 } from 'ethers';
 import {
   validateFaucetEligibilityRequest as validateFaucetEligibilityRequestBoundary,
 } from './faucetEligibilityValidation.js';
@@ -50,7 +51,6 @@ export const faucet = async ({
   requesterAddress = '',
   tokenHasFaucetScope = false,
   onSubmissionAttempt,
-  retryAfterSubmissionFailure = true,
   deps,
   constants,
   defaults,
@@ -197,6 +197,8 @@ export const faucet = async ({
   const wallet = new Wallet(privateKey);
   const fromAddress = wallet.address;
   const thresholdWeiBig = toBigInt(thresholdWei);
+  let signedTx = '';
+  let txHash = '';
 
   for (const rpc of rpcUrls || []) {
     const masked = maskRpcUrl(rpc);
@@ -241,90 +243,94 @@ export const faucet = async ({
       continue;
     }
 
-    let currentBalanceWei = 0n;
-    try {
-      const balanceHex = await rpcRequest({
-        rpcUrl: rpc,
-        method: 'eth_getBalance',
-        params: [to, 'latest'],
-      });
-      currentBalanceWei = toBigInt(balanceHex);
-    } catch (err) {
-      const failure = buildSafeRpcFailure({
-        rpcUrl: rpc,
-        error: err,
-        errorLabel: 'RPC balance check failed.',
-        maskRpcUrl,
-        privateRpcUrls,
-      });
-      errors.push({ ...failure, chainId });
-      continue;
-    }
+    // After a broadcast, every fallback must resend the same payment even if
+    // another RPC reports a newer nonce or balance.
+    if (!signedTx) {
+      let currentBalanceWei = 0n;
+      try {
+        const balanceHex = await rpcRequest({
+          rpcUrl: rpc,
+          method: 'eth_getBalance',
+          params: [to, 'latest'],
+        });
+        currentBalanceWei = toBigInt(balanceHex);
+      } catch (err) {
+        const failure = buildSafeRpcFailure({
+          rpcUrl: rpc,
+          error: err,
+          errorLabel: 'RPC balance check failed.',
+          maskRpcUrl,
+          privateRpcUrls,
+        });
+        errors.push({ ...failure, chainId });
+        continue;
+      }
 
-    if (currentBalanceWei > thresholdWeiBig) {
-      return json(
-        {
-          error: `Balance above threshold (${thresholdEth} ETH).`,
-          balanceEth: formatEther(currentBalanceWei.toString()),
-          thresholdEth,
+      if (currentBalanceWei > thresholdWeiBig) {
+        return json(
+          {
+            error: `Balance above threshold (${thresholdEth} ETH).`,
+            balanceEth: formatEther(currentBalanceWei.toString()),
+            thresholdEth,
+            rpcUrl: masked,
+            chainId,
+          },
+          403,
+          baseHeaders,
+        );
+      }
+
+      let nonceHex = '0x0';
+      try {
+        nonceHex = await rpcRequest({
+          rpcUrl: rpc,
+          method: 'eth_getTransactionCount',
+          params: [fromAddress, 'pending'],
+        });
+      } catch (err) {
+        const failure = buildSafeRpcFailure({
+          rpcUrl: rpc,
+          error: err,
+          errorLabel: 'RPC nonce lookup failed.',
+          maskRpcUrl,
+          privateRpcUrls,
+        });
+        errors.push({ ...failure, chainId });
+        continue;
+      }
+
+      let gasPriceHex = DEFAULT_GAS_PRICE_HEX;
+      try {
+        gasPriceHex = await rpcRequest({ rpcUrl: rpc, method: 'eth_gasPrice', params: [] });
+      } catch (_) {
+        gasPriceHex = DEFAULT_GAS_PRICE_HEX;
+      }
+
+      const txRequest = {
+        to,
+        value: amountWei,
+        nonce: nonceHex,
+        gasLimit: '0x5208',
+        ...(gasPriceHex ? { gasPrice: gasPriceHex } : {}),
+        ...(chainId ? { chainId } : {}),
+      };
+
+      try {
+        signedTx = await wallet.signTransaction(txRequest);
+        txHash = keccak256(signedTx);
+      } catch (err) {
+        errors.push({
           rpcUrl: masked,
           chainId,
-        },
-        403,
-        baseHeaders,
-      );
-    }
-
-    let nonceHex = '0x0';
-    try {
-      nonceHex = await rpcRequest({
-        rpcUrl: rpc,
-        method: 'eth_getTransactionCount',
-        params: [fromAddress, 'pending'],
-      });
-    } catch (err) {
-      const failure = buildSafeRpcFailure({
-        rpcUrl: rpc,
-        error: err,
-        errorLabel: 'RPC nonce lookup failed.',
-        maskRpcUrl,
-        privateRpcUrls,
-      });
-      errors.push({ ...failure, chainId });
-      continue;
-    }
-
-    let gasPriceHex = DEFAULT_GAS_PRICE_HEX;
-    try {
-      gasPriceHex = await rpcRequest({ rpcUrl: rpc, method: 'eth_gasPrice', params: [] });
-    } catch (_) {
-      gasPriceHex = DEFAULT_GAS_PRICE_HEX;
-    }
-
-    const txRequest = {
-      to,
-      value: amountWei,
-      nonce: nonceHex,
-      gasLimit: '0x5208',
-      ...(gasPriceHex ? { gasPrice: gasPriceHex } : {}),
-      ...(chainId ? { chainId } : {}),
-    };
-
-    let signedTx = '';
-    try {
-      signedTx = await wallet.signTransaction(txRequest);
-    } catch (err) {
-      errors.push({
-        rpcUrl: masked,
-        chainId,
-        error: 'Faucet transaction signing failed.',
-      });
-      continue;
+          error: 'Faucet transaction signing failed.',
+        });
+        continue;
+      }
     }
 
     try {
       onSubmissionAttempt?.();
-      const txHash = await rpcRequest({
+      await rpcRequest({
         rpcUrl: rpc,
         method: 'eth_sendRawTransaction',
         params: [signedTx],
@@ -366,15 +372,15 @@ export const faucet = async ({
         ...(failure.code != null ? { code: failure.code } : {}),
         error: failure.error,
       });
-      // A hosted reservation covers one payout. An ambiguous send cannot safely
-      // retry with another RPC's pending nonce and create a second transfer.
-      if (!retryAfterSubmissionFailure) break;
     }
   }
 
   return json(
     {
-      error: errors[errors.length - 1]?.error || 'Faucet transfer failed.',
+      error: txHash
+        ? `Transaction submission outcome is unknown; check transaction ${txHash} before retrying.`
+        : errors[errors.length - 1]?.error || 'Faucet transfer failed.',
+      ...(txHash ? { txHash } : {}),
       rpcUrl: (rpcUrls || []).length ? maskRpcUrl(rpcUrls[0]) : maskRpcUrl(rpcMasked),
       chainId: expectedChainId || null,
       registryChainId,

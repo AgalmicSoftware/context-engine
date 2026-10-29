@@ -85967,6 +85967,9 @@ var arweaveUpload = async ({
   }
 };
 
+// workers/sessionCorsWorker/faucetExecution.js
+init_lib2();
+
 // workers/sessionCorsWorker/faucetEligibilityValidation.js
 init_stringCoercion();
 init_chainIdNormalization();
@@ -86447,7 +86450,6 @@ var faucet = async ({
   requesterAddress = "",
   tokenHasFaucetScope = false,
   onSubmissionAttempt,
-  retryAfterSubmissionFailure = true,
   deps,
   constants,
   defaults
@@ -86581,6 +86583,8 @@ var faucet = async ({
   const wallet = new Wallet2(privateKey);
   const fromAddress = wallet.address;
   const thresholdWeiBig = toBigInt2(thresholdWei);
+  let signedTx = "";
+  let txHash = "";
   for (const rpc2 of rpcUrls || []) {
     const masked = maskRpcUrl(rpc2);
     let chainId = 0;
@@ -86621,84 +86625,86 @@ var faucet = async ({
       });
       continue;
     }
-    let currentBalanceWei = 0n;
-    try {
-      const balanceHex = await rpcRequest2({
-        rpcUrl: rpc2,
-        method: "eth_getBalance",
-        params: [to, "latest"]
-      });
-      currentBalanceWei = toBigInt2(balanceHex);
-    } catch (err) {
-      const failure = buildSafeRpcFailure({
-        rpcUrl: rpc2,
-        error: err,
-        errorLabel: "RPC balance check failed.",
-        maskRpcUrl,
-        privateRpcUrls
-      });
-      errors.push({ ...failure, chainId });
-      continue;
-    }
-    if (currentBalanceWei > thresholdWeiBig) {
-      return json6(
-        {
-          error: `Balance above threshold (${thresholdEth} ETH).`,
-          balanceEth: formatEther2(currentBalanceWei.toString()),
-          thresholdEth,
+    if (!signedTx) {
+      let currentBalanceWei = 0n;
+      try {
+        const balanceHex = await rpcRequest2({
+          rpcUrl: rpc2,
+          method: "eth_getBalance",
+          params: [to, "latest"]
+        });
+        currentBalanceWei = toBigInt2(balanceHex);
+      } catch (err) {
+        const failure = buildSafeRpcFailure({
+          rpcUrl: rpc2,
+          error: err,
+          errorLabel: "RPC balance check failed.",
+          maskRpcUrl,
+          privateRpcUrls
+        });
+        errors.push({ ...failure, chainId });
+        continue;
+      }
+      if (currentBalanceWei > thresholdWeiBig) {
+        return json6(
+          {
+            error: `Balance above threshold (${thresholdEth} ETH).`,
+            balanceEth: formatEther2(currentBalanceWei.toString()),
+            thresholdEth,
+            rpcUrl: masked,
+            chainId
+          },
+          403,
+          baseHeaders
+        );
+      }
+      let nonceHex = "0x0";
+      try {
+        nonceHex = await rpcRequest2({
+          rpcUrl: rpc2,
+          method: "eth_getTransactionCount",
+          params: [fromAddress, "pending"]
+        });
+      } catch (err) {
+        const failure = buildSafeRpcFailure({
+          rpcUrl: rpc2,
+          error: err,
+          errorLabel: "RPC nonce lookup failed.",
+          maskRpcUrl,
+          privateRpcUrls
+        });
+        errors.push({ ...failure, chainId });
+        continue;
+      }
+      let gasPriceHex = DEFAULT_GAS_PRICE_HEX;
+      try {
+        gasPriceHex = await rpcRequest2({ rpcUrl: rpc2, method: "eth_gasPrice", params: [] });
+      } catch (_) {
+        gasPriceHex = DEFAULT_GAS_PRICE_HEX;
+      }
+      const txRequest = {
+        to,
+        value: amountWei,
+        nonce: nonceHex,
+        gasLimit: "0x5208",
+        ...gasPriceHex ? { gasPrice: gasPriceHex } : {},
+        ...chainId ? { chainId } : {}
+      };
+      try {
+        signedTx = await wallet.signTransaction(txRequest);
+        txHash = keccak256(signedTx);
+      } catch (err) {
+        errors.push({
           rpcUrl: masked,
-          chainId
-        },
-        403,
-        baseHeaders
-      );
-    }
-    let nonceHex = "0x0";
-    try {
-      nonceHex = await rpcRequest2({
-        rpcUrl: rpc2,
-        method: "eth_getTransactionCount",
-        params: [fromAddress, "pending"]
-      });
-    } catch (err) {
-      const failure = buildSafeRpcFailure({
-        rpcUrl: rpc2,
-        error: err,
-        errorLabel: "RPC nonce lookup failed.",
-        maskRpcUrl,
-        privateRpcUrls
-      });
-      errors.push({ ...failure, chainId });
-      continue;
-    }
-    let gasPriceHex = DEFAULT_GAS_PRICE_HEX;
-    try {
-      gasPriceHex = await rpcRequest2({ rpcUrl: rpc2, method: "eth_gasPrice", params: [] });
-    } catch (_) {
-      gasPriceHex = DEFAULT_GAS_PRICE_HEX;
-    }
-    const txRequest = {
-      to,
-      value: amountWei,
-      nonce: nonceHex,
-      gasLimit: "0x5208",
-      ...gasPriceHex ? { gasPrice: gasPriceHex } : {},
-      ...chainId ? { chainId } : {}
-    };
-    let signedTx = "";
-    try {
-      signedTx = await wallet.signTransaction(txRequest);
-    } catch (err) {
-      errors.push({
-        rpcUrl: masked,
-        chainId,
-        error: "Faucet transaction signing failed."
-      });
-      continue;
+          chainId,
+          error: "Faucet transaction signing failed."
+        });
+        continue;
+      }
     }
     try {
       onSubmissionAttempt?.();
-      const txHash = await rpcRequest2({
+      await rpcRequest2({
         rpcUrl: rpc2,
         method: "eth_sendRawTransaction",
         params: [signedTx]
@@ -86740,12 +86746,12 @@ var faucet = async ({
         ...failure.code != null ? { code: failure.code } : {},
         error: failure.error
       });
-      if (!retryAfterSubmissionFailure) break;
     }
   }
   return json6(
     {
-      error: errors[errors.length - 1]?.error || "Faucet transfer failed.",
+      error: txHash ? `Transaction submission outcome is unknown; check transaction ${txHash} before retrying.` : errors[errors.length - 1]?.error || "Faucet transfer failed.",
+      ...txHash ? { txHash } : {},
       rpcUrl: (rpcUrls || []).length ? maskRpcUrl(rpcUrls[0]) : maskRpcUrl(rpcMasked),
       chainId: expectedChainId || null,
       registryChainId,
@@ -87827,7 +87833,12 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
         baseHeaders: {}
       });
       const body = await response2.json();
-      return response2.ok ? { ok: true, ...body } : { ok: false, reason: "faucet_request_failed", status: response2.status };
+      return response2.ok ? { ok: true, ...body } : {
+        ok: false,
+        reason: "faucet_request_failed",
+        status: response2.status,
+        ...body.txHash ? { txHash: body.txHash } : {}
+      };
     },
     async uploadArweave(payload) {
       await current();
@@ -104689,8 +104700,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
         ...hosted ? {
           onSubmissionAttempt: () => {
             submissionAttempted = true;
-          },
-          retryAfterSubmissionFailure: false
+          }
         } : {}
       });
     } catch (error) {
