@@ -41,6 +41,16 @@ export interface EncryptionWorkGroupsResult {
   missingRecipients: string[];
 }
 
+export type FieldEncryptionPolicy = { audience: unknown; lit?: unknown };
+export type ResolveFieldEncryptionPolicy = (
+  field: SubmitResponseFieldState,
+  qid: string,
+  fieldKey: string,
+) => FieldEncryptionPolicy;
+const fieldPolicy = (field: SubmitResponseFieldState): FieldEncryptionPolicy => ({
+  audience: field.encryptionAudience,
+});
+
 type EncryptionBucketKey = 'answers' | 'additionalComments';
 type EncryptionFieldKey = 'answer' | 'additional';
 
@@ -137,12 +147,14 @@ export const remaskUnchangedEncryptedFields = <T extends SubmitPrepSlice>(
   slice: T,
   baseline: SubmitPrepSlice | null | undefined,
   changedQids: Set<string>,
+  resolvePolicy: ResolveFieldEncryptionPolicy = fieldPolicy,
 ): T => {
   const next = { ...slice };
   for (const bucket of ['answers', 'additionalComments'] as const) {
     for (const qid of changedQids) {
       const field = slice[bucket]?.[qid];
       const saved = baseline?.[bucket]?.[qid];
+      const policy = field ? resolvePolicy(field, qid, bucket === 'answers' ? 'answer' : 'additional') : null;
       if (
         field?.encrypted &&
         saved?.encrypted &&
@@ -152,7 +164,8 @@ export const remaskUnchangedEncryptedFields = <T extends SubmitPrepSlice>(
         field.encryptedPortion === saved.encryptedPortion &&
         field.hash === saved.hash &&
         field.encryptionAudience === saved.encryptionAudience &&
-        field.encryptionGateId === saved.encryptionGateId
+        field.encryptionGateId === saved.encryptionGateId &&
+        responseEnvelopeMatchesAudience(field.encryptedPortion, policy?.audience, policy?.lit)
       ) {
         next[bucket] = { ...next[bucket], [qid]: { ...field, value: '*' } };
       }
@@ -161,27 +174,20 @@ export const remaskUnchangedEncryptedFields = <T extends SubmitPrepSlice>(
   return next;
 };
 
-/**
- * A still-locked field given a new audience: re-encrypting it for that audience needs its
- * decrypted text. Only a readable envelope says who can open it; anything else is left to
- * the final integrity check.
- */
-export const isLockedAudienceChange = (field: SubmitResponseFieldState | null | undefined): boolean => {
-  if (!field?.encrypted || field.value !== '*' || !field.encryptedPortion) return false;
-  try {
-    const envelope = JSON.parse(String(field.encryptedPortion));
-    return (
-      Array.isArray(envelope?.recipients) &&
-      responseEnvelopeMatchesAudience(envelope, field.encryptionAudience) === false
-    );
-  } catch {
-    return false;
-  }
-};
+// A changed policy requires plaintext before fresh encryption can be performed.
+export const isLockedAudienceChange = (
+  field: SubmitResponseFieldState | null | undefined,
+  policy: FieldEncryptionPolicy = field ? fieldPolicy(field) : { audience: null },
+): boolean =>
+  !!field?.encrypted &&
+  field.value === '*' &&
+  !!field.encryptedPortion &&
+  !responseEnvelopeMatchesAudience(field.encryptedPortion, policy.audience, policy.lit);
 
 export const verifyEncryptionIntegrity = (
   slice: SubmitPrepSlice | null | undefined,
   onlyTheseQids: Set<string> | null = null,
+  resolvePolicy: ResolveFieldEncryptionPolicy = fieldPolicy,
 ): { passed: boolean; failures: string[] } => {
   const failures: string[] = [];
   const stateToCheck = slice || {};
@@ -199,11 +205,15 @@ export const verifyEncryptionIntegrity = (
     const answer = stateToCheck.answers ? stateToCheck.answers[qId] : null;
     const additional = stateToCheck.additionalComments ? stateToCheck.additionalComments[qId] : null;
 
-    for (const field of [answer, additional]) {
+    for (const [field, key] of [
+      [answer, 'answer'],
+      [additional, 'additional'],
+    ] as const) {
+      const policy = field ? resolvePolicy(field, qId, key) : null;
       if (
         field?.encrypted &&
         field.encryptedPortion &&
-        responseEnvelopeMatchesAudience(field.encryptedPortion, field.encryptionAudience) === false
+        responseEnvelopeMatchesAudience(field.encryptedPortion, policy?.audience, policy?.lit) === false
       ) {
         failures.push(`Decrypt and re-encrypt the response for ${qId} before changing its audience.`);
         verificationPassed = false;

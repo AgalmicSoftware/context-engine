@@ -1966,6 +1966,7 @@ export const createSurveyQuestionsRuntimeMethods = (
   };
 
   const {
+    resolveFieldEncryptionPolicy,
     buildLitEncryptionOptionsForRecipients,
     buildFieldEncryptionWorkGroups,
     encryptFieldWorkGroups,
@@ -2082,7 +2083,11 @@ export const createSurveyQuestionsRuntimeMethods = (
       propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
     const stateToCheck: SurveyQuestionsLegacyValue =
       sliceOverride || stateRef.current.surveysResponseState[surveyIndex];
-    const { passed, failures }: SurveyQuestionsLegacyValue = verifyEncryptionIntegrity(stateToCheck, onlyTheseQids);
+    const { passed, failures }: SurveyQuestionsLegacyValue = verifyEncryptionIntegrity(
+      stateToCheck,
+      onlyTheseQids,
+      resolveFieldEncryptionPolicy,
+    );
 
     failures.forEach((msg: SurveyQuestionsLegacyValue) => surveyLog.error(msg));
 

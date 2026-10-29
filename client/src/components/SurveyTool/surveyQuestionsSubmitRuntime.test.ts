@@ -1,5 +1,10 @@
 import { createSurveyQuestionsSubmitRuntime } from './surveyQuestionsSubmitRuntime';
 import { ethers } from 'ethers';
+import { webcrypto } from 'crypto';
+import { cryptoUtils } from '../../utilities/crypto/cryptography';
+import { buildSbtAccessControlConditions } from '../../utilities/crypto/litProtocol';
+import { buildFieldEncryptionWorkGroups, verifyEncryptionIntegrity } from './surveyToolSubmitPrepController';
+import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmitController';
 import type { SurveyQuestionsLegacyRecord } from './surveyQuestionsTypes';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
@@ -100,7 +105,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}): SurveyQuest
   resolveDiffBaselineSlice: jest.fn(() => ({ answers: {}, additionalComments: {}, importance: {}, conviction: {} })),
   resolveEffectiveSlug: jest.fn(() => 'route-edge'),
   resolveEffectiveResponseGateConfig: jest.fn((_slug, props) => props?.sessionConfig || {}),
-  resolveFieldEncryptionAudience: jest.fn(),
+  resolveFieldEncryptionAudience: jest.fn((field) => field?.encryptionAudience || 'self'),
   resolveFieldEncryptionGateId: jest.fn(),
   resolveSessionChainId: jest.fn(() => 11155420),
   resolveSubmitEffectiveDraftSlug: jest.fn(({ draftSlug }) => draftSlug),
@@ -458,7 +463,7 @@ describe('quadratic submission boundary', () => {
     context.stateRef.current.surveysResponseState[2].answers.q1 = {
       value: '*',
       encrypted: true,
-      encryptedPortion: 'existing-envelope',
+      encryptedPortion: JSON.stringify({ recipients: [{ type: 'self-eip712-v1' }] }),
     };
     context.getChangedQidsAndFields.mockReturnValue({
       changedQids: new Set(['q1']),
@@ -720,7 +725,13 @@ describe('answer size budget', () => {
       value: '*',
       encrypted: true,
       encryptionAudience: 'self_admin',
-      encryptedPortion: 'a'.repeat(2 * KIB),
+      encryptedPortion: JSON.stringify({
+        recipients: [
+          { type: 'self-eip712-v1' },
+          { type: 'worker-response-field-v1', policy: { audience: 'self_admin' } },
+        ],
+        ciphertext: 'a'.repeat(2 * KIB - 150),
+      }),
     };
     const context = prepare('cloudflare', answer, locked(fill(46 * KIB)), [
       { id: 'q1', type: 'freeform', prompt: 'p'.repeat(28 * KIB) },
@@ -866,5 +877,167 @@ describe('answer size budget', () => {
     await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
       status: 'submitted',
     });
+  });
+});
+
+describe('gate policy changes use fresh ciphertext', () => {
+  const wallet = new ethers.Wallet(`0x${'47'.repeat(32)}`);
+  const provider = {
+    request: async ({ method, params }: { method: string; params: string[] }) => {
+      if (method === 'eth_accounts' || method === 'eth_requestAccounts') return [wallet.address];
+      if (method === 'eth_chainId') return '0xaa37dc';
+      if (method === 'eth_signTypedData_v4') {
+        const { domain, types, message } = JSON.parse(params[1]);
+        delete types.EIP712Domain;
+        return wallet._signTypedData(domain, types, message);
+      }
+      throw new Error(`Unexpected synthetic wallet call: ${method}`);
+    },
+  };
+  const gate = (address: string, mode = 'any') => ({
+    chain: 'optimismSepolia',
+    accessControlConditions: buildSbtAccessControlConditions({
+      sbtAddresses: [address, `0x${'03'.repeat(20)}`],
+      chainId: 11155420,
+      litChain: 'optimismSepolia',
+      mode,
+    }),
+  });
+  const gateA = gate(`0x${'01'.repeat(20)}`);
+  const gateB = gate(`0x${'02'.repeat(20)}`);
+  beforeAll(() => {
+    Object.defineProperty(window, 'crypto', { value: webcrypto, configurable: true });
+  });
+
+  const fixture = async (bucket: 'answers' | 'additionalComments' = 'answers') => {
+    const context = createContext();
+    context.propsRef.current.account = wallet.address;
+    context.propsRef.current.provider = provider;
+    context.propsRef.current.surveyId = `0x${'12'.repeat(32)}`;
+    context.propsRef.current.lit.saveKey = jest.fn(async () => ({ encryptedSymmetricKey: 'synthetic-key' }));
+    context.stateRef.current.hasher = null;
+    context.stateRef.current.questionPool = [{ id: 'q1', type: 'freeform' }];
+    context.cryptoUtils = cryptoUtils;
+    context.buildFieldEncryptionWorkGroupsCore = buildFieldEncryptionWorkGroups;
+    context.resolveFieldEncryptionAudience = (field: { encryptionAudience?: string }) => field.encryptionAudience;
+    context.getEffectiveRecipientsForField = jest.fn(() => [gateA]);
+    const runtime = createSurveyQuestionsSubmitRuntime(context);
+    context.verifyEncryption.mockImplementation(
+      async (qids: Set<string>, slice: Parameters<typeof verifyEncryptionIntegrity>[0]) => {
+        const result = verifyEncryptionIntegrity(slice, qids, runtime.resolveFieldEncryptionPolicy);
+        if (!result.passed) throw new Error(result.failures[0]);
+      },
+    );
+    const opts = {
+      provider,
+      account: wallet.address,
+      chainId: 11155420,
+      surveyId: context.propsRef.current.surveyId,
+      questionPool: context.stateRef.current.questionPool,
+      lit: runtime.buildLitEncryptionOptionsForRecipients([gateA]),
+    };
+    const encrypted = await cryptoUtils.encryptMultipleAnswers(
+      {
+        [bucket]: {
+          q1: {
+            value: 'Synthetic private text',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            encryptionGateId: 'gate-a',
+          },
+        },
+      },
+      opts,
+    );
+    context.stateRef.current.surveysResponseState[2] = encrypted;
+    context.stateRef.current.editBaseline = JSON.parse(JSON.stringify(encrypted));
+    return { context, runtime, opts, encrypted, bucket };
+  };
+
+  it.each(['answers', 'additionalComments'] as const)(
+    '%s waits for decryption, then encrypts for gate B',
+    async (bucket) => {
+      const f = await fixture(bucket);
+      const old = f.encrypted[bucket]!.q1!.encryptedPortion;
+      f.context.getEffectiveRecipientsForField.mockReturnValue([gateB]);
+      f.context.stateRef.current.surveysResponseState[2][bucket].q1.encryptionGateId = 'gate-b';
+      expect(await f.runtime.encryptAndUpload()).toEqual(
+        expect.objectContaining({ status: 'failed', message: expect.stringMatching(/Decrypt/) }),
+      );
+      expect(f.context.submitSurveyResponse).not.toHaveBeenCalled();
+      const plain = await cryptoUtils.decryptMultipleAnswers(f.encrypted, f.opts.questionPool, f.opts);
+      const readable = { ...f.encrypted, [bucket]: { q1: { ...f.encrypted[bucket]!.q1, ...plain[bucket]!.q1 } } };
+      expect(readable[bucket].q1.value).toBe('Synthetic private text');
+      f.context.stateRef.current.surveysResponseState[2] = readable;
+      f.context.stateRef.current.editBaseline = JSON.parse(JSON.stringify(readable));
+      expect(await f.runtime.encryptAndUpload()).toEqual({ status: 'submitted' });
+      const saved = f.context.submitSurveyResponse.mock.calls[0][0][bucket].q1;
+      expect(saved.encryptedPortion).not.toBe(old);
+      expect(
+        JSON.parse(saved.encryptedPortion).recipients.find((r: { type: string }) => r.type === 'lit-sbt-v1').lit,
+      ).toEqual(expect.objectContaining(gateB));
+    },
+  );
+
+  it('refuses reuse when conditions change behind the same gate ID', async () => {
+    const f = await fixture();
+    f.context.getEffectiveRecipientsForField.mockReturnValue([gate(`0x${'01'.repeat(20)}`, 'all')]);
+    expect(await f.runtime.encryptAndUpload()).toEqual(expect.objectContaining({ status: 'failed' }));
+    expect(f.context.submitSurveyResponse).not.toHaveBeenCalled();
+  });
+
+  it('reuses an unchanged gate envelope and fails closed for an unresolved policy', async () => {
+    const f = await fixture();
+    expect(await f.runtime.encryptAndUpload()).toEqual({ status: 'submitted' });
+    expect(f.context.submitSurveyResponse.mock.calls[0][0].answers.q1.encryptedPortion).toBe(
+      f.encrypted.answers!.q1!.encryptedPortion,
+    );
+    f.context.getEffectiveRecipientsForField.mockReturnValue([]);
+    expect(await f.runtime.encryptAndUpload()).toEqual(expect.objectContaining({ status: 'failed' }));
+    expect(f.context.submitSurveyResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-encrypts unchanged known ratings for the new gate and blocks unknown ratings', async () => {
+    const f = await fixture();
+    const old = await cryptoUtils.encryptEnvelopeValue(7, {
+      ...f.opts,
+      qId: 'importance:q1',
+      kind: 'rating',
+      encryptionAudience: 'gate',
+    });
+    const encrypt = jest.fn((value: unknown, opts: Record<string, unknown>) =>
+      cryptoUtils.encryptEnvelopeValue(value, opts),
+    );
+    const deps = {
+      isQuestionLockedForResponse: () => false,
+      resolveFieldEncryptionAudience: () => 'gate',
+      getEffectiveRecipientsForQid: () => [gateB],
+      getEffectiveRecipientsForField: () => [gateB],
+      getDefaultResponseEncryptionAudienceForQid: () => 'gate',
+      buildLitEncryptionOptionsForRecipients: f.runtime.buildLitEncryptionOptionsForRecipients,
+      encryptEnvelopeValue: encrypt,
+      getImportanceFromResponse: () => null,
+      getConvictionFromResponse: () => null,
+    };
+    const row = { questionID: 'q1', importance: 7, importanceEncrypted: old };
+    const input = {
+      sliceForSubmit: f.encrypted,
+      userAnswersSource: null,
+      questionResponses: [row],
+      changedMapForSubmit: {},
+      encryptionBaseOpts: { ...f.opts, kind: 'rating', hasher: null },
+    };
+    await processRatingEnvelopesForSubmit(input, deps);
+    expect(encrypt).toHaveBeenCalledTimes(1);
+    expect(row.importanceEncrypted).not.toBe(old);
+    expect(
+      JSON.parse(row.importanceEncrypted).recipients.find((r: { type: string }) => r.type === 'lit-sbt-v1').lit,
+    ).toEqual(expect.objectContaining(gateB));
+    await expect(
+      processRatingEnvelopesForSubmit(
+        { ...input, questionResponses: [{ questionID: 'q1', importance: null, importanceEncrypted: old }] },
+        deps,
+      ),
+    ).rejects.toThrow(/Decrypt the ratings/);
   });
 });

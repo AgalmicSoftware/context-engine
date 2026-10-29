@@ -1049,6 +1049,13 @@ to public session configuration. The generated report artifact route uses that
 same private-RPC preparation when checking access to generated artifacts,
 questions, and responses.
 
+Browser response reuse checks each Lit recipient's access conditions (including
+nested AND/OR combinations) and chain against the current encryption options.
+A changed gate policy, even under the same gate ID, requires fresh encryption.
+Still-locked answers and comments must first be decrypted; known rating values
+are re-encrypted automatically. Unresolved policies are not reusable. Re-encryption
+does not revoke access to ciphertext saved previously.
+
 Changing an audience requires new field encryption; changing metadata cannot
 change existing ciphertext recipients. Disabling new encryption does not remove
 existing author/admin key access. Removing session membership blocks subsequent
