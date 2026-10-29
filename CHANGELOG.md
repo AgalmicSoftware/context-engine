@@ -110,6 +110,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Treat retired SBT collections as fully hydrated when their admin is the zero
+  address, so discovery advances and does not repeatedly fetch their metadata.
+
 - Keep in-flight AI analysis tied to its starting session, reader and chain;
   exports omit analysis when the current filtered inputs have changed.
 

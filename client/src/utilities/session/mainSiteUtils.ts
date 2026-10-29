@@ -2,7 +2,6 @@
  * @module utilities/session/mainSiteUtils
  */
 
-import { ethers } from 'ethers';
 import { createLogger, emitForcedLog } from 'utilities/logging.js';
 
 type LoggerMethod = (...args: unknown[]) => void;
@@ -118,10 +117,9 @@ export const hasCoreSbtMetadata = (info: unknown): boolean => {
   const mintingEndRaw = typedInfo.mintingEndTime;
   const burnAuthRaw = typedInfo.burnAuth;
   const adminAddress = String(typedInfo.admin || typedInfo.admin_ || '').trim();
-  const zeroAddress = String(ethers.constants.AddressZero || '').toLowerCase();
   const mintingEndOk = mintingEndRaw !== undefined && mintingEndRaw !== null && Number.isFinite(Number(mintingEndRaw));
   const burnAuthOk = burnAuthRaw !== undefined && burnAuthRaw !== null && Number.isFinite(Number(burnAuthRaw));
-  const adminOk = !!adminAddress && adminAddress.toLowerCase() !== zeroAddress;
+  const adminOk = isRouteResponderAddress(adminAddress);
 
   return (
     hasValue(tokenUri) &&

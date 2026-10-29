@@ -85,7 +85,9 @@ Network keys inside cache values are strings such as `"84532"`.
 - `slug`: cache/source bucket slug for the entry
 - `creationBlock`: best-known SBT creation block
 - `blockNumber`: last block at which that entry was refreshed or updated
-- `sbtInfo`: merged tokenURI/on-chain metadata
+- `sbtInfo`: merged tokenURI/on-chain metadata. A valid zero admin address means
+  the collection is retired and counts as complete metadata; absent or malformed
+  admin addresses still require hydration. Admin actions remain disabled.
 - `mintedAddresses` / `burnedAddresses`: convenience sets materialized as arrays
 - `mintedCountByAddress` / `burnedCountByAddress`: authoritative holder-count source for newer cache consumers
 - `mintedEventCount` / `burnedEventCount`: total event counts observed for that contract
