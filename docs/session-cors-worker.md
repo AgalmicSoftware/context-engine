@@ -834,6 +834,9 @@ Authenticated clients can use the worker as the session storage boundary:
     responses are only size-checked; questions and surveys must be plaintext
     JSON so the Worker can check their ids.
   - URL fetches and image fetches count actual response bytes up to 10 MiB before parsing or returning content. Oversized responses return `413`; image responses are buffered within this limit so they cannot return a partial success before detecting oversize.
+  - HTML text extraction scans forward without repeatedly rescanning malformed
+    unclosed tags. It removes script, style, head, nav and footer elements and
+    collapses whitespace; an unclosed tag suffix remains text.
   - Serialized Cloudflare index metadata is capped at 64 KiB so every accepted
     record fits a backup entry, including its repeated payload-header metadata.
     Uploads accept at most 32 tags, with names up to 64 characters and values up
