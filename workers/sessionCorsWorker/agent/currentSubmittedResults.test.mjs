@@ -4,6 +4,7 @@ import { fixture } from '../agentTestFixture.mjs';
 import * as submitted from './submittedResults.mjs';
 import { buildAgentPolisDataset } from './results.mjs';
 import { buildParticipantGraph } from './participantResults.mjs';
+import { buildResultsImage } from './resultImage.mjs';
 import { canonicalAnswerSessionKvKey, persistAgentSubmitRecord, submitRequestSessionKvKey } from './agentSubmitQueue.mjs';
 import { loadAgentQuestionAnswerState } from './questions.mjs';
 
@@ -15,6 +16,33 @@ const current = records => submitted.selectCurrentSubmittedAnswers(records);
 const answer = (overrides = {}) => ({
   sessionSlug: 'fixture', telegramUserId: 'participant', questionId: 'question',
   createdAt: '2026-10-28T00:00:00.000Z', requestId: 'first', label: 'Agree', ...overrides,
+});
+
+test('HTTP JSON and image include only groups that meet the minimum size', async () => {
+  const f = fixture(); f.withCoordinator(); f.env.CE_STORAGE_INDEX_KV = f.env.GROUP_KV;
+  f.config.storageProfile = { backend: 'cloudflare', payloadAccessControl: { gate: 'public', encryption: 'none' } };
+  f.config.sessionModeProfile.results = { visibility: 'public_full_if_storage_public',
+    exposure: { anonymizedGroupsEnabled: true, minGroupSize: 2 } };
+  const agent = await f.credential({ scopes: ['read_questions', 'pose_questions'] });
+  await jsonOk(await f.request('/api/agent/questions/create', { method: 'POST', token: agent.token,
+    body: { questions: [{ prompt: 'Would a fixture garden help?', questionType: 'binary' }] } }));
+  const [question] = (await jsonOk(await f.request('/api/agent/questions', { token: agent.token }))).questions;
+  for (const [index, label] of ['Agree', 'Agree', 'Disagree'].entries()) {
+    await persistAgentSubmitRecord({ env: f.agentEnv, record: answer({
+      telegramUserId: `participant-${index}`, requestId: `request-${index}`, questionId: question.questionId,
+      status: 'direct_submitted', answer: { label, value: label },
+    }) });
+  }
+  const result = await jsonOk(await f.request('/api/agent/results?view=groups', { token: agent.token }));
+  assert.equal(result.suppressedGroupCount, 1);
+  assert.equal(result.participantCount, 2);
+  assert.deepEqual(result.groups.map(group => [group.groupId, group.size]), [['group-1', 2]]);
+  const graph = buildParticipantGraph(await submitted.loadSubmittedResultRecords(f.agentEnv, 'fixture'), [question]);
+  const response = await f.request('/api/agent/results-image?view=groups', { token: agent.token });
+  assert.equal(response.status, 200, await response.clone().text());
+  const expected = buildResultsImage({ mode: 'group', sessionTitle: 'fixture', responseCount: 3,
+    participants: graph.participants.slice(0, 2), groups: graph.groups.slice(0, 1) });
+  assert.equal(Buffer.compare(Buffer.from(await response.arrayBuffer()), expected.bytes), 0);
 });
 
 test('current answer selection orders revisions, timestamps, request ids and exact ties independently of input order', () => {
