@@ -308,6 +308,8 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Preserve the Session Worker's isolated dependencies in public replay checks.
+
 - Include shared answer validation in Worker release source comparisons.
 
 - Check signed payment hashes in proof-authorized faucet integration tests.

@@ -689,6 +689,8 @@ ensure_public_node_modules_link() {
   local temp_node_path="$TEMP_CLONE/node_modules"
   local client_node_path="$REPO_ROOT/client/node_modules"
   local temp_client_node_path="$TEMP_CLONE/client/node_modules"
+  local worker_node_path="$REPO_ROOT/workers/sessionCorsWorker/node_modules"
+  local temp_worker_node_path="$TEMP_CLONE/workers/sessionCorsWorker/node_modules"
 
   if [ -d "$node_path" ] && [ ! -e "$temp_node_path" ]; then
     log_info "Linking source node_modules into public test checkout."
@@ -698,6 +700,11 @@ ensure_public_node_modules_link() {
   if [ -d "$client_node_path" ] && [ -d "$TEMP_CLONE/client" ] && [ ! -e "$temp_client_node_path" ]; then
     log_info "Linking source client/node_modules into public test checkout."
     ln -s "$client_node_path" "$temp_client_node_path"
+  fi
+
+  if [ -d "$worker_node_path" ] && [ -d "$TEMP_CLONE/workers/sessionCorsWorker" ] && [ ! -e "$temp_worker_node_path" ]; then
+    log_info "Linking source Session Worker node_modules into public test checkout."
+    ln -s "$worker_node_path" "$temp_worker_node_path"
   fi
 }
 

@@ -1059,6 +1059,41 @@ test('sync-public-history links source node_modules for public Node ESM imports 
   });
 });
 
+test('sync-public-history keeps Worker dependencies isolated from root dependencies', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const packagePath = path.join(sourceDir, 'package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+    packageJson.scripts['test:node'] = 'node scripts/public-node-test-fixture.mjs';
+    fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
+    writeFile(sourceDir, path.join('scripts', 'public-node-test-fixture.mjs'), [
+      "import assert from 'node:assert/strict';",
+      "import { marker as rootMarker } from 'public-node-fixture';",
+      "import { marker as workerMarker } from '../workers/sessionCorsWorker/read-local-package.mjs';",
+      "assert.equal(rootMarker, 'root');",
+      "assert.equal(workerMarker, 'worker');",
+      "console.log('package boundaries preserved');",
+      '',
+    ].join('\n'));
+    writeFile(sourceDir, path.join('workers', 'sessionCorsWorker', 'read-local-package.mjs'),
+      "export { marker } from 'public-node-fixture';\n");
+    commitAll(sourceDir, 'Exercise isolated Worker dependencies', {
+      authorDate: '2025-01-05T07:08:10Z',
+      committerDate: '2025-01-05T07:08:10Z',
+    });
+    for (const [packageRoot, marker] of [['', 'root'], ['workers/sessionCorsWorker', 'worker']]) {
+      const dependencyRoot = path.join(packageRoot, 'node_modules', 'public-node-fixture');
+      writeFile(sourceDir, path.join(dependencyRoot, 'package.json'),
+        `${JSON.stringify({ type: 'module', exports: './index.js' })}\n`);
+      writeFile(sourceDir, path.join(dependencyRoot, 'index.js'), `export const marker = '${marker}';\n`);
+    }
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stdout, /package boundaries preserved/);
+  });
+});
+
 test('sync-public-history links source client node_modules for strict public wiring checks', () => {
   withSourceRepo(({ sourceDir }) => {
     writeFile(
