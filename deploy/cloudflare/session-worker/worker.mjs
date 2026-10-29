@@ -92479,7 +92479,6 @@ init_sessionQuestions();
 var AGENT_QUESTION_QUEUE_CONFIG_KV_PREFIX = "telegram:question-queue-config:v1:";
 var AGENT_QUESTION_QUEUE_STATE_KV_PREFIX = "telegram:question-queue-state:v1:";
 var MAX_SPONSORED_QUESTIONS = 50;
-var MAX_SERVED_QUESTION_IDS = 250;
 var MAX_HISTORY = 50;
 function normalizeBoolean3(value, fallback = false) {
   if (value === void 0 || value === null || value === "") return fallback;
@@ -92664,20 +92663,28 @@ async function selectNextAgentQuestion({
   const kv = env?.AGENT_ACTION_KV;
   const now = safeString(createdAt) || (/* @__PURE__ */ new Date()).toISOString();
   const existing = key && kv && typeof kv.get === "function" && !resetQueue ? safeJsonParse(await kv.get(key).catch(() => null), null) : null;
-  const servedQuestionIds = Array.isArray(existing?.servedQuestionIds) ? existing.servedQuestionIds.map(safeString).filter(Boolean) : [];
-  const servedSet = criteria.skipServed ? new Set(servedQuestionIds) : /* @__PURE__ */ new Set();
   const sponsoredIds = normalizeQuestionIds2(sponsoredQuestionIds);
-  let candidates = orderCandidates(questions, sponsoredIds, criteria, servedSet);
+  const eligible = orderCandidates(questions, sponsoredIds, criteria, /* @__PURE__ */ new Set());
+  const eligibleIds = new Set(eligible.map((question) => safeString(question.questionId || question.id)));
+  const previousServed = Array.isArray(existing?.servedQuestionIds) ? existing.servedQuestionIds : [];
+  const servedQuestionIds = [...new Set(previousServed.map(safeString))].filter((id2) => eligibleIds.has(id2));
+  const servedSet = criteria.skipServed ? new Set(servedQuestionIds) : /* @__PURE__ */ new Set();
+  let candidates = eligible.filter((question) => !servedSet.has(safeString(question.questionId || question.id)));
   let cycled = false;
   let statePersisted = false;
   if (!candidates.length && criteria.skipServed && servedQuestionIds.length) {
-    candidates = orderCandidates(questions, sponsoredIds, criteria, /* @__PURE__ */ new Set());
+    candidates = eligible;
     cycled = candidates.length > 0;
   }
   const selected = candidates[0] || null;
   const selectedQuestionId = safeString(selected?.questionId || selected?.id);
   const sponsored = selectedQuestionId ? sponsoredIds.includes(selectedQuestionId) : false;
-  if (selected && advance && key && kv && typeof kv.put === "function") {
+  const nextServed = !selected ? servedQuestionIds : cycled ? [selectedQuestionId] : [
+    ...servedQuestionIds.filter((questionId4) => questionId4 !== selectedQuestionId),
+    selectedQuestionId
+  ];
+  const pruned = servedQuestionIds.length !== previousServed.length;
+  if ((selected || pruned) && advance && key && kv && typeof kv.put === "function") {
     const criteriaFingerprint = stableFingerprint(criteria);
     const criteriaSummary = {
       tagCount: criteria.tags.length,
@@ -92687,19 +92694,15 @@ async function selectNextAgentQuestion({
       sponsoredFirst: criteria.sponsoredFirst,
       skipServed: criteria.skipServed
     };
-    const nextServed = cycled ? [selectedQuestionId] : [
-      ...servedQuestionIds.filter((questionId4) => questionId4 !== selectedQuestionId),
-      selectedQuestionId
-    ].slice(-MAX_SERVED_QUESTION_IDS);
     const history = [
       ...Array.isArray(existing?.history) ? existing.history : [],
-      {
+      ...selected ? [{
         questionId: selectedQuestionId,
         sponsored,
         criteriaFingerprint,
         criteriaSummary,
         selectedAt: now
-      }
+      }] : []
     ].slice(-MAX_HISTORY);
     const record3 = {
       type: "telegram_question_queue_state",
@@ -92708,7 +92711,7 @@ async function selectNextAgentQuestion({
       telegramUserId: safeString(telegramUserId),
       queueKey: criteria.queueKey,
       servedQuestionIds: nextServed,
-      lastQuestionId: selectedQuestionId,
+      lastQuestionId: selectedQuestionId || safeString(existing?.lastQuestionId),
       history,
       createdAt: safeString(existing?.createdAt) || now,
       updatedAt: now
@@ -92729,7 +92732,7 @@ async function selectNextAgentQuestion({
       advanceRequested: Boolean(selected && advance),
       reset: resetQueue,
       cycled,
-      servedCount: selected ? cycled ? 1 : Math.min(MAX_SERVED_QUESTION_IDS, servedQuestionIds.length + 1) : servedQuestionIds.length,
+      servedCount: nextServed.length,
       candidateCount: candidates.length,
       sponsoredQuestionCount: sponsoredIds.length
     }
