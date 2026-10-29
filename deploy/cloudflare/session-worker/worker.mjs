@@ -97221,7 +97221,8 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
   const hasTargeting = Boolean(
     tagHints.length || negativeTags.length || sessionHints.slugs.length || sessionHints.tags.length || importantIds.size || deprioritizeIds.size
   );
-  const entries = (Array.isArray(questions) ? questions : []).filter((question) => question.answerable === true).map((question, index) => {
+  const candidates = (Array.isArray(questions) ? questions : []).filter((question) => question.answerable === true);
+  const entries = candidates.map((question, fallbackOrder) => {
     const positive = questionRelevance(question, {
       tagHints,
       sessionHints,
@@ -97237,9 +97238,10 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
     if (importantIds.has(question.questionId)) positiveScore += 50;
     if (deprioritizeIds.has(question.questionId)) negativeScore += 50;
     const suggestedVote = negativeScore > positiveScore && negativeScore > 0 ? "down" : "up";
-    const rawScore = Math.max(positiveScore, negativeScore);
-    const fallbackScore = rawScore > 0 ? rawScore : Math.max(1, questions.length - index);
-    const confidence = Math.max(0.35, Math.min(0.95, 0.45 + fallbackScore / 100));
+    const relevanceScore = Math.max(positiveScore, negativeScore);
+    const hasTargetedMatch = relevanceScore > 0;
+    const score = hasTargetedMatch ? relevanceScore : candidates.length - fallbackOrder;
+    const confidence = Math.max(0.35, Math.min(0.95, 0.45 + score / 100));
     const matchedTags = suggestedVote === "down" ? negative.matchedTags : positive.matchedTags;
     const reason = matchedTags.length ? `Matched ${suggestedVote === "down" ? "deprioritized" : "relevant"} tags: ${matchedTags.join(", ")}.` : "No strong tag match; surfaced from the active question list for human review.";
     return {
@@ -97248,7 +97250,7 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
       prompt: question.prompt,
       tags: Array.isArray(question.tags) ? question.tags : [],
       suggestedVote,
-      score: fallbackScore,
+      score,
       confidence: Number(confidence.toFixed(2)),
       reason,
       agentNote: `Suggested ${suggestedVote}vote: ${reason}`,
@@ -97258,14 +97260,17 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
         matchedTags,
         matchedSessions: positive.matchedSessions
       },
-      index
+      hasTargetedMatch,
+      relevanceScore,
+      fallbackOrder
     };
-  }).filter((entry2) => !hasTargeting || entry2.score > Math.max(1, questions.length - entry2.index));
-  entries.sort(
-    (left, right) => right.score - left.score || (left.suggestedVote === "up" ? -1 : 1) || left.index - right.index
-  );
+  }).filter((entry2) => !hasTargeting || entry2.hasTargetedMatch);
+  entries.sort((left, right) => {
+    if (!hasTargeting) return left.fallbackOrder - right.fallbackOrder;
+    return right.relevanceScore - left.relevanceScore || (left.suggestedVote === right.suggestedVote ? 0 : left.suggestedVote === "up" ? -1 : 1) || left.fallbackOrder - right.fallbackOrder;
+  });
   return {
-    recommendations: entries.slice(0, limit).map(({ index, ...entry2 }) => entry2),
+    recommendations: entries.slice(0, limit).map(({ hasTargetedMatch, relevanceScore, fallbackOrder, ...entry2 }) => entry2),
     relevance: {
       tags: tagHints,
       downvoteTags: negativeTags,

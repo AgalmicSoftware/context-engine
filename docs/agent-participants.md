@@ -95,6 +95,13 @@ resends the identical transaction; an uncertain outcome returns its transaction
 hash for checking before another request is made. This applies to hosted, registry
 and agent faucet calls.
 
+## Question recommendations
+
+Question-vote recommendations with tag, session or explicit question targeting
+include only matching eligible questions, ranked by relevance, then upvotes before
+downvotes, then catalog order. Catalog size does not disqualify a match. Without
+targeting, recommendations follow the eligible catalog order.
+
 ## Participant results
 
 Participant group scores use canonical binary answers (Agree, Unsure, Disagree)

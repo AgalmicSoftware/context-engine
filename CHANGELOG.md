@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Keep targeted question-vote matches regardless of catalog size or position,
+  with stable ordering for equally relevant recommendations.
+
 - Score participant results from each question's type and rating scale. Keep
   freeform, choice and other unscored answers out of agreement counts and averages.
 
