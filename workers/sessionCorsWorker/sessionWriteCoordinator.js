@@ -46,6 +46,7 @@ import {
 import {
   createWorkerGroupId,
   executeWorkerGroupMutation,
+  forwardWorkerGroupMutation,
   isAddressShapedWorkerGroupId,
   normalizeWorkerGroupId,
   normalizeWorkerGroupPrincipal,
@@ -1928,6 +1929,23 @@ export class SessionWriteCoordinator {
     });
   }
 
+  async executeAuthorizedWorkerGroupMutation(payload) {
+    // Hold the authority queue across the separate group object's commit. Group
+    // mutation/recovery uses only its own durable state and KV; it must not call
+    // back into session config while this queue is held.
+    return this.serializeSessionConfigOperation(async () => {
+      try {
+        await this.assertSessionAuthority(payload);
+        const { expectedAuthority: _expectedAuthority, ...mutation } = payload;
+        const result = await forwardWorkerGroupMutation({ ...mutation, env: this.env });
+        return jsonResponse(result, result.status || (result.ok ? 200 : 503));
+      } catch (error) {
+        return jsonResponse({ ok: false, error: error.message || 'Worker group request failed.',
+          reason: error.status === 409 ? 'session_authority_changed' : 'worker_group_coordination_unavailable' }, error.status || 503);
+      }
+    });
+  }
+
   async executeWorkerGroupMutation(payload) {
     return this.serializeWorkerGroupOperation(async () => {
       if (
@@ -2917,6 +2935,7 @@ export class SessionWriteCoordinator {
       try { return await dispatchWrappedResearch(this, payload); }
       catch (error) { return jsonResponse({ ok: false, reason: 'wrapped_coordinator_unavailable', retryable: true }, error.status || 503); }
     }
+    if (url.pathname === '/session-config/worker-groups/mutate') return this.executeAuthorizedWorkerGroupMutation(payload);
     if (url.pathname === '/session-config/current') return this.executeSessionConfigCurrent(payload);
     if (url.pathname === '/session-config/diagnostics') return this.executeSessionDiagnostics(payload);
     if (url.pathname === '/session-config/recovery-key/export') {

@@ -188,6 +188,7 @@ export const dispatchAdminRequest = async ({
       env,
       slug: targetSlug,
       adminAddress: authorityResult.address || body?.address,
+      expectedAuthority,
       headers,
       deps: {
         json: deps?.json,

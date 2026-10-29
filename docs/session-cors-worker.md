@@ -1525,7 +1525,7 @@ Implemented routes:
   membership limit/deadline, join mode, and member visibility. A limit cannot
   be reduced below the current authoritative member count.
 - `POST /admin/groups/delete`: admin-signed tombstone. Deletion revokes future `group_gate` and `worker_group` condition checks.
-- `POST /admin/groups/add-member` / `POST /admin/groups/remove-member`: admin-signed membership mutation.
+- `POST /admin/groups/add-member` / `POST /admin/groups/remove-member`: admin-signed membership mutation. The verified authority proof is carried to the session config coordinator, which rechecks it and holds its serialization queue while the separate group coordinator commits. Stale proofs return 409 before any group write. Participant create/join/leave use the same check because their JWT admission depends on the session authorization epoch. Already committed group intents recover within the group coordinator without repeating admission or copying session authority into that object.
 - `POST /admin/groups/reconcile-empty`: admin-signed, idempotent repair for a
   matching `legacy_locked` coordinator only when the server-managed bootstrap
   proof and an exhaustive zero-row scan both succeed.

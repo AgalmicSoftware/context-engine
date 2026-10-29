@@ -1,3 +1,4 @@
+import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { normalizeWorkerGroupUrl } from '../../shared/workerGroupUrl.mjs';
 import {
 	normalizeWorkerSessionSlug,
@@ -1686,7 +1687,7 @@ export const isWorkerGroupMember = async ({ env, slug, sessionId, groupId, princ
 	});
 };
 
-export const executeCoordinatedWorkerGroupMutation = async ({
+export const forwardWorkerGroupMutation = async ({
 	env,
 	slug,
 	sessionId,
@@ -1709,6 +1710,14 @@ export const executeCoordinatedWorkerGroupMutation = async ({
 			actorPrincipal,
 		},
 	});
+};
+
+export const executeCoordinatedWorkerGroupMutation = async ({ env, slug, expectedAuthority, ...mutation } = {}) => {
+	const result = await callSessionConfigCoordinator({ env, slug, expectedAuthority,
+		path: 'worker-groups/mutate', ...mutation });
+	return { ...result.body, ok: result.ok, status: result.status,
+		...(!result.ok && !result.body?.reason ? { reason: result.status === 409
+			? 'session_authority_changed' : 'worker_group_coordination_unavailable' } : {}) };
 };
 
 const parseRouteBody = async (request) => {
@@ -1801,7 +1810,7 @@ export const dispatchPublicWorkerGroupListRequest = async ({ request, config, en
 	return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
 };
 
-export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, headers, deps } = {}) => {
+export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, expectedAuthority, headers, deps } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
 	if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, headers);
 	const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
@@ -1845,6 +1854,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 	const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
 	if (action === 'groups/create') {
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -1857,6 +1867,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 	}
 	if (action === 'groups/update') {
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -1870,6 +1881,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 	}
 	if (action === 'groups/delete') {
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -1893,6 +1905,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 	}
 	if (action === 'groups/add-member') {
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -1917,6 +1930,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 	}
 	if (action === 'groups/remove-member') {
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -2017,6 +2031,7 @@ export const workerGroupsRoute = async ({
 	env,
 	slug,
 	requesterAddress,
+	expectedAuthority,
 	authScopes,
 	baseHeaders,
 	deps,
@@ -2174,6 +2189,7 @@ export const workerGroupsRoute = async ({
 		}
 		const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -2198,6 +2214,7 @@ export const workerGroupsRoute = async ({
 	if (path === '/groups/join' && method === 'POST') {
 		const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -2227,6 +2244,7 @@ export const workerGroupsRoute = async ({
 	if (path === '/groups/leave' && method === 'POST') {
 		const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,

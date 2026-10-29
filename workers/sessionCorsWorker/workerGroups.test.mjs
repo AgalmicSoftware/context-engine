@@ -7,7 +7,7 @@ import {
 	deleteWorkerGroup as deleteWorkerGroupBoundary,
 	dispatchAdminWorkerGroupRequest as dispatchAdminWorkerGroupRequestBoundary,
 	dispatchPublicWorkerGroupListRequest,
-	executeCoordinatedWorkerGroupMutation as executeCoordinatedWorkerGroupMutationBoundary,
+	forwardWorkerGroupMutation as executeCoordinatedWorkerGroupMutationBoundary,
 	executeWorkerGroupMutation as executeWorkerGroupMutationBoundary,
 	isWorkerGroupMember,
 	listWorkerGroupMembers as listWorkerGroupMembersBoundary,
@@ -105,6 +105,7 @@ const workerGroupsRoute = async (args = {}) => {
 	const { injectSessionId = true, requestedSessionId = sessionId, ...routeArgs } = args;
 	return workerGroupsRouteBoundary({
 		...routeArgs,
+		deps: { executeCoordinatedWorkerGroupMutation, ...routeArgs.deps },
 		request: injectSessionId ? await requestWithSessionId(routeArgs.request, requestedSessionId) : routeArgs.request,
 		config: routeArgs.config ?? workerCanonicalConfig,
 	});
@@ -112,6 +113,7 @@ const workerGroupsRoute = async (args = {}) => {
 const dispatchAdminWorkerGroupRequest = (args = {}) =>
 	dispatchAdminWorkerGroupRequestBoundary({
 		...args,
+		deps: { executeCoordinatedWorkerGroupMutation, ...args.deps },
 		config: args.config ?? workerCanonicalConfig,
 		body: {
 			sessionId,
