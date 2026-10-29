@@ -259,6 +259,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Remove legacy membership reads and migration from group rosters, preserving
+  removal tombstones across repeated paginated listings.
+
 - Research CSV exports use the browser's shared formula guard and quote every cell; JSONL exports retain exact participant text.
 
 - Groups result images draw only participants in groups that meet the minimum size, matching JSON group counts without assigning suppressed participants to another group.

@@ -1371,6 +1371,11 @@ still disable it explicitly. The legacy `arweave` compatibility scope applies
 only to storage routes. Group membership is visible to the worker/operator by
 design. This is the same trust domain as worker-enforced gates.
 
+Member reads and roster pages use only canonical session-identity keys. Legacy
+slug-only or case-folded membership rows are ignored and never migrated during
+reads. Roster pagination does not write membership records or indexes, so a
+removed member stays absent across page boundaries and retries.
+
 The signed-in user's own `/u/<address>` profile reads
 `/groups/my-memberships` and shows only that principal's joined Worker Groups.
 A pure Worker profile replaces the on-chain SBT profile section with this

@@ -771,7 +771,7 @@ test('worker group membership keys cannot collide across distinct principal ids'
 	assert.equal(Buffer.byteLength(membershipKeys[0], 'utf8') <= 512, true);
 });
 
-test('legacy case-folded membership keys require the exact stored integration principal', async () => {
+test('legacy case-folded membership keys are ignored even for the exact integration principal', async () => {
 	const kv = createMockKv();
 	const env = { CE_WORKER_GROUPS_KV: kv };
 	await createWorkerGroup({
@@ -811,12 +811,13 @@ test('legacy case-folded membership keys require the exact stored integration pr
 		principal: { kind: 'agent', grantId: 'grant-a' },
 	});
 
-	assert.equal(exact.ok, true);
-	assert.equal(exact.member.principalKey, 'agent:Grant-A');
+	assert.equal(exact.ok, false);
+	assert.equal(exact.reason, 'worker_group_membership_denied');
+	assert.equal([...kv.store.keys()].filter((key) => key.startsWith('ce-worker-group-member:')).length, 1);
 	assert.equal(collision.ok, false);
 });
 
-test('legacy slug-only projections migrate only for their exact canonical session identity', async () => {
+test('legacy group identity isolation never imports old membership projections', async () => {
 	const kv = createMockKv();
 	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });
 	const groupId = 'legacy-isolated';
@@ -929,28 +930,13 @@ test('legacy slug-only projections migrate only for their exact canonical sessio
 		groupId,
 		principal: member,
 	});
-	assert.equal(exactProjection.ok, true);
-	const migratedPrincipalIndexKey = [...kv.store.keys()].find(
-		(key) => key.startsWith('ce-worker-group-principal:session-a:') && key !== legacyKeys.principalIndex && key.endsWith(`:${groupId}`),
-	);
-	assert.ok(migratedPrincipalIndexKey);
-	kv.store.delete(migratedPrincipalIndexKey);
-
-	const exactMemberships = await listWorkerGroupMemberships({
-		env,
-		slug: 'session-a',
-		principal: member,
-	});
-	assert.deepEqual(
-		exactMemberships.memberships.map((entry) => entry.group.groupId),
-		[groupId],
-	);
-	assert.equal(
-		[...kv.store.keys()].some(
-			(key) => key.startsWith('ce-worker-group-principal:session-a:') && key !== legacyKeys.principalIndex && key.endsWith(`:${groupId}`),
-		),
-		true,
-	);
+	assert.equal(exactProjection.ok, false);
+	assert.equal(exactProjection.reason, 'worker_group_membership_denied');
+	const exactMemberships = await listWorkerGroupMemberships({ env, slug: 'session-a', principal: member });
+	assert.equal(exactMemberships.ok, false);
+	assert.equal(exactMemberships.reason, 'worker_group_projection_unavailable');
+	assert.equal(kv.store.has(canonicalMemberKey), false);
+	assert.equal(kv.store.has(canonicalPrincipalIndexKey), false);
 	assert.equal(
 		(await resolveWorkerGroupBootstrap({ env, slug: 'session-a', sessionId })).reason,
 		'worker_group_capacity_reconciliation_required',
@@ -2378,6 +2364,101 @@ test('admin member listing stays below the KV operation ceiling and returns a cu
 	assert.equal(secondPage.members.length, 1);
 	assert.equal(secondPage.nextCursor, '');
 	assert.equal(operations <= 4, true);
+});
+
+test('member listings preserve removals across pages and never import legacy-only members', async () => {
+	const kv = createMockKv();
+	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });
+	const groupId = 'removal-pages';
+	assert.equal(
+		(
+			await executeCoordinatedWorkerGroupMutation({
+				env,
+				slug: 'session-a',
+				operation: 'create',
+				input: { groupId, label: 'Removal pages', joinMode: 'admin_add', memberVisibility: 'members' },
+				actorPrincipal: actor,
+			})
+		).ok,
+		true,
+	);
+	const retained = [
+		{ kind: 'agent', grantId: 'Member-A' },
+		{ kind: 'agent', grantId: 'Member-B' },
+	];
+	for (const principal of [member, ...retained]) {
+		assert.equal(
+			(
+				await executeCoordinatedWorkerGroupMutation({
+					env,
+					slug: 'session-a',
+					operation: 'add-member',
+					groupId,
+					principal,
+					actorPrincipal: actor,
+				})
+			).ok,
+			true,
+		);
+	}
+	const principalKey = normalizeWorkerGroupPrincipal(member).key;
+	const encoded = Buffer.from(principalKey).toString('base64url');
+	const canonicalMemberKey = [...kv.store.keys()].find(
+		(key) => key.startsWith('ce-worker-group-member:') && key.endsWith(`:${groupId}:${encoded}`),
+	);
+	const canonicalIndexKey = [...kv.store.keys()].find(
+		(key) => key.startsWith('ce-worker-group-principal:') && key.endsWith(`:${encoded}:${groupId}`),
+	);
+	assert.ok(canonicalMemberKey);
+	assert.ok(canonicalIndexKey);
+	const original = JSON.parse(kv.store.get(canonicalMemberKey));
+	for (const keyPart of [encoded, principalKey.toLowerCase()]) {
+		kv.store.set(`ce-worker-group-member:session-a:${groupId}:${keyPart}`, JSON.stringify(original));
+		kv.store.set(`ce-worker-group-principal:session-a:${keyPart}:${groupId}`, groupId);
+	}
+	const legacyPrincipal = { kind: 'agent', grantId: 'Legacy-Only' };
+	const legacyPrincipalKey = normalizeWorkerGroupPrincipal(legacyPrincipal).key;
+	const legacyEncoded = Buffer.from(legacyPrincipalKey).toString('base64url');
+	kv.store.set(
+		`ce-worker-group-member:session-a:${groupId}:${legacyEncoded}`,
+		JSON.stringify({ ...original, principal: legacyPrincipal, principalKey: legacyPrincipalKey }),
+	);
+	kv.store.set(`ce-worker-group-principal:session-a:${legacyEncoded}:${groupId}`, groupId);
+	assert.equal(
+		(
+			await executeCoordinatedWorkerGroupMutation({
+				env,
+				slug: 'session-a',
+				operation: 'remove-member',
+				groupId,
+				principal: member,
+				actorPrincipal: actor,
+			})
+		).ok,
+		true,
+	);
+	const tombstone = kv.store.get(canonicalMemberKey);
+	assert.ok(JSON.parse(tombstone).removedAt);
+	assert.equal(kv.store.has(canonicalIndexKey), false);
+	const before = [...kv.store];
+	for (let attempt = 0; attempt < 3; attempt += 1) {
+		let cursor = '';
+		const members = [];
+		let pages = 0;
+		do {
+			const page = await listWorkerGroupMembers({ env, slug: 'session-a', groupId, cursor, limit: 1 });
+			assert.equal(page.ok, true);
+			members.push(...page.members.map((row) => row.principalKey));
+			cursor = page.nextCursor;
+			assert.ok(++pages <= 4);
+		} while (cursor);
+		assert.deepEqual(members.sort(), retained.map((principal) => normalizeWorkerGroupPrincipal(principal).key).sort());
+		assert.equal(kv.store.get(canonicalMemberKey), tombstone);
+		assert.equal(kv.store.has(canonicalIndexKey), false);
+		assert.deepEqual([...kv.store], before);
+	}
+	assert.equal((await readWorkerGroupMembershipProjection({ env, slug: 'session-a', groupId, principal: legacyPrincipal })).ok, false);
+	assert.deepEqual([...kv.store], before);
 });
 
 test('explicit removal and deletion prune list indexes while retaining tombstones', async () => {
