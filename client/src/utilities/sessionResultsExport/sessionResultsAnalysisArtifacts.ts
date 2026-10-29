@@ -75,7 +75,6 @@ export type SessionResultsAnalysisAiResponse = {
   answer: string;
   participantId: string;
   questionId: string;
-  questionPrompt?: string;
   questionType?: string;
 };
 
@@ -327,6 +326,16 @@ export const buildSessionResultsAnalysisAiPayload = ({
     return participant;
   };
 
+  const questionKey = (id: unknown): string => normalizeAiText(id).toLowerCase();
+  const fallbackPrompts = new Map<string, string>();
+  responses.slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponses).forEach((response) => {
+    const key = questionKey(response.questionId);
+    const prompt = truncateAiText(
+      response.questionPrompt,
+      SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestionPromptChars,
+    );
+    if (key && prompt && !fallbackPrompts.has(key)) fallbackPrompts.set(key, prompt);
+  });
   const normalizedQuestions = questions
     .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestions)
     .map((question) => ({
@@ -337,7 +346,10 @@ export const buildSessionResultsAnalysisAiPayload = ({
             .map((option) => truncateAiText(option, 140))
             .filter(Boolean)
         : [],
-      prompt: truncateAiText(question?.prompt, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestionPromptChars),
+      prompt: truncateAiText(
+        normalizeAiText(question?.prompt) || fallbackPrompts.get(questionKey(question?.id)),
+        SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestionPromptChars,
+      ),
       tags: Array.isArray(question?.tags)
         ? question.tags
             .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxTagsPerQuestion)
@@ -347,15 +359,17 @@ export const buildSessionResultsAnalysisAiPayload = ({
       type: normalizeAiText(question?.type),
       ...(question?.type === 'quadratic' ? { voiceCredits: getVoiceCredits(question) } : {}),
     }))
-    .filter((question) => question.id || question.prompt);
+    .filter((question) => question.id);
+  const includedQuestionsById = new Map(normalizedQuestions.map((question) => [questionKey(question.id), question]));
 
-  const questionsById = new Map(
-    questions.map((question) => [toSafeString(question?.id).trim().toLowerCase(), question]),
-  );
+  const questionsById = new Map(questions.map((question) => [questionKey(question?.id), question]));
   const normalizedResponses = responses
     .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponses)
     .map((response) => {
-      const question = questionsById.get(toSafeString(response?.questionId).trim().toLowerCase());
+      const key = questionKey(response?.questionId);
+      const includedQuestion = includedQuestionsById.get(key);
+      if (!includedQuestion) return null;
+      const question = questionsById.get(key);
       const questionType = question?.type || toSafeString(response?.questionType);
       const allocation = Array.isArray(response?.answer) ? response.answer : toPlainRecord(response?.answer).value;
       // Label against the full option list before applying context limits; slicing
@@ -377,8 +391,7 @@ export const buildSessionResultsAnalysisAiPayload = ({
         ...(additional ? { additional } : {}),
         answer,
         participantId: participant.syntheticId,
-        questionId: normalizeAiText(response?.questionId),
-        questionPrompt: normalizeAiText(response?.questionPrompt),
+        questionId: includedQuestion.id,
         questionType: normalizeAiText(questionType),
       };
     })

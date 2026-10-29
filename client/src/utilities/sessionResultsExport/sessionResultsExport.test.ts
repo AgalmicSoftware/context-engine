@@ -536,3 +536,52 @@ describe('sessionResultsExport utilities', () => {
     expect(document.querySelector('iframe[title="Context Engine PDF export"]')).toBeNull();
   });
 });
+
+describe('analysis request question limits', () => {
+  const serializedInput = (
+    questions: NonNullable<Parameters<typeof buildSessionResultsAnalysisAiPayload>[0]>['questions'],
+    responses: NonNullable<Parameters<typeof buildSessionResultsAnalysisAiPayload>[0]>['responses'],
+  ) => {
+    const { aiPayload } = buildSessionResultsAnalysisAiPayload({ questions, responses });
+    const prompt = buildSessionResultsAnalysisPrompt(aiPayload);
+    return { prompt, input: JSON.parse(prompt.split('Session input:\n')[1]) };
+  };
+
+  it('one bounded question represents three answers in the complete model request', () => {
+    const text = 'a'.repeat(12680) + 'UNIQUE_SUFFIX_BEYOND_CAP_';
+    const responses = [1, 2, 3].map((index) => ({
+      questionId: 'q1',
+      questionPrompt: text,
+      answer: 'Agree',
+      participantAddress: `participant-${index}`,
+    }));
+    const { prompt, input } = serializedInput([{ id: 'q1', prompt: text, type: 'binary' }], responses);
+    expect(prompt).not.toContain('UNIQUE_SUFFIX_BEYOND_CAP_');
+    expect(input.questions).toHaveLength(1);
+    expect(input.questions[0].prompt.length).toBeLessThanOrEqual(900);
+    expect(input.responses).toHaveLength(3);
+    for (const response of input.responses) {
+      expect(response).not.toHaveProperty('questionPrompt');
+      expect(input.questions.some((question: { id: string }) => question.id === response.questionId)).toBe(true);
+    }
+  });
+
+  it('keeps short text and caps fallback text while dropping responses outside the included questions', () => {
+    const questions = Array.from({ length: 81 }, (_, index) => ({
+      id: `q${index}`,
+      prompt: index === 0 ? '' : `Short ${index}`,
+    }));
+    const { prompt, input } = serializedInput(questions, [
+      { questionId: 'q0', questionPrompt: 'b'.repeat(12704) + 'HIDDEN_FALLBACK_SUFFIX', answer: 'one' },
+      { questionId: 'q1', questionPrompt: 'Short 1', answer: 'two' },
+      { questionId: 'q80', answer: 'outside cap' },
+      { questionId: 'missing', answer: 'orphan' },
+    ]);
+    expect(input.questions[0].prompt.length).toBeGreaterThan(0);
+    expect(input.questions[0].prompt.length).toBeLessThanOrEqual(900);
+    expect(input.questions[1].prompt).toBe('Short 1');
+    expect(prompt).not.toContain('HIDDEN_FALLBACK_SUFFIX');
+    expect(input.responses.map((row: { questionId: string }) => row.questionId)).toEqual(['q0', 'q1']);
+    expect(input.counts.responses).toBe(2);
+  });
+});
