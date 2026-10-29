@@ -266,7 +266,7 @@ describe('sessionWizardWriteNormalization', () => {
           surveys: { address: '0x111', chainId: 84532 },
           reputation: { address: '0x999', chainId: 84532 },
         },
-        blockLimits: { start: '100', end: '120' },
+        blockLimits: { start: '100', end: '120', startDefault: { chainId: DEFAULT_CONFIG_CHAIN_ID, blockNumber: 100 } },
       },
       {
         fieldOrder: ['slug', 'sessionName', 'sessionInfo', 'sessionHeaderImg', 'faucet', 'contracts', 'blockLimits'],
@@ -571,7 +571,7 @@ describe('sessionWizardWriteNormalization', () => {
       draft: {
         networkChainId: DEFAULT_CONFIG_CHAIN_ID,
         corsWorkerUrl: 'https://draft-worker.example',
-        blockLimits: { start: '250', end: '275' },
+        blockLimits: { start: '250', end: '275', startDefault: { chainId: DEFAULT_CONFIG_CHAIN_ID, blockNumber: 250 } },
         contracts: {
           surveys: { address: '0x111', chainId: DEFAULT_CONFIG_CHAIN_ID },
           reputation: { address: '0x999', chainId: DEFAULT_CONFIG_CHAIN_ID },

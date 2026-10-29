@@ -1,12 +1,35 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { useRef, useState } from 'react';
 import useSessionWizardBlockLimits from './useSessionWizardBlockLimits.js';
+import { buildSessionWizardCacheWritePayload } from '../sessionWizardDraftState';
 
 type DraftState = {
   blockLimits?: {
     start?: unknown;
     end?: unknown;
+    startDefault?: { chainId: number; blockNumber: number };
   } | null;
 };
+
+const renderLiveDraft = (
+  initialDraft: DraftState,
+  readLatestBlockNumber: (args: { chainId: number; rpcUrl: string }) => Promise<number>,
+) =>
+  renderHook(
+    ({ chainId }) => {
+      const [draft, setDraft] = useState(initialDraft);
+      const updateDraftValueRef = useRef<null | ((path: string[], value: unknown) => void)>(null);
+      const controls = useSessionWizardBlockLimits({
+        registryChainId: chainId,
+        draftBlockLimitStart: draft.blockLimits?.start,
+        setDraft,
+        updateDraftValueRef,
+        readLatestBlockNumber,
+      });
+      return { draft, setDraft, ...controls };
+    },
+    { initialProps: { chainId: 11155420 } },
+  );
 
 const renderBlockLimits = (
   overrides: Partial<{
@@ -39,6 +62,49 @@ const renderBlockLimits = (
 };
 
 describe('useSessionWizardBlockLimits', () => {
+  it('keeps a restored explicit start and end when the latest block resolves', async () => {
+    const { result } = renderLiveDraft({ blockLimits: { start: 100, end: 200 } }, jest.fn().mockResolvedValue(500));
+    await waitFor(() => expect(result.current.latestChainBlock).toBe(500));
+    expect(result.current.draft.blockLimits).toEqual({ start: 100, end: 200 });
+  });
+
+  it('fills a blank start and retains its default provenance in the saved draft', async () => {
+    const { result } = renderLiveDraft({ blockLimits: { start: null } }, jest.fn().mockResolvedValue(500));
+    await waitFor(() => expect(result.current.draft.blockLimits?.start).toBe(500));
+    const cached = buildSessionWizardCacheWritePayload({ draft: result.current.draft });
+    expect(cached.draft.blockLimits).toEqual({ start: 500, startDefault: { chainId: 11155420, blockNumber: 500 } });
+  });
+
+  it('keeps a restored default on its chain and re-defaults only after the new chain head arrives', async () => {
+    let resolveNewChain: (value: number) => void = () => undefined;
+    const readLatest = jest
+      .fn()
+      .mockResolvedValueOnce(600)
+      .mockImplementationOnce(
+        () =>
+          new Promise<number>((resolve) => {
+            resolveNewChain = resolve;
+          }),
+      );
+    const { result, rerender } = renderLiveDraft(
+      {
+        blockLimits: {
+          start: 500,
+          startDefault: { chainId: 11155420, blockNumber: 500 },
+        },
+      },
+      readLatest,
+    );
+    await waitFor(() => expect(result.current.latestChainBlock).toBe(600));
+    expect(result.current.draft.blockLimits?.start).toBe(500);
+    rerender({ chainId: 84532 });
+    expect(result.current.latestChainBlock).toBe(null);
+    expect(result.current.draft.blockLimits?.start).toBe(500);
+    await act(async () => resolveNewChain(700));
+    await waitFor(() => expect(result.current.draft.blockLimits?.start).toBe(700));
+    expect(result.current.draft.blockLimits?.startDefault).toEqual({ chainId: 84532, blockNumber: 700 });
+  });
+
   it('initializes blank block helper state', () => {
     const { result } = renderBlockLimits();
 
@@ -93,7 +159,7 @@ describe('useSessionWizardBlockLimits', () => {
     expect(setDraft).toHaveBeenCalledTimes(1);
     const updater = setDraft.mock.calls[0][0] as (draft: DraftState) => DraftState;
     expect(updater({ blockLimits: {} })).toEqual({
-      blockLimits: { start: 500 },
+      blockLimits: { start: 500, startDefault: { chainId: 0, blockNumber: 500 } },
     });
   });
 
@@ -105,7 +171,11 @@ describe('useSessionWizardBlockLimits', () => {
       result.current.setLatestChainBlock(500);
     });
 
-    expect(setDraft).not.toHaveBeenCalled();
+    expect(setDraft).toHaveBeenCalledTimes(1);
+    const updater = setDraft.mock.calls[0][0] as (draft: DraftState) => DraftState;
+    expect(updater({ blockLimits: { start: 100, startDefault: { chainId: 0, blockNumber: 100 } } })).toEqual({
+      blockLimits: { start: 100 },
+    });
   });
 
   it('derives an end block from duration, unit, and draft start', () => {
