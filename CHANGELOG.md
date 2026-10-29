@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Isolate community regression tests by clearing complete cache namespaces.
+
 - Use complete encrypted-envelope fixtures in decrypt-and-resubmit regression tests.
 
 - Verify interview submission leaves unrelated manual answers pending for ordinary Submit.
