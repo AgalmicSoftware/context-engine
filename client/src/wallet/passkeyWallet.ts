@@ -332,10 +332,12 @@ export class PasskeyEoaWalletClient {
 
       const salt = randomBase64Url(32);
       const saltBytes = new Uint8Array(base64URLToBuffer(salt));
-      // This mode keeps the only copy of a wallet's key in the saved record,
-      // so never mint a replacement passkey on the device that holds it.
+      // This record holds the only copy of the encrypted wallet key.
       const savedRecord = await this.storage.read();
       this.assertCurrentOperation(generation);
+      if (savedRecord?.rpId === this.config.rpId && isEncryptedWalletRecord(savedRecord)) {
+        throw new Error('A passkey wallet already exists in this browser. Sign in, or delete it first.');
+      }
       const credential = await createPasskeyCredential({
         config: this.config,
         salt: saltBytes,
