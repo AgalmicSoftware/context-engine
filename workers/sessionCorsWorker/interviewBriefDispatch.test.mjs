@@ -121,7 +121,7 @@ test('dispatchInterviewBriefRequest returns public questions and a stable revisi
         interviewMode: { enabled: true },
       }),
       getCorsContext: async () => ({ ok: true, headers: { 'access-control-allow-origin': '*' } }),
-      loadPublicInterviewQuestions: async () => [
+      loadPublicInterviewQuestions: async () => ({ questions: [
         {
           id: 'rating-q1',
           type: 'rating',
@@ -129,7 +129,7 @@ test('dispatchInterviewBriefRequest returns public questions and a stable revisi
           options: [],
           scale: { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
         },
-      ],
+      ], incomplete: false }),
       sha256: async () => 'question-hash',
       json,
     },
@@ -165,7 +165,7 @@ test('dispatchInterviewBriefRequest honors per-session disablement and requires 
   const baseDeps = {
     resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
     getCorsContext: async () => ({ ok: true, headers: {} }),
-    loadPublicInterviewQuestions: async () => [{ id: 'q1', type: 'freeform', prompt: 'Question?', options: [] }],
+    loadPublicInterviewQuestions: async () => ({ questions: [{ id: 'q1', type: 'freeform', prompt: 'Question?', options: [] }], incomplete: false }),
     json,
   };
   const disabled = await dispatchInterviewBriefRequest({
@@ -209,7 +209,7 @@ test('dispatchInterviewBriefRequest preserves only safe source and auto-join sta
       resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
       getSessionConfig: async () => ({ allowOrigins: ['https://app.example'] }),
       getCorsContext: async () => ({ ok: true, headers: {} }),
-      loadPublicInterviewQuestions: async () => [{ id: 'q1', type: 'freeform', prompt: 'Question?', options: [] }],
+      loadPublicInterviewQuestions: async () => ({ questions: [{ id: 'q1', type: 'freeform', prompt: 'Question?', options: [] }], incomplete: false }),
       sha256: async () => 'question-hash',
       json,
     },
@@ -257,7 +257,7 @@ test('dispatchInterviewBriefRequest applies anonymous IP daily budgets before lo
         },
         loadPublicInterviewQuestions: async () => {
           questionsLoaded = true;
-          return [];
+          return ({ questions: [], incomplete: false });
         },
         json,
       },

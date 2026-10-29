@@ -13,6 +13,10 @@ const CATALOG_KV_OPERATION_BUDGET = 800;
 const MAX_CLOUDFLARE_LIST_PAGES = Math.floor((CATALOG_KV_OPERATION_BUDGET - MAX_PAYLOAD_READS) / (MAX_QUESTIONS + 2));
 const MAX_SCAN_BLOCKS = 2_000_000;
 const RPC_CHUNK_SIZE = 100_000;
+const MAX_LOG_CHUNKS = MAX_SCAN_BLOCKS / RPC_CHUNK_SIZE;
+const MAX_POINTER_READS = 200;
+const MAX_CANDIDATES = 2000;
+const catalog = (questions = [], incomplete = false) => ({ questions, incomplete });
 import { normalizePublicInterviewQuestions, hasRestrictedPrompt, hasRatingScaleMetadata, normalizeRatingScale, normalizeQuestion } from '../../shared/interviewQuestionCatalog.mjs';
 import { selectCanonicalStorageVersions } from './storageResourceOwnership.js';
 const trim = (value) => String(value == null ? '' : value).trim();
@@ -42,22 +46,24 @@ const listQuestionRows = async (callStorage) => {
   const items = [];
   const seenCursors = new Set();
   let cursor = '';
+  let complete = false;
   for (let page = 0; page < MAX_CLOUDFLARE_LIST_PAGES; page += 1) {
     const query = new URLSearchParams({ resource: 'questions', limit: String(MAX_QUESTIONS), ...(cursor ? { cursor } : {}) });
-    const listing = await readJsonResponse(await callStorage('/storage/list', query.toString()));
+    let listing;
+    try { listing = await readJsonResponse(await callStorage('/storage/list', query.toString())); } catch { break; }
     if (!Array.isArray(listing?.items)) break;
     items.push(...listing.items);
-    if (listing.listComplete === true) break;
+    if (listing.listComplete === true) { complete = true; break; }
     // A filtered page can be empty; only a fresh cursor continues the walk.
     cursor = trim(listing.cursor);
     if (!cursor || seenCursors.has(cursor)) break;
     seenCursors.add(cursor);
   }
-  return items;
+  return { items, incomplete: !complete };
 };
 
 const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
-  if (typeof storageRoute !== 'function') return [];
+  if (typeof storageRoute !== 'function') return catalog();
   const origin = 'https://session-worker.invalid';
   const callStorage = (path, query) => storageRoute({
     path,
@@ -69,7 +75,8 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
     uploaderAddress: '',
     baseHeaders: {},
   });
-  const items = await listQuestionRows(callStorage);
+  const listing = await listQuestionRows(callStorage);
+  const { items } = listing;
   // Hidden ids arrive as markers without a storage reference.
   const hiddenIds = new Set(items
     .filter((item) => item?.hidden === true || item?.metadata?.hidden === true)
@@ -106,9 +113,9 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
     if (resourceId) versions.push({ ...version, resourceId, payload });
   }
   // Only an upload-time admin stamp can replace the earliest ordinary version.
-  const chosen = selectCanonicalStorageVersions(versions)
-    .filter((version) => !hiddenIds.has(version.resourceId))
-    .slice(0, MAX_PAYLOAD_READS - legacyReads.length);
+  const candidates = selectCanonicalStorageVersions(versions)
+    .filter((version) => !hiddenIds.has(version.resourceId));
+  const chosen = candidates.slice(0, MAX_PAYLOAD_READS - legacyReads.length);
   const questions = [];
   for (const version of chosen) {
     if (questions.length >= MAX_QUESTIONS) break;
@@ -117,7 +124,7 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
     // falling back to another version could serve someone else's copy.
     if (payloadQuestionId(payload) === version.resourceId && normalizeQuestion(payload)) questions.push(payload);
   }
-  return dedupeQuestions(questions);
+  return catalog(dedupeQuestions(questions), listing.incomplete || legacyVersions.length > legacyReads.length || candidates.length > chosen.length);
 };
 
 const pickContractAddress = (config = {}) => {
@@ -174,7 +181,7 @@ const decodeQuestionIds = (data = '') => {
   if (clean.length < 128) return [];
   const offsetBytes = Number(BigInt(`0x${wordAt(clean, 0) || '0'}`));
   const lengthWordIndex = offsetBytes / 32;
-  const length = Math.min(MAX_QUESTIONS, Number(BigInt(`0x${wordAt(clean, lengthWordIndex) || '0'}`)));
+  const length = Math.min(MAX_CANDIDATES + 1, Math.max(0, Math.floor(clean.length / 64) - lengthWordIndex - 1), Number(BigInt(`0x${wordAt(clean, lengthWordIndex) || '0'}`)));
   const ids = [];
   for (let index = 0; index < length; index += 1) {
     const id = `0x${wordAt(clean, lengthWordIndex + 1 + index)}`.toLowerCase();
@@ -226,52 +233,56 @@ const loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
   const surveysAddress = pickContractAddress(config);
   const rpcUrls = pickRpcUrls(config);
   const start = Number(config?.blockLimits?.start);
-  if (!/^0x[0-9a-fA-F]{40}$/.test(surveysAddress) || !rpcUrls.length || !Number.isFinite(start) || start < 0) {
-    return [];
+  if (!/^0x[0-9a-fA-F]{40}$/.test(surveysAddress) || !rpcUrls.length || !Number.isSafeInteger(start) || start < 0) {
+    return catalog();
   }
   const latestHex = await rpc({ rpcUrls, method: 'eth_blockNumber', params: [], fetchImpl });
   const latest = Number(BigInt(latestHex));
   const configuredEnd = Number(config?.blockLimits?.end);
-  const end = Number.isFinite(configuredEnd) && configuredEnd >= start ? Math.min(configuredEnd, latest) : latest;
-  if (end < start || end - start > MAX_SCAN_BLOCKS) return [];
-
-  const ids = [];
-  for (let from = start; from <= end && ids.length < MAX_QUESTIONS; from += RPC_CHUNK_SIZE) {
-    const to = Math.min(end, from + RPC_CHUNK_SIZE - 1);
-    const logs = await rpc({
-      rpcUrls,
-      method: 'eth_getLogs',
-      params: [{
-        address: surveysAddress,
-        fromBlock: `0x${from.toString(16)}`,
-        toBlock: `0x${to.toString(16)}`,
-        topics: [QUESTIONS_ADDED_TOPIC0],
-      }],
-      fetchImpl,
-    });
-    (Array.isArray(logs) ? logs : []).forEach((log) => {
-      decodeQuestionIds(log?.data).forEach((id) => {
-        if (!ids.includes(id) && ids.length < MAX_QUESTIONS) ids.push(id);
-      });
-    });
-  }
-
+  const end = Number.isSafeInteger(configuredEnd) && configuredEnd >= start ? Math.min(configuredEnd, latest) : latest;
+  if (end < start) return catalog();
+  const scanEnd = Math.min(end, start + MAX_SCAN_BLOCKS - 1);
   const questions = [];
-  for (const id of ids) {
-    const result = await rpc({
-      rpcUrls,
-      method: 'eth_call',
-      params: [{ to: surveysAddress, data: `${GET_QUESTION_HASH_SELECTOR}${id.slice(2)}` }, 'latest'],
-      fetchImpl,
-    });
-    const pointer = base64urlFromHex(result);
-    if (!pointer) continue;
-    const payload = await fetchArweaveQuestion(pointer, fetchImpl);
-    if (payload && payloadSessionSlug(payload) === lower(slug)) {
-      questions.push({ ...payload, id: payload.id || id });
+  const seen = new Set();
+  let pointerReads = 0;
+  let candidates = 0;
+  let chunks = 0;
+  for (let from = start; from <= scanEnd && chunks < MAX_LOG_CHUNKS; from += RPC_CHUNK_SIZE) {
+    chunks += 1;
+    const to = Math.min(scanEnd, from + RPC_CHUNK_SIZE - 1);
+    let logs;
+    try {
+      logs = await rpc({ rpcUrls, method: 'eth_getLogs', params: [{
+        address: surveysAddress, fromBlock: `0x${from.toString(16)}`, toBlock: `0x${to.toString(16)}`,
+        topics: [QUESTIONS_ADDED_TOPIC0],
+      }], fetchImpl });
+    } catch { return catalog(questions, true); }
+    if (!Array.isArray(logs)) return catalog(questions, true);
+    for (const log of logs) {
+      for (const id of decodeQuestionIds(log?.data)) {
+        if (++candidates > MAX_CANDIDATES) return catalog(questions, true);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        if (pointerReads >= MAX_POINTER_READS) return catalog(questions, true);
+        pointerReads += 1;
+        let result;
+        try {
+          result = await rpc({ rpcUrls, method: 'eth_call', params: [
+            { to: surveysAddress, data: `${GET_QUESTION_HASH_SELECTOR}${id.slice(2)}` }, 'latest',
+          ], fetchImpl });
+        } catch { continue; }
+        const pointer = base64urlFromHex(result);
+        if (!pointer || result === ZERO_BYTES32) continue;
+        // At most two gateway fetches for each of the bounded pointer reads.
+        const payload = await fetchArweaveQuestion(pointer, fetchImpl);
+        if (!payload || payloadSessionSlug(payload) !== lower(slug)) continue;
+        const question = normalizeQuestion({ ...payload, id });
+        if (question) questions.push(question);
+        if (questions.length >= MAX_QUESTIONS) return catalog(questions);
+      }
     }
   }
-  return dedupeQuestions(questions);
+  return catalog(questions, scanEnd < end);
 };
 
 export const loadPublicInterviewQuestions = async ({
@@ -282,8 +293,9 @@ export const loadPublicInterviewQuestions = async ({
   fetch: fetchImpl = globalThis.fetch,
 } = {}) => {
   const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute });
-  if (cloudflareQuestions.length) return cloudflareQuestions;
-  return loadOnChainQuestions({ config, slug, fetchImpl });
+  if (cloudflareQuestions.questions.length) return cloudflareQuestions;
+  const onChain = await loadOnChainQuestions({ config, slug, fetchImpl });
+  return catalog(onChain.questions, cloudflareQuestions.incomplete || onChain.incomplete);
 };
 
 export const __test__interviewQuestionCatalog = {

@@ -93,13 +93,16 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
 
   if (isAgentQuestionsRoute) {
     const loadPublicInterviewQuestions = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestionsBoundary;
-    const questions = await loadPublicInterviewQuestions({
+    const { questions, incomplete } = await loadPublicInterviewQuestions({
       env,
       config,
       slug,
       storageRoute: deps?.storageRoute,
       fetch: deps?.fetch,
     });
+    if (!questions.length && incomplete) {
+      return { handled: true, response: deps?.json?.({ error: 'Interview question discovery is incomplete. Retry shortly.' }, 503, headers) };
+    }
     const url = new URL(request.url);
     const requestedLimit = Number(url.searchParams.get('limit') || url.searchParams.get('count') || 0);
     const limitCount = Number.isFinite(requestedLimit) && requestedLimit > 0
