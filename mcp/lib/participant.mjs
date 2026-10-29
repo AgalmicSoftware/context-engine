@@ -433,7 +433,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   // Listing your own answers scans the whole session's answer index, so one
   // scan is reused for a while; answers given since come from the local record.
   const scanMyAnswers = async (ctx) => {
-    if (ctx.ownScan && ctx.ownScan.complete && now() - ctx.ownScan.at < OWN_ANSWER_SCAN_MAX_AGE_MS && ctx.ownScan.sessionId === ctx.client.sessionId) {
+    if (ctx.ownScan && ctx.ownScan.complete && now() - ctx.ownScan.at < OWN_ANSWER_SCAN_MAX_AGE_MS && ctx.ownScan.sessionId === ctx.client.sessionId && ctx.ownScan.windowKey === ctx.registry?.windowKey) {
       return ctx.ownScan;
     }
     if (ctx.registry) {
@@ -443,7 +443,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const latest = latestAnswersByQuestion(entries, { registryConfig: ctx.client.config, questionIds });
       const answers = new Map();
       latest.forEach((byResponder, id) => { if (byResponder.has(wallet.address.toLowerCase())) answers.set(id, byResponder.get(wallet.address.toLowerCase())); });
-      ctx.ownScan = { at: now(), sessionId: ctx.client.sessionId, answers, complete, chainOrders, unread: unreadAnswers };
+      ctx.ownScan = { at: now(), sessionId: ctx.client.sessionId, windowKey: ctx.registry.windowKey, answers, complete, chainOrders, unread: unreadAnswers };
       return ctx.ownScan;
     }
     const { items, complete: listed } = await ctx.client.listAll('responses', {
@@ -479,7 +479,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (!isRecord(answer)) continue;
       // An incomplete registry scan cannot establish whether a saved plaintext
       // answer has since been cleared or encrypted by another client.
-      if (ctx.registry && !scan.complete) continue;
+      if (ctx.registry && (!scan.complete || !ctx.registry.containsBlock(answer.blockNumber))) continue;
       const known = mine.get(questionId);
       const chainOrder = scan.chainOrders?.get(questionId);
       if (ctx.registry && chainOrder && compareChainOrder(answer, chainOrder) < 0) continue;

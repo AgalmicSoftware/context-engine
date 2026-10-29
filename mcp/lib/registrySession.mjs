@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { responseReadWindowOptions, historicalResponseReadError } from '../../shared/responseReadWindow.mjs';
 import contracts from '../../client/src/variables/contracts.json' with { type: 'json' };
 import registryAbi from '../../client/src/contractsABI/SESSION_REGISTRY_ABI.json' with { type: 'json' };
 import surveysAbi from '../../client/src/contractsABI/SURVEYS_ABI.json' with { type: 'json' };
@@ -49,6 +50,10 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
   let workerOrigin;
   let surveys;
   let startBlock;
+  let endBlock = null;
+  let readEnd;
+  let windowKey;
+  let questionMark = null;
   let questionCursor;
   const pending = new Map();
   const questions = new Map();
@@ -56,6 +61,21 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
   const localAnswers = new Map();
   const answerScans = new Map();
   let loadingQuestions;
+
+  const containsBlock = (block) => Number.isSafeInteger(block) && block >= startBlock && (endBlock === null || block <= readEnd);
+  const readWindowEnd = async () => {
+    const head = await chainRequest(() => provider.getBlockNumber());
+    readEnd = endBlock === null ? head : Math.min(endBlock, head);
+    return readEnd;
+  };
+  const configuredBlock = (value, name) => {
+    if (value == null) return null;
+    const block = Number(value);
+    if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '' || !Number.isSafeInteger(block) || block < 0) {
+      throw new Error(`Invalid session block limit: ${name} must be a nonnegative integer.`);
+    }
+    return block;
+  };
 
   const loadConfig = async () => {
     await checkRegistryChain(provider, chainId);
@@ -82,12 +102,21 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     if (!surveys) surveys = createContract(address, surveysAbi);
     sessionConfig = { ...metadata, slug: info.slug, networkChainId: chainId, sessionId: normalizeSessionIdHex(row[7]), corsWorkerUrl: workerOrigin,
       contracts: { ...metadata.contracts, surveys: { address, chainId } } };
-    if (startBlock === undefined) {
-      const configured = Number(metadata.blockLimits?.start);
-      const head = await chainRequest(() => provider.getBlockNumber());
-      startBlock = metadata.blockLimits?.start !== undefined && Number.isSafeInteger(configured) && configured >= 0
-        ? configured : await findStartBlock(provider, Number(row[5]), head);
+    const head = await chainRequest(() => provider.getBlockNumber());
+    const nextStart = configuredBlock(metadata.blockLimits?.start, 'start') ?? await findStartBlock(provider, Number(row[5]), head);
+    const nextEnd = configuredBlock(metadata.blockLimits?.end, 'end');
+    if (nextEnd !== null && nextEnd < nextStart) throw new Error('Invalid session block window: end must not precede start.');
+    const nextKey = `${nextStart}:${nextEnd ?? 'head'}`;
+    startBlock = nextStart;
+    endBlock = nextEnd;
+    readEnd = endBlock === null ? head : Math.min(endBlock, head);
+    if (windowKey !== nextKey) {
+      windowKey = nextKey;
       questionCursor = { block: startBlock, offset: 0 };
+      questionMark = null;
+      pending.clear();
+      for (const [id, entry] of questions) if (!entry.local || !containsBlock(entry.blockNumber)) questions.delete(id);
+      answerScans.clear();
     }
     return sessionConfig;
   };
@@ -124,15 +153,15 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
   };
   /** True if replaced, false if retained, null if the RPC cannot verify it yet. */
   const replacedWrite = (entry, blocks = new Map()) => historyReplaced(entry?.blockHash ? { number: entry.blockNumber, hash: entry.blockHash } : null, blocks);
-  let questionMark = null;
   const visibleQuestions = () => {
     const blocked = new Set((Array.isArray(sessionConfig.BLOCKED_QUESTION_IDS) ? sessionConfig.BLOCKED_QUESTION_IDS : []).map(normalized));
-    return [...questions.values()].filter((entry) => !blocked.has(entry.id));
+    return [...questions.values()].filter((entry) => !blocked.has(entry.id) && containsBlock(entry.blockNumber));
   };
 
   const readQuestions = async ({ signal } = {}) => {
     const deadline = now() + 90000;
     const blocks = new Map();
+    const end = await readWindowEnd();
     let complete = true;
     const replaced = await historyReplaced(questionMark, blocks);
     // Advancing a cursor without verifying its prior mark leaves new blocks
@@ -151,7 +180,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
       if (replaced) questions.delete(id);
     }
     if (pending.size < MAX_CACHE && questions.size < MAX_QUESTIONS) {
-      const head = await readHeadMark(await chainRequest(() => provider.getBlockNumber()), blocks);
+      const head = await readHeadMark(end, blocks);
       if (head) {
         const scanned = await scanRegistryLogs({ provider, filter: filter('QuestionsAdded'), cursor: questionCursor,
           toBlock: head.number, maxLogs: 1000, deadline, now, signal });
@@ -194,7 +223,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     let verified = true;
     const responseFilter = filter('ResponsesSubmitted');
     if (mine) responseFilter.topics.push(ethers.utils.hexZeroPad(wallet.address, 32));
-    const head = await chainRequest(() => provider.getBlockNumber());
+    const head = await readWindowEnd();
     const scope = [...known].sort().join(',');
     let state = answerScans.get(mine);
     const replaced = !!state && state.scope === scope && head >= state.head && await historyReplaced(state.mark, blocks);
@@ -206,7 +235,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
         [`${entry.questionId}:${normalized(entry.responder)}`, entry]));
       const chainOrders = new Map(state.result?.chainOrders || []);
       for (const entry of localAnswers.values()) {
-        if (!known.has(entry.questionId)) continue;
+        if (!known.has(entry.questionId) || !containsBlock(entry.blockNumber)) continue;
         const key = `${entry.questionId}:${normalized(entry.responder)}`;
         if ([state.latest.get(key), held.get(key)].some((previous) => previous && compareChainOrder(entry, previous) < 0)) continue;
         chainOrders.set(entry.questionId, entry);
@@ -276,7 +305,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     // Confirmed local writes fill propagation gaps, but must not resurrect an
     // older plaintext answer after a newer encrypted or cleared chain answer.
     for (const [id, entry] of localAnswers) {
-      if (!known.has(entry.questionId)) continue;
+      if (!known.has(entry.questionId) || !containsBlock(entry.blockNumber)) continue;
       // A write can land above the last scanned head, or survive a scope reset.
       const replaced = await replacedWrite(entry, blocks);
       if (replaced === null) verified = false;
@@ -298,7 +327,18 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
         if (now() >= deadline || signal?.aborted) { complete = false; break; }
         const entry = selected[next++];
         try {
-          const pointer = entry.local ? entry.storageId : await chainRequest(() => surveys.getResponse(entry.responder, entry.questionId));
+          const { blockTag } = responseReadWindowOptions(endBlock === null ? null : { blockTag: head }, entry.responder, entry.questionId);
+          let pointer;
+          if (entry.local) pointer = entry.storageId;
+          else {
+            try {
+              pointer = await chainRequest(() => blockTag == null
+                ? surveys.getResponse(entry.responder, entry.questionId)
+                : surveys.getResponse(entry.responder, entry.questionId, { blockTag }));
+            } catch (error) {
+              throw blockTag == null ? error : historicalResponseReadError(error, blockTag);
+            }
+          }
           const payload = await readPayload(pointer);
           if (!registryResponseMatchesSession(payload, sessionConfig) || payload.answer?.encrypted === true) continue;
           if (normalized(payload.questionID || payload.questionId) !== entry.questionId) continue;
@@ -322,5 +362,5 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     if (resource === 'questions') questions.set(id, { ...entry, local: true });
     else localAnswers.set(id, entry);
   } });
-  return { loadConfig, loadQuestions, readAnswers, replacedWrite, ...writer, get config() { return sessionConfig; }, workerOrigin };
+  return { loadConfig, loadQuestions, readAnswers, replacedWrite, containsBlock, get windowKey() { return windowKey; }, ...writer, get config() { return sessionConfig; }, workerOrigin };
 };

@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Bound MCP registry reads and cached/local answers to the configured session window, using historical pointers at its end.
+
 - Read research gold and wide exports from permanent submitted-answer history,
   preserving revision order and gold answers from before each prediction.
 
