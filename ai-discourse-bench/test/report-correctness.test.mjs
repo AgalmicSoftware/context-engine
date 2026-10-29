@@ -14,7 +14,7 @@ const reportFor = (answersByModel, coverage = null) => {
   return buildResultsReport({
     questionBank: { benchmarkId: 'report-correctness', questions: ids.map((id) => ({ id, canonicalPrompt: `Statement ${id}.`, reversedPrompt: `Opposite ${id}.`, topic: 'test' })) },
     modelRoster: { models: Object.keys(answersByModel).map((id) => ({ id, label: id, model: id, provider: 'local', traits: { cohort: 'all' } })) },
-    runsFile: { repeats: 10, runs: Object.entries(answersByModel).flatMap(([modelId, answers]) => (
+    runsFile: { manifest: { mode: 'self', personaId: null, promptTemplateVersion: 'fixture-v1', promptTemplateHash: 'a'.repeat(64) }, repeats: 10, runs: Object.entries(answersByModel).flatMap(([modelId, answers]) => (
       (coverage?.[modelId] || ids).flatMap((questionId) => answers.flatMap((normalizedAnswer) => ['canonical', 'reversed'].map((polarity) => ({ modelId, questionId, polarity, normalizedAnswer }))))
     )) },
   });

@@ -534,6 +534,12 @@ node ./bin/ai-discourse-bench.mjs compare-snapshots \
   --out ./results/model-drift.json
 ```
 
+Snapshots bind the exact persona label used in the prompt, mode and recorded prompt
+template hash/version in a separate versioned experiment-context fingerprint.
+Comparisons refuse changed contexts or snapshots missing this fingerprint; rebuild
+those snapshots from reports with complete run manifests. Comparison output names
+the experiment context it compared.
+
 Comparisons report per-model stance shifts, direction changes, and pairwise
 similarity drift on common models and questions. Each model pair recomputes both
 similarities from questions present in both snapshots with usable distributions

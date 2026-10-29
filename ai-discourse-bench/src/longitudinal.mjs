@@ -12,8 +12,34 @@ const direction = (score) => {
   return 'mixed';
 };
 
+const buildExperimentContext = (report) => {
+  const manifests = [report.rawMaterial?.runManifest, ...(report.rawMaterial?.sourceManifests || [])].filter(Boolean);
+  if (!manifests.length) throw new Error('experiment context is missing; rebuild the report before creating a snapshot');
+  const contexts = manifests.map((manifest) => {
+    const mode = manifest.mode;
+    const label = manifest.personaProfile?.label;
+    if (!['self', 'persona'].includes(mode) || mode !== (report.mode || 'self') ||
+        (manifest.personaId || null) !== (report.personaId || null) ||
+        (mode === 'persona' && (typeof label !== 'string' || !label.trim())) ||
+        !/^[a-f0-9]{64}$/i.test(manifest.promptTemplateHash || '')) {
+      throw new Error('experiment context is incomplete; rebuild the report before creating a snapshot');
+    }
+    return {
+      schemaVersion: 1,
+      mode,
+      // Preserve the exact label interpolated into the prompt; unrelated profile
+      // metadata does not change the experiment's instructions.
+      persona: mode === 'persona' ? { label: String(label) } : null,
+      promptTemplate: { version: manifest.promptTemplateVersion || null, hash: manifest.promptTemplateHash },
+    };
+  });
+  if (new Set(contexts.map(hashJson)).size !== 1) throw new Error('report contains conflicting experiment contexts');
+  return contexts[0];
+};
+
 export const buildReportSnapshot = (report = {}, { label = '' } = {}) => {
   const reportFingerprint = buildReportFingerprint(report);
+  const experimentContext = buildExperimentContext(report);
   const questions = Array.isArray(report.questions) ? report.questions : [];
   const participants = Array.isArray(report.participants) ? report.participants : [];
   const matrix = report.polisReport?.byModelQuestion || {};
@@ -29,6 +55,8 @@ export const buildReportSnapshot = (report = {}, { label = '' } = {}) => {
       reportFingerprint,
       mode: report.mode || 'self',
       personaId: report.personaId || null,
+      experimentContext,
+      experimentContextFingerprint: hashJson(experimentContext),
     },
     questions: questions.map((question) => ({
       id: question.id,
@@ -90,6 +118,18 @@ export const compareLongitudinalSnapshots = (baseline = {}, current = {}) => {
     if ((baseline.source?.[field] ?? null) !== (current.source?.[field] ?? null)) {
       throw new Error(`snapshot source ${field} values do not match`);
     }
+  }
+  for (const snapshot of [baseline, current]) {
+    const { experimentContext, experimentContextFingerprint } = snapshot.source || {};
+    if (!experimentContextFingerprint || !experimentContext) {
+      throw new Error('experiment context is missing; rebuild the snapshot before comparing');
+    }
+    if (experimentContext.schemaVersion !== 1 || hashJson(experimentContext) !== experimentContextFingerprint) {
+      throw new Error('snapshot experiment context fingerprint is invalid');
+    }
+  }
+  if (baseline.source.experimentContextFingerprint !== current.source.experimentContextFingerprint) {
+    throw new Error('snapshot experiment context changed; persona instructions or prompt template differ');
   }
   const baselineModels = new Map((baseline.models || []).map((model) => [model.id, model]));
   const currentModels = new Map((current.models || []).map((model) => [model.id, model]));
@@ -174,6 +214,8 @@ export const compareLongitudinalSnapshots = (baseline = {}, current = {}) => {
   return {
     schemaVersion: 1,
     kind: 'ai_discourse_bench_longitudinal_comparison',
+    experimentContext: baseline.source.experimentContext,
+    experimentContextFingerprint: baseline.source.experimentContextFingerprint,
     generatedAt: new Date().toISOString(),
     baseline: { snapshotId: baseline.snapshotId || null, label: baseline.label || '', source: baseline.source || {} },
     current: { snapshotId: current.snapshotId || null, label: current.label || '', source: current.source || {} },
