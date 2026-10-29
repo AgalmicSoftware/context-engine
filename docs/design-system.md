@@ -556,6 +556,8 @@ sources: paste their text instead. Skipped files and extraction failures are
 named in the generator, and only extracted text counts toward its 50-character
 minimum. The document library's separate file-upload support is unchanged.
 
+Photo generation sources use the image capability declared by each built-in AI preset. Custom Anthropic and OpenRouter Claude names accept both family-first (`claude-sonnet-4-6`) and version-first (`claude-3-5-sonnet`) forms. Unsupported models keep the existing vision-capability error before a request is sent.
+
 ### Breakdown question selection
 
 Breakdown provides a labeled Question selector independently of demographic comparisons and opens the first question with response distributions. Sessions without segments show overall distributions; segment controls and comparison reports appear only when segment data exists. The selector uses document-surface contrast tokens and a visible keyboard focus outline. Standalone benchmark reports expose the same question control alongside model cohort filters.

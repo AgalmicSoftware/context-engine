@@ -1,3 +1,5 @@
+import { AI_PRESET_CONFIGS } from './aiModelPresets';
+
 type PhotoLike = {
   name?: unknown;
   type?: unknown;
@@ -82,25 +84,27 @@ export const resolvePhotoAnalysisSupport = ({
     .toLowerCase();
   const leaf = modelLeaf(model);
 
-  if (normalizedProvider === 'openai') {
-    if (/^(gpt-5|gpt-4o|gpt-4\.1)/.test(leaf)) {
-      return {
-        supported: true,
-        format: usesOpenAiResponsesApi(normalizedProvider, leaf) ? 'openai-responses' : 'openai-chat',
-      };
-    }
-  }
-
-  if (normalizedProvider === 'anthropic') {
-    if (/^claude-(3|4)/.test(leaf)) {
-      return { supported: true, format: 'anthropic' };
-    }
-  }
-
-  if (normalizedProvider === 'openrouter') {
-    if (/^(gpt-5|gpt-4o|gpt-4\.1)/.test(leaf) || /claude-(3|4)/.test(leaf)) {
-      return { supported: true, format: 'openai-chat' };
-    }
+  const preset = Object.values(AI_PRESET_CONFIGS).find(
+    (candidate) =>
+      (candidate.provider === normalizedProvider || normalizedProvider === 'openrouter') &&
+      Object.values(candidate.models).some((modelName) => modelLeaf(modelName) === leaf),
+  );
+  const isOpenAiVisionModel = /^(gpt-5|gpt-4o|gpt-4\.1)/.test(leaf);
+  const isClaudeVisionModel = /^claude-(?:[34](?:[.-]|$)|(?:sonnet|opus|haiku)-[34](?:[.-]|$))/.test(leaf);
+  const customModelSupported =
+    (normalizedProvider === 'openai' && isOpenAiVisionModel) ||
+    (normalizedProvider === 'anthropic' && isClaudeVisionModel) ||
+    (normalizedProvider === 'openrouter' && (isOpenAiVisionModel || isClaudeVisionModel));
+  if (preset ? preset.supportsImages : customModelSupported) {
+    return {
+      supported: true,
+      format:
+        normalizedProvider === 'anthropic'
+          ? 'anthropic'
+          : usesOpenAiResponsesApi(normalizedProvider, leaf)
+            ? 'openai-responses'
+            : 'openai-chat',
+    };
   }
 
   return {
