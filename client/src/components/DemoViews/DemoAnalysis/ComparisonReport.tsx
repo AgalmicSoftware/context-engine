@@ -142,10 +142,7 @@ const getOrderedResponseTexts = (rows: FlatResponse[] = [], preferredResponseTex
 
 const formatDistributionMeta = (rows: FlatResponse[] = []) => {
   const modeledResponseCount = rows.reduce((max, row) => Math.max(max, Number(row?.totalVotes || 0)), 0);
-  const participantCount = rows.reduce(
-    (max, row) => Math.max(max, Number(row?.participantCount || 0)),
-    modeledResponseCount,
-  );
+  const participantCount = rows.reduce((max, row) => Math.max(max, Number(row?.participantCount || 0)), 0);
 
   if (modeledResponseCount > 0 && participantCount > 0) {
     return `${participantCount} ${participantCount === 1 ? 'persona' : 'personas'} · ${modeledResponseCount} modeled responses`;

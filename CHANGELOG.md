@@ -138,6 +138,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Count distinct demo personas separately from their modeled responses, omitting unknown persona counts.
+
 - Accept photo sources with the built-in Claude presets using explicit preset image capabilities.
 
 - Open Breakdown distributions directly and select questions even when no demographic segments exist.

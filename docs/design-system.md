@@ -560,4 +560,6 @@ Photo generation sources use the image capability declared by each built-in AI p
 
 ### Breakdown question selection
 
+Demo comparison cards count distinct personas separately from modeled responses. When persona counts are absent, they show only the response count.
+
 Breakdown provides a labeled Question selector independently of demographic comparisons and opens the first question with response distributions. Sessions without segments show overall distributions; segment controls and comparison reports appear only when segment data exists. The selector uses document-surface contrast tokens and a visible keyboard focus outline. Standalone benchmark reports expose the same question control alongside model cohort filters.

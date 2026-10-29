@@ -2,6 +2,9 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ComparisonReport from './ComparisonReport';
+import buildDemoAnalysisData from '../../../utilities/demo/demoAnalysisAdapter';
+import demoAnalysisData from '../../../variables/demo/demo_analysis_data.json';
+import historicalFigureDemographics from '../../../variables/demo/historical_figure_demographics';
 
 const comparisonGroups = [
   { segmentKey: 'Era:Modern', name: 'Era: Modern' },
@@ -20,6 +23,43 @@ const flatResponses = [
 ];
 
 describe('ComparisonReport', () => {
+  it('counts one persona with two responses independently', () => {
+    render(
+      <ComparisonReport
+        flatResponses={flatResponses.map((row) => ({ ...row, totalVotes: 2, participantCount: 1 }))}
+        questions={questions}
+        comparisonGroups={comparisonGroups}
+      />,
+    );
+    expect(screen.getAllByText('1 persona · 2 modeled responses').length).toBeGreaterThan(0);
+    expect(screen.queryByText('2 personas · 2 modeled responses')).not.toBeInTheDocument();
+  });
+
+  it('shows only the response count when the persona count is unknown', () => {
+    render(
+      <ComparisonReport
+        flatResponses={flatResponses.map((row) => ({ ...row, totalVotes: 2 }))}
+        questions={questions}
+        comparisonGroups={comparisonGroups}
+      />,
+    );
+    expect(screen.getAllByText('2 modeled responses').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/personas? ·/)).not.toBeInTheDocument();
+  });
+
+  it('shows eleven distinct personas in the default demo', () => {
+    const data = buildDemoAnalysisData(demoAnalysisData, historicalFigureDemographics);
+    render(
+      <ComparisonReport
+        flatResponses={data.flatResponses}
+        questions={data.questions.filter((question) => question.id === '6')}
+        comparisonGroups={[{ segmentKey: 'Atlas Category:Supply Chains', name: 'Supply Chains' }, comparisonGroups[0]]}
+      />,
+    );
+    expect(screen.getAllByText('11 personas · 30 modeled responses').length).toBeGreaterThan(0);
+    expect(screen.queryByText('30 personas · 30 modeled responses')).not.toBeInTheDocument();
+  });
+
   it('renders report cards with candlestick distributions instead of response labels', () => {
     render(
       <ComparisonReport flatResponses={flatResponses} questions={questions} comparisonGroups={comparisonGroups} />,

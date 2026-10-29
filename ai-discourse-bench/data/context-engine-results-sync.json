@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "ai_discourse_bench_context_engine_results_sync",
-  "sourceCommit": "2148108a8742e7f34788a2da663ca07dad335a4e",
+  "sourceCommit": "b531124b51dd7e4b86cd7159383ff0d4ca97b4b6",
   "files": {
     "client/src/components/OnePageSession/OnePageSessionStandardShell.tsx": "09842ffbdc38965d7ee4177d5c388ee2c6d7e7405b81149a61d06787928fbde9",
     "client/src/components/OnePageSession/OnePageSession.tsx": "759696b06031b149f94e071d3631b380dfe5f02345e183cb143f1628e039c27e",
@@ -14,7 +14,7 @@
     "client/src/components/MainContent/RiskMatrix.module.scss": "d60cf7b8be5d592f125bce5d2403245bc309ab3e3222a29d4ed3d7193709d079",
     "client/src/components/DemoViews/DemoAnalysis/DemoAnalysisWorkspace.tsx": "33ede825aac244373965d6f75753d3449bdb0f5f56b06d2a3e3079d5d85dd9fe",
     "client/src/components/DemoViews/DemoAnalysis/DemoAnalysisWorkspace.module.scss": "7dafe2282e000423ef026ba2e629186d443196c76db1d72aec6aa184060d6ef6",
-    "client/src/components/DemoViews/DemoAnalysis/ComparisonReport.tsx": "718bc10b3594cd39978782f749d9f10034621475be1f3665ae7d7b5268ac0316",
+    "client/src/components/DemoViews/DemoAnalysis/ComparisonReport.tsx": "921a76298ea188a8b455e433c3d20a427c2a9f5493e5ed805cebbce6ba558246",
     "client/src/components/DemoViews/DemoAnalysis/ComparisonReport.module.scss": "1adeee02275a7797574ae6b3355ee5aaa95ffe3c03685d5122101f59117544a0",
     "client/src/components/DemoViews/DemoAnalysis/ComparisonSuggestions.tsx": "7f01edc30fe95c3a72d15eff88b0b220530568bbd192a4bdf782d1c31e117f10",
     "client/src/components/DemoViews/DemoAnalysis/DemographicSelector.tsx": "6800478dcdce1a220de755b5404a2b19beb0391915a4925283c0e57b703278c0",
