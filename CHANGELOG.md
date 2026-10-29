@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Prepare MCP 0.2.0 with shared rating validation. Fractional grids are supported;
+  new answers must follow the stored step (default 1). Existing answers remain
+  unchanged. The minor version marks the changed accepted-input behavior.
+
 - Keep canonical submitted answers when a stale submission-index copy has the
   same timestamp. Newer timestamps still take precedence when deduplicating copies.
 

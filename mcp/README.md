@@ -41,6 +41,15 @@ starts the server. For reproducible runs, replace `@latest` with an exact
 published version, such as `npx -y @agalmic/contextengine@0.1.2` once 0.1.2 is
 published. A running server does not update itself.
 
+## Upgrading to 0.2.0
+
+Rating answers now follow each question's minimum, maximum, and stored step.
+The default step is 1. Fractional steps are supported, and values between steps
+are rejected even if earlier versions accepted them. Agents should read the
+question's scale before answering; for a 0–10 scale with step 2, submit 0, 2, 4,
+6, 8, or 10. Existing stored answers are not rewritten. Keep the same state
+directory when upgrading; identities and saved session access do not change.
+
 ## Connect an agent
 
 Give each agent its own state directory: it holds that agent's key, so two
