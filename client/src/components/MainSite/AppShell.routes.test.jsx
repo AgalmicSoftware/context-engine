@@ -4314,6 +4314,52 @@ describe('AppShell route render smoke', () => {
     expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['above the configured end', { fromBlock: 10, toBlock: 20 }, { start: 10, end: 20 }, 30],
+    ['below the configured start', { fromBlock: 10, toBlock: 25 }, { start: 10, end: null }, 9],
+    ['outside the session scope', { fromBlock: 1, toBlock: 0 }, { start: null, end: null }, 30],
+  ])('drops live responses %s before fetching or writing', async (_label, window, blockLimits, blockNumber) => {
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig({ blockLimits }),
+    });
+    const dg = attachDgStore(subject);
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue(window);
+    contractScripts.getSurveyResponse.mockResolvedValue({ answer: 'outside' });
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'ResponsesSubmitted',
+      surveyId: `0x${'1'.repeat(64)}`,
+      questionIds: [],
+      responder: '0x0000000000000000000000000000000000000001',
+      blockNumber,
+    });
+    expect(contractScripts.getSurveyResponse).not.toHaveBeenCalled();
+    expect(contractScripts.getResponse).not.toHaveBeenCalled();
+    expect(updateCacheAtomic).not.toHaveBeenCalled();
+    expect(dg.store.size).toBe(0);
+  });
+
+  it('accepts a live response ahead of a lagging RPC head when no end is configured', async () => {
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig({ blockLimits: { start: 10, end: null } }),
+    });
+    attachDgStore(subject);
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 25 });
+    contractScripts.getSurveyResponse.mockResolvedValue({ answer: 'in scope' });
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'ResponsesSubmitted',
+      surveyId: `0x${'1'.repeat(64)}`,
+      questionIds: [],
+      responder: '0x0000000000000000000000000000000000000001',
+      blockNumber: 26,
+    });
+    expect(contractScripts.getSurveyResponse).toHaveBeenCalledTimes(1);
+    expect(updateCacheAtomic).toHaveBeenCalled();
+  });
+
   it('caches every survey responder in a block and keeps same-block edits ordered and idempotent', async () => {
     const surveyId = `0x${'1'.repeat(64)}`;
     const questionId = `0x${'2'.repeat(64)}`;

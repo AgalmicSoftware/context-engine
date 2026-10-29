@@ -3447,6 +3447,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
     const eventBlockWindow = await chainScanReadsPort.getRelevantBlockWindowForFilter(slug);
     const { fromBlock: baseFrom } = eventBlockWindow;
+    if (eventBlockWindow.toBlock < baseFrom) return;
     const initialLastBlockDefault = Math.max(0, baseFrom - 1);
 
     let eventBlockNumber = event.blockNumber;
@@ -3472,6 +3473,14 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     } else if (!eventBlockNumber) {
       eventBlockNumber = eventBlockWindow.toBlock;
     }
+
+    const sessionConfig = sessionRegistryReadsPort.getSessionConfig(slug) || getSessionConfigBySlug(slug);
+    const configuredEnd = isMainSiteRecord(sessionConfig?.blockLimits) ? sessionConfig.blockLimits.end : null;
+    const endBlock = configuredEnd == null ? null : Number(configuredEnd);
+    // The scan window ends at the RPC head, which can lag a valid live event.
+    // Only an explicit configured end limits event admission.
+    if (eventBlockNumber < baseFrom || (endBlock != null && Number.isFinite(endBlock) && eventBlockNumber > endBlock))
+      return;
 
     let surveysCache = (this.readDgRecord('surveysCache', slug) || {}) as Record<
       string,

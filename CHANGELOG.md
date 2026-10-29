@@ -106,6 +106,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Drop live events outside the session scope or configured block limits without
+  treating a lagging RPC head as a configured end.
+
 - Cache every live survey responder in a block, order same-block edits by transaction
   and log position, and ignore duplicate events.
 
