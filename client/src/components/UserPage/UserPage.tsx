@@ -1,11 +1,13 @@
+import {
+  analyzeUser,
+  analysisProfileKey,
+  analysisInputSignature,
+  invalidateUserAnalysis,
+} from './userPageAnalysisActions';
 /** @file UserPage.tsx */
 import React, { Component } from 'react';
 import styles from './UserPage.module.scss';
 import {
-  buildUserPageAnalysisAiOptions,
-  buildUserPageAnalysisErrorStatePatch,
-  buildUserPageAnalysisErrorPresentation,
-  buildUserPageAnalysisCacheReadDescriptor,
   buildUserPageAnalysisFingerprint,
   applyUserPageBookmarkToggle,
   applyUserPageBookmarkNicknameSave,
@@ -13,17 +15,11 @@ import {
   buildUserPageCacheRefreshRequestDescriptor,
   buildUserPageRefreshTelemetrySignature,
   buildUserPageRefreshTelemetrySnapshot,
-  buildUserPageAnalysisCreatedQuestions,
-  buildUserPageAnalysisCreatedSurveys,
   buildUserPageAnalysisCandidateLogRows,
   buildUserPageAnalysisExcludeSlugSet,
   buildUserPageAnalysisElapsedStatePatch,
   buildUserPageAnalysisModalStatePatch,
-  buildUserPageAnalysisQuestions,
-  buildUserPageAnalysisResetStatePatch,
   buildUserPageAnalysisResultStatePatch,
-  buildUserPageAnalysisSbts,
-  buildUserPageAnalysisSurveys,
   buildUserPageAddressContextResetStatePatch,
   buildUserPageAiAvailabilityStatePatch,
   buildUserPageAiSessionSlugCandidates,
@@ -106,7 +102,6 @@ import {
   buildUserPageRootClassName,
   normalizeUserPageDeepScanProgressRows,
   normalizeUserPageDeepScanTooltipLines,
-  normalizeUserAnalysisResult,
   normalizeUserPageBookmarksCache,
   normalizeUserPageQuestionResponseInfoOrder,
   normalizeUserPageSingleQuestionResponsePayload,
@@ -115,7 +110,6 @@ import {
   readUserPageCacheSourceSnapshot,
   readUserPageNamespaceSourceEntries,
   readBoolishUserPageTelemetryFlag,
-  readUserPageAnalysisCreatedSurveyCachesThroughPort,
   readUserPageAnalysisCacheThroughPort,
   dispatchUserPageGateAccessCheckThroughPort,
   resolveUserPageAnalysisAiContext,
@@ -179,7 +173,6 @@ import {
   runUserPageCacheRefreshActionController,
 } from './userPageActionController';
 
-import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -1345,6 +1338,12 @@ class UserPage extends Component<any, any> {
   }
 
   componentDidUpdate(prevProps: UserPagePreviousProps, prevState: UnknownRecord) {
+    if (
+      analysisProfileKey(prevProps) !== analysisProfileKey(this.props) ||
+      analysisInputSignature(prevState) !== analysisInputSignature(this.state)
+    ) {
+      invalidateUserAnalysis(this);
+    }
     // Fast-path: nonce changed → force immediate cache re-read (bypasses signature dedup)
     const responseNonceRefresh = resolveUserPageResponseNonceRefresh({
       account: this.props.account,
@@ -2929,16 +2928,18 @@ class UserPage extends Component<any, any> {
   };
 
   // ---- Analyze helpers (timer management) ----
-  startAnalysisTimer = (): void => {
+  startAnalysisTimer = (isCurrent = () => this._isMounted): void => {
     this.clearAnalysisTimer();
     const startedAt = Date.now();
     this.analysisTimer = setInterval(() => {
-      if (!this._isMounted) return;
-      this.setState(
-        buildUserPageAnalysisElapsedStatePatch({
-          nowMs: Date.now(),
-          startedAt,
-        }),
+      if (!isCurrent()) return;
+      this.setState(() =>
+        isCurrent()
+          ? buildUserPageAnalysisElapsedStatePatch({
+              nowMs: Date.now(),
+              startedAt,
+            })
+          : null,
       );
     }, 250);
   };
@@ -3119,17 +3120,20 @@ class UserPage extends Component<any, any> {
     return cacheRead.entry as UserAnalysisCacheEntry | null;
   };
 
-  _hydrateAnalysisFromCache = (entry: UserAnalysisCacheEntry): void => {
+  _hydrateAnalysisFromCache = (entry: UserAnalysisCacheEntry, isCurrent = () => this._isMounted): void => {
+    if (!isCurrent()) return;
     this.clearAnalysisTimer();
-    this.setState(
-      buildUserPageAnalysisResultStatePatch({
-        cachedAt: entry?.cachedAt,
-        includeElapsed: true,
-        includeError: true,
-        includeModal: true,
-        result: entry?.result || {},
-        servedFromCache: true,
-      }),
+    this.setState(() =>
+      isCurrent()
+        ? buildUserPageAnalysisResultStatePatch({
+            cachedAt: entry?.cachedAt,
+            includeElapsed: true,
+            includeError: true,
+            includeModal: true,
+            result: entry?.result || {},
+            servedFromCache: true,
+          })
+        : null,
     );
   };
 
@@ -3159,182 +3163,7 @@ class UserPage extends Component<any, any> {
     return cacheWrite.entry as UserAnalysisCacheEntry;
   };
 
-  analyzeUser = async (forceRefresh = false): Promise<void> => {
-    if (!this._isMounted) return;
-
-    // --- Assemble inputs strictly from current state (already hydrated from other caches) ---
-    const sbts = buildUserPageAnalysisSbts({
-      getSbtDisplayName,
-      sbtList: this.state.sbtList,
-    });
-
-    // Question-level responses (all types; only visible)
-    const questions = buildUserPageAnalysisQuestions({
-      detailedQuestionResponses: this.state.detailedQuestionResponses,
-      questionResponseInfo: this.state.questionResponseInfo,
-    });
-
-    // Survey-level summaries + samples of answered items (with types & additional comments)
-    const surveys = buildUserPageAnalysisSurveys({
-      detailedSurveyResponses: this.state.detailedSurveyResponses,
-      surveyResponseInfo: this.state.surveyResponseInfo,
-    });
-
-    // Created content (counts + actual items)
-    const questionsCreated = buildUserPageAnalysisCreatedQuestions(this.state.questionCreationInfo);
-
-    // For surveys the user created, include title + a small sample of question prompts/types
-    let surveysCreated: unknown[] = [];
-    try {
-      const networkID = this.props.network?.id?.toString();
-      const slug = this.props.activeSessionSlug == null ? '' : this.props.activeSessionSlug;
-      const createdSurveyCacheRead = readUserPageAnalysisCreatedSurveyCachesThroughPort({
-        networkID,
-        peekCache: peekCacheSync,
-        sessionSlug: slug,
-      });
-      if (createdSurveyCacheRead.status === 'error') {
-        throw createdSurveyCacheRead.error;
-      }
-      surveysCreated = buildUserPageAnalysisCreatedSurveys({
-        networkID: createdSurveyCacheRead.networkID,
-        questionsCache: createdSurveyCacheRead.questionsCache,
-        surveyCreationInfo: this.state.surveyCreationInfo,
-        surveysCache: createdSurveyCacheRead.surveysCache,
-      });
-    } catch (e) {
-      accountLog.warn('UserPage: fallback', e);
-    }
-
-    const createdCounts = {
-      questionsCreated: questionsCreated.length,
-      surveysCreated: surveysCreated.length,
-    };
-
-    const userData = {
-      address: this.props.viewAddress,
-      username: this.state.username || null,
-      sbts,
-      questions,
-      surveys,
-      // NEW: created content + explicit counts
-      questionsCreated,
-      surveysCreated,
-      createdCounts,
-    };
-    const addressLower = String(this.props.viewAddress || '')
-      .trim()
-      .toLowerCase();
-    // Hosted profiles have no chain ID; keep their cache independent of the connected wallet's network.
-    const networkId =
-      this.props.onChainProfileEnabled === false
-        ? 'worker'
-        : String(this.props.network?.id ?? this.props.network?.chainId ?? '');
-    const hydrateAnalysisCacheIfPresent = (cacheContextToRead: UserAnalysisCacheContext): boolean => {
-      const cacheReadDescriptor = buildUserPageAnalysisCacheReadDescriptor({
-        sessionSlug: cacheContextToRead.sessionSlug,
-        networkId,
-        addressLower,
-        fingerprint: cacheContextToRead.fingerprint,
-        forceRefresh,
-      });
-      if (cacheReadDescriptor.action !== 'read') return false;
-      const cachedEntry = this._readAnalysisCacheEntry(cacheReadDescriptor);
-      if (!cachedEntry) return false;
-      if (!this._isMounted) return true;
-      this._hydrateAnalysisFromCache(cachedEntry);
-      return true;
-    };
-
-    try {
-      this.setState(buildUserPageAnalysisResetStatePatch());
-
-      const analysisSession = await this.resolveAnalysisSessionContext();
-      if (!analysisSession?.sessionConfig) {
-        throw new Error('No valid AI session configuration available for this profile context.');
-      }
-      let cacheContext = await this._buildAnalysisCacheContext({
-        userData,
-        analysisSession,
-        addressLower,
-        networkId,
-      });
-      if (hydrateAnalysisCacheIfPresent(cacheContext)) return;
-
-      if (!this._isMounted) return;
-      this.setState(buildUserPageAnalysisResetStatePatch({ analyzing: true }));
-      this.startAnalysisTimer();
-
-      const analysisAiContext = {
-        account: String(this.props.account || ''),
-        providerLike: this.props.provider,
-        chainId: this.props.network?.id ?? this.props.networkChainId ?? null,
-        lit: getGlobalLitHooks(),
-      };
-      const aiOptions = buildUserPageAnalysisAiOptions({
-        analysisSession,
-        context: analysisAiContext,
-      });
-      let result;
-      try {
-        result = await analyzeUserOpinions(userData, aiOptions);
-      } catch (err: unknown) {
-        const isGateUnavailable = /on-chain gate data unavailable/i.test(getUserPageErrorMessage(err, ''));
-        if (!isGateUnavailable) throw err;
-        accountLog.warn('[UserPage] gate data unavailable for session, trying fallback', {
-          failedSlug: analysisSession.slug,
-          gateStatus: analysisSession.status,
-        });
-        const fallbackSession = await this.resolveAnalysisSessionContext([analysisSession.slug]);
-        if (!fallbackSession?.sessionConfig) throw err;
-        cacheContext = await this._buildAnalysisCacheContext({
-          userData,
-          analysisSession: fallbackSession,
-          addressLower,
-          networkId,
-        });
-        if (hydrateAnalysisCacheIfPresent(cacheContext)) return;
-        const fallbackOpts = buildUserPageAnalysisAiOptions({
-          analysisSession: fallbackSession,
-          context: analysisAiContext,
-          defaultReason: 'fallback-gate-unavailable',
-        });
-        result = await analyzeUserOpinions(userData, fallbackOpts);
-      }
-      if (!this._isMounted) return;
-
-      // Update UI
-      const normalizedResult = normalizeUserAnalysisResult(result);
-      this.setState(
-        buildUserPageAnalysisResultStatePatch({
-          result: normalizedResult,
-          servedFromCache: false,
-        }),
-      );
-      this.clearAnalysisTimer();
-      try {
-        await this._writeAnalysisCacheEntry({
-          sessionSlug: cacheContext.sessionSlug,
-          networkId,
-          addressLower,
-          fingerprint: cacheContext.fingerprint,
-          aiContext: cacheContext.aiContext,
-          result: normalizedResult,
-        });
-      } catch (cacheError) {
-        accountLog.warn('[UserPage] analysis cache write failed:', cacheError);
-      }
-    } catch (e) {
-      accountLog.error('[UserPage] analyzeUser failed:', e);
-      if (!this._isMounted) return;
-      this.setState(
-        buildUserPageAnalysisErrorStatePatch({
-          ...buildUserPageAnalysisErrorPresentation(e),
-        }),
-      );
-      this.clearAnalysisTimer();
-    }
-  };
+  analyzeUser = analyzeUser.bind(this);
 
   openAiSettings = (): void => {
     if (this._isMounted) {
