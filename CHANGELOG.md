@@ -331,6 +331,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Count only eligible public questions toward interview discovery's 100-question
+  limit, with separate scan budgets and retryable incomplete-discovery errors.
+
 - Reject encrypted response fields without a valid envelope and public lone-asterisk masks.
 
 - Require public HTTPS targets without embedded credentials throughout custom AI

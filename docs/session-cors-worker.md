@@ -2803,7 +2803,15 @@ Signed login/bootstrap requests:
     catalog's version, and v5 links still validate against a v6 Worker. Verify the served
     client/Worker contracts during rollout; bundle publication alone does not
     establish which version a deployed Worker serves.
-  - Reads at most 100 accessible public questions. Cloudflare-native questions
+  - Returns at most 100 accessible public questions. Foreign-session, restricted,
+    duplicate and unreadable on-chain candidates do not consume that output
+    limit. Separate budgets bound discovery to 20 log chunks, 200 pointer reads
+    and at most two gateway fetches per pointer, within a two-million-block
+    window. Worker storage bounds list pages and payload reads separately.
+    If a budget or window ends discovery before any eligible question is found,
+    the catalog returns retryable HTTP 503 instead of a definitive empty 404;
+    eligible questions found before the limit are still returned.
+  - Cloudflare-native questions
     pass through `/storage/list` and each `/storage/read` authorization check;
     it reads up to 200 stored rows so it can keep the canonical version of a
     re-uploaded id (see `POST /storage/upload`) and skips hidden ids;

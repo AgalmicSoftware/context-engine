@@ -164,13 +164,17 @@ export const dispatchInterviewBriefRequest = async ({
   }
 
   const loadPublicInterviewQuestions = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestionsBoundary;
-  const questions = await loadPublicInterviewQuestions({
+  const { questions, incomplete } = await loadPublicInterviewQuestions({
     env,
     config,
     slug,
     storageRoute: deps?.storageRoute,
     fetch: deps?.fetch,
   });
+  if (!questions.length && incomplete) {
+    headers.set('retry-after', '5');
+    return deps?.json?.({ error: 'Interview question discovery is incomplete. Retry shortly.' }, 503, headers);
+  }
   if (!questions.length) {
     return deps?.json?.({ error: 'No public, accessible questions are available for interview prefill.' }, 404, headers);
   }

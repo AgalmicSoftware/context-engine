@@ -2338,7 +2338,7 @@ test('opening refresh requires admin authority and respects the session switch',
     action: 'refresh-interview-opening',
   };
   const deps = createAdminDeps({
-    loadPublicInterviewQuestions: async () => [{ id: 'q1', prompt: 'An AI question' }],
+    loadPublicInterviewQuestions: async () => ({ questions: [{ id: 'q1', prompt: 'An AI question' }], incomplete: false }),
     proxyOpenAI: async () => {
       generationCalls++;
       return Response.json({ completion: 'What is your AI expertise?' });

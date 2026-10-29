@@ -27,7 +27,7 @@ const fixture = () => {
   };
   const deps = {
     loadPublicInterviewQuestions: async () =>
-      Array.from({ length: count }, (_, id) => ({ id: String(id), prompt: `AI topic ${id}` })),
+      ({ questions: Array.from({ length: count }, (_, id) => ({ id: String(id), prompt: `AI topic ${id}` })), incomplete: false }),
     getSessionSecrets: async () => ({ openaiKey: 'worker-only-fixture' }),
     proxyOpenAI: async ({ payload, secrets }) => {
       calls++;

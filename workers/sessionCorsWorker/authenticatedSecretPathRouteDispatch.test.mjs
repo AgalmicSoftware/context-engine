@@ -41,10 +41,10 @@ test('authenticated agent questions reuse the session question catalog when agen
       },
       loadPublicInterviewQuestions: async ({ slug }) => {
         assert.equal(slug, 'session-a');
-        return [
+        return ({ questions: [
           { id: 'q-1', prompt: 'First?', type: 'binary', options: ['Agree', 'Unsure', 'Disagree'] },
           { id: 'q-2', prompt: 'Second?', type: 'freeform', options: [] },
-        ];
+        ], incomplete: false });
       },
       json: (body, status, headers) => ({ body, status, headers }),
     },
@@ -77,7 +77,7 @@ test('authenticated agent questions fail closed when the session surface is disa
     deps: {
       loadPublicInterviewQuestions: async () => {
         catalogCalled = true;
-        return [];
+        return ({ questions: [], incomplete: false });
       },
       json: (body, status, headers) => ({ body, status, headers }),
     },

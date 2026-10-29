@@ -104,7 +104,7 @@ test('on-chain question discovery fails closed on payloads from another session'
   const eventData = `0x${(32n).toString(16).padStart(64, '0')}${(1n).toString(16).padStart(64, '0')}${qid.slice(2)}`;
   const pointerBytes = Buffer.alloc(32, 1);
   const pointer = pointerBytes.toString('base64url');
-  const questions = await loadPublicInterviewQuestions({
+  const { questions } = await loadPublicInterviewQuestions({
     slug: 'demo',
     config: {
       contracts: { surveys: '0x1111111111111111111111111111111111111111' },
@@ -192,7 +192,7 @@ const createQuestionStore = () => {
       if (args.path === '/storage/read') reads.push(new URL(args.request.url).searchParams.get('id'));
       return storageRoute(args);
     },
-  });
+  }).then(result => result.questions);
   return { kv, put, load, reads };
 };
 
@@ -278,7 +278,7 @@ test('Cloudflare catalog still chooses among the rows it listed when it cannot f
     [(cursor) => (cursor ? page({ error: 'unavailable' }, 503) : page({ items: [listed], cursor: 'next', listComplete: false })), 2],
   ]) {
     let listCalls = 0;
-    const questions = await loadPublicInterviewQuestions({
+    const { questions } = await loadPublicInterviewQuestions({
       slug: 'session-a',
       storageRoute: async ({ path, request }) => {
         if (path !== '/storage/list') return page(question('q1', 'Listed question'));

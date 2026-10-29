@@ -23,14 +23,14 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
   const write = deps.putKvJson || putKvJson;
   const cached = await read(env, cacheKey(slug));
   if (cached?.openingPrompt && !settings.autoRegenerate && !refresh) return withSteeringPrompt(cached);
-  const questions = await (deps.loadPublicInterviewQuestions || loadPublicInterviewQuestions)({
+  const { questions, incomplete } = await (deps.loadPublicInterviewQuestions || loadPublicInterviewQuestions)({
     env,
     slug,
     config,
     storageRoute: deps.storageRoute,
     fetch: deps.fetch,
   });
-  if (!questions.length) return withSteeringPrompt(cached || { openingPrompt: '', source: 'waiting-for-questions' });
+  if (!questions.length) return withSteeringPrompt(cached || { openingPrompt: '', source: incomplete ? 'discovery-incomplete' : 'waiting-for-questions' });
   if (
     cached?.openingPrompt &&
     !refresh &&

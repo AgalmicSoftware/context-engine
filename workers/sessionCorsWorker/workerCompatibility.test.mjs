@@ -30,6 +30,6 @@ for (const upgraded of [false, true]) {
     assert.equal(results.snapshot.responses.length, 1, 'Legacy uploads without receipts still deduplicate by responder and question');
     const catalog = await loadPublicInterviewQuestions({ env, config, slug: config.slug, storageRoute,
       fetch: async () => { throw new Error('Unexpected network fallback'); } });
-    assert.deepEqual(pairs(catalog), expected);
+    assert.deepEqual(pairs(catalog.questions), expected);
   });
 }
