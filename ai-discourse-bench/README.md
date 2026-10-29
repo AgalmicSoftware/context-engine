@@ -443,10 +443,14 @@ npm run publish:static -- \
 ```
 
 This writes a deterministic gzip artifact and updates the route manifest. A
-preview report remains visibly marked `development-preview`. Add `--release`
-for an official artifact; the publisher then refuses to write unless the report
-declares `integrity.releaseReady: true`. API keys and raw provider responses are
-never part of the route artifact.
+preview report remains visibly marked and unindexed, including a release-ready
+report built without `build-report --release`. Only a valid release validation
+receipt makes a report a release. Publishing that report requires `--release`
+confirmation; the flag is refused for previews. Renderer, publisher and verifier
+use that same receipt-bound status. Released artifacts are indexed, omit the
+preview notice, and bind the manifest release hash to the embedded original
+report. Preview manifest entries retain the `development-preview` label.
+API keys and raw provider responses are never part of the route artifact.
 
 Build one report from multiple separately-run local/OpenRouter model artifacts:
 

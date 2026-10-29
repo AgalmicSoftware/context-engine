@@ -197,3 +197,12 @@ export const validateReleaseValidationReceipt = (report = {}) => {
   }
   return errors;
 };
+
+export const reportPublicationState = (report = {}) => {
+  const released = validateReleaseValidationReceipt(report).length === 0;
+  return {
+    status: released ? 'released' : 'preview',
+    manifestStatus: released ? 'released' : 'development-preview',
+    robots: released ? 'index,follow' : 'noindex,nofollow',
+  };
+};

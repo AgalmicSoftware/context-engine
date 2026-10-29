@@ -4,6 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 import { buildResultsReport } from '../src/scoring.mjs';
+import { buildReleaseValidationReceipt } from '../src/provenance.mjs';
 import { renderHtmlReport } from '../src/render-html.mjs';
 import { limitQuestionBank, mergeModelRosters, mergeRunsFiles } from '../src/report-inputs.mjs';
 import { buildContextEnginePolisExport } from '../src/ce-export.mjs';
@@ -244,7 +245,7 @@ test('publication intro explains the benchmark and does not overstate preview ar
   });
   assert.match(wordingSensitiveHtml, /<strong>Wording sensitivity:<\/strong> 1 of 1 questions changed by at least 0\.50 on the normalized -1 to \+1 answer scale when original and reversed wording were compared\. These items require wording review before release\./);
 
-  const releaseHtml = renderHtmlReport({
+  const releaseReport = {
     ...report,
     status: 'release-ready',
     integrity: {
@@ -255,9 +256,17 @@ test('publication intro explains the benchmark and does not overstate preview ar
       repeatConfigurationValid: true,
       declaredRepeatValues: [10],
     },
+  };
+  const readyPreviewHtml = renderHtmlReport(releaseReport);
+  assert.match(readyPreviewHtml, /data-ce-benchmark-publication-status="preview"/);
+  assert.match(readyPreviewHtml, /content="noindex,nofollow"/);
+  assert.match(readyPreviewHtml, /data-ce-benchmark-preview>/);
+  releaseReport.releaseValidationReceipt = buildReleaseValidationReceipt({
+    report: releaseReport, questionBank: {}, modelRoster: {}, runsFiles: [{ manifest: {} }],
   });
+  const releaseHtml = renderHtmlReport(releaseReport);
   assert.match(releaseHtml, /<meta name="robots" content="index,follow" \/>/);
-  assert.match(releaseHtml, /data-ce-benchmark-publication-status="release-ready"/);
+  assert.match(releaseHtml, /data-ce-benchmark-publication-status="released"/);
   assert.doesNotMatch(releaseHtml, /aidb-publication-status/);
   assert.doesNotMatch(releaseHtml, />Release-ready result<\/span>/);
   assert.doesNotMatch(releaseHtml, /<dt>Repeat runs/);
