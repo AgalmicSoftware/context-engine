@@ -110,6 +110,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Cache every live survey responder in a block, order same-block edits by transaction
+  and log position, and ignore duplicate events.
+
 - Reloading the Session Wizard preserves explicit start blocks. New blank starts record draft-only provenance so automatic defaults can follow chain changes without entering published configuration.
 
 - Empty completed filters export zero questions and responses, with report availability based on those same counts. Session totals remain the fallback while filters hydrate.
