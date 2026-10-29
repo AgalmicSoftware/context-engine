@@ -106,6 +106,10 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Separate SBT count-scan coverage from pending live activity. Fill missed history
+  without double counting, replace orphaned counts on complete scans, and rebuild
+  obsolete cache entries instead of migrating them.
+
 - Read later-edited answers at the configured scan end, with separate historical
   requests and partial-failure reasons when archive state is unavailable.
 

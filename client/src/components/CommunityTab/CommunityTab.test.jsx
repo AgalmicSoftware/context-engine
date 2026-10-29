@@ -1,3 +1,4 @@
+import { buildSbtActivityCacheEntry } from '../../utilities/sbt/sbtActivityCacheEntry.js';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider, connect } from 'react-redux';
@@ -1932,6 +1933,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: {},
             mintedAddresses: [],
@@ -2061,6 +2063,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: { name: 'Badge 1' },
             mintedAddresses: ['0xaaa'],
@@ -2103,6 +2106,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: { creator: '0xabc' },
             mintedAddresses: [],
@@ -2148,6 +2152,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: { creator: '0xabc' },
             mintedAddresses: [],
@@ -2235,6 +2240,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: { admin: '0xaaa' },
             mintedAddresses: ['0x111'],
@@ -2283,6 +2289,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: { creator: '0xaaa' },
             mintedAddresses: ['0x111'],
@@ -2332,6 +2339,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: { hidden: false },
             mintedAddresses: ['0x111'],
@@ -2386,6 +2394,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             creationBlock: 1,
             countsLoaded: false,
@@ -2425,6 +2434,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             creationBlock: 1,
             countsLoaded: false,
@@ -2440,6 +2450,7 @@ describe('CommunityTab helpers', () => {
           sbtList: {
             ...(((current || {})[netKey] || {}).sbtList || {}),
             '0x2': {
+              ...buildSbtActivityCacheEntry({ sbtAddress: '0x2' }),
               sbtAddress: '0x2',
               creationBlock: 2,
               countsLoaded: false,

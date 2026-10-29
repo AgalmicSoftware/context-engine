@@ -437,7 +437,7 @@ export const buildSbtFilterSbtEntryCachePatch = ({
       sbtList: {
         ...sbtList,
         // Regression guard: a holder scan is only a snapshot through its block;
-        // merge it monotonically so realtime activity and newer checkpoints survive.
+        // replace covered counts while retaining later pending events and newer checkpoints.
         [addressKey]: mergeSbtActivityCacheEntryCounts(currentEntry, asCacheObject(entryPatch)),
       },
     },

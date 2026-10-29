@@ -26,15 +26,6 @@ export interface SbtCountsScanCheckpoint extends SbtCountsPayload {
   scanToBlock: number;
 }
 
-export interface SbtCountState {
-  mintedAddresses?: string[];
-  burnedAddresses?: string[];
-  mintedCountByAddress?: SbtCountMap | null;
-  burnedCountByAddress?: SbtCountMap | null;
-  mintedEventCount?: number;
-  burnedEventCount?: number;
-}
-
 export const normalizeSbtCountMap = (value: Record<string, unknown> | null = null): SbtCountMap => {
   const out: SbtCountMap = {};
   Object.entries(value || {}).forEach(([addrRaw, countRaw]) => {
@@ -81,53 +72,6 @@ export const mergeSbtCountsPayload = (
     mintedEventCount: (Number(base.mintedEventCount) || 0) + (Number(delta.mintedEventCount) || 0),
     burnedEventCount: (Number(base.burnedEventCount) || 0) + (Number(delta.burnedEventCount) || 0),
   };
-};
-
-export const seedSbtCountMapFromLegacyAddresses = (
-  countMapIn: Record<string, unknown> | null = null,
-  addresses: Array<string | null | undefined> | null | undefined = [],
-): SbtCountMap => {
-  const out = normalizeSbtCountMap(countMapIn);
-  (Array.isArray(addresses) ? addresses : []).forEach((addrRaw) => {
-    const addr = String(addrRaw || '').toLowerCase();
-    if (!addr) return;
-    if (!(Number(out[addr]) > 0)) {
-      out[addr] = 1;
-    }
-  });
-  return out;
-};
-
-export const hydrateLegacySbtCountState = (entry: SbtCountState | null = {}): SbtCountState | null => {
-  if (!entry || typeof entry !== 'object') return entry;
-  const normalizeAddressList = (value: unknown = []): string[] =>
-    Array.from(
-      new Set(
-        (Array.isArray(value) ? value : []).map((addrRaw) => String(addrRaw || '').toLowerCase()).filter(Boolean),
-      ),
-    );
-  const mintedAddresses = normalizeAddressList(entry.mintedAddresses);
-  const burnedAddresses = normalizeAddressList(entry.burnedAddresses);
-  const mintedCountByAddress = seedSbtCountMapFromLegacyAddresses(entry.mintedCountByAddress, mintedAddresses);
-  const burnedCountByAddress = seedSbtCountMapFromLegacyAddresses(entry.burnedCountByAddress, burnedAddresses);
-  const mintedEventCount = Math.max(
-    0,
-    Math.floor(Number(entry.mintedEventCount || 0)),
-    sumSbtCountMap(mintedCountByAddress),
-  );
-  const burnedEventCount = Math.max(
-    0,
-    Math.floor(Number(entry.burnedEventCount || 0)),
-    sumSbtCountMap(burnedCountByAddress),
-  );
-
-  entry.mintedAddresses = mintedAddresses;
-  entry.burnedAddresses = burnedAddresses;
-  entry.mintedCountByAddress = mintedCountByAddress;
-  entry.burnedCountByAddress = burnedCountByAddress;
-  entry.mintedEventCount = mintedEventCount;
-  entry.burnedEventCount = burnedEventCount;
-  return entry;
 };
 
 export const getCurrentHolderAddressesFromCounts = (counts: Partial<SbtCountsPayloadInput> = {}): string[] => {

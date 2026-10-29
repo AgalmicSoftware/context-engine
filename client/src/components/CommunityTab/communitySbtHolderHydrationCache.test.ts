@@ -19,6 +19,15 @@ describe('persistCommunitySbtHolderHydrationResults', () => {
         sbtList: {
           '0xsbt': {
             sbtAddress: '0xSBT',
+            schemaVersion: 2,
+            lastActivityBlock: 105,
+            pendingActivity: {},
+            coveredCounts: {
+              mintedCountByAddress: { '0xholder': 2 },
+              burnedCountByAddress: {},
+              mintedEventCount: 2,
+              burnedEventCount: 0,
+            },
             blockNumber: 105,
             countsLoaded: false,
             countsScanCheckpoint: { phase: 'activity', blockNumber: 110 },

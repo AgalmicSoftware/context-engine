@@ -3,162 +3,128 @@ import {
   buildSbtActivityCacheEntry,
   hydrateSbtActivityCacheEntry,
   mergeSbtActivityCacheEntryCounts,
-  SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
+  type SbtActivityCacheEntry,
 } from './sbtActivityCacheEntry.js';
 
+const makeEntry = (patch: Partial<SbtActivityCacheEntry>): SbtActivityCacheEntry => ({
+  ...buildSbtActivityCacheEntry({ sbtAddress: '0xsbt' }),
+  ...patch,
+  coveredCounts: {
+    mintedCountByAddress: patch.mintedCountByAddress || {},
+    burnedCountByAddress: patch.burnedCountByAddress || {},
+    mintedEventCount: patch.mintedEventCount || 0,
+    burnedEventCount: patch.burnedEventCount || 0,
+  },
+});
+
 describe('sbtActivityCacheEntry', () => {
-  it('builds the default uncached activity entry shape', () => {
-    expect(
-      buildSbtActivityCacheEntry({
-        sbtAddress: '0xSBT',
-        sbtInfo: { creationBlock: 12 },
-      }),
-    ).toEqual({
-      schemaVersion: SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
-      sbtAddress: '0xSBT',
-      sbtInfo: { creationBlock: 12 },
-      mintedAddresses: [],
-      burnedAddresses: [],
+  it('keeps a live delta separate from coverage and retires it when a scan covers it', () => {
+    const initial = mergeSbtActivityCacheEntryCounts(buildSbtActivityCacheEntry({ sbtAddress: '0xsbt' }), {
+      blockNumber: 10,
+      countsLoaded: true,
+      mintedCountByAddress: { '0xaaa': 1 },
+      mintedEventCount: 1,
+    });
+    applySbtActivityCacheEntryUpdate(initial, {
+      account: '0xccc',
+      burned: false,
+      eventBlockNumber: 20,
+      eventId: 'tx20:0',
+    });
+    applySbtActivityCacheEntryUpdate(initial, {
+      account: '0xccc',
+      burned: false,
+      eventBlockNumber: 20,
+      eventId: 'tx20:0',
+    });
+    expect(initial.blockNumber).toBe(10);
+    expect(initial.mintedCountByAddress).toEqual({ '0xaaa': 1, '0xccc': 1 });
+    const refreshed = mergeSbtActivityCacheEntryCounts(initial, {
+      blockNumber: 30,
+      countsLoaded: true,
+      mintedCountByAddress: { '0xaaa': 1, '0xbbb': 1, '0xccc': 1 },
+      mintedEventCount: 3,
+    });
+    expect(refreshed).toMatchObject({ blockNumber: 30, mintedEventCount: 3, pendingActivity: {} });
+    expect(refreshed.mintedCountByAddress).toEqual({ '0xaaa': 1, '0xbbb': 1, '0xccc': 1 });
+  });
+
+  it('replaces a complete covered snapshot, removing an orphan while retaining later live activity', () => {
+    const initial = mergeSbtActivityCacheEntryCounts(buildSbtActivityCacheEntry({ sbtAddress: '0xsbt' }), {
+      blockNumber: 10,
+      countsLoaded: true,
+      mintedCountByAddress: { '0xaaa': 1, '0xorphan': 1 },
+      mintedEventCount: 2,
+    });
+    applySbtActivityCacheEntryUpdate(initial, {
+      account: '0xlive',
+      burned: false,
+      eventBlockNumber: 20,
+      eventId: 'tx20:0',
+    });
+    const replaced = mergeSbtActivityCacheEntryCounts(initial, {
+      blockNumber: 10,
+      countsLoaded: true,
+      mintedCountByAddress: { '0xaaa': 1 },
+      mintedEventCount: 1,
+    });
+    expect(replaced.mintedCountByAddress).toEqual({ '0xaaa': 1, '0xlive': 1 });
+    expect(replaced).toMatchObject({ blockNumber: 10, lastActivityBlock: 20, mintedEventCount: 2 });
+  });
+
+  it('discards old activity entries instead of inventing coverage from their last event', () => {
+    expect(hydrateSbtActivityCacheEntry({ schemaVersion: 1, blockNumber: 20, countsLoaded: true })).toBeNull();
+  });
+
+  it('builds an empty current entry without treating metadata as scan coverage', () => {
+    const entry = buildSbtActivityCacheEntry({ sbtAddress: '0xsbt', sbtInfo: { creationBlock: 12 }, blockNumber: 24 });
+    expect(entry).toMatchObject({
+      schemaVersion: 2,
       blockNumber: 0,
-      creationBlock: 12,
+      lastActivityBlock: 24,
+      countsLoaded: false,
+      pendingActivity: {},
       mintedCountByAddress: {},
       burnedCountByAddress: {},
-      mintedEventCount: 0,
-      burnedEventCount: 0,
-      historySummary: {
-        totalMinted: '0',
-        totalBurned: '0',
-        activeSupply: '0',
-        currentHolderCount: '0',
-        historicalHolderCount: '0',
-      },
-      countsLoaded: false,
+      historySummary: { totalMinted: '0', totalBurned: '0' },
     });
+    expect(hydrateSbtActivityCacheEntry(entry)).toBe(entry);
+    expect(hydrateSbtActivityCacheEntry({ sbtAddress: '0xsbt' })).toBeNull();
   });
 
-  it('narrows legacy entries in place without dropping extension fields', () => {
-    const legacyEntry = {
-      sbtAddress: '0xSBT',
-      legacyExtension: { retained: true },
-    };
-
-    const hydrated = hydrateSbtActivityCacheEntry(legacyEntry);
-
-    expect(hydrated).toBe(legacyEntry);
-    expect(hydrated).toEqual({
-      schemaVersion: SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
-      sbtAddress: '0xSBT',
-      legacyExtension: { retained: true },
-    });
-  });
-
-  it('supports event-block overrides for newly created SBTs', () => {
-    expect(
-      buildSbtActivityCacheEntry({
-        sbtAddress: '0xSBT',
-        sbtInfo: { creationBlock: 12 },
-        creationBlock: 24,
-        blockNumber: 24,
-      }),
-    ).toEqual(
-      expect.objectContaining({
-        sbtAddress: '0xSBT',
-        creationBlock: 24,
-        blockNumber: 24,
-        countsLoaded: false,
-        mintedCountByAddress: {},
-        burnedCountByAddress: {},
-      }),
-    );
-  });
-
-  it('normalizes legacy state and applies a mint event', () => {
-    const entry = {
-      mintedAddresses: ['0xAAA', '0xbbb', '0xAAA'],
-      burnedAddresses: ['0xccc'],
-      mintedCountByAddress: { '0xAAA': 2 },
-      burnedCountByAddress: { '0xBBB': 2 },
-      mintedEventCount: 1,
-      burnedEventCount: 0,
-      blockNumber: 7,
+  it('applies each pending burn once without changing covered history', () => {
+    const entry = makeEntry({
+      blockNumber: 10,
       countsLoaded: true,
-    };
-
-    const updated = applySbtActivityCacheEntryUpdate(entry, {
-      account: '0xBBB',
-      burned: false,
-      eventBlockNumber: 11,
-    });
-
-    expect(updated).toBe(entry);
-    expect(updated).toEqual({
-      schemaVersion: SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
-      mintedAddresses: ['0xaaa', '0xbbb'],
-      burnedAddresses: ['0xccc'],
-      mintedCountByAddress: {
-        '0xaaa': 2,
-        '0xbbb': 2,
-      },
-      burnedCountByAddress: {
-        '0xbbb': 2,
-        '0xccc': 1,
-      },
-      mintedEventCount: 4,
-      burnedEventCount: 3,
-      historySummary: {
-        totalMinted: '4',
-        totalBurned: '3',
-        activeSupply: '2',
-        currentHolderCount: '1',
-        historicalHolderCount: '2',
-      },
-      blockNumber: 11,
-      countsLoaded: true,
-    });
-  });
-
-  it('applies a burn event without duplicating burned addresses', () => {
-    const entry = {
-      mintedAddresses: ['0xaaa'],
-      burnedAddresses: ['0xaaa'],
       mintedCountByAddress: { '0xaaa': 2 },
       burnedCountByAddress: { '0xaaa': 1 },
       mintedEventCount: 2,
       burnedEventCount: 1,
-      blockNumber: 14,
-    };
-
-    const updated = applySbtActivityCacheEntryUpdate(entry, {
-      account: '0xAAA',
-      burned: true,
-      eventBlockNumber: 12,
     });
-
-    expect(updated.burnedAddresses).toEqual(['0xaaa']);
-    expect(updated.burnedCountByAddress).toEqual({ '0xaaa': 2 });
-    expect(updated.burnedEventCount).toBe(2);
-    expect(updated.historySummary).toEqual({
-      totalMinted: '2',
-      totalBurned: '2',
-      activeSupply: '0',
-      currentHolderCount: '0',
-      historicalHolderCount: '1',
+    const event = { account: '0xAAA', burned: true, eventBlockNumber: 12, eventId: 'tx12:0' };
+    applySbtActivityCacheEntryUpdate(entry, event);
+    applySbtActivityCacheEntryUpdate(entry, event);
+    expect(entry).toMatchObject({
+      blockNumber: 10,
+      lastActivityBlock: 12,
+      burnedCountByAddress: { '0xaaa': 2 },
+      burnedEventCount: 2,
+      historySummary: { activeSupply: '0', totalBurned: '2' },
     });
-    expect(updated.blockNumber).toBe(14);
-    expect(updated.countsLoaded).toBe(false);
-    expect(updated.schemaVersion).toBe(SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION);
+    applySbtActivityCacheEntryUpdate(entry, { ...event, eventBlockNumber: 9, eventId: 'already-covered' });
+    expect(entry.burnedEventCount).toBe(2);
   });
 
   it('does not finalize a stale scan behind a newer partial checkpoint', () => {
     const merged = mergeSbtActivityCacheEntryCounts(
-      {
+      makeEntry({
         blockNumber: 105,
         countsLoaded: false,
         countsScanCheckpoint: { phase: 'activity', blockNumber: 110 },
         mintedAddresses: ['0xholder'],
         mintedCountByAddress: { '0xholder': 2 },
         mintedEventCount: 2,
-      },
+      }),
       {
         blockNumber: 100,
         countsLoaded: true,
@@ -180,12 +146,12 @@ describe('sbtActivityCacheEntry', () => {
 
   it('does not finalize a stale scan behind newer activity when no checkpoint exists', () => {
     const merged = mergeSbtActivityCacheEntryCounts(
-      {
+      makeEntry({
         blockNumber: 120,
         countsLoaded: false,
         mintedCountByAddress: { '0xholder': 2 },
         mintedEventCount: 2,
-      },
+      }),
       {
         blockNumber: 100,
         countsLoaded: true,
@@ -204,11 +170,11 @@ describe('sbtActivityCacheEntry', () => {
 
   it('keeps the newest checkpoint when partial scans finish out of order', () => {
     const merged = mergeSbtActivityCacheEntryCounts(
-      {
+      makeEntry({
         blockNumber: 105,
         countsLoaded: false,
         countsScanCheckpoint: { phase: 'activity', blockNumber: 110 },
-      },
+      }),
       {
         blockNumber: 100,
         countsLoaded: false,
@@ -225,11 +191,11 @@ describe('sbtActivityCacheEntry', () => {
 
   it('finalizes a scan that covers the latest partial checkpoint', () => {
     const merged = mergeSbtActivityCacheEntryCounts(
-      {
+      makeEntry({
         blockNumber: 105,
         countsLoaded: false,
         countsScanCheckpoint: { phase: 'activity', blockNumber: 110 },
-      },
+      }),
       {
         blockNumber: 115,
         countsLoaded: true,

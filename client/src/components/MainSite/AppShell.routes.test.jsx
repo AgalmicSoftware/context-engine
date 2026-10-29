@@ -4984,7 +4984,7 @@ describe('AppShell single-SBT counts checkpoints', () => {
 
     const checkpointEntry = cacheState['84532'].sbtList[sbtLower];
     expect(checkpointEntry.countsLoaded).toBe(false);
-    expect(checkpointEntry.blockNumber).toBeNull();
+    expect(checkpointEntry.blockNumber).toBe(0);
     expect(checkpointEntry.mintedCountByAddress).toEqual({});
     expect(checkpointEntry.countsScanCheckpoint).toMatchObject({
       phase: 'activity',

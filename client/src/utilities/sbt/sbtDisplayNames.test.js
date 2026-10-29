@@ -1,3 +1,4 @@
+import { buildSbtActivityCacheEntry } from './sbtActivityCacheEntry.js';
 import {
   __test__getSbtDisplayNameLookupStats,
   __test__resetSbtDisplayNameLookups,
@@ -59,6 +60,7 @@ describe('sbtDisplayNames helpers', () => {
       84532: {
         sbtList: {
           [addrB.toLowerCase()]: {
+            ...buildSbtActivityCacheEntry({ sbtAddress: addrB }),
             sbtAddress: addrB,
             sbtInfo: { name: 'Edge Chain Name', chainID: 84532 },
           },
@@ -67,6 +69,7 @@ describe('sbtDisplayNames helpers', () => {
       10: {
         sbtList: {
           [addrB.toLowerCase()]: {
+            ...buildSbtActivityCacheEntry({ sbtAddress: addrB }),
             sbtAddress: addrB,
             sbtInfo: { name: 'Wrong Chain Name', chainID: 10 },
           },
@@ -99,6 +102,7 @@ describe('sbtDisplayNames helpers', () => {
       84532: {
         sbtList: {
           [addrB.toLowerCase()]: {
+            ...buildSbtActivityCacheEntry({ sbtAddress: addrB }),
             sbtAddress: addrB,
             sbtInfo: { name: 'Edge Chain Name', chainID: 84532 },
           },
@@ -121,6 +125,7 @@ describe('sbtDisplayNames helpers', () => {
       84532: {
         sbtList: {
           [addrA.toLowerCase()]: {
+            ...buildSbtActivityCacheEntry({ sbtAddress: addrA }),
             sbtAddress: addrA,
             sbtInfo: { name: 'Alpha Group' },
           },
@@ -138,6 +143,7 @@ describe('sbtDisplayNames helpers', () => {
       84532: {
         sbtList: {
           [addrA.toLowerCase()]: {
+            ...buildSbtActivityCacheEntry({ sbtAddress: addrA }),
             sbtAddress: addrA,
             sbtInfo: {
               name: '',
@@ -206,6 +212,7 @@ describe('sbtDisplayNames helpers', () => {
       84532: {
         sbtList: {
           [addrA.toLowerCase()]: {
+            ...buildSbtActivityCacheEntry({ sbtAddress: addrA }),
             sbtAddress: addrA,
             sbtInfo: { name: 'Alpha Group', chainID: 84532 },
           },
@@ -225,6 +232,7 @@ describe('sbtDisplayNames helpers', () => {
       84532: {
         sbtList: {
           [addrA.toLowerCase()]: {
+            ...buildSbtActivityCacheEntry({ sbtAddress: addrA }),
             sbtAddress: addrA,
             sbtInfo: { name: 'Renamed Group', chainID: 84532 },
           },
@@ -267,6 +275,7 @@ describe('sbtDisplayNames helpers', () => {
       10: {
         sbtList: {
           [addrB.toLowerCase()]: {
+            ...buildSbtActivityCacheEntry({ sbtAddress: addrB }),
             sbtAddress: addrB,
             sbtInfo: { name: 'Wrong Chain Name', chainID: 10 },
           },
@@ -301,6 +310,7 @@ describe('sbtDisplayNames helpers', () => {
       10: {
         sbtList: {
           [addrA.toLowerCase()]: {
+            ...buildSbtActivityCacheEntry({ sbtAddress: addrA }),
             sbtAddress: addrA,
             sbtInfo: { name: 'Optimism Name', chainID: 10 },
           },
