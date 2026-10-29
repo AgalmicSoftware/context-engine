@@ -11,6 +11,7 @@ import {
   validateReleaseValidationReceipt,
 } from '../src/provenance.mjs';
 import { renderHtmlReport } from '../src/render-html.mjs';
+import { attachAnalysisOverlay } from '../src/analysis-export.mjs';
 
 const parseArgs = (argv) => {
   const args = {};
@@ -92,6 +93,7 @@ export const buildStaticReportPublication = ({
 export const publishStaticReport = async ({
   htmlPath,
   reportPath,
+  analysisPath,
   outDir,
   reportId,
   topic,
@@ -105,7 +107,10 @@ export const publishStaticReport = async ({
     readFile(htmlPath, 'utf8'),
     readFile(reportPath, 'utf8'),
   ]);
-  const report = JSON.parse(reportText);
+  const sourceReport = JSON.parse(reportText);
+  const report = analysisPath
+    ? attachAnalysisOverlay(sourceReport, JSON.parse(await readFile(analysisPath, 'utf8')))
+    : sourceReport;
   const publication = buildStaticReportPublication({
     html,
     report,
@@ -141,6 +146,7 @@ if (isDirectRun) {
   publishStaticReport({
     htmlPath: args.html,
     reportPath: args.report,
+    analysisPath: args.analysis,
     outDir: args['out-dir'],
     reportId: args.id,
     topic: args.topic,
