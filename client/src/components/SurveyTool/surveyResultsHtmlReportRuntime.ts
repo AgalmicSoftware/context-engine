@@ -334,7 +334,9 @@ export const createSurveyResultsHtmlReportRuntime = ({
       exporterMetadata: getHtmlReportExporterMetadata(),
       filterState: state.filterState,
       filteredQuestionsCount: state.filteredQuestionsCount,
-      filteredResponsesCount: state.filteredResponsesCount,
+      // The initial response count is zero even before filters hydrate; the
+      // nullable question count is the completion signal shared by both counts.
+      filteredResponsesCount: state.filteredQuestionsCount == null ? null : state.filteredResponsesCount,
       latestKnownBlock: state.networkLatestBlock,
       networkLabel: getHtmlReportNetworkLabel(),
       participantCount: getHtmlReportParticipantCount(),

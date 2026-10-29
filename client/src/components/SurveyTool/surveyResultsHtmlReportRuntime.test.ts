@@ -12,10 +12,12 @@ const createRuntime = ({
   props = {},
   state = {},
   networkQuestions = {},
+  getFilteredQuestionsForExport,
 }: {
   props?: SurveyResultsHtmlReportProps;
   state?: SurveyResultsHtmlReportState;
   networkQuestions?: unknown;
+  getFilteredQuestionsForExport?: SurveyResultsHtmlReportRuntimeArgs['getFilteredQuestionsForExport'];
 } = {}) => {
   const mutableState: SurveyResultsHtmlReportState = {
     filterState: {},
@@ -47,15 +49,17 @@ const createRuntime = ({
   };
   const runtime = createSurveyResultsHtmlReportRuntime({
     getEffectiveSlug: () => 'runtime-session',
-    getFilteredQuestionsForExport: () => [
-      {
-        id: 'q1',
-        options: [],
-        prompt: 'Runtime question?',
-        tags: [],
-        type: 'binary',
-      },
-    ],
+    getFilteredQuestionsForExport:
+      getFilteredQuestionsForExport ||
+      (() => [
+        {
+          id: 'q1',
+          options: [],
+          prompt: 'Runtime question?',
+          tags: [],
+          type: 'binary',
+        },
+      ]),
     getNetworkQuestionsForCurrentContext: () => networkQuestions,
     getProps: () => props,
     getQuestionEncryptionGates: () => [] as SurveyResultsGateRecord[],
@@ -80,6 +84,27 @@ const createRuntime = ({
 };
 
 describe('surveyResultsHtmlReportRuntime', () => {
+  it('distinguishes an empty completed filter from the initial unhydrated state', () => {
+    const { runtime, mutableState } = createRuntime({
+      getFilteredQuestionsForExport: () => [],
+      state: {
+        filteredQuestionsCount: 0,
+        filteredResponsesCount: 0,
+        totalQuestionsCount: 17,
+        totalResponsesCount: 105,
+        sbtFilteredAggregatorQuestionResponses: {},
+        sbtFilteredResponses: [],
+      },
+    });
+    const filtered = runtime.buildSessionResultsHtmlReportSnapshot();
+    expect(filtered.counts).toMatchObject({ questions: 0, responses: 0 });
+    expect(filtered.sections.report.available).toBe(false);
+    mutableState.filteredQuestionsCount = null;
+    const hydrating = runtime.buildSessionResultsHtmlReportSnapshot();
+    expect(hydrating.counts).toMatchObject({ questions: 17, responses: 105 });
+    expect(hydrating.sections.report.available).toBe(true);
+  });
+
   it('resolves chain labels and exporter metadata from injected props', () => {
     const { runtime } = createRuntime({
       props: {
