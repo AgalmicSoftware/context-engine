@@ -147,7 +147,10 @@ engine and runtime version, source URL, license, system prompt id, and as-of
 date. Response metadata separately records observed resolved provider/model,
 endpoint, system fingerprint, and structured-output mode. `auto` structured
 output falls back from JSON Schema only for endpoint capability errors and
-records the downgrade.
+records the downgrade. Importance resume reuses a saved row only when its
+recorded endpoint matches the current provider endpoint. Both runners and
+importance release validation reject mixed deployment identities, including
+endpoint changes within a model.
 
 Each release manifest model is matched against the model roster selected for
 the report, including effective provider and generation settings. This prevents

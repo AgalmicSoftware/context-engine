@@ -1,3 +1,4 @@
+import { assertConsistentDeployments, deploymentIdentityErrors } from './deployment-identity.mjs';
 import {
   DEFAULT_CONCURRENCY,
   DEFAULT_IMPORTANCE_BUDGET,
@@ -9,7 +10,7 @@ import {
   HARNESS_VERSION,
   IMPORTANCE_PROMPT_TEMPLATE_VERSION,
 } from './config.mjs';
-import { callOpenAiCompatibleChat } from './adapters/openai-compatible.mjs';
+import { callOpenAiCompatibleChat, getProviderConfig } from './adapters/openai-compatible.mjs';
 import { jsonObjectCandidates } from './normalize.mjs';
 import { detectHarnessCommit, hashJson, sha256 } from './provenance.mjs';
 
@@ -271,28 +272,6 @@ const normalizeModelResponse = (response) => (
     : { content: response?.content || '', metadata: response?.metadata || {} }
 );
 
-const assertConsistentImportanceDeployments = (runs) => {
-  const identitiesByModel = new Map();
-  runs.forEach((run) => {
-    const metadata = run?.responseMetadata || {};
-    if (!identitiesByModel.has(run.modelId)) {
-      identitiesByModel.set(run.modelId, { providers: new Set(), models: new Set(), fingerprints: new Set() });
-    }
-    const identity = identitiesByModel.get(run.modelId);
-    const provider = String(metadata.resolvedProvider || metadata.provider || run?.provider || '').trim();
-    const model = String(metadata.resolvedModel || run?.model || '').trim();
-    const fingerprint = String(metadata.systemFingerprint || '').trim();
-    if (provider) identity.providers.add(provider);
-    if (model) identity.models.add(model);
-    if (fingerprint) identity.fingerprints.add(fingerprint);
-  });
-  identitiesByModel.forEach((identity, modelId) => {
-    if (identity.providers.size > 1 || identity.models.size > 1 || identity.fingerprints.size > 1) {
-      throw new Error(`model ${modelId} resolved to multiple deployment identities; start a new importance artifact instead of resuming`);
-    }
-  });
-};
-
 export const buildImportanceRunId = ({ benchmarkId, modelId, repeatIndex }) => (
   [benchmarkId, 'quadratic-importance', modelId, repeatIndex].join(':')
 );
@@ -340,6 +319,8 @@ export const runImportanceBenchmark = async ({
       return {
         modelEntry,
         modelId: modelEntry.id,
+        endpoint: (providerOverride || modelEntry.provider) === 'mock'
+          ? 'mock://deterministic-importance' : getProviderConfig(providerOverride || modelEntry.provider).baseUrl,
         repeatIndex,
         orderedQuestionBank,
         questionOrderHash: hashJson(orderedQuestionBank.questions.map((question) => question.id)),
@@ -371,6 +352,7 @@ export const runImportanceBenchmark = async ({
       && !run.parseError
       && Array.isArray(run.allocations)
       && run.allocations.length > 0
+      && run.responseMetadata?.endpoint === task.endpoint
       && run.promptHash === task.promptHash
       && run.questionOrderMethod === IMPORTANCE_QUESTION_ORDER_METHOD
       && run.questionOrderHash === task.questionOrderHash
@@ -425,7 +407,7 @@ export const runImportanceBenchmark = async ({
           maxVotesPerQuestion,
         }));
         rawOutput = response.content;
-        responseMetadata = response.metadata;
+        responseMetadata = { ...response.metadata, endpoint: response.metadata.endpoint || task.endpoint };
         parsed = parseImportanceAllocation(rawOutput, {
           questionIds,
           budget,
@@ -516,7 +498,7 @@ export const runImportanceBenchmark = async ({
   const runs = Array.from(runsById.values())
     .filter((run) => expectedRunIds.has(run.runId))
     .sort((left, right) => left.runId.localeCompare(right.runId));
-  assertConsistentImportanceDeployments(runs);
+  assertConsistentDeployments(runs);
   const completedAt = nowIso();
   return {
     schemaVersion: DEFAULT_OUTPUT_SCHEMA_VERSION,
@@ -726,7 +708,6 @@ export const validateReleaseImportanceFile = (file, {
     errors.push('release importance runs must be complete');
   }
   const expectedPromptRows = [];
-  const deploymentIdentitiesByModel = new Map();
   (file.runs || []).forEach((run, index) => {
     const model = manifestModelsById.get(run.modelId);
     if (!model) {
@@ -774,18 +755,6 @@ export const validateReleaseImportanceFile = (file, {
     const metadata = run.responseMetadata || {};
     const resolvedProvider = String(metadata.resolvedProvider || metadata.provider || run.provider || '').trim();
     const resolvedModel = String(metadata.resolvedModel || run.model || '').trim();
-    const systemFingerprint = String(metadata.systemFingerprint || '').trim();
-    if (!deploymentIdentitiesByModel.has(run.modelId)) {
-      deploymentIdentitiesByModel.set(run.modelId, {
-        providers: new Set(),
-        models: new Set(),
-        fingerprints: new Set(),
-      });
-    }
-    const deploymentIdentity = deploymentIdentitiesByModel.get(run.modelId);
-    if (resolvedProvider) deploymentIdentity.providers.add(resolvedProvider);
-    if (resolvedModel) deploymentIdentity.models.add(resolvedModel);
-    if (systemFingerprint) deploymentIdentity.fingerprints.add(systemFingerprint);
     if (resolvedProvider && resolvedProvider !== run.provider) {
       errors.push(`runs[${index}] resolved provider does not match its declared provider`);
     }
@@ -794,11 +763,7 @@ export const validateReleaseImportanceFile = (file, {
     }
     expectedPromptRows.push({ modelId: run.modelId, repeatIndex: run.repeatIndex, runId: run.runId, promptHash: sha256(prompt) });
   });
-  deploymentIdentitiesByModel.forEach((identity, modelId) => {
-    if (identity.providers.size > 1 || identity.models.size > 1 || identity.fingerprints.size > 1) {
-      errors.push(`model ${modelId} resolved to multiple deployment identities`);
-    }
-  });
+  errors.push(...deploymentIdentityErrors(file.runs || []));
   const expectedManifestPromptHash = expectedPromptRows.length === 1
     ? expectedPromptRows[0].promptHash
     : hashJson(canonicalImportancePromptRows(expectedPromptRows));

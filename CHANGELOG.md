@@ -389,6 +389,9 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Bind importance resume to its recorded endpoint and reject mixed endpoints
+  using the deployment identity check shared with stance runs.
+
 - Hash importance prompts in model-id and numeric-repeat order for both generation
   and release validation, independent of roster order.
 

@@ -362,3 +362,45 @@ for (const repeats of [1, 10]) {
     assert.ok(validate(changedCoordinate).some((error) => error.includes('run coordinates')));
   });
 }
+
+test('importance resume binds saved rows to the current endpoint and records it', async () => {
+  const original = process.env.AIDB_LOCAL_BASE_URL;
+  try {
+    const roster = { models: [modelRoster.models[0]] };
+    let calls = 0;
+    const run = (existingRuns = []) => runImportanceBenchmark({ questionBank, modelRoster: roster, budget: 10,
+      maxAllocations: 2, repeats: 2, existingRuns,
+      callModelImpl: async () => { calls += 1; return { content: '{"allocations":[{"questionId":"q1","votes":2}]}', metadata: {} }; },
+    });
+    process.env.AIDB_LOCAL_BASE_URL = 'http://127.0.0.1:8001/v1';
+    const first = await run();
+    assert.ok(first.runs.every((row) => row.responseMetadata.endpoint === process.env.AIDB_LOCAL_BASE_URL));
+    const partial = [first.runs[0]];
+    calls = 0;
+    const unchanged = await run(partial);
+    assert.equal(unchanged.resumedRuns, 1);
+    assert.equal(calls, 1);
+    process.env.AIDB_LOCAL_BASE_URL = 'http://127.0.0.1:8002/v1';
+    calls = 0;
+    const changed = await run(partial);
+    assert.equal(changed.resumedRuns, 0);
+    assert.equal(calls, 2);
+    const mixed = structuredClone(changed);
+    mixed.manifest.harnessCommit = 'a'.repeat(40);
+    mixed.runs[0] = partial[0];
+    assert.ok(validateReleaseImportanceFile(mixed, { questionBank, modelRoster: roster, requiredRepeats: 2 })
+      .some((error) => error.includes('multiple deployment identities')));
+  } finally {
+    if (original === undefined) delete process.env.AIDB_LOCAL_BASE_URL;
+    else process.env.AIDB_LOCAL_BASE_URL = original;
+  }
+});
+
+test('importance rejects endpoints mixed within one run artifact', async () => {
+  let calls = 0;
+  await assert.rejects(runImportanceBenchmark({ questionBank, modelRoster: { models: [modelRoster.models[0]] },
+    budget: 10, maxAllocations: 2, repeats: 2,
+    callModelImpl: async () => ({ content: '{"allocations":[{"questionId":"q1","votes":2}]}',
+      metadata: { endpoint: `http://127.0.0.1:${8000 + ++calls}/v1` } }),
+  }), /multiple deployment identities/);
+});
