@@ -81,6 +81,9 @@ Semantics:
 - `surveys[surveyId].sessionSlugExplicit`: `true` when metadata authoritatively declared the session slug; `false` when the cache derived a slug from legacy name mapping or rebucketed unresolved metadata to general
 - `surveyResponses[surveyId][responder]`: latest known response payload for a survey responder
 - `pendingSurveyMetadata[surveyId]`: retry/backoff state for survey metadata that failed to hydrate from Arweave
+- Live events are admitted only within the session scope and configured start/end
+  blocks before fetching payloads. The RPC head is a scan bound, not a hard event
+  end when the session has no configured end.
 - Survey discovery and `SurveyAdded` event commits merge only the surveys,
   pending-metadata entries, and watermark produced by the active scan or event
   into the latest snapshot. Unrelated surveys, responses, and retry entries are
