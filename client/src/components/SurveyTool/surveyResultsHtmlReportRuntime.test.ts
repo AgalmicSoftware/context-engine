@@ -105,6 +105,20 @@ describe('surveyResultsHtmlReportRuntime', () => {
     expect(hydrating.sections.report.available).toBe(true);
   });
 
+  it('omits generated analysis when the current filtered inputs have changed', () => {
+    const { runtime, mutableState } = createRuntime();
+    mutableState.htmlReportAnalysisArtifact = {
+      ...runtime.buildHtmlReportDemoAnalysisArtifact(),
+      inputSignature: runtime.buildSessionResultsAnalysisPayloadForAi().inputSignature,
+    };
+    expect(runtime.getHtmlReportAnalysisArtifact()).not.toBeNull();
+    mutableState.sbtFilteredAggregatorQuestionResponses = {};
+    mutableState.filteredResponsesCount = 0;
+    expect(runtime.getHtmlReportAnalysisArtifact()).toBeNull();
+    const snapshot = runtime.buildSessionResultsHtmlReportSnapshot();
+    expect(snapshot.sections.argumentMap.available).toBe(false);
+  });
+
   it('resolves chain labels and exporter metadata from injected props', () => {
     const { runtime } = createRuntime({
       props: {

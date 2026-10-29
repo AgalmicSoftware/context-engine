@@ -110,6 +110,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep in-flight AI analysis tied to its starting session, reader and chain;
+  exports omit analysis when the current filtered inputs have changed.
+
 - Drop live events outside the session scope or configured block limits without
   treating a lagging RPC head as a configured end.
 

@@ -124,6 +124,68 @@ describe('SurveyResults HTML report analysis cache controls', () => {
     jest.restoreAllMocks();
   });
 
+  it('keeps an in-flight analysis in its captured session after navigation', async () => {
+    const pending = createDeferred<string>();
+    (callAI as jest.Mock).mockReturnValue(pending.promise);
+    seedAnalysisEligibleSession('old-session');
+    seedAnalysisEligibleSession('new-session');
+    const harness = mountSurveyResults({
+      account: WALLET_ACCOUNT,
+      loginComplete: true,
+      network: OP_NETWORK,
+      sessionSlug: 'old-session',
+    });
+    await waitForHydratedResponseCount(3);
+    await openHtmlReportModal();
+    clickGenerateAnalysis();
+    await waitFor(() => expect(callAI).toHaveBeenCalledTimes(1));
+    harness.rerenderSurveyResults({ sessionSlug: 'new-session' });
+    await flushMicrotasks();
+    await act(async () => {
+      pending.resolve(BREAKDOWN_ANALYSIS_JSON);
+    });
+    await waitForAnalysisCacheWrites(1);
+    expect(analysisCacheWrites().map(([, slug]) => slug)).toEqual(['old-session']);
+    fireEvent.click(getDownloadReportButton());
+    await waitFor(() => expect(downloadSessionResultsHtmlReport).toHaveBeenCalledTimes(1));
+    const snapshot = (downloadSessionResultsHtmlReport as jest.Mock).mock.calls[0][0];
+    expect(JSON.stringify(snapshot)).not.toContain('Generated analysis.');
+    expect(JSON.stringify(snapshot)).toContain('new-session');
+  });
+
+  it('does not apply old analysis when the session changes during cache persistence', async () => {
+    const pending = createDeferred<Record<string, unknown>>();
+    (callAI as jest.Mock).mockResolvedValue(BREAKDOWN_ANALYSIS_JSON);
+    seedAnalysisEligibleSession('old-session');
+    seedAnalysisEligibleSession('new-session');
+    const harness = mountSurveyResults({
+      account: WALLET_ACCOUNT,
+      loginComplete: true,
+      network: OP_NETWORK,
+      sessionSlug: 'old-session',
+    });
+    await waitForHydratedResponseCount(3);
+    await openHtmlReportModal();
+    const normalRead = readSpy.getMockImplementation();
+    readSpy.mockImplementation((namespace: unknown, slug: unknown) =>
+      namespace === 'analysisCache' ? pending.promise : normalRead?.(namespace, slug),
+    );
+    clickGenerateAnalysis();
+    await waitFor(() => expect(analysisCacheReads()).toHaveLength(1));
+    harness.rerenderSurveyResults({ sessionSlug: 'new-session' });
+    await flushMicrotasks();
+    await act(async () => {
+      pending.resolve({});
+    });
+    await waitForAnalysisCacheWrites(1);
+    expect(analysisCacheWrites().map(([, slug]) => slug)).toEqual(['old-session']);
+    fireEvent.click(getDownloadReportButton());
+    await waitFor(() => expect(downloadSessionResultsHtmlReport).toHaveBeenCalledTimes(1));
+    const snapshot = (downloadSessionResultsHtmlReport as jest.Mock).mock.calls[0][0];
+    expect(JSON.stringify(snapshot)).not.toContain('Generated analysis.');
+    expect(JSON.stringify(snapshot)).toContain('new-session');
+  });
+
   it('skips analysis artifact cache reads when persistence has no generated artifact', async () => {
     // port note: the original invoked the private write port with a null artifact; no
     // render/DOM path ever dispatches a null artifact (pinned in

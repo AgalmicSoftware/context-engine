@@ -108,6 +108,7 @@ export type SurveyResultsHtmlReportRuntime = {
   ) => SessionResultsGeneratedAnalysisArtifact | null;
   writeSessionResultsAnalysisArtifactToCache: (
     artifact: SessionResultsGeneratedAnalysisArtifact | null,
+    target?: { slug: string; cacheKey: string },
   ) => Promise<void>;
 };
 
@@ -251,7 +252,9 @@ export const createSurveyResultsHtmlReportRuntime = ({
 
   const getHtmlReportAnalysisArtifact = (): SessionResultsGeneratedAnalysisArtifact | null => {
     const artifact = getState().htmlReportAnalysisArtifact || null;
-    return artifact && artifact.kind ? artifact : null;
+    return artifact?.kind && artifact.inputSignature === buildSessionResultsAnalysisPayloadForAi().inputSignature
+      ? artifact
+      : null;
   };
 
   const buildSessionResultsAnalysisPayloadForAi = (): SurveyResultsHtmlReportAnalysisPayloadForAi => {
@@ -314,11 +317,14 @@ export const createSurveyResultsHtmlReportRuntime = ({
 
   const buildHtmlReportDemoAnalysisArtifact = (): SessionResultsGeneratedAnalysisArtifact => {
     const built = buildSessionResultsAnalysisPayloadForAi();
-    return buildSurveyResultsDemoAnalysisArtifact({
-      analysisPayload: built,
-      generatedAt: nowIso(),
+    return {
+      ...buildSurveyResultsDemoAnalysisArtifact({
+        analysisPayload: built,
+        generatedAt: nowIso(),
+        inputSignature: built.inputSignature,
+      }),
       inputSignature: built.inputSignature,
-    });
+    };
   };
 
   const buildSessionResultsHtmlReportSnapshot = (exportedAt: unknown = nowIso()): SessionResultsHtmlSnapshot => {
@@ -394,9 +400,10 @@ export const createSurveyResultsHtmlReportRuntime = ({
 
   const writeSessionResultsAnalysisArtifactToCache = async (
     artifact: SessionResultsGeneratedAnalysisArtifact | null,
+    target?: { slug: string; cacheKey: string },
   ): Promise<void> => {
-    const slug = getSessionResultsAnalysisCacheSlug();
-    const cacheKey = artifact ? getSessionResultsAnalysisCacheKey(artifact.inputSignature) : '';
+    const slug = target?.slug ?? getSessionResultsAnalysisCacheSlug();
+    const cacheKey = target?.cacheKey ?? (artifact ? getSessionResultsAnalysisCacheKey(artifact.inputSignature) : '');
     const writeReadinessPlan = buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
       artifact,
       cacheKey,

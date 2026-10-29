@@ -1434,6 +1434,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     buildSessionResultsHtmlReportSnapshot,
     getHtmlReportAnalysisArtifact,
     getHtmlReportAnalysisSectionsToGenerate,
+    getHtmlReportChainId,
     getHtmlReportExporterMetadata,
     getHtmlReportSelectedSections,
     getSessionResultsAnalysisCacheKey,
@@ -1480,6 +1481,10 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     setState(buildSurveyResultsHtmlReportFormatPatch(format));
   };
 
+  const activeAnalysisGenerationRef = useRef<{ isCurrent: () => boolean } | null>(null);
+  const isHtmlReportAnalysisGenerating = () =>
+    stateRef.current.htmlReportAnalysisGenerating && !!activeAnalysisGenerationRef.current?.isCurrent();
+
   const generateHtmlReportAnalysisViews = async (): Promise<void> => {
     if (isHtmlReportDemoModeActive()) {
       setState(buildSurveyResultsHtmlReportAnalysisDemoReadyPatch(buildHtmlReportDemoAnalysisArtifact()));
@@ -1505,6 +1510,39 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       return;
     }
 
+    const readGenerationContext = () => {
+      const config = getEffectiveSessionContext().sessionConfig;
+      return {
+        slug: getEffectiveSlug() || '',
+        sessionId: String(config?.sessionId || config?.__registry?.sessionIdHex || ''),
+        account: String(propsRef.current.account || '')
+          .trim()
+          .toLowerCase(),
+        chainId: getHtmlReportChainId(),
+      };
+    };
+    const context = readGenerationContext();
+    const cacheTarget = {
+      slug: getSessionResultsAnalysisCacheSlug(),
+      cacheKey: getSessionResultsAnalysisCacheKey(inputSignature),
+    };
+    const contextIsCurrent = () => {
+      const current = readGenerationContext();
+      return (
+        inst._isMounted &&
+        activeAnalysisGenerationRef.current?.isCurrent === contextIsCurrent &&
+        current.slug === context.slug &&
+        current.sessionId === context.sessionId &&
+        current.account === context.account &&
+        current.chainId === context.chainId &&
+        buildSessionResultsAnalysisPayloadForAi().inputSignature === inputSignature
+      );
+    };
+    activeAnalysisGenerationRef.current = { isCurrent: contextIsCurrent };
+    const applyCurrentLifecycleState: typeof applyHtmlReportAnalysisLifecycleStatePatch = (patch) => {
+      if (contextIsCurrent()) applyHtmlReportAnalysisLifecycleStatePatch(patch);
+    };
+
     const cached = readSessionResultsAnalysisArtifactFromCache(inputSignature);
     const currentArtifact = getHtmlReportAnalysisArtifact();
     const analysisLifecyclePlan = buildSurveyResultsAnalysisLifecyclePlan({
@@ -1519,9 +1557,9 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     const lifecycleResult = runSurveyResultsAnalysisLifecycleController({
       plan: analysisLifecyclePlan,
       ports: {
-        applyBlockedState: applyHtmlReportAnalysisLifecycleStatePatch,
-        applyGenerateStartState: applyHtmlReportAnalysisLifecycleStatePatch,
-        applyReadyState: applyHtmlReportAnalysisLifecycleStatePatch,
+        applyBlockedState: applyCurrentLifecycleState,
+        applyGenerateStartState: applyCurrentLifecycleState,
+        applyReadyState: applyCurrentLifecycleState,
       },
     });
     if (!lifecycleResult.shouldGenerate) {
@@ -1535,6 +1573,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       for (let index = 0; index < missingSections.length; index += 1) {
         const section = missingSections[index];
         const label = HTML_REPORT_ANALYSIS_SECTION_LABELS[section];
+        if (!contextIsCurrent()) return;
         setState(
           buildSurveyResultsHtmlReportAnalysisProgressPatch(
             `Generating ${label} (${index + 1}/${missingSections.length})`,
@@ -1544,8 +1583,9 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         const rawOutput = await surveyResultsAnalysisGenerationPort.generateSection({
           maxTokens: HTML_REPORT_ANALYSIS_SECTION_MAX_TOKENS[section],
           prompt,
-          sessionSlug: getEffectiveSlug() || '',
+          sessionSlug: context.slug,
         });
+        const stillCurrentAfterGeneration = contextIsCurrent();
         const sectionArtifact = surveyResultsAnalysisArtifactMergePort.normalizeGeneratedArtifact({
           generatedAt: new Date().toISOString(),
           inputSignature,
@@ -1566,18 +1606,22 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         });
         completionPlan = buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan({
           artifact,
-          cacheKey: artifact ? getSessionResultsAnalysisCacheKey(artifact.inputSignature) : '',
+          cacheKey: cacheTarget.cacheKey,
           failureStatePatch: analysisLifecyclePlan.failureRecovery.statePatch,
           inputSignature,
           requestedSections: analysisLifecyclePlan.sectionsToGenerate,
-          slug: getSessionResultsAnalysisCacheSlug(),
+          slug: cacheTarget.slug,
         });
         const completionResult = await runSurveyResultsAnalysisGeneratedArtifactCompletion({
           plan: completionPlan,
           ports: {
-            writeArtifactToCache: writeSessionResultsAnalysisArtifactToCache,
+            writeArtifactToCache: (completedArtifact) =>
+              writeSessionResultsAnalysisArtifactToCache(completedArtifact, cacheTarget),
           },
         });
+        // A finished section can be saved for its original context, but must
+        // never publish state or launch more sections in a different one.
+        if (!stillCurrentAfterGeneration || !contextIsCurrent()) return;
         if (!completionResult.ok) {
           if (completionResult.error instanceof Error) throw completionResult.error;
           throw new Error(completionResult.errorMessage);
@@ -1587,14 +1631,15 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       if (!completionPlan || !completionLifecyclePatch) {
         throw new Error('Generated analysis artifact completion did not produce a lifecycle patch.');
       }
-      setState(asSurveyResultsStatePatch(completionLifecyclePatch));
+      if (contextIsCurrent()) setState(asSurveyResultsStatePatch(completionLifecyclePatch));
     } catch (error) {
+      if (!contextIsCurrent()) return;
       surveyLog.error('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis:', error);
       runSurveyResultsAnalysisLifecycleController({
         phase: 'failure-recovery',
         plan: analysisLifecyclePlan,
         ports: {
-          applyFailureRecoveryState: applyHtmlReportAnalysisLifecycleStatePatch,
+          applyFailureRecoveryState: applyCurrentLifecycleState,
         },
       });
     }
@@ -1606,7 +1651,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     const selectedSections = getHtmlReportSelectedSections();
     const format = stateRef.current.htmlReportExportFormat || SESSION_RESULTS_EXPORT_FORMAT_VIEWER;
     const downloadPlan = buildSurveyResultsHtmlReportDownloadExecutionPlan({
-      analysisGenerating: stateRef.current.htmlReportAnalysisGenerating,
+      analysisGenerating: isHtmlReportAnalysisGenerating(),
       format,
       isAuthorized: isHtmlReportExportAuthorized(),
       selectedSections,
@@ -2195,9 +2240,9 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     const analysisPayload = buildSessionResultsAnalysisPayloadForAi();
 
     return buildSurveyResultsHtmlReportModalProps({
-      analysisGenerating: stateRef.current.htmlReportAnalysisGenerating,
+      analysisGenerating: isHtmlReportAnalysisGenerating(),
       analysisPayload,
-      analysisProgress: stateRef.current.htmlReportAnalysisProgress,
+      analysisProgress: isHtmlReportAnalysisGenerating() ? stateRef.current.htmlReportAnalysisProgress : '',
       exportFormat: stateRef.current.htmlReportExportFormat,
       htmlReportAnalysisError: stateRef.current.htmlReportAnalysisError,
       isAuthorized,

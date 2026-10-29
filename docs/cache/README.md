@@ -22,7 +22,11 @@ registry; a parity test keeps this documentation aligned with it.
 
 `bookmarksCache` and `filters` hold user-authored choices that a refresh cannot
 rebuild. `analysisCache` mixes retained Results analysis artifacts with expiring
-profile summaries; both writers preserve other saved entries. `questionsCache`,
+profile summaries; both writers preserve other saved entries. Results generation
+captures its session and cache key before asynchronous work. A completed section
+may be saved to that original cache, but session, reader, chain or input changes
+prevent it from updating the current view. Exports include analysis only when
+its input signature matches the current filtered report. `questionsCache`,
 `surveysCache`, `sbtCache` and `userCache` hold derived remote records and scans.
 
 Logical key format:
