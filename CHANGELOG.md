@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Score participant results from each question's type and rating scale. Keep
+  freeform, choice and other unscored answers out of agreement counts and averages.
+
 - Require structured approval for sponsored question changes; text-only approval
   no longer applies them. Reject an approved plan digest when the plan changes.
 

@@ -95,6 +95,14 @@ resends the identical transaction; an uncertain outcome returns its transaction
 hash for checking before another request is made. This applies to hosted, registry
 and agent faucet calls.
 
+## Participant results
+
+Participant group scores use canonical binary answers (Agree, Unsure, Disagree)
+and ratings normalized over each question's declared bounds. Invalid ratings and
+answers to multichoice, quadratic, freeform or unknown question types are excluded
+from score averages and agreement counts. Qualitative responses remain visible;
+questions without scored answers do not appear in the group's top statements.
+
 ## Sponsored question approval
 
 Admins preview sponsored question changes through `/api/agent/question-queue/plan`.
