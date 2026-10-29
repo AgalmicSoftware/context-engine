@@ -3298,12 +3298,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   sumSbtCountMap: SessionSbtCacheController['sumSbtCountMap'] = (...args) =>
     this._sbtCacheController.sumSbtCountMap(...args);
 
-  seedSbtCountMapFromLegacyAddresses: SessionSbtCacheController['seedSbtCountMapFromLegacyAddresses'] = (...args) =>
-    this._sbtCacheController.seedSbtCountMapFromLegacyAddresses(...args);
-
-  hydrateLegacySbtCountState: SessionSbtCacheController['hydrateLegacySbtCountState'] = (...args) =>
-    this._sbtCacheController.hydrateLegacySbtCountState(...args);
-
   buildSbtHistorySummaryFromCounts: SessionSbtCacheController['buildSbtHistorySummaryFromCounts'] = (...args) =>
     this._sbtCacheController.buildSbtHistorySummaryFromCounts(...args);
 

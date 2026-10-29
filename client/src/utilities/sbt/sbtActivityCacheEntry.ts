@@ -1,21 +1,26 @@
-import { hydrateLegacySbtCountState, type SbtCountMap } from './sbtCountHelpers.js';
-import { buildSbtHistorySummaryFromCounts, normalizeSbtHistorySummary } from './sbtHistoryHelpers.js';
+import {
+  mergeSbtCountsPayload,
+  normalizeSbtCountMap,
+  sumSbtCountMap,
+  type SbtCountMap,
+  type SbtCountsPayload,
+} from './sbtCountHelpers.js';
+import { buildSbtHistorySummaryFromCounts } from './sbtHistoryHelpers.js';
 
-const EMPTY_HISTORY_SUMMARY = Object.freeze({
-  totalMinted: '0',
-  totalBurned: '0',
-  activeSupply: '0',
-  currentHolderCount: '0',
-  historicalHolderCount: '0',
-});
+export const SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION = 2 as const;
 
+type PendingSbtActivity = { account: string; burned: boolean; blockNumber: number };
 export interface SbtActivityCacheEntry {
   schemaVersion: typeof SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION;
   sbtAddress?: string;
   sbtInfo?: ({ creationBlock?: unknown } & Record<string, unknown>) | null;
   mintedAddresses?: string[];
   burnedAddresses?: string[];
-  blockNumber?: number | null;
+  /** Contiguous scan coverage, never advanced by a live event. */
+  blockNumber: number;
+  lastActivityBlock: number;
+  coveredCounts: SbtCountsPayload;
+  pendingActivity: Record<string, PendingSbtActivity>;
   creationBlock?: unknown;
   mintedCountByAddress?: SbtCountMap | null;
   burnedCountByAddress?: SbtCountMap | null;
@@ -29,76 +34,62 @@ export interface SbtActivityCacheEntry {
   sessionSlugExplicit?: boolean;
 }
 
-export const SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION = 1 as const;
-
-export type LegacySbtActivityCacheEntry = Omit<Partial<SbtActivityCacheEntry>, 'schemaVersion'> &
-  Record<string, unknown> & {
-    schemaVersion?: unknown;
-  };
-
+type SbtActivityPatch = Omit<Partial<SbtActivityCacheEntry>, 'schemaVersion'> & Record<string, unknown>;
 export interface BuildSbtActivityCacheEntryInput {
   sbtAddress: string;
   sbtInfo?: SbtActivityCacheEntry['sbtInfo'];
   creationBlock?: unknown;
   blockNumber?: number;
 }
-
 export interface ApplySbtActivityCacheEntryUpdateInput {
   account: string;
   burned: boolean;
   eventBlockNumber: number;
+  eventId: string;
 }
 
-const asEntryRecord = (value: unknown): LegacySbtActivityCacheEntry =>
-  value && typeof value === 'object' && !Array.isArray(value) ? { ...(value as LegacySbtActivityCacheEntry) } : {};
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+const asPatch = (value: unknown): SbtActivityPatch => (isRecord(value) ? (value as SbtActivityPatch) : {});
+const normalizedCounts = (value: unknown): SbtCountsPayload => {
+  const counts = asPatch(value);
+  const mintedCountByAddress = normalizeSbtCountMap(counts.mintedCountByAddress);
+  const burnedCountByAddress = normalizeSbtCountMap(counts.burnedCountByAddress);
+  return {
+    mintedCountByAddress,
+    burnedCountByAddress,
+    mintedEventCount: Math.max(Number(counts.mintedEventCount) || 0, sumSbtCountMap(mintedCountByAddress)),
+    burnedEventCount: Math.max(Number(counts.burnedEventCount) || 0, sumSbtCountMap(burnedCountByAddress)),
+  };
+};
 
-const mergeMonotonicCountMaps = (left: unknown, right: unknown): SbtCountMap => {
-  const merged: SbtCountMap = {};
-  for (const source of [left, right]) {
-    if (!source || typeof source !== 'object' || Array.isArray(source)) continue;
-    for (const [address, countIn] of Object.entries(source)) {
-      const addressLower = String(address || '').toLowerCase();
-      const count = Math.max(0, Math.floor(Number(countIn) || 0));
-      if (!addressLower || count <= 0) continue;
-      merged[addressLower] = Math.max(merged[addressLower] || 0, count);
-    }
+const isCurrentSbtActivityEntry = (value: unknown): value is SbtActivityCacheEntry =>
+  isRecord(value) &&
+  value.schemaVersion === SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION &&
+  isRecord(value.coveredCounts) &&
+  isRecord(value.pendingActivity) &&
+  typeof value.blockNumber === 'number' &&
+  Number.isFinite(value.blockNumber);
+
+export const hydrateSbtActivityCacheEntry = (value: unknown): SbtActivityCacheEntry | null =>
+  isCurrentSbtActivityEntry(value) ? value : null;
+
+const materializeCounts = (entry: SbtActivityCacheEntry): SbtActivityCacheEntry => {
+  let counts = normalizedCounts(entry.coveredCounts);
+  for (const event of Object.values(entry.pendingActivity)) {
+    counts = mergeSbtCountsPayload(
+      counts,
+      event.burned
+        ? { burnedCountByAddress: { [event.account]: 1 }, burnedEventCount: 1 }
+        : { mintedCountByAddress: { [event.account]: 1 }, mintedEventCount: 1 },
+    );
   }
-  return merged;
-};
-
-const unionAddresses = (left: unknown, right: unknown): string[] =>
-  Array.from(
-    new Set(
-      [...(Array.isArray(left) ? left : []), ...(Array.isArray(right) ? right : [])]
-        .map((address) => String(address || '').toLowerCase())
-        .filter(Boolean),
-    ),
-  );
-
-const readCheckpointBlock = (value: unknown): number =>
-  Number(value && typeof value === 'object' ? (value as { blockNumber?: unknown }).blockNumber : NaN);
-
-const selectNewestCheckpoint = (currentCheckpoint: unknown, scanCheckpoint: unknown): unknown => {
-  const currentBlock = readCheckpointBlock(currentCheckpoint);
-  const scanBlock = readCheckpointBlock(scanCheckpoint);
-  if (Number.isFinite(currentBlock) && Number.isFinite(scanBlock)) {
-    return scanBlock > currentBlock ? scanCheckpoint : currentCheckpoint;
-  }
-  if (Number.isFinite(currentBlock)) return currentCheckpoint;
-  if (Number.isFinite(scanBlock)) return scanCheckpoint;
-  return scanCheckpoint || currentCheckpoint || null;
-};
-
-const ensureMutableCountMap = (value: unknown): SbtCountMap => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return value as SbtCountMap;
-};
-
-export const hydrateSbtActivityCacheEntry = (value: unknown): SbtActivityCacheEntry | null => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const legacyEntry = value as LegacySbtActivityCacheEntry;
-  legacyEntry.schemaVersion = SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION;
-  return legacyEntry as SbtActivityCacheEntry;
+  Object.assign(entry, counts, {
+    mintedAddresses: Object.keys(counts.mintedCountByAddress),
+    burnedAddresses: Object.keys(counts.burnedCountByAddress),
+    historySummary: buildSbtHistorySummaryFromCounts(counts),
+  });
+  return entry;
 };
 
 export const buildSbtActivityCacheEntry = ({
@@ -106,144 +97,96 @@ export const buildSbtActivityCacheEntry = ({
   sbtInfo = null,
   creationBlock = sbtInfo?.creationBlock ?? null,
   blockNumber = 0,
-}: BuildSbtActivityCacheEntryInput): SbtActivityCacheEntry => ({
-  schemaVersion: SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
-  sbtAddress,
-  sbtInfo,
-  mintedAddresses: [],
-  burnedAddresses: [],
-  blockNumber,
-  creationBlock,
-  mintedCountByAddress: {},
-  burnedCountByAddress: {},
-  mintedEventCount: 0,
-  burnedEventCount: 0,
-  historySummary: { ...EMPTY_HISTORY_SUMMARY },
-  countsLoaded: false,
-});
+}: BuildSbtActivityCacheEntryInput): SbtActivityCacheEntry =>
+  materializeCounts({
+    schemaVersion: SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
+    sbtAddress,
+    sbtInfo,
+    creationBlock,
+    blockNumber: 0,
+    lastActivityBlock: blockNumber,
+    coveredCounts: normalizedCounts(null),
+    pendingActivity: {},
+    countsLoaded: false,
+  });
 
-/** Merge metadata without allowing a delayed hydration to erase holder activity. */
+/** Metadata cannot establish scan coverage or replace activity. */
 export const mergeSbtActivityCacheEntryMetadata = (currentIn: unknown, patchIn: unknown): SbtActivityCacheEntry => {
-  const current = asEntryRecord(currentIn);
-  const patch = asEntryRecord(patchIn);
-  const currentInfo = current.sbtInfo && typeof current.sbtInfo === 'object' ? current.sbtInfo : null;
-  const patchInfo = patch.sbtInfo && typeof patch.sbtInfo === 'object' ? patch.sbtInfo : null;
-  return hydrateSbtActivityCacheEntry({
-    ...current,
+  const patch = asPatch(patchIn);
+  const current =
+    hydrateSbtActivityCacheEntry(currentIn) ||
+    buildSbtActivityCacheEntry({ sbtAddress: String(patch.sbtAddress || '') });
+  return {
     ...patch,
-    sbtInfo:
-      currentInfo || patchInfo
-        ? { ...(currentInfo || {}), ...(patchInfo || {}) }
-        : (patch.sbtInfo ?? current.sbtInfo ?? null),
-    blockNumber: Math.max(Number(current.blockNumber) || 0, Number(patch.blockNumber) || 0),
-    mintedAddresses: current.mintedAddresses,
-    burnedAddresses: current.burnedAddresses,
-    mintedCountByAddress: current.mintedCountByAddress,
-    burnedCountByAddress: current.burnedCountByAddress,
-    mintedEventCount: current.mintedEventCount,
-    burnedEventCount: current.burnedEventCount,
-    countsLoaded: current.countsLoaded,
-    countsScanCheckpoint: current.countsScanCheckpoint,
-    historySummary: current.historySummary,
-  }) as SbtActivityCacheEntry;
+    ...current,
+    sbtAddress: patch.sbtAddress || current.sbtAddress,
+    creationBlock: patch.creationBlock ?? current.creationBlock,
+    lastActivityBlock: Math.max(current.lastActivityBlock, Number(patch.lastActivityBlock) || 0),
+    sbtInfo: current.sbtInfo || patch.sbtInfo ? { ...(current.sbtInfo || {}), ...(patch.sbtInfo || {}) } : null,
+    ...(patch.slug !== undefined ? { slug: patch.slug } : {}),
+    ...(patch.sessionSlug !== undefined ? { sessionSlug: patch.sessionSlug } : {}),
+    ...(patch.sessionSlugExplicit !== undefined ? { sessionSlugExplicit: patch.sessionSlugExplicit } : {}),
+  };
 };
 
-/** Merge a completed/partial scan monotonically with any newer realtime holder activity. */
+/** A scan supplies cumulative covered counts; pending live events are overlaid only beyond that range. */
 export const mergeSbtActivityCacheEntryCounts = (currentIn: unknown, scanIn: unknown): SbtActivityCacheEntry => {
-  const current = asEntryRecord(currentIn);
-  const scan = asEntryRecord(scanIn);
-  const mintedCountByAddress = mergeMonotonicCountMaps(current.mintedCountByAddress, scan.mintedCountByAddress);
-  const burnedCountByAddress = mergeMonotonicCountMaps(current.burnedCountByAddress, scan.burnedCountByAddress);
-  const mintedEventCount = Math.max(Number(current.mintedEventCount) || 0, Number(scan.mintedEventCount) || 0);
-  const burnedEventCount = Math.max(Number(current.burnedEventCount) || 0, Number(scan.burnedEventCount) || 0);
-  const blockCandidates = [current.blockNumber, scan.blockNumber]
-    .filter((value) => value !== null && value !== undefined)
-    .map((value) => Number(value))
-    .filter(Number.isFinite);
-  const blockNumber = blockCandidates.length > 0 ? Math.max(...blockCandidates) : null;
-  const checkpointBlock = readCheckpointBlock(current.countsScanCheckpoint);
-  const currentBlock = Number(current.blockNumber);
-  const scanBlock = Number(scan.blockNumber);
-  const freshnessFloor = Math.max(
-    0,
-    Number.isFinite(currentBlock) ? currentBlock : 0,
-    Number.isFinite(checkpointBlock) ? checkpointBlock : 0,
+  const current = hydrateSbtActivityCacheEntry(currentIn);
+  const scan = asPatch(scanIn);
+  const next = mergeSbtActivityCacheEntryMetadata(current, scan);
+  const scanBlock = scan.blockNumber == null ? NaN : Number(scan.blockNumber);
+  const currentCheckpoint = asPatch(current?.countsScanCheckpoint);
+  const scanCheckpoint = asPatch(scan.countsScanCheckpoint);
+  const checkpointBlock = Number(currentCheckpoint.blockNumber) || 0;
+  const acceptsScan =
+    scan.countsLoaded === true &&
+    Number.isFinite(scanBlock) &&
+    scanBlock >= Math.max(next.blockNumber, checkpointBlock);
+  if (acceptsScan) {
+    next.blockNumber = scanBlock;
+    next.coveredCounts = normalizedCounts(scan.coveredCounts || scan);
+    next.countsLoaded = true;
+    next.countsScanCheckpoint = null;
+  } else if ((Number(scanCheckpoint.blockNumber) || 0) > checkpointBlock) {
+    next.countsScanCheckpoint = scan.countsScanCheckpoint;
+  }
+  next.pendingActivity = Object.fromEntries(
+    Object.entries({
+      ...(hydrateSbtActivityCacheEntry(scanIn)?.pendingActivity || {}),
+      ...(current?.pendingActivity || {}),
+    }).filter(([, event]) => event.blockNumber > next.blockNumber),
   );
-  const scanCoversCurrentActivity = freshnessFloor === 0 || (Number.isFinite(scanBlock) && scanBlock >= freshnessFloor);
-  const scanFinalized = scan.countsLoaded === true && scanCoversCurrentActivity;
-  const newestCheckpoint = selectNewestCheckpoint(current.countsScanCheckpoint, scan.countsScanCheckpoint);
-
-  return hydrateSbtActivityCacheEntry({
-    ...current,
-    ...scan,
-    sbtInfo: {
-      ...(current.sbtInfo && typeof current.sbtInfo === 'object' ? current.sbtInfo : {}),
-      ...(scan.sbtInfo && typeof scan.sbtInfo === 'object' ? scan.sbtInfo : {}),
-    },
-    blockNumber,
-    mintedAddresses: unionAddresses(current.mintedAddresses, scan.mintedAddresses),
-    burnedAddresses: unionAddresses(current.burnedAddresses, scan.burnedAddresses),
-    mintedCountByAddress,
-    burnedCountByAddress,
-    mintedEventCount,
-    burnedEventCount,
-    countsLoaded: current.countsLoaded === true || scanFinalized,
-    countsScanCheckpoint: scanFinalized ? null : newestCheckpoint,
-    historySummary:
-      buildSbtHistorySummaryFromCounts({
-        mintedCountByAddress,
-        burnedCountByAddress,
-        mintedEventCount,
-        burnedEventCount,
-      }) ||
-      normalizeSbtHistorySummary(scan.historySummary) ||
-      normalizeSbtHistorySummary(current.historySummary),
-  }) as SbtActivityCacheEntry;
+  next.lastActivityBlock = Math.max(
+    next.lastActivityBlock,
+    ...Object.values(next.pendingActivity).map((event) => event.blockNumber),
+  );
+  return materializeCounts(next);
 };
 
 export const applySbtActivityCacheEntryUpdate = (
-  entry: SbtActivityCacheEntry | LegacySbtActivityCacheEntry,
-  { account, burned, eventBlockNumber }: ApplySbtActivityCacheEntryUpdateInput,
+  entry: SbtActivityCacheEntry,
+  { account, burned, eventBlockNumber, eventId }: ApplySbtActivityCacheEntryUpdateInput,
 ): SbtActivityCacheEntry => {
-  const versionedEntry = hydrateSbtActivityCacheEntry(entry);
-  if (!versionedEntry) {
-    throw new TypeError('Invalid SBT activity cache entry.');
-  }
-  entry = versionedEntry;
-  if (!Array.isArray(entry.mintedAddresses)) entry.mintedAddresses = [];
-  if (!Array.isArray(entry.burnedAddresses)) entry.burnedAddresses = [];
-  entry.mintedCountByAddress = ensureMutableCountMap(entry.mintedCountByAddress);
-  entry.burnedCountByAddress = ensureMutableCountMap(entry.burnedCountByAddress);
-  if (typeof entry.mintedEventCount !== 'number') entry.mintedEventCount = 0;
-  if (typeof entry.burnedEventCount !== 'number') entry.burnedEventCount = 0;
-  if (typeof entry.countsLoaded !== 'boolean') entry.countsLoaded = false;
-  hydrateLegacySbtCountState(entry);
+  if (!hydrateSbtActivityCacheEntry(entry)) throw new TypeError('Invalid SBT activity cache entry.');
+  if (!eventId || !Number.isFinite(eventBlockNumber))
+    throw new TypeError('SBT activity requires an event identity and block.');
+  if (eventBlockNumber <= entry.blockNumber) return entry;
+  entry.pendingActivity[eventId] = { account: String(account).toLowerCase(), burned, blockNumber: eventBlockNumber };
+  entry.lastActivityBlock = Math.max(entry.lastActivityBlock, eventBlockNumber);
+  return materializeCounts(entry);
+};
 
-  const accountLower = String(account || '').toLowerCase();
-  if (burned) {
-    if (!entry.burnedAddresses.includes(accountLower)) {
-      entry.burnedAddresses.push(accountLower);
+/** Discard incompatible entries and their discovery cursor so they can be rebuilt. */
+export const discardOutdatedSbtActivityEntries = (value: unknown): unknown => {
+  if (!isRecord(value)) return value;
+  const next = { ...value };
+  for (const [network, bucket] of Object.entries(next)) {
+    if (!isRecord(bucket) || !isRecord(bucket.sbtList)) continue;
+    const entries = Object.entries(bucket.sbtList);
+    const valid = entries.filter(([, entry]) => hydrateSbtActivityCacheEntry(entry));
+    if (valid.length !== entries.length) {
+      next[network] = { sbtList: Object.fromEntries(valid), lastBlock: 0 };
     }
-    const previousBurnedCount = Math.max(0, Math.floor(Number(entry.burnedCountByAddress[accountLower] || 0)));
-    entry.burnedCountByAddress[accountLower] = previousBurnedCount + 1;
-    entry.burnedEventCount += 1;
-  } else {
-    if (!entry.mintedAddresses.includes(accountLower)) {
-      entry.mintedAddresses.push(accountLower);
-    }
-    const previousMintedCount = Math.max(0, Math.floor(Number(entry.mintedCountByAddress[accountLower] || 0)));
-    entry.mintedCountByAddress[accountLower] = previousMintedCount + 1;
-    entry.mintedEventCount += 1;
   }
-
-  entry.historySummary =
-    buildSbtHistorySummaryFromCounts({
-      mintedCountByAddress: entry.mintedCountByAddress,
-      burnedCountByAddress: entry.burnedCountByAddress,
-      mintedEventCount: entry.mintedEventCount,
-      burnedEventCount: entry.burnedEventCount,
-    }) || normalizeSbtHistorySummary(entry.historySummary);
-
-  entry.blockNumber = Math.max(entry.blockNumber || 0, eventBlockNumber);
-  return entry;
+  return next;
 };

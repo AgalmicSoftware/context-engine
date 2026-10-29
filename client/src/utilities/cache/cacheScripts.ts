@@ -1,3 +1,4 @@
+import { discardOutdatedSbtActivityEntries } from '../sbt/sbtActivityCacheEntry.js';
 /**
  * @module cacheScripts
  * @description IndexedDB cache CRUD via a small private key-value helper — namespace-scoped read/write/subscribe
@@ -217,7 +218,7 @@ const clearMirror = () => {
 
 const setMirrorValue = (namespace: unknown, slug: unknown, value: CacheValue): void => {
   const key = toStorageKey(namespace, slug);
-  const next = cloneValue(value);
+  const next = cloneValue(namespace === 'sbtCache' ? discardOutdatedSbtActivityEntries(value) : value);
   mirrorByKey.set(key, next);
   getNamespaceBucket(namespace).set(String(slug || ''), next);
 };
@@ -833,7 +834,7 @@ export const readCache = async <TValue = CacheLegacyNode>(
     return cloneValue(mirrorByKey.get(key)) as TValue;
   }
   setMirrorValue(ns, sl, value);
-  return cloneValue(value) as TValue;
+  return cloneValue(mirrorByKey.get(key)) as TValue;
 };
 
 const writeCacheDirect = async ({ namespace, slug, key, value }: ManagedWriteInput): Promise<boolean> => {
@@ -960,7 +961,9 @@ export const updateCacheAtomic = async <TValue = CacheLegacyNode>(
     const persisted = await readPersistentKey(key);
     const current = (persisted === READ_FAILED ? cloneValue(mirrorByKey.get(key)) : persisted) as
       TValue | null | undefined;
-    const next = await updater(current == null ? null : current);
+    const next = await updater(
+      current == null ? null : ((ns === 'sbtCache' ? discardOutdatedSbtActivityEntries(current) : current) as TValue),
+    );
     const ok = await writeCacheDirect({ namespace: ns, slug: sl, key, value: next });
     if (!ok) {
       throw new Error(`[cacheScripts] Failed to persist atomic update for ${key}`);

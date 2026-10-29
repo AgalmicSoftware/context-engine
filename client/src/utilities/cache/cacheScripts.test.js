@@ -169,6 +169,30 @@ describe('cacheScripts', () => {
     global.BroadcastChannel = BASELINE_BROADCAST_CHANNEL;
   });
 
+  it('discards old SBT entries and resets discovery before reads and atomic updates', async () => {
+    const { cacheScripts, idbState } = loadCacheScripts();
+    const { buildSbtActivityCacheEntry } = require('../sbt/sbtActivityCacheEntry.js');
+    const valid = buildSbtActivityCacheEntry({ sbtAddress: '0xcurrent' });
+    idbState.set('dg:sbtCache:old-shape', {
+      1: {
+        lastBlock: 200,
+        lightDiscoveryLatestBlock: 200,
+        sbtList: {
+          '0xold': { schemaVersion: 1, blockNumber: 200, countsLoaded: true, mintedCountByAddress: { '0xorphan': 1 } },
+          '0xcurrent': valid,
+        },
+      },
+    });
+    const expected = { 1: { lastBlock: 0, sbtList: { '0xcurrent': valid } } };
+    await cacheScripts.initCacheManager();
+    expect(cacheScripts.peekCacheSync('sbtCache', 'old-shape')).toEqual(expected);
+    expect(await cacheScripts.readCache('sbtCache', 'old-shape')).toEqual(expected);
+    const updater = jest.fn((current) => current);
+    await cacheScripts.updateCacheAtomic('sbtCache', 'old-shape', updater);
+    expect(updater).toHaveBeenCalledWith(expected);
+    expect(idbState.get('dg:sbtCache:old-shape')).toEqual(expected);
+  });
+
   it('reconciles managed namespace dg keys from localStorage into IDB and mirror during init', async () => {
     const seed = {
       'dg:questionsCache:alpha': { 1: { questions: { q1: { id: 'q1' } } } },

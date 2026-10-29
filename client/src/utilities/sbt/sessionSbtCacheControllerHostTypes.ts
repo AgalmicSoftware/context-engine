@@ -1,4 +1,4 @@
-import type { SbtCountMap, SbtCountState, SbtCountsPayload, SbtCountsPayloadInput } from './sbtCountHelpers.js';
+import type { SbtCountMap, SbtCountsPayload, SbtCountsPayloadInput } from './sbtCountHelpers.js';
 import type { SbtHistorySummary } from './sbtHistoryHelpers.js';
 import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
 import type {
@@ -99,11 +99,6 @@ export interface SessionSbtCacheController {
   normalizeSbtHistorySummary: (summaryIn: unknown) => SbtHistorySummary | null;
   normalizeSbtCountMap: (value?: Record<string, unknown> | null) => SbtCountMap;
   sumSbtCountMap: (value?: Record<string, unknown> | null) => number;
-  seedSbtCountMapFromLegacyAddresses: (
-    countMapIn?: Record<string, unknown> | null,
-    addresses?: Array<string | null | undefined> | null,
-  ) => SbtCountMap;
-  hydrateLegacySbtCountState: (entry?: SbtCountState | null) => SbtCountState | null;
   buildSbtHistorySummaryFromCounts: (counts?: Partial<SbtCountsPayloadInput> | null) => SbtHistorySummary | null;
   getCurrentHolderAddressesFromCounts: (counts?: Partial<SbtCountsPayloadInput>) => string[];
   initializeSbtCache: (options?: SbtCacheInitOptions) => Promise<void>;
