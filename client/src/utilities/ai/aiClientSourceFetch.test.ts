@@ -1,3 +1,4 @@
+import { readFileContent } from './aiClientSourceReaders';
 import { fetchContentFromURL, processAdditionalSources } from './aiClientSourceFetch';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
@@ -106,10 +107,48 @@ describe('aiClientSourceFetch', () => {
       { type: 'photo', value: new File(['image'], 'photo.png', { type: 'image/png' }), name: 'Photo' },
     ]);
 
-    expect(result).toContain('--- Source: Article ---');
-    expect(result).toContain('Fetched URL content');
-    expect(result).toContain('--- Source: Notes ---');
-    expect(result).toContain('Local notes');
-    expect(result).toContain("[Error reading source 'Photo': Photo sources must be analyzed before text extraction.]");
+    expect(result.text).toContain('--- Source: Article ---');
+    expect(result.text).toContain('Fetched URL content');
+    expect(result.text).toContain('--- Source: Notes ---');
+    expect(result.text).toContain('Local notes');
+    expect(result.text).not.toContain('Photo');
+    expect(result.skipped).toEqual([
+      { name: 'Photo', status: 'unsupported', reason: 'Photo sources must be analyzed before text extraction.' },
+    ]);
+  });
+  it('separates unsupported files and read failures from extracted text', async () => {
+    await expect(
+      readFileContent(new File(['not PDF text'], 'memo.pdf', { type: 'application/pdf' })),
+    ).resolves.toMatchObject({ status: 'unsupported' });
+    await expect(readFileContent(new File(['Local notes'], 'memo.txt', { type: 'text/plain' }))).resolves.toEqual({
+      status: 'text',
+      text: 'Local notes',
+    });
+    await expect(readFileContent(new File(['{}'], 'data.bin', { type: 'application/json' }))).resolves.toEqual({
+      status: 'text',
+      text: '{}',
+    });
+    const read = jest.spyOn(FileReader.prototype, 'readAsText').mockImplementation(function (this: FileReader) {
+      this.dispatchEvent(new Event('error'));
+    });
+    try {
+      await expect(readFileContent(new File(['data'], 'broken.txt'))).resolves.toMatchObject({
+        status: 'failed',
+        reason: expect.stringContaining('broken.txt'),
+      });
+    } finally {
+      read.mockRestore();
+    }
+  });
+
+  it('counts only extracted text and names skipped binary sources', async () => {
+    const result = await processAdditionalSources([
+      { type: 'file', name: 'memo.pdf', value: new File(['BINARY_MARKER'], 'memo.pdf') },
+      { type: 'file', name: 'notes.txt', value: new File(['Useful text'], 'notes.txt') },
+    ]);
+    expect(result.text).toContain('Useful text');
+    expect(result.text).not.toMatch(/BINARY_MARKER|memo.pdf|not currently supported/);
+    expect(result.extractedCharacters).toBe('Useful text'.length);
+    expect(result.skipped).toEqual([{ name: 'memo.pdf', status: 'unsupported', reason: expect.any(String) }]);
   });
 });

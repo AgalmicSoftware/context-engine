@@ -402,6 +402,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const [loading, setLoading] = useState(false);
   const [activeAction, setActiveAction] = useState('');
   const [error, setError] = useState('');
+  const [sourceWarnings, setSourceWarnings] = useState<string[]>([]);
   const [waitingSeconds, setWaitingSeconds] = useState(0);
   const waitTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const [surveyTitle, setSurveyTitle] = useState('');
@@ -825,7 +826,16 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     }
 
     if (invalidCount > 0) {
-      setError(buildUnsupportedSourceMessage(invalidCount));
+      const selected = Array.isArray(files) ? files : [files];
+      const skippedNames = selected
+        .filter((file) => !nextSources.some((source) => source.value === file))
+        .map((file) => file.name || 'Unnamed file');
+      setSourceWarnings((previous) => [
+        ...new Set([
+          ...previous,
+          `${buildUnsupportedSourceMessage(invalidCount)} Skipped: ${skippedNames.join(', ')}.`,
+        ]),
+      ]);
     } else if (nextSources.length > 0) {
       setError('');
     }
@@ -1201,6 +1211,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
 
     let currentDocumentURLs: string[] = [];
     let content = '';
+    let extractedCharacters = 0;
     const { effectiveSources } = buildEffectiveAdditionalSources();
     const shouldClearAdditionalUrlInput = Boolean(additionalUrlInput && additionalUrlInput.trim());
     let sourceTypeOverride = '';
@@ -1236,6 +1247,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
         }
       }
 
+      extractedCharacters = content.length;
       const photoAnalysisBySourceId = await analyzeQueuedPhotoSources(effectiveSources);
       if (abortedRef.current) return;
       const savedDocRefs = await saveQueuedSourcesToDocLibrary(effectiveSources, photoAnalysisBySourceId);
@@ -1258,6 +1270,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
           photoSources.forEach((src) => {
             const analysisText = toStr(photoAnalysisBySourceId.get(src?.id)).trim();
             if (!analysisText) return;
+            extractedCharacters += analysisText.length;
             additionalContentSections.push(`--- Photo Source: ${src.name} ---\n\n${analysisText}`);
           });
         }
@@ -1267,7 +1280,16 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             nonPhotoSources as Array<{ type: 'url' | 'file'; value: string | File; name: string }>,
             aiRequestOptions,
           );
-          if (additionalContent) additionalContentSections.push(additionalContent.trim());
+          if (additionalContent.text) additionalContentSections.push(additionalContent.text.trim());
+          extractedCharacters += additionalContent.extractedCharacters;
+          if (additionalContent.skipped.length) {
+            setSourceWarnings((previous) => [
+              ...new Set([
+                ...previous,
+                ...additionalContent.skipped.map(({ name, reason }) => `Skipped ${name}: ${reason}`),
+              ]),
+            ]);
+          }
         }
 
         const mergedAdditionalContent = additionalContentSections.filter(Boolean).join('\n\n');
@@ -1296,9 +1318,9 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
         }
       }
 
-      if (!content || content.length < 50) {
+      if (!content || extractedCharacters < 50) {
         throw new Error(
-          'Total extracted content is too short (min 50 chars). Please enter text, audio, or add valid URLs/Files.',
+          'Total extracted content is too short (min 50 chars). Paste the source text, record audio, or add a readable TXT, Markdown, CSV, JSON, or URL source.',
         );
       }
 
@@ -2173,6 +2195,11 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             )}
           </form>
 
+          {sourceWarnings.length > 0 && (
+            <div role="status" className={styles.error} style={SURVEY_GENERATOR_ERROR_STYLE}>
+              {sourceWarnings.join(' ')}
+            </div>
+          )}
           {error && !loading && (
             <div className={styles.error} style={SURVEY_GENERATOR_ERROR_STYLE}>
               {error}

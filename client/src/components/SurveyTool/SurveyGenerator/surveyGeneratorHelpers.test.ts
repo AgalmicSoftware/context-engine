@@ -144,7 +144,9 @@ describe('surveyGeneratorHelpers', () => {
   });
 
   it('recognizes supported additional files by mime type or extension', () => {
-    expect(isSupportedAdditionalFile({ name: 'deck.bin', type: 'application/vnd.ms-powerpoint' })).toBe(true);
+    expect(isSupportedAdditionalFile({ name: 'deck.bin', type: 'application/vnd.ms-powerpoint' })).toBe(false);
+    expect(isSupportedAdditionalFile({ name: 'memo.pdf', type: 'application/pdf' })).toBe(false);
+    expect(isSupportedAdditionalFile({ name: 'memo.txt', type: 'text/plain' })).toBe(true);
     expect(isSupportedAdditionalFile({ name: 'dataset.json', type: '' })).toBe(true);
     expect(isSupportedAdditionalFile({ name: 'photo.png', type: 'image/png' })).toBe(false);
   });
