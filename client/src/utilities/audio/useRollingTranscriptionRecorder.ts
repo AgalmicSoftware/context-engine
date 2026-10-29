@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { transcribeAudio } from '../ai/aiClient.js';
 import { requestPreferredSpeechMicrophone } from './microphoneSelection';
+import { useRecordingWakeLock } from './useRecordingWakeLock';
 import {
   DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
   RollingTranscriptSegment,
@@ -17,6 +18,7 @@ type UseRollingTranscriptionRecorderOptions = {
   workerUrl?: string;
   chunkMs?: number;
   retainRawAudio?: boolean;
+  recordSpeakerAudio?: boolean;
 };
 
 type FinalizeRecordingOptions = {
@@ -43,8 +45,10 @@ export const useRollingTranscriptionRecorder = ({
   workerUrl,
   chunkMs = DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
   retainRawAudio = false,
+  recordSpeakerAudio = false,
 }: UseRollingTranscriptionRecorderOptions = {}) => {
   const [status, setStatus] = useState<RollingRecorderStatus>('idle');
+  const { wakeLockHeld } = useRecordingWakeLock(status === 'recording' || status === 'paused');
   const [segments, setSegments] = useState<RollingTranscriptSegment[]>([]);
   const [transcript, setTranscript] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -316,7 +320,9 @@ export const useRollingTranscriptionRecorder = ({
     setErrorMessage('');
 
     try {
-      const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices);
+      const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices, {
+        echoCancellation: !recordSpeakerAudio,
+      });
       if (!mountedRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
@@ -339,7 +345,16 @@ export const useRollingTranscriptionRecorder = ({
       setErrorMessage(describeError(error));
       setStatus('error');
     }
-  }, [clearRotationTimer, createRecorder, startElapsedTimer, startRotationTimer, status, stopTimer, stopTracks]);
+  }, [
+    clearRotationTimer,
+    createRecorder,
+    recordSpeakerAudio,
+    startElapsedTimer,
+    startRotationTimer,
+    status,
+    stopTimer,
+    stopTracks,
+  ]);
 
   const pauseRecording = useCallback(() => {
     if (status !== 'recording') return;
@@ -460,6 +475,7 @@ export const useRollingTranscriptionRecorder = ({
   ).length;
 
   return {
+    wakeLockHeld,
     status,
     isRecording: status === 'recording',
     isPaused: status === 'paused',

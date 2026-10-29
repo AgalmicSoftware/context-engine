@@ -49,6 +49,7 @@ export function ImportedResponderContextEditor({
 
 type SessionInterviewVoiceControlsProps = {
   isRecorderSessionActive: boolean;
+  wakeLockHeld?: boolean;
   isPaused: boolean;
   isStopping: boolean;
   isStarting: boolean;
@@ -74,6 +75,7 @@ type SessionInterviewVoiceControlsProps = {
 
 export function SessionInterviewVoiceControls({
   isRecorderSessionActive,
+  wakeLockHeld,
   isPaused,
   isStopping,
   isStarting,
@@ -97,6 +99,9 @@ export function SessionInterviewVoiceControls({
 }: SessionInterviewVoiceControlsProps) {
   return (
     <div className={styles.sessionInterviewActions}>
+      {isRecorderSessionActive && !wakeLockHeld ? (
+        <div className={styles.sessionRecordingWakeNotice}>Keep this screen on.</div>
+      ) : null}
       {!isRecorderSessionActive ? (
         <div className={styles.sessionInterviewPrimaryAction}>
           {onDiscard ? (

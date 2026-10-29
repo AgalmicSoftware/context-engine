@@ -464,3 +464,11 @@ The complete initial/continued voice instructions fit below the Worker’s 32,00
 ### Sharing the voice interview
 
 The session page, admin page and publish result include a compact **Join** panel. Its QR code and **Copy link** action open the voice chooser on another device, retaining the session Worker origin. **For your AI** copies the same review-only prompt as the voice launcher after checking catalog compatibility. Join links contain only the session path and Worker origin; admin tokens and prefill fragments are never copied.
+
+### Recording on a phone or with remote speakers
+
+Group Conversation and Interview request a Screen Wake Lock while recording or paused, release it on stop/close, and request it again when the page returns to the foreground. When a lock is unavailable or released, **Keep this screen on** remains visible. A wake lock cannot keep a backgrounded browser recording reliably; keep the recording page visible.
+
+Group Conversation's **Record speaker audio** option is off by default and remembered on the device. It turns off microphone echo cancellation for people heard through the device's speakers, keeping noise suppression and gain control. Use speakers instead of headphones and test levels before the breakout. The option cannot change during capture.
+
+Foreground recordings rotate into independently decodable three-minute chunks and transcribe serially. Successful text is saved locally. A failed segment is marked; later segments continue. There is no automatic retry or durable raw-audio recovery in this mode, so do not rely on it as the only copy of an important conversation. Background timer suspension, browser termination, storage limits and device battery policies still need device testing.

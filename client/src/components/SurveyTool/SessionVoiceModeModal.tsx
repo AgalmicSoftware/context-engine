@@ -1222,6 +1222,7 @@ function SessionInterviewPanel({
             </div>
           ) : null}
           <SessionInterviewVoiceControls
+            wakeLockHeld={recorder.wakeLockHeld}
             isRecorderSessionActive={isRecorderSessionActive}
             isPaused={isPaused}
             isStopping={isStopping}

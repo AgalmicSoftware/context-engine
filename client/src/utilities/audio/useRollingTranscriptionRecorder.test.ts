@@ -270,4 +270,33 @@ describe('useRollingTranscriptionRecorder', () => {
 
     unmount();
   });
+  it('rotates a 45-minute foreground recording and continues after a failed segment', async () => {
+    (transcribeAudio as jest.Mock)
+      .mockImplementationOnce(async () => {
+        throw new Error('Mobile connection lost');
+      })
+      .mockImplementation(async () => 'Synthetic room transcript.');
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'workshop', recordSpeakerAudio: true }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
+      audio: expect.objectContaining({ echoCancellation: false, noiseSuppression: true }),
+    });
+    for (let segment = 0; segment < 15; segment += 1) {
+      await act(async () => {
+        jest.advanceTimersByTime(3 * 60 * 1000);
+        await flushPromises();
+      });
+    }
+    expect(transcribeAudio).toHaveBeenCalledTimes(15);
+    expect(result.current.segments).toHaveLength(15);
+    expect(result.current.segments.filter((segment) => segment.status === 'error')).toHaveLength(1);
+    expect(result.current.segments.filter((segment) => segment.status === 'complete')).toHaveLength(14);
+    expect(result.current.pendingSegmentCount).toBe(0);
+    expect(result.current.elapsedSeconds).toBe(45 * 60);
+    unmount();
+  });
 });
