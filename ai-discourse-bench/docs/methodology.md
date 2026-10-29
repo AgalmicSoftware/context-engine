@@ -150,7 +150,9 @@ output falls back from JSON Schema only for endpoint capability errors and
 records the downgrade. Importance resume reuses a saved row only when its
 recorded endpoint matches the current provider endpoint. Both runners and
 importance release validation reject mixed deployment identities, including
-endpoint changes within a model.
+endpoint changes within a model. The request timeout covers headers and the full
+success/error body, including any structured-output fallback attempt. Expiry
+cancels the active stream and returns the retryable `AIDB_REQUEST_TIMEOUT` error.
 
 Each release manifest model is matched against the model roster selected for
 the report, including effective provider and generation settings. This prevents
