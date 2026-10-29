@@ -23,6 +23,7 @@ import {
   applySessionConfigMutation,
   resolveCanonicalWorkerSessionIdHex,
 } from './sessionConfigMutation.js';
+import { repairPendingSessionSecretsProjection } from './sessionSecretsAuthority.js';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
 import {
   getSessionConfig, getLegacySessionConfigForAuthority, putSessionConfig,
@@ -2288,6 +2289,7 @@ export class SessionWriteCoordinator {
 
   async repairPendingSessionConfigProjection() {
     await repairPendingLitAuthorizationSetup(this);
+    await repairPendingSessionSecretsProjection(this);
     const authority = await this.state.storage.get(SESSION_CONFIG_AUTHORITY_KEY);
     if (authority?.projectionPending !== true) return;
     await this.projectSessionConfigAuthority(authority);

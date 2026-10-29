@@ -1956,6 +1956,12 @@ Runtime:
     and non-object scalars are stringified before storage.
   - Reads still accept legacy unversioned secrets objects, but new admin and
     deploy-helper writes store the v1 envelope.
+  - The session config coordinator keeps the full encrypted secret document in
+    durable storage. It adopts the provisioned KV envelope once, applies later
+    edits to the committed document, and records cleared fields as absent keys.
+    KV is a repairable projection: a failed write is retried from durable state,
+    including after a restart, before accepting a later edit. Lit setup and
+    backup restore update the same document; backup export reads it directly.
   - The Cloudflare API token is never a session secret. A direct `/new` token is
     consumed only by the deploy helper and is not written to either KV record.
 

@@ -2,9 +2,8 @@ import { ethers } from 'ethers';
 import { LIT_AUTHORIZATION_VERSION as VERSION } from '../../shared/litChipotleAction.mjs';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
 import { buildEncryptedSessionSecretsEnvelope, decryptSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
-import { getSessionSecrets, putSessionSecrets } from './sessionConfigSecretsStore.js';
-import { putKvJson } from './responseKvHelpers.js';
-import { normalizeWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
+import { readCommittedSessionSecrets, commitSessionSecrets, repairPendingSessionSecretsProjection } from './sessionSecretsAuthority.js';
+import { resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
 
 const SIGNER_RECORD = 'session-lit-authorization-signer-v1';
 const SETUP_RECORD = 'session-lit-authorization-pending-v1';
@@ -67,7 +66,7 @@ export const executeLitAuthorizationSignerEnsure = async (coordinator, payload) 
       const config = authorityConfig(await transaction.get(CONFIG_RECORD), payload.baseConfig, slug);
       const secrets = record != null
         ? await readSignerSecrets(record, coordinator.env, slug)
-        : (await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug))) || {};
+        : await readCommittedSessionSecrets(coordinator, transaction, slug);
       const hasExistingKey = hasOwn(secrets, PRIVATE_KEY);
       const chosen = hasExistingKey ? walletFor(secrets[PRIVATE_KEY]) : proposed;
       assertConfiguredSigner(config, chosen, hasExistingKey);
@@ -95,7 +94,7 @@ export const repairPendingLitAuthorizationSetup = async (coordinator) => {
   await decryptSessionSecretsEnvelope(pending.envelope, { env: coordinator.env, slug });
   // Keep the encrypted journal until both projections finish. A restart or
   // later config mutation repairs the same pair before accepting another one.
-  await putKvJson(coordinator.env, `session:${normalizeWorkerSessionSlug(slug)}:secrets`, pending.envelope);
+  await repairPendingSessionSecretsProjection(coordinator);
   await coordinator.projectSessionConfigAuthority(authority);
   await coordinator.state.storage.transaction(async (transaction) => {
     const current = await transaction.get(SETUP_RECORD);
@@ -129,17 +128,15 @@ export const executeLitAuthorizationFinalize = async (coordinator, payload) => {
         mutation: { kind: 'merge-lit-credentials', litCredentials: payload.litCredentials },
       });
       if (!mutation?.ok) fail(mutation?.status || 400);
-      const secrets = { ...((await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug))) || {}), ...signerSecrets };
+      const secrets = { ...(await readCommittedSessionSecrets(coordinator, transaction, slug)), ...signerSecrets };
       for (const [key, value] of Object.entries(outputs)) {
         if (value.trim()) secrets[key] = value.trim();
         else delete secrets[key];
       }
       secrets[PRIVATE_KEY] = wallet.privateKey;
       for (const key of SECRET_KEYS) if (secrets[key] === '') delete secrets[key];
-      const envelope = await buildEncryptedSessionSecretsEnvelope(secrets, { env: coordinator.env, slug });
-      // Empty values in the encrypted authority remember explicit removals;
-      // an eventually consistent KV read must not resurrect an old account key.
-      const litSecrets = Object.fromEntries(SECRET_KEYS.map((key) => [key, secrets[key] ?? '']));
+      const envelope = await commitSessionSecrets(coordinator, transaction, slug, secrets);
+      const litSecrets = Object.fromEntries(SECRET_KEYS.filter((key) => hasOwn(secrets, key)).map((key) => [key, secrets[key]]));
       const signerEnvelope = await buildEncryptedSessionSecretsEnvelope(litSecrets, { env: coordinator.env, slug });
       const revision = Number(existing?.revision || 0) + 1;
       // Commit the selected signer, usage keys and public Lit descriptor as one
@@ -174,22 +171,23 @@ export const executeSessionSecretsAfterLitRepair = async (coordinator, payload) 
     // that older full-secret journal could silently undo the accepted edit.
     await coordinator.assertSessionAuthority(payload);
     await coordinator.repairPendingSessionConfigProjection();
-    const existing = (await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug))) || {};
-    const litPatch = Object.fromEntries(Object.entries(patch).filter(([key]) => SECRET_KEYS.includes(key)));
-    const record = await coordinator.state.storage.get(SIGNER_RECORD);
-    const litSecrets = record == null ? null : await readSignerSecrets(record, coordinator.env, slug);
-    const envelope = litSecrets && Object.keys(litPatch).length
-      ? await buildEncryptedSessionSecretsEnvelope({ ...litSecrets, ...litPatch }, { env: coordinator.env, slug }) : null;
-    // Even an unrelated edit must overlay canonical Lit values and deletions;
-    // a stale KV snapshot may predate the active signer and usage credential.
-    const nextSecrets = { ...existing, ...litSecrets, ...patch };
-    for (const key of SECRET_KEYS) if (litSecrets?.[key] === '' && !hasOwn(patch, key)) delete nextSecrets[key];
-    await putSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug), nextSecrets);
-    if (envelope) {
-      await coordinator.state.storage.transaction(async (transaction) => {
+    await coordinator.state.storage.transaction(async (transaction) => {
+      const existing = await readCommittedSessionSecrets(coordinator, transaction, slug);
+      const record = await transaction.get(SIGNER_RECORD);
+      const litSecrets = record == null ? null : await readSignerSecrets(record, coordinator.env, slug);
+      const nextSecrets = { ...existing, ...litSecrets };
+      for (const [key, value] of Object.entries(patch)) {
+        if (value.trim()) nextSecrets[key] = value.trim();
+        else delete nextSecrets[key];
+      }
+      await commitSessionSecrets(coordinator, transaction, slug, nextSecrets);
+      if (record && Object.keys(patch).some((key) => SECRET_KEYS.includes(key))) {
+        const nextLitSecrets = Object.fromEntries(SECRET_KEYS.filter((key) => hasOwn(nextSecrets, key)).map((key) => [key, nextSecrets[key]]));
+        const envelope = await buildEncryptedSessionSecretsEnvelope(nextLitSecrets, { env: coordinator.env, slug });
         await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope });
-      });
-    }
+      }
+    });
+    await repairPendingSessionSecretsProjection(coordinator);
     return json({ ok: true });
   } catch (error) {
     return json({ error: error.status === 409 ? error.message : 'Session secrets update is pending; retry after setup repair.' }, error.status || 503);

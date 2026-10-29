@@ -399,3 +399,46 @@ test('unrelated admin secret edits preserve canonical Lit fields and removals ov
   fixture.env.GROUP_KV.get = realGet;
   assert.equal((await getSessionSecrets(fixture.env, 'fixture')).litAccountApiKey, undefined);
 });
+
+for (const replacement of ['synthetic-new-key', '']) test(`secret patches preserve committed replacements and removals over stale KV (${replacement ? 'replace' : 'clear'})`, async () => {
+  const fixture = createFixture();
+  await putSessionSecrets(fixture.env, 'fixture', { openaiKey: 'synthetic-old-key', customRpcKey: 'synthetic-provisioned' });
+  const stale = fixture.kv.get('session:fixture:secrets');
+  assert.equal((await fixture.updateSecrets({ openaiKey: replacement })).ok, true);
+  fixture.restart();
+  const realGet = fixture.env.GROUP_KV.get;
+  fixture.env.GROUP_KV.get = (key) => key.endsWith(':secrets') ? stale : realGet(key);
+  assert.equal((await fixture.updateSecrets({ anthropicKey: 'synthetic-other-key' })).ok, true);
+  fixture.env.GROUP_KV.get = realGet;
+  assert.deepEqual(await getSessionSecrets(fixture.env, 'fixture'), {
+    ...(replacement ? { openaiKey: replacement } : {}), customRpcKey: 'synthetic-provisioned', anthropicKey: 'synthetic-other-key',
+  });
+});
+
+test('a committed secret patch survives failed projection, restart and an unrelated retry', async () => {
+  const fixture = createFixture();
+  await putSessionSecrets(fixture.env, 'fixture', { openaiKey: 'synthetic-old-key' });
+  fixture.failSecrets(true);
+  assert.equal((await fixture.updateSecrets({ openaiKey: 'synthetic-new-key' })).status, 503);
+  fixture.restart();
+  fixture.failSecrets(false);
+  assert.equal((await fixture.updateSecrets({ anthropicKey: 'synthetic-other-key' })).ok, true);
+  assert.deepEqual(await getSessionSecrets(fixture.env, 'fixture'), { openaiKey: 'synthetic-new-key', anthropicKey: 'synthetic-other-key' });
+});
+
+test('Lit setup patches the committed full document and later edits retain its keys', async () => {
+  const fixture = createFixture();
+  await putSessionSecrets(fixture.env, 'fixture', { openaiKey: 'synthetic-old-key' });
+  const stale = fixture.kv.get('session:fixture:secrets');
+  assert.equal((await fixture.updateSecrets({ openaiKey: 'synthetic-new-key' })).ok, true);
+  const realGet = fixture.env.GROUP_KV.get;
+  fixture.env.GROUP_KV.get = (key) => key.endsWith(':secrets') ? stale : realGet(key);
+  await fixture.ensure();
+  assert.equal((await fixture.finalize('fresh')).ok, true);
+  fixture.restart();
+  assert.equal((await fixture.updateSecrets({ anthropicKey: 'synthetic-other-key' })).ok, true);
+  fixture.env.GROUP_KV.get = realGet;
+  assert.deepEqual(await getSessionSecrets(fixture.env, 'fixture'), {
+    openaiKey: 'synthetic-new-key', anthropicKey: 'synthetic-other-key', litAuthorizationPrivateKey: KEY_A, litUsageApiKey: 'usage-fresh',
+  });
+});

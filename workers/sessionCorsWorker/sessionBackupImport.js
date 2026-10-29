@@ -1,3 +1,4 @@
+import { SESSION_SECRETS_AUTHORITY_KEY } from './sessionSecretsAuthority.js';
 import { assertAgentBackupTargetEmpty } from './agent/backup.mjs';
 import { BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStagePrefix, backupImportJournalKey, journalBackupImportWrite, readActiveBackupImport, cleanupCompletedBackupImport } from './sessionBackupLifecycle.js';
 import { verifyBackupPage } from './sessionBackupAuthentication.js';
@@ -25,7 +26,7 @@ const temporary = { expirationTtl: 7 * 86400 };
 
 const assertEmptyTarget = async ({ coordinator, current, slug, page, index, budget }) => {
   const nonempty = () => fail('Restore requires an empty target session. Abandon any unfinished restore before starting again.', 409, 'backup_target_not_empty');
-  if (current || await coordinator.state.storage.get('session-lit-authorization-signer-v1')) nonempty();
+  if (current || await coordinator.state.storage.get('session-lit-authorization-signer-v1') || await coordinator.state.storage.get(SESSION_SECRETS_AUTHORITY_KEY)) nonempty();
   const groupKv = budget.wrap(coordinator.env.GROUP_KV);
   await assertAgentBackupTargetEmpty({ kv: groupKv, storage: coordinator.state.storage, sessionId: page.manifest.sessionId });
   budget.consume(1);
@@ -379,6 +380,16 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
         if (groups.nextCursor) return pending();
       }
       if (snapshot.secrets) await write(budget.wrap(env.GROUP_KV), `session:${normalizeWorkerSessionSlug(slug)}:secrets`, JSON.stringify(snapshot.secrets), true, 'group');
+      if (snapshot.secrets) {
+        const restored = { version: 1, slug, revision: 1, envelope: snapshot.secrets, projectionPending: false };
+        const existing = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
+        if (existing && (!await storage.get(backupImportJournalKey(page.archiveId, 'durable', SESSION_SECRETS_AUTHORITY_KEY)) || !same(existing, restored))) conflict(SESSION_SECRETS_AUTHORITY_KEY);
+        else if (existing) progress.counts.skipped += 1;
+        else {
+          await journalBackupImportWrite(storage, page.archiveId, 'durable', SESSION_SECRETS_AUTHORITY_KEY);
+          await storage.put(SESSION_SECRETS_AUTHORITY_KEY, restored); progress.counts.written += 1;
+        }
+      }
       const signer = snapshot.wrappedSessionKeys.litAuthorizationSigner;
       if (signer) {
         const existing = await storage.get('session-lit-authorization-signer-v1');
