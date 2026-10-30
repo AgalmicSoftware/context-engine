@@ -489,6 +489,8 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Preserve Lit accounts and setup resources across failed attempts. Authority-choice switches with a saved group, PKP or action name those resources and offer Resume; supplied keys are checked before reserving an attempt.
+
 - Keep web and agent sessions signed in across effective content-only settings edits, including wizard verification, while revoking authorization for authority changes.
 
 - Return speaker-labelled transcription segments for Group Conversation recordings.

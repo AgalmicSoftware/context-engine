@@ -75559,11 +75559,1465 @@ async function main(params) {
   }
 });
 
+// workers/sessionCorsWorker/litChipotlePolicyCore.mjs
+var CHIPOTLE_WRAPPED_KEY_VERSION, CHIPOTLE_POLICY_VERSION, ethersUtils, toStr10, normalizeChipotleGateMode, normalizeChipotleChainId, normalizeChipotleSbtAddresses, stableChipotleStringify, buildLitChipotlePolicy, fingerprintLitChipotlePolicy, normalizeChipotleCekHex, buildLitChipotleWrappedPlaintext, normalizeLitChipotleMetadataVersion;
+var init_litChipotlePolicyCore = __esm({
+  "workers/sessionCorsWorker/litChipotlePolicyCore.mjs"() {
+    init_lib2();
+    CHIPOTLE_WRAPPED_KEY_VERSION = 2;
+    CHIPOTLE_POLICY_VERSION = "chipotle-sbt-v2";
+    ethersUtils = (() => {
+      const utils2 = ethers_exports?.utils || {};
+      return {
+        isAddress: utils2.isAddress || ethers_exports.isAddress,
+        getAddress: utils2.getAddress || ethers_exports.getAddress,
+        keccak256: utils2.keccak256 || ethers_exports.keccak256,
+        toUtf8Bytes: utils2.toUtf8Bytes || ethers_exports.toUtf8Bytes,
+        hexlify: utils2.hexlify || ethers_exports.hexlify,
+        arrayify: utils2.arrayify || ethers_exports.getBytes
+      };
+    })();
+    toStr10 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
+    normalizeChipotleGateMode = (value) => toStr10(value).trim().toLowerCase() === "all" ? "all" : "any";
+    normalizeChipotleChainId = (value) => {
+      const parsed = Number(value || 0);
+      return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+    };
+    normalizeChipotleSbtAddresses = (values = []) => {
+      const out = [];
+      const seen = /* @__PURE__ */ new Set();
+      (Array.isArray(values) ? values : [values]).forEach((raw) => {
+        const value = toStr10(raw).trim();
+        if (!value) return;
+        if (!ethersUtils.isAddress(value)) {
+          throw new Error("Lit Chipotle policy contains an invalid SBT address.");
+        }
+        const normalized = ethersUtils.getAddress(value).toLowerCase();
+        if (seen.has(normalized)) return;
+        seen.add(normalized);
+        out.push(normalized);
+      });
+      out.sort();
+      return out;
+    };
+    stableChipotleStringify = (value) => {
+      const walk = (entry2) => {
+        if (entry2 == null) return entry2;
+        if (typeof entry2 === "string" || typeof entry2 === "number" || typeof entry2 === "boolean") {
+          return entry2;
+        }
+        if (Array.isArray(entry2)) return entry2.map(walk);
+        if (typeof entry2 === "object") {
+          const out = {};
+          Object.keys(entry2).sort().forEach((key) => {
+            out[key] = walk(entry2[key]);
+          });
+          return out;
+        }
+        return toStr10(entry2);
+      };
+      return JSON.stringify(walk(value));
+    };
+    buildLitChipotlePolicy = ({
+      chainId,
+      gateMode = "any",
+      sbtAddresses = [],
+      litActionCid = "",
+      litPkpId = ""
+    } = {}) => {
+      const normalizedChainId = normalizeChipotleChainId(chainId);
+      if (!normalizedChainId) {
+        throw new Error("Lit Chipotle policy requires a chain ID.");
+      }
+      const normalizedSbtAddresses = normalizeChipotleSbtAddresses(sbtAddresses);
+      if (!normalizedSbtAddresses.length) {
+        throw new Error("Lit Chipotle policy requires at least one SBT address.");
+      }
+      const normalizedLitActionCid = toStr10(litActionCid).trim();
+      if (!normalizedLitActionCid) {
+        throw new Error("Lit Chipotle policy requires a Lit Action CID.");
+      }
+      const normalizedLitPkpId = toStr10(litPkpId).trim();
+      if (!normalizedLitPkpId) {
+        throw new Error("Lit Chipotle policy requires a Lit PKP ID.");
+      }
+      return {
+        version: CHIPOTLE_POLICY_VERSION,
+        chainId: normalizedChainId,
+        gateMode: normalizeChipotleGateMode(gateMode),
+        sbtAddresses: normalizedSbtAddresses,
+        litActionCid: normalizedLitActionCid,
+        litPkpId: normalizedLitPkpId
+      };
+    };
+    fingerprintLitChipotlePolicy = (policy = {}) => {
+      const canonicalPolicy = buildLitChipotlePolicy(policy);
+      return ethersUtils.keccak256(ethersUtils.toUtf8Bytes(stableChipotleStringify(canonicalPolicy)));
+    };
+    normalizeChipotleCekHex = (value) => {
+      const raw = toStr10(value).trim();
+      if (!/^0x[0-9a-f]{64}$/i.test(raw)) {
+        throw new Error("Lit Chipotle CEK must be a 32-byte hex string.");
+      }
+      return ethersUtils.hexlify(ethersUtils.arrayify(raw));
+    };
+    buildLitChipotleWrappedPlaintext = ({ cekHex, policy } = {}) => {
+      const canonicalPolicy = buildLitChipotlePolicy(policy);
+      return {
+        v: CHIPOTLE_WRAPPED_KEY_VERSION,
+        cekHex: normalizeChipotleCekHex(cekHex),
+        policyFingerprint: fingerprintLitChipotlePolicy(canonicalPolicy),
+        policy: canonicalPolicy
+      };
+    };
+    normalizeLitChipotleMetadataVersion = (chipotle = {}) => {
+      const raw = chipotle && typeof chipotle === "object" ? chipotle.version ?? chipotle.v : null;
+      const parsed = Number(raw || 0);
+      return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+    };
+  }
+});
+
+// workers/sessionCorsWorker/litWorkerAuthorization.js
+var utils, bytes2, LIT_AUTHORIZATION_REPROVISION_ERROR, resolveLitAuthorization, prepareLitAuthorization, litAuthorizationMessage, authorizeLitRequest, openLitReply, isLitAuthorizationReady;
+var init_litWorkerAuthorization = __esm({
+  "workers/sessionCorsWorker/litWorkerAuthorization.js"() {
+    init_lib2();
+    init_litChipotlePolicyCore();
+    init_litChipotleAction();
+    utils = ethers_exports.utils || ethers_exports;
+    bytes2 = utils.arrayify || utils.getBytes;
+    LIT_AUTHORIZATION_REPROVISION_ERROR = "Worker authorization is not configured. Ask the session admin to reprovision Lit with a fresh session authority.";
+    resolveLitAuthorization = ({ secrets = {}, config = {}, sessionSlug = "" } = {}) => {
+      const credentials = config.litCredentials || {};
+      if (credentials.litAuthorizationVersion !== LIT_AUTHORIZATION_VERSION || !secrets.litAuthorizationPrivateKey) {
+        throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
+      }
+      let wallet;
+      try {
+        wallet = new ethers_exports.Wallet(secrets.litAuthorizationPrivateKey);
+      } catch {
+        throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
+      }
+      if (wallet.address.toLowerCase() !== String(credentials.litAuthorizationSigner || "").toLowerCase()) {
+        throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
+      }
+      return { wallet, actionCode: buildWorkerAuthorizedLitAction({
+        signer: wallet.address,
+        sessionSlug,
+        pkpId: credentials.litPkpId
+      }) };
+    };
+    prepareLitAuthorization = async ({ secrets = {}, persistAuthorizationSecret } = {}) => {
+      let wallet;
+      try {
+        wallet = secrets.litAuthorizationPrivateKey ? new ethers_exports.Wallet(secrets.litAuthorizationPrivateKey) : ethers_exports.Wallet.createRandom();
+      } catch {
+        throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
+      }
+      if (persistAuthorizationSecret) {
+        const persistedKey = await persistAuthorizationSecret(wallet.privateKey);
+        if (persistedKey) {
+          try {
+            wallet = new ethers_exports.Wallet(persistedKey);
+          } catch {
+            throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
+          }
+        }
+      }
+      return {
+        litAuthorizationPrivateKey: wallet.privateKey,
+        litAuthorizationSigner: wallet.address,
+        litAuthorizationVersion: LIT_AUTHORIZATION_VERSION
+      };
+    };
+    litAuthorizationMessage = (params) => {
+      const auth = params.authorization;
+      return "Context Engine Lit authorization v1\n" + stableChipotleStringify({
+        version: LIT_AUTHORIZATION_VERSION,
+        sessionSlug: auth.sessionSlug,
+        op: params.op,
+        requesterAddress: String(params.requesterAddress).toLowerCase(),
+        chainId: params.expectedChainId,
+        rpcUrl: params.rpcUrl || "",
+        policyFingerprint: params.expectedPolicyFingerprint,
+        pkpId: params.pkpId,
+        actionCid: params.litActionCid,
+        inputDigest: utils.keccak256(utils.toUtf8Bytes(params.op === "encrypt" ? params.message || "" : params.op === "decrypt" ? params.ciphertext || "" : "")),
+        issuedAt: auth.issuedAt,
+        expiresAt: auth.expiresAt,
+        requestId: auth.requestId,
+        replyPublicKey: auth.replyPublicKey
+      });
+    };
+    authorizeLitRequest = async ({ wallet, jsParams, sessionSlug, now = Math.floor(Date.now() / 1e3) }) => {
+      const replyKeys = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]);
+      jsParams.authorization = {
+        sessionSlug,
+        issuedAt: now,
+        expiresAt: now + 60,
+        requestId: utils.hexlify(crypto.getRandomValues(new Uint8Array(32))),
+        replyPublicKey: utils.hexlify(new Uint8Array(await crypto.subtle.exportKey("raw", replyKeys.publicKey)))
+      };
+      const message = litAuthorizationMessage(jsParams);
+      jsParams.authorization.signature = await wallet.signMessage(message);
+      return { privateKey: replyKeys.privateKey, message };
+    };
+    openLitReply = async (reply4, context) => {
+      if (reply4?.version !== LIT_AUTHORIZATION_VERSION || !/^0x04[0-9a-f]{128}$/.test(reply4.publicKey || "") || !/^0x[0-9a-f]{24}$/.test(reply4.iv || "") || !/^0x[0-9a-f]+$/.test(reply4.ciphertext || "")) {
+        throw new Error("Invalid encrypted Lit authorization reply.");
+      }
+      const publicKey = await crypto.subtle.importKey("raw", bytes2(reply4.publicKey), { name: "ECDH", namedCurve: "P-256" }, false, []);
+      const sharedSecret = await crypto.subtle.deriveBits({ name: "ECDH", public: publicKey }, context.privateKey, 256);
+      const material = await crypto.subtle.importKey("raw", sharedSecret, "HKDF", false, ["deriveKey"]);
+      const aad = utils.toUtf8Bytes(context.message);
+      const key = await crypto.subtle.deriveKey(
+        {
+          name: "HKDF",
+          hash: "SHA-256",
+          salt: bytes2(utils.keccak256(aad)),
+          info: utils.toUtf8Bytes("Context Engine Lit reply v1")
+        },
+        material,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["decrypt"]
+      );
+      return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes2(reply4.iv), additionalData: aad }, key, bytes2(reply4.ciphertext)));
+    };
+    isLitAuthorizationReady = ({ secrets = {}, config = {} } = {}) => {
+      try {
+        resolveLitAuthorization({ secrets, config });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+  }
+});
+
+// workers/sessionCorsWorker/chipotleClient.js
+var import_rpcDefaults4, LIT_PROVISIONING_CREDENTIALS_CONFLICT, DEFAULT_LIT_API_BASE, CHIPOTLE_API_PREFIX, APPROVED_LIT_CHIPOTLE_API_HOSTS, LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, DEFAULT_PAGE_NUMBER, DEFAULT_PAGE_SIZE, getPathRpcUrl2, getPublicRpcUrls2, ethersUtils2, toTrimmedString9, isObj18, normalizeChipotleRpcCandidateList, normalizeValidChipotlePkpId, normalizeChipotleMembershipValue, normalizeHostname, parseIpv4Octets2, isPrivateOrLocalIpv4, isPrivateOrLocalIpv6, isPrivateOrLocalHostname, isApprovedLocalChipotleApiHost, isTruthyFlag, isLitChipotleLocalApiBaseAllowed, normalizeLitChipotleApiBase, normalizeChipotleRequestPath, buildChipotleUrl, parseJsonIfPossible, extractChipotleErrorMessage, fetchChipotleJson, resolveLitChipotleRuntime, resolveLitChipotleProvisioningRuntime, ensureChipotleApiKey, ensureChipotleManagementApiKey, buildPagedPath, runtimeAllowsLocalApiBase, listGroupWallets, listActions, listGroupActions, listWallets, resolveActionCidMembership, createStatusWarning, readLitChipotleStatus, deriveLitActionCid, normalizeSessionScopedNameSegment, normalizeGateMode3, isPrivateHostname, validateChipotleRpcUrl, resolveConfigMappedChipotleRpcUrls, resolveDefaultChipotleRpcUrls, resolveSessionChipotleRpcUrl, buildSessionBootstrapMetadata, createLitChipotleAccount, createLitChipotleGroup, createLitChipotleWallet, createLitChipotleUsageKey, readChipotleBillingBalance, ensureActionMetadata, ensureActionInGroup, ensurePkpInGroup, provisionLitChipotleAction, bootstrapLitChipotleSession, bootstrapLitChipotleSessionCore, executeLitChipotleAction, executeSessionLitChipotleAction;
+var init_chipotleClient = __esm({
+  "workers/sessionCorsWorker/chipotleClient.js"() {
+    init_litChipotleAction();
+    init_litWorkerAuthorization();
+    import_rpcDefaults4 = __toESM(require_rpcDefaults(), 1);
+    init_lib2();
+    init_litChipotlePolicyCore();
+    init_chainIdNormalization();
+    LIT_PROVISIONING_CREDENTIALS_CONFLICT = "Lit credentials conflict with saved setup. Restore the previous credentials and Resume the saved setup.";
+    DEFAULT_LIT_API_BASE = "https://api.chipotle.litprotocol.com";
+    CHIPOTLE_API_PREFIX = "/core/v1";
+    APPROVED_LIT_CHIPOTLE_API_HOSTS = /* @__PURE__ */ new Set(["api.chipotle.litprotocol.com"]);
+    LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG = "LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE";
+    LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG = "CE_LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE";
+    DEFAULT_PAGE_NUMBER = 0;
+    DEFAULT_PAGE_SIZE = 100;
+    ({ getPathRpcUrl: getPathRpcUrl2, getPublicRpcUrls: getPublicRpcUrls2 } = import_rpcDefaults4.default);
+    ethersUtils2 = ethers_exports?.utils || ethers_exports;
+    toTrimmedString9 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+    isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    normalizeChipotleRpcCandidateList = (value = []) => {
+      const out = [];
+      const seen = /* @__PURE__ */ new Set();
+      (Array.isArray(value) ? value : [value]).forEach((entry2) => {
+        const trimmed = toTrimmedString9(entry2);
+        if (!trimmed) return;
+        const key = trimmed;
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push(trimmed);
+      });
+      return out;
+    };
+    normalizeValidChipotlePkpId = (value = "") => {
+      const trimmed = toTrimmedString9(value);
+      if (!trimmed || trimmed === "0") return "";
+      return trimmed;
+    };
+    normalizeChipotleMembershipValue = (value = "") => toTrimmedString9(value).toLowerCase();
+    normalizeHostname = (value = "") => toTrimmedString9(value).toLowerCase().replace(/^\[(.*)\]$/, "$1");
+    parseIpv4Octets2 = (hostname = "") => {
+      const normalized = normalizeHostname(hostname);
+      const parts = normalized.split(".");
+      if (parts.length !== 4 || parts.some((part) => !/^\d{1,3}$/.test(part))) return null;
+      const octets = parts.map((part) => Number(part));
+      return octets.every((octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255) ? octets : null;
+    };
+    isPrivateOrLocalIpv4 = (octets = []) => {
+      const [a, b2] = octets;
+      return a === 0 || a === 10 || a === 127 || a === 100 && b2 >= 64 && b2 <= 127 || a === 169 && b2 === 254 || a === 172 && b2 >= 16 && b2 <= 31 || a === 192 && b2 === 168 || a === 198 && (b2 === 18 || b2 === 19) || a >= 224;
+    };
+    isPrivateOrLocalIpv6 = (hostname = "") => {
+      const normalized = normalizeHostname(hostname);
+      if (!normalized.includes(":")) return false;
+      if (normalized === "::" || normalized === "::1" || normalized === "0:0:0:0:0:0:0:1") {
+        return true;
+      }
+      if (normalized.startsWith("::ffff:")) {
+        const embeddedIpv4 = parseIpv4Octets2(normalized.slice("::ffff:".length));
+        return embeddedIpv4 ? isPrivateOrLocalIpv4(embeddedIpv4) : true;
+      }
+      const firstHextetText = normalized.split(":").find(Boolean) || "0";
+      const firstHextet = Number.parseInt(firstHextetText, 16);
+      if (!Number.isFinite(firstHextet)) return true;
+      return (firstHextet & 65024) === 64512 || (firstHextet & 65472) === 65152 || (firstHextet & 65280) === 65280;
+    };
+    isPrivateOrLocalHostname = (hostname = "") => {
+      const normalized = normalizeHostname(hostname);
+      if (!normalized) return true;
+      if (normalized === "localhost" || normalized.endsWith(".localhost") || normalized.endsWith(".local")) {
+        return true;
+      }
+      const ipv4Octets = parseIpv4Octets2(normalized);
+      if (ipv4Octets) return isPrivateOrLocalIpv4(ipv4Octets);
+      return isPrivateOrLocalIpv6(normalized);
+    };
+    isApprovedLocalChipotleApiHost = (hostname = "") => {
+      const normalized = normalizeHostname(hostname);
+      const ipv4Octets = parseIpv4Octets2(normalized);
+      return normalized === "localhost" || normalized.endsWith(".localhost") || normalized === "::1" || normalized === "0:0:0:0:0:0:0:1" || ipv4Octets && ipv4Octets[0] === 127;
+    };
+    isTruthyFlag = (value) => ["1", "true", "yes", "on"].includes(
+      toTrimmedString9(value).toLowerCase()
+    );
+    isLitChipotleLocalApiBaseAllowed = (env = {}) => isTruthyFlag(env?.[LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG]) || isTruthyFlag(env?.[LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG]);
+    normalizeLitChipotleApiBase = (value, {
+      allowLocalApiBase = false
+    } = {}) => {
+      const raw = toTrimmedString9(value);
+      const candidate = raw || DEFAULT_LIT_API_BASE;
+      let parsed;
+      try {
+        parsed = new URL(candidate);
+      } catch {
+        throw new Error("Lit Chipotle API base URL is invalid.");
+      }
+      const hostname = normalizeHostname(parsed.hostname);
+      const isApprovedLocalHost = isApprovedLocalChipotleApiHost(hostname);
+      const localOverrideAllowed = allowLocalApiBase === true && isApprovedLocalHost;
+      const protocol = toTrimmedString9(parsed.protocol).toLowerCase();
+      if (parsed.username || parsed.password) {
+        throw new Error("Lit Chipotle API base URL must not include credentials.");
+      }
+      if (protocol !== "https:" && !(protocol === "http:" && localOverrideAllowed)) {
+        throw new Error("Lit Chipotle API base URL must use HTTPS unless an approved local override is enabled.");
+      }
+      if (parsed.port && !localOverrideAllowed) {
+        throw new Error("Lit Chipotle API base URL must not include a custom port.");
+      }
+      if (isPrivateOrLocalHostname(hostname) && !localOverrideAllowed) {
+        throw new Error("Lit Chipotle API base URL must use an approved public host.");
+      }
+      if (!localOverrideAllowed && !APPROVED_LIT_CHIPOTLE_API_HOSTS.has(hostname)) {
+        throw new Error("Lit Chipotle API base URL host is not approved.");
+      }
+      if (isApprovedLocalHost && allowLocalApiBase !== true) {
+        throw new Error("Lit Chipotle API base URL local override is not enabled.");
+      }
+      const normalizedPath = parsed.pathname.replace(/\/+$/, "");
+      if (normalizedPath && normalizedPath.toLowerCase() !== CHIPOTLE_API_PREFIX) {
+        throw new Error(`Lit Chipotle API base URL path must be empty or ${CHIPOTLE_API_PREFIX}.`);
+      }
+      if (parsed.search || parsed.hash) {
+        throw new Error("Lit Chipotle API base URL must not include query or fragment.");
+      }
+      return parsed.origin.replace(/\/+$/, "");
+    };
+    normalizeChipotleRequestPath = (path) => {
+      const raw = toTrimmedString9(path);
+      if (!raw) return "/";
+      if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("//") || raw.includes("\\")) {
+        throw new Error("Lit Chipotle request path must be relative.");
+      }
+      if (raw.includes("#")) {
+        throw new Error("Lit Chipotle request path must not include a fragment.");
+      }
+      const pathOnly = raw.split("?")[0];
+      if (pathOnly.split("/").some((segment) => segment === "." || segment === "..") || /%2e/i.test(pathOnly)) {
+        throw new Error("Lit Chipotle request path must stay under the Chipotle API prefix.");
+      }
+      return `/${raw.replace(/^\/+/, "")}`;
+    };
+    buildChipotleUrl = (apiBase, path, { allowLocalApiBase = false } = {}) => {
+      const normalizedBase = normalizeLitChipotleApiBase(apiBase, { allowLocalApiBase });
+      const normalizedPath = normalizeChipotleRequestPath(path);
+      return `${normalizedBase}${CHIPOTLE_API_PREFIX}${normalizedPath}`;
+    };
+    parseJsonIfPossible = (value) => {
+      const trimmed = toTrimmedString9(value);
+      if (!trimmed) return {};
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        return { message: trimmed };
+      }
+    };
+    extractChipotleErrorMessage = (status, body, fallback) => {
+      if (typeof body === "string" && body.trim()) return body.trim();
+      if (isObj18(body)) {
+        const nestedError = toTrimmedString9(body.error || body.message || body.detail);
+        if (nestedError) return nestedError;
+      }
+      return `${fallback} (${Number(status || 0) || 500})`;
+    };
+    fetchChipotleJson = async ({
+      apiBase = DEFAULT_LIT_API_BASE,
+      apiKey = "",
+      path = "",
+      method = "GET",
+      body,
+      allowLocalApiBase = false,
+      fetchImpl = globalThis.fetch
+    } = {}) => {
+      const requestUrl = buildChipotleUrl(apiBase, path, { allowLocalApiBase });
+      if (typeof fetchImpl !== "function") {
+        throw new Error("Fetch unavailable for Chipotle request.");
+      }
+      const normalizedApiKey = toTrimmedString9(apiKey);
+      const headers2 = {};
+      if (body !== void 0) {
+        headers2["Content-Type"] = "application/json";
+      }
+      if (normalizedApiKey) {
+        headers2["X-Api-Key"] = normalizedApiKey;
+        headers2.Authorization = `Bearer ${normalizedApiKey}`;
+      }
+      let response2;
+      try {
+        response2 = await fetchImpl(requestUrl, {
+          method,
+          headers: headers2,
+          // The deployed Workers runtime supports manual/follow, but rejects error.
+          // Never follow redirects with the attached Lit account credentials.
+          redirect: "manual",
+          ...body !== void 0 ? { body: JSON.stringify(body) } : {}
+        });
+      } catch (error) {
+        throw new Error(toTrimmedString9(error?.message || error) || "Chipotle request failed.");
+      }
+      if (response2.status >= 300 && response2.status < 400) {
+        throw new Error("Chipotle redirects are not allowed.");
+      }
+      const text = await response2.text().catch(() => "");
+      const parsed = parseJsonIfPossible(text);
+      if (!response2.ok) {
+        throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
+      }
+      if (isObj18(parsed) && toTrimmedString9(parsed.error || "").trim()) {
+        throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
+      }
+      return parsed;
+    };
+    resolveLitChipotleRuntime = ({
+      env = {},
+      config = {},
+      secrets = {},
+      body = {}
+    } = {}) => {
+      const litCredentials = isObj18(config?.litCredentials) ? config.litCredentials : {};
+      const requestBody = isObj18(body) ? body : {};
+      const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
+      const envApiKey = toTrimmedString9(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
+      const requestApiKey = toTrimmedString9(requestBody.litUsageApiKey || requestBody.apiKey);
+      const secretApiKey = toTrimmedString9(secrets?.litUsageApiKey);
+      const litUsageApiKey = requestApiKey || secretApiKey || envApiKey;
+      let apiKeySource = "missing";
+      if (requestApiKey) apiKeySource = "request";
+      else if (secretApiKey) apiKeySource = "session-secret";
+      else if (envApiKey) apiKeySource = "worker-env";
+      return {
+        litApiBase: normalizeLitChipotleApiBase(
+          requestBody.litApiBase || litCredentials.litApiBase || env?.LIT_API_BASE || DEFAULT_LIT_API_BASE,
+          { allowLocalApiBase }
+        ),
+        allowLocalApiBase,
+        litUsageApiKey,
+        apiKeySource,
+        authorizationReady: isLitAuthorizationReady({ config, secrets }),
+        litGroupId: toTrimmedString9(requestBody.litGroupId || litCredentials.litGroupId),
+        litPkpId: toTrimmedString9(requestBody.litPkpId || litCredentials.litPkpId),
+        litActionCid: toTrimmedString9(requestBody.litActionCid || litCredentials.litActionCid),
+        customRpcUrl: toTrimmedString9(requestBody.customRpcUrl || secrets?.customRpcUrl),
+        customRpcKey: toTrimmedString9(requestBody.customRpcKey || secrets?.customRpcKey)
+      };
+    };
+    resolveLitChipotleProvisioningRuntime = ({
+      env = {},
+      config = {},
+      secrets = {},
+      body = {}
+    } = {}) => {
+      const litCredentials = isObj18(config?.litCredentials) ? config.litCredentials : {};
+      const requestBody = isObj18(body) ? body : {};
+      const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
+      const secretManagementApiKey = toTrimmedString9(secrets?.litAccountApiKey);
+      const envManagementApiKey = toTrimmedString9(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
+      const litManagementApiKey = secretManagementApiKey || envManagementApiKey;
+      const litGroupId = toTrimmedString9(requestBody.litGroupId || requestBody.groupId || litCredentials.litGroupId);
+      const litGroupName = toTrimmedString9(requestBody.litGroupName || requestBody.groupName);
+      const resolvedGroupSelector = litGroupId || litGroupName;
+      let apiKeySource = "missing";
+      if (secretManagementApiKey) apiKeySource = "session-secret";
+      else if (envManagementApiKey) apiKeySource = "worker-env";
+      return {
+        litApiBase: normalizeLitChipotleApiBase(
+          requestBody.litApiBase || litCredentials.litApiBase || env?.LIT_API_BASE || DEFAULT_LIT_API_BASE,
+          { allowLocalApiBase }
+        ),
+        allowLocalApiBase,
+        litManagementApiKey,
+        apiKeySource,
+        litGroupId: resolvedGroupSelector,
+        litPkpId: toTrimmedString9(requestBody.litPkpId || requestBody.pkpId || litCredentials.litPkpId),
+        litActionCid: toTrimmedString9(requestBody.litActionCid || litCredentials.litActionCid)
+      };
+    };
+    ensureChipotleApiKey = (runtime = {}) => {
+      if (!toTrimmedString9(runtime?.litUsageApiKey)) {
+        throw new Error("Lit API key not configured.");
+      }
+    };
+    ensureChipotleManagementApiKey = (runtime = {}) => {
+      if (!toTrimmedString9(runtime?.litManagementApiKey)) {
+        throw Object.assign(new Error("Lit account API key not configured."), { status: 400, code: "lit_management_key_missing" });
+      }
+    };
+    buildPagedPath = (path, params = {}) => {
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        const trimmed = toTrimmedString9(value);
+        if (!trimmed) return;
+        query.set(key, trimmed);
+      });
+      const serialized = query.toString();
+      return serialized ? `${path}?${serialized}` : path;
+    };
+    runtimeAllowsLocalApiBase = (runtime = {}) => runtime?.allowLocalApiBase === true;
+    listGroupWallets = async ({ runtime, fetchImpl } = {}) => {
+      if (!toTrimmedString9(runtime?.litGroupId)) return [];
+      const response2 = await fetchChipotleJson({
+        apiBase: runtime.litApiBase,
+        apiKey: runtime.litUsageApiKey,
+        allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+        path: buildPagedPath("/list_wallets_in_group", {
+          group_id: runtime.litGroupId,
+          page_number: DEFAULT_PAGE_NUMBER,
+          page_size: DEFAULT_PAGE_SIZE
+        }),
+        fetchImpl
+      });
+      return Array.isArray(response2) ? response2 : [];
+    };
+    listActions = async ({ runtime, fetchImpl, groupId } = {}) => {
+      const rawGroupId = groupId === null ? "" : groupId === void 0 ? runtime?.litGroupId : groupId;
+      const resolvedGroupId = toTrimmedString9(rawGroupId);
+      if (groupId !== void 0 && groupId !== null && !resolvedGroupId && groupId !== "") return [];
+      const response2 = await fetchChipotleJson({
+        apiBase: runtime.litApiBase,
+        apiKey: runtime.litUsageApiKey || runtime.litManagementApiKey,
+        allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+        path: buildPagedPath("/list_actions", {
+          ...resolvedGroupId ? { group_id: resolvedGroupId } : {},
+          page_number: DEFAULT_PAGE_NUMBER,
+          page_size: DEFAULT_PAGE_SIZE
+        }),
+        fetchImpl
+      });
+      return Array.isArray(response2) ? response2 : [];
+    };
+    listGroupActions = async ({ runtime, fetchImpl } = {}) => {
+      if (!toTrimmedString9(runtime?.litGroupId)) return [];
+      return listActions({ runtime, fetchImpl, groupId: runtime.litGroupId });
+    };
+    listWallets = async ({ runtime, fetchImpl } = {}) => {
+      const response2 = await fetchChipotleJson({
+        apiBase: runtime.litApiBase,
+        apiKey: runtime.litManagementApiKey,
+        allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+        path: buildPagedPath("/list_wallets", {
+          page_number: DEFAULT_PAGE_NUMBER,
+          page_size: DEFAULT_PAGE_SIZE
+        }),
+        fetchImpl
+      });
+      return Array.isArray(response2) ? response2 : [];
+    };
+    resolveActionCidMembership = async ({ runtime, actions = [], fetchImpl } = {}) => {
+      const configuredCid = toTrimmedString9(runtime?.litActionCid);
+      if (!configuredCid) return null;
+      if (!Array.isArray(actions)) return null;
+      const configuredCidLower = configuredCid.toLowerCase();
+      const configuredActionId = ethersUtils2.keccak256(
+        ethersUtils2.toUtf8Bytes(configuredCid)
+      ).toLowerCase();
+      return actions.some((action) => {
+        const actionId = normalizeChipotleMembershipValue(action?.id);
+        const actionCid = normalizeChipotleMembershipValue(
+          action?.action_ipfs_cid || action?.ipfs_cid || action?.cid
+        );
+        return actionId === configuredActionId || actionId === configuredCidLower || actionCid === configuredCidLower;
+      });
+    };
+    createStatusWarning = (step, error) => ({
+      step: toTrimmedString9(step),
+      message: toTrimmedString9(error?.message || error) || "Unknown Chipotle status error."
+    });
+    readLitChipotleStatus = async ({
+      runtime = {},
+      fetchImpl = globalThis.fetch
+    } = {}) => {
+      const warnings = [];
+      const status = {
+        ok: true,
+        apiBase: runtime.litApiBase,
+        apiKeySource: runtime.apiKeySource,
+        litGroupId: runtime.litGroupId,
+        litPkpId: runtime.litPkpId,
+        litActionCid: runtime.litActionCid,
+        balance: null,
+        clientConfig: null,
+        warnings,
+        groupSummary: { walletCount: null, actionCount: null, hasConfiguredPkp: null, hasConfiguredAction: null },
+        needsFreshAuthority: runtime.authorizationReady !== true,
+        ready: false
+      };
+      if (!toTrimmedString9(runtime.litUsageApiKey)) {
+        warnings.push(createStatusWarning("api-key", "Lit API key not configured. Save an account API key to provision Lit."));
+        return status;
+      }
+      const balance = await fetchChipotleJson({
+        apiBase: runtime.litApiBase,
+        apiKey: runtime.litUsageApiKey,
+        allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+        path: "/billing/balance",
+        fetchImpl
+      }).catch((error) => {
+        warnings.push(createStatusWarning("billing.balance", error));
+        return null;
+      });
+      const clientConfig = await fetchChipotleJson({
+        apiBase: runtime.litApiBase,
+        allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+        path: "/get_lit_action_client_config",
+        fetchImpl
+      }).catch((error) => {
+        warnings.push(createStatusWarning("client.config", error));
+        return null;
+      });
+      const wallets = await listGroupWallets({ runtime, fetchImpl }).catch((error) => {
+        warnings.push(createStatusWarning("group.wallets", error));
+        return null;
+      });
+      const actions = await listGroupActions({ runtime, fetchImpl }).catch((error) => {
+        warnings.push(createStatusWarning("group.actions", error));
+        return null;
+      });
+      const groupHasConfiguredPkp = runtime.litPkpId && Array.isArray(wallets) ? wallets.some((wallet) => {
+        const configuredPkp = normalizeChipotleMembershipValue(runtime.litPkpId);
+        return [
+          normalizeChipotleMembershipValue(normalizeValidChipotlePkpId(wallet?.id)),
+          normalizeChipotleMembershipValue(wallet?.wallet_address)
+        ].includes(configuredPkp);
+      }) : null;
+      const groupHasConfiguredAction = await resolveActionCidMembership({
+        runtime,
+        actions,
+        fetchImpl
+      }).catch((error) => {
+        warnings.push(createStatusWarning("group.action-membership", error));
+        return null;
+      });
+      return {
+        ...status,
+        balance,
+        clientConfig,
+        warnings,
+        groupSummary: {
+          walletCount: Array.isArray(wallets) ? wallets.length : null,
+          actionCount: Array.isArray(actions) ? actions.length : null,
+          hasConfiguredPkp: groupHasConfiguredPkp,
+          hasConfiguredAction: groupHasConfiguredAction
+        },
+        ready: runtime.authorizationReady === true && !!toTrimmedString9(runtime.litUsageApiKey) && groupHasConfiguredPkp !== false && groupHasConfiguredAction !== false
+      };
+    };
+    deriveLitActionCid = async ({ runtime = {}, actionCode = "", fetchImpl = globalThis.fetch } = {}) => {
+      const normalizedCode = toTrimmedString9(actionCode);
+      if (!normalizedCode) throw new Error("Lit Action code is required.");
+      return toTrimmedString9(await fetchChipotleJson({
+        apiBase: runtime.litApiBase,
+        allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+        path: "/get_lit_action_ipfs_id",
+        method: "POST",
+        body: normalizedCode,
+        fetchImpl
+      }));
+    };
+    normalizeSessionScopedNameSegment = (value, fallback = "session") => {
+      const normalized = toTrimmedString9(value).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
+      return normalized || fallback;
+    };
+    normalizeGateMode3 = (value) => toTrimmedString9(value).toLowerCase() === "all" ? "all" : "any";
+    isPrivateHostname = isPrivateOrLocalHostname;
+    validateChipotleRpcUrl = (value = "") => {
+      const raw = toTrimmedString9(value);
+      if (!raw) throw new Error("Lit Chipotle RPC URL is required.");
+      let parsed;
+      try {
+        parsed = new URL(raw);
+      } catch {
+        throw new Error("Lit Chipotle RPC URL is invalid.");
+      }
+      if (parsed.protocol !== "https:") {
+        throw new Error("Lit Chipotle RPC URL must be HTTPS.");
+      }
+      if (isPrivateHostname(parsed.hostname)) {
+        throw new Error("Lit Chipotle RPC URL must be public.");
+      }
+      return parsed.toString();
+    };
+    resolveConfigMappedChipotleRpcUrls = ({
+      config = {},
+      chainId = 0
+    } = {}) => {
+      const normalizedChainId = toChainId(chainId);
+      if (!normalizedChainId) return [];
+      const map = isObj18(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
+      const mapped = normalizeChipotleRpcCandidateList(
+        map[normalizedChainId] || map[String(normalizedChainId)] || []
+      );
+      const direct = toChainId(config?.registryChainId) === normalizedChainId ? normalizeChipotleRpcCandidateList(config?.rpcUrl) : [];
+      return normalizeChipotleRpcCandidateList([...mapped, ...direct]);
+    };
+    resolveDefaultChipotleRpcUrls = (chainId = 0) => {
+      const normalizedChainId = toChainId(chainId);
+      if (!normalizedChainId) return [];
+      const publicUrls = getPublicRpcUrls2(normalizedChainId);
+      return normalizeChipotleRpcCandidateList([
+        getPathRpcUrl2(normalizedChainId),
+        ...Array.isArray(publicUrls) ? publicUrls : []
+      ]);
+    };
+    resolveSessionChipotleRpcUrl = ({
+      request = {},
+      config = {},
+      secrets = {},
+      chainId = 0,
+      op = ""
+    } = {}) => {
+      const requestBody = isObj18(request) ? request : {};
+      const normalizedChainId = toChainId(chainId);
+      const requestRpcUrl = toTrimmedString9(requestBody.rpcUrl || requestBody.customRpcUrl);
+      const candidates = normalizeChipotleRpcCandidateList([
+        secrets?.customRpcUrl,
+        ...resolveConfigMappedChipotleRpcUrls({ config, chainId: normalizedChainId }),
+        ...resolveDefaultChipotleRpcUrls(normalizedChainId)
+      ]);
+      const approvedUrls = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const candidate of candidates) {
+        try {
+          const normalized = validateChipotleRpcUrl(candidate);
+          const key = normalized;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          approvedUrls.push(normalized);
+        } catch {
+        }
+      }
+      if (requestRpcUrl) {
+        const normalizedRequestRpcUrl = validateChipotleRpcUrl(requestRpcUrl);
+        const approved = approvedUrls.some((candidate) => candidate === normalizedRequestRpcUrl);
+        if (!approved) {
+          throw new Error("Lit Chipotle request RPC URL is not approved for this gate chain.");
+        }
+        return op === "encrypt" ? "" : normalizedRequestRpcUrl;
+      }
+      if (op === "encrypt") return "";
+      if (approvedUrls.length) return approvedUrls[0];
+      if (normalizedChainId) {
+        throw new Error(
+          `Lit Chipotle RPC URL is required or chain ${normalizedChainId} must have a known default RPC.`
+        );
+      }
+      throw new Error("Lit Chipotle RPC URL is required.");
+    };
+    buildSessionBootstrapMetadata = ({
+      request = {},
+      sessionSlug = ""
+    } = {}) => {
+      const requestBody = isObj18(request) ? request : {};
+      const slugSegment = normalizeSessionScopedNameSegment(
+        requestBody.sessionSlug || requestBody.slug || sessionSlug,
+        "session"
+      );
+      const sessionName = toTrimmedString9(requestBody.sessionName) || slugSegment;
+      const accountName = toTrimmedString9(requestBody.accountName) || `ce-session-${slugSegment}`;
+      const groupName = toTrimmedString9(requestBody.groupName) || `${accountName}-default`;
+      const usageKeyName = toTrimmedString9(requestBody.usageKeyName) || `${groupName}-runtime`;
+      return {
+        sessionName,
+        accountName,
+        accountDescription: toTrimmedString9(requestBody.accountDescription) || `Context Engine Lit account for session ${sessionName}`,
+        groupName,
+        groupDescription: toTrimmedString9(requestBody.groupDescription) || `Default Lit group for session ${sessionName}`,
+        usageKeyName,
+        usageKeyDescription: toTrimmedString9(requestBody.usageKeyDescription) || `Scoped runtime key for session ${sessionName}`
+      };
+    };
+    createLitChipotleAccount = async ({
+      apiBase = DEFAULT_LIT_API_BASE,
+      allowLocalApiBase = false,
+      request = {},
+      sessionSlug = "",
+      fetchImpl = globalThis.fetch
+    } = {}) => {
+      const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
+      const requestBody = isObj18(request) ? request : {};
+      const response2 = await fetchChipotleJson({
+        apiBase,
+        allowLocalApiBase,
+        path: "/new_account",
+        method: "POST",
+        body: {
+          account_name: metadata.accountName,
+          account_description: metadata.accountDescription,
+          ...toTrimmedString9(requestBody.accountEmail) ? { email: toTrimmedString9(requestBody.accountEmail) } : {}
+        },
+        fetchImpl
+      });
+      return {
+        accountApiKey: toTrimmedString9(response2?.api_key),
+        accountWalletAddress: toTrimmedString9(response2?.wallet_address),
+        metadata
+      };
+    };
+    createLitChipotleGroup = async ({
+      runtime = {},
+      request = {},
+      sessionSlug = "",
+      fetchImpl = globalThis.fetch
+    } = {}) => {
+      const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
+      const response2 = await fetchChipotleJson({
+        apiBase: runtime.litApiBase,
+        apiKey: runtime.litManagementApiKey,
+        allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+        path: "/add_group",
+        method: "POST",
+        body: {
+          group_name: metadata.groupName,
+          group_description: metadata.groupDescription,
+          pkp_ids_permitted: [],
+          cid_hashes_permitted: []
+        },
+        fetchImpl
+      });
+      return {
+        groupId: toTrimmedString9(response2?.group_id),
+        metadata
+      };
+    };
+    createLitChipotleWallet = async ({
+      runtime = {},
+      fetchImpl = globalThis.fetch,
+      checkpointWallet
+    } = {}) => {
+      const response2 = await fetchChipotleJson({
+        apiBase: runtime.litApiBase,
+        apiKey: runtime.litManagementApiKey,
+        allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+        path: "/create_wallet",
+        fetchImpl
+      });
+      const walletAddress = toTrimmedString9(response2?.wallet_address);
+      if (walletAddress) await checkpointWallet?.(walletAddress);
+      const wallets = await listWallets({ runtime, fetchImpl }).catch(() => []);
+      const matchedWallet = wallets.find((entry2) => {
+        const entryWalletAddress = toTrimmedString9(entry2?.wallet_address).toLowerCase();
+        return !!walletAddress && entryWalletAddress === walletAddress.toLowerCase();
+      });
+      return {
+        walletAddress,
+        litPkpId: normalizeValidChipotlePkpId(matchedWallet?.id) || walletAddress
+      };
+    };
+    createLitChipotleUsageKey = async ({
+      runtime = {},
+      groupId = "",
+      request = {},
+      sessionSlug = "",
+      fetchImpl = globalThis.fetch
+    } = {}) => {
+      const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
+      const numericGroupId = Number(groupId || 0);
+      if (!Number.isFinite(numericGroupId) || numericGroupId <= 0) {
+        throw new Error("Lit group ID not configured.");
+      }
+      const response2 = await fetchChipotleJson({
+        apiBase: runtime.litApiBase,
+        apiKey: runtime.litManagementApiKey,
+        allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+        path: "/add_usage_api_key",
+        method: "POST",
+        body: {
+          name: metadata.usageKeyName,
+          description: metadata.usageKeyDescription,
+          can_create_groups: false,
+          can_delete_groups: false,
+          can_create_pkps: false,
+          manage_ipfs_ids_in_groups: [],
+          add_pkp_to_groups: [],
+          remove_pkp_from_groups: [],
+          execute_in_groups: [numericGroupId]
+        },
+        fetchImpl
+      });
+      return {
+        usageApiKey: toTrimmedString9(response2?.usage_api_key),
+        metadata
+      };
+    };
+    readChipotleBillingBalance = async ({
+      apiBase = DEFAULT_LIT_API_BASE,
+      apiKey = "",
+      allowLocalApiBase = false,
+      fetchImpl = globalThis.fetch
+    } = {}) => fetchChipotleJson({
+      apiBase,
+      apiKey,
+      allowLocalApiBase,
+      path: "/billing/balance",
+      fetchImpl
+    }).catch(() => null);
+    ensureActionMetadata = async ({ runtime = {}, litActionCid = "", actionName = "", actionDescription = "", fetchImpl = globalThis.fetch } = {}) => {
+      const actions = await listActions({ runtime, fetchImpl, groupId: null });
+      const hasAction = await resolveActionCidMembership({
+        runtime: { ...runtime, litActionCid },
+        actions,
+        fetchImpl
+      });
+      if (hasAction) {
+        return { created: false };
+      }
+      const response2 = await fetchChipotleJson({
+        apiBase: runtime.litApiBase,
+        apiKey: runtime.litManagementApiKey,
+        allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+        path: "/add_action",
+        method: "POST",
+        body: {
+          action_ipfs_cid: litActionCid,
+          name: toTrimmedString9(actionName) || "Context Engine Lit Action",
+          description: toTrimmedString9(actionDescription) || "Provisioned by Context Engine"
+        },
+        fetchImpl
+      });
+      return {
+        created: true,
+        response: response2
+      };
+    };
+    ensureActionInGroup = async ({ runtime = {}, groupId = "", litActionCid = "", fetchImpl = globalThis.fetch } = {}) => {
+      const actions = await listActions({
+        runtime: { ...runtime, litGroupId: groupId },
+        fetchImpl,
+        groupId
+      });
+      const hasAction = await resolveActionCidMembership({
+        runtime: { ...runtime, litActionCid },
+        actions,
+        fetchImpl
+      });
+      if (hasAction) {
+        return { added: false };
+      }
+      const response2 = await fetchChipotleJson({
+        apiBase: runtime.litApiBase,
+        apiKey: runtime.litManagementApiKey,
+        allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+        path: "/add_action_to_group",
+        method: "POST",
+        body: {
+          group_id: Number(groupId),
+          action_ipfs_cid: litActionCid
+        },
+        fetchImpl
+      });
+      return {
+        added: true,
+        response: response2
+      };
+    };
+    ensurePkpInGroup = async ({ runtime = {}, groupId = "", fetchImpl = globalThis.fetch } = {}) => {
+      const wallets = await listGroupWallets({
+        runtime: {
+          ...runtime,
+          litGroupId: groupId,
+          litUsageApiKey: runtime.litManagementApiKey
+        },
+        fetchImpl
+      });
+      const configuredPkp = normalizeChipotleMembershipValue(runtime?.litPkpId);
+      const hasPkp = wallets.some((wallet) => !!configuredPkp && [
+        normalizeChipotleMembershipValue(normalizeValidChipotlePkpId(wallet?.id)),
+        normalizeChipotleMembershipValue(wallet?.wallet_address)
+      ].includes(configuredPkp));
+      if (hasPkp) {
+        return { added: false };
+      }
+      const response2 = await fetchChipotleJson({
+        apiBase: runtime.litApiBase,
+        apiKey: runtime.litManagementApiKey,
+        allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+        path: "/add_pkp_to_group",
+        method: "POST",
+        body: {
+          group_id: Number(groupId),
+          pkp_id: toTrimmedString9(runtime?.litPkpId)
+        },
+        fetchImpl
+      });
+      return {
+        added: true,
+        response: response2
+      };
+    };
+    provisionLitChipotleAction = async ({ runtime = {}, config = {}, secrets = {}, request = {}, sessionSlug = "", persistAuthorizationSecret, provisioning, checkpointProvisioning, fetchImpl = globalThis.fetch } = {}) => {
+      ensureChipotleManagementApiKey(runtime);
+      return bootstrapLitChipotleSession({
+        env: {
+          LIT_API_BASE: runtime.litApiBase,
+          LIT_ACCOUNT_API_KEY: runtime.litManagementApiKey,
+          LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE: runtime.allowLocalApiBase ? "true" : ""
+        },
+        config,
+        secrets,
+        request,
+        sessionSlug,
+        persistAuthorizationSecret,
+        provisioning,
+        checkpointProvisioning,
+        fetchImpl
+      });
+    };
+    bootstrapLitChipotleSession = async (options = {}) => {
+      const config = options.config || {};
+      const secrets = options.secrets || {};
+      const credentials = config.litCredentials || {};
+      const freshAuthority = options.request?.freshAuthority === true;
+      const hasAuthority = !!(credentials.litActionCid || credentials.litPkpId || credentials.litGroupId);
+      if (hasAuthority && credentials.litAuthorizationVersion !== LIT_AUTHORIZATION_VERSION && !freshAuthority) {
+        throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
+      }
+      const authorization = await prepareLitAuthorization({
+        secrets,
+        // Reprovision Lit authority without rotating the independent session signer.
+        persistAuthorizationSecret: options.persistAuthorizationSecret
+      });
+      if (!freshAuthority && credentials.litAuthorizationSigner && credentials.litAuthorizationSigner.toLowerCase() !== authorization.litAuthorizationSigner.toLowerCase()) {
+        throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
+      }
+      const result = await bootstrapLitChipotleSessionCore({
+        ...options,
+        config: freshAuthority ? { ...config, litCredentials: { litApiBase: credentials.litApiBase } } : config,
+        secrets: freshAuthority ? { ...secrets, litUsageApiKey: "" } : secrets,
+        request: { ...options.request, actionCode: DEFAULT_CHIPOTLE_ACTION_CODE },
+        buildActionCode: (pkpId) => buildWorkerAuthorizedLitAction({
+          signer: authorization.litAuthorizationSigner,
+          sessionSlug: options.sessionSlug || "",
+          pkpId
+        })
+      });
+      return {
+        ...result,
+        litAuthorizationVersion: authorization.litAuthorizationVersion,
+        litAuthorizationSigner: authorization.litAuthorizationSigner,
+        litCredentials: {
+          ...result.litCredentials,
+          litAuthorizationVersion: authorization.litAuthorizationVersion,
+          litAuthorizationSigner: authorization.litAuthorizationSigner
+        },
+        secretOutputs: { ...result.secretOutputs, litAuthorizationPrivateKey: authorization.litAuthorizationPrivateKey }
+      };
+    };
+    bootstrapLitChipotleSessionCore = async ({
+      env = {},
+      config = {},
+      secrets = {},
+      request = {},
+      sessionSlug = "",
+      buildActionCode,
+      provisioning = {},
+      checkpointProvisioning,
+      fetchImpl = globalThis.fetch
+    } = {}) => {
+      const progress = { ...provisioning };
+      const checkpoint = async (values) => {
+        Object.assign(progress, values);
+        await checkpointProvisioning?.({ ...progress });
+      };
+      const litCredentials = isObj18(config?.litCredentials) ? config.litCredentials : {};
+      const requestBody = isObj18(request) ? request : {};
+      const secretAccountApiKey = toTrimmedString9(secrets?.litAccountApiKey);
+      const requestAccountApiKey = toTrimmedString9(requestBody.litAccountApiKey);
+      const envAccountApiKey = toTrimmedString9(env?.LIT_ACCOUNT_API_KEY);
+      const supplied = {
+        litAccountApiKey: [requestAccountApiKey, secretAccountApiKey || requestAccountApiKey || envAccountApiKey],
+        litApiBase: [requestBody.litApiBase, litCredentials.litApiBase || env.LIT_API_BASE],
+        litGroupId: [litCredentials.litGroupId],
+        litPkpId: [litCredentials.litPkpId],
+        litActionCid: [litCredentials.litActionCid],
+        litUsageApiKey: [litCredentials.litGroupId === progress.litGroupId ? secrets.litUsageApiKey : ""]
+      };
+      for (const [key, candidates] of Object.entries(supplied)) {
+        const normalize = (value) => {
+          const text = toTrimmedString9(value);
+          if (key !== "litApiBase" || !text) return text;
+          try {
+            return normalizeLitChipotleApiBase(text, { allowLocalApiBase: isLitChipotleLocalApiBaseAllowed(env) });
+          } catch {
+            return text;
+          }
+        };
+        const saved = normalize(progress[key]);
+        if (saved && candidates.some((value) => normalize(value) && normalize(value) !== saved)) {
+          throw Object.assign(new Error(LIT_PROVISIONING_CREDENTIALS_CONFLICT), {
+            status: 409,
+            code: "lit_provisioning_credentials_conflict"
+          });
+        }
+      }
+      let accountApiKey = toTrimmedString9(progress.litAccountApiKey) || secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
+      const accountSource = secretAccountApiKey ? "session-secret" : requestAccountApiKey ? "admin-request" : envAccountApiKey ? "worker-env" : "missing";
+      let accountSecretOutput = Object.hasOwn(progress, "accountSecretOutput") ? progress.accountSecretOutput : accountSource === "worker-env" ? "" : accountApiKey;
+      let groupId = toTrimmedString9(progress.litGroupId || litCredentials.litGroupId);
+      let usageApiKey = toTrimmedString9(progress.litUsageApiKey || (groupId && groupId === toTrimmedString9(litCredentials.litGroupId) ? secrets?.litUsageApiKey : ""));
+      let litPkpId = toTrimmedString9(progress.litPkpId || litCredentials.litPkpId);
+      let litActionCid = toTrimmedString9(progress.litActionCid || litCredentials.litActionCid);
+      const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
+      const litApiBase = normalizeLitChipotleApiBase(progress.litApiBase || requestBody.litApiBase || litCredentials.litApiBase || env.LIT_API_BASE || DEFAULT_LIT_API_BASE, { allowLocalApiBase });
+      const steps = {
+        createdAccount: false,
+        createdGroup: false,
+        createdWallet: false,
+        derivedCid: false,
+        registeredAction: false,
+        addedActionToGroup: false,
+        addedPkpToGroup: false,
+        createdUsageKey: false
+      };
+      if (litActionCid && !progress.litActionCid) {
+        if (!litPkpId) throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
+        const expectedCid = await deriveLitActionCid({ runtime: { litApiBase, allowLocalApiBase }, actionCode: buildActionCode(litPkpId), fetchImpl });
+        if (expectedCid !== litActionCid) throw new Error("Lit Action code does not match the configured Lit Action CID. Reprovision with a fresh session authority.");
+      }
+      const alreadyBootstrapped = !!(accountApiKey && usageApiKey && groupId && litPkpId && litActionCid && !Object.keys(provisioning).length);
+      await checkpoint({
+        litApiBase,
+        ...accountApiKey ? { litAccountApiKey: accountApiKey, accountSecretOutput } : {},
+        ...groupId ? { litGroupId: groupId } : {},
+        ...litPkpId ? { litPkpId } : {},
+        ...litActionCid ? { litActionCid } : {},
+        ...usageApiKey && groupId ? { litUsageApiKey: usageApiKey } : {},
+        ...alreadyBootstrapped ? { registeredAction: true, addedActionToGroup: true, addedPkpToGroup: true } : {}
+      });
+      if (!toTrimmedString9(requestBody.actionCode || requestBody.code) && !litActionCid) throw new Error("Lit Action code is required.");
+      if (!accountApiKey) {
+        const account = await createLitChipotleAccount({ apiBase: litApiBase, allowLocalApiBase, request: requestBody, sessionSlug, fetchImpl });
+        accountApiKey = toTrimmedString9(account.accountApiKey);
+        if (!accountApiKey) throw new Error("Lit account bootstrap did not return an account API key.");
+        accountSecretOutput = accountApiKey;
+        steps.createdAccount = true;
+        await checkpoint({ litAccountApiKey: accountApiKey, accountSecretOutput, accountWalletAddress: account.accountWalletAddress });
+      }
+      const runtime = { litApiBase, allowLocalApiBase, litManagementApiKey: accountApiKey, apiKeySource: accountSource };
+      if (!groupId) {
+        groupId = toTrimmedString9((await createLitChipotleGroup({ runtime, request: requestBody, sessionSlug, fetchImpl })).groupId);
+        if (!groupId) throw new Error("Lit session bootstrap did not return a group ID.");
+        steps.createdGroup = true;
+        await checkpoint({ litGroupId: groupId });
+      }
+      if (!litPkpId) {
+        const wallet = await createLitChipotleWallet({
+          runtime,
+          fetchImpl,
+          checkpointWallet: (id2) => checkpoint({ litPkpId: id2 })
+        });
+        litPkpId = toTrimmedString9(wallet.litPkpId);
+        if (!litPkpId) throw new Error("Lit session bootstrap did not return a PKP ID.");
+        steps.createdWallet = true;
+        await checkpoint({ litPkpId });
+      }
+      const runtimeWithGroup = { ...runtime, litGroupId: groupId, litPkpId };
+      if (!litActionCid) {
+        litActionCid = await deriveLitActionCid({ runtime: runtimeWithGroup, actionCode: buildActionCode(litPkpId), fetchImpl });
+        steps.derivedCid = true;
+        await checkpoint({ litActionCid });
+      }
+      if (!alreadyBootstrapped && !progress.registeredAction) {
+        steps.registeredAction = (await ensureActionMetadata({
+          runtime: runtimeWithGroup,
+          litActionCid,
+          actionName: requestBody.actionName || requestBody.name,
+          actionDescription: requestBody.actionDescription || requestBody.description,
+          fetchImpl
+        })).created;
+        await checkpoint({ registeredAction: true });
+      }
+      if (!alreadyBootstrapped && !progress.addedActionToGroup) {
+        steps.addedActionToGroup = (await ensureActionInGroup({ runtime: runtimeWithGroup, groupId, litActionCid, fetchImpl })).added;
+        await checkpoint({ addedActionToGroup: true });
+      }
+      if (!alreadyBootstrapped && !progress.addedPkpToGroup) {
+        steps.addedPkpToGroup = (await ensurePkpInGroup({ runtime: runtimeWithGroup, groupId, fetchImpl })).added;
+        await checkpoint({ addedPkpToGroup: true });
+      }
+      if (!usageApiKey || steps.createdGroup) {
+        usageApiKey = toTrimmedString9((await createLitChipotleUsageKey({ runtime: runtimeWithGroup, groupId, request: requestBody, sessionSlug, fetchImpl })).usageApiKey);
+        if (!usageApiKey) throw new Error("Lit session bootstrap did not return a usage API key.");
+        steps.createdUsageKey = true;
+        await checkpoint({ litUsageApiKey: usageApiKey });
+      }
+      const billingBalance = alreadyBootstrapped ? void 0 : await readChipotleBillingBalance({ apiBase: litApiBase, apiKey: accountApiKey, allowLocalApiBase, fetchImpl });
+      return {
+        ok: true,
+        bootstrapMode: steps.createdAccount || alreadyBootstrapped && (secretAccountApiKey || !envAccountApiKey) ? "session-account" : "existing-account",
+        alreadyBootstrapped,
+        apiBase: litApiBase,
+        litActionCid,
+        litGroupId: groupId,
+        litPkpId,
+        ...steps.createdAccount ? { accountWalletAddress: progress.accountWalletAddress } : {},
+        ...billingBalance !== void 0 ? { billingBalance } : {},
+        litCredentials: { litApiBase, litActionCid, litGroupId: groupId, litPkpId },
+        secretOutputs: { litAccountApiKey: accountSecretOutput, litUsageApiKey: usageApiKey },
+        steps
+      };
+    };
+    executeLitChipotleAction = async ({
+      runtime = {},
+      request = {},
+      fetchImpl = globalThis.fetch
+    } = {}) => {
+      ensureChipotleApiKey(runtime);
+      const actionRequest = isObj18(request) ? request : {};
+      const code = toTrimmedString9(actionRequest.code);
+      const ipfsId = toTrimmedString9(
+        actionRequest.ipfsId || actionRequest.ipfs_id || runtime.litActionCid
+      );
+      if (!code && !ipfsId) {
+        throw new Error("Lit Action CID or inline code is required.");
+      }
+      const payload = {};
+      if (code) payload.code = code;
+      if (!code && ipfsId) payload.ipfs_id = ipfsId;
+      if (Object.prototype.hasOwnProperty.call(actionRequest, "jsParams")) {
+        payload.js_params = actionRequest.jsParams;
+      } else if (Object.prototype.hasOwnProperty.call(actionRequest, "js_params")) {
+        payload.js_params = actionRequest.js_params;
+      }
+      let response2;
+      try {
+        response2 = await fetchChipotleJson({
+          apiBase: runtime.litApiBase,
+          apiKey: runtime.litUsageApiKey,
+          allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+          path: "/lit_action",
+          method: "POST",
+          body: payload,
+          fetchImpl
+        });
+      } catch (error) {
+        const message = toTrimmedString9(error?.message || error);
+        if (/not found/i.test(message)) {
+          throw new Error("Lit Chipotle action was not found or is not permitted for this session usage key. Re-run Lit Chipotle provisioning for this session worker.");
+        }
+        throw error;
+      }
+      return {
+        ok: true,
+        apiBase: runtime.litApiBase,
+        apiKeySource: runtime.apiKeySource,
+        response: response2
+      };
+    };
+    executeSessionLitChipotleAction = async ({
+      env = {},
+      config = {},
+      secrets = {},
+      request = {},
+      requesterAddress = "",
+      sessionSlug = "",
+      fetchImpl = globalThis.fetch
+    } = {}) => {
+      const litCredentials = isObj18(config?.litCredentials) ? config.litCredentials : {};
+      const requestBody = isObj18(request) ? request : {};
+      const runtime = resolveLitChipotleRuntime({
+        env,
+        config,
+        secrets,
+        body: {}
+      });
+      ensureChipotleApiKey(runtime);
+      const litPkpId = toTrimmedString9(litCredentials?.litPkpId || runtime.litPkpId);
+      if (!litPkpId) {
+        throw new Error("Lit PKP ID not configured.");
+      }
+      const litActionCid = toTrimmedString9(litCredentials?.litActionCid || runtime.litActionCid);
+      if (!litActionCid) {
+        throw new Error("Lit Action CID not configured.");
+      }
+      const { wallet, actionCode } = resolveLitAuthorization({ secrets, config, sessionSlug });
+      const derivedActionCid = await deriveLitActionCid({ runtime, actionCode, fetchImpl });
+      if (derivedActionCid !== litActionCid) {
+        throw new Error("Lit Action code does not match the configured Lit Action CID.");
+      }
+      const op = toTrimmedString9(requestBody.op).toLowerCase();
+      if (!["check", "encrypt", "decrypt"].includes(op)) {
+        throw new Error("Lit Chipotle op must be check, encrypt, or decrypt.");
+      }
+      const sbtAddresses = normalizeChipotleSbtAddresses(requestBody.sbtAddresses);
+      if (!sbtAddresses.length) {
+        throw new Error("Lit Chipotle requires at least one SBT address.");
+      }
+      const gateMode = normalizeGateMode3(requestBody.gateMode);
+      const gateChainId = resolveChainIdWithLegacyFallback(
+        requestBody.chainId,
+        resolveChainIdWithLegacyFallback(
+          requestBody.gateChainId,
+          resolveChainIdWithLegacyFallback(
+            config?.networkChainId,
+            resolveChainIdWithLegacyFallback(config?.registryChainId, 0)
+          )
+        )
+      );
+      if (!gateChainId) {
+        throw new Error("Lit Chipotle requires a gate chain ID.");
+      }
+      const policy = buildLitChipotlePolicy({
+        chainId: gateChainId,
+        gateMode,
+        sbtAddresses,
+        litActionCid,
+        litPkpId
+      });
+      const expectedPolicyFingerprint = fingerprintLitChipotlePolicy(policy);
+      const rpcUrl = resolveSessionChipotleRpcUrl({
+        request: requestBody,
+        config,
+        secrets,
+        chainId: gateChainId,
+        op
+      });
+      const normalizedRequesterAddress = toTrimmedString9(requesterAddress);
+      if (!normalizedRequesterAddress) {
+        throw new Error("Requester address unavailable for Lit Chipotle action.");
+      }
+      const jsParams = {
+        op,
+        pkpId: litPkpId,
+        litActionCid,
+        requesterAddress: normalizedRequesterAddress,
+        sbtAddresses,
+        gateMode,
+        expectedChainId: gateChainId,
+        expectedPolicyFingerprint,
+        policy
+      };
+      if (rpcUrl) {
+        jsParams.rpcUrl = rpcUrl;
+      }
+      if (op === "encrypt") {
+        const cekHex = normalizeChipotleCekHex(requestBody.message);
+        const wrappedPlaintext = buildLitChipotleWrappedPlaintext({
+          cekHex,
+          policy
+        });
+        jsParams.message = JSON.stringify(wrappedPlaintext);
+        if (!cekHex) {
+          throw new Error("Lit Chipotle encrypt requires a message.");
+        }
+      }
+      if (op === "decrypt") {
+        const metadataVersion = normalizeLitChipotleMetadataVersion(requestBody.chipotle || {});
+        if (metadataVersion && metadataVersion !== 2) {
+          throw new Error("Lit Chipotle legacy wrapped keys are not supported.");
+        }
+        jsParams.ciphertext = toTrimmedString9(requestBody.ciphertext);
+        if (!jsParams.ciphertext) {
+          throw new Error("Lit Chipotle decrypt requires ciphertext.");
+        }
+      }
+      const replyContext = await authorizeLitRequest({ wallet, jsParams, sessionSlug });
+      const actionRuntime = {
+        ...runtime,
+        litActionCid,
+        litPkpId
+      };
+      let result;
+      try {
+        result = await executeLitChipotleAction({
+          runtime: actionRuntime,
+          request: {
+            // Execute only the Worker-owned source whose CID matches this authority.
+            ipfsId: litActionCid,
+            jsParams
+          },
+          fetchImpl
+        });
+      } catch (error) {
+        const message = toTrimmedString9(error?.message || error).toLowerCase();
+        if (!message.includes("no cached code found") && !message.includes("cache miss for ipfs id")) {
+          throw new Error("Lit Action execution failed. Ask the session admin to verify Lit provisioning and account access.");
+        }
+        try {
+          result = await executeLitChipotleAction({
+            runtime: actionRuntime,
+            request: {
+              code: actionCode,
+              jsParams
+            },
+            fetchImpl
+          });
+        } catch {
+          throw new Error("Lit Action execution failed. Ask the session admin to verify Lit provisioning and account access.");
+        }
+      }
+      if (result.response?.has_error) throw new Error("Lit Action authorization failed.");
+      const rawResponse = result.response?.response ?? result.response;
+      let response2;
+      try {
+        response2 = typeof rawResponse === "string" ? JSON.parse(rawResponse) : rawResponse;
+      } catch {
+        throw new Error("Invalid Lit Action response.");
+      }
+      if (!response2 || typeof response2 !== "object") throw new Error("Invalid Lit Action response.");
+      if (op === "decrypt" && response2.ok === true && response2.allowed === true) {
+        const plaintext = normalizeChipotleCekHex(await openLitReply(response2.encryptedReply, replyContext));
+        return { ok: true, response: { ok: true, allowed: true, op, plaintext, policyFingerprint: expectedPolicyFingerprint } };
+      }
+      return { ok: true, response: {
+        ok: response2.ok === true,
+        allowed: response2.allowed === true,
+        op,
+        ...response2.allowed === false ? { reason: "Requester does not satisfy the SBT gate." } : {},
+        ...op === "encrypt" && typeof response2.ciphertext === "string" ? { ciphertext: response2.ciphertext } : {},
+        policyFingerprint: expectedPolicyFingerprint,
+        policy
+      } };
+    };
+  }
+});
+
 // workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js
-var SIGNER_RECORD, SETUP_RECORD, PROVISIONING_RECORD, PROVISIONING_LEASE_MS, PROVISIONING_FIELDS, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json4, fail7, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, readProvisioning, executeLitProvisioning, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair, provisionCall, beginSessionLitProvisioning, checkpointSessionLitProvisioning, releaseSessionLitProvisioning;
+var SIGNER_RECORD, SETUP_RECORD, PROVISIONING_RECORD, PROVISIONING_LEASE_MS, PROVISIONING_FIELDS, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json4, fail7, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, readProvisioning, executeLitProvisioning, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair, provisionCall, preflightSessionLitProvisioning, beginSessionLitProvisioning, checkpointSessionLitProvisioning, releaseSessionLitProvisioning;
 var init_sessionLitAuthorizationCoordinator = __esm({
   "workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js"() {
     init_lib2();
+    init_chipotleClient();
     init_litChipotleAction();
     init_deployHelperCore();
     init_sessionSecretsEnvelope();
@@ -75685,11 +77139,25 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         const result = await coordinator.state.storage.transaction(async (transaction) => {
           const record4 = await transaction.get(PROVISIONING_RECORD);
           const now = coordinator.now();
-          if (operation === "begin") {
+          if (operation === "begin" || operation === "preflight") {
             if (record4?.leaseUntilMs > now) fail7();
             const saved = record4 ? await readProvisioning(record4, coordinator.env, slug) : {};
-            const hasResources = ["litAccountApiKey", "accountWalletAddress", "litGroupId", "litPkpId", "litActionCid", "litUsageApiKey"].some((key) => typeof saved[key] === "string" && saved[key].trim());
-            const checkpoint2 = record4?.freshAuthority === (payload.freshAuthority === true) && hasResources ? saved : {};
+            const resourceIds = Object.fromEntries(["litGroupId", "litPkpId", "litActionCid"].filter((key) => typeof saved[key] === "string" && saved[key].trim()).map((key) => [key, saved[key]]));
+            const hasResources = !!saved.accountWalletAddress || Object.keys(resourceIds).length > 0;
+            const suppliedKeys = Array.isArray(payload.accountApiKeys) ? payload.accountApiKeys : [];
+            if (hasResources && saved.litAccountApiKey && suppliedKeys.some((key) => typeof key === "string" && key.trim() && key.trim() !== saved.litAccountApiKey)) {
+              throw Object.assign(new Error(LIT_PROVISIONING_CREDENTIALS_CONFLICT), { status: 409, code: "lit_provisioning_credentials_conflict" });
+            }
+            if (record4 && record4.freshAuthority !== (payload.freshAuthority === true) && Object.keys(resourceIds).length) {
+              const names2 = { litGroupId: "group", litPkpId: "PKP", litActionCid: "action" };
+              const resources2 = Object.entries(resourceIds).map(([key, id2]) => `${names2[key]} ${id2}`).join(", ");
+              throw Object.assign(
+                new Error(`Saved Lit resources: ${resources2}. Resume the previous setup before changing the authority choice.`),
+                { status: 409, code: "lit_provisioning_resources_pending" }
+              );
+            }
+            if (operation === "preflight") return {};
+            const checkpoint2 = hasResources ? saved : {};
             const attemptId = crypto.randomUUID();
             const envelope2 = await buildEncryptedSessionSecretsEnvelope(checkpoint2, { env: coordinator.env, slug });
             await transaction.put(PROVISIONING_RECORD, {
@@ -75720,6 +77188,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         });
         return json4({ ok: true, ...result });
       } catch (error) {
+        if (["lit_provisioning_credentials_conflict", "lit_provisioning_resources_pending"].includes(error?.code)) {
+          return json4({ error: error.message, code: error.code }, error.status);
+        }
         return json4({ error: "Lit provisioning is pending or in progress; retry." }, error?.status || 503);
       }
     };
@@ -75855,9 +77326,13 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     };
     provisionCall = async (args, operation) => {
       const result = await callCoordinator({ ...args, path: `provisioning/${operation}` });
-      if (!result.ok) throw Object.assign(new Error("Lit provisioning is pending or in progress; retry."), { status: result.status });
+      if (!result.ok) {
+        const code = ["lit_provisioning_credentials_conflict", "lit_provisioning_resources_pending"].includes(result.body?.code) ? result.body.code : "";
+        throw Object.assign(new Error(code ? result.body.error : "Lit provisioning is pending or in progress; retry."), { status: result.status, code });
+      }
       return result.body;
     };
+    preflightSessionLitProvisioning = (args) => provisionCall(args, "preflight");
     beginSessionLitProvisioning = (args) => provisionCall(args, "begin");
     checkpointSessionLitProvisioning = (args) => provisionCall(args, "checkpoint");
     releaseSessionLitProvisioning = (args) => provisionCall(args, "release");
@@ -75886,7 +77361,7 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_submissionJournal();
@@ -75962,9 +77437,9 @@ var init_sessionWriteCoordinator = __esm({
       "wrapAlg",
       "wrappedKey"
     ];
-    toTrimmedString9 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+    toTrimmedString10 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
     isObjectRecord = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    byteLength = (value) => new TextEncoder().encode(toTrimmedString9(value)).length;
+    byteLength = (value) => new TextEncoder().encode(toTrimmedString10(value)).length;
     normalizePositiveSafeInteger = (value) => {
       const numeric = Number(value);
       return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : 0;
@@ -75976,7 +77451,7 @@ var init_sessionWriteCoordinator = __esm({
     };
     readActiveAuthNonces = (record4, nowMs) => {
       const entries = Array.isArray(record4?.entries) ? record4.entries : record4?.nonce ? [{ nonce: record4.nonce, expiresAtMs: record4.expiresAtMs }] : [];
-      return entries.map((entry2) => ({ nonce: toTrimmedString9(entry2?.nonce), expiresAtMs: Number(entry2?.expiresAtMs || 0) })).filter((entry2) => entry2.nonce && entry2.expiresAtMs > nowMs);
+      return entries.map((entry2) => ({ nonce: toTrimmedString10(entry2?.nonce), expiresAtMs: Number(entry2?.expiresAtMs || 0) })).filter((entry2) => entry2.nonce && entry2.expiresAtMs > nowMs);
     };
     putActiveAuthNonces = async (transaction, entries) => {
       if (!entries.length) {
@@ -76014,9 +77489,9 @@ ${expiry}`);
       if (!isObjectRecord(value)) return null;
       const fields2 = Object.keys(value).sort();
       if (fields2.join(",") !== [...WRAPPED_SESSION_KEY_FIELDS].sort().join(",")) return null;
-      const createdAt = toTrimmedString9(value.createdAt);
+      const createdAt = toTrimmedString10(value.createdAt);
       const createdAtMs2 = Date.parse(createdAt);
-      if (value.version !== 1 || value.keyProvider !== "worker_secret" || value.alg !== "AES-256-GCM" || value.wrapAlg !== "AES-GCM-KW-v1" || toTrimmedString9(value.keyId) !== `session:${slug}:${createdAt}` || !Number.isFinite(createdAtMs2) || new Date(createdAtMs2).toISOString() !== createdAt || !isBase64url(value.iv, 16) || !isBase64url(value.wrappedKey, 64)) return null;
+      if (value.version !== 1 || value.keyProvider !== "worker_secret" || value.alg !== "AES-256-GCM" || value.wrapAlg !== "AES-GCM-KW-v1" || toTrimmedString10(value.keyId) !== `session:${slug}:${createdAt}` || !Number.isFinite(createdAtMs2) || new Date(createdAtMs2).toISOString() !== createdAt || !isBase64url(value.iv, 16) || !isBase64url(value.wrappedKey, 64)) return null;
       return Object.fromEntries(WRAPPED_SESSION_KEY_FIELDS.map((field) => [field, value[field]]));
     };
     normalizePublicSessionConfig = (value, slug) => {
@@ -76133,12 +77608,12 @@ ${expiry}`);
     normalizeWorkerGroupMutation = (payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
-      const operation = toTrimmedString9(payload?.operation).toLowerCase();
+      const operation = toTrimmedString10(payload?.operation).toLowerCase();
       const actor = normalizeWorkerGroupPrincipal(payload?.actorPrincipal);
       if (!slug || !sessionId || !WORKER_GROUP_MUTATIONS.has(operation) || !actor.ok) return null;
       if (operation === "create") {
         if (!isObjectRecord(payload?.input)) return null;
-        const requestedGroupId = toTrimmedString9(payload.input.groupId);
+        const requestedGroupId = toTrimmedString10(payload.input.groupId);
         const groupId = requestedGroupId ? normalizeWorkerGroupId(requestedGroupId) : createWorkerGroupId();
         if (!groupId) return null;
         return {
@@ -76153,7 +77628,7 @@ ${expiry}`);
           actorPrincipal: actor.principal
         };
       }
-      const rawGroupId = toTrimmedString9(payload?.groupId);
+      const rawGroupId = toTrimmedString10(payload?.groupId);
       if (!rawGroupId) return null;
       const normalized = {
         slug,
@@ -76231,13 +77706,13 @@ ${expiry}`);
         if (Number.isFinite(nextAlarm) && typeof this.state.storage.setAlarm === "function") await this.state.storage.setAlarm(nextAlarm);
       }
       async executeUploadReceipt(payload, settle = false) {
-        const requestId = toTrimmedString9(payload?.requestId);
-        let payloadDigest = toTrimmedString9(payload?.payloadDigest);
+        const requestId = toTrimmedString10(payload?.requestId);
+        let payloadDigest = toTrimmedString10(payload?.payloadDigest);
         if (!requestId || requestId.length > 200 || !settle && !/^[a-f0-9]{64}$/.test(payloadDigest)) {
           return jsonResponse2({ error: "Invalid upload receipt request." }, 400);
         }
-        const storageId = toTrimmedString9(payload?.storageId);
-        const createdAt = toTrimmedString9(payload?.createdAt);
+        const storageId = toTrimmedString10(payload?.storageId);
+        const createdAt = toTrimmedString10(payload?.createdAt);
         if (!settle && (!isSafeCloudflareStorageRefId(storageId) || !Number.isFinite(Date.parse(createdAt)))) {
           return jsonResponse2({ error: "Invalid upload receipt target." }, 400);
         }
@@ -76248,11 +77723,11 @@ ${expiry}`);
           } catch {
             storageRef = null;
           }
-          if (!storageRef || storageRef.backend !== "cloudflare" || storageRef.resource !== "responses" || !toTrimmedString9(payload?.attemptId)) {
+          if (!storageRef || storageRef.backend !== "cloudflare" || storageRef.resource !== "responses" || !toTrimmedString10(payload?.attemptId)) {
             return jsonResponse2({ error: "Invalid upload receipt settlement." }, 400);
           }
         }
-        const secret = toTrimmedString9(this.env?.TOKEN_HMAC_SECRET);
+        const secret = toTrimmedString10(this.env?.TOKEN_HMAC_SECRET);
         if (!secret) return jsonResponse2({ error: "Upload receipt coordination is unavailable.", reason: "upload_receipt_unavailable" }, 503);
         if (!settle) {
           try {
@@ -76345,8 +77820,8 @@ ${expiry}`);
       // the ids found, so it finishes however large the session is; racing
       // uploads wait their turn and read the same answers.
       async executeStorageLegacyOwner(payload) {
-        const resource = toTrimmedString9(payload?.resource);
-        const resourceId = toTrimmedString9(payload?.resourceId).toLowerCase();
+        const resource = toTrimmedString10(payload?.resource);
+        const resourceId = toTrimmedString10(payload?.resourceId).toLowerCase();
         if (!["questions", "surveys"].includes(resource) || !resourceId) {
           return jsonResponse2({ ok: false, error: "Invalid legacy owner request." }, 400);
         }
@@ -76363,8 +77838,8 @@ ${expiry}`);
               config: payload?.config,
               slug: payload?.slug,
               resource,
-              cursor: toTrimmedString9(scan?.cursor),
-              lastKey: toTrimmedString9(scan?.lastKey),
+              cursor: toTrimmedString10(scan?.cursor),
+              lastKey: toTrimmedString10(scan?.lastKey),
               maxRows: this.legacyScanRowsPerStep
             });
           } catch {
@@ -76404,7 +77879,7 @@ ${expiry}`);
         };
       }
       pruneResultsAnalysisRequests(requests) {
-        const entries = Object.entries(isObjectRecord(requests) ? requests : {}).filter(([key, value]) => toTrimmedString9(key) && isObjectRecord(value)).sort((left, right) => Number(right[1]?.updatedAtMs || 0) - Number(left[1]?.updatedAtMs || 0)).slice(0, MAX_RESULTS_ANALYSIS_REQUESTS);
+        const entries = Object.entries(isObjectRecord(requests) ? requests : {}).filter(([key, value]) => toTrimmedString10(key) && isObjectRecord(value)).sort((left, right) => Number(right[1]?.updatedAtMs || 0) - Number(left[1]?.updatedAtMs || 0)).slice(0, MAX_RESULTS_ANALYSIS_REQUESTS);
         return Object.fromEntries(entries);
       }
       isResultsAnalysisActiveFresh(active, nowMs) {
@@ -76463,14 +77938,14 @@ ${expiry}`);
         await storage.put(RESULTS_ANALYSIS_DRAFT_KEY, {
           version: 1,
           chunked: true,
-          draftId: toTrimmedString9(draft?.draftId),
+          draftId: toTrimmedString10(draft?.draftId),
           chunkCount: chunks.length,
           updatedAtMs: Number(this.now()) || Date.now()
         });
       }
       sanitizeResultsAnalysisAutoJob(payload = {}) {
         const slug = resolveCoordinatorSessionSlugStorageKey(payload.slug);
-        const requestId = toTrimmedString9(payload.requestId);
+        const requestId = toTrimmedString10(payload.requestId);
         const committedResponses = Array.isArray(payload.committedResponses) ? payload.committedResponses.slice(0, 1).map((entry2) => {
           const metadata = isObjectRecord(entry2?.metadata) ? entry2.metadata : {};
           const payloadRecord = isObjectRecord(entry2?.payload) ? entry2.payload : {};
@@ -76479,14 +77954,14 @@ ${expiry}`);
           if (payloadLooksLocked) sanitizedPayload.locked = true;
           return {
             metadata: {
-              id: toTrimmedString9(metadata.id).slice(0, 160),
-              responder: toTrimmedString9(metadata.responder).toLowerCase().slice(0, 128),
-              createdAt: toTrimmedString9(metadata.createdAt).slice(0, 64),
+              id: toTrimmedString10(metadata.id).slice(0, 160),
+              responder: toTrimmedString10(metadata.responder).toLowerCase().slice(0, 128),
+              createdAt: toTrimmedString10(metadata.createdAt).slice(0, 64),
               encrypted: metadata.encrypted === true,
               payloadEncrypted: metadata.payloadEncrypted === true,
-              payloadAccessMode: toTrimmedString9(metadata.payloadAccessMode).slice(0, 80),
-              payloadAccessControl: isObjectRecord(metadata.payloadAccessControl) ? metadata.payloadAccessControl : toTrimmedString9(metadata.payloadAccessControl).slice(0, 1e3),
-              groupIds: Array.isArray(metadata.groupIds) ? metadata.groupIds.map((entry3) => toTrimmedString9(entry3).slice(0, 160)).filter(Boolean).slice(0, 24) : []
+              payloadAccessMode: toTrimmedString10(metadata.payloadAccessMode).slice(0, 80),
+              payloadAccessControl: isObjectRecord(metadata.payloadAccessControl) ? metadata.payloadAccessControl : toTrimmedString10(metadata.payloadAccessControl).slice(0, 1e3),
+              groupIds: Array.isArray(metadata.groupIds) ? metadata.groupIds.map((entry3) => toTrimmedString10(entry3).slice(0, 160)).filter(Boolean).slice(0, 24) : []
             },
             payload: sanitizedPayload
           };
@@ -76534,7 +78009,7 @@ ${expiry}`);
           if (Array.isArray(value)) return depth > 2 ? [] : value.slice(0, 24).map((entry2) => sanitizeValue(entry2, depth + 1));
           if (!isObjectRecord(value) || depth > 3) return null;
           return Object.fromEntries(Object.entries(value).slice(0, 32).map(([key, entry2]) => [
-            toTrimmedString9(key).slice(0, 80),
+            toTrimmedString10(key).slice(0, 80),
             sanitizeValue(entry2, depth + 1)
           ]));
         };
@@ -76559,7 +78034,7 @@ ${expiry}`);
             if (existing.retryAttempt) job.retryAttempt = existing.retryAttempt;
             const byId = /* @__PURE__ */ new Map();
             for (const entry2 of [...Array.isArray(existing.committedResponses) ? existing.committedResponses : [], ...job.committedResponses]) {
-              const key = toTrimmedString9(entry2?.metadata?.id) || `${toTrimmedString9(entry2?.metadata?.responder)}:${toTrimmedString9(entry2?.metadata?.createdAt)}`;
+              const key = toTrimmedString10(entry2?.metadata?.id) || `${toTrimmedString10(entry2?.metadata?.responder)}:${toTrimmedString10(entry2?.metadata?.createdAt)}`;
               if (key) byId.set(key, entry2);
             }
             job.committedResponses = [...byId.values()].slice(-12);
@@ -76604,9 +78079,9 @@ ${expiry}`);
           const delayMs = scheduledDelay ? Math.min(Math.max(scheduledDelay, Number(error?.retryAfterMs) || 0), 30 * 6e4) : void 0;
           record4.lastFailure = {
             ok: false,
-            error: error?.message || error?.error || toTrimmedString9(error) || "Automatic results analysis job failed.",
+            error: error?.message || error?.error || toTrimmedString10(error) || "Automatic results analysis job failed.",
             status: Number(error?.status) >= 400 && Number(error?.status) <= 599 ? Number(error.status) : 502,
-            requestId: toTrimmedString9(job?.requestId ?? queued?.requestId),
+            requestId: toTrimmedString10(job?.requestId ?? queued?.requestId),
             trigger: "automatic",
             failedAtMs: nowMs,
             retryAttempt: delayMs ? retryAttempt : Number(queued?.retryAttempt) || 0,
@@ -76614,7 +78089,7 @@ ${expiry}`);
             ...retryable && !delayMs ? { retriesExhausted: true } : {}
           };
           if (delayMs) {
-            const baseRequestId = toTrimmedString9(queued.requestId).replace(/:retry-\d+$/, "");
+            const baseRequestId = toTrimmedString10(queued.requestId).replace(/:retry-\d+$/, "");
             await transaction.put(RESULTS_ANALYSIS_AUTO_JOB_KEY, { ...queued, retryAttempt, requestId: `${baseRequestId}:retry-${retryAttempt}` });
           } else if (sameJob) {
             await transaction.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
@@ -76703,19 +78178,19 @@ ${expiry}`);
         return {
           version: 1,
           jobState: this.isResultsAnalysisActiveFresh(record4.active, nowMs) ? "running" : isObjectRecord(queued) ? "queued" : record4.lastFailure ? "failed" : lastGood ? "succeeded" : "idle",
-          queued: isObjectRecord(queued) ? { requestId: toTrimmedString9(queued.requestId), queuedAtMs: Number(queued.queuedAtMs || 0) || 0 } : null,
+          queued: isObjectRecord(queued) ? { requestId: toTrimmedString10(queued.requestId), queuedAtMs: Number(queued.queuedAtMs || 0) || 0 } : null,
           active: this.isResultsAnalysisActiveFresh(record4.active, nowMs) ? record4.active : null,
           lastGood,
           lastFailure: record4.lastFailure
         };
       }
       async reserveResultsAnalysis(payload = {}) {
-        const requestId = toTrimmedString9(payload.requestId);
-        const sourceSignature = toTrimmedString9(payload.sourceSignature);
-        const sourceVersion = toTrimmedString9(payload.sourceVersion) || "1";
-        const viewSignature = toTrimmedString9(payload.viewSignature);
-        const reservationKey = toTrimmedString9(payload.reservationKey);
-        const trigger = toTrimmedString9(payload.trigger) || "manual";
+        const requestId = toTrimmedString10(payload.requestId);
+        const sourceSignature = toTrimmedString10(payload.sourceSignature);
+        const sourceVersion = toTrimmedString10(payload.sourceVersion) || "1";
+        const viewSignature = toTrimmedString10(payload.viewSignature);
+        const reservationKey = toTrimmedString10(payload.reservationKey);
+        const trigger = toTrimmedString10(payload.trigger) || "manual";
         const refresh = payload.refresh === true;
         if (!sourceSignature || !viewSignature || !reservationKey) {
           return { kind: "failed", status: 400, error: "Invalid results analysis reservation." };
@@ -76774,9 +78249,9 @@ ${expiry}`);
         });
       }
       async finalizeResultsAnalysis(payload = {}) {
-        const requestId = toTrimmedString9(payload.requestId);
-        const reservationKey = toTrimmedString9(payload.reservationKey);
-        const attemptId = toTrimmedString9(payload.attemptId);
+        const requestId = toTrimmedString10(payload.requestId);
+        const reservationKey = toTrimmedString10(payload.reservationKey);
+        const attemptId = toTrimmedString10(payload.attemptId);
         const receipt = isObjectRecord(payload.receipt) ? payload.receipt : null;
         const success = payload.success === true;
         if (!reservationKey || !attemptId || !receipt) return { ok: false, status: 400 };
@@ -76790,7 +78265,7 @@ ${expiry}`);
           record4.active = null;
           if (success) {
             const draft = receipt.draft && isObjectRecord(receipt.draft) ? receipt.draft : receipt;
-            const draftId = toTrimmedString9(draft.draftId);
+            const draftId = toTrimmedString10(draft.draftId);
             if (!draftId) return { ok: false, status: 400 };
             try {
               await this.putResultsAnalysisDraft(transaction, draft);
@@ -76834,7 +78309,7 @@ ${expiry}`);
           } else {
             record4.lastFailure = {
               ok: false,
-              error: toTrimmedString9(receipt.error) || "Results analysis generation failed.",
+              error: toTrimmedString10(receipt.error) || "Results analysis generation failed.",
               status: Number(receipt.status || 0) || 502,
               sourceSignature: active.sourceSignature,
               sourceVersion: active.sourceVersion,
@@ -77018,10 +78493,10 @@ ${expiry}`);
             version: 2,
             phase: "active",
             active: true,
-            joinMode: toTrimmedString9(group?.joinMode).toLowerCase() || "admin_add",
-            memberVisibility: toTrimmedString9(group?.memberVisibility).toLowerCase() || "admin_only",
+            joinMode: toTrimmedString10(group?.joinMode).toLowerCase() || "admin_add",
+            memberVisibility: toTrimmedString10(group?.memberVisibility).toLowerCase() || "admin_only",
             memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
-            joinEndsAt: toTrimmedString9(group?.joinEndsAt)
+            joinEndsAt: toTrimmedString10(group?.joinEndsAt)
           });
         });
       }
@@ -77059,10 +78534,10 @@ ${expiry}`);
             ...withoutPendingMutation(state),
             phase: "active",
             active: true,
-            joinMode: toTrimmedString9(group?.joinMode).toLowerCase() || "admin_add",
-            memberVisibility: toTrimmedString9(group?.memberVisibility).toLowerCase() || "admin_only",
+            joinMode: toTrimmedString10(group?.joinMode).toLowerCase() || "admin_add",
+            memberVisibility: toTrimmedString10(group?.memberVisibility).toLowerCase() || "admin_only",
             memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
-            joinEndsAt: toTrimmedString9(group?.joinEndsAt)
+            joinEndsAt: toTrimmedString10(group?.joinEndsAt)
           });
         });
       }
@@ -77567,7 +79042,7 @@ ${expiry}`);
       }
       async executeWorkerGroupMutation(payload) {
         return this.serializeWorkerGroupOperation(async () => {
-          if (toTrimmedString9(payload?.operation).toLowerCase() === "create" && isAddressShapedWorkerGroupId(payload?.input?.groupId)) {
+          if (toTrimmedString10(payload?.operation).toLowerCase() === "create" && isAddressShapedWorkerGroupId(payload?.input?.groupId)) {
             return jsonResponse2({ ok: false, status: 400, reason: "invalid_worker_group_id" }, 400);
           }
           const mutation = normalizeWorkerGroupMutation(payload);
@@ -77633,7 +79108,7 @@ ${expiry}`);
               }, 403);
             }
             if (mutation.operation === "join") {
-              const joinEndsAt = Date.parse(toTrimmedString9(activeGroup.state.joinEndsAt));
+              const joinEndsAt = Date.parse(toTrimmedString10(activeGroup.state.joinEndsAt));
               if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(this.now())) {
                 return jsonResponse2({
                   ok: false,
@@ -78029,11 +79504,11 @@ ${expiry}`);
       }
       async readAuthNonceKey({ create = false } = {}) {
         const existing = await this.state.storage.get(AUTH_NONCE_MAC_KEY);
-        if (/^[0-9a-f]{64}$/.test(toTrimmedString9(existing?.key)) || !create) return toTrimmedString9(existing?.key);
+        if (/^[0-9a-f]{64}$/.test(toTrimmedString10(existing?.key)) || !create) return toTrimmedString10(existing?.key);
         const candidate = { version: 1, key: bytesToHex3(this.crypto.getRandomValues(new Uint8Array(32))) };
         const record4 = await this.state.storage.transaction(async (transaction) => {
           const current = await transaction.get(AUTH_NONCE_MAC_KEY);
-          if (/^[0-9a-f]{64}$/.test(toTrimmedString9(current?.key))) return current;
+          if (/^[0-9a-f]{64}$/.test(toTrimmedString10(current?.key))) return current;
           await transaction.put(AUTH_NONCE_MAC_KEY, candidate);
           return candidate;
         });
@@ -78042,8 +79517,8 @@ ${expiry}`);
       async executeAuthNonceIssue(payload) {
         const nowMs = Number(this.now()) || Date.now();
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-        const address2 = toTrimmedString9(payload?.address).toLowerCase();
-        const random = toTrimmedString9(payload?.nonce);
+        const address2 = toTrimmedString10(payload?.address).toLowerCase();
+        const random = toTrimmedString10(payload?.nonce);
         const expiresAtMs = normalizeBoundedFutureTimestamp(
           payload?.expiresAtMs,
           nowMs,
@@ -78060,8 +79535,8 @@ ${expiry}`);
       async executeAuthNonceConsume(payload) {
         const nowMs = Number(this.now()) || Date.now();
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-        const address2 = toTrimmedString9(payload?.address).toLowerCase();
-        const nonce = toTrimmedString9(payload?.nonce);
+        const address2 = toTrimmedString10(payload?.address).toLowerCase();
+        const nonce = toTrimmedString10(payload?.nonce);
         const usedExpiresAtMs = normalizeBoundedFutureTimestamp(
           payload?.usedExpiresAtMs,
           nowMs,
@@ -78083,7 +79558,7 @@ ${expiry}`);
         const result = await this.state.storage.transaction(async (transaction) => {
           const used = await transaction.get(AUTH_NONCE_USED_KEY);
           const entries = Array.isArray(used?.entries) ? used.entries.filter((entry2) => Number(entry2?.expiresAtMs || 0) > nowMs) : [];
-          if (entries.some((entry2) => toTrimmedString9(entry2?.nonce) === nonce)) {
+          if (entries.some((entry2) => toTrimmedString10(entry2?.nonce) === nonce)) {
             await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
             return { ok: false, error: "Nonce already used." };
           }
@@ -78108,8 +79583,8 @@ ${expiry}`);
       async executeAuthRateCheck(payload) {
         const nowMs = Number(this.now()) || Date.now();
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-        const route = toTrimmedString9(payload?.route).toLowerCase();
-        const identity = toTrimmedString9(payload?.identity).toLowerCase();
+        const route = toTrimmedString10(payload?.route).toLowerCase();
+        const identity = toTrimmedString10(payload?.identity).toLowerCase();
         const limit = normalizePositiveSafeInteger(payload?.limit);
         const resetAtMs = normalizeBoundedFutureTimestamp(
           payload?.resetAtMs,
@@ -78134,7 +79609,7 @@ ${expiry}`);
         return jsonResponse2(result);
       }
       async executeHostedFaucetQuota(payload, finalize = false) {
-        const requestId = toTrimmedString9(payload?.requestId);
+        const requestId = toTrimmedString10(payload?.requestId);
         if (!/^[a-zA-Z0-9-]{1,64}$/.test(requestId) || finalize && typeof payload?.sent !== "boolean") {
           return jsonResponse2({ error: "Invalid hosted faucet quota request." }, 400);
         }
@@ -78163,13 +79638,13 @@ ${expiry}`);
         const nowMs = Number(this.now()) || Date.now();
         return this.state.storage.transaction(async (transaction) => {
           const existing = await transaction.get(SPONSORED_DEPLOY_RECORD_KEY);
-          if (existing && toTrimmedString9(existing.requestDigest) !== requestDigest) {
+          if (existing && toTrimmedString10(existing.requestDigest) !== requestDigest) {
             return { kind: "conflict" };
           }
           if (existing?.state === "terminal" && existing.result) {
             return { kind: "terminal", result: existing.result };
           }
-          if (existing?.state === "running" && (this.activeAttemptId === toTrimmedString9(existing.attemptId) || nowMs - Number(existing.startedAtMs || 0) < RUNNING_LEASE_MS)) {
+          if (existing?.state === "running" && (this.activeAttemptId === toTrimmedString10(existing.attemptId) || nowMs - Number(existing.startedAtMs || 0) < RUNNING_LEASE_MS)) {
             return { kind: "pending" };
           }
           const attemptId = createAttemptId(this.crypto);
@@ -78186,7 +79661,7 @@ ${expiry}`);
       async finalizeSponsoredDeploy({ requestDigest, attemptId, result, terminal }) {
         await this.state.storage.transaction(async (transaction) => {
           const existing = await transaction.get(SPONSORED_DEPLOY_RECORD_KEY);
-          if (toTrimmedString9(existing?.requestDigest) !== requestDigest || toTrimmedString9(existing?.attemptId) !== attemptId || existing?.state !== "running") {
+          if (toTrimmedString10(existing?.requestDigest) !== requestDigest || toTrimmedString10(existing?.attemptId) !== attemptId || existing?.state !== "running") {
             return;
           }
           await transaction.put(SPONSORED_DEPLOY_RECORD_KEY, terminal ? {
@@ -78207,20 +79682,20 @@ ${expiry}`);
         const nowMs = Number(this.now()) || Date.now();
         return this.state.storage.transaction(async (transaction) => {
           const existing = await transaction.get(DIRECT_DEPLOY_RECORD_KEY);
-          if (existing && toTrimmedString9(existing.immutableIdentityDigest) !== immutableIdentityDigest) {
+          if (existing && toTrimmedString10(existing.immutableIdentityDigest) !== immutableIdentityDigest) {
             return { kind: "identity-conflict" };
           }
-          if (existing && toTrimmedString9(existing.accountId) !== accountId) {
+          if (existing && toTrimmedString10(existing.accountId) !== accountId) {
             return { kind: "account-conflict" };
           }
           if (existing?.state === "terminal" && existing.result) {
             return {
               kind: "terminal",
               result: existing.result,
-              requestDigestMatches: toTrimmedString9(existing.requestDigest) === requestDigest
+              requestDigestMatches: toTrimmedString10(existing.requestDigest) === requestDigest
             };
           }
-          if (existing?.state === "running" && (this.activeDirectAttemptId === toTrimmedString9(existing.attemptId) || nowMs - Number(existing.startedAtMs || 0) < RUNNING_LEASE_MS)) {
+          if (existing?.state === "running" && (this.activeDirectAttemptId === toTrimmedString10(existing.attemptId) || nowMs - Number(existing.startedAtMs || 0) < RUNNING_LEASE_MS)) {
             return { kind: "pending" };
           }
           const attemptId = createAttemptId(this.crypto);
@@ -78246,7 +79721,7 @@ ${expiry}`);
       }) {
         await this.state.storage.transaction(async (transaction) => {
           const existing = await transaction.get(DIRECT_DEPLOY_RECORD_KEY);
-          if (existing?.state !== "running" || toTrimmedString9(existing.requestDigest) !== requestDigest || toTrimmedString9(existing.immutableIdentityDigest) !== immutableIdentityDigest || toTrimmedString9(existing.accountId) !== accountId || toTrimmedString9(existing.attemptId) !== attemptId) return;
+          if (existing?.state !== "running" || toTrimmedString10(existing.requestDigest) !== requestDigest || toTrimmedString10(existing.immutableIdentityDigest) !== immutableIdentityDigest || toTrimmedString10(existing.accountId) !== accountId || toTrimmedString10(existing.attemptId) !== attemptId) return;
           await transaction.put(DIRECT_DEPLOY_RECORD_KEY, terminal ? {
             version: 1,
             state: "terminal",
@@ -78266,17 +79741,17 @@ ${expiry}`);
         });
       }
       async executeDirectDeploy(payload) {
-        const requestDigest = toTrimmedString9(payload?.requestDigest);
-        const immutableIdentityDigest = toTrimmedString9(payload?.immutableIdentityDigest);
+        const requestDigest = toTrimmedString10(payload?.requestDigest);
+        const immutableIdentityDigest = toTrimmedString10(payload?.immutableIdentityDigest);
         const deployBody = payload?.deployBody && typeof payload.deployBody === "object" ? payload.deployBody : null;
         if (!requestDigest || !immutableIdentityDigest || !deployBody) {
           return jsonResponse2({ error: "Invalid direct deploy coordination request." }, 400);
         }
         const account = await this.lookupCloudflareAccount({
-          apiToken: toTrimmedString9(deployBody.apiToken || deployBody.token),
+          apiToken: toTrimmedString10(deployBody.apiToken || deployBody.token),
           env: this.env
         });
-        if (!account?.ok || !toTrimmedString9(account.accountId)) {
+        if (!account?.ok || !toTrimmedString10(account.accountId)) {
           const lookupStatus = Number(account?.status || 0);
           const responseStatus = lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502;
           const safeError = buildSafeSponsoredReceiptBody({
@@ -78289,7 +79764,7 @@ ${expiry}`);
             body: safeError
           }, responseStatus);
         }
-        const accountId = toTrimmedString9(account.accountId);
+        const accountId = toTrimmedString10(account.accountId);
         const reservation = await this.reserveDirectDeploy({ requestDigest, immutableIdentityDigest, accountId });
         if (reservation.kind === "terminal") {
           const replayResult2 = buildDirectDeployTerminalReplay(reservation);
@@ -78338,7 +79813,7 @@ ${expiry}`);
           rawResult = await this.executeDeployHelperRequest({
             body: deployBody,
             env: this.env,
-            requestOrigin: toTrimmedString9(payload?.requestOrigin),
+            requestOrigin: toTrimmedString10(payload?.requestOrigin),
             consoleImpl: console,
             coordinationBypass: true,
             coordinatedRequestDigest,
@@ -78376,7 +79851,7 @@ ${expiry}`);
       async reserveSponsoredFaucet(requestDigest) {
         return this.state.storage.transaction(async (transaction) => {
           const existing = await transaction.get(SPONSORED_FAUCET_RECORD_KEY);
-          if (existing && toTrimmedString9(existing.requestDigest) !== requestDigest) {
+          if (existing && toTrimmedString10(existing.requestDigest) !== requestDigest) {
             return { kind: "conflict" };
           }
           if (existing?.state === "terminal" && existing.receipt) {
@@ -78401,7 +79876,7 @@ ${expiry}`);
         };
         return this.state.storage.transaction(async (transaction) => {
           const existing = await transaction.get(SPONSORED_FAUCET_RECORD_KEY);
-          if (toTrimmedString9(existing?.requestDigest) !== requestDigest) return null;
+          if (toTrimmedString10(existing?.requestDigest) !== requestDigest) return null;
           if (existing?.state === "terminal" && existing.receipt) return existing.receipt;
           if (existing?.state !== "running") return null;
           await transaction.put(SPONSORED_FAUCET_RECORD_KEY, {
@@ -78503,7 +79978,7 @@ ${expiry}`);
         }
         if (url.pathname === "/session-config/storage/set-hidden") return this.executeStorageVisibilityMutation(payload);
         if (url.pathname === "/session-config/storage/publish") return this.executeStoragePublication(payload);
-        if (["begin", "checkpoint", "release"].some((operation) => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
+        if (["preflight", "begin", "checkpoint", "release"].some((operation) => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
           return this.serializeSessionConfigOperation(() => executeLitProvisioning(this, payload, url.pathname.split("/").at(-1)));
         }
         if (url.pathname === "/session-config/lit-authorization/ensure") {
@@ -78568,20 +80043,20 @@ ${expiry}`);
         }
         if (url.pathname === "/deploy-helper") return this.executeDirectDeploy(payload);
         if (url.pathname === "/sponsored-faucet/reserve") {
-          const requestDigest2 = toTrimmedString9(payload?.requestDigest);
+          const requestDigest2 = toTrimmedString10(payload?.requestDigest);
           if (!requestDigest2) return jsonResponse2({ error: "Invalid sponsored faucet reservation." }, 400);
           const reservation2 = await this.reserveSponsoredFaucet(requestDigest2);
           return jsonResponse2(reservation2, reservation2.kind === "conflict" ? 409 : reservation2.kind === "pending" ? 503 : 200);
         }
         if (url.pathname === "/sponsored-faucet/finalize") {
-          const requestDigest2 = toTrimmedString9(payload?.requestDigest);
+          const requestDigest2 = toTrimmedString10(payload?.requestDigest);
           const receipt = payload?.receipt && typeof payload.receipt === "object" ? payload.receipt : null;
           if (!requestDigest2 || !receipt) return jsonResponse2({ error: "Invalid sponsored faucet receipt." }, 400);
           const storedReceipt = await this.finalizeSponsoredFaucet({ requestDigest: requestDigest2, receipt });
           return storedReceipt ? jsonResponse2({ kind: "terminal", receipt: storedReceipt }, 200) : jsonResponse2({ error: "Sponsored faucet reservation does not match." }, 409);
         }
         if (url.pathname !== "/sponsored-deploy") return jsonResponse2({ error: "Not found." }, 404);
-        const requestDigest = toTrimmedString9(payload?.requestDigest);
+        const requestDigest = toTrimmedString10(payload?.requestDigest);
         const deployBody = payload?.deployBody && typeof payload.deployBody === "object" ? payload.deployBody : null;
         const sensitiveValues = Array.isArray(payload?.sensitiveValues) ? payload.sensitiveValues : [];
         if (!requestDigest || !deployBody) {
@@ -78618,7 +80093,7 @@ ${expiry}`);
           rawResult = await this.executeDeployHelperRequest({
             body: deployBody,
             env: this.env,
-            requestOrigin: toTrimmedString9(payload?.requestOrigin),
+            requestOrigin: toTrimmedString10(payload?.requestOrigin),
             consoleImpl: console,
             coordinationBypass: true
           });
@@ -78627,7 +80102,7 @@ ${expiry}`);
             ok: false,
             status: 502,
             body: {
-              error: toTrimmedString9(error?.message || error) || "Failed to run embedded sponsored deploy.",
+              error: toTrimmedString10(error?.message || error) || "Failed to run embedded sponsored deploy.",
               deploymentRequestPending: true
             }
           };
@@ -78668,7 +80143,7 @@ ${expiry}`);
           }
         };
       }
-      const normalizedGrantToken = toTrimmedString9(grantToken);
+      const normalizedGrantToken = toTrimmedString10(grantToken);
       if (!normalizedGrantToken) {
         return { ok: false, status: 400, body: { error: "Missing sponsored deploy grant identity." } };
       }
@@ -78700,7 +80175,7 @@ ${expiry}`);
       const unavailable3 = { status: 503, error: "Upload receipt coordination is unavailable; retry.", reason: "upload_receipt_unavailable" };
       try {
         const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
-        const owner = await sha256Hex(`upload-receipts:${normalizedSlug}:${toTrimmedString9(responder).toLowerCase()}`);
+        const owner = await sha256Hex(`upload-receipts:${normalizedSlug}:${toTrimmedString10(responder).toLowerCase()}`);
         const stub = env.CE_SESSION_COORDINATOR.get(env.CE_SESSION_COORDINATOR.idFromName(owner));
         if (!stub?.fetch || !["reserve", "settle"].includes(operation)) return unavailable3;
         const response2 = await stub.fetch(`https://session-coordinator.internal/upload-receipts/${operation}`, {
@@ -78710,7 +80185,7 @@ ${expiry}`);
         });
         const body = await response2.json();
         if (!isObjectRecord(body) || !response2.ok && ![409, 503].includes(response2.status)) return unavailable3;
-        if (response2.ok && (operation === "settle" ? body.ok !== true : !(body.kind === "execute" && toTrimmedString9(body.attemptId)) && !(body.kind === "replay" && body.storageRef?.id))) return unavailable3;
+        if (response2.ok && (operation === "settle" ? body.ok !== true : !(body.kind === "execute" && toTrimmedString10(body.attemptId)) && !(body.kind === "replay" && body.storageRef?.id))) return unavailable3;
         if (response2.ok && body.kind === "execute" && (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)))) return unavailable3;
         return { ...body, status: response2.status };
       } catch {
@@ -78763,7 +80238,7 @@ ${expiry}`);
       const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
       return callAuthStateCoordinator({
         env,
-        identity: `auth-nonce:${toTrimmedString9(slug)}:${toTrimmedString9(address2).toLowerCase()}`,
+        identity: `auth-nonce:${toTrimmedString10(slug)}:${toTrimmedString10(address2).toLowerCase()}`,
         path: "/auth-state/nonce/issue",
         payload: {
           slug,
@@ -78785,7 +80260,7 @@ ${expiry}`);
       const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
       return callAuthStateCoordinator({
         env,
-        identity: `auth-nonce:${toTrimmedString9(slug)}:${toTrimmedString9(address2).toLowerCase()}`,
+        identity: `auth-nonce:${toTrimmedString10(slug)}:${toTrimmedString10(address2).toLowerCase()}`,
         path: "/auth-state/nonce/consume",
         payload: {
           slug,
@@ -78797,7 +80272,7 @@ ${expiry}`);
     };
     callHostedFaucetQuota = ({ env, slug, address: address2, requestId, sent }, finalize) => callAuthStateCoordinator({
       env,
-      identity: `hosted-faucet:${resolveCoordinatorSessionSlugStorageKey(slug)}:${toTrimmedString9(address2).toLowerCase()}`,
+      identity: `hosted-faucet:${resolveCoordinatorSessionSlugStorageKey(slug)}:${toTrimmedString10(address2).toLowerCase()}`,
       path: finalize ? "/hosted-faucet/finalize" : "/hosted-faucet/reserve",
       payload: { requestId, ...finalize ? { sent } : {} }
     });
@@ -78816,11 +80291,11 @@ ${expiry}`);
       now = Date.now
     } = {}) => {
       const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
-      const normalizedRoute = toTrimmedString9(route).toLowerCase();
-      const normalizedIdentity = toTrimmedString9(identity).toLowerCase();
+      const normalizedRoute = toTrimmedString10(route).toLowerCase();
+      const normalizedIdentity = toTrimmedString10(identity).toLowerCase();
       return callAuthStateCoordinator({
         env,
-        identity: `auth-rate:${toTrimmedString9(slug)}:${normalizedRoute}:${normalizedIdentity}`,
+        identity: `auth-rate:${toTrimmedString10(slug)}:${normalizedRoute}:${normalizedIdentity}`,
         path: "/auth-state/rate/check",
         payload: {
           slug,
@@ -78906,8 +80381,8 @@ ${expiry}`);
       };
     };
     reserveCoordinatedSponsoredFaucet = async ({ env, grantToken, requestDigest } = {}) => {
-      const token = toTrimmedString9(grantToken);
-      const digest2 = toTrimmedString9(requestDigest);
+      const token = toTrimmedString10(grantToken);
+      const digest2 = toTrimmedString10(requestDigest);
       const stub = token ? await resolveCoordinatorStub(env, `sponsored-faucet:${token}`) : null;
       if (!stub) return { kind: "unavailable" };
       try {
@@ -78927,7 +80402,7 @@ ${expiry}`);
       requestDigest,
       receipt
     } = {}) => {
-      const token = toTrimmedString9(grantToken);
+      const token = toTrimmedString10(grantToken);
       const stub = token ? await resolveCoordinatorStub(env, `sponsored-faucet:${token}`) : null;
       if (!stub) return null;
       try {
@@ -86138,7 +87613,7 @@ var getDefaultArweaveCtorCandidates = () => [
   { name: "arweave", loader: async () => await Promise.resolve().then(() => __toESM(require_web(), 1)) }
 ];
 var resolveCtorFromModule = (moduleValue) => (moduleValue && typeof moduleValue.init === "function" ? moduleValue : null) || (moduleValue?.default && typeof moduleValue.default.init === "function" ? moduleValue.default : null) || (moduleValue?.Arweave && typeof moduleValue.Arweave.init === "function" ? moduleValue.Arweave : null) || (moduleValue?.default?.Arweave && typeof moduleValue.default.Arweave.init === "function" ? moduleValue.default.Arweave : null) || (moduleValue?.default?.default && typeof moduleValue.default.default.init === "function" ? moduleValue.default.default : null);
-var toTrimmedString10 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
+var toTrimmedString11 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
 var noop = () => {
 };
 var resolveLog = (deps) => typeof deps?.log === "function" ? deps.log : noop;
@@ -86157,11 +87632,11 @@ var uploadTransactionWithFallback = async ({ arweave, tx, deps }) => {
       return;
     }
     const status = res?.status || "unknown";
-    const statusText = toTrimmedString10(res?.statusText || "", deps);
+    const statusText = toTrimmedString11(res?.statusText || "", deps);
     let responseBody = "";
     if (typeof res?.text === "function") {
       try {
-        responseBody = toTrimmedString10(await res.text(), deps);
+        responseBody = toTrimmedString11(await res.text(), deps);
       } catch {
         responseBody = "";
       }
@@ -86774,7 +88249,7 @@ init_responseKvHelpers();
 init_gateRpcResolution();
 var DEFAULT_GAS_PRICE_HEX = "0x3b9aca00";
 var DEFAULT_ACCESS_DENIED_ERROR = "Access denied.";
-var toTrimmedString11 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
+var toTrimmedString12 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
 var resolveJson2 = (deps) => deps?.json || json;
 var resolveLog2 = (deps) => typeof deps?.log === "function" ? deps.log : () => {
 };
@@ -86833,11 +88308,11 @@ var faucet = async ({
       logContext.rpcUrl = maskRpcUrl(normalizedRpcUrls[0]);
       logContext.rpcUrls = normalizedRpcUrls.map((rpcUrl) => maskRpcUrl(rpcUrl));
     } else {
-      if (/^https?:\/\//i.test(toTrimmedString11(logContext.rpcUrl, deps))) {
+      if (/^https?:\/\//i.test(toTrimmedString12(logContext.rpcUrl, deps))) {
         logContext.rpcUrl = maskRpcUrl(logContext.rpcUrl);
       }
       if (Array.isArray(logContext.rpcUrls)) {
-        logContext.rpcUrls = logContext.rpcUrls.map((rpcUrl) => /^https?:\/\//i.test(toTrimmedString11(rpcUrl, deps)) ? maskRpcUrl(rpcUrl) : rpcUrl);
+        logContext.rpcUrls = logContext.rpcUrls.map((rpcUrl) => /^https?:\/\//i.test(toTrimmedString12(rpcUrl, deps)) ? maskRpcUrl(rpcUrl) : rpcUrl);
       }
     }
     log2("[faucet] request", logContext);
@@ -87634,11 +89109,11 @@ var readTranscribeRequestPayload = async ({ request } = {}) => {
 // workers/sessionCorsWorker/endpointConfig.js
 var DEFAULT_OPENAI_TRANSCRIBE_URL = "https://api.openai.com/v1/audio/transcriptions";
 var OPENAI_TRANSCRIBE_URL_ENV = "CE_OPENAI_TRANSCRIBE_URL";
-var toTrimmedString12 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString13 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var resolveOpenAiTranscribeUrl = ({
   constants = null,
   env = null
-} = {}) => toTrimmedString12(constants?.openAiTranscribeUrl) || toTrimmedString12(constants?.OPENAI_TRANSCRIBE_URL) || toTrimmedString12(env?.[OPENAI_TRANSCRIBE_URL_ENV]) || DEFAULT_OPENAI_TRANSCRIBE_URL;
+} = {}) => toTrimmedString13(constants?.openAiTranscribeUrl) || toTrimmedString13(constants?.OPENAI_TRANSCRIBE_URL) || toTrimmedString13(env?.[OPENAI_TRANSCRIBE_URL_ENV]) || DEFAULT_OPENAI_TRANSCRIBE_URL;
 
 // workers/sessionCorsWorker/transcribeExecution.js
 init_outboundUrlSafetyBinding();
@@ -87649,7 +89124,7 @@ var normalizeSpeakerSegments = (segments) => (Array.isArray(segments) ? segments
   if (!speaker || !text || !Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) return [];
   return [{ speaker, start, end, text }];
 });
-var toTrimmedString13 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
+var toTrimmedString14 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
 var transcribe = async ({
   request,
   secrets,
@@ -87672,7 +89147,7 @@ var transcribe = async ({
     groupSpeakerLabels
   } = normalizedRequest.payload || {};
   let targetUrl = resolveOpenAiTranscribeUrl({ constants });
-  let key = requestApiKey || toTrimmedString13(secrets?.openaiKey, deps);
+  let key = requestApiKey || toTrimmedString14(secrets?.openaiKey, deps);
   let outboundUrlPolicy = "";
   if (provider === "custom") {
     targetUrl = requestRpcUrl;
@@ -88387,7 +89862,7 @@ init_sessionConfigAuthority();
 init_sessionConfigAuthority();
 init_authorizationScopeFreshness();
 init_lib2();
-var toTrimmedString14 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString15 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var resolveEthersCompat2 = (loadedModule) => loadedModule?.ethers || loadedModule?.default?.ethers || loadedModule?.default || loadedModule || null;
 var ethers2 = resolveEthersCompat2(lib_exports);
 var getEthersFn3 = (...candidates) => candidates.find((fn) => typeof fn === "function") || null;
@@ -88428,7 +89903,7 @@ var verifyTypedDataCompat = (...args) => {
   }
   return verifyFn(...args);
 };
-var normalizeAddressLower2 = (value) => toTrimmedString14(value).toLowerCase();
+var normalizeAddressLower2 = (value) => toTrimmedString15(value).toLowerCase();
 var normalizeUnixSeconds = (value, deps) => {
   const raw = Number(
     value != null ? value : typeof deps?.now === "function" ? deps.now() : Date.now()
@@ -88510,12 +89985,12 @@ var resolveAdminRequestAuthority = async ({
     address: address2,
     signature
   } = deps?.normalizeSignedWorkerRequest?.(body) || {};
-  const signedAction = toTrimmedString14(body?.action);
+  const signedAction = toTrimmedString15(body?.action);
   const signedSlugProvided = body && typeof body === "object" && Object.prototype.hasOwnProperty.call(body, "slug") && body?.slug != null;
-  const signedSlug = signedSlugProvided ? toTrimmedString14(body?.slug) : null;
-  const signedBodyHash = toTrimmedString14(body?.bodyHash).toLowerCase();
-  const nonce = toTrimmedString14(body?.nonce);
-  const audience = toTrimmedString14(body?.audience);
+  const signedSlug = signedSlugProvided ? toTrimmedString15(body?.slug) : null;
+  const signedBodyHash = toTrimmedString15(body?.bodyHash).toLowerCase();
+  const nonce = toTrimmedString15(body?.nonce);
+  const audience = toTrimmedString15(body?.audience);
   const expiration = body?.expiration;
   const slugContext = deps?.resolveWorkerBodySlugContext?.({ body, env, slugHint }) || {
     ok: false,
@@ -88573,7 +90048,7 @@ var resolveAdminRequestAuthority = async ({
     };
   }
   const buildAdminActionBodyHash2 = typeof deps?.buildAdminActionBodyHash === "function" ? deps.buildAdminActionBodyHash : buildAdminActionBodyHash;
-  const actualBodyHash = toTrimmedString14(buildAdminActionBodyHash2(body)).toLowerCase();
+  const actualBodyHash = toTrimmedString15(buildAdminActionBodyHash2(body)).toLowerCase();
   if (!actualBodyHash || actualBodyHash !== signedBodyHash) {
     return {
       ok: false,
@@ -98806,10 +100281,10 @@ init_sessionConfigAuthority();
 init_outboundUrlSafetyBinding();
 
 // workers/sessionCorsWorker/anonymousRateLimitPolicy.js
-var isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj19 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isNonNegativeInteger = (value) => Number.isInteger(value) && value >= 0;
 var resolveAnonymousIpDailyLimit = (config = {}) => {
-  const limits = isObj18(config?.limits) ? config.limits : {};
+  const limits = isObj19(config?.limits) ? config.limits : {};
   if (Object.prototype.hasOwnProperty.call(limits, "perAnonymousIpPerDay")) {
     const explicitLimit = limits.perAnonymousIpPerDay;
     if (isNonNegativeInteger(explicitLimit)) return explicitLimit;
@@ -98827,7 +100302,7 @@ init_ratingScale();
 var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
 var trim13 = (value) => String(value == null ? "" : value).trim();
 var lower7 = (value) => trim13(value).toLowerCase();
-var isObj19 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj20 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var hasRestrictedPrompt = (question = {}) => {
   const visibility = lower7(question.visibility || question.access || question.questionVisibility);
   return Boolean(
@@ -98835,7 +100310,7 @@ var hasRestrictedPrompt = (question = {}) => {
   );
 };
 var normalizeQuestion = (value = {}) => {
-  const question = isObj19(value) ? value : {};
+  const question = isObj20(value) ? value : {};
   const id2 = lower7(question.id || question.questionId);
   const prompt = trim13(question.prompt || question.question || question.title);
   if (!id2 || !prompt || hasRestrictedPrompt(question) || /^(?:\[encrypted\]|encrypted prompt[.!]?(?:\s*connect.+decrypt[.!]?)?|connect(?: wallet)? to decrypt(?: encrypted prompt)?[.!]?)$/i.test(
@@ -98844,7 +100319,7 @@ var normalizeQuestion = (value = {}) => {
     return null;
   const type = lower7(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
-  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry2) => trim13(isObj19(entry2) ? entry2.label || entry2.value : entry2)).filter(Boolean);
+  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry2) => trim13(isObj20(entry2) ? entry2.label || entry2.value : entry2)).filter(Boolean);
   const ratingScale = type === "rating" ? normalizeRatingScale(question) : null;
   return {
     id: id2,
@@ -98883,7 +100358,7 @@ var MAX_CANDIDATES = 2e3;
 var catalog = (questions = [], incomplete = false) => ({ questions, incomplete });
 var trim14 = (value) => String(value == null ? "" : value).trim();
 var lower8 = (value) => trim14(value).toLowerCase();
-var isObj20 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj21 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
 var payloadQuestionId = (payload) => lower8(payload?.id || payload?.questionId);
 var readJsonResponse = async (response2) => {
@@ -98941,7 +100416,7 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const hiddenIds = new Set(items.filter((item) => item?.hidden === true || item?.metadata?.hidden === true).map((item) => lower8(item?.metadata?.resourceId)).filter(Boolean));
   const readPayload = async (storageRefId) => {
     const payload = await readJsonResponse(await callStorage("/storage/read", `id=${encodeURIComponent(storageRefId)}`));
-    return isObj20(payload) ? payload : null;
+    return isObj21(payload) ? payload : null;
   };
   const versions = [];
   const legacyVersions = [];
@@ -98975,15 +100450,15 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   return catalog(dedupeQuestions(questions), listing.incomplete || legacyVersions.length > legacyReads.length || candidates.length > chosen.length);
 };
 var pickContractAddress = (config = {}) => {
-  const contracts = isObj20(config.contracts) ? config.contracts : {};
-  const surveys = isObj20(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
+  const contracts = isObj21(config.contracts) ? config.contracts : {};
+  const surveys = isObj21(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
   return trim14(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
 };
 var pickRpcUrls = (config = {}) => {
   const chainId = trim14(config.networkChainId || config.registryChainId || config.chainId || "11155420");
-  const rpcConfig = isObj20(config.rpc) ? config.rpc : {};
-  const pathProvider = isObj20(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj20(rpcConfig.path) ? rpcConfig.path : {};
-  const byChainMap = isObj20(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj20(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
+  const rpcConfig = isObj21(config.rpc) ? config.rpc : {};
+  const pathProvider = isObj21(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj21(rpcConfig.path) ? rpcConfig.path : {};
+  const byChainMap = isObj21(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj21(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
   const byChain = byChainMap[chainId];
   const source = [
     ...Array.isArray(byChain) ? byChain : [byChain],
@@ -99035,7 +100510,7 @@ var base64urlFromHex = (hex = "") => {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 var payloadSessionSlug = (payload = {}) => {
-  const session = isObj20(payload.session) ? payload.session : {};
+  const session = isObj21(payload.session) ? payload.session : {};
   for (const candidate of [
     payload.sessionSlug,
     payload.session_slug,
@@ -99057,7 +100532,7 @@ var fetchArweaveQuestion = async (pointer, fetchImpl) => {
       const response2 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
       if (!response2.ok) continue;
       const payload = await response2.json();
-      if (isObj20(payload)) return payload;
+      if (isObj21(payload)) return payload;
     } catch {
     }
   }
@@ -99448,9 +100923,9 @@ init_realtimeInterviewConfig();
 var OPENAI_LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 var trim15 = (value) => String(value == null ? "" : value).trim();
-var isObj21 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj22 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewModeEnabled = (config = {}) => {
-  const interview = isObj21(config?.interviewMode || config?.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj22(config?.interviewMode || config?.interview) ? config.interviewMode || config.interview : {};
   return config?.interviewModeEnabled !== false && interview.enabled !== false;
 };
 var buildRealtimeMultipartBody = ({ sdp, session }) => {
@@ -99480,7 +100955,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   } catch {
     return { ok: false, status: 400, error: "Invalid JSON." };
   }
-  if (!isObj21(body)) return { ok: false, status: 400, error: "Invalid JSON." };
+  if (!isObj22(body)) return { ok: false, status: 400, error: "Invalid JSON." };
   const sdp = String(body.sdp == null ? "" : body.sdp);
   const instructions = trim15(body.instructions);
   if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
@@ -99491,7 +100966,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   return { ok: true, payload: { sdp, instructions } };
 };
 var resolveRealtimeConfig = (config = {}) => {
-  const interview = isObj21(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj22(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   const provider = trim15(interview.provider || "openai").toLowerCase();
   const model = resolveRealtimeInterviewModel(config);
   return { provider, model };
@@ -100079,1447 +101554,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
 // workers/sessionCorsWorker/adminRequestDispatch.js
 init_sessionConfigAuthority();
 init_sessionLitAuthorizationCoordinator();
-
-// workers/sessionCorsWorker/chipotleClient.js
-init_litChipotleAction();
-
-// workers/sessionCorsWorker/litWorkerAuthorization.js
-init_lib2();
-
-// workers/sessionCorsWorker/litChipotlePolicyCore.mjs
-init_lib2();
-var CHIPOTLE_WRAPPED_KEY_VERSION = 2;
-var CHIPOTLE_POLICY_VERSION = "chipotle-sbt-v2";
-var ethersUtils = (() => {
-  const utils2 = ethers_exports?.utils || {};
-  return {
-    isAddress: utils2.isAddress || ethers_exports.isAddress,
-    getAddress: utils2.getAddress || ethers_exports.getAddress,
-    keccak256: utils2.keccak256 || ethers_exports.keccak256,
-    toUtf8Bytes: utils2.toUtf8Bytes || ethers_exports.toUtf8Bytes,
-    hexlify: utils2.hexlify || ethers_exports.hexlify,
-    arrayify: utils2.arrayify || ethers_exports.getBytes
-  };
-})();
-var toStr10 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-var normalizeChipotleGateMode = (value) => toStr10(value).trim().toLowerCase() === "all" ? "all" : "any";
-var normalizeChipotleChainId = (value) => {
-  const parsed = Number(value || 0);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
-};
-var normalizeChipotleSbtAddresses = (values = []) => {
-  const out = [];
-  const seen = /* @__PURE__ */ new Set();
-  (Array.isArray(values) ? values : [values]).forEach((raw) => {
-    const value = toStr10(raw).trim();
-    if (!value) return;
-    if (!ethersUtils.isAddress(value)) {
-      throw new Error("Lit Chipotle policy contains an invalid SBT address.");
-    }
-    const normalized = ethersUtils.getAddress(value).toLowerCase();
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    out.push(normalized);
-  });
-  out.sort();
-  return out;
-};
-var stableChipotleStringify = (value) => {
-  const walk = (entry2) => {
-    if (entry2 == null) return entry2;
-    if (typeof entry2 === "string" || typeof entry2 === "number" || typeof entry2 === "boolean") {
-      return entry2;
-    }
-    if (Array.isArray(entry2)) return entry2.map(walk);
-    if (typeof entry2 === "object") {
-      const out = {};
-      Object.keys(entry2).sort().forEach((key) => {
-        out[key] = walk(entry2[key]);
-      });
-      return out;
-    }
-    return toStr10(entry2);
-  };
-  return JSON.stringify(walk(value));
-};
-var buildLitChipotlePolicy = ({
-  chainId,
-  gateMode = "any",
-  sbtAddresses = [],
-  litActionCid = "",
-  litPkpId = ""
-} = {}) => {
-  const normalizedChainId = normalizeChipotleChainId(chainId);
-  if (!normalizedChainId) {
-    throw new Error("Lit Chipotle policy requires a chain ID.");
-  }
-  const normalizedSbtAddresses = normalizeChipotleSbtAddresses(sbtAddresses);
-  if (!normalizedSbtAddresses.length) {
-    throw new Error("Lit Chipotle policy requires at least one SBT address.");
-  }
-  const normalizedLitActionCid = toStr10(litActionCid).trim();
-  if (!normalizedLitActionCid) {
-    throw new Error("Lit Chipotle policy requires a Lit Action CID.");
-  }
-  const normalizedLitPkpId = toStr10(litPkpId).trim();
-  if (!normalizedLitPkpId) {
-    throw new Error("Lit Chipotle policy requires a Lit PKP ID.");
-  }
-  return {
-    version: CHIPOTLE_POLICY_VERSION,
-    chainId: normalizedChainId,
-    gateMode: normalizeChipotleGateMode(gateMode),
-    sbtAddresses: normalizedSbtAddresses,
-    litActionCid: normalizedLitActionCid,
-    litPkpId: normalizedLitPkpId
-  };
-};
-var fingerprintLitChipotlePolicy = (policy = {}) => {
-  const canonicalPolicy = buildLitChipotlePolicy(policy);
-  return ethersUtils.keccak256(ethersUtils.toUtf8Bytes(stableChipotleStringify(canonicalPolicy)));
-};
-var normalizeChipotleCekHex = (value) => {
-  const raw = toStr10(value).trim();
-  if (!/^0x[0-9a-f]{64}$/i.test(raw)) {
-    throw new Error("Lit Chipotle CEK must be a 32-byte hex string.");
-  }
-  return ethersUtils.hexlify(ethersUtils.arrayify(raw));
-};
-var buildLitChipotleWrappedPlaintext = ({ cekHex, policy } = {}) => {
-  const canonicalPolicy = buildLitChipotlePolicy(policy);
-  return {
-    v: CHIPOTLE_WRAPPED_KEY_VERSION,
-    cekHex: normalizeChipotleCekHex(cekHex),
-    policyFingerprint: fingerprintLitChipotlePolicy(canonicalPolicy),
-    policy: canonicalPolicy
-  };
-};
-var normalizeLitChipotleMetadataVersion = (chipotle = {}) => {
-  const raw = chipotle && typeof chipotle === "object" ? chipotle.version ?? chipotle.v : null;
-  const parsed = Number(raw || 0);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
-};
-
-// workers/sessionCorsWorker/litWorkerAuthorization.js
-init_litChipotleAction();
-var utils = ethers_exports.utils || ethers_exports;
-var bytes2 = utils.arrayify || utils.getBytes;
-var LIT_AUTHORIZATION_REPROVISION_ERROR = "Worker authorization is not configured. Ask the session admin to reprovision Lit with a fresh session authority.";
-var resolveLitAuthorization = ({ secrets = {}, config = {}, sessionSlug = "" } = {}) => {
-  const credentials = config.litCredentials || {};
-  if (credentials.litAuthorizationVersion !== LIT_AUTHORIZATION_VERSION || !secrets.litAuthorizationPrivateKey) {
-    throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
-  }
-  let wallet;
-  try {
-    wallet = new ethers_exports.Wallet(secrets.litAuthorizationPrivateKey);
-  } catch {
-    throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
-  }
-  if (wallet.address.toLowerCase() !== String(credentials.litAuthorizationSigner || "").toLowerCase()) {
-    throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
-  }
-  return { wallet, actionCode: buildWorkerAuthorizedLitAction({
-    signer: wallet.address,
-    sessionSlug,
-    pkpId: credentials.litPkpId
-  }) };
-};
-var prepareLitAuthorization = async ({ secrets = {}, persistAuthorizationSecret } = {}) => {
-  let wallet;
-  try {
-    wallet = secrets.litAuthorizationPrivateKey ? new ethers_exports.Wallet(secrets.litAuthorizationPrivateKey) : ethers_exports.Wallet.createRandom();
-  } catch {
-    throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
-  }
-  if (persistAuthorizationSecret) {
-    const persistedKey = await persistAuthorizationSecret(wallet.privateKey);
-    if (persistedKey) {
-      try {
-        wallet = new ethers_exports.Wallet(persistedKey);
-      } catch {
-        throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
-      }
-    }
-  }
-  return {
-    litAuthorizationPrivateKey: wallet.privateKey,
-    litAuthorizationSigner: wallet.address,
-    litAuthorizationVersion: LIT_AUTHORIZATION_VERSION
-  };
-};
-var litAuthorizationMessage = (params) => {
-  const auth = params.authorization;
-  return "Context Engine Lit authorization v1\n" + stableChipotleStringify({
-    version: LIT_AUTHORIZATION_VERSION,
-    sessionSlug: auth.sessionSlug,
-    op: params.op,
-    requesterAddress: String(params.requesterAddress).toLowerCase(),
-    chainId: params.expectedChainId,
-    rpcUrl: params.rpcUrl || "",
-    policyFingerprint: params.expectedPolicyFingerprint,
-    pkpId: params.pkpId,
-    actionCid: params.litActionCid,
-    inputDigest: utils.keccak256(utils.toUtf8Bytes(params.op === "encrypt" ? params.message || "" : params.op === "decrypt" ? params.ciphertext || "" : "")),
-    issuedAt: auth.issuedAt,
-    expiresAt: auth.expiresAt,
-    requestId: auth.requestId,
-    replyPublicKey: auth.replyPublicKey
-  });
-};
-var authorizeLitRequest = async ({ wallet, jsParams, sessionSlug, now = Math.floor(Date.now() / 1e3) }) => {
-  const replyKeys = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]);
-  jsParams.authorization = {
-    sessionSlug,
-    issuedAt: now,
-    expiresAt: now + 60,
-    requestId: utils.hexlify(crypto.getRandomValues(new Uint8Array(32))),
-    replyPublicKey: utils.hexlify(new Uint8Array(await crypto.subtle.exportKey("raw", replyKeys.publicKey)))
-  };
-  const message = litAuthorizationMessage(jsParams);
-  jsParams.authorization.signature = await wallet.signMessage(message);
-  return { privateKey: replyKeys.privateKey, message };
-};
-var openLitReply = async (reply4, context) => {
-  if (reply4?.version !== LIT_AUTHORIZATION_VERSION || !/^0x04[0-9a-f]{128}$/.test(reply4.publicKey || "") || !/^0x[0-9a-f]{24}$/.test(reply4.iv || "") || !/^0x[0-9a-f]+$/.test(reply4.ciphertext || "")) {
-    throw new Error("Invalid encrypted Lit authorization reply.");
-  }
-  const publicKey = await crypto.subtle.importKey("raw", bytes2(reply4.publicKey), { name: "ECDH", namedCurve: "P-256" }, false, []);
-  const sharedSecret = await crypto.subtle.deriveBits({ name: "ECDH", public: publicKey }, context.privateKey, 256);
-  const material = await crypto.subtle.importKey("raw", sharedSecret, "HKDF", false, ["deriveKey"]);
-  const aad = utils.toUtf8Bytes(context.message);
-  const key = await crypto.subtle.deriveKey(
-    {
-      name: "HKDF",
-      hash: "SHA-256",
-      salt: bytes2(utils.keccak256(aad)),
-      info: utils.toUtf8Bytes("Context Engine Lit reply v1")
-    },
-    material,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["decrypt"]
-  );
-  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes2(reply4.iv), additionalData: aad }, key, bytes2(reply4.ciphertext)));
-};
-var isLitAuthorizationReady = ({ secrets = {}, config = {} } = {}) => {
-  try {
-    resolveLitAuthorization({ secrets, config });
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-// workers/sessionCorsWorker/chipotleClient.js
-var import_rpcDefaults4 = __toESM(require_rpcDefaults(), 1);
-init_lib2();
-init_chainIdNormalization();
-var LIT_PROVISIONING_CREDENTIALS_CONFLICT = "Lit credentials conflict with saved setup. Restore the previous credentials or choose Create fresh Lit authority.";
-var DEFAULT_LIT_API_BASE = "https://api.chipotle.litprotocol.com";
-var CHIPOTLE_API_PREFIX = "/core/v1";
-var APPROVED_LIT_CHIPOTLE_API_HOSTS = /* @__PURE__ */ new Set(["api.chipotle.litprotocol.com"]);
-var LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG = "LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE";
-var LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG = "CE_LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE";
-var DEFAULT_PAGE_NUMBER = 0;
-var DEFAULT_PAGE_SIZE = 100;
-var { getPathRpcUrl: getPathRpcUrl2, getPublicRpcUrls: getPublicRpcUrls2 } = import_rpcDefaults4.default;
-var ethersUtils2 = ethers_exports?.utils || ethers_exports;
-var toTrimmedString15 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var isObj22 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var normalizeChipotleRpcCandidateList = (value = []) => {
-  const out = [];
-  const seen = /* @__PURE__ */ new Set();
-  (Array.isArray(value) ? value : [value]).forEach((entry2) => {
-    const trimmed = toTrimmedString15(entry2);
-    if (!trimmed) return;
-    const key = trimmed;
-    if (seen.has(key)) return;
-    seen.add(key);
-    out.push(trimmed);
-  });
-  return out;
-};
-var normalizeValidChipotlePkpId = (value = "") => {
-  const trimmed = toTrimmedString15(value);
-  if (!trimmed || trimmed === "0") return "";
-  return trimmed;
-};
-var normalizeChipotleMembershipValue = (value = "") => toTrimmedString15(value).toLowerCase();
-var normalizeHostname = (value = "") => toTrimmedString15(value).toLowerCase().replace(/^\[(.*)\]$/, "$1");
-var parseIpv4Octets2 = (hostname = "") => {
-  const normalized = normalizeHostname(hostname);
-  const parts = normalized.split(".");
-  if (parts.length !== 4 || parts.some((part) => !/^\d{1,3}$/.test(part))) return null;
-  const octets = parts.map((part) => Number(part));
-  return octets.every((octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255) ? octets : null;
-};
-var isPrivateOrLocalIpv4 = (octets = []) => {
-  const [a, b2] = octets;
-  return a === 0 || a === 10 || a === 127 || a === 100 && b2 >= 64 && b2 <= 127 || a === 169 && b2 === 254 || a === 172 && b2 >= 16 && b2 <= 31 || a === 192 && b2 === 168 || a === 198 && (b2 === 18 || b2 === 19) || a >= 224;
-};
-var isPrivateOrLocalIpv6 = (hostname = "") => {
-  const normalized = normalizeHostname(hostname);
-  if (!normalized.includes(":")) return false;
-  if (normalized === "::" || normalized === "::1" || normalized === "0:0:0:0:0:0:0:1") {
-    return true;
-  }
-  if (normalized.startsWith("::ffff:")) {
-    const embeddedIpv4 = parseIpv4Octets2(normalized.slice("::ffff:".length));
-    return embeddedIpv4 ? isPrivateOrLocalIpv4(embeddedIpv4) : true;
-  }
-  const firstHextetText = normalized.split(":").find(Boolean) || "0";
-  const firstHextet = Number.parseInt(firstHextetText, 16);
-  if (!Number.isFinite(firstHextet)) return true;
-  return (firstHextet & 65024) === 64512 || (firstHextet & 65472) === 65152 || (firstHextet & 65280) === 65280;
-};
-var isPrivateOrLocalHostname = (hostname = "") => {
-  const normalized = normalizeHostname(hostname);
-  if (!normalized) return true;
-  if (normalized === "localhost" || normalized.endsWith(".localhost") || normalized.endsWith(".local")) {
-    return true;
-  }
-  const ipv4Octets = parseIpv4Octets2(normalized);
-  if (ipv4Octets) return isPrivateOrLocalIpv4(ipv4Octets);
-  return isPrivateOrLocalIpv6(normalized);
-};
-var isApprovedLocalChipotleApiHost = (hostname = "") => {
-  const normalized = normalizeHostname(hostname);
-  const ipv4Octets = parseIpv4Octets2(normalized);
-  return normalized === "localhost" || normalized.endsWith(".localhost") || normalized === "::1" || normalized === "0:0:0:0:0:0:0:1" || ipv4Octets && ipv4Octets[0] === 127;
-};
-var isTruthyFlag = (value) => ["1", "true", "yes", "on"].includes(
-  toTrimmedString15(value).toLowerCase()
-);
-var isLitChipotleLocalApiBaseAllowed = (env = {}) => isTruthyFlag(env?.[LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG]) || isTruthyFlag(env?.[LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG]);
-var normalizeLitChipotleApiBase = (value, {
-  allowLocalApiBase = false
-} = {}) => {
-  const raw = toTrimmedString15(value);
-  const candidate = raw || DEFAULT_LIT_API_BASE;
-  let parsed;
-  try {
-    parsed = new URL(candidate);
-  } catch {
-    throw new Error("Lit Chipotle API base URL is invalid.");
-  }
-  const hostname = normalizeHostname(parsed.hostname);
-  const isApprovedLocalHost = isApprovedLocalChipotleApiHost(hostname);
-  const localOverrideAllowed = allowLocalApiBase === true && isApprovedLocalHost;
-  const protocol = toTrimmedString15(parsed.protocol).toLowerCase();
-  if (parsed.username || parsed.password) {
-    throw new Error("Lit Chipotle API base URL must not include credentials.");
-  }
-  if (protocol !== "https:" && !(protocol === "http:" && localOverrideAllowed)) {
-    throw new Error("Lit Chipotle API base URL must use HTTPS unless an approved local override is enabled.");
-  }
-  if (parsed.port && !localOverrideAllowed) {
-    throw new Error("Lit Chipotle API base URL must not include a custom port.");
-  }
-  if (isPrivateOrLocalHostname(hostname) && !localOverrideAllowed) {
-    throw new Error("Lit Chipotle API base URL must use an approved public host.");
-  }
-  if (!localOverrideAllowed && !APPROVED_LIT_CHIPOTLE_API_HOSTS.has(hostname)) {
-    throw new Error("Lit Chipotle API base URL host is not approved.");
-  }
-  if (isApprovedLocalHost && allowLocalApiBase !== true) {
-    throw new Error("Lit Chipotle API base URL local override is not enabled.");
-  }
-  const normalizedPath = parsed.pathname.replace(/\/+$/, "");
-  if (normalizedPath && normalizedPath.toLowerCase() !== CHIPOTLE_API_PREFIX) {
-    throw new Error(`Lit Chipotle API base URL path must be empty or ${CHIPOTLE_API_PREFIX}.`);
-  }
-  if (parsed.search || parsed.hash) {
-    throw new Error("Lit Chipotle API base URL must not include query or fragment.");
-  }
-  return parsed.origin.replace(/\/+$/, "");
-};
-var normalizeChipotleRequestPath = (path) => {
-  const raw = toTrimmedString15(path);
-  if (!raw) return "/";
-  if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("//") || raw.includes("\\")) {
-    throw new Error("Lit Chipotle request path must be relative.");
-  }
-  if (raw.includes("#")) {
-    throw new Error("Lit Chipotle request path must not include a fragment.");
-  }
-  const pathOnly = raw.split("?")[0];
-  if (pathOnly.split("/").some((segment) => segment === "." || segment === "..") || /%2e/i.test(pathOnly)) {
-    throw new Error("Lit Chipotle request path must stay under the Chipotle API prefix.");
-  }
-  return `/${raw.replace(/^\/+/, "")}`;
-};
-var buildChipotleUrl = (apiBase, path, { allowLocalApiBase = false } = {}) => {
-  const normalizedBase = normalizeLitChipotleApiBase(apiBase, { allowLocalApiBase });
-  const normalizedPath = normalizeChipotleRequestPath(path);
-  return `${normalizedBase}${CHIPOTLE_API_PREFIX}${normalizedPath}`;
-};
-var parseJsonIfPossible = (value) => {
-  const trimmed = toTrimmedString15(value);
-  if (!trimmed) return {};
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    return { message: trimmed };
-  }
-};
-var extractChipotleErrorMessage = (status, body, fallback) => {
-  if (typeof body === "string" && body.trim()) return body.trim();
-  if (isObj22(body)) {
-    const nestedError = toTrimmedString15(body.error || body.message || body.detail);
-    if (nestedError) return nestedError;
-  }
-  return `${fallback} (${Number(status || 0) || 500})`;
-};
-var fetchChipotleJson = async ({
-  apiBase = DEFAULT_LIT_API_BASE,
-  apiKey = "",
-  path = "",
-  method = "GET",
-  body,
-  allowLocalApiBase = false,
-  fetchImpl = globalThis.fetch
-} = {}) => {
-  const requestUrl = buildChipotleUrl(apiBase, path, { allowLocalApiBase });
-  if (typeof fetchImpl !== "function") {
-    throw new Error("Fetch unavailable for Chipotle request.");
-  }
-  const normalizedApiKey = toTrimmedString15(apiKey);
-  const headers2 = {};
-  if (body !== void 0) {
-    headers2["Content-Type"] = "application/json";
-  }
-  if (normalizedApiKey) {
-    headers2["X-Api-Key"] = normalizedApiKey;
-    headers2.Authorization = `Bearer ${normalizedApiKey}`;
-  }
-  let response2;
-  try {
-    response2 = await fetchImpl(requestUrl, {
-      method,
-      headers: headers2,
-      // The deployed Workers runtime supports manual/follow, but rejects error.
-      // Never follow redirects with the attached Lit account credentials.
-      redirect: "manual",
-      ...body !== void 0 ? { body: JSON.stringify(body) } : {}
-    });
-  } catch (error) {
-    throw new Error(toTrimmedString15(error?.message || error) || "Chipotle request failed.");
-  }
-  if (response2.status >= 300 && response2.status < 400) {
-    throw new Error("Chipotle redirects are not allowed.");
-  }
-  const text = await response2.text().catch(() => "");
-  const parsed = parseJsonIfPossible(text);
-  if (!response2.ok) {
-    throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
-  }
-  if (isObj22(parsed) && toTrimmedString15(parsed.error || "").trim()) {
-    throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
-  }
-  return parsed;
-};
-var resolveLitChipotleRuntime = ({
-  env = {},
-  config = {},
-  secrets = {},
-  body = {}
-} = {}) => {
-  const litCredentials = isObj22(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj22(body) ? body : {};
-  const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
-  const envApiKey = toTrimmedString15(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
-  const requestApiKey = toTrimmedString15(requestBody.litUsageApiKey || requestBody.apiKey);
-  const secretApiKey = toTrimmedString15(secrets?.litUsageApiKey);
-  const litUsageApiKey = requestApiKey || secretApiKey || envApiKey;
-  let apiKeySource = "missing";
-  if (requestApiKey) apiKeySource = "request";
-  else if (secretApiKey) apiKeySource = "session-secret";
-  else if (envApiKey) apiKeySource = "worker-env";
-  return {
-    litApiBase: normalizeLitChipotleApiBase(
-      requestBody.litApiBase || litCredentials.litApiBase || env?.LIT_API_BASE || DEFAULT_LIT_API_BASE,
-      { allowLocalApiBase }
-    ),
-    allowLocalApiBase,
-    litUsageApiKey,
-    apiKeySource,
-    authorizationReady: isLitAuthorizationReady({ config, secrets }),
-    litGroupId: toTrimmedString15(requestBody.litGroupId || litCredentials.litGroupId),
-    litPkpId: toTrimmedString15(requestBody.litPkpId || litCredentials.litPkpId),
-    litActionCid: toTrimmedString15(requestBody.litActionCid || litCredentials.litActionCid),
-    customRpcUrl: toTrimmedString15(requestBody.customRpcUrl || secrets?.customRpcUrl),
-    customRpcKey: toTrimmedString15(requestBody.customRpcKey || secrets?.customRpcKey)
-  };
-};
-var resolveLitChipotleProvisioningRuntime = ({
-  env = {},
-  config = {},
-  secrets = {},
-  body = {}
-} = {}) => {
-  const litCredentials = isObj22(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj22(body) ? body : {};
-  const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
-  const secretManagementApiKey = toTrimmedString15(secrets?.litAccountApiKey);
-  const envManagementApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
-  const litManagementApiKey = secretManagementApiKey || envManagementApiKey;
-  const litGroupId = toTrimmedString15(requestBody.litGroupId || requestBody.groupId || litCredentials.litGroupId);
-  const litGroupName = toTrimmedString15(requestBody.litGroupName || requestBody.groupName);
-  const resolvedGroupSelector = litGroupId || litGroupName;
-  let apiKeySource = "missing";
-  if (secretManagementApiKey) apiKeySource = "session-secret";
-  else if (envManagementApiKey) apiKeySource = "worker-env";
-  return {
-    litApiBase: normalizeLitChipotleApiBase(
-      requestBody.litApiBase || litCredentials.litApiBase || env?.LIT_API_BASE || DEFAULT_LIT_API_BASE,
-      { allowLocalApiBase }
-    ),
-    allowLocalApiBase,
-    litManagementApiKey,
-    apiKeySource,
-    litGroupId: resolvedGroupSelector,
-    litPkpId: toTrimmedString15(requestBody.litPkpId || requestBody.pkpId || litCredentials.litPkpId),
-    litActionCid: toTrimmedString15(requestBody.litActionCid || litCredentials.litActionCid)
-  };
-};
-var ensureChipotleApiKey = (runtime = {}) => {
-  if (!toTrimmedString15(runtime?.litUsageApiKey)) {
-    throw new Error("Lit API key not configured.");
-  }
-};
-var ensureChipotleManagementApiKey = (runtime = {}) => {
-  if (!toTrimmedString15(runtime?.litManagementApiKey)) {
-    throw new Error("Lit account API key not configured.");
-  }
-};
-var buildPagedPath = (path, params = {}) => {
-  const query = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    const trimmed = toTrimmedString15(value);
-    if (!trimmed) return;
-    query.set(key, trimmed);
-  });
-  const serialized = query.toString();
-  return serialized ? `${path}?${serialized}` : path;
-};
-var runtimeAllowsLocalApiBase = (runtime = {}) => runtime?.allowLocalApiBase === true;
-var listGroupWallets = async ({ runtime, fetchImpl } = {}) => {
-  if (!toTrimmedString15(runtime?.litGroupId)) return [];
-  const response2 = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litUsageApiKey,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: buildPagedPath("/list_wallets_in_group", {
-      group_id: runtime.litGroupId,
-      page_number: DEFAULT_PAGE_NUMBER,
-      page_size: DEFAULT_PAGE_SIZE
-    }),
-    fetchImpl
-  });
-  return Array.isArray(response2) ? response2 : [];
-};
-var listActions = async ({ runtime, fetchImpl, groupId } = {}) => {
-  const rawGroupId = groupId === null ? "" : groupId === void 0 ? runtime?.litGroupId : groupId;
-  const resolvedGroupId = toTrimmedString15(rawGroupId);
-  if (groupId !== void 0 && groupId !== null && !resolvedGroupId && groupId !== "") return [];
-  const response2 = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litUsageApiKey || runtime.litManagementApiKey,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: buildPagedPath("/list_actions", {
-      ...resolvedGroupId ? { group_id: resolvedGroupId } : {},
-      page_number: DEFAULT_PAGE_NUMBER,
-      page_size: DEFAULT_PAGE_SIZE
-    }),
-    fetchImpl
-  });
-  return Array.isArray(response2) ? response2 : [];
-};
-var listGroupActions = async ({ runtime, fetchImpl } = {}) => {
-  if (!toTrimmedString15(runtime?.litGroupId)) return [];
-  return listActions({ runtime, fetchImpl, groupId: runtime.litGroupId });
-};
-var listWallets = async ({ runtime, fetchImpl } = {}) => {
-  const response2 = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litManagementApiKey,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: buildPagedPath("/list_wallets", {
-      page_number: DEFAULT_PAGE_NUMBER,
-      page_size: DEFAULT_PAGE_SIZE
-    }),
-    fetchImpl
-  });
-  return Array.isArray(response2) ? response2 : [];
-};
-var resolveActionCidMembership = async ({ runtime, actions = [], fetchImpl } = {}) => {
-  const configuredCid = toTrimmedString15(runtime?.litActionCid);
-  if (!configuredCid) return null;
-  if (!Array.isArray(actions)) return null;
-  const configuredCidLower = configuredCid.toLowerCase();
-  const configuredActionId = ethersUtils2.keccak256(
-    ethersUtils2.toUtf8Bytes(configuredCid)
-  ).toLowerCase();
-  return actions.some((action) => {
-    const actionId = normalizeChipotleMembershipValue(action?.id);
-    const actionCid = normalizeChipotleMembershipValue(
-      action?.action_ipfs_cid || action?.ipfs_cid || action?.cid
-    );
-    return actionId === configuredActionId || actionId === configuredCidLower || actionCid === configuredCidLower;
-  });
-};
-var createStatusWarning = (step, error) => ({
-  step: toTrimmedString15(step),
-  message: toTrimmedString15(error?.message || error) || "Unknown Chipotle status error."
-});
-var readLitChipotleStatus = async ({
-  runtime = {},
-  fetchImpl = globalThis.fetch
-} = {}) => {
-  const warnings = [];
-  const status = {
-    ok: true,
-    apiBase: runtime.litApiBase,
-    apiKeySource: runtime.apiKeySource,
-    litGroupId: runtime.litGroupId,
-    litPkpId: runtime.litPkpId,
-    litActionCid: runtime.litActionCid,
-    balance: null,
-    clientConfig: null,
-    warnings,
-    groupSummary: { walletCount: null, actionCount: null, hasConfiguredPkp: null, hasConfiguredAction: null },
-    needsFreshAuthority: runtime.authorizationReady !== true,
-    ready: false
-  };
-  if (!toTrimmedString15(runtime.litUsageApiKey)) {
-    warnings.push(createStatusWarning("api-key", "Lit API key not configured. Save an account API key to provision Lit."));
-    return status;
-  }
-  const balance = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litUsageApiKey,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: "/billing/balance",
-    fetchImpl
-  }).catch((error) => {
-    warnings.push(createStatusWarning("billing.balance", error));
-    return null;
-  });
-  const clientConfig = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: "/get_lit_action_client_config",
-    fetchImpl
-  }).catch((error) => {
-    warnings.push(createStatusWarning("client.config", error));
-    return null;
-  });
-  const wallets = await listGroupWallets({ runtime, fetchImpl }).catch((error) => {
-    warnings.push(createStatusWarning("group.wallets", error));
-    return null;
-  });
-  const actions = await listGroupActions({ runtime, fetchImpl }).catch((error) => {
-    warnings.push(createStatusWarning("group.actions", error));
-    return null;
-  });
-  const groupHasConfiguredPkp = runtime.litPkpId && Array.isArray(wallets) ? wallets.some((wallet) => {
-    const configuredPkp = normalizeChipotleMembershipValue(runtime.litPkpId);
-    return [
-      normalizeChipotleMembershipValue(normalizeValidChipotlePkpId(wallet?.id)),
-      normalizeChipotleMembershipValue(wallet?.wallet_address)
-    ].includes(configuredPkp);
-  }) : null;
-  const groupHasConfiguredAction = await resolveActionCidMembership({
-    runtime,
-    actions,
-    fetchImpl
-  }).catch((error) => {
-    warnings.push(createStatusWarning("group.action-membership", error));
-    return null;
-  });
-  return {
-    ...status,
-    balance,
-    clientConfig,
-    warnings,
-    groupSummary: {
-      walletCount: Array.isArray(wallets) ? wallets.length : null,
-      actionCount: Array.isArray(actions) ? actions.length : null,
-      hasConfiguredPkp: groupHasConfiguredPkp,
-      hasConfiguredAction: groupHasConfiguredAction
-    },
-    ready: runtime.authorizationReady === true && !!toTrimmedString15(runtime.litUsageApiKey) && groupHasConfiguredPkp !== false && groupHasConfiguredAction !== false
-  };
-};
-var deriveLitActionCid = async ({ runtime = {}, actionCode = "", fetchImpl = globalThis.fetch } = {}) => {
-  const normalizedCode = toTrimmedString15(actionCode);
-  if (!normalizedCode) throw new Error("Lit Action code is required.");
-  return toTrimmedString15(await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: "/get_lit_action_ipfs_id",
-    method: "POST",
-    body: normalizedCode,
-    fetchImpl
-  }));
-};
-var normalizeSessionScopedNameSegment = (value, fallback = "session") => {
-  const normalized = toTrimmedString15(value).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
-  return normalized || fallback;
-};
-var normalizeGateMode3 = (value) => toTrimmedString15(value).toLowerCase() === "all" ? "all" : "any";
-var isPrivateHostname = isPrivateOrLocalHostname;
-var validateChipotleRpcUrl = (value = "") => {
-  const raw = toTrimmedString15(value);
-  if (!raw) throw new Error("Lit Chipotle RPC URL is required.");
-  let parsed;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    throw new Error("Lit Chipotle RPC URL is invalid.");
-  }
-  if (parsed.protocol !== "https:") {
-    throw new Error("Lit Chipotle RPC URL must be HTTPS.");
-  }
-  if (isPrivateHostname(parsed.hostname)) {
-    throw new Error("Lit Chipotle RPC URL must be public.");
-  }
-  return parsed.toString();
-};
-var resolveConfigMappedChipotleRpcUrls = ({
-  config = {},
-  chainId = 0
-} = {}) => {
-  const normalizedChainId = toChainId(chainId);
-  if (!normalizedChainId) return [];
-  const map = isObj22(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
-  const mapped = normalizeChipotleRpcCandidateList(
-    map[normalizedChainId] || map[String(normalizedChainId)] || []
-  );
-  const direct = toChainId(config?.registryChainId) === normalizedChainId ? normalizeChipotleRpcCandidateList(config?.rpcUrl) : [];
-  return normalizeChipotleRpcCandidateList([...mapped, ...direct]);
-};
-var resolveDefaultChipotleRpcUrls = (chainId = 0) => {
-  const normalizedChainId = toChainId(chainId);
-  if (!normalizedChainId) return [];
-  const publicUrls = getPublicRpcUrls2(normalizedChainId);
-  return normalizeChipotleRpcCandidateList([
-    getPathRpcUrl2(normalizedChainId),
-    ...Array.isArray(publicUrls) ? publicUrls : []
-  ]);
-};
-var resolveSessionChipotleRpcUrl = ({
-  request = {},
-  config = {},
-  secrets = {},
-  chainId = 0,
-  op = ""
-} = {}) => {
-  const requestBody = isObj22(request) ? request : {};
-  const normalizedChainId = toChainId(chainId);
-  const requestRpcUrl = toTrimmedString15(requestBody.rpcUrl || requestBody.customRpcUrl);
-  const candidates = normalizeChipotleRpcCandidateList([
-    secrets?.customRpcUrl,
-    ...resolveConfigMappedChipotleRpcUrls({ config, chainId: normalizedChainId }),
-    ...resolveDefaultChipotleRpcUrls(normalizedChainId)
-  ]);
-  const approvedUrls = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const candidate of candidates) {
-    try {
-      const normalized = validateChipotleRpcUrl(candidate);
-      const key = normalized;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      approvedUrls.push(normalized);
-    } catch {
-    }
-  }
-  if (requestRpcUrl) {
-    const normalizedRequestRpcUrl = validateChipotleRpcUrl(requestRpcUrl);
-    const approved = approvedUrls.some((candidate) => candidate === normalizedRequestRpcUrl);
-    if (!approved) {
-      throw new Error("Lit Chipotle request RPC URL is not approved for this gate chain.");
-    }
-    return op === "encrypt" ? "" : normalizedRequestRpcUrl;
-  }
-  if (op === "encrypt") return "";
-  if (approvedUrls.length) return approvedUrls[0];
-  if (normalizedChainId) {
-    throw new Error(
-      `Lit Chipotle RPC URL is required or chain ${normalizedChainId} must have a known default RPC.`
-    );
-  }
-  throw new Error("Lit Chipotle RPC URL is required.");
-};
-var buildSessionBootstrapMetadata = ({
-  request = {},
-  sessionSlug = ""
-} = {}) => {
-  const requestBody = isObj22(request) ? request : {};
-  const slugSegment = normalizeSessionScopedNameSegment(
-    requestBody.sessionSlug || requestBody.slug || sessionSlug,
-    "session"
-  );
-  const sessionName = toTrimmedString15(requestBody.sessionName) || slugSegment;
-  const accountName = toTrimmedString15(requestBody.accountName) || `ce-session-${slugSegment}`;
-  const groupName = toTrimmedString15(requestBody.groupName) || `${accountName}-default`;
-  const usageKeyName = toTrimmedString15(requestBody.usageKeyName) || `${groupName}-runtime`;
-  return {
-    sessionName,
-    accountName,
-    accountDescription: toTrimmedString15(requestBody.accountDescription) || `Context Engine Lit account for session ${sessionName}`,
-    groupName,
-    groupDescription: toTrimmedString15(requestBody.groupDescription) || `Default Lit group for session ${sessionName}`,
-    usageKeyName,
-    usageKeyDescription: toTrimmedString15(requestBody.usageKeyDescription) || `Scoped runtime key for session ${sessionName}`
-  };
-};
-var createLitChipotleAccount = async ({
-  apiBase = DEFAULT_LIT_API_BASE,
-  allowLocalApiBase = false,
-  request = {},
-  sessionSlug = "",
-  fetchImpl = globalThis.fetch
-} = {}) => {
-  const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-  const requestBody = isObj22(request) ? request : {};
-  const response2 = await fetchChipotleJson({
-    apiBase,
-    allowLocalApiBase,
-    path: "/new_account",
-    method: "POST",
-    body: {
-      account_name: metadata.accountName,
-      account_description: metadata.accountDescription,
-      ...toTrimmedString15(requestBody.accountEmail) ? { email: toTrimmedString15(requestBody.accountEmail) } : {}
-    },
-    fetchImpl
-  });
-  return {
-    accountApiKey: toTrimmedString15(response2?.api_key),
-    accountWalletAddress: toTrimmedString15(response2?.wallet_address),
-    metadata
-  };
-};
-var createLitChipotleGroup = async ({
-  runtime = {},
-  request = {},
-  sessionSlug = "",
-  fetchImpl = globalThis.fetch
-} = {}) => {
-  const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-  const response2 = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litManagementApiKey,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: "/add_group",
-    method: "POST",
-    body: {
-      group_name: metadata.groupName,
-      group_description: metadata.groupDescription,
-      pkp_ids_permitted: [],
-      cid_hashes_permitted: []
-    },
-    fetchImpl
-  });
-  return {
-    groupId: toTrimmedString15(response2?.group_id),
-    metadata
-  };
-};
-var createLitChipotleWallet = async ({
-  runtime = {},
-  fetchImpl = globalThis.fetch,
-  checkpointWallet
-} = {}) => {
-  const response2 = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litManagementApiKey,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: "/create_wallet",
-    fetchImpl
-  });
-  const walletAddress = toTrimmedString15(response2?.wallet_address);
-  if (walletAddress) await checkpointWallet?.(walletAddress);
-  const wallets = await listWallets({ runtime, fetchImpl }).catch(() => []);
-  const matchedWallet = wallets.find((entry2) => {
-    const entryWalletAddress = toTrimmedString15(entry2?.wallet_address).toLowerCase();
-    return !!walletAddress && entryWalletAddress === walletAddress.toLowerCase();
-  });
-  return {
-    walletAddress,
-    litPkpId: normalizeValidChipotlePkpId(matchedWallet?.id) || walletAddress
-  };
-};
-var createLitChipotleUsageKey = async ({
-  runtime = {},
-  groupId = "",
-  request = {},
-  sessionSlug = "",
-  fetchImpl = globalThis.fetch
-} = {}) => {
-  const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-  const numericGroupId = Number(groupId || 0);
-  if (!Number.isFinite(numericGroupId) || numericGroupId <= 0) {
-    throw new Error("Lit group ID not configured.");
-  }
-  const response2 = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litManagementApiKey,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: "/add_usage_api_key",
-    method: "POST",
-    body: {
-      name: metadata.usageKeyName,
-      description: metadata.usageKeyDescription,
-      can_create_groups: false,
-      can_delete_groups: false,
-      can_create_pkps: false,
-      manage_ipfs_ids_in_groups: [],
-      add_pkp_to_groups: [],
-      remove_pkp_from_groups: [],
-      execute_in_groups: [numericGroupId]
-    },
-    fetchImpl
-  });
-  return {
-    usageApiKey: toTrimmedString15(response2?.usage_api_key),
-    metadata
-  };
-};
-var readChipotleBillingBalance = async ({
-  apiBase = DEFAULT_LIT_API_BASE,
-  apiKey = "",
-  allowLocalApiBase = false,
-  fetchImpl = globalThis.fetch
-} = {}) => fetchChipotleJson({
-  apiBase,
-  apiKey,
-  allowLocalApiBase,
-  path: "/billing/balance",
-  fetchImpl
-}).catch(() => null);
-var ensureActionMetadata = async ({ runtime = {}, litActionCid = "", actionName = "", actionDescription = "", fetchImpl = globalThis.fetch } = {}) => {
-  const actions = await listActions({ runtime, fetchImpl, groupId: null });
-  const hasAction = await resolveActionCidMembership({
-    runtime: { ...runtime, litActionCid },
-    actions,
-    fetchImpl
-  });
-  if (hasAction) {
-    return { created: false };
-  }
-  const response2 = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litManagementApiKey,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: "/add_action",
-    method: "POST",
-    body: {
-      action_ipfs_cid: litActionCid,
-      name: toTrimmedString15(actionName) || "Context Engine Lit Action",
-      description: toTrimmedString15(actionDescription) || "Provisioned by Context Engine"
-    },
-    fetchImpl
-  });
-  return {
-    created: true,
-    response: response2
-  };
-};
-var ensureActionInGroup = async ({ runtime = {}, groupId = "", litActionCid = "", fetchImpl = globalThis.fetch } = {}) => {
-  const actions = await listActions({
-    runtime: { ...runtime, litGroupId: groupId },
-    fetchImpl,
-    groupId
-  });
-  const hasAction = await resolveActionCidMembership({
-    runtime: { ...runtime, litActionCid },
-    actions,
-    fetchImpl
-  });
-  if (hasAction) {
-    return { added: false };
-  }
-  const response2 = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litManagementApiKey,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: "/add_action_to_group",
-    method: "POST",
-    body: {
-      group_id: Number(groupId),
-      action_ipfs_cid: litActionCid
-    },
-    fetchImpl
-  });
-  return {
-    added: true,
-    response: response2
-  };
-};
-var ensurePkpInGroup = async ({ runtime = {}, groupId = "", fetchImpl = globalThis.fetch } = {}) => {
-  const wallets = await listGroupWallets({
-    runtime: {
-      ...runtime,
-      litGroupId: groupId,
-      litUsageApiKey: runtime.litManagementApiKey
-    },
-    fetchImpl
-  });
-  const configuredPkp = normalizeChipotleMembershipValue(runtime?.litPkpId);
-  const hasPkp = wallets.some((wallet) => !!configuredPkp && [
-    normalizeChipotleMembershipValue(normalizeValidChipotlePkpId(wallet?.id)),
-    normalizeChipotleMembershipValue(wallet?.wallet_address)
-  ].includes(configuredPkp));
-  if (hasPkp) {
-    return { added: false };
-  }
-  const response2 = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litManagementApiKey,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: "/add_pkp_to_group",
-    method: "POST",
-    body: {
-      group_id: Number(groupId),
-      pkp_id: toTrimmedString15(runtime?.litPkpId)
-    },
-    fetchImpl
-  });
-  return {
-    added: true,
-    response: response2
-  };
-};
-var provisionLitChipotleAction = async ({ runtime = {}, config = {}, secrets = {}, request = {}, sessionSlug = "", persistAuthorizationSecret, provisioning, checkpointProvisioning, fetchImpl = globalThis.fetch } = {}) => {
-  ensureChipotleManagementApiKey(runtime);
-  return bootstrapLitChipotleSession({
-    env: {
-      LIT_API_BASE: runtime.litApiBase,
-      LIT_ACCOUNT_API_KEY: runtime.litManagementApiKey,
-      LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE: runtime.allowLocalApiBase ? "true" : ""
-    },
-    config,
-    secrets,
-    request,
-    sessionSlug,
-    persistAuthorizationSecret,
-    provisioning,
-    checkpointProvisioning,
-    fetchImpl
-  });
-};
-var bootstrapLitChipotleSession = async (options = {}) => {
-  const config = options.config || {};
-  const secrets = options.secrets || {};
-  const credentials = config.litCredentials || {};
-  const freshAuthority = options.request?.freshAuthority === true;
-  const hasAuthority = !!(credentials.litActionCid || credentials.litPkpId || credentials.litGroupId);
-  if (hasAuthority && credentials.litAuthorizationVersion !== LIT_AUTHORIZATION_VERSION && !freshAuthority) {
-    throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
-  }
-  const authorization = await prepareLitAuthorization({
-    secrets,
-    // Reprovision Lit authority without rotating the independent session signer.
-    persistAuthorizationSecret: options.persistAuthorizationSecret
-  });
-  if (!freshAuthority && credentials.litAuthorizationSigner && credentials.litAuthorizationSigner.toLowerCase() !== authorization.litAuthorizationSigner.toLowerCase()) {
-    throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
-  }
-  const result = await bootstrapLitChipotleSessionCore({
-    ...options,
-    config: freshAuthority ? { ...config, litCredentials: { litApiBase: credentials.litApiBase } } : config,
-    secrets: freshAuthority ? { ...secrets, litUsageApiKey: "" } : secrets,
-    request: { ...options.request, actionCode: DEFAULT_CHIPOTLE_ACTION_CODE },
-    buildActionCode: (pkpId) => buildWorkerAuthorizedLitAction({
-      signer: authorization.litAuthorizationSigner,
-      sessionSlug: options.sessionSlug || "",
-      pkpId
-    })
-  });
-  return {
-    ...result,
-    litAuthorizationVersion: authorization.litAuthorizationVersion,
-    litAuthorizationSigner: authorization.litAuthorizationSigner,
-    litCredentials: {
-      ...result.litCredentials,
-      litAuthorizationVersion: authorization.litAuthorizationVersion,
-      litAuthorizationSigner: authorization.litAuthorizationSigner
-    },
-    secretOutputs: { ...result.secretOutputs, litAuthorizationPrivateKey: authorization.litAuthorizationPrivateKey }
-  };
-};
-var bootstrapLitChipotleSessionCore = async ({
-  env = {},
-  config = {},
-  secrets = {},
-  request = {},
-  sessionSlug = "",
-  buildActionCode,
-  provisioning = {},
-  checkpointProvisioning,
-  fetchImpl = globalThis.fetch
-} = {}) => {
-  const progress = { ...provisioning };
-  const checkpoint = async (values) => {
-    Object.assign(progress, values);
-    await checkpointProvisioning?.({ ...progress });
-  };
-  const litCredentials = isObj22(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj22(request) ? request : {};
-  const secretAccountApiKey = toTrimmedString15(secrets?.litAccountApiKey);
-  const requestAccountApiKey = toTrimmedString15(requestBody.litAccountApiKey);
-  const envAccountApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY);
-  const supplied = {
-    litAccountApiKey: [requestAccountApiKey, secretAccountApiKey || requestAccountApiKey || envAccountApiKey],
-    litApiBase: [requestBody.litApiBase, litCredentials.litApiBase || env.LIT_API_BASE],
-    litGroupId: [litCredentials.litGroupId],
-    litPkpId: [litCredentials.litPkpId],
-    litActionCid: [litCredentials.litActionCid],
-    litUsageApiKey: [litCredentials.litGroupId === progress.litGroupId ? secrets.litUsageApiKey : ""]
-  };
-  for (const [key, candidates] of Object.entries(supplied)) {
-    const normalize = (value) => {
-      const text = toTrimmedString15(value);
-      if (key !== "litApiBase" || !text) return text;
-      try {
-        return normalizeLitChipotleApiBase(text, { allowLocalApiBase: isLitChipotleLocalApiBaseAllowed(env) });
-      } catch {
-        return text;
-      }
-    };
-    const saved = normalize(progress[key]);
-    if (saved && candidates.some((value) => normalize(value) && normalize(value) !== saved)) {
-      throw Object.assign(new Error(LIT_PROVISIONING_CREDENTIALS_CONFLICT), {
-        status: 409,
-        code: "lit_provisioning_credentials_conflict"
-      });
-    }
-  }
-  let accountApiKey = toTrimmedString15(progress.litAccountApiKey) || secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
-  const accountSource = secretAccountApiKey ? "session-secret" : requestAccountApiKey ? "admin-request" : envAccountApiKey ? "worker-env" : "missing";
-  let accountSecretOutput = Object.hasOwn(progress, "accountSecretOutput") ? progress.accountSecretOutput : accountSource === "worker-env" ? "" : accountApiKey;
-  let groupId = toTrimmedString15(progress.litGroupId || litCredentials.litGroupId);
-  let usageApiKey = toTrimmedString15(progress.litUsageApiKey || (groupId && groupId === toTrimmedString15(litCredentials.litGroupId) ? secrets?.litUsageApiKey : ""));
-  let litPkpId = toTrimmedString15(progress.litPkpId || litCredentials.litPkpId);
-  let litActionCid = toTrimmedString15(progress.litActionCid || litCredentials.litActionCid);
-  const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
-  const litApiBase = normalizeLitChipotleApiBase(progress.litApiBase || requestBody.litApiBase || litCredentials.litApiBase || env.LIT_API_BASE || DEFAULT_LIT_API_BASE, { allowLocalApiBase });
-  const steps = {
-    createdAccount: false,
-    createdGroup: false,
-    createdWallet: false,
-    derivedCid: false,
-    registeredAction: false,
-    addedActionToGroup: false,
-    addedPkpToGroup: false,
-    createdUsageKey: false
-  };
-  if (litActionCid && !progress.litActionCid) {
-    if (!litPkpId) throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
-    const expectedCid = await deriveLitActionCid({ runtime: { litApiBase, allowLocalApiBase }, actionCode: buildActionCode(litPkpId), fetchImpl });
-    if (expectedCid !== litActionCid) throw new Error("Lit Action code does not match the configured Lit Action CID. Reprovision with a fresh session authority.");
-  }
-  const alreadyBootstrapped = !!(accountApiKey && usageApiKey && groupId && litPkpId && litActionCid && !Object.keys(provisioning).length);
-  await checkpoint({
-    litApiBase,
-    ...accountApiKey ? { litAccountApiKey: accountApiKey, accountSecretOutput } : {},
-    ...groupId ? { litGroupId: groupId } : {},
-    ...litPkpId ? { litPkpId } : {},
-    ...litActionCid ? { litActionCid } : {},
-    ...usageApiKey && groupId ? { litUsageApiKey: usageApiKey } : {},
-    ...alreadyBootstrapped ? { registeredAction: true, addedActionToGroup: true, addedPkpToGroup: true } : {}
-  });
-  if (!toTrimmedString15(requestBody.actionCode || requestBody.code) && !litActionCid) throw new Error("Lit Action code is required.");
-  if (!accountApiKey) {
-    const account = await createLitChipotleAccount({ apiBase: litApiBase, allowLocalApiBase, request: requestBody, sessionSlug, fetchImpl });
-    accountApiKey = toTrimmedString15(account.accountApiKey);
-    if (!accountApiKey) throw new Error("Lit account bootstrap did not return an account API key.");
-    accountSecretOutput = accountApiKey;
-    steps.createdAccount = true;
-    await checkpoint({ litAccountApiKey: accountApiKey, accountSecretOutput, accountWalletAddress: account.accountWalletAddress });
-  }
-  const runtime = { litApiBase, allowLocalApiBase, litManagementApiKey: accountApiKey, apiKeySource: accountSource };
-  if (!groupId) {
-    groupId = toTrimmedString15((await createLitChipotleGroup({ runtime, request: requestBody, sessionSlug, fetchImpl })).groupId);
-    if (!groupId) throw new Error("Lit session bootstrap did not return a group ID.");
-    steps.createdGroup = true;
-    await checkpoint({ litGroupId: groupId });
-  }
-  if (!litPkpId) {
-    const wallet = await createLitChipotleWallet({
-      runtime,
-      fetchImpl,
-      checkpointWallet: (id2) => checkpoint({ litPkpId: id2 })
-    });
-    litPkpId = toTrimmedString15(wallet.litPkpId);
-    if (!litPkpId) throw new Error("Lit session bootstrap did not return a PKP ID.");
-    steps.createdWallet = true;
-    await checkpoint({ litPkpId });
-  }
-  const runtimeWithGroup = { ...runtime, litGroupId: groupId, litPkpId };
-  if (!litActionCid) {
-    litActionCid = await deriveLitActionCid({ runtime: runtimeWithGroup, actionCode: buildActionCode(litPkpId), fetchImpl });
-    steps.derivedCid = true;
-    await checkpoint({ litActionCid });
-  }
-  if (!alreadyBootstrapped && !progress.registeredAction) {
-    steps.registeredAction = (await ensureActionMetadata({
-      runtime: runtimeWithGroup,
-      litActionCid,
-      actionName: requestBody.actionName || requestBody.name,
-      actionDescription: requestBody.actionDescription || requestBody.description,
-      fetchImpl
-    })).created;
-    await checkpoint({ registeredAction: true });
-  }
-  if (!alreadyBootstrapped && !progress.addedActionToGroup) {
-    steps.addedActionToGroup = (await ensureActionInGroup({ runtime: runtimeWithGroup, groupId, litActionCid, fetchImpl })).added;
-    await checkpoint({ addedActionToGroup: true });
-  }
-  if (!alreadyBootstrapped && !progress.addedPkpToGroup) {
-    steps.addedPkpToGroup = (await ensurePkpInGroup({ runtime: runtimeWithGroup, groupId, fetchImpl })).added;
-    await checkpoint({ addedPkpToGroup: true });
-  }
-  if (!usageApiKey || steps.createdGroup) {
-    usageApiKey = toTrimmedString15((await createLitChipotleUsageKey({ runtime: runtimeWithGroup, groupId, request: requestBody, sessionSlug, fetchImpl })).usageApiKey);
-    if (!usageApiKey) throw new Error("Lit session bootstrap did not return a usage API key.");
-    steps.createdUsageKey = true;
-    await checkpoint({ litUsageApiKey: usageApiKey });
-  }
-  const billingBalance = alreadyBootstrapped ? void 0 : await readChipotleBillingBalance({ apiBase: litApiBase, apiKey: accountApiKey, allowLocalApiBase, fetchImpl });
-  return {
-    ok: true,
-    bootstrapMode: steps.createdAccount || alreadyBootstrapped && (secretAccountApiKey || !envAccountApiKey) ? "session-account" : "existing-account",
-    alreadyBootstrapped,
-    apiBase: litApiBase,
-    litActionCid,
-    litGroupId: groupId,
-    litPkpId,
-    ...steps.createdAccount ? { accountWalletAddress: progress.accountWalletAddress } : {},
-    ...billingBalance !== void 0 ? { billingBalance } : {},
-    litCredentials: { litApiBase, litActionCid, litGroupId: groupId, litPkpId },
-    secretOutputs: { litAccountApiKey: accountSecretOutput, litUsageApiKey: usageApiKey },
-    steps
-  };
-};
-var executeLitChipotleAction = async ({
-  runtime = {},
-  request = {},
-  fetchImpl = globalThis.fetch
-} = {}) => {
-  ensureChipotleApiKey(runtime);
-  const actionRequest = isObj22(request) ? request : {};
-  const code = toTrimmedString15(actionRequest.code);
-  const ipfsId = toTrimmedString15(
-    actionRequest.ipfsId || actionRequest.ipfs_id || runtime.litActionCid
-  );
-  if (!code && !ipfsId) {
-    throw new Error("Lit Action CID or inline code is required.");
-  }
-  const payload = {};
-  if (code) payload.code = code;
-  if (!code && ipfsId) payload.ipfs_id = ipfsId;
-  if (Object.prototype.hasOwnProperty.call(actionRequest, "jsParams")) {
-    payload.js_params = actionRequest.jsParams;
-  } else if (Object.prototype.hasOwnProperty.call(actionRequest, "js_params")) {
-    payload.js_params = actionRequest.js_params;
-  }
-  let response2;
-  try {
-    response2 = await fetchChipotleJson({
-      apiBase: runtime.litApiBase,
-      apiKey: runtime.litUsageApiKey,
-      allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-      path: "/lit_action",
-      method: "POST",
-      body: payload,
-      fetchImpl
-    });
-  } catch (error) {
-    const message = toTrimmedString15(error?.message || error);
-    if (/not found/i.test(message)) {
-      throw new Error("Lit Chipotle action was not found or is not permitted for this session usage key. Re-run Lit Chipotle provisioning for this session worker.");
-    }
-    throw error;
-  }
-  return {
-    ok: true,
-    apiBase: runtime.litApiBase,
-    apiKeySource: runtime.apiKeySource,
-    response: response2
-  };
-};
-var executeSessionLitChipotleAction = async ({
-  env = {},
-  config = {},
-  secrets = {},
-  request = {},
-  requesterAddress = "",
-  sessionSlug = "",
-  fetchImpl = globalThis.fetch
-} = {}) => {
-  const litCredentials = isObj22(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj22(request) ? request : {};
-  const runtime = resolveLitChipotleRuntime({
-    env,
-    config,
-    secrets,
-    body: {}
-  });
-  ensureChipotleApiKey(runtime);
-  const litPkpId = toTrimmedString15(litCredentials?.litPkpId || runtime.litPkpId);
-  if (!litPkpId) {
-    throw new Error("Lit PKP ID not configured.");
-  }
-  const litActionCid = toTrimmedString15(litCredentials?.litActionCid || runtime.litActionCid);
-  if (!litActionCid) {
-    throw new Error("Lit Action CID not configured.");
-  }
-  const { wallet, actionCode } = resolveLitAuthorization({ secrets, config, sessionSlug });
-  const derivedActionCid = await deriveLitActionCid({ runtime, actionCode, fetchImpl });
-  if (derivedActionCid !== litActionCid) {
-    throw new Error("Lit Action code does not match the configured Lit Action CID.");
-  }
-  const op = toTrimmedString15(requestBody.op).toLowerCase();
-  if (!["check", "encrypt", "decrypt"].includes(op)) {
-    throw new Error("Lit Chipotle op must be check, encrypt, or decrypt.");
-  }
-  const sbtAddresses = normalizeChipotleSbtAddresses(requestBody.sbtAddresses);
-  if (!sbtAddresses.length) {
-    throw new Error("Lit Chipotle requires at least one SBT address.");
-  }
-  const gateMode = normalizeGateMode3(requestBody.gateMode);
-  const gateChainId = resolveChainIdWithLegacyFallback(
-    requestBody.chainId,
-    resolveChainIdWithLegacyFallback(
-      requestBody.gateChainId,
-      resolveChainIdWithLegacyFallback(
-        config?.networkChainId,
-        resolveChainIdWithLegacyFallback(config?.registryChainId, 0)
-      )
-    )
-  );
-  if (!gateChainId) {
-    throw new Error("Lit Chipotle requires a gate chain ID.");
-  }
-  const policy = buildLitChipotlePolicy({
-    chainId: gateChainId,
-    gateMode,
-    sbtAddresses,
-    litActionCid,
-    litPkpId
-  });
-  const expectedPolicyFingerprint = fingerprintLitChipotlePolicy(policy);
-  const rpcUrl = resolveSessionChipotleRpcUrl({
-    request: requestBody,
-    config,
-    secrets,
-    chainId: gateChainId,
-    op
-  });
-  const normalizedRequesterAddress = toTrimmedString15(requesterAddress);
-  if (!normalizedRequesterAddress) {
-    throw new Error("Requester address unavailable for Lit Chipotle action.");
-  }
-  const jsParams = {
-    op,
-    pkpId: litPkpId,
-    litActionCid,
-    requesterAddress: normalizedRequesterAddress,
-    sbtAddresses,
-    gateMode,
-    expectedChainId: gateChainId,
-    expectedPolicyFingerprint,
-    policy
-  };
-  if (rpcUrl) {
-    jsParams.rpcUrl = rpcUrl;
-  }
-  if (op === "encrypt") {
-    const cekHex = normalizeChipotleCekHex(requestBody.message);
-    const wrappedPlaintext = buildLitChipotleWrappedPlaintext({
-      cekHex,
-      policy
-    });
-    jsParams.message = JSON.stringify(wrappedPlaintext);
-    if (!cekHex) {
-      throw new Error("Lit Chipotle encrypt requires a message.");
-    }
-  }
-  if (op === "decrypt") {
-    const metadataVersion = normalizeLitChipotleMetadataVersion(requestBody.chipotle || {});
-    if (metadataVersion && metadataVersion !== 2) {
-      throw new Error("Lit Chipotle legacy wrapped keys are not supported.");
-    }
-    jsParams.ciphertext = toTrimmedString15(requestBody.ciphertext);
-    if (!jsParams.ciphertext) {
-      throw new Error("Lit Chipotle decrypt requires ciphertext.");
-    }
-  }
-  const replyContext = await authorizeLitRequest({ wallet, jsParams, sessionSlug });
-  const actionRuntime = {
-    ...runtime,
-    litActionCid,
-    litPkpId
-  };
-  let result;
-  try {
-    result = await executeLitChipotleAction({
-      runtime: actionRuntime,
-      request: {
-        // Execute only the Worker-owned source whose CID matches this authority.
-        ipfsId: litActionCid,
-        jsParams
-      },
-      fetchImpl
-    });
-  } catch (error) {
-    const message = toTrimmedString15(error?.message || error).toLowerCase();
-    if (!message.includes("no cached code found") && !message.includes("cache miss for ipfs id")) {
-      throw new Error("Lit Action execution failed. Ask the session admin to verify Lit provisioning and account access.");
-    }
-    try {
-      result = await executeLitChipotleAction({
-        runtime: actionRuntime,
-        request: {
-          code: actionCode,
-          jsParams
-        },
-        fetchImpl
-      });
-    } catch {
-      throw new Error("Lit Action execution failed. Ask the session admin to verify Lit provisioning and account access.");
-    }
-  }
-  if (result.response?.has_error) throw new Error("Lit Action authorization failed.");
-  const rawResponse = result.response?.response ?? result.response;
-  let response2;
-  try {
-    response2 = typeof rawResponse === "string" ? JSON.parse(rawResponse) : rawResponse;
-  } catch {
-    throw new Error("Invalid Lit Action response.");
-  }
-  if (!response2 || typeof response2 !== "object") throw new Error("Invalid Lit Action response.");
-  if (op === "decrypt" && response2.ok === true && response2.allowed === true) {
-    const plaintext = normalizeChipotleCekHex(await openLitReply(response2.encryptedReply, replyContext));
-    return { ok: true, response: { ok: true, allowed: true, op, plaintext, policyFingerprint: expectedPolicyFingerprint } };
-  }
-  return { ok: true, response: {
-    ok: response2.ok === true,
-    allowed: response2.allowed === true,
-    op,
-    ...response2.allowed === false ? { reason: "Requester does not satisfy the SBT gate." } : {},
-    ...op === "encrypt" && typeof response2.ciphertext === "string" ? { ciphertext: response2.ciphertext } : {},
-    policyFingerprint: expectedPolicyFingerprint,
-    policy
-  } };
-};
-
-// workers/sessionCorsWorker/adminRequestDispatch.js
+init_chipotleClient();
 init_sponsoredBootstrapGrantStore();
 init_deployHelperCore();
 init_storageRouteExecution();
@@ -101785,8 +101820,16 @@ var dispatchAdminRequest = async ({
     let attempt;
     const coordination = { env, slug: targetSlug, baseConfig: existingConfig, expectedAuthority };
     try {
-      attempt = await (deps?.beginSessionLitProvisioning || beginSessionLitProvisioning)({ ...coordination, freshAuthority: body.freshAuthority === true });
       const existingSecrets = { ...await deps?.getSessionSecrets?.(env, targetSlug) || {} };
+      const runtime = action === "lit-chipotle-provision" ? (deps?.resolveLitChipotleProvisioningRuntime || resolveLitChipotleProvisioningRuntime)({ env, config: existingConfig, secrets: existingSecrets, body }) : null;
+      if (runtime) ensureChipotleManagementApiKey(runtime);
+      const beginArgs = {
+        ...coordination,
+        freshAuthority: body.freshAuthority === true,
+        accountApiKeys: [body.litAccountApiKey, existingSecrets.litAccountApiKey || body.litAccountApiKey || runtime?.litManagementApiKey || env.LIT_ACCOUNT_API_KEY]
+      };
+      await (deps?.preflightSessionLitProvisioning || preflightSessionLitProvisioning)(beginArgs);
+      attempt = await (deps?.beginSessionLitProvisioning || beginSessionLitProvisioning)(beginArgs);
       const options = {
         env,
         config: existingConfig,
@@ -101821,12 +101864,6 @@ var dispatchAdminRequest = async ({
       };
       let result;
       if (action === "lit-chipotle-provision") {
-        const runtime = (deps?.resolveLitChipotleProvisioningRuntime || resolveLitChipotleProvisioningRuntime)({
-          env,
-          config: existingConfig,
-          secrets: existingSecrets,
-          body
-        });
         result = await (deps?.provisionLitChipotleAction || provisionLitChipotleAction)({ ...options, runtime });
       } else {
         result = await (deps?.bootstrapLitChipotleSession || bootstrapLitChipotleSession)(options);
@@ -101848,7 +101885,7 @@ var dispatchAdminRequest = async ({
       delete responseBody.litCredentials;
       return deps?.json?.(responseBody, 200, headers2);
     } catch (error) {
-      return deps?.json?.({ error: error?.code === "lit_provisioning_credentials_conflict" ? LIT_PROVISIONING_CREDENTIALS_CONFLICT : "Lit provisioning did not finish. Retry to resume its saved progress." }, error?.status || 502, headers2);
+      return deps?.json?.({ error: error?.code === "lit_provisioning_credentials_conflict" ? LIT_PROVISIONING_CREDENTIALS_CONFLICT : error?.code === "lit_management_key_missing" ? "Lit account API key not configured." : error?.code === "lit_provisioning_resources_pending" ? error.message : "Lit provisioning did not finish. Retry to resume its saved progress." }, error?.status || 502, headers2);
     } finally {
       if (attempt) {
         try {
@@ -104929,6 +104966,7 @@ init_aiRequestPolicy();
 init_sessionWriteCoordinator();
 init_aiDefaults();
 init_aiRequestNormalization();
+init_chipotleClient();
 init_sessionLifecycle();
 var resolveDefaultModelForProvider2 = (provider) => {
   if (provider === "anthropic") return "claude-3-5-sonnet-20240620";

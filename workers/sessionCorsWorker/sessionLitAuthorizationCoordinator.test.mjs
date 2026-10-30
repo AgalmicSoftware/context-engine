@@ -505,6 +505,17 @@ for (const step of ['litAccountApiKey', 'litGroupId', 'litPkpId', 'litActionCid'
     f.restart();
     await assert.rejects(beginProvisioning(f), error => error.status === 409);
     f.advance(6 * 60_000);
+    if (step !== 'litAccountApiKey') {
+      await assert.rejects(provisioning.beginSessionLitProvisioning({ env: f.env, slug: 'fixture', baseConfig,
+        expectedAuthority: await f.expected(), freshAuthority: true }), error => {
+        assert.equal(error.status, 409);
+        assert.match(error.message, /Resume/);
+        assert.ok(!error.message.includes('recoverable-account-key'));
+        return true;
+      });
+      assert.deepEqual(await decryptSessionSecretsEnvelope(f.store.get(PROVISIONING_RECORD).envelope,
+        { env: f.env, slug: 'fixture' }), recovered);
+    }
     const contenders = await Promise.allSettled([beginProvisioning(f), beginProvisioning(f)]);
     assert.equal(contenders.filter(result => result.status === 'fulfilled').length, 1);
     const resumed = contenders.find(result => result.status === 'fulfilled').value;
@@ -521,7 +532,7 @@ for (const step of ['litAccountApiKey', 'litGroupId', 'litPkpId', 'litActionCid'
 test('a handled setup failure releases its attempt while retaining the checkpoint', async () => {
   const f = createFixture();
   const first = await beginProvisioning(f);
-  await provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(), attemptId: first.attemptId, checkpoint: { litAccountApiKey: 'recoverable-key' } });
+  await provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(), attemptId: first.attemptId, checkpoint: { litAccountApiKey: 'recoverable-key', accountWalletAddress: 'fixture-account' } });
   await provisioning.releaseSessionLitProvisioning({ env: f.env, slug: 'fixture', attemptId: first.attemptId });
   const second = await beginProvisioning(f);
   assert.equal(second.checkpoint.litAccountApiKey, 'recoverable-key');
@@ -570,18 +581,69 @@ for (const freshAuthority of [false, true]) test(`a failed resource-free bootstr
     secretOutputs: result.secretOutputs })).ok, true);
 });
 
-test('a fresh-authority choice discards a released checkpoint for the previous choice', async () => {
+test('a fresh-authority switch preserves resource ids and offers Resume without exposing keys', async () => {
   const f = createFixture();
   const first = await beginProvisioning(f);
+  const saved = { litGroupId: 'previous-group', litPkpId: 'previous-pkp', litActionCid: 'previous-action',
+    litAccountApiKey: 'private-account-key', litUsageApiKey: 'private-usage-key', accountWalletAddress: 'fixture-account' };
   await provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(),
-    attemptId: first.attemptId, checkpoint: { litGroupId: 'previous-group' } });
+    attemptId: first.attemptId, checkpoint: saved });
+  await provisioning.releaseSessionLitProvisioning({ env: f.env, slug: 'fixture', attemptId: first.attemptId });
+  const previous = structuredClone(f.store.get(PROVISIONING_RECORD));
   await assert.rejects(provisioning.beginSessionLitProvisioning({ env: f.env, slug: 'fixture', baseConfig,
-    expectedAuthority: await f.expected(), freshAuthority: true }), error => error.status === 409);
+    expectedAuthority: await f.expected(), freshAuthority: true }), error => {
+    assert.equal(error.status, 409);
+    for (const id of ['previous-group', 'previous-pkp', 'previous-action', 'Resume']) assert.ok(error.message.includes(id));
+    assert.ok(!error.message.includes('private-'));
+    return true;
+  });
+  assert.deepEqual(f.store.get(PROVISIONING_RECORD), previous);
+  assert.deepEqual((await beginProvisioning(f)).checkpoint, saved);
+});
+
+test('switching a setup with only an allocated account reuses that account', async () => {
+  const f = createFixture();
+  const first = await beginProvisioning(f);
+  const saved = { litAccountApiKey: 'recoverable-account-key', accountSecretOutput: 'recoverable-account-key', accountWalletAddress: 'fixture-account' };
+  await provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(), attemptId: first.attemptId, checkpoint: saved });
   await provisioning.releaseSessionLitProvisioning({ env: f.env, slug: 'fixture', attemptId: first.attemptId });
   const next = await provisioning.beginSessionLitProvisioning({ env: f.env, slug: 'fixture', baseConfig,
     expectedAuthority: await f.expected(), freshAuthority: true });
+  assert.deepEqual(next.checkpoint, saved);
+  const remote = litRemoteFixture();
+  await bootstrapLitChipotleSession({ config: baseConfig, secrets: { litAuthorizationPrivateKey: KEY_A }, sessionSlug: 'fixture',
+    request: { freshAuthority: true }, provisioning: next.checkpoint, fetchImpl: remote.fetch });
+  assert.equal(remote.calls.get('/new_account') || 0, 0);
+});
+
+test('an unverified admin key alone does not reserve a resource or block a corrected key', async () => {
+  const f = createFixture();
+  const first = await beginProvisioning(f);
+  await provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(),
+    attemptId: first.attemptId, checkpoint: { litAccountApiKey: 'unverified-key', accountSecretOutput: 'unverified-key' } });
+  await provisioning.releaseSessionLitProvisioning({ env: f.env, slug: 'fixture', attemptId: first.attemptId });
+  const next = await provisioning.beginSessionLitProvisioning({ env: f.env, slug: 'fixture', baseConfig,
+    expectedAuthority: await f.expected(), accountApiKeys: ['corrected-key'] });
   assert.deepEqual(next.checkpoint, {});
-  assert.notEqual(next.attemptId, first.attemptId);
+});
+
+test('a wrong key is refused before begin and the right key can resume unchanged resources', async () => {
+  const f = createFixture();
+  const first = await beginProvisioning(f);
+  const saved = { litAccountApiKey: 'correct-private-key', litGroupId: '7', accountWalletAddress: 'fixture-account' };
+  await provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(), attemptId: first.attemptId, checkpoint: saved });
+  await provisioning.releaseSessionLitProvisioning({ env: f.env, slug: 'fixture', attemptId: first.attemptId });
+  const previous = structuredClone(f.store.get(PROVISIONING_RECORD));
+  const args = { env: f.env, slug: 'fixture', baseConfig, expectedAuthority: await f.expected() };
+  await assert.rejects(provisioning.preflightSessionLitProvisioning({ ...args, accountApiKeys: ['wrong-private-key'] }), error => {
+    assert.equal(error.status, 409);
+    assert.match(error.message, /conflict with saved setup/);
+    assert.ok(!error.message.includes('private-key'));
+    return true;
+  });
+  assert.deepEqual(f.store.get(PROVISIONING_RECORD), previous);
+  await provisioning.preflightSessionLitProvisioning({ ...args, accountApiKeys: ['correct-private-key'] });
+  assert.deepEqual((await provisioning.beginSessionLitProvisioning({ ...args, accountApiKeys: ['correct-private-key'] })).checkpoint, saved);
 });
 
 test('checkpoint persistence is fenced by its attempt and authority epoch rather than its starting config revision', async () => {

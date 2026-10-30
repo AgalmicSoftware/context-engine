@@ -181,6 +181,7 @@ const createAdminDeps = (overrides = {}) => {
       return { ok: true, status: 200, body: { ok: true } };
     };
   }
+  deps.preflightSessionLitProvisioning ||= async () => ({});
   deps.beginSessionLitProvisioning ||= async () => ({ attemptId: 'fixture-attempt', checkpoint: {} });
   deps.checkpointSessionLitProvisioning ||= async () => ({});
   deps.releaseSessionLitProvisioning ||= async () => ({});
@@ -2406,7 +2407,7 @@ test('Lit bootstrap reserves the coordinator signer before upstream calls and ke
 });
 
 test('manual Lit provisioning strips generated secret outputs and persists only public authorization metadata in config', async () => {
-  const env = { GROUP_KV: createMemoryKv(), CE_STORAGE_ENVELOPE_KEK: 'session-secrets-test-kek' };
+  const env = { LIT_ACCOUNT_API_KEY: 'fixture-management-key', GROUP_KV: createMemoryKv(), CE_STORAGE_ENVELOPE_KEK: 'session-secrets-test-kek' };
   const existingConfig = { slug: 'session-a', adminAddress: '0xabc', litCredentials: {} };
   await putSessionConfig(env, 'session-a', existingConfig);
   const privateKey = `0x${'12'.repeat(32)}`;
@@ -2467,4 +2468,40 @@ test('Lit setup reports credential conflicts with safe actionable text', async (
   assert.equal(result.status, 409);
   assert.match(result.body.error, /conflict with saved setup/);
   assert.ok(!result.body.error.includes('secret must not escape'));
+});
+
+
+test('the Lit admin route checks supplied keys before beginning an attempt', async () => {
+  let began = 0;
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ litAccountApiKey: 'wrong-private-key' }) }, env: { GROUP_KV: {} },
+    baseHeaders: {}, slug: '', action: 'lit-chipotle-bootstrap-session',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig: { adminAddress: '0xabc' }, headers: {}, targetSlug: 'session-a' }),
+      getSessionSecrets: async () => ({}),
+      preflightSessionLitProvisioning: async args => {
+        assert.ok(args.accountApiKeys.includes('wrong-private-key'));
+        throw Object.assign(new Error('do not expose wrong-private-key'), { status: 409, code: 'lit_provisioning_credentials_conflict' });
+      },
+      beginSessionLitProvisioning: async () => { began++; return { attemptId: 'fixture' }; },
+      bootstrapLitChipotleSession: async () => ({ ok: true }),
+    }),
+  });
+  assert.equal(result.status, 409);
+  assert.equal(began, 0);
+  assert.ok(!JSON.stringify(result).includes('wrong-private-key'));
+});
+
+test('provisioning without a management key does not begin an attempt', async () => {
+  let began = 0;
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody() }, env: { GROUP_KV: {} }, baseHeaders: {}, slug: '', action: 'lit-chipotle-provision',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig: { adminAddress: '0xabc' }, headers: {}, targetSlug: 'session-a' }),
+      getSessionSecrets: async () => ({}),
+      beginSessionLitProvisioning: async () => { began++; return { attemptId: 'fixture' }; },
+    }),
+  });
+  assert.equal(began, 0);
+  assert.match(result.body.error, /account API key not configured/);
 });

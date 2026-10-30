@@ -15,7 +15,7 @@ import {
   toChainId,
 } from './chainIdNormalization.js';
 
-export const LIT_PROVISIONING_CREDENTIALS_CONFLICT = 'Lit credentials conflict with saved setup. Restore the previous credentials or choose Create fresh Lit authority.';
+export const LIT_PROVISIONING_CREDENTIALS_CONFLICT = 'Lit credentials conflict with saved setup. Restore the previous credentials and Resume the saved setup.';
 
 const DEFAULT_LIT_API_BASE = 'https://api.chipotle.litprotocol.com';
 const CHIPOTLE_API_PREFIX = '/core/v1';
@@ -372,9 +372,9 @@ const ensureChipotleApiKey = (runtime = {}) => {
   }
 };
 
-const ensureChipotleManagementApiKey = (runtime = {}) => {
+export const ensureChipotleManagementApiKey = (runtime = {}) => {
   if (!toTrimmedString(runtime?.litManagementApiKey)) {
-    throw new Error('Lit account API key not configured.');
+    throw Object.assign(new Error('Lit account API key not configured.'), { status: 400, code: 'lit_management_key_missing' });
   }
 };
 

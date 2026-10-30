@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { LIT_PROVISIONING_CREDENTIALS_CONFLICT } from './chipotleClient.js';
 import { LIT_AUTHORIZATION_VERSION as VERSION } from '../../shared/litChipotleAction.mjs';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
 import { buildEncryptedSessionSecretsEnvelope, decryptSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
@@ -124,14 +125,26 @@ export const executeLitProvisioning = async (coordinator, payload, operation) =>
     const result = await coordinator.state.storage.transaction(async transaction => {
       const record = await transaction.get(PROVISIONING_RECORD);
       const now = coordinator.now();
-      if (operation === 'begin') {
+      if (operation === 'begin' || operation === 'preflight') {
         if (record?.leaseUntilMs > now) fail();
         const saved = record ? await readProvisioning(record, coordinator.env, slug) : {};
-        // A changed choice starts a new attempt; an empty setup has no remote
-        // resources to resume. Never discard an active attempt's checkpoint.
-        const hasResources = ['litAccountApiKey', 'accountWalletAddress', 'litGroupId', 'litPkpId', 'litActionCid', 'litUsageApiKey']
-          .some(key => typeof saved[key] === 'string' && saved[key].trim());
-        const checkpoint = record?.freshAuthority === (payload.freshAuthority === true) && hasResources ? saved : {};
+        const resourceIds = Object.fromEntries(['litGroupId', 'litPkpId', 'litActionCid']
+          .filter(key => typeof saved[key] === 'string' && saved[key].trim()).map(key => [key, saved[key]]));
+        // An admin-entered key is unverified until an account or remote resource
+        // exists. A created account must survive fresh-authority switches.
+        const hasResources = !!saved.accountWalletAddress || Object.keys(resourceIds).length > 0;
+        const suppliedKeys = Array.isArray(payload.accountApiKeys) ? payload.accountApiKeys : [];
+        if (hasResources && saved.litAccountApiKey && suppliedKeys.some(key => typeof key === 'string' && key.trim() && key.trim() !== saved.litAccountApiKey)) {
+          throw Object.assign(new Error(LIT_PROVISIONING_CREDENTIALS_CONFLICT), { status: 409, code: 'lit_provisioning_credentials_conflict' });
+        }
+        if (record && record.freshAuthority !== (payload.freshAuthority === true) && Object.keys(resourceIds).length) {
+          const names = { litGroupId: 'group', litPkpId: 'PKP', litActionCid: 'action' };
+          const resources = Object.entries(resourceIds).map(([key, id]) => `${names[key]} ${id}`).join(', ');
+          throw Object.assign(new Error(`Saved Lit resources: ${resources}. Resume the previous setup before changing the authority choice.`),
+            { status: 409, code: 'lit_provisioning_resources_pending' });
+        }
+        if (operation === 'preflight') return {};
+        const checkpoint = hasResources ? saved : {};
         const attemptId = crypto.randomUUID();
         const envelope = await buildEncryptedSessionSecretsEnvelope(checkpoint, { env: coordinator.env, slug });
         await transaction.put(PROVISIONING_RECORD, { version: 1, slug, attemptId, freshAuthority: payload.freshAuthority === true,
@@ -159,7 +172,12 @@ export const executeLitProvisioning = async (coordinator, payload, operation) =>
       return {};
     });
     return json({ ok: true, ...result });
-  } catch (error) { return json({ error: 'Lit provisioning is pending or in progress; retry.' }, error?.status || 503); }
+  } catch (error) {
+    if (['lit_provisioning_credentials_conflict', 'lit_provisioning_resources_pending'].includes(error?.code)) {
+      return json({ error: error.message, code: error.code }, error.status);
+    }
+    return json({ error: 'Lit provisioning is pending or in progress; retry.' }, error?.status || 503);
+  }
 };
 
 export const executeLitAuthorizationFinalize = async (coordinator, payload) => {
@@ -302,9 +320,13 @@ export const updateSessionSecretsAfterLitRepair = async (args) => {
 
 const provisionCall = async (args, operation) => {
   const result = await callCoordinator({ ...args, path: `provisioning/${operation}` });
-  if (!result.ok) throw Object.assign(new Error('Lit provisioning is pending or in progress; retry.'), { status: result.status });
+  if (!result.ok) {
+    const code = ['lit_provisioning_credentials_conflict', 'lit_provisioning_resources_pending'].includes(result.body?.code) ? result.body.code : '';
+    throw Object.assign(new Error(code ? result.body.error : 'Lit provisioning is pending or in progress; retry.'), { status: result.status, code });
+  }
   return result.body;
 };
+export const preflightSessionLitProvisioning = args => provisionCall(args, 'preflight');
 export const beginSessionLitProvisioning = args => provisionCall(args, 'begin');
 export const checkpointSessionLitProvisioning = args => provisionCall(args, 'checkpoint');
 export const releaseSessionLitProvisioning = args => provisionCall(args, 'release');

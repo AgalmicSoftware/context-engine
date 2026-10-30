@@ -118,12 +118,14 @@ Lit background with the concepts Context Engine uses, and the repo wiring.
   from an ordinary ready runtime. The fresh-authority control requires signed
   status from an updated Worker, saved secret changes, and explicit
   acknowledgement on every attempt. A missing account key produces guidance
-  to save one; failures do not automatically retry provisioning. A released or expired
-  attempt with a changed fresh-authority choice starts a new checkpoint, as does a
-  failed attempt that saved no resource identifiers or credentials. Attempts with
-  saved resources otherwise resume without recreating them. Conflicting supplied
-  credentials produce a non-secret error asking the operator to restore the prior
-  credentials or select fresh authority. Checkpoint writes survive content-only
+  to save one; failures do not automatically retry provisioning. An allocated account
+  and its key survive a fresh-authority switch. A saved group, PKP or action blocks
+  the switch with its identifiers and a Resume instruction; no implicit reset
+  discards those resources. A supplied key alone, without an account wallet or any
+  remote resource, does not reserve a resource and can be corrected. Both endpoints
+  check supplied keys against saved resources before beginning an attempt, and
+  repeat that check under the coordinator lock. Conflicts never expose keys: restore
+  the prior credentials and Resume. Checkpoint writes survive content-only
   config revisions while still checking the attempt token and authority epoch;
   finalization continues to require current config authority.
 - When passkey EOA soft-session mode is enabled and the current page has an

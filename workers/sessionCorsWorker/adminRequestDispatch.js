@@ -5,6 +5,7 @@ import {
   ADMIN_SESSION_SECRET_KEYS as ALLOWED_SECRET_KEYS,
   ensureSessionLitAuthorizationSigner,
   beginSessionLitProvisioning,
+  preflightSessionLitProvisioning,
   checkpointSessionLitProvisioning,
   releaseSessionLitProvisioning,
   finalizeSessionLitAuthorization,
@@ -16,6 +17,7 @@ import {
 } from './adminRequestAuthority.js';
 import {
   bootstrapLitChipotleSession,
+  ensureChipotleManagementApiKey,
   LIT_PROVISIONING_CREDENTIALS_CONFLICT,
   provisionLitChipotleAction,
   readLitChipotleStatus,
@@ -339,8 +341,17 @@ export const dispatchAdminRequest = async ({
     let attempt;
     const coordination = { env, slug: targetSlug, baseConfig: existingConfig, expectedAuthority };
     try {
-      attempt = await (deps?.beginSessionLitProvisioning || beginSessionLitProvisioning)({ ...coordination, freshAuthority: body.freshAuthority === true });
       const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
+      const runtime = action === 'lit-chipotle-provision'
+        ? (deps?.resolveLitChipotleProvisioningRuntime || resolveLitChipotleProvisioningRuntime)({ env, config: existingConfig, secrets: existingSecrets, body })
+        : null;
+      if (runtime) ensureChipotleManagementApiKey(runtime);
+      const beginArgs = { ...coordination, freshAuthority: body.freshAuthority === true,
+        accountApiKeys: [body.litAccountApiKey, existingSecrets.litAccountApiKey || body.litAccountApiKey || runtime?.litManagementApiKey || env.LIT_ACCOUNT_API_KEY] };
+      await (deps?.preflightSessionLitProvisioning || preflightSessionLitProvisioning)(beginArgs);
+      // Begin repeats the check under the coordinator lock so the read preflight
+      // cannot race a newly created resource or changed account checkpoint.
+      attempt = await (deps?.beginSessionLitProvisioning || beginSessionLitProvisioning)(beginArgs);
       const options = {
         env,
         config: existingConfig,
@@ -369,9 +380,6 @@ export const dispatchAdminRequest = async ({
       };
       let result;
       if (action === 'lit-chipotle-provision') {
-        const runtime = (deps?.resolveLitChipotleProvisioningRuntime || resolveLitChipotleProvisioningRuntime)({
-          env, config: existingConfig, secrets: existingSecrets, body,
-        });
         result = await (deps?.provisionLitChipotleAction || provisionLitChipotleAction)({ ...options, runtime });
       } else {
         result = await (deps?.bootstrapLitChipotleSession || bootstrapLitChipotleSession)(options);
@@ -394,6 +402,8 @@ export const dispatchAdminRequest = async ({
     } catch (error) {
       return deps?.json?.({ error: error?.code === 'lit_provisioning_credentials_conflict'
         ? LIT_PROVISIONING_CREDENTIALS_CONFLICT
+        : error?.code === 'lit_management_key_missing' ? 'Lit account API key not configured.'
+        : error?.code === 'lit_provisioning_resources_pending' ? error.message
         : 'Lit provisioning did not finish. Retry to resume its saved progress.' }, error?.status || 502, headers);
     } finally {
       if (attempt) {
