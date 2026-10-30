@@ -407,6 +407,8 @@ route. Returned transcripts are stitched with overlap deduplication. Rolling
 and uploaded audio share Unicode letter/digit matching with original-text
 offsets, so trimming an overlap preserves new speech in every script.
 
+Closing Group Conversation with Close, Escape, or an outside click first stops capture, waits for the final segment to finish transcription, and saves the transcript. The dialog shows **Finalizing recording…** and ignores further dismissals until it finishes. If transcription fails, the dialog stays open and keeps the failed audio in memory; closing again retries it. Keep the dialog open until recovery completes. Successful transcripts are restored on reopen.
+
 The visible transcript is collapsed by default. Generated questions are drafts
 rendered through the existing `CreateQuestionsAndSurveys` review surface and
 are never auto-published. Raw chunks are discarded after successful

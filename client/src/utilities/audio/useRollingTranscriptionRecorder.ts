@@ -137,27 +137,8 @@ export const useRollingTranscriptionRecorder = ({
     }
   }, []);
 
-  const processSegment = useCallback(
-    (blob: Blob) => {
-      if (!blob || blob.size < 100) return;
-      const index = segmentIndexRef.current;
-      segmentIndexRef.current += 1;
-      const id = `segment-${Date.now()}-${index}`;
-      const startedAt = Date.now();
-      const segment: RollingTranscriptSegment = {
-        id,
-        index,
-        status: 'queued',
-        text: '',
-        startedAt,
-      };
-
-      if (retainRawAudio) {
-        rawChunksRef.current.set(id, blob);
-      }
-
-      updateSegments((previous) => [...previous, segment]);
-
+  const transcribeSegment = useCallback(
+    (id: string, blob: Blob) => {
       queueRef.current = queueRef.current
         .catch(() => undefined)
         .then(async () => {
@@ -210,6 +191,26 @@ export const useRollingTranscriptionRecorder = ({
     },
     [context, labelSpeakers, retainRawAudio, sessionConfig, sessionSlug, updateSegments, workerUrl],
   );
+
+  const processSegment = useCallback(
+    (blob: Blob) => {
+      if (!blob || blob.size < 100) return;
+      const index = segmentIndexRef.current++;
+      const id = `segment-${Date.now()}-${index}`;
+      // Keep unfinished audio in memory so a failed close can retry the same segment.
+      rawChunksRef.current.set(id, blob);
+      updateSegments((previous) => [...previous, { id, index, status: 'queued', text: '', startedAt: Date.now() }]);
+      transcribeSegment(id, blob);
+    },
+    [transcribeSegment, updateSegments],
+  );
+
+  const finishTranscription = useCallback(async () => {
+    await queueRef.current;
+    if (segmentsRef.current.some((segment) => segment.status === 'error' && rawChunksRef.current.has(segment.id))) {
+      throw new Error('Some audio could not be transcribed. Keep this dialog open. Close again to retry.');
+    }
+  }, []);
 
   const stopRecorder = useCallback((recorder: MediaRecorder | null, endSession: boolean): boolean => {
     if (!recorder || recorder.state === 'inactive') return false;
@@ -393,6 +394,12 @@ export const useRollingTranscriptionRecorder = ({
 
   const finalizeRecording = useCallback(
     async ({ waitForTranscription = true }: FinalizeRecordingOptions = {}) => {
+      if (waitForTranscription) {
+        for (const segment of segmentsRef.current) {
+          const blob = rawChunksRef.current.get(segment.id);
+          if (segment.status === 'error' && blob) transcribeSegment(segment.id, blob);
+        }
+      }
       const recorder = mediaRecorderRef.current;
       if (!recorder || recorder.state === 'inactive') {
         recordingActiveRef.current = false;
@@ -403,7 +410,7 @@ export const useRollingTranscriptionRecorder = ({
           setStatus('idle');
         }
         if (waitForTranscription) {
-          await queueRef.current.catch(() => undefined);
+          await finishTranscription();
         }
         return;
       }
@@ -436,12 +443,14 @@ export const useRollingTranscriptionRecorder = ({
       if (!stopped) {
         stopTimer();
         stopTracks();
+        if (waitForTranscription)
+          throw new Error('The recorder has not finished saving audio. Keep this dialog open and try closing again.');
       }
       if (waitForTranscription) {
-        await queueRef.current.catch(() => undefined);
+        await finishTranscription();
       }
     },
-    [clearRotationTimer, stopRecorder, stopTimer, stopTracks],
+    [clearRotationTimer, finishTranscription, stopRecorder, stopTimer, stopTracks, transcribeSegment],
   );
 
   const stopRecording = useCallback(() => finalizeRecording({ waitForTranscription: false }), [finalizeRecording]);

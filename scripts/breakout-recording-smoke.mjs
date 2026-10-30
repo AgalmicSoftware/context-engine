@@ -42,9 +42,11 @@ try {
         stop() { this.state = 'inactive'; this.ondataavailable?.({ data: new Blob([new Uint8Array(256)], { type: 'audio/webm' }) }); this.onstop?.(); }
       };
     });
-    await page.route('**/*', route => {
+    let releaseTranscription;
+    let transcriptionGate = null;
+    await page.route('**/*', async route => {
       const url = new URL(route.request().url());
-      if (url.origin === 'https://worker.example') return route.fulfill({ json: { text: 'Synthetic room transcript.', segments: [{ speaker: 'A', start: 0, end: 1, text: 'Synthetic room transcript.' }] } });
+      if (url.origin === 'https://worker.example') { await transcriptionGate; return route.fulfill({ json: { text: 'Synthetic room transcript.', segments: [{ speaker: 'A', start: 0, end: 1, text: 'Synthetic room transcript.' }] } }); }
       if (url.origin !== new URL(base).origin) return route.abort();
       if (url.pathname === '/recording-probe') return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html data-ce-theme="${theme}"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="padding:16px;margin:0;background:var(--ce-canvas)"><main id="probe"></main><script type="module">
         import RefreshRuntime from '/@react-refresh'; RefreshRuntime.injectIntoGlobalHook(window);
@@ -52,8 +54,9 @@ try {
         await import('/src/assets/css/contextEngine.scss');
         const ReactModule = await import('/node_modules/.vite/deps/react.js'); const React = ReactModule.default || ReactModule;
         const ReactDOM = await import('/node_modules/.vite/deps/react-dom_client.js');
-        const { default: Panel } = await import('/src/components/SurveyTool/SessionListeningPanel.tsx');
-        (ReactDOM.createRoot || ReactDOM.default.createRoot)(document.getElementById('probe')).render(React.createElement(Panel, { sessionSlug: 'workshop', workerUrl: 'https://worker.example', panelMode: 'recordGroup', embeddedInModal: true }));
+        const { default: Modal } = await import('/src/components/SurveyTool/SessionVoiceModeModal.tsx');
+        function Probe() { const [isOpen, setOpen] = React.useState(true); return React.createElement(React.Fragment, null, React.createElement('button', { onClick: () => setOpen(true) }, 'Reopen recording'), React.createElement(Modal, { isOpen, mode: 'recordGroup', onClose: () => setOpen(false), onSelectMode: () => {}, sessionSlug: 'workshop', workerUrl: 'https://worker.example' })); }
+        (ReactDOM.createRoot || ReactDOM.default.createRoot)(document.getElementById('probe')).render(React.createElement(Probe));
       </script></body></html>` });
       return route.continue();
     });
@@ -82,7 +85,28 @@ try {
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('ce:listening-draft:workshop') || '{}').segments?.[0]?.speakerTurns?.[0]?.speaker === 'A');
     assert.equal(await page.evaluate(() => window.__wakeHeld), false);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
-    console.log(`PASS Breakout recording ${theme} ${width}`);
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    for (const dismissal of ['Close', 'Escape', 'outside']) {
+      await page.getByRole('button', { name: 'Reopen recording' }).click();
+      await page.getByRole('checkbox', { name: 'Label speakers' }).check();
+      await page.getByTestId('ce-session-listening-start').click();
+      await page.getByRole('button', { name: 'Stop recording' }).waitFor();
+      transcriptionGate = new Promise(resolve => { releaseTranscription = resolve; });
+      if (dismissal === 'Close') await page.getByRole('button', { name: 'Close', exact: true }).click();
+      else if (dismissal === 'Escape') await page.keyboard.press('Escape');
+      else await page.getByRole('dialog').click({ position: { x: 2, y: 2 } });
+      await page.getByText('Finalizing recording…').waitFor().catch(async error => { console.error('dismissal', dismissal, await page.locator('body').innerText()); throw error; });
+      await page.keyboard.press('Escape');
+      assert.equal(await page.getByRole('dialog').isVisible(), true);
+      releaseTranscription();
+      await page.getByRole('dialog').waitFor({ state: 'hidden' });
+      const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('ce:listening-draft:workshop')));
+      assert.equal(saved.segments.length, ['Close', 'Escape', 'outside'].indexOf(dismissal) + 2);
+      assert(saved.segments.every(segment => segment.status === 'complete' && segment.text === 'Synthetic room transcript.'));
+      transcriptionGate = null;
+    }
+    console.log(`PASS Breakout recording ${theme} ${width}: Stop, Close, Escape, outside, delayed transcription, reopen`);
     await page.close();
   }
 } finally { await browser.close(); }

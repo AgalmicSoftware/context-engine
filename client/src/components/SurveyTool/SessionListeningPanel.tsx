@@ -29,6 +29,7 @@ type SessionListeningPanelProps = Record<string, unknown> & {
   onClose?: () => void;
   panelMode?: 'recordGroup' | 'listening';
   embeddedInModal?: boolean;
+  closeActionRef?: React.MutableRefObject<(() => Promise<void>) | null>;
 };
 type CreateQuestionsAndSurveysPanelProps = React.ComponentProps<typeof CreateQuestionsAndSurveys>;
 type BrowserAudioWindow = Window &
@@ -333,6 +334,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     onClose,
     panelMode = 'listening',
     embeddedInModal = false,
+    closeActionRef,
   } = props;
   const [labelSpeakers, setLabelSpeakers] = useState(false);
   const [recordSpeakerAudio, setRecordSpeakerAudio] = useState(() => {
@@ -360,6 +362,9 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const closingRef = useRef(false);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const [closeError, setCloseError] = useState('');
   const isMountedRef = useRef(true);
   const lastAutoRequestedTranscriptRef = useRef('');
   const generationInFlightRef = useRef(false);
@@ -400,7 +405,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     Boolean(recorder.errorMessage || generationError);
   const isRecorderSessionActive = recorder.isRecording || recorder.isPaused || recorder.isStopping;
   const hasPendingTranscription = Number(recorder.pendingSegmentCount || 0) > 0;
-  const canGenerate = trimmedTranscript.length >= 50 && !isGenerating && !hasPendingTranscription;
+  useEffect(() => {
+    // Switching Record/Stop removes the focused button; keep Escape inside the modal.
+    if (embeddedInModal && document.activeElement === document.body) panelRef.current?.focus();
+  }, [embeddedInModal, isRecorderSessionActive]);
+
+  const canGenerate = !isClosing && trimmedTranscript.length >= 50 && !isGenerating && !hasPendingTranscription;
   const isStarting = !isRecorderSessionActive && recorder.isBusy;
   const recorderError = recorder.errorMessage && !hasTranscript ? recorder.errorMessage : '';
   const shouldShowGenericRecorderError = Boolean(
@@ -411,6 +421,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         latestFailedTranscriptAt >= latestSuccessfulTranscriptAt)),
   );
   const visibleError =
+    closeError ||
     generationError ||
     recorderError ||
     (hasActionableFailedSegment || shouldShowGenericRecorderError
@@ -461,26 +472,31 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     }
   }, [hasTranscript]);
 
-  const handleClose = async () => {
-    if (isClosing) return;
-    const shouldFinalize = isRecorderSessionActive || hasPendingTranscription;
-    if (!shouldFinalize) {
-      onClose?.();
-      return;
-    }
-
+  const { finalizeRecording } = recorder;
+  const handleClose = useCallback(async () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
     setIsClosing(true);
+    setCloseError('');
     try {
-      if (typeof recorder.finalizeRecording === 'function') {
-        await recorder.finalizeRecording({ waitForTranscription: true });
-      } else if (typeof recorder.stopRecording === 'function') {
-        await recorder.stopRecording();
-      }
+      await finalizeRecording({ waitForTranscription: true });
+      if (isMountedRef.current) onClose?.();
+    } catch (error) {
+      if (isMountedRef.current)
+        setCloseError(error instanceof Error ? error.message : 'Could not finish recording. Close again to retry.');
     } finally {
-      setIsClosing(false);
-      onClose?.();
+      closingRef.current = false;
+      if (isMountedRef.current) setIsClosing(false);
     }
-  };
+  }, [onClose, finalizeRecording]);
+
+  useEffect(() => {
+    if (!closeActionRef) return;
+    closeActionRef.current = handleClose;
+    return () => {
+      closeActionRef.current = null;
+    };
+  }, [closeActionRef, handleClose]);
 
   const handleGenerateQuestions = useCallback(
     async ({ auto = false }: { auto?: boolean } = {}) => {
@@ -548,6 +564,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
 
   return (
     <aside
+      ref={panelRef}
+      tabIndex={-1}
       className={[
         styles.sessionListeningPanel,
         embeddedInModal ? styles.sessionListeningPanelEmbedded : '',
@@ -555,8 +573,10 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       ]
         .filter(Boolean)
         .join(' ')}
+      aria-busy={isClosing}
       data-testid={E2E_TESTIDS.SESSION_LISTENING_PANEL}
     >
+      {isClosing ? <div role="status">Finalizing recording…</div> : null}
       {showPanelHeader ? (
         <div className={styles.sessionListeningHeader}>
           {hasVisibleStatus ? (
@@ -695,7 +715,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             type="button"
             className={styles.sessionListeningRecordButton}
             onClick={recorder.startRecording}
-            disabled={recorder.isBusy}
+            disabled={isClosing || recorder.isBusy}
             data-testid={E2E_TESTIDS.SESSION_LISTENING_START}
           >
             <span className={styles.sessionListeningRecordIcon}>

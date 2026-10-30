@@ -1535,7 +1535,11 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   useEffect(() => {
     onInterviewProgressChange?.(hasUnsavedReview);
   }, [hasUnsavedReview, onInterviewProgressChange]);
-  const requestClose = onClose;
+  const groupCloseRef = useRef<(() => Promise<void>) | null>(null);
+  const requestClose = () => {
+    if (mode === 'recordGroup' && groupCloseRef.current) void groupCloseRef.current();
+    else onClose();
+  };
   const questions = useMemo(
     () => normalizeInterviewQuestions(sortInterviewQuestionPoolNewestFirst(questionPool)),
     [questionPool],
@@ -1582,7 +1586,13 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                   />
                 </SessionVoiceModeChooser>
               ) : (
-                <SessionListeningPanel {...props} panelMode="recordGroup" embeddedInModal onClose={onClose} />
+                <SessionListeningPanel
+                  {...props}
+                  panelMode="recordGroup"
+                  embeddedInModal
+                  onClose={onClose}
+                  closeActionRef={groupCloseRef}
+                />
               )}
             </ModalBody>
           </>
