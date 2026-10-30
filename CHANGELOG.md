@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Recheck encrypted wallet storage before saving a newly created passkey wallet.
+
 - Show the remaining unsubmitted page-answer count with Submit after an interview.
 
 - Keep response scan watermarks unchanged when live events arrive, so refreshes retry earlier unreadable payloads.

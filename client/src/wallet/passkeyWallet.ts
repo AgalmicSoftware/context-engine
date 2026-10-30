@@ -368,6 +368,12 @@ export class PasskeyEoaWalletClient {
       });
       this.assertCurrentOperation(generation);
       await this.mutateWallet(async () => {
+        // The authenticator prompt can remain open while another client saves a wallet.
+        const currentRecord = await this.storage.read();
+        this.assertCurrentOperation(generation);
+        if (currentRecord?.rpId === this.config.rpId && isEncryptedWalletRecord(currentRecord)) {
+          throw new Error('A passkey wallet already exists in this browser. Sign in, or delete it first.');
+        }
         await this.storage.write(record);
         this.assertCurrentOperation(generation);
       }, generation);

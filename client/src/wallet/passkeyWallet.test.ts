@@ -375,6 +375,47 @@ describe('PasskeyEoaWalletClient', () => {
     await returning.lock();
   });
 
+  it('keeps a wallet saved while another passkey creation prompt was open', async () => {
+    const storage = createMemoryWalletStorage();
+    const prompt = deferred<PublicKeyCredential>();
+    const started = deferred<void>();
+    const credentials = makeCredentials();
+    (credentials.create as jest.Mock).mockImplementationOnce(() => {
+      started.resolve();
+      return prompt.promise;
+    });
+    const sessionClient = makeSessionClient();
+    const first = new PasskeyEoaWalletClient({
+      config,
+      storage,
+      credentials,
+      sessionClient,
+      sessionClientFactory: makeSessionClient,
+      privateKeyFactory: () => PRIVATE_KEY,
+    });
+    const second = new PasskeyEoaWalletClient({
+      config,
+      storage,
+      credentials: makeCredentials(),
+      sessionClient: makeSessionClient(),
+      sessionClientFactory: makeSessionClient,
+      privateKeyFactory: () => PRIVATE_KEY,
+    });
+    try {
+      const outcome = first.createWallet().catch((error: unknown) => error);
+      await started.promise;
+      await second.createWallet();
+      const saved = await storage.read();
+      prompt.resolve(makeCredential({ rawId: ALT_RAW_ID }));
+      expect(await outcome).toEqual(expect.objectContaining({ message: expect.stringContaining('already exists') }));
+      expect(await storage.read()).toEqual(saved);
+      expect(sessionClient.calls).toHaveLength(0);
+    } finally {
+      await first.lock();
+      await second.lock();
+    }
+  });
+
   it('still creates a passkey-derived wallet without excluding the saved credential', async () => {
     const storage = createMemoryWalletStorage();
     const credentials = makeCredentials();

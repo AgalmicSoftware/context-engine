@@ -143,6 +143,8 @@ In `encrypted-private-key` compatibility mode, Create refuses before opening a
 passkey prompt if this browser already stores an encrypted wallet for the RP ID.
 Sign in to that wallet, or explicitly delete it before creating another. This
 protects its only stored key even when a different authenticator is selected.
+Creation checks the stored wallet again inside its write operation, so a wallet
+saved while the authenticator prompt was open is preserved.
 Passkey-derived creation remains available because its key can be re-derived.
 
 While registration is pending, the account modal labels the operation
