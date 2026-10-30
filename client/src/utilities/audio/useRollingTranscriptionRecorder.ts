@@ -389,10 +389,6 @@ export const useRollingTranscriptionRecorder = ({
     setErrorMessage('');
   }, [chunks.clearDraft, status]);
 
-  useEffect(() => {
-    if (chunks.storageError && recordingActiveRef.current) void stopRecording();
-  }, [chunks.storageError, stopRecording]);
-
   useEffect(
     () => () => {
       ++requestGenerationRef.current;

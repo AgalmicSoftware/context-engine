@@ -110,8 +110,17 @@ it('does not delete raw audio if persisting the completed transcript fails', asy
   await tick();
   expect(saved.get(id)?.audio).toBe(audio);
   expect(queue.records.get(id)?.audio).toBe(audio);
-  expect(queue.storageError).toContain('Free storage');
-  expect(queue.segments[0].status).toBe('retrying');
+  expect(queue.storageError).toContain("This recording can't be recovered after a reload");
+  expect(queue.segments[0]).toMatchObject({ status: 'complete', text: 'Speech.' });
+  await expect(queue.clear()).rejects.toThrow('unsaved audio');
+  jest.mocked(putRecordingChunk).mockImplementation(async (record) => {
+    saved.set(record.segment.id, record);
+  });
+  queue.retry(id);
+  await tick();
+  expect(saved.get(id)?.segment.text).toBe('Speech.');
+  expect(queue.records.get(id)?.audio).toBeUndefined();
+  expect(queue.storageError).toBe('');
 });
 
 it('recovers interrupted chunks in index order without mixing another scope', async () => {

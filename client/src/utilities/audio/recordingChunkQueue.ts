@@ -15,7 +15,7 @@ type Options = {
 };
 const failureText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const storageText = (error: unknown) =>
-  `Audio could not be saved on this device. Free storage or enable browser storage, then Retry. Download unsaved chunks before leaving. ${failureText(error)}`;
+  `This recording can't be recovered after a reload. Recording and transcription continue in memory; download unsaved audio before leaving. ${failureText(error)}`;
 
 /** Raw audio and its completed transcript share one atomic IndexedDB record. */
 export class RecordingChunkQueue {
@@ -28,6 +28,8 @@ export class RecordingChunkQueue {
   private running: Promise<void> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private attempts = new Map<string, number>();
+  private lastSnapshotAt = new Map<string, number>();
+  private failedWrites = new Set<string>();
   private waiters = new Set<() => void>();
 
   constructor(private options: Options) {
@@ -60,7 +62,6 @@ export class RecordingChunkQueue {
   async prepare() {
     await this.ready;
     if (this.storageError && !this.records.size) await this.restore();
-    if (this.storageError) throw new Error(this.storageError);
   }
   begin(labelSpeakers: boolean): string {
     const index = this.segments.reduce((max, entry) => Math.max(max, entry.index), -1) + 1;
@@ -79,8 +80,10 @@ export class RecordingChunkQueue {
       try {
         await putRecordingChunk(record);
         saved = true;
-        this.storageError = '';
+        this.failedWrites.delete(record.segment.id);
+        if (!this.failedWrites.size) this.storageError = '';
       } catch (error) {
+        this.failedWrites.add(record.segment.id);
         this.storageError = storageText(error);
       }
       this.changed();
@@ -106,9 +109,14 @@ export class RecordingChunkQueue {
     };
     this.records.set(id, record);
     this.changed();
-    void this.save(record).then(() => {
-      if (finished) this.pump();
-    });
+    // Keep cumulative container headers for Safari, but bound full-blob writes.
+    const lastSnapshot = this.lastSnapshotAt.get(id);
+    if (finished || lastSnapshot == null || Date.now() - lastSnapshot >= 10_000) {
+      this.lastSnapshotAt.set(id, Date.now());
+      void this.save(record).then(() => {
+        if (finished) this.pump();
+      });
+    }
   }
   private firstPending() {
     const first = this.segments.find((entry) => entry.status !== 'complete');
@@ -148,7 +156,6 @@ export class RecordingChunkQueue {
     record.segment = { ...record.segment, status: 'transcribing', error: undefined };
     this.changed();
     try {
-      if (!(await this.save(record))) throw new Error(this.storageError);
       if (this.disposed) return;
       const result = await this.options.transcribe(
         record.audio!,
@@ -170,8 +177,9 @@ export class RecordingChunkQueue {
         },
       };
       // Removing audio is part of the same transaction that commits its transcript.
-      if (!(await this.save(complete))) throw new Error(this.storageError);
-      this.records.set(id, complete);
+      const persisted = await this.save(complete);
+      // A failed durable commit must keep both the paid transcript and original audio in memory.
+      this.records.set(id, persisted ? complete : { ...complete, audio: record.audio });
       this.attempts.delete(id);
       this.changed();
     } catch (error) {
@@ -194,6 +202,13 @@ export class RecordingChunkQueue {
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
     for (const record of this.records.values()) {
+      if ((!id || id === record.segment.id) && record.audio && record.segment.status === 'complete') {
+        const complete = { ...record, audio: undefined };
+        void this.save(complete).then((persisted) => {
+          if (persisted) this.records.set(record.segment.id, complete);
+          this.changed();
+        });
+      }
       if ((!id || id === record.segment.id) && record.audio && ['error', 'retrying'].includes(record.segment.status)) {
         this.attempts.delete(record.segment.id);
         record.segment = { ...record.segment, status: 'queued', error: undefined };
@@ -215,6 +230,11 @@ export class RecordingChunkQueue {
     }
   }
   async clear() {
+    if ([...this.records.values()].some((record) => record.audio && record.segment.status === 'complete')) {
+      throw new Error(
+        'Keep unsaved audio until its transcript is saved. Reconnect to retry storage or download it before leaving.',
+      );
+    }
     if (this.segments.some((entry) => entry.status !== 'complete')) {
       throw new Error('Transcribe pending audio before clearing the recording. Download any stuck chunks first.');
     }

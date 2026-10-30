@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep recording and transcription running from memory when device storage fails or is unavailable. Save cumulative audio snapshots at most every ten seconds and retain audio until its transcript is saved.
+
 - Enable speaker labels by default for OpenAI Group Conversation recordings, with the existing plain-transcription fallback.
 
 - Keep recording chunks in IndexedDB until their transcripts are saved, retry uploads in order, and offer per-chunk retry/download controls with storage, offline and microphone guidance.

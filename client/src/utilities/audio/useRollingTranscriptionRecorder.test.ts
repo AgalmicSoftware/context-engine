@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { useRollingTranscriptionRecorder } from './useRollingTranscriptionRecorder';
 import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
-import { putRecordingChunk } from './recordingChunkStore';
+import { listRecordingChunks, putRecordingChunk } from './recordingChunkStore';
 
 jest.mock('../ai/aiClient.js', () => ({
   transcribeAudio: jest.fn(),
@@ -212,7 +212,7 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
-  it('stops capture when storage fails and retains a downloadable memory copy', async () => {
+  it('keeps capturing and transcribing from memory when storage fails', async () => {
     const original = jest.mocked(putRecordingChunk).getMockImplementation()!;
     jest.mocked(putRecordingChunk).mockImplementation(async () => {
       throw new DOMException('Full', 'QuotaExceededError');
@@ -226,10 +226,17 @@ describe('useRollingTranscriptionRecorder', () => {
         instances[0].requestData();
         await flushPromises();
       });
-      expect(result.current.isRecording).toBe(false);
-      expect(result.current.errorMessage).toContain('Free storage');
+      expect(result.current.isRecording).toBe(true);
+      expect(instances[0].stop).not.toHaveBeenCalled();
+      expect(result.current.errorMessage).toContain("This recording can't be recovered after a reload");
       expect(result.current.downloadableChunkIds).toHaveLength(1);
       expect(transcribeAudio).not.toHaveBeenCalled();
+      await act(async () => {
+        await result.current.stopRecording();
+        await flushPromises();
+      });
+      expect(result.current.transcript).toContain('transcript');
+      expect(transcribeAudio).toHaveBeenCalledTimes(1);
       const createUrl = jest.fn<typeof URL.createObjectURL>(() => 'blob:recording-fixture');
       const previous = URL.createObjectURL;
       URL.createObjectURL = createUrl;
@@ -248,6 +255,52 @@ describe('useRollingTranscriptionRecorder', () => {
       unmount();
       jest.mocked(putRecordingChunk).mockImplementation(original);
     }
+  });
+
+  it('records without IndexedDB and explains that reload recovery is unavailable', async () => {
+    const list = jest.mocked(listRecordingChunks).getMockImplementation()!;
+    const put = jest.mocked(putRecordingChunk).getMockImplementation()!;
+    jest.mocked(listRecordingChunks).mockRejectedValue(new Error('IndexedDB unavailable'));
+    jest.mocked(putRecordingChunk).mockRejectedValue(new Error('IndexedDB unavailable'));
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'no-storage' }));
+    try {
+      await act(async () => {
+        await result.current.startRecording();
+      });
+      expect(result.current.isRecording).toBe(true);
+      expect(result.current.errorMessage).toContain("This recording can't be recovered after a reload");
+      await act(async () => {
+        await result.current.stopRecording();
+        await flushPromises();
+      });
+      expect(result.current.transcript).toContain('transcript');
+    } finally {
+      unmount();
+      jest.mocked(listRecordingChunks).mockImplementation(list);
+      jest.mocked(putRecordingChunk).mockImplementation(put);
+    }
+  });
+
+  it('writes at most twenty snapshots and transcript records for a three-minute chunk', async () => {
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ chunkMs: 180_001 }));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    for (let second = 0; second < 180; second++) {
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1000);
+        instances[0].requestData();
+        await flushPromises();
+      });
+    }
+    await act(async () => {
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(putRecordingChunk).toHaveBeenCalled();
+    expect(jest.mocked(putRecordingChunk).mock.calls.length).toBeLessThanOrEqual(20);
+    expect(result.current.transcript).toContain('transcript');
+    unmount();
   });
 
   it('rotates to a fresh recorder segment and transcribes the flushed chunk', async () => {
