@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Name recording uploads and audio downloads by their MIME container, including WebM, MP4, M4A, Ogg and WAV.
+
 - Fall back to plain transcription on provider speaker-label rejections, including errors nested in the Worker response, while keeping temporary errors in the retry queue.
 
 - Keep breakout capture and its transcript together across sign-in or delayed account restoration by pinning the recording scope until it is cleared.

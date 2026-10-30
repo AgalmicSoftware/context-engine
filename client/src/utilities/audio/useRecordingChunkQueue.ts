@@ -1,3 +1,4 @@
+import { audioFileExtension } from './audioFileExtension';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
 import { RecordingChunkQueue } from './recordingChunkQueue';
@@ -118,7 +119,7 @@ export function useRecordingChunkQueue(options: Options) {
   const downloadChunk = useCallback((id: string) => {
     const record = queueRef.current?.records.get(id);
     if (!record?.audio) return;
-    const extension = record.audio.type.includes('mp4') ? 'm4a' : record.audio.type.includes('ogg') ? 'ogg' : 'webm';
+    const extension = audioFileExtension(record.audio.type);
     const url = URL.createObjectURL(record.audio);
     const anchor = document.createElement('a');
     anchor.href = url;

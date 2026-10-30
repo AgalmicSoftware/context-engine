@@ -427,6 +427,30 @@ describe('aiClient worker auth options', () => {
     );
   });
 
+  it.each([
+    ['audio/webm;codecs=opus', 'webm'],
+    ['audio/mp4', 'mp4'],
+    ['audio/x-m4a', 'm4a'],
+    ['audio/ogg;codecs=opus', 'ogg'],
+    ['audio/wav', 'wav'],
+  ])('names plain and labelled %s uploads by their audio type', async (type, extension) => {
+    getEffectiveTranscriptionConfig.mockResolvedValue({ provider: 'openai', model: 'whisper-1' });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    fetchWorkerWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ text: 'Retained transcript.', segments: [] }),
+    });
+    const audio = new Blob(['original bytes'], { type });
+    await expect(transcribeAudio(audio)).resolves.toBe('Retained transcript.');
+    await expect(transcribeGroupAudio(audio)).resolves.toMatchObject({ text: 'Retained transcript.' });
+    for (const [, request] of fetchWorkerWithAuth.mock.calls) {
+      const file = request.body.get('file');
+      expect(file.name).toBe(`audio.${extension}`);
+      expect(file.type).toBe(type);
+      expect(file.size).toBe(audio.size);
+    }
+  });
+
   it('normalizes unsupported audio containers to wav before upload', async () => {
     getEffectiveTranscriptionConfig.mockResolvedValue({
       provider: 'openai',

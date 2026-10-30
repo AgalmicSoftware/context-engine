@@ -1,3 +1,4 @@
+import { audioFileExtension } from '../audio/audioFileExtension';
 import { normalizeSpeakerTurns, type SpeakerTranscriptTurn } from '../audio/speakerTranscript';
 import { createNamedAudioFile } from './aiClientAudioTranscription';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
@@ -76,10 +77,11 @@ const requestAudioTranscription = async (
   const maybeBlob = typeof Blob !== 'undefined' && audioFileOrBlob instanceof Blob ? audioFileOrBlob : null;
   const sourceName = stringValue(asRecord(audioFileOrBlob).name);
   const sourceType = stringValue(asRecord(audioFileOrBlob).type);
+  const defaultName = `audio.${audioFileExtension(sourceType)}`;
   const fileLike = maybeBlob
-    ? createNamedAudioFile(maybeBlob, fileName || sourceName || 'audio.wav', sourceType || 'audio/wav')
+    ? createNamedAudioFile(maybeBlob, fileName || sourceName || defaultName, sourceType || 'audio/wav')
     : audioFileOrBlob;
-  const resolvedName = fileName || stringValue(asRecord(fileLike).name) || 'audio.wav';
+  const resolvedName = fileName || stringValue(asRecord(fileLike).name) || defaultName;
   const form = new FormData();
   form.append('file', fileLike as Blob, resolvedName);
   appendTranscriptionConfig(form, transport?.transcriptionCfg);

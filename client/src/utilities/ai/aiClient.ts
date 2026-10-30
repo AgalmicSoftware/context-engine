@@ -1,3 +1,4 @@
+import { audioFileExtension } from '../audio/audioFileExtension';
 /**
  * @module aiClient
  * @description AI orchestration layer — unified entry point for AI API calls, streaming responses,
@@ -404,11 +405,13 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
   // Helper: coerce to a File when available to preserve filename
   const toFileLike = (blob: Blob & { name?: string }, nameFallback?: string): File | (Blob & { name?: string }) => {
     try {
-      return new File([blob], nameFallback || 'audio.wav', { type: blob.type || 'audio/wav' });
+      return new File([blob], nameFallback || `audio.${audioFileExtension(blob.type)}`, {
+        type: blob.type || 'audio/wav',
+      });
     } catch (error) {
       aiLog.warn('Audio File construction failed; falling back to Blob:', error);
       // Older browsers: attach name on Blob for worker-side filename hints
-      blob.name = nameFallback || 'audio.wav';
+      blob.name = nameFallback || `audio.${audioFileExtension(blob.type)}`;
       return blob;
     }
   };
@@ -464,7 +467,7 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
     return merged.trim();
   }
 
-  const fname = uploadFile.name || (looksSupported ? `audio.${ext || 'wav'}` : 'audio.wav');
+  const fname = uploadFile.name || `audio.${audioFileExtension(uploadFile.type || '')}`;
   return uploadAudioForTranscription(
     uploadFile instanceof Blob ? toFileLike(uploadFile, fname) : uploadFile,
     transport,
