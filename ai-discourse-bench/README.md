@@ -377,8 +377,11 @@ behavior as stance runs; `--seed` fixes the option orders.
 
 Completed stance runs can be combined with `build-report --runs file1.json,file2.json`
 when the bank, prompt template, harness, mode, and persona identity agree.
-Different repeat depths and schedule seeds are allowed, and every source manifest
-keeps its recorded seed and repeat count. Resuming a run is stricter: changed
+Preview builds allow different repeat depths and schedule seeds, warn about
+mixed seeds in the terminal and saved report, and preserve every source manifest.
+`build-report --release` requires one `scheduleSeed` across all run files and names
+the differing seeds when refusing a mixed set. Release repeat-coverage checks
+continue to apply. Resuming a run is stricter: changed
 schedule or request contracts cause saved rows to be rerun, never reused.
 
 ## Compare Models With People

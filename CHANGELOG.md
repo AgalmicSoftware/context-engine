@@ -639,6 +639,8 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Require one schedule seed per release report and warn when previews combine different seeds.
+
 - Allow completed benchmark runs at different repeat depths to share a report while preserving their seeds and strict resume checks.
 
 - Keep importance prompt fingerprints stable across host locales.

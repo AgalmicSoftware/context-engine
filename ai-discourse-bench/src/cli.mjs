@@ -322,6 +322,14 @@ const commandBuildReport = async (args) => {
   const { questionBank, fullQuestionBank, modelRoster } = await readInputs(args);
   const runPaths = parseInputFileList(args.runs);
   const runsFiles = await Promise.all(runPaths.map((runPath) => readJsonFile(runPath)));
+  const scheduleSeeds = [...new Set(runsFiles.map(file => file?.manifest?.scheduleSeed ?? null))];
+  const scheduleWarning = scheduleSeeds.length > 1
+    ? `Run files use different scheduleSeed values: ${scheduleSeeds.map(seed => JSON.stringify(seed)).join(', ')}. Release reports require one seed.`
+    : '';
+  if (scheduleWarning) {
+    if (args.release) throw new Error(scheduleWarning);
+    console.warn(`Warning: ${scheduleWarning}`);
+  }
   if (args.release) {
     runsFiles.forEach((runsFile, index) => {
       throwIfErrors(`release run file ${runPaths[index]}`, validateReleaseRunFile(runsFile, {
@@ -384,6 +392,11 @@ const commandBuildReport = async (args) => {
     }));
   }
   const report = buildResultsReport({ questionBank, modelRoster, runsFile, importanceFile });
+  if (scheduleWarning) {
+    report.integrity.warnings.unshift(scheduleWarning);
+    report.integrity.releaseReady = false;
+    report.status = 'preview';
+  }
   if (args.release && !report.integrity.releaseReady) {
     throw new Error(`release report integrity failed:\n- ${report.integrity.warnings.join('\n- ')}`);
   }
