@@ -651,6 +651,8 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Keep the wallet URI encoder override effective after npm hoisting and validate the installed query-dependency tree.
+
 - Mock wallet disconnection in community and sponsorship lifecycle tests when importing the shared logout boundary.
 
 - Install the Session Worker package in the hosted contracts job before its registry smoke imports Worker code.
