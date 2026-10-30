@@ -3266,3 +3266,6 @@ General-session authentication uses one token namespace for the empty slug and
 `general`. Explicit General requests stay General when checked against a token,
 so named-session tokens cannot authorize them. Token persistence, validation and
 revocation share the same session-key conversion; nonce replay remains refused.
+
+
+Interview question discovery marks temporary payload-read failures (network errors, 408, 429, and 5xx) as incomplete. Missing or malformed payloads are skipped without keeping discovery incomplete forever; gateway fallback still tries both configured Arweave gateways.

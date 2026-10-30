@@ -100356,6 +100356,7 @@ var MAX_LOG_CHUNKS = MAX_SCAN_BLOCKS / RPC_CHUNK_SIZE;
 var MAX_POINTER_READS = 200;
 var MAX_CANDIDATES = 2e3;
 var catalog = (questions = [], incomplete = false) => ({ questions, incomplete });
+var retryableReadStatus = (status) => !status || status === 408 || status === 429 || status >= 500;
 var trim14 = (value) => String(value == null ? "" : value).trim();
 var lower8 = (value) => trim14(value).toLowerCase();
 var isObj21 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -100413,10 +100414,18 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   });
   const listing = await listQuestionRows(callStorage);
   const { items } = listing;
+  let incomplete = listing.incomplete;
   const hiddenIds = new Set(items.filter((item) => item?.hidden === true || item?.metadata?.hidden === true).map((item) => lower8(item?.metadata?.resourceId)).filter(Boolean));
   const readPayload = async (storageRefId) => {
-    const payload = await readJsonResponse(await callStorage("/storage/read", `id=${encodeURIComponent(storageRefId)}`));
-    return isObj21(payload) ? payload : null;
+    try {
+      const response2 = await callStorage("/storage/read", `id=${encodeURIComponent(storageRefId)}`);
+      if (retryableReadStatus(response2?.status)) incomplete = true;
+      const payload = await readJsonResponse(response2);
+      return isObj21(payload) ? payload : null;
+    } catch {
+      incomplete = true;
+      return null;
+    }
   };
   const versions = [];
   const legacyVersions = [];
@@ -100447,7 +100456,7 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
     const payload = version2.payload || await readPayload(version2.storageRefId);
     if (payloadQuestionId(payload) === version2.resourceId && normalizeQuestion(payload)) questions.push(payload);
   }
-  return catalog(dedupeQuestions(questions), listing.incomplete || legacyVersions.length > legacyReads.length || candidates.length > chosen.length);
+  return catalog(dedupeQuestions(questions), incomplete || legacyVersions.length > legacyReads.length || candidates.length > chosen.length);
 };
 var pickContractAddress = (config = {}) => {
   const contracts = isObj21(config.contracts) ? config.contracts : {};
@@ -100526,17 +100535,24 @@ var payloadSessionSlug = (payload = {}) => {
   return "";
 };
 var fetchArweaveQuestion = async (pointer, fetchImpl) => {
-  if (!/^[a-zA-Z0-9_-]{1,43}$/.test(pointer)) return null;
+  if (!/^[a-zA-Z0-9_-]{1,43}$/.test(pointer)) return { payload: null, retryable: false };
+  let retryable = false;
   for (const gateway of ["https://ar-io.dev", "https://arweave.net"]) {
+    let response2;
     try {
-      const response2 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
-      if (!response2.ok) continue;
-      const payload = await response2.json();
-      if (isObj21(payload)) return payload;
+      response2 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
     } catch {
+      retryable = true;
+      continue;
     }
+    if (!response2?.ok) {
+      retryable || (retryable = retryableReadStatus(response2?.status));
+      continue;
+    }
+    const payload = await response2.json().catch(() => null);
+    if (isObj21(payload)) return { payload, retryable: false };
   }
-  return null;
+  return { payload: null, retryable };
 };
 var loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
   const surveysAddress = pickContractAddress(config);
@@ -100591,9 +100607,9 @@ var loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
         }
         const pointer = base64urlFromHex(result);
         if (!pointer || result === ZERO_BYTES322) continue;
-        const payload = await fetchArweaveQuestion(pointer, fetchImpl);
+        const { payload, retryable } = await fetchArweaveQuestion(pointer, fetchImpl);
         if (!payload) {
-          incomplete = true;
+          incomplete || (incomplete = retryable);
           continue;
         }
         if (payloadSessionSlug(payload) !== lower8(slug)) continue;

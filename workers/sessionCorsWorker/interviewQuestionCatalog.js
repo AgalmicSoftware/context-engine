@@ -17,6 +17,7 @@ const MAX_LOG_CHUNKS = MAX_SCAN_BLOCKS / RPC_CHUNK_SIZE;
 const MAX_POINTER_READS = 200;
 const MAX_CANDIDATES = 2000;
 const catalog = (questions = [], incomplete = false) => ({ questions, incomplete });
+const retryableReadStatus = status => !status || status === 408 || status === 429 || status >= 500;
 import { normalizePublicInterviewQuestions, hasRestrictedPrompt, hasRatingScaleMetadata, normalizeRatingScale, normalizeQuestion } from '../../shared/interviewQuestionCatalog.mjs';
 import { selectCanonicalStorageVersions } from './storageResourceOwnership.js';
 const trim = (value) => String(value == null ? '' : value).trim();
@@ -77,6 +78,7 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
   });
   const listing = await listQuestionRows(callStorage);
   const { items } = listing;
+  let incomplete = listing.incomplete;
   // Hidden ids arrive as markers without a storage reference.
   const hiddenIds = new Set(items
     .filter((item) => item?.hidden === true || item?.metadata?.hidden === true)
@@ -85,8 +87,12 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
   // Deliberately sequential and bounded. Each read reuses the storage route's
   // per-item access checks, so this endpoint cannot widen question visibility.
   const readPayload = async (storageRefId) => {
-    const payload = await readJsonResponse(await callStorage('/storage/read', `id=${encodeURIComponent(storageRefId)}`));
-    return isObj(payload) ? payload : null;
+    try {
+      const response = await callStorage('/storage/read', `id=${encodeURIComponent(storageRefId)}`);
+      if (retryableReadStatus(response?.status)) incomplete = true;
+      const payload = await readJsonResponse(response);
+      return isObj(payload) ? payload : null;
+    } catch { incomplete = true; return null; }
   };
   const versions = [];
   const legacyVersions = [];
@@ -124,7 +130,7 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
     // falling back to another version could serve someone else's copy.
     if (payloadQuestionId(payload) === version.resourceId && normalizeQuestion(payload)) questions.push(payload);
   }
-  return catalog(dedupeQuestions(questions), listing.incomplete || legacyVersions.length > legacyReads.length || candidates.length > chosen.length);
+  return catalog(dedupeQuestions(questions), incomplete || legacyVersions.length > legacyReads.length || candidates.length > chosen.length);
 };
 
 const pickContractAddress = (config = {}) => {
@@ -217,16 +223,21 @@ const payloadSessionSlug = (payload = {}) => {
 };
 
 const fetchArweaveQuestion = async (pointer, fetchImpl) => {
-  if (!/^[a-zA-Z0-9_-]{1,43}$/.test(pointer)) return null;
+  if (!/^[a-zA-Z0-9_-]{1,43}$/.test(pointer)) return { payload: null, retryable: false };
+  let retryable = false;
   for (const gateway of ['https://ar-io.dev', 'https://arweave.net']) {
-    try {
-      const response = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: 'application/json' } });
-      if (!response.ok) continue;
-      const payload = await response.json();
-      if (isObj(payload)) return payload;
-    } catch {}
+    let response;
+    try { response = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: 'application/json' } }); }
+    catch { retryable = true; continue; }
+    if (!response?.ok) {
+      retryable ||= retryableReadStatus(response?.status);
+      continue;
+    }
+    // Invalid JSON is a terminal payload problem, not a transport outage.
+    const payload = await response.json().catch(() => null);
+    if (isObj(payload)) return { payload, retryable: false };
   }
-  return null;
+  return { payload: null, retryable };
 };
 
 const loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
@@ -275,8 +286,8 @@ const loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
         const pointer = base64urlFromHex(result);
         if (!pointer || result === ZERO_BYTES32) continue;
         // At most two gateway fetches for each of the bounded pointer reads.
-        const payload = await fetchArweaveQuestion(pointer, fetchImpl);
-        if (!payload) { incomplete = true; continue; }
+        const { payload, retryable } = await fetchArweaveQuestion(pointer, fetchImpl);
+        if (!payload) { incomplete ||= retryable; continue; }
         if (payloadSessionSlug(payload) !== lower(slug)) continue;
         const question = normalizeQuestion({ ...payload, id });
         if (question) questions.push(question);

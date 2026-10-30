@@ -311,3 +311,36 @@ test('Cloudflare catalog keeps room for its payload reads within the per-request
   assert.equal(questions.length, 100);
   assert.ok(operations <= 800, `${operations} KV operations`);
 });
+
+for (const failure of [503, 429, 'network', 404, 'non-json']) test(`Cloudflare read ${failure} distinguishes incomplete discovery from a permanent unusable payload`, async () => {
+  const result = await loadPublicInterviewQuestions({ slug: 'fixture', config,
+    storageRoute: async ({ path }) => {
+      if (path === '/storage/list') return Response.json({ items: [{ storageRef: { id: 'fixture-ref' }, metadata: { resourceId: 'q1' } }], listComplete: true });
+      if (failure === 'network') throw new Error('Synthetic network failure');
+      return failure === 'non-json' ? new Response('not json') : new Response('', { status: failure });
+    },
+    fetch: () => assert.fail('A Worker-only fixture must not call RPC'),
+  });
+  assert.deepEqual(result.questions, []);
+  assert.equal(result.incomplete, [503, 429, 'network'].includes(failure));
+});
+
+for (const failure of [503, 429, 'network', 404, 'non-json']) test(`on-chain payload ${failure} only retries temporary gateway failures`, async () => {
+  const qid = `0x${'11'.repeat(32)}`;
+  const eventData = `0x${(32n).toString(16).padStart(64, '0')}${(1n).toString(16).padStart(64, '0')}${qid.slice(2)}`;
+  const result = await loadPublicInterviewQuestions({ slug: 'fixture',
+    config: { contracts: { surveys: '0x1111111111111111111111111111111111111111' }, rpcUrl: 'https://rpc.example', blockLimits: { start: 1, end: 1 } },
+    fetch: async (url, init) => {
+      if (url === 'https://rpc.example') {
+        const body = JSON.parse(init.body);
+        const result = body.method === 'eth_blockNumber' ? '0x1' : body.method === 'eth_getLogs' ? [{ data: eventData }] : `0x${'01'.repeat(32)}`;
+        return Response.json({ jsonrpc: '2.0', id: 1, result });
+      }
+      assert.ok(['ar-io.dev', 'arweave.net'].includes(new URL(url).hostname));
+      if (failure === 'network') throw new Error('Synthetic network failure');
+      return failure === 'non-json' ? new Response('not json') : new Response('', { status: failure });
+    },
+  });
+  assert.deepEqual(result.questions, []);
+  assert.equal(result.incomplete, [503, 429, 'network'].includes(failure));
+});
