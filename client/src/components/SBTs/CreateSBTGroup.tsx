@@ -3756,53 +3756,6 @@ class CreateSBTGroup extends Component<any, any> {
     }
   };
 
-  async handleImageLoaded(imgRef: HTMLImageElement): Promise<void> {
-    const imageGeneration = this._imageSelectionGeneration;
-    try {
-      imgRef.crossOrigin = 'anonymous';
-      const imageElement = imgRef;
-      if (!imageElement.complete || imageElement.naturalWidth === 0) {
-        this.setState(buildCreateSbtImageLoadErrorPatch(), this.persistFormCache);
-        return;
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = imageElement.naturalWidth;
-      canvas.height = imageElement.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        throw new Error('Unable to create image canvas context.');
-      }
-
-      imageElement.setAttribute('crossOrigin', 'anonymous');
-
-      ctx.drawImage(imageElement, 0, 0);
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b: Blob | null) => {
-          if (!b) {
-            reject(new Error('Failed to create blob from canvas'));
-            return;
-          }
-          resolve(b);
-        }, 'image/png');
-      });
-      if (imageGeneration !== this._imageSelectionGeneration) return;
-      if (!blob) {
-        this.setState(buildCreateSbtImageLoadErrorPatch(), this.persistFormCache);
-        return;
-      }
-      const file = new File([blob], 'url_image.png', { type: 'image/png' });
-      this.setState(buildCreateSbtImageFilePatch({ file }), () => {
-        this.updateGroupHash();
-        this.persistFormCache();
-      });
-    } catch (error) {
-      if (imageGeneration === this._imageSelectionGeneration) {
-        this.setState(buildCreateSbtImageLoadErrorPatch(), this.persistFormCache);
-      }
-    }
-  }
-
   commitPendingDocumentUrl = async ({ persist = true }: { persist?: boolean } = {}): Promise<boolean> => {
     this.resetFormStateForEdit();
     const pendingDocumentUrl = this.getNormalizedDocumentUrlDraft();

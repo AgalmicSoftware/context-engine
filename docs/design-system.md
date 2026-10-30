@@ -569,3 +569,5 @@ Breakdown provides a labeled Question selector independently of demographic comp
 Question generation requires at least one selected type. With no type selected, Generate is disabled and explains how to continue. A response containing no usable questions shows an actionable message and keeps the current draft.
 
 The SBT image picker preserves an in-flight selection when Paste is empty, unsupported, oversized, or fails to fetch. A usable pasted image replaces it only when applied.
+
+Pasted and URL-based SBT artwork use fetched image files for their preview and stored bytes. There is no separate canvas load callback.
