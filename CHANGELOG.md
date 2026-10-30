@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Preserve internal option spacing through the live Results controller so Breakdown counts match stored selections.
+
 - Keep a closed profile analysis dialog closed when refreshed inputs invalidate its result.
 
 - Disconnect wagmi and persist logout intent in shared teardown, including agent logout, so stale wallet props cannot sign the participant back in.

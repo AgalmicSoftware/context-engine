@@ -1,3 +1,4 @@
+import { resolveGeneratedResultsControllerState } from './sessionResultsAnalysisController';
 import { buildGeneratedBreakdownAnalysisData } from '../../components/SessionResults/sessionResultsGeneratedViewAdapters';
 import { buildResultsAnalysisBrowserSnapshotFromCacheNode } from './sessionResultsAnalysisBrowserSnapshot';
 import { loadAdminSnapshotResultsAnalysisSource } from '../../../../workers/sessionCorsWorker/resultsAnalysisGeneration';
@@ -221,7 +222,7 @@ it('counts a note-only encrypted response as locked like the Worker', () => {
 });
 
 it.each(['Two  spaces', 'Non\u00a0breaking'])(
-  'keeps stored option whitespace from Worker snapshots through Breakdown: %s',
+  'keeps option whitespace from Worker through the live controller and Breakdown: %s',
   async (option) => {
     const source = await loadAdminSnapshotResultsAnalysisSource({
       slug: 'edge',
@@ -243,7 +244,14 @@ it.each(['Two  spaces', 'Non\u00a0breaking'])(
     expect(source.ok).toBe(true);
     if (!source.ok || !('snapshot' in source)) throw new Error('Worker did not return a normalized snapshot.');
     expect(source.snapshot.responses.map((row) => row.answer)).toEqual(expect.arrayContaining([[option], ['Other']]));
-    const result = buildGeneratedBreakdownAnalysisData(source.snapshot);
+    const state = resolveGeneratedResultsControllerState({
+      statusBody: {
+        ok: true,
+        viewerAuthorized: true,
+        state: { jobState: 'succeeded', lastGood: { snapshot: source.snapshot } },
+      },
+    });
+    const result = buildGeneratedBreakdownAnalysisData({ questions: state.questions, responses: state.responses });
     expect(
       result.analysisData?.flatResponses.map(({ responseText, count, participantCount, totalVotes, rate }) => [
         responseText,
