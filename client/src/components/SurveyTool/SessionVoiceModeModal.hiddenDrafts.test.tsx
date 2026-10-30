@@ -322,7 +322,9 @@ it('keeps a hidden draft the person already answered, as an ordinary draft, when
 it('explains the grey answer area with a keyboard-accessible tooltip', async () => {
   renderReview();
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-  fireEvent.focus(within(card(hiddenStatement)).getByRole('button', { name: 'Why is the AI guess hidden?' }));
+  const help = within(card(hiddenStatement)).getByRole('button', { name: 'Why is the AI guess hidden?' });
+  expect(help).toHaveAccessibleDescription(/Give your own answer first/);
+  fireEvent.focus(help);
   expect(await screen.findByRole('tooltip')).toHaveTextContent('Give your own answer first');
   expect(answer(hiddenStatement)).toBeEnabled();
   expect(card(hiddenStatement).innerHTML).not.toContain('EVIDENCE-');

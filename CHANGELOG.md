@@ -164,6 +164,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Give hidden-draft help an accessible description and keep its tooltip open while hovered.
+
 - Keep rejected file names visible when question generation starts, while clearing stale extraction failures.
 
 - Show passkey disconnect failures in the login modal after local sign-out clears the account, instead of leaving an unhandled button promise.

@@ -531,3 +531,5 @@ Labelled requests rejected with a non-transient 4xx response retry the same audi
 
 
 After an interview submission leaves page answers unsaved, a notice beside the ordinary Submit button shows their count. Ordinary editing does not show this notice. Submitting the remaining page answers clears it.
+
+Hidden-draft help includes a screen-reader description on its question-mark button; its explanation stays open when the pointer moves into the tooltip.
