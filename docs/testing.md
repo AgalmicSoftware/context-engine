@@ -154,3 +154,5 @@ npm run test:e2e
 Wallet behavior and local contract setup are documented in
 [docs/passkey-wallet.md](passkey-wallet.md) and
 [docs/local-chain.md](local-chain.md).
+
+The contracts job installs both root and Session Worker dependencies: the registry participation smoke imports Worker handlers and must resolve the isolated Worker ethers v6, while root contract tooling remains on ethers v5.

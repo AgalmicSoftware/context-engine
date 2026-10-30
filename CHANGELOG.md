@@ -649,6 +649,8 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Install the Session Worker package in the hosted contracts job before its registry smoke imports Worker code.
+
 - Refresh the client coverage inventory count without changing measured coverage or enforced floors.
 
 - Cover the pinned Worker session route with read-only navigation fixtures and
