@@ -162,3 +162,6 @@ After decrypt (or for plaintext), the viewer supports:
 - fallback: download link
 
 For Lit-encrypted payloads that decode to a blob, the viewer provides “Download decrypted file”.
+
+
+Photo analysis accepts configured `claude-` model IDs through Anthropic and OpenRouter, including new family names. The client sends the image using the selected provider's format; provider validation determines whether that configured model accepts images.

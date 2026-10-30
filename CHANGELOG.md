@@ -164,6 +164,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Accept configured Claude model IDs for photo requests through Anthropic and OpenRouter without restricting the family name or version.
+
 - Track all pending agent answers so navigating between concurrent submissions keeps each pending answer disabled until its own request finishes.
 
 - Show the pending-page-answer notice beside Submit only after an interview submission leaves answers unsaved. Clear it after ordinary submission.
