@@ -3,7 +3,7 @@
   "measuredAt": "2026-10-11",
   "source": "npm --prefix client run test:coverage:full-universe",
   "denominator": "Every tracked executable client/src JS/JSX/TS/TSX production file under the documented exclusion contract.",
-  "productionFileCount": 1230,
+  "productionFileCount": 1297,
   "zeroHitFileCount": 8,
   "zeroHitFiles": [
     "client/src/components/Account/LoginSettingsAiConfigContent.tsx",

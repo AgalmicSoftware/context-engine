@@ -647,6 +647,8 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Refresh the client coverage inventory count without changing measured coverage or enforced floors.
+
 - Cover the pinned Worker session route with read-only navigation fixtures and
   loaded-session assertions while keeping unmatched network requests blocked.
 
