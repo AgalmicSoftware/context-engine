@@ -1,3 +1,4 @@
+import { normalizeRatingScale, ratingStepFor, DEFAULT_RATING_SCALE } from '../../../shared/questions/ratingScale.mjs';
 import { selectCurrentSubmittedAnswers } from './submittedResults.mjs';
 import { authorityError } from './authority.mjs';
 import { safeString, lower, safeJsonParse, sanitizeSessionSlug, sha256Hex } from './runtimePrimitives.mjs';
@@ -48,6 +49,8 @@ export function publicAgentQuestion(question = {}, { session = {} } = {}) {
     questionType,
     prompt,
     options,
+    ...(questionType === 'rating' && !locked && !unavailable
+      ? { scale: { ...(normalizeRatingScale(question) || DEFAULT_RATING_SCALE), step: ratingStepFor(question) } } : {}),
     ...(questionType === 'quadratic' ? { voiceCredits: question.voiceCredits ?? 99 } : {}),
     ...(questionType === 'multichoice' && question.singleSelect === true ? { singleSelect: true } : {}),
     tags,

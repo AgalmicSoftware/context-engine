@@ -433,6 +433,8 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Preserve rating scales and fractional steps through public agent questions and results scoring.
+
 - Route automatic custom-provider results analysis through the same checked HTTPS fetch path as manual analysis, including redirect checks.
 
 - Store and revoke General-session login tokens under one namespace, preserving explicit session isolation.

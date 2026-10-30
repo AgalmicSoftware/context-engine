@@ -1,3 +1,4 @@
+import { normalizeRatingScale as normalizeQuestionRatingScale, ratingStepFor } from '../../../shared/questions/ratingScale.mjs';
 import { validateQuadraticQuestion } from '../../../shared/questions/quadraticAllocation.mjs';
 import {
   safeString,
@@ -221,37 +222,10 @@ function normalizeOptions(value = []) {
     .slice(0, 12);
 }
 
-function leadingNumber(value) {
-  const match = safeString(value).match(/^-?\d+(?:\.\d+)?/);
-  if (!match) return null;
-  const numeric = Number(match[0]);
-  return Number.isFinite(numeric) ? numeric : null;
-}
-
-function normalizeRatingScale(value = {}, options = []) {
-  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  const optionNumbers = normalizeOptions(options)
-    .map((option) => leadingNumber(option))
-    .filter((number) => Number.isFinite(number));
-  let min = Number(source.min ?? source.minimum);
-  let max = Number(source.max ?? source.maximum);
-  let step = Number(source.step ?? source.interval);
-  if (!Number.isFinite(min) && optionNumbers.length >= 2) min = Math.min(...optionNumbers);
-  if (!Number.isFinite(max) && optionNumbers.length >= 2) max = Math.max(...optionNumbers);
-  if (!Number.isFinite(step)) {
-    const sorted = [...new Set(optionNumbers)].sort((left, right) => left - right);
-    const diffs = sorted.slice(1).map((number, index) => number - sorted[index]).filter((number) => number > 0);
-    step = diffs.length ? Math.min(...diffs) : 1;
-  }
-  min = Math.floor(min);
-  max = Math.floor(max);
-  step = Math.floor(step);
-  if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) return null;
-  if (!Number.isFinite(step) || step < 1) step = 1;
-  min = Math.max(-100, Math.min(100, min));
-  max = Math.max(-100, Math.min(100, max));
-  if (Math.floor((max - min) / step) + 1 > 21) return null;
-  return { min, max, step };
+function normalizeRatingScale(value = {}) {
+  const question = { scale: value };
+  const scale = normalizeQuestionRatingScale(question);
+  return scale ? { min: scale.min, max: scale.max, step: ratingStepFor(question) } : null;
 }
 
 function normalizeReferenceUrl(value = '') {
@@ -404,7 +378,7 @@ function proposedRecordToQuestion(record = {}) {
   }
   if (questionType === 'quadratic') question.voiceCredits = record.voiceCredits ?? 99;
   if (questionType === 'rating') {
-    const ratingScale = normalizeRatingScale(record.ratingScale || record.rating_scale, options);
+    const ratingScale = normalizeRatingScale(record.ratingScale || record.rating_scale);
     if (ratingScale) question.ratingScale = ratingScale;
   }
   if (tags.length) question.tags = tags;
@@ -473,7 +447,7 @@ export async function persistAgentProposedQuestion({
     if (reason) return { ok: false, reason };
   }
   const normalizedRatingScale = type === 'rating'
-    ? normalizeRatingScale(ratingScale, normalizedOptions)
+    ? normalizeRatingScale(ratingScale)
     : null;
   const normalizedReferences = normalizeQuestionReferences(references);
   const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);

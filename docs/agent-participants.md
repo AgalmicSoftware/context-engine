@@ -112,7 +112,7 @@ targeting, recommendations follow the eligible catalog order.
 ## Participant results
 
 Participant group scores use canonical binary answers (Agree, Unsure, Disagree)
-and ratings normalized over each question's declared bounds. Invalid ratings and
+and ratings normalized over each question's declared bounds. Public question records retain normalized rating bounds, labels and step sizes through both JSON results and image generation. Invalid ratings and
 answers to multichoice, quadratic, freeform or unknown question types are excluded
 from score averages and agreement counts. Qualitative responses remain visible;
 questions without scored answers do not appear in the group's top statements.

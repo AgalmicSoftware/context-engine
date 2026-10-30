@@ -65033,34 +65033,10 @@ function inferQuestionTags({
 function normalizeOptions3(value = []) {
   return (Array.isArray(value) ? value : []).map((option) => safeString(option).replace(/\s+/g, " ").slice(0, 120)).filter(Boolean).slice(0, 12);
 }
-function leadingNumber(value) {
-  const match = safeString(value).match(/^-?\d+(?:\.\d+)?/);
-  if (!match) return null;
-  const numeric = Number(match[0]);
-  return Number.isFinite(numeric) ? numeric : null;
-}
-function normalizeRatingScale2(value = {}, options = []) {
-  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const optionNumbers = normalizeOptions3(options).map((option) => leadingNumber(option)).filter((number2) => Number.isFinite(number2));
-  let min = Number(source.min ?? source.minimum);
-  let max = Number(source.max ?? source.maximum);
-  let step = Number(source.step ?? source.interval);
-  if (!Number.isFinite(min) && optionNumbers.length >= 2) min = Math.min(...optionNumbers);
-  if (!Number.isFinite(max) && optionNumbers.length >= 2) max = Math.max(...optionNumbers);
-  if (!Number.isFinite(step)) {
-    const sorted = [...new Set(optionNumbers)].sort((left, right) => left - right);
-    const diffs = sorted.slice(1).map((number2, index) => number2 - sorted[index]).filter((number2) => number2 > 0);
-    step = diffs.length ? Math.min(...diffs) : 1;
-  }
-  min = Math.floor(min);
-  max = Math.floor(max);
-  step = Math.floor(step);
-  if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) return null;
-  if (!Number.isFinite(step) || step < 1) step = 1;
-  min = Math.max(-100, Math.min(100, min));
-  max = Math.max(-100, Math.min(100, max));
-  if (Math.floor((max - min) / step) + 1 > 21) return null;
-  return { min, max, step };
+function normalizeRatingScale2(value = {}) {
+  const question = { scale: value };
+  const scale = normalizeRatingScale(question);
+  return scale ? { min: scale.min, max: scale.max, step: ratingStepFor(question) } : null;
 }
 function normalizeReferenceUrl(value = "") {
   const text = safeString(value).slice(0, 2e3);
@@ -65187,7 +65163,7 @@ function proposedRecordToQuestion(record3 = {}) {
   }
   if (questionType === "quadratic") question.voiceCredits = record3.voiceCredits ?? 99;
   if (questionType === "rating") {
-    const ratingScale = normalizeRatingScale2(record3.ratingScale || record3.rating_scale, options);
+    const ratingScale = normalizeRatingScale2(record3.ratingScale || record3.rating_scale);
     if (ratingScale) question.ratingScale = ratingScale;
   }
   if (tags.length) question.tags = tags;
@@ -65251,7 +65227,7 @@ async function persistAgentProposedQuestion({
     const reason = validateQuadraticQuestion({ options: normalizedOptions, voiceCredits });
     if (reason) return { ok: false, reason };
   }
-  const normalizedRatingScale = type === "rating" ? normalizeRatingScale2(ratingScale, normalizedOptions) : null;
+  const normalizedRatingScale = type === "rating" ? normalizeRatingScale2(ratingScale) : null;
   const normalizedReferences = normalizeQuestionReferences(references);
   const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
   const normalizedSessionContext = normalizeSessionContext(sessionContext);
@@ -65458,6 +65434,7 @@ function mergeAgentProposedQuestions(questions = [], proposedQuestions = []) {
 var PROPOSED_QUESTION_KV_PREFIX2, PROPOSED_QUESTION_ID_PREFIX, DEFAULT_PROPOSED_QUESTION_TTL_SECONDS, SUPPORTED_QUESTION_TYPES, MAX_QUESTION_TAGS, MAX_QUESTION_TAG_LENGTH, MAX_QUESTION_GEO_REFS, MAX_QUESTION_GEO_ID_LENGTH, MAX_QUESTION_GEO_LABEL_LENGTH, TAG_STOP_WORDS, TAG_RULES;
 var init_agentQuestionProposals = __esm({
   "workers/sessionCorsWorker/agent/agentQuestionProposals.mjs"() {
+    init_ratingScale();
     init_quadraticAllocation();
     init_runtimePrimitives();
     init_opaqueActions();
@@ -91965,6 +91942,7 @@ async function handleServiceCredentialBootstrapRequest({ request, env = {}, crea
 }
 
 // workers/sessionCorsWorker/agent/questions.mjs
+init_ratingScale();
 init_submittedResults();
 init_authority();
 init_runtimePrimitives();
@@ -92135,6 +92113,7 @@ function publicAgentQuestion(question = {}, { session = {} } = {}) {
     questionType,
     prompt,
     options,
+    ...questionType === "rating" && !locked7 && !unavailable3 ? { scale: { ...normalizeRatingScale(question) || DEFAULT_RATING_SCALE2, step: ratingStepFor(question) } } : {},
     ...questionType === "quadratic" ? { voiceCredits: question.voiceCredits ?? 99 } : {},
     ...questionType === "multichoice" && question.singleSelect === true ? { singleSelect: true } : {},
     tags,
