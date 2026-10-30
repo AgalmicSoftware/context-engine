@@ -14,6 +14,7 @@ import {
   setInputValue,
   setAudioInputValue,
   addAdditionalPhoto,
+  addAdditionalUrl,
   renderSubject,
   makeSessionConfig,
   mockCallAI,
@@ -26,6 +27,35 @@ import {
 
 describe('AudioSurveyGenerator photo and extra source handling', () => {
   setupAudioSurveyGeneratorTestLifecycle();
+
+  it('clears source warnings when a new generation successfully reads the source', async () => {
+    mockProcessAdditionalSources.mockResolvedValueOnce({
+      text: '',
+      extractedCharacters: 0,
+      skipped: [{ name: 'Retry source', reason: 'Temporarily unreadable' }],
+    });
+    mockCallAI.mockResolvedValueOnce(
+      JSON.stringify({ questions: [{ prompt: 'Choose a shared priority?', questionType: 'binary' }] }),
+    );
+    await renderSubject(<AudioSurveyGenerator activeSessionSlug="edge" sessionConfig={makeSessionConfig()} />);
+    await addAdditionalUrl();
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(container.textContent).toContain('Skipped Retry source: Temporarily unreadable');
+    mockProcessAdditionalSources.mockResolvedValueOnce({
+      text: 'A readable source about public decision making and shared priorities.',
+      extractedCharacters: 70,
+      skipped: [],
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(mockProcessAdditionalSources).toHaveBeenCalledTimes(2);
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    expect(container.textContent).not.toContain('Skipped Retry source: Temporarily unreadable');
+  });
 
   it('blocks question generation when photo analysis is unsupported by the configured AI provider or model', async () => {
     mockAnalyzePhotoForQuestionGeneration.mockRejectedValueOnce(

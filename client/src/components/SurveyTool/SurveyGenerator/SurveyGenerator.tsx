@@ -1223,6 +1223,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     if (!selectedQuestionTypes.length) return;
     setError('');
     setActiveAction('generate');
+    setSourceWarnings([]);
 
     let currentDocumentURLs: string[] = [];
     let content = '';
