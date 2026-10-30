@@ -407,13 +407,11 @@ route. Returned transcripts are stitched with overlap deduplication. Rolling
 and uploaded audio share Unicode letter/digit matching with original-text
 offsets, so trimming an overlap preserves new speech in every script.
 
-Closing Group Conversation with Close, Escape, or an outside click first stops capture, waits for the final segment to finish transcription, and saves the transcript. The dialog shows **Finalizing recording…** and ignores further dismissals until it finishes. If transcription fails, the dialog stays open and keeps the failed audio in memory; closing again retries it. Keep the dialog open until recovery completes. Successful transcripts are restored on reopen.
+Closing Group Conversation with Close, Escape, or an outside click first stops capture, waits for the final segment to finish transcription, and saves the transcript. The dialog shows **Finalizing recording…** and ignores further dismissals until it finishes. Failed uploads retry automatically with backoff. If recovery still fails, the dialog stays open with Retry and Download audio controls. Saved chunks and completed transcripts return when the same session and account reopen the recorder; recovery does not start the microphone.
 
 The visible transcript is collapsed by default. Generated questions are drafts
 rendered through the existing `CreateQuestionsAndSurveys` review surface and
-are never auto-published. Raw chunks are discarded after successful
-transcription; the browser retains only transcript and recovery status metadata
-by default.
+are never auto-published. Generation uses the session’s `questionsGenPrompt`. A participant with question-authoring permission can review the generated questions and press Submit. Raw chunks are removed only in the same successful IndexedDB transaction that saves their transcript.
 
 ## Access and failure behavior
 
@@ -471,11 +469,30 @@ The session page, admin page and publish result include a compact **Join** panel
 
 ### Recording on a phone or with remote speakers
 
-Group Conversation and Interview request a Screen Wake Lock while recording or paused, release it on stop/close, and request it again when the page returns to the foreground. When a lock is unavailable or released, **Keep this screen on** remains visible. A wake lock cannot keep a backgrounded browser recording reliably; keep the recording page visible.
+Group Conversation and Interview request a Screen Wake Lock while recording or paused, release it on stop/close, and request it again when the page returns to the foreground. Group Conversation explains when the page is hidden or the screen lock is unavailable and asks the recorder to keep the page visible and screen unlocked. Interview keeps its screen-on notice. A wake lock cannot keep a backgrounded browser recording reliably; keep the recording page visible.
 
 Group Conversation's **Record speaker audio** option is off by default and remembered on the device. It turns off microphone echo cancellation for people heard through the device's speakers, keeping noise suppression and gain control. Use speakers instead of headphones and test levels before the breakout. The option cannot change during capture.
 
-Foreground recordings rotate into independently decodable three-minute chunks and transcribe serially. Successful text is saved locally. A failed segment is marked; later segments continue. There is no automatic retry or durable raw-audio recovery in this mode, so do not rely on it as the only copy of an important conversation. Background timer suspension, browser termination, storage limits and device battery policies still need device testing.
+Foreground recordings rotate into independently decodable three-minute chunks. While capturing, the browser delivers one-second audio fragments; each cumulative chunk is saved in IndexedDB, keeping its container header intact. Finished chunks upload serially in capture order. A failed upload retries after 1, 2, 4 and 8 seconds, then remains Failed with Retry and Download audio actions. Later chunks wait behind it. Offline capture stays local and resumes uploading when connectivity returns. Reopening or reloading the same session restores saved chunks in order without acquiring the microphone.
+
+Each chunk shows Recording, Waiting to upload, Uploading, Transcribed, Failed or Retrying. Download audio saves the original retained bytes as a WebM, Ogg or M4A file. Downloading does not delete the recovery copy. Raw audio is removed only after its transcript commits successfully; clearing the transcript is disabled while audio is pending. Storage failures stop capture and explain how to free space and download unsaved audio before leaving. Microphone revocation stops capture and tells the recorder to restore permission before pressing Record again.
+
+Recovery covers audio already delivered by the browser and committed to IndexedDB. A crash can lose an undelivered final fragment, and operating-system suspension can interrupt capture before any audio exists to save. Browser storage eviction, private browsing limits and phone battery policies still require device testing.
+
+#### 45-minute phone rehearsal
+
+Run this checklist on the intended iOS Safari and Android Chrome devices, microphone, room and network. Automated fake-time tests do not establish phone endurance.
+
+1. Open the session’s HTTPS link on the phone. Confirm the session and Worker; a desktop `127.0.0.1` preview is not reachable from the phone.
+2. Record a short sample from every expected seat. Pause, resume and stop. Confirm readable transcript text, released microphone and wake lock, and speaker labels when enabled. Labels restart per chunk and do not identify people.
+3. If remote participants use the device’s speakers, repeat with Record speaker audio enabled. Check feedback and distant voices; headphones do not feed speaker audio into the microphone.
+4. Record for 45 minutes in the foreground, powered as intended for the event. Expect 15 three-minute rotations plus a final partial chunk. Watch chunk status, memory, battery temperature and the final upload.
+5. Interrupt connectivity during an upload. Confirm local audio remains, retries resume in order after reconnecting, and a stuck chunk offers Retry and a playable Download audio file. Reload during a short recording and confirm the persisted partial chunk recovers without restarting the microphone.
+6. Separately test switching tabs, backgrounding, screen lock, a phone call and low-power mode. Check the hidden-page/screen-lock notice and reacquisition on return. Record any missing capture; these are not guarantees of continuous background recording.
+7. Test microphone denial/revocation, unavailable/full storage and reopening the app. Confirm actionable errors and that pending audio remains downloadable. Stop and wait until every chunk is Transcribed, then reopen and compare the transcript.
+8. Confirm the generated questions reflect the session’s instructions. Review and edit them, submit as a participant with question-authoring permission, and verify they appear in the session. Generation alone must not publish them.
+
+The labeled route has a 24 MiB chunk limit and falls back to ordinary transcription when needed. Actual phone encoding, delayed timers and long background intervals must be checked on the devices.
 
 
 ### Optional speaker labels

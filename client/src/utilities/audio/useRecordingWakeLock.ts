@@ -3,6 +3,12 @@ import { useEffect, useState } from 'react';
 /** A screen lock is best effort: recording must still work when battery or browser policy refuses it. */
 export function useRecordingWakeLock(active: boolean) {
   const [held, setHeld] = useState(false);
+  const [pageHidden, setPageHidden] = useState(document.visibilityState === 'hidden');
+  useEffect(() => {
+    const update = () => setPageHidden(document.visibilityState === 'hidden');
+    document.addEventListener('visibilitychange', update);
+    return () => document.removeEventListener('visibilitychange', update);
+  }, []);
   useEffect(() => {
     setHeld(false);
     if (!active || typeof navigator === 'undefined' || !navigator.wakeLock?.request) return;
@@ -55,5 +61,5 @@ export function useRecordingWakeLock(active: boolean) {
       release();
     };
   }, [active]);
-  return { wakeLockHeld: active && held };
+  return { wakeLockHeld: active && held, pageHidden };
 }

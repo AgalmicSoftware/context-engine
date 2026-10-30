@@ -1,16 +1,31 @@
 import { act, renderHook } from '@testing-library/react';
 import { useRollingTranscriptionRecorder } from './useRollingTranscriptionRecorder';
 import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
+import { putRecordingChunk } from './recordingChunkStore';
 
 jest.mock('../ai/aiClient.js', () => ({
   transcribeAudio: jest.fn(),
   transcribeGroupAudio: jest.fn(),
 }));
 
+const mockChunkRecords = new Map<
+  string,
+  { scope: string; segment: { id: string; status: string; text: string }; audio?: Blob }
+>();
+jest.mock('./recordingChunkStore', () => ({
+  listRecordingChunks: jest.fn(async (scope: string) =>
+    [...mockChunkRecords.values()].filter((record) => record.scope === scope),
+  ),
+  putRecordingChunk: jest.fn(
+    async (record: { scope: string; segment: { id: string; status: string; text: string }; audio?: Blob }) => {
+      mockChunkRecords.set(record.segment.id, { ...record, segment: { ...record.segment } });
+    },
+  ),
+  clearRecordingChunks: jest.fn(async () => mockChunkRecords.clear()),
+}));
+
 const flushPromises = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let index = 0; index < 40; index++) await Promise.resolve();
 };
 
 describe('useRollingTranscriptionRecorder', () => {
@@ -59,6 +74,7 @@ describe('useRollingTranscriptionRecorder', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     window.localStorage.clear();
+    mockChunkRecords.clear();
     instances.length = 0;
     (transcribeAudio as jest.Mock).mockImplementation(async (_blob: Blob) => `transcript ${instances.length}`);
 
@@ -92,6 +108,146 @@ describe('useRollingTranscriptionRecorder', () => {
     });
     jest.useRealTimers();
     jest.clearAllMocks();
+  });
+
+  it('keeps raw audio until a failed upload retries and its transcript is saved', async () => {
+    (transcribeAudio as jest.Mock)
+      .mockImplementationOnce(async () => {
+        throw new Error('Temporary upload failure');
+      })
+      .mockImplementation(async () => 'Recovered speech.');
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'retry' }));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await act(async () => {
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect([...mockChunkRecords.values()][0]?.audio?.size).toBe(256);
+    expect(result.current.segments[0].status).toBe('retrying');
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1000);
+      await flushPromises();
+    });
+    expect(transcribeAudio).toHaveBeenCalledTimes(2);
+    expect(result.current.transcript).toBe('Recovered speech.');
+    expect([...mockChunkRecords.values()][0]?.segment.text).toBe('Recovered speech.');
+    expect([...mockChunkRecords.values()][0]?.audio).toBeUndefined();
+    unmount();
+  });
+
+  it('persists a partial recording before stop and recovers it after reopening', async () => {
+    (transcribeAudio as jest.Mock).mockImplementation(async () => 'Recovered partial recording.');
+    const first = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'recover' }));
+    await act(async () => {
+      await first.result.current.startRecording();
+    });
+    await act(async () => {
+      instances[0].requestData();
+      await flushPromises();
+    });
+    expect([...mockChunkRecords.values()][0]?.audio?.size).toBe(256);
+    expect(transcribeAudio).not.toHaveBeenCalled();
+    // Simulate a process disappearing without the final MediaRecorder event.
+    instances[0].state = 'inactive';
+    first.unmount();
+    const next = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'recover' }));
+    await act(async () => {
+      await flushPromises();
+    });
+    expect(next.result.current.transcript).toBe('Recovered partial recording.');
+    expect(transcribeAudio).toHaveBeenCalledTimes(1);
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+    next.unmount();
+  });
+
+  it('does not start a microphone request completed after switching sessions', async () => {
+    let grant!: (value: MediaStream) => void;
+    (navigator.mediaDevices.getUserMedia as jest.Mock).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          grant = resolve;
+        }),
+    );
+    const { result, rerender, unmount } = renderHook(
+      ({ slug }) => useRollingTranscriptionRecorder({ sessionSlug: slug }),
+      { initialProps: { slug: 'first' } },
+    );
+    let started!: Promise<void>;
+    await act(async () => {
+      started = result.current.startRecording();
+      await flushPromises();
+    });
+    rerender({ slug: 'second' });
+    await act(async () => {
+      grant(mockStream);
+      await started;
+    });
+    expect(instances).toHaveLength(0);
+    expect(mockTrack.stop).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('stops on microphone revocation and keeps the final audio available', async () => {
+    let ended = () => {};
+    Object.assign(mockTrack, {
+      addEventListener: (_name: string, callback: () => void) => {
+        ended = callback;
+      },
+    });
+    (transcribeAudio as jest.Mock).mockImplementation(() => new Promise(() => {}));
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'revoked' }));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await act(async () => {
+      ended();
+      await flushPromises();
+    });
+    expect(result.current.status).toBe('error');
+    expect(result.current.errorMessage).toContain('Restore microphone permission');
+    expect([...mockChunkRecords.values()][0]?.audio?.size).toBe(256);
+    expect(instances[0].stop).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('stops capture when storage fails and retains a downloadable memory copy', async () => {
+    const original = jest.mocked(putRecordingChunk).getMockImplementation()!;
+    jest.mocked(putRecordingChunk).mockImplementation(async () => {
+      throw new DOMException('Full', 'QuotaExceededError');
+    });
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'full' }));
+    try {
+      await act(async () => {
+        await result.current.startRecording();
+      });
+      await act(async () => {
+        instances[0].requestData();
+        await flushPromises();
+      });
+      expect(result.current.isRecording).toBe(false);
+      expect(result.current.errorMessage).toContain('Free storage');
+      expect(result.current.downloadableChunkIds).toHaveLength(1);
+      expect(transcribeAudio).not.toHaveBeenCalled();
+      const createUrl = jest.fn<typeof URL.createObjectURL>(() => 'blob:recording-fixture');
+      const previous = URL.createObjectURL;
+      URL.createObjectURL = createUrl;
+      const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      try {
+        act(() => {
+          result.current.downloadChunk(result.current.downloadableChunkIds[0]);
+        });
+        expect(createUrl).toHaveBeenCalledWith(expect.objectContaining({ size: 512 }));
+        expect(click).toHaveBeenCalledTimes(1);
+      } finally {
+        URL.createObjectURL = previous;
+        click.mockRestore();
+      }
+    } finally {
+      unmount();
+      jest.mocked(putRecordingChunk).mockImplementation(original);
+    }
   });
 
   it('rotates to a fresh recorder segment and transcribes the flushed chunk', async () => {
@@ -271,7 +427,7 @@ describe('useRollingTranscriptionRecorder', () => {
 
     unmount();
   });
-  it('rotates a 45-minute foreground recording and continues after a failed segment', async () => {
+  it('retries a failed upload during a 45-minute foreground recording', async () => {
     (transcribeAudio as jest.Mock)
       .mockImplementationOnce(async () => {
         throw new Error('Mobile connection lost');
@@ -292,10 +448,11 @@ describe('useRollingTranscriptionRecorder', () => {
         await flushPromises();
       });
     }
-    expect(transcribeAudio).toHaveBeenCalledTimes(15);
-    expect(result.current.segments).toHaveLength(15);
-    expect(result.current.segments.filter((segment) => segment.status === 'error')).toHaveLength(1);
-    expect(result.current.segments.filter((segment) => segment.status === 'complete')).toHaveLength(14);
+    expect(transcribeAudio).toHaveBeenCalledTimes(16);
+    expect(result.current.segments).toHaveLength(16);
+    expect(result.current.segments.filter((segment) => segment.status === 'recording')).toHaveLength(1);
+    expect(result.current.segments.filter((segment) => segment.status === 'error')).toHaveLength(0);
+    expect(result.current.segments.filter((segment) => segment.status === 'complete')).toHaveLength(15);
     expect(result.current.pendingSegmentCount).toBe(0);
     expect(result.current.elapsedSeconds).toBe(45 * 60);
     unmount();
@@ -321,7 +478,8 @@ describe('useRollingTranscriptionRecorder', () => {
     expect(result.current.transcript).toContain('First chunk.');
     expect(result.current.transcript).toContain('Second chunk.');
     expect(result.current.labelsUnavailableReason).toBe('Labels unavailable.');
-    expect(result.current.segments.every((segment) => segment.status === 'complete')).toBe(true);
+    expect(result.current.segments.filter((segment) => segment.status === 'complete')).toHaveLength(2);
+    expect(result.current.segments.filter((segment) => segment.status === 'recording')).toHaveLength(1);
     expect(transcribeGroupAudio).toHaveBeenCalledTimes(1);
     expect(transcribeAudio).toHaveBeenCalledTimes(1);
     unmount();
@@ -343,9 +501,15 @@ describe('useRollingTranscriptionRecorder', () => {
       });
     expect(transcribeGroupAudio).toHaveBeenCalledTimes(2);
     expect(transcribeAudio).not.toHaveBeenCalled();
-    expect(result.current.segments.map((segment) => segment.speakerTurns)).toEqual([turns, turns]);
+    expect(
+      result.current.segments.filter((segment) => segment.status === 'complete').map((segment) => segment.speakerTurns),
+    ).toEqual([turns, turns]);
+    instances[instances.length - 1].state = 'inactive';
     unmount();
     const restored = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'workshop' }));
+    await act(async () => {
+      await flushPromises();
+    });
     expect(restored.result.current.segments.map((segment) => segment.speakerTurns)).toEqual([turns, turns]);
     restored.unmount();
   });

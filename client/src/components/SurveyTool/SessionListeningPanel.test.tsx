@@ -90,6 +90,41 @@ describe('SessionListeningPanel', () => {
     jest.useRealTimers();
   });
 
+  it('shows per-chunk recovery actions and keeps device errors visible beside a transcript', () => {
+    const retryChunk = jest.fn(),
+      downloadChunk = jest.fn();
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript: 'Already saved transcript.',
+        segments: [{ id: 'stuck', index: 0, status: 'error', text: '', startedAt: 1 }],
+        downloadableChunkIds: ['stuck'],
+        retryChunk,
+        downloadChunk,
+        errorMessage: 'Storage is full. Free storage, then Retry.',
+      }),
+    );
+    render(<SessionListeningPanel sessionSlug="workshop" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Storage is full');
+    expect(screen.getByText('Failed')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry chunk 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download chunk 1' }));
+    expect(retryChunk).toHaveBeenCalledWith('stuck');
+    expect(downloadChunk).toHaveBeenCalledWith('stuck');
+  });
+
+  it('explains when an active recording page is hidden', () => {
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        isRecording: true,
+        status: 'recording',
+        pageHidden: true,
+        wakeLockHeld: false,
+      }),
+    );
+    render(<SessionListeningPanel sessionSlug="workshop" />);
+    expect(screen.getByText(/Recording page is hidden/)).toBeInTheDocument();
+  });
+
   it('removes duplicate recorder chrome only when embedded in the voice modal', () => {
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
 
@@ -225,7 +260,7 @@ describe('SessionListeningPanel', () => {
     expect(resumeRecording).toHaveBeenCalledTimes(1);
   });
 
-  it('does not expose internal chunk counters when a transcription segment fails', () => {
+  it('shows a failed chunk without hiding its error behind the existing transcript', () => {
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
       buildRecorder({
         transcript: 'The conversation included enough captured text to keep working.',
@@ -245,13 +280,13 @@ describe('SessionListeningPanel', () => {
 
     render(<SessionListeningPanel sessionSlug="demo" />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Some audio could not be transcribed.');
-    expect(screen.queryByText(/could not be decoded/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('could not be decoded');
+    expect(screen.getByText('Failed')).toBeInTheDocument();
     expect(screen.queryByText(/1 failed/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/1 done/i)).not.toBeInTheDocument();
   });
 
-  it('suppresses stale transcription failure warnings after a newer successful chunk', () => {
+  it('keeps an unresolved chunk failure visible after another transcript succeeds', () => {
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
       buildRecorder({
         transcript: 'The conversation recovered with enough later transcript text to keep working.',
@@ -273,7 +308,8 @@ describe('SessionListeningPanel', () => {
 
     render(<SessionListeningPanel sessionSlug="demo" />);
 
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('could not be decoded');
+    expect(screen.getByText('Failed')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS)).toBeInTheDocument();
   });
 
@@ -650,7 +686,9 @@ it('remembers the optional speaker-audio setting and locks it while recording', 
   );
   rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
   expect(screen.getByRole('checkbox', { name: 'Record speaker audio' })).toBeDisabled();
-  expect(screen.getByText('Keep this screen on.')).toBeInTheDocument();
+  expect(
+    screen.getByText('Screen lock is unavailable. Keep this page visible and the screen unlocked.'),
+  ).toBeInTheDocument();
   unmount();
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
   render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);

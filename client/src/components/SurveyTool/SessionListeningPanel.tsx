@@ -15,6 +15,7 @@ import {
 import { Button, UncontrolledTooltip } from 'reactstrap';
 import styles from './SurveyTool.module.scss';
 import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
+import { SessionRecordingChunks } from './SessionRecordingChunks';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS } from '../../utilities/audio/rollingTranscription';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -364,10 +365,17 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   });
   const speakerHelpId = `ce-record-speaker-help-${useId().replace(/:/g, '')}`;
   const labelsHelpId = `ce-speaker-labels-help-${useId().replace(/:/g, '')}`;
+  const recordingContext = useMemo(
+    () => ({
+      ...(context && typeof context === 'object' ? context : {}),
+      account: context && typeof context === 'object' && 'account' in context ? context.account : props.account,
+    }),
+    [context, props.account],
+  );
   const recorder = useRollingTranscriptionRecorder({
     sessionSlug,
     sessionConfig,
-    context,
+    context: recordingContext,
     workerUrl,
     chunkMs: DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
     labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported && labelSpeakers,
@@ -403,15 +411,6 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       }, 0),
     [recorder.segments],
   );
-  const latestFailedTranscriptAt = useMemo(
-    () =>
-      recorder.segments.reduce((latest, segment) => {
-        if (segment.status !== 'error') return latest;
-        return Math.max(latest, Number(segment.completedAt || segment.startedAt || 0));
-      }, 0),
-    [recorder.segments],
-  );
-  const hasActionableFailedSegment = latestFailedTranscriptAt > latestSuccessfulTranscriptAt;
   const hasVisibleStatus =
     recorder.isRecording ||
     recorder.isPaused ||
@@ -430,21 +429,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
 
   const canGenerate = !isClosing && trimmedTranscript.length >= 50 && !isGenerating && !hasPendingTranscription;
   const isStarting = !isRecorderSessionActive && recorder.isBusy;
-  const recorderError = recorder.errorMessage && !hasTranscript ? recorder.errorMessage : '';
-  const shouldShowGenericRecorderError = Boolean(
-    hasTranscript &&
-    (hasActionableFailedSegment ||
-      (recorder.errorMessage &&
-        latestFailedTranscriptAt > 0 &&
-        latestFailedTranscriptAt >= latestSuccessfulTranscriptAt)),
-  );
   const visibleError =
     closeError ||
     generationError ||
-    recorderError ||
-    (hasActionableFailedSegment || shouldShowGenericRecorderError
-      ? 'Some audio could not be transcribed. You can keep recording or generate questions from the transcript already captured.'
-      : '');
+    recorder.errorMessage ||
+    (failedCount > 0 ? 'Some audio could not be transcribed. Retry or download the affected chunks below.' : '');
   const recordButtonLabel = isRecorderSessionActive
     ? recorder.isStopping
       ? 'Stopping'
@@ -684,8 +673,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       {recorder.labelsUnavailableReason ? (
         <div role="status">{recorder.labelsUnavailableReason} Continuing with plain transcription.</div>
       ) : null}
-      {isRecorderSessionActive && !recorder.wakeLockHeld ? (
-        <div className={styles.sessionRecordingWakeNotice}>Keep this screen on.</div>
+      {isRecorderSessionActive && (recorder.pageHidden || !recorder.wakeLockHeld) ? (
+        <div className={styles.sessionRecordingWakeNotice} role="status">
+          {recorder.pageHidden
+            ? 'Recording page is hidden. Return to this page; your phone may pause the microphone in the background.'
+            : 'Screen lock is unavailable. Keep this page visible and the screen unlocked.'}
+        </div>
       ) : null}
       {isRecorderSessionActive ? (
         <div className={styles.sessionListeningActiveRecorder}>
@@ -791,6 +784,13 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         </div>
       )}
 
+      <SessionRecordingChunks
+        segments={recorder.segments}
+        downloadableChunkIds={recorder.downloadableChunkIds}
+        onRetry={recorder.retryChunk}
+        onDownload={recorder.downloadChunk}
+      />
+
       {hasTranscript && isTranscriptOpen && (
         <div className={styles.sessionListeningTranscriptDetails}>
           <div className={styles.sessionListeningTranscriptShell}>
@@ -805,7 +805,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
               type="button"
               className={styles.sessionListeningClearTranscript}
               onClick={handleClear}
-              disabled={isRecorderSessionActive || recorder.isBusy}
+              disabled={
+                isRecorderSessionActive ||
+                recorder.isBusy ||
+                recorder.segments.some((segment) => segment.status !== 'complete')
+              }
               aria-label="Clear transcript"
               title="Clear transcript"
               data-testid={E2E_TESTIDS.SESSION_LISTENING_CLEAR}

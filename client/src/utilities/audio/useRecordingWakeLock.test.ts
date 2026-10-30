@@ -48,11 +48,13 @@ it('holds the screen while recording, reacquires after returning and releases on
   await act(async () => {
     visible('hidden');
   });
+  expect(result.current.pageHidden).toBe(true);
   expect(first.release).toHaveBeenCalledTimes(1);
   expect(result.current.wakeLockHeld).toBe(false);
   await act(async () => {
     visible('visible');
   });
+  expect(result.current.pageHidden).toBe(false);
   expect(result.current.wakeLockHeld).toBe(true);
   rerender({ active: false });
   expect(second.release).toHaveBeenCalledTimes(1);

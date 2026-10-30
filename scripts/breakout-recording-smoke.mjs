@@ -54,6 +54,8 @@ try {
         await import('/src/assets/css/contextEngine.scss');
         const ReactModule = await import('/node_modules/.vite/deps/react.js'); const React = ReactModule.default || ReactModule;
         const ReactDOM = await import('/node_modules/.vite/deps/react-dom_client.js');
+        const { listRecordingChunks } = await import('/src/utilities/audio/recordingChunkStore.ts');
+        window.__loadSavedRecording = async () => (await listRecordingChunks(JSON.stringify(['https://worker.example', 'workshop', '']))).map(record => record.segment);
         const { default: Modal } = await import('/src/components/SurveyTool/SessionVoiceModeModal.tsx');
         function Probe() { const [isOpen, setOpen] = React.useState(true); return React.createElement(React.Fragment, null, React.createElement('button', { onClick: () => setOpen(true) }, 'Reopen recording'), React.createElement(Modal, { isOpen, mode: 'recordGroup', onClose: () => setOpen(false), onSelectMode: () => {}, sessionSlug: 'workshop', workerUrl: 'https://worker.example' })); }
         (ReactDOM.createRoot || ReactDOM.default.createRoot)(document.getElementById('probe')).render(React.createElement(Probe));
@@ -77,12 +79,12 @@ try {
     assert.equal(await speaker.isDisabled(), true);
     assert.equal(await labels.isDisabled(), true);
     await page.evaluate(() => window.__wakeSentinel.release());
-    await page.getByText('Keep this screen on.').waitFor();
-    await readable(page.getByText('Keep this screen on.'));
+    await page.getByText('Screen lock is unavailable. Keep this page visible and the screen unlocked.').waitFor();
+    await readable(page.getByText('Screen lock is unavailable. Keep this page visible and the screen unlocked.'));
     await page.getByTestId('ce-session-listening-panel').screenshot({ path: path.join(output, `recording-${theme}-${width}.png`) });
     await page.getByRole('button', { name: 'Stop recording' }).click();
     await speaker.waitFor({ state: 'visible' });
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('ce:listening-draft:workshop') || '{}').segments?.[0]?.speakerTurns?.[0]?.speaker === 'A');
+    await page.waitForFunction(async () => (await window.__loadSavedRecording())[0]?.speakerTurns?.[0]?.speaker === 'A');
     assert.equal(await page.evaluate(() => window.__wakeHeld), false);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     await page.getByRole('button', { name: 'Close', exact: true }).click();
@@ -101,9 +103,9 @@ try {
       assert.equal(await page.getByRole('dialog').isVisible(), true);
       releaseTranscription();
       await page.getByRole('dialog').waitFor({ state: 'hidden' });
-      const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('ce:listening-draft:workshop')));
-      assert.equal(saved.segments.length, ['Close', 'Escape', 'outside'].indexOf(dismissal) + 2);
-      assert(saved.segments.every(segment => segment.status === 'complete' && segment.text === 'Synthetic room transcript.'));
+      const saved = await page.evaluate(() => window.__loadSavedRecording());
+      assert.equal(saved.length, ['Close', 'Escape', 'outside'].indexOf(dismissal) + 2);
+      assert(saved.every(segment => segment.status === 'complete' && segment.text === 'Synthetic room transcript.'));
       transcriptionGate = null;
     }
     console.log(`PASS Breakout recording ${theme} ${width}: Stop, Close, Escape, outside, delayed transcription, reopen`);

@@ -1,15 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
 import { requestPreferredSpeechMicrophone } from './microphoneSelection';
 import { useRecordingWakeLock } from './useRecordingWakeLock';
-import {
-  DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
-  RollingTranscriptSegment,
-  clearListeningDraft,
-  readListeningDraft,
-  stitchRollingTranscriptSegments,
-  writeListeningDraft,
-} from './rollingTranscription';
+import { useRecordingChunkQueue } from './useRecordingChunkQueue';
+import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS } from './rollingTranscription';
 
 type UseRollingTranscriptionRecorderOptions = {
   sessionSlug?: string;
@@ -17,7 +10,6 @@ type UseRollingTranscriptionRecorderOptions = {
   context?: unknown;
   workerUrl?: string;
   chunkMs?: number;
-  retainRawAudio?: boolean;
   recordSpeakerAudio?: boolean;
   labelSpeakers?: boolean;
 };
@@ -45,65 +37,38 @@ export const useRollingTranscriptionRecorder = ({
   context,
   workerUrl,
   chunkMs = DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
-  retainRawAudio = false,
   recordSpeakerAudio = false,
   labelSpeakers = false,
 }: UseRollingTranscriptionRecorderOptions = {}) => {
   const [status, setStatus] = useState<RollingRecorderStatus>('idle');
-  const { wakeLockHeld } = useRecordingWakeLock(status === 'recording' || status === 'paused');
-  const [segments, setSegments] = useState<RollingTranscriptSegment[]>([]);
-  const [transcript, setTranscript] = useState('');
+  const { wakeLockHeld, pageHidden } = useRecordingWakeLock(status === 'recording' || status === 'paused');
   const [errorMessage, setErrorMessage] = useState('');
-  const [labelsUnavailableReason, setLabelsUnavailableReason] = useState('');
-  const labelsUnavailableRef = useRef('');
+  const chunks = useRecordingChunkQueue({ sessionSlug, sessionConfig, context, workerUrl, labelSpeakers });
+  const { segments, transcript, labelsUnavailableReason, beginChunk, prepare, finishTranscription, retryChunk } =
+    chunks;
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mountedRef = useRef(false);
-  const segmentsRef = useRef<RollingTranscriptSegment[]>([]);
-  const segmentIndexRef = useRef(0);
+  const requestGenerationRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const rotationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingActiveRef = useRef(false);
   const endingRecordersRef = useRef<Set<MediaRecorder>>(new Set());
   const stopWaitersRef = useRef<Set<() => void>>(new Set());
-  const queueRef = useRef<Promise<void>>(Promise.resolve());
-  const rawChunksRef = useRef<Map<string, Blob>>(new Map());
 
   const chunkDurationMs =
     Number.isFinite(Number(chunkMs)) && Number(chunkMs) > 0
       ? Math.max(15_000, Math.floor(Number(chunkMs)))
       : DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS;
 
-  const updateSegments = useCallback(
-    (updater: (previous: RollingTranscriptSegment[]) => RollingTranscriptSegment[]) => {
-      const next = updater(segmentsRef.current);
-      segmentsRef.current = next;
-      const stitched = stitchRollingTranscriptSegments(next);
-      setSegments(next);
-      setTranscript(stitched);
-      writeListeningDraft(sessionSlug, { transcript: stitched, segments: next });
-    },
-    [sessionSlug],
-  );
-
   useEffect(() => {
     mountedRef.current = true;
-    const draft = readListeningDraft(sessionSlug);
-    if (draft) {
-      const restoredTranscript = draft.transcript || stitchRollingTranscriptSegments(draft.segments);
-      segmentsRef.current = draft.segments;
-      setSegments(draft.segments);
-      setTranscript(restoredTranscript);
-      writeListeningDraft(sessionSlug, { transcript: restoredTranscript, segments: draft.segments });
-      const maxIndex = draft.segments.reduce((max, segment) => Math.max(max, Number(segment.index || 0)), -1);
-      segmentIndexRef.current = maxIndex + 1;
-    }
     return () => {
       mountedRef.current = false;
     };
-  }, [sessionSlug]);
+  }, []);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -139,86 +104,6 @@ export const useRollingTranscriptionRecorder = ({
     }
   }, []);
 
-  const transcribeSegment = useCallback(
-    (id: string, blob: Blob) => {
-      queueRef.current = queueRef.current
-        .catch(() => undefined)
-        .then(async () => {
-          if (!mountedRef.current) return;
-          updateSegments((previous) =>
-            previous.map((entry) => (entry.id === id ? { ...entry, status: 'transcribing' } : entry)),
-          );
-
-          try {
-            const options = {
-              sessionSlug,
-              sessionConfig,
-              context,
-              workerUrl,
-            };
-            const labeled =
-              labelSpeakers && !labelsUnavailableRef.current ? await transcribeGroupAudio(blob, options) : null;
-            const text = labeled ? labeled.text : await transcribeAudio(blob, options);
-            if (!mountedRef.current) return;
-            if (labeled?.labelsUnavailableReason) {
-              labelsUnavailableRef.current = labeled.labelsUnavailableReason;
-              setLabelsUnavailableReason(labeled.labelsUnavailableReason);
-            }
-            const cleanedText = String(text || '').trim();
-            if (cleanedText) {
-              setErrorMessage('');
-            }
-            updateSegments((previous) =>
-              previous.map((entry) =>
-                entry.id === id
-                  ? {
-                      ...entry,
-                      status: 'complete',
-                      text: cleanedText,
-                      ...(labeled ? { speakerTurns: labeled.segments } : {}),
-                      completedAt: Date.now(),
-                    }
-                  : entry,
-              ),
-            );
-            if (!retainRawAudio) {
-              rawChunksRef.current.delete(id);
-            }
-          } catch (error) {
-            if (!mountedRef.current) return;
-            const message = describeError(error);
-            setErrorMessage(message);
-            updateSegments((previous) =>
-              previous.map((entry) =>
-                entry.id === id ? { ...entry, status: 'error', error: message, completedAt: Date.now() } : entry,
-              ),
-            );
-          }
-        });
-    },
-    [context, labelSpeakers, retainRawAudio, sessionConfig, sessionSlug, updateSegments, workerUrl],
-  );
-
-  const processSegment = useCallback(
-    (blob: Blob) => {
-      if (!blob || blob.size < 100) return;
-      const index = segmentIndexRef.current++;
-      const id = `segment-${Date.now()}-${index}`;
-      // Keep unfinished audio in memory so a failed close can retry the same segment.
-      rawChunksRef.current.set(id, blob);
-      updateSegments((previous) => [...previous, { id, index, status: 'queued', text: '', startedAt: Date.now() }]);
-      transcribeSegment(id, blob);
-    },
-    [transcribeSegment, updateSegments],
-  );
-
-  const finishTranscription = useCallback(async () => {
-    await queueRef.current;
-    if (segmentsRef.current.some((segment) => segment.status === 'error' && rawChunksRef.current.has(segment.id))) {
-      throw new Error('Some audio could not be transcribed. Keep this dialog open. Close again to retry.');
-    }
-  }, []);
-
   const stopRecorder = useCallback((recorder: MediaRecorder | null, endSession: boolean): boolean => {
     if (!recorder || recorder.state === 'inactive') return false;
     if (endSession) {
@@ -248,9 +133,19 @@ export const useRollingTranscriptionRecorder = ({
       const mimeType = pickSupportedMimeType();
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
 
+      const capture = beginChunk();
+      const fragments: Blob[] = [];
+      const snapshot = (finished = false) => {
+        const audio = new Blob(fragments, {
+          type: recorder.mimeType || mimeType || fragments[0]?.type || 'audio/webm',
+        });
+        capture(audio, finished);
+      };
       recorder.ondataavailable = (event: BlobEvent) => {
         if (event.data && event.data.size > 0) {
-          processSegment(event.data);
+          // Timeslice fragments share a container header; persist the cumulative chunk.
+          fragments.push(event.data);
+          snapshot();
         }
       };
       recorder.onerror = (event: Event) => {
@@ -259,10 +154,15 @@ export const useRollingTranscriptionRecorder = ({
         clearRotationTimer();
         stopTimer();
         stopTracks();
-        setErrorMessage(describeError(error));
+        setErrorMessage(
+          `Recording stopped. Check microphone permission, then press Record again. ${describeError(error)}`,
+        );
         setStatus('error');
+        if (recorder.state !== 'inactive') stopRecorder(recorder, true);
+        else snapshot(true);
       };
       recorder.onstop = () => {
+        snapshot(true);
         const shouldEndSession = endingRecordersRef.current.delete(recorder);
         if (!shouldEndSession) {
           if (mediaRecorderRef.current === recorder && !recordingActiveRef.current) {
@@ -286,7 +186,7 @@ export const useRollingTranscriptionRecorder = ({
 
       return recorder;
     },
-    [clearRotationTimer, processSegment, resolveStopWaiters, stopTimer, stopTracks],
+    [beginChunk, clearRotationTimer, resolveStopWaiters, stopRecorder, stopTimer, stopTracks],
   );
 
   const rotateRecorder = useCallback(() => {
@@ -296,7 +196,7 @@ export const useRollingTranscriptionRecorder = ({
 
     try {
       const nextRecorder = createRecorder(streamRef.current);
-      nextRecorder.start();
+      nextRecorder.start(1000);
       mediaRecorderRef.current = nextRecorder;
       stopRecorder(previousRecorder, false);
     } catch (error) {
@@ -329,41 +229,64 @@ export const useRollingTranscriptionRecorder = ({
       return;
     }
 
+    const requestGeneration = ++requestGenerationRef.current;
     setStatus('requesting');
     setErrorMessage('');
-    labelsUnavailableRef.current = '';
-    setLabelsUnavailableReason('');
 
     try {
+      await prepare();
+      if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) return;
       const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices, {
         echoCancellation: !recordSpeakerAudio,
       });
-      if (!mountedRef.current) {
+      if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
       streamRef.current = stream;
+      stream.getTracks().forEach((track) => {
+        track.addEventListener?.(
+          'ended',
+          () => {
+            if (!recordingActiveRef.current) return;
+            setErrorMessage(
+              'Microphone access ended. Restore microphone permission, then press Record to continue. Saved audio remains available.',
+            );
+            setStatus('error');
+            recordingActiveRef.current = false;
+            clearRotationTimer();
+            stopTimer();
+            stopRecorder(mediaRecorderRef.current, true);
+          },
+          { once: true },
+        );
+      });
       const recorder = createRecorder(stream);
       mediaRecorderRef.current = recorder;
 
       recordingActiveRef.current = true;
-      recorder.start();
+      recorder.start(1000);
       setElapsedSeconds(0);
       startElapsedTimer();
       startRotationTimer();
       setStatus('recording');
     } catch (error) {
+      if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) return;
       recordingActiveRef.current = false;
       clearRotationTimer();
       stopTimer();
       stopTracks();
-      setErrorMessage(describeError(error));
+      setErrorMessage(
+        `Could not start recording. Check microphone permission and available storage, then try again. ${describeError(error)}`,
+      );
       setStatus('error');
     }
   }, [
     clearRotationTimer,
     createRecorder,
     recordSpeakerAudio,
+    prepare,
+    stopRecorder,
     startElapsedTimer,
     startRotationTimer,
     status,
@@ -403,12 +326,7 @@ export const useRollingTranscriptionRecorder = ({
 
   const finalizeRecording = useCallback(
     async ({ waitForTranscription = true }: FinalizeRecordingOptions = {}) => {
-      if (waitForTranscription) {
-        for (const segment of segmentsRef.current) {
-          const blob = rawChunksRef.current.get(segment.id);
-          if (segment.status === 'error' && blob) transcribeSegment(segment.id, blob);
-        }
-      }
+      if (waitForTranscription) retryChunk();
       const recorder = mediaRecorderRef.current;
       if (!recorder || recorder.state === 'inactive') {
         recordingActiveRef.current = false;
@@ -459,25 +377,25 @@ export const useRollingTranscriptionRecorder = ({
         await finishTranscription();
       }
     },
-    [clearRotationTimer, finishTranscription, stopRecorder, stopTimer, stopTracks, transcribeSegment],
+    [clearRotationTimer, finishTranscription, retryChunk, stopRecorder, stopTimer, stopTracks],
   );
 
   const stopRecording = useCallback(() => finalizeRecording({ waitForTranscription: false }), [finalizeRecording]);
 
   const clearDraft = useCallback(() => {
-    if (status === 'recording' || status === 'paused' || status === 'requesting' || status === 'stopping') return;
-    rawChunksRef.current.clear();
-    segmentIndexRef.current = 0;
-    setSegments([]);
-    segmentsRef.current = [];
-    setTranscript('');
+    if (status !== 'idle' && status !== 'error') return;
+    void chunks.clearDraft();
     setElapsedSeconds(0);
     setErrorMessage('');
-    clearListeningDraft(sessionSlug);
-  }, [sessionSlug, status]);
+  }, [chunks.clearDraft, status]);
+
+  useEffect(() => {
+    if (chunks.storageError && recordingActiveRef.current) void stopRecording();
+  }, [chunks.storageError, stopRecording]);
 
   useEffect(
     () => () => {
+      ++requestGenerationRef.current;
       recordingActiveRef.current = false;
       clearRotationTimer();
       stopTimer();
@@ -490,15 +408,22 @@ export const useRollingTranscriptionRecorder = ({
       }
       stopTracks();
     },
-    [clearRotationTimer, stopRecorder, stopTimer, stopTracks],
+    [chunks.scope, clearRotationTimer, stopRecorder, stopTimer, stopTracks],
   );
 
+  useEffect(() => {
+    setStatus('idle');
+    setErrorMessage('');
+  }, [chunks.scope]);
+
   const pendingSegmentCount = segments.filter(
-    (segment) => segment.status === 'queued' || segment.status === 'transcribing',
+    (segment) => segment.status === 'queued' || segment.status === 'transcribing' || segment.status === 'retrying',
   ).length;
 
   return {
     wakeLockHeld,
+    pageHidden,
+    downloadableChunkIds: chunks.downloadableChunkIds,
     status,
     isRecording: status === 'recording',
     isPaused: status === 'paused',
@@ -508,8 +433,12 @@ export const useRollingTranscriptionRecorder = ({
     transcript,
     segments,
     pendingSegmentCount,
-    errorMessage,
+    errorMessage:
+      chunks.storageError ||
+      (chunks.offline ? 'Offline. Audio stays on this device; reconnect to resume uploads in order.' : errorMessage),
     labelsUnavailableReason,
+    retryChunk,
+    downloadChunk: chunks.downloadChunk,
     mediaStreamRef: streamRef,
     startRecording,
     pauseRecording,

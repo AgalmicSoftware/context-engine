@@ -1,19 +1,11 @@
 import {
-  buildListeningDraftStorageKey,
   buildListeningModeSearch,
-  clearListeningDraft,
   isListeningModeQueryEnabled,
   mergeRollingTranscriptText,
-  readListeningDraft,
   stitchRollingTranscriptSegments,
-  writeListeningDraft,
 } from './rollingTranscription';
 
 describe('rollingTranscription helpers', () => {
-  beforeEach(() => {
-    window.localStorage.clear();
-  });
-
   it('deduplicates overlap while stitching transcript chunks in segment order', () => {
     const segments = [
       {
@@ -58,83 +50,4 @@ describe('rollingTranscription helpers', () => {
     expect(buildListeningModeSearch('?session=demo', true)).toBe('?session=demo&mode=listening');
     expect(buildListeningModeSearch('?session=demo&mode=listening', false)).toBe('?session=demo');
   });
-
-  it('persists only transcript and segment metadata for recovery', () => {
-    const segment = {
-      id: 'segment-1',
-      index: 0,
-      status: 'complete' as const,
-      text: 'Recovered transcript',
-      startedAt: 10,
-      completedAt: 20,
-    };
-
-    expect(
-      writeListeningDraft('demo', {
-        transcript: 'Recovered transcript',
-        segments: [segment],
-      }),
-    ).toBe(true);
-
-    expect(window.localStorage.getItem(buildListeningDraftStorageKey('demo'))).not.toContain('Blob');
-    expect(readListeningDraft('demo')).toEqual(
-      expect.objectContaining({
-        sessionSlug: 'demo',
-        transcript: 'Recovered transcript',
-        segments: [segment],
-      }),
-    );
-    expect(clearListeningDraft('demo')).toBe(true);
-    expect(readListeningDraft('demo')).toBeNull();
-  });
-
-  it('restores unfinished draft segments as interrupted errors', () => {
-    const segment = {
-      id: 'segment-queued',
-      index: 1,
-      status: 'transcribing' as const,
-      text: '',
-      startedAt: 30,
-    };
-
-    expect(
-      writeListeningDraft('demo', {
-        transcript: '',
-        segments: [segment],
-      }),
-    ).toBe(true);
-
-    expect(readListeningDraft('demo')?.segments[0]).toEqual(
-      expect.objectContaining({
-        id: 'segment-queued',
-        index: 1,
-        status: 'error',
-        error: 'Recording interrupted before transcription completed.',
-      }),
-    );
-  });
-});
-
-it('restores valid speaker turns without merging labels between chunks', () => {
-  const valid = { speaker: ' A ', start: 0, end: 2, text: ' Room question. ' };
-  window.localStorage.setItem(
-    buildListeningDraftStorageKey('labeled'),
-    JSON.stringify({
-      version: 1,
-      segments: [
-        {
-          id: 'first',
-          index: 0,
-          status: 'complete',
-          text: 'Room question.',
-          speakerTurns: [valid, { ...valid, start: -1 }, null],
-        },
-        { id: 'second', index: 1, status: 'complete', text: 'Room question.', speakerTurns: [valid] },
-      ],
-    }),
-  );
-  expect(readListeningDraft('labeled')?.segments.map((segment) => segment.speakerTurns)).toEqual([
-    [{ speaker: 'A', start: 0, end: 2, text: 'Room question.' }],
-    [{ speaker: 'A', start: 0, end: 2, text: 'Room question.' }],
-  ]);
 });

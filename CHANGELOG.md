@@ -158,6 +158,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep recording chunks in IndexedDB until their transcripts are saved, retry uploads in order, and offer per-chunk retry/download controls with storage, offline and microphone guidance.
+
 - Show concealed AI guesses as grey answer areas with help text until the participant answers.
 
 - Preserve multiple-choice selections in generated results so options containing semicolons count correctly.

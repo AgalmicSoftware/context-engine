@@ -2,7 +2,22 @@ import React, { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { transcribeAudio } from '../../utilities/ai/aiClient.js';
-import { readListeningDraft } from '../../utilities/audio/rollingTranscription';
+import type { RecordingChunk } from '../../utilities/audio/recordingChunkStore';
+const mockRecords = new Map<string, RecordingChunk>();
+const savedSegments = () => [...mockRecords.values()].map((record) => record.segment);
+const savedTranscript = () =>
+  savedSegments()
+    .map((segment) => segment.text)
+    .join(' ');
+jest.mock('../../utilities/audio/recordingChunkStore', () => ({
+  listRecordingChunks: jest.fn(async (scope: string) =>
+    [...mockRecords.values()].filter((record) => record.scope === scope),
+  ),
+  putRecordingChunk: jest.fn(async (record: RecordingChunk) => {
+    mockRecords.set(record.segment.id, { ...record, segment: { ...record.segment } });
+  }),
+  clearRecordingChunks: jest.fn(async () => mockRecords.clear()),
+}));
 
 jest.mock('../../utilities/ai/aiClient.js', () => ({ transcribeAudio: jest.fn() }));
 jest.mock('./sessionListeningQuestions', () => ({
@@ -66,6 +81,7 @@ const originalDevices = navigator.mediaDevices;
 beforeEach(() => {
   jest.clearAllMocks();
   localStorage.clear();
+  mockRecords.clear();
   jest.mocked(transcribeAudio).mockResolvedValue(transcript);
   Object.defineProperty(globalThis, 'MediaRecorder', { configurable: true, value: FakeRecorder });
   Object.defineProperty(navigator, 'mediaDevices', {
@@ -89,7 +105,7 @@ it.each(['Close', 'Escape', 'outside click'])(
     dismiss(method);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(transcribeAudio).toHaveBeenCalledTimes(1);
-    expect(readListeningDraft('recording-fixture')?.transcript).toBe(transcript);
+    expect(savedTranscript()).toBe(transcript);
     fireEvent.click(screen.getByText('Reopen recording'));
     fireEvent.click(await screen.findByTestId('ce-session-listening-transcript-details'));
     expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript);
@@ -115,20 +131,20 @@ it('waits for delayed transcription and ignores repeated dismissals', async () =
   expect(screen.getByRole('dialog')).toBeInTheDocument();
   await act(async () => finish(transcript));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  expect(readListeningDraft('recording-fixture')?.transcript).toBe(transcript);
+  expect(savedTranscript()).toBe(transcript);
 });
 
 it('stopping before closing preserves the completed transcript without transcribing it twice', async () => {
   render(<Harness />);
   fireEvent.click(screen.getByTestId('ce-session-listening-start'));
   fireEvent.click(await screen.findByRole('button', { name: 'Stop recording' }));
-  await waitFor(() => expect(readListeningDraft('recording-fixture')?.transcript).toBe(transcript));
+  await waitFor(() => expect(savedTranscript()).toBe(transcript));
   dismiss('Close');
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(transcribeAudio).toHaveBeenCalledTimes(1);
 });
 
-it('keeps failed audio available in the open modal and retries it before closing', async () => {
+it('keeps failed audio in storage and automatically retries it before closing', async () => {
   jest
     .mocked(transcribeAudio)
     .mockRejectedValueOnce(new Error('Transcription unavailable'))
@@ -137,13 +153,12 @@ it('keeps failed audio available in the open modal and retries it before closing
   fireEvent.click(screen.getByTestId('ce-session-listening-start'));
   await screen.findByRole('button', { name: 'Stop recording' });
   dismiss('Close');
-  expect(await screen.findByRole('alert')).toHaveTextContent('Close again to retry');
+  expect(await screen.findByText('Retrying')).toBeInTheDocument();
   expect(screen.getByRole('dialog')).toBeInTheDocument();
-  expect(readListeningDraft('recording-fixture')?.segments[0]?.status).toBe('error');
-  dismiss('Close');
-  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect([...mockRecords.values()][0]?.audio?.size).toBe(256);
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), { timeout: 3000 });
   expect(transcribeAudio).toHaveBeenCalledTimes(2);
   expect(jest.mocked(transcribeAudio).mock.calls[1][0]).toBe(jest.mocked(transcribeAudio).mock.calls[0][0]);
   expect(mockStop).toHaveBeenCalledTimes(1);
-  expect(readListeningDraft('recording-fixture')?.transcript).toBe(transcript);
+  expect(savedTranscript()).toBe(transcript);
 });
