@@ -37,6 +37,7 @@ describe('useRollingTranscriptionRecorder', () => {
 
   class MockMediaRecorder {
     static isTypeSupported = jest.fn(() => true);
+    static failNextStart = false;
 
     stream: MediaStream;
     state: RecordingState = 'inactive';
@@ -44,6 +45,10 @@ describe('useRollingTranscriptionRecorder', () => {
     onerror: ((event: Event) => void) | null = null;
     onstop: (() => void) | null = null;
     start = jest.fn(() => {
+      if (MockMediaRecorder.failNextStart) {
+        MockMediaRecorder.failNextStart = false;
+        throw new Error('Synthetic recorder start failure');
+      }
       this.state = 'recording';
     });
     pause = jest.fn(() => {
@@ -77,6 +82,7 @@ describe('useRollingTranscriptionRecorder', () => {
     window.sessionStorage.clear();
     mockChunkRecords.clear();
     instances.length = 0;
+    MockMediaRecorder.failNextStart = false;
     (transcribeAudio as jest.Mock).mockImplementation(async (_blob: Blob) => `transcript ${instances.length}`);
 
     originalMediaRecorder = (globalThis as any).MediaRecorder;
@@ -109,6 +115,56 @@ describe('useRollingTranscriptionRecorder', () => {
     });
     jest.useRealTimers();
     jest.clearAllMocks();
+  });
+
+  it('a failed recorder start leaves no empty recording chunk and can be retried', async () => {
+    const { result } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'failed-start' }));
+    MockMediaRecorder.failNextStart = true;
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    expect(result.current.status).toBe('error');
+    expect(result.current.errorMessage).toContain('Synthetic recorder start failure');
+    expect(result.current.segments).toEqual([]);
+    expect(mockChunkRecords.size).toBe(0);
+    expect(mockTrack.stop).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    expect(result.current.status).toBe('recording');
+    expect(result.current.segments).toHaveLength(1);
+    await act(async () => {
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete']);
+  });
+
+  it('a failed rotation leaves the current recorder running with no phantom chunk', async () => {
+    const { result } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'failed-rotation', chunkMs: 15000 }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    MockMediaRecorder.failNextStart = true;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(15000);
+    });
+    expect(result.current.isRecording).toBe(true);
+    expect(instances[0].state).toBe('recording');
+    expect(result.current.errorMessage).toContain('Synthetic recorder start failure');
+    expect(result.current.segments).toHaveLength(1);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(15000);
+      await flushPromises();
+    });
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete', 'recording']);
+    await act(async () => {
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete', 'complete']);
   });
 
   it.each(['during capture', 'immediately after Record'])('keeps one recording through sign-in %s', async (when) => {

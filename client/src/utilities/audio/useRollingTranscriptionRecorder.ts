@@ -135,13 +135,14 @@ export const useRollingTranscriptionRecorder = ({
       const mimeType = pickSupportedMimeType();
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
 
-      const capture = beginChunk();
+      let capture: ReturnType<typeof beginChunk> | undefined;
       const fragments: Blob[] = [];
       const snapshot = (finished = false) => {
         const audio = new Blob(fragments, {
           type: recorder.mimeType || mimeType || fragments[0]?.type || 'audio/webm',
         });
-        capture(audio, finished);
+        if (!capture && audio.size) capture = beginChunk();
+        capture?.(audio, finished);
       };
       recorder.ondataavailable = (event: BlobEvent) => {
         if (event.data && event.data.size > 0) {
@@ -186,6 +187,9 @@ export const useRollingTranscriptionRecorder = ({
         }
       };
 
+      // A constructor/start failure must not publish an empty chunk to the queue.
+      recorder.start(1000);
+      capture ??= beginChunk();
       return recorder;
     },
     [beginChunk, clearRotationTimer, resolveStopWaiters, stopRecorder, stopTimer, stopTracks],
@@ -198,7 +202,6 @@ export const useRollingTranscriptionRecorder = ({
 
     try {
       const nextRecorder = createRecorder(streamRef.current);
-      nextRecorder.start(1000);
       mediaRecorderRef.current = nextRecorder;
       stopRecorder(previousRecorder, false);
     } catch (error) {
@@ -263,11 +266,9 @@ export const useRollingTranscriptionRecorder = ({
           { once: true },
         );
       });
+      recordingActiveRef.current = true;
       const recorder = createRecorder(stream);
       mediaRecorderRef.current = recorder;
-
-      recordingActiveRef.current = true;
-      recorder.start(1000);
       setElapsedSeconds(0);
       startElapsedTimer();
       startRotationTimer();
@@ -279,7 +280,7 @@ export const useRollingTranscriptionRecorder = ({
       stopTimer();
       stopTracks();
       setErrorMessage(
-        `Could not start recording. Check microphone permission and available storage, then try again. ${describeError(error)}`,
+        `Could not start recording. Check microphone permission and recording support, then try again. ${describeError(error)}`,
       );
       setStatus('error');
     }

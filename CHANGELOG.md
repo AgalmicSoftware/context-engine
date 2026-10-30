@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Leave no empty recording chunk when microphone capture fails to start or rotate; retain the active chunk on rotation failure.
+
 - Keep timestamped hidden-page recording notices after returning and stopping, until dismissed.
 
 - Name recording uploads and audio downloads by their MIME container, including WebM, MP4, M4A, Ogg and WAV.
