@@ -31,6 +31,21 @@ export const displayResponderContext = (packet: InterviewPrefillPacket | null): 
     .join('\n');
 };
 
+export const omitConcealedInterviewFacts = (
+  context: string,
+  packet: InterviewPrefillPacket | null,
+  isConcealed: (questionId: string) => boolean,
+): string => {
+  let filtered = context;
+  for (const entry of packet?.responderContext?.facts || []) {
+    const ids = entry.relatedQuestionIds || [];
+    const fact = String(entry.fact || '').trim();
+    // Imported facts can also have been copied into the editable context field.
+    if (fact && ids.length && ids.every(isConcealed)) filtered = filtered.split(fact).join('');
+  }
+  return filtered.trim();
+};
+
 /** "ChatGPT", "Claude" or "Other": the platform an AI prefill reports for itself. */
 export const describeInterviewPlatform = (platform: InterviewPrefillPacket['source']['platform']): string =>
   ({ chatgpt: 'ChatGPT', claude: 'Claude', other: 'Other' })[platform];

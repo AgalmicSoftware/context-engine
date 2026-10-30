@@ -70,6 +70,7 @@ import {
   describeInterviewPlatform,
   describeResearchCoverage,
   displayResponderContext,
+  omitConcealedInterviewFacts,
   hasDraftValue,
   responseCommentValue,
   responseFieldValue,
@@ -874,12 +875,13 @@ function SessionInterviewPanel({
     setSubmitSucceeded(false);
     roundBaseTranscriptRef.current = transcriptRef.current;
     setShowTranscript(false);
+    const voiceContext = omitConcealedInterviewFacts(responderContext, prefillPacket, isDraftConcealed);
     const validatedPrefillPacket =
       prefillPacket && (!prefillPacket.questionSetHash || validatedPrefillRef.current === prefillPacket)
         ? scopeInterviewPrefillToQuestions(
             prefillPacket,
             validatedPrefillQuestionsRef.current || questions,
-            responderContext,
+            voiceContext,
           )
         : null;
     const answered = (questionId: string) =>
@@ -898,7 +900,7 @@ function SessionInterviewPanel({
       const instructions = buildRealtimeInterviewInstructions({
         questions: openQuestions.length ? openQuestions : questions,
         onlyRevisions: !openQuestions.length,
-        responderContext,
+        responderContext: voiceContext,
         openingPrompt: openQuestions.length === questions.length ? interviewOpening.opening : undefined,
         steeringPrompt: interviewOpening.steeringPrompt,
         previousTranscript: transcriptRef.current,

@@ -44,7 +44,13 @@ const prefillPacket = {
   version: 1 as const,
   sessionSlug: 'demo',
   source: { platform: 'claude' as const, modelId: 'claude-test', verification: 'self_reported' as const },
-  responderContext: {},
+  responderContext: {
+    facts: [
+      ...statements.map((questionId) => ({ fact: `FACT-${questionId}`, relatedQuestionIds: [questionId] })),
+      { fact: 'MIXED-FACT', relatedQuestionIds: statements },
+      { fact: 'GENERAL-FACT' },
+    ],
+  },
   responses: [
     ...statements.map((questionId) => ({
       questionId,
@@ -236,7 +242,13 @@ it('keeps hidden guesses from the voice interviewer and the drafting request', a
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
   await screen.findByLabelText('Pause interview');
   expect(instructions).toContain(`EVIDENCE-${shownStatement}`);
-  for (const id of hiddenIds) expect(instructions).not.toContain(`EVIDENCE-${id}`);
+  expect(instructions).toContain(`FACT-${shownStatement}`);
+  expect(instructions).toContain('MIXED-FACT');
+  expect(instructions).toContain('GENERAL-FACT');
+  for (const id of hiddenIds) {
+    expect(instructions).not.toContain(`EVIDENCE-${id}`);
+    expect(instructions).not.toContain(`FACT-${id}`);
+  }
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
   await waitFor(() => expect(mapInterviewEvidenceToResponses).toHaveBeenCalled());
   const [request] = jest.mocked(mapInterviewEvidenceToResponses).mock.calls[0];
