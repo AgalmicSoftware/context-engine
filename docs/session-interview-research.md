@@ -88,6 +88,7 @@ hidden.
   question-mark tooltip explaining why. Your answer controls remain available
   below it. The AI answer, comment, ratings and notes are absent from the
   rendered markup and accessible text; the grey area contains only placeholders.
+  The placeholder and its help text stay readable in light and dark themes.
 - **Reveal.** Agree/disagree and single-choice questions show "Your AI guessed:
   Agree · 70% sure" right after the answer. Ratings, multi-select and
   quadratic questions show it once the person edits another card or submits,
