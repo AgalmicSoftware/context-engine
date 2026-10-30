@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep profile analysis open across data refreshes while discarding stale results.
+
 - Accept Claude 5 model names for photo analysis through Anthropic and OpenRouter.
 
 - Clear stale source warnings when starting a new question generation.

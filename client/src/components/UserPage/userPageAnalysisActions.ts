@@ -60,10 +60,13 @@ type AnalysisOwner = {
 };
 const owners = new WeakMap<UserPage, AnalysisOwner>();
 let requestGeneration = 0;
-export const invalidateUserAnalysis = (page: UserPage): void => {
-  if (!owners.delete(page)) return;
+export const invalidateUserAnalysis = (page: UserPage, closeModal: boolean): void => {
+  const hadOwner = owners.delete(page);
+  if (!hadOwner && !closeModal) return;
   page.clearAnalysisTimer();
-  if (page._isMounted) page.setState({ ...buildUserPageAnalysisResetStatePatch(), showAnalysisModal: false });
+  if (page._isMounted) {
+    page.setState({ ...buildUserPageAnalysisResetStatePatch(), ...(closeModal ? { showAnalysisModal: false } : {}) });
+  }
 };
 
 export async function analyzeUser(this: UserPage, forceRefresh = false): Promise<void> {

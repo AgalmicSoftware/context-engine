@@ -968,6 +968,19 @@ describe('UserPage analysis cache and routing', () => {
     expect(instance.state).toMatchObject({ analysisDetails: 'new result', analysisServedFromCache: true });
   });
 
+  it('keeps the analysis open when the same profile receives refreshed inputs', async () => {
+    const { instance } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({ details: 'old input result' });
+    await instance.analyzeUser();
+    expect(instance.state.showAnalysisModal).toBe(true);
+    const previous = instance.state;
+    instance.state = { ...previous, username: 'Updated profile data' };
+    instance.componentDidUpdate(instance.props, previous);
+    expect(instance.state).toMatchObject({ analysisDetails: '', showAnalysisModal: true });
+    switchAnalysisProfile(instance, { viewAddress: '0x00000000000000000000000000000000000000ee' });
+    expect(instance.state.showAnalysisModal).toBe(false);
+  });
+
   it('changed analysis inputs invalidate a pending result without applying it', async () => {
     const { instance } = makeAnalysisCacheInstance();
     const pending = deferredAnalysis();
@@ -979,7 +992,7 @@ describe('UserPage analysis cache and routing', () => {
     instance.componentDidUpdate(instance.props, previous);
     pending.resolve({ details: 'obsolete input' });
     await run;
-    expect(instance.state).toMatchObject({ analysisDetails: '', analyzing: false, showAnalysisModal: false });
+    expect(instance.state).toMatchObject({ analysisDetails: '', analyzing: false, showAnalysisModal: true });
     expect(instance.analysisTimer).toBeNull();
   });
   it('a delayed cache lookup cannot hydrate a different profile', async () => {

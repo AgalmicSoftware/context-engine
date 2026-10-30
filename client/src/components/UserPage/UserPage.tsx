@@ -1338,11 +1338,9 @@ class UserPage extends Component<any, any> {
   }
 
   componentDidUpdate(prevProps: UserPagePreviousProps, prevState: UnknownRecord) {
-    if (
-      analysisProfileKey(prevProps) !== analysisProfileKey(this.props) ||
-      analysisInputSignature(prevState) !== analysisInputSignature(this.state)
-    ) {
-      invalidateUserAnalysis(this);
+    const analysisProfileChanged = analysisProfileKey(prevProps) !== analysisProfileKey(this.props);
+    if (analysisProfileChanged || analysisInputSignature(prevState) !== analysisInputSignature(this.state)) {
+      invalidateUserAnalysis(this, analysisProfileChanged);
     }
     // Fast-path: nonce changed → force immediate cache re-read (bypasses signature dedup)
     const responseNonceRefresh = resolveUserPageResponseNonceRefresh({
