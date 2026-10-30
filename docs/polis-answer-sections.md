@@ -117,3 +117,5 @@ the analysis. Input controls retain their existing clamping behavior.
 Breakdown's spectrum details open outside the chart panel so they are not clipped
 by its edges. Click a point to pin its details; long popups scroll within the
 viewport and have a close button.
+
+The saved-filter loader is available from **Load a saved filter** in both inline Results and the filter dialog, including when no filters are active or immediately after clearing them. Paste a saved token or its full URL to restore the selection, including Group and Top questions settings.

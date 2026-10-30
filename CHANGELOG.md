@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Open the saved-filter loader in inline Results even when no filters are active or after clearing them; tokens and full URLs restore Group and Top question selections.
+
 - Finish and save Group Conversation transcription before Close, Escape, or outside dismissal; keep failed audio available in the open dialog for retry.
 
 - Count every quadratic step in double and triple clicks after pile auto-advance,

@@ -3026,22 +3026,29 @@ class QuestionFilter extends React.Component<any, any> {
       </div>
     );
 
-    const filterSummaryAndControlsJsx = (
-      <QuestionFilterSummaryControls
-        copiedUrlSuccess={this.state.copiedUrlSuccess}
-        filterBookmarkedFeedback={this.state.filterBookmarkedFeedback}
-        filterUrlInput={filterUrlInput}
-        isCurrentFilterBookmarked={this.state.isCurrentFilterBookmarked}
-        isDefault={isCurrentFilterDefault}
-        onBookmarkCurrentFilter={this.handleBookmarkCurrentFilter}
-        onClearFilters={this.handleClearFilters}
-        onCopyFilterUrl={this.handleCopyFilterUrl}
-        onFilterUrlInputChange={this.handleFilterUrlInputChange}
-        onLoadFilter={this.handleLoadFilter}
-        showLoadInput={showLoadInput}
-        summaryItems={summaryItems}
-      />
-    );
+    const filterSummaryAndControlsJsx =
+      summaryItems.length > 0 ? (
+        <QuestionFilterSummaryControls
+          copiedUrlSuccess={this.state.copiedUrlSuccess}
+          filterBookmarkedFeedback={this.state.filterBookmarkedFeedback}
+          filterUrlInput={filterUrlInput}
+          isCurrentFilterBookmarked={this.state.isCurrentFilterBookmarked}
+          isDefault={isCurrentFilterDefault}
+          onBookmarkCurrentFilter={this.handleBookmarkCurrentFilter}
+          onClearFilters={this.handleClearFilters}
+          onCopyFilterUrl={this.handleCopyFilterUrl}
+          onFilterUrlInputChange={this.handleFilterUrlInputChange}
+          onLoadFilter={this.handleLoadFilter}
+          showLoadInput={showLoadInput}
+          summaryItems={summaryItems}
+        />
+      ) : showLoadInput ? (
+        <QuestionFilterLoadFilterControls
+          filterUrlInput={filterUrlInput}
+          onFilterUrlInputChange={this.handleFilterUrlInputChange}
+          onLoadFilter={this.handleLoadFilter}
+        />
+      ) : null;
 
     if (isInline) {
       // "resultsMode" => render inline, but hide if filterModalOpen is false
@@ -3068,7 +3075,7 @@ class QuestionFilter extends React.Component<any, any> {
               />
             </div>
 
-            {summaryItems.length > 0 && filterSummaryAndControlsJsx}
+            {filterSummaryAndControlsJsx}
 
             {bodyContent}
           </div>
@@ -3102,15 +3109,7 @@ class QuestionFilter extends React.Component<any, any> {
               </div>
             </ModalHeader>
             <ModalBody className={styles.modalBody}>
-              {summaryItems.length > 0 && filterSummaryAndControlsJsx}
-              {/* In modal mode, also allow loading even if there are no current filters */}
-              {showLoadInput && summaryItems.length === 0 && (
-                <QuestionFilterLoadFilterControls
-                  filterUrlInput={filterUrlInput}
-                  onFilterUrlInputChange={this.handleFilterUrlInputChange}
-                  onLoadFilter={this.handleLoadFilter}
-                />
-              )}
+              {filterSummaryAndControlsJsx}
               {bodyContent}
             </ModalBody>
             <ModalFooter className={styles.modalFooter}>
