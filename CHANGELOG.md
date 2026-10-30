@@ -439,6 +439,8 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Return retryable interview discovery when question pointers or payloads cannot be read.
+
 - Calculate research completion from each run’s own answer events and initial statement set.
 
 - Allow failed Lit setup to restart with a fresh authority choice, reject conflicting credentials clearly, and preserve checkpoint writes across content revisions.

@@ -283,3 +283,29 @@ test('catalog accepts approved loopback HTTP URLs but rejects other protocols', 
   assert.equal(safe('ftp://127.0.0.1/session/demo', options), '');
   assert.equal(safe('http://unapproved.example/session/demo', options), '');
 });
+
+for (const failure of ['pointer', 'payload']) test(`unreadable only-question ${failure} asks interview clients to retry`, async () => {
+  const qid = `0x${'11'.repeat(32)}`;
+  const eventData = `0x${(32n).toString(16).padStart(64, '0')}${(1n).toString(16).padStart(64, '0')}${qid.slice(2)}`;
+  const response = await dispatchInterviewBriefRequest({
+    request: new Request('https://worker.example/agent/interview-brief?slug=fixture'), env: {}, baseHeaders: {},
+    deps: {
+      resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'fixture' }),
+      getSessionConfig: async () => ({ interviewMode: { enabled: true },
+        contracts: { surveys: '0x1111111111111111111111111111111111111111' },
+        rpcUrl: 'https://rpc.example', blockLimits: { start: 1, end: 1 } }),
+      getCorsContext: async () => ({ ok: true, headers: {} }), json,
+      fetch: async (url, init) => {
+        if (String(url) !== 'https://rpc.example') return new Response('Unavailable', { status: 503 });
+        const body = JSON.parse(init.body);
+        if (body.method === 'eth_call' && failure === 'pointer') throw new Error('Unavailable');
+        const result = body.method === 'eth_blockNumber' ? '0x1' : body.method === 'eth_getLogs'
+          ? [{ data: eventData }] : `0x${'01'.repeat(32)}`;
+        return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }));
+      },
+    },
+  });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('retry-after'), '5');
+  assert.match((await response.json()).error, /Retry/);
+});

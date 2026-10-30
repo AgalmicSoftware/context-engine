@@ -16,6 +16,11 @@ statement set in the durable journal. Subsequent runs, overlapping batches,
 request replays, edits and later question additions cannot rewrite earlier
 completion counts. Attempts remain traffic records and do not inflate coverage.
 
+Interview question discovery keeps failed pointer and payload reads marked
+incomplete. If no readable question remains, the public interview brief returns
+503 with a Retry-After header, allowing clients to retry instead of treating the
+session as empty.
+
 ## Agent HTTP client handoff
 
 Each session has one continuous Wrapped space. There is no opening action,

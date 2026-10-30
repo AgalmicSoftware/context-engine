@@ -98946,6 +98946,7 @@ var loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
   const scanEnd = Math.min(end, start + MAX_SCAN_BLOCKS - 1);
   const questions = [];
   const seen = /* @__PURE__ */ new Set();
+  let incomplete = false;
   let pointerReads = 0;
   let candidates = 0;
   let chunks = 0;
@@ -98978,19 +98979,24 @@ var loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
             "latest"
           ], fetchImpl });
         } catch {
+          incomplete = true;
           continue;
         }
         const pointer = base64urlFromHex(result);
         if (!pointer || result === ZERO_BYTES322) continue;
         const payload = await fetchArweaveQuestion(pointer, fetchImpl);
-        if (!payload || payloadSessionSlug(payload) !== lower8(slug)) continue;
+        if (!payload) {
+          incomplete = true;
+          continue;
+        }
+        if (payloadSessionSlug(payload) !== lower8(slug)) continue;
         const question = normalizeQuestion({ ...payload, id: id2 });
         if (question) questions.push(question);
-        if (questions.length >= MAX_QUESTIONS) return catalog(questions);
+        if (questions.length >= MAX_QUESTIONS) return catalog(questions, incomplete);
       }
     }
   }
-  return catalog(questions, scanEnd < end);
+  return catalog(questions, incomplete || scanEnd < end);
 };
 var loadPublicInterviewQuestions = async ({
   env = {},

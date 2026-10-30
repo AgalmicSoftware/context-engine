@@ -244,6 +244,7 @@ const loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
   const scanEnd = Math.min(end, start + MAX_SCAN_BLOCKS - 1);
   const questions = [];
   const seen = new Set();
+  let incomplete = false;
   let pointerReads = 0;
   let candidates = 0;
   let chunks = 0;
@@ -270,19 +271,20 @@ const loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
           result = await rpc({ rpcUrls, method: 'eth_call', params: [
             { to: surveysAddress, data: `${GET_QUESTION_HASH_SELECTOR}${id.slice(2)}` }, 'latest',
           ], fetchImpl });
-        } catch { continue; }
+        } catch { incomplete = true; continue; }
         const pointer = base64urlFromHex(result);
         if (!pointer || result === ZERO_BYTES32) continue;
         // At most two gateway fetches for each of the bounded pointer reads.
         const payload = await fetchArweaveQuestion(pointer, fetchImpl);
-        if (!payload || payloadSessionSlug(payload) !== lower(slug)) continue;
+        if (!payload) { incomplete = true; continue; }
+        if (payloadSessionSlug(payload) !== lower(slug)) continue;
         const question = normalizeQuestion({ ...payload, id });
         if (question) questions.push(question);
-        if (questions.length >= MAX_QUESTIONS) return catalog(questions);
+        if (questions.length >= MAX_QUESTIONS) return catalog(questions, incomplete);
       }
     }
   }
-  return catalog(questions, scanEnd < end);
+  return catalog(questions, incomplete || scanEnd < end);
 };
 
 export const loadPublicInterviewQuestions = async ({
