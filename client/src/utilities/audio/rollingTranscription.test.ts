@@ -51,3 +51,14 @@ describe('rollingTranscription helpers', () => {
     expect(buildListeningModeSearch('?session=demo&mode=listening', false)).toBe('?session=demo');
   });
 });
+
+it('marks a permanently failed chunk as a gap between successful transcript parts', () => {
+  const segments = [
+    { id: 'first', index: 0, status: 'complete' as const, text: 'Before.', startedAt: 1 },
+    { id: 'lost', index: 1, status: 'failed' as const, text: '', startedAt: 2 },
+    { id: 'last', index: 2, status: 'complete' as const, text: 'After.', startedAt: 3 },
+  ];
+  expect(stitchRollingTranscriptSegments(segments)).toBe(
+    'Before. [Recording gap: chunk 2 could not be transcribed.] After.',
+  );
+});

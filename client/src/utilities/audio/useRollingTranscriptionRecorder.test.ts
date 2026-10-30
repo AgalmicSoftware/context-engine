@@ -504,7 +504,7 @@ describe('useRollingTranscriptionRecorder', () => {
     expect(transcribeAudio).toHaveBeenCalledTimes(16);
     expect(result.current.segments).toHaveLength(16);
     expect(result.current.segments.filter((segment) => segment.status === 'recording')).toHaveLength(1);
-    expect(result.current.segments.filter((segment) => segment.status === 'error')).toHaveLength(0);
+    expect(result.current.segments.filter((segment) => segment.status === 'failed')).toHaveLength(0);
     expect(result.current.segments.filter((segment) => segment.status === 'complete')).toHaveLength(15);
     expect(result.current.pendingSegmentCount).toBe(0);
     expect(result.current.elapsedSeconds).toBe(45 * 60);

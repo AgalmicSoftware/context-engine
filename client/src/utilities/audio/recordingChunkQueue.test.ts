@@ -72,28 +72,43 @@ it('retries the first chunk with backoff before uploading later chunks', async (
   expect([...saved.values()].every((record) => !record.audio)).toBe(true);
 });
 
-it('keeps audio after five failures, blocks later chunks, and supports manual retry', async () => {
-  const transcribe = jest.fn<Transcribe>(async () => {
-    throw new Error('Upload refused');
+it('recovers from a thirty-second outage without manual action', async () => {
+  const started = Date.now();
+  const transcribe = jest.fn(async () => {
+    if (Date.now() - started < 30_000) throw Object.assign(new Error('Unavailable'), { status: 503 });
+    return { text: 'Recovered.' };
   });
   const queue = create(transcribe);
   await queue.ready;
-  const first = queue.begin(false);
-  queue.capture(first, audio, true);
-  const second = queue.begin(false);
-  queue.capture(second, new Blob(['next']), true);
+  queue.capture(queue.begin(false), audio, true);
   await tick();
-  await jest.advanceTimersByTimeAsync(15000);
-  await tick();
-  expect(transcribe).toHaveBeenCalledTimes(5);
-  expect(queue.segments.map((segment) => segment.status)).toEqual(['error', 'queued']);
-  expect(saved.get(first)?.audio).toBe(audio);
-  await expect(queue.finish()).rejects.toThrow('Retry');
+  await jest.advanceTimersByTimeAsync(30_000);
+  await queue.finish();
+  expect(transcribe).toHaveBeenCalledTimes(6);
+  expect(queue.segments[0]).toMatchObject({ status: 'complete', text: 'Recovered.' });
+});
+
+it('skips permanent failures while retaining their exact audio for retry and download', async () => {
+  const badAudio = new Blob(['all original bytes'], { type: 'audio/mp4' });
+  const transcribe = jest.fn(async (blob: Blob) => {
+    if (blob === badAudio) throw Object.assign(new Error('Undecodable audio'), { status: 400 });
+    return { text: 'Kept transcript.' };
+  });
+  const queue = create(transcribe);
+  await queue.ready;
+  queue.capture(queue.begin(false), audio, true);
+  const failed = queue.begin(false);
+  queue.capture(failed, badAudio, true);
+  queue.capture(queue.begin(false), new Blob(['third']), true);
+  await queue.finish();
+  expect(queue.segments.map((segment) => segment.status)).toEqual(['complete', 'failed', 'complete']);
+  expect(queue.records.get(failed)?.audio).toBe(badAudio);
+  expect(saved.get(failed)?.audio).toBe(badAudio);
   await expect(queue.clear()).rejects.toThrow('pending audio');
   transcribe.mockImplementation(async () => ({ text: 'Recovered.' }));
-  queue.retry(first);
+  queue.retry(failed);
   await queue.finish();
-  expect(queue.segments.map((segment) => segment.status)).toEqual(['complete', 'complete']);
+  expect(queue.segments.every((segment) => segment.status === 'complete')).toBe(true);
 });
 
 it('does not delete raw audio if persisting the completed transcript fails', async () => {
@@ -209,4 +224,37 @@ it('resets speaker fallback when a completed recording is cleared', async () => 
   queue.capture(queue.begin(true), audio, true);
   await queue.finish();
   expect(transcribe).toHaveBeenLastCalledWith(audio, true);
+});
+
+it('reopens kept pending audio even when IndexedDB is unavailable', async () => {
+  jest.mocked(listRecordingChunks).mockRejectedValue(new Error('No storage'));
+  jest.mocked(putRecordingChunk).mockRejectedValue(new Error('No storage'));
+  const queue = create(async () => new Promise(() => {}), 'volatile-room');
+  await queue.ready;
+  const id = queue.begin(false);
+  queue.capture(id, audio, true);
+  await queue.keepAudio();
+  queue.dispose();
+  const transcribe = jest.fn<Transcribe>(async () => ({ text: 'Recovered from memory.' }));
+  const reopened = create(transcribe, 'volatile-room');
+  await reopened.finish();
+  expect(transcribe).toHaveBeenCalledWith(audio, false);
+  expect(reopened.segments[0].text).toBe('Recovered from memory.');
+  expect(reopened.records.get(id)?.audio).toBe(audio);
+  expect(reopened.storageError).toContain("can't be recovered after a reload");
+});
+
+it.each([408, 429, 500])('keeps retrying HTTP %s with a capped backoff', async (status) => {
+  const times: number[] = [];
+  const started = Date.now();
+  const queue = create(async () => {
+    times.push(Date.now() - started);
+    throw Object.assign(new Error('Temporary failure'), { status });
+  });
+  await queue.ready;
+  queue.capture(queue.begin(false), audio, true);
+  await tick();
+  await jest.advanceTimersByTimeAsync(90_000);
+  expect(times).toEqual([0, 1000, 3000, 7000, 15000, 30000, 60000, 90000]);
+  expect(queue.segments[0].status).toBe('retrying');
 });

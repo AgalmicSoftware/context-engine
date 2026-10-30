@@ -74,6 +74,7 @@ const buildRecorder = (overrides: Record<string, unknown> = {}) => ({
   resumeRecording: jest.fn(),
   stopRecording: jest.fn(),
   finalizeRecording: jest.fn(),
+  keepAudio: jest.fn(),
   clearDraft: jest.fn(),
   ...overrides,
 });
@@ -96,7 +97,7 @@ describe('SessionListeningPanel', () => {
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
       buildRecorder({
         transcript: 'Already saved transcript.',
-        segments: [{ id: 'stuck', index: 0, status: 'error', text: '', startedAt: 1 }],
+        segments: [{ id: 'stuck', index: 0, status: 'failed', text: '', startedAt: 1 }],
         downloadableChunkIds: ['stuck'],
         retryChunk,
         downloadChunk,
@@ -272,7 +273,7 @@ describe('SessionListeningPanel', () => {
             text: 'The conversation included enough captured text to keep working.',
             startedAt: 1,
           },
-          { id: 's2', index: 1, status: 'error', text: '', startedAt: 2 },
+          { id: 's2', index: 1, status: 'failed', text: '', startedAt: 2 },
         ],
         errorMessage: 'The audio file could not be decoded or its format is not supported.',
       }),
@@ -292,7 +293,7 @@ describe('SessionListeningPanel', () => {
         transcript: 'The conversation recovered with enough later transcript text to keep working.',
         segments: [
           { id: 's1', index: 0, status: 'complete', text: 'Opening text.', startedAt: 1, completedAt: 2 },
-          { id: 's2', index: 1, status: 'error', text: '', startedAt: 3, completedAt: 4 },
+          { id: 's2', index: 1, status: 'failed', text: '', startedAt: 3, completedAt: 4 },
           {
             id: 's3',
             index: 2,
@@ -752,4 +753,36 @@ it('waits for the transcription provider before starting Group Conversation with
   expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
   fireEvent.click(start);
   expect(startRecording).toHaveBeenCalledTimes(1);
+});
+
+it('generates with a gap warning and offers closing while keeping pending audio', async () => {
+  const finalizeRecording = jest.fn(async (_options?: { waitForTranscription?: boolean }) => undefined);
+  const keepAudio = jest.fn(async () => undefined);
+  const onClose = jest.fn();
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({
+      transcript:
+        'A useful transcript with enough detail to generate questions. [Recording gap: chunk 2 could not be transcribed.]',
+      segments: [
+        {
+          id: 'done',
+          index: 0,
+          status: 'complete',
+          text: 'A useful transcript with enough detail to generate questions.',
+          startedAt: 1,
+        },
+        { id: 'failed', index: 1, status: 'failed', text: '', startedAt: 2 },
+      ],
+      downloadableChunkIds: ['failed'],
+      finalizeRecording,
+      keepAudio,
+    }),
+  );
+  render(<SessionListeningPanel sessionSlug="room" onClose={onClose} />);
+  expect(screen.getByText(/1 part of the recording couldn't be transcribed/)).toBeInTheDocument();
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Close and keep the audio' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  expect(finalizeRecording).toHaveBeenCalledWith({ waitForTranscription: false });
+  expect(keepAudio).toHaveBeenCalledTimes(1);
 });

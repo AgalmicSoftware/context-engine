@@ -129,7 +129,7 @@ const requestAudioTranscription = async (
         'Speaker labels are unavailable for this provider, Worker, or audio size.',
       );
     }
-    throw new Error(parseTranscriptionErrorMessage(data, resp.status));
+    throw Object.assign(new Error(parseTranscriptionErrorMessage(data, resp.status)), { status: resp.status });
   }
 
   return asRecord(data);

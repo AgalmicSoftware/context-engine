@@ -435,6 +435,7 @@ export const useRollingTranscriptionRecorder = ({
     labelsUnavailableReason,
     retryChunk,
     downloadChunk: chunks.downloadChunk,
+    keepAudio: chunks.keepAudio,
     mediaStreamRef: streamRef,
     startRecording,
     pauseRecording,

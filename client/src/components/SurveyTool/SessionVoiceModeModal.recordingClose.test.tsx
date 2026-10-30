@@ -169,3 +169,21 @@ it('keeps failed audio in storage and automatically retries it before closing', 
   expect(mockStop).toHaveBeenCalledTimes(1);
   expect(savedTranscript()).toBe(transcript);
 });
+
+it('closes with pending audio and resumes it when the recording reopens', async () => {
+  jest.mocked(transcribeAudio).mockImplementation(() => new Promise(() => {}));
+  render(<Harness />);
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
+  fireEvent.click(screen.getByTestId('ce-session-listening-start'));
+  await screen.findByRole('button', { name: 'Stop recording' });
+  dismiss('Close');
+  fireEvent.click(await screen.findByRole('button', { name: 'Close and keep the audio' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect([...mockRecords.values()][0]?.audio?.size).toBe(256);
+  jest.mocked(transcribeAudio).mockResolvedValue(transcript);
+  fireEvent.click(screen.getByText('Reopen recording'));
+  await screen.findByText('Transcribed');
+  expect(savedTranscript()).toBe(transcript);
+  expect([...mockRecords.values()][0]?.audio).toBeUndefined();
+  expect(transcribeAudio).toHaveBeenCalledTimes(2);
+});

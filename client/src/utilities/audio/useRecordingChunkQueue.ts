@@ -88,6 +88,9 @@ export function useRecordingChunkQueue(options: Options) {
   const finishTranscription = useCallback(async () => {
     await queueRef.current?.finish();
   }, []);
+  const keepAudio = useCallback(async () => {
+    await queueRef.current?.keepAudio();
+  }, []);
   const retryChunk = useCallback((id?: string) => queueRef.current?.retry(id), []);
   const downloadChunk = useCallback((id: string) => {
     const record = queueRef.current?.records.get(id);
@@ -112,6 +115,7 @@ export function useRecordingChunkQueue(options: Options) {
     prepare,
     beginChunk,
     finishTranscription,
+    keepAudio,
     retryChunk,
     downloadChunk,
     clearDraft,

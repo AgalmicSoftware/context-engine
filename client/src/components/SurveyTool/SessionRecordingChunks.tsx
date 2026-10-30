@@ -7,7 +7,7 @@ const STATUS_LABELS = {
   queued: 'Waiting to upload',
   transcribing: 'Uploading',
   complete: 'Transcribed',
-  error: 'Failed',
+  failed: 'Failed',
   retrying: 'Retrying',
 };
 
@@ -28,7 +28,7 @@ export function SessionRecordingChunks({ segments, downloadableChunkIds = [], on
             <strong>Chunk {segment.index + 1}</strong>
             <span role="status">{STATUS_LABELS[segment.status]}</span>
             <div className={styles.actions}>
-              {segment.status === 'error' || segment.status === 'retrying' ? (
+              {segment.status === 'failed' || segment.status === 'retrying' ? (
                 <button
                   type="button"
                   onClick={() => onRetry(segment.id)}

@@ -7,6 +7,9 @@ import {
 import type { RollingTranscriptSegment } from './rollingTranscription';
 import type { SpeakerTranscriptTurn } from './speakerTranscript';
 
+// Unsaved records survive closing and reopening the panel in the same page.
+const memoryRecordings = new Map<string, Map<string, RecordingChunk>>();
+
 type Transcription = { text: string; speakerTurns?: SpeakerTranscriptTurn[]; labelsUnavailableReason?: string };
 type Options = {
   scope: string;
@@ -46,17 +49,26 @@ export class RecordingChunkQueue {
       const saved = await listRecordingChunks(this.options.scope);
       if (this.disposed) return;
       this.storageError = '';
-      for (const entry of saved) {
-        if (entry.audio) entry.segment = { ...entry.segment, status: 'queued', error: undefined };
-        else if (entry.segment.status !== 'complete') continue;
+      for (const entry of [...saved, ...(memoryRecordings.get(this.options.scope)?.values() || [])]) {
+        if (entry.audio && !['failed', 'complete'].includes(entry.segment.status))
+          entry.segment = { ...entry.segment, status: 'queued', error: undefined };
+        else if (!entry.audio && entry.segment.status !== 'complete') continue;
         this.records.set(entry.segment.id, entry);
         if (entry.labelsUnavailableReason) this.labelsUnavailableReason = entry.labelsUnavailableReason;
       }
+      memoryRecordings.delete(this.options.scope);
       this.changed();
-      this.pump();
+      this.retry();
     } catch (error) {
       this.storageError = storageText(error);
+      for (const entry of memoryRecordings.get(this.options.scope)?.values() || []) {
+        if (entry.audio && !['failed', 'complete'].includes(entry.segment.status))
+          entry.segment = { ...entry.segment, status: 'queued' };
+        this.records.set(entry.segment.id, entry);
+      }
+      memoryRecordings.delete(this.options.scope);
       this.changed();
+      this.retry();
     }
   }
   async prepare() {
@@ -119,7 +131,7 @@ export class RecordingChunkQueue {
     }
   }
   private firstPending() {
-    const first = this.segments.find((entry) => entry.status !== 'complete');
+    const first = this.segments.find((entry) => !['complete', 'failed'].includes(entry.status));
     return first && this.records.get(first.id);
   }
   private settle() {
@@ -130,7 +142,7 @@ export class RecordingChunkQueue {
   private pump() {
     if (this.disposed || this.running || this.retryTimer) return;
     const record = this.firstPending();
-    if (!record?.audio || record.segment.status === 'recording' || record.segment.status === 'error') {
+    if (!record?.audio || record.segment.status === 'recording') {
       this.settle();
       return;
     }
@@ -184,16 +196,18 @@ export class RecordingChunkQueue {
       this.changed();
     } catch (error) {
       if (this.disposed) return;
-      const retry = attempt < 5;
-      record.segment = { ...record.segment, status: retry ? 'retrying' : 'error', error: failureText(error) };
+      const status = error && typeof error === 'object' && 'status' in error ? Number(error.status) : 0;
+      const retry = !(status >= 400 && status < 500 && status !== 408 && status !== 429);
+      record.segment = { ...record.segment, status: retry ? 'retrying' : 'failed', error: failureText(error) };
       this.records.set(id, record);
+      if (!retry) await this.save(record);
       if (retry)
         this.retryTimer = setTimeout(
           () => {
             this.retryTimer = null;
             this.pump();
           },
-          Math.min(30_000, 1000 * 2 ** (attempt - 1)),
+          [1000, 2000, 4000, 8000, 15_000][attempt - 1] ?? 30_000,
         );
       this.changed();
     }
@@ -209,7 +223,11 @@ export class RecordingChunkQueue {
           this.changed();
         });
       }
-      if ((!id || id === record.segment.id) && record.audio && ['error', 'retrying'].includes(record.segment.status)) {
+      if (
+        (!id || id === record.segment.id) &&
+        record.audio &&
+        (record.segment.status === 'retrying' || (Boolean(id) && record.segment.status === 'failed'))
+      ) {
         this.attempts.delete(record.segment.id);
         record.segment = { ...record.segment, status: 'queued', error: undefined };
       }
@@ -222,12 +240,17 @@ export class RecordingChunkQueue {
     await this.writes;
     this.pump();
     if (this.running || this.retryTimer) await new Promise<void>((resolve) => this.waiters.add(resolve));
-    if (this.segments.some((entry) => entry.status !== 'complete')) {
+    if (this.segments.some((entry) => !['complete', 'failed'].includes(entry.status))) {
       throw new Error(
         this.storageError ||
           'Some audio is waiting for transcription. Reconnect or Retry a failed chunk, or download its audio before leaving.',
       );
     }
+  }
+  async keepAudio() {
+    await this.writes;
+    if (this.storageError) memoryRecordings.set(this.options.scope, this.records);
+    else memoryRecordings.delete(this.options.scope);
   }
   async clear() {
     if ([...this.records.values()].some((record) => record.audio && record.segment.status === 'complete')) {
@@ -241,6 +264,7 @@ export class RecordingChunkQueue {
     await this.writes;
     await clearRecordingChunks(this.options.scope);
     this.records.clear();
+    memoryRecordings.delete(this.options.scope);
     this.labelsUnavailableReason = '';
     this.storageError = '';
     this.changed();

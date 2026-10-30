@@ -397,7 +397,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const activeGenerationRequestRef = useRef(0);
 
   const failedCount = useMemo(
-    () => recorder.segments.filter((segment) => segment.status === 'error').length,
+    () => recorder.segments.filter((segment) => segment.status === 'failed').length,
     [recorder.segments],
   );
   const trimmedTranscript = recorder.transcript.trim();
@@ -429,11 +429,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
 
   const canGenerate = !isClosing && trimmedTranscript.length >= 50 && !isGenerating && !hasPendingTranscription;
   const isStarting = !isRecorderSessionActive && recorder.isBusy;
-  const visibleError =
-    closeError ||
-    generationError ||
-    recorder.errorMessage ||
-    (failedCount > 0 ? 'Some audio could not be transcribed. Retry or download the affected chunks below.' : '');
+  const visibleError = closeError || generationError || recorder.errorMessage || '';
+  const gapWarning =
+    failedCount > 0
+      ? `${failedCount} ${failedCount === 1 ? 'part' : 'parts'} of the recording couldn't be transcribed. Retry or download the affected chunks below.`
+      : '';
   const isPreparingRecording = panelMode === 'recordGroup' && speakerLabelsSupported === null;
   const recordButtonLabel = isRecorderSessionActive
     ? recorder.isStopping
@@ -482,7 +482,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     }
   }, [hasTranscript]);
 
-  const { finalizeRecording } = recorder;
+  const { finalizeRecording, keepAudio } = recorder;
   const handleClose = useCallback(async () => {
     if (closingRef.current) return;
     closingRef.current = true;
@@ -490,6 +490,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     setCloseError('');
     try {
       await finalizeRecording({ waitForTranscription: true });
+      await keepAudio();
       if (isMountedRef.current) onClose?.();
     } catch (error) {
       if (isMountedRef.current)
@@ -498,7 +499,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       closingRef.current = false;
       if (isMountedRef.current) setIsClosing(false);
     }
-  }, [onClose, finalizeRecording]);
+  }, [onClose, finalizeRecording, keepAudio]);
 
   useEffect(() => {
     if (!closeActionRef) return;
@@ -672,6 +673,26 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             </span>
           ) : null}
         </div>
+      ) : null}
+      {gapWarning ? <div role="status">{gapWarning}</div> : null}
+      {(hasPendingTranscription || failedCount > 0 || isClosing) && onClose ? (
+        <Button
+          type="button"
+          className={styles.sessionInterviewHeaderButton}
+          onClick={async () => {
+            try {
+              await finalizeRecording({ waitForTranscription: false });
+              await keepAudio();
+              if (isMountedRef.current) onClose();
+            } catch (error) {
+              setCloseError(
+                error instanceof Error ? error.message : 'Could not keep the audio. Download it before leaving.',
+              );
+            }
+          }}
+        >
+          Close and keep the audio
+        </Button>
       ) : null}
       {recorder.labelsUnavailableReason ? (
         <div role="status">{recorder.labelsUnavailableReason} Continuing with plain transcription.</div>

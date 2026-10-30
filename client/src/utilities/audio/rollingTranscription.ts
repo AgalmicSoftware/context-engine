@@ -4,7 +4,7 @@ export const DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS = 3 * 60 * 1000;
 export const LISTENING_MODE_QUERY_VALUE = 'listening';
 
 export type RollingTranscriptSegmentStatus =
-  'recording' | 'queued' | 'transcribing' | 'complete' | 'error' | 'retrying';
+  'recording' | 'queued' | 'transcribing' | 'complete' | 'failed' | 'retrying';
 
 export type RollingTranscriptSegment = {
   id: string;
@@ -22,9 +22,18 @@ export const mergeRollingTranscriptText = (previous: string, next: string): stri
 
 export const stitchRollingTranscriptSegments = (segments: RollingTranscriptSegment[] = []): string =>
   [...segments]
-    .filter((segment) => segment.status === 'complete' && segment.text.trim())
+    .filter((segment) => segment.status === 'failed' || (segment.status === 'complete' && segment.text.trim()))
     .sort((a, b) => a.index - b.index)
-    .reduce((merged, segment) => mergeRollingTranscriptText(merged, segment.text), '');
+    .reduce(
+      (merged, segment) =>
+        mergeRollingTranscriptText(
+          merged,
+          segment.status === 'failed'
+            ? `[Recording gap: chunk ${segment.index + 1} could not be transcribed.]`
+            : segment.text,
+        ),
+      '',
+    );
 
 export const isListeningModeQueryEnabled = (search: unknown): boolean => {
   try {

@@ -39,7 +39,7 @@ try {
       const url = new URL(route.request().url());
       if (url.origin === 'https://worker.example') {
         attempts++;
-        if (failure === 'always' || (failure === 'twice' && attempts <= 2)) return route.fulfill({ status: 422, json: { error: 'Synthetic upload interruption' } });
+        if (failure === 'always' || (failure === 'twice' && attempts <= 2)) return route.fulfill({ status: failure === 'always' ? 400 : 503, json: { error: 'Synthetic upload interruption' } });
         return route.fulfill({ json: { text: 'Recovered room transcript.' } });
       }
       if (url.origin !== new URL(base).origin) return route.abort();
@@ -50,7 +50,12 @@ try {
         const ReactModule = await import('/node_modules/.vite/deps/react.js'); const React = ReactModule.default || ReactModule;
         const ReactDOM = await import('/node_modules/.vite/deps/react-dom_client.js');
         const { default: Panel } = await import('/src/components/SurveyTool/SessionListeningPanel.tsx');
-        (ReactDOM.createRoot || ReactDOM.default.createRoot)(document.getElementById('probe')).render(React.createElement(Panel, { sessionSlug: 'recovery', workerUrl: 'https://worker.example' }));
+        function Probe() {
+          const [open, setOpen] = React.useState(true);
+          return open ? React.createElement(Panel, { sessionSlug: 'recovery', workerUrl: 'https://worker.example', onClose: () => setOpen(false) })
+            : React.createElement('button', { onClick: () => setOpen(true) }, 'Reopen recording');
+        }
+        (ReactDOM.createRoot || ReactDOM.default.createRoot)(document.getElementById('probe')).render(React.createElement(Probe));
       </script></body></html>` });
       return route.continue();
     });
@@ -74,7 +79,11 @@ try {
     await page.getByTestId('ce-session-listening-start').click();
     await page.getByRole('button', { name: 'Stop recording' }).click();
     await page.getByText('Failed', { exact: true }).waitFor({ timeout: 30000 });
-    assert.equal(attempts, 5);
+    assert.equal(attempts, 1);
+    await page.getByRole('button', { name: 'Close and keep the audio' }).click();
+    await page.getByRole('button', { name: 'Reopen recording' }).click();
+    await page.getByText('Failed', { exact: true }).waitFor();
+    assert.equal(attempts, 1, 'Reopening preserves a permanent failure until explicitly retried');
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Download chunk 2' }).click();
     const download = await downloadPromise;
@@ -101,11 +110,13 @@ try {
     await page.getByTestId('ce-session-listening-start').click();
     await page.getByRole('button', { name: 'Stop recording' }).waitFor();
     await page.evaluate(() => window.__recorder.requestData());
-    await page.getByRole('alert').filter({ hasText: 'Free storage' }).waitFor();
-    await page.getByRole('button', { name: 'Stop recording' }).waitFor({ state: 'hidden' });
+    await page.getByRole('alert').filter({ hasText: "This recording can't be recovered after a reload" }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Stop recording' }).isVisible(), true);
+    await page.getByRole('button', { name: 'Stop recording' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="ce-recording-chunks"] [role="status"]')[2]?.textContent === 'Transcribed');
     assert.equal(await page.getByRole('button', { name: 'Download chunk 3' }).isVisible(), true);
     await page.evaluate(() => { IDBObjectStore.prototype.put = window.__originalIdbPut; });
-    await page.getByRole('button', { name: 'Retry chunk 3' }).click();
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="ce-recording-chunks"] [role="status"]')[2]?.textContent === 'Transcribed');
 
     await page.context().setOffline(true);
