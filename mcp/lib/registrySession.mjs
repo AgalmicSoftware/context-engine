@@ -50,6 +50,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
   let workerOrigin;
   let surveys;
   let startBlock;
+  const creationBlocks = new Map();
   let endBlock = null;
   let readEnd;
   let windowKey;
@@ -103,7 +104,18 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
     sessionConfig = { ...metadata, slug: info.slug, networkChainId: chainId, sessionId: normalizeSessionIdHex(row[7]), corsWorkerUrl: workerOrigin,
       contracts: { ...metadata.contracts, surveys: { address, chainId } } };
     const head = await chainRequest(() => provider.getBlockNumber());
-    const nextStart = configuredBlock(metadata.blockLimits?.start, 'start') ?? await findStartBlock(provider, Number(row[5]), head);
+    let nextStart = configuredBlock(metadata.blockLimits?.start, 'start');
+    if (nextStart === null) {
+      const createdAt = Number(row[5]);
+      if (!creationBlocks.has(createdAt)) {
+        const lookup = findStartBlock(provider, createdAt, head).catch((error) => {
+          creationBlocks.delete(createdAt);
+          throw error;
+        });
+        creationBlocks.set(createdAt, lookup);
+      }
+      nextStart = await creationBlocks.get(createdAt);
+    }
     const nextEnd = configuredBlock(metadata.blockLimits?.end, 'end');
     if (nextEnd !== null && nextEnd < nextStart) throw new Error('Invalid session block window: end must not precede start.');
     const nextKey = `${nextStart}:${nextEnd ?? 'head'}`;

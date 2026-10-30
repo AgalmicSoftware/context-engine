@@ -18,6 +18,7 @@ fresh credentials; there is no Bridge deployment or credential migration.
 Hosted links include `?worker=<origin>`. Normal links such as
 `https://contextengine.sh/session/<slug>` use the OP Sepolia session registry.
 Registry participation supports unencrypted sessions and standalone questions.
+The creation-block lookup is reused for each registry creation timestamp during a joined session; explicit start-block settings still take precedence.
 Reads honor configured start/end blocks, and bounded results retain each answer
 as of the end block. Unavailable historical state is reported as partial.
 

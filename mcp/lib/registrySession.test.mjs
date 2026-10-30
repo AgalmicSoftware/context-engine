@@ -958,3 +958,27 @@ test('an unavailable bounded pointer keeps results partial without reading lates
   assert.ok(reads.length > 0);
   assert.ok(reads.every((options) => options?.blockTag === 5));
 });
+
+
+test('config reloads reuse creation-block lookup until the registry creation time changes', async (t) => {
+  const f = fixture({ blockLimits: {} });
+  const lookup = t.mock.method(f.options.provider, 'getBlock');
+  const session = await f.open();
+  assert.ok(lookup.mock.callCount() > 0);
+  lookup.mock.resetCalls();
+  await Promise.all([session.loadConfig(), session.loadConfig()]);
+  assert.equal(lookup.mock.callCount(), 0);
+  const getRow = f.registry.getSessionBySlug;
+  f.registry.getSessionBySlug = async () => { const row = await getRow(); row[5] = 1006; return row; };
+  await session.loadConfig();
+  assert.ok(lookup.mock.callCount() > 0);
+  assert.equal(session.containsBlock(5), false);
+  assert.equal(session.containsBlock(6), true);
+  lookup.mock.resetCalls();
+  await session.loadConfig();
+  assert.equal(lookup.mock.callCount(), 0);
+  f.meta.blockLimits = { start: 2 };
+  await session.loadConfig();
+  assert.equal(session.containsBlock(2), true);
+  assert.equal(lookup.mock.callCount(), 0);
+});
