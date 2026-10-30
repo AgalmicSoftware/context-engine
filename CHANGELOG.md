@@ -22,12 +22,6 @@ All notable changes to this project will be documented in this file.
 
 - Verify interview submission leaves unrelated manual answers pending for ordinary Submit.
 
-- Require at least one question type before generation and explain responses with no usable questions.
-
-- Allow completed benchmark runs at different repeat depths to share a report while preserving their seeds and strict resume checks.
-
-- Preserve multiple-choice selections in generated results so options containing semicolons count correctly.
-
 ### Arweave
 
 - Use one forced-refresh option across payload caches and in-flight requests.
@@ -164,6 +158,10 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Preserve multiple-choice selections in generated results so options containing semicolons count correctly.
+
+- Require at least one question type before generation and explain responses with no usable questions.
+
 - Reuse cached and in-flight Arweave payloads when loading SBT metadata.
 
 - Release agent login loading after account changes and allow independent answer submissions to finish.
@@ -271,7 +269,7 @@ All notable changes to this project will be documented in this file.
 
 - Prioritize newer unanswered questions in the voice interview and personal AI-prefill prompt using the browser’s own answer state, preserving public catalog versions and fingerprints.
 
-- Add optional Group Conversation speaker labels, stored per recording chunk in the local transcript draft. Requires the matching Worker template; speaker review and claiming remain unavailable.
+- Add optional Group Conversation speaker labels, stored per recording chunk in the local transcript draft. Speaker review and claiming remain unavailable.
 
 - Keep Group Conversation and Interview screens awake where supported, and offer a remembered speaker-audio option for recording remote participants heard through the device speakers.
 
@@ -455,6 +453,8 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Return speaker-labelled transcription segments for Group Conversation recordings.
+
 - Recover lost restore handoff replies using a scoped, expiring completion receipt for the importing signer.
 
 - Return retryable interview discovery when question pointers or payloads cannot be read.
@@ -634,6 +634,8 @@ All notable changes to this project will be documented in this file.
   add-on's bundled ethers library. Release hashes include the appended notices.
 
 ### Benchmark reports
+
+- Allow completed benchmark runs at different repeat depths to share a report while preserving their seeds and strict resume checks.
 
 - Keep importance prompt fingerprints stable across host locales.
 
