@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Disconnect wagmi and persist logout intent in shared teardown, including agent logout, so stale wallet props cannot sign the participant back in.
+
 - Document phone recording limits, a dedicated powered recorder, and the revised 45-minute recovery rehearsal.
 
 - Enable Group Conversation recording with plain transcription when the speaker-label provider check takes more than two seconds.

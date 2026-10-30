@@ -384,8 +384,10 @@ invalidated, mounted views and account state reset, and the saved passkey wallet
 is disconnected. Returning to a session cannot restore authorization until a
 fresh login. This local cleanup does not revoke server tokens.
 
-MetaMask logout first disconnects wagmi and records the explicit disconnect before
-shared teardown clears account props. Passkey disconnect errors remain visible to
+Every logout, including the agent screen, starts wagmi disconnect and records
+explicit disconnect intent inside shared teardown before clearing account props.
+Both wallet hydration paths respect that intent while disconnect is pending or
+failed; a later explicit wallet connection clears it. Passkey disconnect errors remain visible to
 passkey users even after the account state has reset.
 
 Logout, deletion, and a replacing create invalidate older wallet operations.

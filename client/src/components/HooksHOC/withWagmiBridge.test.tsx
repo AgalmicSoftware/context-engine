@@ -34,6 +34,7 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
 
 jest.mock('../../utilities/web3/wagmiDisconnectState.js', () => ({
   clearUserExplicitlyDisconnected: jest.fn(),
+  wasUserExplicitlyDisconnected: jest.fn(() => false),
 }));
 
 jest.mock('../../wallet/passkeyWallet.js', () => ({

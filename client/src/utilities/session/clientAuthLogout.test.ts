@@ -1,3 +1,7 @@
+import React, { useSyncExternalStore } from 'react';
+import { act, render } from '@testing-library/react';
+import { disconnect } from 'wagmi/actions';
+import { WagmiHooksHOC } from '../../components/HooksHOC/withWagmiBridge';
 import store from '../../store';
 import { changeAccount } from '../../actions/accountActions';
 import { updateLoginInfo } from '../../actions/sessionStateActions';
@@ -26,6 +30,20 @@ import { readTokenCache, writeTokenCache } from '../worker/workerAuthTokenCache'
 import { logoutPasskeyWallet } from '../../wallet/passkeyWallet';
 
 jest.mock('../../wallet/passkeyWallet', () => ({ logoutPasskeyWallet: jest.fn(async () => {}) }));
+jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
+jest.mock('wagmi', () => ({
+  useAccount: () => ({ address: '0x1111111111111111111111111111111111111111', isDisconnected: false }),
+  useDisconnect: () => ({ disconnect: jest.fn() }),
+  useBalance: () => ({}),
+  useBlockNumber: () => ({}),
+  useNetwork: () => ({ chain: { id: 11155420 }, chains: [] }),
+  useProvider: () => ({}),
+}));
+jest.mock('../../app/runtime/walletUiRuntime.js', () => ({
+  useConnectModal: () => ({}),
+  useAccountModal: () => ({}),
+  useChainModal: () => ({}),
+}));
 
 const origin = 'https://worker.example';
 const expiry = '2035-01-01T00:00:00.000Z';
@@ -175,4 +193,46 @@ test('logout cancels pending agent pagination before any next authenticated requ
   expect(authenticatedCalls(fetchImpl)).toHaveLength(before);
   expect(mounted.state().agentQuestions).toEqual([]);
   expect(mounted.state().agentClientEnvelope).toBeNull();
+});
+
+test('agent-screen logout disconnects MetaMask once before reset and the bridge never reauthorizes its stale address', async () => {
+  localStorage.removeItem('ce:userDisconnected');
+  changeAccount({ account: envelope().address, provider: 'wagmi' })(store.dispatch);
+  updateLoginInfo({ loginComplete: true, loginInProgress: false, provider: 'wagmi' })(store.dispatch);
+  const Wrapped = WagmiHooksHOC(() => null);
+  const syncAccount = (payload: Record<string, unknown>) => changeAccount(payload)(store.dispatch);
+  const syncLogin = (payload: Record<string, unknown>) => updateLoginInfo(payload)(store.dispatch);
+  const Bridge = () => {
+    const state = useSyncExternalStore(store.subscribe, store.getState);
+    return React.createElement(Wrapped, {
+      account: state.profile.account || '',
+      provider: state.profile.provider,
+      loginComplete: state.sessionState.loginComplete,
+      changeAccount: syncAccount,
+      updateLoginInfo: syncLogin,
+    });
+  };
+  const view = render(React.createElement(Bridge));
+  const mounted = mount(jest.fn(async () => response()));
+  const dispatch = jest.spyOn(store, 'dispatch');
+  jest.mocked(disconnect).mockClear();
+  try {
+    await act(async () => {
+      mounted.actions.handleAgentLogout();
+      await settle();
+    });
+    expect(disconnect).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
+    expect(jest.mocked(disconnect).mock.invocationCallOrder[0]).toBeLessThan(dispatch.mock.invocationCallOrder[0]);
+    expect(store.getState().profile.account).toBeFalsy();
+    expect(dispatch.mock.calls.map(([action]) => action)).not.toContainEqual(
+      expect.objectContaining({
+        type: 'LOGIN_ACCOUNT',
+        payload: expect.objectContaining({ provider: 'wagmi' }),
+      }),
+    );
+  } finally {
+    view.unmount();
+    dispatch.mockRestore();
+  }
 });

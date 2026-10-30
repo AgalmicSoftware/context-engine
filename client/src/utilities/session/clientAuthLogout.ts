@@ -1,3 +1,6 @@
+import { disconnect } from 'wagmi/actions';
+import { markUserExplicitlyDisconnected } from '../web3/wagmiDisconnectState';
+import { createLogger } from '../logging';
 import store from '../../store';
 import { changeAccount } from '../../actions/accountActions';
 import { updateLoginInfo } from '../../actions/sessionStateActions';
@@ -7,7 +10,22 @@ import { clearAllAgentClientLoginEnvelopes } from './agentClientLogin';
 
 export const CLIENT_AUTH_LOGOUT_EVENT = 'ce-client-auth-logout';
 
-export const logoutClientAuth = async (): Promise<void> => {
+const accountLog = createLogger('account');
+
+export const logoutClientAuth = async ({
+  disconnectWallet = disconnect,
+}: { disconnectWallet?: () => void | Promise<void> } = {}): Promise<void> => {
+  // Mark before any reset or asynchronous disconnect: a still-connected bridge
+  // must not rehydrate the account while the wallet finishes disconnecting.
+  markUserExplicitlyDisconnected();
+  let walletDisconnected = Promise.resolve();
+  try {
+    walletDisconnected = Promise.resolve(disconnectWallet()).catch((error) => {
+      accountLog.error('wagmiDisconnect failed:', error);
+    });
+  } catch (error) {
+    accountLog.error('wagmiDisconnect failed:', error);
+  }
   clearAllWorkerSessionTokens();
   clearAllAgentClientLoginEnvelopes();
   // The wallet's disconnect invalidates pending signer operations synchronously,
@@ -20,5 +38,5 @@ export const logoutClientAuth = async (): Promise<void> => {
     changeAccount({})(store.dispatch);
     if (typeof window !== 'undefined') window.dispatchEvent(new Event(CLIENT_AUTH_LOGOUT_EVENT));
   }
-  await disconnected;
+  await Promise.all([walletDisconnected, disconnected]);
 };

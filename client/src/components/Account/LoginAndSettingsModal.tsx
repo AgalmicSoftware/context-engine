@@ -77,7 +77,7 @@ import {
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
 import type { WorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
 import { resolveActiveSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
-import { markUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
+import { wasUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
 import { notify } from '../../utilities/ui/notify.js';
 import {
   normalizeSessionScanScope,
@@ -881,20 +881,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   handleLogout = async () => {
     const { provider, wagmiDisconnect } = this.props;
-    // Teardown resets these props, so disconnect the active wallet before it runs.
-    if (provider === 'wagmi') {
-      markUserExplicitlyDisconnected();
-      try {
-        await wagmiDisconnect?.();
-      } catch (e) {
-        accountLog.error('wagmiDisconnect failed:', e);
-      }
-    }
-
     // Disconnect a saved passkey wallet on every logout, not only a passkey one,
     // so the start-up restore cannot sign the visitor back in as that account.
     try {
-      const disconnected = logoutClientAuth();
+      const disconnected = logoutClientAuth({ disconnectWallet: wagmiDisconnect });
       this.resetClientAuthState();
       await disconnected;
     } catch (error) {
@@ -2475,6 +2465,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   updateStateUponWagmiLogin = async () => {
+    if (wasUserExplicitlyDisconnected()) return;
     const wagmiAddr = (this.props.wagmiAddress || '').toLowerCase();
     const reduxAddr = (this.props.account || '').toLowerCase();
     const reduxIsWagmi = this.props.provider === 'wagmi' && this.props.loginComplete === true;

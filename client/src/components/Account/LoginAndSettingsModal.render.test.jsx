@@ -1,3 +1,4 @@
+jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import React, { act } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';

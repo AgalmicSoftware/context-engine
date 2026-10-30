@@ -5,7 +5,10 @@ import { useAccount, useBalance, useBlockNumber, useNetwork, useProvider, useDis
 import { useConnectModal, useAccountModal, useChainModal } from '../../app/runtime/walletUiRuntime.js';
 import { base, baseSepolia } from '../../variables/chains.js';
 import { getSessionNetwork } from '../../utilities/web3/chainGateway.js';
-import { clearUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
+import {
+  clearUserExplicitlyDisconnected,
+  wasUserExplicitlyDisconnected,
+} from '../../utilities/web3/wagmiDisconnectState.js';
 import { logoutPasskeyWallet } from '../../wallet/passkeyWallet.js';
 import { createLogger } from 'utilities/logging.js';
 
@@ -175,6 +178,7 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
 
         // CONNECT / REHYDRATE
         if (address) {
+          if (wasUserExplicitlyDisconnected()) return;
           const acctMatches = reduxAddrLower === addrLower;
           const alreadyWagmi = props.provider === 'wagmi' && props.loginComplete === true;
 

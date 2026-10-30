@@ -1,3 +1,4 @@
+jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import { readAgentClientLoginEnvelope, writeAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { cacheAgentClientLoginEnvelope } from '../OnePageSession/onePageSessionAgentController';
 import { ethers } from 'ethers';
@@ -846,6 +847,24 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(props.updateLoginInfo).not.toHaveBeenCalledWith(expect.objectContaining({ loginComplete: true }));
   });
 
+  it('never rehydrates a lingering wallet address after logout', async () => {
+    const props = buildProps({
+      provider: 'wagmi',
+      wagmiAddress: WAGMI_ADDRESS,
+      loginComplete: true,
+      wagmiDisconnect: jest.fn(),
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
+    props.changeAccount.mockImplementation(() => {
+      subject.props = { ...subject.props, provider: 'none', loginComplete: false };
+    });
+    await subject.handleLogout();
+    subject.state.wagmiLoginUpdateNeeded = true;
+    await subject.updateStateUponWagmiLogin();
+    expect(props.changeAccount.mock.calls).toEqual([[{}]]);
+    expect(props.updateLoginInfo).not.toHaveBeenCalledWith(expect.objectContaining({ loginComplete: true }));
+  });
+
   it('surfaces a passkey disconnect failure after teardown resets provider props', async () => {
     const failure = new Error('passkey storage unavailable');
     mockedPasskeyWallet.logoutPasskeyWallet.mockRejectedValueOnce(failure);
@@ -931,7 +950,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     }
   });
 
-  it('does not set wagmi disconnect flag when logging out passkey wallet', async () => {
+  it('also records wallet disconnect intent when logging out a passkey wallet', async () => {
     const subject = new LoginAndSettingsModalSubject(
       buildProps({
         provider: 'passkey_eoa',
@@ -942,7 +961,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     await subject.handleLogout();
 
     expect(mockedPasskeyWallet.logoutPasskeyWallet).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem('ce:userDisconnected')).toBeNull();
+    expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
   });
 
   it('clears worker tokens and notifies when passkey wallet sign-in switches passkey accounts', () => {
