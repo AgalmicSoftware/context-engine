@@ -19,6 +19,7 @@ export async function suggestTagsForQuestion(this: CreateQuestionsAndSurveys, in
     id: question.id,
     key: requestKey(question),
     prompt: String(question.prompt || ''),
+    tags: [...(question.tags || [])],
     generation: ++requestGeneration,
   };
   const requests = requestsByPage.get(this) || new Map<string, number>();
@@ -46,7 +47,10 @@ export async function suggestTagsForQuestion(this: CreateQuestionsAndSurveys, in
         questions[rowIndex] = {
           ...row,
           ...(tags && String(row.prompt || '') === owner.prompt
-            ? { aiGeneratedTagsFromSource: tags, tags: [...tags] }
+            ? {
+                aiGeneratedTagsFromSource: tags,
+                tags: [...new Set([...tags, ...(row.tags || []).filter((tag) => !owner.tags.includes(tag))])],
+              }
             : {}),
           isGeneratingTags: false,
         };

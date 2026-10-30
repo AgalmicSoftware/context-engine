@@ -1323,7 +1323,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               options: normalizeAuthoringQuestionOptions(q.type, q.options),
               singleSelect,
               currentTagInputValue: q.currentTagInputValue || '',
-              isGeneratingTags: q.isGeneratingTags || false,
+              isGeneratingTags: false,
               lockGateIds: isStandalone
                 ? normalizeGateIds(q.lockGateIds)
                 : Object.prototype.hasOwnProperty.call(q || {}, 'lockGateIds')
@@ -1395,7 +1395,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }
     if (stateToSave.questions && Array.isArray(stateToSave.questions)) {
       stateToSave.questions = stateToSave.questions.map((question) => {
-        const { uiKey, aiGeneratedTagsFromSource, ...restOfQuestion } = question;
+        const { uiKey, aiGeneratedTagsFromSource, isGeneratingTags, ...restOfQuestion } = question;
         return restOfQuestion;
       });
     }

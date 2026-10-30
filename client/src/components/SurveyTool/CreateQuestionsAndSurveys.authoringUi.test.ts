@@ -135,6 +135,33 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       expectTagSubmitEnabled(instance);
     },
   );
+  it('never stores an in-progress tag request in a draft', async () => {
+    const pending = pendingTags();
+    jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);
+    const instance = tagDraft();
+    const run = instance.suggestTagsForQuestion(0);
+    try {
+      expect(instance.state.questions[0].isGeneratingTags).toBe(true);
+      expect(JSON.parse(instance.serializeUnfinishedSurveyDraft()).questions[0]).not.toHaveProperty('isGeneratingTags');
+    } finally {
+      pending.resolve('{"tags":["generated"]}');
+      await run;
+    }
+  });
+
+  it('keeps tags entered while a tag request is pending', async () => {
+    const pending = pendingTags();
+    jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);
+    const instance = tagDraft();
+    const run = instance.suggestTagsForQuestion(0);
+    instance.handleCurrentTagInputChange(0, 'typed-while-pending');
+    instance.processTagInput(0);
+    pending.resolve('{"tags":["generated"]}');
+    await run;
+    expect(instance.state.questions[0].tags).toEqual(['generated', 'typed-while-pending']);
+    expectTagSubmitEnabled(instance);
+  });
+
   it('editing a question discards pending tags and releases its busy state', async () => {
     const pending = pendingTags();
     jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);

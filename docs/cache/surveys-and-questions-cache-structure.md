@@ -282,3 +282,7 @@ submission differences and interview review share this policy.
 Successful question or survey publication clears the unchanged saved authoring
 draft captured at submit, even if a debounced save lagged behind the submitted
 form. A newer stored draft written during publication is preserved.
+
+Authoring drafts do not persist tag-generation progress. Reloaded questions are
+ready to generate tags again. A completed generation keeps any tags manually
+added while that request was pending.
