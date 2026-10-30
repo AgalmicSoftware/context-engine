@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Separate the voice-mode modal shell and interview panel to keep client components within the release size limits.
+
 - Include catalog completeness in the interview compatibility fixture.
 
 - Complete mocked Lit provisioning checkpoints before testing atomic configuration writes.
