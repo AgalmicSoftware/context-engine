@@ -2444,6 +2444,7 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
   }
   // Use the same complete own-answer baseline as manual Submit while the
   // public listing is pending or capped; never bypass the saved-answer read.
+  const submitContext = buildSessionInterviewSubmitContextToken(engine.props);
   const result = await handlePileSubmitWithOwnAnswers(
     engine,
     new Set(questionIds.map(normalizeQuestionIdKey).filter(Boolean)),
@@ -2460,6 +2461,15 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
       status: 'failed' as const,
       message: String(engine._heldBackSubmitMessage || 'Some answers were not submitted.'),
     };
+  }
+  if (
+    engine._isMounted &&
+    result &&
+    typeof result === 'object' &&
+    result.status === 'submitted' &&
+    submitContext === buildSessionInterviewSubmitContextToken(engine.props)
+  ) {
+    engine.setState({ interviewPendingNoticeContext: engine.getSubmitCount() > 0 ? submitContext : '' });
   }
   if (result && typeof result === 'object' && 'status' in result) return result;
   if (!engine.props.loginComplete) return { status: 'login-required' as const };
@@ -3346,9 +3356,23 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             pileSubmitResponderHref,
             showSuccessBadgeStatus,
             showSubmitButton,
-            handlePileSubmitClick: () => handlePileSubmitWithOwnAnswers(engine),
+            handlePileSubmitClick: async () => {
+              const context = buildSessionInterviewSubmitContextToken(engine.props);
+              const result = await handlePileSubmitWithOwnAnswers(engine);
+              if (
+                engine._isMounted &&
+                result?.status === 'submitted' &&
+                context === buildSessionInterviewSubmitContextToken(engine.props)
+              ) {
+                engine.setState({ interviewPendingNoticeContext: '' });
+              }
+              return result;
+            },
             hasPendingPileChanges,
-            pendingAnswerCount: Number(_pileStats.total || 0),
+            pendingAnswerCount:
+              engine.state.interviewPendingNoticeContext === buildSessionInterviewSubmitContextToken(engine.props)
+                ? Number(_pileStats.total || 0)
+                : 0,
             shouldHidePileSubmitButton,
             isSubmitting: engine.state.isSubmitting,
             activePromptMasked,

@@ -528,3 +528,6 @@ same order. Live protocol fragments continue to use their timestamps. See the
 [OpenAI server-event reference](https://developers.openai.com/api/reference/resources/realtime/server-events).
 
 Labelled requests rejected with a non-transient 4xx response retry the same audio as plain transcription. Provider error codes, types and parameters nested inside the Worker’s `details.error` envelope are recognized. Network errors, 408, 429 and 5xx responses stay in the retry queue. Audio that the plain path cannot decode into smaller chunks is marked Failed and remains downloadable.
+
+
+After an interview submission leaves page answers unsaved, a notice beside the ordinary Submit button shows their count. Ordinary editing does not show this notice. Submitting the remaining page answers clears it.

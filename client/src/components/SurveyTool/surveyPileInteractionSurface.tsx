@@ -388,33 +388,35 @@ const renderPileFooterControls = ({
         <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
       </div>
     ) : showSubmitButton ? (
-      <Button
-        onClick={handlePileSubmitClick}
-        data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
-        className={buildPileSubmitButtonClassName(styles, hasPendingPileChanges, shouldHidePileSubmitButton)}
-        disabled={isSubmitting || activePromptMasked}
-      >
-        {isSubmitting ? (
-          <FontAwesomeIcon icon={faSpinner} spin />
-        ) : (
-          <span className={styles.pileSubmitButtonContent}>
-            <span className={styles.pileSubmitButtonCopy}>
-              <span className={styles.pileSubmitButtonLabel}>{finalSubmitText}</span>
-              {pendingAnswerCount > 0 && (
-                <span className={styles.pilePendingAnswerNotice} role="status">
-                  {pendingAnswerCount}{' '}
-                  {pendingAnswerCount === 1 ? "answer on the page isn't" : "answers on the page aren't"} submitted yet.
-                </span>
-              )}
+      <>
+        <Button
+          onClick={handlePileSubmitClick}
+          data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
+          className={buildPileSubmitButtonClassName(styles, hasPendingPileChanges, shouldHidePileSubmitButton)}
+          disabled={isSubmitting || activePromptMasked}
+        >
+          {isSubmitting ? (
+            <FontAwesomeIcon icon={faSpinner} spin />
+          ) : (
+            <span className={styles.pileSubmitButtonContent}>
+              <span className={styles.pileSubmitButtonCopy}>
+                <span className={styles.pileSubmitButtonLabel}>{finalSubmitText}</span>
+              </span>
+              <span className={styles.pileSubmitButtonTrail} aria-hidden="true">
+                <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+                <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+                <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+              </span>
             </span>
-            <span className={styles.pileSubmitButtonTrail} aria-hidden="true">
-              <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
-              <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
-              <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
-            </span>
+          )}
+        </Button>
+        {pendingAnswerCount > 0 && (
+          <span className={styles.pilePendingAnswerNotice} role="status">
+            {pendingAnswerCount} {pendingAnswerCount === 1 ? "answer on the page isn't" : "answers on the page aren't"}{' '}
+            submitted yet.
           </span>
         )}
-      </Button>
+      </>
     ) : null}
 
     {showClearPendingButton && (

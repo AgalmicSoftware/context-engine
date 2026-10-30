@@ -448,7 +448,9 @@ describe('surveyPileInteractionSurface', () => {
 
   it('counts pending page answers beside their submit action', () => {
     const { rerender } = render(renderPileInteractionSurface({ ...buildBaseProps(), pendingAnswerCount: 2 }));
-    expect(screen.getByText("2 answers on the page aren't submitted yet.")).toHaveAttribute('role', 'status');
+    const notice = screen.getByText("2 answers on the page aren't submitted yet.");
+    expect(notice).toHaveAttribute('role', 'status');
+    expect(notice.closest('button')).toBeNull();
     rerender(renderPileInteractionSurface({ ...buildBaseProps(), pendingAnswerCount: 0 }));
     expect(screen.queryByText(/answers on the page/)).not.toBeInTheDocument();
   });

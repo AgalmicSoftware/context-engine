@@ -164,6 +164,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Show the pending-page-answer notice beside Submit only after an interview submission leaves answers unsaved. Clear it after ordinary submission.
+
 - Keep previous publication IDs and cache-hydration status out of saved authoring drafts.
 
 - Preserve internal option spacing through the live Results controller so Breakdown counts match stored selections.

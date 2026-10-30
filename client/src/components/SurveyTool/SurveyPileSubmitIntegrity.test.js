@@ -1253,6 +1253,7 @@ it.each([
     await act(async () => h.engine().handleAnswerPile(BINARY_QID, 'Yes'));
     if (otherDraft) await act(async () => h.engine().handleAnswerPile(FREEFORM_QID, 'Unselected manual draft'));
     await settle();
+    expect(screen.queryByText(/answers? on the page .*submitted yet/)).not.toBeInTheDocument();
     const untouched = JSON.parse(JSON.stringify(h.engine().state.surveysResponseState[0].answers[FREEFORM_QID]));
     if (interview)
       expect(await run(() => submitSessionInterviewResponses(h.engine(), [BINARY_QID]))).toEqual({
@@ -1269,6 +1270,14 @@ it.each([
       expect(h.engine().state.surveysResponseState[0].answers[FREEFORM_QID]).toEqual(untouched);
       expect(draftHolds(FREEFORM_QID)).toBe(true);
       expect(Array.from(h.engine().getChangedQidsAndFields(0).changedQids)).toEqual([FREEFORM_QID]);
+      const notice = screen.getByText("1 answer on the page isn't submitted yet.");
+      expect(notice.closest('button')).toBeNull();
+      await h.click();
+      await settle();
+      expect(screen.queryByText(/answer on the page/)).not.toBeInTheDocument();
+      await act(async () => h.engine().handleAnswerPile(FREEFORM_QID, 'New ordinary edit'));
+      await settle();
+      expect(screen.queryByText(/answer on the page/)).not.toBeInTheDocument();
     }
   },
 );
