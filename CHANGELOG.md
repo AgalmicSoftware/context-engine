@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep General-session question bookmarks, result links, and copied URLs pinned to General even when another session is selected.
+
 - Preserve the latest SBT image choice and saved bytes when an earlier image request finishes late.
 
 - Count Community groups by chain and contract address, while counting the same contract across session caches only once.

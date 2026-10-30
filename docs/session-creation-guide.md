@@ -1258,6 +1258,14 @@ so a host-only URL and the same URL with a trailing slash reuse the saved Group.
 
 The wizard restores custom allowed origins from its tab-scoped draft after reload, including an explicitly empty field. Drafts without a saved origins field use the normal defaults.
 
+### Sharing questions
+
+Question links preserve their source session: `?session=general` pins General,
+and `?session=<session-slug>` pins a named session. Bookmarks, result links, and
+copied question URLs retain that pin even when another session is selected.
+A question URL without a session hint still discovers its session from the
+available caches and then records the resolved session in the URL.
+
 ### Exploring group tags
 
 Click a tag in a session’s SBT or worker-group details to open the tag explorer

@@ -1,3 +1,4 @@
+import { buildQuestionBookmarkHref } from '../Bookmarks/BookmarksPage';
 import React from 'react';
 import fs from 'fs';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -3325,6 +3326,58 @@ describe('AppShell route render smoke', () => {
     expect(subject._registryBootstrapPromise).toBeNull();
     expect(subject._registryBootstrapScopeKey).toBe('');
   });
+
+  it.each([
+    ['General bookmark', '', 'general'],
+    ['named bookmark', 'edge', 'edge'],
+    ['explicit General link', '', 'general'],
+    ['discovery link', 'beta', 'beta'],
+  ])(
+    'opens a %s with Beta selected and preserves its resolved session when copied',
+    async (source, expectedSlug, expectedQuery) => {
+      const questionId = `0x${'aa'.repeat(32)}`;
+      const href =
+        source === 'explicit General link'
+          ? `/question/${questionId}?session=general`
+          : source === 'discovery link'
+            ? `/question/${questionId}`
+            : buildQuestionBookmarkHref({ id: questionId, sessionSlug: expectedSlug });
+      const config = buildSessionConfig({ slug: expectedSlug, sessionName: expectedQuery });
+      const open = (link) => {
+        const url = new URL(link, window.location.origin);
+        const subject = createSubject({
+          path: url.pathname,
+          search: url.search,
+          activeSessionSlug: 'beta',
+          sessionConfig: config,
+        });
+        subject.findGroupSlugForQuestion = jest.fn(() => 'beta');
+        subject.getDisplaySessionCfg = jest.fn((slug) =>
+          slug === expectedSlug ? config : buildSessionConfig({ slug }),
+        );
+        return subject;
+      };
+      const subject = open(href);
+      const view = render(subject.render());
+      await screen.findByTestId('mock-survey-tool');
+      expect(mockSurveyTool.mock.calls.at(-1)[0]).toEqual(
+        expect.objectContaining({ sessionSlug: expectedSlug, sessionConfig: config }),
+      );
+      expect(window.location.search).toBe(`?session=${expectedQuery}`);
+      if (source === 'discovery link') expect(subject.findGroupSlugForQuestion).toHaveBeenCalledWith(questionId);
+      else expect(subject.findGroupSlugForQuestion).not.toHaveBeenCalled();
+      const copied = window.location.href;
+      view.unmount();
+      const reopened = open(copied);
+      render(reopened.render());
+      await screen.findByTestId('mock-survey-tool');
+      expect(mockSurveyTool.mock.calls.at(-1)[0]).toEqual(
+        expect.objectContaining({ sessionSlug: expectedSlug, sessionConfig: config, sessionSlugPinned: true }),
+      );
+      expect(reopened.findGroupSlugForQuestion).not.toHaveBeenCalled();
+      expect(window.location.search).toBe(`?session=${expectedQuery}`);
+    },
+  );
 
   it('keeps an exact pure Worker question route free of registry and wallet-chain context', async () => {
     const questionId = `0x${'12'.repeat(32)}`;

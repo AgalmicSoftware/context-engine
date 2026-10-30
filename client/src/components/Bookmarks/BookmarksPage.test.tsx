@@ -106,7 +106,9 @@ describe('BookmarksPage cache scan helpers', () => {
       expect(buildSurveyBookmarkHref({ id: '0xabc', sessionSlug: 'edge' })).toBe('/survey/0xabc?session=edge');
       expect(buildSurveyBookmarkHref({ id: '0xabc', sessionSlug: 'general' })).toBe('/survey/0xabc');
       expect(buildQuestionBookmarkHref({ id: '0xdef', sessionSlug: 'edge' })).toBe('/question/0xdef?session=edge');
-      expect(buildQuestionBookmarkHref({ id: '0xdef', sessionSlug: 'general' })).toBe('/question/0xdef');
+      expect(buildQuestionBookmarkHref({ id: '0xdef', sessionSlug: 'general' })).toBe(
+        '/question/0xdef?session=general',
+      );
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
