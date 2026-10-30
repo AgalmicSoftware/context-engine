@@ -474,6 +474,7 @@ describe('sessionCorsWorker admin routes', () => {
   it('ignores malformed set-config limits and scopes branches instead of corrupting stored config', async () => {
     const existingConfig = {
       adminAddress: adminWallet.address,
+      authzEpoch: 7,
       sessionName: 'Existing Session',
       limits: {
         perWalletPerDay: 3,
@@ -509,7 +510,7 @@ describe('sessionCorsWorker admin routes', () => {
     expect(response.status).toBe(200);
     expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual({
       adminAddress: adminWallet.address,
-      authzEpoch: 1,
+      authzEpoch: 7,
       sessionName: 'Updated Session',
       limits: {
         perWalletPerDay: 3,

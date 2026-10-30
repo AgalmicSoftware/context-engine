@@ -459,7 +459,7 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
-- Keep web and agent sessions signed in across content-only settings edits, including wizard verification, while revoking authorization for authority changes.
+- Keep web and agent sessions signed in across effective content-only settings edits, including wizard verification, while revoking authorization for authority changes.
 
 - Return speaker-labelled transcription segments for Group Conversation recordings.
 

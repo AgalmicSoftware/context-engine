@@ -2426,6 +2426,7 @@ Never return secrets in responses.
   an existing invite revokes authorization. Other fields, including permissions,
   gates, groups, surfaces, visibility, encryption, origins and unknown settings,
   remain authority-sensitive. A mixed content/authority edit raises `authzEpoch`.
+  Classification compares the normalized configuration that will be stored.
   Config revision and optimistic-write checks still cover every effective edit.
 
 - `pileAutoAdvanceEnabled` is an optional boolean controlling question pile
