@@ -621,6 +621,34 @@ export const validateImportanceRuns = (file, {
   return errors;
 };
 
+const importancePromptBinding = (file, run, questionBank) => {
+  const orderedQuestionBank = orderImportanceQuestionBank({
+    questionBank, modelId: run.modelId, repeatIndex: run.repeatIndex,
+  });
+  const prompt = buildImportancePrompt({
+    questionBank: orderedQuestionBank,
+    budget: Number(file.budget),
+    maxAllocations: Number(file.maxAllocations),
+    maxVotesPerQuestion: Number(file.maxVotesPerQuestion),
+  });
+  return {
+    promptHash: sha256(prompt),
+    questionOrderHash: hashJson(orderedQuestionBank.questions.map(question => question.id)),
+  };
+};
+
+export const validateImportancePromptBindings = (file, { questionBank } = {}) => {
+  const errors = [];
+  (file.runs || []).forEach((run, index) => {
+    const expected = importancePromptBinding(file, run, questionBank);
+    if (run.promptHash !== expected.promptHash) errors.push(`runs[${index}].promptHash does not match the current prompt`);
+    if (run.questionOrderHash !== expected.questionOrderHash) {
+      errors.push(`runs[${index}].questionOrderHash does not match the deterministic question order`);
+    }
+  });
+  return errors;
+};
+
 export const validateReleaseImportanceFile = (file, {
   questionBank,
   modelRoster,
@@ -707,6 +735,7 @@ export const validateReleaseImportanceFile = (file, {
   if (Number(manifest.completedRuns) !== expectedRuns || (file.runs || []).length !== expectedRuns) {
     errors.push('release importance runs must be complete');
   }
+  errors.push(...validateImportancePromptBindings(file, { questionBank }));
   const expectedPromptRows = [];
   (file.runs || []).forEach((run, index) => {
     const model = manifestModelsById.get(run.modelId);
@@ -714,27 +743,13 @@ export const validateReleaseImportanceFile = (file, {
       errors.push(`runs[${index}].modelId is absent from manifest.models`);
       return;
     }
-    const orderedQuestionBank = orderImportanceQuestionBank({
-      questionBank,
-      modelId: run.modelId,
-      repeatIndex: run.repeatIndex,
-    });
-    const prompt = buildImportancePrompt({
-      questionBank: orderedQuestionBank,
-      budget: Number(file.budget),
-      maxAllocations: Number(file.maxAllocations),
-      maxVotesPerQuestion: Number(file.maxVotesPerQuestion),
-    });
+    const binding = importancePromptBinding(file, run, questionBank);
     const expectedRunId = buildImportanceRunId({
       benchmarkId: questionBank.benchmarkId,
       modelId: run.modelId,
       repeatIndex: run.repeatIndex,
     });
     if (run.runId !== expectedRunId) errors.push(`runs[${index}].runId does not match its run coordinates`);
-    if (run.promptHash !== sha256(prompt)) errors.push(`runs[${index}].promptHash does not match the current prompt`);
-    if (run.questionOrderHash !== hashJson(orderedQuestionBank.questions.map((question) => question.id))) {
-      errors.push(`runs[${index}].questionOrderHash does not match the deterministic question order`);
-    }
     if (run.error || run.parseError) errors.push(`runs[${index}] must be valid for release`);
     if (run.model !== model.model || run.provider !== model.provider) {
       errors.push(`runs[${index}] model/provider does not match manifest.models`);
@@ -753,7 +768,7 @@ export const validateReleaseImportanceFile = (file, {
       errors.push(`runs[${index}].modelProvenance does not match manifest.models`);
     }
     errors.push(...responseIdentityErrors(run, model, index));
-    expectedPromptRows.push({ modelId: run.modelId, repeatIndex: run.repeatIndex, runId: run.runId, promptHash: sha256(prompt) });
+    expectedPromptRows.push({ modelId: run.modelId, repeatIndex: run.repeatIndex, runId: run.runId, promptHash: binding.promptHash });
   });
   errors.push(...deploymentIdentityErrors(file.runs || []));
   const expectedManifestPromptHash = expectedPromptRows.length === 1

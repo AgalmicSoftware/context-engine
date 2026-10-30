@@ -733,3 +733,8 @@ Every preview and release report checks each run's prompt hash against the
 selected question wording, polarity, mode and recorded persona. Missing or
 mismatched hashes stop the build and name the question; rerun it or restore the
 matching bank. Preview coverage may still be incomplete.
+
+Importance allocations also require matching prompt and question-order hashes in
+preview builds. These checks use the complete selected bank before any
+`--limit-questions` display restriction, so edits outside that subset still
+require new importance runs.

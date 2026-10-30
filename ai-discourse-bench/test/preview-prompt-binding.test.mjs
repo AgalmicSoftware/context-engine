@@ -8,6 +8,40 @@ import test from 'node:test';
 import { validateReleaseRunFile } from '../src/schema.mjs';
 
 const cli = fileURLToPath(new URL('../bin/ai-discourse-bench.mjs', import.meta.url));
+test('preview importance stays bound to the full bank before display limits', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aidb-preview-importance-'));
+  try {
+    const sample = JSON.parse(await fs.readFile(new URL('../data/question-bank.sample.json', import.meta.url), 'utf8'));
+    const bank = { ...sample, questions: structuredClone(sample.questions.slice(0, 2)) };
+    const models = { models: [{ id: 'fixture', label: 'Fixture model', model: 'fixture', provider: 'mock', traits: {} }] };
+    const write = (name, value) => fs.writeFile(path.join(root, name), JSON.stringify(value));
+    const invoke = (...args) => execFileSync(process.execPath, [cli, ...args], { cwd: root, stdio: 'pipe' });
+    await write('bank.json', bank);
+    await write('models.json', models);
+    invoke('run', '--questions', 'bank.json', '--models', 'models.json', '--provider', 'mock', '--repeats', '1', '--limit-questions', '1', '--out', 'runs.json');
+    invoke('run-importance', '--questions', 'bank.json', '--models', 'models.json', '--provider', 'mock', '--repeats', '1', '--out', 'importance.json');
+    const args = ['build-report', '--questions', 'bank.json', '--models', 'models.json', '--runs', 'runs.json', '--importance', 'importance.json', '--limit-questions', '1', '--out', 'report.json'];
+    bank.questions[1].canonicalPrompt += ' Changed wording outside the displayed subset.';
+    await write('bank.json', bank);
+    const fullArgs = args.filter((arg, index) => arg !== '--limit-questions' && args[index - 1] !== '--limit-questions');
+    const fullMismatch = spawnSync(process.execPath, [cli, ...fullArgs], { cwd: root, encoding: 'utf8' });
+    assert.notEqual(fullMismatch.status, 0);
+    assert.match(fullMismatch.stderr, /promptHash.*current prompt/);
+    const mismatch = spawnSync(process.execPath, [cli, ...args], { cwd: root, encoding: 'utf8' });
+    assert.notEqual(mismatch.status, 0);
+    assert.match(mismatch.stderr, /promptHash.*current prompt/);
+    bank.questions[1].canonicalPrompt = sample.questions[1].canonicalPrompt;
+    await write('bank.json', bank);
+    invoke(...args);
+    const importance = JSON.parse(await fs.readFile(path.join(root, 'importance.json'), 'utf8'));
+    importance.runs[0].questionOrderHash = 'wrong-order';
+    await write('importance.json', importance);
+    const orderMismatch = spawnSync(process.execPath, [cli, ...args], { cwd: root, encoding: 'utf8' });
+    assert.notEqual(orderMismatch.status, 0);
+    assert.match(orderMismatch.stderr, /questionOrderHash/);
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});
+
 test('preview and export keep answers bound to the wording asked by run', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aidb-preview-wording-'));
   try {

@@ -42,6 +42,7 @@ import { runBenchmark } from './runner.mjs';
 import {
   runImportanceBenchmark,
   validateImportanceRuns,
+  validateImportancePromptBindings,
   validateReleaseImportanceFile,
 } from './importance.mjs';
 import { buildResultsReport } from './scoring.mjs';
@@ -103,10 +104,8 @@ const parsePositiveInt = (value, fallback, label) => {
 const readInputs = async (args, { personasOptional = true } = {}) => {
   if (!args.questions) throw new Error(`Missing --questions\n${usage}`);
   if (!args.models) throw new Error(`Missing --models\n${usage}`);
-  const questionBank = limitQuestionBank(
-    await readJsonFile(args.questions),
-    args['limit-questions'] || 0
-  );
+  const fullQuestionBank = await readJsonFile(args.questions);
+  const questionBank = limitQuestionBank(fullQuestionBank, args['limit-questions'] || 0);
   const modelPaths = parseInputFileList(args.models);
   const modelRosters = await Promise.all(modelPaths.map((modelPath) => readJsonFile(modelPath)));
   modelRosters.forEach((modelRoster, index) => {
@@ -123,7 +122,7 @@ const readInputs = async (args, { personasOptional = true } = {}) => {
     throwIfErrors('personas', validatePersonas(personasFile));
   }
 
-  return { questionBank, modelRoster, personasFile };
+  return { questionBank, fullQuestionBank, modelRoster, personasFile };
 };
 
 const commandValidate = async (args) => {
@@ -320,7 +319,7 @@ const commandBuildReport = async (args) => {
   if (args.release && args['limit-questions']) {
     throw new Error('--release cannot be combined with --limit-questions');
   }
-  const { questionBank, modelRoster } = await readInputs(args);
+  const { questionBank, fullQuestionBank, modelRoster } = await readInputs(args);
   const runPaths = parseInputFileList(args.runs);
   const runsFiles = await Promise.all(runPaths.map((runPath) => readJsonFile(runPath)));
   if (args.release) {
@@ -374,10 +373,13 @@ const commandBuildReport = async (args) => {
         }));
       });
     }
+    importanceFiles.forEach((file, index) => {
+      throwIfErrors(`importance file ${importancePaths[index]}`, validateImportancePromptBindings(file, { questionBank: fullQuestionBank }));
+    });
     importanceFile = mergeImportanceRunFiles(importanceFiles);
     throwIfErrors('importance runs', validateImportanceRuns(importanceFile, {
       modelIds: new Set(modelRoster.models.map((model) => model.id)),
-      questionIds: new Set(questionBank.questions.map((question) => question.id)),
+      questionIds: new Set(fullQuestionBank.questions.map((question) => question.id)),
       benchmarkId: questionBank.benchmarkId,
     }));
   }
