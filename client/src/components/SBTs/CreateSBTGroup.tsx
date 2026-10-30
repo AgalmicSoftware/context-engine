@@ -2217,7 +2217,6 @@ class CreateSBTGroup extends Component<any, any> {
     file: Blob | null | undefined,
     { useImageUrl = false, statusText = '', statusTone = 'default' }: ApplySelectedImageFileOptions = {},
   ): boolean => {
-    this.invalidateImageSelection();
     if (file && file.size > 10 * 1024 * 1024) {
       sbtLog.error('Image too large (>10MB)');
       if (statusText) {
@@ -2230,6 +2229,7 @@ class CreateSBTGroup extends Component<any, any> {
       }
       return false;
     }
+    this.invalidateImageSelection();
     this.resetFormStateForEdit();
     this.setState(
       buildCreateSbtSelectedImageFilePatch({
@@ -2255,7 +2255,7 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   handlePasteImage = async (): Promise<void> => {
-    const imageGeneration = this.invalidateImageSelection();
+    const imageGeneration = this._imageSelectionGeneration;
     const clipboardResult = await readCompactImageClipboard({
       fileNamePrefix: 'clipboard-sbt-image',
     });
@@ -2299,6 +2299,7 @@ class CreateSBTGroup extends Component<any, any> {
       try {
         const file = await this.fetchSelectedImage(fetchableUrl);
         if (imageGeneration !== this._imageSelectionGeneration) return;
+        this.invalidateImageSelection();
         this.resetFormStateForEdit();
         await this.setStateAsync(
           buildCreateSbtSelectedImageFilePatch({

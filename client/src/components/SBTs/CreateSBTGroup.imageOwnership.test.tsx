@@ -152,6 +152,37 @@ describe('the newest SBT image choice owns the preview and saved bytes', () => {
     expect(form.state.sbtImageFile).toBe(local);
   });
 
+  it.each(['empty', 'unsupported text', 'oversized file', 'failed URL'] as const)(
+    'keeps an in-flight image when a paste supplies %s',
+    async (kind) => {
+      const form = makeForm();
+      const request = pendingImage();
+      mockFetchImageFromURL.mockReturnValueOnce(request.promise);
+      startUrl(form);
+      const signal = mockFetchImageFromURL.mock.calls[0]?.[1]?.signal;
+      const oversized = localFile();
+      Object.defineProperty(oversized, 'size', { value: 11 * 1024 * 1024 });
+      jest.mocked(readCompactImageClipboard).mockResolvedValue(
+        kind === 'oversized file'
+          ? { kind: 'file', file: oversized }
+          : kind === 'empty'
+            ? { error: 'No image available.' }
+            : {
+                kind: 'text',
+                text: kind === 'failed URL' ? 'https://image.example.test/missing.png' : 'ordinary text',
+              },
+      );
+      if (kind === 'failed URL') mockFetchImageFromURL.mockRejectedValueOnce(new Error('Unavailable'));
+      await form.handlePasteImage();
+      expect(signal?.aborted).toBe(false);
+      const remote = remoteFile();
+      await act(async () => {
+        request.resolve(remote);
+      });
+      expect(form.state.sbtImageFile).toBe(remote);
+    },
+  );
+
   it('still saves the current image when a paste does not supply a replacement', async () => {
     const form = makeForm();
     form.applySelectedImageFile(localFile());

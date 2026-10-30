@@ -567,3 +567,5 @@ Demo comparison cards count distinct personas separately from modeled responses.
 Breakdown provides a labeled Question selector independently of demographic comparisons and opens the first question with response distributions. Sessions without segments show overall distributions; segment controls and comparison reports appear only when segment data exists. The selector uses document-surface contrast tokens and a visible keyboard focus outline. Standalone benchmark reports expose the same question control alongside model cohort filters.
 
 Question generation requires at least one selected type. With no type selected, Generate is disabled and explains how to continue. A response containing no usable questions shows an actionable message and keeps the current draft.
+
+The SBT image picker preserves an in-flight selection when Paste is empty, unsupported, oversized, or fails to fetch. A usable pasted image replaces it only when applied.

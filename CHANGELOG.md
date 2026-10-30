@@ -164,6 +164,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Preserve an in-flight SBT image when pasting supplies no usable replacement; only an applied image supersedes it.
+
 - Keep bare question URLs unpinned until their session is explicit or found in cache, so General fallback cannot become permanent.
 
 - Recheck invalid Arweave metadata after the terminal cooldown so a temporary gateway error cannot hide SBT metadata permanently.
