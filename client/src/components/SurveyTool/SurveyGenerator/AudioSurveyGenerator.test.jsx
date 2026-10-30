@@ -418,6 +418,10 @@ describe('AudioSurveyGenerator input and question generation', () => {
       ...(includePdf ? [new File(['PDF_BINARY_MARKER'], 'memo.pdf', { type: 'application/pdf' })] : []),
       new File([text], 'notes.txt', { type: 'text/plain' }),
     ]);
+    if (includePdf) {
+      expect(container.textContent).toContain('memo.pdf');
+      expect(container.textContent).toContain('Skipped');
+    }
     await act(async () => {
       container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -425,10 +429,8 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     expect(mockCallAI.mock.calls[0][0]).toContain(text);
     expect(mockCallAI.mock.calls[0][0]).not.toMatch(/PDF_BINARY_MARKER|memo.pdf|not currently supported/);
-    if (includePdf) {
-      expect(container.textContent).toContain('memo.pdf');
-      expect(container.textContent).toContain('Skipped');
-    }
+    expect(container.textContent).not.toContain('memo.pdf');
+    expect(container.textContent).not.toContain('Skipped');
   });
 
   it('does not count source headings toward minimum extracted text', async () => {

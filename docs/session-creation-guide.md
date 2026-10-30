@@ -1243,7 +1243,8 @@ models and local overrides remain available; bundled demo defaults use Terra.
 
 Hosted Worker verification writes and reads back the prepared public configuration
 without finalizing publication. You can edit and verify again; Publish creates
-the final publication revision. Edits replace what an earlier verification
+the final publication revision. Verifying an edited session description preserves
+existing sign-ins; authority changes still revoke them. Edits replace what an earlier verification
 stored: a blank end time is sent as `""` and blank request limits as `null`,
 so a cleared value does not stay on the Worker. The browser compares the shared
 public fields, including session appearance and the Worker URL's origin. It
