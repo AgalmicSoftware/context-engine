@@ -164,6 +164,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Recheck invalid Arweave metadata after the terminal cooldown so a temporary gateway error cannot hide SBT metadata permanently.
+
 - Omit imported facts tied only to hidden drafts from voice interview context, including copied context text.
 
 - Give hidden-draft help an accessible description and keep its tooltip open while hovered.

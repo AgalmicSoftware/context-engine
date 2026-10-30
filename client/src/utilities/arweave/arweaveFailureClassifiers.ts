@@ -170,7 +170,7 @@ export const classifyArweaveFailureState = ({
   let nextRetryAtMs = 0;
   if (state === 'transient') {
     nextRetryAtMs = Math.max(now + computedBackoff, Number.isFinite(externalNextRetryAt) ? externalNextRetryAt : 0);
-  } else if (state === 'terminal_not_found') {
+  } else if (isTerminalArweaveFailureState(state)) {
     nextRetryAtMs = Math.max(
       now + ARWEAVE_TX_FAILURE_TERMINAL_RECHECK_MS,
       Number.isFinite(externalNextRetryAt) ? externalNextRetryAt : 0,

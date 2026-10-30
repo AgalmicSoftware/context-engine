@@ -123,3 +123,22 @@ test('a forced refresh does not read unavailable persistent caches', async () =>
   ).toBe('{"fresh":true}');
   expect(unavailable).not.toHaveBeenCalled();
 });
+
+test('a gateway invalid failure can recover after its bounded terminal recheck', async () => {
+  const now = Date.now();
+  const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+  global.fetch
+    .mockResolvedValueOnce(response('Gateway unavailable', 522))
+    .mockResolvedValue(response('{"recovered":true}'));
+  try {
+    await expect(read('terminal-recovery')).rejects.toThrow();
+    await expect(read('terminal-recovery')).rejects.toThrow();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    clock.mockReturnValue(now + 30 * 60 * 1000 + 1);
+    expect(await read('terminal-recovery')).toBe('{"recovered":true}');
+    expect(await read('terminal-recovery')).toBe('{"recovered":true}');
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  } finally {
+    clock.mockRestore();
+  }
+});

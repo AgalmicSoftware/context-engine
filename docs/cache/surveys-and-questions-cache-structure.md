@@ -286,3 +286,5 @@ form. A newer stored draft written during publication is preserved.
 Authoring drafts do not persist tag-generation progress, previous publication IDs, or cache-hydration status. Reloaded questions are
 ready to generate tags again. A completed generation keeps any tags manually
 added while that request was pending.
+
+Terminal invalid Arweave responses have the same bounded 30-minute recheck as terminal missing responses. A later ordinary metadata read can recover, including SBT names and images; successful payload caching and concurrent read reuse remain enabled.

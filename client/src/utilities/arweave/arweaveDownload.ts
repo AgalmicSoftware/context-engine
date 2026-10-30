@@ -150,8 +150,8 @@ export function createArweaveDownloadOps({
         if (!cacheBypass && failureEntry && isTerminalArweaveFailureState(failureEntry.state)) {
           const terminalState = String(failureEntry.state || '');
           const terminalRetryAtMs = Number(failureEntry.nextRetryAtMs || 0);
-          const isNotFoundTerminal = terminalState === 'terminal_not_found';
-          const shouldSkipTerminal = !isNotFoundTerminal || terminalRetryAtMs > now;
+          // Gateway errors describe a response, so every terminal classification has a recheck time.
+          const shouldSkipTerminal = terminalRetryAtMs > now;
           if (!shouldSkipTerminal) {
             contractsLog.debug('[arweave-cache] tx-failure-terminal-recheck', {
               txId: normalizedTxId,

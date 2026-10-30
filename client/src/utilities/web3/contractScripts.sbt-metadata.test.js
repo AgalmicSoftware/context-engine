@@ -73,6 +73,30 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     } catch (_) {}
   });
 
+  it('rechecks failed SBT metadata after the terminal cooldown and caches recovery', async () => {
+    const clock = jest.spyOn(Date, 'now');
+    const start = Date.now();
+    clock.mockReturnValue(start);
+    const stub = baseContractStub('EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE');
+    contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
+    arweaveSpy = jest
+      .spyOn(arweaveClient, 'downloadDataFromArweave')
+      .mockRejectedValueOnce(Object.assign(new Error('Gateway unavailable'), { status: 522, retryable: false }))
+      .mockResolvedValue(JSON.stringify({ name: 'Recovered metadata' }));
+    const config = { slug: 'sbt-recovery-fixture', networkChainId: 11155420, contracts: {} };
+    try {
+      expect((await contractScripts.getSbtMetadata('none', sbtAddress, config)).name).toBe('Metadata Test SBT');
+      expect((await contractScripts.getSbtMetadata('none', sbtAddress, config)).name).toBe('Metadata Test SBT');
+      expect(arweaveSpy).toHaveBeenCalledTimes(1);
+      clock.mockReturnValue(start + 30 * 60 * 1000 + 1);
+      expect((await contractScripts.getSbtMetadata('none', sbtAddress, config)).name).toBe('Recovered metadata');
+      expect((await contractScripts.getSbtMetadata('none', sbtAddress, config)).name).toBe('Recovered metadata');
+      expect(arweaveSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it('shares concurrent metadata downloads and reuses their successful payload', async () => {
     const stub = baseContractStub('DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD');
     contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
