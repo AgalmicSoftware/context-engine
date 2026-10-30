@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom';
 import { TextDecoder, TextEncoder } from 'util';
 
+// Component suites share the external wallet boundary; auth tests can override it.
+jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
+
 jest.mock('react-dom/test-utils', () => {
   const React = jest.requireActual('react');
   const testUtils = jest.requireActual('react-dom/test-utils');
