@@ -1962,8 +1962,9 @@ Runtime:
     profiles, but the default worker-canonical config omits them.
   - Worker KV config is normalized on read/write:
     - `authzEpoch` is server-managed. New deployments start at `1`; effective
-      signed `set-config` writes increment it, while rejected and idempotent
-      writes do not. Callers cannot set it directly.
+      signed `set-config` authority changes increment it; content-only, rejected
+      and idempotent writes do not. Every effective write still increments the
+      coordinator config revision. Callers cannot set it directly.
     - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array. New config mutations reject `*` and wildcard hosts because runtime CORS matching requires exact origins.
     - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist). The `/new` native verification path refuses an empty list for new or attached Workers so clearing the field cannot accidentally publish an unrestricted CORS policy.
     - `limits.perWalletPerDay` remains the authenticated per-wallet daily route budget and the legacy anonymous fallback. `limits.perAnonymousIpPerDay` is an optional anonymous-only daily IP budget for the public anonymous route surface (`/ai`, `/transcribe`, `/realtime/call`, `/storage/read`, `/storage/list`, `/groups/list`, `/interview/starter`, `/agent/interview-brief`, and `/agent/interview-catalog`): omitted keeps the legacy `perWalletPerDay` fallback, `0` explicitly makes those anonymous route buckets unlimited, and a positive integer enforces that per-session/per-route anonymous identity budget. Malformed values fall back to `perWalletPerDay` rather than disabling limits. In native Cloudflare requests, IPv6 addresses within one /64 share an anonymous identity and IPv4-mapped addresses use their IPv4 identity, matching nonce throttling.
@@ -2416,6 +2417,16 @@ token):
 Never return secrets in responses.
 
 `/admin/set-config` notes:
+
+- Content-only edits keep web and agent sessions signed in: `sessionName`,
+  `sessionInfo`, `sessionContext`, `questionsGenPrompt`, `appearance`,
+  `sessionHeaderImg`, and `interviewMode.openingPrompt` / `steeringPrompt`.
+  Adding unique `agentHttp.invites` also preserves authorization when all prior
+  invite records remain unchanged. Removing, disabling, re-enabling or editing
+  an existing invite revokes authorization. Other fields, including permissions,
+  gates, groups, surfaces, visibility, encryption, origins and unknown settings,
+  remain authority-sensitive. A mixed content/authority edit raises `authzEpoch`.
+  Config revision and optimistic-write checks still cover every effective edit.
 
 - `pileAutoAdvanceEnabled` is an optional boolean controlling question pile
   navigation. Both `true` and `false` survive deployment, config patches, and

@@ -1,3 +1,4 @@
+import { sessionConfigRequiresReauthorization } from './sessionConfigAuthorization.js';
 import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from '../../shared/interviewSettings.mjs';
 import { normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
@@ -471,6 +472,8 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   if (nextEpoch === null) {
     return { ok: false, status: 409, error: 'Authorization epoch is invalid.' };
   }
+  if (Object.keys(authorityExisting).length &&
+      !sessionConfigRequiresReauthorization(comparisonExisting, publicationWrite.config)) return publicationWrite;
   return {
     ...publicationWrite,
     config: {

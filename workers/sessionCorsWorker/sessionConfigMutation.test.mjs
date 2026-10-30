@@ -716,7 +716,7 @@ test('set-config preserves an identical server-managed Worker Group bootstrap ma
   });
 
   assert.equal(result.ok, true);
-  assert.equal(result.config.authzEpoch, 4);
+  assert.equal(result.config.authzEpoch, 3);
   assert.equal(result.config.sessionName, 'Renamed Session');
   assert.deepEqual(result.config.workerGroupsBootstrap, workerGroupsBootstrap);
 });

@@ -25410,8 +25410,8 @@ var init_storageRefNormalization = __esm({
         resource: opts.resource
       }, opts);
     };
-    resolvePayloadStorageRef = (record3, opts = {}) => {
-      const raw = isObj(record3) ? record3 : {};
+    resolvePayloadStorageRef = (record4, opts = {}) => {
+      const raw = isObj(record4) ? record4 : {};
       const ref = raw.storageRef ? normalizeStorageRef(raw.storageRef, {
         ...opts,
         legacyArweaveTxId: raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId
@@ -25426,17 +25426,17 @@ var init_storageRefNormalization = __esm({
         resource: raw.resource || opts.resource
       });
     };
-    getLegacyArweaveTxId = (record3, opts = {}) => {
-      if (!isObj(record3)) return trim(record3);
-      const storageRef = record3.storageRef ? normalizeStorageRef(record3.storageRef, {
+    getLegacyArweaveTxId = (record4, opts = {}) => {
+      if (!isObj(record4)) return trim(record4);
+      const storageRef = record4.storageRef ? normalizeStorageRef(record4.storageRef, {
         ...opts,
-        legacyArweaveTxId: record3.arweaveTxId || record3.txId || opts.legacyArweaveTxId
+        legacyArweaveTxId: record4.arweaveTxId || record4.txId || opts.legacyArweaveTxId
       }) : null;
       if (storageRef) return isArweaveStorageBackend(storageRef.backend) ? storageRef.id : "";
-      return trim(record3.arweaveTxId || record3.txId || opts.legacyArweaveTxId);
+      return trim(record4.arweaveTxId || record4.txId || opts.legacyArweaveTxId);
     };
-    attachStorageRefCompatibilityFields = (record3, opts = {}) => {
-      const source = isObj(record3) ? { ...record3 } : {};
+    attachStorageRefCompatibilityFields = (record4, opts = {}) => {
+      const source = isObj(record4) ? { ...record4 } : {};
       const storageRef = resolvePayloadStorageRef(source, opts);
       if (!storageRef) return source;
       source.storageRef = storageRef;
@@ -26307,23 +26307,23 @@ var init_workerConfigModeValidation = __esm({
       }, {});
     };
     sessionModeValuesEqual = (left, right) => JSON.stringify(stableSessionModeValue(left)) === JSON.stringify(stableSessionModeValue(right));
-    validateEnumField = (record3, key, path, allowed) => {
-      if (!hasOwn(record3, key)) return valid();
-      const value = record3[key];
+    validateEnumField = (record4, key, path, allowed) => {
+      if (!hasOwn(record4, key)) return valid();
+      const value = record4[key];
       return typeof value === "string" && allowed.has(value) ? valid() : invalid(path);
     };
-    validateRequiredEnumField = (record3, key, path, allowed) => hasOwn(record3, key) ? validateEnumField(record3, key, path, allowed) : invalid(path);
-    validateObjectField = (record3, key, path) => {
-      if (!hasOwn(record3, key)) return { ok: true, value: null };
-      return isObj3(record3[key]) ? { ok: true, value: record3[key] } : { ok: false, path };
+    validateRequiredEnumField = (record4, key, path, allowed) => hasOwn(record4, key) ? validateEnumField(record4, key, path, allowed) : invalid(path);
+    validateObjectField = (record4, key, path) => {
+      if (!hasOwn(record4, key)) return { ok: true, value: null };
+      return isObj3(record4[key]) ? { ok: true, value: record4[key] } : { ok: false, path };
     };
-    validateExactKeys = (record3, path, allowed) => {
+    validateExactKeys = (record4, path, allowed) => {
       const allowedKeys2 = new Set(allowed);
-      const unknownKey = Object.keys(record3).find((key) => !allowedKeys2.has(key));
+      const unknownKey = Object.keys(record4).find((key) => !allowedKeys2.has(key));
       return unknownKey ? invalid(path ? `${path}.${unknownKey}` : unknownKey) : valid();
     };
-    validateRequiredObjectField = (record3, key, path, allowed) => {
-      const result = validateObjectField(record3, key, path);
+    validateRequiredObjectField = (record4, key, path, allowed) => {
+      const result = validateObjectField(record4, key, path);
       if (!result.ok || !result.value) return result.ok ? invalid(path) : result;
       const keysResult = validateExactKeys(result.value, path, allowed);
       return keysResult.ok ? result : keysResult;
@@ -26378,14 +26378,14 @@ var init_workerConfigModeValidation = __esm({
       }
       return { ok: true, sbtChainIds };
     };
-    validatePayloadAccessControl = (record3, path) => {
-      if (!isObj3(record3)) return invalid(path);
+    validatePayloadAccessControl = (record4, path) => {
+      if (!isObj3(record4)) return invalid(path);
       for (const [key, allowed] of [
         ["mode", PAYLOAD_ACCESS_MODES],
         ["gate", PAYLOAD_ACCESS_GATES],
         ["encryption", PAYLOAD_ENCRYPTION_MODES]
       ]) {
-        const result = validateEnumField(record3, key, `${path}.${key}`, allowed);
+        const result = validateEnumField(record4, key, `${path}.${key}`, allowed);
         if (!result.ok) return result;
       }
       return valid();
@@ -27596,14 +27596,14 @@ var init_deployHelperCore = __esm({
         return null;
       }
     };
-    writeDeployJournalRecord = async (binding, key, record3) => binding.put(
+    writeDeployJournalRecord = async (binding, key, record4) => binding.put(
       key,
-      JSON.stringify(record3),
+      JSON.stringify(record4),
       { expirationTtl: DEPLOYMENT_JOURNAL_TTL_SECONDS }
     );
-    writeDurableDeployJournalRecord = async (binding, key, record3) => binding.put(
+    writeDurableDeployJournalRecord = async (binding, key, record4) => binding.put(
       key,
-      JSON.stringify(record3)
+      JSON.stringify(record4)
     );
     normalizeResourceStage = (value, fallback) => {
       const normalized = toStr9(value).trim().toLowerCase();
@@ -28974,9 +28974,9 @@ var init_deployHelperCore = __esm({
       const recoveryKeyRecordPath = `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/ce-deployment-recovery-key:${deploymentId}`;
       if (envelopeKekSecretPreserved) {
         const readback = await cfFetch(apiToken, recoveryKeyRecordPath, { method: "GET" }, cfFetchOptions);
-        const record3 = readback?.data?.result || readback?.data;
-        if (readback.ok && record3?.deploymentId === deploymentId && /^[a-f0-9]{64}$/.test(record3?.fingerprint || "")) {
-          deploymentPayload.recoveryKeyFingerprint = record3.fingerprint;
+        const record4 = readback?.data?.result || readback?.data;
+        if (readback.ok && record4?.deploymentId === deploymentId && /^[a-f0-9]{64}$/.test(record4?.fingerprint || "")) {
+          deploymentPayload.recoveryKeyFingerprint = record4.fingerprint;
         } else if (!readback.ok && Number(readback.status) !== 404) {
           return buildDeploymentFailure(503, {
             error: "Could not read the preserved recovery key fingerprint; retry.",
@@ -29272,13 +29272,13 @@ var init_deployHelperCore = __esm({
           }, { fallbackEligible: true });
         }
       };
-      const buildTerminalJournalReplay = (record3) => {
-        let result2 = record3?.result;
+      const buildTerminalJournalReplay = (record4) => {
+        let result2 = record4?.result;
         if (result2?.ok !== true) return result2;
         if (result2.body?.recoveryKeyFingerprint || result2.body?.envelopeKekSecretSet || result2.body?.envelopeKekSecretPreserved) {
           result2 = { ...result2, body: { ...result2.body, keyPreserved: true } };
         }
-        const recordedFullRequestDigest = toStr9(record3?.fullRequestDigest).trim().toLowerCase();
+        const recordedFullRequestDigest = toStr9(record4?.fullRequestDigest).trim().toLowerCase();
         const fullRequestDigestMatches = recordedFullRequestDigest ? recordedFullRequestDigest === context.fullRequestDigest : context.requestDigest === context.fullRequestDigest;
         if (fullRequestDigestMatches) return result2;
         return {
@@ -29604,9 +29604,9 @@ var init_resultsAnalysisSettings = __esm({
       inputScope: "submitted",
       publication: "latest_success_visible"
     });
-    allowedKeys = (record3, keys) => {
+    allowedKeys = (record4, keys) => {
       const allowed = new Set(keys);
-      const unknown = Object.keys(record3 || {}).find((key) => !allowed.has(key));
+      const unknown = Object.keys(record4 || {}).find((key) => !allowed.has(key));
       return unknown || "";
     };
     normalizeBoolean = (value, fallback) => typeof value === "boolean" ? value : fallback;
@@ -30027,6 +30027,51 @@ var init_workerGroupUrl = __esm({
   }
 });
 
+// workers/sessionCorsWorker/sessionConfigAuthorization.js
+var CONTENT_FIELDS, INTERVIEW_CONTENT_FIELDS, record2, same, without, onlyAddsInvites, sessionConfigRequiresReauthorization;
+var init_sessionConfigAuthorization = __esm({
+  "workers/sessionCorsWorker/sessionConfigAuthorization.js"() {
+    init_deployHelperCore();
+    CONTENT_FIELDS = /* @__PURE__ */ new Set([
+      "sessionName",
+      "sessionInfo",
+      "sessionContext",
+      "questionsGenPrompt",
+      "appearance",
+      "sessionHeaderImg"
+    ]);
+    INTERVIEW_CONTENT_FIELDS = /* @__PURE__ */ new Set(["openingPrompt", "steeringPrompt"]);
+    record2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    same = (left, right) => stableCanonicalSerialize(left) === stableCanonicalSerialize(right);
+    without = (value, keys) => Object.fromEntries(Object.entries(value).filter(([key]) => !keys.has(key)));
+    onlyAddsInvites = (before, after) => {
+      const prior = before === void 0 ? [] : before;
+      const next = after === void 0 ? [] : after;
+      if (!Array.isArray(prior) || !Array.isArray(next)) return false;
+      const unique2 = (rows) => rows.every((row) => record2(row) && typeof row.tokenHash === "string") && new Set(rows.map((row) => row.tokenHash)).size === rows.length;
+      if (!unique2(prior) || !unique2(next)) return false;
+      const byHash = new Map(next.map((row) => [row.tokenHash, row]));
+      return prior.every((row) => byHash.has(row.tokenHash) && same(row, byHash.get(row.tokenHash)));
+    };
+    sessionConfigRequiresReauthorization = (before, after) => {
+      const additiveInvites = onlyAddsInvites(before?.agentHttp?.invites, after?.agentHttp?.invites);
+      const authority = (config) => {
+        const result = without(config, CONTENT_FIELDS);
+        if (record2(result.interviewMode)) {
+          result.interviewMode = without(result.interviewMode, INTERVIEW_CONTENT_FIELDS);
+          if (!Object.keys(result.interviewMode).length) delete result.interviewMode;
+        }
+        if (record2(result.agentHttp) && additiveInvites) {
+          result.agentHttp = without(result.agentHttp, /* @__PURE__ */ new Set(["invites"]));
+          if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
+        }
+        return result;
+      };
+      return !same(authority(before), authority(after));
+    };
+  }
+});
+
 // shared/interviewSettings.mjs
 var DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
 var init_interviewSettings = __esm({
@@ -30147,6 +30192,7 @@ var init_realtimeInterviewConfig = __esm({
 var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEYS, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
 var init_sessionConfigMutation = __esm({
   "workers/sessionCorsWorker/sessionConfigMutation.js"() {
+    init_sessionConfigAuthorization();
     init_sessionAgentConfig();
     init_interviewSettings();
     init_siweMessage();
@@ -30528,6 +30574,7 @@ var init_sessionConfigMutation = __esm({
       if (nextEpoch === null) {
         return { ok: false, status: 409, error: "Authorization epoch is invalid." };
       }
+      if (Object.keys(authorityExisting).length && !sessionConfigRequiresReauthorization(comparisonExisting, publicationWrite.config)) return publicationWrite;
       return {
         ...publicationWrite,
         config: {
@@ -33277,7 +33324,7 @@ async function issueAgentCredential({
   const normalizedTtl = Math.max(1, Math.ceil((expiresMs - issuedMs) / 1e3));
   const token = `ceagt_${randomSecret2()}`;
   const tokenHash = await sha256Hex2(token);
-  const record3 = {
+  const record4 = {
     type: "agent_credential",
     version: 2,
     workerVersion: SESSION_AGENT_VERSION,
@@ -33303,7 +33350,7 @@ async function issueAgentCredential({
     expiresAt,
     ttlSeconds: normalizedTtl
   };
-  assertNoSecretShape(record3, "Agent credential records must not serialize bearer tokens.");
+  assertNoSecretShape(record4, "Agent credential records must not serialize bearer tokens.");
   const metadata = {
     v: 2,
     t: "agent_credential",
@@ -33316,7 +33363,7 @@ async function issueAgentCredential({
   assertNoSecretShape(metadata, "Agent credential metadata must not serialize secrets.");
   const recordKey2 = tokenKvKey(tokenHash);
   try {
-    await kv.put(recordKey2, JSON.stringify(record3), {
+    await kv.put(recordKey2, JSON.stringify(record4), {
       expirationTtl: Math.max(60, normalizedTtl),
       metadata
     });
@@ -33355,8 +33402,8 @@ async function issueAgentCredential({
     ok: true,
     token,
     tokenHash,
-    tokenPrefix: record3.tokenPrefix,
-    record: record3
+    tokenPrefix: record4.tokenPrefix,
+    record: record4
   };
 }
 async function loadAgentCredential({ env = {}, token = "", now = null } = {}) {
@@ -33412,8 +33459,8 @@ async function revokeAgentCredentialHash({ env = {}, tokenHash = "" } = {}) {
   }
   return { ok: true, tokenHash: safeString(tokenHash).toLowerCase() };
 }
-function agentCredentialHasScope(record3 = {}, scope = "") {
-  const scopes = new Set(normalizeScopes(record3.scopes || []));
+function agentCredentialHasScope(record4 = {}, scope = "") {
+  const scopes = new Set(normalizeScopes(record4.scopes || []));
   return scopes.has(scope);
 }
 var AGENT_CREDENTIAL_KV_PREFIX, AGENT_CREDENTIAL_SLOT_KV_PREFIX, AGENT_CREDENTIAL_DEFAULT_TTL_SECONDS, AGENT_BROWSER_CREDENTIAL_TTL_SECONDS, AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS, AGENT_CREDENTIAL_AUDIENCES, AGENT_CREDENTIAL_KINDS, AGENT_CREDENTIAL_SCOPES, AGENT_CREDENTIAL_DEFAULT_SCOPES;
@@ -33497,26 +33544,26 @@ var init_authority = __esm({
       };
       return agentEnv;
     };
-    validateCredentialAuthority = async ({ env, record: record3, validateSourceJwt, depth = 0 }) => {
+    validateCredentialAuthority = async ({ env, record: record4, validateSourceJwt, depth = 0 }) => {
       const ctx = env.AGENT_CONTEXT;
       if (!ctx || !agentHttpEnabled(ctx.config)) throw authorityError("agent_http_disabled");
-      if (record3.sessionId !== ctx.sessionId || record3.sessionSlug !== ctx.slug || record3.sessionWorkerOrigin !== ctx.origin || record3.authzEpoch !== ctx.authzEpoch) {
+      if (record4.sessionId !== ctx.sessionId || record4.sessionSlug !== ctx.slug || record4.sessionWorkerOrigin !== ctx.origin || record4.authzEpoch !== ctx.authzEpoch) {
         throw authorityError("agent_credential_authority_stale", 401);
       }
-      if (!Object.values(AGENT_CREDENTIAL_KINDS).includes(record3.credentialKind) || !Object.values(AGENT_CREDENTIAL_AUDIENCES).includes(record3.audience) || record3.credentialKind === "browser" !== (record3.audience === AGENT_CREDENTIAL_AUDIENCES.SESSION_AGENT_BROWSER)) {
+      if (!Object.values(AGENT_CREDENTIAL_KINDS).includes(record4.credentialKind) || !Object.values(AGENT_CREDENTIAL_AUDIENCES).includes(record4.audience) || record4.credentialKind === "browser" !== (record4.audience === AGENT_CREDENTIAL_AUDIENCES.SESSION_AGENT_BROWSER)) {
         throw authorityError("agent_credential_purpose_invalid", 401);
       }
-      if (record3.credentialKind === "browser" && !record3.sourceCredentialHash || record3.credentialKind === "member" && !record3.sourceParticipant) throw authorityError("agent_credential_source_missing", 401);
-      if (record3.sourceCredentialHash) {
+      if (record4.credentialKind === "browser" && !record4.sourceCredentialHash || record4.credentialKind === "member" && !record4.sourceParticipant) throw authorityError("agent_credential_source_missing", 401);
+      if (record4.sourceCredentialHash) {
         if (depth > 0) throw authorityError("agent_credential_source_invalid", 401);
-        const source = await loadAgentCredentialHash({ env, tokenHash: record3.sourceCredentialHash, now: new Date(ctx.now()).toISOString() });
+        const source = await loadAgentCredentialHash({ env, tokenHash: record4.sourceCredentialHash, now: new Date(ctx.now()).toISOString() });
         if (!source.ok) throw authorityError("agent_credential_source_inactive", 401);
         await validateCredentialAuthority({ env, record: source.record, validateSourceJwt, depth: depth + 1 });
-        if (source.record.principal.principalId !== record3.principal.principalId || source.record.accountAddress.toLowerCase() !== record3.accountAddress.toLowerCase() || record3.scopes.some((scope) => !source.record.scopes.includes(scope)) || Date.parse(record3.expiresAt) > Date.parse(source.record.expiresAt)) throw authorityError("agent_credential_source_invalid", 401);
+        if (source.record.principal.principalId !== record4.principal.principalId || source.record.accountAddress.toLowerCase() !== record4.accountAddress.toLowerCase() || record4.scopes.some((scope) => !source.record.scopes.includes(scope)) || Date.parse(record4.expiresAt) > Date.parse(source.record.expiresAt)) throw authorityError("agent_credential_source_invalid", 401);
       }
-      if (record3.sourceParticipant) {
+      if (record4.sourceParticipant) {
         if (!validateSourceJwt) throw authorityError("agent_credential_source_unavailable", 503);
-        await validateSourceJwt(record3.sourceParticipant);
+        await validateSourceJwt(record4.sourceParticipant);
       }
     };
     validateAgentParticipantSource = async ({ request, env, payload, slug, deps = {} }) => {
@@ -33539,8 +33586,8 @@ var init_authority = __esm({
       if (!payload || payload.slug !== context.slug || payload.sessionId !== context.sessionId || payload.authzEpoch !== context.authzEpoch || !Number.isSafeInteger(payload.exp) || payload.exp * 1e3 <= context.now()) {
         throw authorityError("agent_member_source_stale", 401);
       }
-      const record3 = await validateAuthTokenRecord({ env, payload, slug: context.slug });
-      if (!record3.ok) throw authorityError("agent_member_source_revoked", 401);
+      const record4 = await validateAuthTokenRecord({ env, payload, slug: context.slug });
+      if (!record4.ok) throw authorityError("agent_member_source_revoked", 401);
       const source = await validateAgentParticipantSource({ request: new Request(context.origin), env, payload, slug: context.slug, deps });
       if (!source.ok) throw authorityError("agent_member_source_revoked", 401);
       try {
@@ -61452,7 +61499,7 @@ var init_ratingScale = __esm({
       "highLabel"
     ];
     hasMetadataValue = (value) => value !== void 0 && value !== null && trim4(value) !== "";
-    recordHasRatingScaleMetadata = (record3 = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record3[key]));
+    recordHasRatingScaleMetadata = (record4 = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record4[key]));
     pickRatingScaleRecord = (question = {}) => {
       const scale = isObj9(question.scale) ? question.scale : null;
       if (scale && recordHasRatingScaleMetadata(scale)) return scale;
@@ -61494,7 +61541,7 @@ var init_ratingScale = __esm({
     };
     DEFAULT_RATING_SCALE2 = Object.freeze({ min: 0, max: 10, minLabel: "0", maxLabel: "10" });
     ratingStepFor = (question = {}) => {
-      const source = [question.scale, question.ratingScale].find((record3) => isObj9(record3) && recordHasRatingScaleMetadata(record3)) || question;
+      const source = [question.scale, question.ratingScale].find((record4) => isObj9(record4) && recordHasRatingScaleMetadata(record4)) || question;
       const step = Number(source.step);
       return Number.isFinite(step) && step > 0 ? step : 1;
     };
@@ -61518,9 +61565,9 @@ var init_ratingScale = __esm({
 
 // workers/sessionCorsWorker/agent/ratingScale.mjs
 function normalizeAgentRatingScale(question = {}) {
-  const record3 = withLegacyScale(question);
-  const { min, max } = normalizeRatingScale(record3) || DEFAULT_RATING_SCALE2;
-  return { min, max, step: ratingStepFor(record3) };
+  const record4 = withLegacyScale(question);
+  const { min, max } = normalizeRatingScale(record4) || DEFAULT_RATING_SCALE2;
+  return { min, max, step: ratingStepFor(record4) };
 }
 function normalizeAgentRatingAnswer(value, question = {}) {
   return normalizeRatingAnswer(value, withLegacyScale(question));
@@ -62364,9 +62411,9 @@ async function listKvRecordsByPrefix(env = {}, prefix = "", {
     for (const entry2 of keys) {
       const key = safeString(entry2?.name || entry2);
       if (!key) continue;
-      const record3 = safeJsonParse(await kv.get(key).catch(() => null), null);
-      if (record3 && typeof record3 === "object" && !Array.isArray(record3)) {
-        records.push({ ...record3, key });
+      const record4 = safeJsonParse(await kv.get(key).catch(() => null), null);
+      if (record4 && typeof record4 === "object" && !Array.isArray(record4)) {
+        records.push({ ...record4, key });
       }
       if (records.length >= maxRecords) return records;
     }
@@ -62405,8 +62452,8 @@ async function listKvKeyMetadataByPrefix(env = {}, prefix = "", {
 async function readKvRecord(env = {}, key = "") {
   const kv = env?.AGENT_ACTION_KV;
   if (!key || !kv || typeof kv.get !== "function") return null;
-  const record3 = safeJsonParse(await kv.get(key).catch(() => null), null);
-  return record3 && typeof record3 === "object" && !Array.isArray(record3) ? { ...record3, key } : null;
+  const record4 = safeJsonParse(await kv.get(key).catch(() => null), null);
+  return record4 && typeof record4 === "object" && !Array.isArray(record4) ? { ...record4, key } : null;
 }
 function buildAgentActivityMetadata({
   type = "",
@@ -62494,31 +62541,31 @@ function publicItem(item = {}, {
   assertNoSecretShape(out, "Agent activity items must not serialize secrets.");
   return out;
 }
-function draftItem(record3 = {}, options = {}) {
+function draftItem(record4 = {}, options = {}) {
   return publicItem({
     type: "answer_draft",
-    sessionSlug: sanitizeSessionSlug(record3.sessionSlug),
-    questionId: safeString(record3.questionId),
-    createdAt: safeString(record3.selectedAt || record3.createdAt),
-    status: safeString(record3.status || "draft_saved"),
-    editCount: Number(record3.editCount || 0),
-    originSource: safeString(record3.originSource || record3.origin?.source),
-    summary: options.includeContent ? `Draft: ${safeString(record3.answerLabel).slice(0, 140)}` : "Answer draft saved for review",
+    sessionSlug: sanitizeSessionSlug(record4.sessionSlug),
+    questionId: safeString(record4.questionId),
+    createdAt: safeString(record4.selectedAt || record4.createdAt),
+    status: safeString(record4.status || "draft_saved"),
+    editCount: Number(record4.editCount || 0),
+    originSource: safeString(record4.originSource || record4.origin?.source),
+    summary: options.includeContent ? `Draft: ${safeString(record4.answerLabel).slice(0, 140)}` : "Answer draft saved for review",
     pendingAction: "review_draft",
     content: {
-      answerLabel: safeString(record3.answerLabel),
-      answerValue: safeString(record3.answerValue),
-      controlType: safeString(record3.controlType)
+      answerLabel: safeString(record4.answerLabel),
+      answerValue: safeString(record4.answerValue),
+      controlType: safeString(record4.controlType)
     }
   }, options);
 }
-function recommendationItems(record3 = {}, options = {}) {
-  const recommendations = Array.isArray(record3.recommendations) ? record3.recommendations : [];
+function recommendationItems(record4 = {}, options = {}) {
+  const recommendations = Array.isArray(record4.recommendations) ? record4.recommendations : [];
   return recommendations.map((recommendation) => publicItem({
     type: "question_vote_recommendation",
-    sessionSlug: sanitizeSessionSlug(record3.sessionSlug),
+    sessionSlug: sanitizeSessionSlug(record4.sessionSlug),
     questionId: safeString(recommendation.questionId),
-    createdAt: safeString(record3.createdAt),
+    createdAt: safeString(record4.createdAt),
     status: "pending_review",
     summary: `Suggested ${safeString(recommendation.suggestedVote || "vote")} vote`,
     pendingAction: "approve_or_override_agent_question_votes",
@@ -62530,13 +62577,13 @@ function recommendationItems(record3 = {}, options = {}) {
     }
   }, options));
 }
-function decisionItems(record3 = {}, options = {}) {
-  const decisions = Array.isArray(record3.decisions) ? record3.decisions : [];
+function decisionItems(record4 = {}, options = {}) {
+  const decisions = Array.isArray(record4.decisions) ? record4.decisions : [];
   return decisions.map((decision) => publicItem({
     type: "question_vote_decision",
-    sessionSlug: sanitizeSessionSlug(record3.sessionSlug),
+    sessionSlug: sanitizeSessionSlug(record4.sessionSlug),
     questionId: safeString(decision.questionId),
-    createdAt: safeString(record3.createdAt),
+    createdAt: safeString(record4.createdAt),
     status: decision.applied ? "applied" : safeString(decision.approvalStatus || "pending_review"),
     summary: decision.applied ? `Applied ${safeString(decision.finalVote || decision.suggestedVote)} vote` : `Pending ${safeString(decision.suggestedVote || decision.finalVote || "vote")} decision`,
     pendingAction: decision.applied ? "" : "approve_or_override_agent_question_votes",
@@ -62549,35 +62596,35 @@ function decisionItems(record3 = {}, options = {}) {
     }
   }, options));
 }
-function proposedQuestionItem(record3 = {}, options = {}) {
-  const prompt = safeString(record3.prompt);
+function proposedQuestionItem(record4 = {}, options = {}) {
+  const prompt = safeString(record4.prompt);
   return publicItem({
     type: "proposed_question",
-    sessionSlug: sanitizeSessionSlug(record3.sessionSlug),
-    questionId: safeString(record3.questionId),
-    createdAt: safeString(record3.createdAt),
-    status: safeString(record3.status || "active"),
+    sessionSlug: sanitizeSessionSlug(record4.sessionSlug),
+    questionId: safeString(record4.questionId),
+    createdAt: safeString(record4.createdAt),
+    status: safeString(record4.status || "active"),
     summary: prompt ? `Question proposed: ${prompt.slice(0, 140)}` : "Question proposed for review",
     pendingAction: "",
     content: {
       prompt,
-      questionType: safeString(record3.questionType),
-      tags: Array.isArray(record3.tags) ? record3.tags.map(safeString).filter(Boolean) : []
+      questionType: safeString(record4.questionType),
+      tags: Array.isArray(record4.tags) ? record4.tags.map(safeString).filter(Boolean) : []
     }
   }, options);
 }
-function groupProposalItem(record3 = {}, options = {}) {
+function groupProposalItem(record4 = {}, options = {}) {
   return publicItem({
     type: "group_proposal",
-    sessionSlug: sanitizeSessionSlug(record3.sessionSlug),
-    createdAt: safeString(record3.createdAt),
-    status: safeString(record3.status || "pending_user_decision"),
-    summary: safeString(record3.message) || "Group membership suggestion",
+    sessionSlug: sanitizeSessionSlug(record4.sessionSlug),
+    createdAt: safeString(record4.createdAt),
+    status: safeString(record4.status || "pending_user_decision"),
+    summary: safeString(record4.message) || "Group membership suggestion",
     pendingAction: "review_group_proposal",
     content: {
-      categoryId: safeString(record3.categoryId),
-      optionIds: Array.isArray(record3.optionIds) ? record3.optionIds.map(safeString).filter(Boolean) : [],
-      message: safeString(record3.message)
+      categoryId: safeString(record4.categoryId),
+      optionIds: Array.isArray(record4.optionIds) ? record4.optionIds.map(safeString).filter(Boolean) : [],
+      message: safeString(record4.message)
     }
   }, options);
 }
@@ -62597,8 +62644,8 @@ async function listMetadataBackedRecords(env = {}, prefix = "", {
       records.push(metadataRecord);
       continue;
     }
-    const record3 = await readKvRecord(env, entry2.key);
-    if (record3 && filter(record3)) records.push(record3);
+    const record4 = await readKvRecord(env, entry2.key);
+    if (record4 && filter(record4)) records.push(record4);
   }
   return records;
 }
@@ -62618,28 +62665,28 @@ async function listAgentActivity({
   const drafts = await listMetadataBackedRecords(env, `${ANSWER_DRAFT_KV_PREFIX2}${userId}:`, {
     includeContent,
     limit: 300,
-    filter: (record3) => !slugSet.size || slugSet.has(sanitizeSessionSlug(record3.sessionSlug))
+    filter: (record4) => !slugSet.size || slugSet.has(sanitizeSessionSlug(record4.sessionSlug))
   });
-  drafts.forEach((record3) => items.push(draftItem(record3, options)));
+  drafts.forEach((record4) => items.push(draftItem(record4, options)));
   for (const slug of slugs) {
     for (const subjectKey of /* @__PURE__ */ new Set([kvKeySafePart(userId), userId])) {
       const recommendations = await listKvRecordsByPrefix(env, `${AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX}${slug}:${subjectKey}:`, { limit: 300 });
-      recommendations.filter((record3) => safeString(record3.telegramUserId) === userId).forEach((record3) => items.push(...recommendationItems(record3, options)));
+      recommendations.filter((record4) => safeString(record4.telegramUserId) === userId).forEach((record4) => items.push(...recommendationItems(record4, options)));
       const decisions = await listKvRecordsByPrefix(env, `${AGENT_QUESTION_VOTE_DECISION_KV_PREFIX}${slug}:${subjectKey}:`, { limit: 300 });
-      decisions.filter((record3) => safeString(record3.telegramUserId) === userId).forEach((record3) => items.push(...decisionItems(record3, options)));
+      decisions.filter((record4) => safeString(record4.telegramUserId) === userId).forEach((record4) => items.push(...decisionItems(record4, options)));
     }
     const proposed = await listMetadataBackedRecords(env, `${PROPOSED_QUESTION_KV_PREFIX}${slug}:`, {
       includeContent,
       limit: 1e3,
-      filter: (record3) => safeString(record3.createdByTelegramUserId) === userId
+      filter: (record4) => safeString(record4.createdByTelegramUserId) === userId
     });
-    proposed.forEach((record3) => items.push(proposedQuestionItem(record3, options)));
+    proposed.forEach((record4) => items.push(proposedQuestionItem(record4, options)));
     const groupProposals = await listMetadataBackedRecords(env, `${LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX}${slug}:`, {
       includeContent,
       limit: 1e3,
-      filter: (record3) => [record3.proposedBy, record3.targetTelegramUserId].map(safeString).includes(userId)
+      filter: (record4) => [record4.proposedBy, record4.targetTelegramUserId].map(safeString).includes(userId)
     });
-    groupProposals.forEach((record3) => items.push(groupProposalItem(record3, options)));
+    groupProposals.forEach((record4) => items.push(groupProposalItem(record4, options)));
   }
   return items.filter(Boolean).sort((left, right) => Date.parse(createdAtOf(right)) - Date.parse(createdAtOf(left))).slice(0, Math.max(1, Math.min(100, Number(limit) || 50)));
 }
@@ -62677,16 +62724,16 @@ function answerDraftViewKey({
   const qid = questionIdSeedPart(selectedQuestionId || "question");
   return telegramUserId && slug && qid ? `${ANSWER_DRAFT_VIEW_KV_PREFIX}${telegramUserId}:${slug}:${qid}` : "";
 }
-function answerDraftFingerprint(record3 = {}) {
+function answerDraftFingerprint(record4 = {}) {
   return stableFingerprint({
-    answerLabel: safeString(record3.answerLabel),
-    answerValue: safeString(record3.answerValue),
-    controlType: safeString(record3.controlType)
+    answerLabel: safeString(record4.answerLabel),
+    answerValue: safeString(record4.answerValue),
+    controlType: safeString(record4.controlType)
   });
 }
-function answerDraftOrigin(record3 = null) {
-  if (!record3 || typeof record3 !== "object" || Array.isArray(record3)) return null;
-  const origin = record3.origin && typeof record3.origin === "object" && !Array.isArray(record3.origin) ? record3.origin : null;
+function answerDraftOrigin(record4 = null) {
+  if (!record4 || typeof record4 !== "object" || Array.isArray(record4)) return null;
+  const origin = record4.origin && typeof record4.origin === "object" && !Array.isArray(record4.origin) ? record4.origin : null;
   if (origin) {
     return {
       source: safeString(origin.source) || null,
@@ -62699,23 +62746,23 @@ function answerDraftOrigin(record3 = null) {
     };
   }
   return {
-    source: safeString(record3.source) || null,
-    agentMetadata: record3.agentMetadata && typeof record3.agentMetadata === "object" && !Array.isArray(record3.agentMetadata) ? record3.agentMetadata : null,
-    answerLabel: safeString(record3.answerLabel),
-    answerValue: safeString(record3.answerValue),
-    controlType: safeString(record3.controlType),
-    fingerprint: safeString(record3.fingerprint) || answerDraftFingerprint(record3),
-    savedAt: safeString(record3.selectedAt) || null
+    source: safeString(record4.source) || null,
+    agentMetadata: record4.agentMetadata && typeof record4.agentMetadata === "object" && !Array.isArray(record4.agentMetadata) ? record4.agentMetadata : null,
+    answerLabel: safeString(record4.answerLabel),
+    answerValue: safeString(record4.answerValue),
+    controlType: safeString(record4.controlType),
+    fingerprint: safeString(record4.fingerprint) || answerDraftFingerprint(record4),
+    savedAt: safeString(record4.selectedAt) || null
   };
 }
 async function writeDraftLifecycleEvent() {
   return false;
 }
-function canonicalDraftAnswerForm(record3 = {}) {
-  const raw = safeString(record3.answerValue);
+function canonicalDraftAnswerForm(record4 = {}) {
+  const raw = safeString(record4.answerValue);
   const parsed = safeEnvJsonParse(raw, null);
   const source = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
-  const type = CANONICAL_ANSWER_KINDS[lower2(safeString(source?.questionType))] || CANONICAL_ANSWER_KINDS[lower2(safeString(record3.controlType))] || "unknown";
+  const type = CANONICAL_ANSWER_KINDS[lower2(safeString(source?.questionType))] || CANONICAL_ANSWER_KINDS[lower2(safeString(record4.controlType))] || "unknown";
   const text = safeString(source ? source.text ?? source.value ?? "" : raw);
   const comments = safeString(source?.comments);
   if (type === "binary") {
@@ -62735,8 +62782,8 @@ function canonicalDraftAnswerForm(record3 = {}) {
   }
   return { type, text, comments };
 }
-function answerDraftSemanticFingerprint(record3 = {}) {
-  return stableFingerprint(canonicalDraftAnswerForm(record3));
+function answerDraftSemanticFingerprint(record4 = {}) {
+  return stableFingerprint(canonicalDraftAnswerForm(record4));
 }
 function buildDraftDelta(origin = null, finalAnswer = null) {
   if (!origin || !finalAnswer) return null;
@@ -62872,7 +62919,7 @@ async function persistAnswerDraft({
   const existing = typeof env.AGENT_ACTION_KV.get === "function" ? safeEnvJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null) : null;
   const previous = existing && typeof existing === "object" && !Array.isArray(existing) ? existing : null;
   const savedAt = createdAt || nowIso2();
-  const record3 = {
+  const record4 = {
     version: 2,
     telegramUserId: safeString(normalized.user?.telegramUserId),
     chatId: safeString(normalized.chat?.chatId),
@@ -62887,64 +62934,64 @@ async function persistAnswerDraft({
     selectedAt: savedAt
   };
   if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
-    record3.source = safeString(metadata.source) || null;
-    record3.actionMetadata = { ...metadata };
+    record4.source = safeString(metadata.source) || null;
+    record4.actionMetadata = { ...metadata };
   }
   if (agentMetadata && typeof agentMetadata === "object" && !Array.isArray(agentMetadata)) {
-    record3.agentMetadata = { ...agentMetadata };
+    record4.agentMetadata = { ...agentMetadata };
   }
-  if (!record3.telegramUserId || !record3.sessionSlug || !record3.questionId || !record3.answerLabel) {
+  if (!record4.telegramUserId || !record4.sessionSlug || !record4.questionId || !record4.answerLabel) {
     return { ok: false, reason: "answer_draft_incomplete" };
   }
-  record3.fingerprint = answerDraftFingerprint(record3);
-  record3.semanticFingerprint = answerDraftSemanticFingerprint(record3);
-  record3.origin = answerDraftOrigin(previous) || {
-    source: record3.source || null,
-    agentMetadata: record3.agentMetadata || null,
-    answerLabel: record3.answerLabel,
-    answerValue: record3.answerValue,
-    controlType: record3.controlType,
-    fingerprint: record3.fingerprint,
+  record4.fingerprint = answerDraftFingerprint(record4);
+  record4.semanticFingerprint = answerDraftSemanticFingerprint(record4);
+  record4.origin = answerDraftOrigin(previous) || {
+    source: record4.source || null,
+    agentMetadata: record4.agentMetadata || null,
+    answerLabel: record4.answerLabel,
+    answerValue: record4.answerValue,
+    controlType: record4.controlType,
+    fingerprint: record4.fingerprint,
     savedAt
   };
   const previousSemanticFingerprint = previous ? safeString(previous.semanticFingerprint) || answerDraftSemanticFingerprint(previous) : "";
-  const contentChanged = Boolean(previous) && previousSemanticFingerprint !== record3.semanticFingerprint;
-  const isAgentWrite = record3.source === "agent_handoff";
-  record3.editCount = Number(previous?.editCount || 0) + (contentChanged ? 1 : 0);
-  record3.lastEditedAt = contentChanged ? savedAt : safeString(previous?.lastEditedAt) || null;
-  record3.humanEditCount = Number(previous?.humanEditCount || 0) + (contentChanged && !isAgentWrite ? 1 : 0);
-  record3.lastEditSource = contentChanged ? record3.source || null : safeString(previous?.lastEditSource) || null;
+  const contentChanged = Boolean(previous) && previousSemanticFingerprint !== record4.semanticFingerprint;
+  const isAgentWrite = record4.source === "agent_handoff";
+  record4.editCount = Number(previous?.editCount || 0) + (contentChanged ? 1 : 0);
+  record4.lastEditedAt = contentChanged ? savedAt : safeString(previous?.lastEditedAt) || null;
+  record4.humanEditCount = Number(previous?.humanEditCount || 0) + (contentChanged && !isAgentWrite ? 1 : 0);
+  record4.lastEditSource = contentChanged ? record4.source || null : safeString(previous?.lastEditSource) || null;
   const previousAgentRevision = previous?.agentRevision && typeof previous.agentRevision === "object" && !Array.isArray(previous.agentRevision) ? previous.agentRevision : null;
-  record3.agentRevision = isAgentWrite ? { semanticFingerprint: record3.semanticFingerprint, savedAt } : previousAgentRevision;
-  assertNoSecretShape(record3, "Agent answer drafts must not serialize secrets.");
+  record4.agentRevision = isAgentWrite ? { semanticFingerprint: record4.semanticFingerprint, savedAt } : previousAgentRevision;
+  assertNoSecretShape(record4, "Agent answer drafts must not serialize secrets.");
   const activityMetadata = buildAgentActivityMetadata({
     type: "answer_draft",
-    status: record3.status,
-    createdAt: record3.selectedAt,
+    status: record4.status,
+    createdAt: record4.selectedAt,
     pendingAction: "review_draft",
-    sessionSlug: record3.sessionSlug,
-    questionId: record3.questionId,
-    telegramUserId: record3.telegramUserId,
-    editCount: record3.editCount,
-    originSource: record3.origin?.source || ""
+    sessionSlug: record4.sessionSlug,
+    questionId: record4.questionId,
+    telegramUserId: record4.telegramUserId,
+    editCount: record4.editCount,
+    originSource: record4.origin?.source || ""
   });
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record3), {
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record4), {
     expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
     metadata: activityMetadata
   });
   if (!previous || contentChanged) {
     await writeDraftLifecycleEvent(env, {
       event: previous ? "draft_edited" : "draft_created",
-      sessionSlug: record3.sessionSlug,
-      questionId: record3.questionId,
-      source: safeString(record3.source),
-      originSource: safeString(record3.origin?.source),
-      controlType: record3.controlType,
-      editCount: record3.editCount,
-      telegramUserId: record3.telegramUserId
+      sessionSlug: record4.sessionSlug,
+      questionId: record4.questionId,
+      source: safeString(record4.source),
+      originSource: safeString(record4.origin?.source),
+      controlType: record4.controlType,
+      editCount: record4.editCount,
+      telegramUserId: record4.telegramUserId
     });
   }
-  return { ok: true, key, draft: record3 };
+  return { ok: true, key, draft: record4 };
 }
 var init_answerDrafts = __esm({
   "workers/sessionCorsWorker/agent/answerDrafts.mjs"() {
@@ -63044,9 +63091,9 @@ async function listKvRecordsByPrefix2(env = {}, prefix = "", {
     for (const entry2 of keys) {
       const key = safeString(entry2?.name || entry2);
       if (!key) continue;
-      const record3 = parseJson(await kv.get(key), null);
-      if (record3 && typeof record3 === "object" && !Array.isArray(record3)) {
-        records.push({ ...record3, key });
+      const record4 = parseJson(await kv.get(key), null);
+      if (record4 && typeof record4 === "object" && !Array.isArray(record4)) {
+        records.push({ ...record4, key });
       }
       if (records.length >= maxRecords) return records;
     }
@@ -63072,26 +63119,26 @@ function normalizeResultAnswerLabel(value = "") {
 function selectCurrentSubmittedAnswers(records = []) {
   const byParticipantQuestion = /* @__PURE__ */ new Map();
   const anonymous = [];
-  for (const record3 of Array.isArray(records) ? records : []) {
-    const participant = safeString(record3.telegramUserId);
+  for (const record4 of Array.isArray(records) ? records : []) {
+    const participant = safeString(record4.telegramUserId);
     if (!participant) {
-      anonymous.push(record3);
+      anonymous.push(record4);
       continue;
     }
-    const key = JSON.stringify([sanitizeSessionSlug(record3.sessionSlug) || safeString(record3.sessionId), participant, safeString(record3.questionId)]);
+    const key = JSON.stringify([sanitizeSessionSlug(record4.sessionSlug) || safeString(record4.sessionId), participant, safeString(record4.questionId)]);
     const existing = byParticipantQuestion.get(key);
-    if (!existing || compareAnswers(existing, record3) < 0) byParticipantQuestion.set(key, record3);
+    if (!existing || compareAnswers(existing, record4) < 0) byParticipantQuestion.set(key, record4);
   }
   return [...byParticipantQuestion.values(), ...anonymous].sort(compareAnswerChronology);
 }
 function dedupeSubmitRecords(records = []) {
   const byId = /* @__PURE__ */ new Map();
-  (Array.isArray(records) ? records : []).forEach((record3) => {
-    const requestId = safeString(record3.requestId || record3.idempotencyKey || record3.key);
+  (Array.isArray(records) ? records : []).forEach((record4) => {
+    const requestId = safeString(record4.requestId || record4.idempotencyKey || record4.key);
     if (!requestId) return;
     const existing = byId.get(requestId);
-    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record3.createdAt)) <= 0) {
-      byId.set(requestId, record3);
+    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record4.createdAt)) <= 0) {
+      byId.set(requestId, record4);
     }
   });
   return Array.from(byId.values());
@@ -63104,49 +63151,49 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = "", { includeR
   const canonicalRecords = canonicalPrefix ? await listKvRecordsByPrefix2(env, canonicalPrefix, { limit: Infinity, parseJson: safeEnvJsonParse }) : [];
   const records = dedupeSubmitRecords([...indexedRecords, ...canonicalRecords]);
   const submittedStatuses = /* @__PURE__ */ new Set(["direct_submitted"]);
-  return records.filter((record3) => submittedStatuses.has(safeString(record3?.status)) && sanitizeSessionSlug(record3.sessionSlug) === slug && safeString(record3.questionId)).map((record3) => {
-    const answer = structuredResultAnswer(record3);
+  return records.filter((record4) => submittedStatuses.has(safeString(record4?.status)) && sanitizeSessionSlug(record4.sessionSlug) === slug && safeString(record4.questionId)).map((record4) => {
+    const answer = structuredResultAnswer(record4);
     return {
-      key: safeString(record3.key),
-      requestId: safeString(record3.requestId),
-      createdAt: safeString(record3.createdAt),
+      key: safeString(record4.key),
+      requestId: safeString(record4.requestId),
+      createdAt: safeString(record4.createdAt),
       sessionSlug: slug,
-      answerRevision: answerRevision(record3),
-      telegramUserId: safeString(record3.telegramUserId),
-      questionId: safeString(record3.questionId),
+      answerRevision: answerRevision(record4),
+      telegramUserId: safeString(record4.telegramUserId),
+      questionId: safeString(record4.questionId),
       label: normalizeResultAnswerLabel(firstAnswerValue(
         answer.label,
         answer.value,
         answer.text,
-        record3.answerLabel,
-        record3.answerValue
+        record4.answerLabel,
+        record4.answerValue
       )),
       value: safeAnswerString(firstAnswerValue(
         answer.value,
         answer.text,
         answer.label,
-        record3.answerValue,
-        record3.answerLabel
+        record4.answerValue,
+        record4.answerLabel
       )),
-      questionType: safeString(answer.questionType || record3.questionType || record3.controlType),
-      ...includeRawAnswer ? { answer: record3.answer || null } : answer.questionType === "quadratic" ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {},
+      questionType: safeString(answer.questionType || record4.questionType || record4.controlType),
+      ...includeRawAnswer ? { answer: record4.answer || null } : answer.questionType === "quadratic" ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {},
       text: safeAnswerString(firstAnswerValue(
         answer.text,
-        record3.answerText
+        record4.answerText
       )),
       comments: safeAnswerString(firstAnswerValue(
         answer.comments,
         answer.additionalComments,
-        record3.comments,
-        record3.answerComments
+        record4.comments,
+        record4.answerComments
       )),
-      txHash: safeString(record3.onChain?.txHash)
+      txHash: safeString(record4.onChain?.txHash)
     };
   }).sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)));
 }
-function structuredResultAnswer(record3 = {}) {
-  const answer = record3.answer && typeof record3.answer === "object" && !Array.isArray(record3.answer) ? { ...record3.answer } : {};
-  const parsed = safeEnvJsonParse(answer.value || record3.answerValue, null);
+function structuredResultAnswer(record4 = {}) {
+  const answer = record4.answer && typeof record4.answer === "object" && !Array.isArray(record4.answer) ? { ...record4.answer } : {};
+  const parsed = safeEnvJsonParse(answer.value || record4.answerValue, null);
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
     return {
       ...answer,
@@ -63183,20 +63230,20 @@ function consensusQuestionsForResults(questions = []) {
 function summarizeQuestionResults(records = [], questions = []) {
   const promptMap = questionPromptById(questions);
   const byQuestion = /* @__PURE__ */ new Map();
-  for (const record3 of records) {
-    if (!byQuestion.has(record3.questionId)) {
-      byQuestion.set(record3.questionId, {
-        questionId: record3.questionId,
-        prompt: promptMap.get(record3.questionId) || shortQuestionId(record3.questionId),
+  for (const record4 of records) {
+    if (!byQuestion.has(record4.questionId)) {
+      byQuestion.set(record4.questionId, {
+        questionId: record4.questionId,
+        prompt: promptMap.get(record4.questionId) || shortQuestionId(record4.questionId),
         total: 0,
         participants: /* @__PURE__ */ new Set(),
         counts: /* @__PURE__ */ new Map()
       });
     }
-    const item = byQuestion.get(record3.questionId);
+    const item = byQuestion.get(record4.questionId);
     item.total += 1;
-    if (record3.telegramUserId) item.participants.add(record3.telegramUserId);
-    item.counts.set(record3.label, (item.counts.get(record3.label) || 0) + 1);
+    if (record4.telegramUserId) item.participants.add(record4.telegramUserId);
+    item.counts.set(record4.label, (item.counts.get(record4.label) || 0) + 1);
   }
   return Array.from(byQuestion.values()).map((item) => {
     const counts = Array.from(item.counts.entries()).sort(([left], [right]) => left.localeCompare(right));
@@ -63219,7 +63266,7 @@ var init_submittedResults = __esm({
     init_agentSubmitQueue();
     init_runtimeCore();
     compareText = (left, right) => left === right ? 0 : left < right ? -1 : 1;
-    answerRevision = (record3) => Number.isSafeInteger(record3.answerRevision) && record3.answerRevision >= 0 ? record3.answerRevision : 0;
+    answerRevision = (record4) => Number.isSafeInteger(record4.answerRevision) && record4.answerRevision >= 0 ? record4.answerRevision : 0;
     compareAnswerChronology = (left, right) => compareText(safeString(left.createdAt), safeString(right.createdAt)) || compareText(safeString(left.requestId), safeString(right.requestId)) || compareText(stableJson(left), stableJson(right));
     compareAnswers = (left, right) => answerRevision(left) - answerRevision(right) || compareAnswerChronology(left, right);
   }
@@ -63239,14 +63286,14 @@ function answerScore(label = "", value = "", question = {}) {
   return 2 * (answer.value - min) / (max - min) - 1;
 }
 function averageAnswerScore(records = [], questionLookup = /* @__PURE__ */ new Map()) {
-  const scored = records.map((record3) => answerScore(record3.label, record3.value, questionLookup.get(record3.questionId))).filter((score) => Number.isFinite(score));
+  const scored = records.map((record4) => answerScore(record4.label, record4.value, questionLookup.get(record4.questionId))).filter((score) => Number.isFinite(score));
   if (!scored.length) return null;
   return scored.reduce((sum, score) => sum + score, 0) / scored.length;
 }
 function countResultVotes(records = [], questionLookup = /* @__PURE__ */ new Map()) {
   const counts = { agree: 0, disagree: 0, unsure: 0, responded: 0 };
-  for (const record3 of records) {
-    const score = answerScore(record3.label, record3.value, questionLookup.get(record3.questionId));
+  for (const record4 of records) {
+    const score = answerScore(record4.label, record4.value, questionLookup.get(record4.questionId));
     if (!Number.isFinite(score)) continue;
     if (score > 0.25) counts.agree += 1;
     else if (score < -0.25) counts.disagree += 1;
@@ -63268,10 +63315,10 @@ function questionTypeById(questions = []) {
   }
   return map;
 }
-function qualitativeTextFromResultRecord(record3 = {}, questionTypeLookup = /* @__PURE__ */ new Map()) {
-  const type = lower2(record3.questionType || questionTypeLookup.get(record3.questionId));
-  const text = safeAnswerString(record3.text);
-  const comments = safeAnswerString(record3.comments);
+function qualitativeTextFromResultRecord(record4 = {}, questionTypeLookup = /* @__PURE__ */ new Map()) {
+  const type = lower2(record4.questionType || questionTypeLookup.get(record4.questionId));
+  const text = safeAnswerString(record4.text);
+  const comments = safeAnswerString(record4.comments);
   const parts = [];
   if (type === "freeform" && text) parts.push(text);
   if (comments) parts.push(comments);
@@ -63286,14 +63333,14 @@ function qualitativeResponsesForGroup({
   limit = 8
 } = {}) {
   const responses = [];
-  for (const record3 of records) {
-    const text = qualitativeTextFromResultRecord(record3, questionTypeLookup);
+  for (const record4 of records) {
+    const text = qualitativeTextFromResultRecord(record4, questionTypeLookup);
     if (!text) continue;
     responses.push({
-      participant: aliases.get(record3.telegramUserId) || "Participant",
-      questionId: record3.questionId,
-      questionLabel: questionIndex.get(record3.questionId) || "Q?",
-      prompt: promptMap.get(record3.questionId) || shortQuestionId(record3.questionId),
+      participant: aliases.get(record4.telegramUserId) || "Participant",
+      questionId: record4.questionId,
+      questionLabel: questionIndex.get(record4.questionId) || "Q?",
+      prompt: promptMap.get(record4.questionId) || shortQuestionId(record4.questionId),
       text: text.slice(0, 500)
     });
     if (responses.length >= limit) break;
@@ -63317,7 +63364,7 @@ function requestedScoreBuckets({ records = [], participantIds = [], questionLook
   if (!Number.isFinite(count) || count <= 0) return null;
   const scored = participantIds.map((id2) => ({
     id: id2,
-    score: averageAnswerScore(records.filter((record3) => record3.telegramUserId === id2), questionLookup)
+    score: averageAnswerScore(records.filter((record4) => record4.telegramUserId === id2), questionLookup)
   })).sort((left, right) => (right.score ?? 0) - (left.score ?? 0) || String(left.id).localeCompare(String(right.id)));
   const resolvedCount = Math.max(1, Math.min(6, Math.floor(count), scored.length));
   if (!resolvedCount || !scored.length) return [];
@@ -63357,7 +63404,7 @@ function buildParticipantResultGroups({
   const buckets = Array.isArray(requestedBuckets) ? requestedBuckets : (() => {
     const out = /* @__PURE__ */ new Map();
     for (const id2 of participantIds) {
-      const participantRecords = records.filter((record3) => record3.telegramUserId === id2);
+      const participantRecords = records.filter((record4) => record4.telegramUserId === id2);
       const score = averageAnswerScore(participantRecords, questionLookup);
       const bucket = groupBucketForScore(score);
       if (!out.has(bucket.bucketId)) {
@@ -63380,7 +63427,7 @@ function buildParticipantResultGroups({
   })();
   return buckets.filter((bucket) => bucket.participantIds.length).sort((left, right) => bucketAverageScore(right) - bucketAverageScore(left) || right.participantIds.length - left.participantIds.length || left.theme.localeCompare(right.theme)).map((bucket, index) => {
     const participantSet = new Set(bucket.participantIds);
-    const clusterRecords = records.filter((record3) => participantSet.has(record3.telegramUserId));
+    const clusterRecords = records.filter((record4) => participantSet.has(record4.telegramUserId));
     const qualitativeResponses = qualitativeResponsesForGroup({
       records: clusterRecords,
       aliases,
@@ -63389,8 +63436,8 @@ function buildParticipantResultGroups({
       questionTypeLookup
     });
     const topStatements = questionIds.map((id2, questionNumber) => {
-      const clusterQuestionRecords = clusterRecords.filter((record3) => record3.questionId === id2);
-      const overallQuestionRecords = records.filter((record3) => record3.questionId === id2);
+      const clusterQuestionRecords = clusterRecords.filter((record4) => record4.questionId === id2);
+      const overallQuestionRecords = records.filter((record4) => record4.questionId === id2);
       const clusterAverage = averageAnswerScore(clusterQuestionRecords, questionLookup);
       const overallAverage = averageAnswerScore(overallQuestionRecords, questionLookup);
       return {
@@ -63417,25 +63464,25 @@ function buildParticipantResultGroups({
 function buildParticipantGraph(records = [], questions = [], options = {}) {
   const questionTypeLookup = questionTypeById(questions);
   const questionLookup = new Map(questions.map((question) => [questionId(question), question]));
-  const graphRecords = (Array.isArray(records) ? records : []).map((record3) => ({
-    ...record3,
-    questionType: safeString(questionTypeLookup.get(record3.questionId) || record3.questionType)
+  const graphRecords = (Array.isArray(records) ? records : []).map((record4) => ({
+    ...record4,
+    questionType: safeString(questionTypeLookup.get(record4.questionId) || record4.questionType)
   }));
-  const questionIds = Array.from(new Set(graphRecords.map((record3) => record3.questionId).filter(Boolean)));
+  const questionIds = Array.from(new Set(graphRecords.map((record4) => record4.questionId).filter(Boolean)));
   const questionIndex = new Map(questionIds.map((id2, index) => [id2, `Q${index + 1}`]));
-  const participants = Array.from(new Set(graphRecords.map((record3) => record3.telegramUserId).filter(Boolean)));
+  const participants = Array.from(new Set(graphRecords.map((record4) => record4.telegramUserId).filter(Boolean)));
   const aliases = new Map(participants.map((id2, index) => [id2, participantAlias(id2, index)]));
   const lines = participants.map((id2) => {
-    const answered = graphRecords.filter((record3) => record3.telegramUserId === id2).map((record3) => `${questionIndex.get(record3.questionId) || "Q?"}:${record3.label}`);
+    const answered = graphRecords.filter((record4) => record4.telegramUserId === id2).map((record4) => `${questionIndex.get(record4.questionId) || "Q?"}:${record4.label}`);
     return `${aliases.get(id2)} -> ${answered.join(", ") || "No answers"}`;
   });
   const promptMap = questionPromptById(questions);
   const legend = questionIds.slice(0, 5).map((id2, index) => `${index + 1}. ${promptMap.get(id2) || shortQuestionId(id2)}`);
   const imageParticipants = participants.slice(0, 8).map((id2) => ({
     participant: aliases.get(id2),
-    answers: graphRecords.filter((record3) => record3.telegramUserId === id2).map((record3) => ({
-      question: questionIndex.get(record3.questionId) || "Q?",
-      label: record3.label
+    answers: graphRecords.filter((record4) => record4.telegramUserId === id2).map((record4) => ({
+      question: questionIndex.get(record4.questionId) || "Q?",
+      label: record4.label
     }))
   }));
   const groups = buildParticipantResultGroups({
@@ -64877,10 +64924,10 @@ async function persistQuestionNumberMap(env = {}, map = {}, createdAt = null) {
   const key = agentQuestionNumberKvKey(map.sessionSlug);
   const kv = env?.AGENT_ACTION_KV;
   if (!key || !kv || typeof kv.put !== "function") return { ok: false, reason: "action_kv_unavailable" };
-  const record3 = normalizeAgentQuestionNumberMap({ ...map, updatedAt: nowIsoOrCurrent(createdAt) }, map.sessionSlug);
-  assertNoSecretShape(record3, "Agent question number map must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record3));
-  return { ok: true, key, record: record3 };
+  const record4 = normalizeAgentQuestionNumberMap({ ...map, updatedAt: nowIsoOrCurrent(createdAt) }, map.sessionSlug);
+  assertNoSecretShape(record4, "Agent question number map must not serialize secrets.");
+  await kv.put(key, JSON.stringify(record4));
+  return { ok: true, key, record: record4 };
 }
 async function assignAgentQuestionNumber({
   env = {},
@@ -65136,35 +65183,35 @@ function questionIdFromPrompt({
   ].join("|");
   return `${PROPOSED_QUESTION_ID_PREFIX}${buildOpaqueActionId(seed).replace(/^ceab_/, "")}`;
 }
-function proposedRecordToQuestion(record3 = {}) {
-  const questionId4 = safeString(record3.questionId);
-  const prompt = normalizePrompt(record3.prompt || record3.questionText);
+function proposedRecordToQuestion(record4 = {}) {
+  const questionId4 = safeString(record4.questionId);
+  const prompt = normalizePrompt(record4.prompt || record4.questionText);
   if (!questionId4 || !prompt) return null;
-  const questionType = normalizeQuestionType3(record3.questionType);
-  const tags = normalizeQuestionTags(record3.tags);
-  const references = normalizeQuestionReferences(record3.references);
-  const geoRefs = normalizeQuestionGeoRefs(record3.geoRefs || record3.geoIds || record3.geoId);
+  const questionType = normalizeQuestionType3(record4.questionType);
+  const tags = normalizeQuestionTags(record4.tags);
+  const references = normalizeQuestionReferences(record4.references);
+  const geoRefs = normalizeQuestionGeoRefs(record4.geoRefs || record4.geoIds || record4.geoId);
   const question = {
     questionId: questionId4,
     id: questionId4,
     questionType,
     prompt,
     questionText: prompt,
-    sessionSlug: sanitizeSessionSlug(record3.sessionSlug),
+    sessionSlug: sanitizeSessionSlug(record4.sessionSlug),
     source: "telegram_question_proposal",
     visibility: "public",
     canAnswer: true,
     proposed: true,
-    createdAt: safeString(record3.createdAt) || null
+    createdAt: safeString(record4.createdAt) || null
   };
-  const options = questionType === "quadratic" && Array.isArray(record3.options) ? record3.options : normalizeOptions3(record3.options);
+  const options = questionType === "quadratic" && Array.isArray(record4.options) ? record4.options : normalizeOptions3(record4.options);
   if (options.length) question.options = options;
-  if (questionType === "multichoice" && record3.singleSelect === true) {
+  if (questionType === "multichoice" && record4.singleSelect === true) {
     question.singleSelect = true;
   }
-  if (questionType === "quadratic") question.voiceCredits = record3.voiceCredits ?? 99;
+  if (questionType === "quadratic") question.voiceCredits = record4.voiceCredits ?? 99;
   if (questionType === "rating") {
-    const ratingScale = normalizeRatingScale2(record3.ratingScale || record3.rating_scale);
+    const ratingScale = normalizeRatingScale2(record4.ratingScale || record4.rating_scale);
     if (ratingScale) question.ratingScale = ratingScale;
   }
   if (tags.length) question.tags = tags;
@@ -65181,16 +65228,16 @@ function questionTagsShapeIsValid(value) {
   if (value === null) return false;
   return Array.isArray(value) || typeof value === "string";
 }
-function proposedRecordMalformedReason(record3 = {}) {
-  if (!record3 || typeof record3 !== "object" || Array.isArray(record3)) return "record_not_object";
+function proposedRecordMalformedReason(record4 = {}) {
+  if (!record4 || typeof record4 !== "object" || Array.isArray(record4)) return "record_not_object";
   let questionId4 = "";
   try {
-    questionId4 = safeString(record3.questionId);
+    questionId4 = safeString(record4.questionId);
   } catch {
     return "question_id_invalid";
   }
   if (!questionId4) return "question_id_missing";
-  const promptValue = record3.prompt ?? record3.questionText;
+  const promptValue = record4.prompt ?? record4.questionText;
   if (!questionTextValueIsString(promptValue)) return "question_prompt_invalid";
   let prompt = "";
   try {
@@ -65199,7 +65246,7 @@ function proposedRecordMalformedReason(record3 = {}) {
     return "question_prompt_invalid";
   }
   if (!prompt) return "question_prompt_missing";
-  if (!questionTagsShapeIsValid(record3.tags)) return "question_tags_invalid";
+  if (!questionTagsShapeIsValid(record4.tags)) return "question_tags_invalid";
   return "";
 }
 async function persistAgentProposedQuestion({
@@ -65259,7 +65306,7 @@ async function persistAgentProposedQuestion({
     telegramUserId,
     chatId
   });
-  const record3 = {
+  const record4 = {
     version: 1,
     questionId: questionId4,
     sessionSlug: slug,
@@ -65280,19 +65327,19 @@ async function persistAgentProposedQuestion({
     createdAt: nowIso2(createdAt)
   };
   if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
-    record3.actionMetadata = { ...metadata };
+    record4.actionMetadata = { ...metadata };
   }
-  assertNoSecretShape(record3, "Agent proposed questions must not serialize secrets.");
+  assertNoSecretShape(record4, "Agent proposed questions must not serialize secrets.");
   const activityMetadata = buildAgentActivityMetadata({
     type: "proposed_question",
-    status: record3.status,
-    createdAt: record3.createdAt,
+    status: record4.status,
+    createdAt: record4.createdAt,
     pendingAction: "",
-    sessionSlug: record3.sessionSlug,
-    questionId: record3.questionId,
-    telegramUserId: record3.createdByTelegramUserId
+    sessionSlug: record4.sessionSlug,
+    questionId: record4.questionId,
+    telegramUserId: record4.createdByTelegramUserId
   });
-  await env.AGENT_ACTION_KV.put(`${prefix}${questionId4}`, JSON.stringify(record3), {
+  await env.AGENT_ACTION_KV.put(`${prefix}${questionId4}`, JSON.stringify(record4), {
     expirationTtl: ttlSeconds,
     metadata: activityMetadata
   });
@@ -65300,14 +65347,14 @@ async function persistAgentProposedQuestion({
     env,
     sessionSlug: slug,
     questionId: questionId4,
-    createdAt: record3.createdAt
+    createdAt: record4.createdAt
   });
-  if (assigned.ok) record3.stableQuestionNumber = assigned.number;
+  if (assigned.ok) record4.stableQuestionNumber = assigned.number;
   return {
     ok: true,
     questionId: questionId4,
-    question: assigned.ok ? { ...proposedRecordToQuestion(record3), stableQuestionNumber: assigned.number } : proposedRecordToQuestion(record3),
-    record: record3
+    question: assigned.ok ? { ...proposedRecordToQuestion(record4), stableQuestionNumber: assigned.number } : proposedRecordToQuestion(record4),
+    record: record4
   };
 }
 async function archiveAgentProposedQuestion({
@@ -65329,25 +65376,25 @@ async function archiveAgentProposedQuestion({
   if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
     throw new Error("proposed_question_record_invalid");
   }
-  const record3 = {
+  const record4 = {
     ...existing,
     status: "archived",
     archivedAt: lower2(existing.status) === "archived" && safeString(existing.archivedAt) ? safeString(existing.archivedAt) : nowIso2(now),
     archivedBy: "service"
   };
-  assertNoSecretShape(record3, "Agent proposed questions must not serialize secrets.");
+  assertNoSecretShape(record4, "Agent proposed questions must not serialize secrets.");
   const existingMetadata = await readProposedQuestionMetadata(env, key);
   const metadata = existingMetadata ? { ...existingMetadata, s: "archived" } : buildAgentActivityMetadata({
     type: "proposed_question",
-    status: record3.status,
-    createdAt: record3.createdAt,
+    status: record4.status,
+    createdAt: record4.createdAt,
     pendingAction: "",
-    sessionSlug: record3.sessionSlug,
-    questionId: record3.questionId,
-    telegramUserId: record3.createdByTelegramUserId
+    sessionSlug: record4.sessionSlug,
+    questionId: record4.questionId,
+    telegramUserId: record4.createdByTelegramUserId
   });
   assertNoSecretShape(metadata, "Agent proposed question metadata must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record3), {
+  await kv.put(key, JSON.stringify(record4), {
     expirationTtl: DEFAULT_PROPOSED_QUESTION_TTL_SECONDS,
     metadata
   });
@@ -66151,7 +66198,7 @@ async function persistDraftEditMetric({
     metrics
   });
   const key = `${DRAFT_EDIT_METRIC_KV_PREFIX}${slug}:${questionIdSeedPart2(qid)}:${fingerprint}`;
-  const record3 = {
+  const record4 = {
     type: "telegram_draft_edit_metric",
     version: 1,
     sessionSlug: slug,
@@ -66163,8 +66210,8 @@ async function persistDraftEditMetric({
     metrics,
     createdAt: recordedAt
   };
-  assertNoSecretShape(record3, "Agent draft-edit metric records must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record3));
+  assertNoSecretShape(record4, "Agent draft-edit metric records must not serialize secrets.");
+  await kv.put(key, JSON.stringify(record4));
   return { ok: true, stored: true, key, metrics };
 }
 var DRAFT_EDIT_METRIC_KV_PREFIX;
@@ -66340,7 +66387,7 @@ async function executeAgentSubmitRequest({
     telegramUserId
   });
   if (agentSubmitQueueEnabled(env)) {
-    const record4 = buildQueuedSubmitRecord({
+    const record5 = buildQueuedSubmitRecord({
       session,
       canonicalBody: {
         session: slug,
@@ -66380,7 +66427,7 @@ async function executeAgentSubmitRequest({
         createdAt
       }
     });
-    const queued = await queueAgentSubmitRecord({ env, kvKey, record: record4 }).catch((error) => ({
+    const queued = await queueAgentSubmitRecord({ env, kvKey, record: record5 }).catch((error) => ({
       ok: false,
       reason: "telegram_submit_queue_failed",
       retryable: true,
@@ -66391,8 +66438,8 @@ async function executeAgentSubmitRequest({
       return {
         ok: true,
         requestId,
-        status: record4.status,
-        canonicalApiRequest: record4.canonicalApiRequest,
+        status: record5.status,
+        canonicalApiRequest: record5.canonicalApiRequest,
         idempotencyKey,
         queued: true,
         replayed: false
@@ -66485,19 +66532,19 @@ async function executeAgentSubmitRequest({
   if (directSubmit.replayed) return { ...directSubmit, requestId, idempotencyKey };
   if (!admitted) return { ...directSubmit, ok: false, requestId, idempotencyKey };
   const status = directSubmit.ok === true ? "direct_submitted" : directSubmit.reconciliationRequired ? "direct_submit_reconciliation_required" : "direct_submit_failed";
-  const record3 = {
+  const record4 = {
     ...baseRecord,
     status,
     onChain: { ...directSubmit, submissionAttemptId },
     canonicalApiRequest: { ...baseRecord.canonicalApiRequest, status: directSubmit.ok ? "executed_direct_onchain" : status }
   };
-  assertNoSecretShape(record3, "Agent direct submit records must not serialize secrets.");
-  const persisted = await env.AGENT_SERVICES.persistSubmitOutcome(record3);
+  assertNoSecretShape(record4, "Agent direct submit records must not serialize secrets.");
+  const persisted = await env.AGENT_SERVICES.persistSubmitOutcome(record4);
   if (persisted.replayed && persisted.record) return resultFromRecord(persisted.record, true);
   if (!persisted.ok || persisted.replayed) return { ...persisted, requestId, idempotencyKey };
   if (directSubmit.ok) await emitSubmittedEvent().catch(() => {
   });
-  return resultFromRecord(persisted.record || record3, persisted.replayed);
+  return resultFromRecord(persisted.record || record4, persisted.replayed);
 }
 var activeSubmissions, submissionIdentity, resultFromRecord;
 var init_answerSubmission = __esm({
@@ -66524,15 +66571,15 @@ var init_answerSubmission = __esm({
       questionId: qid,
       answer: { answerLabel: safeString(draft.answerLabel), answerValue: safeString(draft.answerValue), controlType: safeString(draft.controlType) }
     });
-    resultFromRecord = (record3, replayed = false) => ({
-      ok: ["direct_submitted", "submit_queued"].includes(record3.status),
-      requestId: record3.requestId,
-      status: record3.status,
-      idempotencyKey: record3.idempotencyKey,
-      canonicalApiRequest: record3.canonicalApiRequest || null,
-      onChain: record3.onChain || null,
-      reason: record3.onChain?.reason || (record3.status === "submit_request_created" ? "direct_submit_unavailable" : record3.status),
-      retryable: record3.onChain?.retryable === true,
+    resultFromRecord = (record4, replayed = false) => ({
+      ok: ["direct_submitted", "submit_queued"].includes(record4.status),
+      requestId: record4.requestId,
+      status: record4.status,
+      idempotencyKey: record4.idempotencyKey,
+      canonicalApiRequest: record4.canonicalApiRequest || null,
+      onChain: record4.onChain || null,
+      reason: record4.onChain?.reason || (record4.status === "submit_request_created" ? "direct_submit_unavailable" : record4.status),
+      retryable: record4.onChain?.retryable === true,
       replayed
     });
   }
@@ -66561,7 +66608,7 @@ async function writeAgentSkillUpdateFlag({
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== "function") return { ok: false, reason: "action_kv_unavailable" };
-  const record3 = {
+  const record4 = {
     version: 1,
     updateAvailable: true,
     latestVersion: safeString(latestVersion).slice(0, 40),
@@ -66569,9 +66616,9 @@ async function writeAgentSkillUpdateFlag({
     updatedBy: accountAddress ? shortAddress(accountAddress) : "",
     updatedAt: createdAt || nowIso2()
   };
-  assertNoSecretShape(record3, "Agent skill-update flag must not serialize secrets.");
-  await kv.put(AGENT_SKILL_UPDATE_KV_KEY, JSON.stringify(record3));
-  return { ok: true, latestVersion: record3.latestVersion };
+  assertNoSecretShape(record4, "Agent skill-update flag must not serialize secrets.");
+  await kv.put(AGENT_SKILL_UPDATE_KV_KEY, JSON.stringify(record4));
+  return { ok: true, latestVersion: record4.latestVersion };
 }
 async function clearAgentSkillUpdateFlag(env = {}) {
   const kv = env?.AGENT_ACTION_KV;
@@ -66633,9 +66680,9 @@ function submitRequestSessionKvPrefix(sessionSlug = "") {
   const slug = sanitizeSessionSlug(sessionSlug);
   return slug ? `${SUBMIT_REQUEST_SESSION_KV_PREFIX}${slug}:` : "";
 }
-function submitRequestSessionKvKey(record3 = {}) {
-  const prefix = submitRequestSessionKvPrefix(record3.sessionSlug);
-  const requestId = safeString(record3.requestId);
+function submitRequestSessionKvKey(record4 = {}) {
+  const prefix = submitRequestSessionKvPrefix(record4.sessionSlug);
+  const requestId = safeString(record4.requestId);
   return prefix && requestId ? `${prefix}${requestId}` : "";
 }
 function submitRequestUserKvPrefix({
@@ -66646,26 +66693,26 @@ function submitRequestUserKvPrefix({
   const userId = safeString(telegramUserId).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 128);
   return slug && userId ? `${SUBMIT_REQUEST_USER_KV_PREFIX}${slug}:${userId}:` : "";
 }
-function submitRequestUserKvKey(record3 = {}) {
+function submitRequestUserKvKey(record4 = {}) {
   const prefix = submitRequestUserKvPrefix({
-    sessionSlug: record3.sessionSlug,
-    telegramUserId: record3.telegramUserId
+    sessionSlug: record4.sessionSlug,
+    telegramUserId: record4.telegramUserId
   });
-  const questionId4 = safeString(record3.questionId).replace(/[^0-9A-Za-z._:-]/g, "").slice(0, 160);
-  const requestId = safeString(record3.requestId);
+  const questionId4 = safeString(record4.questionId).replace(/[^0-9A-Za-z._:-]/g, "").slice(0, 160);
+  const requestId = safeString(record4.requestId);
   return prefix && requestId ? `${prefix}${questionId4 || "question"}:${requestId}` : "";
 }
-function canonicalAnswerKvKey(record3 = {}) {
-  const requestId = safeString(record3.requestId || record3.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 160);
+function canonicalAnswerKvKey(record4 = {}) {
+  const requestId = safeString(record4.requestId || record4.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 160);
   return requestId ? `${CANONICAL_ANSWER_KV_PREFIX}${requestId}` : "";
 }
 function canonicalAnswerSessionKvPrefix(sessionSlug = "") {
   const slug = sanitizeSessionSlug(sessionSlug);
   return slug ? `${CANONICAL_ANSWER_SESSION_KV_PREFIX}${slug}:` : "";
 }
-function canonicalAnswerSessionKvKey(record3 = {}) {
-  const prefix = canonicalAnswerSessionKvPrefix(record3.sessionSlug);
-  const requestId = safeString(record3.requestId || record3.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 160);
+function canonicalAnswerSessionKvKey(record4 = {}) {
+  const prefix = canonicalAnswerSessionKvPrefix(record4.sessionSlug);
+  const requestId = safeString(record4.requestId || record4.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 160);
   return prefix && requestId ? `${prefix}${requestId}` : "";
 }
 function agentSubmitQueueEnabled(env = {}) {
@@ -66697,44 +66744,44 @@ function safeSessionSnapshotForSubmitQueue(session = {}) {
 function objectOrNull(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
-function normalizeSubmitRecordTimestamps(record3 = {}) {
-  const createdAt = safeString(record3.createdAt || record3.processedAt || record3.updatedAt) || nowIso2();
+function normalizeSubmitRecordTimestamps(record4 = {}) {
+  const createdAt = safeString(record4.createdAt || record4.processedAt || record4.updatedAt) || nowIso2();
   return {
-    ...record3,
+    ...record4,
     createdAt
   };
 }
-function buildCanonicalAnswerRecord(record3 = {}, {
+function buildCanonicalAnswerRecord(record4 = {}, {
   sourceKey = ""
 } = {}) {
-  const requestId = safeString(record3.requestId || record3.idempotencyKey);
-  const sessionSlug = sanitizeSessionSlug(record3.sessionSlug);
-  const questionId4 = safeString(record3.questionId);
+  const requestId = safeString(record4.requestId || record4.idempotencyKey);
+  const sessionSlug = sanitizeSessionSlug(record4.sessionSlug);
+  const questionId4 = safeString(record4.questionId);
   if (!requestId || !sessionSlug || !questionId4) return null;
-  const createdAt = safeString(record3.createdAt || record3.processedAt || record3.updatedAt);
-  const updatedAt = safeString(record3.processedAt || record3.updatedAt || createdAt);
+  const createdAt = safeString(record4.createdAt || record4.processedAt || record4.updatedAt);
+  const updatedAt = safeString(record4.processedAt || record4.updatedAt || createdAt);
   const canonical = {
     version: 1,
     type: "telegram_canonical_answer",
     requestId,
-    idempotencyKey: safeString(record3.idempotencyKey),
-    status: safeString(record3.status),
-    lane: safeString(record3.lane),
-    telegramUserId: safeString(record3.telegramUserId),
-    username: safeString(record3.username),
-    languageCode: safeString(record3.languageCode),
-    chatId: safeString(record3.chatId),
+    idempotencyKey: safeString(record4.idempotencyKey),
+    status: safeString(record4.status),
+    lane: safeString(record4.lane),
+    telegramUserId: safeString(record4.telegramUserId),
+    username: safeString(record4.username),
+    languageCode: safeString(record4.languageCode),
+    chatId: safeString(record4.chatId),
     sessionSlug,
     questionId: questionId4,
-    questionIdShort: safeString(record3.questionIdShort),
-    answerFingerprint: safeString(record3.answerFingerprint),
-    ...Number.isSafeInteger(record3.answerRevision) ? { answerRevision: record3.answerRevision } : {},
-    answer: objectOrNull(record3.answer),
-    onChainAnswer: objectOrNull(record3.onChainAnswer),
-    answerRef: objectOrNull(record3.answerRef),
-    canonicalApiRequest: objectOrNull(record3.canonicalApiRequest),
-    onChain: objectOrNull(record3.onChain),
-    directSubmitAttempt: objectOrNull(record3.directSubmitAttempt),
+    questionIdShort: safeString(record4.questionIdShort),
+    answerFingerprint: safeString(record4.answerFingerprint),
+    ...Number.isSafeInteger(record4.answerRevision) ? { answerRevision: record4.answerRevision } : {},
+    answer: objectOrNull(record4.answer),
+    onChainAnswer: objectOrNull(record4.onChainAnswer),
+    answerRef: objectOrNull(record4.answerRef),
+    canonicalApiRequest: objectOrNull(record4.canonicalApiRequest),
+    onChain: objectOrNull(record4.onChain),
+    directSubmitAttempt: objectOrNull(record4.directSubmitAttempt),
     sourceKey: safeString(sourceKey),
     createdAt,
     updatedAt
@@ -66747,7 +66794,7 @@ function buildQueuedSubmitRecord({
   session = {},
   canonicalBody = {}
 } = {}) {
-  const record3 = normalizeSubmitRecordTimestamps({
+  const record4 = normalizeSubmitRecordTimestamps({
     ...baseRecord,
     action: AGENT_ACTIONS.DIRECT_SUBMIT_RESPONSE,
     status: "submit_queued",
@@ -66759,28 +66806,28 @@ function buildQueuedSubmitRecord({
     },
     sessionSnapshot: safeSessionSnapshotForSubmitQueue(session)
   });
-  assertNoSecretShape(record3, "Queued Agent submit records must not serialize secrets.");
-  return record3;
+  assertNoSecretShape(record4, "Queued Agent submit records must not serialize secrets.");
+  return record4;
 }
 async function persistQueuedSubmitRecord({
   env = {},
   kvKey = "",
-  record: record3 = {}
+  record: record4 = {}
 } = {}) {
   if (!env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== "function") {
     return { ok: false, reason: "action_kv_unavailable" };
   }
-  assertNoSecretShape(record3, "Queued Agent submit records must not serialize secrets.");
-  await persistAgentSubmitRecord({ env, kvKey, record: record3 });
+  assertNoSecretShape(record4, "Queued Agent submit records must not serialize secrets.");
+  await persistAgentSubmitRecord({ env, kvKey, record: record4 });
   return { ok: true };
 }
 async function persistCanonicalAnswerRecord({
   kv,
-  record: record3 = {},
+  record: record4 = {},
   sourceKey = ""
 } = {}) {
   if (!kv || typeof kv.put !== "function") return { ok: false, reason: "action_kv_unavailable" };
-  const canonical = buildCanonicalAnswerRecord(record3, { sourceKey });
+  const canonical = buildCanonicalAnswerRecord(record4, { sourceKey });
   if (!canonical) return { ok: false, reason: "canonical_answer_incomplete" };
   const keys = [
     canonicalAnswerKvKey(canonical),
@@ -66794,16 +66841,16 @@ async function persistCanonicalAnswerRecord({
 async function persistAgentSubmitRecord({
   env = {},
   kvKey = "",
-  record: record3 = {}
+  record: record4 = {}
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== "function") {
     return { ok: false, reason: "action_kv_unavailable" };
   }
-  const requestId = safeString(record3.requestId);
+  const requestId = safeString(record4.requestId);
   const canonicalKey = kvKey || submitRequestKvKey(requestId);
   if (!canonicalKey) return { ok: false, reason: "submit_request_key_missing" };
-  const storedRecord = normalizeSubmitRecordTimestamps(record3);
+  const storedRecord = normalizeSubmitRecordTimestamps(record4);
   assertNoSecretShape(storedRecord, "Agent submit records must not serialize secrets.");
   const serialized = JSON.stringify(storedRecord);
   const canonical = await persistCanonicalAnswerRecord({ kv, record: storedRecord, sourceKey: canonicalKey });
@@ -66828,7 +66875,7 @@ async function persistAgentSubmitRecord({
 }
 async function enqueueAgentSubmitRecord({
   env = {},
-  record: record3 = {}
+  record: record4 = {}
 } = {}) {
   if (!agentSubmitQueueEnabled(env)) {
     return { ok: false, skipped: true, reason: "telegram_submit_queue_disabled" };
@@ -66836,8 +66883,8 @@ async function enqueueAgentSubmitRecord({
   const body = {
     type: AGENT_SUBMIT_QUEUE_MESSAGE_TYPE,
     version: 1,
-    requestId: safeString(record3.requestId),
-    record: record3
+    requestId: safeString(record4.requestId),
+    record: record4
   };
   assertNoSecretShape(body, "Queued Agent submit messages must not serialize secrets.");
   await env.AGENT_RESPONSE_QUEUE.send(body, { contentType: "json" });
@@ -66846,17 +66893,17 @@ async function enqueueAgentSubmitRecord({
 async function queueAgentSubmitRecord({
   env = {},
   kvKey = "",
-  record: record3 = {}
+  record: record4 = {}
 } = {}) {
   const normalizedRecord = {
-    ...normalizeSubmitRecordTimestamps(record3),
-    queueGeneration: safeString(record3.queueGeneration) || crypto.randomUUID()
+    ...normalizeSubmitRecordTimestamps(record4),
+    queueGeneration: safeString(record4.queueGeneration) || crypto.randomUUID()
   };
   const persisted = await persistQueuedSubmitRecord({ env, kvKey, record: normalizedRecord });
   if (!persisted.ok) return persisted;
   const queued = await enqueueAgentSubmitRecord({ env, record: normalizedRecord });
   if (!queued.ok) return queued;
-  return { ok: true, queued: true, requestId: record3.requestId };
+  return { ok: true, queued: true, requestId: record4.requestId };
 }
 function queueAttemptPolicy(env, attempts = 1) {
   const configured = Number(env.AGENT_CONTEXT?.config?.agentHttp?.submitMaxAttempts);
@@ -66880,16 +66927,16 @@ function withRetryExhaustion(outcome, policy) {
 function outcomeStatus(outcome) {
   return outcome.ok === true ? "direct_submitted" : outcome.retryable === true ? "submit_queued" : outcome.reconciliationRequired === true ? "direct_submit_reconciliation_required" : "direct_submit_failed";
 }
-function replayResult(record3) {
+function replayResult(record4) {
   return {
-    ok: record3.status === "direct_submitted",
-    requestId: record3.requestId,
+    ok: record4.status === "direct_submitted",
+    requestId: record4.requestId,
     replayed: true,
-    status: record3.status,
+    status: record4.status,
     retryable: false,
-    reconciliationRequired: record3.status === "direct_submit_reconciliation_required" || record3.onChain?.reconciliationRequired === true,
-    reason: record3.onChain?.reason || null,
-    onChain: record3.onChain || null
+    reconciliationRequired: record4.status === "direct_submit_reconciliation_required" || record4.onChain?.reconciliationRequired === true,
+    reason: record4.onChain?.reason || null,
+    onChain: record4.onChain || null
   };
 }
 function sameQueuedRequest(left, right) {
@@ -66898,26 +66945,26 @@ function sameQueuedRequest(left, right) {
 function staleQueueGeneration(existing, incoming) {
   return existing?.queueGeneration && incoming?.queueGeneration && existing.queueGeneration !== incoming.queueGeneration;
 }
-function recoveryDiagnostics(record3, reason) {
+function recoveryDiagnostics(record4, reason) {
   return {
     event: "agent_submit_recovery_required",
     reason,
-    requestId: safeString(record3.requestId),
-    status: safeString(record3.status),
-    sessionSlug: safeString(record3.sessionSlug),
-    txHash: safeString(record3.onChain?.txHash),
-    storageId: safeString(record3.onChain?.storageId),
-    createdAt: safeString(record3.createdAt),
-    queueGeneration: safeString(record3.queueGeneration)
+    requestId: safeString(record4.requestId),
+    status: safeString(record4.status),
+    sessionSlug: safeString(record4.sessionSlug),
+    txHash: safeString(record4.onChain?.txHash),
+    storageId: safeString(record4.onChain?.storageId),
+    createdAt: safeString(record4.createdAt),
+    queueGeneration: safeString(record4.queueGeneration)
   };
 }
-async function retainOutcomeForRecovery(env, record3, error) {
-  const recovery = record3.onChain?.retryable === true ? {
-    ...record3,
+async function retainOutcomeForRecovery(env, record4, error) {
+  const recovery = record4.onChain?.retryable === true ? {
+    ...record4,
     status: "direct_submit_failed",
-    canonicalApiRequest: { ...record3.canonicalApiRequest, status: "direct_submit_failed" },
-    onChain: { ...record3.onChain, retryable: false, safeToRetry: true, recoveryReason: "submit_result_persistence_failed" }
-  } : { ...record3, canonicalApiRequest: { ...record3.canonicalApiRequest, status: record3.status === "direct_submitted" ? "executed_direct_onchain" : record3.status } };
+    canonicalApiRequest: { ...record4.canonicalApiRequest, status: "direct_submit_failed" },
+    onChain: { ...record4.onChain, retryable: false, safeToRetry: true, recoveryReason: "submit_result_persistence_failed" }
+  } : { ...record4, canonicalApiRequest: { ...record4.canonicalApiRequest, status: record4.status === "direct_submitted" ? "executed_direct_onchain" : record4.status } };
   const body = { type: AGENT_SUBMIT_QUEUE_MESSAGE_TYPE, version: 1, requestId: recovery.requestId, persistenceOnly: true, record: recovery };
   let retained = false;
   try {
@@ -66935,7 +66982,7 @@ async function retainOutcomeForRecovery(env, record3, error) {
     reason: "submit_result_persistence_failed",
     error: safeString(error?.message || error),
     retryable: false,
-    reconciliationRequired: record3.onChain?.ok === true || record3.onChain?.reconciliationRequired === true,
+    reconciliationRequired: record4.onChain?.ok === true || record4.onChain?.reconciliationRequired === true,
     persistenceOnlyQueued: retained,
     diagnosticsRetained: retained,
     onChain: recovery.onChain
@@ -66997,50 +67044,50 @@ async function persistQueueOutcome({ env, source, outcome, now }) {
   };
 }
 async function persistRecoveryMessage({ env, body, requireExisting = false }) {
-  const record3 = objectOrNull(body.record);
-  if (!record3 || safeString(body.requestId) !== safeString(record3.requestId) || !record3.requestId || !record3.sessionSlug || !record3.questionId || !["direct_submitted", "direct_submit_failed", "direct_submit_reconciliation_required"].includes(record3.status) || !objectOrNull(record3.onChain)) {
+  const record4 = objectOrNull(body.record);
+  if (!record4 || safeString(body.requestId) !== safeString(record4.requestId) || !record4.requestId || !record4.sessionSlug || !record4.questionId || !["direct_submitted", "direct_submit_failed", "direct_submit_reconciliation_required"].includes(record4.status) || !objectOrNull(record4.onChain)) {
     return { ok: false, retryable: false, reason: "submit_recovery_record_invalid" };
   }
-  if (record3.submissionJournal === true) {
-    const result = await env.AGENT_SERVICES.recoverSubmitOutcome(record3);
+  if (record4.submissionJournal === true) {
+    const result = await env.AGENT_SERVICES.recoverSubmitOutcome(record4);
     return result.record ? { ...replayResult(result.record), persistenceOnly: true } : result;
   }
   try {
     const kv = env.AGENT_ACTION_KV;
     if (typeof kv?.get !== "function" || typeof kv?.put !== "function") throw new Error("action_kv_unavailable");
-    const raw = await kv.get(submitRequestKvKey(record3.requestId));
+    const raw = await kv.get(submitRequestKvKey(record4.requestId));
     const existing = raw == null ? null : objectOrNull(safeJsonParse(raw, null));
     if (requireExisting && !existing) return { ok: false, reason: "submit_intent_missing" };
-    if (raw != null && (!existing || !sameQueuedRequest(existing, record3))) {
+    if (raw != null && (!existing || !sameQueuedRequest(existing, record4))) {
       return { ok: false, retryable: false, reason: "submit_recovery_request_mismatch" };
     }
-    if (staleQueueGeneration(existing, record3)) return { ok: true, replayed: true, reason: "stale_submit_recovery" };
-    if (existing?.status === "direct_submitted" && record3.status !== "direct_submitted") return replayResult(existing);
-    if (existing?.status === "direct_submit_failed" && existing.onChain?.safeToRetry !== true && record3.onChain.safeToRetry === true) {
+    if (staleQueueGeneration(existing, record4)) return { ok: true, replayed: true, reason: "stale_submit_recovery" };
+    if (existing?.status === "direct_submitted" && record4.status !== "direct_submitted") return replayResult(existing);
+    if (existing?.status === "direct_submit_failed" && existing.onChain?.safeToRetry !== true && record4.onChain.safeToRetry === true) {
       return replayResult(existing);
     }
-    if ((existing?.status === "direct_submit_reconciliation_required" || existing?.onChain?.reconciliationRequired === true) && record3.onChain.safeToRetry === true && (!record3.onChain.submissionAttemptId || record3.onChain.submissionAttemptId !== existing.onChain?.submissionAttemptId)) {
+    if ((existing?.status === "direct_submit_reconciliation_required" || existing?.onChain?.reconciliationRequired === true) && record4.onChain.safeToRetry === true && (!record4.onChain.submissionAttemptId || record4.onChain.submissionAttemptId !== existing.onChain?.submissionAttemptId)) {
       return replayResult(existing);
     }
-    if (existing?.onChain?.txHash && record3.onChain?.txHash && existing.onChain.txHash !== record3.onChain.txHash) {
-      return { ok: false, requestId: record3.requestId, retryable: true, persistenceOnly: true, reason: "submit_recovery_outcome_conflict" };
+    if (existing?.onChain?.txHash && record4.onChain?.txHash && existing.onChain.txHash !== record4.onChain.txHash) {
+      return { ok: false, requestId: record4.requestId, retryable: true, persistenceOnly: true, reason: "submit_recovery_outcome_conflict" };
     }
-    const persisted = await persistAgentSubmitRecord({ env, record: { ...record3, createdAt: existing?.createdAt || record3.createdAt } });
+    const persisted = await persistAgentSubmitRecord({ env, record: { ...record4, createdAt: existing?.createdAt || record4.createdAt } });
     if (!persisted.ok) throw new Error(persisted.reason || "submit_recovery_write_failed");
-    return { ok: true, requestId: record3.requestId, status: record3.status, persistenceOnly: true };
+    return { ok: true, requestId: record4.requestId, status: record4.status, persistenceOnly: true };
   } catch (error) {
-    return { ok: false, requestId: record3.requestId, retryable: true, persistenceOnly: true, reason: "submit_recovery_write_failed", error: safeString(error?.message || error) };
+    return { ok: false, requestId: record4.requestId, retryable: true, persistenceOnly: true, reason: "submit_recovery_write_failed", error: safeString(error?.message || error) };
   }
 }
 async function processQueuedAgentSubmitRecord({
   env = {},
-  record: record3 = {},
+  record: record4 = {},
   createdAt = null,
   now = /* @__PURE__ */ new Date(),
   attempts = 1,
   contractFactory
 } = {}) {
-  const requestId = safeString(record3.requestId);
+  const requestId = safeString(record4.requestId);
   const retryPolicy = queueAttemptPolicy(env, attempts);
   const kvKey = submitRequestKvKey(requestId);
   if (!kvKey) return { ok: false, retryable: false, reason: "submit_request_key_missing" };
@@ -67054,13 +67101,13 @@ async function processQueuedAgentSubmitRecord({
   } catch (error) {
     const outcome = withRetryExhaustion({ ok: false, retryable: true, reason: "submit_request_read_failed", error: safeString(error?.message || error) }, retryPolicy);
     if (outcome.retryable) return { ...outcome, requestId };
-    return retainOutcomeForRecovery(env, { ...record3, status: "direct_submit_failed", onChain: outcome }, error);
+    return retainOutcomeForRecovery(env, { ...record4, status: "direct_submit_failed", onChain: outcome }, error);
   }
   const existing = rawExisting == null ? null : objectOrNull(safeJsonParse(rawExisting, null));
-  if (rawExisting != null && (!existing || !sameQueuedRequest(existing, record3))) {
+  if (rawExisting != null && (!existing || !sameQueuedRequest(existing, record4))) {
     return { ok: false, requestId, retryable: false, reason: "submit_request_record_invalid" };
   }
-  if (staleQueueGeneration(existing, record3)) return { ok: true, requestId, replayed: true, reason: "stale_submit_delivery" };
+  if (staleQueueGeneration(existing, record4)) return { ok: true, requestId, replayed: true, reason: "stale_submit_delivery" };
   if (existing?.status === "direct_submit_failed") return replayResult(existing);
   if (existing?.status === "direct_submitted") {
     return { ok: true, requestId, replayed: true, status: "direct_submitted" };
@@ -67077,7 +67124,7 @@ async function processQueuedAgentSubmitRecord({
       onChain: existing.onChain || null
     };
   }
-  const source = existing || record3;
+  const source = existing || record4;
   const executionTime = now instanceof Date ? now : new Date(now);
   if (!Number.isFinite(executionTime.getTime())) {
     return { ok: false, requestId, retryable: false, reason: "submit_execution_time_invalid" };
@@ -67257,16 +67304,16 @@ async function scheduleProjectionRepair(coordinator) {
   if (!current || current <= Number(coordinator.now()) || current > nextAt) await coordinator.state.storage.setAlarm(nextAt);
 }
 async function projectOutcome(coordinator, key, stored) {
-  const record3 = journalRecord(stored);
-  const projectionKey = `${PROJECTION_PREFIX}${record3.sessionId}:${record3.requestId}`;
-  const digest2 = await sha256Hex2(stableJson(record3));
+  const record4 = journalRecord(stored);
+  const projectionKey = `${PROJECTION_PREFIX}${record4.sessionId}:${record4.requestId}`;
+  const digest2 = await sha256Hex2(stableJson(record4));
   const previous = stored.kvProjection || {};
   if (previous.digest === digest2 && previous.pending !== true) return;
   const now = Number(coordinator.now());
   let notBeforeMs = Number(previous.notBeforeMs) || now;
   const pending = { digest: digest2, pending: true, notBeforeMs };
   await coordinator.state.storage.transaction(async (storage) => {
-    await storage.put(key, { ...record3, kvProjection: pending });
+    await storage.put(key, { ...record4, kvProjection: pending });
     await storage.put(projectionKey, { key, notBeforeMs });
   });
   if (now < notBeforeMs) {
@@ -67275,18 +67322,18 @@ async function projectOutcome(coordinator, key, stored) {
   }
   notBeforeMs = now + 1e3;
   await coordinator.state.storage.transaction(async (storage) => {
-    await storage.put(key, { ...record3, kvProjection: { ...pending, notBeforeMs } });
+    await storage.put(key, { ...record4, kvProjection: { ...pending, notBeforeMs } });
     await storage.put(projectionKey, { key, notBeforeMs });
   });
   await scheduleProjectionRepair(coordinator);
   try {
-    const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record3.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
-    const persisted = await persistAgentSubmitRecord({ env: { AGENT_ACTION_KV: kv }, record: record3 });
+    const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record4.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
+    const persisted = await persistAgentSubmitRecord({ env: { AGENT_ACTION_KV: kv }, record: record4 });
     if (!persisted.ok) throw new Error(persisted.reason);
   } catch {
     notBeforeMs = Number(coordinator.now()) + 1e3;
     await coordinator.state.storage.transaction(async (storage) => {
-      await storage.put(key, { ...record3, kvProjection: { ...pending, notBeforeMs } });
+      await storage.put(key, { ...record4, kvProjection: { ...pending, notBeforeMs } });
       await storage.put(projectionKey, { key, notBeforeMs });
     });
     await scheduleProjectionRepair(coordinator);
@@ -67294,7 +67341,7 @@ async function projectOutcome(coordinator, key, stored) {
   }
   notBeforeMs = Number(coordinator.now()) + 1e3;
   await coordinator.state.storage.transaction(async (storage) => {
-    await storage.put(key, { ...record3, kvProjection: { digest: digest2, pending: false, notBeforeMs } });
+    await storage.put(key, { ...record4, kvProjection: { digest: digest2, pending: false, notBeforeMs } });
     await storage.delete(projectionKey);
   });
 }
@@ -67324,38 +67371,38 @@ var init_submissionJournal = __esm({
     sameRequest = (a, b2) => ["sessionId", "sessionSlug", "workerOrigin", "accountAddress", "principalId", "questionId", "idempotencyKey", "requestId"].every((key) => a[key] === b2[key]);
     journalRecord = (stored) => {
       if (!stored) return null;
-      const { kvProjection: _projection, ...record3 } = stored;
-      return record3;
+      const { kvProjection: _projection, ...record4 } = stored;
+      return record4;
     };
     dispatchAgentSubmissionJournal = (coordinator, operation, payload) => coordinator.serializeSessionConfigOperation(async () => {
-      const record3 = payload?.record;
+      const record4 = payload?.record;
       if (operation === "claim") {
-        if (!record3 || record3.sessionSlug !== payload.slug || ["principalId", "questionId", "transport", "contentDigest"].some((key3) => typeof record3[key3] !== "string" || !record3[key3])) {
+        if (!record4 || record4.sessionSlug !== payload.slug || ["principalId", "questionId", "transport", "contentDigest"].some((key3) => typeof record4[key3] !== "string" || !record4[key3])) {
           return reply({ ok: false, reason: "submit_journal_record_invalid" }, 400);
         }
         const authority2 = await coordinator.readSessionConfigAuthority(payload.slug);
-        if (resolveCanonicalWorkerSessionIdHex(authority2?.config) !== record3.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
-        const key2 = `ce-agent-answer-head:${record3.sessionId}:${await sha256Hex2(stableJson([record3.principalId, record3.questionId]))}`;
+        if (resolveCanonicalWorkerSessionIdHex(authority2?.config) !== record4.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
+        const key2 = `ce-agent-answer-head:${record4.sessionId}:${await sha256Hex2(stableJson([record4.principalId, record4.questionId]))}`;
         const head = await coordinator.state.storage.get(key2);
-        if (head?.contentDigest === record3.contentDigest) return reply({ ok: true, head });
+        if (head?.contentDigest === record4.contentDigest) return reply({ ok: true, head });
         assertExpectedSessionAuthority(authority2, payload.expectedAuthority, payload.slug);
         const revision = (head?.revision || 0) + 1;
         if (!Number.isSafeInteger(revision)) return reply({ ok: false, reason: "submit_revision_exhausted" }, 409);
-        const idempotencyKey = buildOpaqueActionId(await sha256Hex2(stableJson([record3.transport, record3.principalId, record3.sessionId, record3.questionId, revision])));
-        const next2 = { revision, contentDigest: record3.contentDigest, requestId: buildOpaqueActionId(idempotencyKey), idempotencyKey };
+        const idempotencyKey = buildOpaqueActionId(await sha256Hex2(stableJson([record4.transport, record4.principalId, record4.sessionId, record4.questionId, revision])));
+        const next2 = { revision, contentDigest: record4.contentDigest, requestId: buildOpaqueActionId(idempotencyKey), idempotencyKey };
         await coordinator.state.storage.put(key2, next2);
         return reply({ ok: true, head: next2 });
       }
-      if (!["begin", "finish", "read"].includes(operation) || !record3 || !/^[A-Za-z0-9_-]{1,160}$/.test(record3.requestId || "") || !record3.idempotencyKey || record3.sessionSlug !== payload.slug || operation !== "read" && !record3.onChain?.submissionAttemptId) {
+      if (!["begin", "finish", "read"].includes(operation) || !record4 || !/^[A-Za-z0-9_-]{1,160}$/.test(record4.requestId || "") || !record4.idempotencyKey || record4.sessionSlug !== payload.slug || operation !== "read" && !record4.onChain?.submissionAttemptId) {
         return reply({ ok: false, reason: "submit_journal_record_invalid" }, 400);
       }
       const authority = await coordinator.readSessionConfigAuthority(payload.slug);
-      if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record3.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
-      const key = `ce-agent-submit:${record3.sessionId}:${record3.requestId}`;
+      if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record4.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
+      const key = `ce-agent-submit:${record4.sessionId}:${record4.requestId}`;
       const stored = await coordinator.state.storage.get(key);
       const existing = journalRecord(stored);
-      if (existing && !sameRequest(existing, record3)) return reply({ ok: false, reason: "submit_journal_request_mismatch" }, 409);
-      let next = record3;
+      if (existing && !sameRequest(existing, record4)) return reply({ ok: false, reason: "submit_journal_request_mismatch" }, 409);
+      let next = record4;
       let replayed = false;
       if (operation === "read") {
         if (!existing) return reply({ ok: true, record: null });
@@ -67369,31 +67416,31 @@ var init_submissionJournal = __esm({
         } else if (existing?.status === "direct_submit_in_progress") {
           next = existing;
         } else if (existing) next = {
-          ...record3,
+          ...record4,
           createdAt: existing.createdAt,
           draftProvenance: existing.draftProvenance,
           responsePayload: existing.responsePayload,
-          onChain: { ...record3.onChain, ...existing.onChain?.storageId ? { storageId: existing.onChain.storageId, storageRef: existing.onChain.storageRef } : {} }
+          onChain: { ...record4.onChain, ...existing.onChain?.storageId ? { storageId: existing.onChain.storageId, storageRef: existing.onChain.storageRef } : {} }
         };
       } else {
         if (!existing) return reply({ ok: false, reason: "submit_intent_missing" }, 409);
-        if (!["direct_submitted", "direct_submit_failed", "direct_submit_reconciliation_required"].includes(record3.status)) return reply({ ok: false, reason: "submit_journal_outcome_invalid" }, 400);
-        if (existing.status === "direct_submitted" || record3.onChain.safeToRetry === true && existing.onChain?.submissionAttemptId !== record3.onChain.submissionAttemptId) {
+        if (!["direct_submitted", "direct_submit_failed", "direct_submit_reconciliation_required"].includes(record4.status)) return reply({ ok: false, reason: "submit_journal_outcome_invalid" }, 400);
+        if (existing.status === "direct_submitted" || record4.onChain.safeToRetry === true && existing.onChain?.submissionAttemptId !== record4.onChain.submissionAttemptId) {
           next = existing;
           replayed = true;
         } else next = {
-          ...record3,
+          ...record4,
           createdAt: existing.createdAt,
           draftProvenance: existing.draftProvenance,
           responsePayload: existing.responsePayload,
-          onChain: { ...record3.onChain, ...existing.onChain?.storageId && !record3.onChain?.storageId ? { storageId: existing.onChain.storageId, storageRef: existing.onChain.storageRef } : {} }
+          onChain: { ...record4.onChain, ...existing.onChain?.storageId && !record4.onChain?.storageId ? { storageId: existing.onChain.storageId, storageRef: existing.onChain.storageRef } : {} }
         };
       }
       if (operation === "begin" && !replayed) {
         next = { ...next, admissionComplete: true };
         await coordinator.state.storage.transaction(async (storage) => {
           await storage.put(key, { ...next, kvProjection: { ...stored?.kvProjection, pending: false } });
-          await storage.delete(`${PROJECTION_PREFIX}${record3.sessionId}:${record3.requestId}`);
+          await storage.delete(`${PROJECTION_PREFIX}${record4.sessionId}:${record4.requestId}`);
         });
       } else if (operation === "finish" || stored?.kvProjection?.pending) {
         await projectOutcome(coordinator, key, { ...next, kvProjection: stored?.kvProjection });
@@ -67651,23 +67698,23 @@ var init_wrappedJournal = __esm({
     reply3 = (body, status = 200) => Response.json(body, { status });
     busy = () => reply3({ ok: false, status: 503, reason: "wrapped_storage_busy", retryable: true, retryAfterSeconds: 1 }, 503);
     dispatchWrappedResearch = (coordinator, payload) => coordinator.serializeSessionConfigOperation(async () => {
-      const record3 = payload?.record;
-      if (!record3 || !["answers", "votes"].includes(record3.kind) || record3.sessionSlug !== payload.slug || typeof record3.subjectId !== "string" || !record3.subjectId || record3.subjectId.length > 256 || typeof record3.requestId !== "string" || !record3.requestId || record3.requestId.length > 160 || !/^[a-f0-9]{64}$/.test(record3.summaryHash || "") || !Array.isArray(record3.events) || record3.events.length < 1 || record3.events.length > 50 || record3.kind === "votes" && !["linear", "quadratic"].includes(record3.mode)) {
+      const record4 = payload?.record;
+      if (!record4 || !["answers", "votes"].includes(record4.kind) || record4.sessionSlug !== payload.slug || typeof record4.subjectId !== "string" || !record4.subjectId || record4.subjectId.length > 256 || typeof record4.requestId !== "string" || !record4.requestId || record4.requestId.length > 160 || !/^[a-f0-9]{64}$/.test(record4.summaryHash || "") || !Array.isArray(record4.events) || record4.events.length < 1 || record4.events.length > 50 || record4.kind === "votes" && !["linear", "quadratic"].includes(record4.mode)) {
         return reply3({ ok: false, reason: "wrapped_request_invalid" }, 400);
       }
       const authority = await coordinator.readSessionConfigAuthority(payload.slug);
       assertExpectedSessionAuthority(authority, payload.expectedAuthority, payload.slug);
-      if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record3.sessionId) {
+      if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record4.sessionId) {
         return reply3({ ok: false, reason: "wrapped_session_mismatch" }, 409);
       }
-      const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record3.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
+      const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record4.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
       const storage = coordinator.state.storage;
-      const stateKey = record3.kind === "answers" ? answerStateKey(record3.sessionSlug, record3.subjectId) : voteStateKey(record3.sessionSlug, record3.subjectId, record3.mode);
-      const namespace = `ce-agent-wrapped:${record3.sessionId}:${await sha256Hex2(stateKey)}`;
+      const stateKey = record4.kind === "answers" ? answerStateKey(record4.sessionSlug, record4.subjectId) : voteStateKey(record4.sessionSlug, record4.subjectId, record4.mode);
+      const namespace = `ce-agent-wrapped:${record4.sessionId}:${await sha256Hex2(stateKey)}`;
       const durableStateKey = `${namespace}:state`;
-      const requestKey = `${namespace}:request:${await sha256Hex2(record3.requestId)}`;
+      const requestKey = `${namespace}:request:${await sha256Hex2(record4.requestId)}`;
       const existing = await storage.get(requestKey);
-      if (existing && existing.summaryHash !== record3.summaryHash) return reply3({ ok: false, status: 409, reason: "request_id_conflict" }, 409);
+      if (existing && existing.summaryHash !== record4.summaryHash) return reply3({ ok: false, status: 409, reason: "request_id_conflict" }, 409);
       if (existing?.complete) return reply3({ ...existing.response, replay: true });
       let state = await storage.get(durableStateKey);
       if (!state) state = { value: safeJsonParse(await kv.get(stateKey), null), notBeforeMs: 0, pending: null };
@@ -67701,13 +67748,13 @@ var init_wrappedJournal = __esm({
         if (existing) return reply3({ ...existing.response, replay: true });
       }
       if (now < state.notBeforeMs) return busy();
-      const base = state.value || record3.initialState;
-      if (!base || !record3.changes || typeof record3.changes !== "object") return reply3({ ok: false, reason: "wrapped_state_invalid" }, 400);
+      const base = state.value || record4.initialState;
+      if (!base || !record4.changes || typeof record4.changes !== "object") return reply3({ ok: false, reason: "wrapped_state_invalid" }, 400);
       let value;
-      let events = record3.events;
-      if (record3.kind === "answers") {
+      let events = record4.events;
+      if (record4.kind === "answers") {
         const runScopes = [...base.runScopes || []];
-        events = record3.events.map((event) => {
+        events = record4.events.map((event) => {
           const runId = event.value.runId;
           let scope = runScopes.find((entry2) => entry2.runId === runId);
           if (!scope) {
@@ -67717,7 +67764,7 @@ var init_wrappedJournal = __esm({
           return { ...event, value: { ...event.value, runStatementIds: scope.runStatementIds } };
         });
         const byStatement = { ...base.byStatement };
-        for (const [id2, change] of Object.entries(record3.changes)) {
+        for (const [id2, change] of Object.entries(record4.changes)) {
           byStatement[id2] = { ...byStatement[id2], agent: change.agent, agentSkip: change.agentSkip };
         }
         const counts = { answers: 0, skips: 0 };
@@ -67725,26 +67772,26 @@ var init_wrappedJournal = __esm({
           if (entry2.agent) counts.answers++;
           if (entry2.agentSkip) counts.skips++;
         }
-        value = { ...base, byStatement, runScopes, counts, updatedAt: record3.createdAt };
-      } else value = { ...base, ...record3.changes, updatedAt: record3.createdAt };
+        value = { ...base, byStatement, runScopes, counts, updatedAt: record4.createdAt };
+      } else value = { ...base, ...record4.changes, updatedAt: record4.createdAt };
       value.recentRequestIds = [
-        ...(base.recentRequestIds || []).filter((entry2) => entry2.requestId !== record3.requestId),
-        { requestId: record3.requestId, summaryHash: record3.summaryHash, at: record3.createdAt }
+        ...(base.recentRequestIds || []).filter((entry2) => entry2.requestId !== record4.requestId),
+        { requestId: record4.requestId, summaryHash: record4.summaryHash, at: record4.createdAt }
       ].slice(-MAX_RECENT_REQUEST_IDS);
       const pending = {
-        summaryHash: record3.summaryHash,
+        summaryHash: record4.summaryHash,
         events,
-        stateMetadata: record3.stateMetadata,
-        response: record3.response,
+        stateMetadata: record4.stateMetadata,
+        response: record4.response,
         complete: false
       };
-      if (record3.kind === "answers") pending.stateMetadata = { ...pending.stateMetadata, a: value.counts.answers, s: value.counts.skips };
+      if (record4.kind === "answers") pending.stateMetadata = { ...pending.stateMetadata, a: value.counts.answers, s: value.counts.skips };
       state = { ...state, value, pending: requestKey };
       await storage.transaction(async (tx) => {
         await tx.put(requestKey, pending);
         await tx.put(durableStateKey, state);
       });
-      return await project() ? reply3(record3.response) : busy();
+      return await project() ? reply3(record4.response) : busy();
     });
   }
 });
@@ -68017,15 +68064,15 @@ var init_storageEnvelopeEncryption = __esm({
       const envelope = isObj11(config.storageEnvelope) ? config.storageEnvelope : {};
       return isObj11(envelope.sessionKey) ? envelope.sessionKey : null;
     };
-    isCoordinatorWrappedSessionKeyRecord = (record3, slug) => {
-      if (!isObj11(record3)) return false;
-      const createdAt = trim8(record3.createdAt);
+    isCoordinatorWrappedSessionKeyRecord = (record4, slug) => {
+      if (!isObj11(record4)) return false;
+      const createdAt = trim8(record4.createdAt);
       const createdAtMs2 = Date.parse(createdAt);
-      return record3.version === ENVELOPE_VERSION && record3.keyProvider === "worker_secret" && record3.alg === AES_256_GCM && record3.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs2) && new Date(createdAtMs2).toISOString() === createdAt && trim8(record3.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim8(record3.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim8(record3.wrappedKey));
+      return record4.version === ENVELOPE_VERSION && record4.keyProvider === "worker_secret" && record4.alg === AES_256_GCM && record4.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs2) && new Date(createdAtMs2).toISOString() === createdAt && trim8(record4.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim8(record4.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim8(record4.wrappedKey));
     };
     unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
-      const record3 = readSessionKeyRecord(config);
-      if (!record3) throw new Error("Storage envelope session key is missing.");
+      const record4 = readSessionKeyRecord(config);
+      if (!record4) throw new Error("Storage envelope session key is missing.");
       const aad = `ce-storage-envelope:session:${safeSlugPart(slug)}`;
       const attempts = [false, true];
       let lastError = null;
@@ -68033,7 +68080,7 @@ var init_storageEnvelopeEncryption = __esm({
         if (previous && !trim8(readDeploymentSecret({ env, previous, deps }))) continue;
         try {
           const deploymentKey = await importDeploymentKek({ env, previous, deps });
-          return await unwrapBytesWithKey({ wrappingKey: deploymentKey, wrapped: record3, aad, deps });
+          return await unwrapBytesWithKey({ wrappingKey: deploymentKey, wrapped: record4, aad, deps });
         } catch (error) {
           lastError = error;
         }
@@ -71639,11 +71686,11 @@ var init_sessionSecretsAuthority = __esm({
       throw new Error("Invalid session secrets authority.");
     };
     readSessionSecretsAuthority = async (coordinator, storage, slug) => {
-      const record3 = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
-      if (record3 != null) {
-        if (record3.version !== 1 || record3.slug !== slug || !Number.isSafeInteger(record3.revision) || record3.revision < 1) fail3();
-        await decryptSessionSecretsEnvelope(record3.envelope, { env: coordinator.env, slug });
-        return record3;
+      const record4 = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
+      if (record4 != null) {
+        if (record4.version !== 1 || record4.slug !== slug || !Number.isSafeInteger(record4.revision) || record4.revision < 1) fail3();
+        await decryptSessionSecretsEnvelope(record4.envelope, { env: coordinator.env, slug });
+        return record4;
       }
       const raw = await coordinator.env.GROUP_KV.get(`session:${normalizeWorkerSessionSlug(slug)}:secrets`);
       if (raw == null) return null;
@@ -71655,8 +71702,8 @@ var init_sessionSecretsAuthority = __esm({
       return adopted;
     };
     readCommittedSessionSecrets = async (coordinator, storage, slug) => {
-      const record3 = await readSessionSecretsAuthority(coordinator, storage, slug);
-      return record3 ? decryptSessionSecretsEnvelope(record3.envelope, { env: coordinator.env, slug }) : {};
+      const record4 = await readSessionSecretsAuthority(coordinator, storage, slug);
+      return record4 ? decryptSessionSecretsEnvelope(record4.envelope, { env: coordinator.env, slug }) : {};
     };
     commitSessionSecrets = async (coordinator, storage, slug, secrets) => {
       const previous = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
@@ -71671,13 +71718,13 @@ var init_sessionSecretsAuthority = __esm({
       return envelope;
     };
     repairPendingSessionSecretsProjection = async (coordinator) => {
-      const record3 = await coordinator.state.storage.get(SESSION_SECRETS_AUTHORITY_KEY);
-      if (!record3?.projectionPending) return;
-      await decryptSessionSecretsEnvelope(record3.envelope, { env: coordinator.env, slug: record3.slug });
-      await putKvJson(coordinator.env, `session:${normalizeWorkerSessionSlug(record3.slug)}:secrets`, record3.envelope);
+      const record4 = await coordinator.state.storage.get(SESSION_SECRETS_AUTHORITY_KEY);
+      if (!record4?.projectionPending) return;
+      await decryptSessionSecretsEnvelope(record4.envelope, { env: coordinator.env, slug: record4.slug });
+      await putKvJson(coordinator.env, `session:${normalizeWorkerSessionSlug(record4.slug)}:secrets`, record4.envelope);
       await coordinator.state.storage.transaction(async (transaction) => {
         const current = await transaction.get(SESSION_SECRETS_AUTHORITY_KEY);
-        if (current?.revision === record3.revision) {
+        if (current?.revision === record4.revision) {
           await transaction.put(SESSION_SECRETS_AUTHORITY_KEY, { ...current, projectionPending: false });
         }
       });
@@ -72036,7 +72083,7 @@ var init_sessionBackupAuthentication = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupImport.js
-var fail6, object3, stable, same, digest, hashPattern, resources, temporary, workerUrlFields, workerOrigin, assertEmptyTarget, validateSnapshot, validatePage, importCoordinatorBackupPage;
+var fail6, object3, stable, same2, digest, hashPattern, resources, temporary, workerUrlFields, workerOrigin, assertEmptyTarget, validateSnapshot, validatePage, importCoordinatorBackupPage;
 var init_sessionBackupImport = __esm({
   "workers/sessionCorsWorker/sessionBackupImport.js"() {
     init_sessionSecretsAuthority();
@@ -72060,7 +72107,7 @@ var init_sessionBackupImport = __esm({
     };
     object3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     stable = (value) => JSON.stringify(value, (_, item) => object3(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
-    same = (a, b2) => stable(a) === stable(b2);
+    same2 = (a, b2) => stable(a) === stable(b2);
     digest = async (bytes3) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes3))].map((v) => v.toString(16).padStart(2, "0")).join("");
     hashPattern = /^[a-f0-9]{64}$/;
     resources = /* @__PURE__ */ new Set(["docsContext", "questions", "surveys", "responses", "generatedArtifacts", "media", "images"]);
@@ -72120,7 +72167,7 @@ var init_sessionBackupImport = __esm({
       const authority = snapshot?.configAuthority;
       if (authority?.config?.agentHttp?.invites !== void 0) fail6("Agent invite admission material is not restorable.");
       const slug = manifest.sessionSlug;
-      if (!object3(authority) || authority.schemaVersion !== 1 || authority.slug !== slug || Object.keys(authority).some((key) => !["schemaVersion", "slug", "revision", "config", "projectionPending", "activeSessionKey"].includes(key)) || !Number.isSafeInteger(authority.revision) || authority.revision < 1 || authority.projectionPending !== false || !normalizeConfig(authority.config, slug) || resolveCanonicalWorkerSessionIdHex(authority.config) !== manifest.sessionId || !object3(snapshot.wrappedSessionKeys) || !same(snapshot.wrappedSessionKeys.activeSessionKey, authority.activeSessionKey || null)) {
+      if (!object3(authority) || authority.schemaVersion !== 1 || authority.slug !== slug || Object.keys(authority).some((key) => !["schemaVersion", "slug", "revision", "config", "projectionPending", "activeSessionKey"].includes(key)) || !Number.isSafeInteger(authority.revision) || authority.revision < 1 || authority.projectionPending !== false || !normalizeConfig(authority.config, slug) || resolveCanonicalWorkerSessionIdHex(authority.config) !== manifest.sessionId || !object3(snapshot.wrappedSessionKeys) || !same2(snapshot.wrappedSessionKeys.activeSessionKey, authority.activeSessionKey || null)) {
         fail6("Invalid backup config authority.");
       }
       if (authority.activeSessionKey && !normalizeSessionKey(authority.activeSessionKey, slug)) fail6("Invalid wrapped session key.");
@@ -72259,7 +72306,7 @@ var init_sessionBackupImport = __esm({
           await transaction.put(stateKey, progress);
         });
       }
-      if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.nextEntry > 0 && progress.pageHash !== pageHash || !same(progress.manifest, { ...manifest, counts: void 0, complete: void 0 })) fail6("Backup pages must be imported unchanged and in order.", 409);
+      if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.nextEntry > 0 && progress.pageHash !== pageHash || !same2(progress.manifest, { ...manifest, counts: void 0, complete: void 0 })) fail6("Backup pages must be imported unchanged and in order.", 409);
       progress.pageHash = pageHash;
       if (!progress.groupsStarted) {
         const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: "begin", archiveId: page.archiveId });
@@ -72283,7 +72330,7 @@ var init_sessionBackupImport = __esm({
           let identical = existing === value;
           if (!identical && json6) {
             try {
-              identical = same(JSON.parse(existing), JSON.parse(value));
+              identical = same2(JSON.parse(existing), JSON.parse(value));
             } catch {
             }
           }
@@ -72440,7 +72487,7 @@ var init_sessionBackupImport = __esm({
         await storage.put(stateKey, progress);
       }
       if (manifest.complete) {
-        if (!progress.snapshotReady || progress.pendingPayloads || progress.pendingRecords || !same(progress.observed, manifest.counts)) fail6("The backup is incomplete; its records or chunks are missing.", 409);
+        if (!progress.snapshotReady || progress.pendingPayloads || progress.pendingRecords || !same2(progress.observed, manifest.counts)) fail6("The backup is incomplete; its records or chunks are missing.", 409);
         const snapshotHeader = progress.chunkedSnapshot ? await storage.get(descriptorKey("coordinator", "coordinator")) : null;
         if (budget.remaining < (snapshotHeader?.chunkCount || 1) + 32) return pending();
         const snapshot = progress.chunkedSnapshot ? JSON.parse(new TextDecoder().decode(await assemble(snapshotHeader))) : JSON.parse(await index.get(`${root}coordinator`) || "null");
@@ -72475,7 +72522,7 @@ var init_sessionBackupImport = __esm({
           if (snapshot.secrets) {
             const restored = { version: 1, slug, revision: 1, envelope: snapshot.secrets, projectionPending: false };
             const existing = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
-            if (existing && (!await storage.get(backupImportJournalKey(page.archiveId, "durable", SESSION_SECRETS_AUTHORITY_KEY)) || !same(existing, restored))) conflict(SESSION_SECRETS_AUTHORITY_KEY);
+            if (existing && (!await storage.get(backupImportJournalKey(page.archiveId, "durable", SESSION_SECRETS_AUTHORITY_KEY)) || !same2(existing, restored))) conflict(SESSION_SECRETS_AUTHORITY_KEY);
             else if (existing) progress.counts.skipped += 1;
             else {
               await journalBackupImportWrite(storage, page.archiveId, "durable", SESSION_SECRETS_AUTHORITY_KEY);
@@ -72486,7 +72533,7 @@ var init_sessionBackupImport = __esm({
           const signer = snapshot.wrappedSessionKeys.litAuthorizationSigner;
           if (signer) {
             const existing = await storage.get("session-lit-authorization-signer-v1");
-            if (existing && (!await storage.get(backupImportJournalKey(page.archiveId, "durable", "session-lit-authorization-signer-v1")) || !same(existing, signer))) conflict("session-lit-authorization-signer-v1");
+            if (existing && (!await storage.get(backupImportJournalKey(page.archiveId, "durable", "session-lit-authorization-signer-v1")) || !same2(existing, signer))) conflict("session-lit-authorization-signer-v1");
             else if (existing) progress.counts.skipped += 1;
             else {
               await journalBackupImportWrite(storage, page.archiveId, "durable", "session-lit-authorization-signer-v1");
@@ -72564,9 +72611,9 @@ var init_sponsoredBootstrapGrantStore = __esm({
       const getKvJsonFn = typeof deps.getKvJson === "function" ? deps.getKvJson : getKvJson;
       return getKvJsonFn(env, buildSponsoredGrantKvKey(token));
     };
-    writeSponsoredGrantRecord = async (env, token, record3, ttlSeconds = null, deps = {}) => {
+    writeSponsoredGrantRecord = async (env, token, record4, ttlSeconds = null, deps = {}) => {
       const putKvJsonFn = typeof deps.putKvJson === "function" ? deps.putKvJson : putKvJson;
-      return putKvJsonFn(env, buildSponsoredGrantKvKey(token), record3, ttlSeconds || void 0);
+      return putKvJsonFn(env, buildSponsoredGrantKvKey(token), record4, ttlSeconds || void 0);
     };
     deleteSponsoredGrantRecord = async (env, token) => env?.GROUP_KV?.delete?.(buildSponsoredGrantKvKey(token));
     normalizeSensitiveValues = (values = []) => Array.from(new Set(
@@ -72776,26 +72823,26 @@ var init_aiModelParams = __esm({
 });
 
 // workers/sessionCorsWorker/aiRequestPolicy.js
-var trim11, record2, tasks, taskName, modelEntry, configuredModels, resolveSessionAiModel, AI_MODEL_NOT_ALLOWED, isSessionTranscriptionModelAllowed, operationCeilings, tokenFields, effortOrder, configuredFunctions, boundSessionAiRequest;
+var trim11, record3, tasks, taskName, modelEntry, configuredModels, resolveSessionAiModel, AI_MODEL_NOT_ALLOWED, isSessionTranscriptionModelAllowed, operationCeilings, tokenFields, effortOrder, configuredFunctions, boundSessionAiRequest;
 var init_aiRequestPolicy = __esm({
   "workers/sessionCorsWorker/aiRequestPolicy.js"() {
     init_aiDefaults();
     init_aiModelParams();
     trim11 = (value) => typeof value === "string" ? value.trim() : "";
-    record2 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    record3 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
     tasks = /* @__PURE__ */ new Set(["generate", "rewrite", "summarize", "rank", "analysis", "compare", "categorize", "interview-map", "interview-opening"]);
     taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : "";
     modelEntry = (entry2, provider, fallback = DEFAULT_AI_MODEL) => {
-      const obj = record2(entry2);
+      const obj = record3(entry2);
       return {
         model: trim11(obj.model || obj.name || obj.value || entry2) || fallback,
         provider: (trim11(obj.provider) || provider || "openai").toLowerCase()
       };
     };
     configuredModels = (config, task) => {
-      const ai = record2(config?.ai);
-      const models2 = record2(ai.models);
-      const providers = record2(ai.modelProviders);
+      const ai = record3(config?.ai);
+      const models2 = record3(ai.models);
+      const providers = record3(ai.modelProviders);
       const provider = trim11(ai.mode || ai.provider).toLowerCase() || "openai";
       const fallback = trim11(ai.model) || DEFAULT_AI_MODEL;
       const fast = modelEntry(models2.fast || models2.default, trim11(providers.fast || providers.default) || provider, fallback);
@@ -72812,8 +72859,8 @@ var init_aiRequestPolicy = __esm({
       reason: "ai_model_not_allowed"
     });
     isSessionTranscriptionModelAllowed = ({ config, provider, model, groupSpeakerLabels = false }) => {
-      const ai = record2(config?.ai);
-      const entry2 = record2(ai.models?.transcription || ai.transcription);
+      const ai = record3(config?.ai);
+      const entry2 = record3(ai.models?.transcription || ai.transcription);
       if (groupSpeakerLabels && provider === "openai" && model === "gpt-4o-transcribe-diarize" && (trim11(entry2.provider).toLowerCase() || "openai") === "openai") return true;
       return provider === (trim11(entry2.provider).toLowerCase() || "openai") && model === (trim11(entry2.model) || "whisper-1");
     };
@@ -72854,7 +72901,7 @@ var init_aiRequestPolicy = __esm({
         return typeof value === "number" && Number.isFinite(value) && value >= 1 ? Math.floor(value) : ceiling;
       });
       const tokens = Math.min(ceiling, ...requested);
-      const ai = record2(config?.ai);
+      const ai = record3(config?.ai);
       const savedEffort = ai.taskReasoningEffort?.[task] || task === "analysis" && ai.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || "low";
       const maximumEffort = ["low", "medium", "high"].includes(savedEffort) ? savedEffort : "low";
       const requestedEffort = trim11(payload.reasoning_effort || payload.reasoningEffort || payload.reasoning?.effort);
@@ -72998,9 +73045,9 @@ var init_resultsAnalysisArtifactValidation = __esm({
       });
       return refs;
     };
-    normalizeSourceFields = (record3, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
-      const participantIds = normalizeIdRefs({ value: record3.participantIds, allowed: allowed.participants, label: "participantId", errors, limit: participantLimit });
-      const questionIds = normalizeIdRefs({ value: record3.questionIds, allowed: allowed.questions, label: "questionId", errors });
+    normalizeSourceFields = (record4, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
+      const participantIds = normalizeIdRefs({ value: record4.participantIds, allowed: allowed.participants, label: "participantId", errors, limit: participantLimit });
+      const questionIds = normalizeIdRefs({ value: record4.questionIds, allowed: allowed.questions, label: "questionId", errors });
       if (participantIds.length && questionIds.length) {
         for (const participantId of participantIds) {
           if (!questionIds.some((questionId4) => allowed.questionsByParticipant.get(participantId)?.has(questionId4))) {
@@ -73019,9 +73066,9 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeSummaryRecord = (value) => {
-      const record3 = isObj16(value) ? value : {};
-      const overview = cleanText(record3.overview || record3.summary || record3.interpretation || record3.narrative);
-      const themes = toArray(record3.themes || record3.keyFindings || record3.findings).slice(0, LIMITS.breakdownThemes).map((entry2, index) => {
+      const record4 = isObj16(value) ? value : {};
+      const overview = cleanText(record4.overview || record4.summary || record4.interpretation || record4.narrative);
+      const themes = toArray(record4.themes || record4.keyFindings || record4.findings).slice(0, LIMITS.breakdownThemes).map((entry2, index) => {
         const item = isObj16(entry2) ? entry2 : { summary: entry2 };
         const label = cleanText(item.label || item.name || item.title || `Theme ${index + 1}`, LIMITS.labelChars);
         const summary = cleanText(item.summary || item.description || item.finding || item.body);
@@ -73205,11 +73252,11 @@ var init_resultsAnalysisArtifactValidation = __esm({
     });
     normalizeRiskAxis = (axis, fallback) => {
       if (!isObj16(axis)) return null;
-      const record3 = axis;
-      const label = cleanText(record3.label || record3.name, LIMITS.labelChars);
+      const record4 = axis;
+      const label = cleanText(record4.label || record4.name, LIMITS.labelChars);
       if (!label) return null;
-      const id2 = slugId(record3.id || label, fallback.id);
-      const rawLevels = toArray(record3.levels);
+      const id2 = slugId(record4.id || label, fallback.id);
+      const rawLevels = toArray(record4.levels);
       const seen = /* @__PURE__ */ new Set();
       const levels = rawLevels.slice(0, LIMITS.riskAxisLevels).map((level, index) => {
         const levelRecord = isObj16(level) ? level : { label: level, id: level };
@@ -73968,9 +74015,9 @@ var init_storedRating = __esm({
     RATING_MAX = 10;
     LEGACY_RATING_MAX = 100;
     readStoredRating = (value) => {
-      const record2 = value && typeof value === "object" && !Array.isArray(value) ? value : null;
-      if (record2?.encrypted === true) return null;
-      const raw = record2 ? record2.value : value;
+      const record4 = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+      if (record4?.encrypted === true) return null;
+      const raw = record4 ? record4.value : value;
       if (typeof raw !== "number" && typeof raw !== "string") return null;
       if (typeof raw === "string" && !raw.trim()) return null;
       const rating = Number(raw);
@@ -74172,7 +74219,7 @@ var init_resultsAnalysisGeneration = __esm({
       return Number.isFinite(numeric) ? numeric : null;
     };
     hasMetadataValue2 = (value) => value !== void 0 && value !== null && trim12(value) !== "";
-    recordHasRatingScaleMetadata2 = (record3 = {}) => RATING_SCALE_METADATA_KEYS2.some((key) => hasMetadataValue2(record3[key]));
+    recordHasRatingScaleMetadata2 = (record4 = {}) => RATING_SCALE_METADATA_KEYS2.some((key) => hasMetadataValue2(record4[key]));
     pickRatingScaleRecord2 = (question = {}) => {
       const scale = isObj17(question.scale) ? question.scale : null;
       if (scale && recordHasRatingScaleMetadata2(scale)) return scale;
@@ -74281,11 +74328,11 @@ var init_resultsAnalysisGeneration = __esm({
       return source.map((entry2) => trim12(entry2).toLowerCase()).filter(Boolean).sort();
     };
     normalizeAccessAudienceExtras = ({ value, metadata } = {}) => {
-      const record3 = parseAccessRecord(value);
+      const record4 = parseAccessRecord(value);
       return {
-        groupIds: normalizeAccessGroupIds(record3.groupIds || metadata?.groupIds),
-        role: trim12(record3.role || metadata?.role).toLowerCase(),
-        accessConditions: stableCanonicalSerialize(record3.accessConditions || metadata?.accessConditions || null)
+        groupIds: normalizeAccessGroupIds(record4.groupIds || metadata?.groupIds),
+        role: trim12(record4.role || metadata?.role).toLowerCase(),
+        accessConditions: stableCanonicalSerialize(record4.accessConditions || metadata?.accessConditions || null)
       };
     };
     metadataAccessMatchesPublishedAudience = (metadata = {}, config = {}) => {
@@ -75560,9 +75607,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       if (signer == null && version2 == null) return;
       if (!hasExistingKey || version2 !== LIT_AUTHORIZATION_VERSION || typeof signer !== "string" || signer.toLowerCase() !== wallet.address.toLowerCase()) fail7();
     };
-    readSignerSecrets = async (record3, env, slug) => {
-      if (!isRecord3(record3) || record3.version !== 1 || record3.slug !== slug) fail7();
-      const secrets = await decryptSessionSecretsEnvelope(record3.envelope, { env, slug });
+    readSignerSecrets = async (record4, env, slug) => {
+      if (!isRecord3(record4) || record4.version !== 1 || record4.slug !== slug) fail7();
+      const secrets = await decryptSessionSecretsEnvelope(record4.envelope, { env, slug });
       if (!isRecord3(secrets) || Object.keys(secrets).some((key) => !SECRET_KEYS.includes(key)) || Object.values(secrets).some((value) => typeof value !== "string")) fail7();
       walletFor(secrets[PRIVATE_KEY]);
       return secrets;
@@ -75575,13 +75622,13 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         await coordinator.assertSessionAuthority(payload);
         await coordinator.repairPendingSessionConfigProjection();
         const privateKey = await coordinator.state.storage.transaction(async (transaction) => {
-          const record3 = await transaction.get(SIGNER_RECORD);
+          const record4 = await transaction.get(SIGNER_RECORD);
           const config = authorityConfig(await transaction.get(CONFIG_RECORD), payload.baseConfig, slug);
-          const secrets = record3 != null ? await readSignerSecrets(record3, coordinator.env, slug) : await readCommittedSessionSecrets(coordinator, transaction, slug);
+          const secrets = record4 != null ? await readSignerSecrets(record4, coordinator.env, slug) : await readCommittedSessionSecrets(coordinator, transaction, slug);
           const hasExistingKey = hasOwn7(secrets, PRIVATE_KEY);
           const chosen = hasExistingKey ? walletFor(secrets[PRIVATE_KEY]) : proposed;
           assertConfiguredSigner(config, chosen, hasExistingKey);
-          if (record3 == null) {
+          if (record4 == null) {
             const envelope = await buildEncryptedSessionSecretsEnvelope({ [PRIVATE_KEY]: chosen.privateKey }, { env: coordinator.env, slug });
             await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope });
           }
@@ -75606,9 +75653,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         if (current?.revision === pending.revision) await transaction.delete(SETUP_RECORD);
       });
     };
-    readProvisioning = async (record3, env, slug) => {
-      if (!isRecord3(record3) || record3.version !== 1 || record3.slug !== slug) fail7();
-      const checkpoint = await decryptSessionSecretsEnvelope(record3.envelope, { env, slug });
+    readProvisioning = async (record4, env, slug) => {
+      if (!isRecord3(record4) || record4.version !== 1 || record4.slug !== slug) fail7();
+      const checkpoint = await decryptSessionSecretsEnvelope(record4.envelope, { env, slug });
       if (!isRecord3(checkpoint) || Object.keys(checkpoint).some((key) => !PROVISIONING_FIELDS.has(key)) || Object.values(checkpoint).some((value) => typeof value !== "string" && typeof value !== "boolean")) fail7();
       return checkpoint;
     };
@@ -75621,13 +75668,13 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           await coordinator.repairPendingSessionConfigProjection();
         }
         const result = await coordinator.state.storage.transaction(async (transaction) => {
-          const record3 = await transaction.get(PROVISIONING_RECORD);
+          const record4 = await transaction.get(PROVISIONING_RECORD);
           const now = coordinator.now();
           if (operation === "begin") {
-            if (record3?.leaseUntilMs > now) fail7();
-            const saved = record3 ? await readProvisioning(record3, coordinator.env, slug) : {};
+            if (record4?.leaseUntilMs > now) fail7();
+            const saved = record4 ? await readProvisioning(record4, coordinator.env, slug) : {};
             const hasResources = ["litAccountApiKey", "accountWalletAddress", "litGroupId", "litPkpId", "litActionCid", "litUsageApiKey"].some((key) => typeof saved[key] === "string" && saved[key].trim());
-            const checkpoint2 = record3?.freshAuthority === (payload.freshAuthority === true) && hasResources ? saved : {};
+            const checkpoint2 = record4?.freshAuthority === (payload.freshAuthority === true) && hasResources ? saved : {};
             const attemptId = crypto.randomUUID();
             const envelope2 = await buildEncryptedSessionSecretsEnvelope(checkpoint2, { env: coordinator.env, slug });
             await transaction.put(PROVISIONING_RECORD, {
@@ -75641,19 +75688,19 @@ var init_sessionLitAuthorizationCoordinator = __esm({
             return { attemptId, checkpoint: checkpoint2 };
           }
           if (operation === "release") {
-            if (record3?.slug === slug && record3.attemptId === payload.attemptId)
-              await transaction.put(PROVISIONING_RECORD, { ...record3, leaseUntilMs: 0 });
+            if (record4?.slug === slug && record4.attemptId === payload.attemptId)
+              await transaction.put(PROVISIONING_RECORD, { ...record4, leaseUntilMs: 0 });
             return {};
           }
-          if (operation !== "checkpoint" || !record3 || !payload.attemptId || record3.attemptId !== payload.attemptId) fail7();
-          const previous = await readProvisioning(record3, coordinator.env, slug);
+          if (operation !== "checkpoint" || !record4 || !payload.attemptId || record4.attemptId !== payload.attemptId) fail7();
+          const previous = await readProvisioning(record4, coordinator.env, slug);
           const checkpoint = payload.checkpoint;
           if (!isRecord3(checkpoint) || Object.keys(checkpoint).some((key) => !PROVISIONING_FIELDS.has(key)) || Object.values(checkpoint).some((value) => typeof value !== "string" && typeof value !== "boolean")) fail7(400);
           for (const [key, value] of Object.entries(previous)) {
             if (key !== "litPkpId" && hasOwn7(checkpoint, key) && checkpoint[key] !== value) fail7();
           }
           const envelope = await buildEncryptedSessionSecretsEnvelope({ ...previous, ...checkpoint }, { env: coordinator.env, slug });
-          await transaction.put(PROVISIONING_RECORD, { ...record3, leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
+          await transaction.put(PROVISIONING_RECORD, { ...record4, leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
           return {};
         });
         return json4({ ok: true, ...result });
@@ -75680,8 +75727,8 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           }
           if (hasOwn7(checkpoint, "litUsageApiKey") && checkpoint.litUsageApiKey !== outputs.litUsageApiKey) fail7();
           if (hasOwn7(checkpoint, "accountSecretOutput") && checkpoint.accountSecretOutput !== outputs.litAccountApiKey) fail7();
-          const record3 = await transaction.get(SIGNER_RECORD);
-          const signerSecrets = await readSignerSecrets(record3, coordinator.env, slug);
+          const record4 = await transaction.get(SIGNER_RECORD);
+          const signerSecrets = await readSignerSecrets(record4, coordinator.env, slug);
           const wallet = walletFor(signerSecrets[PRIVATE_KEY]);
           if (walletFor(outputs[PRIVATE_KEY]).privateKey !== wallet.privateKey) fail7();
           assertConfiguredSigner({ litCredentials: payload.litCredentials }, wallet, true);
@@ -75740,15 +75787,15 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         await coordinator.repairPendingSessionConfigProjection();
         await coordinator.state.storage.transaction(async (transaction) => {
           const existing = await readCommittedSessionSecrets(coordinator, transaction, slug);
-          const record3 = await transaction.get(SIGNER_RECORD);
-          const litSecrets = record3 == null ? null : await readSignerSecrets(record3, coordinator.env, slug);
+          const record4 = await transaction.get(SIGNER_RECORD);
+          const litSecrets = record4 == null ? null : await readSignerSecrets(record4, coordinator.env, slug);
           const nextSecrets = { ...existing, ...litSecrets };
           for (const [key, value] of Object.entries(patch)) {
             if (value.trim()) nextSecrets[key] = value.trim();
             else delete nextSecrets[key];
           }
           await commitSessionSecrets(coordinator, transaction, slug, nextSecrets);
-          if (record3 && Object.keys(patch).some((key) => SECRET_KEYS.includes(key))) {
+          if (record4 && Object.keys(patch).some((key) => SECRET_KEYS.includes(key))) {
             const nextLitSecrets = Object.fromEntries(SECRET_KEYS.filter((key) => hasOwn7(nextSecrets, key)).map((key) => [key, nextSecrets[key]]));
             const envelope = await buildEncryptedSessionSecretsEnvelope(nextLitSecrets, { env: coordinator.env, slug });
             await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope });
@@ -75876,7 +75923,7 @@ var init_sessionWriteCoordinator = __esm({
     UPLOAD_RECEIPT_PREFIX = "upload-receipt-v1:";
     UPLOAD_RECEIPT_LEASE_MS = 12e4;
     UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1e3;
-    uploadReceiptExpiresAt = (record3) => record3.state === "settled" ? record3.settledAt + UPLOAD_RECEIPT_RETENTION_MS : record3.state === "pending" ? record3.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : 0;
+    uploadReceiptExpiresAt = (record4) => record4.state === "settled" ? record4.settledAt + UPLOAD_RECEIPT_RETENTION_MS : record4.state === "pending" ? record4.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : 0;
     MAX_UPLOAD_RECEIPTS = 2e3;
     MAX_RESULTS_ANALYSIS_REQUESTS = 24;
     RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24e3;
@@ -75912,8 +75959,8 @@ var init_sessionWriteCoordinator = __esm({
       if (!numeric || numeric <= nowMs || numeric > nowMs + maxAheadMs) return 0;
       return numeric;
     };
-    readActiveAuthNonces = (record3, nowMs) => {
-      const entries = Array.isArray(record3?.entries) ? record3.entries : record3?.nonce ? [{ nonce: record3.nonce, expiresAtMs: record3.expiresAtMs }] : [];
+    readActiveAuthNonces = (record4, nowMs) => {
+      const entries = Array.isArray(record4?.entries) ? record4.entries : record4?.nonce ? [{ nonce: record4.nonce, expiresAtMs: record4.expiresAtMs }] : [];
       return entries.map((entry2) => ({ nonce: toTrimmedString9(entry2?.nonce), expiresAtMs: Number(entry2?.expiresAtMs || 0) })).filter((entry2) => entry2.nonce && entry2.expiresAtMs > nowMs);
     };
     putActiveAuthNonces = async (transaction, entries) => {
@@ -76152,16 +76199,16 @@ ${expiry}`);
       async pruneUploadReceipts(transaction, nowMs) {
         const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
         const retained = [];
-        for (const [key, record3] of records) {
-          const live = record3.state === "pending" && record3.leaseUntil > nowMs;
-          const expiresAt = uploadReceiptExpiresAt(record3);
+        for (const [key, record4] of records) {
+          const live = record4.state === "pending" && record4.leaseUntil > nowMs;
+          const expiresAt = uploadReceiptExpiresAt(record4);
           if (!live && !(expiresAt > nowMs)) await transaction.delete(key);
-          else retained.push({ key, live, expiresAt: Math.max(expiresAt, live ? record3.leaseUntil : 0) });
+          else retained.push({ key, live, expiresAt: Math.max(expiresAt, live ? record4.leaseUntil : 0) });
         }
-        const removable = retained.filter((record3) => !record3.live).sort((a, b2) => a.expiresAt - b2.expiresAt);
-        const evicted = new Set(removable.slice(0, Math.max(0, retained.length - MAX_UPLOAD_RECEIPTS)).map((record3) => record3.key));
+        const removable = retained.filter((record4) => !record4.live).sort((a, b2) => a.expiresAt - b2.expiresAt);
+        const evicted = new Set(removable.slice(0, Math.max(0, retained.length - MAX_UPLOAD_RECEIPTS)).map((record4) => record4.key));
         for (const key of evicted) await transaction.delete(key);
-        return retained.reduce((next, record3) => evicted.has(record3.key) ? next : Math.min(next, record3.expiresAt), Infinity);
+        return retained.reduce((next, record4) => evicted.has(record4.key) ? next : Math.min(next, record4.expiresAt), Infinity);
       }
       async scheduleUploadReceiptCleanup() {
         const nextExpiry = await this.state.storage.transaction((transaction) => this.pruneUploadReceipts(transaction, Number(this.now()) || Date.now()));
@@ -76209,31 +76256,31 @@ ${expiry}`);
         const nowMs = Number(this.now()) || Date.now();
         const result = await this.state.storage.transaction(async (transaction) => {
           if (!settle) await this.pruneUploadReceipts(transaction, nowMs);
-          const record3 = await transaction.get(key);
+          const record4 = await transaction.get(key);
           if (settle) {
-            if (record3?.state !== "pending" || record3.attemptId !== payload.attemptId) {
+            if (record4?.state !== "pending" || record4.attemptId !== payload.attemptId) {
               return { status: 409, error: "Upload attempt no longer owns this receipt.", reason: "upload_attempt_superseded" };
             }
-            if (record3.storageId !== storageRef.id) return { status: 409, error: "Upload target does not match this receipt.", reason: "upload_receipt_target_mismatch" };
-            await transaction.put(key, { state: "settled", payloadDigest: record3.payloadDigest, storageRef, settledAt: nowMs });
+            if (record4.storageId !== storageRef.id) return { status: 409, error: "Upload target does not match this receipt.", reason: "upload_receipt_target_mismatch" };
+            await transaction.put(key, { state: "settled", payloadDigest: record4.payloadDigest, storageRef, settledAt: nowMs });
             await this.pruneUploadReceipts(transaction, nowMs);
             return { status: 200, ok: true };
           }
-          if (record3?.state === "settled" && nowMs - record3.settledAt < UPLOAD_RECEIPT_RETENTION_MS) {
-            return equalText(record3.payloadDigest, payloadDigest) ? { status: 200, kind: "replay", storageRef: record3.storageRef } : { status: 409, error: "This upload request id already stored different content.", reason: "upload_request_conflict" };
+          if (record4?.state === "settled" && nowMs - record4.settledAt < UPLOAD_RECEIPT_RETENTION_MS) {
+            return equalText(record4.payloadDigest, payloadDigest) ? { status: 200, kind: "replay", storageRef: record4.storageRef } : { status: 409, error: "This upload request id already stored different content.", reason: "upload_request_conflict" };
           }
-          if (record3?.state === "pending" && record3.leaseUntil > nowMs) {
+          if (record4?.state === "pending" && record4.leaseUntil > nowMs) {
             return { status: 503, error: "This upload is still in progress; retry shortly.", reason: "upload_in_progress" };
           }
-          const resumed = record3?.state === "pending" && uploadReceiptExpiresAt(record3) > nowMs;
-          if (resumed && !equalText(record3.payloadDigest, payloadDigest)) {
+          const resumed = record4?.state === "pending" && uploadReceiptExpiresAt(record4) > nowMs;
+          if (resumed && !equalText(record4.payloadDigest, payloadDigest)) {
             return { status: 409, error: "This upload request id already reserved different content.", reason: "upload_request_conflict" };
           }
           const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
-          if ([...records.values()].filter((record4) => record4.state === "pending" && record4.leaseUntil > nowMs).length >= MAX_UPLOAD_RECEIPTS) {
+          if ([...records.values()].filter((record5) => record5.state === "pending" && record5.leaseUntil > nowMs).length >= MAX_UPLOAD_RECEIPTS) {
             return { status: 503, error: "Upload receipt capacity is busy; retry shortly.", reason: "upload_in_progress" };
           }
-          const target = resumed ? { storageId: record3.storageId, createdAt: record3.createdAt, reservedAt: record3.reservedAt } : { storageId, createdAt, reservedAt: nowMs };
+          const target = resumed ? { storageId: record4.storageId, createdAt: record4.createdAt, reservedAt: record4.reservedAt } : { storageId, createdAt, reservedAt: nowMs };
           const attemptId = createAttemptId(this.crypto);
           await transaction.put(key, { state: "pending", attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS, ...target });
           await this.pruneUploadReceipts(transaction, nowMs);
@@ -76251,12 +76298,12 @@ ${expiry}`);
         let cursor = "";
         for (; ; ) {
           const records = await this.state.storage.list({ prefix: UPLOAD_RECEIPT_PREFIX, ...cursor ? { startAfter: cursor } : {}, limit: 500 });
-          for (const record3 of records.values()) {
-            if (record3.state === "pending" && record3.leaseUntil > nowMs) {
+          for (const record4 of records.values()) {
+            if (record4.state === "pending" && record4.leaseUntil > nowMs) {
               pendingLeases += 1;
-              oldestPendingAgeMs = Math.max(oldestPendingAgeMs ?? 0, nowMs - (record3.leaseUntil - UPLOAD_RECEIPT_LEASE_MS));
+              oldestPendingAgeMs = Math.max(oldestPendingAgeMs ?? 0, nowMs - (record4.leaseUntil - UPLOAD_RECEIPT_LEASE_MS));
             }
-            if (record3.state === "settled" && nowMs - record3.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settledCount += 1;
+            if (record4.state === "settled" && nowMs - record4.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settledCount += 1;
           }
           if (records.size < 500) break;
           cursor = [...records.keys()].at(-1);
@@ -76329,8 +76376,8 @@ ${expiry}`);
         this.resultsAnalysisTail = run.catch(() => void 0);
         return run;
       }
-      normalizeResultsAnalysisRecord(record3) {
-        const source = isObjectRecord(record3) && record3.version === 1 ? record3 : {};
+      normalizeResultsAnalysisRecord(record4) {
+        const source = isObjectRecord(record4) && record4.version === 1 ? record4 : {};
         const requests = isObjectRecord(source.requests) ? source.requests : {};
         return {
           version: 1,
@@ -76355,9 +76402,9 @@ ${expiry}`);
         }
       }
       async readResultsAnalysisDraft(storage = this.state.storage) {
-        const record3 = await storage.get(RESULTS_ANALYSIS_DRAFT_KEY);
-        if (!isObjectRecord(record3) || record3.chunked !== true) return record3;
-        const chunkCount = Number(record3.chunkCount || 0) || 0;
+        const record4 = await storage.get(RESULTS_ANALYSIS_DRAFT_KEY);
+        if (!isObjectRecord(record4) || record4.chunked !== true) return record4;
+        const chunkCount = Number(record4.chunkCount || 0) || 0;
         if (!chunkCount || chunkCount > RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS) return null;
         let serialized = "";
         for (let index = 0; index < chunkCount; index += 1) {
@@ -76520,9 +76567,9 @@ ${expiry}`);
         const nowMs = Number(this.now()) || Date.now();
         const nextExpiry = await this.state.storage.transaction(async (transaction) => {
           let next = Infinity;
-          for (const [key, record3] of await transaction.list({ prefix: RESULTS_ANALYSIS_UPLOAD_PREFIX })) {
-            if (record3.expiresAt <= nowMs) await transaction.delete(key);
-            else next = Math.min(next, record3.expiresAt);
+          for (const [key, record4] of await transaction.list({ prefix: RESULTS_ANALYSIS_UPLOAD_PREFIX })) {
+            if (record4.expiresAt <= nowMs) await transaction.delete(key);
+            else next = Math.min(next, record4.expiresAt);
           }
           return next;
         });
@@ -76534,13 +76581,13 @@ ${expiry}`);
         const nowMs = Number(this.now()) || Date.now();
         const retryDelayMs = await this.state.storage.transaction(async (transaction) => {
           const queued = await transaction.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-          const record3 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          const record4 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
           const sameJob = !job || queued?.queuedAtMs === job.queuedAtMs;
           const retryable = error?.retryable !== false && RESULTS_ANALYSIS_RETRYABLE_STATUSES.has(Number(error?.status));
           const retryAttempt = (Number(queued?.retryAttempt) || 0) + 1;
           const scheduledDelay = retryable && sameJob && isObjectRecord(queued) ? RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS[retryAttempt - 1] : void 0;
           const delayMs = scheduledDelay ? Math.min(Math.max(scheduledDelay, Number(error?.retryAfterMs) || 0), 30 * 6e4) : void 0;
-          record3.lastFailure = {
+          record4.lastFailure = {
             ok: false,
             error: error?.message || error?.error || toTrimmedString9(error) || "Automatic results analysis job failed.",
             status: Number(error?.status) >= 400 && Number(error?.status) <= 599 ? Number(error.status) : 502,
@@ -76557,7 +76604,7 @@ ${expiry}`);
           } else if (sameJob) {
             await transaction.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
           }
-          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record3);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record4);
           return delayMs;
         });
         if (retryDelayMs) await this.scheduleResultsAnalysisAlarm(retryDelayMs);
@@ -76633,18 +76680,18 @@ ${expiry}`);
       }
       async readResultsAnalysisStatus() {
         const existing = await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY);
-        const record3 = this.normalizeResultsAnalysisRecord(existing);
+        const record4 = this.normalizeResultsAnalysisRecord(existing);
         const latestDraft = await this.readResultsAnalysisDraft();
         const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-        const lastGood = record3.lastGood && latestDraft?.draftId === record3.lastGood.draftId ? { ...record3.lastGood, ...latestDraft } : record3.lastGood;
+        const lastGood = record4.lastGood && latestDraft?.draftId === record4.lastGood.draftId ? { ...record4.lastGood, ...latestDraft } : record4.lastGood;
         const nowMs = Number(this.now()) || Date.now();
         return {
           version: 1,
-          jobState: this.isResultsAnalysisActiveFresh(record3.active, nowMs) ? "running" : isObjectRecord(queued) ? "queued" : record3.lastFailure ? "failed" : lastGood ? "succeeded" : "idle",
+          jobState: this.isResultsAnalysisActiveFresh(record4.active, nowMs) ? "running" : isObjectRecord(queued) ? "queued" : record4.lastFailure ? "failed" : lastGood ? "succeeded" : "idle",
           queued: isObjectRecord(queued) ? { requestId: toTrimmedString9(queued.requestId), queuedAtMs: Number(queued.queuedAtMs || 0) || 0 } : null,
-          active: this.isResultsAnalysisActiveFresh(record3.active, nowMs) ? record3.active : null,
+          active: this.isResultsAnalysisActiveFresh(record4.active, nowMs) ? record4.active : null,
           lastGood,
-          lastFailure: record3.lastFailure
+          lastFailure: record4.lastFailure
         };
       }
       async reserveResultsAnalysis(payload = {}) {
@@ -76660,9 +76707,9 @@ ${expiry}`);
         }
         const nowMs = Number(this.now()) || Date.now();
         return this.state.storage.transaction(async (transaction) => {
-          const record3 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          const record4 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
           const latestDraft = await this.readResultsAnalysisDraft(transaction);
-          const prior = requestId ? record3.requests[requestId] : null;
+          const prior = requestId ? record4.requests[requestId] : null;
           if (prior?.state === "succeeded" && prior.draftId) {
             if (latestDraft?.draftId === prior.draftId) {
               return { kind: "terminal", draft: latestDraft, draftId: prior.draftId };
@@ -76672,30 +76719,30 @@ ${expiry}`);
           if (prior?.state === "failed") {
             return { kind: "failed", status: prior.status || 502, error: prior.error || "Results analysis generation failed." };
           }
-          if (prior?.state === "running" && record3.active?.requestId === requestId && this.isResultsAnalysisActiveFresh(record3.active, nowMs)) {
+          if (prior?.state === "running" && record4.active?.requestId === requestId && this.isResultsAnalysisActiveFresh(record4.active, nowMs)) {
             return { kind: "pending" };
           }
-          if (!refresh && record3.lastGood?.sourceSignature === sourceSignature && record3.lastGood?.viewSignature === viewSignature && latestDraft?.draftId === record3.lastGood.draftId) {
+          if (!refresh && record4.lastGood?.sourceSignature === sourceSignature && record4.lastGood?.viewSignature === viewSignature && latestDraft?.draftId === record4.lastGood.draftId) {
             if (requestId) {
-              record3.requests[requestId] = { state: "succeeded", draftId: latestDraft.draftId, updatedAtMs: nowMs };
-              record3.requests = this.pruneResultsAnalysisRequests(record3.requests);
-              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record3);
+              record4.requests[requestId] = { state: "succeeded", draftId: latestDraft.draftId, updatedAtMs: nowMs };
+              record4.requests = this.pruneResultsAnalysisRequests(record4.requests);
+              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record4);
             }
             return { kind: "terminal", draft: latestDraft, draftId: latestDraft.draftId };
           }
-          if (trigger === "automatic" && record3.lastFailure?.sourceSignature === sourceSignature && record3.lastFailure?.viewSignature === viewSignature) {
-            return { kind: "failed", status: record3.lastFailure.status || 502, error: record3.lastFailure.error || "Results analysis generation failed." };
+          if (trigger === "automatic" && record4.lastFailure?.sourceSignature === sourceSignature && record4.lastFailure?.viewSignature === viewSignature) {
+            return { kind: "failed", status: record4.lastFailure.status || 502, error: record4.lastFailure.error || "Results analysis generation failed." };
           }
-          if (this.isResultsAnalysisActiveFresh(record3.active, nowMs)) {
-            if (requestId && !record3.requests[requestId]) {
-              record3.requests[requestId] = { state: "running", updatedAtMs: nowMs };
-              record3.requests = this.pruneResultsAnalysisRequests(record3.requests);
-              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record3);
+          if (this.isResultsAnalysisActiveFresh(record4.active, nowMs)) {
+            if (requestId && !record4.requests[requestId]) {
+              record4.requests[requestId] = { state: "running", updatedAtMs: nowMs };
+              record4.requests = this.pruneResultsAnalysisRequests(record4.requests);
+              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record4);
             }
             return { kind: "pending" };
           }
           const attemptId = createAttemptId(this.crypto);
-          record3.active = {
+          record4.active = {
             reservationKey,
             requestId,
             attemptId,
@@ -76705,9 +76752,9 @@ ${expiry}`);
             trigger,
             startedAtMs: nowMs
           };
-          if (requestId) record3.requests[requestId] = { state: "running", updatedAtMs: nowMs };
-          record3.requests = this.pruneResultsAnalysisRequests(record3.requests);
-          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record3);
+          if (requestId) record4.requests[requestId] = { state: "running", updatedAtMs: nowMs };
+          record4.requests = this.pruneResultsAnalysisRequests(record4.requests);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record4);
           return { kind: "execute", attemptId };
         });
       }
@@ -76720,12 +76767,12 @@ ${expiry}`);
         if (!reservationKey || !attemptId || !receipt) return { ok: false, status: 400 };
         const nowMs = Number(this.now()) || Date.now();
         return this.state.storage.transaction(async (transaction) => {
-          const record3 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
-          if (record3.active?.reservationKey !== reservationKey || record3.active?.attemptId !== attemptId) {
+          const record4 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          if (record4.active?.reservationKey !== reservationKey || record4.active?.attemptId !== attemptId) {
             return { ok: false, status: 409 };
           }
-          const active = record3.active;
-          record3.active = null;
+          const active = record4.active;
+          record4.active = null;
           if (success) {
             const draft = receipt.draft && isObjectRecord(receipt.draft) ? receipt.draft : receipt;
             const draftId = toTrimmedString9(draft.draftId);
@@ -76733,7 +76780,7 @@ ${expiry}`);
             try {
               await this.putResultsAnalysisDraft(transaction, draft);
             } catch (error) {
-              record3.lastFailure = {
+              record4.lastFailure = {
                 ok: false,
                 error: error?.message || "Results analysis draft exceeds durable storage limits.",
                 status: Number(error?.status || 0) || 413,
@@ -76744,17 +76791,17 @@ ${expiry}`);
                 trigger: active.trigger,
                 failedAtMs: nowMs
               };
-              if (requestId) record3.requests[requestId] = {
+              if (requestId) record4.requests[requestId] = {
                 state: "failed",
-                error: record3.lastFailure.error,
-                status: record3.lastFailure.status,
+                error: record4.lastFailure.error,
+                status: record4.lastFailure.status,
                 updatedAtMs: nowMs
               };
-              record3.requests = this.pruneResultsAnalysisRequests(record3.requests);
-              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record3);
-              return { ok: false, status: record3.lastFailure.status, error: record3.lastFailure.error };
+              record4.requests = this.pruneResultsAnalysisRequests(record4.requests);
+              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record4);
+              return { ok: false, status: record4.lastFailure.status, error: record4.lastFailure.error };
             }
-            record3.lastGood = {
+            record4.lastGood = {
               draftId,
               generatedAt: draft.generatedAt,
               requestId,
@@ -76766,11 +76813,11 @@ ${expiry}`);
               sections: Array.isArray(draft.sections) ? draft.sections : [],
               completedAtMs: nowMs
             };
-            if (active.trigger === "automatic") record3.lastAutomaticSuccessAtMs = nowMs;
-            record3.lastFailure = null;
-            if (requestId) record3.requests[requestId] = { state: "succeeded", draftId, updatedAtMs: nowMs };
+            if (active.trigger === "automatic") record4.lastAutomaticSuccessAtMs = nowMs;
+            record4.lastFailure = null;
+            if (requestId) record4.requests[requestId] = { state: "succeeded", draftId, updatedAtMs: nowMs };
           } else {
-            record3.lastFailure = {
+            record4.lastFailure = {
               ok: false,
               error: toTrimmedString9(receipt.error) || "Results analysis generation failed.",
               status: Number(receipt.status || 0) || 502,
@@ -76781,15 +76828,15 @@ ${expiry}`);
               trigger: active.trigger,
               failedAtMs: nowMs
             };
-            if (requestId) record3.requests[requestId] = {
+            if (requestId) record4.requests[requestId] = {
               state: "failed",
-              error: record3.lastFailure.error,
-              status: record3.lastFailure.status,
+              error: record4.lastFailure.error,
+              status: record4.lastFailure.status,
               updatedAtMs: nowMs
             };
           }
-          record3.requests = this.pruneResultsAnalysisRequests(record3.requests);
-          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record3);
+          record4.requests = this.pruneResultsAnalysisRequests(record4.requests);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record4);
           return { ok: true, status: 200 };
         });
       }
@@ -77727,15 +77774,15 @@ ${expiry}`);
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
         if (!slug) return jsonResponse2({ error: "Invalid session slug." }, 400);
         const authority = await this.readSessionConfigAuthority(slug);
-        const record3 = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
+        const record4 = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
         const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-        const failure = record3.lastFailure?.trigger === "automatic" ? record3.lastFailure : null;
+        const failure = record4.lastFailure?.trigger === "automatic" ? record4.lastFailure : null;
         return jsonResponse2({
           ok: true,
           config: authority?.config ?? null,
           revision: authority?.revision ?? 0,
           analysis: {
-            lastSuccessAtMs: record3.lastAutomaticSuccessAtMs,
+            lastSuccessAtMs: record4.lastAutomaticSuccessAtMs,
             retryAttempt: Number(queued?.retryAttempt ?? failure?.retryAttempt) || 0,
             nextAttemptAtMs: queued ? Number(failure?.nextAttemptAtMs) || null : null,
             retriesExhausted: failure?.retriesExhausted === true
@@ -77969,13 +78016,13 @@ ${expiry}`);
         const existing = await this.state.storage.get(AUTH_NONCE_MAC_KEY);
         if (/^[0-9a-f]{64}$/.test(toTrimmedString9(existing?.key)) || !create) return toTrimmedString9(existing?.key);
         const candidate = { version: 1, key: bytesToHex3(this.crypto.getRandomValues(new Uint8Array(32))) };
-        const record3 = await this.state.storage.transaction(async (transaction) => {
+        const record4 = await this.state.storage.transaction(async (transaction) => {
           const current = await transaction.get(AUTH_NONCE_MAC_KEY);
           if (/^[0-9a-f]{64}$/.test(toTrimmedString9(current?.key))) return current;
           await transaction.put(AUTH_NONCE_MAC_KEY, candidate);
           return candidate;
         });
-        return record3.key;
+        return record4.key;
       }
       async executeAuthNonceIssue(payload) {
         const nowMs = Number(this.now()) || Date.now();
@@ -88033,13 +88080,13 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
     const ok = !!ctx.address && await deps.validateAdmin({ env, slug: ctx.slug, address: ctx.address, config: ctx.config });
     return { ok: !!ok, accountAddress: ctx.address };
   };
-  const submitJournal = async (operation, record3) => {
-    if (record3.sessionId !== ctx.sessionId || record3.sessionSlug !== ctx.slug || record3.workerOrigin !== ctx.origin) throw authorityError("submit_outcome_identity_mismatch");
+  const submitJournal = async (operation, record4) => {
+    if (record4.sessionId !== ctx.sessionId || record4.sessionSlug !== ctx.slug || record4.workerOrigin !== ctx.origin) throw authorityError("submit_outcome_identity_mismatch");
     const result = await callSessionConfigCoordinator({
       env,
       slug: ctx.slug,
       path: `agent-submit/${operation}`,
-      record: record3,
+      record: record4,
       ...["begin", "claim"].includes(operation) ? { expectedAuthority: expectedAuthority() } : {}
     });
     if (!result.ok) return { ok: false, retryable: true, reason: result.body?.reason || "submit_coordinator_unavailable" };
@@ -88047,31 +88094,31 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
   };
   return Object.freeze({
     current,
-    async commitWrappedResearch(record3) {
+    async commitWrappedResearch(record4) {
       await current();
       const result = await callSessionConfigCoordinator({
         env,
         slug: ctx.slug,
         path: "agent-wrapped/commit",
         expectedAuthority: expectedAuthority(),
-        record: { ...record3, sessionId: ctx.sessionId, sessionSlug: ctx.slug }
+        record: { ...record4, sessionId: ctx.sessionId, sessionSlug: ctx.slug }
       });
       return result.body || { ok: false, status: 503, reason: "wrapped_coordinator_unavailable", retryable: true };
     },
-    claimAnswerSubmission: (record3) => submitJournal("claim", record3),
-    readSubmitRecord: (record3) => submitJournal("read", record3),
-    async persistSubmitIntent(record3) {
+    claimAnswerSubmission: (record4) => submitJournal("claim", record4),
+    readSubmitRecord: (record4) => submitJournal("read", record4),
+    async persistSubmitIntent(record4) {
       await current();
-      return submitJournal("begin", record3);
+      return submitJournal("begin", record4);
     },
-    recoverSubmitOutcome: (record3) => submitJournal("finish", record3),
-    async persistSubmitOutcome(record3) {
-      if (record3.sessionId !== ctx.sessionId || record3.sessionSlug !== ctx.slug || record3.workerOrigin !== ctx.origin || record3.accountAddress !== ctx.address || record3.sourceCredentialHash !== ctx.auth?.delegation?.tokenHash) {
+    recoverSubmitOutcome: (record4) => submitJournal("finish", record4),
+    async persistSubmitOutcome(record4) {
+      if (record4.sessionId !== ctx.sessionId || record4.sessionSlug !== ctx.slug || record4.workerOrigin !== ctx.origin || record4.accountAddress !== ctx.address || record4.sourceCredentialHash !== ctx.auth?.delegation?.tokenHash) {
         throw authorityError("submit_outcome_identity_mismatch");
       }
       const persistenceEnv = { ...agentEnv, AGENT_ACTION_KV: createAgentStorage({ kv: env.GROUP_KV, sessionId: ctx.sessionId, cursorSecret: env.TOKEN_HMAC_SECRET }) };
-      const result = record3.submissionJournal === true ? await submitJournal("finish", record3) : await persistRecoveryMessage({ env: persistenceEnv, body: { requestId: record3.requestId, record: record3 }, requireExisting: true });
-      return result.ok || result.replayed ? result : retainOutcomeForRecovery(persistenceEnv, record3, new Error(result.reason));
+      const result = record4.submissionJournal === true ? await submitJournal("finish", record4) : await persistRecoveryMessage({ env: persistenceEnv, body: { requestId: record4.requestId, record: record4 }, requireExisting: true });
+      return result.ok || result.replayed ? result : retainOutcomeForRecovery(persistenceEnv, record4, new Error(result.reason));
     },
     paginate: createAgentPagination(env.TOKEN_HMAC_SECRET, ctx),
     admin,
@@ -88227,18 +88274,18 @@ init_agentSubmitQueue();
 var dispatchSessionAgentQueue = async ({ batch, env, deps }) => {
   const results = [];
   for (const message of batch.messages || []) {
-    const record3 = message.body?.record;
-    if (message.body?.type !== AGENT_SUBMIT_QUEUE_MESSAGE_TYPE || !record3 || !validateInboundWorkerSessionSlug(record3.sessionSlug).ok || !record3.sessionSlug || !/^0x[0-9a-f]{32}$/.test(record3.sessionId || "")) {
+    const record4 = message.body?.record;
+    if (message.body?.type !== AGENT_SUBMIT_QUEUE_MESSAGE_TYPE || !record4 || !validateInboundWorkerSessionSlug(record4.sessionSlug).ok || !record4.sessionSlug || !/^0x[0-9a-f]{32}$/.test(record4.sessionId || "")) {
       message.ack?.();
       results.push({ ok: false, reason: "unsupported_queue_message" });
       continue;
     }
     try {
-      const { config, revision } = await (deps.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: record3.sessionSlug });
+      const { config, revision } = await (deps.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: record4.sessionSlug });
       const origin = new URL(config.corsWorkerUrl).origin;
-      const agentEnv = createAgentEnvironment({ env, config, revision, slug: record3.sessionSlug, origin, now: deps.now, persistenceOnly: true, fetchImpl: deps.fetch });
+      const agentEnv = createAgentEnvironment({ env, config, revision, slug: record4.sessionSlug, origin, now: deps.now, persistenceOnly: true, fetchImpl: deps.fetch });
       const ctx = agentEnv.AGENT_CONTEXT;
-      if (ctx.sessionId !== record3.sessionId || origin !== record3.workerOrigin) {
+      if (ctx.sessionId !== record4.sessionId || origin !== record4.workerOrigin) {
         message.ack?.();
         results.push({ ok: false, reason: "queue_session_mismatch" });
         continue;
@@ -88890,7 +88937,7 @@ async function saveAgentOnlyModeConfig({
   const loaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
   const normalized = normalizeAgentOnlyModeConfigPatch(patch, loaded.config);
   const timestamp = nowIsoOrCurrent(createdAt);
-  const record3 = {
+  const record4 = {
     ...defaultAgentOnlyModeConfig(slug),
     ...loaded.config,
     ...normalized,
@@ -88899,11 +88946,11 @@ async function saveAgentOnlyModeConfig({
     updatedAt: timestamp,
     updatedBy: safeString(updatedBy) || "service"
   };
-  assertNoSecretShape(record3, "Agent-only config records must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record3), {
-    metadata: { v: 1, t: "ao_config", sg: slug, q: record3.enabledQuestionIds.length }
+  assertNoSecretShape(record4, "Agent-only config records must not serialize secrets.");
+  await kv.put(key, JSON.stringify(record4), {
+    metadata: { v: 1, t: "ao_config", sg: slug, q: record4.enabledQuestionIds.length }
   });
-  return { ok: true, source: "kv", config: record3 };
+  return { ok: true, source: "kv", config: record4 };
 }
 
 // workers/sessionCorsWorker/agent/wrappedStatements.mjs
@@ -89934,7 +89981,7 @@ async function submitAgentOnlyAnswersBulk({
     const isSkip = row.skipped === true;
     const key = `${answerEventPrefix(slug, userPart)}${kvKeySafePart(requestId)}:${kvKeySafePart(row.statementId)}`;
     const semanticFingerprint = isSkip ? "" : await semanticFingerprintForAgentOnlyAnswer(row.answer, row.answerSchema);
-    const record3 = {
+    const record4 = {
       type: "telegram_agent_only_answer_event",
       version: 1,
       sessionSlug: slug,
@@ -89956,8 +90003,8 @@ async function submitAgentOnlyAnswersBulk({
       semanticFingerprint,
       createdAt
     };
-    assertNoSecretShape(record3, "Agent-only answer events must not serialize secrets.");
-    events.push({ key, value: record3, metadata: { v: 1, t: "ao_evt", sg: slug, k: isSkip ? "s" : "a", src: "agent_autofill" } });
+    assertNoSecretShape(record4, "Agent-only answer events must not serialize secrets.");
+    events.push({ key, value: record4, metadata: { v: 1, t: "ao_evt", sg: slug, k: isSkip ? "s" : "a", src: "agent_autofill" } });
     const current = state.byStatement[row.statementId] && typeof state.byStatement[row.statementId] === "object" ? state.byStatement[row.statementId] : {};
     changes[row.statementId] = isSkip ? {
       ...current,
@@ -90044,7 +90091,7 @@ async function recordAgentOnlyAttemptEvent({
   const ok = result?.ok === false ? false : httpStatus >= 200 && httpStatus < 400;
   const normalizedStage = normalizeAttemptStage(stage);
   const reason = attemptReasonFromResult(result);
-  const record3 = {
+  const record4 = {
     type: "telegram_agent_only_attempt_event",
     version: 1,
     sessionSlug: slug,
@@ -90060,9 +90107,9 @@ async function recordAgentOnlyAttemptEvent({
     counts: attemptCountsFromResult(result),
     createdAt: nowIsoOrCurrent(now)
   };
-  assertNoSecretShape(record3, "Agent-only attempt events must not serialize secrets.");
+  assertNoSecretShape(record4, "Agent-only attempt events must not serialize secrets.");
   const key = `${prefix}${eventId()}`;
-  await kv.put(key, JSON.stringify(record3), {
+  await kv.put(key, JSON.stringify(record4), {
     metadata: {
       v: 1,
       t: "ao_attempt",
@@ -90315,7 +90362,7 @@ async function saveAgentOnlyWrappedImage({
   const key = `${prefix}${imageId}`;
   const viewKey = wrappedImageViewKey(imageViewId);
   const runKey = wrappedImageRunKey(sessionSlug, telegramUserId, mode, normalizedRunId);
-  const record3 = {
+  const record4 = {
     type: "telegram_agent_only_wrapped_image",
     version: 1,
     sessionId,
@@ -90341,7 +90388,7 @@ async function saveAgentOnlyWrappedImage({
     createdAt
   };
   assertNoSecretShape({
-    ...record3,
+    ...record4,
     imageBase64: "[image omitted]"
   }, "Agent-only wrapped image metadata must not serialize secrets.");
   const viewRecord = {
@@ -90351,14 +90398,14 @@ async function saveAgentOnlyWrappedImage({
     expiresAt,
     imageViewId,
     imageKey: key,
-    sessionSlug: record3.sessionSlug,
-    runId: record3.runId,
-    mode: record3.mode,
-    mediaKind: record3.mediaKind,
-    frameCount: record3.frameCount,
-    storyDurationSeconds: record3.storyDurationSeconds,
-    frameKeys: record3.frameKeys,
-    imageContentType: record3.imageContentType,
+    sessionSlug: record4.sessionSlug,
+    runId: record4.runId,
+    mode: record4.mode,
+    mediaKind: record4.mediaKind,
+    frameCount: record4.frameCount,
+    storyDurationSeconds: record4.storyDurationSeconds,
+    frameKeys: record4.frameKeys,
+    imageContentType: record4.imageContentType,
     createdAt
   };
   const runRecord = {
@@ -90366,14 +90413,14 @@ async function saveAgentOnlyWrappedImage({
     version: 1,
     sessionId,
     expiresAt,
-    sessionSlug: record3.sessionSlug,
-    telegramUserId: record3.telegramUserId,
-    runId: record3.runId,
-    mode: record3.mode,
-    mediaKind: record3.mediaKind,
-    frameCount: record3.frameCount,
-    storyDurationSeconds: record3.storyDurationSeconds,
-    frameKeys: record3.frameKeys,
+    sessionSlug: record4.sessionSlug,
+    telegramUserId: record4.telegramUserId,
+    runId: record4.runId,
+    mode: record4.mode,
+    mediaKind: record4.mediaKind,
+    frameCount: record4.frameCount,
+    storyDurationSeconds: record4.storyDurationSeconds,
+    frameKeys: record4.frameKeys,
     imageKey: key,
     imageId,
     imageViewId,
@@ -90382,13 +90429,13 @@ async function saveAgentOnlyWrappedImage({
   };
   assertNoSecretShape(viewRecord, "Agent-only wrapped image view metadata must not serialize secrets.");
   assertNoSecretShape(runRecord, "Agent-only wrapped image run metadata must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record3), {
+  await kv.put(key, JSON.stringify(record4), {
     expirationTtl: 7 * 86400,
     metadata: {
       v: 1,
       t: "ao_img",
       m: wrappedImageModeMetadata(mode),
-      b: record3.imageByteLengthApprox
+      b: record4.imageByteLengthApprox
     }
   });
   await kv.put(viewKey, JSON.stringify(viewRecord), {
@@ -90396,7 +90443,7 @@ async function saveAgentOnlyWrappedImage({
     metadata: {
       v: 1,
       t: "ao_img_view",
-      m: wrappedImageModeMetadata(record3.mode)
+      m: wrappedImageModeMetadata(record4.mode)
     }
   });
   if (runKey) {
@@ -90405,7 +90452,7 @@ async function saveAgentOnlyWrappedImage({
       metadata: {
         v: 1,
         t: "ao_img_run",
-        m: wrappedImageModeMetadata(record3.mode)
+        m: wrappedImageModeMetadata(record4.mode)
       }
     });
   }
@@ -91177,13 +91224,13 @@ async function exportAgentOnlyData({
   const answerKey = (user, question) => JSON.stringify([safeString(user), safeString(question)]);
   if (view === "gold" || view === "wide" && !compactExport) {
     const records = await loadSubmittedResultRecords(env, slug, { includeRawAnswer: true });
-    for (const record3 of records) {
-      const key = answerKey(record3.telegramUserId, record3.questionId);
+    for (const record4 of records) {
+      const key = answerKey(record4.telegramUserId, record4.questionId);
       if (!submittedHistory.has(key)) submittedHistory.set(key, []);
-      submittedHistory.get(key).push(record3);
+      submittedHistory.get(key).push(record4);
     }
-    for (const record3 of selectCurrentSubmittedAnswers(records)) {
-      currentSubmitted.set(answerKey(record3.telegramUserId, record3.questionId), record3);
+    for (const record4 of selectCurrentSubmittedAnswers(records)) {
+      currentSubmitted.set(answerKey(record4.telegramUserId, record4.questionId), record4);
     }
   }
   if (["answers", "wide", "calibration", "gold"].includes(view)) {
@@ -91240,54 +91287,54 @@ async function exportAgentOnlyData({
       const eventEntries = listed.entries;
       nextCursor = listed.nextCursor;
       for (const entry2 of eventEntries) {
-        const record3 = await readKvJson2(env, entry2.key);
-        if (!record3) continue;
-        if (!readable.has(record3.questionId)) continue;
-        const principalId = await agentOnlyPrincipalId(env, record3.telegramUserId);
+        const record4 = await readKvJson2(env, entry2.key);
+        if (!record4) continue;
+        if (!readable.has(record4.questionId)) continue;
+        const principalId = await agentOnlyPrincipalId(env, record4.telegramUserId);
         if (view === "answers") {
           rows.push({
             principal_id: principalId,
-            statement_id: safeString(record3.questionId),
-            statement: record3.statement || null,
-            run_id: safeString(record3.runId),
-            source: safeString(record3.source),
-            event_kind: safeString(record3.eventKind),
-            answer: record3.answer || null,
-            confidence: record3.confidence ?? null,
-            rationale: safeString(record3.eventKind) === "privacy_protective_skip" ? null : safeString(record3.rationale),
-            agent_initialized_at: safeString(record3.agentMetadata?.agentInitializedAt),
-            model: safeString(record3.agentMetadata?.model),
-            scaffold_version: safeString(record3.agentMetadata?.scaffoldVersion),
-            token_current_run_total: normalizeTokenCount(record3.agentMetadata?.tokenUsage?.currentRunTotalTokens),
-            token_recent_sessions_total: normalizeTokenCount(record3.agentMetadata?.tokenUsage?.recentSessionsTotalTokens),
-            token_input: normalizeTokenCount(record3.agentMetadata?.tokenUsage?.inputTokens),
-            token_output: normalizeTokenCount(record3.agentMetadata?.tokenUsage?.outputTokens),
-            token_daily_usage_30d: normalizeDailyTokenUsage(record3.agentMetadata?.tokenUsage?.dailyUsage30d),
-            token_edge_in_person_dates: normalizeTokenUsageDates(record3.agentMetadata?.tokenUsage?.edgeInPersonDates),
-            token_usage_source: safeString(record3.agentMetadata?.tokenUsage?.source),
-            instructions_version: safeString(record3.instructionsVersion),
-            request_id: safeString(record3.requestId),
-            created_at: safeString(record3.createdAt)
+            statement_id: safeString(record4.questionId),
+            statement: record4.statement || null,
+            run_id: safeString(record4.runId),
+            source: safeString(record4.source),
+            event_kind: safeString(record4.eventKind),
+            answer: record4.answer || null,
+            confidence: record4.confidence ?? null,
+            rationale: safeString(record4.eventKind) === "privacy_protective_skip" ? null : safeString(record4.rationale),
+            agent_initialized_at: safeString(record4.agentMetadata?.agentInitializedAt),
+            model: safeString(record4.agentMetadata?.model),
+            scaffold_version: safeString(record4.agentMetadata?.scaffoldVersion),
+            token_current_run_total: normalizeTokenCount(record4.agentMetadata?.tokenUsage?.currentRunTotalTokens),
+            token_recent_sessions_total: normalizeTokenCount(record4.agentMetadata?.tokenUsage?.recentSessionsTotalTokens),
+            token_input: normalizeTokenCount(record4.agentMetadata?.tokenUsage?.inputTokens),
+            token_output: normalizeTokenCount(record4.agentMetadata?.tokenUsage?.outputTokens),
+            token_daily_usage_30d: normalizeDailyTokenUsage(record4.agentMetadata?.tokenUsage?.dailyUsage30d),
+            token_edge_in_person_dates: normalizeTokenUsageDates(record4.agentMetadata?.tokenUsage?.edgeInPersonDates),
+            token_usage_source: safeString(record4.agentMetadata?.tokenUsage?.source),
+            instructions_version: safeString(record4.instructionsVersion),
+            request_id: safeString(record4.requestId),
+            created_at: safeString(record4.createdAt)
           });
-        } else if (safeString(record3.source) === "agent_autofill" && record3.eventKind === "answer") {
-          const beforeMs = Date.parse(record3.createdAt);
-          const history = submittedHistory.get(answerKey(record3.telegramUserId, record3.questionId)) || [];
+        } else if (safeString(record4.source) === "agent_autofill" && record4.eventKind === "answer") {
+          const beforeMs = Date.parse(record4.createdAt);
+          const history = submittedHistory.get(answerKey(record4.telegramUserId, record4.questionId)) || [];
           const [prior] = selectCurrentSubmittedAnswers(history.filter((answer) => Date.parse(answer.createdAt) < beforeMs));
           if (!prior) continue;
           rows.push({
             principal_id: principalId,
-            statement_id: safeString(record3.questionId),
-            statement: record3.statement || null,
-            run_id: safeString(record3.runId),
+            statement_id: safeString(record4.questionId),
+            statement: record4.statement || null,
+            run_id: safeString(record4.runId),
             prior_human_answer: prior.answer || null,
             prior_human_created_at: safeString(prior.createdAt),
-            agent_prediction: record3.answer || null,
-            agent_confidence: record3.confidence ?? null,
-            model: safeString(record3.agentMetadata?.model),
-            scaffold_version: safeString(record3.agentMetadata?.scaffoldVersion),
-            instructions_version: safeString(record3.instructionsVersion),
-            eval_type: compactExport ? "" : safeString(record3.evalType),
-            created_at: safeString(record3.createdAt)
+            agent_prediction: record4.answer || null,
+            agent_confidence: record4.confidence ?? null,
+            model: safeString(record4.agentMetadata?.model),
+            scaffold_version: safeString(record4.agentMetadata?.scaffoldVersion),
+            instructions_version: safeString(record4.instructionsVersion),
+            eval_type: compactExport ? "" : safeString(record4.evalType),
+            created_at: safeString(record4.createdAt)
           });
         }
       }
@@ -91332,24 +91379,24 @@ async function exportAgentOnlyData({
     for (const prefix of prefixes2) {
       const entries = await listKvEntriesByPrefix(env, prefix);
       for (const entry2 of entries) {
-        const record3 = await readKvJson2(env, entry2.key);
-        if (!record3) continue;
-        const principalId = await agentOnlyPrincipalId(env, record3.telegramUserId);
-        const votes = record3.votes || record3.nets || {};
+        const record4 = await readKvJson2(env, entry2.key);
+        if (!record4) continue;
+        const principalId = await agentOnlyPrincipalId(env, record4.telegramUserId);
+        const votes = record4.votes || record4.nets || {};
         Object.entries(votes).forEach(([statementId, votesValue]) => {
           if (!readable.has(statementId)) return;
           rows.push({
             principal_id: principalId,
             statement_id: statementId,
-            statement: record3.statements?.[statementId] || null,
-            run_id: safeString(record3.runId),
-            source: safeString(record3.source),
-            mode: safeString(record3.mode),
+            statement: record4.statements?.[statementId] || null,
+            run_id: safeString(record4.runId),
+            source: safeString(record4.source),
+            mode: safeString(record4.mode),
             votes: Number(votesValue) || 0,
-            budget_used: Number(record3.budgetUsed) || 0,
-            request_id: safeString(record3.requestId),
-            created_at: safeString(record3.createdAt),
-            updated_at: safeString(record3.updatedAt || record3.createdAt)
+            budget_used: Number(record4.budgetUsed) || 0,
+            request_id: safeString(record4.requestId),
+            created_at: safeString(record4.createdAt),
+            updated_at: safeString(record4.updatedAt || record4.createdAt)
           });
         });
       }
@@ -91359,26 +91406,26 @@ async function exportAgentOnlyData({
     const entries = listed.entries;
     nextCursor = listed.nextCursor;
     for (const entry2 of entries) {
-      const record3 = await readKvJson2(env, entry2.key);
-      if (!record3) continue;
+      const record4 = await readKvJson2(env, entry2.key);
+      if (!record4) continue;
       rows.push({
-        principal_id: await agentOnlyPrincipalId(env, record3.telegramUserId),
-        run_id: safeString(record3.runId),
-        stage: safeString(record3.stage),
-        mode: safeString(record3.mode),
-        ok: record3.ok === true,
-        status: Number(record3.status) || 0,
-        reason: safeString(record3.reason),
-        request_id: safeString(record3.requestId),
-        replay: record3.replay === true,
-        accepted: record3.counts?.accepted ?? null,
-        skips_recorded: record3.counts?.skipsRecorded ?? null,
-        budget_used: record3.counts?.budgetUsed ?? null,
-        statement_count: record3.counts?.statementCount ?? null,
-        agent_prediction_count: record3.counts?.agentPredictionCount ?? null,
-        agent_response_count: record3.counts?.agentResponseCount ?? null,
-        privacy_skip_count: record3.counts?.privacySkipCount ?? null,
-        created_at: safeString(record3.createdAt)
+        principal_id: await agentOnlyPrincipalId(env, record4.telegramUserId),
+        run_id: safeString(record4.runId),
+        stage: safeString(record4.stage),
+        mode: safeString(record4.mode),
+        ok: record4.ok === true,
+        status: Number(record4.status) || 0,
+        reason: safeString(record4.reason),
+        request_id: safeString(record4.requestId),
+        replay: record4.replay === true,
+        accepted: record4.counts?.accepted ?? null,
+        skips_recorded: record4.counts?.skipsRecorded ?? null,
+        budget_used: record4.counts?.budgetUsed ?? null,
+        statement_count: record4.counts?.statementCount ?? null,
+        agent_prediction_count: record4.counts?.agentPredictionCount ?? null,
+        agent_response_count: record4.counts?.agentResponseCount ?? null,
+        privacy_skip_count: record4.counts?.privacySkipCount ?? null,
+        created_at: safeString(record4.createdAt)
       });
     }
   } else if (view === "summary") {
@@ -91389,13 +91436,13 @@ async function exportAgentOnlyData({
     let latestAttemptAt = "";
     let includedAttemptEventCount = 0;
     for (const entry2 of entries) {
-      const record3 = await readKvJson2(env, entry2.key);
-      if (!record3) continue;
+      const record4 = await readKvJson2(env, entry2.key);
+      if (!record4) continue;
       includedAttemptEventCount += 1;
-      const createdAt = safeString(record3.createdAt);
+      const createdAt = safeString(record4.createdAt);
       if (createdAt && (!firstAttemptAt || createdAt < firstAttemptAt)) firstAttemptAt = createdAt;
       if (createdAt && (!latestAttemptAt || createdAt > latestAttemptAt)) latestAttemptAt = createdAt;
-      const principalId = await agentOnlyPrincipalId(env, record3.telegramUserId);
+      const principalId = await agentOnlyPrincipalId(env, record4.telegramUserId);
       if (!principalRows.has(principalId)) {
         principalRows.set(principalId, {
           principal_id: principalId,
@@ -91412,7 +91459,7 @@ async function exportAgentOnlyData({
       principal.attempt_event_count += 1;
       if (createdAt && (!principal.first_attempt_at || createdAt < principal.first_attempt_at)) principal.first_attempt_at = createdAt;
       if (createdAt && (!principal.latest_attempt_at || createdAt > principal.latest_attempt_at)) principal.latest_attempt_at = createdAt;
-      const runId = normalizeAgentOnlyRunId(record3.runId) || "unknown";
+      const runId = normalizeAgentOnlyRunId(record4.runId) || "unknown";
       const runKey = `${principalId}	${runId}`;
       if (!runRows.has(runKey)) {
         runRows.set(runKey, {
@@ -91432,8 +91479,8 @@ async function exportAgentOnlyData({
       run.attempt_event_count += 1;
       if (createdAt && (!run.first_attempt_at || createdAt < run.first_attempt_at)) run.first_attempt_at = createdAt;
       if (createdAt && (!run.latest_attempt_at || createdAt > run.latest_attempt_at)) run.latest_attempt_at = createdAt;
-      const stage = safeString(record3.stage);
-      if (stage === "wrapped_image" && record3.ok === true) run.wrapped_image_ok = true;
+      const stage = safeString(record4.stage);
+      if (stage === "wrapped_image" && record4.ok === true) run.wrapped_image_ok = true;
     }
     const answerEventsByRun = /* @__PURE__ */ new Map();
     const answerEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_EVENT_KV_PREFIX}${slug}:`);
@@ -91505,27 +91552,27 @@ async function exportAgentOnlyData({
     const entries = listed.entries;
     nextCursor = listed.nextCursor;
     for (const entry2 of entries) {
-      const record3 = await readKvJson2(env, entry2.key);
-      if (!record3) continue;
+      const record4 = await readKvJson2(env, entry2.key);
+      if (!record4) continue;
       rows.push({
-        principal_id: await agentOnlyPrincipalId(env, record3.telegramUserId),
-        image_id: safeString(record3.imageId) || safeString(entry2.key).split(":").pop() || "",
-        image_view_id: safeString(record3.imageViewId),
-        run_id: safeString(record3.runId),
-        mode: safeString(record3.mode),
-        model: safeString(record3.model),
-        size: safeString(record3.size),
-        quality: safeString(record3.quality),
-        reference_image: safeString(record3.referenceImage),
-        media_kind: safeString(record3.mediaKind),
-        frame_count: Number(record3.frameCount || 0) || 0,
-        story_duration_seconds: Number(record3.storyDurationSeconds || 0) || 0,
-        frame_keys: Array.isArray(record3.frameKeys) ? record3.frameKeys.join(",") : "",
-        image_content_type: safeString(record3.imageContentType),
-        image_byte_length_approx: Number(record3.imageByteLengthApprox || 0) || 0,
-        prompt_hash: safeString(record3.promptHash),
-        created_at: safeString(record3.createdAt),
-        ...includeImageBase64 ? { image_base64: safeString(record3.imageBase64) } : {}
+        principal_id: await agentOnlyPrincipalId(env, record4.telegramUserId),
+        image_id: safeString(record4.imageId) || safeString(entry2.key).split(":").pop() || "",
+        image_view_id: safeString(record4.imageViewId),
+        run_id: safeString(record4.runId),
+        mode: safeString(record4.mode),
+        model: safeString(record4.model),
+        size: safeString(record4.size),
+        quality: safeString(record4.quality),
+        reference_image: safeString(record4.referenceImage),
+        media_kind: safeString(record4.mediaKind),
+        frame_count: Number(record4.frameCount || 0) || 0,
+        story_duration_seconds: Number(record4.storyDurationSeconds || 0) || 0,
+        frame_keys: Array.isArray(record4.frameKeys) ? record4.frameKeys.join(",") : "",
+        image_content_type: safeString(record4.imageContentType),
+        image_byte_length_approx: Number(record4.imageByteLengthApprox || 0) || 0,
+        prompt_hash: safeString(record4.promptHash),
+        created_at: safeString(record4.createdAt),
+        ...includeImageBase64 ? { image_base64: safeString(record4.imageBase64) } : {}
       });
     }
   } else {
@@ -91750,13 +91797,13 @@ function delegationScopeForRequest(pathname = "", method = "GET") {
   return "";
 }
 function applyDelegationToInput(auth = {}, input = {}, pathname = "", method = "GET") {
-  const record3 = auth.delegation;
-  if (record3) {
+  const record4 = auth.delegation;
+  if (record4) {
     const scope = delegationScopeForRequest(pathname, method);
-    if (!scope || !agentCredentialHasScope(record3, scope)) return { ok: false, status: 403, reason: "agent_token_scope_denied", requiredScope: scope };
-    if (input.sessionSlug && sanitizeSessionSlug(input.sessionSlug) !== record3.sessionSlug) return { ok: false, status: 403, reason: "agent_token_session_mismatch" };
+    if (!scope || !agentCredentialHasScope(record4, scope)) return { ok: false, status: 403, reason: "agent_token_scope_denied", requiredScope: scope };
+    if (input.sessionSlug && sanitizeSessionSlug(input.sessionSlug) !== record4.sessionSlug) return { ok: false, status: 403, reason: "agent_token_session_mismatch" };
   }
-  const principal = record3?.principal || auth.principal;
+  const principal = record4?.principal || auth.principal;
   if (!principal?.principalId) return { ok: false, status: 401, reason: "agent_principal_required" };
   return { ok: true, input: {
     ...input,
@@ -91769,8 +91816,8 @@ function applyDelegationToInput(auth = {}, input = {}, pathname = "", method = "
     telegram: {},
     adapterMetadata: {},
     username: principal.label || "",
-    accountAddress: record3?.accountAddress || auth.address,
-    sessionSlug: record3?.sessionSlug || auth.slug
+    accountAddress: record4?.accountAddress || auth.address,
+    sessionSlug: record4?.sessionSlug || auth.slug
   } };
 }
 async function resolveHandoffContext({ env, auth = env.AGENT_CONTEXT.auth, input = {} }) {
@@ -92058,15 +92105,15 @@ async function listMetricKvEntriesByPrefix(env = {}, prefix = "", { limit = 1e4 
 async function readMetricRecord(env = {}, key = "") {
   const kv = env?.AGENT_ACTION_KV;
   if (!key || !kv || typeof kv.get !== "function") return null;
-  const record3 = safeJsonParse(await kv.get(key).catch(() => null), null);
-  return record3 && typeof record3 === "object" && !Array.isArray(record3) ? record3 : null;
+  const record4 = safeJsonParse(await kv.get(key).catch(() => null), null);
+  return record4 && typeof record4 === "object" && !Array.isArray(record4) ? record4 : null;
 }
 async function listHandoffKvRecordsByPrefix(env = {}, prefix = "", { limit = 1e4 } = {}) {
   const entries = await listMetricKvEntriesByPrefix(env, prefix, { limit });
   const records = [];
   for (const entry2 of entries) {
-    const record3 = await readMetricRecord(env, entry2.key);
-    if (record3) records.push({ ...record3, key: entry2.key });
+    const record4 = await readMetricRecord(env, entry2.key);
+    if (record4) records.push({ ...record4, key: entry2.key });
   }
   return records;
 }
@@ -92225,24 +92272,24 @@ function agentQuestionAnswerRef(sessionSlug = "", questionId4 = "") {
 function firstAnswerValue2(...values) {
   return values.find((value) => safeAnswerString2(value) !== "");
 }
-function submitRecordAnswerForAgent(record3 = {}) {
-  const answer = record3.answer && typeof record3.answer === "object" && !Array.isArray(record3.answer) ? record3.answer : {};
-  const parsed = safeJsonParse(answer.value || record3.answerValue, null);
+function submitRecordAnswerForAgent(record4 = {}) {
+  const answer = record4.answer && typeof record4.answer === "object" && !Array.isArray(record4.answer) ? record4.answer : {};
+  const parsed = safeJsonParse(answer.value || record4.answerValue, null);
   const structured = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   const questionType = safeString(
-    firstAnswerValue2(structured.questionType, record3.questionType, answer.questionType, record3.controlType)
+    firstAnswerValue2(structured.questionType, record4.questionType, answer.questionType, record4.controlType)
   );
-  const label = safeAnswerString2(firstAnswerValue2(answer.label, structured.label, record3.answerLabel));
+  const label = safeAnswerString2(firstAnswerValue2(answer.label, structured.label, record4.answerLabel));
   const base = {
-    requestId: safeString(record3.requestId),
-    answeredAt: safeString(record3.createdAt),
-    status: safeString(record3.status),
+    requestId: safeString(record4.requestId),
+    answeredAt: safeString(record4.createdAt),
+    status: safeString(record4.status),
     questionType,
     ...label ? { label } : {}
   };
   if (questionType === "quadratic") return { ...base, value: structured.value ?? answer.value, comments: safeString(structured.comments || answer.comments) };
   if (questionType === "multichoice") {
-    const values = Array.isArray(structured.values) ? structured.values.map(safeAnswerString2).filter(Boolean) : [firstAnswerValue2(structured.value, answer.value, record3.answerValue)].map(safeAnswerString2).filter(Boolean);
+    const values = Array.isArray(structured.values) ? structured.values.map(safeAnswerString2).filter(Boolean) : [firstAnswerValue2(structured.value, answer.value, record4.answerValue)].map(safeAnswerString2).filter(Boolean);
     return {
       ...base,
       values,
@@ -92253,12 +92300,12 @@ function submitRecordAnswerForAgent(record3 = {}) {
     return {
       ...base,
       text: safeAnswerString2(
-        firstAnswerValue2(structured.text, structured.value, answer.text, answer.value, record3.answerText)
+        firstAnswerValue2(structured.text, structured.value, answer.text, answer.value, record4.answerText)
       ),
       ...safeAnswerString2(structured.comments) ? { comments: safeAnswerString2(structured.comments) } : {}
     };
   }
-  const value = Object.hasOwn(structured, "value") ? structured.value : firstAnswerValue2(answer.value, record3.answerValue);
+  const value = Object.hasOwn(structured, "value") ? structured.value : firstAnswerValue2(answer.value, record4.answerValue);
   return {
     ...base,
     value,
@@ -92292,18 +92339,18 @@ async function loadAgentQuestionAnswerState({ env = {}, context = {}, questions 
       }) : [];
     })
   );
-  const records = selectCurrentSubmittedAnswers(indexedRecordGroups.flat().filter((record3) => safeString(record3.telegramUserId) === telegramUserId && submittedStatuses.has(safeString(record3.status))));
+  const records = selectCurrentSubmittedAnswers(indexedRecordGroups.flat().filter((record4) => safeString(record4.telegramUserId) === telegramUserId && submittedStatuses.has(safeString(record4.status))));
   const answeredByRef = /* @__PURE__ */ new Map();
-  records.forEach((record3) => {
-    if (safeString(record3.telegramUserId) !== telegramUserId) return;
-    if (!submittedStatuses.has(safeString(record3.status))) return;
-    const ref = agentQuestionAnswerRef(record3.sessionSlug, record3.questionId);
+  records.forEach((record4) => {
+    if (safeString(record4.telegramUserId) !== telegramUserId) return;
+    if (!submittedStatuses.has(safeString(record4.status))) return;
+    const ref = agentQuestionAnswerRef(record4.sessionSlug, record4.questionId);
     if (!questionByRef.has(ref)) return;
     answeredByRef.set(ref, {
       answeredByUser: true,
-      answeredAt: safeString(record3.createdAt),
-      answerStatus: safeString(record3.status),
-      myAnswer: submitRecordAnswerForAgent(record3)
+      answeredAt: safeString(record4.createdAt),
+      answerStatus: safeString(record4.status),
+      myAnswer: submitRecordAnswerForAgent(record4)
     });
   });
   return {
@@ -92840,7 +92887,7 @@ async function saveAgentQuestionQueueConfig({
   }
   const existing = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
   const now = safeString(createdAt) || (/* @__PURE__ */ new Date()).toISOString();
-  const record3 = {
+  const record4 = {
     type: "telegram_question_queue_config",
     version: 1,
     sessionSlug: sanitizeSessionSlug(sessionSlug),
@@ -92850,9 +92897,9 @@ async function saveAgentQuestionQueueConfig({
     createdAt: safeString(existing?.createdAt) || now,
     updatedAt: now
   };
-  assertNoSecretShape(record3, "Agent question queue config records must not serialize secrets.");
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record3));
-  return { ok: true, key, config: record3 };
+  assertNoSecretShape(record4, "Agent question queue config records must not serialize secrets.");
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record4));
+  return { ok: true, key, config: record4 };
 }
 function normalizeQuestionQueueCriteria(input = {}) {
   const criteria = input.criteria && typeof input.criteria === "object" && !Array.isArray(input.criteria) ? input.criteria : {};
@@ -92975,7 +93022,7 @@ async function selectNextAgentQuestion({
         selectedAt: now
       }] : []
     ].slice(-MAX_HISTORY);
-    const record3 = {
+    const record4 = {
       type: "telegram_question_queue_state",
       version: 1,
       sessionSlug: sanitizeSessionSlug(sessionSlug),
@@ -92987,8 +93034,8 @@ async function selectNextAgentQuestion({
       createdAt: safeString(existing?.createdAt) || now,
       updatedAt: now
     };
-    assertNoSecretShape(record3, "Agent question queue state records must not serialize secrets.");
-    await kv.put(key, JSON.stringify(record3));
+    assertNoSecretShape(record4, "Agent question queue state records must not serialize secrets.");
+    await kv.put(key, JSON.stringify(record4));
     statePersisted = true;
   }
   return {
@@ -93727,9 +93774,9 @@ async function buildAdminMetricsSnapshot({
     let tokenSessionSlug = sanitizeSessionSlug(metadata?.sg);
     let telegramUserId = safeString(metadata?.p || metadata?.u);
     if (!tokenSessionSlug || !telegramUserId) {
-      const record3 = await readMetricRecord(env, entry2.key);
-      tokenSessionSlug = sanitizeSessionSlug(record3?.sessionSlug);
-      telegramUserId = safeString(record3?.principal?.principalId || record3?.telegramUserId);
+      const record4 = await readMetricRecord(env, entry2.key);
+      tokenSessionSlug = sanitizeSessionSlug(record4?.sessionSlug);
+      telegramUserId = safeString(record4?.principal?.principalId || record4?.telegramUserId);
     }
     if (!tokenSessionSlug || !inScope(tokenSessionSlug)) continue;
     totals.agentsOnboarded += 1;
@@ -93791,10 +93838,10 @@ async function buildAdminMetricsSnapshot({
     let slug = sanitizeSessionSlug(meta?.sg);
     let telegramUserId = safeString(meta?.u);
     if (!status || !slug) {
-      const record3 = await readMetricRecord(env, entry2.key);
-      status = status || safeString(record3?.status);
-      slug = slug || sanitizeSessionSlug(record3?.sessionSlug);
-      telegramUserId = telegramUserId || safeString(record3?.telegramUserId);
+      const record4 = await readMetricRecord(env, entry2.key);
+      status = status || safeString(record4?.status);
+      slug = slug || sanitizeSessionSlug(record4?.sessionSlug);
+      telegramUserId = telegramUserId || safeString(record4?.telegramUserId);
     }
     slug = slug || scopedSessionSlug || sessionFromSessionFirstKey(entry2.key, SUBMIT_REQUEST_SESSION_KV_PREFIX);
     if (!slug || !inScope(slug)) continue;
@@ -94249,15 +94296,15 @@ async function writeCustomGroupConfig(env = {}, sessionSlug = "", categories = [
     ...category,
     source: "cloudflare_custom"
   })));
-  const record3 = {
+  const record4 = {
     version: 1,
     sessionSlug: sanitizeSessionSlug(sessionSlug),
     categories: merged,
     updatedBy: safeString(updatedBy) || null,
     updatedAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
   };
-  assertNoSecretShape(record3, "Agent lightweight group config must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record3));
+  assertNoSecretShape(record4, "Agent lightweight group config must not serialize secrets.");
+  await kv.put(key, JSON.stringify(record4));
   return { ok: true, categories: merged };
 }
 async function readMembership(env = {}, {
@@ -94424,7 +94471,7 @@ async function saveAgentLightweightGroupMembership({
   const bucketKey = bucketMembershipKey({ sessionSlug, accountAddress });
   const kv = env?.AGENT_ACTION_KV;
   if (!key && !bucketKey || !kv || typeof kv.put !== "function") return { ok: false, reason: "action_kv_unavailable" };
-  const record3 = {
+  const record4 = {
     version: 1,
     sessionSlug,
     telegramUserId: safeString(telegramUserId),
@@ -94432,9 +94479,9 @@ async function saveAgentLightweightGroupMembership({
     details: normalizedDetails,
     updatedAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
   };
-  assertNoSecretShape(record3, "Agent lightweight group memberships must not serialize secrets.");
+  assertNoSecretShape(record4, "Agent lightweight group memberships must not serialize secrets.");
   if (key) {
-    await kv.put(key, JSON.stringify(record3));
+    await kv.put(key, JSON.stringify(record4));
   }
   if (bucketKey) {
     const bucketRecord = {
@@ -94444,7 +94491,7 @@ async function saveAgentLightweightGroupMembership({
       accountAddress: normalizeAddress2(accountAddress),
       selections: normalizedSelections,
       details: normalizedDetails,
-      updatedAt: record3.updatedAt
+      updatedAt: record4.updatedAt
     };
     assertNoSecretShape(bucketRecord, "Agent KV bucket memberships must not serialize secrets.");
     await kv.put(bucketKey, JSON.stringify(bucketRecord));
@@ -94456,7 +94503,7 @@ async function saveAgentLightweightGroupMembership({
       selections: normalizedSelections,
       details: normalizedDetails,
       membershipSource: key ? "telegram_user" : "managed_wallet",
-      updatedAt: record3.updatedAt
+      updatedAt: record4.updatedAt
     }
   };
 }
@@ -94496,7 +94543,7 @@ async function persistAgentLightweightGroupProposal({
     targetTelegramUserId: input.targetTelegramUserId,
     createdAt
   })}`;
-  const record3 = {
+  const record4 = {
     version: 1,
     proposalId,
     sessionSlug,
@@ -94509,26 +94556,26 @@ async function persistAgentLightweightGroupProposal({
     createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
   };
   if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
-    record3.actionMetadata = { ...metadata };
+    record4.actionMetadata = { ...metadata };
   }
-  assertNoSecretShape(record3, "Agent lightweight group proposals must not serialize secrets.");
+  assertNoSecretShape(record4, "Agent lightweight group proposals must not serialize secrets.");
   const activityMetadata = buildAgentActivityMetadata({
     type: "group_proposal",
-    status: record3.status,
-    createdAt: record3.createdAt,
+    status: record4.status,
+    createdAt: record4.createdAt,
     pendingAction: "review_group_proposal",
-    sessionSlug: record3.sessionSlug,
-    telegramUserId: record3.proposedBy,
-    targetTelegramUserId: record3.targetTelegramUserId
+    sessionSlug: record4.sessionSlug,
+    telegramUserId: record4.proposedBy,
+    targetTelegramUserId: record4.targetTelegramUserId
   });
-  await kv.put(`${proposalPrefix(sessionSlug)}${proposalId}`, JSON.stringify(record3), {
+  await kv.put(`${proposalPrefix(sessionSlug)}${proposalId}`, JSON.stringify(record4), {
     metadata: activityMetadata
   });
   return {
     ok: true,
     sessionSlug,
     category,
-    proposal: record3,
+    proposal: record4,
     requiresUserApproval: true
   };
 }
@@ -94547,7 +94594,7 @@ async function persistAgentChildSession({
     return { ok: false, reason: "action_kv_unavailable" };
   }
   const groups = normalizeAgentGroupCategories(input.groups || input.lightweightGroups || []);
-  const record3 = {
+  const record4 = {
     version: 1,
     sessionSlug: childSessionSlug,
     parentSessionSlug,
@@ -94560,8 +94607,8 @@ async function persistAgentChildSession({
     createdByTelegramUserId: safeString(normalized.user?.telegramUserId) || null,
     createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
   };
-  assertNoSecretShape(record3, "Agent child session records must not serialize secrets.");
-  await kv.put(childSessionKey(childSessionSlug), JSON.stringify(record3));
+  assertNoSecretShape(record4, "Agent child session records must not serialize secrets.");
+  await kv.put(childSessionKey(childSessionSlug), JSON.stringify(record4));
   if (groups.length) {
     await writeCustomGroupConfig(env, childSessionSlug, groups, {
       createdAt,
@@ -94570,7 +94617,7 @@ async function persistAgentChildSession({
   }
   return {
     ok: true,
-    session: record3,
+    session: record4,
     canonicalStatus: "worker_local_until_session_registry_parity"
   };
 }
@@ -94768,10 +94815,10 @@ async function loadAgentSettings({
   const defaults = defaultAgentSettings(env);
   const key = agentSettingsKey({ sessionSlug, telegramUserId });
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== "function") return defaults;
-  const record3 = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
-  if (!record3 || typeof record3 !== "object" || Array.isArray(record3)) return defaults;
-  assertNoSecretShape(record3, "Agent settings records must not serialize secrets.");
-  const settings = record3.settings && typeof record3.settings === "object" && !Array.isArray(record3.settings) ? record3.settings : record3;
+  const record4 = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
+  if (!record4 || typeof record4 !== "object" || Array.isArray(record4)) return defaults;
+  assertNoSecretShape(record4, "Agent settings records must not serialize secrets.");
+  const settings = record4.settings && typeof record4.settings === "object" && !Array.isArray(record4.settings) ? record4.settings : record4;
   return {
     draftStyle: normalizeDraftStyle(settings.draftStyle || defaults.draftStyle),
     showUnansweredFirst: normalizeBoolean4(settings.showUnansweredFirst, defaults.showUnansweredFirst),
@@ -94813,7 +94860,7 @@ async function saveAgentSettingsPatch({
     ...normalized.publicSummary
   };
   const existing = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
-  const record3 = {
+  const record4 = {
     type: "telegram_agent_settings",
     version: 1,
     sessionSlug: sanitizeSessionSlug(sessionSlug) || "global",
@@ -94822,8 +94869,8 @@ async function saveAgentSettingsPatch({
     createdAt: safeString(existing?.createdAt) || createdAt,
     updatedAt: createdAt
   };
-  assertNoSecretShape(record3, "Agent settings records must not serialize secrets.");
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record3));
+  assertNoSecretShape(record4, "Agent settings records must not serialize secrets.");
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record4));
   return {
     ok: true,
     key,
@@ -96233,8 +96280,8 @@ function topicForQuestion(question = {}, session = {}) {
 }
 function recordsByQuestion(records = []) {
   const byQuestion = /* @__PURE__ */ new Map();
-  for (const record3 of Array.isArray(records) ? records : []) {
-    const qid = safeString(record3.questionId);
+  for (const record4 of Array.isArray(records) ? records : []) {
+    const qid = safeString(record4.questionId);
     if (!qid) continue;
     if (!byQuestion.has(qid)) {
       byQuestion.set(qid, {
@@ -96245,8 +96292,8 @@ function recordsByQuestion(records = []) {
     }
     const item = byQuestion.get(qid);
     item.responseCount += 1;
-    if (record3.telegramUserId) item.participants.add(safeString(record3.telegramUserId));
-    const createdAt = safeString(record3.createdAt);
+    if (record4.telegramUserId) item.participants.add(safeString(record4.telegramUserId));
+    const createdAt = safeString(record4.createdAt);
     if (createdAt && createdAt > item.latestCreatedAt) item.latestCreatedAt = createdAt;
   }
   return byQuestion;
@@ -96302,7 +96349,7 @@ function buildAgentTopicMapSignature({
     participantCount: item.participants.size,
     latestCreatedAt: item.latestCreatedAt
   })).sort((left, right) => left.questionId.localeCompare(right.questionId));
-  const participantIds = new Set((Array.isArray(records) ? records : []).map((record3) => safeString(record3.telegramUserId)).filter(Boolean));
+  const participantIds = new Set((Array.isArray(records) ? records : []).map((record4) => safeString(record4.telegramUserId)).filter(Boolean));
   return {
     questionCount: questionParts.length,
     responseCount: responseParts.reduce((sum, item) => sum + item.responseCount, 0),
@@ -96828,18 +96875,18 @@ function buildAgentPolisDataset({ sessionSlug = "", sourceRecords = [], sourceQu
     binaryQuestions.map((question) => safeString(question.questionId || question.id)).filter(Boolean)
   );
   const records = (Array.isArray(sourceRecords) ? sourceRecords : []).filter(
-    (record3) => binaryQuestionIds.has(safeString(record3.questionId)) && AGENT_POLIS_BINARY_LABELS.has(safeString(record3.label)) && safeString(record3.telegramUserId)
+    (record4) => binaryQuestionIds.has(safeString(record4.questionId)) && AGENT_POLIS_BINARY_LABELS.has(safeString(record4.label)) && safeString(record4.telegramUserId)
   );
   const latestRecords = demo ? records : selectCurrentSubmittedAnswers(records);
-  const participants = Array.from(new Set(latestRecords.map((record3) => safeString(record3.telegramUserId))));
+  const participants = Array.from(new Set(latestRecords.map((record4) => safeString(record4.telegramUserId))));
   const aliasById = new Map(participants.map((id2, index) => [id2, `P${index + 1}`]));
   const responses = {};
-  for (const record3 of latestRecords) {
-    const questionIdValue = safeString(record3.questionId);
+  for (const record4 of latestRecords) {
+    const questionIdValue = safeString(record4.questionId);
     if (!responses[questionIdValue]) responses[questionIdValue] = [];
     responses[questionIdValue].push({
-      responder: aliasById.get(safeString(record3.telegramUserId)),
-      value: safeString(record3.label)
+      responder: aliasById.get(safeString(record4.telegramUserId)),
+      value: safeString(record4.label)
     });
   }
   const questions = binaryQuestions.map((question) => ({
@@ -96868,7 +96915,7 @@ function aggregateQuestionRows(records = [], questions = [], view = "consensus")
   const consensusQuestionIds = new Set(
     consensusQuestions.map((question) => safeString(question.questionId || question.id)).filter(Boolean)
   );
-  const consensusRecords = records.filter((record3) => consensusQuestionIds.has(safeString(record3.questionId)));
+  const consensusRecords = records.filter((record4) => consensusQuestionIds.has(safeString(record4.questionId)));
   const rows = summarizeQuestionResults(consensusRecords, consensusQuestions).map((summary) => {
     const counts = summary.counts.map(([label, count]) => ({ label, count }));
     const maxCount = counts.reduce((max, item) => Math.max(max, Number(item.count || 0)), 0);
@@ -97557,7 +97604,7 @@ async function persistAgentQuestionVoteRecommendations({
   const requestId = safeString(input.requestId || input.idempotencyKey) || buildOpaqueActionId(
     `agent_question_vote_recommendations|${sessionSlug}|${telegramUserId}|${stableFingerprint(recommendations)}|${createdAt}`
   );
-  const record3 = {
+  const record4 = {
     type: "telegram_agent_question_vote_recommendation",
     version: 1,
     requestId,
@@ -97575,12 +97622,12 @@ async function persistAgentQuestionVoteRecommendations({
     })),
     createdAt
   };
-  assertNoSecretShape(record3, "Agent question vote recommendation records must not serialize secrets.");
+  assertNoSecretShape(record4, "Agent question vote recommendation records must not serialize secrets.");
   await kv.put(
     `${AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX}${sessionSlug}:${kvKeySafePart(telegramUserId)}:${requestId}`,
-    JSON.stringify(record3)
+    JSON.stringify(record4)
   );
-  return { ok: true, requestId, record: record3 };
+  return { ok: true, requestId, record: record4 };
 }
 var SECRETISH_METADATA_KEY_RE = /(?:secret|token|api.?key|private.?key|password|authorization|bearer|signature|mnemonic|seed)/i;
 function sanitizeResearchMetadata(value, { depth = 0, maxString = 600 } = {}) {
@@ -98233,7 +98280,7 @@ function isSessionWrappedOnboardingRequest(body = {}) {
 function trustedOnboardingInviteRecords(env = {}) {
   const ctx = env.AGENT_CONTEXT;
   const configured = ctx.config.agentHttp?.invites;
-  return (Array.isArray(configured) ? configured : []).filter((record3) => record3 && /^[a-f0-9]{64}$/.test(record3.tokenHash || "") && record3.enabled !== false).map((record3) => ({ tokenHash: record3.tokenHash, sessionSlug: ctx.slug, label: safeString(record3.label).slice(0, 120), source: safeString(record3.source).slice(0, 160) }));
+  return (Array.isArray(configured) ? configured : []).filter((record4) => record4 && /^[a-f0-9]{64}$/.test(record4.tokenHash || "") && record4.enabled !== false).map((record4) => ({ tokenHash: record4.tokenHash, sessionSlug: ctx.slug, label: safeString(record4.label).slice(0, 120), source: safeString(record4.source).slice(0, 160) }));
 }
 async function resolveTrustedOnboardingInvite(env = {}, inviteToken = "") {
   const supplied = safeString(inviteToken);
@@ -98246,16 +98293,16 @@ async function resolveTrustedOnboardingInvite(env = {}, inviteToken = "") {
       reason: "invite_onboarding_not_configured"
     };
   const suppliedHash = await sha256Hex2(supplied);
-  for (const record3 of records) {
-    const recordHash = /^[0-9a-f]{64}$/.test(safeString(record3.tokenHash)) ? safeString(record3.tokenHash).toLowerCase() : record3.token ? await sha256Hex2(record3.token) : "";
+  for (const record4 of records) {
+    const recordHash = /^[0-9a-f]{64}$/.test(safeString(record4.tokenHash)) ? safeString(record4.tokenHash).toLowerCase() : record4.token ? await sha256Hex2(record4.token) : "";
     if (recordHash && timingSafeEqualString(recordHash, suppliedHash)) {
       return {
         ok: true,
         tokenHash: suppliedHash,
         invite: {
-          sessionSlug: sanitizeSessionSlug(record3.sessionSlug),
-          label: safeString(record3.label),
-          source: safeString(record3.source)
+          sessionSlug: sanitizeSessionSlug(record4.sessionSlug),
+          label: safeString(record4.label),
+          source: safeString(record4.source)
         }
       };
     }
@@ -102646,8 +102693,8 @@ var recordAbuseEventBestEffort = async ({
   now
 } = {}) => {
   try {
-    const record3 = deps?.recordAbuseEvent || recordAbuseEvent;
-    await record3({ env, type, now });
+    const record4 = deps?.recordAbuseEvent || recordAbuseEvent;
+    await record4({ env, type, now });
   } catch {
   }
 };
@@ -102916,8 +102963,8 @@ init_deployHelperCore();
 init_sessionWriteCoordinator();
 var INVALID_GRANT_ERROR = "Invalid, expired, or already used sponsored bootstrap grant.";
 var toTrimmedString19 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var isExpiredGrant = (record3 = {}, nowMs = Date.now()) => {
-  const expiresAt = toTrimmedString19(record3?.expiresAt);
+var isExpiredGrant = (record4 = {}, nowMs = Date.now()) => {
+  const expiresAt = toTrimmedString19(record4?.expiresAt);
   if (!expiresAt) return false;
   const expirationMs = Date.parse(expiresAt);
   if (!Number.isFinite(expirationMs)) return false;
