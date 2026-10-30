@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Preserve the latest SBT image choice and saved bytes when an earlier image request finishes late.
+
 - Count Community groups by chain and contract address, while counting the same contract across session caches only once.
 
 - Open the saved-filter loader in inline Results even when no filters are active or after clearing them; tokens and full URLs restore Group and Top question selections.

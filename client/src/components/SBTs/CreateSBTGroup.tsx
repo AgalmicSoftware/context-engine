@@ -772,6 +772,27 @@ class CreateSBTGroup extends Component<any, any> {
     });
   };
 
+  _imageSelectionGeneration = 0;
+  _imageFetchController: AbortController | null = null;
+
+  invalidateImageSelection = (): number => {
+    // Cancellation saves work; the generation also rejects providers that settle after abort.
+    ++this._imageSelectionGeneration;
+    this._imageFetchController?.abort();
+    this._imageFetchController = null;
+    return this._imageSelectionGeneration;
+  };
+
+  fetchSelectedImage = async (url: string): Promise<File> => {
+    const controller = new AbortController();
+    this._imageFetchController = controller;
+    try {
+      return await fetchImageFromURL(url, { signal: controller.signal });
+    } finally {
+      if (this._imageFetchController === controller) this._imageFetchController = null;
+    }
+  };
+
   _cacheWriteSeq = 0;
   _memoizedImageDataUrl: string | null = null;
   _memoizedImageFileRef: Blob | null = null;
@@ -930,6 +951,8 @@ class CreateSBTGroup extends Component<any, any> {
   applyAuthoringPayload = (parsed: unknown = {}): boolean => {
     const nextState = this.buildRestoredFormStateFromPayload(parsed);
     if (!nextState) return false;
+    this.invalidateImageSelection();
+    ++this._cacheWriteSeq;
     this.setState(nextState, () => {
       this.updateGroupHash();
     });
@@ -1526,6 +1549,7 @@ class CreateSBTGroup extends Component<any, any> {
 
   componentWillUnmount() {
     this._isMounted = false;
+    this.invalidateImageSelection();
     this.clearCountdownTimer();
     this.clearTrackedTimeouts();
     this.clearPredictAddressTimer();
@@ -2007,6 +2031,7 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   resetForm = (): void => {
+    this.invalidateImageSelection();
     const nextAuthoringChain = this.getAuthoringChainState();
     this.resumeFormCachePersistence();
     this.clearFormCache();
@@ -2115,6 +2140,7 @@ class CreateSBTGroup extends Component<any, any> {
     const target = event.target;
     let value = target.type === 'checkbox' ? target.checked : target.value;
     const name = target.name;
+    const imageGeneration = name === 'sbtImageUrl' ? this.invalidateImageSelection() : null;
 
     // Special handling for tags is done via separate handlers, ignore here if accidentally caught
     if (name === 'tags') return;
@@ -2144,12 +2170,14 @@ class CreateSBTGroup extends Component<any, any> {
 
       if (name === 'sbtImageUrl') {
         this.setState(buildCreateSbtImageLoadReadyPatch(), async () => {
+          if (imageGeneration !== this._imageSelectionGeneration) return;
           const trimmedUrl = this.state.sbtImageUrl.trim();
           const fetchableUrl = this.getFetchableImageUrl(trimmedUrl);
 
           if (trimmedUrl !== '' && fetchableUrl) {
             try {
-              const file = await fetchImageFromURL(fetchableUrl);
+              const file = await this.fetchSelectedImage(fetchableUrl);
+              if (imageGeneration !== this._imageSelectionGeneration) return;
               this.setState(
                 buildCreateSbtImageFilePatch({
                   clearLockedAsset: true,
@@ -2161,6 +2189,7 @@ class CreateSBTGroup extends Component<any, any> {
                 },
               );
             } catch (error) {
+              if (imageGeneration !== this._imageSelectionGeneration) return;
               sbtLog.error('Failed to fetch image via worker:', error);
               this.setState(
                 buildCreateSbtImageLoadErrorPatch({
@@ -2188,6 +2217,7 @@ class CreateSBTGroup extends Component<any, any> {
     file: Blob | null | undefined,
     { useImageUrl = false, statusText = '', statusTone = 'default' }: ApplySelectedImageFileOptions = {},
   ): boolean => {
+    this.invalidateImageSelection();
     if (file && file.size > 10 * 1024 * 1024) {
       sbtLog.error('Image too large (>10MB)');
       if (statusText) {
@@ -2225,9 +2255,11 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   handlePasteImage = async (): Promise<void> => {
+    const imageGeneration = this.invalidateImageSelection();
     const clipboardResult = await readCompactImageClipboard({
       fileNamePrefix: 'clipboard-sbt-image',
     });
+    if (imageGeneration !== this._imageSelectionGeneration) return;
 
     if (clipboardResult?.kind === 'file' && clipboardResult.file) {
       const applied = this.applySelectedImageFile(clipboardResult.file, {
@@ -2265,7 +2297,8 @@ class CreateSBTGroup extends Component<any, any> {
       );
 
       try {
-        const file = await fetchImageFromURL(fetchableUrl);
+        const file = await this.fetchSelectedImage(fetchableUrl);
+        if (imageGeneration !== this._imageSelectionGeneration) return;
         this.resetFormStateForEdit();
         await this.setStateAsync(
           buildCreateSbtSelectedImageFilePatch({
@@ -2277,6 +2310,7 @@ class CreateSBTGroup extends Component<any, any> {
         this.updateGroupHash();
         this.persistFormCache();
       } catch (error) {
+        if (imageGeneration !== this._imageSelectionGeneration) return;
         sbtLog.error('Failed to fetch pasted image via worker:', error);
         this.setState(
           buildCreateSbtImageChooserStatusPatch({
@@ -2301,6 +2335,7 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   setImageUploadMethod = (useImageUrl: unknown, afterUpdate: (() => void) | null = null): void => {
+    this.invalidateImageSelection();
     this.resetFormStateForEdit();
     this.setState(
       () => buildCreateSbtImageUploadMethodPatch({ useImageUrl }),
@@ -2322,6 +2357,7 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   resetImage = (): void => {
+    this.invalidateImageSelection();
     this.resetFormStateForEdit();
     this.setState(buildCreateSbtImageResetPatch(), () => {
       this.updateGroupHash();
@@ -3678,18 +3714,26 @@ class CreateSBTGroup extends Component<any, any> {
 
     const fetchableImageUrl = this.getFetchableImageUrl(this.state.sbtImageUrl);
     if (this.state.useImageUrl && fetchableImageUrl && !this.state.sbtImageFile) {
+      const imageGeneration = this.invalidateImageSelection();
       try {
-        const file = await fetchImageFromURL(fetchableImageUrl);
+        const file = await this.fetchSelectedImage(fetchableImageUrl);
         // Await state update so sbtImageFile is set before uploadImageToArweave reads it
         await new Promise<void>((resolve) => {
-          this.setState(buildCreateSbtImageFilePatch({ file }), () => {
-            this.updateGroupHash();
-            this.persistFormCache();
-            resolve();
-          });
+          this.setState(
+            () => (imageGeneration === this._imageSelectionGeneration ? buildCreateSbtImageFilePatch({ file }) : null),
+            () => {
+              if (imageGeneration === this._imageSelectionGeneration) {
+                this.updateGroupHash();
+                this.persistFormCache();
+              }
+              resolve();
+            },
+          );
         });
       } catch (error) {
-        this.setState(buildCreateSbtImageLoadErrorPatch({ clearFile: false }), this.persistFormCache);
+        if (imageGeneration === this._imageSelectionGeneration) {
+          this.setState(buildCreateSbtImageLoadErrorPatch({ clearFile: false }), this.persistFormCache);
+        }
       }
     }
 
@@ -3712,6 +3756,7 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   async handleImageLoaded(imgRef: HTMLImageElement): Promise<void> {
+    const imageGeneration = this._imageSelectionGeneration;
     try {
       imgRef.crossOrigin = 'anonymous';
       const imageElement = imgRef;
@@ -3740,6 +3785,7 @@ class CreateSBTGroup extends Component<any, any> {
           resolve(b);
         }, 'image/png');
       });
+      if (imageGeneration !== this._imageSelectionGeneration) return;
       if (!blob) {
         this.setState(buildCreateSbtImageLoadErrorPatch(), this.persistFormCache);
         return;
@@ -3750,7 +3796,9 @@ class CreateSBTGroup extends Component<any, any> {
         this.persistFormCache();
       });
     } catch (error) {
-      this.setState(buildCreateSbtImageLoadErrorPatch(), this.persistFormCache);
+      if (imageGeneration === this._imageSelectionGeneration) {
+        this.setState(buildCreateSbtImageLoadErrorPatch(), this.persistFormCache);
+      }
     }
   }
 

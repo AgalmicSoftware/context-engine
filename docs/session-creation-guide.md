@@ -704,6 +704,10 @@ The standalone Create SBT (`/sbts/new`) and global Smart Contracts references
 in Docs remain optional on-chain tools. Opening them from a Worker-native
 session does not add them to that session's native Groups authority.
 
+In the on-chain Group form, changing the image URL, choosing a local file,
+clearing the image, or restoring a draft supersedes any earlier image request.
+Late previews and errors cannot replace that choice or its saved image bytes.
+
 ### 3. Worker deploy and secrets
 
 Every reachable hosting profile uses a Session Worker for the web runtime. The

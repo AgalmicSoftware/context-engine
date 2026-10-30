@@ -272,7 +272,9 @@ describe('CreateSBTGroup render and image authoring', () => {
       });
 
       await waitFor(() => {
-        expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/sbt-image.png');
+        expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/sbt-image.png', {
+          signal: expect.any(AbortSignal),
+        });
         expect(instance.state.sbtImageFile).toBe(fetchedFile);
       });
 
@@ -316,7 +318,7 @@ describe('CreateSBTGroup render and image authoring', () => {
     });
 
     await waitFor(() => {
-      expect(mockFetchImageFromURL).toHaveBeenCalledWith(normalizedArweaveUrl);
+      expect(mockFetchImageFromURL).toHaveBeenCalledWith(normalizedArweaveUrl, { signal: expect.any(AbortSignal) });
       expect(instance.state.sbtImageFile).toBe(fetchedFile);
     });
 
@@ -351,7 +353,7 @@ describe('CreateSBTGroup render and image authoring', () => {
       await instance.handleMintClick();
     });
 
-    expect(mockFetchImageFromURL).toHaveBeenCalledWith(normalizedArweaveUrl);
+    expect(mockFetchImageFromURL).toHaveBeenCalledWith(normalizedArweaveUrl, { signal: expect.any(AbortSignal) });
     expect(instance.state.sbtImageFile).toBe(fetchedFile);
     expect(instance.uploadImageToArweave).toHaveBeenCalledTimes(1);
     expect(instance.uploadTokenUriToArweave).toHaveBeenCalledTimes(1);
@@ -465,7 +467,9 @@ describe('CreateSBTGroup render and image authoring', () => {
 
       view.rerender(instance.render());
 
-      expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/not-an-image');
+      expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/not-an-image', {
+        signal: expect.any(AbortSignal),
+      });
       expect(instance.state.useImageUrl).toBe(false);
       expect(instance.state.sbtImageFile).toBe(existingFile);
       expect(screen.queryByTestId(E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT)).not.toBeInTheDocument();
