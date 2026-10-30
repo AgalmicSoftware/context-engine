@@ -553,7 +553,7 @@ when unchecked, the viewer has no snapshot download control.
 Question generation accepts text, Markdown, CSV and JSON files, plus supported
 images for analysis. PDF and PowerPoint files are not offered as generation
 sources: paste their text instead. Skipped files and extraction failures are
-named in the generator. Each new generation clears the previous source warnings, including notices for files rejected during selection; new failures from that generation produce new warnings. Only extracted text counts toward its 50-character
+named in the generator. Each new generation clears previous extraction failures and repeats the notices for files rejected during selection; new extraction failures produce new warnings. Only extracted text counts toward its 50-character
 minimum. The document library's separate file-upload support is unchanged.
 
 Photo generation sources use the image capability declared by each built-in AI preset. Custom Anthropic and OpenRouter Claude names accept versions 3, 4 and 5 in both family-first (`claude-sonnet-4-6`) and version-first (`claude-3-5-sonnet`) forms. Unsupported models keep the existing vision-capability error before a request is sent.

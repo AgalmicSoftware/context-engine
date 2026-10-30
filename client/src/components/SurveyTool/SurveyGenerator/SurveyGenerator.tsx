@@ -406,6 +406,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const [activeAction, setActiveAction] = useState('');
   const [error, setError] = useState('');
   const [sourceWarnings, setSourceWarnings] = useState<string[]>([]);
+  const selectionWarningsRef = React.useRef<string[]>([]);
   const [waitingSeconds, setWaitingSeconds] = useState(0);
   const waitTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const [surveyTitle, setSurveyTitle] = useState('');
@@ -850,12 +851,9 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       const skippedNames = selected
         .filter((file) => !nextSources.some((source) => source.value === file))
         .map((file) => file.name || 'Unnamed file');
-      setSourceWarnings((previous) => [
-        ...new Set([
-          ...previous,
-          `${buildUnsupportedSourceMessage(invalidCount)} Skipped: ${skippedNames.join(', ')}.`,
-        ]),
-      ]);
+      const warning = `${buildUnsupportedSourceMessage(invalidCount)} Skipped: ${skippedNames.join(', ')}.`;
+      selectionWarningsRef.current = [...new Set([...selectionWarningsRef.current, warning])];
+      setSourceWarnings((previous) => [...new Set([...previous, warning])]);
     } else if (nextSources.length > 0) {
       setError('');
     }
@@ -1223,7 +1221,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     if (!selectedQuestionTypes.length) return;
     setError('');
     setActiveAction('generate');
-    setSourceWarnings([]);
+    setSourceWarnings([...selectionWarningsRef.current]);
 
     let currentDocumentURLs: string[] = [];
     let content = '';
