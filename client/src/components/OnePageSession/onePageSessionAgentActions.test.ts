@@ -1,3 +1,4 @@
+import { normalizeAgentQuestion } from '../../utilities/session/agentSessionData';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import {
   buildInitialAgentState,
@@ -37,6 +38,7 @@ const createHarness = () => {
   });
   const loadQuestions = jest.fn();
   const fetchImpl = jest.fn();
+  const submitAnswer = jest.fn();
   const actions = createOnePageSessionAgentActions({
     getState: () => state,
     isAgentBackendMode: () => agentMode,
@@ -59,7 +61,7 @@ const createHarness = () => {
         approximate: false,
       })),
       readStoredEnvelope: jest.fn(() => buildEnvelope(slug)),
-      submitAnswer: jest.fn(),
+      submitAnswer,
     },
     resolveCurrentSessionConfig: () => ({
       slug,
@@ -73,6 +75,7 @@ const createHarness = () => {
 
   return {
     actions,
+    submitAnswer,
     fetchImpl,
     getState: () => state,
     loadQuestions,
@@ -176,4 +179,47 @@ describe('onePageSessionAgentActions request lifecycle', () => {
     expect(harness.setState).toHaveBeenCalledTimes(writesBeforeDispose);
     expect(harness.getState().agentSessionMetaStatus).toBe('loading');
   });
+});
+
+it('keeps both answer POSTs alive and records both completions', async () => {
+  const harness = createHarness();
+  const first = deferred<{ ok: true }>();
+  const second = deferred<{ ok: true }>();
+  harness.submitAnswer.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  harness.loadQuestions.mockResolvedValue({ ok: true, questions: [] });
+  const answer = { value: 'Agree' };
+  const one = harness.actions.handleAgentQuestionSubmit(
+    normalizeAgentQuestion({ questionId: 'q1', type: 'binary', prompt: 'One?' }),
+    answer,
+  );
+  const two = harness.actions.handleAgentQuestionSubmit(
+    normalizeAgentQuestion({ questionId: 'q2', type: 'binary', prompt: 'Two?' }),
+    answer,
+  );
+  const firstSignal = harness.submitAnswer.mock.calls[0][0].signal;
+  expect(firstSignal.aborted).toBe(false);
+  first.resolve({ ok: true });
+  await one;
+  expect(harness.getState().agentSubmittedQuestionIds).toEqual(['q1']);
+  expect(harness.getState().agentSubmittingQuestionId).toBe('q2');
+  second.resolve({ ok: true });
+  await two;
+  expect(harness.getState().agentSubmittedQuestionIds).toEqual(['q1', 'q2']);
+  expect(harness.getState().agentSubmittingQuestionId).toBe('');
+});
+
+it('disposing the session still aborts every pending answer POST', async () => {
+  const harness = createHarness();
+  const pending = deferred<{ ok: true }>();
+  harness.submitAnswer.mockReturnValue(pending.promise);
+  const requests = ['q1', 'q2'].map((questionId) =>
+    harness.actions.handleAgentQuestionSubmit(normalizeAgentQuestion({ questionId, type: 'binary', prompt: 'One?' }), {
+      value: 'Agree',
+    }),
+  );
+  harness.actions.disposeAgentActions();
+  for (const [args] of harness.submitAnswer.mock.calls) expect(args.signal.aborted).toBe(true);
+  pending.resolve({ ok: true });
+  await Promise.all(requests);
+  expect(harness.getState().agentSubmittedQuestionIds).toEqual([]);
 });

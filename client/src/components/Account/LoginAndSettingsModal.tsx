@@ -911,6 +911,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.getTestFundsRequestContextKey(this.props, this.state) !==
       this.getTestFundsRequestContextKey(prevProps, prevState);
     const accountChanged = this.props.account !== prevProps.account;
+    if ((accountChanged || activeSessionChanged) && this.state.agentTokenStatus === 'loading') {
+      this.setStateIfMounted({ agentTokenInput: '', agentTokenStatus: '', agentTokenError: '' });
+    }
     const settingsOpened = this.props.loginModalToggled && !prevProps.loginModalToggled;
     const focusChanged = this.props.loginModalFocus !== prevProps.loginModalFocus;
     if (this.props.loginModalToggled && (settingsOpened || focusChanged)) {

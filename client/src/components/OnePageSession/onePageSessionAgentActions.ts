@@ -134,16 +134,22 @@ export const createOnePageSessionAgentActions = ({
     submit: 0,
   };
   const requestControllers = new Map<RequestChannel, AbortController>();
+  const submitControllers = new Map<AbortSignal, AbortController>();
   let disposed = false;
   let listeningForLogout = false;
   const resolveCurrentIdentityKey = () => getAgentClientLoginEnvelopeMemoryKey(resolveCurrentIdentityTarget());
   const beginRequest = (channel: RequestChannel): RequestSnapshot => {
-    requestControllers.get(channel)?.abort();
     const controller = new AbortController();
-    requestControllers.set(channel, controller);
+    // Read requests supersede each other; independent answer writes must finish.
+    if (channel === 'submit') submitControllers.set(controller.signal, controller);
+    else {
+      requestControllers.get(channel)?.abort();
+      requestControllers.set(channel, controller);
+      requestGenerations[channel] += 1;
+    }
     return {
       channel,
-      generation: ++requestGenerations[channel],
+      generation: requestGenerations[channel],
       authGeneration: getClientAuthGeneration(),
       identityKey: resolveCurrentIdentityKey(),
       signal: controller.signal,
@@ -155,6 +161,8 @@ export const createOnePageSessionAgentActions = ({
     requestGenerations[snapshot.channel] === snapshot.generation &&
     resolveCurrentIdentityKey() === snapshot.identityKey;
   const invalidateAgentRequests = (): void => {
+    submitControllers.forEach((controller) => controller.abort());
+    submitControllers.clear();
     (Object.keys(requestGenerations) as RequestChannel[]).forEach((channel) => {
       requestControllers.get(channel)?.abort();
       requestGenerations[channel] += 1;
@@ -314,27 +322,31 @@ export const createOnePageSessionAgentActions = ({
     }
     const requestSnapshot = beginRequest('submit');
     setState({ agentSubmittingQuestionId: question.questionId, agentQuestionSubmitError: '' });
-    const result = await ports.submitAnswer({
-      envelope,
-      agentWorkerUrl: resolveSessionAgentWorkerUrl(),
-      question,
-      answer,
-      signal: requestSnapshot.signal,
-    });
+    const result = await ports
+      .submitAnswer({
+        envelope,
+        agentWorkerUrl: resolveSessionAgentWorkerUrl(),
+        question,
+        answer,
+        signal: requestSnapshot.signal,
+      })
+      .finally(() => submitControllers.delete(requestSnapshot.signal));
     if (!isRequestCurrent(requestSnapshot)) return;
     if (!result.ok) {
       if (ports.isAuthFailure({ status: result.status, reason: result.reason })) {
         handleAgentAuthFailure(result.reason);
       } else {
-        setState({
-          agentSubmittingQuestionId: '',
+        setState((prev: Readonly<OnePageSessionAgentState>) => ({
+          agentSubmittingQuestionId:
+            prev.agentSubmittingQuestionId === question.questionId ? '' : prev.agentSubmittingQuestionId,
           agentQuestionSubmitError: result.reason || 'Could not submit this answer.',
-        });
+        }));
       }
       return;
     }
     setState((prev: Readonly<OnePageSessionAgentState>) => ({
-      agentSubmittingQuestionId: '',
+      agentSubmittingQuestionId:
+        prev.agentSubmittingQuestionId === question.questionId ? '' : prev.agentSubmittingQuestionId,
       agentSubmittedQuestionIds: Array.from(new Set([...(prev.agentSubmittedQuestionIds || []), question.questionId])),
     }));
     void loadAgentData(true);

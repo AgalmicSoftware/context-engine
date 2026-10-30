@@ -381,6 +381,23 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     });
   });
 
+  it('releases the token login form when another account signs in during exchange', () => {
+    const previous = buildProps({ account: '', provider: 'none', loginComplete: false });
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: PASSKEY_ADDRESS,
+          provider: 'passkey_eoa',
+          loginComplete: true,
+        }),
+      ),
+    );
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+    subject.state = { ...subject.state, agentTokenStatus: 'loading' };
+    subject.componentDidUpdate(previous, subject.state);
+    expect(subject.state.agentTokenStatus).toBe('');
+  });
+
   it('does not prefetch worker auth when loginComplete flips true after restore', () => {
     const prevProps = buildProps({
       account: PASSKEY_ADDRESS,

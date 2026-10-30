@@ -168,3 +168,5 @@ web-written answers without session identity only for the session's known
 questions, select the latest answer by chain order, and omit blocked
 questions and encrypted answers. Worker groups do not apply to registry
 sessions.
+
+Browser token login releases its loading state when the active account or session changes. Independent answer submissions do not cancel one another; logout or leaving the session still invalidates all pending requests.
