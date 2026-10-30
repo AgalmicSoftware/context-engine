@@ -31,6 +31,7 @@ import {
   proxyOpenRouter as proxyOpenRouterBoundary,
 } from './aiProviderExecution.js';
 import { json as jsonResponse } from './responseKvHelpers.js';
+import { createOutboundUrlSafetyHelpersWithWorkerDeps } from './outboundUrlSafetyBinding.js';
 import { normalizePayloadAccessControl } from './payloadAccessControl.js';
 import { formatValidAnalysisAnswer, readStoredRating } from './resultsAnalysisAnswerValidation.js';
 import { createResultsAnalysisScanBudget, isStorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
@@ -847,7 +848,9 @@ export const callResultsAnalysisProvider = async ({ env, slug, config, prompt, h
   const secrets = await (deps?.getSessionSecrets ? deps.getSessionSecrets(env, slug) : getStoredSessionSecrets(env, slug)) || {};
   const proxyArgs = { payload, secrets, config, baseHeaders: headers };
   let response;
-  const proxyDeps = { fetch: deps?.fetch || globalThis.fetch?.bind(globalThis), json: deps?.json || jsonResponse };
+  const fetchImpl = deps?.fetch || globalThis.fetch?.bind(globalThis);
+  const { safeFetch } = createOutboundUrlSafetyHelpersWithWorkerDeps({ deps: { fetch: fetchImpl } });
+  const proxyDeps = { fetch: fetchImpl, safeFetch, json: deps?.json || jsonResponse };
   const runProvider = async () => {
     if (provider === 'anthropic') return (deps?.proxyAnthropic || ((args) => proxyAnthropicBoundary({ ...args, deps: proxyDeps })))(proxyArgs);
     if (provider === 'openrouter') return (deps?.proxyOpenRouter || ((args) => proxyOpenRouterBoundary({ ...args, deps: proxyDeps })))(proxyArgs);

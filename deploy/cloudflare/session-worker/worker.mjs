@@ -74018,6 +74018,7 @@ var init_resultsAnalysisGeneration = __esm({
     init_aiRequestNormalization();
     init_aiProviderExecution();
     init_responseKvHelpers();
+    init_outboundUrlSafetyBinding();
     init_payloadAccessControl();
     init_resultsAnalysisAnswerValidation();
     init_storageScanBudget();
@@ -74734,7 +74735,9 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       const secrets = await (deps?.getSessionSecrets ? deps.getSessionSecrets(env, slug) : getSessionSecrets(env, slug)) || {};
       const proxyArgs = { payload, secrets, config, baseHeaders: headers2 };
       let response2;
-      const proxyDeps = { fetch: deps?.fetch || globalThis.fetch?.bind(globalThis), json: deps?.json || json };
+      const fetchImpl = deps?.fetch || globalThis.fetch?.bind(globalThis);
+      const { safeFetch } = createOutboundUrlSafetyHelpersWithWorkerDeps({ deps: { fetch: fetchImpl } });
+      const proxyDeps = { fetch: fetchImpl, safeFetch, json: deps?.json || json };
       const runProvider = async () => {
         if (provider === "anthropic") return (deps?.proxyAnthropic || ((args) => proxyAnthropic({ ...args, deps: proxyDeps })))(proxyArgs);
         if (provider === "openrouter") return (deps?.proxyOpenRouter || ((args) => proxyOpenRouter({ ...args, deps: proxyDeps })))(proxyArgs);

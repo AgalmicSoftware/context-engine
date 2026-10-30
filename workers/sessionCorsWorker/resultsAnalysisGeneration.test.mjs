@@ -19,6 +19,7 @@ import {
   normalizeGeneratedArtifact,
   readPublishedResultsAnalysisArtifact,
   readResultsAnalysisAdminStatus,
+  runQueuedAutomaticResultsAnalysisJob,
   resolveAnalysisAiPayload,
   resolveResultsAnalysisCapability,
 } from './resultsAnalysisGeneration.js';
@@ -1216,4 +1217,45 @@ test('automatic generation pauses after an automatic failure until manual recove
   assert.equal(generated, false);
   assert.equal((await runRetry(10_000)).ok, true);
   assert.equal(generated, true);
+});
+
+for (const [rpcUrl, redirect, expectedStatus] of [
+  ['https://analysis.example.test/complete', false, 200],
+  ['http://analysis.example.test/complete', false, 403],
+  ['https://fixture:[redacted-email]/complete', false, 403],
+  ['https://analysis.example.test/complete', true, 403],
+]) test(`queued custom analysis checks its outbound target: ${rpcUrl}, redirect=${redirect}`, async () => {
+  const kv = createKv();
+  await putPayload({ kv, resource: 'questions', id: 'qmeta1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Question?', type: 'text' } });
+  const committedResponses = [1, 2, 3].map((index) => ({
+    metadata: { id: `r${index}`, responder: `0x${String(index).repeat(40)}`, createdAt: '2026-09-17T00:00:00.000Z' },
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: `View ${index}` },
+  }));
+  const calls = [];
+  const result = await runQueuedAutomaticResultsAnalysisJob({
+    env: { CE_STORAGE_INDEX_KV: kv }, slug: 'session-a', job: { requestId: 'custom-auto', committedResponses },
+    deps: {
+      getSessionConfig: async () => ({ ...config,
+        ai: { models: { thinking: { provider: 'custom', model: 'fixture-model' } }, providers: { custom: { rpcUrl } } } }),
+      getSessionSecrets: async () => ({}),
+      readCoordinatedResultsAnalysisStatus: async () => ({ ok: true, state: {} }),
+      reserveCoordinatedResultsAnalysis: async () => ({ kind: 'execute', attemptId: 'attempt-custom' }),
+      finalizeCoordinatedResultsAnalysis: async () => ({ ok: true }),
+      fetch: async (url, init) => {
+        calls.push({ url, init });
+        if (redirect) return new Response(null, { status: 302, headers: { location: 'http://analysis.example.test/unsafe' } });
+        return Response.json({ choices: [{ message: { content: JSON.stringify({ breakdown: { summary: { overview: 'Synthetic report' } } }) } }] });
+      },
+    },
+  });
+  assert.equal(result.status, expectedStatus, JSON.stringify(result));
+  assert.equal(result.ok, expectedStatus === 200);
+  assert.equal(calls.length, expectedStatus === 200 || redirect ? 1 : 0);
+  if (calls.length) {
+    assert.equal(calls[0].url, rpcUrl);
+    assert.equal(calls[0].init.redirect, 'manual');
+    assert.match(JSON.parse(calls[0].init.body).messages[0].content, /Question/);
+  }
+  if (result.ok) assert.equal(result.draft.artifact.sections.breakdown.summary.overview, 'Synthetic report');
 });
