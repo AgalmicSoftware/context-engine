@@ -37,6 +37,8 @@ test('default navigation smoke covers session modes, Docs, its legacy contracts 
   assert.ok(DEFAULT_ROUTES.includes('/new'));
   assert.equal(DEFAULT_ROUTE_PROBES['/new'], probeSessionModePresets);
   assert.equal(DEFAULT_ROUTE_PROBES['/benchmarks'], probeBenchmarkReportFrame);
+  assert.ok(DEFAULT_ROUTES.includes('/session/demo/questions'));
+  assert.deepEqual(DEFAULT_ROUTE_TEXT['/session/demo/questions'], ['Questions', 'Results', 'Existential risk from AI justifies extraordinary precautions.']);
   assert.ok(DEFAULT_ROUTES.includes('/docs'));
   assert.ok(DEFAULT_ROUTES.includes('/contracts'));
   assert.ok(DEFAULT_ROUTES.includes('/benchmarks'));

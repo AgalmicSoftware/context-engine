@@ -4,6 +4,22 @@ import {
 } from './questionFilterSessionResolution.js';
 
 describe('questionFilterSessionResolution', () => {
+  it.each(['worker-ai', ''])('honors the explicitly pinned session %s over the route alias', (sessionSlug) => {
+    const sessionConfig = { slug: sessionSlug, corsWorkerUrl: 'https://worker-ai.example.test' };
+    const resolveBySlug = jest.fn<null, [string]>(() => null);
+    const input = {
+      pathname: '/session/demo/questions',
+      activeSessionSlug: 'stale-session',
+      sessionSlug,
+      sessionSlugPinned: true,
+      sessionConfig,
+      resolveBySlug,
+    };
+    expect(resolveQuestionFilterEffectiveSlug(input)).toBe(sessionSlug);
+    expect(resolveQuestionFilterSessionContext(input)).toMatchObject({ sessionSlug, sessionConfig });
+    expect(resolveBySlug).not.toHaveBeenCalled();
+  });
+
   it('uses the active Worker bootstrap config for the matching route without a registry lookup', () => {
     const sessionConfig = { slug: 'worker-ai', corsWorkerUrl: 'https://worker-ai.example.test' };
     const resolveBySlug = jest.fn<null, [string]>(() => null);

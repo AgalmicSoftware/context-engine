@@ -14,6 +14,7 @@ const DEFAULT_BASE_URL = 'http://127.0.0.1:3000';
 const DEFAULT_ROUTES = Object.freeze([
   '/new',
   '/session/demo',
+  '/session/demo/questions',
   '/session/pe4',
   '/admin',
   '/about',
@@ -29,6 +30,7 @@ const DEFAULT_ROUTES = Object.freeze([
 const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/session/new': ['Session Setup'],
   '/session/demo': ['Session'],
+  '/session/demo/questions': ['Questions', 'Results', 'Existential risk from AI justifies extraordinary precautions.'],
   '/session/pe4': ['Groups', 'Results'],
   '/rxc-ra-test': ['Groups', 'Results'],
   '/session/rxc-ra-test': ['Groups', 'Results'],

@@ -25,6 +25,7 @@ export type QuestionFilterSessionProps = UnknownRecord & {
   provider?: unknown;
   sessionConfig?: unknown;
   sessionSlug?: unknown;
+  sessionSlugPinned?: boolean;
   ensureLightSbtUniverse?: unknown;
   storageKeyPrefix?: unknown;
 };
@@ -202,6 +203,7 @@ export function resolveEffectiveSlug(props: QuestionFilterSessionProps = {}) {
     pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
     activeSessionSlug: props.activeSessionSlug,
     sessionSlug: props.sessionSlug,
+    sessionSlugPinned: props.sessionSlugPinned,
   });
 }
 
@@ -210,6 +212,7 @@ export function resolveEffectiveSessionContext(props: QuestionFilterSessionProps
     pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
     activeSessionSlug: props.activeSessionSlug,
     sessionSlug: props.sessionSlug,
+    sessionSlugPinned: props.sessionSlugPinned,
     sessionConfig: props.sessionConfig,
     resolveBySlug: getSessionConfigBySlug,
   });

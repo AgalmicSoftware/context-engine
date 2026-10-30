@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Preserve the pinned Worker session through the full question view, filters, and response editor so alias routes such as `/session/demo/questions` load without an EVM network.
+
 - Remove the unused standalone `/debate`, `/beta`, `/contributors`, `/matrix`, and `/demos` pages and obsolete navigation. Preserve Atlas, simulated profiles, demo sessions, and the shared risk matrix.
 
 - Include catalog completeness in the interview compatibility fixture.

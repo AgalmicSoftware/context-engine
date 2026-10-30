@@ -13,6 +13,10 @@ results; its keyboard interactions are verified independently.
 Standalone `/debate`, `/beta`, `/contributors`, `/matrix`, and `/demos` pages
 are removed and use the normal unknown-route view. Simulated profiles at
 `/su/...`, demo sessions and their `/session/demo/...` views remain available.
+Full question views preserve the session shell’s pinned canonical slug through
+question loading, filtering, and response editing. Worker-backed sessions use
+the Worker cache scope without requiring an EVM network, including when a
+route such as `/session/demo/questions` is an alias for the canonical session.
 The home Tools surface and embedded session views retain the shared risk matrix.
 
 ## Client Boundary Model
