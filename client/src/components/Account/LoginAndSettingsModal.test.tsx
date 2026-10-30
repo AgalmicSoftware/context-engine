@@ -1,3 +1,4 @@
+import { render, screen } from '@testing-library/react';
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import { readAgentClientLoginEnvelope, writeAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { cacheAgentClientLoginEnvelope } from '../OnePageSession/onePageSessionAgentController';
@@ -869,12 +870,15 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     const failure = new Error('passkey storage unavailable');
     mockedPasskeyWallet.logoutPasskeyWallet.mockRejectedValueOnce(failure);
     const props = buildProps({ provider: 'passkey_eoa' });
-    const subject = new LoginAndSettingsModalSubject(props);
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
     props.changeAccount.mockImplementation(() => {
-      subject.props = { ...subject.props, provider: 'none' };
+      subject.props = { ...subject.props, provider: 'none', loginComplete: false };
     });
 
-    await expect(subject.handleLogout()).rejects.toBe(failure);
+    await expect(subject.handleLogout()).resolves.toBeUndefined();
+    render(subject.getModalDisplay());
+    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(/sign-out could not be completed/i);
+    expect(subject.state.passkeyWalletStatusTone).toBe('error');
     expect(props.changeAccount).toHaveBeenCalledWith({});
     expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
   });

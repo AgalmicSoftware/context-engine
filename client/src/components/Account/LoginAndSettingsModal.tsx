@@ -881,6 +881,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   handleLogout = async () => {
     const { provider, wagmiDisconnect } = this.props;
+    this.setStateIfMounted({ passkeyWalletStatusMessage: '', passkeyWalletStatusTone: '' });
     // Disconnect a saved passkey wallet on every logout, not only a passkey one,
     // so the start-up restore cannot sign the visitor back in as that account.
     try {
@@ -888,7 +889,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.resetClientAuthState();
       await disconnected;
     } catch (error) {
-      if (provider === 'passkey_eoa') throw error;
+      if (provider === 'passkey_eoa') {
+        this.setStateIfMounted({
+          passkeyWalletStatusMessage:
+            'Passkey sign-out could not be completed. Your app session has been cleared, but disconnecting the saved wallet failed.',
+          passkeyWalletStatusTone: 'error',
+        });
+      }
       accountLog.warn('Saved passkey wallet disconnect failed during logout:', error);
     }
   };

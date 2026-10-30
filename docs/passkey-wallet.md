@@ -387,8 +387,7 @@ fresh login. This local cleanup does not revoke server tokens.
 Every logout, including the agent screen, starts wagmi disconnect and records
 explicit disconnect intent inside shared teardown before clearing account props.
 Both wallet hydration paths respect that intent while disconnect is pending or
-failed; a later explicit wallet connection clears it. Passkey disconnect errors remain visible to
-passkey users even after the account state has reset.
+failed; a later explicit wallet connection clears it. Passkey disconnect failures appear in the login modal even after the account state has reset; the notice distinguishes the cleared app session from the failed saved-wallet disconnect.
 
 Logout, deletion, and a replacing create invalidate older wallet operations.
 Late passkey replies cannot save metadata, activate a signer, or retry a signature
