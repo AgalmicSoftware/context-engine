@@ -164,6 +164,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep previous publication IDs and cache-hydration status out of saved authoring drafts.
+
 - Preserve internal option spacing through the live Results controller so Breakdown counts match stored selections.
 
 - Keep a closed profile analysis dialog closed when refreshed inputs invalidate its result.

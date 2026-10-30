@@ -1400,6 +1400,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       });
     }
     // Clean up submission state so it doesn't persist on reload
+    delete stateToSave.lastSubmittedSurveyId;
+    delete stateToSave.lastSubmittedSurveyArweaveTxId;
+    delete stateToSave.cacheLoaded;
     delete stateToSave.isSubmitting;
     delete stateToSave.progress;
     delete stateToSave.showSubmitSteps;

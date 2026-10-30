@@ -135,6 +135,20 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       expectTagSubmitEnabled(instance);
     },
   );
+  it('saves editable draft content without prior publication or hydration status', () => {
+    const instance = tagDraft();
+    Object.assign(instance.state, {
+      lastSubmittedSurveyId: 'published-survey',
+      lastSubmittedSurveyArweaveTxId: 'published-transaction',
+      cacheLoaded: true,
+    });
+    const draft = JSON.parse(instance.serializeUnfinishedSurveyDraft());
+    expect(draft.questions[0].prompt).toBe('First question?');
+    for (const key of ['lastSubmittedSurveyId', 'lastSubmittedSurveyArweaveTxId', 'cacheLoaded']) {
+      expect(draft).not.toHaveProperty(key);
+    }
+  });
+
   it('never stores an in-progress tag request in a draft', async () => {
     const pending = pendingTags();
     jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);
