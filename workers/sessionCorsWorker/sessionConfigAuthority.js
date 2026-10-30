@@ -10,13 +10,14 @@ export const SESSION_CONFIG_COORDINATION_ERROR = 'Session config coordination is
 export const SUPERSEDED_AUTHORITY_ERROR = 'Session authorization changed; retry with current authority.';
 
 // Only Worker-verified actors reach this internal boundary. Preserve that proof
-// and its policy revision through slow work; never rebase it onto a newer config.
-export const assertExpectedSessionAuthority = (authority, expected, slug) => {
+// and its authority epoch through slow work. Config writes also require the exact
+// revision; fenced progress journals may survive content-only revisions.
+export const assertExpectedSessionAuthority = (authority, expected, slug, { requireRevision = true } = {}) => {
   if (!slug || !expected || !/^0x[0-9a-f]{40}$/i.test(expected.actor || '') ||
     !Number.isSafeInteger(expected.revision) || expected.revision < 0 ||
     !Number.isSafeInteger(expected.authzEpoch) || expected.authzEpoch < 0 ||
     (authority != null && authority.slug !== slug) ||
-    expected.revision !== (authority?.revision ?? 0) ||
+    (requireRevision && expected.revision !== (authority?.revision ?? 0)) ||
     expected.authzEpoch !== readAuthorizationEpoch(authority?.config)) {
     throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
   }

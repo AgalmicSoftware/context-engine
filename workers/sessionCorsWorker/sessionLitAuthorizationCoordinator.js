@@ -118,17 +118,22 @@ export const executeLitProvisioning = async (coordinator, payload, operation) =>
   if (!slug) return json({ error: COORDINATION_ERROR }, 400);
   try {
     if (operation !== 'release') {
-      await coordinator.assertSessionAuthority(payload);
+      await coordinator.assertSessionAuthority(payload, { requireRevision: operation !== 'checkpoint' });
       await coordinator.repairPendingSessionConfigProjection();
     }
     const result = await coordinator.state.storage.transaction(async transaction => {
       const record = await transaction.get(PROVISIONING_RECORD);
       const now = coordinator.now();
       if (operation === 'begin') {
-        if (record && (record.leaseUntilMs > now || record.freshAuthority !== (payload.freshAuthority === true))) fail();
-        const checkpoint = record ? await readProvisioning(record, coordinator.env, slug) : {};
+        if (record?.leaseUntilMs > now) fail();
+        const saved = record ? await readProvisioning(record, coordinator.env, slug) : {};
+        // A changed choice starts a new attempt; an empty setup has no remote
+        // resources to resume. Never discard an active attempt's checkpoint.
+        const hasResources = ['litAccountApiKey', 'accountWalletAddress', 'litGroupId', 'litPkpId', 'litActionCid', 'litUsageApiKey']
+          .some(key => typeof saved[key] === 'string' && saved[key].trim());
+        const checkpoint = record?.freshAuthority === (payload.freshAuthority === true) && hasResources ? saved : {};
         const attemptId = crypto.randomUUID();
-        const envelope = record?.envelope || await buildEncryptedSessionSecretsEnvelope(checkpoint, { env: coordinator.env, slug });
+        const envelope = await buildEncryptedSessionSecretsEnvelope(checkpoint, { env: coordinator.env, slug });
         await transaction.put(PROVISIONING_RECORD, { version: 1, slug, attemptId, freshAuthority: payload.freshAuthority === true,
           leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
         return { attemptId, checkpoint };

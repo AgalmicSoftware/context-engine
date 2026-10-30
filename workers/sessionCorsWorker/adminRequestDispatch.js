@@ -16,6 +16,7 @@ import {
 } from './adminRequestAuthority.js';
 import {
   bootstrapLitChipotleSession,
+  LIT_PROVISIONING_CREDENTIALS_CONFLICT,
   provisionLitChipotleAction,
   readLitChipotleStatus,
   resolveLitChipotleProvisioningRuntime,
@@ -391,7 +392,9 @@ export const dispatchAdminRequest = async ({
       delete responseBody.litCredentials;
       return deps?.json?.(responseBody, 200, headers);
     } catch (error) {
-      return deps?.json?.({ error: 'Lit provisioning did not finish. Retry to resume its saved progress.' }, error?.status || 502, headers);
+      return deps?.json?.({ error: error?.code === 'lit_provisioning_credentials_conflict'
+        ? LIT_PROVISIONING_CREDENTIALS_CONFLICT
+        : 'Lit provisioning did not finish. Retry to resume its saved progress.' }, error?.status || 502, headers);
     } finally {
       if (attempt) {
         try { await (deps?.releaseSessionLitProvisioning || releaseSessionLitProvisioning)({ ...coordination, attemptId: attempt.attemptId }); } catch {}

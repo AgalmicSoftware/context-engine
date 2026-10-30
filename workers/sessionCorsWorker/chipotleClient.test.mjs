@@ -1708,3 +1708,21 @@ test('provider errors cannot reflect signed tickets back to the participant', as
     return true;
   });
 });
+
+for (const request of [{ litAccountApiKey: 'replacement-private-key' }, { litApiBase: 'http://localhost:4000' }]) {
+  test(`resuming Lit setup refuses conflicting ${Object.keys(request)[0]} without exposing credentials`, async () => {
+    let calls = 0;
+    await assert.rejects(bootstrapLitChipotleSession({
+      config: {}, secrets: AUTH_SECRETS, sessionSlug: 'fixture', request,
+      provisioning: { litAccountApiKey: 'saved-private-key', litGroupId: '7', litApiBase: 'https://api.chipotle.litprotocol.com' },
+      fetchImpl: async () => { calls++; throw new Error('unexpected provider call'); },
+    }), error => {
+      assert.equal(error.status, 409);
+      assert.equal(error.code, 'lit_provisioning_credentials_conflict');
+      assert.match(error.message, /conflict with saved setup/);
+      assert.ok(!error.message.includes('private-key'));
+      return true;
+    });
+    assert.equal(calls, 0);
+  });
+}

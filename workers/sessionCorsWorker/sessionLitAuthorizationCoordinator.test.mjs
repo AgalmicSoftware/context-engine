@@ -541,3 +541,71 @@ test('unfinished provisioning cannot become active or be consumed by finalizatio
   assert.equal((await getSessionConfig(f.env, 'fixture')).litCredentials, undefined);
   assert.equal((await getSessionSecrets(f.env, 'fixture'))?.litUsageApiKey, undefined);
 });
+
+for (const freshAuthority of [false, true]) test(`a failed resource-free bootstrap can restart with freshAuthority=${freshAuthority}`, async () => {
+  const f = createFixture();
+  await f.ensure();
+  const first = await beginProvisioning(f);
+  await assert.rejects(bootstrapLitChipotleSession({
+    config: baseConfig, secrets: { litAuthorizationPrivateKey: KEY_A }, sessionSlug: 'fixture',
+    provisioning: first.checkpoint,
+    checkpointProvisioning: async checkpoint => provisioning.checkpointSessionLitProvisioning({
+      env: f.env, slug: 'fixture', expectedAuthority: await f.expected(), attemptId: first.attemptId, checkpoint,
+    }),
+    fetchImpl: async () => { throw new Error('synthetic bootstrap failure'); },
+  }), /synthetic bootstrap failure/);
+  await provisioning.releaseSessionLitProvisioning({ env: f.env, slug: 'fixture', attemptId: first.attemptId });
+  const next = await provisioning.beginSessionLitProvisioning({ env: f.env, slug: 'fixture', baseConfig,
+    expectedAuthority: await f.expected(), freshAuthority });
+  assert.deepEqual(next.checkpoint, {});
+  const result = await bootstrapLitChipotleSession({
+    config: baseConfig, secrets: { litAuthorizationPrivateKey: KEY_A }, sessionSlug: 'fixture', request: { freshAuthority },
+    provisioning: next.checkpoint, fetchImpl: litRemoteFixture().fetch,
+    checkpointProvisioning: async checkpoint => provisioning.checkpointSessionLitProvisioning({
+      env: f.env, slug: 'fixture', expectedAuthority: await f.expected(), attemptId: next.attemptId, checkpoint,
+    }),
+  });
+  assert.equal((await finalizeSessionLitAuthorization({ env: f.env, slug: 'fixture', baseConfig,
+    expectedAuthority: await f.expected(), attemptId: next.attemptId, litCredentials: result.litCredentials,
+    secretOutputs: result.secretOutputs })).ok, true);
+});
+
+test('a fresh-authority choice discards a released checkpoint for the previous choice', async () => {
+  const f = createFixture();
+  const first = await beginProvisioning(f);
+  await provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(),
+    attemptId: first.attemptId, checkpoint: { litGroupId: 'previous-group' } });
+  await assert.rejects(provisioning.beginSessionLitProvisioning({ env: f.env, slug: 'fixture', baseConfig,
+    expectedAuthority: await f.expected(), freshAuthority: true }), error => error.status === 409);
+  await provisioning.releaseSessionLitProvisioning({ env: f.env, slug: 'fixture', attemptId: first.attemptId });
+  const next = await provisioning.beginSessionLitProvisioning({ env: f.env, slug: 'fixture', baseConfig,
+    expectedAuthority: await f.expected(), freshAuthority: true });
+  assert.deepEqual(next.checkpoint, {});
+  assert.notEqual(next.attemptId, first.attemptId);
+});
+
+test('checkpoint persistence is fenced by its attempt and authority epoch rather than its starting config revision', async () => {
+  const f = createFixture();
+  const expectedAuthority = await f.expected();
+  const attempt = await beginProvisioning(f);
+  const current = f.store.get(CONFIG_RECORD);
+  f.store.set(CONFIG_RECORD, { ...current, revision: current.revision + 1, config: { ...current.config, sessionName: 'Updated title' } });
+  await provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority,
+    attemptId: attempt.attemptId, checkpoint: { litGroupId: 'new-group' } });
+  const saved = await decryptSessionSecretsEnvelope(f.store.get(PROVISIONING_RECORD).envelope, { env: f.env, slug: 'fixture' });
+  assert.equal(saved.litGroupId, 'new-group');
+  assert.equal(f.store.get(CONFIG_RECORD).config.sessionName, 'Updated title');
+  f.store.get(CONFIG_RECORD).config.authzEpoch = expectedAuthority.authzEpoch + 1;
+  await assert.rejects(provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority,
+    attemptId: attempt.attemptId, checkpoint: {} }), error => error.status === 409);
+});
+
+test('resuming setup accepts equivalent normalized API base spellings', async () => {
+  const result = await bootstrapLitChipotleSession({
+    config: baseConfig, secrets: { litAuthorizationPrivateKey: KEY_A }, sessionSlug: 'fixture',
+    request: { litApiBase: 'https://api.chipotle.litprotocol.com/core/v1/' },
+    provisioning: { litApiBase: 'https://api.chipotle.litprotocol.com', litAccountApiKey: 'recoverable-account-key' },
+    fetchImpl: litRemoteFixture().fetch,
+  });
+  assert.equal(result.litCredentials.litApiBase, 'https://api.chipotle.litprotocol.com');
+});

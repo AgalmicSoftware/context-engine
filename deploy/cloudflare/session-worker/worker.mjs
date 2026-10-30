@@ -29974,8 +29974,8 @@ var init_sessionConfigAuthority = __esm({
     init_sessionConfigSecretsStore();
     SESSION_CONFIG_COORDINATION_ERROR = "Session config coordination is unavailable; retry.";
     SUPERSEDED_AUTHORITY_ERROR = "Session authorization changed; retry with current authority.";
-    assertExpectedSessionAuthority = (authority, expected, slug) => {
-      if (!slug || !expected || !/^0x[0-9a-f]{40}$/i.test(expected.actor || "") || !Number.isSafeInteger(expected.revision) || expected.revision < 0 || !Number.isSafeInteger(expected.authzEpoch) || expected.authzEpoch < 0 || authority != null && authority.slug !== slug || expected.revision !== (authority?.revision ?? 0) || expected.authzEpoch !== readAuthorizationEpoch(authority?.config)) {
+    assertExpectedSessionAuthority = (authority, expected, slug, { requireRevision = true } = {}) => {
+      if (!slug || !expected || !/^0x[0-9a-f]{40}$/i.test(expected.actor || "") || !Number.isSafeInteger(expected.revision) || expected.revision < 0 || !Number.isSafeInteger(expected.authzEpoch) || expected.authzEpoch < 0 || authority != null && authority.slug !== slug || requireRevision && expected.revision !== (authority?.revision ?? 0) || expected.authzEpoch !== readAuthorizationEpoch(authority?.config)) {
         throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
       }
     };
@@ -75565,17 +75565,19 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       if (!slug) return json4({ error: COORDINATION_ERROR }, 400);
       try {
         if (operation !== "release") {
-          await coordinator.assertSessionAuthority(payload);
+          await coordinator.assertSessionAuthority(payload, { requireRevision: operation !== "checkpoint" });
           await coordinator.repairPendingSessionConfigProjection();
         }
         const result = await coordinator.state.storage.transaction(async (transaction) => {
           const record3 = await transaction.get(PROVISIONING_RECORD);
           const now = coordinator.now();
           if (operation === "begin") {
-            if (record3 && (record3.leaseUntilMs > now || record3.freshAuthority !== (payload.freshAuthority === true))) fail7();
-            const checkpoint2 = record3 ? await readProvisioning(record3, coordinator.env, slug) : {};
+            if (record3?.leaseUntilMs > now) fail7();
+            const saved = record3 ? await readProvisioning(record3, coordinator.env, slug) : {};
+            const hasResources = ["litAccountApiKey", "accountWalletAddress", "litGroupId", "litPkpId", "litActionCid", "litUsageApiKey"].some((key) => typeof saved[key] === "string" && saved[key].trim());
+            const checkpoint2 = record3?.freshAuthority === (payload.freshAuthority === true) && hasResources ? saved : {};
             const attemptId = crypto.randomUUID();
-            const envelope2 = record3?.envelope || await buildEncryptedSessionSecretsEnvelope(checkpoint2, { env: coordinator.env, slug });
+            const envelope2 = await buildEncryptedSessionSecretsEnvelope(checkpoint2, { env: coordinator.env, slug });
             await transaction.put(PROVISIONING_RECORD, {
               version: 1,
               slug,
@@ -77633,10 +77635,10 @@ ${expiry}`);
           return authority;
         });
       }
-      async assertSessionAuthority(payload, { allowRestore = false } = {}) {
+      async assertSessionAuthority(payload, { allowRestore = false, requireRevision = true } = {}) {
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
         const authority = slug ? await this.readSessionConfigAuthority(slug) : null;
-        assertExpectedSessionAuthority(authority, payload?.expectedAuthority, slug);
+        assertExpectedSessionAuthority(authority, payload?.expectedAuthority, slug, { requireRevision });
         if (!allowRestore) await assertNoActiveBackupImport(this);
         return authority;
       }
@@ -100155,6 +100157,7 @@ var isLitAuthorizationReady = ({ secrets = {}, config = {} } = {}) => {
 var import_rpcDefaults4 = __toESM(require_rpcDefaults(), 1);
 init_lib2();
 init_chainIdNormalization();
+var LIT_PROVISIONING_CREDENTIALS_CONFLICT = "Lit credentials conflict with saved setup. Restore the previous credentials or choose Create fresh Lit authority.";
 var DEFAULT_LIT_API_BASE = "https://api.chipotle.litprotocol.com";
 var CHIPOTLE_API_PREFIX = "/core/v1";
 var APPROVED_LIT_CHIPOTLE_API_HOSTS = /* @__PURE__ */ new Set(["api.chipotle.litprotocol.com"]);
@@ -101012,6 +101015,32 @@ var bootstrapLitChipotleSessionCore = async ({
   const secretAccountApiKey = toTrimmedString15(secrets?.litAccountApiKey);
   const requestAccountApiKey = toTrimmedString15(requestBody.litAccountApiKey);
   const envAccountApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY);
+  const supplied = {
+    litAccountApiKey: [requestAccountApiKey, secretAccountApiKey || requestAccountApiKey || envAccountApiKey],
+    litApiBase: [requestBody.litApiBase, litCredentials.litApiBase || env.LIT_API_BASE],
+    litGroupId: [litCredentials.litGroupId],
+    litPkpId: [litCredentials.litPkpId],
+    litActionCid: [litCredentials.litActionCid],
+    litUsageApiKey: [litCredentials.litGroupId === progress.litGroupId ? secrets.litUsageApiKey : ""]
+  };
+  for (const [key, candidates] of Object.entries(supplied)) {
+    const normalize = (value) => {
+      const text = toTrimmedString15(value);
+      if (key !== "litApiBase" || !text) return text;
+      try {
+        return normalizeLitChipotleApiBase(text, { allowLocalApiBase: isLitChipotleLocalApiBaseAllowed(env) });
+      } catch {
+        return text;
+      }
+    };
+    const saved = normalize(progress[key]);
+    if (saved && candidates.some((value) => normalize(value) && normalize(value) !== saved)) {
+      throw Object.assign(new Error(LIT_PROVISIONING_CREDENTIALS_CONFLICT), {
+        status: 409,
+        code: "lit_provisioning_credentials_conflict"
+      });
+    }
+  }
   let accountApiKey = toTrimmedString15(progress.litAccountApiKey) || secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
   const accountSource = secretAccountApiKey ? "session-secret" : requestAccountApiKey ? "admin-request" : envAccountApiKey ? "worker-env" : "missing";
   let accountSecretOutput = Object.hasOwn(progress, "accountSecretOutput") ? progress.accountSecretOutput : accountSource === "worker-env" ? "" : accountApiKey;
@@ -101661,7 +101690,7 @@ var dispatchAdminRequest = async ({
       delete responseBody.litCredentials;
       return deps?.json?.(responseBody, 200, headers2);
     } catch (error) {
-      return deps?.json?.({ error: "Lit provisioning did not finish. Retry to resume its saved progress." }, error?.status || 502, headers2);
+      return deps?.json?.({ error: error?.code === "lit_provisioning_credentials_conflict" ? LIT_PROVISIONING_CREDENTIALS_CONFLICT : "Lit provisioning did not finish. Retry to resume its saved progress." }, error?.status || 502, headers2);
     } finally {
       if (attempt) {
         try {

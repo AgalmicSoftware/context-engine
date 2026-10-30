@@ -15,6 +15,8 @@ import {
   toChainId,
 } from './chainIdNormalization.js';
 
+export const LIT_PROVISIONING_CREDENTIALS_CONFLICT = 'Lit credentials conflict with saved setup. Restore the previous credentials or choose Create fresh Lit authority.';
+
 const DEFAULT_LIT_API_BASE = 'https://api.chipotle.litprotocol.com';
 const CHIPOTLE_API_PREFIX = '/core/v1';
 const APPROVED_LIT_CHIPOTLE_API_HOSTS = new Set(['api.chipotle.litprotocol.com']);
@@ -1024,6 +1026,28 @@ const bootstrapLitChipotleSessionCore = async ({
   const secretAccountApiKey = toTrimmedString(secrets?.litAccountApiKey);
   const requestAccountApiKey = toTrimmedString(requestBody.litAccountApiKey);
   const envAccountApiKey = toTrimmedString(env?.LIT_ACCOUNT_API_KEY);
+  const supplied = {
+    litAccountApiKey: [requestAccountApiKey, secretAccountApiKey || requestAccountApiKey || envAccountApiKey],
+    litApiBase: [requestBody.litApiBase, litCredentials.litApiBase || env.LIT_API_BASE],
+    litGroupId: [litCredentials.litGroupId],
+    litPkpId: [litCredentials.litPkpId],
+    litActionCid: [litCredentials.litActionCid],
+    litUsageApiKey: [litCredentials.litGroupId === progress.litGroupId ? secrets.litUsageApiKey : ''],
+  };
+  for (const [key, candidates] of Object.entries(supplied)) {
+    const normalize = value => {
+      const text = toTrimmedString(value);
+      if (key !== 'litApiBase' || !text) return text;
+      try { return normalizeLitChipotleApiBase(text, { allowLocalApiBase: isLitChipotleLocalApiBaseAllowed(env) }); }
+      catch { return text; }
+    };
+    const saved = normalize(progress[key]);
+    if (saved && candidates.some(value => normalize(value) && normalize(value) !== saved)) {
+      throw Object.assign(new Error(LIT_PROVISIONING_CREDENTIALS_CONFLICT), {
+        status: 409, code: 'lit_provisioning_credentials_conflict',
+      });
+    }
+  }
   let accountApiKey = toTrimmedString(progress.litAccountApiKey) || secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
   const accountSource = secretAccountApiKey ? 'session-secret' : requestAccountApiKey ? 'admin-request' : envAccountApiKey ? 'worker-env' : 'missing';
   let accountSecretOutput = Object.hasOwn(progress, 'accountSecretOutput') ? progress.accountSecretOutput : accountSource === 'worker-env' ? '' : accountApiKey;

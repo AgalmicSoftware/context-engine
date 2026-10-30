@@ -2455,3 +2455,16 @@ test('the admin Lit route resumes only its reserved checkpoint and releases fail
   assert.equal(released, 1);
   assert.ok(!JSON.stringify(result).includes('private-recovery-key'));
 });
+
+test('Lit setup reports credential conflicts with safe actionable text', async () => {
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody() }, env: { GROUP_KV: {} }, baseHeaders: {}, slug: '', action: 'lit-chipotle-bootstrap-session',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig: { adminAddress: '0xabc' }, headers: {}, targetSlug: 'session-a' }),
+      bootstrapLitChipotleSession: async () => { throw Object.assign(new Error('secret must not escape'), { status: 409, code: 'lit_provisioning_credentials_conflict' }); },
+    }),
+  });
+  assert.equal(result.status, 409);
+  assert.match(result.body.error, /conflict with saved setup/);
+  assert.ok(!result.body.error.includes('secret must not escape'));
+});

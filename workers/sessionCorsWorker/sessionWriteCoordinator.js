@@ -2158,10 +2158,10 @@ export class SessionWriteCoordinator {
     });
   }
 
-  async assertSessionAuthority(payload, { allowRestore = false } = {}) {
+  async assertSessionAuthority(payload, { allowRestore = false, requireRevision = true } = {}) {
     const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     const authority = slug ? await this.readSessionConfigAuthority(slug) : null;
-    assertExpectedSessionAuthority(authority, payload?.expectedAuthority, slug);
+    assertExpectedSessionAuthority(authority, payload?.expectedAuthority, slug, { requireRevision });
     if (!allowRestore) await assertNoActiveBackupImport(this);
     return authority;
   }
