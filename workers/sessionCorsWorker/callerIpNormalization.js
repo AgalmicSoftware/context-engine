@@ -17,4 +17,3 @@ export const normalizeCallerIp = (ip) => {
   if (mappedIpv4) return mappedIpv4[1];
   return ip.includes(':') ? ipv6Prefix64(ip) || ip : ip;
 };
-

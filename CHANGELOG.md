@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-30
+
+### Verification and shared rules
+
 - Include catalog completeness in the interview compatibility fixture.
 
 - Complete mocked Lit provisioning checkpoints before testing atomic configuration writes.
@@ -22,12 +26,53 @@ All notable changes to this project will be documented in this file.
 
 - Verify interview submission leaves unrelated manual answers pending for ordinary Submit.
 
+- Verify mixed-file generation retains rejected-file notices while sending only supported extracted text to the model.
+
+- Provide the mocked wallet-action boundary in shared Jest setup for session-page imports as well as account components.
+
+- Keep the wallet URI encoder override effective after npm hoisting and validate the installed query-dependency tree.
+
+- Mock wallet disconnection in community and sponsorship lifecycle tests when importing the shared logout boundary.
+
+- Install the Session Worker package in the hosted contracts job before its registry smoke imports Worker code.
+
+- Refresh the client coverage inventory count without changing measured coverage or enforced floors.
+
+- Cover the pinned Worker session route with read-only navigation fixtures and
+  loaded-session assertions while keeping unmatched network requests blocked.
+
+- Seed encrypted provisioned secrets in admin integration fixtures.
+
+- Align integration assertions with explicit General comparison links and scanned
+  SBT mint totals.
+
+- Keep the analysis session-switch regression mock compatible with typed Jest.
+
+- Preserve the Session Worker's isolated dependencies in public replay checks.
+
+- Include shared answer validation in Worker release source comparisons.
+
+- Check signed payment hashes in proof-authorized faucet integration tests.
+
+- Verify authenticated faucet replies against the signed payment hash and amount.
+
+- Preserve the original benchmark rating prompts for integer-origin, step-1
+  scales; describe increments only for other rating grids.
+
+- Reject eager client runtime import cycles in the wiring gate, with a zero
+  baseline and exclusions for type-only imports and deferred loads.
+
+- Use one rating bounds and step rule across browser sliders, agent drafts and
+  submissions, Wrapped, MCP and benchmark answers; suggested buttons are display hints.
+
 ### Arweave
 
 - Use one forced-refresh option across payload caches and in-flight requests.
   Evict malformed JSON replies so ordinary reads can retry immediately.
 
 ### Agents and MCP
+
+- Prepare MCP 0.1.3 with the package fixes since 0.1.2; application and MCP versions remain independent.
 
 - Summarize research runs from bounded per-principal journal coverage, storing each frozen question list once. Summary exports read attempt metadata and one answer state per principal instead of every answer event.
 
@@ -89,70 +134,6 @@ All notable changes to this project will be documented in this file.
 - Count one current answer per participant and question in agent results and
   answered-state views, using a shared deterministic revision order within each
   participant/question and chronological order across the selected answers.
-
-- Serialize Wrapped research batches in the session coordinator. Bind retries
-  to their original content, preserve concurrent answer summaries, and return a
-  retryable response while KV is busy. Export both readable question sources
-  and report source outages instead of silently dropping history.
-- Retry unexpected queue-processing failures instead of acknowledging an
-  unprocessed submission.
-
-- Use one continuous Wrapped space per session. Remove weekly windows and their
-  opening action; saved answers retain their exact statement wording and schema,
-  with current access checked on reads and exports.
-- Project completed direct agent submissions to KV once and repair delayed
-  projections with a durable alarm. Queued successes retain their outcome while
-  an accepted persistence-only message repairs KV. Keep successful outcomes successful, retain uploaded
-  payload IDs on retry, validate before admission, and use server timestamps.
-- Surface Wrapped config/state read failures and proposal outages. Keep the
-  first 2,000 proposals with an explicit incomplete marker instead of dropping
-  them or reporting complete aggregates.
-
-- Apply participant upload preflight to agent writes, retain submission outcomes
-  across authority changes, and retry pre-send failures without duplicate uploads.
-- Preserve Wrapped history across selection and visibility changes; fail closed
-  on incomplete KV reads and invalid export cursors. Bind signed operator writes
-  to their HTTP method and body, and bound registry RPC response bodies.
-- Persist native verification capabilities for Admin and reject deployment
-  capabilities whose origin differs from the Session Worker.
-
-- Serve new-session Agent HTTP and Session Wrapped from the Session Worker,
-  including scoped credentials, atomic invites, source-bound browser exchange,
-  managed testnet submissions and optional queue processing. Remove separate
-  Bridge deployment and release bundles without migrating or retiring existing resources.
-- Apply canonical session gates and stored-key AI policy to agent workflows.
-  Optional operator-funded posters stay disabled by default. Agent auxiliary
-  state and signing keys are excluded from session archives.
-
-- Prepare MCP 0.1.2 with the updated agent behavior and automated release workflow.
-  Default new host configurations to `npx -y --prefer-online @agalmic/contextengine@latest`.
-  Existing users should update their host command once and restart to receive
-  future published updates; exact version pins remain available for reproducible
-  runs. Publication stays disabled until the application release is merged,
-  canonical CI passes and the repository owner enables it.
-- Add opt-in GitHub-to-npm publication of the exact CI-tested MCP tarball using
-  npm Trusted Publishing, with version, source, integrity and stale-run checks.
-
-- Require explicit `session_login` scope when a service credential exchanges
-  into a Session Worker login. Personal user credentials retain login, and exchanged
-  tokens are capped by source expiry and invalidated when the source is revoked.
-- Retain confirmed local answers in incomplete registry reads during a failed
-  block-mark check, while preserving newer canonical answers.
-- Persist pending answer-upload identities so repeating a timed-out tool call
-  replays the settled record. Keep complete Worker listings complete after an
-  agent answers, and hold registry scan cursors when a block mark cannot be checked.
-- Verify each remembered registry write against its own block before using it,
-  share block probes within a read, and report incomplete results when RPC
-  history is unavailable without discarding the last verified scan mark.
-- Send response-upload request IDs so a retry within an upload operation can
-  replay the original stored reference.
-- Bind saved agent state to its wallet and stop startup if its key is missing
-  or differs from the recorded identity. Legacy state adopts its existing key.
-- Rebuild registry reads when the scanned block is replaced, and discard local
-  questions and remembered answers from orphaned blocks.
-- Route every MCP registry chain call, including reads, log scans and test-ETH
-  checks, through one error sanitizer, and redact URLs and ethers diagnostics
-  from tool errors and logs, so a keyed RPC URL cannot reach a transcript.
 
 ### Local tooling
 
@@ -409,6 +390,7 @@ All notable changes to this project will be documented in this file.
   AI-prefill drafts and the participant score together, and in `/admin` turns
   voice interviews back on if they were off; turning it off restores the
   research defaults.
+
 - Add **How well AIs predicted people** to the Results report of sessions that
   turn on **Show “How well AIs predicted people” in Results**: the overall and
   hidden-draft Mirror Scores, how often people changed a shown draft, stated
@@ -417,6 +399,7 @@ All notable changes to this project will be documented in this file.
   of people, 5 by default, and withholds any figure from fewer, and a
   platform also when subtracting it from the overall score would reveal
   fewer. It scores in a background thread.
+
 - Add two Interview settings for that section, in the wizard and `/admin`
   (each needs a Session Worker newer than 0.8.0): **Show “How well AIs
   predicted people” in Results** (`interviewMode.showFidelityResults`, off by
@@ -424,94 +407,39 @@ All notable changes to this project will be documented in this file.
   person; and under it, **Smallest group shown in “How
   well AIs predicted people”** (`interviewMode.fidelityMinimumPeople`, 5 by
   default), whose **Off** shows every figure, even one person's.
+
 - Suggest the session's open groups after an interview or AI prefill link
   (`interviewMode.suggestGroups`, off by default; needs a Session Worker
   newer than 0.8.0). A group named like the person's single-choice answer
   comes first without an AI call, hidden AI drafts stay out until shown, and
   suggestions never join anyone. A join started before sign-in now survives
   it, and suggestions no longer reload, with an AI call, on every render.
+
 - Resolve the `rxc-ra-test-2` session from its short URL through bundled Worker
   discovery, without requiring a `worker` query parameter.
-- Restart backup downloads after configuration/group changes or invalid cursors.
-  Before restoring into an unpublished session, check the pinned Worker origin
-  and show the target before asking for a signature.
-- Clear authoring draft warnings and unload prompts after Clear form or successful
-  publication, cancelling queued saves of the discarded draft.
-- Keep the license-analysis module inventory outside the published site output.
 
-- Add a versioned product film and 1200×630 poster for site link previews, with
-  crawler HTML for About. Posts keep their own header images and omit the film.
-
-- Show persistent authoring draft save failures with Retry and Copy draft,
-  a JSON download fallback, and an unload warning while failed edits are unsaved.
-- Enforce local scripts and wallet workers through the static CSP, with one
-  exact script hash for the sandboxed benchmark report. Browser smoke tests
-  apply the real headers, reject CSP violations and check blocked injections.
-- Reuse an unchanged survey container on response retries, and refresh cached
-  readiness on Submit only when submission is unavailable.
-- Restart changed-session backups without retaining stale pages. Deployment
-  replay identifies a preserved recovery key and its known fingerprint.
-- Advance saved-answer revisions when edited, including changing an
-  answer back, and discard in-flight submission state when the account changes.
-- Recheck unavailable Worker readiness on Submit and avoid caching transient
-  network failures. Expire near-head numeric RPC reads after two seconds so a
-  recent chain replacement cannot remain cached for ten minutes.
-- Preserve operator-supplied recovery keys through wizard identity changes,
-  normalize hex case and distinguish supplied from generated keys. Stream JSONL
-  restore files and let admins abandon an unfinished restore.
-- Show automatic-analysis retry exhaustion beside manual recovery controls.
-  Add private admin diagnostics for upload receipts, automatic-analysis retries
-  and pending configuration repair, with bounded pages and explicit refresh.
-- Keep a submission's operation ID across failed and partial attempts, so an
-  unchanged answer can recover a lost upload reply without another stored copy.
-- Gate admin corrections on Worker authority-stamp support and explain known
-  submission readiness failures. Show Worker API/bundle details and upgrade hints.
-- Add complete session backup and resumable restore to admin settings, with
-  generated or operator-supplied recovery keys during setup and confirmed key
-  export for existing sessions. Key dialogs offer a private download and keep
-  their raw values out of browser persistence.
-- Preserve the bookmark action the page showed, match Results bookmark IDs
-  case-insensitively, and keep optimistic writes that start during a tab reload.
-- Extend required browser coverage to lost upload replies, backup/import and
-  recovery-key downloads; pin previous-minor records across canonical readers.
-- Keep successfully stored Worker answers saved after a later upload fails,
-  name the unsaved drafts, and keep Submit available to retry only those drafts.
-- Serialize persisted cache writes across tabs and reload saved values on
-  cross-tab notifications. Bookmark changes preserve other tabs' additions.
-- Merge saved filters, SBT bookmarks and analysis results into current local
-  storage, and retain valid bookmark lists when another list is missing.
-- Require browser checks for hosted publication, reload, Results, permissions,
-  partial-submit retry and concurrent two-tab bookmarks in CI.
 - Move Discard interview out of the modal footer into a trash button beside
   the microphone. Its tooltip, and its description for screen readers, say
   what discarding clears and that submitted responses are kept.
+
 - Offer the ChatGPT or Claude prefill prompt from the voice chooser, in a
   **Let your AI draft your answers** card below Interview and Group
   Conversation, instead of inside the interview; the chooser's descriptions
   now sit behind question-mark tooltips. `?mode=voice` opens the chooser.
   Prefill links still open the interview on their drafts, now with a status
   line and a **Talk through your drafts** microphone.
+
 - Open the interview's AI submission choices inside their dropdown instead of
   over the drafts, with every sharing choice listed before the prefill metadata.
   The metadata no longer repeats what an unticked box leaves out, and is hidden
   when nothing is shared.
+
 - Leave questions people have already answered out of interview and AI-prefill
   drafts, and say how many were left out. A voice or typed interview that gives
   a different answer still shows that draft, noting the answer it changes.
   Answers saved earlier but not yet loaded on the page now count too, so an
   interview no longer replaces them unasked. While questions remain open, the
   voice interviewer asks only about those.
-- Scope cached Worker questions and answers to the signed-in reader. Account
-  switches and logouts purge Worker cache nodes, a load started under another
-  account is discarded, and a complete listing drops answers the reader can no
-  longer read.
-- Load Interview saved answers after a full survey submission, whose stored
-  survey container previously failed the whole load.
-- Resume capped response listings on the next refresh, so sessions above
-  10,000 answers eventually load every row.
-- Give multichoice questions that the old delimiter encoding conflated, such as
-  options containing `,` or `:`, a versioned id. Every other id is unchanged,
-  and either form verifies in the web client, MCP and CE-CC.
 
 ### Workers — requires redeployment
 
@@ -592,6 +520,238 @@ All notable changes to this project will be documented in this file.
 - Resume interrupted response uploads at their reserved storage ID and timestamp,
   retaining pending receipts and avoiding duplicate published answers after a crash.
 
+### Benchmark reports
+
+- Compare importance shuffle and mock-allocation hashes in code-point order; model fingerprint ordering retains its explicit English locale.
+
+- Omit full-bank importance from question-limited previews with an explicit integrity warning instead of silently dropping allocation runs.
+
+- Require one schedule seed per release report and warn when previews combine different seeds.
+
+- Allow completed benchmark runs at different repeat depths to share a report while preserving their seeds and strict resume checks.
+
+- Keep importance prompt fingerprints stable across host locales.
+
+- Bind preview importance allocations to the full question wording and order before display limits.
+
+- Refuse preview reports with missing or mismatched question prompt hashes before answers can be exported against changed wording.
+
+- Bind longitudinal snapshots to the persona instructions and prompt template actually used, rejecting changed or missing context.
+
+- Parse benchmark answers after removing inline reasoning, and retry conflicting or truncated final answers.
+
+- Publish rendered previews with the same validated analysis overlay, retaining HTML equality and integrity checks.
+
+- Keep report trait names and values as own dictionary keys, including built-in
+  names such as constructor, across grouping, filtering and export.
+
+- Audit every model the full OpenRouter runner will send, using one effective
+  roster for preflight, planning and execution.
+
+- Validate OpenRouter's transport and serving provider separately. Enforce upstream
+  routing restrictions with normalized comparisons while preserving reported metadata.
+
+- Use the validated release receipt for benchmark labels, indexing and publication
+  status. Require explicit release confirmation and verify the embedded report's hash.
+
+- Compare similarity drift over the same usable question set in both snapshots,
+  report its IDs and count, and mark insufficient common overlap unavailable.
+
+- Keep benchmark deadlines active through success/error bodies and structured-output
+  fallback attempts, cancelling stalled streams so tasks can retry.
+
+- Repair incomplete checkpoint tails and missing final newlines before any
+  benchmark resume appends new records; reject corrupt middle lines.
+
+- Bind importance resume to its recorded endpoint and reject mixed endpoints
+  using the deployment identity check shared with stance runs.
+
+- Hash importance prompts in model-id and numeric-repeat order for both generation
+  and release validation, independent of roster order.
+
+- Let the AI discourse benchmark answer any session's questions, every type
+  included: `answer` asks each model with reversed wording, flipped rating
+  scales and shuffled options, and checks replies with the MCP's answer rules,
+  now shared in `shared/questions/answerValue.mjs`. `compare-answers` then
+  compares models with everyone and with each group, using statistics suited
+  to each question type; a group is withheld when it has fewer than 5 people
+  or when subtracting it from everyone would leave fewer.
+
+### Research
+
+- Add Cohen's kappa for choice predictions and rating error, as a share of
+  the scale, to the agent fidelity report.
+
+- Add an agent fidelity report: `scripts/agent-fidelity-report.mjs` scores
+  how well AI drafts predicted participants' answers from a Results JSON
+  export or Session Wrapped rows. It reports Mirror Score, correction rate,
+  calibration, lift over a majority guess, accuracy for unusual views, and
+  whether drafts flatten strong or varied views. See `docs/agent-fidelity.md`.
+  It counts each response under the responder the Worker or chain recorded,
+  not the payload's own claim, reads platforms as ChatGPT, Claude or other,
+  and withholds calibration bands from fewer than 5 people, and any platform,
+  draft-source or group row whose subtraction from the total would reveal
+  fewer.
+
+- Keep shared AI draft comparisons minimal by default: predicted answers, ratings,
+  confidence and changed fields, without the AI's notes, drafted text or drafts
+  for skipped questions. Owners can choose full detail with
+  `interviewMode.researchDetail`, which needs a Session Worker newer than 0.8.0.
+  Records now carry `version: 2`, `researchTier` and `draftOrigin`, and a line
+  beside Submit says when sharing is on.
+
+- Hide a share of AI-prefill drafts until people answer, to measure how much
+  seeing a draft sways answers: `interviewMode.hiddenDraftShare`, which needs a
+  Session Worker newer than 0.8.0. Each hidden question shows the AI's guess
+  after the answer, and research records keep `predictionCondition`, the answer
+  from before the reveal and when it was shown. Anchoring now compares hidden
+  drafts only with shown drafts from the same source.
+
+- Ask AI prefill and interview drafting for confidence as the chance the
+  person keeps the answer unchanged (prompt `ce-interview-brief-v6`), so it can
+  be calibrated. v4 and v5 links and catalogs still work; the fidelity report
+  calibrates only confidences with this meaning.
+
+- Show participants a private score after they submit AI-prefill drafts
+  (`interviewMode.showFidelityScore`, which needs a Session Worker newer than
+  0.8.0): how many answers their AI matched, its Mirror Score, its hidden-draft
+  guesses and most confident misses, worked out in the browser. The footer
+  button stays in place.
+
+## [0.8.0] - 2026-10-28
+
+### Agents and MCP
+
+- Serialize Wrapped research batches in the session coordinator. Bind retries
+  to their original content, preserve concurrent answer summaries, and return a
+  retryable response while KV is busy. Export both readable question sources
+  and report source outages instead of silently dropping history.
+- Retry unexpected queue-processing failures instead of acknowledging an
+  unprocessed submission.
+
+- Use one continuous Wrapped space per session. Remove weekly windows and their
+  opening action; saved answers retain their exact statement wording and schema,
+  with current access checked on reads and exports.
+- Project completed direct agent submissions to KV once and repair delayed
+  projections with a durable alarm. Queued successes retain their outcome while
+  an accepted persistence-only message repairs KV. Keep successful outcomes successful, retain uploaded
+  payload IDs on retry, validate before admission, and use server timestamps.
+- Surface Wrapped config/state read failures and proposal outages. Keep the
+  first 2,000 proposals with an explicit incomplete marker instead of dropping
+  them or reporting complete aggregates.
+
+- Apply participant upload preflight to agent writes, retain submission outcomes
+  across authority changes, and retry pre-send failures without duplicate uploads.
+- Preserve Wrapped history across selection and visibility changes; fail closed
+  on incomplete KV reads and invalid export cursors. Bind signed operator writes
+  to their HTTP method and body, and bound registry RPC response bodies.
+- Persist native verification capabilities for Admin and reject deployment
+  capabilities whose origin differs from the Session Worker.
+
+- Serve new-session Agent HTTP and Session Wrapped from the Session Worker,
+  including scoped credentials, atomic invites, source-bound browser exchange,
+  managed testnet submissions and optional queue processing. Remove separate
+  Bridge deployment and release bundles without migrating or retiring existing resources.
+- Apply canonical session gates and stored-key AI policy to agent workflows.
+  Optional operator-funded posters stay disabled by default. Agent auxiliary
+  state and signing keys are excluded from session archives.
+
+- Prepare MCP 0.1.2 with the updated agent behavior and automated release workflow.
+  Default new host configurations to `npx -y --prefer-online @agalmic/contextengine@latest`.
+  Existing users should update their host command once and restart to receive
+  future published updates; exact version pins remain available for reproducible
+  runs. Publication stays disabled until the application release is merged,
+  canonical CI passes and the repository owner enables it.
+- Add opt-in GitHub-to-npm publication of the exact CI-tested MCP tarball using
+  npm Trusted Publishing, with version, source, integrity and stale-run checks.
+
+- Require explicit `session_login` scope when a service credential exchanges
+  into a Session Worker login. Personal user credentials retain login, and exchanged
+  tokens are capped by source expiry and invalidated when the source is revoked.
+- Retain confirmed local answers in incomplete registry reads during a failed
+  block-mark check, while preserving newer canonical answers.
+- Persist pending answer-upload identities so repeating a timed-out tool call
+  replays the settled record. Keep complete Worker listings complete after an
+  agent answers, and hold registry scan cursors when a block mark cannot be checked.
+- Verify each remembered registry write against its own block before using it,
+  share block probes within a read, and report incomplete results when RPC
+  history is unavailable without discarding the last verified scan mark.
+- Send response-upload request IDs so a retry within an upload operation can
+  replay the original stored reference.
+- Bind saved agent state to its wallet and stop startup if its key is missing
+  or differs from the recorded identity. Legacy state adopts its existing key.
+- Rebuild registry reads when the scanned block is replaced, and discard local
+  questions and remembered answers from orphaned blocks.
+- Route every MCP registry chain call, including reads, log scans and test-ETH
+  checks, through one error sanitizer, and redact URLs and ethers diagnostics
+  from tool errors and logs, so a keyed RPC URL cannot reach a transcript.
+
+### Client — available when the site deploys
+
+- Restart backup downloads after configuration/group changes or invalid cursors.
+  Before restoring into an unpublished session, check the pinned Worker origin
+  and show the target before asking for a signature.
+- Clear authoring draft warnings and unload prompts after Clear form or successful
+  publication, cancelling queued saves of the discarded draft.
+- Keep the license-analysis module inventory outside the published site output.
+
+- Add a versioned product film and 1200×630 poster for site link previews, with
+  crawler HTML for About. Posts keep their own header images and omit the film.
+
+- Show persistent authoring draft save failures with Retry and Copy draft,
+  a JSON download fallback, and an unload warning while failed edits are unsaved.
+- Enforce local scripts and wallet workers through the static CSP, with one
+  exact script hash for the sandboxed benchmark report. Browser smoke tests
+  apply the real headers, reject CSP violations and check blocked injections.
+- Reuse an unchanged survey container on response retries, and refresh cached
+  readiness on Submit only when submission is unavailable.
+- Restart changed-session backups without retaining stale pages. Deployment
+  replay identifies a preserved recovery key and its known fingerprint.
+- Advance saved-answer revisions when edited, including changing an
+  answer back, and discard in-flight submission state when the account changes.
+- Recheck unavailable Worker readiness on Submit and avoid caching transient
+  network failures. Expire near-head numeric RPC reads after two seconds so a
+  recent chain replacement cannot remain cached for ten minutes.
+- Preserve operator-supplied recovery keys through wizard identity changes,
+  normalize hex case and distinguish supplied from generated keys. Stream JSONL
+  restore files and let admins abandon an unfinished restore.
+- Show automatic-analysis retry exhaustion beside manual recovery controls.
+  Add private admin diagnostics for upload receipts, automatic-analysis retries
+  and pending configuration repair, with bounded pages and explicit refresh.
+- Keep a submission's operation ID across failed and partial attempts, so an
+  unchanged answer can recover a lost upload reply without another stored copy.
+- Gate admin corrections on Worker authority-stamp support and explain known
+  submission readiness failures. Show Worker API/bundle details and upgrade hints.
+- Add complete session backup and resumable restore to admin settings, with
+  generated or operator-supplied recovery keys during setup and confirmed key
+  export for existing sessions. Key dialogs offer a private download and keep
+  their raw values out of browser persistence.
+- Preserve the bookmark action the page showed, match Results bookmark IDs
+  case-insensitively, and keep optimistic writes that start during a tab reload.
+- Extend required browser coverage to lost upload replies, backup/import and
+  recovery-key downloads; pin previous-minor records across canonical readers.
+- Keep successfully stored Worker answers saved after a later upload fails,
+  name the unsaved drafts, and keep Submit available to retry only those drafts.
+- Serialize persisted cache writes across tabs and reload saved values on
+  cross-tab notifications. Bookmark changes preserve other tabs' additions.
+- Merge saved filters, SBT bookmarks and analysis results into current local
+  storage, and retain valid bookmark lists when another list is missing.
+- Require browser checks for hosted publication, reload, Results, permissions,
+  partial-submit retry and concurrent two-tab bookmarks in CI.
+- Scope cached Worker questions and answers to the signed-in reader. Account
+  switches and logouts purge Worker cache nodes, a load started under another
+  account is discarded, and a complete listing drops answers the reader can no
+  longer read.
+- Load Interview saved answers after a full survey submission, whose stored
+  survey container previously failed the whole load.
+- Resume capped response listings on the next refresh, so sessions above
+  10,000 answers eventually load every row.
+- Give multichoice questions that the old delimiter encoding conflated, such as
+  options containing `,` or `:`, a versioned id. Every other id is unchanged,
+  and either form verifies in the web client, MCP and CE-CC.
+
+### Workers — requires redeployment
+
 - Clear completed restore journals and page receipts in resumable steps, retaining
   a small completion record. A later import must pass the empty-target check.
 - Bound upload diagnostics registration to 250 ms, back off failed attempts for
@@ -651,45 +811,6 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
-- Verify mixed-file generation retains rejected-file notices while sending only supported extracted text to the model.
-
-- Provide the mocked wallet-action boundary in shared Jest setup for session-page imports as well as account components.
-
-- Keep the wallet URI encoder override effective after npm hoisting and validate the installed query-dependency tree.
-
-- Mock wallet disconnection in community and sponsorship lifecycle tests when importing the shared logout boundary.
-
-- Install the Session Worker package in the hosted contracts job before its registry smoke imports Worker code.
-
-- Refresh the client coverage inventory count without changing measured coverage or enforced floors.
-
-- Cover the pinned Worker session route with read-only navigation fixtures and
-  loaded-session assertions while keeping unmatched network requests blocked.
-
-- Seed encrypted provisioned secrets in admin integration fixtures.
-
-- Align integration assertions with explicit General comparison links and scanned
-  SBT mint totals.
-
-- Keep the analysis session-switch regression mock compatible with typed Jest.
-
-- Preserve the Session Worker's isolated dependencies in public replay checks.
-
-- Include shared answer validation in Worker release source comparisons.
-
-- Check signed payment hashes in proof-authorized faucet integration tests.
-
-- Verify authenticated faucet replies against the signed payment hash and amount.
-
-- Preserve the original benchmark rating prompts for integer-origin, step-1
-  scales; describe increments only for other rating grids.
-
-- Reject eager client runtime import cycles in the wiring gate, with a zero
-  baseline and exclusions for type-only imports and deferred loads.
-
-- Use one rating bounds and step rule across browser sliders, agent drafts and
-  submissions, Wrapped, MCP and benchmark answers; suggested buttons are display hints.
-
 - Verify recovery of saved answers and unsaved drafts after reload without
   resending saved records.
 - Exercise current MCP and browser readers against the unchanged previous
@@ -717,98 +838,9 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
-- Compare importance shuffle and mock-allocation hashes in code-point order; model fingerprint ordering retains its explicit English locale.
-
-- Omit full-bank importance from question-limited previews with an explicit integrity warning instead of silently dropping allocation runs.
-
-- Require one schedule seed per release report and warn when previews combine different seeds.
-
-- Allow completed benchmark runs at different repeat depths to share a report while preserving their seeds and strict resume checks.
-
-- Keep importance prompt fingerprints stable across host locales.
-
-- Bind preview importance allocations to the full question wording and order before display limits.
-
-- Refuse preview reports with missing or mismatched question prompt hashes before answers can be exported against changed wording.
-
-- Bind longitudinal snapshots to the persona instructions and prompt template actually used, rejecting changed or missing context.
-
-- Parse benchmark answers after removing inline reasoning, and retry conflicting or truncated final answers.
-
-- Publish rendered previews with the same validated analysis overlay, retaining HTML equality and integrity checks.
-
-- Keep report trait names and values as own dictionary keys, including built-in
-  names such as constructor, across grouping, filtering and export.
-
-- Audit every model the full OpenRouter runner will send, using one effective
-  roster for preflight, planning and execution.
-
-- Validate OpenRouter's transport and serving provider separately. Enforce upstream
-  routing restrictions with normalized comparisons while preserving reported metadata.
-
-- Use the validated release receipt for benchmark labels, indexing and publication
-  status. Require explicit release confirmation and verify the embedded report's hash.
-
-- Compare similarity drift over the same usable question set in both snapshots,
-  report its IDs and count, and mark insufficient common overlap unavailable.
-
-- Keep benchmark deadlines active through success/error bodies and structured-output
-  fallback attempts, cancelling stalled streams so tasks can retry.
-
-- Repair incomplete checkpoint tails and missing final newlines before any
-  benchmark resume appends new records; reject corrupt middle lines.
-
-- Bind importance resume to its recorded endpoint and reject mixed endpoints
-  using the deployment identity check shared with stance runs.
-
-- Hash importance prompts in model-id and numeric-repeat order for both generation
-  and release validation, independent of roster order.
-
 - File questions without valid answers under "no data" in the report's tag
   filter instead of "mixed / unsure".
-- Let the AI discourse benchmark answer any session's questions, every type
-  included: `answer` asks each model with reversed wording, flipped rating
-  scales and shuffled options, and checks replies with the MCP's answer rules,
-  now shared in `shared/questions/answerValue.mjs`. `compare-answers` then
-  compares models with everyone and with each group, using statistics suited
-  to each question type; a group is withheld when it has fewer than 5 people
-  or when subtracting it from everyone would leave fewer.
 
-### Research
-
-- Add Cohen's kappa for choice predictions and rating error, as a share of
-  the scale, to the agent fidelity report.
-- Add an agent fidelity report: `scripts/agent-fidelity-report.mjs` scores
-  how well AI drafts predicted participants' answers from a Results JSON
-  export or Session Wrapped rows. It reports Mirror Score, correction rate,
-  calibration, lift over a majority guess, accuracy for unusual views, and
-  whether drafts flatten strong or varied views. See `docs/agent-fidelity.md`.
-  It counts each response under the responder the Worker or chain recorded,
-  not the payload's own claim, reads platforms as ChatGPT, Claude or other,
-  and withholds calibration bands from fewer than 5 people, and any platform,
-  draft-source or group row whose subtraction from the total would reveal
-  fewer.
-- Keep shared AI draft comparisons minimal by default: predicted answers, ratings,
-  confidence and changed fields, without the AI's notes, drafted text or drafts
-  for skipped questions. Owners can choose full detail with
-  `interviewMode.researchDetail`, which needs a Session Worker newer than 0.8.0.
-  Records now carry `version: 2`, `researchTier` and `draftOrigin`, and a line
-  beside Submit says when sharing is on.
-- Hide a share of AI-prefill drafts until people answer, to measure how much
-  seeing a draft sways answers: `interviewMode.hiddenDraftShare`, which needs a
-  Session Worker newer than 0.8.0. Each hidden question shows the AI's guess
-  after the answer, and research records keep `predictionCondition`, the answer
-  from before the reveal and when it was shown. Anchoring now compares hidden
-  drafts only with shown drafts from the same source.
-- Ask AI prefill and interview drafting for confidence as the chance the
-  person keeps the answer unchanged (prompt `ce-interview-brief-v6`), so it can
-  be calibrated. v4 and v5 links and catalogs still work; the fidelity report
-  calibrates only confidences with this meaning.
-- Show participants a private score after they submit AI-prefill drafts
-  (`interviewMode.showFidelityScore`, which needs a Session Worker newer than
-  0.8.0): how many answers their AI matched, its Mirror Score, its hidden-draft
-  guesses and most confident misses, worked out in the browser. The footer
-  button stays in place.
 
 ## [0.7.0] - 2026-10-21
 
