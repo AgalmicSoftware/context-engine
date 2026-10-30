@@ -697,6 +697,30 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       {recorder.labelsUnavailableReason ? (
         <div role="status">{recorder.labelsUnavailableReason} Continuing with plain transcription.</div>
       ) : null}
+      {recorder.hiddenPeriods?.length ? (
+        <div className={styles.sessionRecordingWakeNotice} role="status">
+          {recorder.hiddenPeriods.map((period, index) => (
+            <p key={`${period.startedAt}-${index}`}>
+              The page was hidden{' '}
+              {new Date(period.startedAt).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                hourCycle: 'h23',
+              })}
+              –
+              {new Date(period.endedAt).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                hourCycle: 'h23',
+              })}
+              ; recording may have paused.
+            </p>
+          ))}
+          <Button size="sm" onClick={recorder.dismissHiddenPeriods} aria-label="Dismiss hidden-page notice">
+            Dismiss
+          </Button>
+        </div>
+      ) : null}
       {isRecorderSessionActive && (recorder.pageHidden || !recorder.wakeLockHeld) ? (
         <div className={styles.sessionRecordingWakeNotice} role="status">
           {recorder.pageHidden

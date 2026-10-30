@@ -1,14 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** A screen lock is best effort: recording must still work when battery or browser policy refuses it. */
 export function useRecordingWakeLock(active: boolean) {
   const [held, setHeld] = useState(false);
   const [pageHidden, setPageHidden] = useState(document.visibilityState === 'hidden');
+  const [hiddenPeriods, setHiddenPeriods] = useState<Array<{ startedAt: number; endedAt: number }>>([]);
+  const hiddenSince = useRef<number | null>(null);
+  const dismissHiddenPeriods = useCallback(() => setHiddenPeriods([]), []);
   useEffect(() => {
-    const update = () => setPageHidden(document.visibilityState === 'hidden');
+    const update = () => {
+      const hidden = document.visibilityState === 'hidden';
+      setPageHidden(hidden);
+      if (active && hidden) {
+        if (hiddenSince.current === null) hiddenSince.current = Date.now();
+      } else if (hiddenSince.current !== null) {
+        const period = { startedAt: hiddenSince.current, endedAt: Date.now() };
+        hiddenSince.current = null;
+        setHiddenPeriods((previous) => [...previous, period]);
+      }
+    };
+    update();
     document.addEventListener('visibilitychange', update);
     return () => document.removeEventListener('visibilitychange', update);
-  }, []);
+  }, [active]);
   useEffect(() => {
     setHeld(false);
     if (!active || typeof navigator === 'undefined' || !navigator.wakeLock?.request) return;
@@ -61,5 +75,5 @@ export function useRecordingWakeLock(active: boolean) {
       release();
     };
   }, [active]);
-  return { wakeLockHeld: active && held, pageHidden };
+  return { wakeLockHeld: active && held, pageHidden, hiddenPeriods, dismissHiddenPeriods };
 }

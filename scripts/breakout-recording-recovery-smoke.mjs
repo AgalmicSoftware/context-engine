@@ -143,6 +143,9 @@ try {
       window.__track.dispatchEvent(new Event('ended'));
     });
     await page.getByRole('alert').filter({ hasText: 'Microphone access ended' }).waitFor();
+    await page.getByText(/The page was hidden .*recording may have paused/).waitFor();
+    await page.getByRole('button', { name: 'Dismiss hidden-page notice' }).click();
+    assert.equal(await page.getByText(/The page was hidden/).count(), 0);
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="ce-recording-chunks"] [role="status"]')[4]?.textContent === 'Transcribed');
     assert.deepEqual(errors, []);
     console.log(`PASS ${theme}: native IndexedDB partial recovery, ordered automatic retries, exact audio download, manual retry, raw deletion after transcript, quota/offline/microphone/visibility recovery`);

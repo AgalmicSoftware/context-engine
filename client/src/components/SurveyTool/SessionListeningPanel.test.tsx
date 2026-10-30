@@ -113,6 +113,22 @@ describe('SessionListeningPanel', () => {
     expect(downloadChunk).toHaveBeenCalledWith('stuck');
   });
 
+  it('keeps the hidden-period notice visible after Stop and lets the recorder dismiss it', () => {
+    const dismissHiddenPeriods = jest.fn();
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        hiddenPeriods: [
+          { startedAt: new Date(2026, 9, 30, 14, 2).getTime(), endedAt: new Date(2026, 9, 30, 14, 12).getTime() },
+        ],
+        dismissHiddenPeriods,
+      }),
+    );
+    render(<SessionListeningPanel sessionSlug="hidden-period" />);
+    expect(screen.getByText('The page was hidden 14:02–14:12; recording may have paused.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss hidden-page notice' }));
+    expect(dismissHiddenPeriods).toHaveBeenCalledTimes(1);
+  });
+
   it('explains when an active recording page is hidden', () => {
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
       buildRecorder({

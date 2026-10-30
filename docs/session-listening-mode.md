@@ -469,7 +469,7 @@ The session page, admin page and publish result include a compact **Join** panel
 
 ### Recording on a phone or with remote speakers
 
-Group Conversation and Interview request a Screen Wake Lock while recording or paused, release it on stop/close, and request it again when the page returns to the foreground. Group Conversation explains when the page is hidden or the screen lock is unavailable and asks the recorder to keep the page visible and screen unlocked. Interview keeps its screen-on notice. A wake lock cannot keep a backgrounded browser recording reliably; keep the recording page visible.
+Group Conversation and Interview request a Screen Wake Lock while recording or paused, release it on stop/close, and request it again when the page returns to the foreground. Group Conversation explains when the page is hidden or the screen lock is unavailable and asks the recorder to keep the page visible and screen unlocked. After returning, Group Conversation keeps a timestamped hidden-period notice, including after Stop, until the recorder dismisses it. Interview keeps its screen-on notice. A wake lock cannot keep a backgrounded browser recording reliably; keep the recording page visible.
 
 Group Conversation's **Record speaker audio** option is off by default and remembered on the device. It turns off microphone echo cancellation for people heard through the device's speakers, keeping noise suppression and gain control. Use speakers instead of headphones and test levels before the breakout. The option cannot change during capture.
 
