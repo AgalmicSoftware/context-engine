@@ -71,6 +71,7 @@ import {
   resolveTranscriptionWorkerEndpoint,
   uploadAudioForTranscription,
   uploadAudioForDiarizedTranscription,
+  SpeakerLabelsUnavailableError,
   type DiarizedTranscription,
 } from './aiClientTranscriptionWorkerTransport.js';
 import { enqueueAiCallWithRetry } from './aiClientQueue.js';
@@ -476,12 +477,15 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
 export async function transcribeGroupAudio(audio: AudioUploadBlob, opts: unknown = {}): Promise<DiarizedTranscription> {
   if (!audio) throw new Error('No audio provided');
   const { signal } = resolveTranscriptionUploadOptions(opts, { defaultMaxUploadBytes: TRANSCRIBE_MAX_UPLOAD_BYTES });
-  // Splitting a large background capture would reset labels again inside a single displayed chunk.
-  if (audio.size > TRANSCRIBE_MAX_UPLOAD_BYTES)
-    throw new Error(
-      'This speaker-label chunk is too large. Keep the recording page visible and record a shorter segment.',
-    );
-  return uploadAudioForDiarizedTranscription(audio, await resolveTranscriptionTransport(opts), { signal });
+  try {
+    if (audio.size > TRANSCRIBE_MAX_UPLOAD_BYTES)
+      throw new SpeakerLabelsUnavailableError('Speaker labels are unavailable for this audio size.');
+    return await uploadAudioForDiarizedTranscription(audio, await resolveTranscriptionTransport(opts), { signal });
+  } catch (error) {
+    if (!(error instanceof SpeakerLabelsUnavailableError)) throw error;
+    // The plain path already normalizes and chunks oversized audio safely.
+    return { text: await transcribeAudio(audio, opts), segments: [], labelsUnavailableReason: error.message };
+  }
 }
 
 const resolveTranscriptionTransport = async (opts: unknown = {}) => {

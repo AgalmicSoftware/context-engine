@@ -54,6 +54,8 @@ export const useRollingTranscriptionRecorder = ({
   const [segments, setSegments] = useState<RollingTranscriptSegment[]>([]);
   const [transcript, setTranscript] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [labelsUnavailableReason, setLabelsUnavailableReason] = useState('');
+  const labelsUnavailableRef = useRef('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -154,9 +156,14 @@ export const useRollingTranscriptionRecorder = ({
               context,
               workerUrl,
             };
-            const labeled = labelSpeakers ? await transcribeGroupAudio(blob, options) : null;
+            const labeled =
+              labelSpeakers && !labelsUnavailableRef.current ? await transcribeGroupAudio(blob, options) : null;
             const text = labeled ? labeled.text : await transcribeAudio(blob, options);
             if (!mountedRef.current) return;
+            if (labeled?.labelsUnavailableReason) {
+              labelsUnavailableRef.current = labeled.labelsUnavailableReason;
+              setLabelsUnavailableReason(labeled.labelsUnavailableReason);
+            }
             const cleanedText = String(text || '').trim();
             if (cleanedText) {
               setErrorMessage('');
@@ -324,6 +331,8 @@ export const useRollingTranscriptionRecorder = ({
 
     setStatus('requesting');
     setErrorMessage('');
+    labelsUnavailableRef.current = '';
+    setLabelsUnavailableReason('');
 
     try {
       const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices, {
@@ -500,6 +509,7 @@ export const useRollingTranscriptionRecorder = ({
     segments,
     pendingSegmentCount,
     errorMessage,
+    labelsUnavailableReason,
     mediaStreamRef: streamRef,
     startRecording,
     pauseRecording,

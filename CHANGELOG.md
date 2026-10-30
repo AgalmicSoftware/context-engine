@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Fall back to plain transcription when speaker labels are unavailable, retain text-only replies, and hide the labels toggle for other providers.
+
 - Preserve registry routing in join links and recover from invalid admin Worker fields when resolving interview compatibility.
 
 - Preserve internal whitespace in Breakdown choice labels so valid selections and participant totals match the Report.

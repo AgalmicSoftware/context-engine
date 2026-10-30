@@ -1,3 +1,4 @@
+import { getEffectiveTranscriptionConfig } from '../../utilities/ai/aiSettings';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionListeningPanel from './SessionListeningPanel';
@@ -6,6 +7,10 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { generateQuestionsFromListeningTranscript } from './sessionListeningQuestions';
 import type { ListeningQuestionGenerationResult } from './sessionListeningQuestions';
 import { readThemeToken, subscribeThemeChanges } from '../../utilities/ui/themeRuntime';
+
+jest.mock('../../utilities/ai/aiSettings', () => ({
+  getEffectiveTranscriptionConfig: jest.fn(async () => ({ provider: 'openai' })),
+}));
 
 let mockCreateQuestionsMountCount = 0;
 
@@ -653,14 +658,33 @@ it('remembers the optional speaker-audio setting and locks it while recording', 
   window.localStorage.removeItem('ce:record-speaker-audio:v1');
 });
 
-it('only offers optional speaker labels for Group Conversation', () => {
+it('only offers optional speaker labels for Group Conversation', async () => {
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
   const { rerender } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
-  const toggle = screen.getByRole('checkbox', { name: 'Label speakers' });
+  const toggle = await screen.findByRole('checkbox', { name: 'Label speakers' });
   expect(toggle).not.toBeChecked();
   fireEvent.click(toggle);
   expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
   rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="listening" />);
   expect(screen.queryByRole('checkbox', { name: 'Label speakers' })).not.toBeInTheDocument();
   expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+});
+
+it.each(['custom', 'local'])('hides speaker labels for the effective %s transcription provider', async (provider) => {
+  jest
+    .mocked(getEffectiveTranscriptionConfig)
+    .mockResolvedValueOnce({ provider } as Awaited<ReturnType<typeof getEffectiveTranscriptionConfig>>);
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
+  render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+  await waitFor(() => expect(getEffectiveTranscriptionConfig).toHaveBeenCalled());
+  expect(screen.queryByRole('checkbox', { name: 'Label speakers' })).not.toBeInTheDocument();
+  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+});
+
+it('shows when recording continues without speaker labels', async () => {
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({ labelsUnavailableReason: 'Labels unavailable. Continuing with plain transcription.' }),
+  );
+  render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+  expect(await screen.findByRole('status')).toHaveTextContent('Continuing with plain transcription');
 });

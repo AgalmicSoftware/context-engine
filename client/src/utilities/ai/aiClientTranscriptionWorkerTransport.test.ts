@@ -149,9 +149,11 @@ it('handles silent labeled clips, old Workers, and provider errors explicitly', 
     segments: [],
   });
   mockedFetchWorkerWithAuth.mockResolvedValueOnce({ ok: true, json: async () => ({ text: 'Plain text' }) } as Response);
-  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).rejects.toThrow(
-    'does not support speaker labels',
-  );
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).resolves.toEqual({
+    text: 'Plain text',
+    segments: [],
+    labelsUnavailableReason: expect.any(String),
+  });
   mockedFetchWorkerWithAuth.mockResolvedValueOnce({
     ok: false,
     status: 429,

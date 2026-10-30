@@ -300,6 +300,33 @@ describe('useRollingTranscriptionRecorder', () => {
     expect(result.current.elapsedSeconds).toBe(45 * 60);
     unmount();
   });
+  it('keeps a fallback transcript and stops requesting labels for the rest of the recording', async () => {
+    (transcribeGroupAudio as jest.Mock).mockImplementation(async () => ({
+      text: 'First chunk.',
+      segments: [],
+      labelsUnavailableReason: 'Labels unavailable.',
+    }));
+    (transcribeAudio as jest.Mock).mockImplementation(async () => 'Second chunk.');
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'fallback', labelSpeakers: true }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    for (let index = 0; index < 2; index++)
+      await act(async () => {
+        jest.advanceTimersByTime(180000);
+        await flushPromises();
+      });
+    expect(result.current.transcript).toContain('First chunk.');
+    expect(result.current.transcript).toContain('Second chunk.');
+    expect(result.current.labelsUnavailableReason).toBe('Labels unavailable.');
+    expect(result.current.segments.every((segment) => segment.status === 'complete')).toBe(true);
+    expect(transcribeGroupAudio).toHaveBeenCalledTimes(1);
+    expect(transcribeAudio).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
   it('keeps speaker labels scoped to each independently transcribed chunk', async () => {
     const turns = [{ speaker: 'A', start: 0, end: 1, text: 'Room question.' }];
     (transcribeGroupAudio as jest.Mock).mockImplementation(async () => ({ text: 'Room question.', segments: turns }));

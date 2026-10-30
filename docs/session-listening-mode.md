@@ -480,9 +480,9 @@ Foreground recordings rotate into independently decodable three-minute chunks an
 
 ### Optional speaker labels
 
-Group Conversation offers **Label speakers**, off by default. It uses OpenAI `gpt-4o-transcribe-diarize` with `diarized_json` and automatic chunking, retaining normalized speaker turns alongside the ordinary transcript in the existing local draft. An updated Session Worker is required; older Workers fail with an explicit compatibility message. Other transcription callers retain their existing model, request and text response.
+Group Conversation offers **Label speakers**, off by default. It uses OpenAI `gpt-4o-transcribe-diarize` with `diarized_json` and automatic chunking, retaining normalized speaker turns alongside the ordinary transcript in the existing local draft. When the Worker cannot provide labels, the recorder keeps plain transcription and explains that labels are unavailable. Other transcription callers retain their existing model, request and text response.
 
-Labels restart for each three-minute upload. They do not establish identity and are not merged across uploads. Speaker review, per-speaker mapping and claiming QR codes are not yet available. Labeled chunks exceeding 24 MiB fail explicitly instead of being silently split into additional label namespaces. Keep the page visible during capture. The diarization model is deprecated with removal scheduled for 2027-02-26; replacing it is separate work.
+Labels restart for each three-minute upload. They do not establish identity and are not merged across uploads. Speaker review, per-speaker mapping and claiming QR codes are not yet available. The labels toggle is available only for OpenAI transcription. If labels are unsupported by the provider or Worker, or a chunk exceeds 24 MiB, the same audio falls back to plain transcription using the normal audio chunker. A text-only reply is kept without another upload. The recorder reports that labels are unavailable and uses plain transcription for the rest of that recording. Keep the page visible during capture. The diarization model is deprecated with removal scheduled for 2027-02-26; replacing it is separate work.
 
 
 ### Returning after new questions are added

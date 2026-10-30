@@ -1,3 +1,4 @@
+import * as audioTranscription from './aiClientAudioTranscription';
 import {
   analyzeClusterOpinions,
   analyzeUserOpinions,
@@ -648,21 +649,101 @@ describe('aiClient worker auth options', () => {
   });
 });
 
-it('bounds group uploads and keeps custom-provider credentials off OpenAI', async () => {
-  jest.clearAllMocks();
-  const large = new Blob(['audio'], { type: 'audio/webm' });
-  Object.defineProperty(large, 'size', { value: 25 * 1024 * 1024 });
-  await expect(transcribeGroupAudio(large)).rejects.toThrow('too large');
-  expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
-  getEffectiveTranscriptionConfig.mockResolvedValue({ provider: 'custom', apiKey: 'synthetic-key' });
-  await expect(transcribeGroupAudio(new Blob(['audio']), { workerUrl: 'https://worker.example' })).rejects.toThrow(
-    'require OpenAI',
-  );
-  expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
-  getEffectiveTranscriptionConfig.mockResolvedValue({ provider: 'openai', model: 'whisper-1' });
-  fetchWorkerWithAuth.mockResolvedValue({ ok: true, json: async () => ({ text: '', segments: [] }) });
-  await expect(
-    transcribeGroupAudio(new Blob(['audio']), { sessionSlug: 'workshop', workerUrl: 'https://worker.example' }),
-  ).resolves.toEqual({ text: '', segments: [] });
-  expect(fetchWorkerWithAuth.mock.lastCall[1].body.get('model')).toBe('gpt-4o-transcribe-diarize');
+describe('group transcription fallback', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getEffectiveTranscriptionConfig.mockResolvedValue({ provider: 'openai', model: 'whisper-1' });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    fetchWorkerWithAuth.mockResolvedValue({ ok: true, json: async () => ({ text: 'Recovered transcript.' }) });
+  });
+
+  it('uses the custom provider without forwarding its credentials to an OpenAI model', async () => {
+    getEffectiveTranscriptionConfig.mockResolvedValue({
+      provider: 'custom',
+      model: 'fixture-model',
+      apiKey: 'synthetic-key',
+      rpcUrl: 'https://custom.example',
+    });
+    const audio = new Blob(['audio'], { type: 'audio/webm' });
+    await expect(transcribeGroupAudio(audio)).resolves.toEqual({
+      text: 'Recovered transcript.',
+      segments: [],
+      labelsUnavailableReason: expect.any(String),
+    });
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    const form = fetchWorkerWithAuth.mock.lastCall[1].body;
+    expect(form.get('provider')).toBe('custom');
+    expect(form.get('model')).toBe('fixture-model');
+    expect(form.get('apiKey')).toBe('synthetic-key');
+    expect(form.get('labelSpeakers')).toBeNull();
+  });
+
+  it('falls back for oversized labeled audio using the existing plain-audio chunker', async () => {
+    const audio = new Blob(['audio'], { type: 'audio/webm' });
+    Object.defineProperty(audio, 'size', { value: 25 * 1024 * 1024 });
+    const split = jest
+      .spyOn(audioTranscription, 'splitAudioBlobToWavChunks')
+      .mockResolvedValue([new Blob(['first'], { type: 'audio/wav' }), new Blob(['second'], { type: 'audio/wav' })]);
+    try {
+      const result = await transcribeGroupAudio(audio);
+      expect(result.text).toContain('Recovered transcript.');
+      expect(result.labelsUnavailableReason).toBeTruthy();
+      expect(split).toHaveBeenCalledWith(audio, expect.any(Object));
+      expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
+      for (const call of fetchWorkerWithAuth.mock.calls) expect(call[1].body.get('labelSpeakers')).toBeNull();
+    } finally {
+      split.mockRestore();
+    }
+  });
+
+  it.each([
+    [403, { error: 'Model is not allowed', reason: 'ai_model_not_allowed' }],
+    [413, { error: 'Audio is too large' }],
+  ])('retries the same chunk as plain transcription after label error %s', async (status, data) => {
+    fetchWorkerWithAuth.mockResolvedValueOnce({ ok: false, status, json: async () => data });
+    const audio = new Blob(['same audio'], { type: 'audio/webm' });
+    const result = await transcribeGroupAudio(audio);
+    expect(result).toEqual({
+      text: 'Recovered transcript.',
+      segments: [],
+      labelsUnavailableReason: expect.any(String),
+    });
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
+    const [first, fallback] = fetchWorkerWithAuth.mock.calls.map((call) => call[1].body);
+    expect(first.get('labelSpeakers')).toBe('true');
+    expect(fallback.get('labelSpeakers')).toBeNull();
+    expect(fallback.get('model')).toBe('whisper-1');
+    const read = (blob) =>
+      new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsText(blob);
+      });
+    expect(await read(fallback.get('file'))).toBe('same audio');
+    expect(await read(first.get('file'))).toBe('same audio');
+  });
+
+  it('keeps a paid text-only reply without uploading the audio again', async () => {
+    await expect(transcribeGroupAudio(new Blob(['audio'], { type: 'audio/webm' }))).resolves.toEqual({
+      text: 'Recovered transcript.',
+      segments: [],
+      labelsUnavailableReason: expect.any(String),
+    });
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not turn a transient provider failure into an extra plain request', async () => {
+    fetchWorkerWithAuth.mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({ error: 'Busy' }) });
+    await expect(transcribeGroupAudio(new Blob(['audio'], { type: 'audio/webm' }))).rejects.toThrow('Busy');
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains successful speaker labels', async () => {
+    fetchWorkerWithAuth.mockResolvedValue({ ok: true, json: async () => ({ text: '', segments: [] }) });
+    await expect(transcribeGroupAudio(new Blob(['audio'], { type: 'audio/webm' }))).resolves.toEqual({
+      text: '',
+      segments: [],
+    });
+    expect(fetchWorkerWithAuth.mock.lastCall[1].body.get('model')).toBe('gpt-4o-transcribe-diarize');
+  });
 });

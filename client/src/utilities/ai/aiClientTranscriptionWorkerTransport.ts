@@ -63,6 +63,10 @@ const parseTranscriptionErrorMessage = (data: unknown, status: unknown): string 
   );
 };
 
+export class SpeakerLabelsUnavailableError extends Error {
+  name = 'SpeakerLabelsUnavailableError';
+}
+
 const requestAudioTranscription = async (
   audioFileOrBlob: unknown,
   transport: TranscriptionWorkerTransport,
@@ -108,6 +112,23 @@ const requestAudioTranscription = async (
   }
 
   if (!resp.ok) {
+    const record = asRecord(data);
+    const code = stringValue(record.reason || record.code || asRecord(record.error).code);
+    if (
+      groupSpeakerLabels &&
+      (resp.status === 413 ||
+        [
+          'ai_model_not_allowed',
+          'model_not_found',
+          'unsupported_model',
+          'unsupported_response_format',
+          'unsupported_provider',
+        ].includes(code))
+    ) {
+      throw new SpeakerLabelsUnavailableError(
+        'Speaker labels are unavailable for this provider, Worker, or audio size.',
+      );
+    }
     throw new Error(parseTranscriptionErrorMessage(data, resp.status));
   }
 
@@ -120,7 +141,11 @@ export const uploadAudioForTranscription = async (
   options: TranscriptionUploadOptions = {},
 ): Promise<string> => stringValue((await requestAudioTranscription(audioFileOrBlob, transport, options)).text);
 
-export type DiarizedTranscription = { text: string; segments: SpeakerTranscriptTurn[] };
+export type DiarizedTranscription = {
+  text: string;
+  segments: SpeakerTranscriptTurn[];
+  labelsUnavailableReason?: string;
+};
 
 export const uploadAudioForDiarizedTranscription = async (
   audioFileOrBlob: unknown,
@@ -128,7 +153,8 @@ export const uploadAudioForDiarizedTranscription = async (
   options: TranscriptionUploadOptions = {},
 ): Promise<DiarizedTranscription> => {
   const config = transport.transcriptionCfg || {};
-  if (config.provider && config.provider !== 'openai') throw new Error('Speaker labels require OpenAI transcription.');
+  if (config.provider && config.provider !== 'openai')
+    throw new SpeakerLabelsUnavailableError('Speaker labels require OpenAI transcription.');
   const data = await requestAudioTranscription(
     audioFileOrBlob,
     {
@@ -138,7 +164,10 @@ export const uploadAudioForDiarizedTranscription = async (
     options,
     true,
   );
-  if (!Array.isArray(data.segments))
-    throw new Error('This Worker does not support speaker labels. Update it or turn off Label speakers.');
+  if (!Array.isArray(data.segments)) {
+    const reason = 'This Worker returned text without speaker labels.';
+    if (typeof data.text === 'string') return { text: data.text, segments: [], labelsUnavailableReason: reason };
+    throw new SpeakerLabelsUnavailableError(reason);
+  }
   return { text: stringValue(data.text), segments: normalizeSpeakerTurns(data.segments) };
 };

@@ -1,3 +1,4 @@
+import { getEffectiveTranscriptionConfig } from '../../utilities/ai/aiSettings';
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -337,6 +338,23 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     closeActionRef,
   } = props;
   const [labelSpeakers, setLabelSpeakers] = useState(false);
+  const [speakerLabelsSupported, setSpeakerLabelsSupported] = useState(false);
+  useEffect(() => {
+    let current = true;
+    setSpeakerLabelsSupported(false);
+    // Checking availability must not unlock local credentials or prompt a wallet.
+    void getEffectiveTranscriptionConfig({ sessionSlug, sessionConfig }).then(
+      (config) => {
+        if (current) setSpeakerLabelsSupported(config.provider === 'openai');
+      },
+      () => {
+        if (current) setSpeakerLabelsSupported(false);
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [sessionSlug, sessionConfig]);
   const [recordSpeakerAudio, setRecordSpeakerAudio] = useState(() => {
     try {
       return window.localStorage.getItem('ce:record-speaker-audio:v1') === 'true';
@@ -352,7 +370,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     context,
     workerUrl,
     chunkMs: DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
-    labelSpeakers: panelMode === 'recordGroup' && labelSpeakers,
+    labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported && labelSpeakers,
     recordSpeakerAudio: panelMode === 'recordGroup' && recordSpeakerAudio,
   });
   const [isGenerating, setIsGenerating] = useState(false);
@@ -636,30 +654,35 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
               speakers, not headphones.
             </UncontrolledTooltip>
           </span>
-          <span className={styles.sessionRecordingOption}>
-            <label>
-              <input
-                type="checkbox"
-                checked={labelSpeakers}
-                disabled={isRecorderSessionActive || recorder.isBusy}
-                onChange={(event) => setLabelSpeakers(event.target.checked)}
-              />{' '}
-              Label speakers
-            </label>
-            <button
-              type="button"
-              id={labelsHelpId}
-              className={styles.sessionInterviewHeaderButton}
-              aria-label="About speaker labels"
-            >
-              <FontAwesomeIcon icon={faQuestionCircle} />
-            </button>
-            <UncontrolledTooltip target={labelsHelpId} trigger="hover focus" autohide={false}>
-              Saves speaker turns with the transcript using OpenAI. Labels restart in each three-minute chunk and do not
-              identify people. Speaker review and claiming are not available yet.
-            </UncontrolledTooltip>
-          </span>
+          {speakerLabelsSupported ? (
+            <span className={styles.sessionRecordingOption}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={labelSpeakers}
+                  disabled={isRecorderSessionActive || recorder.isBusy || Boolean(recorder.labelsUnavailableReason)}
+                  onChange={(event) => setLabelSpeakers(event.target.checked)}
+                />{' '}
+                Label speakers
+              </label>
+              <button
+                type="button"
+                id={labelsHelpId}
+                className={styles.sessionInterviewHeaderButton}
+                aria-label="About speaker labels"
+              >
+                <FontAwesomeIcon icon={faQuestionCircle} />
+              </button>
+              <UncontrolledTooltip target={labelsHelpId} trigger="hover focus" autohide={false}>
+                Saves speaker turns with the transcript using OpenAI. Labels restart in each three-minute chunk and do
+                not identify people. Speaker review and claiming are not available yet.
+              </UncontrolledTooltip>
+            </span>
+          ) : null}
         </div>
+      ) : null}
+      {recorder.labelsUnavailableReason ? (
+        <div role="status">{recorder.labelsUnavailableReason} Continuing with plain transcription.</div>
       ) : null}
       {isRecorderSessionActive && !recorder.wakeLockHeld ? (
         <div className={styles.sessionRecordingWakeNotice}>Keep this screen on.</div>
