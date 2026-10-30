@@ -2854,7 +2854,9 @@ Signed login/bootstrap requests:
     window. Worker storage bounds list pages and payload reads separately.
     If a budget or window ends discovery before any eligible question is found,
     the catalog returns retryable HTTP 503 instead of a definitive empty 404;
-    eligible questions found before the limit are still returned.
+    eligible questions found before the limit are still returned. An unreadable
+    pointer or payload also marks discovery incomplete without hiding any
+    eligible questions that were successfully read.
   - Cloudflare-native questions
     pass through `/storage/list` and each `/storage/read` authorization check;
     it reads up to 200 stored rows so it can keep the canonical version of a

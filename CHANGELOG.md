@@ -465,7 +465,7 @@ All notable changes to this project will be documented in this file.
 
 - Recover lost restore handoff replies using a scoped, expiring completion receipt for the importing signer.
 
-- Return retryable interview discovery when question pointers or payloads cannot be read.
+- Mark interview discovery incomplete when question pointers or payloads cannot be read, while retaining readable eligible questions and retryable empty results.
 
 - Calculate research completion from each run’s own answer events and initial statement set.
 

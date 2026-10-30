@@ -21,14 +21,14 @@ const discover = async (ids, payload, config = baseConfig) => {
   } });
   return { result, reads };
 };
-for (const excluded of ['foreign', 'restricted']) {
-  test(`100 ${excluded} candidates and duplicate or unreadable rows do not hide an eligible question`, async () => {
+for (const excluded of ['foreign', 'restricted']) for (const unreadable of [true, false]) {
+  test(`100 ${excluded} candidates keep eligible questions visible; unreadable rows=${unreadable}`, async () => {
     const ids = Array.from({ length: 100 }, (_, index) => index + 1);
     const { result, reads } = await discover([...ids, ...ids, 101, 101, 102], value => value < 101
       ? excluded === 'foreign' ? { sessionSlug: 'elsewhere' } : { visibility: 'sbt_gated' }
-      : value === 101 ? null : {});
+      : value === 101 ? (unreadable ? null : { sessionSlug: 'elsewhere' }) : {});
     assert.deepEqual(result.questions.map(question => question.id), [id(102)]);
-    assert.equal(result.incomplete, false);
+    assert.equal(result.incomplete, unreadable);
     assert.equal(reads.filter(method => method === 'eth_call').length, 102);
   });
 }
