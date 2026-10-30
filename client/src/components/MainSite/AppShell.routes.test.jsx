@@ -3328,6 +3328,29 @@ describe('AppShell route render smoke', () => {
     expect(subject._registryBootstrapScopeKey).toBe('');
   });
 
+  it.each([false, true])('pins a bare General question only after a cache hit (cached=%s)', async (cached) => {
+    const questionId = `0x${'ab'.repeat(32)}`;
+    const config = buildSessionConfig({ slug: '', sessionName: 'General' });
+    const subject = createSubject({
+      path: `/question/${questionId}`,
+      search: '',
+      activeSessionSlug: '',
+      sessionConfig: config,
+    });
+    subject.getSessionSlugFromState = jest.fn(() => '');
+    subject.getQuestionRouteSessionSlugHint = jest.fn(() => null);
+    subject.getSessionCfg = jest.fn(() => config);
+    subject.getDisplaySessionCfg = jest.fn(() => config);
+    subject.readDgRecord = jest.fn((collection, slug) =>
+      collection === 'questionsCache' && slug === '' && cached
+        ? { [DEFAULT_NETWORK.id]: { questions: { [questionId]: { id: questionId, sessionSlug: '' } } } }
+        : null,
+    );
+    render(subject.render());
+    await screen.findByTestId('mock-survey-tool');
+    expect(window.location.search).toBe(cached ? '?session=general' : '');
+  });
+
   it.each([
     ['General bookmark', '', 'general'],
     ['named bookmark', 'edge', 'edge'],
@@ -3365,7 +3388,8 @@ describe('AppShell route render smoke', () => {
         expect.objectContaining({ sessionSlug: expectedSlug, sessionConfig: config }),
       );
       expect(window.location.search).toBe(`?session=${expectedQuery}`);
-      if (source === 'discovery link') expect(subject.findGroupSlugForQuestion).toHaveBeenCalledWith(questionId);
+      if (source === 'discovery link')
+        expect(subject.findGroupSlugForQuestion).toHaveBeenCalledWith(questionId, { requireCacheHit: true });
       else expect(subject.findGroupSlugForQuestion).not.toHaveBeenCalled();
       const copied = window.location.href;
       view.unmount();

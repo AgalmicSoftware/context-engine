@@ -962,8 +962,17 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         </div>
       );
     }
-    const effectiveQuestionSlug = questionSlugPinned ? queryQuestionSlug : host.findGroupSlugForQuestion(questionID);
-    if (effectiveQuestionSlug != null && typeof window !== 'undefined') {
+    const cachedQuestionSlug = questionSlugPinned
+      ? null
+      : host.findGroupSlugForQuestion(questionID, { requireCacheHit: true });
+    const effectiveQuestionSlug = questionSlugPinned
+      ? queryQuestionSlug
+      : (cachedQuestionSlug ?? host.findGroupSlugForQuestion(questionID));
+    if (
+      (questionSlugPinned || cachedQuestionSlug !== null) &&
+      effectiveQuestionSlug != null &&
+      typeof window !== 'undefined'
+    ) {
       const canonicalQuestionPath = buildQuestionRoutePath(questionID, {
         responderAddress,
         sessionSlug: effectiveQuestionSlug,

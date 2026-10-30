@@ -1757,22 +1757,29 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
   };
 
-  findGroupSlugForQuestion = (questionID: string | null | undefined): string => {
-    return findGroupSlugForQuestionFn(questionID, {
-      getCurrentSlug: () => this.getSessionSlugFromState(),
-      getQueryHintSlug: () => this.getQuestionRouteSessionSlugHint(),
-      isCacheManagerReady: this.state.isCacheManagerReady,
-      getSessionCfg: (slug: string) => this.getSessionCfg(slug),
-      dgRead: (collection: string, slug: string) => this.readDgRecord(collection, slug, { clone: false }),
-      resolveMetadataSessionSlug: (metadata: unknown, fallbackSlug: string) =>
-        this.resolveMetadataSessionSlug(metadata, fallbackSlug),
-      getAllSessionSlugs,
-      normalizeSessionSlug,
-      isKnownOrGeneralSessionSlug: (slug: string) => isKnownOrGeneralSessionSlug(slug, getSessionConfigBySlug),
-      warn: (error: unknown) => {
-        mainSiteLog.warn('MainSite: fallback', error);
+  findGroupSlugForQuestion = (
+    questionID: string | null | undefined,
+    options: { requireCacheHit?: boolean } = {},
+  ): string | null => {
+    return findGroupSlugForQuestionFn(
+      questionID,
+      {
+        getCurrentSlug: () => this.getSessionSlugFromState(),
+        getQueryHintSlug: () => this.getQuestionRouteSessionSlugHint(),
+        isCacheManagerReady: this.state.isCacheManagerReady,
+        getSessionCfg: (slug: string) => this.getSessionCfg(slug),
+        dgRead: (collection: string, slug: string) => this.readDgRecord(collection, slug, { clone: false }),
+        resolveMetadataSessionSlug: (metadata: unknown, fallbackSlug: string) =>
+          this.resolveMetadataSessionSlug(metadata, fallbackSlug),
+        getAllSessionSlugs,
+        normalizeSessionSlug,
+        isKnownOrGeneralSessionSlug: (slug: string) => isKnownOrGeneralSessionSlug(slug, getSessionConfigBySlug),
+        warn: (error: unknown) => {
+          mainSiteLog.warn('MainSite: fallback', error);
+        },
       },
-    });
+      options,
+    );
   };
 
   resolveGroupSlugForSbtAddress = async (

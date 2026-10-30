@@ -384,3 +384,5 @@ When `USE_ONCHAIN_SESSION_REGISTRY` is enabled:
 - Verify registry reads, Arweave metadata, and Lit decryption for locked fields.
 - Exercise disabled registry mode only when maintaining an intentional legacy
   deployment that still requires the demo-session fallback.
+
+Bare question routes are canonicalized with a session query only after an explicit session pin or a real question/survey cache hit. A selected General session alone is a discovery fallback, not an authoritative pin.
