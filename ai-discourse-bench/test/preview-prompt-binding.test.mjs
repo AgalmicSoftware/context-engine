@@ -33,6 +33,10 @@ test('preview importance stays bound to the full bank before display limits', as
     bank.questions[1].canonicalPrompt = sample.questions[1].canonicalPrompt;
     await write('bank.json', bank);
     invoke(...args);
+    const preview = JSON.parse(await fs.readFile(path.join(root, 'report.json'), 'utf8'));
+    assert.equal(preview.importance.available, false);
+    assert.ok(preview.integrity.warnings.some(warning => /importance omitted.*full question bank/i.test(warning)),
+      'a question-limited preview must explain why full-bank importance is omitted');
     const importance = JSON.parse(await fs.readFile(path.join(root, 'importance.json'), 'utf8'));
     importance.runs[0].questionOrderHash = 'wrong-order';
     await write('importance.json', importance);

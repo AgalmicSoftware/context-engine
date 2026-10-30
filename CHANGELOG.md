@@ -697,6 +697,8 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Omit full-bank importance from question-limited previews with an explicit integrity warning instead of silently dropping allocation runs.
+
 - Require one schedule seed per release report and warn when previews combine different seeds.
 
 - Allow completed benchmark runs at different repeat depths to share a report while preserving their seeds and strict resume checks.

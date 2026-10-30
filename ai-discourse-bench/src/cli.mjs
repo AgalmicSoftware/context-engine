@@ -391,7 +391,13 @@ const commandBuildReport = async (args) => {
       benchmarkId: questionBank.benchmarkId,
     }));
   }
-  const report = buildResultsReport({ questionBank, modelRoster, runsFile, importanceFile });
+  const limitedImportance = importanceFile && questionBank.questions.length < fullQuestionBank.questions.length;
+  const report = buildResultsReport({ questionBank, modelRoster, runsFile, importanceFile: limitedImportance ? null : importanceFile });
+  if (limitedImportance) {
+    report.integrity.warnings.unshift('Importance omitted from this question-limited preview: allocations are bound to the full question bank.');
+    report.integrity.releaseReady = false;
+    report.status = 'preview';
+  }
   if (scheduleWarning) {
     report.integrity.warnings.unshift(scheduleWarning);
     report.integrity.releaseReady = false;
