@@ -65,7 +65,10 @@ export const invalidateUserAnalysis = (page: UserPage, closeModal: boolean): voi
   if (!hadOwner && !closeModal) return;
   page.clearAnalysisTimer();
   if (page._isMounted) {
-    page.setState({ ...buildUserPageAnalysisResetStatePatch(), ...(closeModal ? { showAnalysisModal: false } : {}) });
+    page.setState((previous: { showAnalysisModal: boolean }) => ({
+      ...buildUserPageAnalysisResetStatePatch(),
+      showAnalysisModal: closeModal ? false : previous.showAnalysisModal,
+    }));
   }
 };
 

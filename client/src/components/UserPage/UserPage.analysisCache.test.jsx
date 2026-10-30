@@ -968,6 +968,18 @@ describe('UserPage analysis cache and routing', () => {
     expect(instance.state).toMatchObject({ analysisDetails: 'new result', analysisServedFromCache: true });
   });
 
+  it('keeps a closed analysis dialog closed when the same profile refreshes', async () => {
+    const { instance } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({ details: 'old input result' });
+    await instance.analyzeUser();
+    instance.setState({ showAnalysisModal: false });
+    const previous = instance.state;
+    instance.state = { ...previous, username: 'Updated profile data' };
+    instance.componentDidUpdate(instance.props, previous);
+    expect(instance.state).toMatchObject({ analysisDetails: '', showAnalysisModal: false });
+    expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the analysis open when the same profile receives refreshed inputs', async () => {
     const { instance } = makeAnalysisCacheInstance();
     analyzeUserOpinions.mockResolvedValueOnce({ details: 'old input result' });
