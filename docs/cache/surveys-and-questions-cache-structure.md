@@ -194,7 +194,9 @@ Semantics:
 - `questionsDiscoveryCheckpointBlock`: in-progress checkpoint used for resume-after-refresh behavior
 - `questions[qid].sessionSlugExplicit`: `true` when metadata authoritatively declared the session slug; `false` when the cache derived a slug from legacy name mapping or rebucketed unresolved metadata to general
 - `questions[qid].__ceQuestionMetadataPending`: temporary placeholder marker used when a response has been discovered before its question metadata has hydrated
-- `questionResponsesLatestBlock`: response watermark for the session+network.
+- `questionResponsesLatestBlock`: response scan watermark for the session+network.
+  Live response events update per-responder recency only; neither question nor survey
+  response scan watermarks advance until the scan processes those blocks.
   Chain response scans stop this watermark before the earliest event whose payload
   failed with a retryable error, so ordinary refreshes revisit it. Invalid pointers
   and malformed payloads are skipped without holding the watermark. A forced full

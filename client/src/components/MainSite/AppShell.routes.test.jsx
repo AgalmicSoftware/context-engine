@@ -349,6 +349,7 @@ jest.mock('../../utilities/web3/chainGateway.js', () => {
     getQuestionData: jest.fn(),
     getReadProviderForSession: jest.fn(),
     getResponse: jest.fn(),
+    getQuestionResponsesChunkedWithCallback: jest.fn(),
     getRelevantBlockWindowForFilter: jest.fn(),
     getSbtCreationBlockByAddress: jest.fn(),
     getSbtHistorySummary: jest.fn(),
@@ -4413,6 +4414,72 @@ describe('AppShell route render smoke', () => {
     expect(updateCacheAtomic).toHaveBeenCalled();
   });
 
+  it('keeps a retryable scan gap after a later live event and resumes an ordinary refresh at that gap', async () => {
+    const surveyId = `0x${'1'.repeat(64)}`;
+    const questionId = `0x${'2'.repeat(64)}`;
+    const responder = '0x0000000000000000000000000000000000000001';
+    const config = buildSessionConfig({ blockLimits: { start: 1, end: null } });
+    const subject = createSubject({ path: '/session/edge', activeSessionSlug: 'edge', sessionConfig: config });
+    subject._mounted = true;
+    subject.getCacheSessionCfg = jest.fn(() => config);
+    subject.getCacheSessionChainId = jest.fn(() => 84532);
+    subject.scanScopeNoop = jest.fn(() => false);
+    subject.queueLocalRevisionUpdate = jest.fn();
+    const dg = attachDgStore(subject);
+    dg.write('questionsCache', 'edge', {
+      84532: {
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+        questionResponsesLatestBlock: 6,
+      },
+    });
+    dg.write('surveysCache', 'edge', {
+      84532: {
+        surveys: {},
+        surveyResponses: {},
+        surveyResponsesMeta: {},
+        surveyResponsesLatestBlock: { [surveyId]: 6 },
+      },
+    });
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const next = await updater(dg.read(name, slug) || {});
+      dg.write(name, slug, next);
+      return next;
+    });
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 35 });
+    contractScripts.getSurveyResponse.mockResolvedValue({ answer: 'live survey' });
+    contractScripts.getResponse.mockResolvedValue({ answer: 'live question' });
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'ResponsesSubmitted',
+      surveyId,
+      questionIds: [questionId],
+      responder,
+      blockNumber: 30,
+    });
+    const questions = dg.read('questionsCache', 'edge')['84532'];
+    const surveys = dg.read('surveysCache', 'edge')['84532'];
+    expect(questions.questionResponsesMeta[questionId][responder].bn).toBe(30);
+    expect(surveys.surveyResponsesMeta[surveyId][responder].bn).toBe(30);
+    expect(questions.questionResponsesLatestBlock).toBe(6);
+    expect(surveys.surveyResponsesLatestBlock[surveyId]).toBe(6);
+    contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementation(
+      async (_provider, _from, to, _progress, partial) => partial({}, to),
+    );
+    await subject._responseHydrationController.refreshQuestionResponses(null, { slug: 'edge' });
+    expect(contractScripts.getQuestionResponsesChunkedWithCallback).toHaveBeenCalledWith(
+      'none',
+      7,
+      35,
+      expect.any(Function),
+      expect.any(Function),
+      'edge',
+      expect.any(Object),
+    );
+    expect(dg.read('questionsCache', 'edge')['84532'].questionResponsesLatestBlock).toBe(35);
+    subject._responseHydrationController.destroy();
+  });
+
   it('caches every survey responder in a block and keeps same-block edits ordered and idempotent', async () => {
     const surveyId = `0x${'1'.repeat(64)}`;
     const questionId = `0x${'2'.repeat(64)}`;
@@ -4458,7 +4525,7 @@ describe('AppShell route render smoke', () => {
     const questions = dg.read('questionsCache', 'edge')['84532'];
     expect(survey.surveyResponses[surveyId]).toEqual({ [first]: { answer: 'edited' }, [second]: { answer: 'second' } });
     expect(questions.questionResponses[questionId]).toEqual(survey.surveyResponses[surveyId]);
-    expect(survey.surveyResponsesLatestBlock[surveyId]).toBe(30);
+    expect(survey.surveyResponsesLatestBlock[surveyId]).toBeUndefined();
     const before = JSON.stringify([...dg.store]);
     const revisions = subject.queueLocalRevisionUpdate.mock.calls.length;
     await subject.onNewSurveyEventDetectedForGroup('edge', edit);

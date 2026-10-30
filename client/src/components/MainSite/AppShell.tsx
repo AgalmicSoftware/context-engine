@@ -3866,8 +3866,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       const bn = Number(eventBlockNumber || 0);
       const incomingResponseRecency = { bn, txi: eventTransactionIndex, li: eventLogIndex, ts: eventTimestamp };
 
-      // A scan watermark is shared by responders; only this responder's event
-      // position can decide whether its payload is newer.
+      // Live events update responder recency only. Advancing a shared scan
+      // watermark here would skip unresolved payloads before this event.
       if (surveyIdFromEvent && surveyIdFromEvent !== ethers.constants.HashZero.toLowerCase()) {
         const previous =
           currentSurveyNetworkCache.surveyResponsesMeta?.[surveyIdFromEvent]?.[responderAddressLower] || {};
@@ -3967,7 +3967,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           if (!isMainSiteRecord(targetNet.surveyResponses)) targetNet.surveyResponses = {};
           if (!isMainSiteRecord(targetNet.surveyResponsesMeta)) targetNet.surveyResponsesMeta = {};
           if (!isMainSiteRecord(targetNet.surveyResponsesLatestBlock)) targetNet.surveyResponsesLatestBlock = {};
-          const currentWatermark = Number(targetNet.surveyResponsesLatestBlock[surveyIdFromEvent]) || 0;
           const existingMeta = targetNet.surveyResponsesMeta?.[surveyIdFromEvent]?.[responderAddressLower] || {};
           if (isResponseRecencyNewer(incomingResponseRecency, existingMeta)) {
             if (!isMainSiteRecord(targetNet.surveyResponses[surveyIdFromEvent])) {
@@ -3977,10 +3976,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
             const surveyMeta = targetNet.surveyResponsesMeta![surveyIdFromEvent] || {};
             surveyMeta[responderAddressLower] = incomingResponseRecency;
             targetNet.surveyResponsesMeta![surveyIdFromEvent] = surveyMeta;
-            targetNet.surveyResponsesLatestBlock[surveyIdFromEvent] = Math.max(
-              currentWatermark,
-              Number(eventBlockNumber) || 0,
-            );
             surveyResponsePersisted = true;
           }
           next[networkID] = targetNet;
@@ -4005,12 +4000,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
             targetNet.questionResponsesMeta[qId]![responderAddressLower] = incomingResponseRecency;
             questionResponsePersisted = true;
           });
-          if (questionResponsePersisted) {
-            targetNet.questionResponsesLatestBlock = Math.max(
-              Number(targetNet.questionResponsesLatestBlock) || initialLastBlockDefault,
-              bn,
-            );
-          }
           next[networkID] = targetNet;
           return next;
         });
