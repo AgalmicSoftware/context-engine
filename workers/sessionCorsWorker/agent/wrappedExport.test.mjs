@@ -1,3 +1,4 @@
+import { agentOnlyRunResponseCoverage } from './wrappedEvidence.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { csvEscape, rowsToCsv, rowsToJsonl } from './wrappedExport.mjs';
@@ -23,4 +24,21 @@ test('research CSV quotes every cell and preserves existing non-string serializa
 test('research JSONL keeps participant text exact', () => {
   const rows = [{ text: '=1+1', note: '\rwith\n"quotes"', number: -5 }, { text: '@x' }];
   assert.deepEqual(rowsToJsonl(rows).split('\n').map(line => JSON.parse(line)), rows);
+});
+
+
+test('run completion counts distinct accepted answers and privacy skips without replay rows', () => {
+  const base = { runStatementIds: ['a', 'b'], createdAt: '2026-10-29T00:00:00.000Z' };
+  const answer = { ...base, questionId: 'a', eventKind: 'answer', answer: { value: 'agree' }, requestId: 'first' };
+  const skip = { ...base, questionId: 'b', eventKind: 'privacy_protective_skip', requestId: 'second' };
+  const incomplete = agentOnlyRunResponseCoverage([answer, { ...skip, replay: true }]);
+  assert.equal(incomplete.agentResponseCount, 1);
+  assert.equal(incomplete.allStatementsCovered, false);
+  const complete = agentOnlyRunResponseCoverage([answer, answer, skip,
+    { ...answer, questionId: 'later', createdAt: '2026-10-30T00:00:00.000Z' }]);
+  assert.equal(complete.statementCount, 2);
+  assert.equal(complete.agentPredictionCount, 1);
+  assert.equal(complete.privacySkipCount, 1);
+  assert.equal(complete.agentResponseCount, 2);
+  assert.equal(complete.allStatementsCovered, true);
 });

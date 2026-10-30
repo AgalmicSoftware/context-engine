@@ -70,7 +70,20 @@ export const dispatchWrappedResearch = (coordinator, payload) => coordinator.ser
   const base = state.value || record.initialState;
   if (!base || !record.changes || typeof record.changes !== 'object') return reply({ ok: false, reason: 'wrapped_state_invalid' }, 400);
   let value;
+  let events = record.events;
   if (record.kind === 'answers') {
+    const runScopes = [...(base.runScopes || [])];
+    events = record.events.map(event => {
+      const runId = event.value.runId;
+      // Freeze membership in the serialized commit, so overlapping batches and
+      // later catalog edits cannot change a run's historical denominator.
+      let scope = runScopes.find(entry => entry.runId === runId);
+      if (!scope) {
+        scope = { runId, runStatementIds: event.value.runStatementIds };
+        runScopes.push(scope);
+      }
+      return { ...event, value: { ...event.value, runStatementIds: scope.runStatementIds } };
+    });
     const byStatement = { ...base.byStatement };
     for (const [id, change] of Object.entries(record.changes)) {
       byStatement[id] = { ...byStatement[id], agent: change.agent, agentSkip: change.agentSkip };
@@ -80,11 +93,11 @@ export const dispatchWrappedResearch = (coordinator, payload) => coordinator.ser
       if (entry.agent) counts.answers++;
       if (entry.agentSkip) counts.skips++;
     }
-    value = { ...base, byStatement, counts, updatedAt: record.createdAt };
+    value = { ...base, byStatement, runScopes, counts, updatedAt: record.createdAt };
   } else value = { ...base, ...record.changes, updatedAt: record.createdAt };
   value.recentRequestIds = [...(base.recentRequestIds || []).filter(entry => entry.requestId !== record.requestId),
     { requestId: record.requestId, summaryHash: record.summaryHash, at: record.createdAt }].slice(-MAX_RECENT_REQUEST_IDS);
-  const pending = { summaryHash: record.summaryHash, events: record.events, stateMetadata: record.stateMetadata,
+  const pending = { summaryHash: record.summaryHash, events, stateMetadata: record.stateMetadata,
     response: record.response, complete: false };
   if (record.kind === 'answers') pending.stateMetadata = { ...pending.stateMetadata, a: value.counts.answers, s: value.counts.skips };
   state = { ...state, value, pending: requestKey };

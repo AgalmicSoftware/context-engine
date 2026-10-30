@@ -305,6 +305,7 @@ export async function submitAgentOnlyAnswersBulk({
       agentMetadata: metadata.value,
       instructionsVersion: AGENT_ONLY_INSTRUCTIONS_VERSION,
       runId,
+      runStatementIds: materialized.space.statements.map(statement => statement.statement_id),
       requestId,
       semanticFingerprint,
       createdAt,

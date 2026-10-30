@@ -3,8 +3,7 @@ import { safeString, lower, safeJsonParse, nowIsoOrCurrent as nowIso, sanitizeSe
 import { loadSubmittedResultRecords, selectCurrentSubmittedAnswers } from './submittedResults.mjs';
 import { AGENT_ONLY_ANSWER_EVENT_KV_PREFIX, AGENT_ONLY_ANSWER_STATE_KV_PREFIX, AGENT_ONLY_VOTE_EVENT_KV_PREFIX, AGENT_ONLY_HUMAN_VOTE_EVENT_KV_PREFIX, AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX, AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX, AGENT_ONLY_PRINCIPAL_ID_SALT, hmacSha256Hex, normalizeAgentOnlyRunId } from './wrappedCore.mjs';
 import { loadWrappedStatements } from './wrappedStatements.mjs';
-import { loadAnswerState } from './wrappedAnswers.mjs';
-import { agentOnlyResponseCoverage } from './wrappedEvidence.mjs';
+import { agentOnlyRunResponseCoverage } from './wrappedEvidence.mjs';
 import { WRAPPED_QUESTION_SOURCE_MODES } from './wrappedQuestionSource.mjs';
 import { normalizeTokenCount, normalizeDailyTokenUsage, normalizeTokenUsageDates } from './wrappedMetadata.mjs';
 import { reviewStatusForCurrentAgentAnswer } from './wrappedReview.mjs';
@@ -296,7 +295,6 @@ export async function exportAgentOnlyData({
     const entries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX}${slug}:`);
     const principalRows = new Map();
     const runRows = new Map();
-    const subjects = new Map();
     let firstAttemptAt = '';
     let latestAttemptAt = '';
     let includedAttemptEventCount = 0;
@@ -320,7 +318,6 @@ export async function exportAgentOnlyData({
           latest_attempt_at: createdAt,
         });
       }
-      subjects.set(principalId, record.telegramUserId);
       const principal = principalRows.get(principalId);
       principal.attempt_event_count += 1;
       if (createdAt && (!principal.first_attempt_at || createdAt < principal.first_attempt_at)) principal.first_attempt_at = createdAt;
@@ -350,20 +347,20 @@ export async function exportAgentOnlyData({
 
       if (stage === 'wrapped_image' && record.ok === true) run.wrapped_image_ok = true;
     }
-    const states = new Map();
-    let space = {};
-    if (runRows.size) {
-      const materialized = await loadWrappedStatements({ env, sessionSlug: slug });
-      if (!materialized.ok) return materialized;
-      space = materialized.space;
-      for (const [principalId, telegramUserId] of subjects) {
-        states.set(principalId, await loadAnswerState({ env, sessionSlug: slug, telegramUserId }));
-      }
+    const answerEventsByRun = new Map();
+    const answerEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_EVENT_KV_PREFIX}${slug}:`);
+    for (const entry of answerEntries) {
+      const event = await readKvJson(env, entry.key);
+      if (!event || event.replay === true) continue;
+      const principalId = await agentOnlyPrincipalId(env, event.telegramUserId);
+      const key = `${principalId}\t${normalizeAgentOnlyRunId(event.runId) || 'unknown'}`;
+      if (!answerEventsByRun.has(key)) answerEventsByRun.set(key, []);
+      answerEventsByRun.get(key).push(event);
     }
     const runs = [...runRows.values()].map((run) => {
-      // Attempts describe traffic; only the image gate's stored coverage can
-      // establish completion, including accepted privacy-protective skips.
-      const coverage = agentOnlyResponseCoverage(space, states.get(run.principal_id), { runId: run.run_id });
+      // Attempts describe traffic. Accepted events retain each run independently
+      // of subsequent answers and the current catalog.
+      const coverage = agentOnlyRunResponseCoverage(answerEventsByRun.get(`${run.principal_id}\t${run.run_id}`) || []);
       const answerComplete = coverage.allStatementsCovered;
       return {
         ...run,

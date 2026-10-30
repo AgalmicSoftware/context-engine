@@ -400,3 +400,33 @@ for (const revised of [false, true]) test(`research exports retain canonical ans
   assert.deepEqual(await exported('gold'), gold);
   assert.deepEqual(await exported('wide'), wide);
 });
+
+test('research summaries retain each run own answers and original statement set', async () => {
+  const { f, coordinated, questions } = readableFixture();
+  let time = Date.now(); coordinated.coordinator.now = () => time;
+  const member = await memberToken(f);
+  const admin = await f.credential({ scopes: ['read_questions'] });
+  const statements = async () => (await jsonOk(await f.request('/api/agent/agent-only/statements', { token: member }))).statements;
+  const send = async (runId, requestId, ids) => {
+    const page = await statements(); time += 1000;
+    return jsonOk(await f.request('/api/agent/agent-only/answers/bulk', { method: 'POST', token: member,
+      body: { run_id: runId, request_id: requestId, agent_metadata: metadata,
+        answers: page.filter(q => ids.includes(q.statement_id)).map(q => ({ statement_id: q.statement_id,
+          statement_version: q.statement_version, answer: { value: 'agree' }, confidence: 80 })) } }));
+  };
+  const summary = async () => (await jsonOk(await f.request('/api/agent/admin/agent-only/export?view=summary&format=json', { token: admin.token }))).runs
+    .map(run => [run.run_id, run.agent_response_count, run.statement_count, run.answer_complete]).sort();
+  await send('run-one', 'first', [openQ, gatedQ]);
+  await send('run-two', 'second', [openQ]);
+  assert.deepEqual(await summary(), [['run-one', 2, 2, true], ['run-two', 1, 2, false]]);
+  const addedQ = `0x${'c'.repeat(64)}`;
+  questions.set('later-ref', { questionId: addedQ, sessionSlug: 'fixture', prompt: 'Added after both runs', questionType: 'binary' });
+  assert.equal((await statements()).length, 3);
+  assert.deepEqual(await summary(), [['run-one', 2, 2, true], ['run-two', 1, 2, false]]);
+  await send('run-one', 'later-edit', [openQ]);
+  assert.deepEqual(await summary(), [['run-one', 2, 2, true], ['run-two', 1, 2, false]]);
+  await send('run-three', 'third', [openQ]);
+  assert.deepEqual(await summary(), [['run-one', 2, 2, true], ['run-three', 1, 3, false], ['run-two', 1, 2, false]]);
+  const events = [...f.records.entries()].filter(([key]) => key.includes('answer-event:')).map(([, value]) => JSON.parse(value));
+  assert.ok(events.filter(event => event.runId === 'run-one').every(event => event.runStatementIds.length === 2));
+});

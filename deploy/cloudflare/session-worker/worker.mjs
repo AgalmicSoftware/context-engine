@@ -33072,7 +33072,8 @@ var init_redaction = __esm({
     ]);
     SAFE_HASH_VALUE_CONTAINER_KEYS = /* @__PURE__ */ new Set([
       "numbertoquestionid",
-      "legacycursorstatementids"
+      "legacycursorstatementids",
+      "runstatementids"
     ]);
     SAFE_AUTHORITY_METADATA_KEYS = /* @__PURE__ */ new Set([
       "privatekeyauthority",
@@ -67703,7 +67704,18 @@ var init_wrappedJournal = __esm({
       const base = state.value || record3.initialState;
       if (!base || !record3.changes || typeof record3.changes !== "object") return reply3({ ok: false, reason: "wrapped_state_invalid" }, 400);
       let value;
+      let events = record3.events;
       if (record3.kind === "answers") {
+        const runScopes = [...base.runScopes || []];
+        events = record3.events.map((event) => {
+          const runId = event.value.runId;
+          let scope = runScopes.find((entry2) => entry2.runId === runId);
+          if (!scope) {
+            scope = { runId, runStatementIds: event.value.runStatementIds };
+            runScopes.push(scope);
+          }
+          return { ...event, value: { ...event.value, runStatementIds: scope.runStatementIds } };
+        });
         const byStatement = { ...base.byStatement };
         for (const [id2, change] of Object.entries(record3.changes)) {
           byStatement[id2] = { ...byStatement[id2], agent: change.agent, agentSkip: change.agentSkip };
@@ -67713,7 +67725,7 @@ var init_wrappedJournal = __esm({
           if (entry2.agent) counts.answers++;
           if (entry2.agentSkip) counts.skips++;
         }
-        value = { ...base, byStatement, counts, updatedAt: record3.createdAt };
+        value = { ...base, byStatement, runScopes, counts, updatedAt: record3.createdAt };
       } else value = { ...base, ...record3.changes, updatedAt: record3.createdAt };
       value.recentRequestIds = [
         ...(base.recentRequestIds || []).filter((entry2) => entry2.requestId !== record3.requestId),
@@ -67721,7 +67733,7 @@ var init_wrappedJournal = __esm({
       ].slice(-MAX_RECENT_REQUEST_IDS);
       const pending = {
         summaryHash: record3.summaryHash,
-        events: record3.events,
+        events,
         stateMetadata: record3.stateMetadata,
         response: record3.response,
         complete: false
@@ -89432,6 +89444,15 @@ function agentOnlyResponseCoverage(space = {}, state = {}, { runId = "" } = {}) 
     allStatementsCovered: statementIds.size > 0 && agentResponseCount >= statementIds.size
   };
 }
+function agentOnlyRunResponseCoverage(events = []) {
+  const accepted = events.filter((event) => event.replay !== true && ["answer", "privacy_protective_skip"].includes(event.eventKind)).sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)) || safeString(left.requestId).localeCompare(safeString(right.requestId)));
+  const ids = Array.isArray(accepted[0]?.runStatementIds) ? accepted[0].runStatementIds : [];
+  const byStatement = /* @__PURE__ */ Object.create(null);
+  for (const event of accepted) {
+    byStatement[event.questionId] = event.eventKind === "privacy_protective_skip" ? { agentSkip: event } : { agent: event };
+  }
+  return agentOnlyResponseCoverage({ statements: ids.map((statement_id) => ({ statement_id })) }, { byStatement });
+}
 function wrappedAnswerFormatForSchema(schema = {}) {
   const kind = safeString(schema?.kind);
   if (kind === "text") return "freeform text";
@@ -89878,6 +89899,7 @@ async function submitAgentOnlyAnswersBulk({
       agentMetadata: metadata.value,
       instructionsVersion: AGENT_ONLY_INSTRUCTIONS_VERSION,
       runId,
+      runStatementIds: materialized.space.statements.map((statement) => statement.statement_id),
       requestId,
       semanticFingerprint,
       createdAt
@@ -91311,7 +91333,6 @@ async function exportAgentOnlyData({
     const entries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX}${slug}:`);
     const principalRows = /* @__PURE__ */ new Map();
     const runRows = /* @__PURE__ */ new Map();
-    const subjects = /* @__PURE__ */ new Map();
     let firstAttemptAt = "";
     let latestAttemptAt = "";
     let includedAttemptEventCount = 0;
@@ -91335,7 +91356,6 @@ async function exportAgentOnlyData({
           latest_attempt_at: createdAt
         });
       }
-      subjects.set(principalId, record3.telegramUserId);
       const principal = principalRows.get(principalId);
       principal.attempt_event_count += 1;
       if (createdAt && (!principal.first_attempt_at || createdAt < principal.first_attempt_at)) principal.first_attempt_at = createdAt;
@@ -91363,18 +91383,18 @@ async function exportAgentOnlyData({
       const stage = safeString(record3.stage);
       if (stage === "wrapped_image" && record3.ok === true) run.wrapped_image_ok = true;
     }
-    const states = /* @__PURE__ */ new Map();
-    let space = {};
-    if (runRows.size) {
-      const materialized = await loadWrappedStatements({ env, sessionSlug: slug });
-      if (!materialized.ok) return materialized;
-      space = materialized.space;
-      for (const [principalId, telegramUserId] of subjects) {
-        states.set(principalId, await loadAnswerState({ env, sessionSlug: slug, telegramUserId }));
-      }
+    const answerEventsByRun = /* @__PURE__ */ new Map();
+    const answerEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_EVENT_KV_PREFIX}${slug}:`);
+    for (const entry2 of answerEntries) {
+      const event = await readKvJson2(env, entry2.key);
+      if (!event || event.replay === true) continue;
+      const principalId = await agentOnlyPrincipalId(env, event.telegramUserId);
+      const key = `${principalId}	${normalizeAgentOnlyRunId(event.runId) || "unknown"}`;
+      if (!answerEventsByRun.has(key)) answerEventsByRun.set(key, []);
+      answerEventsByRun.get(key).push(event);
     }
     const runs = [...runRows.values()].map((run) => {
-      const coverage = agentOnlyResponseCoverage(space, states.get(run.principal_id), { runId: run.run_id });
+      const coverage = agentOnlyRunResponseCoverage(answerEventsByRun.get(`${run.principal_id}	${run.run_id}`) || []);
       const answerComplete = coverage.allStatementsCovered;
       return {
         ...run,

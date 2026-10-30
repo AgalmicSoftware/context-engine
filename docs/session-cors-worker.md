@@ -10,6 +10,12 @@ credentials.
 
 It also exposes canonical session storage routes for future backend routing: `POST /storage/upload`, `GET|POST /storage/read`, `GET|POST /storage/list`, and the authorization-gated `GET|POST /storage/export-envelopes`. `/arweave/upload` remains supported for compatibility.
 
+Research summary completion is calculated from each run's distinct accepted
+answer and privacy-skip events. The first accepted batch fixes that run's
+statement set in the durable journal. Subsequent runs, overlapping batches,
+request replays, edits and later question additions cannot rewrite earlier
+completion counts. Attempts remain traffic records and do not inflate coverage.
+
 ## Agent HTTP client handoff
 
 Each session has one continuous Wrapped space. There is no opening action,

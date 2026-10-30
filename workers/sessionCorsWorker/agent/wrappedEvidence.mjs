@@ -214,6 +214,20 @@ export function agentOnlyResponseCoverage(space = {}, state = {}, { runId = '' }
   };
 }
 
+export function agentOnlyRunResponseCoverage(events = []) {
+  const accepted = events.filter(event => event.replay !== true &&
+    ['answer', 'privacy_protective_skip'].includes(event.eventKind))
+    .sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)) ||
+      safeString(left.requestId).localeCompare(safeString(right.requestId)));
+  const ids = Array.isArray(accepted[0]?.runStatementIds) ? accepted[0].runStatementIds : [];
+  const byStatement = Object.create(null);
+  for (const event of accepted) {
+    byStatement[event.questionId] = event.eventKind === 'privacy_protective_skip'
+      ? { agentSkip: event } : { agent: event };
+  }
+  return agentOnlyResponseCoverage({ statements: ids.map(statement_id => ({ statement_id })) }, { byStatement });
+}
+
 export function wrappedAnswerFormatForSchema(schema = {}) {
   const kind = safeString(schema?.kind);
   if (kind === 'text') return 'freeform text';

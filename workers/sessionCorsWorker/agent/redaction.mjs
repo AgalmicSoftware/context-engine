@@ -16,6 +16,7 @@ const SAFE_HASH_VALUE_KEYS = new Set([
 const SAFE_HASH_VALUE_CONTAINER_KEYS = new Set([
   'numbertoquestionid',
   'legacycursorstatementids',
+  'runstatementids',
 ]);
 const SAFE_AUTHORITY_METADATA_KEYS = new Set([
   'privatekeyauthority',
