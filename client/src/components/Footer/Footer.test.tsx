@@ -12,7 +12,6 @@ import styles from './Footer.module.scss';
 import { applyResolvedTheme } from '../../utilities/ui/themeRuntime';
 
 jest.mock('../../actions/sessionStateActions.js', () => ({
-  changeFocusedTab: jest.fn(() => ({ type: 'CHANGE_FOCUSED_TAB' })),
   toggleLoginModal: jest.fn(() => ({ type: 'TOGGLE_LOGIN_MODAL' })),
 }));
 

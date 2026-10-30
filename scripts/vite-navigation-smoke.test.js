@@ -45,6 +45,13 @@ test('default navigation smoke covers session modes, Docs, its legacy contracts 
   assert.equal(DEFAULT_ROUTE_TEXT['/benchmarks'], undefined);
 });
 
+test('default navigation smoke checks removed standalone pages use the normal not-found view', () => {
+  for (const route of ['/debate', '/beta', '/contributors', '/matrix', '/demos']) {
+    assert.ok(DEFAULT_ROUTES.includes(route));
+    assert.deepEqual(DEFAULT_ROUTE_TEXT[route], ['Page not found', `Path: ${route}`]);
+  }
+});
+
 test('session mode probe selects both supported presets', async () => {
   const selected = new Map();
   const presetIds = ['fast_cheap_cloudflare', 'trustless_public_decentralized'];
@@ -128,8 +135,8 @@ test('demo interview ready fixture requires the explicit Worker discovery route'
   assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=recordGroup&worker=${worker}`), false);
 });
 
-test('both session setup aliases receive the pinned demo cache fixture in local smoke', async () => {
-  for (const route of ['/new', '/session/new', '/session/new?mode=interview']) {
+test('setup, removed standalone pages, and shared demo views receive the pinned default-cache fixture locally', async () => {
+  for (const route of ['/new', '/session/new', '/session/new?mode=interview', '/debate', '/beta', '/contributors', '/matrix', '/demos', '/atlas', '/atlas/scenario', '/su/Franklin']) {
     const handlers = [];
     await installDemoWorkerFixtureRoutes({ route: async (pattern, handler) => handlers.push({ pattern, handler }) },
       'http://127.0.0.1:4173', route);
@@ -137,12 +144,19 @@ test('both session setup aliases receive the pinned demo cache fixture in local 
     assert.equal(handlers[0].pattern, 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?*');
     let response;
     await handlers[0].handler({
-      request: () => ({ url: () => 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?resource=questions&limit=100' }),
+      request: () => ({ method: () => 'GET', url: () => 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?resource=questions&limit=100' }),
       fulfill: async (value) => { response = value; },
       fallback: async () => assert.fail('the pinned question list should use the fixture'),
     });
     assert.equal(response.status, 200);
     assert.deepEqual(JSON.parse(response.body), { items: [], listComplete: true });
+    let fellBack = false;
+    await handlers[0].handler({
+      request: () => ({ method: () => 'POST', url: () => 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?resource=questions' }),
+      fulfill: async () => assert.fail('the default-cache fixture must not intercept writes'),
+      fallback: async () => { fellBack = true; },
+    });
+    assert.equal(fellBack, true);
   }
   assert.equal(DEFAULT_ROUTE_PROBES['/session/new'], probeSessionModePresets);
 });

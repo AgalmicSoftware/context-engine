@@ -106,10 +106,7 @@ Core routes:
 - `/admin`: Session admin UI (registry and worker tests; sessionId query supported).
 - `/sponsor`: Sponsor page for generating grant-backed sponsored-bundle links into the Session Wizard.
 - `/bookmarks`: Bookmarked surveys/questions/SBTs/users.
-- `/debate`: Experimental stub for an older debate/discussion surface; not part of the supported public surface in this build.
 - `/atlas` and `/tag/...`: Debate map / AI Policy Atlas demo surface.
-- `/matrix`: Risk matrix demo view.
-- `/demos`: Demo sessions launcher (`/agent` also exists as a dev-only route).
 - `/benchmarks`: Static benchmark index and interactive report viewer. Bundled
   manifests identify each artifact as either a development preview or a
   released result; the report itself runs in a sandboxed iframe.
@@ -123,6 +120,7 @@ Core routes:
 - `/su/:username`: Simulated historical-user profile view used by demo/atlas surfaces.
 - `/compare/...`: Address comparison view.
 - `/about`: About page.
+- `/agent`: Development-only agent page.
 
 ## Feature Inventory (Current App Capabilities)
 
@@ -137,7 +135,7 @@ The home route (`/`) is tab-based and functions as the app's main "portal":
 Legacy note:
 - `Votes` is no longer a current top-level home tab.
 - `Community` is still a current home tab, and Polis-style reports are still current embedded results surfaces.
-- The remaining older demo-oriented surface is Atlas / debate-map UI, while `/debate` itself is currently an experimental stub.
+- Atlas / debate-map UI, simulated profiles, and demo-session views remain available.
 
 ### 1) Sessions (Spaces)
 
@@ -407,7 +405,8 @@ Deep-dive docs:
 
 This repo still includes an older Atlas / debate-map demo surface alongside the primary session, survey, and SBT workflows.
 That remaining surface is mainly `/atlas`, `/tag/...`, and embedded debate-map UI inside demo session results.
-The older `/debate` path itself is currently an experimental stub rather than a supported public feature.
+The home Tools surface and embedded session views also retain the shared risk matrix.
+Removed standalone pages use the normal unknown-route behavior.
 
 Intent for these features:
 - Either retire them cleanly (if no longer needed), or explicitly scope and bring them back under test.

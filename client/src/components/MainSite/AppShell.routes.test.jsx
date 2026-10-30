@@ -1994,9 +1994,9 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByText((_, node) => node?.textContent === 'Path: /telegram-demo-setup')).toBeInTheDocument();
   });
 
-  it.each([['/debate', /Debate view is not part of the supported public surface yet\./i]])(
-    'renders the experimental stub for %s without waiting for cache bootstrap',
-    async (path, descriptionMatcher) => {
+  it.each(['/debate', '/beta', '/contributors', '/matrix', '/demos'])(
+    'renders the normal not-found view for removed page %s without waiting for cache bootstrap',
+    async (path) => {
       const subject = createSubject({ path });
       subject.state = {
         ...subject.state,
@@ -2011,8 +2011,8 @@ describe('AppShell route render smoke', () => {
 
       render(subject.render());
 
-      expect(await screen.findByRole('heading', { name: /this feature is in development/i })).toBeInTheDocument();
-      expect(screen.getByText(descriptionMatcher)).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+      expect(screen.getByText(`Path: ${path}`)).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/');
     },
   );
@@ -3137,15 +3137,15 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByTestId('mock-sbt-create-page')).toHaveAttribute('data-session-slug', 'edge');
   });
 
-  it('does not access window directly while rendering atlas and stubbed experimental routes', () => {
-    const debateSubject = createSubject({ path: '/debate' });
+  it('does not access window directly while rendering atlas, tag, and unknown routes', () => {
+    const unknownSubject = createSubject({ path: '/missing-page' });
     const atlasSubject = createSubject({ path: '/atlas' });
     const tagSubject = createSubject({ path: '/tag/governance' });
     const originalWindow = global.window;
 
     try {
       delete global.window;
-      expect(() => debateSubject.render()).not.toThrow();
+      expect(() => unknownSubject.render()).not.toThrow();
       expect(() => atlasSubject.render()).not.toThrow();
       expect(() => tagSubject.render()).not.toThrow();
     } finally {

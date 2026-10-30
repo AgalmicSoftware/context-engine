@@ -20,6 +20,11 @@ const DEFAULT_ROUTES = Object.freeze([
   '/docs',
   '/contracts',
   '/benchmarks',
+  '/debate',
+  '/beta',
+  '/contributors',
+  '/matrix',
+  '/demos',
 ]);
 const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/session/new': ['Session Setup'],
@@ -31,6 +36,11 @@ const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/about': ['Context Engine'],
   '/docs': ['Docs'],
   '/contracts': ['Docs'],
+  '/debate': ['Page not found', 'Path: /debate'],
+  '/beta': ['Page not found', 'Path: /beta'],
+  '/contributors': ['Page not found', 'Path: /contributors'],
+  '/matrix': ['Page not found', 'Path: /matrix'],
+  '/demos': ['Page not found', 'Path: /demos'],
 });
 const DEFAULT_LAYOUT_PROBE_SELECTORS = Object.freeze([
   '[data-testid="ce-survey-submit"]',
@@ -88,8 +98,11 @@ function isSessionSetupRoute(route) {
 }
 
 function shouldInstallDemoWorkerFixture(baseUrl, route) {
+  const pathname = String(route || '').split(/[?#]/, 1)[0];
   return isLocalSmokeBaseUrl(baseUrl) &&
-    (isSessionSetupRoute(route) || String(route || '').startsWith('/session/demo'));
+    (isSessionSetupRoute(route) || pathname.startsWith('/session/demo') ||
+      ['/debate', '/beta', '/contributors', '/matrix', '/demos', '/atlas'].includes(pathname) ||
+      pathname.startsWith('/atlas/') || pathname.startsWith('/su/'));
 }
 
 async function installLocalSmokeFixtureRoutes(page, baseUrl, route = '') {
@@ -200,11 +213,11 @@ function buildDemoReadyInterviewConfig() {
 async function installDemoWorkerFixtureRoutes(page, baseUrl, route) {
   if (!shouldInstallDemoWorkerFixture(baseUrl, route) || !DEMO_READY_WORKER_ORIGIN) return;
 
-  // Demo routes use local questions; setup aliases also warm the unrelated default demo cache.
-  // Its pinned Worker can reject loopback origins, so isolate only these local smoke reads.
+  // Setup, unknown-page checks, and shared demo views also warm the default demo cache.
+  // Isolate its pinned read endpoint so local navigation checks stay independent of live data.
   // Non-local base URLs still exercise the real Worker/CORS path.
   await page.route(`${DEMO_READY_WORKER_ORIGIN}/storage/list?*`, (requestRoute) => {
-    if (!isDemoStorageListFixtureRequest(requestRoute.request().url())) {
+    if (requestRoute.request().method() !== 'GET' || !isDemoStorageListFixtureRequest(requestRoute.request().url())) {
       return requestRoute.fallback();
     }
     return requestRoute.fulfill({

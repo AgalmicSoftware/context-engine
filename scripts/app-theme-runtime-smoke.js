@@ -43,7 +43,6 @@ const ROUTE_CASES = Object.freeze([
     label: 'tag related-chip surface',
     requiresReadableTagRelatedChips: true,
   },
-  { path: '/demos', label: 'demo surface' },
   {
     path: '/session/demo-sh',
     label: 'session question surface',

@@ -26,11 +26,7 @@ import {
   composeMainSiteSurveyCacheViewProps,
   composeMainSiteWalletViewProps,
 } from './mainSiteViewProps.js';
-import {
-  ExperimentalStub as ExperimentalStubRaw,
-  NotFoundRoute as NotFoundRouteRaw,
-  removeHashQueryParam,
-} from './routeStatusViews';
+import { NotFoundRoute as NotFoundRouteRaw, removeHashQueryParam } from './routeStatusViews';
 import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE } from './routeConfig.js';
 import { resolveMainSiteRouteMatch } from './routeTable.js';
 import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
@@ -86,9 +82,7 @@ import {
   BookmarksPage as BookmarksPageRaw,
   CompareAddresses as CompareAddressesRaw,
   DocsPage as DocsPageRaw,
-  DemosIndex as DemosIndexRaw,
   OnePageSession as OnePageSessionRaw,
-  RiskMatrixDemo as RiskMatrixDemoRaw,
   SBTPage as SBTPageRaw,
   SBTsPage as SBTsPageRaw,
   SessionDocumentsPage as SessionDocumentsPageRaw,
@@ -135,7 +129,6 @@ const MainAreaTabs = asMainSiteRouteComponent(MainAreaTabsRaw);
 const RightSide = asMainSiteRouteComponent(RightSideRaw);
 const LazyFallback = asMainSiteRouteComponent(LazyFallbackRaw);
 const InitialRouteBoundary = asMainSiteRouteComponent(InitialRouteBoundaryRaw);
-const ExperimentalStub = asMainSiteRouteComponent(ExperimentalStubRaw);
 const NotFoundRoute = asMainSiteRouteComponent(NotFoundRouteRaw);
 const AboutPage = asMainSiteRouteComponent(AboutPageRaw);
 const AdminPage = asMainSiteRouteComponent(AdminPageRaw);
@@ -146,9 +139,7 @@ const DebateMap = asMainSiteRouteComponent(DebateMapRaw);
 const BookmarksPage = asMainSiteRouteComponent(BookmarksPageRaw);
 const CompareAddresses = asMainSiteRouteComponent(CompareAddressesRaw);
 const DocsPage = asMainSiteRouteComponent(DocsPageRaw);
-const DemosIndex = asMainSiteRouteComponent(DemosIndexRaw);
 const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
-const RiskMatrixDemo = asMainSiteRouteComponent(RiskMatrixDemoRaw);
 const SBTPage = asMainSiteRouteComponent(SBTPageRaw);
 const SBTsPage = asMainSiteRouteComponent(SBTsPageRaw);
 const SessionDocumentsPage = asMainSiteRouteComponent(SessionDocumentsPageRaw);
@@ -162,12 +153,6 @@ const UserPage = asMainSiteRouteComponent(UserPageRaw);
 
 export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) => ({
   workerCanonicalRoutes: getWorkerCanonicalRouteController(host),
-  _renderDebateRoute: (fullPath: string) => (
-    <InitialRouteBoundary resetKey={fullPath}>
-      <ExperimentalStub featureName="Debate view" path={fullPath} />
-    </InitialRouteBoundary>
-  ),
-
   _renderBookmarksRoute: () => (
     <InitialRouteBoundary fallback={<LazyFallback label="Loading Bookmarks..." />}>
       <div data-testid={E2E_TESTIDS.PAGE_BOOKMARKS_ROOT}>
@@ -184,24 +169,10 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     </InitialRouteBoundary>
   ),
 
-  _renderDemosRoute: () => (
-    <InitialRouteBoundary fallback={<div />}>
-      <DemosIndex />
-    </InitialRouteBoundary>
-  ),
-
   _renderBenchmarksRoute: () => (
     <Suspense fallback={<LazyFallback label="Loading benchmarks..." minHeight="60vh" />}>
       <BenchmarksPage />
     </Suspense>
-  ),
-
-  _renderMatrixRoute: () => (
-    <InitialRouteBoundary fallback={<LazyFallback label="Loading..." />}>
-      <div data-testid={E2E_TESTIDS.PAGE_MATRIX_ROOT}>
-        <RiskMatrixDemo />
-      </div>
-    </InitialRouteBoundary>
   ),
 
   _renderAgentRoute: () => {
@@ -1447,7 +1418,6 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       renderers: {
         surveyId: () => host._renderSurveyIdRoute(ctx),
         home: () => host._renderHomeRoute(ctx),
-        debate: () => host._renderDebateRoute(fullPath),
         atlas: () => host._renderAtlasRoute(ctx),
         tag: () => host._renderTagRoute(ctx),
         bookmarks: () => host._renderBookmarksRoute(),
@@ -1461,9 +1431,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         userProfile: () => host._renderUserProfileRoute(ctx),
         about: () => host._renderAboutRoute(),
         posts: renderPostsRoute,
-        demos: () => host._renderDemosRoute(),
         benchmarks: () => host._renderBenchmarksRoute(),
-        matrix: () => host._renderMatrixRoute(),
         docs: () => host._renderDocsRoute(ctx),
         admin: () => host._renderAdminRoute(ctx),
         sponsor: () => host._renderSponsorRoute(ctx),

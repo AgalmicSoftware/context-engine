@@ -36,25 +36,6 @@ export const RouteStatusPage = ({ eyebrow = '', title = '', description = '', pa
   </div>
 );
 
-type ExperimentalStubProps = {
-  featureName?: string;
-  description?: string;
-  path?: string;
-};
-
-export const ExperimentalStub = ({
-  featureName = 'This feature',
-  description = '',
-  path = '',
-}: ExperimentalStubProps) => (
-  <RouteStatusPage
-    eyebrow="Experimental"
-    title="This feature is in development"
-    description={description || `${featureName} is not part of the supported public surface yet.`}
-    path={path}
-  />
-);
-
 export const NotFoundRoute = ({ path = '' }: { path?: string }) => (
   <RouteStatusPage
     eyebrow="404"

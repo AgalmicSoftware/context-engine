@@ -170,7 +170,6 @@ import {
 } from '../../utilities/cache/sessionCacheConstants.js';
 import { buildMainSiteCacheManagerReadyStatePatch } from '../../utilities/session/mainSiteUtils.js';
 import {
-  ExperimentalStub as ExperimentalStubRaw,
   NotFoundRoute as NotFoundRouteRaw,
   SessionLoadingSkeleton as SessionLoadingSkeletonRaw,
 } from './routeStatusViews';
@@ -260,7 +259,6 @@ const Footer = asMainSiteRouteComponent(FooterRaw);
 const LazyFallback = asMainSiteRouteComponent(LazyFallbackRaw);
 const DevE2eNav = asMainSiteRouteComponent(DevE2eNavRaw);
 const RouteErrorBoundary = asMainSiteRouteComponent(RouteErrorBoundaryRaw);
-const ExperimentalStub = asMainSiteRouteComponent(ExperimentalStubRaw);
 const NotFoundRoute = asMainSiteRouteComponent(NotFoundRouteRaw);
 const SessionLoadingSkeleton = asMainSiteRouteComponent(SessionLoadingSkeletonRaw);
 
@@ -4015,12 +4013,9 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
   // React routing
   _routeRenderers = createMainSiteRouteRenderers(this);
-  _renderDebateRoute = this._routeRenderers._renderDebateRoute;
   _renderBookmarksRoute = this._routeRenderers._renderBookmarksRoute;
   _renderAboutRoute = this._routeRenderers._renderAboutRoute;
-  _renderDemosRoute = this._routeRenderers._renderDemosRoute;
   _renderBenchmarksRoute = this._routeRenderers._renderBenchmarksRoute;
-  _renderMatrixRoute = this._routeRenderers._renderMatrixRoute;
   _renderAgentRoute = this._routeRenderers._renderAgentRoute;
   _renderSimUserRoute = this._routeRenderers._renderSimUserRoute;
   _renderAtlasRoute = this._routeRenderers._renderAtlasRoute;

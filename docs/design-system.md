@@ -508,7 +508,7 @@ npm run build
 
 The runtime Playwright smoke covers the home Welcome/Login and Community Stats
 surfaces, `/about`, `/session/new`, `/session/demo-sh`, a simulated-user profile,
-session Groups, `/docs`, `/demos`, and a not-found route at desktop and mobile
+session Groups, `/docs`, and a not-found route at desktop and mobile
 widths. It boots `classic-95`, switches to `context-engine`
 without reload, and verifies palette, typography, geometry, modal chrome,
 Session Wizard preview scope, Community Stats/tooltip contrast and data spread,

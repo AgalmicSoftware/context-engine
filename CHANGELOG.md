@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Remove the unused standalone `/debate`, `/beta`, `/contributors`, `/matrix`, and `/demos` pages and obsolete navigation. Preserve Atlas, simulated profiles, demo sessions, and the shared risk matrix.
+
 - Include catalog completeness in the interview compatibility fixture.
 
 - Complete mocked Lit provisioning checkpoints before testing atomic configuration writes.

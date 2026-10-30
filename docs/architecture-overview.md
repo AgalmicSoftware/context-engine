@@ -7,8 +7,13 @@ duplicating their full detail.
 Interactive disclosure headers, removable question-filter chips, sync refresh,
 user statistics, and the Debate Map suggestion close control use native buttons.
 Disclosures expose their expanded state and report sections retain their heading
-semantics. The standalone `/debate` route remains a public-surface placeholder;
-the Debate Map component's keyboard interactions are verified independently.
+semantics. The Debate Map remains available at `/atlas` and in demo session
+results; its keyboard interactions are verified independently.
+
+Standalone `/debate`, `/beta`, `/contributors`, `/matrix`, and `/demos` pages
+are removed and use the normal unknown-route view. Simulated profiles at
+`/su/...`, demo sessions and their `/session/demo/...` views remain available.
+The home Tools surface and embedded session views retain the shared risk matrix.
 
 ## Client Boundary Model
 

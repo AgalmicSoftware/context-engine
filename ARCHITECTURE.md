@@ -181,7 +181,7 @@ authority setup and content preservation follow
 | Account / login settings | `components/Account/LoginAndSettingsModal.tsx`, `LoginButton.tsx` |
 | Session wizard | `components/Sessions/SessionWizard.tsx` |
 | Session page shell | `components/OnePageSession/OnePageSession.tsx`; hosted agent access uses `OnePageSessionAgentShell.tsx`, `onePageSessionAgentController.ts`, and `onePageSessionAgentActions.ts` |
-| Demo-only views | `components/DemoViews/DemosIndex.tsx`, `RiskMatrixDemo.tsx`, `CorpusViewer.tsx`, `components/DemoViews/DemoAnalysis/`, `components/DemoViews/DebateHUD/` |
+| Shared demo-session views | `components/DemoViews/CorpusViewer.tsx`, `components/DemoViews/DemoAnalysis/`, `components/DemoViews/DebateHUD/` |
 | Document library | `components/DocumentLibrary/SessionDocumentsPage.tsx`, `DocumentLibraryPanel.tsx` |
 | Admin | `components/Admin/AdminPage.tsx` |
 | About page | `components/About/AboutPage.tsx` |
