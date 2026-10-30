@@ -2437,7 +2437,7 @@ class OnePageSession extends Component<any, any> {
           agentQuestionSubmitError={this.state.agentQuestionSubmitError}
           agentSessionMeta={this.state.agentSessionMeta}
           agentSubmittedQuestionIds={this.state.agentSubmittedQuestionIds}
-          agentSubmittingQuestionId={this.state.agentSubmittingQuestionId}
+          agentSubmittingQuestionIds={this.state.agentSubmittingQuestionIds}
           workerGroupSessionId={String(agentLoginTarget.sessionId || '')}
           workerGroupWorkerUrl={String(agentLoginTarget.workerUrl || '')}
           titleText={titleText}

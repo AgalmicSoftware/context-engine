@@ -38,7 +38,7 @@ export type OnePageSessionAgentState = {
   agentSessionMeta: AgentSessionMeta | null;
   agentSessionMetaStatus: string;
   agentSubmittedQuestionIds: string[];
-  agentSubmittingQuestionId: string;
+  agentSubmittingQuestionIds: Set<string>;
 };
 
 type AgentStatePatch = Partial<OnePageSessionAgentState>;
@@ -96,7 +96,7 @@ export const buildInitialAgentState = (
   agentQuestions: [],
   agentAnswerState: null,
   agentQuestionPileIndex: 0,
-  agentSubmittingQuestionId: '',
+  agentSubmittingQuestionIds: new Set<string>(),
   agentSubmittedQuestionIds: [],
   agentQuestionSubmitError: '',
   agentResultsStatus: 'idle',
@@ -315,13 +315,17 @@ export const createOnePageSessionAgentActions = ({
   const handleAgentQuestionSubmit = async (question: AgentQuestion, answer: AgentAnswerInput): Promise<void> => {
     if (disposed) return;
     const state = getState();
+    if (state.agentSubmittingQuestionIds.has(question.questionId)) return;
     const envelope = state.agentClientEnvelope;
     if (!ports.envelopeAllowsSubmit(envelope, state.agentSessionMeta)) {
       setState({ agentQuestionSubmitError: 'Submitting from the client is not enabled for this deployment yet.' });
       return;
     }
     const requestSnapshot = beginRequest('submit');
-    setState({ agentSubmittingQuestionId: question.questionId, agentQuestionSubmitError: '' });
+    setState((prev) => ({
+      agentSubmittingQuestionIds: new Set([...prev.agentSubmittingQuestionIds, question.questionId]),
+      agentQuestionSubmitError: '',
+    }));
     const result = await ports
       .submitAnswer({
         envelope,
@@ -337,16 +341,18 @@ export const createOnePageSessionAgentActions = ({
         handleAgentAuthFailure(result.reason);
       } else {
         setState((prev: Readonly<OnePageSessionAgentState>) => ({
-          agentSubmittingQuestionId:
-            prev.agentSubmittingQuestionId === question.questionId ? '' : prev.agentSubmittingQuestionId,
+          agentSubmittingQuestionIds: new Set(
+            [...prev.agentSubmittingQuestionIds].filter((id) => id !== question.questionId),
+          ),
           agentQuestionSubmitError: result.reason || 'Could not submit this answer.',
         }));
       }
       return;
     }
     setState((prev: Readonly<OnePageSessionAgentState>) => ({
-      agentSubmittingQuestionId:
-        prev.agentSubmittingQuestionId === question.questionId ? '' : prev.agentSubmittingQuestionId,
+      agentSubmittingQuestionIds: new Set(
+        [...prev.agentSubmittingQuestionIds].filter((id) => id !== question.questionId),
+      ),
       agentSubmittedQuestionIds: Array.from(new Set([...(prev.agentSubmittedQuestionIds || []), question.questionId])),
     }));
     void loadAgentData(true);

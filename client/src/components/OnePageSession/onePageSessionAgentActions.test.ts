@@ -1,3 +1,4 @@
+jest.mock('wagmi/actions', () => ({ disconnect: jest.fn() }));
 import { normalizeAgentQuestion } from '../../utilities/session/agentSessionData';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import {
@@ -196,16 +197,17 @@ it('keeps both answer POSTs alive and records both completions', async () => {
     normalizeAgentQuestion({ questionId: 'q2', type: 'binary', prompt: 'Two?' }),
     answer,
   );
+  expect(harness.getState().agentSubmittingQuestionIds).toEqual(new Set(['q1', 'q2']));
   const firstSignal = harness.submitAnswer.mock.calls[0][0].signal;
   expect(firstSignal.aborted).toBe(false);
   first.resolve({ ok: true });
   await one;
   expect(harness.getState().agentSubmittedQuestionIds).toEqual(['q1']);
-  expect(harness.getState().agentSubmittingQuestionId).toBe('q2');
+  expect(harness.getState().agentSubmittingQuestionIds).toEqual(new Set(['q2']));
   second.resolve({ ok: true });
   await two;
   expect(harness.getState().agentSubmittedQuestionIds).toEqual(['q1', 'q2']);
-  expect(harness.getState().agentSubmittingQuestionId).toBe('');
+  expect(harness.getState().agentSubmittingQuestionIds).toEqual(new Set());
 });
 
 it('disposing the session still aborts every pending answer POST', async () => {

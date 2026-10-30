@@ -51,7 +51,7 @@ export type OnePageSessionAgentDataResetState = {
   agentQuestionPileIndex: 0;
   agentQuestionSubmitError: '';
   agentSubmittedQuestionIds: [];
-  agentSubmittingQuestionId: '';
+  agentSubmittingQuestionIds: Set<string>;
 };
 
 export type AgentClientLoginEnvelopeMemoryGlobal = {
@@ -173,7 +173,7 @@ export const buildAgentDataResetState = (): OnePageSessionAgentDataResetState =>
   agentQuestions: [],
   agentAnswerState: null,
   agentQuestionPileIndex: 0,
-  agentSubmittingQuestionId: '',
+  agentSubmittingQuestionIds: new Set<string>(),
   agentSubmittedQuestionIds: [],
   agentQuestionSubmitError: '',
   agentResultsStatus: 'idle',

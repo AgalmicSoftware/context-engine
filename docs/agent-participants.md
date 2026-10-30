@@ -173,3 +173,6 @@ Browser token login releases its loading state when the active account or sessio
 
 
 Research summary exports retain each run's original question membership and answer/skip coverage in the principal's journal. Each question list is stored once per run; event exports retain the individual answers. Summary reads load the current catalog, attempt-list metadata, and one answer-state record per principal. Journal history is limited to 20 runs and 1 MiB of run scopes per principal. A new run that exceeds either limit returns `409 wrapped_run_history_full` before writing; existing results are preserved and existing runs can still be updated.
+
+
+The client tracks pending agent answers as a set. Navigating between questions preserves each submission's busy state, and completing one answer does not clear another question's pending state.

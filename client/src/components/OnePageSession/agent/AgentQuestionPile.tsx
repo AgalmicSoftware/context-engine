@@ -20,7 +20,7 @@ type AgentQuestionPileProps = {
   questions: AgentQuestion[];
   status: string;
   submittedQuestionIds?: string[];
-  submittingQuestionId?: string;
+  submittingQuestionIds?: ReadonlySet<string>;
   submitError?: string;
   onActiveIndexChange: (nextIndex: number) => void;
   onSubmitAnswer: (question: AgentQuestion, answer: AgentAnswerInput) => void;
@@ -58,7 +58,7 @@ const AgentQuestionPile = ({
   questions,
   status,
   submittedQuestionIds = [],
-  submittingQuestionId = '',
+  submittingQuestionIds = new Set<string>(),
   submitError = '',
   onActiveIndexChange,
   onSubmitAnswer,
@@ -90,7 +90,7 @@ const AgentQuestionPile = ({
   const questionId = activeQuestion.questionId;
   const answer = answers[questionId] || buildInitialAnswer(activeQuestion);
   const type = normalizeQuestionType(activeQuestion);
-  const isSubmitting = submittingQuestionId === questionId;
+  const isSubmitting = submittingQuestionIds.has(questionId);
   const alreadySubmitted = submitted.has(questionId) || activeQuestion.answeredByUser;
   const submitDisabled = !canSubmit || isSubmitting || alreadySubmitted || activeQuestion.answerable === false;
   const submitDisabledReason = alreadySubmitted

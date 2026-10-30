@@ -80,3 +80,24 @@ it('keeps signed costs, budget clamps, reset, drafts, and submission in the reta
   fireEvent.click(screen.getByRole('button', { name: 'Next agent question' }));
   expect(screen.getByRole('textbox', { name: 'Answer' })).toHaveValue('Local draft');
 });
+
+it('keeps either pending answer disabled while navigating between concurrent submissions', () => {
+  const questions = ['first', 'second'].map((id) => ({ ...question, id, questionId: id }));
+  const props = {
+    questions,
+    status: 'loaded',
+    canSubmit: true,
+    onSubmitAnswer: jest.fn(),
+    onActiveIndexChange: jest.fn(),
+  };
+  const { rerender } = render(
+    <AgentQuestionPile {...props} activeIndex={0} submittingQuestionIds={new Set(['first', 'second'])} />,
+  );
+  expect(screen.getByRole('button', { name: 'Submitting' })).toBeDisabled();
+  rerender(<AgentQuestionPile {...props} activeIndex={1} submittingQuestionIds={new Set(['first', 'second'])} />);
+  expect(screen.getByRole('button', { name: 'Submitting' })).toBeDisabled();
+  rerender(<AgentQuestionPile {...props} activeIndex={0} submittingQuestionIds={new Set(['second'])} />);
+  expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
+  rerender(<AgentQuestionPile {...props} activeIndex={1} submittingQuestionIds={new Set(['second'])} />);
+  expect(screen.getByRole('button', { name: 'Submitting' })).toBeDisabled();
+});

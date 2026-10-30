@@ -51,7 +51,7 @@ const baseProps = {
   agentQuestionSubmitError: '',
   agentSessionMeta: {},
   agentSubmittedQuestionIds: [],
-  agentSubmittingQuestionId: '',
+  agentSubmittingQuestionIds: new Set<string>(),
   workerGroupSessionId: '0x11111111111111111111111111111111',
   workerGroupWorkerUrl: 'https://worker.example',
   titleText: 'Agent Session',
