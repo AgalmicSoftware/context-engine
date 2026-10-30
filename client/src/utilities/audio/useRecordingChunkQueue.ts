@@ -3,6 +3,20 @@ import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
 import { RecordingChunkQueue } from './recordingChunkQueue';
 import { stitchRollingTranscriptSegments, type RollingTranscriptSegment } from './rollingTranscription';
 
+const memoryScopes = new Map<string, string>();
+const scopeStorageKey = (identity: string) => `ce:recording-scope:${identity}`;
+const readPinnedScope = (identity: string): string => {
+  const memoryScope = memoryScopes.get(identity);
+  if (memoryScope) return memoryScope;
+  try {
+    const saved = window.sessionStorage.getItem(scopeStorageKey(identity)) || '';
+    const parts: unknown = JSON.parse(saved);
+    return Array.isArray(parts) && parts.length === 3 && JSON.stringify(parts.slice(0, 2)) === identity ? saved : '';
+  } catch {
+    return '';
+  }
+};
+
 type Options = {
   sessionSlug: string;
   sessionConfig: Record<string, unknown> | null;
@@ -24,11 +38,12 @@ export function useRecordingChunkQueue(options: Options) {
     options.context && typeof options.context === 'object' && 'account' in options.context
       ? String(options.context.account || '')
       : '';
-  const scope = JSON.stringify([
-    options.workerUrl || options.sessionConfig?.corsWorkerUrl || options.sessionConfig?.workerUrl || '',
-    options.sessionSlug,
-    account.toLowerCase(),
-  ]);
+  const worker = options.workerUrl || options.sessionConfig?.corsWorkerUrl || options.sessionConfig?.workerUrl || '';
+  const identity = JSON.stringify([worker, options.sessionSlug]);
+  const pinned = useRef({ identity, scope: readPinnedScope(identity) });
+  const [, refreshScope] = useState(0);
+  if (pinned.current.identity !== identity) pinned.current = { identity, scope: readPinnedScope(identity) };
+  const scope = pinned.current.scope || JSON.stringify([worker, options.sessionSlug, account.toLowerCase()]);
 
   useEffect(() => {
     let current = true;
@@ -78,8 +93,16 @@ export function useRecordingChunkQueue(options: Options) {
   const prepare = useCallback(async () => {
     const queue = queueRef.current;
     if (!queue) throw new Error('Audio storage is not ready. Reopen the recorder.');
+    // Pin before awaiting storage or microphone access: account hydration can run during either.
+    pinned.current = { identity, scope };
+    memoryScopes.set(identity, scope);
+    try {
+      window.sessionStorage.setItem(scopeStorageKey(identity), scope);
+    } catch {
+      // Memory still protects an active recording when browser storage is unavailable.
+    }
     await queue.prepare();
-  }, []);
+  }, [identity, scope]);
   const beginChunk = useCallback(() => {
     const queue = queueRef.current!;
     const id = queue.begin(latest.current.labelSpeakers);
@@ -106,10 +129,18 @@ export function useRecordingChunkQueue(options: Options) {
   const clearDraft = useCallback(async () => {
     try {
       await queueRef.current?.clear();
+      pinned.current = { identity, scope: '' };
+      memoryScopes.delete(identity);
+      try {
+        window.sessionStorage.removeItem(scopeStorageKey(identity));
+      } catch {
+        // Clearing the in-memory pin still starts the next recording in the current account scope.
+      }
+      refreshScope((value) => value + 1);
     } catch (error) {
       setStorageError(error instanceof Error ? error.message : String(error));
     }
-  }, []);
+  }, [identity]);
   return {
     scope,
     prepare,

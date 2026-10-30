@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep breakout capture and its transcript together across sign-in or delayed account restoration by pinning the recording scope until it is cleared.
+
 - Retry temporary recording failures for as long as the page is open, keep failed audio with transcript gap markers, continue later chunks after permanent errors, and offer closing with pending audio kept for reopening.
 
 - Keep recording and transcription running from memory when device storage fails or is unavailable. Save cumulative audio snapshots at most every ten seconds and retain audio until its transcript is saved.

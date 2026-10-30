@@ -52,7 +52,9 @@ try {
         const { default: Panel } = await import('/src/components/SurveyTool/SessionListeningPanel.tsx');
         function Probe() {
           const [open, setOpen] = React.useState(true);
-          return open ? React.createElement(Panel, { sessionSlug: 'recovery', workerUrl: 'https://worker.example', onClose: () => setOpen(false) })
+          const [account, setAccount] = React.useState('');
+          window.__signIn = () => setAccount('0x1111111111111111111111111111111111111111');
+          return open ? React.createElement(Panel, { sessionSlug: 'recovery', workerUrl: 'https://worker.example', context: { account }, onClose: () => setOpen(false) })
             : React.createElement('button', { onClick: () => setOpen(true) }, 'Reopen recording');
         }
         (ReactDOM.createRoot || ReactDOM.default.createRoot)(document.getElementById('probe')).render(React.createElement(Probe));
@@ -69,6 +71,8 @@ try {
       return (await listRecordingChunks(JSON.stringify(['https://worker.example', 'recovery', ''])))[0]?.audio?.size === 256;
     });
     assert.equal(attempts, 0, 'Partial capture is saved without uploading a dependent fragment');
+    await page.evaluate(() => window.__signIn());
+    assert.equal(await page.getByRole('button', { name: 'Stop recording' }).isVisible(), true, 'Sign-in leaves capture running');
     await page.reload();
     await page.getByText('Transcribed', { exact: true }).waitFor({ timeout: 20000 });
     assert.equal(attempts, 3, 'Reloaded raw audio retries twice before succeeding');

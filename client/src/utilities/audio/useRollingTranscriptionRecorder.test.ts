@@ -74,6 +74,7 @@ describe('useRollingTranscriptionRecorder', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     window.localStorage.clear();
+    window.sessionStorage.clear();
     mockChunkRecords.clear();
     instances.length = 0;
     (transcribeAudio as jest.Mock).mockImplementation(async (_blob: Blob) => `transcript ${instances.length}`);
@@ -108,6 +109,50 @@ describe('useRollingTranscriptionRecorder', () => {
     });
     jest.useRealTimers();
     jest.clearAllMocks();
+  });
+
+  it.each(['during capture', 'immediately after Record'])('keeps one recording through sign-in %s', async (when) => {
+    const { result, rerender, unmount } = renderHook(
+      ({ account }) =>
+        useRollingTranscriptionRecorder({
+          sessionSlug: `sign-in-${when}`,
+          context: { account },
+          chunkMs: 15000,
+        }),
+      { initialProps: { account: '' } },
+    );
+    await act(async () => {
+      const starting = result.current.startRecording();
+      if (when === 'immediately after Record') rerender({ account: '0x1111111111111111111111111111111111111111' });
+      await starting;
+    });
+    if (when === 'during capture') {
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(15000);
+        await flushPromises();
+      });
+      rerender({ account: '0x1111111111111111111111111111111111111111' });
+    }
+    expect(result.current.isRecording).toBe(true);
+    expect(mockTrack.stop).not.toHaveBeenCalled();
+    await act(async () => {
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(result.current.segments).toHaveLength(when === 'during capture' ? 2 : 1);
+    expect(result.current.segments.every((segment) => segment.status === 'complete')).toBe(true);
+    expect(new Set([...mockChunkRecords.values()].map((record) => record.scope)).size).toBe(1);
+    const originalTranscript = result.current.transcript;
+    unmount();
+    const reopened = renderHook(() =>
+      useRollingTranscriptionRecorder({
+        sessionSlug: `sign-in-${when}`,
+        context: { account: '0x1111111111111111111111111111111111111111' },
+      }),
+    );
+    await act(flushPromises);
+    expect(reopened.result.current.transcript).toBe(originalTranscript);
+    reopened.unmount();
   });
 
   it('keeps raw audio until a failed upload retries and its transcript is saved', async () => {
