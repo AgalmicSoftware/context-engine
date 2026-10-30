@@ -158,3 +158,5 @@ Wallet behavior and local contract setup are documented in
 The contracts job installs both root and Session Worker dependencies: the registry participation smoke imports Worker handlers and must resolve the isolated Worker ethers v6, while root contract tooling remains on ethers v5.
 
 Shared Jest setup supplies a default `wagmi/actions` disconnect mock for direct and indirect imports of the shared logout helper. Auth and account tests can override it to verify disconnect count and ordering. Component suites keep mocking the wallet UI bridge and never load or call the live wallet action.
+
+Mixed-file generation tests retain rejected-file notices after Generate and separately verify that only supported extracted text enters the model prompt.

@@ -651,6 +651,8 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Verify mixed-file generation retains rejected-file notices while sending only supported extracted text to the model.
+
 - Provide the mocked wallet-action boundary in shared Jest setup for session-page imports as well as account components.
 
 - Keep the wallet URI encoder override effective after npm hoisting and validate the installed query-dependency tree.

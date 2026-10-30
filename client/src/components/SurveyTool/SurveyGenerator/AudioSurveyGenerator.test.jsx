@@ -429,8 +429,8 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     expect(mockCallAI.mock.calls[0][0]).toContain(text);
     expect(mockCallAI.mock.calls[0][0]).not.toMatch(/PDF_BINARY_MARKER|memo.pdf|not currently supported/);
-    expect(container.textContent).not.toContain('memo.pdf');
-    expect(container.textContent).not.toContain('Skipped');
+    expect(container.textContent.includes('memo.pdf')).toBe(includePdf);
+    expect(container.textContent.includes('Skipped')).toBe(includePdf);
   });
 
   it('does not count source headings toward minimum extracted text', async () => {
