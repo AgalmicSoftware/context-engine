@@ -2959,4 +2959,50 @@ describe('CommunityTab helpers', () => {
     window.cancelAnimationFrame = originalCancelRaf;
     jest.useRealTimers();
   });
+
+  it.each([
+    {
+      rule: 'same address on different chains counts twice',
+      chains: ['1', '10'],
+      addresses: ['0x' + 'ab'.repeat(20), '0x' + 'ab'.repeat(20)],
+      count: 2,
+    },
+    {
+      rule: 'different addresses on the same chain count twice',
+      chains: ['1', '1'],
+      addresses: ['0x' + 'ab'.repeat(20), '0x' + 'cd'.repeat(20)],
+      count: 2,
+    },
+    {
+      rule: 'same chain and address across sessions counts once',
+      chains: ['10', '10'],
+      addresses: ['0x' + 'AB'.repeat(20), '0x' + 'ab'.repeat(20)],
+      count: 1,
+    },
+  ])('$rule without counting an account twice', async ({ chains, addresses, count }) => {
+    const slugs = ['chain-fixture-a', 'chain-fixture-b'];
+    const instance = new CommunityTab({});
+    instance._resolveNetKeyForSlug = jest.fn((slug) => chains[slugs.indexOf(slug)]);
+    instance._resolveScopeAuthority = jest.fn(() => ({ isWorkerCanonical: false, workerCanonicalIdentity: null }));
+    for (const [index, slug] of slugs.entries()) {
+      await writeCache('sbtCache', slug, {
+        [chains[index]]: {
+          sbtList: {
+            [addresses[index].toLowerCase()]: {
+              ...buildSbtActivityCacheEntry({ sbtAddress: addresses[index] }),
+              sbtAddress: addresses[index],
+              sbtInfo: { creator: '0x123', admin: '0x123' },
+              mintedAddresses: ['0x123'],
+              burnedAddresses: [],
+            },
+          },
+        },
+      });
+    }
+    const entries = instance._buildScopeEntriesFromSlugs(slugs);
+    expect(entries.map((entry) => entry.netKey)).toEqual(chains);
+    const stats = instance._computeUniverseStatsSnapshot(entries);
+    expect(stats.sbtsCreatedCount).toBe(count);
+    expect(stats.uniqueUsers).toEqual(['0x123']);
+  });
 });

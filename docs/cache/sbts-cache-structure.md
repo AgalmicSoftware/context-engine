@@ -11,6 +11,8 @@ The SBT cache namespace is:
 
 Network keys inside cache values are strings such as `"84532"`.
 
+Community statistics identify a group by its network key and lowercased contract address. The same address deployed on two chains counts as two groups; repeated sightings of one chain/address across session caches count once. Participant addresses remain deduplicated independently of chain.
+
 ## Per-network shape
 
 ```jsonc
