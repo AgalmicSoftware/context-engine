@@ -33,6 +33,8 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- Summarize research runs from bounded per-principal journal coverage, storing each frozen question list once. Summary exports read attempt metadata and one answer state per principal instead of every answer event.
+
 - Reuse registry creation-block lookup across MCP configuration refreshes.
 
 - Bound MCP registry reads and cached/local answers to the configured session window, using historical pointers at its end.

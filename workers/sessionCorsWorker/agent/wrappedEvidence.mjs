@@ -214,18 +214,15 @@ export function agentOnlyResponseCoverage(space = {}, state = {}, { runId = '' }
   };
 }
 
-export function agentOnlyRunResponseCoverage(events = []) {
-  const accepted = events.filter(event => event.replay !== true &&
-    ['answer', 'privacy_protective_skip'].includes(event.eventKind))
-    .sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)) ||
-      safeString(left.requestId).localeCompare(safeString(right.requestId)));
-  const ids = Array.isArray(accepted[0]?.runStatementIds) ? accepted[0].runStatementIds : [];
-  const byStatement = Object.create(null);
-  for (const event of accepted) {
-    byStatement[event.questionId] = event.eventKind === 'privacy_protective_skip'
-      ? { agentSkip: event } : { agent: event };
-  }
-  return agentOnlyResponseCoverage({ statements: ids.map(statement_id => ({ statement_id })) }, { byStatement });
+export function agentOnlyRunResponseCoverage(scope = {}) {
+  const ids = Array.isArray(scope.runStatementIds) ? scope.runStatementIds : [];
+  const coverage = String(scope.coverage || '').slice(0, ids.length);
+  const agentPredictionCount = [...coverage].filter(value => value === 'a').length;
+  const privacySkipCount = [...coverage].filter(value => value === 's').length;
+  const agentResponseCount = agentPredictionCount + privacySkipCount;
+  return { statementCount: ids.length, agentPredictionCount, privacySkipCount, agentResponseCount,
+    allStatementsPredicted: ids.length > 0 && agentPredictionCount === ids.length,
+    allStatementsCovered: ids.length > 0 && agentResponseCount === ids.length };
 }
 
 export function wrappedAnswerFormatForSchema(schema = {}) {

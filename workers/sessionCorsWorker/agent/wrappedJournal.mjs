@@ -5,6 +5,8 @@ import { answerStateKey, voteStateKey, MAX_RECENT_REQUEST_IDS } from './wrappedC
 import { sha256Hex, safeJsonParse } from './runtimePrimitives.mjs';
 
 const reply = (body, status = 200) => Response.json(body, { status });
+const MAX_RESEARCH_RUNS = 20;
+const MAX_RUN_SCOPES_BYTES = 1024 * 1024;
 const busy = () => reply({ ok: false, status: 503, reason: 'wrapped_storage_busy', retryable: true, retryAfterSeconds: 1 }, 503);
 
 // The coordinator binds a request before its first KV write. KV holds the
@@ -72,18 +74,29 @@ export const dispatchWrappedResearch = (coordinator, payload) => coordinator.ser
   let value;
   let events = record.events;
   if (record.kind === 'answers') {
-    const runScopes = [...(base.runScopes || [])];
-    events = record.events.map(event => {
-      const runId = event.value.runId;
-      // Freeze membership in the serialized commit, so overlapping batches and
-      // later catalog edits cannot change a run's historical denominator.
+    const runScopes = (base.runScopes || []).map(scope => ({ ...scope }));
+    for (const event of events) {
+      const { runId, questionId, eventKind } = event.value;
+      // Freeze membership once, then keep one coverage character per question.
+      // Replays return above; later runs cannot overwrite earlier coverage.
       let scope = runScopes.find(entry => entry.runId === runId);
       if (!scope) {
-        scope = { runId, runStatementIds: event.value.runStatementIds };
+        if (!Array.isArray(record.runStatementIds) || !record.runStatementIds.length) {
+          return reply({ ok: false, status: 400, reason: 'wrapped_run_scope_invalid' }, 400);
+        }
+        scope = { runId, runStatementIds: [...new Set(record.runStatementIds)], coverage: '' };
+        scope.coverage = '0'.repeat(scope.runStatementIds.length);
         runScopes.push(scope);
       }
-      return { ...event, value: { ...event.value, runStatementIds: scope.runStatementIds } };
-    });
+      const index = scope.runStatementIds.indexOf(questionId);
+      if (index >= 0) scope.coverage = scope.coverage.slice(0, index) +
+        (eventKind === 'privacy_protective_skip' ? 's' : 'a') + scope.coverage.slice(index + 1);
+    }
+    // Refuse new history before any write rather than silently evicting results.
+    if (runScopes.length > MAX_RESEARCH_RUNS || new TextEncoder().encode(JSON.stringify(runScopes)).length > MAX_RUN_SCOPES_BYTES) {
+      return reply({ ok: false, status: 409, reason: 'wrapped_run_history_full',
+        error: 'Research run history is full. Existing runs remain available; a new run cannot be saved.' }, 409);
+    }
     const byStatement = { ...base.byStatement };
     for (const [id, change] of Object.entries(record.changes)) {
       byStatement[id] = { ...byStatement[id], agent: change.agent, agentSkip: change.agentSkip };

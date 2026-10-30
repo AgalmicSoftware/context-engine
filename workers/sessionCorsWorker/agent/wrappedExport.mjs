@@ -292,6 +292,8 @@ export async function exportAgentOnlyData({
       });
     }
   } else if (view === 'summary') {
+    const catalog = await loadWrappedStatements({ env, sessionSlug: slug, readabilityOnly: true });
+    if (!catalog.ok) return catalog;
     const entries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX}${slug}:`);
     const principalRows = new Map();
     const runRows = new Map();
@@ -299,8 +301,10 @@ export async function exportAgentOnlyData({
     let latestAttemptAt = '';
     let includedAttemptEventCount = 0;
     for (const entry of entries) {
-      const record = await readKvJson(env, entry.key);
-      if (!record) continue;
+      const metadata = entry.metadata;
+      if (!metadata) continue;
+      const record = { telegramUserId: metadata.u, runId: metadata.run, createdAt: metadata.at,
+        stage: metadata.st, ok: metadata.ok === 1 };
       includedAttemptEventCount += 1;
       const createdAt = safeString(record.createdAt);
       if (createdAt && (!firstAttemptAt || createdAt < firstAttemptAt)) firstAttemptAt = createdAt;
@@ -347,20 +351,18 @@ export async function exportAgentOnlyData({
 
       if (stage === 'wrapped_image' && record.ok === true) run.wrapped_image_ok = true;
     }
-    const answerEventsByRun = new Map();
-    const answerEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_EVENT_KV_PREFIX}${slug}:`);
-    for (const entry of answerEntries) {
-      const event = await readKvJson(env, entry.key);
-      if (!event || event.replay === true) continue;
-      const principalId = await agentOnlyPrincipalId(env, event.telegramUserId);
-      const key = `${principalId}\t${normalizeAgentOnlyRunId(event.runId) || 'unknown'}`;
-      if (!answerEventsByRun.has(key)) answerEventsByRun.set(key, []);
-      answerEventsByRun.get(key).push(event);
+    const coverageByRun = new Map();
+    const stateEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
+    for (const entry of stateEntries) {
+      const state = await readKvJson(env, entry.key);
+      if (!state) continue;
+      const principalId = await agentOnlyPrincipalId(env, state.telegramUserId);
+      for (const scope of state.runScopes || []) {
+        coverageByRun.set(`${principalId}\t${scope.runId}`, agentOnlyRunResponseCoverage(scope));
+      }
     }
     const runs = [...runRows.values()].map((run) => {
-      // Attempts describe traffic. Accepted events retain each run independently
-      // of subsequent answers and the current catalog.
-      const coverage = agentOnlyRunResponseCoverage(answerEventsByRun.get(`${run.principal_id}\t${run.run_id}`) || []);
+      const coverage = coverageByRun.get(`${run.principal_id}\t${run.run_id}`) || agentOnlyRunResponseCoverage();
       const answerComplete = coverage.allStatementsCovered;
       return {
         ...run,

@@ -305,7 +305,6 @@ export async function submitAgentOnlyAnswersBulk({
       agentMetadata: metadata.value,
       instructionsVersion: AGENT_ONLY_INSTRUCTIONS_VERSION,
       runId,
-      runStatementIds: materialized.space.statements.map(statement => statement.statement_id),
       requestId,
       semanticFingerprint,
       createdAt,
@@ -341,5 +340,6 @@ export async function submitAgentOnlyAnswersBulk({
   if (!env.AGENT_SERVICES?.commitWrappedResearch) return { ok: false, status: 503, reason: 'wrapped_coordinator_unavailable', retryable: true };
   return env.AGENT_SERVICES.commitWrappedResearch({ kind: 'answers', subjectId: safeString(telegramUserId), requestId,
     summaryHash, createdAt, events, changes, initialState: state, response,
+    runStatementIds: materialized.space.statements.map(statement => statement.statement_id),
     stateMetadata: { v: 1, t: 'ao_ans', sg: slug } });
 }

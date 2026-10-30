@@ -81,6 +81,9 @@ export async function recordAgentOnlyAttemptEvent({
       st: normalizedStage.slice(0, 16),
       ok: ok ? 1 : 0,
       r: reason.slice(0, 48),
+      u: record.telegramUserId,
+      run: record.runId,
+      at: record.createdAt,
     },
   });
   return { ok: true, key };

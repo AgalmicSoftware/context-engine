@@ -28,9 +28,10 @@ export function enforceKvWriteLimit(kv, now = Date.now) {
 export function fixture(overrides = {}) {
   const records = new Map();
   const writes = [];
+  const metadata = new Map();
   let reads = 0;
-  const kv = { async get(key) { return records.get(key) ?? null; }, async put(key, value) { writes.push(key); records.set(key, value); },
-    async delete(key) { writes.push(key); records.delete(key); }, async list({ prefix = '' } = {}) { return { keys: [...records.keys()].filter(key => key.startsWith(prefix)).map(name => ({ name })), list_complete: true }; } };
+  const kv = { async get(key) { return records.get(key) ?? null; }, async put(key, value, options) { writes.push(key); records.set(key, value); metadata.set(key, options?.metadata); },
+    async delete(key) { writes.push(key); records.delete(key); }, async list({ prefix = '' } = {}) { return { keys: [...records.keys()].filter(key => key.startsWith(prefix)).map(name => ({ name, metadata: metadata.get(name) })), list_complete: true }; } };
   const config = { sessionId, authzEpoch: 1, adminAddress: wallet.address, corsWorkerUrl: origin, allowOrigins: ['https://client.example'],
     sessionModeProfile: { authority: { mode: 'worker_canonical' }, surfaces: { agentHttp: true, browser: true } },
     workerAuthority: { version: 1, loginGate: { conditions: [] }, participantScopes: ['storage', 'groups', 'ai'] }, agentHttp: {} };
@@ -64,5 +65,5 @@ export function fixture(overrides = {}) {
     env.CE_SESSION_COORDINATOR = { idFromName: value => value, get: () => ({ fetch: (url, init) => coordinator.fetch(new Request(url, init)) }) };
     return { durable, coordinator, storage };
   }
-  return { env, config, agentEnv, records, writes, request, credential, withCoordinator, queue: batch => runtime.queue(batch, env), reads: () => reads };
+  return { env, config, agentEnv, records, metadata, writes, request, credential, withCoordinator, queue: batch => runtime.queue(batch, env), reads: () => reads };
 }

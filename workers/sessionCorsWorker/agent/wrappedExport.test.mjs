@@ -27,15 +27,12 @@ test('research JSONL keeps participant text exact', () => {
 });
 
 
-test('run completion counts distinct accepted answers and privacy skips without replay rows', () => {
-  const base = { runStatementIds: ['a', 'b'], createdAt: '2026-10-29T00:00:00.000Z' };
-  const answer = { ...base, questionId: 'a', eventKind: 'answer', answer: { value: 'agree' }, requestId: 'first' };
-  const skip = { ...base, questionId: 'b', eventKind: 'privacy_protective_skip', requestId: 'second' };
-  const incomplete = agentOnlyRunResponseCoverage([answer, { ...skip, replay: true }]);
+test('run completion counts journal answers and privacy skips within its frozen bank', () => {
+  const base = { runStatementIds: ['a', 'b'] };
+  const incomplete = agentOnlyRunResponseCoverage({ ...base, coverage: 'a0' });
   assert.equal(incomplete.agentResponseCount, 1);
   assert.equal(incomplete.allStatementsCovered, false);
-  const complete = agentOnlyRunResponseCoverage([answer, answer, skip,
-    { ...answer, questionId: 'later', createdAt: '2026-10-30T00:00:00.000Z' }]);
+  const complete = agentOnlyRunResponseCoverage({ ...base, coverage: 'as' });
   assert.equal(complete.statementCount, 2);
   assert.equal(complete.agentPredictionCount, 1);
   assert.equal(complete.privacySkipCount, 1);

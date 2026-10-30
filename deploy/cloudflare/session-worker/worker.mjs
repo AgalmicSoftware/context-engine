@@ -67687,7 +67687,7 @@ Wrapped predictions remain separate from normal session submissions. A Wrapped c
 });
 
 // workers/sessionCorsWorker/agent/wrappedJournal.mjs
-var reply3, busy, dispatchWrappedResearch;
+var reply3, MAX_RESEARCH_RUNS, MAX_RUN_SCOPES_BYTES, busy, dispatchWrappedResearch;
 var init_wrappedJournal = __esm({
   "workers/sessionCorsWorker/agent/wrappedJournal.mjs"() {
     init_sessionConfigAuthority();
@@ -67696,6 +67696,8 @@ var init_wrappedJournal = __esm({
     init_wrappedCore();
     init_runtimePrimitives();
     reply3 = (body, status = 200) => Response.json(body, { status });
+    MAX_RESEARCH_RUNS = 20;
+    MAX_RUN_SCOPES_BYTES = 1024 * 1024;
     busy = () => reply3({ ok: false, status: 503, reason: "wrapped_storage_busy", retryable: true, retryAfterSeconds: 1 }, 503);
     dispatchWrappedResearch = (coordinator, payload) => coordinator.serializeSessionConfigOperation(async () => {
       const record4 = payload?.record;
@@ -67753,16 +67755,29 @@ var init_wrappedJournal = __esm({
       let value;
       let events = record4.events;
       if (record4.kind === "answers") {
-        const runScopes = [...base.runScopes || []];
-        events = record4.events.map((event) => {
-          const runId = event.value.runId;
+        const runScopes = (base.runScopes || []).map((scope) => ({ ...scope }));
+        for (const event of events) {
+          const { runId, questionId: questionId4, eventKind } = event.value;
           let scope = runScopes.find((entry2) => entry2.runId === runId);
           if (!scope) {
-            scope = { runId, runStatementIds: event.value.runStatementIds };
+            if (!Array.isArray(record4.runStatementIds) || !record4.runStatementIds.length) {
+              return reply3({ ok: false, status: 400, reason: "wrapped_run_scope_invalid" }, 400);
+            }
+            scope = { runId, runStatementIds: [...new Set(record4.runStatementIds)], coverage: "" };
+            scope.coverage = "0".repeat(scope.runStatementIds.length);
             runScopes.push(scope);
           }
-          return { ...event, value: { ...event.value, runStatementIds: scope.runStatementIds } };
-        });
+          const index = scope.runStatementIds.indexOf(questionId4);
+          if (index >= 0) scope.coverage = scope.coverage.slice(0, index) + (eventKind === "privacy_protective_skip" ? "s" : "a") + scope.coverage.slice(index + 1);
+        }
+        if (runScopes.length > MAX_RESEARCH_RUNS || new TextEncoder().encode(JSON.stringify(runScopes)).length > MAX_RUN_SCOPES_BYTES) {
+          return reply3({
+            ok: false,
+            status: 409,
+            reason: "wrapped_run_history_full",
+            error: "Research run history is full. Existing runs remain available; a new run cannot be saved."
+          }, 409);
+        }
         const byStatement = { ...base.byStatement };
         for (const [id2, change] of Object.entries(record4.changes)) {
           byStatement[id2] = { ...byStatement[id2], agent: change.agent, agentSkip: change.agentSkip };
@@ -89543,14 +89558,20 @@ function agentOnlyResponseCoverage(space = {}, state = {}, { runId = "" } = {}) 
     allStatementsCovered: statementIds.size > 0 && agentResponseCount >= statementIds.size
   };
 }
-function agentOnlyRunResponseCoverage(events = []) {
-  const accepted = events.filter((event) => event.replay !== true && ["answer", "privacy_protective_skip"].includes(event.eventKind)).sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)) || safeString(left.requestId).localeCompare(safeString(right.requestId)));
-  const ids = Array.isArray(accepted[0]?.runStatementIds) ? accepted[0].runStatementIds : [];
-  const byStatement = /* @__PURE__ */ Object.create(null);
-  for (const event of accepted) {
-    byStatement[event.questionId] = event.eventKind === "privacy_protective_skip" ? { agentSkip: event } : { agent: event };
-  }
-  return agentOnlyResponseCoverage({ statements: ids.map((statement_id) => ({ statement_id })) }, { byStatement });
+function agentOnlyRunResponseCoverage(scope = {}) {
+  const ids = Array.isArray(scope.runStatementIds) ? scope.runStatementIds : [];
+  const coverage = String(scope.coverage || "").slice(0, ids.length);
+  const agentPredictionCount = [...coverage].filter((value) => value === "a").length;
+  const privacySkipCount = [...coverage].filter((value) => value === "s").length;
+  const agentResponseCount = agentPredictionCount + privacySkipCount;
+  return {
+    statementCount: ids.length,
+    agentPredictionCount,
+    privacySkipCount,
+    agentResponseCount,
+    allStatementsPredicted: ids.length > 0 && agentPredictionCount === ids.length,
+    allStatementsCovered: ids.length > 0 && agentResponseCount === ids.length
+  };
 }
 function wrappedAnswerFormatForSchema(schema = {}) {
   const kind = safeString(schema?.kind);
@@ -89998,7 +90019,6 @@ async function submitAgentOnlyAnswersBulk({
       agentMetadata: metadata.value,
       instructionsVersion: AGENT_ONLY_INSTRUCTIONS_VERSION,
       runId,
-      runStatementIds: materialized.space.statements.map((statement) => statement.statement_id),
       requestId,
       semanticFingerprint,
       createdAt
@@ -90038,6 +90058,7 @@ async function submitAgentOnlyAnswersBulk({
     changes,
     initialState: state,
     response: response2,
+    runStatementIds: materialized.space.statements.map((statement) => statement.statement_id),
     stateMetadata: { v: 1, t: "ao_ans", sg: slug }
   });
 }
@@ -90116,7 +90137,10 @@ async function recordAgentOnlyAttemptEvent({
       sg: slug,
       st: normalizedStage.slice(0, 16),
       ok: ok ? 1 : 0,
-      r: reason.slice(0, 48)
+      r: reason.slice(0, 48),
+      u: record4.telegramUserId,
+      run: record4.runId,
+      at: record4.createdAt
     }
   });
   return { ok: true, key };
@@ -91429,6 +91453,8 @@ async function exportAgentOnlyData({
       });
     }
   } else if (view === "summary") {
+    const catalog2 = await loadWrappedStatements({ env, sessionSlug: slug, readabilityOnly: true });
+    if (!catalog2.ok) return catalog2;
     const entries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX}${slug}:`);
     const principalRows = /* @__PURE__ */ new Map();
     const runRows = /* @__PURE__ */ new Map();
@@ -91436,8 +91462,15 @@ async function exportAgentOnlyData({
     let latestAttemptAt = "";
     let includedAttemptEventCount = 0;
     for (const entry2 of entries) {
-      const record4 = await readKvJson2(env, entry2.key);
-      if (!record4) continue;
+      const metadata = entry2.metadata;
+      if (!metadata) continue;
+      const record4 = {
+        telegramUserId: metadata.u,
+        runId: metadata.run,
+        createdAt: metadata.at,
+        stage: metadata.st,
+        ok: metadata.ok === 1
+      };
       includedAttemptEventCount += 1;
       const createdAt = safeString(record4.createdAt);
       if (createdAt && (!firstAttemptAt || createdAt < firstAttemptAt)) firstAttemptAt = createdAt;
@@ -91482,18 +91515,18 @@ async function exportAgentOnlyData({
       const stage = safeString(record4.stage);
       if (stage === "wrapped_image" && record4.ok === true) run.wrapped_image_ok = true;
     }
-    const answerEventsByRun = /* @__PURE__ */ new Map();
-    const answerEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_EVENT_KV_PREFIX}${slug}:`);
-    for (const entry2 of answerEntries) {
-      const event = await readKvJson2(env, entry2.key);
-      if (!event || event.replay === true) continue;
-      const principalId = await agentOnlyPrincipalId(env, event.telegramUserId);
-      const key = `${principalId}	${normalizeAgentOnlyRunId(event.runId) || "unknown"}`;
-      if (!answerEventsByRun.has(key)) answerEventsByRun.set(key, []);
-      answerEventsByRun.get(key).push(event);
+    const coverageByRun = /* @__PURE__ */ new Map();
+    const stateEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
+    for (const entry2 of stateEntries) {
+      const state = await readKvJson2(env, entry2.key);
+      if (!state) continue;
+      const principalId = await agentOnlyPrincipalId(env, state.telegramUserId);
+      for (const scope of state.runScopes || []) {
+        coverageByRun.set(`${principalId}	${scope.runId}`, agentOnlyRunResponseCoverage(scope));
+      }
     }
     const runs = [...runRows.values()].map((run) => {
-      const coverage = agentOnlyRunResponseCoverage(answerEventsByRun.get(`${run.principal_id}	${run.run_id}`) || []);
+      const coverage = coverageByRun.get(`${run.principal_id}	${run.run_id}`) || agentOnlyRunResponseCoverage();
       const answerComplete = coverage.allStatementsCovered;
       return {
         ...run,

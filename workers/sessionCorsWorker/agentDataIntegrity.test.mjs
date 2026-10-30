@@ -6,6 +6,7 @@ import { saveAgentOnlyModeConfig } from './agent/wrappedConfig.mjs';
 import { createWorkerExecutionServicesWithWorkerDeps } from './workerExecutionServiceBinding.js';
 import { signToken } from './tokenSigning.js';
 import { persistAuthTokenRecord } from './authTokenClaims.js';
+import { dispatchWrappedResearch } from './agent/wrappedJournal.mjs';
 import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 const openQ = '0x' + 'a'.repeat(64), gatedQ = '0x' + 'b'.repeat(64);
 const metadata = { model: 'fixture-model', scaffold_version: 'fixture-v1' };
@@ -428,5 +429,89 @@ test('research summaries retain each run own answers and original statement set'
   await send('run-three', 'third', [openQ]);
   assert.deepEqual(await summary(), [['run-one', 2, 2, true], ['run-three', 1, 3, false], ['run-two', 1, 2, false]]);
   const events = [...f.records.entries()].filter(([key]) => key.includes('answer-event:')).map(([, value]) => JSON.parse(value));
-  assert.ok(events.filter(event => event.runId === 'run-one').every(event => event.runStatementIds.length === 2));
+  assert.ok(events.every(event => !Object.hasOwn(event, 'runStatementIds')), 'events never duplicate the frozen bank');
+  const state = JSON.parse(f.records.get([...f.records.keys()].find(key => key.includes('answer-state:'))));
+  assert.equal(state.runScopes.find(scope => scope.runId === 'run-one').runStatementIds.length, 2);
+});
+
+
+test('a summary of over a thousand answer and attempt events stays below the KV operation budget', async () => {
+  const { f } = readableFixture();
+  const member = await memberToken(f);
+  const admin = await f.credential({ scopes: ['read_questions'] });
+  const page = await jsonOk(await f.request('/api/agent/agent-only/statements', { token: member }));
+  await jsonOk(await f.request('/api/agent/agent-only/answers/bulk', { method: 'POST', token: member,
+    body: { run_id: 'budget-run', request_id: 'budget-first', agent_metadata: metadata,
+      answers: page.statements.map(q => ({ statement_id: q.statement_id, statement_version: q.statement_version,
+        answer: { value: 'agree' }, confidence: 80 })) } }));
+  for (const marker of ['answer-event:', 'attempt-event:']) {
+    const key = [...f.records.keys()].find(key => key.includes(marker));
+    assert.ok(key, marker);
+    for (let i = 0; i < 1100; i++) {
+      const copy = `${key}-copy-${i}`;
+      f.records.set(copy, f.records.get(key));
+      f.metadata.set(copy, f.metadata.get(key));
+    }
+  }
+  let operations = 0, answerReads = 0, stateReads = 0;
+  const get = f.env.GROUP_KV.get.bind(f.env.GROUP_KV), list = f.env.GROUP_KV.list.bind(f.env.GROUP_KV);
+  f.env.GROUP_KV.get = async key => { operations++; if (key.includes('answer-event:')) answerReads++;
+    if (key.includes('answer-state:')) stateReads++; return get(key); };
+  f.env.GROUP_KV.list = async options => {
+    operations++;
+    const all = await list(options), offset = Number(options.cursor || 0), end = offset + options.limit;
+    return { keys: all.keys.slice(offset, end), list_complete: end >= all.keys.length,
+      ...(end < all.keys.length ? { cursor: String(end) } : {}) };
+  };
+  const summary = await jsonOk(await f.request('/api/agent/admin/agent-only/export?view=summary&format=json', { token: admin.token }));
+  assert.ok(operations < 1000, `${operations} KV operations exceed the budget`);
+  assert.equal(answerReads, 0);
+  assert.equal(stateReads, 1);
+  assert.equal(summary.runs[0].agent_response_count, 2);
+  assert.equal(summary.runs[0].answer_complete, true);
+  assert.ok(summary.attempt_event_count > 1000);
+});
+
+test('a pending 50-answer commit for a 600-statement bank stays below two MiB', async () => {
+  const { f, coordinated } = readableFixture();
+  const ids = Array.from({ length: 600 }, (_, i) => `0x${i.toString(16).padStart(64, '0')}`);
+  const runId = 'large-bank', createdAt = new Date().toISOString();
+  const put = f.env.GROUP_KV.put.bind(f.env.GROUP_KV);
+  f.env.GROUP_KV.put = async (key, value, options) => {
+    if (key.includes('answer-event:')) throw new Error('Projection unavailable');
+    return put(key, value, options);
+  };
+  const response = await dispatchWrappedResearch(coordinated.coordinator, { slug: 'fixture',
+    expectedAuthority: { actor: wallet.address.toLowerCase(), revision: 1, authzEpoch: 1 },
+    record: { kind: 'answers', subjectId: 'fixture-member', sessionSlug: 'fixture', sessionId,
+      requestId: 'large-bank-first', summaryHash: 'a'.repeat(64), createdAt, runStatementIds: ids,
+      initialState: { byStatement: {}, telegramUserId: 'fixture-member' }, changes: {}, response: { ok: true },
+      events: ids.slice(0, 50).map(questionId => ({ key: `answer-event:${questionId}`, metadata: {},
+        value: { runId, questionId, eventKind: 'answer', answer: { value: 'agree' }, createdAt } })) } });
+  assert.equal(response.status, 503);
+  const pending = [...coordinated.durable.values()].find(value => value.complete === false && value.events);
+  assert.ok(pending);
+  const bytes = Buffer.byteLength(JSON.stringify(pending));
+  assert.ok(bytes < 2 * 1024 * 1024, `${bytes} pending bytes exceed two MiB`);
+  const state = [...coordinated.durable.values()].find(value => value.value?.runScopes);
+  assert.equal(state.value.runScopes[0].runStatementIds?.length, 600);
+  assert.ok(pending.events.every(event => !Object.hasOwn(event.value, 'runStatementIds')));
+});
+
+test('bounded run history refuses a new run without dropping existing coverage', async () => {
+  const { f, coordinated } = readableFixture();
+  let time = Date.now(); coordinated.coordinator.now = () => time;
+  const member = await memberToken(f);
+  const page = await jsonOk(await f.request('/api/agent/agent-only/statements', { token: member }));
+  const send = async runId => { time += 1000; return f.request('/api/agent/agent-only/answers/bulk', { method: 'POST', token: member,
+    body: { run_id: runId, request_id: runId, agent_metadata: metadata,
+      answers: page.statements.map(q => ({ statement_id: q.statement_id, statement_version: q.statement_version,
+        answer: { value: 'agree' }, confidence: 80 })) } }); };
+  for (let i = 0; i < 20; i++) await jsonOk(await send(`run-${i}`));
+  const stateKey = [...f.records.keys()].find(key => key.includes('answer-state:'));
+  const original = f.records.get(stateKey);
+  const rejected = await send('run-over-limit');
+  assert.equal(rejected.status, 409);
+  assert.equal((await rejected.json()).reason, 'wrapped_run_history_full');
+  assert.equal(f.records.get(stateKey), original);
 });
