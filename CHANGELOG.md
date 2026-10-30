@@ -164,6 +164,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Reuse cached and in-flight Arweave payloads when loading SBT metadata.
+
 - Release agent login loading after account changes and allow independent answer submissions to finish.
 
 - Keep profile analysis open across data refreshes while discarding stale results.

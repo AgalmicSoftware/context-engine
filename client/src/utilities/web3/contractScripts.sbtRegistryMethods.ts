@@ -952,7 +952,6 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
                   arweaveOpts: {
                     // Honor the deployment-wide AR.IO-only toggle. Per-call
                     // fanout here previously made SBT names intermittently blank.
-                    cacheBypass: true,
                     shortCircuitNotFound: true,
                     retries: 0,
                     gatewayTimeoutMs: Math.max(1000, SBT_TOKENURI_METADATA_TIMEOUT_MS - 500),
