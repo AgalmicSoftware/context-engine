@@ -67,6 +67,7 @@ type PileFooterControlsProps = {
   showSubmitButton: boolean;
   handlePileSubmitClick: VoidHandler;
   hasPendingPileChanges: boolean;
+  pendingAnswerCount?: number;
   shouldHidePileSubmitButton: boolean;
   isSubmitting: boolean;
   activePromptMasked: boolean;
@@ -144,6 +145,7 @@ export type PileInteractionSurfaceProps = {
   showSubmitButton: boolean;
   handlePileSubmitClick: VoidHandler;
   hasPendingPileChanges: boolean;
+  pendingAnswerCount?: number;
   shouldHidePileSubmitButton: boolean;
   isSubmitting: boolean;
   activePromptMasked: boolean;
@@ -356,6 +358,7 @@ const renderPileFooterControls = ({
   showSubmitButton,
   handlePileSubmitClick,
   hasPendingPileChanges,
+  pendingAnswerCount = 0,
   shouldHidePileSubmitButton,
   isSubmitting,
   activePromptMasked,
@@ -395,7 +398,15 @@ const renderPileFooterControls = ({
           <FontAwesomeIcon icon={faSpinner} spin />
         ) : (
           <span className={styles.pileSubmitButtonContent}>
-            <span className={styles.pileSubmitButtonLabel}>{finalSubmitText}</span>
+            <span className={styles.pileSubmitButtonCopy}>
+              <span className={styles.pileSubmitButtonLabel}>{finalSubmitText}</span>
+              {pendingAnswerCount > 0 && (
+                <span className={styles.pilePendingAnswerNotice} role="status">
+                  {pendingAnswerCount}{' '}
+                  {pendingAnswerCount === 1 ? "answer on the page isn't" : "answers on the page aren't"} submitted yet.
+                </span>
+              )}
+            </span>
             <span className={styles.pileSubmitButtonTrail} aria-hidden="true">
               <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
               <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
@@ -580,6 +591,7 @@ export const renderPileInteractionSurface = ({
   showSubmitButton,
   handlePileSubmitClick,
   hasPendingPileChanges,
+  pendingAnswerCount = 0,
   shouldHidePileSubmitButton,
   isSubmitting,
   activePromptMasked,
@@ -693,6 +705,7 @@ export const renderPileInteractionSurface = ({
           showSubmitButton,
           handlePileSubmitClick,
           hasPendingPileChanges,
+          pendingAnswerCount,
           shouldHidePileSubmitButton,
           isSubmitting,
           activePromptMasked,

@@ -6554,6 +6554,23 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   text-transform: uppercase;
 }
 
+.pileSubmitButtonCopy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.pilePendingAnswerNotice {
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: normal;
+}
+
 .pileSubmitButtonLabel {
   display: inline-flex;
   align-items: center;

@@ -354,7 +354,8 @@ Session interview research is narrower and persists with ordinary submitted resp
 
 An interview submission sends only the selected questions that actually changed.
 The same set limits preflight checks, encryption, uploaded rows and draft cleanup;
-unselected manual drafts remain pending. The ordinary Submit button still sends
+unselected manual drafts remain pending. The page Submit control shows how many
+answers remain unsubmitted and clears the notice when they are saved. The ordinary Submit button still sends
 every changed answer.
 
 The semantics are also different. Edge2026 distinguishes explicit confirm, edit, stale confirm, skips, agent reruns, and prior human answers with semantic fingerprints. Interview research distinguishes selected versus unselected drafts, final submitted values, fields whose final values changed, and instrumented fields the reviewer touched. It does not record keystrokes, edit timing, time-to-review, cursor history, or a semantic agreement score. A no-change submitted value is documented as unchanged, not as scientific agreement with the AI. When a touched marker is captured for a field that is later restored to the original, that field remains in `userEditedFields` but drops out of `changedFields`.

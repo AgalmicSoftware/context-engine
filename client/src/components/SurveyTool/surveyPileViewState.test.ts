@@ -79,6 +79,21 @@ describe('surveyPileViewState', () => {
     });
   });
 
+  it('keeps Submit available when a successful partial submit leaves page answers pending', () => {
+    expect(
+      buildPileSubmitRailViewState({
+        pendingStats: { total: 1 },
+        submittedSinceLastEdit: true,
+        submissionComplete: true,
+      }),
+    ).toMatchObject({
+      showSubmitButton: true,
+      showSuccessBadgeLink: false,
+      showSuccessBadgeStatus: false,
+      showClearPendingButton: true,
+    });
+  });
+
   it('builds the hidden-idle submit presentation state when nothing is pending', () => {
     expect(
       buildPileSubmitViewState({

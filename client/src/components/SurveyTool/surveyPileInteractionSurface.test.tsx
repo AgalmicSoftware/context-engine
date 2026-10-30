@@ -446,6 +446,13 @@ describe('surveyPileInteractionSurface', () => {
     expect(framelessIconButtonCount).toBe(iconButtonCount);
   });
 
+  it('counts pending page answers beside their submit action', () => {
+    const { rerender } = render(renderPileInteractionSurface({ ...buildBaseProps(), pendingAnswerCount: 2 }));
+    expect(screen.getByText("2 answers on the page aren't submitted yet.")).toHaveAttribute('role', 'status');
+    rerender(renderPileInteractionSurface({ ...buildBaseProps(), pendingAnswerCount: 0 }));
+    expect(screen.queryByText(/answers on the page/)).not.toBeInTheDocument();
+  });
+
   it('makes the mobile action menu available before there are pending answers', () => {
     const tree = renderPileInteractionSurface({
       ...buildBaseProps(),

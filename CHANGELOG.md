@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Show the remaining unsubmitted page-answer count with Submit after an interview.
+
 - Keep response scan watermarks unchanged when live events arrive, so refreshes retry earlier unreadable payloads.
 
 - Fall back to plain transcription when speaker labels are unavailable, retain text-only replies, and hide the labels toggle for other providers.

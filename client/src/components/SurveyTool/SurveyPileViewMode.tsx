@@ -3348,6 +3348,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             showSubmitButton,
             handlePileSubmitClick: () => handlePileSubmitWithOwnAnswers(engine),
             hasPendingPileChanges,
+            pendingAnswerCount: Number(_pileStats.total || 0),
             shouldHidePileSubmitButton,
             isSubmitting: engine.state.isSubmitting,
             activePromptMasked,

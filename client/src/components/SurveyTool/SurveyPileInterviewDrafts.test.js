@@ -331,11 +331,14 @@ it('treats an unsaved pile answer as answered, so the interview leaves its draft
   expect(uploadedRows(upload, 0)).toEqual([['q3', 'Agree']]);
   expect(pile.engine().state.surveysResponseState[0].answers.q1.value).toBe('Disagree');
   expect(pile.engine().getPendingEditStats().total).toBe(1);
+  expect(screen.getByText("1 answer on the page isn't submitted yet.")).toBeInTheDocument();
+  expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toBeEnabled();
   await act(async () => {
     await pile.engine().handlePileSubmitClick();
   });
   expect(uploadedRows(upload, 1)).toEqual([['q1', 'Disagree']]);
   expect(pile.engine().getPendingEditStats().total).toBe(0);
+  expect(screen.queryByText(/answer.*on the page.*submitted yet/)).not.toBeInTheDocument();
 });
 
 it('names every submitted response once the saved name box is ticked', async () => {

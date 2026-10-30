@@ -280,7 +280,7 @@ export const buildPileSubmitViewState = ({
   isAddress?: (value: string) => boolean;
 } = {}): PileSubmitViewState => {
   const hasPendingPileChanges = Number(pendingStats?.total || 0) > 0;
-  const pileSubmittedStateActive = !!(submittedSinceLastEdit || submissionComplete);
+  const pileSubmittedStateActive = !hasPendingPileChanges && !!(submittedSinceLastEdit || submissionComplete);
   const showPileSubmitSuccessBadge = pileSubmittedStateActive && !isSubmitting;
   const shouldHidePileSubmitButton = !hasPendingPileChanges && !isSubmitting && !pileSubmittedStateActive;
   const finalSubmitText = String(pileSubmitTempText || '') || String(pileSubmitLabel || '');
