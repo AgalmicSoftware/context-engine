@@ -160,6 +160,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Reject malformed WalletConnect query escapes with native URI decoding, removing the vulnerable decoder dependency while keeping the existing wallet stack.
+
 - Remove the unused SBT canvas image-load callback; previews continue to use fetched image files.
 
 - Preserve the pinned Worker session through the full question view, filters, and response editor so alias routes such as `/session/demo/questions` load without an EVM network.

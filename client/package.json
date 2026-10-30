@@ -119,7 +119,11 @@
       "ws": "7.5.11"
     },
     "@walletconnect/utils": {
-      "bn.js": "4.12.3"
+      "bn.js": "4.12.3",
+      "query-string": {
+        ".": "4.3.4",
+        "strict-uri-encode": "2.0.0"
+      }
     },
     "asn1.js": {
       "bn.js": "4.12.3"
