@@ -1,4 +1,5 @@
-import { sessionSlugStorageKey } from './sessionSlugResolution.js';
+import { readAuthorizationEpoch } from './authorizationScopeFreshness.js';
+import { normalizeWorkerSessionSlug, sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { getStorageIndexBinding, getStorageR2Binding } from './storageRouteExecution.js';
 import { coordinateWorkerGroupBackup } from './workerGroups.js';
 
@@ -49,7 +50,9 @@ export const cleanupCompletedBackupImport = async (coordinator, slug, archiveId,
   const authority = { ...progress.committedAuthority, projectionPending: true, projectionPendingSinceMs: coordinator.now() };
   await storage.transaction(async (transaction) => {
     await transaction.put('session-config-authority', authority);
-    await transaction.put('session-backup-import-completion', { archiveId, completedAt: coordinator.now(), counts: progress.counts });
+    await transaction.put('session-backup-import-completion', { archiveId, completedAt: coordinator.now(), counts: progress.counts,
+      actor: progress.actor, revision: authority.revision, authzEpoch: readAuthorizationEpoch(authority.config),
+      pageNumber: progress.pageNumber, pageHash: progress.pageHash });
     await transaction.delete(backupImportStateKey(archiveId));
     await transaction.delete(BACKUP_IMPORT_ACTIVE_KEY);
   });
@@ -110,7 +113,27 @@ export const readActiveBackupImport = async (coordinator, slug, cleanExpired = t
   return { archiveId, progress };
 };
 
+export const readCompletedBackupImport = async (coordinator, payload) => {
+  const receipt = await coordinator.state.storage.get('session-backup-import-completion');
+  if (!receipt || receipt.actor !== payload.expectedAuthority?.actor ||
+      (payload.archiveId && receipt.archiveId !== payload.archiveId) ||
+      !Number.isFinite(receipt.completedAt) || receipt.completedAt + BACKUP_IMPORT_TTL_MS <= coordinator.now()) return null;
+  const authority = await coordinator.readSessionConfigAuthority(sessionSlugStorageKey(payload.slug));
+  // This receipt only recovers the handoff result; later configuration changes
+  // end that access, and it never authorizes a new restore or other admin action.
+  if (!authority || authority.revision !== receipt.revision ||
+      readAuthorizationEpoch(authority.config) !== receipt.authzEpoch) return null;
+  await coordinator.repairPendingSessionConfigProjection();
+  const projected = await coordinator.env.GROUP_KV.get(`session:${normalizeWorkerSessionSlug(payload.slug)}:config`);
+  if (projected == null) return null;
+  return receipt;
+};
+
 export const controlCoordinatorBackupImport = async (coordinator, payload, abandon = false) => {
+  if (!abandon && await readCompletedBackupImport(coordinator, payload)) {
+    return Response.json({ ok: true, restore: null });
+  }
+  if (payload.completedOnly) return Response.json({ error: 'Admin authorization failed.' }, { status: 403 });
   await coordinator.assertSessionAuthority(payload, { allowRestore: true });
   let active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
   if (active?.progress.committedAuthority && active.progress.actor !== payload.expectedAuthority.actor) {

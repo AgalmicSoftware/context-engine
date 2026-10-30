@@ -71219,9 +71219,10 @@ var init_storageRouteExecution = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupLifecycle.js
-var BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStateKey, backupImportStagePrefix, fail2, backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJournal, clearBackupImportMetadata, cleanupCompletedBackupImport, assertNoActiveBackupImport, cleanup, readActiveBackupImport, controlCoordinatorBackupImport;
+var BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStateKey, backupImportStagePrefix, fail2, backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJournal, clearBackupImportMetadata, cleanupCompletedBackupImport, assertNoActiveBackupImport, cleanup, readActiveBackupImport, readCompletedBackupImport, controlCoordinatorBackupImport;
 var init_sessionBackupLifecycle = __esm({
   "workers/sessionCorsWorker/sessionBackupLifecycle.js"() {
+    init_authorizationScopeFreshness();
     init_sessionSlugResolution();
     init_storageRouteExecution();
     init_workerGroups();
@@ -71271,7 +71272,16 @@ var init_sessionBackupLifecycle = __esm({
       const authority = { ...progress.committedAuthority, projectionPending: true, projectionPendingSinceMs: coordinator.now() };
       await storage.transaction(async (transaction) => {
         await transaction.put("session-config-authority", authority);
-        await transaction.put("session-backup-import-completion", { archiveId, completedAt: coordinator.now(), counts: progress.counts });
+        await transaction.put("session-backup-import-completion", {
+          archiveId,
+          completedAt: coordinator.now(),
+          counts: progress.counts,
+          actor: progress.actor,
+          revision: authority.revision,
+          authzEpoch: readAuthorizationEpoch(authority.config),
+          pageNumber: progress.pageNumber,
+          pageHash: progress.pageHash
+        });
         await transaction.delete(backupImportStateKey(archiveId));
         await transaction.delete(BACKUP_IMPORT_ACTIVE_KEY);
       });
@@ -71335,7 +71345,21 @@ var init_sessionBackupLifecycle = __esm({
       }
       return { archiveId, progress };
     };
+    readCompletedBackupImport = async (coordinator, payload) => {
+      const receipt = await coordinator.state.storage.get("session-backup-import-completion");
+      if (!receipt || receipt.actor !== payload.expectedAuthority?.actor || payload.archiveId && receipt.archiveId !== payload.archiveId || !Number.isFinite(receipt.completedAt) || receipt.completedAt + BACKUP_IMPORT_TTL_MS <= coordinator.now()) return null;
+      const authority = await coordinator.readSessionConfigAuthority(sessionSlugStorageKey(payload.slug));
+      if (!authority || authority.revision !== receipt.revision || readAuthorizationEpoch(authority.config) !== receipt.authzEpoch) return null;
+      await coordinator.repairPendingSessionConfigProjection();
+      const projected = await coordinator.env.GROUP_KV.get(`session:${normalizeWorkerSessionSlug(payload.slug)}:config`);
+      if (projected == null) return null;
+      return receipt;
+    };
     controlCoordinatorBackupImport = async (coordinator, payload, abandon = false) => {
+      if (!abandon && await readCompletedBackupImport(coordinator, payload)) {
+        return Response.json({ ok: true, restore: null });
+      }
+      if (payload.completedOnly) return Response.json({ error: "Admin authorization failed." }, { status: 403 });
       await coordinator.assertSessionAuthority(payload, { allowRestore: true });
       let active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
       if (active?.progress.committedAuthority && active.progress.actor !== payload.expectedAuthority.actor) {
@@ -72141,6 +72165,22 @@ var init_sessionBackupImport = __esm({
       const missing = required.filter((fingerprint) => !fingerprints.includes(fingerprint));
       if (missing.length) fail6(`The target is missing backup recovery keys: ${missing.join(", ")}.`, 409, "recovery_key_mismatch");
       if (!await verifyBackupPage(page, env)) fail6("Backup page authentication failed. Use the original unmodified archive.", 403, "backup_authentication_failed");
+      const completed = await readCompletedBackupImport(coordinator, { ...payload, archiveId: page.archiveId });
+      if (completed) {
+        if (completed.pageNumber !== page.pageNumber || completed.pageHash !== await sha256Hex(JSON.stringify(page))) {
+          fail6("Resume completion with the final unchanged backup page.", 409);
+        }
+        return Response.json({
+          ok: true,
+          archiveId: page.archiveId,
+          pageNumber: page.pageNumber,
+          counts: completed.counts,
+          conflicts: [],
+          complete: true,
+          replayed: true,
+          restore: null
+        });
+      }
       const current = await coordinator.assertSessionAuthority(payload, { allowRestore: true });
       if (current && (!workerOrigin(current.config?.corsWorkerUrl) || workerUrlFields.some((key) => Object.hasOwn(current.config, key) && workerOrigin(current.config[key]) !== destination))) {
         fail6("The target config Worker origin does not match this restore destination.", 409);
@@ -88282,6 +88322,7 @@ init_sessionSlugResolution();
 init_sessionConfigAuthority();
 
 // workers/sessionCorsWorker/adminRequestAuthority.js
+init_sessionConfigAuthority();
 init_authorizationScopeFreshness();
 init_lib2();
 var toTrimmedString14 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
@@ -88542,6 +88583,17 @@ var resolveAdminRequestAuthority = async ({
       config: existingConfig,
       body
     });
+  }
+  if (!adminOk && existingConfig && (action === "session-backup-status" || action === "import-session-backup" && body?.adoptSessionId === true)) {
+    const completion = await callSessionConfigCoordinator({
+      env,
+      slug: targetSlug,
+      path: "backup/status",
+      completedOnly: true,
+      archiveId: action === "import-session-backup" ? body?.page?.archiveId : body?.archiveId,
+      expectedAuthority: { actor: address2.toLowerCase(), revision: corsState.revision, authzEpoch: readAuthorizationEpoch(existingConfig) }
+    });
+    adminOk = completion.ok === true;
   }
   if (!adminOk) {
     return {

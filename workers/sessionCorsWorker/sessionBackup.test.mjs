@@ -262,7 +262,7 @@ test('backup export refuses modified, unsigned, or foreign-session cursors befor
   assert.equal(stale.reason, 'backup_session_changed', 'A valid cursor cannot conceal concurrent writes');
 });
 
-test('restore validates recovery keys and refuses a completed archive on a nonempty target', async () => {
+test('restore validates recovery keys and replays only its completed receipt', async () => {
   const source = fixture();
   const metadata = { id: 'cf_restore_answer', resource: 'responses', responder: admin, size: 5, storageLayer: 'kv' };
   const indexKey = `ce-storage:${slug}:responses:${metadata.id}`;
@@ -291,8 +291,10 @@ test('restore validates recovery keys and refuses a completed archive on a nonem
       assert.equal(result.body.counts.conflicts, 0);
       assert.equal(await target.kv.get(indexKey), JSON.stringify(metadata));
       const replay = await importPage(target.env, page, 1);
-      assert.equal(replay.status, 409);
-      assert.equal(replay.body.reason, 'backup_target_not_empty');
+      assert.equal(replay.status, 200);
+      assert.equal(replay.body.replayed, true);
+      assert.equal(replay.body.complete, true);
+      assert.equal(await target.kv.get(payloadKey), JSON.stringify({ metadata, payloadBase64url: Buffer.from('hello').toString('base64url') }));
     }
   }
 });
@@ -1477,4 +1479,49 @@ test('the signed restore destination is checked against the actual HTTP request 
   assert.equal(response.status, 400, await response.clone().text());
   assert.equal(await target.kv.get(`session:${slug}:config`), null);
   assert.equal([...target.env.__coordinatorInstances.values()].some(({ store }) => store.has('session-backup-import-active')), false);
+});
+
+for (const recovery of ['status', 'retry']) test(`signed restore ${recovery} recovers a lost handoff reply without granting admin rights`, async (t) => {
+  const { ethers } = createRequire(new URL('../../package.json', import.meta.url))('ethers');
+  const importer = new ethers.Wallet(`0x${'4'.repeat(64)}`);
+  const stranger = new ethers.Wallet(`0x${'5'.repeat(64)}`);
+  let clock = Date.now();
+  t.mock.method(Date, 'now', () => clock);
+  const source = fixture();
+  const [page] = await allPages(source.env);
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  Object.assign(target.env, { BOOTSTRAP_ADMIN_ADDRESS: importer.address, ADMIN_TRUSTED_ORIGINS: 'https://app.example' });
+  const worker = createWorkerRuntime(target.env, { now: () => clock });
+  const call = async (signer, action, body) => {
+    clock += 20_000;
+    const signed = await createSignedSiweBody({ worker, env: target.env, wallet: signer, sessionSlug: slug,
+      adminAction: action, audience: 'https://app.example', body });
+    return worker.fetch(makeJsonRequest(`/admin/${action}`, signed, { headers: { Origin: 'https://app.example' } }), target.env);
+  };
+  const importBody = { page, adoptSessionId: true, workerUrl: 'https://worker.example' };
+  const put = target.kv.put;
+  let loseReply = true;
+  target.kv.put = async (key, value) => {
+    const result = await put(key, value);
+    if (loseReply && key === `session:${slug}:config`) { loseReply = false; throw new Error('Lost handoff reply'); }
+    return result;
+  };
+  assert.equal((await call(importer, 'import-session-backup', importBody)).status, 503);
+  const action = recovery === 'status' ? 'session-backup-status' : 'import-session-backup';
+  const body = recovery === 'status' ? { archiveId: page.archiveId } : importBody;
+  const recovered = await call(importer, action, body);
+  assert.equal(recovered.status, 200, await recovered.clone().text());
+  assert.equal((await recovered.json()).restore, null);
+  assert.equal((await call(stranger, action, body)).status, 403);
+  assert.equal((await call(importer, 'session-backup-status', { archiveId: 'different' })).status, 403);
+  assert.equal((await call(importer, 'set-config', { config: { sessionName: 'Unauthorized' } })).status, 403);
+  const store = restoreStore(target.env);
+  const receipt = store.get('session-backup-import-completion');
+  store.set('session-backup-import-completion', { ...receipt, completedAt: 0 });
+  assert.equal((await call(importer, action, body)).status, 403);
+  store.set('session-backup-import-completion', receipt);
+  const authority = store.get('session-config-authority');
+  store.set('session-config-authority', { ...authority, revision: authority.revision + 1 });
+  assert.equal((await call(importer, action, body)).status, 403);
 });

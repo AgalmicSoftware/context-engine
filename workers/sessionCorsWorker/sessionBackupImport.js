@@ -1,6 +1,6 @@
 import { SESSION_SECRETS_AUTHORITY_KEY } from './sessionSecretsAuthority.js';
 import { assertAgentBackupTargetEmpty } from './agent/backup.mjs';
-import { BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStagePrefix, backupImportJournalKey, journalBackupImportWrite, readActiveBackupImport, cleanupCompletedBackupImport } from './sessionBackupLifecycle.js';
+import { BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStagePrefix, backupImportJournalKey, journalBackupImportWrite, readActiveBackupImport, cleanupCompletedBackupImport, readCompletedBackupImport } from './sessionBackupLifecycle.js';
 import { verifyBackupPage } from './sessionBackupAuthentication.js';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
@@ -132,6 +132,14 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const missing = required.filter((fingerprint) => !fingerprints.includes(fingerprint));
   if (missing.length) fail(`The target is missing backup recovery keys: ${missing.join(', ')}.`, 409, 'recovery_key_mismatch');
   if (!await verifyBackupPage(page, env)) fail('Backup page authentication failed. Use the original unmodified archive.', 403, 'backup_authentication_failed');
+  const completed = await readCompletedBackupImport(coordinator, { ...payload, archiveId: page.archiveId });
+  if (completed) {
+    if (completed.pageNumber !== page.pageNumber || completed.pageHash !== await sha256Hex(JSON.stringify(page))) {
+      fail('Resume completion with the final unchanged backup page.', 409);
+    }
+    return Response.json({ ok: true, archiveId: page.archiveId, pageNumber: page.pageNumber,
+      counts: completed.counts, conflicts: [], complete: true, replayed: true, restore: null });
+  }
   const current = await coordinator.assertSessionAuthority(payload, { allowRestore: true });
   if (current && (!workerOrigin(current.config?.corsWorkerUrl) || workerUrlFields.some(key =>
     Object.hasOwn(current.config, key) && workerOrigin(current.config[key]) !== destination))) {
