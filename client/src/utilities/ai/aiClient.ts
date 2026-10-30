@@ -447,7 +447,10 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
       targetHz: TRANSCRIBE_WAV_TARGET_HZ,
     });
     if (!chunkedUploads.length) {
-      throw new Error('Audio exceeds the /transcribe 25 MB upload limit and could not be chunked client-side.');
+      throw Object.assign(
+        new Error('Audio exceeds the /transcribe 25 MB upload limit and could not be decoded into smaller chunks.'),
+        { status: 422 },
+      );
     }
 
     let merged = '';

@@ -1,3 +1,4 @@
+import { transcribe as transcribeWorker } from '../../../../workers/sessionCorsWorker/transcribeExecution.js';
 import * as audioTranscription from './aiClientAudioTranscription';
 import {
   analyzeClusterOpinions,
@@ -726,6 +727,70 @@ describe('group transcription fallback', () => {
     expect(await read(first.get('file'))).toBe('same audio');
   });
 
+  it.each([
+    [404, { code: 'model_not_found' }],
+    [400, { type: 'invalid_request_error', param: 'response_format' }],
+    [422, { param: 'chunking_strategy' }],
+    [400, { message: 'Unsupported labeling option' }],
+  ])('falls back using the actual Worker error envelope for HTTP %s (%j)', async (status, providerError) => {
+    const OriginalResponse = global.Response;
+    class ProviderResponse {
+      ok = false;
+      constructor() {
+        this.status = status;
+      }
+      async json() {
+        return { error: providerError };
+      }
+    }
+    let rejection;
+    global.Response = ProviderResponse;
+    try {
+      rejection = await transcribeWorker({
+        transcribeRequest: {
+          ok: true,
+          payload: {
+            provider: 'openai',
+            requestApiKey: 'synthetic-key',
+            groupSpeakerLabels: true,
+            upstreamFormData: new FormData(),
+          },
+        },
+        deps: {
+          safeFetch: async () => new ProviderResponse(),
+          json: (body, responseStatus) => ({
+            ok: responseStatus < 400,
+            status: responseStatus,
+            json: async () => body,
+          }),
+        },
+      });
+    } finally {
+      global.Response = OriginalResponse;
+    }
+    expect(await rejection.json()).toEqual({ error: expect.any(String), details: { error: providerError } });
+    fetchWorkerWithAuth.mockResolvedValueOnce(rejection);
+    await expect(transcribeGroupAudio(new Blob(['retained audio'], { type: 'audio/webm' }))).resolves.toMatchObject({
+      text: 'Recovered transcript.',
+      segments: [],
+      labelsUnavailableReason: expect.any(String),
+    });
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
+    expect(fetchWorkerWithAuth.mock.calls[1][1].body.get('labelSpeakers')).toBeNull();
+  });
+
+  it('marks undecodable oversized audio as permanent after trying the plain fallback', async () => {
+    const audio = new Blob(['undecodable'], { type: 'audio/webm' });
+    Object.defineProperty(audio, 'size', { value: 25 * 1024 * 1024 });
+    const split = jest.spyOn(audioTranscription, 'splitAudioBlobToWavChunks').mockResolvedValue([]);
+    try {
+      await expect(transcribeGroupAudio(audio)).rejects.toMatchObject({ status: 422 });
+      expect(split).toHaveBeenCalled();
+    } finally {
+      split.mockRestore();
+    }
+  });
+
   it('keeps a paid text-only reply without uploading the audio again', async () => {
     await expect(transcribeGroupAudio(new Blob(['audio'], { type: 'audio/webm' }))).resolves.toEqual({
       text: 'Recovered transcript.',
@@ -736,7 +801,11 @@ describe('group transcription fallback', () => {
   });
 
   it('does not turn a transient provider failure into an extra plain request', async () => {
-    fetchWorkerWithAuth.mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({ error: 'Busy' }) });
+    fetchWorkerWithAuth.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: 'Busy', details: { error: { code: 'model_not_found' } } }),
+    });
     await expect(transcribeGroupAudio(new Blob(['audio'], { type: 'audio/webm' }))).rejects.toThrow('Busy');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
   });

@@ -113,18 +113,29 @@ const requestAudioTranscription = async (
 
   if (!resp.ok) {
     const record = asRecord(data);
-    const code = stringValue(record.reason || record.code || asRecord(record.error).code);
-    if (
-      groupSpeakerLabels &&
-      (resp.status === 413 ||
-        [
-          'ai_model_not_allowed',
-          'model_not_found',
-          'unsupported_model',
-          'unsupported_response_format',
-          'unsupported_provider',
-        ].includes(code))
-    ) {
+    const providerError = asRecord(asRecord(record.details).error);
+    const reasons = [
+      record.reason,
+      record.code,
+      asRecord(record.error).code,
+      providerError.code,
+      providerError.type,
+      providerError.param,
+    ].map(stringValue);
+    const transient = resp.status === 408 || resp.status === 429 || resp.status >= 500;
+    const labelConfigurationError = reasons.some((reason) =>
+      [
+        'ai_model_not_allowed',
+        'model_not_found',
+        'unsupported_model',
+        'unsupported_response_format',
+        'unsupported_provider',
+        'invalid_request_error',
+        'response_format',
+        'chunking_strategy',
+      ].includes(reason),
+    );
+    if (groupSpeakerLabels && !transient && ((resp.status >= 400 && resp.status < 500) || labelConfigurationError)) {
       throw new SpeakerLabelsUnavailableError(
         'Speaker labels are unavailable for this provider, Worker, or audio size.',
       );
