@@ -157,6 +157,17 @@ describe('sessionResultsGeneratedViewAdapters', () => {
     ).toBe('Breakdown charts binary, rating, and multiple-choice questions only.');
   });
 
+  it('trims both option labels and picks without collapsing their internal whitespace', () => {
+    const result = buildGeneratedBreakdownAnalysisData({
+      questions: [{ id: 'q1', type: 'multichoice', options: [' A  B ', 'A B'] }],
+      responses: [{ questionId: 'q1', participantId: 'p1', answer: [' A  B ', 'A  B'] }],
+    });
+    expect(result.analysisData?.flatResponses.map(({ responseText, count }) => [responseText, count])).toEqual([
+      ['A  B', 1],
+      ['A B', 0],
+    ]);
+  });
+
   it('counts exact selections when an option contains the selection separator', () => {
     const result = buildGeneratedBreakdownAnalysisData({
       questions: [

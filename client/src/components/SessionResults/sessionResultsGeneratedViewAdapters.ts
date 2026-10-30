@@ -73,6 +73,7 @@ const slugify = (value: unknown, fallback = 'item'): string => {
 };
 
 const uniqueTexts = (values: unknown[]): string[] => Array.from(new Set(values.map(toText).filter(Boolean)));
+const choiceLabel = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 const flattenSourceRefValues = (value: unknown): unknown[] => {
   if (Array.isArray(value)) return value.flatMap(flattenSourceRefValues);
@@ -258,7 +259,7 @@ const normalizeQuestion = (question: GeneratedSessionResultsSubmittedQuestion, i
   return {
     id,
     text,
-    options: uniqueTexts(toArray(question.options)),
+    options: [...new Set(toArray(question.options).map(choiceLabel).filter(Boolean))],
     category: uniqueTexts(toArray(question.tags))[0] || '',
     keyTension: '',
     sourcePromptType: toText(question.type) || 'session',
@@ -319,9 +320,9 @@ export const buildGeneratedBreakdownAnalysisData = ({
       question.sourcePromptType.toLowerCase() === 'multichoice'
         ? [
             ...new Set(
-              toArray(response.answer).filter(
-                (pick): pick is string => typeof pick === 'string' && question.options.includes(pick),
-              ),
+              toArray(response.answer)
+                .map(choiceLabel)
+                .filter((pick) => question.options.includes(pick)),
             ),
           ]
         : [toText(response.answer)];

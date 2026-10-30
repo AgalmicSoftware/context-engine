@@ -642,6 +642,8 @@ Admin test panel:
   option labels, including single-select answers. Breakdown counts those selections
   directly; only model prose joins labels. Regenerate previously built snapshots
   from their source responses; joined choice strings are not parsed into selections.
+  Breakdown trims labels and picks without collapsing internal whitespace, keeping
+  double spaces and non-breaking spaces consistent with the Report's counts.
 - Every generated argument-map claim requires nonempty `participantIds` and
   `questionIds`. Whenever a generated record cites both arrays, every cited
   participant must have an included response to a cited question, and every

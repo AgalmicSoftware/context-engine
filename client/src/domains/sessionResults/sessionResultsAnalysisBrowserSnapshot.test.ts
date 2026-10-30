@@ -1,3 +1,4 @@
+import { buildGeneratedBreakdownAnalysisData } from '../../components/SessionResults/sessionResultsGeneratedViewAdapters';
 import { buildResultsAnalysisBrowserSnapshotFromCacheNode } from './sessionResultsAnalysisBrowserSnapshot';
 import { loadAdminSnapshotResultsAnalysisSource } from '../../../../workers/sessionCorsWorker/resultsAnalysisGeneration';
 
@@ -218,3 +219,42 @@ it('counts a note-only encrypted response as locked like the Worker', () => {
   expect(result.counts.skippedCount).toBe(1);
   expect(result.snapshot.responses).toHaveLength(1);
 });
+
+it.each(['Two  spaces', 'Non\u00a0breaking'])(
+  'keeps stored option whitespace from Worker snapshots through Breakdown: %s',
+  async (option) => {
+    const source = await loadAdminSnapshotResultsAnalysisSource({
+      slug: 'edge',
+      config: { slug: 'edge' },
+      body: {
+        source: {
+          kind: 'admin-snapshot',
+          snapshot: {
+            sessionSlug: 'edge',
+            questions: [{ id: 'q1', prompt: 'Choose', type: 'multichoice', options: [option, 'Other'] }],
+            responses: [
+              { questionId: 'q1', participantId: 'participant-one', answer: [` ${option} `] },
+              { questionId: 'q1', participantId: 'participant-two', answer: ['Other'] },
+            ],
+          },
+        },
+      },
+    });
+    expect(source.ok).toBe(true);
+    if (!source.ok || !('snapshot' in source)) throw new Error('Worker did not return a normalized snapshot.');
+    expect(source.snapshot.responses.map((row) => row.answer)).toEqual(expect.arrayContaining([[option], ['Other']]));
+    const result = buildGeneratedBreakdownAnalysisData(source.snapshot);
+    expect(
+      result.analysisData?.flatResponses.map(({ responseText, count, participantCount, totalVotes, rate }) => [
+        responseText,
+        count,
+        participantCount,
+        totalVotes,
+        rate,
+      ]),
+    ).toEqual([
+      [option, 1, 2, 2, 0.5],
+      ['Other', 1, 2, 2, 0.5],
+    ]);
+  },
+);
