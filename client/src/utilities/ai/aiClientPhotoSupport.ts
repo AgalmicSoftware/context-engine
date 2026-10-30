@@ -90,7 +90,7 @@ export const resolvePhotoAnalysisSupport = ({
       Object.values(candidate.models).some((modelName) => modelLeaf(modelName) === leaf),
   );
   const isOpenAiVisionModel = /^(gpt-5|gpt-4o|gpt-4\.1)/.test(leaf);
-  const isClaudeVisionModel = /^claude-(?:[34](?:[.-]|$)|(?:sonnet|opus|haiku)-[34](?:[.-]|$))/.test(leaf);
+  const isClaudeVisionModel = /^claude-(?:[345](?:[.-]|$)|(?:sonnet|opus|haiku)-[345](?:[.-]|$))/.test(leaf);
   const customModelSupported =
     (normalizedProvider === 'openai' && isOpenAiVisionModel) ||
     (normalizedProvider === 'anthropic' && isClaudeVisionModel) ||
