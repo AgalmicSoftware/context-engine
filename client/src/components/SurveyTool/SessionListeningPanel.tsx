@@ -340,20 +340,31 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   } = props;
   const [labelSpeakers, setLabelSpeakers] = useState(true);
   const [speakerLabelsSupported, setSpeakerLabelsSupported] = useState<boolean | null>(null);
+  const [speakerLabelsCheckTimedOut, setSpeakerLabelsCheckTimedOut] = useState(false);
   useEffect(() => {
     let current = true;
     setSpeakerLabelsSupported(null);
-    // Checking availability must not unlock local credentials or prompt a wallet.
+    setSpeakerLabelsCheckTimedOut(false);
+    const complete = (supported: boolean) => {
+      if (!current) return;
+      current = false;
+      clearTimeout(timeout);
+      setSpeakerLabelsSupported(supported);
+    };
+    const timeout = setTimeout(() => {
+      if (!current) return;
+      setSpeakerLabelsCheckTimedOut(true);
+      complete(false);
+    }, 2000);
+    // Checking availability must not unlock credentials or delay Record indefinitely.
+    // Ignore late results so a timeout cannot switch labels on during capture.
     void getEffectiveTranscriptionConfig({ sessionSlug, sessionConfig }).then(
-      (config) => {
-        if (current) setSpeakerLabelsSupported(config.provider === 'openai');
-      },
-      () => {
-        if (current) setSpeakerLabelsSupported(false);
-      },
+      (config) => complete(config.provider === 'openai'),
+      () => complete(false),
     );
     return () => {
       current = false;
+      clearTimeout(timeout);
     };
   }, [sessionSlug, sessionConfig]);
   const [recordSpeakerAudio, setRecordSpeakerAudio] = useState(() => {
@@ -693,6 +704,9 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         >
           Close and keep the audio
         </Button>
+      ) : null}
+      {panelMode === 'recordGroup' && speakerLabelsCheckTimedOut ? (
+        <div role="status">Speaker label check timed out. Recording is available with plain transcription.</div>
       ) : null}
       {recorder.labelsUnavailableReason ? (
         <div role="status">{recorder.labelsUnavailableReason} Continuing with plain transcription.</div>

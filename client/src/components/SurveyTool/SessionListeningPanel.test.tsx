@@ -802,3 +802,39 @@ it('generates with a gap warning and offers closing while keeping pending audio'
   expect(finalizeRecording).toHaveBeenCalledWith({ waitForTranscription: false });
   expect(keepAudio).toHaveBeenCalledTimes(1);
 });
+
+it('makes Record available with plain transcription after two seconds and ignores a late provider result', async () => {
+  jest.useFakeTimers();
+  type Config = Awaited<ReturnType<typeof getEffectiveTranscriptionConfig>>;
+  let resolve!: (config: Config) => void;
+  jest.mocked(getEffectiveTranscriptionConfig).mockImplementationOnce(
+    () =>
+      new Promise<Config>((done) => {
+        resolve = done;
+      }),
+  );
+  const startRecording = jest.fn();
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ startRecording }));
+  try {
+    render(<SessionListeningPanel sessionSlug="timed-provider" panelMode="recordGroup" />);
+    const start = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1999);
+    });
+    expect(start).toBeDisabled();
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1);
+    });
+    expect(start).toBeEnabled();
+    expect(screen.getByText(/Speaker label check timed out/)).toHaveTextContent('plain transcription');
+    fireEvent.click(start);
+    expect(startRecording).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolve({ provider: 'openai' } as Config);
+    });
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+    expect(screen.queryByRole('checkbox', { name: 'Label speakers' })).not.toBeInTheDocument();
+  } finally {
+    jest.useRealTimers();
+  }
+});

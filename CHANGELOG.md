@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Enable Group Conversation recording with plain transcription when the speaker-label provider check takes more than two seconds.
+
 - Leave no empty recording chunk when microphone capture fails to start or rotate; retain the active chunk on rotation failure.
 
 - Keep timestamped hidden-page recording notices after returning and stopping, until dismissed.
