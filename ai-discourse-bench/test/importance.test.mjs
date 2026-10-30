@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
 
 import {
   buildImportanceJsonSchema,
@@ -403,4 +404,18 @@ test('importance rejects endpoints mixed within one run artifact', async () => {
     callModelImpl: async () => ({ content: '{"allocations":[{"questionId":"q1","votes":2}]}',
       metadata: { endpoint: `http://127.0.0.1:${8000 + ++calls}/v1` } }),
   }), /multiple deployment identities/);
+});
+
+
+test('importance manifest fingerprints do not depend on the host locale', () => {
+  const moduleUrl = new URL('../src/importance.mjs', import.meta.url).href;
+  const roster = { models: ['model-z', 'model-ä'].map((id) => ({ id, model: id, provider: 'mock', traits: {} })) };
+  const script = `import { runImportanceBenchmark } from ${JSON.stringify(moduleUrl)};
+    const result = await runImportanceBenchmark({ questionBank: ${JSON.stringify(questionBank)},
+      modelRoster: ${JSON.stringify(roster)}, providerOverride: 'mock', budget: 10, maxAllocations: 2 });
+    process.stdout.write(result.manifest.promptHash);`;
+  const fingerprint = (locale) => execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+    env: { ...process.env, LANG: locale, LC_ALL: locale }, encoding: 'utf8',
+  });
+  assert.equal(fingerprint('en_US.UTF-8'), fingerprint('sv_SE.UTF-8'));
 });

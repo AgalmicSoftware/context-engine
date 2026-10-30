@@ -738,3 +738,5 @@ Importance allocations also require matching prompt and question-order hashes in
 preview builds. These checks use the complete selected bank before any
 `--limit-questions` display restriction, so edits outside that subset still
 require new importance runs.
+
+Importance prompt fingerprints order model identifiers using the explicit English locale so host locale settings cannot alter a manifest.

@@ -635,6 +635,8 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Keep importance prompt fingerprints stable across host locales.
+
 - Bind preview importance allocations to the full question wording and order before display limits.
 
 - Refuse preview reports with missing or mismatched question prompt hashes before answers can be exported against changed wording.

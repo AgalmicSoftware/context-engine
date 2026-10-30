@@ -277,7 +277,7 @@ export const buildImportanceRunId = ({ benchmarkId, modelId, repeatIndex }) => (
 );
 
 const canonicalImportancePromptRows = (runs) => [...runs]
-  .sort((left, right) => left.modelId.localeCompare(right.modelId) || left.repeatIndex - right.repeatIndex)
+  .sort((left, right) => left.modelId.localeCompare(right.modelId, 'en') || left.repeatIndex - right.repeatIndex)
   .map(({ runId, promptHash }) => ({ runId, promptHash }));
 
 export const runImportanceBenchmark = async ({
