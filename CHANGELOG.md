@@ -4,10 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Preserve the pinned Worker session through the full question view, filters, and response editor so alias routes such as `/session/demo/questions` load without an EVM network.
-
-- Remove the unused standalone `/debate`, `/beta`, `/contributors`, `/matrix`, and `/demos` pages and obsolete navigation. Preserve Atlas, simulated profiles, demo sessions, and the shared risk matrix.
-
 - Include catalog completeness in the interview compatibility fixture.
 
 - Complete mocked Lit provisioning checkpoints before testing atomic configuration writes.
@@ -163,6 +159,10 @@ All notable changes to this project will be documented in this file.
 - Add an in-process participation rehearsal for concurrent invite, Wrapped prediction and signed-in browser response flows, with optional KV write throttling.
 
 ### Client — available when the site deploys
+
+- Preserve the pinned Worker session through the full question view, filters, and response editor so alias routes such as `/session/demo/questions` load without an EVM network.
+
+- Remove the unused standalone `/debate`, `/beta`, `/contributors`, `/matrix`, and `/demos` pages and obsolete navigation. Preserve Atlas, simulated profiles, demo sessions, and the shared risk matrix.
 
 - Preserve an in-flight SBT image when pasting supplies no usable replacement; only an applied image supersedes it.
 
