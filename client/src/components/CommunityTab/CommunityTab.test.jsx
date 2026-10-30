@@ -1,3 +1,4 @@
+jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import { buildSbtActivityCacheEntry } from '../../utilities/sbt/sbtActivityCacheEntry.js';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';

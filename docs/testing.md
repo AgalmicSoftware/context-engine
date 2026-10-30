@@ -156,3 +156,5 @@ Wallet behavior and local contract setup are documented in
 [docs/local-chain.md](local-chain.md).
 
 The contracts job installs both root and Session Worker dependencies: the registry participation smoke imports Worker handlers and must resolve the isolated Worker ethers v6, while root contract tooling remains on ethers v5.
+
+Component tests importing the shared logout helper mock `wagmi/actions` alongside the wallet UI bridge. Logout behavior itself is covered by the shared-auth and account tests; unrelated component suites do not load or call the live wallet action.
