@@ -275,6 +275,7 @@ type CreateSurveyPublicationContext = {
   sessionSlug: string;
   draftKey: string;
   submittedDraft: string;
+  storedDraft: string | null | undefined;
   cacheTarget: CreateQuestionsManagedCacheSeedTargets;
   workerCacheIdentity: ReturnType<typeof resolveCreateQuestionsManagedWorkerCacheIdentity>;
   account: string;
@@ -868,7 +869,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       const sessionSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
       const draftKey = publication?.draftKey || buildCreateSurveyDraftStorageKey(sessionSlug);
       try {
-        if (!publication || storage.getItem(draftKey) === publication.submittedDraft) {
+        const storedDraft = storage.getItem(draftKey);
+        if (!publication || storedDraft === publication.storedDraft || storedDraft === publication.submittedDraft) {
           storage.removeItem(draftKey);
         }
         if (draftKey !== CREATE_SURVEY_DRAFT_LEGACY_KEY) {
@@ -2268,9 +2270,17 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     const submitProps = { ...this.props };
     const submittedState = JSON.parse(JSON.stringify(this.state)) as CreateQuestionsAndSurveysState;
     const cacheTarget = this.resolveManagedCacheSeedTargets();
+    const draftKey = buildCreateSurveyDraftStorageKey(this.getActiveSessionSlug());
+    let storedDraft: string | null | undefined;
+    try {
+      storedDraft = getCreateSurveyDraftStorage()?.getItem(draftKey);
+    } catch (_) {
+      /* Storage failure must not block publication. */
+    }
     const publication: CreateSurveyPublicationContext = {
       sessionSlug: normalizeSessionSlug(this.getActiveSessionSlug() || ''),
-      draftKey: buildCreateSurveyDraftStorageKey(this.getActiveSessionSlug()),
+      draftKey,
+      storedDraft,
       submittedDraft: this.serializeUnfinishedSurveyDraft(),
       cacheTarget,
       workerCacheIdentity: this.resolveManagedWorkerCacheIdentity(cacheTarget),

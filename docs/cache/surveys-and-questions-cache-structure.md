@@ -278,3 +278,7 @@ Response change detection uses the question's declared type. Freeform answers
 and comments compare as exact text, including leading zeros and large integer
 strings. Only rating answers compare numerically. Editing, pending counts,
 submission differences and interview review share this policy.
+
+Successful question or survey publication clears the unchanged saved authoring
+draft captured at submit, even if a debounced save lagged behind the submitted
+form. A newer stored draft written during publication is preserved.

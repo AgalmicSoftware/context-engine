@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Clear unchanged authoring drafts after publication even when their debounced save lagged behind the form.
+
 - Recheck encrypted wallet storage before saving a newly created passkey wallet.
 
 - Show the remaining unsubmitted page-answer count with Submit after an interview.

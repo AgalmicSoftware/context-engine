@@ -142,6 +142,30 @@ describe('publication completes in its captured session', () => {
     expect(subject.state.questions[0].prompt).toBe('New draft');
   });
 
+  it.each([true, false])(
+    'clears the stored draft even when its last debounced save predates submit (questions=%s)',
+    async (standalone) => {
+      const { subject, published, entered } = setup(standalone);
+      subject.state = { ...subject.state, title: 'Latest submitted title' };
+      const operation = subject.createSurvey();
+      await entered.promise;
+      published.resolve({ receipt: { status: 1 }, uploadedQuestions: [{ questionId: 'q1' }] });
+      await operation;
+      expect(localStorage.getItem(buildCreateSurveyDraftStorageKey('session-a'))).toBeNull();
+    },
+  );
+
+  it('preserves a draft saved by another editor during publication', async () => {
+    const { subject, published, entered } = setup(true);
+    const operation = subject.createSurvey();
+    await entered.promise;
+    const key = buildCreateSurveyDraftStorageKey('session-a');
+    localStorage.setItem(key, 'newer-editor-draft');
+    published.resolve({ receipt: { status: 1 }, uploadedQuestions: [{ questionId: 'q1' }] });
+    await operation;
+    expect(localStorage.getItem(key)).toBe('newer-editor-draft');
+  });
+
   it.each([true, false])('clears the unchanged submitted draft without a switch (questions=%s)', async (standalone) => {
     const { subject, published, entered } = setup(standalone);
     const operation = subject.createSurvey();
