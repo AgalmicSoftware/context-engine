@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Preserve registry routing in join links and recover from invalid admin Worker fields when resolving interview compatibility.
+
 - Preserve internal whitespace in Breakdown choice labels so valid selections and participant totals match the Report.
 
 - Disconnect MetaMask before logout clears account props, preserve explicit disconnect intent, and surface passkey disconnect failures.

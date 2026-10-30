@@ -4,19 +4,13 @@ import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
+import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection';
+import { normalizeShareableWorkerOrigin } from './sessionWizardUrlSupport';
 import { buildExternalInterviewKickoff } from '../SurveyTool/sessionInterview';
 import { verifyInterviewKickoffCatalog } from '../SurveyTool/sessionInterviewCatalogValidation';
 import styles from './SessionJoinPanel.module.scss';
 
 type Props = { sessionUrl?: string; sessionSlug?: string; workerUrl?: string; sessionConfig?: unknown };
-const originOf = (value: string): string => {
-  try {
-    const url = new URL(value);
-    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.origin : '';
-  } catch {
-    return '';
-  }
-};
 
 export default function SessionJoinPanel({ sessionUrl, sessionSlug, workerUrl = '', sessionConfig }: Props) {
   const [open, setOpen] = useState(false);
@@ -35,13 +29,18 @@ export default function SessionJoinPanel({ sessionUrl, sessionSlug, workerUrl = 
     url = null;
     slug = '';
   }
-  const activeWorker = originOf(
-    workerUrl || url?.searchParams.get('worker') || (resolvedWorker.session === slug ? resolvedWorker.url : ''),
-  );
-  // Sharing only the session identity and Worker prevents copying an admin token or prefill packet.
+  const linkedWorker = normalizeShareableWorkerOrigin(url?.searchParams.get('worker'));
+  const activeWorker =
+    normalizeShareableWorkerOrigin(workerUrl) ||
+    linkedWorker ||
+    normalizeShareableWorkerOrigin(resolvedWorker.session === slug ? resolvedWorker.url : '');
+  const pinWorker = claimsWorkerCanonicalAuthority(sessionConfig) || Boolean(linkedWorker);
+  // A Worker hint selects routing authority, so registry links must not gain one.
   const returnUrl =
-    url && activeWorker ? `${url.origin}${url.pathname}?${new URLSearchParams({ worker: activeWorker })}` : '';
-  const voiceUrl = returnUrl ? `${returnUrl}&mode=voice` : '';
+    url && activeWorker
+      ? `${url.origin}${url.pathname}${pinWorker ? `?${new URLSearchParams({ worker: activeWorker })}` : ''}`
+      : '';
+  const voiceUrl = returnUrl ? `${returnUrl}${pinWorker ? '&' : '?'}mode=voice` : '';
   const kickoff = returnUrl
     ? buildExternalInterviewKickoff({ workerUrl: activeWorker, sessionSlug: slug, sessionUrl: returnUrl })
     : '';
@@ -52,7 +51,8 @@ export default function SessionJoinPanel({ sessionUrl, sessionSlug, workerUrl = 
     const check = async () => {
       if (!activeWorker) {
         const worker = await getCorsProxyUrlOrThrow({ sessionSlug: slug, sessionConfig, allowDemoFallback: false });
-        if (!originOf(worker)) throw new Error('This session needs a Worker before its join links are available.');
+        if (!normalizeShareableWorkerOrigin(worker))
+          throw new Error('This session needs a Worker before its join links are available.');
         if (current) setResolvedWorker({ session: slug, url: worker });
         return;
       }

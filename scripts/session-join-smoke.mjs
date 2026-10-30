@@ -10,8 +10,13 @@ async function main() {
   await fs.mkdir(output, { recursive: true });
   const browser = await chromium.launch({ headless: true });
   try {
-    for (const theme of ['civic', 'context-engine']) {
+    for (const mode of ['linked', 'registry', 'worker', 'invalid']) for (const theme of ['civic', 'context-engine']) {
       for (const width of [375, 1280]) {
+        const workerPinned = mode === 'linked' || mode === 'worker';
+        const sessionUrl = `${base}/session/workshop${mode === 'linked' ? '?worker=https%3A%2F%2Fworker.example' : ''}`;
+        const props = { sessionUrl, workerUrl: mode === 'invalid' ? 'not a URL' : mode === 'linked' ? '' : 'https://worker.example',
+          sessionConfig: { slug: 'workshop', corsWorkerUrl: 'https://worker.example',
+            sessionModeProfile: { authority: { mode: mode === 'worker' ? 'worker_canonical' : 'registry' } } } };
         const page = await browser.newPage({ viewport: { width, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
         page.on('pageerror', error => console.error(error.message));
         page.on('response', response => { if (response.status() >= 400) console.error(response.status(), response.url()); });
@@ -32,7 +37,7 @@ async function main() {
             const ReactDOM = await import('/node_modules/.vite/deps/react-dom_client.js');
             const createRoot = ReactDOM.createRoot || ReactDOM.default.createRoot;
             const { default: Join } = await import('/src/components/Sessions/SessionJoinPanel.tsx');
-            createRoot(document.getElementById('probe')).render(React.createElement(Join, { sessionUrl: '${base}/session/workshop?worker=https%3A%2F%2Fworker.example' }));
+            createRoot(document.getElementById('probe')).render(React.createElement(Join, ${JSON.stringify(props)}));
           </script></body></html>` });
           return route.continue();
         });
@@ -40,15 +45,15 @@ async function main() {
         await page.getByRole('button', { name: 'Join', exact: true }).click();
         await page.getByRole('button', { name: 'Copy AI prompt' }).waitFor();
         await page.waitForFunction(() => !document.querySelector('[aria-label="Copy AI prompt"]').disabled);
-        const voice = `${base}/session/workshop?worker=https%3A%2F%2Fworker.example&mode=voice`;
+        const voice = `${base}/session/workshop?${workerPinned ? 'worker=https%3A%2F%2Fworker.example&' : ''}mode=voice`;
         assert.equal(await page.getByRole('link', { name: 'Open voice interview' }).getAttribute('href'), voice);
         await page.getByRole('button', { name: 'Copy voice link' }).click();
         assert.equal(await page.evaluate(() => navigator.clipboard.readText()), voice);
         await page.getByRole('button', { name: 'Copy AI prompt' }).click();
         assert.match(await page.evaluate(() => navigator.clipboard.readText()), /review-only Context Engine interview prefill/);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
-        await page.getByTestId('ce-session-join').screenshot({ path: path.join(output, `join-${theme}-${width}.png`) });
-        console.log(`PASS Join panel ${theme} ${width}`);
+        await page.getByTestId('ce-session-join').screenshot({ path: path.join(output, `join-${mode}-${theme}-${width}.png`) });
+        console.log(`PASS Join panel ${mode} ${theme} ${width}`);
         await page.close();
       }
     }

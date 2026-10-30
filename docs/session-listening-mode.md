@@ -467,7 +467,7 @@ The complete initial/continued voice instructions fit below the Worker’s 32,00
 
 ### Sharing the voice interview
 
-The session page, admin page and publish result include a compact **Join** panel. Its QR code and **Copy link** action open the voice chooser on another device, retaining the session Worker origin. **For your AI** copies the same review-only prompt as the voice launcher after checking catalog compatibility. Join links contain only the session path and Worker origin; admin tokens and prefill fragments are never copied.
+The session page, admin page and publish result include a compact **Join** panel. Its QR code and **Copy link** action open the voice chooser on another device. A Worker origin is included only for Worker-canonical sessions or when the current session link already carries one; registry session links keep registry routing. **For your AI** copies the same review-only prompt as the voice launcher after checking catalog compatibility. Join links contain only the session path and, when needed, the validated Worker origin; admin tokens and prefill fragments are never copied.
 
 ### Recording on a phone or with remote speakers
 

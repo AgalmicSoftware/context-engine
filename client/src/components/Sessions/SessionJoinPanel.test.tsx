@@ -1,3 +1,4 @@
+import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionJoinPanel from './SessionJoinPanel';
 import { buildExternalInterviewKickoff } from '../SurveyTool/sessionInterview';
@@ -62,3 +63,53 @@ it('offers selectable text if clipboard access fails', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('Copy the text below');
   expect(screen.getByLabelText('Text to copy')).toHaveValue(`${cleanUrl}&mode=voice`);
 });
+
+it.each([
+  ['registry', 'registry', 'https://site.example/session/workshop'],
+  ['Worker canonical', 'worker_canonical', cleanUrl],
+])('keeps %s routing authority in voice and AI join links', async (_, mode, expected) => {
+  render(
+    <SessionJoinPanel
+      sessionUrl="https://site.example/session/workshop?token=private"
+      workerUrl="https://worker.example/"
+      sessionConfig={{ sessionModeProfile: { authority: { mode } } }}
+    />,
+  );
+  fireEvent.click(screen.getByText('Join'));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeEnabled());
+  const voice = `${expected}${expected.includes('?') ? '&' : '?'}mode=voice`;
+  expect(screen.getByRole('link', { name: 'Open voice interview' })).toHaveAttribute('href', voice);
+  expect(screen.getByTestId('qr')).toHaveAttribute('data-value', voice);
+  expect(verify).toHaveBeenCalledWith({
+    workerUrl: 'https://worker.example',
+    sessionSlug: 'workshop',
+    sessionUrl: expected,
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Copy AI prompt' }));
+  await waitFor(() =>
+    expect(writeText).toHaveBeenCalledWith(
+      buildExternalInterviewKickoff({
+        workerUrl: 'https://worker.example',
+        sessionSlug: 'workshop',
+        sessionUrl: expected,
+      }),
+    ),
+  );
+});
+
+it.each(['not a URL', 'https://wrong.example/path', 'https://fixture:[redacted-email]'])(
+  'uses the resolved Worker when the admin field is invalid: %s',
+  async (workerUrl) => {
+    jest.mocked(getCorsProxyUrlOrThrow).mockResolvedValue('https://worker.example');
+    render(<SessionJoinPanel sessionUrl="https://site.example/session/workshop" workerUrl={workerUrl} />);
+    fireEvent.click(screen.getByText('Join'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeEnabled());
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledTimes(1);
+    expect(verify).toHaveBeenCalledWith({
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'workshop',
+      sessionUrl: 'https://site.example/session/workshop',
+    });
+    expect(screen.queryByText('Checking session compatibility…')).not.toBeInTheDocument();
+  },
+);

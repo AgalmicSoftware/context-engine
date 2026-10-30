@@ -58,7 +58,7 @@ export const normalizeSessionWizardWorkerUrl = (url: unknown): string => normali
 const resolveBrowserOrigin = (): string =>
   typeof window !== 'undefined' && window.location ? toStr(window.location.origin).trim() : '';
 
-const normalizeShareableWorkerOrigin = (value: unknown): string => {
+export const normalizeShareableWorkerOrigin = (value: unknown): string => {
   try {
     const parsed = new URL(toStr(value).trim());
     if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) return '';
