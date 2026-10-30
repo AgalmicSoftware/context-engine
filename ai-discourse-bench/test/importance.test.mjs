@@ -419,3 +419,25 @@ test('importance manifest fingerprints do not depend on the host locale', () => 
   });
   assert.equal(fingerprint('en_US.UTF-8'), fingerprint('sv_SE.UTF-8'));
 });
+
+test('question shuffles and mock allocations use code-point hash order', async () => {
+  const bank = { ...questionBank, questions: Array.from({ length: 20 }, (_, index) => ({
+    id: `q${index}`, canonicalPrompt: `Question ${index}`, topic: 'fixture',
+  })) };
+  const order = () => orderImportanceQuestionBank({ questionBank: bank, modelId: 'mock-model', repeatIndex: 1 }).questions.map(row => row.id);
+  const run = async () => (await runImportanceBenchmark({ questionBank: bank,
+    modelRoster: { models: [{ id: 'mock-model', model: 'mock-model', provider: 'mock', traits: {} }] },
+    budget: 10, maxAllocations: 2, repeats: 1,
+  })).runs[0].allocations;
+  const expectedOrder = order();
+  const expectedAllocations = await run();
+  const original = String.prototype.localeCompare;
+  try {
+    String.prototype.localeCompare = function (other, ...args) {
+      const result = original.call(this, other, ...args);
+      return /^[0-9a-f]{64}$/.test(String(this)) ? -result : result;
+    };
+    assert.deepEqual(order(), expectedOrder);
+    assert.deepEqual(await run(), expectedAllocations);
+  } finally { String.prototype.localeCompare = original; }
+});

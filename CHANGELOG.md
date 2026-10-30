@@ -697,6 +697,8 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark reports
 
+- Compare importance shuffle and mock-allocation hashes in code-point order; model fingerprint ordering retains its explicit English locale.
+
 - Omit full-bank importance from question-limited previews with an explicit integrity warning instead of silently dropping allocation runs.
 
 - Require one schedule seed per release report and warn when previews combine different seeds.

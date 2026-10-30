@@ -14,6 +14,8 @@ import { callOpenAiCompatibleChat, getProviderConfig } from './adapters/openai-c
 import { jsonObjectCandidates } from './normalize.mjs';
 import { detectHarnessCommit, hashJson, sha256 } from './provenance.mjs';
 
+const compareHash = (left, right) => left < right ? -1 : left > right ? 1 : 0;
+
 const nowIso = () => new Date().toISOString();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const round = (value, digits = 4) => (
@@ -32,7 +34,7 @@ export const orderImportanceQuestionBank = ({ questionBank, modelId, repeatIndex
   return {
     ...questionBank,
     questions: [...(questionBank.questions || [])].sort((left, right) => (
-      sha256(`${seed}:${left.id}`).localeCompare(sha256(`${seed}:${right.id}`))
+      compareHash(sha256(`${seed}:${left.id}`), sha256(`${seed}:${right.id}`))
     )),
   };
 };
@@ -201,7 +203,7 @@ const deterministicMockImportance = ({
 }) => {
   let remaining = budget;
   const allocations = [...(questionBank.questions || [])]
-    .sort((left, right) => sha256(`${model}:${left.id}`).localeCompare(sha256(`${model}:${right.id}`)))
+    .sort((left, right) => compareHash(sha256(`${model}:${left.id}`), sha256(`${model}:${right.id}`)))
     .slice(0, maxAllocations)
     .map((question) => {
       const votes = Math.min(maxVotesPerQuestion, Math.floor(Math.sqrt(remaining)));

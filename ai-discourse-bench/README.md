@@ -742,6 +742,6 @@ preview builds. These checks use the complete selected bank before any
 `--limit-questions` display restriction, so edits outside that subset still
 require new importance runs.
 
-Importance prompt fingerprints order model identifiers using the explicit English locale so host locale settings cannot alter a manifest.
+Importance question shuffles and mock allocation selection compare hexadecimal hashes in code-point order. Prompt fingerprints order model identifiers using the explicit English locale, so host locale settings cannot alter these manifest inputs.
 
 Question-limited previews validate importance against the full bank, then omit it with an integrity warning. Use the full question bank to display quadratic importance; allocations outside a displayed subset cannot be treated as invalid runs.
