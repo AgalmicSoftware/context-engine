@@ -35,19 +35,22 @@ const authorityEdits = [
   ['field encryption', { responseFieldEncryption: { mode: 'optional' } }],
   ['removed invites', { agentHttp: { invites: [] } }],
   ['disabled invite', { agentHttp: { invites: [{ ...invite, enabled: false }] } }],
-  ['Wrapped permissions', { agentHttp: { wrapped: { posterEnabled: true } } }],
-  ['submit permissions', { agentHttp: { managedAccountSubmitAllowed: true } }],
+  ['Wrapped permissions', { agentHttp: { invites: [invite], wrapped: { posterEnabled: true } } }],
+  ['submit permissions', { agentHttp: { invites: [invite], managedAccountSubmitAllowed: true } }],
   ['interview enablement', { interviewMode: { enabled: true } }],
   ['AI settings', { ai: { provider: 'openai' } }],
   ['limits', { limits: { ai: { daily: 20 } } }],
   ['scopes', { scopes: { ai: false } }],
-  ['mixed content and authority', { sessionName: 'Renamed', agentHttp: { asyncSubmitEnabled: true } }],
+  ['mixed content and authority', { sessionName: 'Renamed', agentHttp: { invites: [invite], asyncSubmitEnabled: true } }],
 ];
 
 for (const [name, patch, revokes] of [
   ...contentEdits.map(([name, patch]) => [name, patch, false]),
   ...authorityEdits.map(([name, patch]) => [name, patch, true]),
 ]) test(`${name} edits ${revokes ? 'revoke' : 'preserve'} existing web and agent authorization`, async () => {
+  if (['Wrapped permissions', 'submit permissions', 'mixed content and authority'].includes(name)) {
+    assert.deepEqual(patch.agentHttp.invites, [invite], 'unrelated invites must stay unchanged so this tests the named permission');
+  }
   const w = world({ sessions: { alpha: config() }, overrides: { readCurrentSessionConfig } });
   const jwt = await w.login('alpha');
   const agent = await w.credential('alpha');

@@ -2425,7 +2425,7 @@ Never return secrets in responses.
   invite records remain unchanged. Removing, disabling, re-enabling or editing
   an existing invite revokes authorization. Other fields, including permissions,
   gates, groups, surfaces, visibility, encryption, origins and unknown settings,
-  remain authority-sensitive. A mixed content/authority edit raises `authzEpoch`.
+  remain authority-sensitive. A mixed content/authority edit raises `authzEpoch`. Permission-revocation tests preserve existing invites so they verify the changed permission independently.
   Classification compares the normalized configuration that will be stored.
   Config revision and optimistic-write checks still cover every effective edit.
 

@@ -501,6 +501,8 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Isolate Wrapped and submit permission revocation tests from invite removal.
+
 - Mark interview discovery incomplete for temporary Cloudflare payload-read failures, and stop retrying permanently missing or malformed on-chain payloads.
 
 - Preserve Lit accounts and setup resources across failed attempts. Authority-choice switches with a saved group, PKP or action name those resources and offer Resume; supplied keys are checked before reserving an attempt.
