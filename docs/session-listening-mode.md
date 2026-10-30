@@ -484,7 +484,7 @@ Recovery covers audio already delivered by the browser and committed to IndexedD
 Run this checklist on the intended iOS Safari and Android Chrome devices, microphone, room and network. Automated fake-time tests do not establish phone endurance.
 
 1. Open the session’s HTTPS link on the phone. Confirm the session and Worker; a desktop `127.0.0.1` preview is not reachable from the phone.
-2. Record a short sample from every expected seat. Pause, resume and stop. Confirm readable transcript text, released microphone and wake lock, and speaker labels when enabled. Labels restart per chunk and do not identify people.
+2. Record a short sample from every expected seat. Pause, resume and stop. Confirm readable transcript text, released microphone and wake lock, and speaker labels enabled by default for OpenAI. Labels restart per chunk and do not identify people.
 3. If remote participants use the device’s speakers, repeat with Record speaker audio enabled. Check feedback and distant voices; headphones do not feed speaker audio into the microphone.
 4. Record for 45 minutes in the foreground, powered as intended for the event. Expect 15 three-minute rotations plus a final partial chunk. Watch chunk status, memory, battery temperature and the final upload.
 5. Interrupt connectivity during an upload. Confirm local audio remains, retries resume in order after reconnecting, and a stuck chunk offers Retry and a playable Download audio file. Reload during a short recording and confirm the persisted partial chunk recovers without restarting the microphone.
@@ -495,9 +495,9 @@ Run this checklist on the intended iOS Safari and Android Chrome devices, microp
 The labeled route has a 24 MiB chunk limit and falls back to ordinary transcription when needed. Actual phone encoding, delayed timers and long background intervals must be checked on the devices.
 
 
-### Optional speaker labels
+### Speaker labels
 
-Group Conversation offers **Label speakers**, off by default. It uses OpenAI `gpt-4o-transcribe-diarize` with `diarized_json` and automatic chunking, retaining normalized speaker turns alongside the ordinary transcript in the existing local draft. When the Worker cannot provide labels, the recorder keeps plain transcription and explains that labels are unavailable. Other transcription callers retain their existing model, request and text response.
+Group Conversation enables **Label speakers** by default for OpenAI transcription. Record becomes available after the provider settings load; the recorder can turn labels off before capturing. It uses OpenAI `gpt-4o-transcribe-diarize` with `diarized_json` and automatic chunking, retaining normalized speaker turns alongside the ordinary transcript in the saved recording. When the Worker cannot provide labels, the recorder keeps plain transcription and explains that labels are unavailable. Other transcription callers retain their existing model, request and text response.
 
 Labels restart for each three-minute upload. They do not establish identity and are not merged across uploads. Speaker review, per-speaker mapping and claiming QR codes are not yet available. The labels toggle is available only for OpenAI transcription. If labels are unsupported by the provider or Worker, or a chunk exceeds 24 MiB, the same audio falls back to plain transcription using the normal audio chunker. A text-only reply is kept without another upload. The recorder reports that labels are unavailable and uses plain transcription for the rest of that recording. Keep the page visible during capture. The diarization model is deprecated with removal scheduled for 2027-02-26; replacing it is separate work.
 

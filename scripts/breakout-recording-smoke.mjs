@@ -68,9 +68,9 @@ try {
     assert.equal(await speaker.isChecked(), false);
     await speaker.check();
     const labels = page.getByRole('checkbox', { name: 'Label speakers' });
-    assert.equal(await labels.isChecked(), false);
-    await labels.check();
+    assert.equal(await labels.isChecked(), true, 'OpenAI speaker labels start enabled');
     await readable(speaker.locator('..'));
+    await page.waitForFunction(() => [...document.querySelectorAll('.modal, .modal-dialog')].every(element => getComputedStyle(element).opacity === '1'));
     await page.getByTestId('ce-session-listening-panel').screenshot({ path: path.join(output, `setup-${theme}-${width}.png`) });
     await page.getByTestId('ce-session-listening-start').click();
     await page.getByRole('button', { name: 'Stop recording' }).waitFor();

@@ -158,6 +158,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Enable speaker labels by default for OpenAI Group Conversation recordings, with the existing plain-transcription fallback.
+
 - Keep recording chunks in IndexedDB until their transcripts are saved, retry uploads in order, and offer per-chunk retry/download controls with storage, offline and microphone guidance.
 
 - Show concealed AI guesses as grey answer areas with help text until the participant answers.

@@ -19,6 +19,9 @@ jest.mock('../../utilities/audio/recordingChunkStore', () => ({
   clearRecordingChunks: jest.fn(async () => mockRecords.clear()),
 }));
 
+jest.mock('../../utilities/ai/aiSettings', () => ({
+  getEffectiveTranscriptionConfig: jest.fn(async () => ({ provider: 'custom' })),
+}));
 jest.mock('../../utilities/ai/aiClient.js', () => ({ transcribeAudio: jest.fn() }));
 jest.mock('./sessionListeningQuestions', () => ({
   LISTENING_QUESTION_COUNT: 10,
@@ -100,6 +103,7 @@ it.each(['Close', 'Escape', 'outside click'])(
   'closing with %s saves the final speech and restores it on reopen',
   async (method) => {
     render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
     fireEvent.click(screen.getByTestId('ce-session-listening-start'));
     await screen.findByRole('button', { name: 'Stop recording' });
     dismiss(method);
@@ -121,6 +125,7 @@ it('waits for delayed transcription and ignores repeated dismissals', async () =
       }),
   );
   render(<Harness />);
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
   fireEvent.click(screen.getByTestId('ce-session-listening-start'));
   await screen.findByRole('button', { name: 'Stop recording' });
   dismiss('Close');
@@ -136,6 +141,7 @@ it('waits for delayed transcription and ignores repeated dismissals', async () =
 
 it('stopping before closing preserves the completed transcript without transcribing it twice', async () => {
   render(<Harness />);
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
   fireEvent.click(screen.getByTestId('ce-session-listening-start'));
   fireEvent.click(await screen.findByRole('button', { name: 'Stop recording' }));
   await waitFor(() => expect(savedTranscript()).toBe(transcript));
@@ -150,6 +156,7 @@ it('keeps failed audio in storage and automatically retries it before closing', 
     .mockRejectedValueOnce(new Error('Transcription unavailable'))
     .mockResolvedValue(transcript);
   render(<Harness />);
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
   fireEvent.click(screen.getByTestId('ce-session-listening-start'));
   await screen.findByRole('button', { name: 'Stop recording' });
   dismiss('Close');

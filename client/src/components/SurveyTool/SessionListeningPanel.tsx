@@ -338,11 +338,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     embeddedInModal = false,
     closeActionRef,
   } = props;
-  const [labelSpeakers, setLabelSpeakers] = useState(false);
-  const [speakerLabelsSupported, setSpeakerLabelsSupported] = useState(false);
+  const [labelSpeakers, setLabelSpeakers] = useState(true);
+  const [speakerLabelsSupported, setSpeakerLabelsSupported] = useState<boolean | null>(null);
   useEffect(() => {
     let current = true;
-    setSpeakerLabelsSupported(false);
+    setSpeakerLabelsSupported(null);
     // Checking availability must not unlock local credentials or prompt a wallet.
     void getEffectiveTranscriptionConfig({ sessionSlug, sessionConfig }).then(
       (config) => {
@@ -378,7 +378,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     context: recordingContext,
     workerUrl,
     chunkMs: DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
-    labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported && labelSpeakers,
+    labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported === true && labelSpeakers,
     recordSpeakerAudio: panelMode === 'recordGroup' && recordSpeakerAudio,
   });
   const [isGenerating, setIsGenerating] = useState(false);
@@ -434,15 +434,18 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     generationError ||
     recorder.errorMessage ||
     (failedCount > 0 ? 'Some audio could not be transcribed. Retry or download the affected chunks below.' : '');
+  const isPreparingRecording = panelMode === 'recordGroup' && speakerLabelsSupported === null;
   const recordButtonLabel = isRecorderSessionActive
     ? recorder.isStopping
       ? 'Stopping'
       : 'Stop'
-    : isStarting
-      ? 'Starting'
-      : hasTranscript
-        ? 'Record more'
-        : 'Record';
+    : isPreparingRecording
+      ? 'Preparing recording'
+      : isStarting
+        ? 'Starting'
+        : hasTranscript
+          ? 'Record more'
+          : 'Record';
   const recordButtonIcon = isRecorderSessionActive
     ? recorder.isStopping
       ? faSpinner
@@ -731,7 +734,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             type="button"
             className={styles.sessionListeningRecordButton}
             onClick={recorder.startRecording}
-            disabled={isClosing || recorder.isBusy}
+            disabled={isClosing || recorder.isBusy || isPreparingRecording}
             data-testid={E2E_TESTIDS.SESSION_LISTENING_START}
           >
             <span className={styles.sessionListeningRecordIcon}>

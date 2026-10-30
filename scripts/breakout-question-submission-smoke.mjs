@@ -43,7 +43,10 @@ const providerCalls = [];
 const worker = createWorkerRuntime(env, { rpcFetch: async () => assert.fail('No RPC calls are allowed'), fetch: async (url, init) => {
   assert.equal(new URL(url).origin, 'https://api.openai.com');
   providerCalls.push(new URL(url).pathname);
-  if (new URL(url).pathname.endsWith('/audio/transcriptions')) return Response.json({ text: transcript, segments: [{ speaker: 'A', start: 0, end: 2, text: transcript }] });
+  if (new URL(url).pathname.endsWith('/audio/transcriptions')) {
+    assert.equal(init.body.get('model'), 'gpt-4o-transcribe-diarize', 'Default speaker labels use the permitted Worker diarization route');
+    return Response.json({ text: transcript, segments: [{ speaker: 'A', start: 0, end: 2, text: transcript }] });
+  }
   const body = JSON.parse(init.body);
   assert(JSON.stringify(body).includes(instruction), 'Generation uses the saved session questionsGenPrompt');
   assert(JSON.stringify(body).includes(transcript), 'Generation includes the complete recorded transcript');
@@ -102,6 +105,8 @@ try {
     return route.continue();
   });
   await page.goto(`${base}/breakout-submit-probe`);
+  await page.getByRole('checkbox', { name: 'Label speakers' }).waitFor();
+  assert.equal(await page.getByRole('checkbox', { name: 'Label speakers' }).isChecked(), true);
   await page.getByTestId('ce-session-listening-start').click();
   await page.getByRole('button', { name: 'Stop recording' }).click();
   await page.getByTestId('ce-session-listening-suggestions').waitFor({ timeout: 30000 });

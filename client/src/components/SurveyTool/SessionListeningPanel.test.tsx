@@ -696,13 +696,14 @@ it('remembers the optional speaker-audio setting and locks it while recording', 
   window.localStorage.removeItem('ce:record-speaker-audio:v1');
 });
 
-it('only offers optional speaker labels for Group Conversation', async () => {
+it('defaults speaker labels on for OpenAI Group Conversation and lets the recorder opt out', async () => {
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
   const { rerender } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
   const toggle = await screen.findByRole('checkbox', { name: 'Label speakers' });
-  expect(toggle).not.toBeChecked();
-  fireEvent.click(toggle);
+  expect(toggle).toBeChecked();
   expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+  fireEvent.click(toggle);
+  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
   rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="listening" />);
   expect(screen.queryByRole('checkbox', { name: 'Label speakers' })).not.toBeInTheDocument();
   expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
@@ -725,4 +726,30 @@ it('shows when recording continues without speaker labels', async () => {
   );
   render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
   expect(await screen.findByRole('status')).toHaveTextContent('Continuing with plain transcription');
+});
+
+it('waits for the transcription provider before starting Group Conversation with labels', async () => {
+  type Config = Awaited<ReturnType<typeof getEffectiveTranscriptionConfig>>;
+  let resolve!: (config: Config) => void;
+  jest.mocked(getEffectiveTranscriptionConfig).mockImplementationOnce(
+    () =>
+      new Promise<Config>((done) => {
+        resolve = done;
+      }),
+  );
+  const startRecording = jest.fn();
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ startRecording }));
+  render(<SessionListeningPanel sessionSlug="pending-provider" panelMode="recordGroup" />);
+  const start = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START);
+  expect(start).toBeDisabled();
+  fireEvent.click(start);
+  expect(startRecording).not.toHaveBeenCalled();
+  await act(async () => {
+    resolve({ provider: 'openai' } as Config);
+  });
+  expect(start).toBeEnabled();
+  expect(screen.getByRole('checkbox', { name: 'Label speakers' })).toBeChecked();
+  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+  fireEvent.click(start);
+  expect(startRecording).toHaveBeenCalledTimes(1);
 });
