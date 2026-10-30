@@ -429,3 +429,64 @@
     opacity: 1 !important;
   }
 }
+
+.draftCard .hiddenAnswer {
+  padding: 14px;
+  border: 1px solid #9198a1;
+  border-radius: 12px;
+  background: #e4e7eb;
+  color: #27313e;
+
+  strong,
+  p {
+    color: #27313e !important;
+  }
+
+  p {
+    margin: 8px 0 0;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+}
+
+.hiddenAnswerHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.draftCard .hiddenAnswerHelp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #66717f;
+  border-radius: 50%;
+  background: #f8fafc;
+  color: #27313e;
+  cursor: help;
+
+  &:hover,
+  &:focus-visible {
+    background: #fff;
+    outline: 2px solid #27313e;
+    outline-offset: 2px;
+  }
+}
+
+.hiddenAnswerMask {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0 4px;
+
+  span {
+    height: 16px;
+    border-radius: 4px;
+    background: #a8b0bb;
+  }
+  span:last-child {
+    width: 65%;
+  }
+}

@@ -84,8 +84,10 @@ hidden.
   `round(count × share)` are hidden, at least one of three or more.
   Participant is the signed-in account, or this browser's local id before
   login, so a reload hides the same drafts.
-- **Hidden.** The card starts blank and says "Your AI's answer is hidden until
-  you answer." It shows none of the AI's answer, comment, ratings or notes.
+- **Hidden.** A grey answer area says "AI guess hidden", with a keyboard-accessible
+  question-mark tooltip explaining why. Your answer controls remain available
+  below it. The AI answer, comment, ratings and notes are absent from the
+  rendered markup and accessible text; the grey area contains only placeholders.
 - **Reveal.** Agree/disagree and single-choice questions show "Your AI guessed:
   Agree · 70% sure" right after the answer. Ratings, multi-select and
   quadratic questions show it once the person edits another card or submits,

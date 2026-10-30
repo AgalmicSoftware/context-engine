@@ -1,4 +1,5 @@
 import { responseValuesEqual, answerValueType } from './responseValueEquality';
+import SessionInterviewHiddenAnswer from './SessionInterviewHiddenAnswer';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Input } from 'reactstrap';
@@ -43,6 +44,7 @@ type Props = InterviewQuestionControls & {
   savedComment?: string;
   // A hidden draft's status line. The card then holds only the responder's own answer.
   blindNote?: string;
+  concealed?: boolean;
   disabled: boolean;
   onSelect: (selected: boolean) => void;
   onEdit: (patch: Partial<InterviewDraftResponse>) => void;
@@ -242,6 +244,7 @@ function SessionInterviewDraftCardContent({
   earlierAnswer,
   savedComment = '',
   blindNote,
+  concealed = false,
   disabled,
   onSelect,
   onEdit,
@@ -313,13 +316,16 @@ function SessionInterviewDraftCardContent({
         <FontAwesomeIcon icon={faTimes} />
       </button>
       <div className={styles.questionText}>{prompt}</div>
-      {blindNote ? (
+      {concealed ? (
+        <SessionInterviewHiddenAnswer note={blindNote} />
+      ) : blindNote ? (
         <p className={styles.blindNote} role="status">
           {blindNote}
         </p>
       ) : null}
       {changeNote ? <p className={styles.blindNote}>{changeNote}</p> : null}
       <div className={styles.editorStack}>
+        {blindNote ? <strong>Your answer</strong> : null}
         {useNativeAnswer && renderAnswerInput ? (
           renderAnswerInput(draft.questionId, answerValue, onAnswerChange, question, draft.answer)
         ) : question?.type === 'quadratic' ? (

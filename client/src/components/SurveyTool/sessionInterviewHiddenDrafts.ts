@@ -194,6 +194,7 @@ export function useInterviewHiddenDrafts({ questions, editedDrafts, savedRespons
     const state = hidden[draft.questionId];
     if (!state) return null;
     return {
+      concealed: state.revealedAt === undefined,
       draft: withoutAiDraft(
         { questionId: draft.questionId, answer: undefined },
         responseCommentValue(savedResponses, draft.questionId),

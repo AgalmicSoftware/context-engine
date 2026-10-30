@@ -127,6 +127,12 @@ it('hides the same share of AI prefill drafts on every load while research shari
   for (const id of hiddenIds) {
     expect(card(id)).toHaveTextContent(HIDDEN_DRAFT_NOTE);
     expect(answer(id)).toHaveValue('');
+    const concealed = within(card(id)).getByRole('group', { name: 'Hidden AI guess' });
+    expect(concealed).toHaveTextContent('AI guess hidden');
+    expect(concealed.querySelector('input, textarea')).toBeNull();
+    expect(card(id).innerHTML).not.toContain('AI note');
+    expect(card(id).innerHTML).not.toContain(`EVIDENCE-${id}`);
+    expect(within(card(id)).getByRole('button', { name: 'Why is the AI guess hidden?' })).toBeEnabled();
     // Neither the AI's notes nor its marker give the answer away.
     expect(within(card(id)).queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_BASIS_TOGGLE)).not.toBeInTheDocument();
     expect(within(card(id)).queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
@@ -150,6 +156,7 @@ it('reveals a statement guess after the answer and records the first answer', as
   const props = renderReview();
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   answerWith(hiddenStatement, 'Disagree');
+  expect(within(card(hiddenStatement)).queryByRole('group', { name: 'Hidden AI guess' })).not.toBeInTheDocument();
   expect(card(hiddenStatement)).toHaveTextContent('Your AI guessed: Agree · 80% sure');
   answerWith(hiddenStatement, 'Unsure');
   submit();
@@ -310,4 +317,13 @@ it('keeps a hidden draft the person already answered, as an ordinary draft, when
   submit();
   await waitFor(() => expect(view.onSubmitResponses).toHaveBeenCalled());
   expect(view.onApplyAnswer).toHaveBeenCalledWith('r1', 4);
+});
+
+it('explains the grey answer area with a keyboard-accessible tooltip', async () => {
+  renderReview();
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  fireEvent.focus(within(card(hiddenStatement)).getByRole('button', { name: 'Why is the AI guess hidden?' }));
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('Give your own answer first');
+  expect(answer(hiddenStatement)).toBeEnabled();
+  expect(card(hiddenStatement).innerHTML).not.toContain('EVIDENCE-');
 });

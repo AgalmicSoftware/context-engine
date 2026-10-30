@@ -158,6 +158,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Show concealed AI guesses as grey answer areas with help text until the participant answers.
+
 - Preserve multiple-choice selections in generated results so options containing semicolons count correctly.
 
 - Require at least one question type before generation and explain responses with no usable questions.

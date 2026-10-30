@@ -1329,6 +1329,7 @@ function SessionInterviewPanel({
                     draft={hiddenView?.draft || draft}
                     edited={hiddenView?.edited || editedDrafts[draft.questionId] || draft}
                     blindNote={hiddenView?.note}
+                    concealed={hiddenView?.concealed}
                     question={questions.find((question) => question.id === draft.questionId)}
                     selected={Boolean(selected[draft.questionId])}
                     existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
