@@ -880,6 +880,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   handleLogout = async () => {
+    const { provider, wagmiDisconnect } = this.props;
+    // Teardown resets these props, so disconnect the active wallet before it runs.
+    if (provider === 'wagmi') {
+      markUserExplicitlyDisconnected();
+      try {
+        await wagmiDisconnect?.();
+      } catch (e) {
+        accountLog.error('wagmiDisconnect failed:', e);
+      }
+    }
+
     // Disconnect a saved passkey wallet on every logout, not only a passkey one,
     // so the start-up restore cannot sign the visitor back in as that account.
     try {
@@ -887,17 +898,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.resetClientAuthState();
       await disconnected;
     } catch (error) {
-      if (this.props.provider === 'passkey_eoa') throw error;
+      if (provider === 'passkey_eoa') throw error;
       accountLog.warn('Saved passkey wallet disconnect failed during logout:', error);
-    }
-
-    if (this.props.provider === 'wagmi' && this.props.wagmiDisconnect) {
-      markUserExplicitlyDisconnected();
-      try {
-        await this.props.wagmiDisconnect();
-      } catch (e) {
-        accountLog.error('wagmiDisconnect failed:', e);
-      }
     }
   };
 

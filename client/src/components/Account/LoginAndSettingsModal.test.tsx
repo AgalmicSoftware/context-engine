@@ -808,6 +808,41 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(treeHasPropValue(tree, 'data-testid', 'ce-prelogin-config-panel')).toBe(false);
   });
 
+  it('disconnects before teardown resets provider props and cannot log the wallet back in', async () => {
+    const props = buildProps({ provider: 'wagmi', wagmiAddress: WAGMI_ADDRESS, loginComplete: true });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
+    const wagmiDisconnect = jest.fn(() => {
+      subject.props = { ...subject.props, wagmiAddress: undefined };
+    });
+    subject.props = { ...subject.props, wagmiDisconnect };
+    props.changeAccount.mockImplementation(() => {
+      subject.props = { ...subject.props, provider: 'none', loginComplete: false, wagmiDisconnect: undefined };
+    });
+
+    await subject.handleLogout();
+    await subject.updateStateUponWagmiLogin();
+
+    expect(wagmiDisconnect).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
+    expect(props.changeAccount.mock.calls).toEqual([[{}]]);
+    expect(wagmiDisconnect.mock.invocationCallOrder[0]).toBeLessThan(props.changeAccount.mock.invocationCallOrder[0]);
+    expect(props.updateLoginInfo).not.toHaveBeenCalledWith(expect.objectContaining({ loginComplete: true }));
+  });
+
+  it('surfaces a passkey disconnect failure after teardown resets provider props', async () => {
+    const failure = new Error('passkey storage unavailable');
+    mockedPasskeyWallet.logoutPasskeyWallet.mockRejectedValueOnce(failure);
+    const props = buildProps({ provider: 'passkey_eoa' });
+    const subject = new LoginAndSettingsModalSubject(props);
+    props.changeAccount.mockImplementation(() => {
+      subject.props = { ...subject.props, provider: 'none' };
+    });
+
+    await expect(subject.handleLogout()).rejects.toBe(failure);
+    expect(props.changeAccount).toHaveBeenCalledWith({});
+    expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
+  });
+
   it('sets persistent wagmi disconnect flag on wagmi logout', async () => {
     const wagmiDisconnect = jest.fn();
     const subject = new LoginAndSettingsModalSubject(

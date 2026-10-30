@@ -162,6 +162,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Disconnect MetaMask before logout clears account props, preserve explicit disconnect intent, and surface passkey disconnect failures.
+
 - Keep General-session question bookmarks, result links, and copied URLs pinned to General even when another session is selected.
 
 - Preserve the latest SBT image choice and saved bytes when an earlier image request finishes late.
