@@ -8,7 +8,7 @@ import {
   type SessionTemplate,
 } from '@ce-shared/sessionTemplate.mjs';
 import { decodeSessionTemplateLink, encodeSessionTemplateLink } from '@ce-shared/sessionTemplateLink.mjs';
-import { prose } from '../sessionWizardTemplate.testUtils';
+import { prose, salonSetupTemplateFields } from '../sessionWizardTemplate.testUtils';
 import { SessionTemplateActions, SessionTemplateLinkNotice, SetupQuestionsPublisher } from './SessionTemplateTools';
 
 const mockPublishQuestions = jest.fn();
@@ -120,6 +120,19 @@ describe('session template tools', () => {
     expect(onImport).toHaveBeenCalledWith(expect.objectContaining({ sessionName: '<script>alert(1)</script>' }));
   });
 
+  it('imports the JSON an AI returns for a salon-sized session', () => {
+    const { onImport } = renderActions();
+    fireEvent.click(screen.getByTestId('ce-template-import'));
+    fireEvent.change(screen.getByTestId('ce-template-paste'), {
+      target: { value: `\n${JSON.stringify(salonSetupTemplateFields(), null, 2)}\n` },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check' }));
+    expect(screen.getByTestId('ce-template-changes')).toHaveTextContent('questions: 0 items → 28 items');
+    fireEvent.click(screen.getByTestId('ce-template-import-apply'));
+    expect(onImport).toHaveBeenCalledWith(expect.objectContaining({ questions: expect.any(Array) }));
+    expect((onImport.mock.calls[0][0] as SessionTemplate).questions).toHaveLength(28);
+  });
+
   it('imports an uploaded template file after the same check', async () => {
     const { onImport } = renderActions();
     fireEvent.click(screen.getByTestId('ce-template-import'));
@@ -179,6 +192,7 @@ describe('session template tools', () => {
       />,
     );
     expect(screen.getByTestId('ce-template-errors')).toHaveTextContent('cannot be unpacked');
+    expect(screen.getByText(/paste it under Import/)).toBeInTheDocument();
     expect(screen.queryByTestId('ce-template-link-accept')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('ce-template-link-dismiss'));
     expect(onDismiss).toHaveBeenCalled();

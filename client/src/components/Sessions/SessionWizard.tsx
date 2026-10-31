@@ -102,11 +102,12 @@ import {
   type SessionTemplateChange,
   type SessionTemplateResult,
 } from '@ce-shared/sessionTemplate.mjs';
-import { decodeSessionTemplateLink } from '@ce-shared/sessionTemplateLink.mjs';
+import { decodeSessionTemplateLink, hasSessionTemplateLink } from '@ce-shared/sessionTemplateLink.mjs';
 import type { SetupCreateStage } from './setup/SetupCreatePanel';
 import { defaultSessionSetupProfile, editSessionSetupProfile } from './setup/sessionSetupProfile';
 import SetupSlugPreview from './setup/SetupSlugPreview';
 import SetupWorkerQuick from './setup/SetupWorkerQuick';
+import { SetupWithAi } from './setup/SetupWithAi';
 import SessionHostedFaucetControl from './SessionHostedFaucetControl';
 import WorkerDeployHelperToggle from './WorkerDeployHelperToggle';
 import {
@@ -2641,13 +2642,16 @@ const SessionWizard = ({
     window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
   };
   // On load, and when a link is pasted into this tab (only its hash changes).
+  // The fragment leaves the address bar once read, so a reload or a copied
+  // address doesn't carry the draft again; the notice keeps it until answered.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let cancelled = false;
     const readLink = () => {
-      if (!window.location.hash.includes('template=')) return;
+      if (!hasSessionTemplateLink(window.location.hash)) return;
       void decodeSessionTemplateLink(window.location.hash).then((result) => {
         if (cancelled || !result) return;
+        window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
         const mine = sessionTemplateFromDraft(draftRef.current);
         const sameDraft =
           result.ok && !!result.template.draftId && result.template.draftId === draftRef.current?.draftId;
@@ -2755,6 +2759,7 @@ const SessionWizard = ({
           linkBase={`${typeof window === 'undefined' ? '' : window.location.origin}/new`}
         />
       }
+      aiSetup={<SetupWithAi setupUrl={`${typeof window === 'undefined' ? '' : window.location.origin}/new`} />}
       templateNotice={
         linkTemplate ? (
           <SessionTemplateLinkNotice

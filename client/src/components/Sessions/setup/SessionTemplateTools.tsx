@@ -306,6 +306,7 @@ export const SessionTemplateLinkNotice = ({
     ) : (
       <>
         <TemplateErrors errors={result.errors} />
+        <p className={styles.hint}>Ask for the template as JSON instead, and paste it under Import → Or paste it.</p>
         <div className={styles.buttonRow}>
           <button
             type="button"

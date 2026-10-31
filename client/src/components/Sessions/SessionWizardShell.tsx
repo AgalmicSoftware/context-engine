@@ -31,6 +31,8 @@ export type SessionWizardShellProps = {
   templateActions?: React.ReactNode;
   /** "This draft came from a link", with its differences. */
   templateNotice?: React.ReactNode;
+  /** "Set up with your AI": a prompt whose answer fills in this page. */
+  aiSetup?: React.ReactNode;
   draft: Record<string, unknown>;
   updateDraftValue: (path: string[], value: unknown) => void;
   editProfile: SetupProfileEditor;
@@ -71,6 +73,7 @@ const SessionWizardShell = ({
   recoveryKeyDialog = null,
   templateActions = null,
   templateNotice = null,
+  aiSetup = null,
   draft,
   updateDraftValue,
   editProfile,
@@ -113,6 +116,7 @@ const SessionWizardShell = ({
           {templateActions}
         </header>
         {templateNotice}
+        {aiSetup}
         <SessionWizardSponsoredStatus {...sponsoredStatusProps} />
         <SetupBasicsSection
           draft={draft}

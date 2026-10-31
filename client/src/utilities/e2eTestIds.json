@@ -240,6 +240,8 @@
   "SETUP_TEMPLATE_LINK_ACCEPT": "ce-template-link-accept",
   "SETUP_TEMPLATE_LINK_DISMISS": "ce-template-link-dismiss",
   "SETUP_TEMPLATE_CHANGES": "ce-template-changes",
+  "SETUP_WITH_AI": "ce-setup-with-ai",
+  "SETUP_WITH_AI_COPY": "ce-setup-with-ai-copy",
   "SESSION_SETTINGS_PAGE": "ce-settings-page",
   "SESSION_SETTINGS_GROUP_RECORDER_LINK": "ce-settings-group-recorder-link",
   "SESSION_SETTINGS_AUTHORITY_CHANGES": "ce-settings-authority-changes",

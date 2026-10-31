@@ -279,6 +279,12 @@
   }
 }
 
+// A link that looks like .button; it outranks .page a.
+a.button {
+  display: inline-block;
+  text-decoration: none;
+}
+
 // Applied with .button.
 .primaryButton {
   background: var(--ce-action-accent);
