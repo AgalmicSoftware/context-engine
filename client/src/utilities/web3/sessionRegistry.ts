@@ -1281,6 +1281,18 @@ const buildSessionConfigFromRegistry = ({
   return normalizeSessionNaming(nextConfig) as AnyRecord;
 };
 
+// The last usable copy of a session's metadata: the document kept with its
+// cached entry or, for an entry saved without one, the entry itself when it
+// was built from its loaded document.
+const lastUsableRegistryMetadata = (cachedConfig: AnyRecord | null) => {
+  const registryMeta = cachedConfig?.__registry || {};
+  if (registryMeta.metadata && typeof registryMeta.metadata === 'object') return registryMeta.metadata;
+  if (registryMeta.metadataLoadState !== 'loaded') return null;
+  const entry = { ...cachedConfig };
+  delete entry.__registry;
+  return entry;
+};
+
 const mergeSessionFieldsIntoCachedConfig = async ({
   baseConfig,
   session,
@@ -1310,17 +1322,21 @@ const mergeSessionFieldsIntoCachedConfig = async ({
           lit,
           caller: 'refreshSessionRegistryFieldsCache',
         });
-  return buildSessionConfigFromRegistry({
+  const hasMetadataUri = !!(session.metadataURI || session.encryptedMetadataURI);
+  // A failed load (an outage, or encrypted metadata without a key) keeps the
+  // last usable copy rather than rebuilding the session from nothing. The copy
+  // isn't kept as the record's document, so the next refresh loads that again.
+  const fallback = !metadata && hasMetadataUri ? lastUsableRegistryMetadata(baseConfig) : null;
+  const config = buildSessionConfigFromRegistry({
     session,
-    metadata,
+    metadata: metadata || fallback,
     fieldsByKey: fields,
     gatesByResource: registryMeta.gatesByResource,
     registryChainId,
-    metadataLoadState: resolveMetadataLoadState({
-      metadata,
-      hasMetadataUri: !!(session.metadataURI || session.encryptedMetadataURI),
-    }),
+    metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
   });
+  if (fallback) config.__registry.metadata = null;
+  return config;
 };
 
 const addSessionConfigToCache = (cache: RegistryCache | null, config: AnyRecord | null, opts: AnyRecord = {}) => {
@@ -1560,7 +1576,10 @@ export const refreshSessionRegistryFieldsCache = async ({
   bootstrapRpc,
 }: AnyRecord = {}) => {
   const registrySlug = toRegistrySlug(slug || '');
-  const existingConfig = sessionRegistryStore.getSessionConfig(registrySlug);
+  // The cached entry itself, not its Worker config overlay: a failed metadata
+  // load rebuilds from it, and the overlay must not be saved into the registry.
+  const existingConfig: AnyRecord | null =
+    sessionRegistryStore.readCache()?.sessions?.[normalizeRegistrySlug(registrySlug)] || null;
   const existingRegistry =
     existingConfig?.__registry && typeof existingConfig.__registry === 'object' ? existingConfig.__registry : {};
   const resolvedChainId =

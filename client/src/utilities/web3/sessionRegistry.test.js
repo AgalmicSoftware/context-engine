@@ -685,6 +685,117 @@ describe('targeted registry field clear semantics', () => {
   });
 });
 
+describe('targeted registry refresh when the metadata cannot load', () => {
+  const CUSTOM_SURVEYS = '0x' + '5'.repeat(40);
+  const metadata = {
+    sessionName: 'Synthetic outage session',
+    corsWorkerUrl: 'https://metadata-worker.example',
+    interviewMode: true,
+    contracts: { surveys: { address: CUSTOM_SURVEYS, chainId: CONFIGURED_REGISTRY_CHAIN_ID } },
+  };
+
+  afterEach(() => {
+    localStorage.removeItem('dg:sessionRegistryCache:v1');
+    localStorage.removeItem('ce:sessionWorkerConfigCache:v1');
+    jest.restoreAllMocks();
+    arweaveClient.downloadDataFromArweave.mockReset();
+  });
+
+  const fixture = async ({ keepDocument }) => {
+    const record = { metadataURI: `ar://${'M'.repeat(43)}`, encryptedMetadataURI: '' };
+    const fields = { rpcUrl: 'https://old-rpc.example' };
+    arweaveClient.downloadDataFromArweave.mockResolvedValue(JSON.stringify(metadata));
+    installPublicRpcFeeMocks();
+    const contract = {
+      getSessionBySlug: jest.fn(async () => [
+        'outage',
+        CONFIGURED_REGISTRY_CHAIN_ID,
+        record.metadataURI,
+        record.encryptedMetadataURI,
+        TEST_SIGNER_ADDRESS,
+        1,
+        2,
+        '0x' + '36'.repeat(16),
+      ]),
+      getResourceGate: jest.fn().mockResolvedValue([[], 0, 0, 0]),
+      getSessionFields: jest.fn(async (_slug, keys) => keys.map((key) => fields[key] || '')),
+    };
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contract;
+    });
+    const full = () => fetchSessionFromRegistry({ chainId: CONFIGURED_REGISTRY_CHAIN_ID, slug: 'outage' });
+    const initial = await full();
+    // An entry saved before cached entries kept their metadata document.
+    if (!keepDocument) delete initial.__registry.metadata;
+    upsertSessionRegistryCache({ config: initial });
+    fields.rpcUrl = 'https://new-rpc.example';
+    arweaveClient.downloadDataFromArweave.mockReset();
+    arweaveClient.downloadDataFromArweave.mockRejectedValue(new Error('Synthetic gateway outage'));
+    return {
+      record,
+      full,
+      refresh: () =>
+        refreshSessionRegistryFieldsCache({
+          chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+          slug: 'outage',
+          fieldKeys: ['rpcUrl'],
+        }),
+    };
+  };
+
+  const expectLastUsableCopy = (config) => {
+    expect(config.rpc.providers.path.rpcUrl).toBe('https://new-rpc.example');
+    expect(config).toMatchObject({
+      sessionName: 'Synthetic outage session',
+      corsWorkerUrl: 'https://metadata-worker.example',
+      interviewMode: true,
+    });
+    expect(config.contracts.surveys.address).toBe(CUSTOM_SURVEYS);
+    // The copy isn't the record's document, so the next refresh loads that again.
+    expect(config.__registry).toMatchObject({ metadata: null, metadataLoadState: 'unavailable' });
+  };
+
+  it.each([
+    ['an outage, for an entry saved without its document', { keepDocument: false }, () => {}],
+    [
+      'an outage, after the record moved to new metadata',
+      { keepDocument: true },
+      (f) => {
+        f.record.metadataURI = `ar://${'N'.repeat(43)}`;
+      },
+    ],
+    [
+      'encrypted metadata without a key',
+      { keepDocument: true },
+      (f) => {
+        f.record.metadataURI = '';
+        f.record.encryptedMetadataURI = `ar://${'E'.repeat(43)}`;
+        arweaveClient.downloadDataFromArweave.mockResolvedValue(JSON.stringify({ ciphertext: 'synthetic' }));
+      },
+    ],
+  ])('keeps the last usable copy after %s', async (_label, options, change) => {
+    const f = await fixture(options);
+    change(f);
+    const refreshed = await f.refresh();
+    expectLastUsableCopy(refreshed);
+    expectLastUsableCopy(sessionRegistryStore.readCache().sessions.outage);
+  });
+
+  it('rebuilds from the cached entry, not its Worker config overlay, then reloads the document', async () => {
+    const f = await fixture({ keepDocument: false });
+    upsertCachedSessionWorkerConfig({ slug: 'outage', config: { corsWorkerUrl: 'https://worker-kv-cache.example' } });
+    expect(sessionRegistryStore.getSessionConfig('outage').corsWorkerUrl).toBe('https://worker-kv-cache.example');
+    await f.refresh();
+    expectLastUsableCopy(sessionRegistryStore.readCache().sessions.outage);
+    arweaveClient.downloadDataFromArweave.mockReset();
+    arweaveClient.downloadDataFromArweave.mockResolvedValue(JSON.stringify(metadata));
+    const recovered = await f.refresh();
+    expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(1);
+    expect(recovered.__registry).toMatchObject({ metadata, metadataLoadState: 'loaded' });
+    expect(recovered).toEqual(await f.full());
+  });
+});
+
 describe('registerSessionOnChain registry address override', () => {
   it('uses explicit registryAddress when chain defaults are missing', async () => {
     await expect(
