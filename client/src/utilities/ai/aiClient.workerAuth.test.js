@@ -15,6 +15,8 @@ import {
 import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSettings.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
+import { act, renderHook } from '@testing-library/react';
+import { useRecordingChunkQueue } from '../audio/useRecordingChunkQueue';
 
 jest.mock('./aiSettings.js', () => ({
   getEffectiveAiConfig: jest.fn(),
@@ -759,7 +761,8 @@ describe('group transcription fallback', () => {
     [404, { code: 'model_not_found' }, true],
     [400, { type: 'invalid_request_error', param: 'response_format' }, true],
     [422, { param: 'chunking_strategy' }, true],
-    [400, { message: 'Unsupported labeling option' }, false],
+    [400, { message: 'Unsupported labeling option' }, true],
+    [400, { type: 'invalid_request_error' }, true],
     [400, { type: 'invalid_request_error', param: 'file', message: 'Audio file might be corrupted' }, false],
   ])(
     'falls back using the actual Worker error envelope for HTTP %s (%j)',
@@ -840,6 +843,37 @@ describe('group transcription fallback', () => {
     });
     await expect(transcribeGroupAudio(new Blob(['audio'], { type: 'audio/webm' }))).rejects.toThrow('Busy');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it('turns labels off for the recording after an older Worker refuses them, uploading later chunks once', async () => {
+    fetchWorkerWithAuth
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: 'Invalid request.', details: { error: { type: 'invalid_request_error' } } }),
+      })
+      .mockResolvedValue({ ok: true, json: async () => ({ text: 'Plain transcript.' }) });
+    const { result, unmount } = renderHook(() =>
+      useRecordingChunkQueue({ sessionSlug: 'older-worker', sessionConfig: null, labelSpeakers: true }),
+    );
+    try {
+      await act(() => result.current.prepare());
+      const record = (chunk) =>
+        act(async () => {
+          result.current.beginChunk()(new Blob([chunk], { type: 'audio/webm' }), true);
+          await result.current.finishTranscription();
+        });
+      await record('first chunk');
+      expect(result.current.labelsUnavailableReason).toBeTruthy();
+      await record('second chunk');
+      expect(fetchWorkerWithAuth.mock.calls.map(([, request]) => request.body.get('labelSpeakers'))).toEqual([
+        'true',
+        null,
+        null,
+      ]);
+    } finally {
+      unmount();
+    }
   });
 
   it('retains successful speaker labels', async () => {

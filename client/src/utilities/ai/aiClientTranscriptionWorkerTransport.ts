@@ -121,34 +121,15 @@ const requestAudioTranscription = async (
   }
 
   if (!resp.ok) {
-    const record = asRecord(data);
-    // Older Workers relay the provider's error under `details.error`, so these codes need no newer Worker.
-    const providerError = asRecord(asRecord(record.details).error);
-    const reasons = [
-      record.reason,
-      record.code,
-      asRecord(record.error).code,
-      providerError.code,
-      providerError.param,
-    ].map(stringValue);
     const transient = resp.status === 408 || resp.status === 429 || resp.status >= 500;
-    // Every later chunk would meet the same refusal. A 400 with the provider's generic
-    // `invalid_request_error` type, such as corrupt audio, says nothing about labels.
-    const labelConfigurationError = reasons.some((reason) =>
-      [
-        'ai_model_not_allowed',
-        'model_not_found',
-        'unsupported_model',
-        'unsupported_response_format',
-        'unsupported_provider',
-        'response_format',
-        'chunking_strategy',
-      ].includes(reason),
-    );
-    if (groupSpeakerLabels && !transient && ((resp.status >= 400 && resp.status < 500) || labelConfigurationError)) {
-      throw labelConfigurationError
-        ? new SpeakerLabelsUnavailableError('Speaker labels are unavailable for this provider or Worker.')
-        : new SpeakerLabelsUnavailableError('This chunk was rejected with speaker labels.', true);
+    if (groupSpeakerLabels && !transient && resp.status >= 400 && resp.status < 500) {
+      // Only a rejection of this chunk's audio (too large, or a provider error naming the file, which older
+      // Workers relay under `details.error`) leaves labels on for later chunks. Anything else, such as a
+      // Worker without label support, would refuse every chunk, so labels end for the recording.
+      const audioRejected = resp.status === 413 || asRecord(asRecord(asRecord(data).details).error).param === 'file';
+      throw audioRejected
+        ? new SpeakerLabelsUnavailableError('This chunk was rejected with speaker labels.', true)
+        : new SpeakerLabelsUnavailableError('Speaker labels are unavailable for this provider or Worker.');
     }
     throw Object.assign(new Error(parseTranscriptionErrorMessage(data, resp.status)), { status: resp.status });
   }
