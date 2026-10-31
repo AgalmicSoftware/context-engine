@@ -111,7 +111,7 @@ test('dispatchAuthenticatedSecretPathRoute blocks participant writes after the s
     deps,
   };
 
-  for (const path of ['/groups/create', '/groups/join', '/groups/leave']) {
+  for (const path of ['/groups/create', '/groups/join', '/groups/leave', '/storage/context']) {
     const blocked = await dispatchAuthenticatedSecretPathRoute({
       ...base,
       path,

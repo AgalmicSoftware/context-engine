@@ -159,6 +159,10 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
     deps: {
       json: deps?.json,
       getSessionSecrets: deps?.getSessionSecrets,
+      // Context links and PDFs: the guarded page fetch and the provider call.
+      fetch: deps?.fetch,
+      safeFetch: deps?.safeFetch,
+      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
       arweaveUpload,
       randomUUID: deps?.randomUUID,
       now: deps?.now,

@@ -66,6 +66,8 @@ import { checkCoordinatedLegacyStorageOwner, coordinateResponseUploadReceipt } f
 import { executeCoordinatedStoragePublication, SUPERSEDED_AUTHORITY_ERROR } from './sessionConfigAuthority.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
+import { checkContextSourceUpload, contextSourceListFields } from './contextSourcePolicy.js';
+import { contextSourceRoute } from './contextSourceRoute.js';
 import { toStr } from './stringCoercion.js';
 import {
   isStorageReadLimitError, jsonByteLength, parseStorageExportCursor, readStorageBytesBounded,
@@ -1457,6 +1459,16 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   const uploader = normalizeAddress(uploaderAddress);
   const owned = isOwnedStorageResource(resource);
   const uploaderIsAdmin = owned && resolveSessionAdminAddresses(config).has(uploader);
+  const contextCheck = resource === 'docsContext'
+    ? checkContextSourceUpload({
+      payload,
+      isAdmin: resolveSessionAdminAddresses(config).has(uploader),
+      litEncrypted: payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.LIT,
+    })
+    : { ok: true, role: '' };
+  if (!contextCheck.ok) {
+    return responseJson(deps, { error: contextCheck.error, reason: contextCheck.reason }, contextCheck.status, baseHeaders);
+  }
   let owner = null;
   let hidden = false;
   if (owned) {
@@ -1584,6 +1596,13 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
       // Authorship and precedence are server-authored; payload fields cannot grant
       // admin correction authority, and later role changes cannot withdraw it.
       ...(owned ? { resourceId, uploadAuthority: uploaderIsAdmin ? 'admin' : 'author', ...(uploader ? { uploader } : {}), ...(hidden ? { hidden: true } : {}) } : {}),
+      // Server-authored: only an admin's upload with a context role is context.
+      ...(contextCheck.role ? {
+        contextSource: true,
+        uploadAuthority: 'admin',
+        uploader,
+        ...(payload.contextOrigin === 'worker' ? { contextOrigin: 'worker' } : {}),
+      } : {}),
       payloadAccessMode: payloadAccess.mode,
       payloadAccessControl: {
         gate: payloadAccess.gate,
@@ -1909,6 +1928,8 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
   const { cursor, limit, resource } = listOptions;
   const mine = url.searchParams.get('mine') === 'true';
   const responder = mine ? normalizeAddress(uploaderAddress) : '';
+  // ?role=context lists only context sources (a narrower view, never a wider one).
+  const contextOnly = resource === 'docsContext' && url.searchParams.get('role') === 'context';
   if (mine && (resource !== 'responses' || !responder)) {
     return responseJson(deps, { error: 'Own responses require authentication and the responses resource.' }, 403, baseHeaders);
   }
@@ -1978,6 +1999,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     if (mine && !trim(metadata?.responder)) {
       return responseJson(deps, { error: 'Response ownership is unavailable.' }, 503, baseHeaders);
     }
+    if (contextOnly && metadata?.contextSource !== true) continue;
     if (mine && normalizeAddress(metadata.responder) !== responder) continue;
     const itemAccess = await authorizeCloudflareStorageAccess({
       env,
@@ -2029,6 +2051,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
           encryption: metadataAccess.encryption,
         },
         payloadAccessMode: deriveLegacyPayloadAccessMode(metadataAccess),
+        ...contextSourceListFields(metadata),
       },
     });
   }
@@ -2517,6 +2540,62 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
   };
 };
 
+// Context sources: doc-library rows an admin's upload with a context role
+// created (contextSource is server-authored at upload).
+export const listContextSourceRows = async ({ env, slug, budget } = {}) => {
+  const index = getStorageIndexBinding(env);
+  if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') return [];
+  const rows = await listCloudflareMetadataRows({ index, slug, resource: 'docsContext', budget });
+  return rows.map((row) => row.metadata).filter((metadata) => metadata?.contextSource === true);
+};
+
+export const readContextSourceRow = async ({ env, slug, id } = {}) => {
+  const index = getStorageIndexBinding(env);
+  if (!isSafeCloudflareStorageRefId(trim(id)) || typeof index?.get !== 'function') return null;
+  let metadata = null;
+  try {
+    const raw = await index.get(buildIndexKey({ slug, resource: 'docsContext', id: trim(id) }));
+    metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  return isObj(metadata) && metadata.contextSource === true && trim(metadata.id) === trim(id) ? metadata : null;
+};
+
+// A context source's stored bytes, decrypted. The Worker reads them for the
+// session's AI, so each worker_envelope read is audited under that principal.
+export const readContextSourceBytes = async ({ env, config, slug, metadata, maxBytes, principal = 'session-ai', deps } = {}) => {
+  const index = getStorageIndexBinding(env);
+  let bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, maxBytes });
+  if (!bytes) return null;
+  if (isObj(metadata?.envelope)) {
+    await writeStorageEnvelopeKeyReleaseAudit({
+      env, slug, payloadId: trim(metadata.id), principal, conditionMatched: 'context_source', deps,
+    });
+    bytes = await decryptPayloadWithStorageEnvelope({
+      env, config, slug, payloadId: trim(metadata.id), ciphertextBytes: bytes, envelope: metadata.envelope, deps,
+    });
+  }
+  return toUint8Array(bytes);
+};
+
+// Removes stored records: payload first, index row last, so a failure part
+// way leaves a row a retry removes rather than a payload nothing lists.
+export const removeCloudflareStorageRecords = async ({ env, slug, rows = [] } = {}) => {
+  const r2 = getStorageR2Binding(env);
+  const index = getStorageIndexBinding(env);
+  if (!index || typeof index.delete !== 'function') throw new Error('Cloudflare storage index binding not configured.');
+  await markStorageBackupWrite(env, slug);
+  for (const metadata of rows) {
+    const id = trim(metadata?.id);
+    if (!isSafeCloudflareStorageRefId(id)) continue;
+    if (r2 && typeof r2.delete === 'function') await r2.delete(buildObjectKey({ slug, id }));
+    await index.delete(buildPayloadKey({ slug, id }));
+    await index.delete(buildIndexKey({ slug, resource: trim(metadata.resource) || 'docsContext', id }));
+  }
+  await markStorageBackupWrite(env, slug);
+};
+
 export const storageRoute = async ({ path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, deps } = {}) => {
   if (method === 'POST' && ['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path)) {
     // Field keys use the same lazy private-RPC setup and chain attestation as
@@ -2559,6 +2638,16 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
   const configuredBackend = resolveConfiguredStorageBackend({ config });
   if (configuredBackend !== STORAGE_BACKENDS.CLOUDFLARE) {
     return responseJson(deps, { error: 'Storage route read/list is only available for Cloudflare storage.' }, 400, baseHeaders);
+  }
+  if (path === '/storage/context' && method === 'POST') {
+    const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+    return contextSourceRoute({
+      request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps,
+      store: (payload) => handleCloudflareUpload({
+        env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, deps: routeDeps,
+        payload: { resource: 'docsContext', groupIds: [], uploadPolicy: null, payloadEncrypted: false, ...payload, contextOrigin: 'worker' },
+      }),
+    });
   }
   if (path === '/storage/read' && (method === 'GET' || method === 'POST')) {
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });

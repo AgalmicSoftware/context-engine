@@ -20,7 +20,7 @@ const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 export const CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR =
   'Custom provider rpcUrl override requires a request apiKey/rpcKey.';
 
-const extractOpenAiCompletion = (data, useResponses = false) => {
+export const extractOpenAiCompletion = (data, useResponses = false) => {
   if (!data || typeof data !== 'object') return '';
   if (useResponses) {
     if (typeof data.output_text === 'string') return data.output_text;

@@ -24,6 +24,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
   const isStorageRoute = (
     (['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path) && method === 'POST') ||
     (path === '/storage/upload' && method === 'POST') ||
+    (path === '/storage/context' && method === 'POST') ||
     (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
     (path === '/storage/list' && (method === 'GET' || method === 'POST')) ||
     (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST'))
@@ -50,6 +51,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     isTranscribeRoute ||
     isArweaveUploadRoute ||
     (path === '/storage/upload' && method === 'POST') ||
+    (path === '/storage/context' && method === 'POST') ||
     (path === '/groups/create' && method === 'POST') ||
     (path === '/groups/join' && method === 'POST') ||
     (path === '/groups/leave' && method === 'POST')

@@ -1,0 +1,180 @@
+import {
+  ADMINS_ONLY_ACCESS,
+  CONTEXT_FILE_TYPES,
+  CONTEXT_ROLE,
+  CONTEXT_SOURCE_LIMITS as LIMITS,
+  CONTEXT_TAGS as TAGS,
+  CONTEXT_TEXT_ROLE,
+  contextRoleOf,
+  contextTagValue,
+  isAdminsOnlyAccess,
+} from '../../shared/sessionContextSources.mjs';
+import { readPdfWithSessionAi } from './contextDocumentRead.js';
+import { fetchContextSnapshotText } from './fetchExecution.js';
+import {
+  listContextSourceRows,
+  readContextSourceBytes,
+  readContextSourceRow,
+  removeCloudflareStorageRecords,
+  resolveSessionAdminAddresses,
+} from './storageRouteExecution.js';
+
+const encoder = new TextEncoder();
+const trim = (value) => (typeof value === 'string' ? value.trim() : '');
+const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+const clip = (value, max) => trim(value).replace(/\s+/g, ' ').slice(0, max);
+
+const commonTags = (kind) => [
+  { name: 'CE-DocLibrary', value: '1' },
+  { name: TAGS.kind, value: kind },
+  { name: 'CE-DocStorage', value: 'cloudflare' },
+];
+const derivedRowsOf = (rows, id) => rows.filter((row) =>
+  contextRoleOf(row.tags) === CONTEXT_TEXT_ROLE && contextTagValue(row.tags, TAGS.derivedFrom) === id);
+
+// Stores a record through the doc-library upload path and returns its id, or
+// the upload's own failure response.
+const storeRecord = async (store, payload) => {
+  const response = await store(payload);
+  if (!response?.ok) return { response };
+  const body = await response.clone().json().catch(() => ({}));
+  return trim(body?.id) ? { id: trim(body.id) } : { response };
+};
+
+// A link: the Worker fetches the page under the strict link policy and stores
+// its text with the link. With `replaces`, a refresh of that link: the new
+// snapshot keeps its privacy and title, then the old record goes.
+const addLink = async ({ body, env, slug, deps, store, json, now }) => {
+  const url = trim(body.url);
+  let parsed = null;
+  try { parsed = url.length <= LIMITS.urlChars ? new URL(url) : null; } catch { parsed = null; }
+  if (parsed?.protocol !== 'https:') {
+    return json({ error: `Enter an https:// link of at most ${LIMITS.urlChars.toLocaleString('en-US')} characters.` }, 400);
+  }
+  const replaces = trim(body.replaces) ? await readContextSourceRow({ env, slug, id: body.replaces }) : null;
+  if (trim(body.replaces) && (!replaces || contextTagValue(replaces.tags, TAGS.kind) !== 'link')) {
+    return json({ error: 'That link is no longer in the session.' }, 404);
+  }
+  const fetched = await fetchContextSnapshotText({
+    url: parsed.toString(),
+    deps: { safeFetch: deps?.safeFetch, isBlockedOutboundUrl: deps?.isBlockedOutboundUrl, fetchTimeoutMs: deps?.fetchTimeoutMs },
+    maxBytes: LIMITS.pageBytes,
+  });
+  if (!fetched.ok) {
+    return json({ error: `The link could not be read: ${fetched.error || 'no response'}.`, reason: 'context_link_unreadable' },
+      fetched.status >= 500 ? 502 : 422);
+  }
+  const text = fetched.text.slice(0, LIMITS.snapshotChars);
+  if (!text.trim()) return json({ error: 'The page has no text to read.', reason: 'context_link_empty' }, 422);
+  const title = clip(trim(body.title) || contextTagValue(replaces?.tags, TAGS.name) || fetched.title || parsed.hostname, LIMITS.titleChars);
+  const adminsOnly = replaces ? isAdminsOnlyAccess(replaces.accessConditions) : body.adminsOnly === true;
+  const fetchedAt = now();
+  const record = {
+    v: 1,
+    kind: 'link',
+    url: parsed.toString(),
+    title,
+    createdAt: fetchedAt,
+    snapshot: { text, fetchedAt, contentType: fetched.mediaType, truncated: fetched.text.length > text.length },
+  };
+  const stored = await storeRecord(store, {
+    bytes: encoder.encode(JSON.stringify(record)),
+    contentType: 'application/json',
+    accessConditions: adminsOnly ? ADMINS_ONLY_ACCESS : null,
+    tags: [
+      ...commonTags('link'),
+      { name: TAGS.role, value: CONTEXT_ROLE },
+      { name: TAGS.name, value: title },
+      { name: TAGS.mime, value: 'application/json' },
+      { name: TAGS.url, value: record.url },
+      { name: TAGS.fetchedAt, value: fetchedAt },
+    ],
+  });
+  if (stored.response) return stored.response;
+  if (replaces) await removeCloudflareStorageRecords({ env, slug, rows: [replaces] });
+  return json({
+    ok: true,
+    source: {
+      id: stored.id, kind: 'link', title, url: record.url, fetchedAt, adminsOnly,
+      chars: text.length, truncated: record.snapshot.truncated,
+    },
+  });
+};
+
+// A PDF: the session's own AI reads it, and its text is stored beside the
+// PDF with the same privacy, replacing any earlier reading.
+const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now }) => {
+  const pdf = await readContextSourceRow({ env, slug, id: body.id });
+  if (!pdf || contextRoleOf(pdf.tags) !== CONTEXT_ROLE || pdf.contentType !== CONTEXT_FILE_TYPES.pdf) {
+    return json({ error: 'That PDF is no longer in the session.' }, 404);
+  }
+  if (config?.scopes?.ai === false) return json({ error: 'AI is turned off for this session.', reason: 'ai_disabled' }, 403);
+  if (Number(pdf.size) > LIMITS.pdfBytes) return json({ error: 'This PDF is too large for the session’s AI to read.' }, 413);
+  const bytes = await readContextSourceBytes({ env, config, slug, metadata: pdf, maxBytes: LIMITS.pdfBytes, principal: admin, deps });
+  if (!bytes) return json({ error: 'That PDF is no longer in the session.' }, 404);
+  const name = contextTagValue(pdf.tags, TAGS.name) || 'document.pdf';
+  const secrets = (await deps?.getSessionSecrets?.(env, slug)) || {};
+  const read = await readPdfWithSessionAi({
+    config, secrets, bytes, filename: name, deps: { fetch: deps?.fetch, readTimeoutMs: deps?.readTimeoutMs },
+  });
+  if (!read.ok) return json({ error: read.error, reason: read.reason }, read.status);
+  const readAt = now();
+  const text = read.text.slice(0, LIMITS.readTextChars);
+  const stored = await storeRecord(store, {
+    bytes: encoder.encode(text),
+    contentType: 'text/plain',
+    accessConditions: isAdminsOnlyAccess(pdf.accessConditions) ? ADMINS_ONLY_ACCESS : null,
+    tags: [
+      ...commonTags('file'),
+      { name: TAGS.role, value: CONTEXT_TEXT_ROLE },
+      { name: TAGS.derivedFrom, value: pdf.id },
+      { name: TAGS.name, value: clip(`${name} (read by AI).txt`, 180) },
+      { name: TAGS.mime, value: 'text/plain' },
+      { name: TAGS.readBy, value: 'ai' },
+      { name: TAGS.readModel, value: clip(read.model, 120) },
+      { name: TAGS.readAt, value: readAt },
+    ],
+  });
+  if (stored.response) return stored.response;
+  const earlier = derivedRowsOf(await listContextSourceRows({ env, slug }), pdf.id).filter((row) => row.id !== stored.id);
+  if (earlier.length) await removeCloudflareStorageRecords({ env, slug, rows: earlier });
+  return json({
+    ok: true,
+    text: {
+      id: stored.id, derivedFrom: pdf.id, model: read.model, readAt,
+      chars: text.length, truncated: read.truncated || read.text.length > text.length,
+    },
+  });
+};
+
+// Removes a source and the text the session's AI read from it.
+const remove = async ({ body, env, slug, json }) => {
+  const row = await readContextSourceRow({ env, slug, id: body.id });
+  if (!row) return json({ error: 'That item is no longer in the session.' }, 404);
+  const rows = [row, ...derivedRowsOf(await listContextSourceRows({ env, slug }), row.id)];
+  await removeCloudflareStorageRecords({ env, slug, rows });
+  return json({ ok: true, removed: rows.map((entry) => entry.id) });
+};
+
+const ACTIONS = { 'add-link': addLink, 'read-pdf': readPdf, remove };
+
+// POST /storage/context { action, ... }: admin-only changes to context
+// sources. Files are added through /storage/upload with a context role.
+export const contextSourceRoute = async ({
+  request, env, config, slug, uploaderAddress, baseHeaders, deps, store,
+} = {}) => {
+  const json = (body, status = 200) => (deps?.json
+    ? deps.json(body, status, baseHeaders)
+    : new Response(JSON.stringify(body), { status, headers: baseHeaders }));
+  const admin = trim(uploaderAddress).toLowerCase();
+  if (!admin || !resolveSessionAdminAddresses(config).has(admin)) {
+    return json({ error: 'Only session admins can change context.', reason: 'context_admin_required' }, 403);
+  }
+  let body = null;
+  try { body = await request.json(); } catch { body = null; }
+  if (!isObj(body)) return json({ error: 'Invalid JSON.' }, 400);
+  const action = ACTIONS[trim(body.action)];
+  if (!action) return json({ error: 'Unknown context action.' }, 400);
+  const now = () => new Date(deps?.now?.() || Date.now()).toISOString();
+  return action({ body, env, config, slug, admin, deps, store, json, now });
+};

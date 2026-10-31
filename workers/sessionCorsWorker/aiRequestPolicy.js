@@ -3,7 +3,7 @@ import { isChatReasoningModel, usesOpenAiResponsesApi } from './aiModelParams.js
 
 const trim = (value) => typeof value === 'string' ? value.trim() : '';
 const record = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-const tasks = new Set(['generate', 'rewrite', 'summarize', 'rank', 'analysis', 'compare', 'categorize', 'interview-map', 'interview-opening']);
+const tasks = new Set(['generate', 'rewrite', 'summarize', 'rank', 'analysis', 'compare', 'categorize', 'interview-map', 'interview-opening', 'context-read']);
 const taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : '';
 const modelEntry = (entry, provider, fallback = DEFAULT_AI_MODEL) => {
   const obj = record(entry);
@@ -51,6 +51,8 @@ export const isSessionTranscriptionModelAllowed = ({ config, provider, model, gr
 const operationCeilings = Object.freeze({
   generate: 16000, rewrite: 16000, summarize: 16000, rank: 16000, compare: 16000, categorize: 16000,
   analysis: 7000, 'interview-map': 8000, 'interview-opening': 600,
+  // A context PDF's text, read once by an admin's request.
+  'context-read': 8000,
 });
 const tokenFields = ['max_tokens', 'max_completion_tokens', 'max_output_tokens', 'max_tokens_to_sample', 'maxTokens'];
 const effortOrder = ['none', 'minimal', 'low', 'medium', 'high'];
