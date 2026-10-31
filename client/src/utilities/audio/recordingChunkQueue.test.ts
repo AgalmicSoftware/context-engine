@@ -258,3 +258,44 @@ it.each([408, 429, 500])('keeps retrying HTTP %s with a capped backoff', async (
   expect(times).toEqual([0, 1000, 3000, 7000, 15000, 30000, 60000, 90000]);
   expect(queue.segments[0].status).toBe('retrying');
 });
+
+it('keeps memory-only audio through a second close-and-keep when storage reads but cannot write', async () => {
+  jest.mocked(putRecordingChunk).mockRejectedValue(new DOMException('Full', 'QuotaExceededError'));
+  const pending = () => new Promise<{ text: string }>(() => {});
+  const open = async () => {
+    const queue = create(pending, 'full-phone');
+    await queue.ready;
+    await tick();
+    return queue;
+  };
+  const first = await open();
+  const id = first.begin(false);
+  first.capture(id, audio, true);
+  await first.keepAudio();
+  first.dispose();
+  const second = await open();
+  expect(second.records.get(id)?.audio).toBe(audio);
+  expect(second.storageError).toContain("This recording can't be recovered after a reload");
+  await second.keepAudio();
+  second.dispose();
+  const third = await open();
+  expect(third.records.get(id)?.audio).toBe(audio);
+});
+
+it('saves kept memory-only audio to device storage once writes work again', async () => {
+  jest.mocked(putRecordingChunk).mockRejectedValueOnce(new DOMException('Full', 'QuotaExceededError'));
+  const pending = () => new Promise<{ text: string }>(() => {});
+  const first = create(pending, 'recovered-phone');
+  await first.ready;
+  const id = first.begin(false);
+  first.capture(id, audio, true);
+  await first.keepAudio();
+  first.dispose();
+  const second = create(pending, 'recovered-phone');
+  await second.ready;
+  await tick();
+  await second.keepAudio();
+  expect(second.storageError).toBe('');
+  expect(saved.get(id)?.audio).toBe(audio);
+  second.dispose();
+});

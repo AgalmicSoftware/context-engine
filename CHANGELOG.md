@@ -143,6 +143,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep Group Conversation audio held only in memory when its dialog is closed and reopened more than once, and retry saving it to the device on each reopening.
+
 - Reject malformed WalletConnect query escapes with native URI decoding, removing the vulnerable decoder dependency while keeping the existing wallet stack.
 
 - Remove the unused SBT canvas image-load callback; previews continue to use fetched image files.

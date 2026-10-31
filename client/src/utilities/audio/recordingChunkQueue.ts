@@ -49,7 +49,8 @@ export class RecordingChunkQueue {
       const saved = await listRecordingChunks(this.options.scope);
       if (this.disposed) return;
       this.storageError = '';
-      for (const entry of [...saved, ...(memoryRecordings.get(this.options.scope)?.values() || [])]) {
+      const kept = [...(memoryRecordings.get(this.options.scope)?.values() || [])];
+      for (const entry of [...saved, ...kept]) {
         if (entry.audio && !['failed', 'complete'].includes(entry.segment.status))
           entry.segment = { ...entry.segment, status: 'queued', error: undefined };
         else if (!entry.audio && entry.segment.status !== 'complete') continue;
@@ -57,6 +58,11 @@ export class RecordingChunkQueue {
         if (entry.labelsUnavailableReason) this.labelsUnavailableReason = entry.labelsUnavailableReason;
       }
       memoryRecordings.delete(this.options.scope);
+      // Audio kept only in memory stays unsaved until a write succeeds: a failed write
+      // restores the warning, so the next close keeps the memory copy instead of dropping it.
+      for (const entry of kept)
+        if (entry.audio && entry.segment.status !== 'complete' && this.records.get(entry.segment.id) === entry)
+          void this.save(entry);
       this.changed();
       this.retry();
     } catch (error) {
