@@ -16,7 +16,8 @@ const ListField = ({
   listKey,
   label,
   help,
-}: FieldsProps & { listKey: string; label: string; help: string }) => {
+  readOnly = false,
+}: FieldsProps & { listKey: string; label: string; help: string; readOnly?: boolean }) => {
   const id = `ce-settings-list-${listKey}`;
   return (
     <SetupField id={id} label={label} help={help}>
@@ -25,6 +26,7 @@ const ListField = ({
         type="textarea"
         rows={3}
         value={text(asRecord(draft.lists)[listKey])}
+        readOnly={readOnly}
         aria-describedby={setupHelpId(id)}
         data-testid={id}
         onChange={(event) => onChange(['lists', listKey], event.target.value)}
@@ -35,7 +37,14 @@ const ListField = ({
 
 // How the question list opens and which questions and surveys it highlights
 // or hides. Lists take one ID per line.
-export const SettingsQuestionListFields = ({ draft, onChange }: FieldsProps) => (
+export const SettingsQuestionListFields = ({
+  draft,
+  onChange,
+  listsLockedReason = '',
+}: FieldsProps & {
+  /** Why the ID lists are read-only here, or '' when they can be edited. */
+  listsLockedReason?: string;
+}) => (
   <>
     <h3 className={styles.subheading}>Question list</h3>
     <SetupCheck
@@ -61,12 +70,18 @@ export const SettingsQuestionListFields = ({ draft, onChange }: FieldsProps) => 
         onChange={(event) => onChange(['defaultFilterState'], event.target.value)}
       />
     </SetupField>
+    {listsLockedReason ? (
+      <p className={styles.hint} data-testid="ce-settings-lists-locked">
+        {listsLockedReason}
+      </p>
+    ) : null}
     <ListField
       draft={draft}
       onChange={onChange}
       listKey="HIGHLIGHTED_QUESTION_IDS"
       label="Highlighted questions"
       help="Question IDs shown first, one per line."
+      readOnly={!!listsLockedReason}
     />
     <ListField
       draft={draft}
@@ -74,6 +89,7 @@ export const SettingsQuestionListFields = ({ draft, onChange }: FieldsProps) => 
       listKey="BLOCKED_QUESTION_IDS"
       label="Hidden questions"
       help="Question IDs participants don’t see, one per line."
+      readOnly={!!listsLockedReason}
     />
     <ListField
       draft={draft}
@@ -81,6 +97,7 @@ export const SettingsQuestionListFields = ({ draft, onChange }: FieldsProps) => 
       listKey="HIGHLIGHTED_SURVEY_IDS"
       label="Highlighted surveys"
       help="Survey IDs shown first, one per line."
+      readOnly={!!listsLockedReason}
     />
     <ListField
       draft={draft}
@@ -88,6 +105,7 @@ export const SettingsQuestionListFields = ({ draft, onChange }: FieldsProps) => 
       listKey="BLOCKED_SURVEY_IDS"
       label="Hidden surveys"
       help="Survey IDs participants don’t see, one per line."
+      readOnly={!!listsLockedReason}
     />
   </>
 );

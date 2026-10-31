@@ -212,9 +212,13 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
       parseFilterState(draft.defaultFilterState),
     ),
   };
-  CURATED_ID_LIST_KEYS.forEach((key) => {
-    values[key] = idList(before, draft, key);
-  });
+  // Workers that merge ai are the first to accept these lists. An older one
+  // refuses a save that carries them, so they stay out of its patch.
+  if (onChain || workerMergesAi(before)) {
+    CURATED_ID_LIST_KEYS.forEach((key) => {
+      values[key] = idList(before, draft, key);
+    });
+  }
   // Pile navigation has a deployment default; only a changed choice is stored.
   if (draft.pileAutoAdvanceEnabled !== resolvePileAutoAdvanceEnabled(before)) {
     values.pileAutoAdvanceEnabled = draft.pileAutoAdvanceEnabled === true;

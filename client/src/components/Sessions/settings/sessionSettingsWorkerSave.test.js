@@ -199,6 +199,15 @@ describe('saving the edit page through the Session Worker', () => {
     expect(buildSessionSettingsSave(before, draft).patch).toEqual({});
   });
 
+  it('keeps the highlighted and hidden lists out of a save to an older Worker, which refuses them', () => {
+    const before = projectPublicWorkerSessionConfig(publishedSession());
+    delete before.setConfigMergesAi;
+    const draft = buildSessionSettingsDraft(before);
+    draft.sessionName = 'Renamed';
+    draft.lists.BLOCKED_QUESTION_IDS = 'q-1';
+    expect(buildSessionSettingsSave(before, draft).patch).toEqual({ sessionName: 'Renamed' });
+  });
+
   it('saves an interview voice model edit, but not an unknown model', () => {
     const stored = publishedSession();
     const { save, result } = editAndSave(stored, (draft) => {

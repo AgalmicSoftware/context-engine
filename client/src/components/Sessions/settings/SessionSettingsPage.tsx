@@ -84,6 +84,8 @@ const CLOSED: Record<SetupSectionKey, boolean> = {
 
 const AI_LOCKED_REASON =
   'They are read-only here: this Session Worker is older and would drop the AI settings this page can’t see. Update the Worker to edit them.';
+const LISTS_LOCKED_REASON =
+  'The ID lists are read-only here: this Session Worker is older and refuses them. Update the Worker to edit them.';
 
 const lower = (value: unknown) => toStr(value).trim().toLowerCase();
 const sameJson = (left: unknown, right: unknown) =>
@@ -441,7 +443,13 @@ const SessionSettingsPage = ({
                   </p>
                 </>
               )}
-              {openSections.questions ? <SettingsQuestionListFields draft={draft} onChange={updateDraft} /> : null}
+              {openSections.questions ? (
+                <SettingsQuestionListFields
+                  draft={draft}
+                  onChange={updateDraft}
+                  listsLockedReason={onChain || workerMergesAi(saved) ? '' : LISTS_LOCKED_REASON}
+                />
+              ) : null}
             </>
           }
         />

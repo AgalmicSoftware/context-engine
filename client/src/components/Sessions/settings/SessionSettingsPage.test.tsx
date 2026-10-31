@@ -292,9 +292,20 @@ describe('SessionSettingsPage', () => {
     });
   });
 
-  it('edits the question list settings in the Questions section and saves them without a sign-out', async () => {
+  it('shows the ID lists read-only, with the reason, on an older Worker', async () => {
     renderPage();
     await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('ce-setup-more-questions'));
+    expect(screen.getByTestId('ce-settings-lists-locked')).toHaveTextContent('this Session Worker is older');
+    expect(screen.getByTestId('ce-settings-list-BLOCKED_QUESTION_IDS')).toHaveAttribute('readonly');
+    expect(screen.getByTestId('ce-settings-default-filters')).not.toHaveAttribute('readonly');
+  });
+
+  it('edits the question list settings in the Questions section and saves them without a sign-out', async () => {
+    mockFetchBootstrap.mockResolvedValue(bootstrapOf(workerConfig({ setConfigMergesAi: true })));
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    expect(screen.queryByTestId('ce-settings-lists-locked')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-settings-list-BLOCKED_QUESTION_IDS')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('ce-setup-more-questions'));
     fireEvent.change(screen.getByTestId('ce-settings-list-BLOCKED_QUESTION_IDS'), { target: { value: 'q-1\nq-2' } });
