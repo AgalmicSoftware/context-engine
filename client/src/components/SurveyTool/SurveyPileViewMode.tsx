@@ -206,6 +206,7 @@ import {
 } from './surveyAuthoritativeQuestionPool';
 
 import { SurveyQuestions } from './SurveyQuestions';
+import KeptRecordingProbe from './KeptRecordingProbe';
 
 export const LazyPileCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
 export const LazySessionListeningPanel = React.lazy(() => import('./SessionListeningPanel'));
@@ -3147,8 +3148,10 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     interviewPrefillPacket,
     interviewPrefillError,
   } = engine.state;
-  // The voice modal and its large chunk load on first open, then stay mounted so closing animates.
-  const voiceModeModalMounted = (engine._voiceModeModalMounted ||= !!showVoiceModeModal);
+  // The voice modal and its large chunk load on first open, then stay mounted so closing animates. Unsent
+  // recording audio kept on this device mounts it closed, so its notice shows after a reload too.
+  const voiceModeModalMounted = (engine._voiceModeModalMounted ||=
+    !!showVoiceModeModal || !!engine.state.keptRecordingAudio);
   const fallbackQuestionPool: EarlyVisiblePileQuestion[] =
     Array.isArray(engine.state.questionPool) && engine.state.questionPool.length > 0
       ? (engine.state.questionPool as EarlyVisiblePileQuestion[])
@@ -3521,6 +3524,13 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             );
           })()}
         </React.Suspense>
+      ) : null}
+      {isInterviewFeatureEnabled(engine.props?.sessionConfig) && !voiceModeModalMounted ? (
+        <KeptRecordingProbe
+          {...engine.getAudioInputWorkerProps()}
+          workerUrl={engine.props.workerUrl}
+          onFound={() => engine.setState({ keptRecordingAudio: true })}
+        />
       ) : null}
 
       {!showHologramAssistant && showCreate && (

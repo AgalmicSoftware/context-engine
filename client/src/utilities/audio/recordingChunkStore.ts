@@ -62,6 +62,18 @@ async function transact<T>(mode: IDBTransactionMode, action: (store: IDBObjectSt
 export const listRecordingChunks = (scope: string): Promise<RecordingChunk[]> =>
   transact('readonly', (store) => store.index('scope').getAll(IDBKeyRange.only(scope)));
 
+/**
+ * Whether this device keeps audio to upload for a session's recording, made by any account (Failed chunks wait
+ * for Retry). Scopes are `[worker, slug, account]` as JSON, so a session's start with its `identity` minus `]`.
+ */
+export async function hasKeptRecordingAudio(identity: string): Promise<boolean> {
+  const prefix = `${identity.slice(0, -1)},`;
+  const records = await transact<RecordingChunk[]>('readonly', (store) =>
+    store.index('scope').getAll(IDBKeyRange.bound(prefix, `${prefix}￿`)),
+  );
+  return records.some((record) => record.audio && record.segment.status !== 'failed');
+}
+
 export async function putRecordingChunk(record: RecordingChunk): Promise<void> {
   await transact('readwrite', (store) => store.put(record));
 }

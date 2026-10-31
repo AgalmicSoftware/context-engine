@@ -29,6 +29,7 @@ import {
 } from './surveyQuestionSubmitFeedback.js';
 import { buildSurveyQuestionPoolLoadState } from './surveyQuestionsTypes.js';
 import { buildListeningModeSearch, isListeningModeQueryEnabled } from '../../utilities/audio/rollingTranscription';
+import * as recordingChunkStore from '../../utilities/audio/recordingChunkStore';
 import { encodeInterviewPrefillPacket, resolveSessionVoiceMode } from './sessionInterview';
 import { readSessionRecruitmentSource } from './sessionRecruitmentSource';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -613,6 +614,20 @@ describe('SurveyPileViewMode runtime surface', () => {
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE));
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
+  });
+
+  it('mounts the voice-mode modal closed when this device keeps unsent recording audio', async () => {
+    mockVoiceModeProps = undefined;
+    const kept = jest.spyOn(recordingChunkStore, 'hasKeptRecordingAudio').mockResolvedValue(true);
+    try {
+      renderDemoPile({}, { route: '/session/demo' });
+      // After a reload its notice asks for the recording to be reopened, without the dialog opening.
+      await waitFor(() => expect(mockVoiceModeProps?.isOpen).toBe(false));
+      expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument();
+      expect(kept).toHaveBeenCalledWith(expect.stringMatching(/,"demo"\]$/));
+    } finally {
+      kept.mockRestore();
+    }
   });
 
   it('keeps the microphone active for retained interviews and resumes them after closing', async () => {

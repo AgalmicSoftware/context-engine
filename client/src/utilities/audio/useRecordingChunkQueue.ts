@@ -2,6 +2,7 @@ import { audioFileExtension } from './audioFileExtension';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
 import { countKeptChunks, hasUnsavedAudio, RecordingChunkQueue } from './recordingChunkQueue';
+import { recordingOwner, type RecordingOptions } from './recordingOwner';
 import {
   stitchRollingTranscriptSegments,
   type CaptureGap,
@@ -46,23 +47,10 @@ const OPEN_ELSEWHERE_WAIT_MS = 1000;
 const OWNER_NOTICE =
   'This recording belongs to the account that made it. It closes when its uploads finish and its audio is saved, or when you clear it. Download any audio you need first.';
 
-type RecordingOptions = {
-  sessionSlug: string;
-  sessionConfig: Record<string, unknown> | null;
-  context?: unknown;
-  workerUrl?: string;
-};
 type Options = RecordingOptions & {
   labelSpeakers: boolean;
   // Another account's recording stays open while capture continues.
   capturing?: boolean;
-};
-// A recording belongs to a session on a Worker, and to the account that made it.
-const recordingOwner = ({ sessionSlug, sessionConfig, context, workerUrl }: RecordingOptions) => {
-  const account =
-    context && typeof context === 'object' && 'account' in context ? String(context.account || '').toLowerCase() : '';
-  const worker = workerUrl || sessionConfig?.corsWorkerUrl || sessionConfig?.workerUrl || '';
-  return { account, worker, identity: JSON.stringify([worker, sessionSlug]) };
 };
 
 export function useRecordingChunkQueue(options: Options) {
