@@ -1,5 +1,6 @@
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { normalizeResultsAnalysisSettings } from '../../../../shared/resultsAnalysisSettings.mjs';
+import type { SessionTemplate } from '../../../../shared/sessionTemplate.mjs';
 import { getDefaultHttpRpc } from '../../variables/chains.js';
 import {
   CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED,
@@ -36,6 +37,7 @@ import {
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
 import type { AnyRecord } from '../shellTypes';
+import { applySessionModeProfileSelectionToDraft } from './sessionWizardModeProfileDraftController';
 import { serializePendingWorkerGroupDrafts } from './sessionWizardPendingWorkerGroups';
 
 const { getPathRpcUrl } = rpcDefaults;
@@ -319,6 +321,31 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
     draft.lit.defaultGateId = 'gate-1';
   }
   return normalizeSessionWizardDraftShape(draft);
+};
+
+// Replaces a draft's portable fields with a validated template's; deployment
+// fields such as the Worker, slug and session ID stay. A template without a
+// mode profile keeps the base draft's profile.
+export const applySessionTemplateToDraft = (
+  template: SessionTemplate,
+  baseDraft: AnyRecord = buildSessionWizardDefaultTemplate(),
+): AnyRecord => {
+  const { format: _format, draftId, sessionModeProfile, ...fields } = template;
+  let next = mergeSessionWizardDraftDeep(deepClone(baseDraft), deepClone(fields));
+  if (draftId) next.draftId = draftId;
+  else delete next.draftId;
+  if (sessionModeProfile) {
+    const profile = deepClone(sessionModeProfile) as SessionModeProfile;
+    if (classifySessionModeProfileSupport(profile).status === 'reachable') {
+      next = applySessionModeProfileSelectionToDraft(next, profile, compileSessionModeProfile(profile));
+    } else {
+      next.sessionModeProfile = profile;
+      // Normalizing merges the storage profile into the mode profile, so the
+      // base draft's storage would rewrite the imported profile.
+      delete next.storageProfile;
+    }
+  }
+  return normalizeSessionWizardDraftShape(next);
 };
 
 export const buildSessionWizardInitialDraftFromCache = ({
