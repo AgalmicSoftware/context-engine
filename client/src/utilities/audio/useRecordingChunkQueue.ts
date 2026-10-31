@@ -2,7 +2,11 @@ import { audioFileExtension } from './audioFileExtension';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
 import { hasUnsavedAudio, RecordingChunkQueue } from './recordingChunkQueue';
-import { stitchRollingTranscriptSegments, type RollingTranscriptSegment } from './rollingTranscription';
+import {
+  stitchRollingTranscriptSegments,
+  type CaptureGap,
+  type RollingTranscriptSegment,
+} from './rollingTranscription';
 
 const memoryScopes = new Map<string, string>();
 const scopeStorageKey = (identity: string) => `ce:recording-scope:${identity}`;
@@ -170,9 +174,9 @@ export function useRecordingChunkQueue(options: Options) {
     }
     await queue.prepare();
   }, [identity, scope]);
-  const beginChunk = useCallback(() => {
+  const beginChunk = useCallback((gapBefore?: CaptureGap) => {
     const queue = queueRef.current!;
-    const id = queue.begin(latest.current.labelSpeakers);
+    const id = queue.begin(latest.current.labelSpeakers, gapBefore);
     return (audio: Blob, finished = false) => queue.capture(id, audio, finished);
   }, []);
   const finishTranscription = useCallback(async () => {

@@ -139,3 +139,22 @@ it('drops speech both chunks heard and joins a voice that carries on across chun
     ].join('\n'),
   );
 });
+
+it('notes time without audio before a chunk, without counting it as speech', () => {
+  const after = (gapBefore: { startedAt: number; endedAt: number; cause: 'muted' | 'stalled' }) => ({
+    ...chunk(1, 'After.'),
+    gapBefore,
+  });
+  const muted = stitchRollingTranscriptSegments([
+    chunk(0, 'Before.'),
+    after({ startedAt: 1_000, endedAt: 21_400, cause: 'muted' }),
+  ]);
+  expect(muted).toBe('Before. [Microphone paused for 20 s.] After.');
+  const stalled = stitchRollingTranscriptSegments([
+    chunk(0, 'Before.', [turn('Person 1', 'Before.')]),
+    { ...after({ startedAt: 0, endedAt: 220_000, cause: 'stalled' }), speakerTurns: [turn('Person 1', 'After.')] },
+  ]);
+  expect(stalled).toBe('Person 1: Before.\n[No audio for 3 min 40 s.]\nPerson 1: After.');
+  expect(transcriptSpeech(muted)).toBe('Before.  After.');
+  expect(transcriptSpeech(stalled)).toBe('Before.\n\nAfter.');
+});

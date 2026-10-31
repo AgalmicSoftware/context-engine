@@ -5,7 +5,7 @@ import {
   type HiddenPeriod,
   type RecordingChunk,
 } from './recordingChunkStore';
-import type { RollingTranscriptSegment } from './rollingTranscription';
+import type { CaptureGap, RollingTranscriptSegment } from './rollingTranscription';
 import { cutSpeakerSamples } from './speakerSamples';
 import {
   MAX_KNOWN_SPEAKERS,
@@ -192,13 +192,13 @@ export class RecordingChunkQueue {
     await this.ready;
     if (this.storageError && !this.records.size) await this.restore();
   }
-  begin(labelSpeakers: boolean): string {
+  begin(labelSpeakers: boolean, gapBefore?: CaptureGap): string {
     const index = this.segments.reduce((max, entry) => Math.max(max, entry.index), -1) + 1;
     const id = `segment-${Date.now()}-${index}`;
     this.records.set(id, {
       scope: this.options.scope,
       labelSpeakers,
-      segment: { id, index, status: 'recording', text: '', startedAt: Date.now() },
+      segment: { id, index, status: 'recording', text: '', startedAt: Date.now(), ...(gapBefore && { gapBefore }) },
     });
     this.changed();
     return id;

@@ -1004,3 +1004,21 @@ it('makes Record available with plain transcription after two seconds and ignore
     jest.useRealTimers();
   }
 });
+
+it('says when the device has paused the microphone, and that recording resumes', () => {
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({ isRecording: true, status: 'recording', wakeLockHeld: true, microphonePaused: true }),
+  );
+  const { rerender } = render(<SessionListeningPanel sessionSlug="room" panelMode="recordGroup" />);
+  expect(screen.getByText('Microphone paused by the device. Recording resumes when it returns.')).toHaveAttribute(
+    'role',
+    'status',
+  );
+  expect(screen.getByText('Mic paused')).toBeInTheDocument();
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({ isRecording: true, status: 'recording', wakeLockHeld: true }),
+  );
+  rerender(<SessionListeningPanel sessionSlug="room" panelMode="recordGroup" />);
+  expect(screen.queryByText(/Microphone paused by the device/)).not.toBeInTheDocument();
+  expect(screen.getByText('Recording')).toBeInTheDocument();
+});

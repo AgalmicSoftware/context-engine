@@ -601,11 +601,56 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
+  it('says when the device pauses the microphone, and notes the gap where recording continues', async () => {
+    const listeners: Record<string, () => void> = {};
+    Object.assign(mockTrack, {
+      addEventListener: (name: string, callback: () => void) => {
+        listeners[name] = callback;
+      },
+    });
+    let uploads = 0;
+    (transcribeAudio as jest.Mock).mockImplementation(async () => `Chunk ${++uploads}.`);
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'muted', chunkMs: 60_000 }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+      await jest.advanceTimersByTimeAsync(10_000);
+    });
+    // A call or Siri takes the microphone without hiding the page.
+    act(() => listeners.mute());
+    expect(result.current.microphonePaused).toBe(true);
+    expect(result.current.isRecording).toBe(true);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(80_000);
+    });
+    // The rotation during the pause still ends chunk 1 on time.
+    expect(instances).toHaveLength(2);
+    await act(async () => {
+      listeners.unmute();
+      await flushPromises();
+    });
+    expect(result.current.microphonePaused).toBe(false);
+    // Recording continues in a new chunk, which starts a full chunk length from the return.
+    expect(instances).toHaveLength(3);
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete', 'complete', 'recording']);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(59_000);
+    });
+    expect(instances).toHaveLength(3);
+    await act(async () => {
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(result.current.transcript).toBe('Chunk 1. Chunk 2. [Microphone paused for 1 min 20 s.] Chunk 3.');
+    unmount();
+  });
+
   it('stops on microphone revocation and keeps the final audio available', async () => {
     let ended = () => {};
     Object.assign(mockTrack, {
-      addEventListener: (_name: string, callback: () => void) => {
-        ended = callback;
+      addEventListener: (name: string, callback: () => void) => {
+        if (name === 'ended') ended = callback;
       },
     });
     (transcribeAudio as jest.Mock).mockImplementation(() => new Promise(() => {}));
@@ -873,8 +918,8 @@ describe('useRollingTranscriptionRecorder', () => {
       }
       let ended = () => {};
       Object.assign(mockTrack, {
-        addEventListener: (_name: string, callback: () => void) => {
-          ended = callback;
+        addEventListener: (name: string, callback: () => void) => {
+          if (name === 'ended') ended = callback;
         },
       });
       (transcribeAudio as jest.Mock).mockImplementation(() => new Promise(() => {}));

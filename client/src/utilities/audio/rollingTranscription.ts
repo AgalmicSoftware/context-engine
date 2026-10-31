@@ -6,6 +6,9 @@ export const LISTENING_MODE_QUERY_VALUE = 'listening';
 export type RollingTranscriptSegmentStatus =
   'recording' | 'queued' | 'transcribing' | 'complete' | 'failed' | 'retrying';
 
+/** Time before a chunk when no audio was captured: the device paused the microphone, or audio stopped arriving. */
+export type CaptureGap = { startedAt: number; endedAt: number; cause: 'muted' | 'stalled' };
+
 export type RollingTranscriptSegment = {
   id: string;
   index: number;
@@ -17,6 +20,7 @@ export type RollingTranscriptSegment = {
   speakerTurns?: SpeakerTranscriptTurn[];
   // No voice matched the samples sent, so this chunk numbers its voices on its own.
   speakersRenumbered?: boolean;
+  gapBefore?: CaptureGap;
 };
 
 // A chunk boundary repeats at most a second of speech, so only its last 80 words are compared.
@@ -25,20 +29,29 @@ export const mergeRollingTranscriptText = (previous: string, next: string): stri
   mergeTranscriptOverlap(previous, next, OVERLAP_WORDS);
 
 const recordingGap = (index: number) => `[Recording gap: chunk ${index + 1} could not be transcribed.]`;
+const duration = (milliseconds: number) => {
+  const seconds = Math.max(1, Math.round(milliseconds / 1000));
+  const minutes = Math.floor(seconds / 60);
+  return minutes ? `${minutes} min${seconds % 60 ? ` ${seconds % 60} s` : ''}` : `${seconds} s`;
+};
+const captureGap = ({ startedAt, endedAt, cause }: CaptureGap) =>
+  `[${cause === 'muted' ? 'Microphone paused' : 'No audio'} for ${duration(endedAt - startedAt)}.]`;
 /** The words people said: gap markers keep a transcript honest about missing audio, but they are not speech. */
 export const transcriptSpeech = (transcript: string): string =>
   transcript
     .replace(/\[Recording gap: chunk \d+ could not be transcribed\.\]/g, '')
+    .replace(/\[(?:Microphone paused|No audio) for [\w ]+\.\]/g, '')
     .replace(/^Person \d+: /gm, '')
     .trim();
 
 // A line of the transcript: a voice's turn, or plain text and gap markers (no speaker).
 type TranscriptLine = { speaker: string; text: string };
 const chunkLines = (segment: RollingTranscriptSegment): TranscriptLine[] => {
-  if (segment.status === 'failed') return [{ speaker: '', text: recordingGap(segment.index) }];
+  const gap = segment.gapBefore ? [{ speaker: '', text: captureGap(segment.gapBefore) }] : [];
+  if (segment.status === 'failed') return [...gap, { speaker: '', text: recordingGap(segment.index) }];
   const turns = (segment.speakerTurns || []).filter((turn) => turn.speaker && turn.text.trim());
   const lines = turns.length ? turns : [{ speaker: '', text: segment.text }];
-  return lines.map(({ speaker, text }) => ({ speaker, text: text.trim() })).filter((line) => line.text);
+  return [...gap, ...lines.map(({ speaker, text }) => ({ speaker, text: text.trim() })).filter((line) => line.text)];
 };
 
 /**

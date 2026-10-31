@@ -3,7 +3,7 @@ import { requestPreferredSpeechMicrophone } from './microphoneSelection';
 import { useRecordingWakeLock } from './useRecordingWakeLock';
 import { useRecordingLeaveGuard } from './useRecordingLeaveGuard';
 import { useRecordingChunkQueue } from './useRecordingChunkQueue';
-import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS } from './rollingTranscription';
+import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS, type CaptureGap } from './rollingTranscription';
 
 type UseRollingTranscriptionRecorderOptions = {
   sessionSlug?: string;
@@ -75,6 +75,9 @@ export const useRollingTranscriptionRecorder = ({
   const { segments, transcript, labelsUnavailableReason, beginChunk, prepare, finishTranscription, retryChunk } =
     chunks;
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  // The device took the microphone (a call, Siri) without hiding the page; recording goes on when it returns.
+  const [microphonePaused, setMicrophonePaused] = useState(false);
+  const mutedAtRef = useRef<number | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const mountedRef = useRef(false);
@@ -161,7 +164,7 @@ export const useRollingTranscriptionRecorder = ({
   }, []);
 
   const createRecorder = useCallback(
-    (stream: MediaStream): MediaRecorder => {
+    (stream: MediaStream, gapBefore?: CaptureGap): MediaRecorder => {
       const mimeType = pickSupportedMimeType();
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
 
@@ -176,7 +179,7 @@ export const useRollingTranscriptionRecorder = ({
         const audio = new Blob(fragments, {
           type: recorder.mimeType || mimeType || fragments[0]?.type || 'audio/webm',
         });
-        if (!capture && audio.size) capture = beginChunk();
+        if (!capture && audio.size) capture = beginChunk(gapBefore);
         capture?.(audio, finishing);
       };
       recorder.ondataavailable = (event: BlobEvent) => {
@@ -230,33 +233,36 @@ export const useRollingTranscriptionRecorder = ({
 
       // A constructor/start failure must not publish an empty chunk to the queue.
       recorder.start(1000);
-      capture ??= beginChunk();
+      capture ??= beginChunk(gapBefore);
       finishersRef.current.set(recorder, () => snapshot(true));
       return recorder;
     },
     [beginChunk, clearRotationTimer, resolveStopWaiters, stopRecorder, stopTimer, stopTracks],
   );
 
-  const rotateRecorder = useCallback(() => {
-    if (!recordingActiveRef.current || !streamRef.current) return;
-    const previousRecorder = mediaRecorderRef.current;
-    if (!previousRecorder || previousRecorder.state === 'inactive') return;
+  const rotateRecorder = useCallback(
+    (gapBefore?: CaptureGap) => {
+      if (!recordingActiveRef.current || !streamRef.current) return;
+      const previousRecorder = mediaRecorderRef.current;
+      if (!previousRecorder || previousRecorder.state === 'inactive') return;
 
-    try {
-      const nextRecorder = createRecorder(streamRef.current);
-      mediaRecorderRef.current = nextRecorder;
-      stopRecorder(previousRecorder, false);
-      // Rotation is the only error raised while capture continues; a successful one clears it.
-      setErrorMessage('');
-    } catch (error) {
-      setErrorMessage(describeError(error));
       try {
-        previousRecorder.requestData();
-      } catch (_) {
-        // Keep the active recorder running; the next timer tick will retry rotation.
+        const nextRecorder = createRecorder(streamRef.current, gapBefore);
+        mediaRecorderRef.current = nextRecorder;
+        stopRecorder(previousRecorder, false);
+        // Rotation is the only error raised while capture continues; a successful one clears it.
+        setErrorMessage('');
+      } catch (error) {
+        setErrorMessage(describeError(error));
+        try {
+          previousRecorder.requestData();
+        } catch (_) {
+          // Keep the active recorder running; the next timer tick will retry rotation.
+        }
       }
-    }
-  }, [createRecorder, stopRecorder]);
+    },
+    [createRecorder, stopRecorder],
+  );
 
   const startRotationTimer = useCallback(() => {
     clearRotationTimer();
@@ -311,6 +317,21 @@ export const useRollingTranscriptionRecorder = ({
           },
           { once: true },
         );
+        track.addEventListener?.('mute', () => {
+          if (streamRef.current !== stream || !recordingActiveRef.current) return;
+          mutedAtRef.current ??= Date.now();
+          setMicrophonePaused(true);
+        });
+        track.addEventListener?.('unmute', () => {
+          const startedAt = mutedAtRef.current;
+          if (streamRef.current !== stream || startedAt == null) return;
+          mutedAtRef.current = null;
+          setMicrophonePaused(false);
+          // Nothing was captured meanwhile: speech carries on in a new chunk, and the transcript notes the gap.
+          if (mediaRecorderRef.current?.state !== 'recording') return;
+          rotateRecorder({ startedAt, endedAt: Date.now(), cause: 'muted' });
+          startRotationTimer();
+        });
       });
       recordingActiveRef.current = true;
       const recorder = createRecorder(stream);
@@ -335,6 +356,7 @@ export const useRollingTranscriptionRecorder = ({
     createRecorder,
     recordSpeakerAudio,
     prepare,
+    rotateRecorder,
     stopRecorder,
     startElapsedTimer,
     startRotationTimer,
@@ -471,6 +493,12 @@ export const useRollingTranscriptionRecorder = ({
     setErrorMessage('');
   }, [chunks.scope]);
 
+  useEffect(() => {
+    if (status !== 'idle' && status !== 'error') return;
+    mutedAtRef.current = null;
+    setMicrophonePaused(false);
+  }, [status]);
+
   const pendingSegmentCount = segments.filter(
     (segment) => segment.status === 'queued' || segment.status === 'transcribing' || segment.status === 'retrying',
   ).length;
@@ -492,6 +520,7 @@ export const useRollingTranscriptionRecorder = ({
     isStopping: status === 'stopping',
     isBusy: status === 'requesting' || status === 'stopping',
     elapsedSeconds,
+    microphonePaused,
     transcript,
     segments,
     pendingSegmentCount,

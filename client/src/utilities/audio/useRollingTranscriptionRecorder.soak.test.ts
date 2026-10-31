@@ -228,8 +228,14 @@ function blobBytes(this: Blob) {
     reader.readAsArrayBuffer(this);
   });
 }
+// The latest microphone's event listeners, so the test can play the device pausing it.
+const microphone = { listeners: {} as Record<string, () => void> };
 const getUserMedia = jest.fn(async () => {
-  const track = { kind: 'audio', label: 'Phone microphone', stop: jest.fn(), addEventListener: jest.fn() };
+  microphone.listeners = {};
+  const addEventListener = (name: string, listener: () => void) => {
+    microphone.listeners[name] = listener;
+  };
+  const track = { kind: 'audio', label: 'Phone microphone', stop: jest.fn(), addEventListener };
   return { getTracks: () => [track], getAudioTracks: () => [track] };
 });
 
@@ -274,7 +280,8 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     // A burst of 503s, then a Worker that struggles before one request never answers.
     mockWorker.plan.set(2, ['503', '503', '503', '503']);
     mockWorker.plan.set(7, ['503', '503', 'hang']);
-    // The provider can't decode chunk 9, with labels or without, and chunk 10's recorder never confirms its stop.
+    // The provider can't decode chunk 9, with labels or without, and chunk 10's recorder never confirms its stop
+    // when a call ends and the microphone returns.
     mockWorker.plan.set(9, ['corrupt', 'corrupt']);
     // Device storage refuses one write: the commit of chunk 4's transcript.
     mockStore.failNext = (record) => record.segment.index === 3 && record.segment.status === 'complete';
@@ -351,6 +358,13 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     setPage({ visible: false });
     await runUntil(at(24));
     setPage({ visible: true });
+    await runUntil(at(25, 30));
+    // A call takes the microphone for a minute without hiding the page.
+    act(() => microphone.listeners.mute());
+    expect(view.result.current.microphonePaused).toBe(true);
+    await runUntil(at(26, 30));
+    act(() => microphone.listeners.unmute());
+    expect(view.result.current.microphonePaused).toBe(false);
     await runUntil(at(30, 30));
     await act(async () => {
       const stopping = view.result.current.stopRecording();
@@ -361,15 +375,18 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
 
     const recorder = view.result.current;
     const rejected = recorder.segments[8];
-    expect(FakeMediaRecorder.made).toHaveLength(11);
-    expect(statuses(view)).toEqual([...Array(8).fill('complete'), 'failed', 'complete', 'complete']);
+    expect(FakeMediaRecorder.made).toHaveLength(12);
+    expect(statuses(view)).toEqual([...Array(8).fill('complete'), 'failed', 'complete', 'complete', 'complete']);
     const speech = (chunks: number[]) => chunks.map((chunk) => `Chunk ${chunk} speech.`).join(' ');
     const gap = '[Recording gap: chunk 9 could not be transcribed.]';
+    const call = '[Microphone paused for 1 min.]';
     // The room's one voice is Person 1 in every chunk, before and after the reload.
     expect(recorder.transcript).toBe(
       generation === 'current'
-        ? [`Person 1: ${speech([1, 2, 3, 4, 5, 6, 7, 8])}`, gap, `Person 1: ${speech([10, 11])}`].join('\n')
-        : [speech([1, 2, 3, 4, 5, 6, 7, 8]), gap, speech([10, 11])].join(' '),
+        ? [`Person 1: ${speech([1, 2, 3, 4, 5, 6, 7, 8])}`, gap, `Person 1: ${speech([10])}`, call]
+            .concat(`Person 1: ${speech([11, 12])}`)
+            .join('\n')
+        : [speech([1, 2, 3, 4, 5, 6, 7, 8]), gap, speech([10]), call, speech([11, 12])].join(' '),
     );
     expect(recorder.pendingSegmentCount).toBe(0);
     expect(recorder.errorMessage).toBe('');
@@ -421,7 +438,7 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     );
     // Device storage keeps every chunk in one recording, and audio only for the rejected one.
     const stored = [...mockStore.records.values()].filter((record) => record.segment.index >= 0);
-    expect(stored).toHaveLength(11);
+    expect(stored).toHaveLength(12);
     expect(new Set(stored.map((record) => record.scope)).size).toBe(1);
     expect(stored.filter((record) => record.audio).map((record) => record.segment)).toEqual([
       expect.objectContaining({ id: rejected.id, status: 'failed' }),

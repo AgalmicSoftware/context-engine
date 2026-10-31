@@ -819,6 +819,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           </Button>
         </div>
       ) : null}
+      {isRecorderSessionActive && recorder.microphonePaused ? (
+        <div className={styles.sessionRecordingWakeNotice} role="status">
+          Microphone paused by the device. Recording resumes when it returns.
+        </div>
+      ) : null}
       {isRecorderSessionActive && recorder.backBlocked ? (
         <div className={styles.sessionRecordingWakeNotice} role="status">
           Still recording. Press Stop before leaving.
@@ -842,9 +847,13 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             <div className={styles.sessionListeningWaveformTimer} aria-live="polite" aria-atomic="true">
               <FontAwesomeIcon
                 icon={faCircle}
-                className={recorder.isPaused ? styles.sessionListeningTimerDotPaused : styles.sessionListeningTimerDot}
+                className={
+                  recorder.isPaused || recorder.microphonePaused
+                    ? styles.sessionListeningTimerDotPaused
+                    : styles.sessionListeningTimerDot
+                }
               />
-              <span>{recorder.isPaused ? 'Paused' : 'Recording'}</span>
+              <span>{recorder.microphonePaused ? 'Mic paused' : recorder.isPaused ? 'Paused' : 'Recording'}</span>
               <span>{formatSessionRecordingElapsed(recorder.elapsedSeconds)}</span>
             </div>
           </div>
