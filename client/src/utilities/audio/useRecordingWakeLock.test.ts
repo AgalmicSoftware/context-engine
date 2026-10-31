@@ -89,25 +89,27 @@ it('keeps recording usable when the API is missing or refuses the lock', async (
   expect(missing.result.current.wakeLockHeld).toBe(false);
 });
 
-it('keeps hidden recording intervals after return and Stop until dismissed', async () => {
+it('reports hiding only during capture, and the return even after capture stopped while hidden', async () => {
   jest.useFakeTimers();
   Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: undefined });
   try {
     jest.setSystemTime(new Date('2026-10-30T14:02:00Z'));
-    const { result, rerender } = renderHook(({ active }) => useRecordingWakeLock(active), {
+    const onHidden = jest.fn<(at: number) => void>();
+    const onShown = jest.fn<(at: number) => void>();
+    const { rerender } = renderHook(({ active }) => useRecordingWakeLock(active, onHidden, onShown), {
       initialProps: { active: true },
     });
+    onShown.mockClear();
     act(() => visible('hidden'));
-    const startedAt = Date.now();
+    expect(onHidden).toHaveBeenCalledWith(Date.now());
+    jest.setSystemTime(new Date('2026-10-30T14:05:00Z'));
+    rerender({ active: false });
+    expect(onShown).not.toHaveBeenCalled();
     jest.setSystemTime(new Date('2026-10-30T14:12:00Z'));
     act(() => visible('visible'));
-    expect(result.current.hiddenPeriods).toEqual([{ startedAt, endedAt: Date.now() }]);
-    rerender({ active: false });
+    expect(onShown).toHaveBeenCalledWith(Date.now());
     act(() => visible('hidden'));
-    act(() => visible('visible'));
-    expect(result.current.hiddenPeriods).toHaveLength(1);
-    act(() => result.current.dismissHiddenPeriods());
-    expect(result.current.hiddenPeriods).toEqual([]);
+    expect(onHidden).toHaveBeenCalledTimes(1);
   } finally {
     jest.useRealTimers();
   }

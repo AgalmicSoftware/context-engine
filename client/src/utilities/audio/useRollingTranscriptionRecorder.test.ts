@@ -276,6 +276,45 @@ describe('useRollingTranscriptionRecorder', () => {
     }
   });
 
+  it('keeps a hidden period that capture stopped during, ending it at the return, through close and reopen', async () => {
+    const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+    const show = (state: string) => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: state });
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    try {
+      jest.setSystemTime(new Date('2026-10-31T14:02:00Z'));
+      const first = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'hidden-room' }));
+      await act(async () => {
+        await first.result.current.startRecording();
+      });
+      const hiddenAt = Date.now();
+      act(() => show('hidden'));
+      jest.setSystemTime(new Date('2026-10-31T14:05:00Z'));
+      await act(async () => {
+        await first.result.current.stopRecording();
+        await flushPromises();
+      });
+      jest.setSystemTime(new Date('2026-10-31T14:12:00Z'));
+      await act(async () => {
+        show('visible');
+        await flushPromises();
+      });
+      const periods = [{ startedAt: hiddenAt, endedAt: Date.now() }];
+      expect(first.result.current.hiddenPeriods).toEqual(periods);
+      first.unmount();
+      const reopened = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'hidden-room' }));
+      await act(flushPromises);
+      expect(reopened.result.current.hiddenPeriods).toEqual(periods);
+      act(() => reopened.result.current.dismissHiddenPeriods());
+      expect(reopened.result.current.hiddenPeriods).toEqual([]);
+      reopened.unmount();
+    } finally {
+      if (visibility) Object.defineProperty(document, 'visibilityState', visibility);
+      else Reflect.deleteProperty(document, 'visibilityState');
+    }
+  });
+
   it('keeps raw audio until a failed upload retries and its transcript is saved', async () => {
     (transcribeAudio as jest.Mock)
       .mockImplementationOnce(async () => {

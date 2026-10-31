@@ -324,6 +324,29 @@ it('clears a Failed chunk only once its audio is explicitly discarded', async ()
   expect(saved.size).toBe(0);
 });
 
+it('restores hidden periods saved by an earlier page and ends one still open at the return', async () => {
+  jest.setSystemTime(5000);
+  saved.set('hidden-periods', {
+    scope: 'reloaded-room',
+    labelSpeakers: false,
+    hiddenPeriods: [{ startedAt: 1000, endedAt: 2000 }, { startedAt: 3000 }],
+    segment: { id: 'hidden-periods', index: -1, status: 'recording', text: '', startedAt: 0 },
+  });
+  const queue = create(undefined, 'reloaded-room');
+  await queue.ready;
+  await tick();
+  const periods = [
+    { startedAt: 1000, endedAt: 2000 },
+    { startedAt: 3000, endedAt: 5000 },
+  ];
+  expect(queue.segments).toEqual([]);
+  expect(queue.hiddenPeriods).toEqual(periods);
+  expect(saved.get('hidden-periods')?.hiddenPeriods).toEqual(periods);
+  queue.dismissHiddenPeriods();
+  await tick();
+  expect(saved.get('hidden-periods')?.hiddenPeriods).toEqual([]);
+});
+
 it('reopens kept pending audio even when IndexedDB is unavailable', async () => {
   jest.mocked(listRecordingChunks).mockRejectedValue(new Error('No storage'));
   jest.mocked(putRecordingChunk).mockRejectedValue(new Error('No storage'));

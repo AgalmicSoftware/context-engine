@@ -1,28 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-/** A screen lock is best effort: recording must still work when battery or browser policy refuses it. */
-export function useRecordingWakeLock(active: boolean) {
+/**
+ * A screen lock is best effort: recording must still work when battery or browser policy refuses it.
+ * `onHidden` hears the page hide while active; `onShown` hears every return, so a hidden period
+ * opened during capture ends at the return even when capture stopped meanwhile.
+ */
+export function useRecordingWakeLock(active: boolean, onHidden?: (at: number) => void, onShown?: (at: number) => void) {
   const [held, setHeld] = useState(false);
   const [pageHidden, setPageHidden] = useState(document.visibilityState === 'hidden');
-  const [hiddenPeriods, setHiddenPeriods] = useState<Array<{ startedAt: number; endedAt: number }>>([]);
-  const hiddenSince = useRef<number | null>(null);
-  const dismissHiddenPeriods = useCallback(() => setHiddenPeriods([]), []);
   useEffect(() => {
     const update = () => {
       const hidden = document.visibilityState === 'hidden';
       setPageHidden(hidden);
-      if (active && hidden) {
-        if (hiddenSince.current === null) hiddenSince.current = Date.now();
-      } else if (hiddenSince.current !== null) {
-        const period = { startedAt: hiddenSince.current, endedAt: Date.now() };
-        hiddenSince.current = null;
-        setHiddenPeriods((previous) => [...previous, period]);
-      }
+      if (!hidden) onShown?.(Date.now());
+      else if (active) onHidden?.(Date.now());
     };
     update();
     document.addEventListener('visibilitychange', update);
     return () => document.removeEventListener('visibilitychange', update);
-  }, [active]);
+  }, [active, onHidden, onShown]);
   useEffect(() => {
     setHeld(false);
     if (!active || typeof navigator === 'undefined' || !navigator.wakeLock?.request) return;
@@ -75,5 +71,5 @@ export function useRecordingWakeLock(active: boolean) {
       release();
     };
   }, [active]);
-  return { wakeLockHeld: active && held, pageHidden, hiddenPeriods, dismissHiddenPeriods };
+  return { wakeLockHeld: active && held, pageHidden };
 }

@@ -2,6 +2,7 @@ import {
   clearRecordingChunks,
   listRecordingChunks,
   putRecordingChunk,
+  type HiddenPeriod,
   type RecordingChunk,
 } from './recordingChunkStore';
 import type { RollingTranscriptSegment } from './rollingTranscription';
@@ -9,6 +10,11 @@ import type { SpeakerTranscriptTurn } from './speakerTranscript';
 
 // Unsaved records survive closing and reopening the panel in the same page.
 const memoryRecordings = new Map<string, Map<string, RecordingChunk>>();
+// Hidden periods are kept with the recording under one reserved record. It has no audio and is never
+// complete, so restoring skips it as a chunk (as 0.8.1 does), and Clear deletes it with the recording.
+// The page's own copy also covers a failed save.
+const HIDDEN_PERIODS_ID = 'hidden-periods';
+const memoryHiddenPeriods = new Map<string, HiddenPeriod[]>();
 
 type Transcription = { text: string; speakerTurns?: SpeakerTranscriptTurn[]; labelsUnavailableReason?: string };
 type Options = {
@@ -28,6 +34,7 @@ export class RecordingChunkQueue {
   records = new Map<string, RecordingChunk>();
   storageError = '';
   labelsUnavailableReason = '';
+  hiddenPeriods: HiddenPeriod[] = [];
   ready: Promise<void>;
   private disposed = false;
   private writes: Promise<void> = Promise.resolve();
@@ -54,7 +61,12 @@ export class RecordingChunkQueue {
       if (this.disposed) return;
       this.storageError = '';
       const kept = [...(memoryRecordings.get(this.options.scope)?.values() || [])];
+      let storedPeriods: HiddenPeriod[] = [];
       for (const entry of [...saved, ...kept]) {
+        if (entry.segment.id === HIDDEN_PERIODS_ID) {
+          storedPeriods = entry.hiddenPeriods || [];
+          continue;
+        }
         if (entry.audio && !['failed', 'complete'].includes(entry.segment.status))
           entry.segment = { ...entry.segment, status: 'queued', error: undefined };
         else if (!entry.audio && entry.segment.status !== 'complete') continue;
@@ -63,6 +75,7 @@ export class RecordingChunkQueue {
       }
       memoryRecordings.delete(this.options.scope);
       this.resaveKept(kept);
+      this.restoreHiddenPeriods(storedPeriods);
       this.changed();
       void this.retry();
     } catch (error) {
@@ -75,9 +88,40 @@ export class RecordingChunkQueue {
       }
       memoryRecordings.delete(this.options.scope);
       this.resaveKept(kept);
+      this.restoreHiddenPeriods([]);
       this.changed();
       void this.retry();
     }
+  }
+  // Restoring happens with the page in view: a period still open from an earlier page ends now.
+  private restoreHiddenPeriods(stored: HiddenPeriod[]) {
+    this.hiddenPeriods = memoryHiddenPeriods.get(this.options.scope) ?? stored;
+    this.pageShown(Date.now());
+  }
+  /** A period opens only during capture, and ends when the page returns, even if capture stopped meanwhile. */
+  pageHidden(at: number) {
+    if (!this.hiddenPeriods.some((period) => period.endedAt == null))
+      this.saveHiddenPeriods([...this.hiddenPeriods, { startedAt: at }]);
+  }
+  pageShown(at: number) {
+    if (this.hiddenPeriods.some((period) => period.endedAt == null))
+      this.saveHiddenPeriods(this.hiddenPeriods.map((period) => ({ ...period, endedAt: period.endedAt ?? at })));
+  }
+  dismissHiddenPeriods() {
+    this.saveHiddenPeriods([]);
+  }
+  private saveHiddenPeriods(hiddenPeriods: HiddenPeriod[]) {
+    this.hiddenPeriods = hiddenPeriods;
+    memoryHiddenPeriods.set(this.options.scope, hiddenPeriods);
+    const record: RecordingChunk = {
+      scope: this.options.scope,
+      labelSpeakers: false,
+      hiddenPeriods,
+      segment: { id: HIDDEN_PERIODS_ID, index: -1, status: 'recording', text: '', startedAt: 0 },
+    };
+    // Best effort, in order with chunk writes, so Clear deletes it after any pending save.
+    this.writes = this.writes.then(() => putRecordingChunk(record).catch(() => {}));
+    this.changed();
   }
   // Audio kept only in memory stays unsaved until a write succeeds: a failed write keeps the
   // warning (and failedWrites), so a later close or unmount keeps the memory copy instead of dropping it.
@@ -308,6 +352,8 @@ export class RecordingChunkQueue {
     }
     this.records.clear();
     memoryRecordings.delete(this.options.scope);
+    memoryHiddenPeriods.delete(this.options.scope);
+    this.hiddenPeriods = [];
     this.labelsUnavailableReason = '';
     this.storageError = '';
     this.changed();

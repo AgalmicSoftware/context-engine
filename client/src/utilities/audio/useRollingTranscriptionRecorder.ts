@@ -41,9 +41,6 @@ export const useRollingTranscriptionRecorder = ({
   labelSpeakers = false,
 }: UseRollingTranscriptionRecorderOptions = {}) => {
   const [status, setStatus] = useState<RollingRecorderStatus>('idle');
-  const { wakeLockHeld, pageHidden, hiddenPeriods, dismissHiddenPeriods } = useRecordingWakeLock(
-    status === 'recording' || status === 'paused',
-  );
   const [errorMessage, setErrorMessage] = useState('');
   const chunks = useRecordingChunkQueue({
     sessionSlug,
@@ -53,6 +50,11 @@ export const useRollingTranscriptionRecorder = ({
     labelSpeakers,
     capturing: status !== 'idle' && status !== 'error',
   });
+  const { wakeLockHeld, pageHidden } = useRecordingWakeLock(
+    status === 'recording' || status === 'paused',
+    chunks.pageHidden,
+    chunks.pageShown,
+  );
   const { segments, transcript, labelsUnavailableReason, beginChunk, prepare, finishTranscription, retryChunk } =
     chunks;
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -434,8 +436,8 @@ export const useRollingTranscriptionRecorder = ({
   return {
     wakeLockHeld,
     pageHidden,
-    hiddenPeriods,
-    dismissHiddenPeriods,
+    hiddenPeriods: chunks.hiddenPeriods,
+    dismissHiddenPeriods: chunks.dismissHiddenPeriods,
     downloadableChunkIds: chunks.downloadableChunkIds,
     status,
     isRecording: status === 'recording',

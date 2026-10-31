@@ -36,6 +36,7 @@ export function useRecordingChunkQueue(options: Options) {
   const [downloadableChunkIds, setDownloadableChunkIds] = useState<string[]>([]);
   const [storageError, setStorageError] = useState('');
   const [labelsUnavailableReason, setLabelsUnavailableReason] = useState('');
+  const [hiddenPeriods, setHiddenPeriods] = useState<Array<{ startedAt: number; endedAt: number }>>([]);
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && navigator.onLine === false);
   const account =
     options.context && typeof options.context === 'object' && 'account' in options.context
@@ -73,6 +74,7 @@ export function useRecordingChunkQueue(options: Options) {
   useEffect(() => {
     let current = true;
     setSegments([]);
+    setHiddenPeriods([]);
     const queue = new RecordingChunkQueue({
       scope,
       transcribe: async (audio, labels, signal) => {
@@ -96,6 +98,9 @@ export function useRecordingChunkQueue(options: Options) {
         );
         setStorageError(queue.storageError);
         setLabelsUnavailableReason(queue.labelsUnavailableReason);
+        setHiddenPeriods(
+          queue.hiddenPeriods.flatMap(({ startedAt, endedAt }) => (endedAt == null ? [] : [{ startedAt, endedAt }])),
+        );
       },
     });
     queueRef.current = queue;
@@ -141,6 +146,9 @@ export function useRecordingChunkQueue(options: Options) {
     await queueRef.current?.keepAudio();
   }, []);
   const retryChunk = useCallback((id?: string) => queueRef.current?.retry(id), []);
+  const pageHidden = useCallback((at: number) => queueRef.current?.pageHidden(at), []);
+  const pageShown = useCallback((at: number) => queueRef.current?.pageShown(at), []);
+  const dismissHiddenPeriods = useCallback(() => queueRef.current?.dismissHiddenPeriods(), []);
   const downloadChunk = useCallback((id: string) => {
     const record = queueRef.current?.records.get(id);
     if (!record?.audio) return;
@@ -170,6 +178,10 @@ export function useRecordingChunkQueue(options: Options) {
     finishTranscription,
     keepAudio,
     retryChunk,
+    pageHidden,
+    pageShown,
+    dismissHiddenPeriods,
+    hiddenPeriods,
     downloadChunk,
     clearDraft,
     downloadableChunkIds,

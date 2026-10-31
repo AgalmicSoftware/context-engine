@@ -1,11 +1,16 @@
 import type { RollingTranscriptSegment } from './rollingTranscription';
 
+/** `endedAt` is unset while the page is still hidden. */
+export type HiddenPeriod = { startedAt: number; endedAt?: number };
+
 export type RecordingChunk = {
   scope: string;
   segment: RollingTranscriptSegment;
   audio?: Blob;
   labelSpeakers: boolean;
   labelsUnavailableReason?: string;
+  // Set only on the recording's hidden-periods record (see recordingChunkQueue).
+  hiddenPeriods?: HiddenPeriod[];
 };
 
 const DATABASE = 'ce-recording-chunks';
