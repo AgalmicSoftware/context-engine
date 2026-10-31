@@ -1083,17 +1083,51 @@ If `/health` or the other worker calls fail with browser network errors, use the
 
 ### Edit a session
 
-An admin edits a Worker-hosted session at `/session/<slug>/settings`; the
-**Edit settings** link on `/admin` opens it. The page reuses the setup sections.
-The slug, session ID, Worker URL and hosting are shown as fixed facts, not
-inputs. Before saving, it lists which edits sign participants out (authority
-changes such as who can create groups or access rules) and which do not
-(content such as the name or prompts), using the same classifier as the Worker,
-and the button reads **Save and sign participants out** when any authority
-edit is pending. Save sends only the changed fields the Worker accepts for
-`set-config`, signed by your passkey. **Copy group recorder link** copies the
-session link with `?mode=groupRecording`. On-chain sessions are not edited on
-this page.
+An admin edits a session at `/session/<slug>/settings`, whether it is
+Worker-hosted or on chain; the **Edit settings** link on `/admin` opens it for
+Worker-hosted sessions. The page reuses the setup sections. The slug, session
+ID, Worker URL and hosting are shown as fixed facts, not inputs, and so are an
+on-chain session's registry network, registry admin and metadata URI. Before
+saving, it lists which edits sign participants out (authority changes such as
+who can create groups or access rules) and which do not (content such as the
+name or prompts), using the same classifier as the Worker, and the button reads
+**Save and sign participants out** when any authority edit is pending. **Copy
+group recorder link** copies the session link with `?mode=groupRecording`. If
+the Worker's copy of the settings arrives while you are typing, your edits are
+kept on top of it.
+
+Besides the setup fields, the page edits:
+
+- **Questions:** the question list's default filters (a JSON object, or a query
+  such as `tag=housing`), whether the pile moves on after an answer, and the
+  highlighted and hidden question and survey IDs, one per line (up to 500 in
+  each list). These lists keep everyone signed in.
+- **AI:** the provider, the everyday and thinking models, reasoning effort, the
+  effort for single tasks, and the transcription model. A saved model that setup
+  no longer offers stays selected until you pick another. The page edits AI
+  only when the Session Worker says its `set-config` merges `ai`; on an older
+  Worker the section is read-only and says why.
+- **Access**, where SBTs grant access: SBT tags, featured SBTs, and whether the
+  session's own SBTs are featured.
+- **On-chain sessions only:** the contracts, the block range, the test ETH
+  faucet amounts and the featured and ignored SBT lists. The faucet's key stays
+  a Worker secret, changed in Admin.
+
+A Worker-hosted session saves the changed fields the Worker accepts for
+`set-config`, signed by your passkey. An on-chain session saves new metadata,
+showing each step as it runs and the transaction link at the end:
+
+1. upload the new metadata to Arweave;
+2. update the SessionRegistry from the registry admin's wallet, on the registry
+   network the page names (the encrypted metadata URI is kept);
+3. update this browser's copy of the registry entry;
+4. sync the session's Worker with `set-config`. A failed sync is reported on its
+   own; the on-chain update still stands.
+
+Saving needs a start block, and it is refused while the page shows contract
+addresses it took from chain defaults because the metadata could not be read,
+until you correct or confirm them. An on-chain session's questions are added on
+its session page, not from a template here.
 
 ### Templates and share links
 
