@@ -258,6 +258,46 @@ it('saves a refused transcript once a later write succeeds, so a reload neither 
   expect(transcribe.mock.calls.filter(([blob]) => blob === audio)).toHaveLength(1);
 });
 
+it('never lets a re-save of an uploading chunk overwrite the transcript saved after it', async () => {
+  let answer = (_value: { text: string }) => {};
+  const transcribe = jest.fn<Transcribe>(
+    () =>
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+  );
+  const queue = create(transcribe);
+  await queue.ready;
+  const first = queue.begin(false);
+  // The chunk's final write is refused, so it uploads from memory.
+  jest.mocked(putRecordingChunk).mockRejectedValueOnce(new DOMException('Quota exceeded', 'QuotaExceededError'));
+  queue.capture(first, audio, true);
+  await tick();
+  expect(queue.segments[0].status).toBe('transcribing');
+  // The next chunk's first write is slow and succeeds only after the transcript arrives.
+  let finishWrite = () => {};
+  jest.mocked(putRecordingChunk).mockImplementationOnce(async (record: RecordingChunk) => {
+    await new Promise<void>((resolve) => {
+      finishWrite = resolve;
+    });
+    saved.set(record.segment.id, { ...record, segment: { ...record.segment } });
+  });
+  queue.capture(queue.begin(false), new Blob(['next'], { type: 'audio/webm' }));
+  await tick();
+  answer({ text: 'Speech.' });
+  await tick();
+  finishWrite();
+  await tick();
+  expect(saved.get(first)).toMatchObject({ segment: { status: 'complete', text: 'Speech.' } });
+  expect(saved.get(first)?.audio).toBeUndefined();
+  expect(queue.storageError).toBe('');
+  queue.dispose();
+  const reopened = create(transcribe);
+  await reopened.ready;
+  await tick();
+  expect(transcribe.mock.calls.filter(([blob]) => blob === audio)).toHaveLength(1);
+});
+
 it('recovers interrupted chunks in index order without mixing another scope', async () => {
   const record = (id: string, index: number, scope: string): RecordingChunk => ({
     scope,

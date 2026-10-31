@@ -181,11 +181,13 @@ export class RecordingChunkQueue {
   }
   // A write just succeeded, so storage works again: save what it refused earlier. Otherwise a refused
   // transcript keeps its audio in memory and the warning stays up, and after a reload its chunk is sent again.
+  // An uploading chunk is left to its upload, which saves the outcome: re-saving the copy from before the
+  // upload could land after the transcript and overwrite it.
   private resaveFailed() {
     for (const id of this.failedWrites) {
       const record = this.records.get(id);
       if (!record) this.failedWrites.delete(id);
-      if (!record || this.resaving.has(id)) continue;
+      if (!record || record.segment.status === 'transcribing' || this.resaving.has(id)) continue;
       this.resaving.add(id);
       const saving = record.segment.status === 'complete' && record.audio ? this.commit(record) : this.save(record);
       void saving.finally(() => this.resaving.delete(id));
