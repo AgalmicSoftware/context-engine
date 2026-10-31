@@ -1406,6 +1406,33 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
+  it('stops with an error, keeping the audio, when the microphone cannot restart', async () => {
+    (transcribeAudio as jest.Mock).mockImplementation(async () => 'Before the stall.');
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'no-restart', chunkMs: 60_000 }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+      instances[0].requestData();
+    });
+    instances[0].silent = MockMediaRecorder.silent = true;
+    jest.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValueOnce(new Error('Microphone busy'));
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(95_000);
+      await flushPromises();
+    });
+    expect(result.current.status).toBe('error');
+    expect(result.current.errorMessage).toMatch(/^Recording stopped: no audio arrived.*Microphone busy$/);
+    // The audio delivered before the stall is transcribed, and one press of Record continues.
+    expect(result.current.transcript).toBe('Before the stall.');
+    MockMediaRecorder.silent = false;
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    expect(result.current.isRecording).toBe(true);
+    unmount();
+  });
+
   it('expects no audio while the page is hidden or the device holds the microphone', async () => {
     const listeners: Record<string, () => void> = {};
     Object.assign(mockTrack, {
