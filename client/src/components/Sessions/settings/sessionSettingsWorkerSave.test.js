@@ -12,6 +12,7 @@ import {
   applyTemplateToSessionSettingsDraft,
   buildSessionSettingsDraft,
   buildSessionSettingsSave,
+  rebaseSessionSettingsDraft,
 } from './sessionSettingsEdits';
 
 const SLUG = 'edit-salon';
@@ -150,17 +151,52 @@ describe('saving the edit page through the Session Worker', () => {
     expect(result.config).toMatchObject({ sessionName: 'All changed', interviewModeEnabled: false });
   });
 
-  it('leaves AI settings alone, since the public config cannot show their effort', () => {
+  it('saves only the AI parts the admin changed, and the Worker keeps the parts the page cannot see', () => {
     const created = publishedSession();
     const stored = workerSave(created, {
-      ai: { ...created.ai, reasoningEffort: 'high', taskReasoningEffort: { generate: 'medium' } },
+      ai: {
+        ...created.ai,
+        reasoningEffort: 'high',
+        taskReasoningEffort: { generate: 'medium' },
+        providers: { custom: { functions: '[{"name":"lookup"}]' } },
+      },
     }).config;
+    const before = projectPublicWorkerSessionConfig(stored);
+    expect(before.ai).not.toHaveProperty('providers');
     const { save, result } = editAndSave(stored, (draft) => {
-      draft.ai = { models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } }, reasoningEffort: 'low' };
+      draft.ai.reasoningEffort = 'medium';
+      draft.ai.taskReasoningEffort = { generate: 'medium', 'interview-map': 'high' };
     });
 
-    expect(save.patch).toEqual({});
-    expect(result.config.ai).toMatchObject({ reasoningEffort: 'high', taskReasoningEffort: { generate: 'medium' } });
+    expect(save.patch).toEqual({
+      ai: { reasoningEffort: 'medium', taskReasoningEffort: { generate: 'medium', 'interview-map': 'high' } },
+    });
+    expect(save.classification).toEqual({ content: [], authority: ['ai'], signsParticipantsOut: true });
+    expect(result).toMatchObject({ ok: true });
+    expect(result.config.ai).toEqual({
+      ...stored.ai,
+      reasoningEffort: 'medium',
+      taskReasoningEffort: { generate: 'medium', 'interview-map': 'high' },
+    });
+    expect(result.config.authzEpoch).not.toBe(stored.authzEpoch);
+
+    // A model edit sends the models alone; a model outside the list is kept as saved.
+    const models = editAndSave(result.config, (draft) => {
+      draft.ai.models.fast.model = 'gpt-legacy-fast';
+    });
+    expect(Object.keys(models.save.patch.ai)).toEqual(['models']);
+    expect(models.result.config.ai.reasoningEffort).toBe('medium');
+    expect(models.result.config.ai.models.fast.model).toBe('gpt-legacy-fast');
+  });
+
+  it('leaves AI alone on an older Worker, which replaces ai whole and shows only the models', () => {
+    const stored = workerSave(publishedSession(), { ai: { ...publishedSession().ai, reasoningEffort: 'high' } }).config;
+    const before = projectPublicWorkerSessionConfig(stored);
+    delete before.setConfigMergesAi;
+    before.ai = { models: before.ai.models };
+    const draft = buildSessionSettingsDraft(before);
+    draft.ai.models.fast.model = 'claude-sonnet-5-5';
+    expect(buildSessionSettingsSave(before, draft).patch).toEqual({});
   });
 
   it('saves an interview voice model edit, but not an unknown model', () => {
@@ -208,6 +244,119 @@ describe('saving the edit page through the Session Worker', () => {
     });
     expect(draft.sessionModeProfile.surfaces.agentHttp).toBe(before.sessionModeProfile.surfaces.agentHttp);
     expect(buildSessionSettingsSave(before, draft).patch).not.toHaveProperty('sessionModeProfile');
+  });
+
+  it('saves highlighted and hidden lists, one ID per line, without signing anyone out', () => {
+    const stored = publishedSession();
+    const questionId = `0x${'ab'.repeat(32)}`;
+    const { save, result } = editAndSave(stored, (draft) => {
+      draft.lists.HIGHLIGHTED_QUESTION_IDS = `${questionId}\n\n ${questionId.toUpperCase()} \nq-2`;
+      draft.lists.BLOCKED_SURVEY_IDS = 'survey-1, survey-2';
+    });
+
+    expect(save.patch).toEqual({
+      HIGHLIGHTED_QUESTION_IDS: [questionId, 'q-2'],
+      BLOCKED_SURVEY_IDS: ['survey-1', 'survey-2'],
+    });
+    expect(save.classification.signsParticipantsOut).toBe(false);
+    expect(result).toMatchObject({ ok: true });
+    expect(result.config.authzEpoch).toBe(stored.authzEpoch);
+
+    const before = projectPublicWorkerSessionConfig(result.config);
+    const draft = buildSessionSettingsDraft(before);
+    expect(draft.lists.HIGHLIGHTED_QUESTION_IDS).toBe(`${questionId}\nq-2`);
+    draft.lists.BLOCKED_QUESTION_IDS = 'not an id';
+    expect(() => buildSessionSettingsSave(before, draft)).toThrow('Hidden questions: up to 500 IDs, one per line');
+  });
+
+  it('saves default filters as a JSON object or a query, and never blocks on an untouched stored value', () => {
+    const stored = publishedSession();
+    const object = editAndSave(stored, (draft) => {
+      draft.defaultFilterState = '{"selectedTags":["housing"]}';
+    });
+    expect(object.save.patch).toEqual({ defaultFilterState: { selectedTags: ['housing'] } });
+    expect(object.result).toMatchObject({ ok: true });
+
+    const query = editAndSave(object.result.config, (draft) => {
+      draft.defaultFilterState = 'tag=housing&sort=importance';
+    });
+    expect(query.save.patch).toEqual({ defaultFilterState: 'tag=housing&sort=importance' });
+
+    const before = projectPublicWorkerSessionConfig(stored);
+    const draft = buildSessionSettingsDraft(before);
+    draft.defaultFilterState = '{"selectedTags":';
+    expect(() => buildSessionSettingsSave(before, draft)).toThrow('Default filters must be a JSON object');
+
+    // A stored value this page would refuse stays as it is while untouched.
+    const legacy = { ...before, defaultFilterState: ['legacy'] };
+    const untouched = buildSessionSettingsDraft(legacy);
+    untouched.sessionName = 'Renamed';
+    expect(buildSessionSettingsSave(legacy, untouched).patch).toEqual({ sessionName: 'Renamed' });
+  });
+
+  it('saves the pile navigation choice and leaves the deployment default alone otherwise', () => {
+    const stored = publishedSession();
+    const { save, result } = editAndSave(stored, (draft) => {
+      draft.pileAutoAdvanceEnabled = !draft.pileAutoAdvanceEnabled;
+    });
+    expect(Object.keys(save.patch)).toEqual(['pileAutoAdvanceEnabled']);
+    expect(result).toMatchObject({ ok: true });
+    expect(result.config.pileAutoAdvanceEnabled).toBe(save.patch.pileAutoAdvanceEnabled);
+  });
+
+  it('saves SBT defaults only where SBTs grant access, as the Worker requires', () => {
+    const plain = editAndSave(publishedSession(), (draft) => {
+      draft.defaultSbtTags = 'members';
+      draft.lists.defaultFeaturedSBTs = '0x00000000000000000000000000000000000000f1';
+    });
+    expect(plain.save.patch).toEqual({});
+
+    // A Worker-hosted session where SBT holders may read, stored as the Worker keeps it.
+    const stored = publishedSession();
+    const rules = {
+      match: 'any',
+      conditions: [
+        { kind: 'worker_role', role: 'admin' },
+        { kind: 'sbt_onchain', chainId: 11155420, contract: `0x${'01'.repeat(20)}`, anyOrAll: 'any' },
+      ],
+    };
+    stored.sessionModeProfile.preset = 'custom';
+    stored.sessionModeProfile.evm.registryChainId = 11155420;
+    stored.sessionModeProfile.authorization.mechanisms.push('sbt_onchain');
+    stored.sessionModeProfile.storage.payloadAccessControl.accessConditions = rules;
+    stored.storageProfile.payloadAccessControl.accessConditions = rules;
+    const { save, result } = editAndSave(stored, (draft) => {
+      draft.defaultSbtTags = 'members';
+      draft.lists.defaultFeaturedSBTs = '0x00000000000000000000000000000000000000f1';
+      draft.autoFeatureSBTsBySessionSlug = false;
+    });
+    expect(save.patch).toEqual({
+      defaultSbtTags: 'members',
+      defaultFeaturedSBTs: ['0x00000000000000000000000000000000000000f1'],
+      autoFeatureSBTsBySessionSlug: false,
+    });
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('keeps typed edits when a fresh copy of the settings arrives', () => {
+    const before = projectPublicWorkerSessionConfig(publishedSession());
+    const draft = buildSessionSettingsDraft(before);
+    draft.sessionName = 'Typed name';
+    draft.ai.reasoningEffort = 'high';
+    const fresh = {
+      ...before,
+      sessionInfo: 'Changed elsewhere',
+      ai: { ...before.ai, models: { fast: { model: 'm2' } } },
+    };
+
+    const rebased = rebaseSessionSettingsDraft(draft, before, fresh);
+    expect(rebased.sessionName).toBe('Typed name');
+    expect(rebased.sessionInfo).toBe('Changed elsewhere');
+    expect(rebased.ai).toEqual({ ...fresh.ai, reasoningEffort: 'high' });
+    expect(buildSessionSettingsSave(fresh, rebased).patch).toEqual({
+      sessionName: 'Typed name',
+      ai: { reasoningEffort: 'high' },
+    });
   });
 
   it('saves nothing when nothing changed', () => {

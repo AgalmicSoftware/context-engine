@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import wizardStyles from '../SessionWizard.module.scss';
 import styles from '../setup/SessionSetup.module.scss';
-import { SetupAiSection } from '../setup/SetupAiSection';
 import ContextSourcesPanel from '../setup/ContextSourcesPanel';
 import { normalizeSessionContext } from '@ce-shared/sessionContext.mjs';
 import type { ContextSource } from '../../../utilities/docLibrary/contextSources';
@@ -38,8 +37,12 @@ import {
   buildSessionSettingsSave,
   describeSessionSettingsPath,
   rebaseSessionSettingsDraft,
+  usesSbtDefaults,
+  workerMergesAi,
 } from './sessionSettingsEdits';
 import { saveSessionSettings } from './sessionSettingsSave';
+import { SettingsAiSection } from './SettingsAiSection';
+import { SettingsQuestionListFields, SettingsSbtFields } from './SettingsListFields';
 
 type SessionSettingsPageProps = {
   account?: string;
@@ -64,6 +67,9 @@ const CLOSED: Record<SetupSectionKey, boolean> = {
   hosting: false,
   ai: false,
 };
+
+const AI_LOCKED_REASON =
+  'They are read-only here: this Session Worker is older and would drop the AI settings this page can’t see. Update the Worker to edit them.';
 
 const lower = (value: unknown) => toStr(value).trim().toLowerCase();
 
@@ -343,12 +349,18 @@ const SessionSettingsPage = ({
               <p className={styles.hint}>
                 Questions already in the session are edited on the <a href={sessionUrl}>session page</a>.
               </p>
+              {openSections.questions ? <SettingsQuestionListFields draft={draft} onChange={updateDraft} /> : null}
             </>
           }
         />
         <SetupParticipationSection {...section('participation')} supportsEndTime />
         <SetupResultsSection {...section('results')} editProfile={editProfile} registryChainId={null} />
-        <SetupAccessSection {...section('access')} editProfile={editProfile} registryChainId={null} />
+        <SetupAccessSection
+          {...section('access')}
+          editProfile={editProfile}
+          registryChainId={null}
+          gates={usesSbtDefaults(draft) ? <SettingsSbtFields draft={draft} onChange={updateDraft} /> : null}
+        />
         <SetupHostingSection
           {...section('hosting')}
           editProfile={editProfile}
@@ -366,8 +378,12 @@ const SessionSettingsPage = ({
             </dl>
           }
         />
-        <SetupAiSection
-          {...section('ai')}
+        <SettingsAiSection
+          draft={draft}
+          onChange={updateDraft}
+          open={openSections.ai}
+          onToggle={() => setOpenSections((prev) => ({ ...prev, ai: !prev.ai }))}
+          lockedReason={workerMergesAi(saved) ? '' : AI_LOCKED_REASON}
           keys={
             <p className={styles.hint}>
               API keys live on the Session Worker. Change them in{' '}

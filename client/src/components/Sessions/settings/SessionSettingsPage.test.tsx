@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../../utilities/session/sessionModeProfile';
@@ -240,6 +240,57 @@ describe('SessionSettingsPage', () => {
     expect(buildGroupRecorderLink('edit-salon', '', 'https://contextengine.sh')).toBe(
       `https://contextengine.sh/session/edit-salon?mode=${GROUP_CONVERSATION_MODE_QUERY_VALUE}`,
     );
+  });
+
+  it('edits AI only when the Worker says it merges ai, keeping a saved model that is not offered', async () => {
+    const ai = {
+      models: {
+        fast: { provider: 'openai', model: 'gpt-legacy-fast' },
+        thinking: { provider: 'openai', model: 'gpt-5' },
+      },
+      reasoningEffort: 'low',
+      taskReasoningEffort: { generate: 'medium' },
+    };
+    renderPage({ sessionConfig: workerConfig({ ai }) });
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
+    expect(screen.getByTestId('ce-settings-ai-locked')).toHaveTextContent('this Session Worker is older');
+    expect(screen.queryByTestId('ce-setup-ai-fast')).not.toBeInTheDocument();
+    cleanup();
+
+    mockFetchBootstrap.mockResolvedValue(bootstrapOf(workerConfig({ ai, setConfigMergesAi: true })));
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
+    expect(screen.getByTestId('ce-setup-ai-fast')).toHaveValue('gpt-legacy-fast');
+    expect(screen.getByTestId('ce-settings-ai-task-generate')).toHaveValue('medium');
+    fireEvent.change(screen.getByTestId('ce-setup-ai-effort'), { target: { value: 'high' } });
+    fireEvent.change(screen.getByTestId('ce-settings-ai-task-new'), { target: { value: 'interview-map' } });
+    fireEvent.click(screen.getByTestId('ce-settings-ai-task-add'));
+    expect(screen.getByTestId('ce-settings-authority-changes')).toHaveTextContent('AI models and effort');
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE));
+    });
+    const write = posted.find((entry) => String(entry.url).endsWith('/admin/set-config'));
+    expect((write?.body as Record<string, unknown>).config).toEqual({
+      ai: { reasoningEffort: 'high', taskReasoningEffort: { generate: 'medium', 'interview-map': 'high' } },
+    });
+  });
+
+  it('edits the question list settings in the Questions section and saves them without a sign-out', async () => {
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    expect(screen.queryByTestId('ce-settings-list-BLOCKED_QUESTION_IDS')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ce-setup-more-questions'));
+    fireEvent.change(screen.getByTestId('ce-settings-list-BLOCKED_QUESTION_IDS'), { target: { value: 'q-1\nq-2' } });
+    fireEvent.change(screen.getByTestId('ce-settings-default-filters'), { target: { value: 'tag=housing' } });
+    expect(screen.getByTestId('ce-settings-content-changes')).toHaveTextContent('Hidden questions');
+    expect(screen.getByTestId('ce-settings-authority-changes')).toHaveTextContent('Default filters');
+
+    fireEvent.change(screen.getByTestId('ce-settings-default-filters'), { target: { value: '{"selectedTags":' } });
+    expect(screen.getByText(/Default filters must be a JSON object/)).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE)).toBeDisabled();
   });
 
   it('keeps typed edits when the Worker’s copy arrives after them', async () => {
