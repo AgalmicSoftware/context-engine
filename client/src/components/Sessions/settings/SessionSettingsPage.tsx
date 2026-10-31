@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import wizardStyles from '../SessionWizard.module.scss';
 import styles from '../setup/SessionSetup.module.scss';
@@ -37,6 +37,7 @@ import {
   buildSessionSettingsDraft,
   buildSessionSettingsSave,
   describeSessionSettingsPath,
+  rebaseSessionSettingsDraft,
 } from './sessionSettingsEdits';
 import { saveSessionSettings } from './sessionSettingsSave';
 
@@ -111,6 +112,7 @@ const SessionSettingsPage = ({
   const capabilities = resolveSessionCapabilityProjection(sessionConfig);
   const workerOrigin = toStr(workerOriginProp || sessionConfig?.corsWorkerUrl).trim();
   const [saved, setSaved] = useState<Record<string, unknown> | null>(sessionConfig);
+  const savedRef = useRef(saved);
   const [draft, setDraft] = useState<SetupDraft>(() => buildSessionSettingsDraft(sessionConfig));
   const [openSections, setOpenSections] = useState(CLOSED);
   const [status, setStatus] = useState('');
@@ -118,25 +120,36 @@ const SessionSettingsPage = ({
   // The session's files, listed by name in an exported template.
   const [contextSources, setContextSources] = useState<ContextSource[]>([]);
 
-  // The Worker's own copy is the "before" every edit is compared with.
-  const refresh = useCallback(async () => {
-    if (!capabilities.isWorkerCanonical || !workerOrigin) return null;
-    const bootstrap = await fetchWorkerCanonicalSessionBootstrap({
-      sessionSlug,
-      workerQueryValue: workerOrigin,
-      ...(fetchImpl ? { fetchImpl } : {}),
-    });
-    upsertWorkerCanonicalSessionBootstrap({
-      slug: bootstrap.sessionSlug,
-      sessionIdHex: bootstrap.sessionId,
-      workerOrigin: bootstrap.workerOrigin,
-      configRevision: bootstrap.configRevision,
-      config: bootstrap.config,
-    });
-    setSaved(bootstrap.config);
-    setDraft(buildSessionSettingsDraft(bootstrap.config));
-    return bootstrap.config;
-  }, [capabilities.isWorkerCanonical, fetchImpl, sessionSlug, workerOrigin]);
+  // A fresh copy replaces the "before" every edit is compared with. Unless
+  // the edits were just saved, the admin's edits are kept on top of it.
+  const adopt = useCallback((fresh: Record<string, unknown> | null, keepEdits: boolean) => {
+    const base = savedRef.current;
+    savedRef.current = fresh;
+    setSaved(fresh);
+    setDraft((prev) => (keepEdits ? rebaseSessionSettingsDraft(prev, base, fresh) : buildSessionSettingsDraft(fresh)));
+  }, []);
+
+  // The Worker's own copy is the "before" for a Worker-hosted session.
+  const refresh = useCallback(
+    async (keepEdits = true) => {
+      if (!capabilities.isWorkerCanonical || !workerOrigin) return null;
+      const bootstrap = await fetchWorkerCanonicalSessionBootstrap({
+        sessionSlug,
+        workerQueryValue: workerOrigin,
+        ...(fetchImpl ? { fetchImpl } : {}),
+      });
+      upsertWorkerCanonicalSessionBootstrap({
+        slug: bootstrap.sessionSlug,
+        sessionIdHex: bootstrap.sessionId,
+        workerOrigin: bootstrap.workerOrigin,
+        configRevision: bootstrap.configRevision,
+        config: bootstrap.config,
+      });
+      adopt(bootstrap.config, keepEdits);
+      return bootstrap.config;
+    },
+    [adopt, capabilities.isWorkerCanonical, fetchImpl, sessionSlug, workerOrigin],
+  );
 
   useEffect(() => {
     refresh().catch(() => setStatus('Couldn’t load the latest settings from the Session Worker.'));
@@ -197,7 +210,7 @@ const SessionSettingsPage = ({
         provider,
         chainId: Number(network?.id || 1) || 1,
       });
-      await refresh();
+      await refresh(false);
       setStatus('Settings saved.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Saving failed.';

@@ -157,6 +157,25 @@ export const buildSessionSettingsSave = (
   return { patch, after, classification: classifySessionConfigEdits(before, after) };
 };
 
+// A fresh copy over an edited draft: a field the admin left alone takes the
+// fresh value, an edited one stays. Records merge one level down, so editing
+// one interview setting keeps a fresh change to another.
+const rebaseValue = (edited: unknown, base: unknown, fresh: unknown, depth: number): unknown => {
+  if (same(edited, base)) return fresh;
+  const records = [edited, base, fresh].every((value) => !!value && typeof value === 'object' && !Array.isArray(value));
+  if (!records || depth === 0) return edited;
+  const [e, b, f] = [edited, base, fresh].map(asRecord);
+  return Object.fromEntries(
+    [...new Set([...Object.keys(e), ...Object.keys(b), ...Object.keys(f)])]
+      .map((key) => [key, rebaseValue(e[key], b[key], f[key], depth - 1)])
+      .filter(([, value]) => value !== undefined),
+  );
+};
+
+/** The draft rebuilt on a fresh config, keeping the admin's edits to the old one. */
+export const rebaseSessionSettingsDraft = (draft: SetupDraft, baseConfig: unknown, freshConfig: unknown): SetupDraft =>
+  rebaseValue(draft, buildSessionSettingsDraft(baseConfig), buildSessionSettingsDraft(freshConfig), 2) as SetupDraft;
+
 // The template fields the edit page applies; slug, Worker and hosting stay.
 const TEMPLATE_FIELDS = [
   'sessionName',

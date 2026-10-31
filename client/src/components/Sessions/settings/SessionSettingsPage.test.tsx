@@ -242,6 +242,19 @@ describe('SessionSettingsPage', () => {
     );
   });
 
+  it('keeps typed edits when the Worker’s copy arrives after them', async () => {
+    let resolveBootstrap: (value: unknown) => void = () => {};
+    mockFetchBootstrap.mockReturnValue(new Promise((resolve) => (resolveBootstrap = resolve)));
+    renderPage();
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), { target: { value: 'Typed first' } });
+    await act(async () => {
+      resolveBootstrap(bootstrapOf(workerConfig({ sessionInfo: 'Saved elsewhere.' })));
+    });
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toHaveValue('Typed first');
+    expect(screen.getByTestId('ce-settings-content-changes')).toHaveTextContent('Name');
+    expect(screen.getByTestId('ce-settings-content-changes')).not.toHaveTextContent('Description');
+  });
+
   it('says on-chain sessions are not edited here', () => {
     renderPage({
       sessionConfig: workerConfig({
