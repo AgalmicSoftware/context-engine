@@ -1,5 +1,4 @@
 import AdminInterviewOpening from './AdminInterviewOpening';
-import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 /** @file AdminPage.tsx */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Label, FormGroup } from 'reactstrap';
@@ -63,11 +62,10 @@ import {
   countSessionsForChain,
   getChainName,
   getErrorMessage,
-  inferAiProviderFromModel,
-  normalizeAiProvider,
   normalizeSlug,
   normalizeWorkerUrl,
   parseChainIdInput,
+  resolveAdminAiTestModel,
   resolveAdminCapabilities,
 } from './adminPageHelpers';
 import {
@@ -1711,33 +1709,7 @@ const AdminPageRuntime = ({
           // Fall through to withSessionConfigRetry for user-visible errors.
         }
       }
-      const aiCfg = selectedConfig?.ai && typeof selectedConfig.ai === 'object' ? selectedConfig.ai : {};
-      const fastModelEntry = aiCfg?.models?.fast && typeof aiCfg.models.fast === 'object' ? aiCfg.models.fast : {};
-      const fastModelCandidate = toStr(fastModelEntry.model).trim();
-      const legacyModelCandidate = toStr(aiCfg?.model).trim();
-      const inferredProvider = inferAiProviderFromModel(fastModelCandidate || legacyModelCandidate);
-      const providerMode = normalizeAiProvider(
-        fastModelEntry.provider || aiCfg?.mode || aiCfg?.provider || inferredProvider || 'openai',
-      );
-      const providerCfg = aiCfg?.providers?.[providerMode] || {};
-      const providerModelCandidate = toStr(providerCfg.model).trim();
-      const inferredFastProvider = inferAiProviderFromModel(fastModelCandidate);
-      const inferredLegacyProvider = inferAiProviderFromModel(legacyModelCandidate);
-      const fastModelMatchesProvider =
-        !!fastModelCandidate && (!inferredFastProvider || inferredFastProvider === providerMode);
-      const legacyModelMatchesProvider =
-        !!legacyModelCandidate && (!inferredLegacyProvider || inferredLegacyProvider === providerMode);
-      const model =
-        (fastModelMatchesProvider ? fastModelCandidate : '') ||
-        providerModelCandidate ||
-        (legacyModelMatchesProvider ? legacyModelCandidate : '') ||
-        (providerMode === 'openai'
-          ? DEFAULT_AI_MODEL
-          : providerMode === 'openrouter'
-            ? `openai/${DEFAULT_AI_MODEL}`
-            : providerMode === 'anthropic'
-              ? 'claude-3-haiku-20240307'
-              : DEFAULT_AI_MODEL);
+      const { provider: providerMode, model } = resolveAdminAiTestModel(selectedConfig?.ai);
 
       const payload = {
         action: 'ai',

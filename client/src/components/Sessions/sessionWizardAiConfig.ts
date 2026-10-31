@@ -11,10 +11,12 @@ export const AI_PROVIDER_OPTIONS = [
   { value: 'custom', label: 'Custom', disabled: true },
 ];
 
+// The one model list for setup, editing and the admin AI test. The first entry
+// is each role's default.
 export const AI_MODEL_OPTIONS = Object.freeze({
   anthropic: {
-    fast: ['claude-sonnet-4-5-20250929', 'claude-3-5-sonnet-20240620'],
-    thinking: ['claude-3-5-sonnet-20240620', 'claude-sonnet-4-5-20250929'],
+    fast: ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5', 'claude-fable-5-1'],
+    thinking: ['claude-opus-5-5', 'claude-fable-5-1', 'claude-sonnet-5-5', 'claude-haiku-5-5'],
   },
   openai: {
     fast: ['gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-6-astra', 'gpt-5', 'gpt-4o', 'gpt-4o-mini', 'o3-mini'],

@@ -1,4 +1,6 @@
+import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { getChainById } from '../../variables/chains.js';
+import { getAiModelOptions } from '../Sessions/sessionWizardAiConfig';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { normalizeWorkerUrl as normalizeWorkerBaseUrl } from '../../utilities/worker/workerUrl.js';
@@ -90,6 +92,31 @@ export const inferAiProviderFromModel = (modelRaw: unknown): string => {
   if (/^(gpt-|o[1-9]|chatgpt)/.test(model)) return 'openai';
   if (model.includes('/')) return 'openrouter';
   return '';
+};
+
+const asAiRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+// The admin AI test pings the session's everyday model, or the provider's default.
+export const resolveAdminAiTestModel = (aiValue: unknown): { provider: string; model: string } => {
+  const ai = asAiRecord(aiValue);
+  const fast = asAiRecord(asAiRecord(ai.models).fast);
+  const fastModel = toStr(fast.model).trim();
+  const legacyModel = toStr(ai.model).trim();
+  const provider = normalizeAiProvider(
+    fast.provider || ai.mode || ai.provider || inferAiProviderFromModel(fastModel || legacyModel) || 'openai',
+  );
+  const providerModel = toStr(asAiRecord(asAiRecord(ai.providers)[provider]).model).trim();
+  const fits = (model: string) => !!model && ['', provider].includes(inferAiProviderFromModel(model));
+  const fallback =
+    provider === 'anthropic'
+      ? getAiModelOptions('fast', 'anthropic')[0]
+      : provider === 'openrouter'
+        ? `openai/${DEFAULT_AI_MODEL}`
+        : DEFAULT_AI_MODEL;
+  const model =
+    (fits(fastModel) ? fastModel : '') || providerModel || (fits(legacyModel) ? legacyModel : '') || fallback;
+  return { provider, model };
 };
 
 export const buildTxExplorerUrl = (hash: unknown, chainId: unknown): string => {
