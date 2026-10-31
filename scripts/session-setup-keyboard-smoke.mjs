@@ -4,8 +4,6 @@ import { chromium } from 'playwright';
 const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 assert(['127.0.0.1', 'localhost', '[::1]'].includes(new URL(baseUrl).hostname), 'This smoke requires a local client');
 
-const activeTestId = (page) => page.evaluate(() => document.activeElement?.getAttribute('data-testid') || '');
-
 // Tab forward until the target has focus, proving it is reachable without a pointer.
 const tabTo = async (page, locator, label, limit = 80) => {
   const target = await locator.elementHandle();
@@ -17,15 +15,24 @@ const tabTo = async (page, locator, label, limit = 80) => {
   assert.fail(`${label} is not reachable with Tab`);
 };
 
+// Fields animate their outline in, so wait for the transition to finish.
 const assertVisibleFocus = async (locator, label) => {
-  const indicator = await locator.evaluate((element) => {
-    const style = getComputedStyle(element);
-    return {
-      outline: style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0,
-      shadow: style.boxShadow !== 'none',
-    };
-  });
-  assert(indicator.outline || indicator.shadow, `${label} shows a visible focus indicator`);
+  const shown = await locator
+    .evaluate(
+      (element) =>
+        new Promise((resolve) => {
+          const deadline = Date.now() + 2000;
+          const check = () => {
+            const style = getComputedStyle(element);
+            const outline = style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0;
+            if (outline || style.boxShadow !== 'none') resolve(true);
+            else if (Date.now() > deadline) resolve(false);
+            else requestAnimationFrame(check);
+          };
+          check();
+        }),
+    );
+  assert(shown, `${label} shows a visible focus indicator`);
 };
 
 const assertNoHorizontalOverflow = async (page, label) => {
@@ -44,42 +51,43 @@ try {
     const page = await context.newPage();
     await page.route(/^https?:\/\/(?!127\.0\.0\.1|localhost)/, (route) => route.abort());
     await page.goto(`${baseUrl}/new`, { waitUntil: 'domcontentloaded' });
-    const centralized = page.getByTestId('ce-new-preset-fast_cheap_cloudflare');
-    await centralized.waitFor({ timeout: 30000 });
-    await assertNoHorizontalOverflow(page, `${label} preset choice`);
+    const name = page.getByTestId('ce-wizard-session-name');
+    await name.waitFor({ timeout: 30000 });
+    await assertNoHorizontalOverflow(page, `${label} setup page`);
 
-    await tabTo(page, centralized, `${label} Centralized preset`);
-    await assertVisibleFocus(centralized, `${label} Centralized preset`);
-    await page.keyboard.press('ArrowDown');
-    assert.equal(await activeTestId(page), 'ce-new-preset-trustless_public_decentralized', `${label} arrows move between presets`);
-    await page.keyboard.press('ArrowUp');
-    assert.equal(await activeTestId(page), 'ce-new-preset-fast_cheap_cloudflare', `${label} arrows move back`);
+    await tabTo(page, name, `${label} session name`);
+    await assertVisibleFocus(name, `${label} session name`);
+    await page.keyboard.type('Keyboard session');
+    assert.equal(await name.inputValue(), 'Keyboard session', `${label} the name takes typed text`);
+
+    const hosting = page.getByTestId('ce-setup-more-hosting');
+    await tabTo(page, hosting, `${label} hosting caret`);
+    await assertVisibleFocus(hosting, `${label} hosting caret`);
+    assert.equal(await hosting.getAttribute('aria-expanded'), 'false', `${label} hosting starts closed`);
     await page.keyboard.press('Enter');
+    assert.equal(await hosting.getAttribute('aria-expanded'), 'true', `${label} Enter opens a section`);
+    await page.getByTestId('ce-setup-storage').waitFor({ timeout: 10000 });
+    await assertNoHorizontalOverflow(page, `${label} opened section`);
+    await page.keyboard.press('Space');
+    assert.equal(await hosting.getAttribute('aria-expanded'), 'false', `${label} Space closes it again`);
 
-    const steps = page.getByRole('region', { name: 'Session setup steps' });
-    await steps.waitFor({ timeout: 15000 });
-    const stepButtons = steps.getByRole('button');
-    const stepCount = await stepButtons.count();
-    assert(stepCount >= 3, `${label} shows the setup steps`);
-    for (let index = 0; index < stepCount; index += 1) {
-      const title = (await stepButtons.nth(index).getAttribute('aria-label')).replace(/^Step \d+: /, '');
-      assert((await stepButtons.nth(index).innerText()).includes(title), `${label} step "${title}" shows its name`);
-    }
-    await assertNoHorizontalOverflow(page, `${label} setup steps`);
-
-    const secondStep = stepButtons.nth(1);
-    await tabTo(page, secondStep, `${label} second setup step`);
-    await assertVisibleFocus(secondStep, `${label} second setup step`);
-    await page.keyboard.press('Enter');
-    await page.waitForFunction(
-      (element) => element.className.includes('normalModeCardActive'),
-      await secondStep.elementHandle(),
-      { timeout: 10000 },
+    // The token's "?" opens from the keyboard; its text is also the input's description.
+    const tip = page.getByRole('button', { name: 'About Cloudflare API token' });
+    await tabTo(page, tip, `${label} token help`);
+    const bubble = page.locator('#ce-setup-cloudflare-token-tip-content');
+    await bubble.waitFor({ state: 'visible', timeout: 10000 });
+    assert.match(await bubble.innerText(), /never saved/i, `${label} the token help opens on focus`);
+    await page.keyboard.press('Escape');
+    await bubble.waitFor({ state: 'hidden', timeout: 10000 });
+    const helpId = await page.getByTestId('ce-wizard-cloudflare-api-token').getAttribute('aria-describedby');
+    assert.match(
+      await page.locator(`[id="${helpId}"]`).textContent(),
+      /never saved/i,
+      `${label} screen readers get the same help`,
     );
-    await assertNoHorizontalOverflow(page, `${label} opened step`);
     await context.close();
   }
 } finally {
   await browser.close();
 }
-console.log('Session setup keyboard smoke passed at 1280px and 390px: presets, named steps and step focus work without a pointer.');
+console.log('Session setup keyboard smoke passed at 1280px and 390px: fields, section carets and help work without a pointer.');

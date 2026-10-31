@@ -28,7 +28,7 @@ const DEFAULT_ROUTES = Object.freeze([
   '/demos',
 ]);
 const DEFAULT_ROUTE_TEXT = Object.freeze({
-  '/session/new': ['Session Setup'],
+  '/session/new': ['New session'],
   '/session/demo': ['Session'],
   '/session/demo/questions': ['Questions', 'Results', 'Existential risk from AI justifies extraordinary precautions.'],
   '/session/pe4': ['Groups', 'Results'],
@@ -373,52 +373,37 @@ async function dismissOnboardingIfPresent(page, { timeoutMs }) {
   await overlay.waitFor({ state: 'detached', timeout: timeoutMs });
 }
 
-async function restoreRouteForPresetProbe(page, { baseUrl, route, timeoutMs }) {
-  if (!baseUrl || !route) return;
-  await page.goto(routeUrl(baseUrl, route), { waitUntil: 'domcontentloaded', timeout: timeoutMs });
-  await page.waitForSelector('#root', { state: 'attached', timeout: timeoutMs });
-  await dismissOnboardingIfPresent(page, { timeoutMs });
-}
+const SESSION_SETUP_SECTIONS = Object.freeze([
+  'basics',
+  'context',
+  'questions',
+  'participation',
+  'results',
+  'access',
+  'hosting',
+  'ai',
+]);
 
-async function probeSessionModePresets(page, { timeoutMs, baseUrl, route } = {}) {
+// The one-page setup renders every section and Create, and a caret opens a section.
+async function probeSessionSetup(page, { timeoutMs } = {}) {
   await dismissOnboardingIfPresent(page, { timeoutMs });
-
-  const presets = [
-    ['fast_cheap_cloudflare', 'Centralized'],
-    ['trustless_public_decentralized', 'Decentralized'],
-  ];
   const failures = [];
-
-  for (const [index, [presetId, label]] of presets.entries()) {
-    let preset = page.getByTestId(`ce-new-preset-${presetId}`);
-    if (index > 0 && typeof preset.count === 'function' && (await preset.count()) === 0) {
-      await restoreRouteForPresetProbe(page, { baseUrl, route, timeoutMs });
-      preset = page.getByTestId(`ce-new-preset-${presetId}`);
-    }
-    await preset.waitFor({ state: 'visible', timeout: timeoutMs });
-    if (index > 0) {
-      page.once('dialog', (dialog) => dialog.accept());
-    }
-    await preset.click();
-    let selected = '';
+  for (const key of SESSION_SETUP_SECTIONS) {
     try {
-      selected = await preset.getAttribute('aria-checked', { timeout: 1000 });
+      await page.getByTestId(`ce-setup-section-${key}`).waitFor({ state: 'visible', timeout: timeoutMs });
     } catch (_error) {
-      selected = '';
+      failures.push(`setup section ${key} did not render`);
     }
-    if (selected === 'true') continue;
-
-    if (typeof page.locator === 'function') {
-      try {
-        const bodyText = await page.locator('body').innerText({ timeout: timeoutMs });
-        if (bodyText.includes(`Session Setup (${label})`)) continue;
-      } catch (_error) {
-        // Fall through to the normalized failure below.
-      }
-    }
-    failures.push(`${presetId} did not become the selected session mode`);
   }
-
+  try {
+    await page.getByTestId('ce-wizard-publish').waitFor({ state: 'visible', timeout: timeoutMs });
+  } catch (_error) {
+    failures.push('the Create button did not render');
+  }
+  if (failures.length) return failures;
+  const more = page.getByTestId('ce-setup-more-hosting');
+  await more.click();
+  if ((await more.getAttribute('aria-expanded')) !== 'true') failures.push('the hosting caret did not open its section');
   return failures;
 }
 
@@ -461,8 +446,8 @@ async function probeDefaultPublicPreview(page, { timeoutMs, baseUrl, route } = {
 }
 
 const DEFAULT_ROUTE_PROBES = Object.freeze({
-  '/new': probeSessionModePresets,
-  '/session/new': probeSessionModePresets,
+  '/new': probeSessionSetup,
+  '/session/new': probeSessionSetup,
   '/benchmarks': probeBenchmarkReportFrame,
   '/about': probeDefaultPublicPreview,
 });
@@ -783,7 +768,7 @@ module.exports = {
   normalizeLayoutProbeSelectors,
   normalizeRoutes,
   probeBenchmarkReportFrame,
-  probeSessionModePresets,
+  probeSessionSetup,
   resolveViewport,
   routeUrl,
   runRouteProbe,

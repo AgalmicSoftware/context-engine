@@ -605,11 +605,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     : null;
 
   if (routeCase.requiresReadableSessionSetup) {
-    await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').waitFor({ state: 'visible' });
-    await page
-      .locator('[role="listitem"][class*="modePresetCardRequirementPill"]')
-      .first()
-      .waitFor({ state: 'visible' });
+    await page.getByTestId('ce-setup-section-basics').waitFor({ state: 'visible' });
+    await page.getByTestId('ce-setup-missing').waitFor({ state: 'visible' });
   }
 
   const sessionSetupContrastState = routeCase.requiresReadableSessionSetup
@@ -656,29 +653,19 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
 
         return {
-          architectureHelpRatio: textRatio('[aria-label="View the deployment architecture diagram on GitHub"]'),
-          providerRatio: textRatio(
-            '[data-testid="ce-new-preset-fast_cheap_cloudflare"] [class*="modePresetCardProvider"]',
-          ),
-          descriptionRatio: textRatio(
-            '[data-testid="ce-new-preset-fast_cheap_cloudflare"] [class*="modePresetCardDescription"]',
-          ),
-          requirementRatio: textRatio('[role="listitem"][class*="modePresetCardRequirementPill"]'),
-          requirementPillCount: document.querySelectorAll('[role="listitem"][class*="modePresetCardRequirementPill"]')
-            .length,
-          entryCardText: Array.from(document.querySelectorAll('[data-testid^="ce-new-preset-"]'))
-            .map((card) => card.textContent || '')
-            .join(' '),
+          titleRatio: textRatio('h1[class*="pageTitle"]'),
+          sectionTitleRatio: textRatio('[data-testid="ce-setup-section-basics"] h2'),
+          labelRatio: textRatio('label[for="ce-setup-name"]'),
+          summaryRatio: textRatio('[data-testid="ce-setup-summary-context"]'),
+          caretRatio: textRatio('[data-testid="ce-setup-more-context"]'),
+          missingRatio: textRatio('[data-testid="ce-setup-missing"] li'),
+          presetCardCount: document.querySelectorAll('[data-testid^="ce-new-preset-"]').length,
         };
       })
     : null;
 
   if (routeCase.requiresSessionColors) {
-    await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').click();
-    await page.getByRole('button', { name: /Optional details/i }).click();
-    await page.getByRole('button', { name: 'Session colors expand' }).click();
     await page.waitForSelector('[data-testid="ce-wizard-session-color-scheme"]', { timeout: 15000 });
-    await page.waitForSelector('[data-testid="ce-wizard-session-color-preview"]', { timeout: 15000 });
   }
 
   let classicReportClusterColors = null;
@@ -1159,7 +1146,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
   const routeState = await page.evaluate(() => {
     const root = document.querySelector('#root');
-    const preview = document.querySelector('[data-testid="ce-wizard-session-color-preview"]');
+    const colorPicker = document.querySelector('[data-testid="ce-wizard-session-color-scheme"]');
     const homeTabs = document.querySelector('[role="tablist"]');
     const homeTabCenters = homeTabs
       ? Array.from(homeTabs.children).map((item) => {
@@ -1229,8 +1216,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       inactiveHomeTabBackground: inactiveHomeTabStyle?.backgroundColor || '',
       inactiveHomeTabBoxShadow: inactiveHomeTabStyle?.boxShadow || '',
       inactiveHomeTabIconSize: Math.min(inactiveHomeTabIconRect?.width || 0, inactiveHomeTabIconRect?.height || 0),
-      sessionPreviewAccent: preview
-        ? window.getComputedStyle(preview).getPropertyValue('--ce-session-accent').trim()
+      sessionPreviewAccent: colorPicker
+        ? window.getComputedStyle(colorPicker).getPropertyValue('--ce-session-accent').trim()
         : '',
     };
   });
@@ -2407,7 +2394,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     `${routeCase.label} should not overflow the ${viewportName} viewport; received ${routeState.overflow}px (${JSON.stringify(routeState.overflowElements)})`,
   );
   if (routeCase.requiresSessionColors) {
-    assert.ok(routeState.sessionPreviewAccent, 'Session Wizard preview should expose its scoped accent immediately');
+    assert.ok(routeState.sessionPreviewAccent, 'Session setup should expose its scoped accent immediately');
   }
   if (routeCase.requiresSpreadHomeTabs) {
     assert.equal(routeState.homeTabCount, 4, 'Classic 95 home title bar should expose all four tab options');
@@ -2905,36 +2892,14 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
   }
   if (sessionSetupContrastState) {
-    assert.equal(
-      sessionSetupContrastState.requirementPillCount,
-      6,
-      'Session Setup should render every requirement as an individual pill',
-    );
-    assert.doesNotMatch(
-      sessionSetupContrastState.entryCardText,
-      /worker/i,
-      'Session Setup entry cards should explain storage without internal Worker terminology',
-    );
-    assert.match(
-      sessionSetupContrastState.entryCardText,
-      /Ethereum RPC URL/,
-      'Session Setup should identify the RPC URL as an Ethereum requirement',
-    );
-    assert.match(
-      sessionSetupContrastState.entryCardText,
-      /Ethereum Gas \(TX Fees\)/,
-      'Session Setup should explain that Ethereum gas pays transaction fees',
-    );
-    assert.doesNotMatch(
-      sessionSetupContrastState.entryCardText,
-      /EVM testnet gas/,
-      'Session Setup should not use the superseded gas label',
-    );
+    assert.equal(sessionSetupContrastState.presetCardCount, 0, 'Session Setup should be one page without preset cards');
     [
-      ['Session Setup architecture help', sessionSetupContrastState.architectureHelpRatio],
-      ['Cloudflare provider', sessionSetupContrastState.providerRatio],
-      ['Cloudflare description', sessionSetupContrastState.descriptionRatio],
-      ['setup requirement pill', sessionSetupContrastState.requirementRatio],
+      ['Session Setup title', sessionSetupContrastState.titleRatio],
+      ['setup section title', sessionSetupContrastState.sectionTitleRatio],
+      ['setup field label', sessionSetupContrastState.labelRatio],
+      ['setup section summary', sessionSetupContrastState.summaryRatio],
+      ['setup section caret', sessionSetupContrastState.caretRatio],
+      ['setup missing-input list', sessionSetupContrastState.missingRatio],
     ].forEach(([label, received]) => {
       assert.ok(
         received >= 4.5,

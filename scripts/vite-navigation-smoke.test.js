@@ -26,16 +26,17 @@ const {
   normalizeLayoutProbeSelectors,
   normalizeRoutes,
   probeBenchmarkReportFrame,
-  probeSessionModePresets,
+  probeSessionSetup,
   resolveViewport,
   routeUrl,
   runRouteProbe,
   summarizeFailures,
 } = require('./vite-navigation-smoke');
 
-test('default navigation smoke covers session modes, Docs, its legacy contracts alias, and benchmarks', () => {
+test('default navigation smoke covers session setup, Docs, its legacy contracts alias, and benchmarks', () => {
   assert.ok(DEFAULT_ROUTES.includes('/new'));
-  assert.equal(DEFAULT_ROUTE_PROBES['/new'], probeSessionModePresets);
+  assert.equal(DEFAULT_ROUTE_PROBES['/new'], probeSessionSetup);
+  assert.deepEqual(DEFAULT_ROUTE_TEXT['/session/new'], ['New session']);
   assert.equal(DEFAULT_ROUTE_PROBES['/benchmarks'], probeBenchmarkReportFrame);
   assert.ok(DEFAULT_ROUTES.includes('/session/demo/questions'));
   assert.deepEqual(DEFAULT_ROUTE_TEXT['/session/demo/questions'], ['Questions', 'Results', 'Existential risk from AI justifies extraordinary precautions.']);
@@ -54,38 +55,60 @@ test('default navigation smoke checks removed standalone pages use the normal no
   }
 });
 
-test('session mode probe selects both supported presets', async () => {
-  const selected = new Map();
-  const presetIds = ['fast_cheap_cloudflare', 'trustless_public_decentralized'];
+test('session setup probe finds every section and opens one from its caret', async () => {
+  const expanded = new Map();
+  const seen = [];
   const page = {
     getByTestId: (testId) => {
       if (testId === 'ce-onboarding-overlay') {
         return { count: async () => 0 };
       }
-      const presetId = testId.replace('ce-new-preset-', '');
-      assert.ok(presetIds.includes(presetId));
+      seen.push(testId);
       return {
         waitFor: async ({ state, timeout }) => {
           assert.equal(state, 'visible');
           assert.equal(timeout, 1234);
         },
         click: async () => {
-          presetIds.forEach((id) => selected.set(id, id === presetId));
+          expanded.set(testId, 'true');
         },
         getAttribute: async (name) => {
-          assert.equal(name, 'aria-checked');
-          return selected.get(presetId) ? 'true' : 'false';
+          assert.equal(name, 'aria-expanded');
+          return expanded.get(testId) || 'false';
         },
       };
     },
-    once: (eventName, handler) => {
-      assert.equal(eventName, 'dialog');
-      handler({ accept: async () => {} });
-    },
   };
 
-  assert.deepEqual(await probeSessionModePresets(page, { timeoutMs: 1234 }), []);
-  assert.equal(selected.get('trustless_public_decentralized'), true);
+  assert.deepEqual(await probeSessionSetup(page, { timeoutMs: 1234 }), []);
+  assert.deepEqual(seen, [
+    'ce-setup-section-basics',
+    'ce-setup-section-context',
+    'ce-setup-section-questions',
+    'ce-setup-section-participation',
+    'ce-setup-section-results',
+    'ce-setup-section-access',
+    'ce-setup-section-hosting',
+    'ce-setup-section-ai',
+    'ce-wizard-publish',
+    'ce-setup-more-hosting',
+  ]);
+  assert.equal(expanded.get('ce-setup-more-hosting'), 'true');
+});
+
+test('session setup probe reports a section that does not render', async () => {
+  const page = {
+    getByTestId: (testId) => ({
+      count: async () => 0,
+      waitFor: async () => {
+        if (testId === 'ce-setup-section-access') throw new Error('timeout');
+      },
+      click: async () => {},
+      getAttribute: async () => 'true',
+    }),
+  };
+
+  assert.deepEqual(await probeSessionSetup(page, { timeoutMs: 5 }), ['setup section access did not render']);
 });
 
 test('normalizeBaseUrl keeps the app origin and removes path/search/hash drift', () => {
@@ -160,7 +183,7 @@ test('setup, removed standalone pages, and shared demo views receive the pinned 
     });
     assert.equal(fellBack, true);
   }
-  assert.equal(DEFAULT_ROUTE_PROBES['/session/new'], probeSessionModePresets);
+  assert.equal(DEFAULT_ROUTE_PROBES['/session/new'], probeSessionSetup);
 });
 
 test('local demo presence fixtures cover queryless reads and keep interview readiness scoped', async () => {

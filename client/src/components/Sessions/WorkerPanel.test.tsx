@@ -78,7 +78,7 @@ describe('WorkerPanel', () => {
 
     // Hosting's More shows it inline: no panel header to collapse.
     expect(document.getElementById('session-wizard-section-worker')).toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-wizard-worker-panel-toggle')).not.toBeInTheDocument();
   });
 
   it('preserves the worker mode toggle test id', () => {

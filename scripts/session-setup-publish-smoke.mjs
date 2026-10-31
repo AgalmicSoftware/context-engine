@@ -226,13 +226,10 @@ try {
   page = await adminContext.newPage();
   await page.goto(`${baseUrl}/new`, { waitUntil: 'domcontentloaded' });
   await login(page, admin);
-  await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').click();
   await page.getByTestId('ce-wizard-session-name').fill('Setup smoke session');
   await page.getByTestId('ce-wizard-session-info').fill('Synthetic publication and participant fixture.');
-  await page.getByTestId('ce-wizard-customize').click();
-  const key = page.getByTestId('ce-wizard-secret-openai-key');
-  if (!(await key.isVisible())) await page.getByTestId('ce-wizard-worker-panel-toggle').click();
-  await key.fill('synthetic-ai-key-not-a-credential');
+  await page.getByTestId('ce-wizard-secret-openai-key').fill('synthetic-ai-key-not-a-credential');
+  await page.getByTestId('ce-setup-more-hosting').click();
   await page.getByRole('checkbox', { name: 'Agents (HTTP API)', exact: true }).check();
   await page
     .locator('label')
@@ -247,9 +244,9 @@ try {
     .first()
     .waitFor({ timeout: 30000 });
   console.log('Session Worker attachment verified through signed real Worker requests.');
-  await page.locator('#session-wizard-section-publish').getByRole('button', { name: 'Publish', exact: true }).click();
-  await page.getByTestId('ce-wizard-publish').click();
-  await page.getByText('Session Created', { exact: true }).waitFor({ timeout: 30000 });
+  const create = page.getByTestId('ce-wizard-publish');
+  await create.click();
+  await create.filter({ hasText: 'Session created' }).waitFor({ timeout: 30000 });
   console.log('Wizard publication completed.');
   const sessionLink = await page.locator('a[href*="/session/"][href*="worker="]').first().getAttribute('href');
   assert(sessionLink, 'Publication returns a portable session link');
