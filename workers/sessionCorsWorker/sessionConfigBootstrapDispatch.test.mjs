@@ -185,6 +185,7 @@ test('projectPublicWorkerSessionConfig returns canonical fields and recursively 
     ai: {
       models: { fast: { provider: 'openai', model: 'gpt-5' } },
     },
+    setConfigMergesAi: true,
   });
   for (const secret of [
     'sk-never-public',
@@ -237,6 +238,7 @@ test('projectPublicWorkerSessionConfig cannot expose the non-enumerable runtime 
     slug: 'session-a',
     networkChainId: 31337,
     sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    setConfigMergesAi: true,
   });
   assert.equal(JSON.stringify(projected).includes(secretRpcUrl), false);
 });
@@ -280,6 +282,7 @@ test('projectPublicWorkerSessionConfig keeps worker-canonical editable text meta
     BLOCKED_SURVEY_IDS: ['s2'],
     ignored_SBTs_LIST: ['0x0000000000000000000000000000000000000002'],
     featured_SBTs_LIST: ['0x0000000000000000000000000000000000000003'],
+    setConfigMergesAi: true,
   });
 });
 
@@ -308,6 +311,7 @@ test('projectPublicWorkerSessionConfig publishes only the versioned Agent Sessio
       revision: 'wrapped-revision-1',
       verifiedAt: '2026-07-20T18:00:00.000Z',
     },
+    setConfigMergesAi: true,
   });
   assert.equal(JSON.stringify(projected).includes('must-not-publish'), false);
 });
@@ -401,7 +405,7 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
   );
   assert.deepEqual(
     projectPublicWorkerSessionConfig({ sessionModeProfile: { authorization: 'Bearer secret' } }),
-    { sessionModeProfile: {} },
+    { sessionModeProfile: {}, setConfigMergesAi: true },
   );
   assert.equal(findForbiddenWorkerConfigSecretPath({ keyProvider: 'worker_secret' }), '');
   assert.equal(findForbiddenWorkerConfigSecretPath({ publicKey: 'public-id' }), '');

@@ -10,6 +10,9 @@ export type SessionConfigEditClassification = {
   signsParticipantsOut: boolean;
 };
 
+/** The stored `ai` after set-config receives `sent`: sent subkeys replace, omitted ones stay. */
+export function mergeSetConfigAi(stored: unknown, sent: unknown): unknown;
+
 export function sessionConfigRequiresReauthorization(
   before: Record<string, unknown>,
   after: Record<string, unknown>,

@@ -1,5 +1,6 @@
 import {
   WORKER_CANONICAL_SET_CONFIG_KEYS,
+  mergeSetConfigAi,
   sessionConfigRequiresReauthorization,
 } from '../../shared/sessionConfigEdits.mjs';
 import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
@@ -327,6 +328,11 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
         status: 400,
         error: `Invalid session config mode at ${incomingModeValidation.path}.`,
       };
+    }
+    // Merged after the checks above, so they judge only what was sent; the
+    // complete record is checked again below.
+    if (hasOwn(incomingConfig, 'ai')) {
+      incomingConfig = { ...incomingConfig, ai: mergeSetConfigAi(existing.ai, incomingConfig.ai) };
     }
     mergedConfig = mergeWorkerConfigRecords({ existingConfig: existing, incomingConfig, slug });
   } else if (kind === 'set-limits') {

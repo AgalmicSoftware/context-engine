@@ -1,4 +1,8 @@
-import { PUBLIC_WORKER_CONFIG_FIELDS } from '@ce-shared/workerSessionPublicConfig.mjs';
+import {
+  PUBLIC_WORKER_AI_FIELDS,
+  PUBLIC_WORKER_CONFIG_FIELDS,
+  SET_CONFIG_MERGES_AI_FIELD,
+} from '@ce-shared/workerSessionPublicConfig.mjs';
 import {
   normalizeWorkerCanonicalSessionIdHex,
   parseSessionWorkerDiscoveryOrigin,
@@ -60,12 +64,14 @@ const isRetryableConfigReadStatus = (status: number): boolean =>
   RETRYABLE_CONFIG_READ_STATUSES.has(status) || (status >= 500 && status <= 599);
 const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
 // The Worker sets these public fields itself: the authorization epoch and the
-// publication marker on writes, and response field encryption on every read.
-// They are not config the wizard writes, so the readback check skips them.
+// publication marker on writes, and response field encryption and the
+// merges-ai field on every read. They are not config the wizard writes, so the
+// readback check skips them.
 const WORKER_MANAGED_PUBLIC_CONFIG_FIELDS = Object.freeze([
   'authzEpoch',
   WORKER_CANONICAL_PUBLICATION_REVISION_KEY,
   'responseFieldEncryption',
+  SET_CONFIG_MERGES_AI_FIELD,
 ]);
 // Only a finalizing write claims a revision. Before that, a stored revision
 // (such as one the deploy helper staged) is not part of the checked config.
@@ -178,18 +184,30 @@ const clonePublicConfig = (value: unknown): UnknownRecord => {
   return clonePublicConfigValue(value, 'config', new WeakSet()) as UnknownRecord;
 };
 
+const pickFields = (source: UnknownRecord, fields: readonly string[]): UnknownRecord =>
+  fields.reduce<UnknownRecord>((picked, field) => {
+    if (Object.prototype.hasOwnProperty.call(source, field)) picked[field] = source[field];
+    return picked;
+  }, {});
+
 const buildExpectedPublicConfig = (config: UnknownRecord, ignoredFields: readonly string[]): UnknownRecord =>
   PUBLIC_WORKER_CONFIG_FIELDS.reduce<UnknownRecord>((expected, key) => {
     if (ignoredFields.includes(key) || !Object.prototype.hasOwnProperty.call(config, key)) return expected;
     if (key === 'ai') {
       const ai =
         config.ai && typeof config.ai === 'object' && !Array.isArray(config.ai) ? (config.ai as UnknownRecord) : {};
-      expected.ai = Object.prototype.hasOwnProperty.call(ai, 'models') ? { models: ai.models } : {};
+      expected.ai = pickFields(ai, PUBLIC_WORKER_AI_FIELDS);
       return expected;
     }
     expected[key] = config[key];
     return expected;
   }, {});
+
+// A Worker without the merges-ai field is older and shows only ai.models.
+const expectedForWorker = (expected: UnknownRecord, readback: UnknownRecord): UnknownRecord =>
+  readback[SET_CONFIG_MERGES_AI_FIELD] === true || !expected.ai || typeof expected.ai !== 'object'
+    ? expected
+    : { ...expected, ai: pickFields(expected.ai as UnknownRecord, ['models']) };
 
 const verifyExpectedPublicConfigValue = (expected: unknown, actual: unknown, path: string): void => {
   if (Array.isArray(expected)) {
@@ -537,7 +555,7 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
       let configMatches = true;
       try {
         verifyExpectedPublicConfigValue(
-          expectedPublicConfig,
+          expectedForWorker(expectedPublicConfig, verifiedPublicConfig),
           buildComparableActualPublicConfig({
             config: verifiedPublicConfig,
             revision,

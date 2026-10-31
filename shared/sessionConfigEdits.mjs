@@ -56,6 +56,11 @@ const CONTENT_FIELDS = new Set([
 const INTERVIEW_CONTENT_FIELDS = new Set(['openingPrompt', 'steeringPrompt']);
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);
 const same = (left, right) => stableCanonicalSerialize(left) === stableCanonicalSerialize(right);
+
+// set-config merges `ai` one level deep: a sent subkey replaces that subkey
+// and an omitted one is kept, so a writer that sees only the public part of
+// `ai` cannot drop the rest. Workers before this rule replace `ai` whole.
+export const mergeSetConfigAi = (stored, sent) => (record(stored) && record(sent) ? { ...stored, ...sent } : sent);
 const without = (value, keys) => Object.fromEntries(Object.entries(value).filter(([key]) => !keys.has(key)));
 
 const onlyAddsInvites = (before, after) => {

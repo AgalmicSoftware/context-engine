@@ -882,3 +882,42 @@ test('set-config preserves owner opening and optional interview features', () =>
   assert.equal(result.ok, true);
   assert.deepEqual(result.config.interviewMode, interviewMode);
 });
+
+test('set-config merges ai one level deep, so an edit of one part keeps the rest', () => {
+  const ai = {
+    models: { fast: { provider: 'openai', model: 'gpt-5' }, transcription: { provider: 'openai', model: 'whisper-1' } },
+    reasoningEffort: 'high',
+    taskReasoningEffort: { generate: 'medium' },
+    providers: { custom: { functions: '[{"name":"lookup"}]' } },
+  };
+  const stored = applySessionConfigMutation({
+    existingConfig: {},
+    mutation: { kind: 'set-config', incomingConfig: { ...cloneJson(profileBearingConfig), ai } },
+    slug: 'session-a',
+  }).config;
+  const save = (incomingConfig) =>
+    applySessionConfigMutation({ existingConfig: stored, mutation: { kind: 'set-config', incomingConfig }, slug: 'session-a' });
+
+  // A sent subkey replaces that subkey whole; the omitted ones stay.
+  const models = { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } };
+  const edited = save({ ai: { models } });
+  assert.equal(edited.ok, true);
+  assert.deepEqual(edited.config.ai, { ...ai, models });
+  assert.notEqual(edited.config.authzEpoch, stored.authzEpoch);
+
+  assert.deepEqual(save({ ai: { reasoningEffort: 'low' } }).config.ai, { ...ai, reasoningEffort: 'low' });
+  assert.deepEqual(save({ ai: { taskReasoningEffort: {} } }).config.ai, { ...ai, taskReasoningEffort: {} });
+
+  // Resending what is stored changes nothing, so no one is signed out.
+  const resent = save({ ai: { reasoningEffort: 'high', models: ai.models } });
+  assert.equal(resent.ok, true);
+  assert.deepEqual(resent.config.ai, ai);
+  assert.equal(resent.config.authzEpoch, stored.authzEpoch);
+
+  // Merging never lets a secret in.
+  assert.deepEqual(save({ ai: { models: { fast: { apiKey: 'sk-secret' } } } }), {
+    ok: false,
+    status: 400,
+    error: 'Secret-like values are not allowed in public session config fields.',
+  });
+});

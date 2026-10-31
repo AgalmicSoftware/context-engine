@@ -1,5 +1,9 @@
 import { projectPublicAgentConfig } from '../../shared/sessionAgentConfig.mjs';
-import { PUBLIC_WORKER_CONFIG_FIELDS } from '../../shared/workerSessionPublicConfig.mjs';
+import {
+  PUBLIC_WORKER_AI_FIELDS,
+  PUBLIC_WORKER_CONFIG_FIELDS,
+  SET_CONFIG_MERGES_AI_FIELD,
+} from '../../shared/workerSessionPublicConfig.mjs';
 
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
@@ -188,7 +192,7 @@ const sanitizePublicValue = (value, path = 'config') => {
 
 const projectPublicAiConfig = (value, path) => {
   const ai = isObj(value) ? value : {};
-  return selectFields(ai, ['models'], path);
+  return selectFields(ai, PUBLIC_WORKER_AI_FIELDS, path);
 };
 
 const selectFields = (source, keys, path = 'config') => keys.reduce((acc, key) => {
@@ -304,6 +308,8 @@ export const findForbiddenWorkerConfigSecretPath = (config, path = 'config') => 
 export const projectPublicWorkerSessionConfig = (config) => {
   const projected = selectFields(isObj(config) ? config : {}, PUBLIC_WORKER_CONFIG_FIELDS);
   if (projected.agentHttp) projected.agentHttp = projectPublicAgentConfig(projected.agentHttp);
+  // This code's set-config merges `ai` (mergeSetConfigAi); older Workers lack the field.
+  projected[SET_CONFIG_MERGES_AI_FIELD] = true;
   return projected;
 };
 
