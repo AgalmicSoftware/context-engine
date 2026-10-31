@@ -49,6 +49,7 @@ export class RecordingChunkQueue {
   private attempts = new Map<string, number>();
   private lastSnapshotAt = new Map<string, number>();
   private failedWrites = new Set<string>();
+  private resaving = new Set<string>();
   private waiters = new Set<() => void>();
 
   constructor(private options: Options) {
@@ -158,6 +159,7 @@ export class RecordingChunkQueue {
         saved = true;
         this.failedWrites.delete(record.segment.id);
         if (!this.failedWrites.size) this.storageError = '';
+        else this.resaveFailed();
       } catch (error) {
         this.failedWrites.add(record.segment.id);
         this.storageError = storageText(error);
@@ -167,6 +169,26 @@ export class RecordingChunkQueue {
     });
     this.writes = operation;
     return operation.then(() => saved);
+  }
+  // A write just succeeded, so storage works again: save what it refused earlier. Otherwise a refused
+  // transcript keeps its audio in memory and the warning stays up, and after a reload its chunk is sent again.
+  private resaveFailed() {
+    for (const id of this.failedWrites) {
+      const record = this.records.get(id);
+      if (!record) this.failedWrites.delete(id);
+      if (!record || this.resaving.has(id)) continue;
+      this.resaving.add(id);
+      const saving = record.segment.status === 'complete' && record.audio ? this.commit(record) : this.save(record);
+      void saving.finally(() => this.resaving.delete(id));
+    }
+  }
+  /** Saves a transcript whose audio only memory still holds, then lets that audio go. */
+  private commit(record: RecordingChunk) {
+    const complete = { ...record, audio: undefined };
+    return this.save(complete).then((persisted) => {
+      if (persisted && this.records.get(record.segment.id) === record) this.records.set(record.segment.id, complete);
+      this.changed();
+    });
   }
   capture(id: string, audio: Blob, finished = false): void {
     const previous = this.records.get(id);
@@ -301,13 +323,8 @@ export class RecordingChunkQueue {
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
     for (const record of this.records.values()) {
-      if ((!id || id === record.segment.id) && record.audio && record.segment.status === 'complete') {
-        const complete = { ...record, audio: undefined };
-        void this.save(complete).then((persisted) => {
-          if (persisted) this.records.set(record.segment.id, complete);
-          this.changed();
-        });
-      }
+      if ((!id || id === record.segment.id) && record.audio && record.segment.status === 'complete')
+        void this.commit(record);
       if (
         (!id || id === record.segment.id) &&
         record.audio &&

@@ -204,6 +204,34 @@ it('does not delete raw audio if persisting the completed transcript fails', asy
   expect(queue.storageError).toBe('');
 });
 
+it('saves a refused transcript once a later write succeeds, so a reload neither warns nor uploads it again', async () => {
+  const transcribe = jest.fn<Transcribe>(async () => ({ text: 'Speech.' }));
+  const queue = create(transcribe);
+  await queue.ready;
+  const first = queue.begin(false);
+  jest.mocked(putRecordingChunk).mockImplementationOnce(async (record: RecordingChunk) => {
+    saved.set(record.segment.id, { ...record, segment: { ...record.segment } });
+  });
+  jest.mocked(putRecordingChunk).mockRejectedValueOnce(new DOMException('Quota exceeded', 'QuotaExceededError'));
+  queue.capture(first, audio, true);
+  await tick();
+  expect(queue.storageError).toContain("This recording can't be recovered after a reload");
+  expect(queue.records.get(first)?.audio).toBe(audio);
+  // The next chunk's first snapshot is saved: storage works again.
+  queue.capture(queue.begin(false), new Blob(['next'], { type: 'audio/webm' }));
+  await tick();
+  expect(saved.get(first)).toMatchObject({ segment: { status: 'complete', text: 'Speech.' } });
+  expect(saved.get(first)?.audio).toBeUndefined();
+  expect(queue.records.get(first)?.audio).toBeUndefined();
+  expect(queue.storageError).toBe('');
+  queue.dispose();
+  const reopened = create(transcribe);
+  await reopened.ready;
+  await tick();
+  expect(reopened.segments[0]).toMatchObject({ status: 'complete', text: 'Speech.' });
+  expect(transcribe.mock.calls.filter(([blob]) => blob === audio)).toHaveLength(1);
+});
+
 it('recovers interrupted chunks in index order without mixing another scope', async () => {
   const record = (id: string, index: number, scope: string): RecordingChunk => ({
     scope,
