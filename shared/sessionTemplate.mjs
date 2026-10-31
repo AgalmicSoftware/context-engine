@@ -115,7 +115,8 @@ const DEFAULTS = Object.freeze({
 const SHAPE = {
   ...shapeOf(DEFAULTS),
   sessionContext: { title: TEXT, paragraphs: [TEXT], links: [{ label: TEXT, url: TEXT }] },
-  contextFiles: [{ name: TEXT }],
+  // A file's name and privacy; its bytes never travel, so it is attached again.
+  contextFiles: [{ name: TEXT, adminsOnly: FLAG }],
   questions: [QUESTION],
   sessionModeProfile: PROFILE,
 };

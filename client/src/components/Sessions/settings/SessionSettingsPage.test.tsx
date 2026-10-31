@@ -23,6 +23,21 @@ jest.mock('../../../utilities/worker/workerAuth', () => ({
   buildSignedAdminActionAuth: (options: unknown) => mockSignAdminAction(options),
 }));
 
+// The live files and links panel reports what the Worker lists.
+jest.mock('../setup/ContextSourcesPanel', () => {
+  const { useEffect } = jest.requireActual<typeof import('react')>('react');
+  const MockPanel = ({ onSourcesChange }: { onSourcesChange?: (sources: unknown[]) => void }) => {
+    useEffect(() => {
+      onSourcesChange?.([
+        { id: 'pdf-1', kind: 'file', title: 'deck.pdf', adminsOnly: true },
+        { id: 'link-1', kind: 'link', title: 'Essay', url: 'https://example.org/essay', adminsOnly: false },
+      ]);
+    }, [onSourcesChange]);
+    return <div data-testid="mock-context-sources-panel" />;
+  };
+  return { __esModule: true, default: MockPanel };
+});
+
 const ADMIN = '0x00000000000000000000000000000000000000aa';
 const WORKER = 'https://edit-salon.example.workers.dev';
 const SESSION_ID = `0x${'1f'.repeat(16)}`;
@@ -79,6 +94,41 @@ describe('SessionSettingsPage', () => {
   });
   afterEach(() => {
     global.fetch = originalFetch;
+  });
+
+  it('exports a template listing the session’s files by name and privacy, without their contents', async () => {
+    mockFetchBootstrap.mockResolvedValue(
+      bootstrapOf(
+        workerConfig({
+          sessionContext: {
+            title: 'Context',
+            paragraphs: ['Notes.'],
+            links: [{ label: 'Site', url: 'https://example.org/' }],
+          },
+        }),
+      ),
+    );
+    const createObjectURL = jest.fn((_blob: Blob) => 'blob:template');
+    Object.assign(URL, { createObjectURL, revokeObjectURL: jest.fn() });
+    const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('ce-setup-more-context'));
+    expect(screen.getByTestId('mock-context-sources-panel')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SETUP_TEMPLATE_EXPORT));
+    const text = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsText(createObjectURL.mock.calls[0][0]);
+    });
+    const template = JSON.parse(text);
+    expect(template.contextFiles).toEqual([{ name: 'deck.pdf', adminsOnly: true }]);
+    expect(template.sessionContext).toEqual({
+      title: 'Context',
+      paragraphs: ['Notes.'],
+      links: [{ label: 'Site', url: 'https://example.org/' }],
+    });
+    click.mockRestore();
   });
 
   it('is admin-only', async () => {

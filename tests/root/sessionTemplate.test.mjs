@@ -191,6 +191,29 @@ test('settings with fixed vocabularies or limits are checked', () => {
   ]);
 });
 
+test('a template carries links, notes and file names with their privacy, never file contents', () => {
+  const draft = {
+    sessionContext: {
+      title: 'Read first',
+      paragraphs: ['Notes for the salon.'],
+      links: [{ label: 'Essay', url: 'https://example.com/essay' }],
+    },
+    contextFiles: [{ name: 'deck.pdf', adminsOnly: true, size: 12, bytes: 'JVBERi0x' }, { name: 'notes.md' }],
+  };
+  const exported = sessionTemplateFromDraft(draft);
+  assert.equal(exported.ok, true, JSON.stringify(exported.errors));
+  assert.deepEqual(exported.template.sessionContext, draft.sessionContext);
+  assert.deepEqual(exported.template.contextFiles, [{ name: 'deck.pdf', adminsOnly: true }, { name: 'notes.md' }]);
+  const reimported = parseSessionTemplateJson(JSON.stringify(exported.template));
+  assert.deepEqual(reimported.template, exported.template);
+  assert.deepEqual(errorsOf({ format, contextFiles: [{ name: 'deck.pdf', adminsOnly: 'yes' }] }).map((error) => error.path), [
+    'contextFiles.0.adminsOnly',
+  ]);
+  assert.deepEqual(errorsOf({ format, contextFiles: [{ name: 'deck.pdf', data: 'JVBERi0x' }] }).map((error) => error.path), [
+    'contextFiles.0.data',
+  ]);
+});
+
 test('a template holds no more context than set-config accepts', () => {
   const errors = errorsOf({
     format,

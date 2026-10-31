@@ -33,8 +33,8 @@ export type SessionTemplate = {
   sessionEndsAt: string;
   appearance: { colorSchemeId: string };
   sessionContext: { title: string; paragraphs: string[]; links: Array<{ label: string; url: string }> };
-  /** Files are listed by name only, to attach again. */
-  contextFiles: Array<{ name: string }>;
+  /** Files are listed by name and privacy only, to attach again. */
+  contextFiles: Array<{ name: string; adminsOnly?: boolean }>;
   questionsGenPrompt: string;
   /** Added to the session after it is created; at most 200. */
   questions: SessionTemplateQuestion[];
