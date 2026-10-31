@@ -73,9 +73,11 @@ describe('session interview protocol', () => {
 
   it('resolves and updates only the two new voice mode query values', () => {
     expect(resolveSessionVoiceMode('?x=1&mode=interview')).toBe('interview');
-    expect(resolveSessionVoiceMode('?mode=recordGroup')).toBe('recordGroup');
+    expect(resolveSessionVoiceMode('?mode=groupRecording')).toBe('recordGroup');
+    expect(resolveSessionVoiceMode('?mode=recordGroup')).toBeNull();
     expect(resolveSessionVoiceMode('?mode=listening')).toBeNull();
-    expect(buildSessionVoiceModeSearch('?x=1', 'recordGroup')).toBe('?x=1&mode=recordGroup');
+    expect(buildSessionVoiceModeSearch('?x=1', 'recordGroup')).toBe('?x=1&mode=groupRecording');
+    expect(buildSessionVoiceModeSearch('?x=1', 'interview')).toBe('?x=1&mode=interview');
     expect(buildSessionVoiceModeSearch('?x=1&mode=interview', null)).toBe('?x=1');
   });
 

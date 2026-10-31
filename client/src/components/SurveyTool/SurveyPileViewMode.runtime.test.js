@@ -652,7 +652,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(resolveSessionVoiceMode(window.location.search)).toBe('interview');
     first.unmount();
 
-    renderDemoPile({}, { route: '/session/demo?mode=recordGroup' });
+    renderDemoPile({}, { route: '/session/demo?mode=groupRecording' });
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'recordGroup');
     expect(resolveSessionVoiceMode(window.location.search)).toBe('recordGroup');
   });

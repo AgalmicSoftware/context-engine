@@ -134,7 +134,7 @@ test('demo interview ready fixture requires the explicit Worker discovery route'
   const worker = encodeURIComponent('https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev');
   assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=interview&worker=${worker}`), true);
   assert.equal(isDemoReadyInterviewRoute('/session/demo?mode=interview'), false);
-  assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=recordGroup&worker=${worker}`), false);
+  assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=groupRecording&worker=${worker}`), false);
 });
 
 test('setup, removed standalone pages, and shared demo views receive the pinned default-cache fixture locally', async () => {
@@ -166,7 +166,7 @@ test('setup, removed standalone pages, and shared demo views receive the pinned 
 test('local demo presence fixtures cover queryless reads and keep interview readiness scoped', async () => {
   const origin = 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev';
   const interviewRoute = `/session/demo?mode=interview&worker=${encodeURIComponent(origin)}`;
-  for (const route of ['/session/demo', '/session/demo?mode=recordGroup', '/session/demo-2', interviewRoute]) {
+  for (const route of ['/session/demo', '/session/demo?mode=groupRecording', '/session/demo-2', interviewRoute]) {
     const handlers = [];
     await installDemoWorkerFixtureRoutes({ route: async (pattern, handler) => handlers.push({ pattern, handler }) },
       'http://127.0.0.1:4173', route);

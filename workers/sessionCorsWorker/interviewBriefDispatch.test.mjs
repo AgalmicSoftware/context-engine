@@ -85,7 +85,7 @@ test('safeSessionUrl preserves only bounded recruitment and group auto-join stat
   const safe = __test__interviewBriefDispatch.safeSessionUrl;
   const options = { slug: 'demo', allowOrigins: ['https://app.example'] };
   assert.equal(
-    safe('https://app.example/session/demo?src=partner launch&joinGroup=EDDY-2026&worker=https%3A%2F%2Fattacker.example&mode=recordGroup#prefill=private', options),
+    safe('https://app.example/session/demo?src=partner launch&joinGroup=EDDY-2026&worker=https%3A%2F%2Fattacker.example&mode=groupRecording#prefill=private', options),
     'https://app.example/session/demo?src=partner-launch&joinGroup=eddy-2026',
   );
   assert.equal(
@@ -204,7 +204,7 @@ test('dispatchInterviewBriefRequest honors per-session disablement and requires 
 
 test('dispatchInterviewBriefRequest preserves only safe source and auto-join state from the supplied return URL', async () => {
   const response = await dispatchInterviewBriefRequest({
-    request: new Request('https://worker.example/agent/interview-brief?slug=demo&format=json&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%3Fsrc%3Dpartner%2520launch%26joinGroup%3DEDDY-2026%26worker%3Dhttps%253A%252F%252Fattacker.example%26mode%3DrecordGroup%23private'),
+    request: new Request('https://worker.example/agent/interview-brief?slug=demo&format=json&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%3Fsrc%3Dpartner%2520launch%26joinGroup%3DEDDY-2026%26worker%3Dhttps%253A%252F%252Fattacker.example%26mode%3DgroupRecording%23private'),
     deps: {
       resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
       getSessionConfig: async () => ({ allowOrigins: ['https://app.example'] }),
@@ -220,7 +220,7 @@ test('dispatchInterviewBriefRequest preserves only safe source and auto-join sta
     'https://app.example/session/demo?src=partner-launch&joinGroup=eddy-2026&worker=https%3A%2F%2Fworker.example&mode=interview',
   );
   assert.equal(body.reviewUrl.includes('attacker.example'), false);
-  assert.equal(body.reviewUrl.includes('recordGroup'), false);
+  assert.equal(body.reviewUrl.includes('groupRecording'), false);
   assert.equal(body.reviewUrl.includes('private'), false);
   assert.equal('instructions' in body, false);
 });

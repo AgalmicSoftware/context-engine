@@ -10,7 +10,7 @@ The session links are:
 ```text
 /session/<slug>?mode=voice
 /session/<slug>?mode=interview
-/session/<slug>?mode=recordGroup
+/session/<slug>?mode=groupRecording
 ```
 
 The direct links open the selected modal panel; `?mode=voice` opens the
