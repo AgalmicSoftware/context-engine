@@ -1281,3 +1281,23 @@ it.each([
     }
   },
 );
+
+it('keeps the interview notice away after Clear discards the unsaved answers', async () => {
+  const h = await fixture();
+  await act(async () => h.sync());
+  await h.mount();
+  await act(async () => h.engine().handleAnswerPile(BINARY_QID, 'Yes'));
+  await act(async () => h.engine().handleAnswerPile(FREEFORM_QID, 'Unselected manual draft'));
+  await settle();
+  expect(await run(() => submitSessionInterviewResponses(h.engine(), [BINARY_QID]))).toEqual({ status: 'submitted' });
+  await settle();
+  expect(screen.getByText("1 answer on the page isn't submitted yet.")).toBeInTheDocument();
+
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Clear pending changes' })));
+  await settle();
+  expect(h.engine().getPendingEditStats().total).toBe(0);
+  await act(async () => h.engine().handleAnswerPile(FREEFORM_QID, 'New ordinary edit'));
+  await settle();
+  expect(h.engine().getPendingEditStats().total).toBe(1);
+  expect(screen.queryByText(/answer on the page/)).not.toBeInTheDocument();
+});

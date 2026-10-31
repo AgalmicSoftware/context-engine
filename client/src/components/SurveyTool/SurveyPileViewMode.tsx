@@ -3378,7 +3378,11 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             activePromptMasked,
             finalSubmitText,
             showClearPendingButton,
-            handleRevertPendingChanges: engine.handleRevertPendingChanges,
+            handleRevertPendingChanges: () => {
+              engine.handleRevertPendingChanges();
+              // Clear discards the answers the interview left unsaved, so their notice ends with them.
+              engine.setState({ interviewPendingNoticeContext: '' });
+            },
             navCounterVisible,
             handlePrev: engine.handlePrev,
             handleNext: engine.handleNext,
