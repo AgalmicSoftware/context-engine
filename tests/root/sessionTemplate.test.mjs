@@ -235,6 +235,8 @@ test('a template holds no more context than set-config accepts', () => {
   ]);
 });
 
+// Built at runtime where needed, so the public release scan and email scrub
+// leave these samples intact.
 const SECRET_SAMPLES = [
   `sk-proj-${'A1b2'.repeat(8)}`,
   `sk-ant-api03-${'x9Y8'.repeat(8)}`,
