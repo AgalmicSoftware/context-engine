@@ -100,6 +100,19 @@ test('Responses and reasoning limits converge aliases and cap saved task/global 
   }
 });
 
+test('interview mapping may use medium effort on a low-effort session', () => {
+  const config = configFor('openai', 'gpt-6.1-terra');
+  const effort = (payload, cfg = config) =>
+    boundSessionAiRequest({ provider: 'openai', config: cfg, payload: { model: 'gpt-6.1-terra', ...payload } }).payload.reasoning_effort;
+  assert.equal(effort({ taskType: 'interview-map', reasoning_effort: 'medium' }), 'medium');
+  // Group suggestions ask for low and get it; other tasks keep the session's effort.
+  assert.equal(effort({ taskType: 'interview-map', reasoning_effort: 'low' }), 'low');
+  assert.equal(effort({ taskType: 'generate', reasoning_effort: 'medium' }), 'low');
+  // A per-task effort the session sets still decides, and a higher session effort still bounds.
+  assert.equal(effort({ taskType: 'interview-map', reasoning_effort: 'medium' }, { ai: { ...config.ai, taskReasoningEffort: { 'interview-map': 'low' } } }), 'low');
+  assert.equal(effort({ taskType: 'interview-map', reasoning_effort: 'high' }, { ai: { ...config.ai, reasoningEffort: 'high' } }), 'high');
+});
+
 test('stored custom Functions remain usable but caller definitions cannot replace them', async () => {
   const config = configFor('custom', 'configured-model');
   const functions = [{ name: 'owner_function', parameters: { type: 'object' } }];

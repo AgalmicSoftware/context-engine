@@ -56,6 +56,9 @@ const operationCeilings = Object.freeze({
 });
 const tokenFields = ['max_tokens', 'max_completion_tokens', 'max_output_tokens', 'max_tokens_to_sample', 'maxTokens'];
 const effortOrder = ['none', 'minimal', 'low', 'medium', 'high'];
+// Interview mapping may use medium effort on a low-effort session; a per-task
+// effort the session sets for it still decides.
+const minimumTaskEffort = Object.freeze({ 'interview-map': 'medium' });
 const configuredFunctions = (config) => {
   const value = config?.ai?.providers?.custom?.functions ?? config?.ai?.custom?.functions;
   if (typeof value !== 'string') return value;
@@ -83,7 +86,9 @@ export const boundSessionAiRequest = ({ payload = {}, provider, config, requestK
   const tokens = Math.min(ceiling, ...requested);
   const ai = record(config?.ai);
   const savedEffort = ai.taskReasoningEffort?.[task] || (task === 'analysis' && ai.taskReasoningEffort?.generate) || ai.reasoningEffort || ai.reasoning_effort || 'low';
-  const maximumEffort = ['low', 'medium', 'high'].includes(savedEffort) ? savedEffort : 'low';
+  const sessionEffort = ['low', 'medium', 'high'].includes(savedEffort) ? savedEffort : 'low';
+  const floor = ai.taskReasoningEffort?.[task] ? '' : minimumTaskEffort[task];
+  const maximumEffort = floor && effortOrder.indexOf(floor) > effortOrder.indexOf(sessionEffort) ? floor : sessionEffort;
   const requestedEffort = trim(payload.reasoning_effort || payload.reasoningEffort || payload.reasoning?.effort);
   const effort = effortOrder.includes(requestedEffort) && effortOrder.indexOf(requestedEffort) < effortOrder.indexOf(maximumEffort)
     ? requestedEffort : maximumEffort;
