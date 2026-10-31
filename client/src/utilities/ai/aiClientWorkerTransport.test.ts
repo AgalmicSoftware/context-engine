@@ -190,6 +190,17 @@ it('sends a JSON schema only to OpenAI and Claude', () => {
       .response_format;
   expect(formatFor('openai', schema)).toEqual(schema);
   expect(formatFor('anthropic', schema)).toEqual(schema);
+  // GPT-5 and GPT-6 use the Responses API, which takes the schema's fields flat.
+  const responses = buildAiWorkerRequestPlan({
+    ai: { provider: 'openai', model: 'gpt-6.1-terra' },
+    opts: { response_format: schema },
+  }).requestBody;
+  expect(responses.response_format).toEqual({
+    type: 'json_schema',
+    name: 'result',
+    schema: { type: 'object' },
+    strict: true,
+  });
   // Other providers keep their JSON mode but rely on the prompt for a schema.
   expect(formatFor('openrouter', schema)).toBeUndefined();
   expect(formatFor('custom', schema)).toBeUndefined();

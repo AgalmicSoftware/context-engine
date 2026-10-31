@@ -58,10 +58,18 @@ export const buildAiWorkerRequestPlan = ({
   const maxOutputTokens = opts.max_output_tokens ?? (usesResponsesApi ? maxTokens : undefined);
   const maxCompletionTokens = opts.max_completion_tokens ?? (usesCompletionTokens ? maxTokens : undefined);
   // A JSON schema goes only to OpenAI and Claude; other providers rely on the prompt's description.
+  // The Responses API takes the schema's fields at the top of the format, and released
+  // Workers pass the format to it unchanged, so the client sends that flat form itself.
+  const format = asRecord(opts.response_format);
+  const jsonSchema = asRecord(format.json_schema);
   const responseFormat =
-    asRecord(opts.response_format).type === 'json_schema' && provider !== 'openai' && provider !== 'anthropic'
-      ? null
-      : opts.response_format;
+    format.type !== 'json_schema'
+      ? opts.response_format
+      : provider !== 'openai' && provider !== 'anthropic'
+        ? null
+        : usesResponsesApi && Object.keys(jsonSchema).length
+          ? { type: 'json_schema', ...jsonSchema }
+          : opts.response_format;
 
   const requestBody: UnknownRecord = {
     action: 'ai',

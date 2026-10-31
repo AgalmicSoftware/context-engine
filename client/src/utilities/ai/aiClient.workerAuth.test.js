@@ -428,10 +428,8 @@ describe('aiClient worker auth options', () => {
     expect(sentPrompt(2)).toContain('"budget $& {{topX}}"');
     expect(sentPrompt(2)).toContain('Select at most 3 IDs');
     const rankBody = JSON.parse(fetchWorkerWithAuth.mock.calls[2][1].body);
-    expect(rankBody.response_format).toMatchObject({
-      type: 'json_schema',
-      json_schema: { name: 'question_ranking', strict: true },
-    });
+    // GPT-6 uses the Responses API, which takes the schema flat.
+    expect(rankBody.response_format).toMatchObject({ type: 'json_schema', name: 'question_ranking', strict: true });
   });
 
   it('returns an empty ranking when fallback JSON extraction is malformed', async () => {
