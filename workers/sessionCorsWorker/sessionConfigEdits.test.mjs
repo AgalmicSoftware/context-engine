@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   WORKER_CANONICAL_SET_CONFIG_KEYS,
+  classifySessionConfigEdits as classify,
   sessionConfigRequiresReauthorization as revokes,
 } from '../../shared/sessionConfigEdits.mjs';
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
@@ -97,5 +98,99 @@ test('the shared set-config key list is exactly what a Worker-canonical session 
   for (const key of ['HIGHLIGHTED_QUESTION_IDS', 'BLOCKED_QUESTION_IDS', 'HIGHLIGHTED_SURVEY_IDS',
     'BLOCKED_SURVEY_IDS', 'blockLimits', 'publicKey']) {
     assert.deepEqual(setConfig({ [key]: [] }), { ok: false, status: 400, error: unsupported(key) }, key);
+  }
+});
+
+test('lists each edited path as content or as a sign-out', () => {
+  const before = {
+    sessionName: 'A',
+    defaultTags: 'x',
+    interviewMode: { enabled: true, openingPrompt: 'Hi', hiddenDraftShare: 0 },
+    agentHttp: { enabled: true, invites: [invite] },
+  };
+  const after = {
+    sessionName: 'B',
+    defaultTags: 'y',
+    interviewMode: { enabled: true, openingPrompt: 'Hello', hiddenDraftShare: 0.5 },
+    agentHttp: { enabled: true, invites: [invite, second] },
+  };
+  assert.deepEqual(classify(before, after), {
+    content: ['sessionName', 'interviewMode.openingPrompt', 'agentHttp.invites'],
+    authority: ['defaultTags', 'interviewMode.hiddenDraftShare'],
+    signsParticipantsOut: true,
+  });
+  assert.deepEqual(classify(before, { ...before, sessionName: 'B' }),
+    { content: ['sessionName'], authority: [], signsParticipantsOut: false });
+  assert.deepEqual(classify(before, before), { content: [], authority: [], signsParticipantsOut: false });
+  assert.deepEqual(classify(withInvites([invite]), withInvites([])),
+    { content: [], authority: ['agentHttp.invites'], signsParticipantsOut: true });
+  assert.deepEqual(classify({ interviewMode: 'legacy' }, { interviewMode: { openingPrompt: 'Hi' } }),
+    { content: ['interviewMode.openingPrompt'], authority: ['interviewMode'], signsParticipantsOut: true });
+  assert.deepEqual(classify({}, { sessionModeProfile: { preset: 'custom' } }),
+    { content: [], authority: ['sessionModeProfile'], signsParticipantsOut: true });
+});
+
+test('the path lists agree with the Worker verdict for any pair of configs', () => {
+  let seed = 7;
+  const pick = (count) => { // mulberry32
+    seed = (seed + 0x6d2b79f5) | 0;
+    let mixed = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+    return ((mixed ^ (mixed >>> 14)) >>> 0) % count;
+  };
+  const keys = ['sessionName', 'sessionContext', 'defaultTags', 'interviewMode', 'agentHttp', 'futureSetting'];
+  const values = [undefined, null, 'a', 'b', ['x'], {}, { openingPrompt: 'a' }, { openingPrompt: 'b', enabled: true },
+    { enabled: true }, { invites: [invite] }, { invites: [invite, second] }, { invites: [second], enabled: false }];
+  const config = () => Object.fromEntries(keys.filter(() => pick(2)).map(key => [key, values[pick(values.length)]]));
+  for (let run = 0; run < 3000; run += 1) {
+    const before = config();
+    const after = pick(3) ? { ...before, ...config() } : config();
+    const result = classify(before, after);
+    const label = JSON.stringify({ before, after });
+    assert.equal(result.signsParticipantsOut, revokes(before, after), label);
+    assert.equal(result.signsParticipantsOut, result.authority.length > 0, label);
+  }
+});
+
+test('the preview matches the authorization epoch the Worker assigns on save', () => {
+  const initialized = setConfig({
+    ...workerCanonicalConfig(),
+    sessionInfo: 'About',
+    defaultTags: 'a, b',
+    groupCreationPolicy: 'participants',
+    interviewModeEnabled: true,
+    interviewMode: { enabled: true, provider: 'openai', openingPrompt: 'Hi', steeringPrompt: '', hiddenDraftShare: 0 },
+  });
+  assert.equal(initialized.ok, true);
+  const stored = initialized.config;
+  const profile = stored.sessionModeProfile;
+  for (const [patch, signsOut] of [
+    [{ sessionName: 'Renamed' }, false],
+    [{ sessionName: stored.sessionName }, false],
+    [{
+      sessionInfo: 'New text',
+      sessionContext: { title: 'Read first', paragraphs: ['One'], links: [] },
+      appearance: { colorSchemeId: 'ocean' },
+      sessionHeaderImg: 'https://example.com/header.png',
+      questionsGenPrompt: 'Ask about parks',
+    }, false],
+    [{ interviewMode: { ...stored.interviewMode, openingPrompt: 'Welcome', steeringPrompt: 'Stay on topic' } }, false],
+    [{ interviewMode: { ...stored.interviewMode, hiddenDraftShare: 0.5 } }, true],
+    [{ interviewModeEnabled: false, interviewMode: { ...stored.interviewMode, enabled: false } }, true],
+    [{ defaultTags: 'a, b, c' }, true],
+    [{ groupCreationPolicy: 'admin_only' }, true],
+    [{ sessionName: 'Renamed', defaultTags: 'a, b, c' }, true],
+    [{ sessionModeProfile: { ...profile, results: { ...profile.results, exposure: { ...profile.results.exposure, minGroupSize: 3 } } } }, true],
+    [{ resultsAnalysis: { generationMode: 'automatic' } }, true],
+  ]) {
+    const saved = applySessionConfigMutation({
+      existingConfig: stored,
+      mutation: { kind: 'set-config', incomingConfig: patch },
+      slug: 'session-a',
+    });
+    const label = JSON.stringify(patch);
+    assert.equal(saved.ok, true, label);
+    assert.equal(saved.config.authzEpoch !== stored.authzEpoch, signsOut, label);
+    assert.equal(classify(stored, { ...stored, ...patch }).signsParticipantsOut, signsOut, label);
   }
 });

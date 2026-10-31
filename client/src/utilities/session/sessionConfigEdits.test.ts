@@ -1,0 +1,12 @@
+import { WORKER_CANONICAL_SET_CONFIG_KEYS, classifySessionConfigEdits } from '@ce-shared/sessionConfigEdits.mjs';
+
+describe('shared session config edits in the client', () => {
+  it('previews which edits sign participants out and which keys a save may send', () => {
+    const before = { sessionName: 'Salon', defaultTags: 'housing' };
+    expect(
+      classifySessionConfigEdits(before, { ...before, sessionName: 'Salon, part 2', defaultTags: 'housing, transit' }),
+    ).toEqual({ content: ['sessionName'], authority: ['defaultTags'], signsParticipantsOut: true });
+    expect(WORKER_CANONICAL_SET_CONFIG_KEYS).toContain('sessionModeProfile');
+    expect(WORKER_CANONICAL_SET_CONFIG_KEYS).not.toContain('HIGHLIGHTED_QUESTION_IDS');
+  });
+});

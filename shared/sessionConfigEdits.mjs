@@ -69,21 +69,62 @@ const onlyAddsInvites = (before, after) => {
   return prior.every(row => byHash.has(row.tokenHash) && same(row, byHash.get(row.tokenHash)));
 };
 
+const authorityView = (config, additiveInvites) => {
+  const result = without(config, CONTENT_FIELDS);
+  if (record(result.interviewMode)) {
+    result.interviewMode = without(result.interviewMode, INTERVIEW_CONTENT_FIELDS);
+    if (!Object.keys(result.interviewMode).length) delete result.interviewMode;
+  }
+  if (record(result.agentHttp) && additiveInvites) {
+    result.agentHttp = without(result.agentHttp, new Set(['invites']));
+    if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
+  }
+  return result;
+};
+
 // Compare effective records after validation. Only the explicit content paths
 // disappear; newly introduced fields therefore keep revoking by default.
 export const sessionConfigRequiresReauthorization = (before, after) => {
   const additiveInvites = onlyAddsInvites(before?.agentHttp?.invites, after?.agentHttp?.invites);
-  const authority = config => {
-    const result = without(config, CONTENT_FIELDS);
-    if (record(result.interviewMode)) {
-      result.interviewMode = without(result.interviewMode, INTERVIEW_CONTENT_FIELDS);
-      if (!Object.keys(result.interviewMode).length) delete result.interviewMode;
+  return !same(authorityView(before, additiveInvites), authorityView(after, additiveInvites));
+};
+
+const keysOf = (...values) => [...new Set(values.flatMap(value => Object.keys(value)))];
+// Sub-fields that differ; [] when either side is present but not a record.
+const changedFields = (before, after) => {
+  const fields = value => (value === undefined ? {} : record(value) ? value : null);
+  const prior = fields(before);
+  const next = fields(after);
+  return prior && next ? keysOf(prior, next).filter(key => !same(prior[key], next[key])) : [];
+};
+
+// The edited paths in two effective records, split the way the Worker splits
+// them on save: an authority path raises authzEpoch, signing participants out.
+// The verdict is the per-field form of sessionConfigRequiresReauthorization.
+export const classifySessionConfigEdits = (before, after) => {
+  const prior = record(before) ? before : {};
+  const next = record(after) ? after : {};
+  const additiveInvites = onlyAddsInvites(prior.agentHttp?.invites, next.agentHttp?.invites);
+  const priorAuthority = authorityView(prior, additiveInvites);
+  const nextAuthority = authorityView(next, additiveInvites);
+  const authority = keysOf(priorAuthority, nextAuthority)
+    .filter(key => !same(priorAuthority[key], nextAuthority[key]))
+    .flatMap((key) => {
+      const nested = key === 'interviewMode' || key === 'agentHttp'
+        ? changedFields(priorAuthority[key], nextAuthority[key])
+        : [];
+      return nested.length ? nested.map(field => `${key}.${field}`) : [key];
+    });
+  const content = keysOf(prior, next).flatMap((key) => {
+    if (CONTENT_FIELDS.has(key)) return same(prior[key], next[key]) ? [] : [key];
+    if (key === 'interviewMode') {
+      return [...INTERVIEW_CONTENT_FIELDS]
+        .filter(field => !same(prior.interviewMode?.[field], next.interviewMode?.[field]))
+        .map(field => `interviewMode.${field}`);
     }
-    if (record(result.agentHttp) && additiveInvites) {
-      result.agentHttp = without(result.agentHttp, new Set(['invites']));
-      if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
-    }
-    return result;
-  };
-  return !same(authority(before), authority(after));
+    return key === 'agentHttp' && additiveInvites && !same(prior.agentHttp?.invites, next.agentHttp?.invites)
+      ? ['agentHttp.invites']
+      : [];
+  });
+  return { content, authority, signsParticipantsOut: authority.length > 0 };
 };

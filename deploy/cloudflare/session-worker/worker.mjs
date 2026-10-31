@@ -30036,7 +30036,7 @@ var init_workerGroupUrl = __esm({
 });
 
 // shared/sessionConfigEdits.mjs
-var WORKER_CANONICAL_SET_CONFIG_KEYS, CONTENT_FIELDS, INTERVIEW_CONTENT_FIELDS, record2, same, without, onlyAddsInvites, sessionConfigRequiresReauthorization;
+var WORKER_CANONICAL_SET_CONFIG_KEYS, CONTENT_FIELDS, INTERVIEW_CONTENT_FIELDS, record2, same, without, onlyAddsInvites, authorityView, sessionConfigRequiresReauthorization;
 var init_sessionConfigEdits = __esm({
   "shared/sessionConfigEdits.mjs"() {
     init_canonicalJson();
@@ -30109,21 +30109,21 @@ var init_sessionConfigEdits = __esm({
       const byHash = new Map(next.map((row) => [row.tokenHash, row]));
       return prior.every((row) => byHash.has(row.tokenHash) && same(row, byHash.get(row.tokenHash)));
     };
+    authorityView = (config, additiveInvites) => {
+      const result = without(config, CONTENT_FIELDS);
+      if (record2(result.interviewMode)) {
+        result.interviewMode = without(result.interviewMode, INTERVIEW_CONTENT_FIELDS);
+        if (!Object.keys(result.interviewMode).length) delete result.interviewMode;
+      }
+      if (record2(result.agentHttp) && additiveInvites) {
+        result.agentHttp = without(result.agentHttp, /* @__PURE__ */ new Set(["invites"]));
+        if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
+      }
+      return result;
+    };
     sessionConfigRequiresReauthorization = (before, after) => {
       const additiveInvites = onlyAddsInvites(before?.agentHttp?.invites, after?.agentHttp?.invites);
-      const authority = (config) => {
-        const result = without(config, CONTENT_FIELDS);
-        if (record2(result.interviewMode)) {
-          result.interviewMode = without(result.interviewMode, INTERVIEW_CONTENT_FIELDS);
-          if (!Object.keys(result.interviewMode).length) delete result.interviewMode;
-        }
-        if (record2(result.agentHttp) && additiveInvites) {
-          result.agentHttp = without(result.agentHttp, /* @__PURE__ */ new Set(["invites"]));
-          if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
-        }
-        return result;
-      };
-      return !same(authority(before), authority(after));
+      return !same(authorityView(before, additiveInvites), authorityView(after, additiveInvites));
     };
   }
 });
