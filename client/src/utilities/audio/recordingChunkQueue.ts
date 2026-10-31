@@ -58,24 +58,29 @@ export class RecordingChunkQueue {
         if (entry.labelsUnavailableReason) this.labelsUnavailableReason = entry.labelsUnavailableReason;
       }
       memoryRecordings.delete(this.options.scope);
-      // Audio kept only in memory stays unsaved until a write succeeds: a failed write
-      // restores the warning, so the next close keeps the memory copy instead of dropping it.
-      for (const entry of kept)
-        if (entry.audio && entry.segment.status !== 'complete' && this.records.get(entry.segment.id) === entry)
-          void this.save(entry);
+      this.resaveKept(kept);
       this.changed();
       this.retry();
     } catch (error) {
       this.storageError = storageText(error);
-      for (const entry of memoryRecordings.get(this.options.scope)?.values() || []) {
+      const kept = [...(memoryRecordings.get(this.options.scope)?.values() || [])];
+      for (const entry of kept) {
         if (entry.audio && !['failed', 'complete'].includes(entry.segment.status))
           entry.segment = { ...entry.segment, status: 'queued' };
         this.records.set(entry.segment.id, entry);
       }
       memoryRecordings.delete(this.options.scope);
+      this.resaveKept(kept);
       this.changed();
       this.retry();
     }
+  }
+  // Audio kept only in memory stays unsaved until a write succeeds: a failed write keeps the
+  // warning (and failedWrites), so a later close or unmount keeps the memory copy instead of dropping it.
+  private resaveKept(kept: RecordingChunk[]) {
+    for (const entry of kept)
+      if (entry.audio && entry.segment.status !== 'complete' && this.records.get(entry.segment.id) === entry)
+        void this.save(entry);
   }
   async prepare() {
     await this.ready;
@@ -103,6 +108,7 @@ export class RecordingChunkQueue {
       } catch (error) {
         this.failedWrites.add(record.segment.id);
         this.storageError = storageText(error);
+        if (this.disposed) memoryRecordings.set(this.options.scope, this.records);
       }
       this.changed();
     });
@@ -254,6 +260,7 @@ export class RecordingChunkQueue {
     }
   }
   async keepAudio() {
+    await this.ready;
     await this.writes;
     if (this.storageError) memoryRecordings.set(this.options.scope, this.records);
     else memoryRecordings.delete(this.options.scope);
@@ -277,6 +284,8 @@ export class RecordingChunkQueue {
   }
   dispose() {
     this.disposed = true;
+    // Leaving without Close and keep (Back, a route change) must not drop audio that only memory holds.
+    if (this.storageError || this.failedWrites.size) memoryRecordings.set(this.options.scope, this.records);
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
     this.waiters.forEach((resolve) => resolve());

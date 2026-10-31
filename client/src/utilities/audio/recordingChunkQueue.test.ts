@@ -299,3 +299,76 @@ it('saves kept memory-only audio to device storage once writes work again', asyn
   expect(saved.get(id)?.audio).toBe(audio);
   second.dispose();
 });
+
+it('keeps memory-only audio when an unreadable store reopens and a later write succeeds', async () => {
+  jest.mocked(putRecordingChunk).mockRejectedValue(new DOMException('Full', 'QuotaExceededError'));
+  const pending = () => new Promise<{ text: string }>(() => {});
+  const first = create(pending, 'flaky-phone');
+  await first.ready;
+  const id = first.begin(false);
+  first.capture(id, audio, true);
+  await first.keepAudio();
+  first.dispose();
+  jest.mocked(listRecordingChunks).mockRejectedValueOnce(new Error('Unreadable'));
+  jest.mocked(putRecordingChunk).mockImplementation(async (record: RecordingChunk) => {
+    if (record.segment.id === id) throw new DOMException('Full', 'QuotaExceededError');
+    saved.set(record.segment.id, { ...record, segment: { ...record.segment } });
+  });
+  const second = create(pending, 'flaky-phone');
+  await second.ready;
+  await tick();
+  second.capture(second.begin(false), new Blob(['later audio'], { type: 'audio/webm' }), true);
+  await second.keepAudio();
+  expect(second.storageError).toContain("This recording can't be recovered after a reload");
+  second.dispose();
+  const third = create(pending, 'flaky-phone');
+  await third.ready;
+  await tick();
+  expect(third.records.get(id)?.audio).toBe(audio);
+});
+
+it.each(['after', 'before'])(
+  'keeps memory-only audio when the recorder closes without Close and keep, %s its save fails',
+  async (timing) => {
+    jest.mocked(putRecordingChunk).mockRejectedValue(new DOMException('Full', 'QuotaExceededError'));
+    const pending = () => new Promise<{ text: string }>(() => {});
+    const first = create(pending, `route-change-${timing}`);
+    await first.ready;
+    const id = first.begin(false);
+    first.capture(id, audio, true);
+    if (timing === 'after') await tick();
+    first.dispose();
+    await tick();
+    const second = create(pending, `route-change-${timing}`);
+    await second.ready;
+    await tick();
+    expect(second.records.get(id)?.audio).toBe(audio);
+  },
+);
+
+it('keeps memory-only audio when Close and keep runs before the store answers', async () => {
+  jest.mocked(putRecordingChunk).mockRejectedValue(new DOMException('Full', 'QuotaExceededError'));
+  const pending = () => new Promise<{ text: string }>(() => {});
+  const first = create(pending, 'slow-store');
+  await first.ready;
+  const id = first.begin(false);
+  first.capture(id, audio, true);
+  await first.keepAudio();
+  first.dispose();
+  let answer: (value: RecordingChunk[]) => void = () => {};
+  jest.mocked(listRecordingChunks).mockImplementationOnce(
+    () =>
+      new Promise<RecordingChunk[]>((resolve) => {
+        answer = resolve;
+      }),
+  );
+  const second = create(pending, 'slow-store');
+  const kept = second.keepAudio();
+  answer([]);
+  await kept;
+  second.dispose();
+  const third = create(pending, 'slow-store');
+  await third.ready;
+  await tick();
+  expect(third.records.get(id)?.audio).toBe(audio);
+});
