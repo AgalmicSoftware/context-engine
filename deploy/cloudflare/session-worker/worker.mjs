@@ -30263,14 +30263,18 @@ var init_realtimeInterviewConfig = __esm({
 });
 
 // shared/secretText.mjs
-var SECRET_PATTERNS, TOKEN_RUN, looksSecret;
+var SECRET_PATTERNS, HEX_KEY, TOKEN_RUN, HEX_KEY_HINT, hasHexKey, looksSecret;
 var init_secretText = __esm({
   "shared/secretText.mjs"() {
     SECRET_PATTERNS = [
       /\bsk-[\w-]{16,}/,
+      /\b[rs]k_(?:live|test)_[A-Za-z\d]{16,}/,
+      /\bhf_[A-Za-z\d]{30,}/,
       /\bAIza[\w-]{30,}/,
       /\b(?:gsk|ghp|gho|ghu|ghs|ghr|github_pat|glpat|xox[abpr])[-_][\w-]{16,}/,
-      /(?<![/\w])(?:0x)?[0-9a-f]{64,}\b/i,
+      /(?<![\w:])\d{6,12}:[\w-]{30,40}(?![\w-])/,
+      /\balchemy(?:api)?\.(?:com|io)\/v2\/[\w-]{16,}/i,
+      /\binfura\.io\/v3\/[\da-f]{32}/i,
       /-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----/,
       /"kty"\s*:/,
       /\bBearer\s+[\w.~+/=-]{16,}/i,
@@ -30278,8 +30282,11 @@ var init_secretText = __esm({
       /[?&#](?:access_token|api[_-]?key|key|token|secret|password|sig|signature|auth)=[^&#\s]/i,
       /#(?:[^\s#]*&)?k=[^&#\s]/
     ];
-    TOKEN_RUN = /(?<![\w-])[\w-]{40}(?![\w-])/g;
-    looksSecret = (text4) => typeof text4 === "string" && (SECRET_PATTERNS.some((pattern) => pattern.test(text4)) || (text4.match(TOKEN_RUN) || []).some((run) => /[A-Z]/.test(run) && /[a-z]/.test(run) && /\d/.test(run)));
+    HEX_KEY = /(?<![/\w])(?:0x)?[0-9a-f]{64,}\b/i;
+    TOKEN_RUN = /(?<![\w/-])[\w-]{40}(?![\w-])/g;
+    HEX_KEY_HINT = "has 64 hex digits, the shape of a private key. To cite a transaction, link to it in a block explorer instead.";
+    hasHexKey = (text4) => typeof text4 === "string" && HEX_KEY.test(text4);
+    looksSecret = (text4) => typeof text4 === "string" && (hasHexKey(text4) || SECRET_PATTERNS.some((pattern) => pattern.test(text4)) || (text4.match(TOKEN_RUN) || []).some((run) => /[A-Z]/.test(run) && /[a-z]/.test(run) && /\d/.test(run)));
   }
 });
 
@@ -30376,13 +30383,13 @@ var init_sessionContext = __esm({
         if (links.length > L.links) fail(errors, "sessionContext.links", `Context holds at most ${L.links} links.`);
       }
       const SECRET = "looks like a key, token or password. Remove it: secrets never go in context.";
-      if (looksSecret(title)) fail(errors, "sessionContext.title", `The title ${SECRET}`);
-      paragraphs.forEach((paragraph, index) => {
-        if (looksSecret(paragraph)) fail(errors, `sessionContext.paragraphs.${index}`, `Paragraph ${index + 1} ${SECRET}`);
-      });
-      links.forEach(({ label, url }, index) => {
-        if (looksSecret(label) || looksSecret(url)) fail(errors, `sessionContext.links.${index}`, `Link ${index + 1} ${SECRET}`);
-      });
+      const refuse = (path, subject, ...texts) => {
+        if (texts.some(hasHexKey)) fail(errors, path, `${subject} ${HEX_KEY_HINT}`);
+        else if (texts.some(looksSecret)) fail(errors, path, `${subject} ${SECRET}`);
+      };
+      refuse("sessionContext.title", "The title", title);
+      paragraphs.forEach((paragraph, index) => refuse(`sessionContext.paragraphs.${index}`, `Paragraph ${index + 1}`, paragraph));
+      links.forEach(({ label, url }, index) => refuse(`sessionContext.links.${index}`, `Link ${index + 1}`, label, url));
       return errors.length ? { ok: false, errors } : { ok: true, value: { title, paragraphs, links }, errors };
     };
     sessionContextPlainText = (value) => {
@@ -67687,6 +67694,346 @@ var init_inviteJournal = __esm({
   }
 });
 
+// workers/sessionCorsWorker/agent/agentQuestionQueue.mjs
+function normalizeBoolean2(value, fallback = false) {
+  if (value === void 0 || value === null || value === "") return fallback;
+  if (value === true || value === false) return value;
+  const normalized = lower2(value);
+  if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "off"].includes(normalized)) return false;
+  return fallback;
+}
+function normalizeTokenList(value = []) {
+  const source = Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/);
+  return source.map((entry2) => {
+    if (entry2 && typeof entry2 === "object" && !Array.isArray(entry2)) {
+      return safeString(entry2.id || entry2.questionId || entry2.value || entry2.label || entry2.name);
+    }
+    return safeString(entry2);
+  }).filter(Boolean).filter((entry2, index, values) => values.indexOf(entry2) === index);
+}
+function normalizeQuestionIds(value = []) {
+  return normalizeTokenList(value).slice(0, MAX_SPONSORED_QUESTIONS);
+}
+function normalizeTags(value = []) {
+  return normalizeTokenList(value).flatMap((entry2) => entry2.split(/\s+/)).map((entry2) => lower2(entry2).replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "")).filter(Boolean).filter((entry2, index, values) => values.indexOf(entry2) === index);
+}
+function canonicalQuestionType(value = "") {
+  const type = lower2(value).replace(/[^a-z0-9_ -]+/g, "").replace(/\s+/g, "_");
+  if (type === "multiselect") return "multichoice";
+  if (["number", "numeric"].includes(type)) return "rating";
+  return normalizeQuestionType2({ type }, type || "freeform");
+}
+function normalizeQuestionTypes(value = []) {
+  return normalizeTokenList(value).map(canonicalQuestionType).filter(Boolean).filter((entry2, index, values) => values.indexOf(entry2) === index);
+}
+function envQuestionQueueConfig() {
+  return {};
+}
+function questionQueueConfigKey(sessionSlug = "") {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  return slug ? `${AGENT_QUESTION_QUEUE_CONFIG_KV_PREFIX}${slug}` : "";
+}
+function questionQueueStateKey({
+  sessionSlug = "",
+  telegramUserId = "",
+  queueKey = ""
+} = {}) {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const user = kvKeySafePart(telegramUserId);
+  const queue = kvKeySafePart(queueKey || "default");
+  return slug && user && queue ? `${AGENT_QUESTION_QUEUE_STATE_KV_PREFIX}${slug}:${user}:${queue}` : "";
+}
+async function loadAgentQuestionQueueConfig({
+  env = {},
+  sessionSlug = ""
+} = {}) {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const defaults = envQuestionQueueConfig(env, slug);
+  const fallback = {
+    type: "telegram_question_queue_config",
+    version: 1,
+    sessionSlug: slug,
+    sponsoredQuestionIds: normalizeQuestionIds(defaults.sponsoredQuestionIds || defaults.questionIds),
+    source: defaults.sponsoredQuestionIds || defaults.questionIds ? "env" : "default"
+  };
+  const key = questionQueueConfigKey(slug);
+  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== "function") return fallback;
+  const parsed = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return fallback;
+  assertNoSecretShape(parsed, "Agent question queue config records must not serialize secrets.");
+  return {
+    ...fallback,
+    ...parsed,
+    sessionSlug: slug,
+    sponsoredQuestionIds: normalizeQuestionIds(parsed.sponsoredQuestionIds || parsed.questionIds),
+    source: "kv"
+  };
+}
+async function saveAgentQuestionQueueConfig({
+  env = {},
+  sessionSlug = "",
+  sponsoredQuestionIds = [],
+  updatedByTelegramUserId = "",
+  updatedByAccountAddress = "",
+  createdAt = null
+} = {}) {
+  const key = questionQueueConfigKey(sessionSlug);
+  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== "function") {
+    return { ok: false, reason: "question_queue_storage_unavailable" };
+  }
+  const existing = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
+  const now = safeString(createdAt) || (/* @__PURE__ */ new Date()).toISOString();
+  const record4 = {
+    type: "telegram_question_queue_config",
+    version: 1,
+    sessionSlug: sanitizeSessionSlug(sessionSlug),
+    sponsoredQuestionIds: normalizeQuestionIds(sponsoredQuestionIds),
+    updatedByTelegramUserId: safeString(updatedByTelegramUserId),
+    updatedByAccountAddress: safeString(updatedByAccountAddress).toLowerCase(),
+    createdAt: safeString(existing?.createdAt) || now,
+    updatedAt: now
+  };
+  assertNoSecretShape(record4, "Agent question queue config records must not serialize secrets.");
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record4));
+  return { ok: true, key, config: record4 };
+}
+function normalizeQuestionQueueCriteria(input = {}) {
+  const criteria = input.criteria && typeof input.criteria === "object" && !Array.isArray(input.criteria) ? input.criteria : {};
+  const preferences = input.preferences && typeof input.preferences === "object" && !Array.isArray(input.preferences) ? input.preferences : {};
+  const tags = normalizeTags(
+    input.tags || criteria.tags || criteria.tagIds || preferences.tags || preferences.tagIds || preferences.interests || input.interests
+  );
+  const questionTypes = normalizeQuestionTypes(
+    input.questionTypes || input.questionType || criteria.questionTypes || criteria.questionType || preferences.questionTypes
+  );
+  const excludeQuestionIds = normalizeQuestionIds(
+    input.excludeQuestionIds || criteria.excludeQuestionIds || preferences.excludeQuestionIds
+  );
+  const includeSponsored = normalizeBoolean2(input.includeSponsored ?? criteria.includeSponsored, true);
+  const sponsoredFirst = normalizeBoolean2(input.sponsoredFirst ?? criteria.sponsoredFirst, true);
+  const skipServed = normalizeBoolean2(input.skipServed ?? criteria.skipServed, true);
+  const queueKey = safeString(input.queueKey || criteria.queueKey) || stableFingerprint({
+    tags,
+    questionTypes,
+    includeSponsored,
+    sponsoredFirst
+  });
+  return {
+    tags,
+    questionTypes,
+    excludeQuestionIds,
+    includeSponsored,
+    sponsoredFirst,
+    skipServed,
+    queueKey
+  };
+}
+function questionMatchesCriteria(question = {}, criteria = {}) {
+  if (!question || question.answerable !== true) return false;
+  if (criteria.questionTypes.length) {
+    const type = canonicalQuestionType(question.questionType || question.type);
+    if (!criteria.questionTypes.includes(type)) return false;
+  }
+  if (criteria.tags.length) {
+    const questionTags = new Set(normalizeTags(question.tags));
+    const promptText = [
+      question.prompt,
+      question.questionType,
+      Array.isArray(question.options) ? question.options.join(" ") : ""
+    ].map((value) => lower2(value)).join(" ");
+    const matched = criteria.tags.some((tag) => questionTags.has(tag) || promptText.includes(tag.replace(/-/g, " ")));
+    if (!matched) return false;
+  }
+  return true;
+}
+function orderCandidates(questions = [], sponsoredIds = [], criteria = {}, servedSet = /* @__PURE__ */ new Set()) {
+  const excluded = new Set(criteria.excludeQuestionIds);
+  const base = questions.filter((question) => {
+    const questionId4 = safeString(question.questionId || question.id);
+    return questionId4 && !excluded.has(questionId4) && !servedSet.has(questionId4) && questionMatchesCriteria(question, criteria);
+  });
+  if (!criteria.includeSponsored || !criteria.sponsoredFirst || !sponsoredIds.length) return base;
+  const byId = new Map(base.map((question) => [safeString(question.questionId || question.id), question]));
+  const sponsored = sponsoredIds.map((questionId4) => byId.get(questionId4)).filter(Boolean);
+  const sponsoredSet = new Set(sponsored.map((question) => safeString(question.questionId || question.id)));
+  return [
+    ...sponsored,
+    ...base.filter((question) => !sponsoredSet.has(safeString(question.questionId || question.id)))
+  ];
+}
+async function advanceAgentQuestionQueueState({
+  kv = null,
+  sessionSlug = "",
+  telegramUserId = "",
+  criteria = {},
+  eligibleIds = [],
+  sponsoredIds = [],
+  advance = true,
+  resetQueue = false,
+  requestId = "",
+  now = ""
+} = {}) {
+  const key = questionQueueStateKey({ sessionSlug, telegramUserId, queueKey: criteria.queueKey });
+  const existing = key && kv && typeof kv.get === "function" && !resetQueue ? safeJsonParse(await kv.get(key).catch(() => null), null) : null;
+  const eligibleSet = new Set(eligibleIds);
+  const previousServed = Array.isArray(existing?.servedQuestionIds) ? existing.servedQuestionIds : [];
+  const servedQuestionIds = [...new Set(previousServed.map(safeString))].filter((id2) => eligibleSet.has(id2));
+  const servedSet = criteria.skipServed ? new Set(servedQuestionIds) : /* @__PURE__ */ new Set();
+  let candidates = eligibleIds.filter((id2) => !servedSet.has(id2));
+  let cycled = false;
+  if (!candidates.length && criteria.skipServed && servedQuestionIds.length) {
+    candidates = eligibleIds;
+    cycled = candidates.length > 0;
+  }
+  const lastQuestionId = safeString(existing?.lastQuestionId);
+  if (requestId && existing?.lastRequestId === requestId && eligibleSet.has(lastQuestionId)) {
+    return {
+      questionId: lastQuestionId,
+      sponsored: sponsoredIds.includes(lastQuestionId),
+      cycled: false,
+      advanced: false,
+      replayed: true,
+      servedCount: servedQuestionIds.length,
+      candidateCount: candidates.length
+    };
+  }
+  const questionId4 = candidates[0] || "";
+  const sponsored = questionId4 ? sponsoredIds.includes(questionId4) : false;
+  const nextServed = !questionId4 ? servedQuestionIds : cycled ? [questionId4] : [
+    ...servedQuestionIds.filter((id2) => id2 !== questionId4),
+    questionId4
+  ];
+  const pruned = servedQuestionIds.length !== previousServed.length;
+  let advanced = false;
+  if ((questionId4 || pruned) && advance && key && kv && typeof kv.put === "function") {
+    const criteriaFingerprint = stableFingerprint(criteria);
+    const criteriaSummary = {
+      tagCount: criteria.tags.length,
+      questionTypes: criteria.questionTypes,
+      excludeQuestionCount: criteria.excludeQuestionIds.length,
+      includeSponsored: criteria.includeSponsored,
+      sponsoredFirst: criteria.sponsoredFirst,
+      skipServed: criteria.skipServed
+    };
+    const history = [
+      ...Array.isArray(existing?.history) ? existing.history : [],
+      ...questionId4 ? [{
+        questionId: questionId4,
+        sponsored,
+        criteriaFingerprint,
+        criteriaSummary,
+        selectedAt: now
+      }] : []
+    ].slice(-MAX_HISTORY);
+    const record4 = {
+      type: "telegram_question_queue_state",
+      version: 1,
+      sessionSlug: sanitizeSessionSlug(sessionSlug),
+      telegramUserId: safeString(telegramUserId),
+      queueKey: criteria.queueKey,
+      servedQuestionIds: nextServed,
+      lastQuestionId: questionId4 || lastQuestionId,
+      ...questionId4 && requestId ? { lastRequestId: requestId } : {},
+      history,
+      createdAt: safeString(existing?.createdAt) || now,
+      updatedAt: now
+    };
+    assertNoSecretShape(record4, "Agent question queue state records must not serialize secrets.");
+    await kv.put(key, JSON.stringify(record4));
+    advanced = true;
+  }
+  return { questionId: questionId4, sponsored, cycled, advanced, replayed: false, servedCount: nextServed.length, candidateCount: candidates.length };
+}
+async function selectNextAgentQuestion({
+  env = {},
+  sessionSlug = "",
+  telegramUserId = "",
+  questions = [],
+  sponsoredQuestionIds = [],
+  input = {},
+  createdAt = null,
+  advanceState = (step) => advanceAgentQuestionQueueState({ ...step, kv: env?.AGENT_ACTION_KV })
+} = {}) {
+  const criteria = normalizeQuestionQueueCriteria(input);
+  const advance = normalizeBoolean2(input.advance, true);
+  const resetQueue = normalizeBoolean2(input.resetQueue || input.reset, false);
+  const requestId = safeString(input.requestId);
+  const sponsoredIds = normalizeQuestionIds(sponsoredQuestionIds);
+  const byId = /* @__PURE__ */ new Map();
+  for (const question of orderCandidates(questions, sponsoredIds, criteria, /* @__PURE__ */ new Set())) {
+    const questionId4 = safeString(question.questionId || question.id);
+    if (!byId.has(questionId4)) byId.set(questionId4, question);
+  }
+  const step = await advanceState({
+    sessionSlug,
+    telegramUserId,
+    criteria,
+    eligibleIds: [...byId.keys()],
+    sponsoredIds,
+    advance,
+    resetQueue,
+    requestId: requestId.length <= 200 ? requestId : "",
+    now: safeString(createdAt) || (/* @__PURE__ */ new Date()).toISOString()
+  });
+  const selected = byId.get(safeString(step.questionId)) || null;
+  const sponsored = Boolean(selected) && step.sponsored === true;
+  return {
+    ok: Boolean(selected),
+    question: selected,
+    sponsored,
+    reason: selected ? sponsored ? "sponsored_question_queue" : "criteria_ranked_question_queue" : "no_matching_question",
+    queue: {
+      queueKey: criteria.queueKey,
+      criteria,
+      advanced: step.advanced === true,
+      advanceRequested: Boolean(selected && advance),
+      ...step.replayed === true ? { replayed: true } : {},
+      reset: resetQueue,
+      cycled: step.cycled === true,
+      servedCount: step.servedCount,
+      candidateCount: step.candidateCount,
+      sponsoredQuestionCount: sponsoredIds.length
+    }
+  };
+}
+var AGENT_QUESTION_QUEUE_CONFIG_KV_PREFIX, AGENT_QUESTION_QUEUE_STATE_KV_PREFIX, MAX_SPONSORED_QUESTIONS, MAX_HISTORY, QUESTION_QUEUE_STATE_PREFIX, reply3, executeAgentQuestionQueueAdvance;
+var init_agentQuestionQueue = __esm({
+  "workers/sessionCorsWorker/agent/agentQuestionQueue.mjs"() {
+    init_runtimePrimitives();
+    init_redaction();
+    init_sessionQuestions();
+    init_storage();
+    init_sessionConfigMutation();
+    AGENT_QUESTION_QUEUE_CONFIG_KV_PREFIX = "telegram:question-queue-config:v1:";
+    AGENT_QUESTION_QUEUE_STATE_KV_PREFIX = "telegram:question-queue-state:v1:";
+    MAX_SPONSORED_QUESTIONS = 50;
+    MAX_HISTORY = 50;
+    QUESTION_QUEUE_STATE_PREFIX = "ce-agent-question-queue:";
+    reply3 = (body, status = 200) => Response.json(body, { status });
+    executeAgentQuestionQueueAdvance = (coordinator, payload = {}) => coordinator.serializeSessionConfigOperation(async () => {
+      const authority = await coordinator.readSessionConfigAuthority(payload.slug);
+      const sessionId = resolveCanonicalWorkerSessionIdHex(authority?.config);
+      if (!sessionId || sessionId !== payload.sessionId) return reply3({ ok: false, reason: "question_queue_authority_changed" }, 409);
+      const { criteria } = payload;
+      if (!criteria || typeof criteria !== "object" || !Array.isArray(payload.eligibleIds) || !Array.isArray(payload.sponsoredIds)) {
+        return reply3({ ok: false, reason: "question_queue_request_invalid" }, 400);
+      }
+      const stateKey = questionQueueStateKey({ sessionSlug: payload.sessionSlug, telegramUserId: payload.telegramUserId, queueKey: criteria.queueKey });
+      const storageKey = `${QUESTION_QUEUE_STATE_PREFIX}${sessionId}:${stateKey}`;
+      let stored = stateKey && payload.resetQueue !== true ? await coordinator.state.storage.get(storageKey) : void 0;
+      if (stored === void 0 && stateKey && payload.resetQueue !== true) {
+        stored = await createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId })?.get(stateKey);
+      }
+      const kv = {
+        get: async (key) => key === stateKey ? stored ?? null : null,
+        put: (key, value) => key === stateKey ? coordinator.state.storage.put(storageKey, value) : void 0
+      };
+      return reply3({ ok: true, ...await advanceAgentQuestionQueueState({ ...payload, kv }) });
+    });
+  }
+});
+
 // workers/sessionCorsWorker/agent/wrappedCore.mjs
 function canonicalAgentEndpoint(pathname = "") {
   return safeString(pathname);
@@ -67869,7 +68216,7 @@ Wrapped predictions remain separate from normal session submissions. A Wrapped c
 });
 
 // workers/sessionCorsWorker/agent/wrappedJournal.mjs
-var reply3, busy, dispatchWrappedResearch;
+var reply4, busy, dispatchWrappedResearch;
 var init_wrappedJournal = __esm({
   "workers/sessionCorsWorker/agent/wrappedJournal.mjs"() {
     init_sessionConfigAuthority();
@@ -67877,17 +68224,17 @@ var init_wrappedJournal = __esm({
     init_storage();
     init_wrappedCore();
     init_runtimePrimitives();
-    reply3 = (body, status = 200) => Response.json(body, { status });
-    busy = () => reply3({ ok: false, status: 503, reason: "wrapped_storage_busy", retryable: true, retryAfterSeconds: 1 }, 503);
+    reply4 = (body, status = 200) => Response.json(body, { status });
+    busy = () => reply4({ ok: false, status: 503, reason: "wrapped_storage_busy", retryable: true, retryAfterSeconds: 1 }, 503);
     dispatchWrappedResearch = (coordinator, payload) => coordinator.serializeSessionConfigOperation(async () => {
       const record4 = payload?.record;
       if (!record4 || !["answers", "votes"].includes(record4.kind) || record4.sessionSlug !== payload.slug || typeof record4.subjectId !== "string" || !record4.subjectId || record4.subjectId.length > 256 || typeof record4.requestId !== "string" || !record4.requestId || record4.requestId.length > 160 || !/^[a-f0-9]{64}$/.test(record4.summaryHash || "") || !Array.isArray(record4.events) || record4.events.length < 1 || record4.events.length > 50 || record4.kind === "votes" && !["linear", "quadratic"].includes(record4.mode)) {
-        return reply3({ ok: false, reason: "wrapped_request_invalid" }, 400);
+        return reply4({ ok: false, reason: "wrapped_request_invalid" }, 400);
       }
       const authority = await coordinator.readSessionConfigAuthority(payload.slug);
       assertExpectedSessionAuthority(authority, payload.expectedAuthority, payload.slug);
       if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record4.sessionId) {
-        return reply3({ ok: false, reason: "wrapped_session_mismatch" }, 409);
+        return reply4({ ok: false, reason: "wrapped_session_mismatch" }, 409);
       }
       const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record4.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
       const storage = coordinator.state.storage;
@@ -67896,8 +68243,8 @@ var init_wrappedJournal = __esm({
       const durableStateKey = `${namespace}:state`;
       const requestKey = `${namespace}:request:${await sha256Hex2(record4.requestId)}`;
       const existing = await storage.get(requestKey);
-      if (existing && existing.summaryHash !== record4.summaryHash) return reply3({ ok: false, status: 409, reason: "request_id_conflict" }, 409);
-      if (existing?.complete) return reply3({ ...existing.response, replay: true });
+      if (existing && existing.summaryHash !== record4.summaryHash) return reply4({ ok: false, status: 409, reason: "request_id_conflict" }, 409);
+      if (existing?.complete) return reply4({ ...existing.response, replay: true });
       let state = await storage.get(durableStateKey);
       if (!state) state = { value: safeJsonParse(await kv.get(stateKey), null), notBeforeMs: 0, pending: null };
       const now = Number(coordinator.now());
@@ -67927,11 +68274,11 @@ var init_wrappedJournal = __esm({
       };
       if (state.pending) {
         if (!await project()) return busy();
-        if (existing) return reply3({ ...existing.response, replay: true });
+        if (existing) return reply4({ ...existing.response, replay: true });
       }
       if (now < state.notBeforeMs) return busy();
       const base = state.value || record4.initialState;
-      if (!base || !record4.changes || typeof record4.changes !== "object") return reply3({ ok: false, reason: "wrapped_state_invalid" }, 400);
+      if (!base || !record4.changes || typeof record4.changes !== "object") return reply4({ ok: false, reason: "wrapped_state_invalid" }, 400);
       let value;
       let events = record4.events;
       if (record4.kind === "answers") {
@@ -67941,7 +68288,7 @@ var init_wrappedJournal = __esm({
           let scope = runScopes.find((entry2) => entry2.runId === runId);
           if (!scope) {
             if (!Array.isArray(record4.runStatementIds) || !record4.runStatementIds.length) {
-              return reply3({ ok: false, status: 400, reason: "wrapped_run_scope_invalid" }, 400);
+              return reply4({ ok: false, status: 400, reason: "wrapped_run_scope_invalid" }, 400);
             }
             scope = { runId, runStatementIds: [...new Set(record4.runStatementIds)], coverage: "" };
             scope.coverage = "0".repeat(scope.runStatementIds.length);
@@ -67951,7 +68298,7 @@ var init_wrappedJournal = __esm({
           if (index >= 0) scope.coverage = scope.coverage.slice(0, index) + (eventKind === "privacy_protective_skip" ? "s" : "a") + scope.coverage.slice(index + 1);
         }
         if (runScopes.length > MAX_RESEARCH_RUNS || new TextEncoder().encode(JSON.stringify(runScopes)).length > MAX_RUN_SCOPES_BYTES) {
-          return reply3({
+          return reply4({
             ok: false,
             status: 409,
             reason: "wrapped_run_history_full",
@@ -67986,7 +68333,7 @@ var init_wrappedJournal = __esm({
         await tx.put(requestKey, pending);
         await tx.put(durableStateKey, state);
       });
-      return await project() ? reply3(record4.response) : busy();
+      return await project() ? reply4(record4.response) : busy();
     });
   }
 });
@@ -69766,11 +70113,11 @@ var init_contextDocumentRead = __esm({
         const detail = trim11(data?.error?.message).slice(0, 300);
         return fail4(502, `The session\u2019s AI could not read this PDF${detail ? `: ${detail}` : "."}`, "context_pdf_provider_error");
       }
-      const reply4 = readReply(provider, data);
-      if (reply4.refused) return fail4(422, "The session\u2019s AI declined to read this PDF.", "context_pdf_refused");
-      const text4 = trim11(reply4.text);
+      const reply5 = readReply(provider, data);
+      if (reply5.refused) return fail4(422, "The session\u2019s AI declined to read this PDF.", "context_pdf_refused");
+      const text4 = trim11(reply5.text);
       if (!text4) return fail4(422, "The session\u2019s AI found no text in this PDF.", "context_pdf_empty");
-      return { ok: true, text: text4, model: policy.payload.model, provider, truncated: !!reply4.truncated };
+      return { ok: true, text: text4, model: policy.payload.model, provider, truncated: !!reply5.truncated };
     };
   }
 });
@@ -71863,6 +72210,25 @@ var init_storageRouteExecution = __esm({
         if (prepared.response) return prepared.response;
       }
       const { objectKey, bytesToStore, metadata, serializedMetadata, serializedKvPayload } = prepared;
+      const withdrawSupersededUpload = async () => {
+        try {
+          const withdrawn = await coordinateResponseUploadReceipt({
+            env,
+            slug,
+            responder: uploader,
+            operation: "withdraw",
+            payload: { requestId, attemptId: uploadReceipt.attemptId, storageId: id2 }
+          });
+          if (!withdrawn?.ok) return;
+          await markStorageBackupWrite(env, slug);
+          await index.delete(buildIndexKey({ slug, resource, id: id2 }));
+          if (canWriteR2) {
+            if (typeof r2.delete === "function") await r2.delete(objectKey);
+          } else await index.delete(buildPayloadKey({ slug, id: id2 }));
+          await markStorageBackupWrite(env, slug);
+        } catch {
+        }
+      };
       const finishUpload = async (storageRef, publishedMetadata, publishedBytes, replayed = false) => {
         if (uploadReceipt) {
           const settled = await coordinateResponseUploadReceipt({
@@ -71872,23 +72238,25 @@ var init_storageRouteExecution = __esm({
             operation: "settle",
             payload: { requestId, attemptId: uploadReceipt.attemptId, storageRef }
           });
-          if (!settled?.ok) return responseJson(deps, { error: "Upload settlement is unavailable; retry.", reason: "upload_receipt_unavailable" }, 503, baseHeaders);
+          if (!settled?.ok) {
+            if (!replayed && settled?.reason === "upload_attempt_superseded") await withdrawSupersededUpload();
+            return responseJson(deps, { error: "Upload settlement is unavailable; retry.", reason: "upload_receipt_unavailable" }, 503, baseHeaders);
+          }
         }
         await enqueueResponseAnalysis(storageRef.id, publishedMetadata, publishedBytes);
         return responseJson(deps, { id: storageRef.id, storageRef, ...replayed ? { replayed: true } : {} }, 200, baseHeaders);
       };
-      if (uploadReceipt?.resumed) {
-        const stored = await index.get(buildIndexKey({ slug, resource, id: id2 }));
-        if (stored != null) {
-          let published;
-          try {
-            published = typeof stored === "string" ? JSON.parse(stored) : stored;
-          } catch {
-          }
-          const storageRef = published?.id === id2 && published?.resource === resource && published?.responder === uploader ? normalizeStorageRef(published) : null;
-          if (!storageRef) return responseJson(deps, { error: "Stored upload metadata is unavailable; retry." }, 503, baseHeaders);
-          return finishUpload(storageRef, void 0, void 0, true);
+      for (const priorId of uploadReceipt?.resumed ? uploadReceipt.priorStorageIds || [] : []) {
+        const stored = await index.get(buildIndexKey({ slug, resource, id: priorId }));
+        if (stored == null) continue;
+        let published;
+        try {
+          published = typeof stored === "string" ? JSON.parse(stored) : stored;
+        } catch {
         }
+        const storageRef = published?.id === priorId && published?.resource === resource && published?.responder === uploader ? normalizeStorageRef(published) : null;
+        if (!storageRef) return responseJson(deps, { error: "Stored upload metadata is unavailable; retry." }, 503, baseHeaders);
+        return finishUpload(storageRef, void 0, void 0, true);
       }
       await markStorageBackupWrite(env, slug);
       if (canWriteR2) {
@@ -73019,6 +73387,10 @@ var init_sessionBackupLifecycle = __esm({
       if (!archiveId) return null;
       const progress = await storage.get(backupImportStateKey(archiveId));
       if (!progress) return null;
+      if (progress.configPublished === true && !progress.committedAuthority) {
+        progress.committedAuthority = await storage.get("session-config-authority");
+        if (!progress.committedAuthority) fail5("The published restore has no session authority; nothing was deleted.");
+      }
       const expired = !Number.isFinite(progress.expiresAt) || progress.expiresAt <= coordinator.now();
       if (cleanExpired && (expired || progress.abandoning) && !progress.committedAuthority) {
         if (await cleanup(coordinator, slug, archiveId, progress, budget)) return null;
@@ -73042,7 +73414,7 @@ var init_sessionBackupLifecycle = __esm({
       if (payload.completedOnly) return Response.json({ error: "Admin authorization failed." }, { status: 403 });
       await coordinator.assertSessionAuthority(payload, { allowRestore: true });
       let active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
-      if (active?.progress.committedAuthority && active.progress.actor !== payload.expectedAuthority.actor) {
+      if (active?.progress.committedAuthority && !active.progress.configPublished && active.progress.actor !== payload.expectedAuthority.actor) {
         fail5("Only the importing admin can finish this restore.");
       }
       if (abandon) {
@@ -73240,9 +73612,9 @@ var init_sessionDiagnostics = __esm({
         try {
           if (!HASH.test(owner)) throw unavailable();
           const ownerStub = env.CE_SESSION_COORDINATOR.get(env.CE_SESSION_COORDINATOR.idFromName(owner));
-          const reply4 = await ownerStub.fetch("https://session-coordinator.internal/upload-receipts/diagnostics", { method: "POST", body: "{}" });
-          const counts = await reply4.json();
-          if (!reply4.ok) throw unavailable();
+          const reply5 = await ownerStub.fetch("https://session-coordinator.internal/upload-receipts/diagnostics", { method: "POST", body: "{}" });
+          const counts = await reply5.json();
+          if (!reply5.ok) throw unavailable();
           totals.pendingLeases += counts.pendingLeases;
           totals.settledCount += counts.settledCount;
           if (counts.oldestPendingAgeMs !== null) totals.oldestPendingAgeMs = Math.max(totals.oldestPendingAgeMs ?? 0, counts.oldestPendingAgeMs);
@@ -73264,21 +73636,21 @@ var init_recoveryKeyExport = __esm({
     init_sessionSlugResolution();
     exportCoordinatorRecoveryKey = async (coordinator, payload) => {
       const headers2 = { "Cache-Control": "no-store" };
-      const reply4 = (body, status) => Response.json(body, { status, headers: headers2 });
+      const reply5 = (body, status) => Response.json(body, { status, headers: headers2 });
       try {
         const authority = await coordinator.assertSessionAuthority(payload);
-        if (!authority) return reply4({ error: "Session config is not initialized." }, 409);
+        if (!authority) return reply5({ error: "Session config is not initialized." }, 409);
         const pinnedSlug = getDefaultWorkerSessionSlug(coordinator.env);
         if (!pinnedSlug || pinnedSlug !== normalizeWorkerSessionSlug(authority.slug)) {
-          return reply4({
+          return reply5({
             error: "The deployment operator holds the recovery key for this Worker.",
             reason: "recovery_key_deployment_scoped"
           }, 403);
         }
-        if (payload?.confirm !== "export-recovery-key") return reply4({ error: "Confirm export-recovery-key in the signed payload." }, 400);
+        if (payload?.confirm !== "export-recovery-key") return reply5({ error: "Confirm export-recovery-key in the signed payload." }, 400);
         const rawKey = String(coordinator.env.CE_STORAGE_ENVELOPE_KEK || "").trim();
         const recoveryKey = /^[a-f0-9]{64}$/i.test(rawKey) ? rawKey.toLowerCase() : rawKey;
-        if (!recoveryKey) return reply4({ error: "Recovery key is not configured." }, 503);
+        if (!recoveryKey) return reply5({ error: "Recovery key is not configured." }, 503);
         const fingerprint = await recoveryKeyFingerprint(recoveryKey);
         const now = Number(coordinator.now()) || Date.now();
         const day = Math.floor(now / 864e5);
@@ -73289,7 +73661,7 @@ var init_recoveryKeyExport = __esm({
           await transaction.put("recovery-key-export-counter", { day, count: used + 1 });
           return used + 1;
         });
-        if (!count) return reply4({ error: "Recovery key export is limited to three times per UTC day.", reason: "recovery_key_export_limit" }, 429);
+        if (!count) return reply5({ error: "Recovery key export is limited to three times per UTC day.", reason: "recovery_key_export_limit" }, 429);
         const audit = coordinator.env.CE_STORAGE_AUDIT_KV;
         if (audit) {
           await audit.put(`ce-recovery-key-audit:${authority.slug}:${day}:${count}`, JSON.stringify({
@@ -73299,9 +73671,9 @@ var init_recoveryKeyExport = __esm({
             timestamp: new Date(now).toISOString()
           }));
         }
-        return reply4({ ok: true, recoveryKey, fingerprint }, 200);
+        return reply5({ ok: true, recoveryKey, fingerprint }, 200);
       } catch (error) {
-        return reply4({ error: error.status === 409 ? error.message : "Recovery key export is unavailable; retry." }, error.status || 503);
+        return reply5({ error: error.status === 409 ? error.message : "Recovery key export is unavailable; retry." }, error.status || 503);
       }
     };
   }
@@ -73389,7 +73761,7 @@ var init_backup = __esm({
       if (!Array.isArray(rows?.keys) || typeof rows.list_complete !== "boolean" || rows.keys.some((row) => typeof row?.name !== "string" || !row.name.startsWith(prefix))) unavailable3();
       if (rows.keys.length) occupied();
       if (rows.list_complete !== true) unavailable3();
-      for (const journalPrefix of ["ce-agent-invite:", "ce-agent-submit:", "ce-agent-wrapped:"]) {
+      for (const journalPrefix of ["ce-agent-invite:", "ce-agent-submit:", "ce-agent-wrapped:", "ce-agent-question-queue:"]) {
         const journals = await storage.list({ prefix: journalPrefix, limit: 1 });
         if (!(journals instanceof Map)) unavailable3();
         if (journals.size) occupied();
@@ -73875,6 +74247,7 @@ var init_sessionBackupImport = __esm({
       const stateKey = `session-backup-import:${page.archiveId}`;
       const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
       const active = await readActiveBackupImport(coordinator, slug, true, budget);
+      if (active && !active.progress.workerUrl) active.progress.workerUrl = destination;
       if (active && active.progress.workerUrl !== destination) fail9("Restore Worker origin cannot change between pages.", 409);
       if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail9("Another backup restore is in progress. Check restore status to abandon it.", 409, "backup_restore_in_progress");
       const pageHash = await sha256Hex(JSON.stringify(page));
@@ -77000,11 +77373,11 @@ var init_litWorkerAuthorization = __esm({
       jsParams.authorization.signature = await wallet.signMessage(message);
       return { privateKey: replyKeys.privateKey, message };
     };
-    openLitReply = async (reply4, context) => {
-      if (reply4?.version !== LIT_AUTHORIZATION_VERSION || !/^0x04[0-9a-f]{128}$/.test(reply4.publicKey || "") || !/^0x[0-9a-f]{24}$/.test(reply4.iv || "") || !/^0x[0-9a-f]+$/.test(reply4.ciphertext || "")) {
+    openLitReply = async (reply5, context) => {
+      if (reply5?.version !== LIT_AUTHORIZATION_VERSION || !/^0x04[0-9a-f]{128}$/.test(reply5.publicKey || "") || !/^0x[0-9a-f]{24}$/.test(reply5.iv || "") || !/^0x[0-9a-f]+$/.test(reply5.ciphertext || "")) {
         throw new Error("Invalid encrypted Lit authorization reply.");
       }
-      const publicKey = await crypto.subtle.importKey("raw", bytes2(reply4.publicKey), { name: "ECDH", namedCurve: "P-256" }, false, []);
+      const publicKey = await crypto.subtle.importKey("raw", bytes2(reply5.publicKey), { name: "ECDH", namedCurve: "P-256" }, false, []);
       const sharedSecret = await crypto.subtle.deriveBits({ name: "ECDH", public: publicKey }, context.privateKey, 256);
       const material = await crypto.subtle.importKey("raw", sharedSecret, "HKDF", false, ["deriveKey"]);
       const aad = utils.toUtf8Bytes(context.message);
@@ -77020,7 +77393,7 @@ var init_litWorkerAuthorization = __esm({
         false,
         ["decrypt"]
       );
-      return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes2(reply4.iv), additionalData: aad }, key, bytes2(reply4.ciphertext)));
+      return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes2(reply5.iv), additionalData: aad }, key, bytes2(reply5.ciphertext)));
     };
     isLitAuthorizationReady = ({ secrets = {}, config = {} } = {}) => {
       try {
@@ -78668,11 +79041,12 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_submissionJournal();
     init_inviteJournal();
+    init_agentQuestionQueue();
     init_wrappedJournal();
     init_sessionBackupLifecycle();
     init_sessionDiagnostics();
@@ -78722,6 +79096,7 @@ var init_sessionWriteCoordinator = __esm({
     UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1e3;
     uploadReceiptExpiresAt = (record4) => record4.state === "settled" ? record4.settledAt + UPLOAD_RECEIPT_RETENTION_MS : record4.state === "pending" ? record4.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : 0;
     MAX_UPLOAD_RECEIPTS = 2e3;
+    MAX_PRIOR_UPLOAD_TARGETS = 8;
     MAX_RESULTS_ANALYSIS_REQUESTS = 24;
     RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24e3;
     RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 64;
@@ -79012,15 +79387,18 @@ ${expiry}`);
         const nextAlarm = Math.min(nextExpiry, await readUploadReceiptRegistrationRetryAt(this), await nextAgentSubmitProjectionAt(this));
         if (Number.isFinite(nextAlarm) && typeof this.state.storage.setAlarm === "function") await this.state.storage.setAlarm(nextAlarm);
       }
-      async executeUploadReceipt(payload, settle = false) {
+      async executeUploadReceipt(payload, operation = "reserve") {
+        const reserve = operation === "reserve";
+        const settle = operation === "settle";
+        const withdraw = operation === "withdraw";
         const requestId = toTrimmedString10(payload?.requestId);
         let payloadDigest = toTrimmedString10(payload?.payloadDigest);
-        if (!requestId || requestId.length > 200 || !settle && !/^[a-f0-9]{64}$/.test(payloadDigest)) {
+        if (!requestId || requestId.length > 200 || reserve && !/^[a-f0-9]{64}$/.test(payloadDigest)) {
           return jsonResponse2({ error: "Invalid upload receipt request." }, 400);
         }
         const storageId = toTrimmedString10(payload?.storageId);
         const createdAt = toTrimmedString10(payload?.createdAt);
-        if (!settle && (!isSafeCloudflareStorageRefId(storageId) || !Number.isFinite(Date.parse(createdAt)))) {
+        if (reserve && (!isSafeCloudflareStorageRefId(storageId) || !Number.isFinite(Date.parse(createdAt))) || withdraw && (!isSafeCloudflareStorageRefId(storageId) || !toTrimmedString10(payload?.attemptId))) {
           return jsonResponse2({ error: "Invalid upload receipt target." }, 400);
         }
         let storageRef;
@@ -79036,7 +79414,7 @@ ${expiry}`);
         }
         const secret = toTrimmedString10(this.env?.TOKEN_HMAC_SECRET);
         if (!secret) return jsonResponse2({ error: "Upload receipt coordination is unavailable.", reason: "upload_receipt_unavailable" }, 503);
-        if (!settle) {
+        if (reserve) {
           try {
             await registerUploadReceiptStore(this, payload?.diagnostics);
           } catch {
@@ -79049,16 +79427,28 @@ ${expiry}`);
         const macKey = await this.crypto.subtle.importKey("raw", derived, algorithm, false, ["sign"]);
         const mac = async (domain, value) => bytesToHex3(new Uint8Array(await this.crypto.subtle.sign("HMAC", macKey, encoder11.encode(`${domain}:${value}`))));
         const key = `${UPLOAD_RECEIPT_PREFIX}${await mac("request", requestId)}`;
-        if (!settle) payloadDigest = await mac("payload", payloadDigest);
+        if (reserve) payloadDigest = await mac("payload", payloadDigest);
         const nowMs = Number(this.now()) || Date.now();
         const result = await this.state.storage.transaction(async (transaction) => {
-          if (!settle) await this.pruneUploadReceipts(transaction, nowMs);
+          if (reserve) await this.pruneUploadReceipts(transaction, nowMs);
           const record4 = await transaction.get(key);
+          if (withdraw) {
+            const adopted = record4?.state === "settled" ? record4.storageRef?.id === storageId : record4?.storageId === storageId;
+            if (!record4 || adopted || record4.attemptId === payload.attemptId) {
+              return { status: 409, error: "This upload target is still in use.", reason: "upload_target_in_use" };
+            }
+            if (record4.priorStorageIds?.includes(storageId)) {
+              await transaction.put(key, { ...record4, priorStorageIds: record4.priorStorageIds.filter((id2) => id2 !== storageId) });
+            }
+            return { status: 200, ok: true };
+          }
           if (settle) {
             if (record4?.state !== "pending" || record4.attemptId !== payload.attemptId) {
               return { status: 409, error: "Upload attempt no longer owns this receipt.", reason: "upload_attempt_superseded" };
             }
-            if (record4.storageId !== storageRef.id) return { status: 409, error: "Upload target does not match this receipt.", reason: "upload_receipt_target_mismatch" };
+            if (record4.storageId !== storageRef.id && !record4.priorStorageIds?.includes(storageRef.id)) {
+              return { status: 409, error: "Upload target does not match this receipt.", reason: "upload_receipt_target_mismatch" };
+            }
             await transaction.put(key, { state: "settled", payloadDigest: record4.payloadDigest, storageRef, settledAt: nowMs });
             await this.pruneUploadReceipts(transaction, nowMs);
             return { status: 200, ok: true };
@@ -79077,11 +79467,24 @@ ${expiry}`);
           if ([...records.values()].filter((record5) => record5.state === "pending" && record5.leaseUntil > nowMs).length >= MAX_UPLOAD_RECEIPTS) {
             return { status: 503, error: "Upload receipt capacity is busy; retry shortly.", reason: "upload_in_progress" };
           }
-          const target = resumed ? { storageId: record4.storageId, createdAt: record4.createdAt, reservedAt: record4.reservedAt } : { storageId, createdAt, reservedAt: nowMs };
+          const target = resumed ? {
+            storageId,
+            createdAt: record4.createdAt,
+            reservedAt: record4.reservedAt,
+            priorStorageIds: [...record4.priorStorageIds || [], record4.storageId].slice(-MAX_PRIOR_UPLOAD_TARGETS)
+          } : { storageId, createdAt, reservedAt: nowMs };
           const attemptId = createAttemptId(this.crypto);
           await transaction.put(key, { state: "pending", attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS, ...target });
           await this.pruneUploadReceipts(transaction, nowMs);
-          return { status: 200, kind: "execute", attemptId, storageId: target.storageId, createdAt: target.createdAt, resumed };
+          return {
+            status: 200,
+            kind: "execute",
+            attemptId,
+            storageId: target.storageId,
+            createdAt: target.createdAt,
+            priorStorageIds: target.priorStorageIds || [],
+            resumed
+          };
         });
         await this.scheduleUploadReceiptCleanup();
         const { status, ...body } = result;
@@ -81207,7 +81610,8 @@ ${expiry}`);
           if (url.pathname.startsWith("/upload-receipts/index/")) return dispatchUploadReceiptIndex(this, url.pathname, payload);
           if (url.pathname === "/upload-receipts/diagnostics") return this.readUploadReceiptDiagnostics();
           if (url.pathname === "/upload-receipts/reserve") return this.executeUploadReceipt(payload);
-          if (url.pathname === "/upload-receipts/settle") return this.executeUploadReceipt(payload, true);
+          if (url.pathname === "/upload-receipts/settle") return this.executeUploadReceipt(payload, "settle");
+          if (url.pathname === "/upload-receipts/withdraw") return this.executeUploadReceipt(payload, "withdraw");
         }
         if (url.pathname.startsWith("/session-config/") && url.hostname !== "session-coordinator.internal") {
           return jsonResponse2({ error: "Not found." }, 404);
@@ -81224,6 +81628,13 @@ ${expiry}`);
             return await dispatchAgentInviteJournal(this, url.pathname.split("/").pop(), payload);
           } catch {
             return jsonResponse2({ ok: false, reason: "invite_coordinator_unavailable" }, 503);
+          }
+        }
+        if (url.pathname === "/session-config/agent-question-queue/advance") {
+          try {
+            return await executeAgentQuestionQueueAdvance(this, payload);
+          } catch {
+            return jsonResponse2({ ok: false, reason: "question_queue_unavailable" }, 503);
           }
         }
         if (url.pathname === "/session-config/agent-wrapped/commit") {
@@ -81484,7 +81895,7 @@ ${expiry}`);
         const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
         const owner = await sha256Hex(`upload-receipts:${normalizedSlug}:${toTrimmedString10(responder).toLowerCase()}`);
         const stub = env.CE_SESSION_COORDINATOR.get(env.CE_SESSION_COORDINATOR.idFromName(owner));
-        if (!stub?.fetch || !["reserve", "settle"].includes(operation)) return unavailable3;
+        if (!stub?.fetch || !["reserve", "settle", "withdraw"].includes(operation)) return unavailable3;
         const response2 = await stub.fetch(`https://session-coordinator.internal/upload-receipts/${operation}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -81492,8 +81903,9 @@ ${expiry}`);
         });
         const body = await response2.json();
         if (!isObjectRecord(body) || !response2.ok && ![409, 503].includes(response2.status)) return unavailable3;
-        if (response2.ok && (operation === "settle" ? body.ok !== true : !(body.kind === "execute" && toTrimmedString10(body.attemptId)) && !(body.kind === "replay" && body.storageRef?.id))) return unavailable3;
-        if (response2.ok && body.kind === "execute" && (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)))) return unavailable3;
+        if (response2.ok && (operation !== "reserve" ? body.ok !== true : !(body.kind === "execute" && toTrimmedString10(body.attemptId)) && !(body.kind === "replay" && body.storageRef?.id))) return unavailable3;
+        const priorStorageIds = body.priorStorageIds ?? [];
+        if (response2.ok && body.kind === "execute" && (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)) || !Array.isArray(priorStorageIds) || !priorStorageIds.every(isSafeCloudflareStorageRefId))) return unavailable3;
         return { ...body, status: response2.status };
       } catch {
         return unavailable3;
@@ -90940,6 +91352,18 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
         ...payload
       });
       return { ...result.body, ok: result.ok, status: result.status };
+    },
+    async advanceQuestionQueue(step) {
+      await current();
+      const result = await callSessionConfigCoordinator({
+        env,
+        slug: ctx.slug,
+        path: "agent-question-queue/advance",
+        ...step,
+        sessionId: ctx.sessionId
+      });
+      if (!result.ok) throw authorityError(result.body?.reason || "question_queue_unavailable", result.status === 409 ? 409 : 503);
+      return result.body;
     }
   });
 };
@@ -91533,7 +91957,7 @@ function defaultAgentOnlyModeConfig(sessionSlug = "") {
     updatedBy: "default"
   };
 }
-function normalizeQuestionIds(value = []) {
+function normalizeQuestionIds2(value = []) {
   const source = Array.isArray(value) ? value : safeString(value).split(/[\s,;|]+/);
   const seen = /* @__PURE__ */ new Set();
   const out = [];
@@ -91560,7 +91984,7 @@ function normalizeEvalTypes(value = {}, enabledQuestionIds = []) {
 function normalizeAgentOnlyModeConfigPatch(patch = {}, current = null) {
   const input = patch && typeof patch === "object" && !Array.isArray(patch) ? patch : {};
   const base = current && typeof current === "object" && !Array.isArray(current) ? current : defaultAgentOnlyModeConfig(input.sessionSlug);
-  const enabledQuestionIds = Object.hasOwn(input, "enabledQuestionIds") ? normalizeQuestionIds(input.enabledQuestionIds) : normalizeQuestionIds(base.enabledQuestionIds);
+  const enabledQuestionIds = Object.hasOwn(input, "enabledQuestionIds") ? normalizeQuestionIds2(input.enabledQuestionIds) : normalizeQuestionIds2(base.enabledQuestionIds);
   const evalTypesByQuestionId = Object.hasOwn(input, "evalTypesByQuestionId") ? normalizeEvalTypes(input.evalTypesByQuestionId, enabledQuestionIds) : normalizeEvalTypes(base.evalTypesByQuestionId, enabledQuestionIds);
   const questionSourceMode = Object.hasOwn(input, "questionSourceMode") ? resolveWrappedQuestionSourceMode({ source: "default", config: { questionSourceMode: input.questionSourceMode } }) : Object.hasOwn(input, "enabledQuestionIds") && enabledQuestionIds.length > 0 ? WRAPPED_QUESTION_SOURCE_MODES.AGENT_ONLY_PROPOSALS : resolveWrappedQuestionSourceMode({ source: "default", config: base });
   return {
@@ -94306,7 +94730,7 @@ function safeAnswerString2(value) {
   if (value === void 0 || value === null) return "";
   return String(value).trim();
 }
-function normalizeBoolean2(value, fallback = false) {
+function normalizeBoolean3(value, fallback = false) {
   if (value === void 0 || value === null || value === "") return fallback;
   if (value === true || value === false) return value;
   const normalized = lower2(value);
@@ -95495,273 +95919,7 @@ async function handleGeoBacklinkRequest({ env = {}, context = {}, input = {}, wa
 // workers/sessionCorsWorker/agent/questionQueue.mjs
 init_runtimePrimitives();
 init_agentQuestionProposals();
-
-// workers/sessionCorsWorker/agent/agentQuestionQueue.mjs
-init_runtimePrimitives();
-init_redaction();
-init_sessionQuestions();
-var AGENT_QUESTION_QUEUE_CONFIG_KV_PREFIX = "telegram:question-queue-config:v1:";
-var AGENT_QUESTION_QUEUE_STATE_KV_PREFIX = "telegram:question-queue-state:v1:";
-var MAX_SPONSORED_QUESTIONS = 50;
-var MAX_HISTORY = 50;
-function normalizeBoolean3(value, fallback = false) {
-  if (value === void 0 || value === null || value === "") return fallback;
-  if (value === true || value === false) return value;
-  const normalized = lower2(value);
-  if (["true", "1", "yes", "on"].includes(normalized)) return true;
-  if (["false", "0", "no", "off"].includes(normalized)) return false;
-  return fallback;
-}
-function normalizeTokenList(value = []) {
-  const source = Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/);
-  return source.map((entry2) => {
-    if (entry2 && typeof entry2 === "object" && !Array.isArray(entry2)) {
-      return safeString(entry2.id || entry2.questionId || entry2.value || entry2.label || entry2.name);
-    }
-    return safeString(entry2);
-  }).filter(Boolean).filter((entry2, index, values) => values.indexOf(entry2) === index);
-}
-function normalizeQuestionIds2(value = []) {
-  return normalizeTokenList(value).slice(0, MAX_SPONSORED_QUESTIONS);
-}
-function normalizeTags(value = []) {
-  return normalizeTokenList(value).flatMap((entry2) => entry2.split(/\s+/)).map((entry2) => lower2(entry2).replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "")).filter(Boolean).filter((entry2, index, values) => values.indexOf(entry2) === index);
-}
-function canonicalQuestionType(value = "") {
-  const type = lower2(value).replace(/[^a-z0-9_ -]+/g, "").replace(/\s+/g, "_");
-  if (type === "multiselect") return "multichoice";
-  if (["number", "numeric"].includes(type)) return "rating";
-  return normalizeQuestionType2({ type }, type || "freeform");
-}
-function normalizeQuestionTypes(value = []) {
-  return normalizeTokenList(value).map(canonicalQuestionType).filter(Boolean).filter((entry2, index, values) => values.indexOf(entry2) === index);
-}
-function envQuestionQueueConfig() {
-  return {};
-}
-function questionQueueConfigKey(sessionSlug = "") {
-  const slug = sanitizeSessionSlug(sessionSlug);
-  return slug ? `${AGENT_QUESTION_QUEUE_CONFIG_KV_PREFIX}${slug}` : "";
-}
-function questionQueueStateKey({
-  sessionSlug = "",
-  telegramUserId = "",
-  queueKey = ""
-} = {}) {
-  const slug = sanitizeSessionSlug(sessionSlug);
-  const user = kvKeySafePart(telegramUserId);
-  const queue = kvKeySafePart(queueKey || "default");
-  return slug && user && queue ? `${AGENT_QUESTION_QUEUE_STATE_KV_PREFIX}${slug}:${user}:${queue}` : "";
-}
-async function loadAgentQuestionQueueConfig({
-  env = {},
-  sessionSlug = ""
-} = {}) {
-  const slug = sanitizeSessionSlug(sessionSlug);
-  const defaults = envQuestionQueueConfig(env, slug);
-  const fallback = {
-    type: "telegram_question_queue_config",
-    version: 1,
-    sessionSlug: slug,
-    sponsoredQuestionIds: normalizeQuestionIds2(defaults.sponsoredQuestionIds || defaults.questionIds),
-    source: defaults.sponsoredQuestionIds || defaults.questionIds ? "env" : "default"
-  };
-  const key = questionQueueConfigKey(slug);
-  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== "function") return fallback;
-  const parsed = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return fallback;
-  assertNoSecretShape(parsed, "Agent question queue config records must not serialize secrets.");
-  return {
-    ...fallback,
-    ...parsed,
-    sessionSlug: slug,
-    sponsoredQuestionIds: normalizeQuestionIds2(parsed.sponsoredQuestionIds || parsed.questionIds),
-    source: "kv"
-  };
-}
-async function saveAgentQuestionQueueConfig({
-  env = {},
-  sessionSlug = "",
-  sponsoredQuestionIds = [],
-  updatedByTelegramUserId = "",
-  updatedByAccountAddress = "",
-  createdAt = null
-} = {}) {
-  const key = questionQueueConfigKey(sessionSlug);
-  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== "function") {
-    return { ok: false, reason: "question_queue_storage_unavailable" };
-  }
-  const existing = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
-  const now = safeString(createdAt) || (/* @__PURE__ */ new Date()).toISOString();
-  const record4 = {
-    type: "telegram_question_queue_config",
-    version: 1,
-    sessionSlug: sanitizeSessionSlug(sessionSlug),
-    sponsoredQuestionIds: normalizeQuestionIds2(sponsoredQuestionIds),
-    updatedByTelegramUserId: safeString(updatedByTelegramUserId),
-    updatedByAccountAddress: safeString(updatedByAccountAddress).toLowerCase(),
-    createdAt: safeString(existing?.createdAt) || now,
-    updatedAt: now
-  };
-  assertNoSecretShape(record4, "Agent question queue config records must not serialize secrets.");
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record4));
-  return { ok: true, key, config: record4 };
-}
-function normalizeQuestionQueueCriteria(input = {}) {
-  const criteria = input.criteria && typeof input.criteria === "object" && !Array.isArray(input.criteria) ? input.criteria : {};
-  const preferences = input.preferences && typeof input.preferences === "object" && !Array.isArray(input.preferences) ? input.preferences : {};
-  const tags = normalizeTags(
-    input.tags || criteria.tags || criteria.tagIds || preferences.tags || preferences.tagIds || preferences.interests || input.interests
-  );
-  const questionTypes = normalizeQuestionTypes(
-    input.questionTypes || input.questionType || criteria.questionTypes || criteria.questionType || preferences.questionTypes
-  );
-  const excludeQuestionIds = normalizeQuestionIds2(
-    input.excludeQuestionIds || criteria.excludeQuestionIds || preferences.excludeQuestionIds
-  );
-  const includeSponsored = normalizeBoolean3(input.includeSponsored ?? criteria.includeSponsored, true);
-  const sponsoredFirst = normalizeBoolean3(input.sponsoredFirst ?? criteria.sponsoredFirst, true);
-  const skipServed = normalizeBoolean3(input.skipServed ?? criteria.skipServed, true);
-  const queueKey = safeString(input.queueKey || criteria.queueKey) || stableFingerprint({
-    tags,
-    questionTypes,
-    includeSponsored,
-    sponsoredFirst
-  });
-  return {
-    tags,
-    questionTypes,
-    excludeQuestionIds,
-    includeSponsored,
-    sponsoredFirst,
-    skipServed,
-    queueKey
-  };
-}
-function questionMatchesCriteria(question = {}, criteria = {}) {
-  if (!question || question.answerable !== true) return false;
-  if (criteria.questionTypes.length) {
-    const type = canonicalQuestionType(question.questionType || question.type);
-    if (!criteria.questionTypes.includes(type)) return false;
-  }
-  if (criteria.tags.length) {
-    const questionTags = new Set(normalizeTags(question.tags));
-    const promptText = [
-      question.prompt,
-      question.questionType,
-      Array.isArray(question.options) ? question.options.join(" ") : ""
-    ].map((value) => lower2(value)).join(" ");
-    const matched = criteria.tags.some((tag) => questionTags.has(tag) || promptText.includes(tag.replace(/-/g, " ")));
-    if (!matched) return false;
-  }
-  return true;
-}
-function orderCandidates(questions = [], sponsoredIds = [], criteria = {}, servedSet = /* @__PURE__ */ new Set()) {
-  const excluded = new Set(criteria.excludeQuestionIds);
-  const base = questions.filter((question) => {
-    const questionId4 = safeString(question.questionId || question.id);
-    return questionId4 && !excluded.has(questionId4) && !servedSet.has(questionId4) && questionMatchesCriteria(question, criteria);
-  });
-  if (!criteria.includeSponsored || !criteria.sponsoredFirst || !sponsoredIds.length) return base;
-  const byId = new Map(base.map((question) => [safeString(question.questionId || question.id), question]));
-  const sponsored = sponsoredIds.map((questionId4) => byId.get(questionId4)).filter(Boolean);
-  const sponsoredSet = new Set(sponsored.map((question) => safeString(question.questionId || question.id)));
-  return [
-    ...sponsored,
-    ...base.filter((question) => !sponsoredSet.has(safeString(question.questionId || question.id)))
-  ];
-}
-async function selectNextAgentQuestion({
-  env = {},
-  sessionSlug = "",
-  telegramUserId = "",
-  questions = [],
-  sponsoredQuestionIds = [],
-  input = {},
-  createdAt = null
-} = {}) {
-  const criteria = normalizeQuestionQueueCriteria(input);
-  const advance = normalizeBoolean3(input.advance, true);
-  const resetQueue = normalizeBoolean3(input.resetQueue || input.reset, false);
-  const key = questionQueueStateKey({ sessionSlug, telegramUserId, queueKey: criteria.queueKey });
-  const kv = env?.AGENT_ACTION_KV;
-  const now = safeString(createdAt) || (/* @__PURE__ */ new Date()).toISOString();
-  const existing = key && kv && typeof kv.get === "function" && !resetQueue ? safeJsonParse(await kv.get(key).catch(() => null), null) : null;
-  const sponsoredIds = normalizeQuestionIds2(sponsoredQuestionIds);
-  const eligible = orderCandidates(questions, sponsoredIds, criteria, /* @__PURE__ */ new Set());
-  const eligibleIds = new Set(eligible.map((question) => safeString(question.questionId || question.id)));
-  const previousServed = Array.isArray(existing?.servedQuestionIds) ? existing.servedQuestionIds : [];
-  const servedQuestionIds = [...new Set(previousServed.map(safeString))].filter((id2) => eligibleIds.has(id2));
-  const servedSet = criteria.skipServed ? new Set(servedQuestionIds) : /* @__PURE__ */ new Set();
-  let candidates = eligible.filter((question) => !servedSet.has(safeString(question.questionId || question.id)));
-  let cycled = false;
-  let statePersisted = false;
-  if (!candidates.length && criteria.skipServed && servedQuestionIds.length) {
-    candidates = eligible;
-    cycled = candidates.length > 0;
-  }
-  const selected = candidates[0] || null;
-  const selectedQuestionId = safeString(selected?.questionId || selected?.id);
-  const sponsored = selectedQuestionId ? sponsoredIds.includes(selectedQuestionId) : false;
-  const nextServed = !selected ? servedQuestionIds : cycled ? [selectedQuestionId] : [
-    ...servedQuestionIds.filter((questionId4) => questionId4 !== selectedQuestionId),
-    selectedQuestionId
-  ];
-  const pruned = servedQuestionIds.length !== previousServed.length;
-  if ((selected || pruned) && advance && key && kv && typeof kv.put === "function") {
-    const criteriaFingerprint = stableFingerprint(criteria);
-    const criteriaSummary = {
-      tagCount: criteria.tags.length,
-      questionTypes: criteria.questionTypes,
-      excludeQuestionCount: criteria.excludeQuestionIds.length,
-      includeSponsored: criteria.includeSponsored,
-      sponsoredFirst: criteria.sponsoredFirst,
-      skipServed: criteria.skipServed
-    };
-    const history = [
-      ...Array.isArray(existing?.history) ? existing.history : [],
-      ...selected ? [{
-        questionId: selectedQuestionId,
-        sponsored,
-        criteriaFingerprint,
-        criteriaSummary,
-        selectedAt: now
-      }] : []
-    ].slice(-MAX_HISTORY);
-    const record4 = {
-      type: "telegram_question_queue_state",
-      version: 1,
-      sessionSlug: sanitizeSessionSlug(sessionSlug),
-      telegramUserId: safeString(telegramUserId),
-      queueKey: criteria.queueKey,
-      servedQuestionIds: nextServed,
-      lastQuestionId: selectedQuestionId || safeString(existing?.lastQuestionId),
-      history,
-      createdAt: safeString(existing?.createdAt) || now,
-      updatedAt: now
-    };
-    assertNoSecretShape(record4, "Agent question queue state records must not serialize secrets.");
-    await kv.put(key, JSON.stringify(record4));
-    statePersisted = true;
-  }
-  return {
-    ok: Boolean(selected),
-    question: selected,
-    sponsored,
-    reason: selected ? sponsored ? "sponsored_question_queue" : "criteria_ranked_question_queue" : "no_matching_question",
-    queue: {
-      queueKey: criteria.queueKey,
-      criteria,
-      advanced: statePersisted,
-      advanceRequested: Boolean(selected && advance),
-      reset: resetQueue,
-      cycled,
-      servedCount: nextServed.length,
-      candidateCount: candidates.length,
-      sponsoredQuestionCount: sponsoredIds.length
-    }
-  };
-}
+init_agentQuestionQueue();
 
 // workers/sessionCorsWorker/agent/adminAuthority.mjs
 async function loadAgentAdminStatus({ env, context }) {
@@ -95802,7 +95960,8 @@ async function handleNextQuestionRequest({ env = {}, context = {}, input = {}, w
     questions: ranked.questions,
     sponsoredQuestionIds: queueConfig.sponsoredQuestionIds,
     input,
-    createdAt: input.createdAt || null
+    createdAt: input.createdAt || null,
+    advanceState: (step) => env.AGENT_SERVICES.advanceQuestionQueue(step)
   });
   return json5(
     {
@@ -96762,13 +96921,13 @@ async function handleAdminAgentOnlyExportRequest({ env = {}, input = {} } = {}) 
   const sessionSlug = sanitizeSessionSlug(input.sessionSlug);
   if (!sessionSlug) return json5({ ok: false, reason: "session_slug_required" }, { status: 400 });
   const includeBase64Input = lower2(input.include_base64 || input.includeBase64);
-  const includeImageBase64 = normalizeBoolean2(input.include_base64, false) || normalizeBoolean2(input.includeBase64, false) || includeBase64Input === "true";
+  const includeImageBase64 = normalizeBoolean3(input.include_base64, false) || normalizeBoolean3(input.includeBase64, false) || includeBase64Input === "true";
   const exported = await exportAgentOnlyData({
     env,
     sessionSlug,
     view: input.view || "answers",
     format: input.format || "jsonl",
-    compact: normalizeBoolean2(input.compact, false),
+    compact: normalizeBoolean3(input.compact, false),
     includeImageBase64,
     cursor: input.cursor,
     limit: input.limit
@@ -97797,22 +97956,22 @@ function normalizeOnboardingAnswers(input = {}, settings = {}) {
   const source = input.answers && typeof input.answers === "object" && !Array.isArray(input.answers) ? input.answers : input;
   const previous = onboardingAnswersFromSettings(settings);
   const answers = AGENT_ONBOARDING_QUESTIONS.reduce((result, question) => {
-    result[question.id] = normalizeBoolean2(
+    result[question.id] = normalizeBoolean3(
       Object.hasOwn(source, question.id) ? source[question.id] : void 0,
       previous[question.id] === true ? true : false
     );
     return result;
   }, {});
-  const combinedResearchLink = normalizeBoolean2(
+  const combinedResearchLink = normalizeBoolean3(
     Object.hasOwn(source, "demographic_link_opt_in") ? source.demographic_link_opt_in : void 0,
     previous.demographic_link_opt_in === true || previous.demographics_research === true || previous.attendance_context_opt_in === true
   );
   answers.demographic_link_opt_in = combinedResearchLink;
-  answers.demographics_research = normalizeBoolean2(
+  answers.demographics_research = normalizeBoolean3(
     Object.hasOwn(source, "demographics_research") ? source.demographics_research : void 0,
     combinedResearchLink
   );
-  answers.attendance_context_opt_in = normalizeBoolean2(
+  answers.attendance_context_opt_in = normalizeBoolean3(
     Object.hasOwn(source, "attendance_context_opt_in") ? source.attendance_context_opt_in : void 0,
     combinedResearchLink
   );
@@ -100027,7 +100186,7 @@ async function handleAgentOnlyStatementsRequest({ env = {}, context = {}, input 
     sessionSlug: context.session.sessionSlug,
     cursor: input.cursor,
     limit: input.limit,
-    compact: normalizeBoolean2(input.compact, false) || lower2(input.format) === "compact",
+    compact: normalizeBoolean3(input.compact, false) || lower2(input.format) === "compact",
     now: agentOnlyRequestNow(env)
   });
   const status = page.ok === false ? page.status || 500 : 200;
@@ -100771,11 +100930,11 @@ function normalizeDraftForQuestion(answer = {}, question = {}) {
 }
 function directSubmitRequested(input = {}) {
   const preferences = input.preferences && typeof input.preferences === "object" && !Array.isArray(input.preferences) ? input.preferences : {};
-  const submit = normalizeBoolean2(
+  const submit = normalizeBoolean3(
     firstValue2(input.submit, input.submitAnswers, preferences.submit, preferences.submitAnswers),
     false
   );
-  const approved = normalizeBoolean2(
+  const approved = normalizeBoolean3(
     firstValue2(
       input.humanApproved,
       input.approved,
