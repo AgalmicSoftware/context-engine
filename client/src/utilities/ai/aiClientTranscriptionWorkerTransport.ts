@@ -64,8 +64,15 @@ const parseTranscriptionErrorMessage = (data: unknown, status: unknown): string 
   );
 };
 
+/** `chunkOnly` refusals (this audio's size or content) leave labels on for the rest of the recording. */
 export class SpeakerLabelsUnavailableError extends Error {
   name = 'SpeakerLabelsUnavailableError';
+  constructor(
+    message: string,
+    readonly chunkOnly = false,
+  ) {
+    super(message);
+  }
 }
 
 const requestAudioTranscription = async (
@@ -115,16 +122,18 @@ const requestAudioTranscription = async (
 
   if (!resp.ok) {
     const record = asRecord(data);
+    // Older Workers relay the provider's error under `details.error`, so these codes need no newer Worker.
     const providerError = asRecord(asRecord(record.details).error);
     const reasons = [
       record.reason,
       record.code,
       asRecord(record.error).code,
       providerError.code,
-      providerError.type,
       providerError.param,
     ].map(stringValue);
     const transient = resp.status === 408 || resp.status === 429 || resp.status >= 500;
+    // Every later chunk would meet the same refusal. A 400 with the provider's generic
+    // `invalid_request_error` type, such as corrupt audio, says nothing about labels.
     const labelConfigurationError = reasons.some((reason) =>
       [
         'ai_model_not_allowed',
@@ -132,15 +141,14 @@ const requestAudioTranscription = async (
         'unsupported_model',
         'unsupported_response_format',
         'unsupported_provider',
-        'invalid_request_error',
         'response_format',
         'chunking_strategy',
       ].includes(reason),
     );
     if (groupSpeakerLabels && !transient && ((resp.status >= 400 && resp.status < 500) || labelConfigurationError)) {
-      throw new SpeakerLabelsUnavailableError(
-        'Speaker labels are unavailable for this provider, Worker, or audio size.',
-      );
+      throw labelConfigurationError
+        ? new SpeakerLabelsUnavailableError('Speaker labels are unavailable for this provider or Worker.')
+        : new SpeakerLabelsUnavailableError('This chunk was rejected with speaker labels.', true);
     }
     throw Object.assign(new Error(parseTranscriptionErrorMessage(data, resp.status)), { status: resp.status });
   }

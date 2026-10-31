@@ -485,12 +485,13 @@ export async function transcribeGroupAudio(audio: AudioUploadBlob, opts: unknown
   const { signal } = resolveTranscriptionUploadOptions(opts, { defaultMaxUploadBytes: TRANSCRIBE_MAX_UPLOAD_BYTES });
   try {
     if (audio.size > TRANSCRIBE_MAX_UPLOAD_BYTES)
-      throw new SpeakerLabelsUnavailableError('Speaker labels are unavailable for this audio size.');
+      throw new SpeakerLabelsUnavailableError('Speaker labels are unavailable for this audio size.', true);
     return await uploadAudioForDiarizedTranscription(audio, await resolveTranscriptionTransport(opts), { signal });
   } catch (error) {
     if (!(error instanceof SpeakerLabelsUnavailableError)) throw error;
     // The plain path already normalizes and chunks oversized audio safely.
-    return { text: await transcribeAudio(audio, opts), segments: [], labelsUnavailableReason: error.message };
+    const text = await transcribeAudio(audio, opts);
+    return error.chunkOnly ? { text, segments: [] } : { text, segments: [], labelsUnavailableReason: error.message };
   }
 }
 
