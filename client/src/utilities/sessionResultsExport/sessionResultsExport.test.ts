@@ -15,6 +15,7 @@ import {
   mergeGeneratedSessionResultsAnalysisArtifacts,
   normalizeGeneratedSessionResultsAnalysisArtifact,
 } from './sessionResultsAnalysisArtifacts';
+import { buildResultsAnalysisPrompt } from '../../../../shared/resultsAnalysisPrompt.mjs';
 
 describe('sessionResultsExport utilities', () => {
   it('builds safe report filenames from session identifiers and timestamps', () => {
@@ -457,6 +458,56 @@ describe('sessionResultsExport utilities', () => {
     expect(merged?.sections.breakdown.available).toBe(true);
     expect(merged?.sections.argumentMap.available).toBe(true);
     expect(merged?.sections.riskMatrix.categories).toEqual([{ id: 'risk_2', label: 'Export confusion' }]);
+  });
+
+  it('sends the Worker’s results prompt and reads its generated risk axes into the report', () => {
+    const payload = buildSessionResultsAnalysisAiPayload({
+      questions: [{ id: 'q1', prompt: 'Pilot?', type: 'binary' }],
+    });
+    expect(buildSessionResultsAnalysisPrompt(payload, 'riskMatrix')).toBe(
+      buildResultsAnalysisPrompt({ sections: ['riskMatrix'], input: payload }),
+    );
+    const artifact = normalizeGeneratedSessionResultsAnalysisArtifact({
+      rawOutput: JSON.stringify({
+        riskMatrix: {
+          axes: {
+            x: {
+              id: 'reach',
+              label: 'Reach',
+              levels: [
+                { id: 'few', label: 'Few people' },
+                { id: 'many', label: 'Many' },
+              ],
+            },
+            y: {
+              id: 'cost',
+              label: 'Cost',
+              levels: [
+                { id: 'cheap', label: 'Cheap' },
+                { id: 'dear', label: 'Dear' },
+              ],
+            },
+          },
+          assessments: [
+            {
+              id: 'risk_1',
+              label: 'Slow rollout',
+              summary: 'Few would see it.',
+              xLevelId: 'few',
+              yLevelId: 'dear',
+              participantIds: ['participant_001'],
+              questionIds: ['q1'],
+            },
+          ],
+        },
+      }),
+    });
+    expect(artifact.sections.riskMatrix).toMatchObject({
+      available: true,
+      categories: [{ id: 'risk_1', label: 'Slow rollout', description: 'Few would see it.' }],
+      comments: [{ categoryId: 'risk_1', participantIds: ['participant_001'], questionIds: ['q1'] }],
+      heatmap: { risk_1: { Reach: 'Few people', Cost: 'Dear' } },
+    });
   });
 
   it('downloads browser files with object URLs and revokes them', () => {
