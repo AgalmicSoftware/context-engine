@@ -24,7 +24,9 @@ export const checkContextSourceUpload = ({ payload = {}, isAdmin = false, litEnc
     return fail(400, 'Context must be readable by the Session Worker, so it cannot be Lit-encrypted.', 'context_encryption_unsupported');
   }
   if (payload.uploadPolicy || payload.groupIds?.length) return fail(400, POLICY_ERROR, 'context_policy_unsupported');
-  if (payload.accessConditions && !isAdminsOnlyAccess(payload.accessConditions)) {
+  // The context route copies a PDF's stored rule onto its reading; uploads
+  // choose between the session's access and admins only.
+  if (payload.accessConditions && payload.contextOrigin !== 'worker' && !isAdminsOnlyAccess(payload.accessConditions)) {
     return fail(400, POLICY_ERROR, 'context_policy_unsupported');
   }
   const kind = contextTagValue(payload.tags, CONTEXT_TAGS.kind);

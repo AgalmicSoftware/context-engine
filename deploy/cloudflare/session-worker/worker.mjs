@@ -68922,7 +68922,7 @@ var init_contextSourcePolicy = __esm({
         return fail3(400, "Context must be readable by the Session Worker, so it cannot be Lit-encrypted.", "context_encryption_unsupported");
       }
       if (payload.uploadPolicy || payload.groupIds?.length) return fail3(400, POLICY_ERROR, "context_policy_unsupported");
-      if (payload.accessConditions && !isAdminsOnlyAccess(payload.accessConditions)) {
+      if (payload.accessConditions && payload.contextOrigin !== "worker" && !isAdminsOnlyAccess(payload.accessConditions)) {
         return fail3(400, POLICY_ERROR, "context_policy_unsupported");
       }
       const kind = contextTagValue(payload.tags, CONTEXT_TAGS.kind);
@@ -69893,7 +69893,7 @@ var init_fetchExecution = __esm({
 });
 
 // workers/sessionCorsWorker/contextSourceRoute.js
-var encoder5, trim12, isObj15, clip, commonTags, derivedRowsOf, storeRecord, addLink, readPdf, remove, ACTIONS, contextSourceRoute;
+var encoder5, trim12, isObj15, clip, commonTags, isReadingOf, readingsOf, storeRecord, addLink, readPdf, remove, ACTIONS, contextSourceRoute;
 var init_contextSourceRoute = __esm({
   "workers/sessionCorsWorker/contextSourceRoute.js"() {
     init_sessionContextSources();
@@ -69909,7 +69909,16 @@ var init_contextSourceRoute = __esm({
       { name: CONTEXT_TAGS.kind, value: kind },
       { name: "CE-DocStorage", value: "cloudflare" }
     ];
-    derivedRowsOf = (rows, id2) => rows.filter((row) => contextRoleOf(row.tags) === CONTEXT_TEXT_ROLE && contextTagValue(row.tags, CONTEXT_TAGS.derivedFrom) === id2);
+    isReadingOf = (row, id2) => !!row && contextRoleOf(row.tags) === CONTEXT_TEXT_ROLE && contextTagValue(row.tags, CONTEXT_TAGS.derivedFrom) === id2;
+    readingsOf = async ({ env, slug, row, shownIds = [] }) => {
+      const found = new Map((await listContextSourceRows({ env, slug })).filter((entry2) => isReadingOf(entry2, row.id)).map((entry2) => [entry2.id, entry2]));
+      const named = [row.contextReadingId, ...Array.isArray(shownIds) ? shownIds.slice(0, 20) : []].map(trim12).filter((id2) => id2 && !found.has(id2));
+      for (const id2 of new Set(named)) {
+        const reading = await readContextSourceRow({ env, slug, id: id2 });
+        if (isReadingOf(reading, row.id)) found.set(id2, reading);
+      }
+      return [...found.values()];
+    };
     storeRecord = async (store, payload) => {
       const response2 = await store(payload);
       if (!response2?.ok) return { response: response2 };
@@ -70008,7 +70017,8 @@ var init_contextSourceRoute = __esm({
       const stored = await storeRecord(store, {
         bytes: encoder5.encode(text4),
         contentType: "text/plain",
-        accessConditions: isAdminsOnlyAccess(pdf.accessConditions) ? ADMINS_ONLY_ACCESS : null,
+        // The PDF's own stored rule, so its text is never easier to read than it.
+        accessConditions: pdf.accessConditions || null,
         tags: [
           ...commonTags("file"),
           { name: CONTEXT_TAGS.role, value: CONTEXT_TEXT_ROLE },
@@ -70021,8 +70031,18 @@ var init_contextSourceRoute = __esm({
         ]
       });
       if (stored.response) return stored.response;
-      const earlier = derivedRowsOf(await listContextSourceRows({ env, slug }), pdf.id).filter((row) => row.id !== stored.id);
+      const reading = { id: stored.id, resource: "docsContext" };
+      const current = await readContextSourceRow({ env, slug, id: pdf.id });
+      if (!current) {
+        await removeCloudflareStorageRecords({ env, slug, rows: [reading] });
+        return json6({ error: "That PDF was removed while the session\u2019s AI read it." }, 404);
+      }
+      const earlier = (await readingsOf({ env, slug, row: current })).filter((row) => row.id !== stored.id);
       if (earlier.length) await removeCloudflareStorageRecords({ env, slug, rows: earlier });
+      await getStorageIndexBinding(env).put(
+        buildIndexKey({ slug, resource: "docsContext", id: pdf.id }),
+        JSON.stringify({ ...current, contextReadingId: stored.id })
+      );
       return json6({
         ok: true,
         text: {
@@ -70038,7 +70058,7 @@ var init_contextSourceRoute = __esm({
     remove = async ({ body, env, slug, json: json6 }) => {
       const row = await readContextSourceRow({ env, slug, id: body.id });
       if (!row) return json6({ error: "That item is no longer in the session." }, 404);
-      const rows = [row, ...derivedRowsOf(await listContextSourceRows({ env, slug }), row.id)];
+      const rows = [...await readingsOf({ env, slug, row, shownIds: body.readingIds }), row];
       await removeCloudflareStorageRecords({ env, slug, rows });
       return json6({ ok: true, removed: rows.map((entry2) => entry2.id) });
     };
@@ -74952,11 +74972,14 @@ var init_sessionContextText = __esm({
       };
       const addText = (key, body, make) => {
         if (tryAdd(key, make(body))) return;
-        let room = totalChars - blockLength({ ...data, [key]: [...data[key] || [], make("")] });
-        for (let attempt = 0; attempt < 4 && room >= MIN_FITTED_CHARS; attempt += 1) {
+        const base = blockLength({ ...data, [key]: [...data[key] || [], make("")] });
+        const allowed = totalChars - base;
+        let room = Math.min(body.length - 1, allowed);
+        for (let attempt = 0; attempt < 6 && room >= MIN_FITTED_CHARS; attempt += 1) {
           const fitted = make(clip2(body, room));
           if (tryAdd(key, fitted)) return;
-          room -= blockLength({ ...data, [key]: [...data[key] || [], fitted] }) - totalChars;
+          const produced = blockLength({ ...data, [key]: [...data[key] || [], fitted] }) - base;
+          room = Math.floor(room * allowed / produced) - 1;
         }
         omitted += 1;
       };

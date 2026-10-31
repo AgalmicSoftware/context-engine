@@ -218,3 +218,62 @@ test('the request body carries the PDF as base64 bytes without copying it into a
     }
   }
 });
+
+test('removing a PDF removes its reading even when the KV list has not caught up, readings first', async () => {
+  const h = harness({ provider: async () => json({ content: [{ type: 'text', text: 'Deck text.' }] }) });
+  const pdf = await idOf(await h.uploadFile());
+  const reading = await idOf(await h.context({ action: 'read-pdf', id: pdf }));
+  const readingKey = [...h.kv.store.keys()].find((key) => key.endsWith(`:docsContext:${reading}`));
+  h.kv.lagging.add(readingKey);
+  const removed = await (await h.context({ action: 'remove', id: pdf })).json();
+  assert.deepEqual(removed.removed, [reading, pdf]);
+  assert.equal(h.kv.store.has(readingKey), false);
+  const indexDeletes = h.kv.deletes.filter((key) => key.includes(':docsContext:'));
+  assert.ok(indexDeletes.indexOf(readingKey) < indexDeletes.findIndex((key) => key.endsWith(`:docsContext:${pdf}`)));
+
+  // Without the PDF's pointer, the reading the admin's page shows is named instead.
+  const second = await idOf(await h.uploadFile({ name: 'second.pdf' }));
+  const secondReading = await idOf(await h.context({ action: 'read-pdf', id: second }));
+  const secondKey = [...h.kv.store.keys()].find((key) => key.endsWith(`:docsContext:${second}`));
+  const row = JSON.parse(h.kv.store.get(secondKey));
+  delete row.contextReadingId;
+  h.kv.store.set(secondKey, JSON.stringify(row));
+  h.kv.lagging.add([...h.kv.store.keys()].find((key) => key.endsWith(`:docsContext:${secondReading}`)));
+  const named = await (await h.context({ action: 'remove', id: second, readingIds: [secondReading, pdf, 'unknown'] })).json();
+  assert.deepEqual(named.removed, [secondReading, second]);
+  assert.equal([...h.kv.store.keys()].some((key) => key.includes(':docsContext:')), false);
+});
+
+test('a PDF removed while its AI reads it leaves no reading behind', async () => {
+  let release;
+  const h = harness({
+    provider: () => new Promise((resolve) => {
+      release = () => resolve(json({ content: [{ type: 'text', text: 'Late text.' }] }));
+    }),
+  });
+  const pdf = await idOf(await h.uploadFile());
+  const reading = h.context({ action: 'read-pdf', id: pdf });
+  while (!release) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal((await h.context({ action: 'remove', id: pdf })).status, 200);
+  release();
+  const late = await reading;
+  assert.equal(late.status, 404);
+  assert.match((await late.json()).error, /removed while/);
+  assert.deepEqual(await h.list(ADMIN), []);
+  assert.equal([...h.r2.store.keys()].length, 0);
+});
+
+test('a reading keeps its PDF’s stored rule after the session’s access changes', async () => {
+  const h = harness({ provider: async () => json({ content: [{ type: 'text', text: 'Deck text.' }] }) });
+  const pdf = await idOf(await h.uploadFile());
+  const pdfRow = JSON.parse([...h.kv.store.entries()].find(([key]) => key.endsWith(`:docsContext:${pdf}`))[1]);
+  h.state.config = {
+    ...h.state.config,
+    storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'role_gate', encryption: 'none', accessConditions: {
+      match: 'any', conditions: [{ kind: 'worker_role', role: 'admin' }],
+    } } },
+  };
+  const reading = await idOf(await h.context({ action: 'read-pdf', id: pdf }));
+  const readingRow = JSON.parse([...h.kv.store.entries()].find(([key]) => key.endsWith(`:docsContext:${reading}`))[1]);
+  assert.deepEqual(readingRow.accessConditions, pdfRow.accessConditions);
+});

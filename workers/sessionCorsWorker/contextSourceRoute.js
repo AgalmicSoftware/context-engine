@@ -12,6 +12,8 @@ import {
 import { readPdfWithSessionAi } from './contextDocumentRead.js';
 import { fetchContextSnapshotText } from './fetchExecution.js';
 import {
+  buildIndexKey,
+  getStorageIndexBinding,
   listContextSourceRows,
   readContextSourceBytes,
   readContextSourceRow,
@@ -29,8 +31,25 @@ const commonTags = (kind) => [
   { name: TAGS.kind, value: kind },
   { name: 'CE-DocStorage', value: 'cloudflare' },
 ];
-const derivedRowsOf = (rows, id) => rows.filter((row) =>
-  contextRoleOf(row.tags) === CONTEXT_TEXT_ROLE && contextTagValue(row.tags, TAGS.derivedFrom) === id);
+const isReadingOf = (row, id) =>
+  !!row && contextRoleOf(row.tags) === CONTEXT_TEXT_ROLE && contextTagValue(row.tags, TAGS.derivedFrom) === id;
+
+// A source's AI readings. A KV list can lag a recent write, so the readings a
+// PDF row points to and those the admin's page shows are read directly too;
+// each must be a reading of this PDF.
+const readingsOf = async ({ env, slug, row, shownIds = [] }) => {
+  const found = new Map((await listContextSourceRows({ env, slug }))
+    .filter((entry) => isReadingOf(entry, row.id))
+    .map((entry) => [entry.id, entry]));
+  const named = [row.contextReadingId, ...(Array.isArray(shownIds) ? shownIds.slice(0, 20) : [])]
+    .map(trim)
+    .filter((id) => id && !found.has(id));
+  for (const id of new Set(named)) {
+    const reading = await readContextSourceRow({ env, slug, id });
+    if (isReadingOf(reading, row.id)) found.set(id, reading);
+  }
+  return [...found.values()];
+};
 
 // Stores a record through the doc-library upload path and returns its id, or
 // the upload's own failure response.
@@ -123,7 +142,8 @@ const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now 
   const stored = await storeRecord(store, {
     bytes: encoder.encode(text),
     contentType: 'text/plain',
-    accessConditions: isAdminsOnlyAccess(pdf.accessConditions) ? ADMINS_ONLY_ACCESS : null,
+    // The PDF's own stored rule, so its text is never easier to read than it.
+    accessConditions: pdf.accessConditions || null,
     tags: [
       ...commonTags('file'),
       { name: TAGS.role, value: CONTEXT_TEXT_ROLE },
@@ -136,8 +156,20 @@ const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now 
     ],
   });
   if (stored.response) return stored.response;
-  const earlier = derivedRowsOf(await listContextSourceRows({ env, slug }), pdf.id).filter((row) => row.id !== stored.id);
+  const reading = { id: stored.id, resource: 'docsContext' };
+  // The PDF may have been removed while its AI read it; its text goes too.
+  const current = await readContextSourceRow({ env, slug, id: pdf.id });
+  if (!current) {
+    await removeCloudflareStorageRecords({ env, slug, rows: [reading] });
+    return json({ error: 'That PDF was removed while the session’s AI read it.' }, 404);
+  }
+  const earlier = (await readingsOf({ env, slug, row: current })).filter((row) => row.id !== stored.id);
   if (earlier.length) await removeCloudflareStorageRecords({ env, slug, rows: earlier });
+  // The PDF row names its reading, so removing the PDF finds it without a list.
+  await getStorageIndexBinding(env).put(
+    buildIndexKey({ slug, resource: 'docsContext', id: pdf.id }),
+    JSON.stringify({ ...current, contextReadingId: stored.id }),
+  );
   return json({
     ok: true,
     text: {
@@ -147,11 +179,12 @@ const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now 
   });
 };
 
-// Removes a source and the text the session's AI read from it.
+// Removes a source and the text the session's AI read from it, readings first
+// so a failure part way never leaves a reading without its PDF.
 const remove = async ({ body, env, slug, json }) => {
   const row = await readContextSourceRow({ env, slug, id: body.id });
   if (!row) return json({ error: 'That item is no longer in the session.' }, 404);
-  const rows = [row, ...derivedRowsOf(await listContextSourceRows({ env, slug }), row.id)];
+  const rows = [...await readingsOf({ env, slug, row, shownIds: body.readingIds }), row];
   await removeCloudflareStorageRecords({ env, slug, rows });
   return json({ ok: true, removed: rows.map((entry) => entry.id) });
 };

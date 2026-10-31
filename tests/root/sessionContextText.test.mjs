@@ -80,3 +80,12 @@ test('a text that only partly fits is cut to the room left; a sliver is left out
   assert.equal(dataOf(tight.text).sources.length, 1);
   assert.equal(tight.omitted, 1);
 });
+
+test('text that escapes long in JSON (quotes, backslashes, tags) is cut to fit, not dropped', () => {
+  const heavy = '"<a href=\\"x\\">"'.repeat(800);
+  const { text, omitted } = buildSessionContextPrompt({ sources: [{ title: 'Page', text: heavy }], totalChars: 4000 });
+  assert.equal(omitted, 0);
+  assert.ok(text.length <= 4000, String(text.length));
+  const [source] = dataOf(text).sources;
+  assert.ok(source.text.length >= 400 && source.text.endsWith('…'));
+});

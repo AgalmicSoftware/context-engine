@@ -117,7 +117,7 @@ describe('context sources panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove deck.pdf' }));
     expect(removeContextSource).not.toHaveBeenCalled();
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Remove deck.pdf' })));
-    expect(removeContextSource).toHaveBeenCalledWith('pdf-1', options);
+    expect(removeContextSource).toHaveBeenCalledWith(deck, options);
   });
 
   it('uploads a file and has the session’s AI read a PDF only when Analyze is ticked', async () => {

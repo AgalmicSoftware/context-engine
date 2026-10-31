@@ -20,14 +20,22 @@ export const json = (body, status = 200, baseHeaders = {}) => {
   return new Response(JSON.stringify(body), { status, headers });
 };
 
+// `lagging` holds keys a KV list does not show yet, as after a recent write.
 const createKv = () => {
   const store = new Map();
+  const lagging = new Set();
+  const deletes = [];
   return {
     store,
+    lagging,
+    deletes,
     get: async (key) => store.get(key) ?? null,
     put: async (key, value) => { store.set(key, value); },
-    delete: async (key) => { store.delete(key); },
-    list: async ({ prefix = '' } = {}) => ({ keys: [...store.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
+    delete: async (key) => { deletes.push(key); store.delete(key); },
+    list: async ({ prefix = '' } = {}) => ({
+      keys: [...store.keys()].filter((key) => key.startsWith(prefix) && !lagging.has(key)).map((name) => ({ name })),
+      list_complete: true,
+    }),
   };
 };
 const createR2 = () => {

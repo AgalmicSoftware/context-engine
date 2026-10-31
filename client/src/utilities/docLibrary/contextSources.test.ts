@@ -163,8 +163,10 @@ describe('context sources on the client', () => {
       title: 'Post',
     });
     expect(await readContextPdf('pdf-1', options)).toEqual({ id: 'text-2', model: 'gpt-5.6-terra' });
-    await removeContextSource('pdf-1', options);
-    await expect(removeContextSource('pdf-1', options)).rejects.toThrow('Only session admins can change context.');
+    await removeContextSource({ id: 'pdf-1', reading: { id: 'text-1', model: 'm', at: '' } }, options);
+    await expect(removeContextSource({ id: 'pdf-1', reading: null }, options)).rejects.toThrow(
+      'Only session admins can change context.',
+    );
     const [url, init] = workerFetch.mock.calls[0];
     expect(url).toBe('https://worker.example/storage/context');
     expect(JSON.parse(String((init as RequestInit).body))).toEqual({
@@ -176,6 +178,11 @@ describe('context sources on the client', () => {
     expect(JSON.parse(String((workerFetch.mock.calls[1][1] as RequestInit).body))).toEqual({
       action: 'read-pdf',
       id: 'pdf-1',
+    });
+    expect(JSON.parse(String((workerFetch.mock.calls[2][1] as RequestInit).body))).toEqual({
+      action: 'remove',
+      id: 'pdf-1',
+      readingIds: ['text-1'],
     });
   });
 });

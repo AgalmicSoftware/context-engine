@@ -43,13 +43,18 @@ export const buildSessionContextPrompt = ({
     return true;
   };
   // A long text is cut to what room is left, when that is still useful.
+  // Escaped JSON can be longer than the text reads, so each try scales the
+  // cut by how far the last one overshot.
   const addText = (key, body, make) => {
     if (tryAdd(key, make(body))) return;
-    let room = totalChars - blockLength({ ...data, [key]: [...(data[key] || []), make('')] });
-    for (let attempt = 0; attempt < 4 && room >= MIN_FITTED_CHARS; attempt += 1) {
+    const base = blockLength({ ...data, [key]: [...(data[key] || []), make('')] });
+    const allowed = totalChars - base;
+    let room = Math.min(body.length - 1, allowed);
+    for (let attempt = 0; attempt < 6 && room >= MIN_FITTED_CHARS; attempt += 1) {
       const fitted = make(clip(body, room));
       if (tryAdd(key, fitted)) return;
-      room -= blockLength({ ...data, [key]: [...(data[key] || []), fitted] }) - totalChars;
+      const produced = blockLength({ ...data, [key]: [...(data[key] || []), fitted] }) - base;
+      room = Math.floor((room * allowed) / produced) - 1;
     }
     omitted += 1;
   };

@@ -215,9 +215,15 @@ export const addContextLink = async (
 export const readContextPdf = async (id: string, options: ContextSourceOptions): Promise<UnknownRecord> =>
   asRecord((await postContextAction({ action: 'read-pdf', id }, options)).text);
 
-/** Removes a source and the AI's reading of it. */
-export const removeContextSource = async (id: string, options: ContextSourceOptions): Promise<void> => {
-  await postContextAction({ action: 'remove', id }, options);
+/** Removes a source and the AI's reading of it (named too, as a list can lag a recent reading). */
+export const removeContextSource = async (
+  source: Pick<ContextSource, 'id' | 'reading'>,
+  options: ContextSourceOptions,
+): Promise<void> => {
+  await postContextAction(
+    { action: 'remove', id: source.id, ...(source.reading ? { readingIds: [source.reading.id] } : {}) },
+    options,
+  );
 };
 
 /** A file the context accepts, or the reason it does not. */

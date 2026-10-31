@@ -180,7 +180,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
                   onClick={() => {
                     if (!window.confirm(`Remove ${source.title || 'this item'} from the session?`)) return;
                     void run('Removing…', async () => {
-                      await removeContextSource(source.id, options);
+                      await removeContextSource(source, options);
                       return 'Removed.';
                     });
                   }}
