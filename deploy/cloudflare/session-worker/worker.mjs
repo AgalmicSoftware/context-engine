@@ -75797,7 +75797,7 @@ var init_litWorkerAuthorization = __esm({
 });
 
 // workers/sessionCorsWorker/chipotleClient.js
-var import_rpcDefaults4, LIT_PROVISIONING_CREDENTIALS_CONFLICT, DEFAULT_LIT_API_BASE, CHIPOTLE_API_PREFIX, APPROVED_LIT_CHIPOTLE_API_HOSTS, LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, DEFAULT_PAGE_NUMBER, DEFAULT_PAGE_SIZE, getPathRpcUrl2, getPublicRpcUrls2, ethersUtils2, toTrimmedString9, isObj18, normalizeChipotleRpcCandidateList, normalizeValidChipotlePkpId, normalizeChipotleMembershipValue, normalizeHostname, parseIpv4Octets2, isPrivateOrLocalIpv4, isPrivateOrLocalIpv6, isPrivateOrLocalHostname, isApprovedLocalChipotleApiHost, isTruthyFlag, isLitChipotleLocalApiBaseAllowed, normalizeLitChipotleApiBase, normalizeChipotleRequestPath, buildChipotleUrl, parseJsonIfPossible, extractChipotleErrorMessage, fetchChipotleJson, resolveLitChipotleRuntime, resolveLitChipotleProvisioningRuntime, ensureChipotleApiKey, ensureChipotleManagementApiKey, buildPagedPath, runtimeAllowsLocalApiBase, listGroupWallets, listActions, listGroupActions, listWallets, MAX_GONE_CHECK_PAGES, GONE_CHECK_STATUSES, listAllIds, confirmLitSetupGone, resolveActionCidMembership, createStatusWarning, readLitChipotleStatus, deriveLitActionCid, normalizeSessionScopedNameSegment, normalizeGateMode3, isPrivateHostname, validateChipotleRpcUrl, resolveConfigMappedChipotleRpcUrls, resolveDefaultChipotleRpcUrls, resolveSessionChipotleRpcUrl, buildSessionBootstrapMetadata, createLitChipotleAccount, createLitChipotleGroup, createLitChipotleWallet, createLitChipotleUsageKey, readChipotleBillingBalance, ensureActionMetadata, ensureActionInGroup, ensurePkpInGroup, provisionLitChipotleAction, bootstrapLitChipotleSession, bootstrapLitChipotleSessionCore, executeLitChipotleAction, executeSessionLitChipotleAction;
+var import_rpcDefaults4, LIT_PROVISIONING_CREDENTIALS_CONFLICT, DEFAULT_LIT_API_BASE, CHIPOTLE_API_PREFIX, APPROVED_LIT_CHIPOTLE_API_HOSTS, LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, DEFAULT_PAGE_NUMBER, DEFAULT_PAGE_SIZE, getPathRpcUrl2, getPublicRpcUrls2, ethersUtils2, toTrimmedString9, isObj18, normalizeChipotleRpcCandidateList, normalizeValidChipotlePkpId, normalizeChipotleMembershipValue, normalizeHostname, parseIpv4Octets2, isPrivateOrLocalIpv4, isPrivateOrLocalIpv6, isPrivateOrLocalHostname, isApprovedLocalChipotleApiHost, isTruthyFlag, isLitChipotleLocalApiBaseAllowed, normalizeLitChipotleApiBase, normalizeChipotleRequestPath, buildChipotleUrl, parseJsonIfPossible, extractChipotleErrorMessage, fetchChipotleJson, resolveLitChipotleRuntime, resolveLitChipotleProvisioningRuntime, ensureChipotleApiKey, ensureChipotleManagementApiKey, buildPagedPath, runtimeAllowsLocalApiBase, listGroupWallets, listActions, listGroupActions, listWallets, MAX_GONE_CHECK_PAGES, GONE_CHECK_STATUSES, listAllIds, mayMeanLitSetupGone, confirmLitSetupGone, resolveActionCidMembership, createStatusWarning, readLitChipotleStatus, deriveLitActionCid, normalizeSessionScopedNameSegment, normalizeGateMode3, isPrivateHostname, validateChipotleRpcUrl, resolveConfigMappedChipotleRpcUrls, resolveDefaultChipotleRpcUrls, resolveSessionChipotleRpcUrl, buildSessionBootstrapMetadata, createLitChipotleAccount, createLitChipotleGroup, createLitChipotleWallet, createLitChipotleUsageKey, readChipotleBillingBalance, ensureActionMetadata, ensureActionInGroup, ensurePkpInGroup, provisionLitChipotleAction, bootstrapLitChipotleSession, bootstrapLitChipotleSessionCore, executeLitChipotleAction, executeSessionLitChipotleAction;
 var init_chipotleClient = __esm({
   "workers/sessionCorsWorker/chipotleClient.js"() {
     init_litChipotleAction();
@@ -76169,9 +76169,10 @@ var init_chipotleClient = __esm({
       }
       return null;
     };
-    confirmLitSetupGone = async ({ checkpoint = {}, failure, env = {}, fetchImpl = globalThis.fetch } = {}) => {
+    mayMeanLitSetupGone = (failure) => GONE_CHECK_STATUSES.has(failure?.litStatus);
+    confirmLitSetupGone = async ({ checkpoint = {}, env = {}, fetchImpl = globalThis.fetch } = {}) => {
       const apiKey = toTrimmedString9(checkpoint.litAccountApiKey);
-      if (!GONE_CHECK_STATUSES.has(failure?.litStatus) || !apiKey) return "";
+      if (!apiKey) return "";
       const groupId = toTrimmedString9(checkpoint.litGroupId);
       const pkpId = normalizeChipotleMembershipValue(checkpoint.litPkpId);
       try {
@@ -77069,7 +77070,7 @@ var init_chipotleClient = __esm({
 });
 
 // workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js
-var SIGNER_RECORD, SETUP_RECORD, PROVISIONING_RECORD, PROVISIONING_LEASE_MS, PROVISIONING_FIELDS, ACCOUNT_FIELDS, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json4, fail7, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, readProvisioning, executeLitProvisioning, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair, provisionCall, preflightSessionLitProvisioning, beginSessionLitProvisioning, checkpointSessionLitProvisioning, releaseSessionLitProvisioning, discardSessionLitProvisioning;
+var SIGNER_RECORD, SETUP_RECORD, PROVISIONING_RECORD, PROVISIONING_LEASE_MS, PROVISIONING_FIELDS, ACCOUNT_FIELDS, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json4, fail7, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, readProvisioning, executeLitProvisioning, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair, provisionCall, preflightSessionLitProvisioning, beginSessionLitProvisioning, checkpointSessionLitProvisioning, releaseSessionLitProvisioning, checkSessionLitProvisioning, discardSessionLitProvisioning;
 var init_sessionLitAuthorizationCoordinator = __esm({
   "workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js"() {
     init_lib2();
@@ -77225,6 +77226,13 @@ var init_sessionLitAuthorizationCoordinator = __esm({
               leaseUntilMs: now + PROVISIONING_LEASE_MS,
               envelope: envelope2
             });
+            return { attemptId, checkpoint: checkpoint2 };
+          }
+          if (operation === "check") {
+            if (!record4 || record4.leaseUntilMs > now) fail7();
+            const checkpoint2 = await readProvisioning(record4, coordinator.env, slug);
+            const attemptId = crypto.randomUUID();
+            await transaction.put(PROVISIONING_RECORD, { ...record4, attemptId, leaseUntilMs: now + PROVISIONING_LEASE_MS });
             return { attemptId, checkpoint: checkpoint2 };
           }
           if (operation === "release") {
@@ -77399,6 +77407,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     beginSessionLitProvisioning = (args) => provisionCall(args, "begin");
     checkpointSessionLitProvisioning = (args) => provisionCall(args, "checkpoint");
     releaseSessionLitProvisioning = (args) => provisionCall(args, "release");
+    checkSessionLitProvisioning = (args) => provisionCall(args, "check");
     discardSessionLitProvisioning = (args) => provisionCall(args, "discard");
   }
 });
@@ -80042,7 +80051,7 @@ ${expiry}`);
         }
         if (url.pathname === "/session-config/storage/set-hidden") return this.executeStorageVisibilityMutation(payload);
         if (url.pathname === "/session-config/storage/publish") return this.executeStoragePublication(payload);
-        if (["preflight", "begin", "checkpoint", "release", "discard"].some((operation) => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
+        if (["preflight", "begin", "check", "checkpoint", "release", "discard"].some((operation) => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
           return this.serializeSessionConfigOperation(() => executeLitProvisioning(this, payload, url.pathname.split("/").at(-1)));
         }
         if (url.pathname === "/session-config/lit-authorization/ensure") {
@@ -101980,19 +101989,22 @@ var dispatchAdminRequest = async ({
       delete responseBody.litCredentials;
       return deps?.json?.(responseBody, 200, headers2);
     } catch (error) {
-      const gone = attempt ? await confirmLitSetupGone({ checkpoint: attempt.checkpoint, failure: error, env, fetchImpl }).catch(() => "") : "";
-      if (gone) {
-        try {
+      const conflict = error?.code === "lit_provisioning_credentials_conflict";
+      const keyConflict = conflict && !attempt;
+      try {
+        if (keyConflict) attempt = await (deps?.checkSessionLitProvisioning || checkSessionLitProvisioning)(coordination);
+        const gone = attempt && (conflict || mayMeanLitSetupGone(error)) ? await confirmLitSetupGone({ checkpoint: attempt.checkpoint, env, fetchImpl }) : "";
+        if (gone) {
           await (deps?.discardSessionLitProvisioning || discardSessionLitProvisioning)({
             ...coordination,
             attemptId: attempt.attemptId,
-            keepAccount: gone === "resources"
+            keepAccount: gone === "resources" && !keyConflict
           });
           return deps?.json?.({
-            error: gone === "account" ? "Lit no longer accepts the saved Lit account key, so the saved setup was cleared. Retry to start over." : "Lit no longer has the saved Lit group or PKP, so the saved setup was cleared and its account kept. Retry to start over."
+            error: gone === "account" ? "Lit no longer accepts the saved Lit account key, so the saved setup was cleared. Retry to start over." : "Lit no longer has the saved Lit group or PKP, so the saved setup was cleared. Retry to start over."
           }, 409, headers2);
-        } catch {
         }
+      } catch {
       }
       return deps?.json?.({ error: error?.code === "lit_provisioning_credentials_conflict" ? LIT_PROVISIONING_CREDENTIALS_CONFLICT : error?.code === "lit_management_key_missing" ? "Lit account API key not configured." : error?.code === "lit_provisioning_resources_pending" ? error.message : "Lit provisioning did not finish. Retry to resume its saved progress." }, error?.status || 502, headers2);
     } finally {

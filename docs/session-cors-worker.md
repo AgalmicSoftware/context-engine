@@ -2015,8 +2015,11 @@ Runtime:
     attempt fails with a Lit client error and Lit then refuses the saved account
     key, or its complete group or wallet list no longer includes the saved group
     or PKP, the pending record is cleared (keeping an account Lit still accepts)
-    and the admin route returns 409, so the next attempt starts over. Network
-    errors, timeouts, 5xx, rate limits and billing refusals keep the record.
+    and the admin route returns 409, so the next attempt starts over. A supplied
+    key that conflicts with the saved one triggers the same check before any
+    attempt; if Lit confirms the saved setup is gone, the whole record is
+    cleared so the new key can proceed. Network errors, timeouts, 5xx, rate
+    limits and billing refusals keep the record and any conflict.
     Lit setup and backup restore update the same document; backup export reads it directly.
   - The Cloudflare API token is never a session secret. A direct `/new` token is
     consumed only by the deploy helper and is not written to either KV record.

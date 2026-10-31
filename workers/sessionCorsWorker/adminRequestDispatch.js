@@ -8,6 +8,7 @@ import {
   preflightSessionLitProvisioning,
   checkpointSessionLitProvisioning,
   releaseSessionLitProvisioning,
+  checkSessionLitProvisioning,
   discardSessionLitProvisioning,
   finalizeSessionLitAuthorization,
   updateSessionSecretsAfterLitRepair,
@@ -21,6 +22,7 @@ import {
   confirmLitSetupGone,
   ensureChipotleManagementApiKey,
   LIT_PROVISIONING_CREDENTIALS_CONFLICT,
+  mayMeanLitSetupGone,
   provisionLitChipotleAction,
   readLitChipotleStatus,
   resolveLitChipotleProvisioningRuntime,
@@ -405,20 +407,26 @@ export const dispatchAdminRequest = async ({
     } catch (error) {
       // Only Lit confirming that saved resources are gone clears the saved
       // setup so a retry starts over; any other failure keeps it for Resume.
-      const gone = attempt
-        ? await confirmLitSetupGone({ checkpoint: attempt.checkpoint, failure: error, env, fetchImpl }).catch(() => '')
-        : '';
-      if (gone) {
-        try {
+      // A supplied key that conflicts with saved setup is refused before Lit is
+      // asked, so lease the saved setup and ask; that key then replaces the
+      // saved account too.
+      const conflict = error?.code === 'lit_provisioning_credentials_conflict';
+      const keyConflict = conflict && !attempt;
+      try {
+        if (keyConflict) attempt = await (deps?.checkSessionLitProvisioning || checkSessionLitProvisioning)(coordination);
+        const gone = attempt && (conflict || mayMeanLitSetupGone(error))
+          ? await confirmLitSetupGone({ checkpoint: attempt.checkpoint, env, fetchImpl })
+          : '';
+        if (gone) {
           await (deps?.discardSessionLitProvisioning || discardSessionLitProvisioning)({
-            ...coordination, attemptId: attempt.attemptId, keepAccount: gone === 'resources',
+            ...coordination, attemptId: attempt.attemptId, keepAccount: gone === 'resources' && !keyConflict,
           });
           return deps?.json?.({ error: gone === 'account'
             ? 'Lit no longer accepts the saved Lit account key, so the saved setup was cleared. Retry to start over.'
-            : 'Lit no longer has the saved Lit group or PKP, so the saved setup was cleared and its account kept. Retry to start over.',
+            : 'Lit no longer has the saved Lit group or PKP, so the saved setup was cleared. Retry to start over.',
           }, 409, headers);
-        } catch {}
-      }
+        }
+      } catch {}
       return deps?.json?.({ error: error?.code === 'lit_provisioning_credentials_conflict'
         ? LIT_PROVISIONING_CREDENTIALS_CONFLICT
         : error?.code === 'lit_management_key_missing' ? 'Lit account API key not configured.'

@@ -13,6 +13,7 @@ import {
   executeSessionLitChipotleAction,
   fetchChipotleJson,
   isLitChipotleLocalApiBaseAllowed,
+  mayMeanLitSetupGone,
   normalizeLitChipotleApiBase,
   provisionLitChipotleAction,
   readLitChipotleStatus,
@@ -1731,9 +1732,8 @@ for (const request of [{ litAccountApiKey: 'replacement-private-key' }, { litApi
 test('saved Lit setup counts as gone only on a complete listing without it or a refused saved key', async () => {
   const group = { litApiBase: 'https://api.chipotle.litprotocol.com', litAccountApiKey: 'saved-key', litGroupId: '7' };
   const pkp = { ...group, litGroupId: '', litPkpId: 'pkp-7' };
-  const notFound = Object.assign(new Error('Not found.'), { litStatus: 404 });
   const others = Array.from({ length: 100 }, (_, index) => ({ id: 1000 + index }));
-  const check = async (checkpoint, lists, failure = notFound) => {
+  const check = async (checkpoint, lists) => {
     let calls = 0;
     const fetchImpl = async (url, options) => {
       calls += 1;
@@ -1743,7 +1743,7 @@ test('saved Lit setup counts as gone only on a complete listing without it or a 
       const listed = typeof answer === 'function' ? answer(Number(searchParams.get('page_number'))) : answer;
       return typeof listed === 'number' ? jsonResponse({ error: 'Refused.' }, { ok: false, status: listed }) : jsonResponse(listed);
     };
-    return [await confirmLitSetupGone({ checkpoint, failure, fetchImpl }), calls];
+    return [await confirmLitSetupGone({ checkpoint, fetchImpl }), calls];
   };
   for (const [checkpoint, lists, expected] of [
     [group, { '/list_groups': [{ id: 7 }] }, ''],
@@ -1766,8 +1766,10 @@ test('saved Lit setup counts as gone only on a complete listing without it or a 
   ]) {
     assert.equal((await check(checkpoint, lists))[0], expected, JSON.stringify(lists, (key, value) => typeof value === 'function' ? 'paged' : value));
   }
-  // Only a Lit client error on the failed call starts a check.
-  for (const failure of [new Error('fetch failed'), ...[402, 408, 429, 500, 503].map(litStatus => Object.assign(new Error('Failed.'), { litStatus }))]) {
-    assert.deepEqual(await check(group, { '/list_groups': [] }, failure), ['', 0]);
-  }
+  assert.deepEqual(await check({ ...group, litAccountApiKey: '' }, { '/list_groups': [] }), ['', 0]);
+  // Only a Lit client error on a failed setup call starts a check.
+  const failure = litStatus => Object.assign(new Error('Failed.'), { litStatus });
+  for (const status of [400, 401, 403, 404, 410, 422]) assert.equal(mayMeanLitSetupGone(failure(status)), true, status);
+  for (const status of [402, 408, 409, 429, 500, 503]) assert.equal(mayMeanLitSetupGone(failure(status)), false, status);
+  assert.equal(mayMeanLitSetupGone(new Error('fetch failed')), false);
 });

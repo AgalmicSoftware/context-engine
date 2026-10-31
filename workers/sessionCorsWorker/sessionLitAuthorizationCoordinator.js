@@ -152,6 +152,15 @@ export const executeLitProvisioning = async (coordinator, payload, operation) =>
           leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
         return { attemptId, checkpoint };
       }
+      // A key conflict refuses begin before Lit is asked. Lease the saved setup
+      // unchanged so the route can ask; only discard or release may follow.
+      if (operation === 'check') {
+        if (!record || record.leaseUntilMs > now) fail();
+        const checkpoint = await readProvisioning(record, coordinator.env, slug);
+        const attemptId = crypto.randomUUID();
+        await transaction.put(PROVISIONING_RECORD, { ...record, attemptId, leaseUntilMs: now + PROVISIONING_LEASE_MS });
+        return { attemptId, checkpoint };
+      }
       // A delayed failure must not release a newer attempt's lease.
       if (operation === 'release') {
         if (record?.slug === slug && record.attemptId === payload.attemptId)
@@ -340,4 +349,5 @@ export const preflightSessionLitProvisioning = args => provisionCall(args, 'pref
 export const beginSessionLitProvisioning = args => provisionCall(args, 'begin');
 export const checkpointSessionLitProvisioning = args => provisionCall(args, 'checkpoint');
 export const releaseSessionLitProvisioning = args => provisionCall(args, 'release');
+export const checkSessionLitProvisioning = args => provisionCall(args, 'check');
 export const discardSessionLitProvisioning = args => provisionCall(args, 'discard');

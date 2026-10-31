@@ -680,9 +680,9 @@ test('resuming setup accepts equivalent normalized API base spellings', async ()
 const simulatedLit = () => {
   const lit = { groups: new Set(), nextGroup: 1, revoked: new Set(), failure: null };
   lit.remote = litRemoteFixture(async (path, url, init) => {
-    if (lit.revoked.has(init.headers?.['X-Api-Key'])) return Response.json({ error: 'Invalid API key.' }, { status: 401 });
     const failed = await lit.failure?.(path);
     if (failed) return failed;
+    if (lit.revoked.has(init.headers?.['X-Api-Key'])) return Response.json({ error: 'Invalid API key.' }, { status: 401 });
     if (path === '/add_group') {
       const id = String(lit.nextGroup++);
       lit.groups.add(id);
@@ -750,8 +750,6 @@ test('Lit confirming that a saved group is gone lets setup start over and keeps 
 test('Lit refusing the saved account key lets an admin start over with a working key', async () => {
   const { f, lit } = await interruptedSetup();
   lit.revoked.add('recoverable-account-key');
-  // Until Lit refuses the saved key, a different key conflicts with the saved setup.
-  assert.equal((await provisionThroughRoute(f, lit, { litAccountApiKey: 'replacement-key' })).status, 409);
   const refused = await provisionThroughRoute(f, lit);
   assert.equal(refused.status, 409);
   assert.match(refused.body.error, /no longer accepts the saved Lit account key/);
@@ -775,4 +773,52 @@ test('only the current attempt can clear saved setup', async () => {
   await assert.rejects(provisioning.discardSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(),
     attemptId: first.attemptId, keepAccount: false }), error => error.status === 409);
   assert.equal((await savedSetup(f)).litGroupId, '7');
+});
+
+test('a replaced Lit key proceeds once Lit refuses the saved key; transient errors keep the conflict', async () => {
+  const f = createFixture();
+  const lit = simulatedLit();
+  f.env.LIT_ACCOUNT_API_KEY = 'old-env-key';
+  lit.failure = path => path === '/create_wallet' ? Response.json({ error: 'Unavailable.' }, { status: 503 }) : null;
+  assert.equal((await provisionThroughRoute(f, lit)).status, 502);
+  const saved = await savedSetup(f);
+  assert.equal(saved.litGroupId, '1');
+  // Lit revokes the saved key and the operator replaces it.
+  lit.revoked.add('old-env-key');
+  f.env.LIT_ACCOUNT_API_KEY = 'new-env-key';
+  for (const failure of [
+    () => { throw new TypeError('fetch failed'); },
+    () => Response.json({ error: 'Unavailable.' }, { status: 503 }),
+    () => Response.json({ error: 'payment_required' }, { status: 402 }),
+    () => Response.json({ error: 'Slow down.' }, { status: 429 }),
+  ]) {
+    lit.failure = failure;
+    const refused = await provisionThroughRoute(f, lit);
+    assert.equal(refused.status, 409);
+    assert.match(refused.body.error, /conflict with saved setup/);
+    assert.deepEqual(await savedSetup(f), saved);
+  }
+  lit.failure = null;
+  const asked = lit.remote.calls.get('/list_groups') || 0;
+  const cleared = await provisionThroughRoute(f, lit);
+  assert.ok((lit.remote.calls.get('/list_groups') || 0) > asked, 'Lit is asked about the saved key');
+  assert.equal(cleared.status, 409);
+  assert.match(cleared.body.error, /no longer accepts the saved Lit account key/);
+  assert.ok(!JSON.stringify(cleared).includes('env-key'));
+  assert.deepEqual(await savedSetup(f), {});
+  const restarted = await provisionThroughRoute(f, lit);
+  assert.equal(restarted.status, 200, JSON.stringify(restarted.body));
+  assert.equal(restarted.body.litGroupId, '2');
+});
+
+test('a different key replaces a created account once Lit confirms its saved group is gone', async () => {
+  const { f, lit } = await interruptedSetup();
+  lit.groups.delete('1');
+  const cleared = await provisionThroughRoute(f, lit, { litAccountApiKey: 'replacement-key' });
+  assert.equal(cleared.status, 409);
+  assert.match(cleared.body.error, /no longer has the saved Lit group or PKP/);
+  assert.deepEqual(await savedSetup(f), {});
+  const restarted = await provisionThroughRoute(f, lit, { litAccountApiKey: 'replacement-key' });
+  assert.equal(restarted.status, 200, JSON.stringify(restarted.body));
+  assert.equal((await getSessionSecrets(f.env, 'fixture')).litAccountApiKey, 'replacement-key');
 });

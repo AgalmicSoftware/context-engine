@@ -489,14 +489,17 @@ const listAllIds = async ({ runtime, path, idsOf, fetchImpl } = {}) => {
   return null;
 };
 
-// Saved setup is gone only when Lit says so: after a setup call fails with a
-// client error, Lit refuses the saved account key, or its complete group or
-// wallet list (read with that key) lacks a saved group or PKP. Network errors,
-// timeouts, 5xx, rate limits, billing refusals and partial or unrecognized
-// listings confirm nothing, so the saved progress stays resumable.
-export const confirmLitSetupGone = async ({ checkpoint = {}, failure, env = {}, fetchImpl = globalThis.fetch } = {}) => {
+// Only a Lit client error can mean saved setup is gone; network errors,
+// timeouts, 5xx, rate limits and billing refusals never start a check.
+export const mayMeanLitSetupGone = (failure) => GONE_CHECK_STATUSES.has(failure?.litStatus);
+
+// Saved setup is gone only when Lit says so: it refuses the saved account key,
+// or its complete group or wallet list (read with that key) lacks a saved
+// group or PKP. Failed, partial or unrecognized listings confirm nothing, so
+// the saved progress stays resumable.
+export const confirmLitSetupGone = async ({ checkpoint = {}, env = {}, fetchImpl = globalThis.fetch } = {}) => {
   const apiKey = toTrimmedString(checkpoint.litAccountApiKey);
-  if (!GONE_CHECK_STATUSES.has(failure?.litStatus) || !apiKey) return '';
+  if (!apiKey) return '';
   const groupId = toTrimmedString(checkpoint.litGroupId);
   const pkpId = normalizeChipotleMembershipValue(checkpoint.litPkpId);
   try {
