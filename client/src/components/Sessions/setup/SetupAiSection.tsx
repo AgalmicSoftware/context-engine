@@ -1,4 +1,5 @@
 import React from 'react';
+import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { Input } from 'reactstrap';
 
 import { AI_PROVIDER_OPTIONS, getAiModelOptions, normalizeAiProvider } from '../sessionWizardAiConfig';
@@ -74,7 +75,7 @@ export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null }:
           id="ce-setup-ai-provider"
           type="select"
           value={provider}
-          data-testid="ce-setup-ai-provider"
+          data-testid={E2E_TESTIDS.SETUP_AI_PROVIDER}
           onChange={(event) => setProvider(event.target.value)}
         >
           {AI_PROVIDER_OPTIONS.map((option) => (

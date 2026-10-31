@@ -99,10 +99,8 @@ const editedValues = (before: Config, draft: SetupDraft, nowMs: number): Config 
 const isBlank = (value: unknown) =>
   value === undefined || value === null || value === '' || (typeof value === 'object' && !Object.keys(value).length);
 
-const contextIsBlank = (value: unknown) => {
-  const context = normalizeContext(value);
-  return !context.title && !context.paragraphs.length && !context.links.length;
-};
+// The publish normalizer returns null for a context with nothing left in it.
+const contextIsBlank = (value: unknown) => !normalizeSessionWizardContext(value);
 
 const unchanged = (key: string, before: unknown, after: unknown) => {
   if (key === 'sessionContext')
@@ -142,6 +140,45 @@ export const buildSessionSettingsSave = (
   }
   const after = { ...before, ...patch };
   return { patch, after, classification: classifySessionConfigEdits(before, after) };
+};
+
+// The template fields the edit page applies; slug, Worker and hosting stay.
+const TEMPLATE_FIELDS = [
+  'sessionName',
+  'sessionInfo',
+  'sessionHeader',
+  'sessionEndsAt',
+  'appearance',
+  'sessionContext',
+  'questionsGenPrompt',
+  'defaultTags',
+  'defaultGroupTags',
+  'groupCreationPolicy',
+  'interviewModeEnabled',
+  'interviewMode',
+  'resultsAnalysis',
+  'ai',
+  'questions',
+] as const;
+
+const authorityOf = (profile: unknown) => text(asRecord(asRecord(profile).authority).mode);
+
+/**
+ * A template's portable fields over the edit draft. Its profile is used only
+ * when it keeps the session's hosting, which is fixed once published.
+ */
+export const applyTemplateToSessionSettingsDraft = (
+  draft: SetupDraft,
+  template: Record<string, unknown>,
+): { draft: SetupDraft; keptHosting: boolean } => {
+  const next: SetupDraft = { ...draft };
+  TEMPLATE_FIELDS.forEach((key) => {
+    next[key] = clone(template[key]);
+  });
+  const profile = template.sessionModeProfile;
+  const sameHosting = !!profile && authorityOf(profile) === authorityOf(draft.sessionModeProfile);
+  if (sameHosting) next.sessionModeProfile = clone(profile);
+  return { draft: next, keptHosting: !!profile && !sameHosting };
 };
 
 const LABELS: Record<string, string> = {

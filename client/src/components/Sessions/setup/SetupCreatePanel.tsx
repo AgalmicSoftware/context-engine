@@ -59,19 +59,19 @@ const SetupCreatePanel = ({
   const blocked = missing.length > 0 || conflicts.length > 0;
   const working = busy || stage !== 'idle';
   return (
-    <section className={styles.section} aria-labelledby="ce-setup-create-title" data-testid="ce-setup-create">
+    <section className={styles.section} aria-labelledby="ce-setup-create-title" data-testid={E2E_TESTIDS.SETUP_CREATE}>
       <h2 id="ce-setup-create-title" className={styles.sectionTitle}>
         Create
       </h2>
       {!completed && missing.length ? (
-        <ul className={styles.hint} data-testid="ce-setup-missing">
+        <ul className={styles.hint} data-testid={E2E_TESTIDS.SETUP_CREATE_MISSING}>
           {missing.map((entry) => (
             <li key={entry}>{entry}</li>
           ))}
         </ul>
       ) : null}
       {!completed && conflicts.length ? (
-        <div role="status" data-testid="ce-setup-conflicts">
+        <div role="status" data-testid={E2E_TESTIDS.SETUP_CREATE_CONFLICTS}>
           {conflicts.map((conflict) => (
             <p key={`${conflict.path}:${conflict.code}`} className={styles.conflict}>
               {conflict.message}{' '}
@@ -108,7 +108,7 @@ const SetupCreatePanel = ({
         ) : null}
       </div>
       {stage !== 'idle' ? (
-        <p className={styles.statusText} role="status" data-testid="ce-setup-create-stage">
+        <p className={styles.statusText} role="status" data-testid={E2E_TESTIDS.SETUP_CREATE_STAGE}>
           {STAGE_LABELS[stage]}
         </p>
       ) : null}

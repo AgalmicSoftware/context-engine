@@ -143,6 +143,30 @@ describe('SessionSettingsPage', () => {
     expect(save).toBeDisabled();
   });
 
+  it('imports a template but keeps the session’s fixed hosting, and queues its questions', async () => {
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('ce-template-import'));
+    fireEvent.change(screen.getByTestId('ce-template-paste'), {
+      target: {
+        value: JSON.stringify({
+          format: 'ce.session-template/v1',
+          sessionName: 'From a template',
+          questions: [{ prompt: 'Adapting institutions deserves investment.', type: 'binary' }],
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+        }),
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check' }));
+    fireEvent.click(screen.getByTestId('ce-template-import-apply'));
+
+    expect(screen.getByTestId('ce-settings-status')).toHaveTextContent('the session keeps its own');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toHaveValue('From a template');
+    expect(screen.getByTestId('ce-setup-summary-questions')).toHaveTextContent('1 question');
+    expect(screen.getByTestId('ce-setup-questions-publish')).toHaveTextContent('Add 1 question to the session');
+    expect(screen.getByTestId('ce-settings-content-changes')).toHaveTextContent('Name');
+  });
+
   it('copies the group recorder link', async () => {
     const writeText = jest.fn(async () => undefined);
     Object.assign(navigator, { clipboard: { writeText } });

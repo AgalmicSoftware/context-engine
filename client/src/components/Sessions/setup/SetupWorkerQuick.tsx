@@ -33,7 +33,7 @@ const SetupWorkerQuick = ({
 }: SetupWorkerQuickProps): React.ReactElement => (
   <>
     {verifiedWorkerUrl ? (
-      <p className={styles.statusText} data-testid="ce-setup-worker-ready">
+      <p className={styles.statusText} data-testid={E2E_TESTIDS.SETUP_WORKER_READY}>
         Session Worker ready: <span className={styles.readOnlyValue}>{verifiedWorkerUrl}</span>
       </p>
     ) : (

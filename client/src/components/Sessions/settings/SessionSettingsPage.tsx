@@ -3,11 +3,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import wizardStyles from '../SessionWizard.module.scss';
 import styles from '../setup/SessionSetup.module.scss';
 import { SetupAiSection } from '../setup/SetupAiSection';
+import { SessionTemplateActions, SetupQuestionsPublisher } from '../setup/SessionTemplateTools';
+import { sessionTemplateFromDraft } from '@ce-shared/sessionTemplate.mjs';
 import {
   SetupBasicsSection,
   SetupContextSection,
   SetupParticipationSection,
   SetupQuestionsSection,
+  readSetupQuestions,
 } from '../setup/SetupContentSections';
 import { SetupAccessSection, SetupHostingSection, SetupResultsSection } from '../setup/SetupPolicySections';
 import type { SetupSectionKey } from '../setup/SetupPrimitives';
@@ -27,6 +30,7 @@ import {
 import { upsertWorkerCanonicalSessionBootstrap } from '../../../utilities/session/sessionWorkerConfigCache';
 import { describeWorkerModeError, listSessionModeConflicts } from '../../../utilities/session/sessionModeRuleMessages';
 import {
+  applyTemplateToSessionSettingsDraft,
   buildSessionSettingsDraft,
   buildSessionSettingsSave,
   describeSessionSettingsPath,
@@ -198,15 +202,33 @@ const SessionSettingsPage = ({
     }
   };
 
+  const importTemplate = (template: Record<string, unknown>) => {
+    const { draft: next, keptHosting } = applyTemplateToSessionSettingsDraft(draft, template);
+    setDraft(next);
+    setStatus(
+      keptHosting
+        ? 'Template applied. Its hosting differs from this session’s, which is fixed, so the session keeps its own.'
+        : 'Template applied. Review the changes, then save.',
+    );
+  };
   const header = (
     <header className={styles.pageHeader}>
       <h1 className={styles.pageTitle}>Session settings</h1>
+      {capabilities.isWorkerCanonical && isSessionAdmin(saved, account) ? (
+        <SessionTemplateActions
+          buildTemplate={() => sessionTemplateFromDraft(draft)}
+          onImport={importTemplate}
+          fromLink={false}
+          fileName={sessionSlug}
+          linkBase={`${typeof window === 'undefined' ? '' : window.location.origin}/new`}
+        />
+      ) : null}
     </header>
   );
 
   if (!capabilities.isWorkerCanonical) {
     return (
-      <div className={wizardStyles.groupWizard} data-testid="ce-settings-page">
+      <div className={wizardStyles.groupWizard} data-testid={E2E_TESTIDS.SESSION_SETTINGS_PAGE}>
         <div className={styles.page}>
           {header}
           <p className={styles.hint} data-testid="ce-settings-unsupported">
@@ -219,7 +241,7 @@ const SessionSettingsPage = ({
 
   if (!isSessionAdmin(saved, account)) {
     return (
-      <div className={wizardStyles.groupWizard} data-testid="ce-settings-page">
+      <div className={wizardStyles.groupWizard} data-testid={E2E_TESTIDS.SESSION_SETTINGS_PAGE}>
         <div className={styles.page}>
           {header}
           <p className={styles.hint} data-testid="ce-settings-admin-only">
@@ -244,7 +266,7 @@ const SessionSettingsPage = ({
   const sessionUrl = buildSessionWizardSessionUrl({ slug: sessionSlug, workerOrigin });
 
   return (
-    <div className={wizardStyles.groupWizard} data-testid="ce-settings-page">
+    <div className={wizardStyles.groupWizard} data-testid={E2E_TESTIDS.SESSION_SETTINGS_PAGE}>
       <div className={styles.page}>
         {header}
         <div className={styles.buttonRow}>
@@ -254,7 +276,7 @@ const SessionSettingsPage = ({
           <button
             type="button"
             className={styles.button}
-            data-testid="ce-settings-group-recorder-link"
+            data-testid={E2E_TESTIDS.SESSION_SETTINGS_GROUP_RECORDER_LINK}
             onClick={() => void copyGroupRecorderLink()}
           >
             Copy group recorder link
@@ -273,9 +295,19 @@ const SessionSettingsPage = ({
         <SetupQuestionsSection
           {...section('questions')}
           publisher={
-            <p className={styles.hint}>
-              Questions already in the session are edited on the <a href={sessionUrl}>session page</a>.
-            </p>
+            <>
+              <SetupQuestionsPublisher
+                questions={readSetupQuestions(draft)}
+                sessionConfig={saved}
+                sessionSlug={sessionSlug}
+                account={account}
+                provider={provider}
+                onPublished={() => updateDraft(['questions'], [])}
+              />
+              <p className={styles.hint}>
+                Questions already in the session are edited on the <a href={sessionUrl}>session page</a>.
+              </p>
+            </>
           }
         />
         <SetupParticipationSection {...section('participation')} supportsEndTime />
@@ -318,12 +350,12 @@ const SessionSettingsPage = ({
               <ChangeList
                 title="Keeps everyone signed in"
                 paths={changes.content}
-                testId="ce-settings-content-changes"
+                testId={E2E_TESTIDS.SESSION_SETTINGS_CONTENT_CHANGES}
               />
               <ChangeList
                 title="Signs participants out: they sign in again"
                 paths={changes.authority}
-                testId="ce-settings-authority-changes"
+                testId={E2E_TESTIDS.SESSION_SETTINGS_AUTHORITY_CHANGES}
               />
             </>
           ) : (
@@ -341,7 +373,7 @@ const SessionSettingsPage = ({
             </button>
           </div>
           {status ? (
-            <p className={styles.statusText} role="status" data-testid="ce-settings-status">
+            <p className={styles.statusText} role="status" data-testid={E2E_TESTIDS.SESSION_SETTINGS_STATUS}>
               {status}
             </p>
           ) : null}

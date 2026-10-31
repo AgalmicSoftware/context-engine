@@ -88,6 +88,20 @@ import SessionPublishAdvancedSettingsPanel from './SessionPublishAdvancedSetting
 import SessionPublishProgressPanel from './SessionPublishProgressPanel';
 import SessionPublishResultLinks from './SessionPublishResultLinks';
 import { SetupVoiceKeyNote } from './setup/SetupAiSection';
+import { readSetupQuestions } from './setup/SetupContentSections';
+import {
+  SessionTemplateActions,
+  SessionTemplateLinkNotice,
+  SetupQuestionsPublisher,
+} from './setup/SessionTemplateTools';
+import {
+  diffSessionTemplates,
+  sessionTemplateFromDraft,
+  type SessionTemplate,
+  type SessionTemplateChange,
+  type SessionTemplateResult,
+} from '@ce-shared/sessionTemplate.mjs';
+import { decodeSessionTemplateLink } from '@ce-shared/sessionTemplateLink.mjs';
 import type { SetupCreateStage } from './setup/SetupCreatePanel';
 import { defaultSessionSetupProfile, editSessionSetupProfile } from './setup/sessionSetupProfile';
 import SetupSlugPreview from './setup/SetupSlugPreview';
@@ -180,6 +194,7 @@ import {
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
 import {
+  applySessionTemplateToDraft,
   applySessionWizardRegistryChainDraftDefaults,
   buildSessionWizardCacheWritePayload,
   buildSessionWizardInitialDraftFromCache,
@@ -436,6 +451,15 @@ const SessionWizard = ({
     createInitialSessionPublishState({ status: 'editing' }),
   );
   const [createStage, setCreateStage] = useState<SetupCreateStage>('idle');
+  // A #template= link waits here until it is used or dismissed.
+  const [linkTemplate, setLinkTemplate] = useState<{
+    result: SessionTemplateResult;
+    changes: SessionTemplateChange[];
+    sameDraft: boolean;
+  } | null>(null);
+  const [draftFromLink, setDraftFromLink] = useState(false);
+  // The created session's public config, for adding a template's questions.
+  const [publishedSessionConfig, setPublishedSessionConfig] = useState<Record<string, unknown> | null>(null);
   const publishBusy = resolveSessionWizardPublishReducerUiState({ state: sessionPublishState }).publishBusy;
   const publishRequestInFlightRef = useRef(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
@@ -2040,6 +2064,7 @@ const SessionWizard = ({
           publishControllerResult,
           runTrackedPublishEffect,
         });
+        setPublishedSessionConfig(publishControllerResult.verifiedWorkerConfig?.publicConfig || null);
         if (publishExecutionPlan.shouldCreateWorkerGroups) {
           setPendingWorkerGroupDrafts([]);
         }
@@ -2585,6 +2610,51 @@ const SessionWizard = ({
   const wizardContractViewerContracts = wizardContractViewerPlan.contracts;
   const selectedWizardContract = wizardContractViewerPlan.selectedContract;
   const selectedWizardContractHref = wizardContractViewerPlan.selectedContractHref;
+  // Templates: export, import and share links carry only portable fields.
+  const buildDraftTemplate = (): SessionTemplateResult => {
+    const current = draftRef.current || draft;
+    let draftId = toStr(current.draftId).trim();
+    if (!draftId) {
+      // Links made from this draft can be matched back to it.
+      draftId = Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) =>
+        byte.toString(16).padStart(2, '0'),
+      ).join('');
+      updateDraftValue(['draftId'], draftId);
+    }
+    return sessionTemplateFromDraft({ ...current, draftId });
+  };
+  const importTemplate = (template: SessionTemplate) => {
+    const profileChain = Number((template.sessionModeProfile as SessionModeProfile | null)?.evm?.registryChainId || 0);
+    if (profileChain) setRegistryChainId(profileChain);
+    setDraft((prev) => {
+      const next = applySessionTemplateToDraft(template, prev) as DraftState;
+      draftRef.current = next;
+      return next;
+    });
+  };
+  const clearTemplateLink = () => {
+    setLinkTemplate(null);
+    if (typeof window === 'undefined') return;
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
+  };
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.location.hash.includes('template=')) return;
+    let cancelled = false;
+    void decodeSessionTemplateLink(window.location.hash).then((result) => {
+      if (cancelled || !result) return;
+      const mine = sessionTemplateFromDraft(draftRef.current);
+      const sameDraft = result.ok && !!result.template.draftId && result.template.draftId === draftRef.current?.draftId;
+      setLinkTemplate({
+        result,
+        changes: result.ok && mine.ok ? diffSessionTemplates(mine.template, result.template) : [],
+        sameDraft,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // The rules table, beside the options that conflict.
   const conflicts = useMemo(() => listSessionModeConflicts(draft.sessionModeProfile), [draft.sessionModeProfile]);
   const editProfile = useCallback((mutate: (profile: SessionModeProfile) => void) => {
@@ -2663,6 +2733,42 @@ const SessionWizard = ({
 
   return (
     <SessionWizardShell
+      templateActions={
+        <SessionTemplateActions
+          buildTemplate={buildDraftTemplate}
+          onImport={importTemplate}
+          fromLink={draftFromLink}
+          fileName={toStr(draft.slug || draft.sessionName)}
+          linkBase={`${typeof window === 'undefined' ? '' : window.location.origin}/new`}
+        />
+      }
+      templateNotice={
+        linkTemplate ? (
+          <SessionTemplateLinkNotice
+            result={linkTemplate.result}
+            changes={linkTemplate.changes}
+            sameDraft={linkTemplate.sameDraft}
+            onAccept={(template) => {
+              importTemplate(template);
+              setDraftFromLink(true);
+              clearTemplateLink();
+            }}
+            onDismiss={clearTemplateLink}
+          />
+        ) : null
+      }
+      questionsPublisher={
+        sessionModeRequirements.isWorkerCanonical ? (
+          <SetupQuestionsPublisher
+            questions={readSetupQuestions(draft)}
+            sessionConfig={sessionCreated ? publishedSessionConfig : null}
+            sessionSlug={toStr(draft.slug).trim()}
+            account={toStr(account).trim()}
+            provider={provider}
+            onPublished={() => updateDraftValue(['questions'], [])}
+          />
+        ) : null
+      }
       recoveryKeyDialog={
         recoveryDisplay ? (
           <RecoveryKeyDialog

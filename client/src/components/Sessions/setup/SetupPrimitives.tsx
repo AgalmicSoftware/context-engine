@@ -1,4 +1,5 @@
 import React, { useContext } from 'react';
+import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
@@ -48,7 +49,7 @@ export const SetupSection = ({
       id={domId}
       className={styles.section}
       aria-labelledby={`${domId}-title`}
-      data-testid={`ce-setup-section-${sectionKey}`}
+      data-testid={`${E2E_TESTIDS.SETUP_SECTION_PREFIX}${sectionKey}`}
     >
       <div className={styles.sectionHeader}>
         <h2 id={`${domId}-title`} className={styles.sectionTitle}>
@@ -61,7 +62,7 @@ export const SetupSection = ({
             aria-expanded={expanded}
             aria-controls={`${domId}-more`}
             onClick={onToggle}
-            data-testid={`ce-setup-more-${sectionKey}`}
+            data-testid={`${E2E_TESTIDS.SETUP_MORE_PREFIX}${sectionKey}`}
           >
             <FontAwesomeIcon icon={expanded ? faCaretUp : faCaretDown} aria-hidden="true" />
             {expanded ? 'Less' : 'More'}
@@ -69,7 +70,7 @@ export const SetupSection = ({
         ) : null}
       </div>
       {!alwaysOpen && summary ? (
-        <p className={styles.sectionSummary} data-testid={`ce-setup-summary-${sectionKey}`}>
+        <p className={styles.sectionSummary} data-testid={`${E2E_TESTIDS.SETUP_SUMMARY_PREFIX}${sectionKey}`}>
           {summary}
           {conflictCount ? (
             <span className={styles.conflictBadge}>
@@ -188,7 +189,7 @@ export const SetupConflicts = ({ conflicts }: { conflicts: SessionSetupConflict[
         <p
           key={`${conflict.path}:${conflict.code}`}
           className={styles.conflict}
-          data-testid={`ce-setup-conflict-${conflict.code}`}
+          data-testid={`${E2E_TESTIDS.SETUP_CONFLICT_PREFIX}${conflict.code}`}
         >
           {conflict.message}
         </p>

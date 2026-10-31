@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { Input } from 'reactstrap';
 
 import ResultsAnalysisSettingsFields from '../ResultsAnalysisSettingsFields';
@@ -131,7 +132,7 @@ export const SetupResultsSection = ({ draft, onChange, open, onToggle, conflicts
               type="select"
               value={profile.results.visibility}
               aria-describedby={setupHelpId('ce-setup-results-visibility')}
-              data-testid="ce-setup-results-visibility"
+              data-testid={E2E_TESTIDS.SETUP_RESULTS_VISIBILITY}
               onChange={(event) =>
                 editProfile((next) => setResultsVisibility(next, event.target.value as SessionModeResultsVisibility))
               }
@@ -425,7 +426,7 @@ export const SetupAccessSection = ({
           type="select"
           value={profile.encryption.mode}
           aria-describedby={setupHelpId('ce-setup-encryption')}
-          data-testid="ce-setup-encryption"
+          data-testid={E2E_TESTIDS.SETUP_ENCRYPTION}
           onChange={(event) => editProfile((next) => setEncryptionMode(next, event.target.value, registryChainId))}
         >
           <option value="worker_envelope">{ENCRYPTION_LABELS.worker_envelope}</option>
@@ -539,7 +540,7 @@ export const SetupHostingSection = ({
               type="select"
               value={profile.authority.mode}
               aria-describedby={setupHelpId('ce-setup-authority')}
-              data-testid="ce-setup-authority"
+              data-testid={E2E_TESTIDS.SETUP_AUTHORITY}
               onChange={(event) => editProfile((next) => setHosting(next, event.target.value, registryChainId))}
             >
               <option value="worker_canonical">Session Worker</option>
@@ -551,7 +552,7 @@ export const SetupHostingSection = ({
               id="ce-setup-storage"
               type="select"
               value={profile.storage.backend}
-              data-testid="ce-setup-storage"
+              data-testid={E2E_TESTIDS.SETUP_STORAGE}
               onChange={(event) =>
                 editProfile((next) => {
                   if (event.target.value === next.storage.backend) return;

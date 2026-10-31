@@ -143,7 +143,7 @@ const buildSessionWizardPublicAiConfig = (value: unknown): AnyRecord => {
 
 // sessionContext as the session page reads it: trimmed text, no empty
 // paragraphs or link-less links. null when nothing is left to publish.
-export const normalizeSessionWizardContext = (value: unknown): AnyRecord | null => {
+export const normalizeSessionWizardContext = (value: unknown): Record<string, unknown> | null => {
   const context = isObj(value) ? value : {};
   const text = (entry: unknown) => (typeof entry === 'string' ? entry.trim() : '');
   const normalized = {
