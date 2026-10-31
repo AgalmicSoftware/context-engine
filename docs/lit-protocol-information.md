@@ -120,8 +120,12 @@ Lit background with the concepts Context Engine uses, and the repo wiring.
   acknowledgement on every attempt. A missing account key produces guidance
   to save one; failures do not automatically retry provisioning. An allocated account
   and its key survive a fresh-authority switch. A saved group, PKP or action blocks
-  the switch with its identifiers and a Resume instruction; no implicit reset
-  discards those resources. A supplied key alone, without an account wallet or any
+  the switch with its identifiers and a Resume instruction. Saved progress is
+  discarded only when Lit confirms it is gone: if Lit refuses the saved account
+  key, or its complete group or wallet list no longer includes the saved group or
+  PKP, the pending record is cleared (keeping an account Lit still accepts) and
+  the next attempt starts over. Network errors, timeouts, 5xx, rate limits and
+  billing refusals keep it. A supplied key alone, without an account wallet or any
   remote resource, does not reserve a resource and can be corrected. Both endpoints
   check supplied keys against saved resources before beginning an attempt, and
   repeat that check under the coordinator lock. Conflicts never expose keys: restore
