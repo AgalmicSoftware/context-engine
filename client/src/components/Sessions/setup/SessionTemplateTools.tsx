@@ -4,6 +4,7 @@ import { Input } from 'reactstrap';
 
 import {
   SESSION_TEMPLATE_FORMAT,
+  SESSION_TEMPLATE_MAX_BYTES,
   diffSessionTemplates,
   parseSessionTemplateJson,
   validateSessionTemplate,
@@ -143,6 +144,11 @@ export const SessionTemplateActions = ({
   };
   const readFile = (file: File | undefined) => {
     if (!file) return;
+    // Refused before reading, so an oversized file never loads into memory.
+    if (file.size > SESSION_TEMPLATE_MAX_BYTES) {
+      setErrors([{ path: '', message: `This template is larger than ${SESSION_TEMPLATE_MAX_BYTES / 1024} KB.` }]);
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => check(String(reader.result ?? ''));
     reader.onerror = () => setErrors([{ path: '', message: 'That file could not be read.' }]);

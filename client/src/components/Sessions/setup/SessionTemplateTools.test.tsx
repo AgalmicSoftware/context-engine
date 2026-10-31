@@ -132,6 +132,17 @@ describe('session template tools', () => {
     expect(onImport).toHaveBeenCalledWith(expect.objectContaining({ defaultTags: 'parks' }));
   });
 
+  it('refuses a template file over 256 KB without reading it', () => {
+    const readAsText = jest.spyOn(FileReader.prototype, 'readAsText');
+    renderActions();
+    fireEvent.click(screen.getByTestId('ce-template-import'));
+    const file = new File(['x'.repeat(256 * 1024 + 1)], 'huge.json', { type: 'application/json' });
+    fireEvent.change(screen.getByTestId('ce-template-file'), { target: { files: [file] } });
+    expect(readAsText).not.toHaveBeenCalled();
+    expect(screen.getByTestId('ce-template-errors')).toHaveTextContent('larger than 256 KB');
+    readAsText.mockRestore();
+  });
+
   it('shows a link draft and its differences before anything is used', () => {
     const mine = template({ draftId: 'draft-1', sessionName: 'Mine' });
     const theirs = template({ draftId: 'draft-1', sessionName: 'Theirs', defaultTags: 'parks' });
