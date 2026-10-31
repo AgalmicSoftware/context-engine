@@ -32,6 +32,8 @@ type SessionListeningPanelProps = Record<string, unknown> & {
   panelMode?: 'recordGroup' | 'listening';
   embeddedInModal?: boolean;
   closeActionRef?: React.MutableRefObject<(() => Promise<void>) | null>;
+  // Lets the dialog ignore backdrop taps and Escape while the microphone is capturing.
+  onCaptureChange?: (capturing: boolean) => void;
 };
 type CreateQuestionsAndSurveysPanelProps = React.ComponentProps<typeof CreateQuestionsAndSurveys>;
 type BrowserAudioWindow = Window &
@@ -81,6 +83,9 @@ export const formatSessionRecordingElapsed = (secondsRaw: unknown) => {
   const rest = seconds % 60;
   return `${minutes}:${String(rest).padStart(2, '0')}`;
 };
+
+const KEEP_AUDIO_HELP =
+  'Closes without waiting for transcription. Audio still waiting for it stays on this device and resumes uploading when you reopen this recording.';
 
 const getSessionInstructions = (sessionConfig: unknown) =>
   sessionConfig && typeof sessionConfig === 'object'
@@ -337,6 +342,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     panelMode = 'listening',
     embeddedInModal = false,
     closeActionRef,
+    onCaptureChange,
   } = props;
   const [labelSpeakers, setLabelSpeakers] = useState(true);
   const [speakerLabelsSupported, setSpeakerLabelsSupported] = useState<boolean | null>(null);
@@ -376,6 +382,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   });
   const speakerHelpId = `ce-record-speaker-help-${useId().replace(/:/g, '')}`;
   const labelsHelpId = `ce-speaker-labels-help-${useId().replace(/:/g, '')}`;
+  const keepHelpId = `ce-keep-audio-help-${useId().replace(/:/g, '')}`;
   const recordingContext = useMemo(
     () => ({
       ...(context && typeof context === 'object' ? context : {}),
@@ -432,6 +439,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     failedCount > 0 ||
     Boolean(recorder.errorMessage || generationError);
   const isRecorderSessionActive = recorder.isRecording || recorder.isPaused || recorder.isStopping;
+  const isCapturing = isRecorderSessionActive || recorder.isBusy;
+  useEffect(() => {
+    if (!isCapturing || !onCaptureChange) return undefined;
+    onCaptureChange(true);
+    return () => onCaptureChange(false);
+  }, [isCapturing, onCaptureChange]);
   const hasPendingTranscription = Number(recorder.pendingSegmentCount || 0) > 0;
   useEffect(() => {
     // Switching Record/Stop removes the focused button; keep Escape inside the modal.
@@ -692,24 +705,43 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         </div>
       ) : null}
       {gapWarning ? <div role="status">{gapWarning}</div> : null}
-      {(hasPendingTranscription || failedCount > 0 || isClosing) && onClose ? (
-        <Button
-          type="button"
-          className={styles.sessionInterviewHeaderButton}
-          onClick={async () => {
-            try {
-              await finalizeRecording({ waitForTranscription: false });
-              await keepAudio();
-              if (isMountedRef.current) onClose();
-            } catch (error) {
-              setCloseError(
-                error instanceof Error ? error.message : 'Could not keep the audio. Download it before leaving.',
-              );
-            }
-          }}
-        >
-          Close and keep the audio
-        </Button>
+      {/* One tap must not end capture: Stop first, then close without waiting for uploads. */}
+      {!isCapturing && (hasPendingTranscription || failedCount > 0 || isClosing) && onClose ? (
+        <span className={styles.sessionRecordingOption}>
+          <Button
+            type="button"
+            className={styles.sessionInterviewHeaderButton}
+            aria-describedby={`${keepHelpId}-about`}
+            onClick={async () => {
+              try {
+                await finalizeRecording({ waitForTranscription: false });
+                await keepAudio();
+                if (isMountedRef.current) onClose();
+              } catch (error) {
+                setCloseError(
+                  error instanceof Error ? error.message : 'Could not keep the audio. Download it before leaving.',
+                );
+              }
+            }}
+          >
+            Close and keep the audio
+          </Button>
+          <button
+            type="button"
+            id={keepHelpId}
+            className={styles.sessionInterviewHeaderButton}
+            aria-label="About closing and keeping the audio"
+            aria-describedby={`${keepHelpId}-about`}
+          >
+            <FontAwesomeIcon icon={faQuestionCircle} />
+          </button>
+          <span id={`${keepHelpId}-about`} hidden>
+            {KEEP_AUDIO_HELP}
+          </span>
+          <UncontrolledTooltip target={keepHelpId} trigger="hover focus" autohide={false}>
+            {KEEP_AUDIO_HELP}
+          </UncontrolledTooltip>
+        </span>
       ) : null}
       {panelMode === 'recordGroup' && speakerLabelsCheckTimedOut ? (
         <div role="status">Speaker label check timed out. Recording is available with plain transcription.</div>

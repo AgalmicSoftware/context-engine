@@ -99,20 +99,37 @@ afterEach(() => {
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: originalDevices });
 });
 
-it.each(['Close', 'Escape', 'outside click'])(
-  'closing with %s saves the final speech and restores it on reopen',
+it('closing with Close saves the final speech and restores it on reopen', async () => {
+  render(<Harness />);
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
+  fireEvent.click(screen.getByTestId('ce-session-listening-start'));
+  await screen.findByRole('button', { name: 'Stop recording' });
+  dismiss('Close');
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(transcribeAudio).toHaveBeenCalledTimes(1);
+  expect(savedTranscript()).toBe(transcript);
+  fireEvent.click(screen.getByText('Reopen recording'));
+  fireEvent.click(await screen.findByTestId('ce-session-listening-transcript-details'));
+  expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript);
+});
+
+it.each(['Escape', 'outside click'])(
+  '%s keeps capturing, then closes and saves once the recording is stopped',
   async (method) => {
     render(<Harness />);
     await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
     fireEvent.click(screen.getByTestId('ce-session-listening-start'));
     await screen.findByRole('button', { name: 'Stop recording' });
     dismiss(method);
+    await act(async () => {});
+    expect(mockStop).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Stop recording' }));
+    await screen.findByText('Transcribed');
+    dismiss(method);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(transcribeAudio).toHaveBeenCalledTimes(1);
+    expect(mockStop).toHaveBeenCalledTimes(1);
     expect(savedTranscript()).toBe(transcript);
-    fireEvent.click(screen.getByText('Reopen recording'));
-    fireEvent.click(await screen.findByTestId('ce-session-listening-transcript-details'));
-    expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript);
   },
 );
 

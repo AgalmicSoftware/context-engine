@@ -823,6 +823,26 @@ it('generates with a gap warning and offers closing while keeping pending audio'
   expect(keepAudio).toHaveBeenCalledTimes(1);
 });
 
+it('offers Close and keep the audio only after capture stops, with its explanation behind a question mark', () => {
+  const onCaptureChange = jest.fn();
+  const pending = { segments: [{ id: 'up', index: 0, status: 'transcribing', text: '', startedAt: 1 }] };
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({ ...pending, pendingSegmentCount: 1, isRecording: true, status: 'recording' }),
+  );
+  const { rerender } = render(
+    <SessionListeningPanel sessionSlug="room" onClose={jest.fn()} onCaptureChange={onCaptureChange} />,
+  );
+  expect(screen.queryByRole('button', { name: 'Close and keep the audio' })).not.toBeInTheDocument();
+  expect(onCaptureChange).toHaveBeenLastCalledWith(true);
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ ...pending, pendingSegmentCount: 1 }));
+  rerender(<SessionListeningPanel sessionSlug="room" onClose={jest.fn()} onCaptureChange={onCaptureChange} />);
+  expect(onCaptureChange).toHaveBeenLastCalledWith(false);
+  const keep = screen.getByRole('button', { name: 'Close and keep the audio' });
+  const help = screen.getByRole('button', { name: 'About closing and keeping the audio' });
+  expect(keep).toHaveAccessibleDescription(/resumes uploading when you reopen this recording/);
+  expect(help).toHaveAccessibleDescription(/resumes uploading when you reopen this recording/);
+});
+
 it('makes Record available with plain transcription after two seconds and ignores a late provider result', async () => {
   jest.useFakeTimers();
   type Config = Awaited<ReturnType<typeof getEffectiveTranscriptionConfig>>;

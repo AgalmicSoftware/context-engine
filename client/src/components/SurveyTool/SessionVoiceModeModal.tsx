@@ -26,6 +26,8 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
     onInterviewProgressChange?.(hasUnsavedReview);
   }, [hasUnsavedReview, onInterviewProgressChange]);
   const groupCloseRef = useRef<(() => Promise<void>) | null>(null);
+  // A tap outside or Escape must not end a recording; the header close button still stops and saves it.
+  const [groupCapturing, setGroupCapturing] = useState(false);
   const requestClose = () => {
     if (mode === 'recordGroup' && groupCloseRef.current) void groupCloseRef.current();
     else onClose();
@@ -41,6 +43,8 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         isOpen={isOpen}
         unmountOnClose={mode !== 'interview'}
         toggle={requestClose}
+        backdrop={groupCapturing ? 'static' : true}
+        keyboard={!groupCapturing}
         size="lg"
         centered
         labelledBy="ce-session-voice-mode-title"
@@ -82,6 +86,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                   embeddedInModal
                   onClose={onClose}
                   closeActionRef={groupCloseRef}
+                  onCaptureChange={setGroupCapturing}
                 />
               )}
             </ModalBody>
