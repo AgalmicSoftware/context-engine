@@ -36,7 +36,7 @@ export const MAX_RUN_SCOPES_BYTES = 1024 * 1024;
 
 export const AGENT_ONLY_PRINCIPAL_ID_SALT = 'context-engine-agent-only-principal-id-v1';
 
-export const DEFAULT_WRAPPED_IMAGE_MODEL = 'gpt-image-2';
+export const DEFAULT_WRAPPED_IMAGE_MODEL = 'gpt-image-2.5-flare';
 
 export const DEFAULT_WRAPPED_IMAGE_SIZE = '1536x1024';
 
