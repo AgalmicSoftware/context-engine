@@ -1,4 +1,5 @@
 import { normalizeInterviewSettings } from '@ce-shared/interviewSettings.mjs';
+import { isRealtimeInterviewModel } from '@ce-shared/realtimeInterviewConfig.mjs';
 import { normalizeResultsAnalysisSettings } from '@ce-shared/resultsAnalysisSettings.mjs';
 import {
   WORKER_CANONICAL_SET_CONFIG_KEYS,
@@ -43,7 +44,7 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     groupCreationPolicy: source.groupCreationPolicy,
     interviewModeEnabled: source.interviewModeEnabled !== false,
     interviewMode: clone(asRecord(source.interviewMode)),
-    resultsAnalysis: clone(source.resultsAnalysis ?? null),
+    resultsAnalysis: normalizeResultsAnalysisSettings(source.resultsAnalysis),
     ai: clone(asRecord(source.ai)),
     sessionModeProfile: clone(source.sessionModeProfile ?? null),
   };
@@ -65,6 +66,9 @@ const nextInterviewMode = (before: unknown, edited: unknown, enabled: boolean): 
   const changed: Config = Object.fromEntries(
     Object.entries(now).filter(([key, value]) => !same(value, (was as Config)[key])),
   );
+  // The voice model sits outside those settings; only a supported one is saved.
+  const model = trimmed(asRecord(edited).realtimeModel);
+  if (isRealtimeInterviewModel(model) && model !== trimmed(stored.realtimeModel)) changed.realtimeModel = model;
   // The wizard stores the voice switch in both places; keep them in step.
   if ('enabled' in stored && stored.enabled !== enabled) changed.enabled = enabled;
   return withoutNewInterviewDefaults({ ...stored, ...changed });
@@ -85,7 +89,6 @@ const editedValues = (before: Config, draft: SetupDraft, nowMs: number): Config 
     interviewModeEnabled: draft.interviewModeEnabled !== false,
     interviewMode: nextInterviewMode(before.interviewMode, draft.interviewMode, draft.interviewModeEnabled !== false),
     resultsAnalysis: normalizeResultsAnalysisSettings(draft.resultsAnalysis),
-    ai: clone(asRecord(draft.ai)),
     sessionModeProfile: clone(draft.sessionModeProfile ?? null),
   };
   // A cleared end time is sent as '' so the stored one goes; an unchanged one is left alone.
@@ -102,7 +105,14 @@ const isBlank = (value: unknown) =>
 // The publish normalizer returns null for a context with nothing left in it.
 const contextIsBlank = (value: unknown) => !normalizeSessionWizardContext(value);
 
+// Every edit marks a profile `custom`; that label alone is not a change.
+const withoutPreset = (profile: unknown) => {
+  const { preset: _preset, ...rest } = asRecord(profile);
+  return rest;
+};
+
 const unchanged = (key: string, before: unknown, after: unknown) => {
+  if (key === 'sessionModeProfile') return same(withoutPreset(before), withoutPreset(after));
   if (key === 'sessionContext')
     return same(normalizeContext(before), after) || (contextIsBlank(before) && contextIsBlank(after));
   if (key === 'resultsAnalysis') return same(normalizeResultsAnalysisSettings(before), after);
@@ -157,7 +167,6 @@ const TEMPLATE_FIELDS = [
   'interviewModeEnabled',
   'interviewMode',
   'resultsAnalysis',
-  'ai',
   'questions',
 ] as const;
 
@@ -177,7 +186,13 @@ export const applyTemplateToSessionSettingsDraft = (
   });
   const profile = template.sessionModeProfile;
   const sameHosting = !!profile && authorityOf(profile) === authorityOf(draft.sessionModeProfile);
-  if (sameHosting) next.sessionModeProfile = clone(profile);
+  if (sameHosting) {
+    // Agent access is fixed on this page, as in its Hosting section.
+    const own = asRecord(asRecord(draft.sessionModeProfile).surfaces);
+    const kept = clone(asRecord(profile));
+    kept.surfaces = { ...asRecord(kept.surfaces), agentHttp: own.agentHttp };
+    next.sessionModeProfile = kept;
+  }
   return { draft: next, keptHosting: !!profile && !sameHosting };
 };
 

@@ -6,7 +6,13 @@ import { buildSessionWizardDefaultTemplate } from '../sessionWizardDraftState';
 import { applySessionModeProfileSelectionToDraft } from '../sessionWizardModeProfileDraftController';
 import { buildSessionWizardWorkerConfigPayload } from '../sessionWizardWriteNormalization';
 import { editSessionSetupProfile, setEncryptionMode, setResultsVisibility } from '../setup/sessionSetupProfile';
-import { buildSessionSettingsDraft, buildSessionSettingsSave } from './sessionSettingsEdits';
+import { normalizeResultsAnalysisSettings } from '@ce-shared/resultsAnalysisSettings.mjs';
+import { SESSION_TEMPLATE_FORMAT, sessionTemplateFromDraft } from '@ce-shared/sessionTemplate.mjs';
+import {
+  applyTemplateToSessionSettingsDraft,
+  buildSessionSettingsDraft,
+  buildSessionSettingsSave,
+} from './sessionSettingsEdits';
 
 const SLUG = 'edit-salon';
 const ADMIN = '0x00000000000000000000000000000000000000aa';
@@ -142,6 +148,66 @@ describe('saving the edit page through the Session Worker', () => {
     expect(save.patch).not.toHaveProperty('corsWorkerUrl');
     expect(result).toMatchObject({ ok: true });
     expect(result.config).toMatchObject({ sessionName: 'All changed', interviewModeEnabled: false });
+  });
+
+  it('leaves AI settings alone, since the public config cannot show their effort', () => {
+    const created = publishedSession();
+    const stored = workerSave(created, {
+      ai: { ...created.ai, reasoningEffort: 'high', taskReasoningEffort: { generate: 'medium' } },
+    }).config;
+    const { save, result } = editAndSave(stored, (draft) => {
+      draft.ai = { models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } }, reasoningEffort: 'low' };
+    });
+
+    expect(save.patch).toEqual({});
+    expect(result.config.ai).toMatchObject({ reasoningEffort: 'high', taskReasoningEffort: { generate: 'medium' } });
+  });
+
+  it('saves an interview voice model edit, but not an unknown model', () => {
+    const stored = publishedSession();
+    const { save, result } = editAndSave(stored, (draft) => {
+      draft.interviewMode = { ...draft.interviewMode, realtimeModel: 'gpt-realtime-2.1' };
+    });
+    expect(save.patch.interviewMode).toMatchObject({ realtimeModel: 'gpt-realtime-2.1' });
+    expect(result).toMatchObject({ ok: true });
+    expect(result.config.interviewMode.realtimeModel).toBe('gpt-realtime-2.1');
+
+    const unknown = editAndSave(stored, (draft) => {
+      draft.interviewMode = { ...draft.interviewMode, realtimeModel: 'not-a-voice-model' };
+    });
+    expect(unknown.save.patch).toEqual({});
+  });
+
+  it('does not sign anyone out for a profile edit that changes nothing back', () => {
+    const stored = publishedSession();
+    const { save, result } = editAndSave(stored, (draft) => {
+      draft.sessionModeProfile = editSessionSetupProfile(draft.sessionModeProfile, () => {}).profile;
+    });
+    expect(save.patch).toEqual({});
+    expect(result.config.authzEpoch).toBe(stored.authzEpoch);
+  });
+
+  it('exports a session saved without results analysis settings', () => {
+    const before = projectPublicWorkerSessionConfig(publishedSession());
+    delete before.resultsAnalysis;
+    const draft = buildSessionSettingsDraft(before);
+    expect(draft.resultsAnalysis).toEqual(normalizeResultsAnalysisSettings(undefined));
+    expect(sessionTemplateFromDraft(draft)).toMatchObject({ ok: true });
+    expect(buildSessionSettingsSave(before, draft).patch).toEqual({});
+  });
+
+  it('keeps the session’s own agent access when a template is imported', () => {
+    const stored = publishedSession();
+    const before = projectPublicWorkerSessionConfig(stored);
+    const profile = editSessionSetupProfile(before.sessionModeProfile, (next) => {
+      next.surfaces.agentHttp = !before.sessionModeProfile.surfaces.agentHttp;
+    }).profile;
+    const { draft } = applyTemplateToSessionSettingsDraft(buildSessionSettingsDraft(before), {
+      format: SESSION_TEMPLATE_FORMAT,
+      sessionModeProfile: profile,
+    });
+    expect(draft.sessionModeProfile.surfaces.agentHttp).toBe(before.sessionModeProfile.surfaces.agentHttp);
+    expect(buildSessionSettingsSave(before, draft).patch).not.toHaveProperty('sessionModeProfile');
   });
 
   it('saves nothing when nothing changed', () => {
