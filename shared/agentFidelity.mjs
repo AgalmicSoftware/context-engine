@@ -1,7 +1,7 @@
 // Agent fidelity: how well an AI's predicted answers match the answers people
 // give, and whether AI drafts flatten how strongly or how differently people
 // answer. Pure functions with no I/O. The method is in docs/agent-fidelity.md.
-import { DEFAULT_AI_MODEL } from './aiDefaults.mjs';
+import { DEFAULT_AI_MODELS } from './aiDefaults.mjs';
 import { confidenceMeaningOf } from './interviewConfidence.mjs';
 import { getVoiceCredits } from './questions/quadraticAllocation.mjs';
 import { normalizeRatingScale } from './questions/ratingScale.mjs';
@@ -224,10 +224,14 @@ const pairwiseSimilaritySum = (question, entries) => {
 // ---------------------------------------------------------------------------
 // Reading records
 
+// The models in-app interviews draft with by default: today's, and gpt-5.6-terra,
+// the default for records before 0.8.2. A draft records the model that ran.
+const DEFAULT_DRAFT_MODELS = new Set([DEFAULT_AI_MODELS.fast, DEFAULT_AI_MODELS.thinking, 'gpt-5.6-terra']);
+
 /**
  * Where a draft came from. Records don't say so yet, so this falls back on
  * the provenance source: chat-assistant prefill self-reports chatgpt or claude;
- * in-app voice drafts use the app's default model.
+ * in-app voice drafts name one of the app's default models.
  */
 export const inferDraftOrigin = (provenance = {}) => {
   const explicit = text(provenance.draftOrigin);
@@ -237,7 +241,7 @@ export const inferDraftOrigin = (provenance = {}) => {
   const modelId = text(source.modelId);
   if (platform === 'chatgpt' || platform === 'claude') return 'external_prefill';
   if (modelId === 'direct-user-context') return 'typed_context';
-  if (platform === 'other' && modelId === DEFAULT_AI_MODEL) return 'voice_interview';
+  if (platform === 'other' && DEFAULT_DRAFT_MODELS.has(modelId)) return 'voice_interview';
   return 'unknown';
 };
 

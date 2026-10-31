@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
+import { DEFAULT_AI_MODEL, DEFAULT_AI_MODELS } from '../../shared/aiDefaults.mjs';
 import {
   answerSimilarity,
   collectSessionFidelityData,
@@ -71,6 +71,10 @@ test('draft origin falls back on the self-reported source', () => {
   assert.equal(inferDraftOrigin({ source: { platform: 'claude', modelId: 'x' } }), 'external_prefill');
   assert.equal(inferDraftOrigin({ source: { platform: 'other', modelId: 'direct-user-context' } }), 'typed_context');
   assert.equal(inferDraftOrigin({ source: { platform: 'other', modelId: DEFAULT_AI_MODEL } }), 'voice_interview');
+  // In-app interviews draft with the thinking model; records before 0.8.2 name gpt-5.6-terra.
+  assert.equal(inferDraftOrigin({ source: { platform: 'other', modelId: DEFAULT_AI_MODELS.thinking } }), 'voice_interview');
+  assert.equal(inferDraftOrigin({ source: { platform: 'other', modelId: 'gpt-5.6-terra' } }), 'voice_interview');
+  assert.equal(inferDraftOrigin({ source: { platform: 'other', modelId: 'gemini-3-pro' } }), 'unknown');
   assert.equal(inferDraftOrigin({ draftOrigin: 'external_prefill', source: {} }), 'external_prefill');
   assert.equal(inferDraftOrigin({}), 'unknown');
 });

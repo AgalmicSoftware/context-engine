@@ -123,7 +123,11 @@ test('results, deterministic images, shared operator caches and Geo backlinks en
   const backlink = await jsonOk(await f.request(`/api/agent/geo-backlink?questionId=${questions[0].questionId}`, { token }));
   assert.equal(new URL(backlink.backlink.questionEndpoint).origin, origin);
   const cache = { viewType: 'consensus', dataVersionKey: 'fixture-results-v1', value: { label: 'Fixture aggregate' } };
-  await jsonOk(await signed(f, '/api/agent/result-view-cache', cache));
+  // The cache records the model its poster reports running, never one of its own.
+  assert.equal('model' in await jsonOk(await signed(f, '/api/agent/result-view-cache', cache)), false);
+  const reported = await jsonOk(await signed(f, '/api/agent/result-view-cache',
+    { ...cache, dataVersionKey: 'fixture-results-v0', model: 'claude-opus-5-5', reasoning_effort: 'medium' }));
+  assert.deepEqual([reported.model, reported.reasoning_effort], ['claude-opus-5-5', 'medium']);
   assert.equal((await f.request('/api/agent/result-view-cache', { method: 'POST', token, body: cache })).status, 403);
   const path = '/api/agent/result-view-cache?viewType=consensus&dataVersionKey=fixture-results-v1';
   const cached = await jsonOk(await f.request(path, { token })); assert.equal(cached.cached, true); assert.equal(cached.value.label, cache.value.label);

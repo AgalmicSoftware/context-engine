@@ -136,7 +136,7 @@ export async function loadResultViewCache(env = {}, { sessionSlug = '', viewType
 
 export async function saveResultViewCache(
   env = {},
-  { sessionSlug = '', viewType = '', dataVersionKey = '', value = {} } = {},
+  { sessionSlug = '', viewType = '', dataVersionKey = '', value = {}, model = '', reasoningEffort = '' } = {},
 ) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== 'function') return null;
@@ -151,8 +151,9 @@ export async function saveResultViewCache(
     viewType: type,
     dataVersionKey: dataKey,
     generatedAt: new Date().toISOString(),
-    model: 'gpt-5.5',
-    reasoning_effort: 'high',
+    // The poster ran the model, so the cache records what it reports, or nothing.
+    ...(safeString(model) ? { model: safeString(model).slice(0, 128) } : {}),
+    ...(safeString(reasoningEffort) ? { reasoning_effort: safeString(reasoningEffort).slice(0, 16) } : {}),
     value: normalizeResultViewAnalysisValue(value, type),
   };
   assertNoSecretShape(payload, "Agent result view cache payload must not serialize secrets.");
@@ -198,6 +199,8 @@ export async function handleResultViewCacheRequest({ env = {}, context = {}, inp
     viewType,
     dataVersionKey,
     value: input.value || input.result || input.cache || {},
+    model: input.model,
+    reasoningEffort: input.reasoning_effort || input.reasoningEffort,
   });
   if (saved?.ok === false) {
     return jsonResultViewCache(request, env, saved, { status: 413 });
