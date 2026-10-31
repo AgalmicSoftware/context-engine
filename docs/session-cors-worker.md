@@ -560,9 +560,11 @@ Admin test panel:
   bootstrapped from the selected session without manual KV edits.
 - If selected metadata omits `registryAddress`/`rpcUrl`, the admin payload now backfills those from
   chain defaults (`chains.ts`) before calling `/admin/set-config`.
-- Admin metadata saves now also reuse the same signed `/admin/set-config` path after a successful
-  Arweave + SessionRegistry metadata update, so worker-relevant config such as `blockLimits`,
-  faucet thresholds, and registry/rpc/contracts context stay aligned with the latest admin-edited session metadata.
+- On-chain saves on the settings page (`/session/<slug>/settings`) reuse the same signed
+  `/admin/set-config` path after a successful Arweave + SessionRegistry metadata update, so
+  worker-relevant config such as `blockLimits`, faucet thresholds, registry/rpc/contracts context
+  and the edited fields (with all of `ai` when it changed) stay aligned with the new metadata. A
+  failed sync is reported on its own; the on-chain update stands.
 - `/health` now follows the same recovery path: admin tests auto-attempt `/admin/set-config` on
   `Session config not found.` and retry once.
 - The faucet test sends a micro transfer (0.0000001) to a fresh random address; it does not fund the connected wallet.
@@ -2436,7 +2438,9 @@ Never return secrets in responses.
 
 - Content-only edits keep web and agent sessions signed in: `sessionName`,
   `sessionInfo`, `sessionContext`, `questionsGenPrompt`, `appearance`,
-  `sessionHeaderImg`, and `interviewMode.openingPrompt` / `steeringPrompt`.
+  `sessionHeaderImg`, `interviewMode.openingPrompt` / `steeringPrompt`, and the
+  curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
+  `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
   Adding unique `agentHttp.invites` also preserves authorization when all prior
   invite records remain unchanged. Removing, disabling, re-enabling or editing
   an existing invite revokes authorization. Other fields, including permissions,
@@ -2444,6 +2448,22 @@ Never return secrets in responses.
   remain authority-sensitive. A mixed content/authority edit raises `authzEpoch`. Permission-revocation tests preserve existing invites so they verify the changed permission independently.
   Classification compares the normalized configuration that will be stored.
   Config revision and optimistic-write checks still cover every effective edit.
+
+- `ai` merges one level deep: a sent subkey such as `models`,
+  `reasoningEffort` or `taskReasoningEffort` replaces that subkey, and an
+  omitted one is kept. An editor that sees only the public part of `ai` can
+  therefore save it without dropping hidden parts such as
+  `providers.custom.functions`. To remove a subkey's contents, send it empty
+  (for example `taskReasoningEffort: {}`). The complete merged record is
+  checked as before, and sign-out is judged on it, so resending stored values
+  signs no one out; any change to `ai` still raises `authzEpoch`. The public
+  `/session-config` shows `ai.models`, `ai.reasoningEffort` and
+  `ai.taskReasoningEffort`, and every read carries `setConfigMergesAi: true`,
+  set by the Worker and never stored. Workers from before this change replace
+  `ai` whole and lack the field, so editors leave `ai` alone on them.
+- The curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
+  `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS` are accepted as lists of at
+  most 500 IDs of 1-128 letters, digits or `._:-`; anything else returns `400`.
 
 - `pileAutoAdvanceEnabled` is an optional boolean controlling question pile
   navigation. Both `true` and `false` survive deployment, config patches, and
