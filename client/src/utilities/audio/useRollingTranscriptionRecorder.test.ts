@@ -239,6 +239,30 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
+  it('restarts an upload left hanging by an outage when the connection returns', async () => {
+    (transcribeAudio as jest.Mock)
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockImplementation(async () => 'Uploaded after reconnecting.');
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'hung-upload' }));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await act(async () => {
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(result.current.segments[0].status).toBe('transcribing');
+    const firstOptions = (transcribeAudio as jest.Mock).mock.calls[0][1] as { signal: AbortSignal };
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+      await flushPromises();
+    });
+    expect(transcribeAudio).toHaveBeenCalledTimes(2);
+    expect(result.current.transcript).toBe('Uploaded after reconnecting.');
+    expect(firstOptions.signal.aborted).toBe(true);
+    unmount();
+  });
+
   it('persists a partial recording before stop and recovers it after reopening', async () => {
     (transcribeAudio as jest.Mock).mockImplementation(async () => 'Recovered partial recording.');
     const first = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'recover' }));

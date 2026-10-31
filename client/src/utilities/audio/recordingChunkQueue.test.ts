@@ -17,7 +17,7 @@ const tick = async () => {
 const audio = new Blob(['recorded audio'], { type: 'audio/webm' });
 let saved: Map<string, RecordingChunk>;
 let queues: RecordingChunkQueue[];
-type Transcribe = (audio: Blob, labels: boolean) => Promise<{ text: string }>;
+type Transcribe = (audio: Blob, labels: boolean, signal: AbortSignal) => Promise<{ text: string }>;
 const create = (transcribe: Transcribe = jest.fn(async () => ({ text: 'Speech.' })), scope = 'room') => {
   const queue = new RecordingChunkQueue({ scope, transcribe, onChange: jest.fn() });
   queues.push(queue);
@@ -70,6 +70,48 @@ it('retries the first chunk with backoff before uploading later chunks', async (
   expect(calls).toEqual([audio, audio, audio, later]);
   expect(queue.segments.map((segment) => segment.status)).toEqual(['complete', 'complete']);
   expect([...saved.values()].every((record) => !record.audio)).toBe(true);
+});
+
+it('abandons an upload that never answers, retries it, then uploads later chunks', async () => {
+  const signals: AbortSignal[] = [];
+  const transcribe = jest.fn((_blob: Blob, _labels: boolean, signal: AbortSignal) => {
+    signals.push(signal);
+    return signals.length === 1 ? new Promise<{ text: string }>(() => {}) : Promise.resolve({ text: 'Answered.' });
+  });
+  const queue = create(transcribe);
+  await queue.ready;
+  const later = new Blob(['later']);
+  queue.capture(queue.begin(false), audio, true);
+  queue.capture(queue.begin(false), later, true);
+  await tick();
+  await jest.advanceTimersByTimeAsync(119_999);
+  expect(transcribe).toHaveBeenCalledTimes(1);
+  await jest.advanceTimersByTimeAsync(1);
+  expect(queue.segments[0]).toMatchObject({ status: 'retrying', error: expect.stringContaining('stopped responding') });
+  expect(signals[0].aborted).toBe(true);
+  await jest.advanceTimersByTimeAsync(2000);
+  expect(transcribe).toHaveBeenCalledTimes(3);
+  expect(transcribe.mock.calls[1][0]).toBe(audio);
+  expect(transcribe.mock.calls[2][0]).toBe(later);
+  expect(queue.segments.map((segment) => segment.status)).toEqual(['complete', 'complete']);
+});
+
+it('restarts the uploading chunk at once when asked to retry it', async () => {
+  const signals: AbortSignal[] = [];
+  const queue = create((_blob: Blob, _labels: boolean, signal: AbortSignal) => {
+    signals.push(signal);
+    return signals.length === 1 ? new Promise<{ text: string }>(() => {}) : Promise.resolve({ text: 'Answered.' });
+  });
+  await queue.ready;
+  const id = queue.begin(false);
+  queue.capture(id, audio, true);
+  await tick();
+  expect(queue.segments[0].status).toBe('transcribing');
+  await queue.retry(id);
+  await tick();
+  expect(signals).toHaveLength(2);
+  expect(signals[0].aborted).toBe(true);
+  expect(queue.segments[0]).toMatchObject({ status: 'complete', text: 'Answered.' });
 });
 
 it('recovers from a thirty-second outage without manual action', async () => {
@@ -223,7 +265,7 @@ it('resets speaker fallback when a completed recording is cleared', async () => 
   await queue.clear();
   queue.capture(queue.begin(true), audio, true);
   await queue.finish();
-  expect(transcribe).toHaveBeenLastCalledWith(audio, true);
+  expect(transcribe).toHaveBeenLastCalledWith(audio, true, expect.any(AbortSignal));
 });
 
 it('reopens kept pending audio even when IndexedDB is unavailable', async () => {
@@ -238,7 +280,7 @@ it('reopens kept pending audio even when IndexedDB is unavailable', async () => 
   const transcribe = jest.fn<Transcribe>(async () => ({ text: 'Recovered from memory.' }));
   const reopened = create(transcribe, 'volatile-room');
   await reopened.finish();
-  expect(transcribe).toHaveBeenCalledWith(audio, false);
+  expect(transcribe).toHaveBeenCalledWith(audio, false, expect.any(AbortSignal));
   expect(reopened.segments[0].text).toBe('Recovered from memory.');
   expect(reopened.records.get(id)?.audio).toBe(audio);
   expect(reopened.storageError).toContain("can't be recovered after a reload");

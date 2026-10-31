@@ -13,12 +13,15 @@ const memoryRecordings = new Map<string, Map<string, RecordingChunk>>();
 type Transcription = { text: string; speakerTurns?: SpeakerTranscriptTurn[]; labelsUnavailableReason?: string };
 type Options = {
   scope: string;
-  transcribe: (audio: Blob, labels: boolean) => Promise<Transcription>;
+  transcribe: (audio: Blob, labels: boolean, signal: AbortSignal) => Promise<Transcription>;
   onChange: () => void;
 };
 const failureText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const storageText = (error: unknown) =>
   `This recording can't be recovered after a reload. Its audio and transcript are kept in memory on this page; download unsaved audio before leaving. ${failureText(error)}`;
+// A request that never answers must not hold later chunks. Each attempt waits longer, so a slow upload still finishes.
+const UPLOAD_DEADLINE_MS = 120_000;
+const stalledText = 'The upload stopped responding. Retrying.';
 
 /** Raw audio and its completed transcript share one atomic IndexedDB record. */
 export class RecordingChunkQueue {
@@ -29,6 +32,7 @@ export class RecordingChunkQueue {
   private disposed = false;
   private writes: Promise<void> = Promise.resolve();
   private running: Promise<void> | null = null;
+  private uploading: { id: string; controller: AbortController } | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private attempts = new Map<string, number>();
   private lastSnapshotAt = new Map<string, number>();
@@ -60,7 +64,7 @@ export class RecordingChunkQueue {
       memoryRecordings.delete(this.options.scope);
       this.resaveKept(kept);
       this.changed();
-      this.retry();
+      void this.retry();
     } catch (error) {
       this.storageError = storageText(error);
       const kept = [...(memoryRecordings.get(this.options.scope)?.values() || [])];
@@ -72,7 +76,7 @@ export class RecordingChunkQueue {
       memoryRecordings.delete(this.options.scope);
       this.resaveKept(kept);
       this.changed();
-      this.retry();
+      void this.retry();
     }
   }
   // Audio kept only in memory stays unsaved until a write succeeds: a failed write keeps the
@@ -179,12 +183,20 @@ export class RecordingChunkQueue {
     this.attempts.set(id, attempt);
     record.segment = { ...record.segment, status: 'transcribing', error: undefined };
     this.changed();
+    const controller = new AbortController();
+    this.uploading = { id, controller };
     try {
       if (this.disposed) return;
-      const result = await this.options.transcribe(
-        record.audio!,
-        record.labelSpeakers && !this.labelsUnavailableReason,
-      );
+      const result = await new Promise<Transcription>((resolve, reject) => {
+        const deadline = setTimeout(() => controller.abort(), UPLOAD_DEADLINE_MS * attempt);
+        controller.signal.addEventListener('abort', () => reject(new Error(stalledText)), { once: true });
+        this.options
+          .transcribe(record.audio!, record.labelSpeakers && !this.labelsUnavailableReason, controller.signal)
+          .then(resolve, reject)
+          .finally(() => clearTimeout(deadline));
+      }).finally(() => {
+        this.uploading = null;
+      });
       if (this.disposed) return;
       if (result.labelsUnavailableReason) this.labelsUnavailableReason = result.labelsUnavailableReason;
       const complete: RecordingChunk = {
@@ -224,7 +236,18 @@ export class RecordingChunkQueue {
       this.changed();
     }
   }
-  retry(id?: string) {
+  /** Back online: a request sent before the outage may never answer, so start it again now. */
+  async reconnect() {
+    await this.abandonUpload();
+    await this.retry();
+  }
+  private async abandonUpload() {
+    this.uploading?.controller.abort();
+    await this.running;
+  }
+  /** Naming the chunk that is uploading abandons its request, which may never answer, and sends it again. */
+  async retry(id?: string) {
+    if (id && this.uploading?.id === id) await this.abandonUpload();
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
     for (const record of this.records.values()) {

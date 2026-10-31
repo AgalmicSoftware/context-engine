@@ -113,6 +113,21 @@ describe('SessionListeningPanel', () => {
     expect(downloadChunk).toHaveBeenCalledWith('stuck');
   });
 
+  it('lets the recorder retry a chunk that is stuck uploading', () => {
+    const retryChunk = jest.fn();
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        segments: [{ id: 'stuck-upload', index: 0, status: 'transcribing', text: '', startedAt: 1 }],
+        pendingSegmentCount: 1,
+        retryChunk,
+      }),
+    );
+    render(<SessionListeningPanel sessionSlug="workshop" />);
+    expect(screen.getByText('Uploading')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry chunk 1' }));
+    expect(retryChunk).toHaveBeenCalledWith('stuck-upload');
+  });
+
   it('keeps the hidden-period notice visible after Stop and lets the recorder dismiss it', () => {
     const dismissHiddenPeriods = jest.fn();
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(

@@ -51,16 +51,17 @@ export function useRecordingChunkQueue(options: Options) {
     setSegments([]);
     const queue = new RecordingChunkQueue({
       scope,
-      transcribe: async (audio, labels) => {
+      transcribe: async (audio, labels, signal) => {
+        const request = { ...latest.current, signal };
         if (labels) {
-          const result = await transcribeGroupAudio(audio, latest.current);
+          const result = await transcribeGroupAudio(audio, request);
           return {
             text: result.text,
             speakerTurns: result.segments,
             labelsUnavailableReason: result.labelsUnavailableReason,
           };
         }
-        return { text: await transcribeAudio(audio, latest.current) };
+        return { text: await transcribeAudio(audio, request) };
       },
       onChange: () => {
         if (!current) return;
@@ -76,7 +77,7 @@ export function useRecordingChunkQueue(options: Options) {
     queueRef.current = queue;
     const onOnline = () => {
       setOffline(false);
-      queue.retry();
+      void queue.reconnect();
     };
     const onOffline = () => {
       setOffline(true);

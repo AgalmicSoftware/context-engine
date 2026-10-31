@@ -28,7 +28,8 @@ export function SessionRecordingChunks({ segments, downloadableChunkIds = [], on
             <strong>Chunk {segment.index + 1}</strong>
             <span role="status">{STATUS_LABELS[segment.status]}</span>
             <div className={styles.actions}>
-              {segment.status === 'failed' || segment.status === 'retrying' ? (
+              {/* An upload can hang without failing; Retry sends it again. */}
+              {segment.status === 'failed' || segment.status === 'retrying' || segment.status === 'transcribing' ? (
                 <button
                   type="button"
                   onClick={() => onRetry(segment.id)}
