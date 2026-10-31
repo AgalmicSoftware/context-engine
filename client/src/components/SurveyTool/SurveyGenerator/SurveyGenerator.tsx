@@ -406,6 +406,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const [activeAction, setActiveAction] = useState('');
   const [error, setError] = useState('');
   const [sourceWarnings, setSourceWarnings] = useState<string[]>([]);
+  // Files rejected at selection, repeated by the next Generate only while the source list stays the same.
   const selectionWarningsRef = React.useRef<string[]>([]);
   const [waitingSeconds, setWaitingSeconds] = useState(0);
   const waitTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
@@ -771,8 +772,13 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     return true;
   }
 
+  const changeAdditionalSources: typeof setAdditionalSources = (update) => {
+    selectionWarningsRef.current = [];
+    setAdditionalSources(update);
+  };
+
   const queueAdditionalUrlSource = (rawUrl: string) => {
-    setAdditionalSources((prev) => [
+    changeAdditionalSources((prev) => [
       ...prev,
       {
         id: buildAdditionalSourceId(additionalSourceIdRef),
@@ -828,7 +834,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     const { invalidCount, nextSources, validFiles } = buildQueuedPhotoSourceBatch(files, additionalSourceIdRef);
 
     if (validFiles.length > 0) {
-      setAdditionalSources((prev) => [...prev, ...nextSources]);
+      changeAdditionalSources((prev) => [...prev, ...nextSources]);
     }
 
     if (invalidCount > 0) {
@@ -843,7 +849,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     const { nextSources, invalidCount } = buildQueuedUploadedSourceBatch(files, additionalSourceIdRef);
 
     if (nextSources.length > 0) {
-      setAdditionalSources((prev) => [...prev, ...nextSources]);
+      changeAdditionalSources((prev) => [...prev, ...nextSources]);
     }
 
     if (invalidCount > 0) {
@@ -898,7 +904,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   };
 
   const removeAdditionalSource = (sourceId: string) => {
-    setAdditionalSources((prev) => prev.filter((source) => source?.id !== sourceId));
+    changeAdditionalSources((prev) => prev.filter((source) => source?.id !== sourceId));
   };
 
   const updateAdditionalSourceById = (sourceId: string, patch: SurveyGeneratorAdditionalSourcePatch) => {
@@ -1187,7 +1193,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       if (abortedRef.current) return;
 
       const savedSourceIds = new Set(savedDocRefs.map((entry) => entry.sourceId).filter(Boolean));
-      setAdditionalSources((current) => current.filter((source) => !savedSourceIds.has(source.id)));
+      changeAdditionalSources((current) => current.filter((source) => !savedSourceIds.has(source.id)));
       setAdditionalUrlInput('');
       setSaveExtraSourcesToDocLibrary(false);
       setDocumentURLs(savedDocRefs.flatMap((entry) => entry.viewerUrls).filter(Boolean));
@@ -1222,6 +1228,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     setError('');
     setActiveAction('generate');
     setSourceWarnings([...selectionWarningsRef.current]);
+    selectionWarningsRef.current = [];
 
     let currentDocumentURLs: string[] = [];
     let content = '';

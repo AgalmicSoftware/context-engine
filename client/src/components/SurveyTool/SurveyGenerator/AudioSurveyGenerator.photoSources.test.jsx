@@ -14,6 +14,7 @@ import {
   setInputValue,
   setAudioInputValue,
   addAdditionalPhoto,
+  addAdditionalFile,
   addAdditionalUrl,
   renderSubject,
   makeSessionConfig,
@@ -39,6 +40,44 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     });
     expect(mockCallAI).toHaveBeenCalled();
     expect(container.textContent).toContain('Skipped: memo.pdf');
+  });
+
+  it('repeats a selection-time rejection for the next generation only', async () => {
+    await renderSubject(<AudioSurveyGenerator activeSessionSlug="edge" sessionConfig={makeSessionConfig()} />);
+    addAdditionalPhoto(new File(['fixture'], 'memo.pdf', { type: 'application/pdf' }));
+    setAudioInputValue('A long discussion about shared priorities and practical ways to improve public decisions.');
+    const form = container.querySelector('form');
+    mockCallAI.mockRejectedValueOnce(new Error('Provider unavailable.'));
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(container.textContent).toContain('Skipped: memo.pdf');
+
+    mockCallAI.mockImplementationOnce(() => new Promise(() => {}));
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toContain('Skipped: memo.pdf');
+  });
+
+  it('leaves a selection-time rejection out of generation once the sources change', async () => {
+    await renderSubject(<AudioSurveyGenerator activeSessionSlug="edge" sessionConfig={makeSessionConfig()} />);
+    addAdditionalPhoto(new File(['fixture'], 'memo.pdf', { type: 'application/pdf' }));
+    expect(container.textContent).toContain('Skipped: memo.pdf');
+    addAdditionalFile(new File(['notes'], 'memo.txt', { type: 'text/plain' }));
+    setAudioInputValue('A long discussion about shared priorities and practical ways to improve public decisions.');
+    mockProcessAdditionalSources.mockResolvedValueOnce({
+      text: 'Notes from the memo about shared priorities.',
+      extractedCharacters: 44,
+      skipped: [],
+    });
+    mockCallAI.mockImplementationOnce(() => new Promise(() => {}));
+    await act(async () => {
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(mockCallAI).toHaveBeenCalled();
+    expect(container.textContent).not.toContain('Skipped: memo.pdf');
   });
 
   it('clears source warnings when a new generation successfully reads the source', async () => {
