@@ -208,6 +208,19 @@ describe('saving the edit page through the Session Worker', () => {
     expect(buildSessionSettingsSave(before, draft).patch).toEqual({ sessionName: 'Renamed' });
   });
 
+  it('saves other fields when the stored context fails a newer check, but checks an edited context', () => {
+    const before = {
+      ...projectPublicWorkerSessionConfig(publishedSession()),
+      sessionContext: { title: 'Context', paragraphs: [`Old note: sk-${'a'.repeat(24)}`], links: [] },
+    };
+    const draft = buildSessionSettingsDraft(before);
+    draft.sessionName = 'Renamed';
+    expect(buildSessionSettingsSave(before, draft).patch).toEqual({ sessionName: 'Renamed' });
+
+    draft.sessionContext = { ...draft.sessionContext, title: 'Edited' };
+    expect(() => buildSessionSettingsSave(before, draft)).toThrow('looks like a key, token or password');
+  });
+
   it('saves an interview voice model edit, but not an unknown model', () => {
     const stored = publishedSession();
     const { save, result } = editAndSave(stored, (draft) => {

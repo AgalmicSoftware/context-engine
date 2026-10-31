@@ -199,7 +199,11 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
     sessionInfo: trimmed(draft.sessionInfo),
     sessionHeaderImg: trimmed(draft.sessionHeader),
     appearance: normalizeSessionAppearance(draft.appearance),
-    sessionContext: normalizeContext(draft.sessionContext),
+    // A context left as stored isn't checked again, so one saved before a newer
+    // rule (such as the secret check) never blocks an unrelated save.
+    sessionContext: same(draft.sessionContext, storedContext(before.sessionContext))
+      ? storedContext(before.sessionContext)
+      : normalizeContext(draft.sessionContext),
     defaultTags: trimmed(draft.defaultTags),
     defaultGroupTags: trimmed(draft.defaultGroupTags),
     questionsGenPrompt: trimmed(draft.questionsGenPrompt),
