@@ -1,4 +1,4 @@
-import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
+import { DEFAULT_AI_MODEL, GROUP_TRANSCRIPTION_MODEL, TRANSCRIPTION_FALLBACK_MODEL } from '../../shared/aiDefaults.mjs';
 import { isChatReasoningModel, usesOpenAiResponsesApi } from './aiModelParams.js';
 
 const trim = (value) => typeof value === 'string' ? value.trim() : '';
@@ -39,9 +39,10 @@ export const isSessionTranscriptionModelAllowed = ({ config, provider, model, gr
   const ai = record(config?.ai);
   const entry = record(ai.models?.transcription || ai.transcription);
   // The caller may opt into this one bounded group operation, never an arbitrary model.
-  if (groupSpeakerLabels && provider === 'openai' && model === 'gpt-4o-transcribe-diarize' &&
+  if (groupSpeakerLabels && provider === 'openai' && model === GROUP_TRANSCRIPTION_MODEL &&
       (trim(entry.provider).toLowerCase() || 'openai') === 'openai') return true;
-  return provider === (trim(entry.provider).toLowerCase() || 'openai') && model === (trim(entry.model) || 'whisper-1');
+  return provider === (trim(entry.provider).toLowerCase() || 'openai') &&
+    model === (trim(entry.model) || TRANSCRIPTION_FALLBACK_MODEL);
 };
 
 // These are per-call ceilings, not allowances. Labels are caller-controlled but

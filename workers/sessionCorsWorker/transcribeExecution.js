@@ -1,3 +1,4 @@
+import { TRANSCRIPTION_FALLBACK_MODEL } from '../../shared/aiDefaults.mjs';
 import { AI_MODEL_NOT_ALLOWED, isSessionTranscriptionModelAllowed } from './aiRequestPolicy.js';
 import { readTranscribeRequestPayload } from './transcribeRequestNormalization.js';
 import { resolveOpenAiTranscribeUrl } from './endpointConfig.js';
@@ -68,7 +69,7 @@ export const transcribe = async ({
   }
 
   if (provider === 'openai' && !requestApiKey && !isSessionTranscriptionModelAllowed({
-    config, provider, groupSpeakerLabels, model: normalizedRequest.payload.model || upstreamFormData.get('model') || 'whisper-1',
+    config, provider, groupSpeakerLabels, model: normalizedRequest.payload.model || upstreamFormData.get('model') || TRANSCRIPTION_FALLBACK_MODEL,
   })) return json?.(AI_MODEL_NOT_ALLOWED, 403, baseHeaders);
 
   const headers = {};

@@ -1,3 +1,4 @@
+import { GROUP_TRANSCRIPTION_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { audioFileExtension } from '../audio/audioFileExtension';
 import { normalizeSpeakerTurns, type KnownSpeaker, type SpeakerTranscriptTurn } from '../audio/speakerTranscript';
 import { createNamedAudioFile } from './aiClientAudioTranscription';
@@ -166,7 +167,7 @@ export const uploadAudioForDiarizedTranscription = async (
     throw new SpeakerLabelsUnavailableError('Speaker labels require OpenAI transcription.');
   const labelled = {
     ...transport,
-    transcriptionCfg: { ...config, provider: 'openai', model: 'gpt-4o-transcribe-diarize' },
+    transcriptionCfg: { ...config, provider: 'openai', model: GROUP_TRANSCRIPTION_MODEL },
   };
   let data: UnknownRecord;
   let speakerSamplesRefused = false;

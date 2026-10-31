@@ -1,3 +1,4 @@
+import { GROUP_TRANSCRIPTION_MODEL, TRANSCRIPTION_FALLBACK_MODEL } from '../../shared/aiDefaults.mjs';
 import { toTrimmedString } from './stringCoercion.js';
 
 export const MISSING_TRANSCRIBE_FILE_ERROR = 'Missing file (use field "file"; "audio" also accepted).';
@@ -11,6 +12,19 @@ const MAX_SPEAKER_SAMPLE_LENGTH = 450 * 1024;
 const SPEAKER_NAME = /^[\p{L}\p{N}](?:[\p{L}\p{N} .'_-]*[\p{L}\p{N}.])?$/u;
 const WAV_DATA_URL_PREFIX = 'data:audio/wav;base64,';
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+// Context for the transcriber, such as the question being answered. OpenAI
+// refuses a prompt over a model's limit without stating gpt-transcribe's, so
+// a long one is cut at a word.
+const MAX_PROMPT_LENGTH = 500;
+
+const readTranscriptionPrompt = (form) => {
+  const value = form.get('prompt');
+  const text = typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+  if (text.length <= MAX_PROMPT_LENGTH) return text;
+  const cut = text.slice(0, MAX_PROMPT_LENGTH + 1);
+  const space = cut.lastIndexOf(' ');
+  return (space > 0 ? cut.slice(0, space) : cut.slice(0, MAX_PROMPT_LENGTH)).trim();
+};
 
 const isWavSample = (value) => {
   if (typeof value !== 'string' || value.length > MAX_SPEAKER_SAMPLE_LENGTH || !value.startsWith(WAV_DATA_URL_PREFIX)) {
@@ -51,12 +65,12 @@ export const normalizeTranscribeRequestPayload = ({ formData } = {}) => {
     };
   }
 
-  const model = toTrimmedString(form.get('model') || 'whisper-1') || 'whisper-1';
+  const model = toTrimmedString(form.get('model') || TRANSCRIPTION_FALLBACK_MODEL) || TRANSCRIPTION_FALLBACK_MODEL;
   const provider = toTrimmedString(form.get('provider') || 'openai').toLowerCase();
   const apiKey = toTrimmedString(form.get('apiKey'));
   const rpcUrl = toTrimmedString(form.get('rpcUrl'));
   const file = form.get('file') || form.get('audio');
-  const groupSpeakerLabels = provider === 'openai' && model === 'gpt-4o-transcribe-diarize' &&
+  const groupSpeakerLabels = provider === 'openai' && model === GROUP_TRANSCRIPTION_MODEL &&
     form.get('purpose') === 'group-conversation' && form.get('labelSpeakers') === 'true';
   if (!file) {
     return {
@@ -87,6 +101,9 @@ export const normalizeTranscribeRequestPayload = ({ formData } = {}) => {
   upstreamFormData.append('file', file, file.name || 'audio.mp3');
   upstreamFormData.append('model', model);
   upstreamFormData.append('response_format', groupSpeakerLabels ? 'diarized_json' : 'json');
+  // The diarization model refuses a prompt.
+  const prompt = model === GROUP_TRANSCRIPTION_MODEL ? '' : readTranscriptionPrompt(form);
+  if (prompt) upstreamFormData.append('prompt', prompt);
   if (groupSpeakerLabels) {
     upstreamFormData.append('chunking_strategy', 'auto');
     // Samples of voices from earlier chunks keep their labels the same in this one.

@@ -159,3 +159,21 @@ test('known speakers keep at most four pairs of samples under 450 KB', () => {
   unpaired.append('known_speaker_names[]', 'Person 2');
   assert.deepEqual(forwarded(unpaired).names, ['Person 1']);
 });
+
+test('a transcription prompt is forwarded in one bounded line, never to the diarization model', () => {
+  const upstreamPrompt = (model, prompt) => {
+    const formData = new FormData();
+    formData.append('file', new File(['audio'], 'answer.webm', { type: 'audio/webm' }));
+    formData.append('model', model);
+    if (prompt !== undefined) formData.append('prompt', prompt);
+    return normalizeTranscribeRequestPayload({ formData }).payload.upstreamFormData.get('prompt');
+  };
+  assert.equal(upstreamPrompt('gpt-transcribe', '  Should the city\n trial  shared spaces?  '), 'Should the city trial shared spaces?');
+  assert.equal(upstreamPrompt('gpt-transcribe', '   '), null);
+  assert.equal(upstreamPrompt('whisper-1'), null);
+  // OpenAI refuses an over-long prompt, so a long one is cut at a word.
+  const long = upstreamPrompt('gpt-transcribe', `${'word '.repeat(120)}end`);
+  assert.ok(long.length <= 500 && long.endsWith('word'), long.length);
+  assert.equal(upstreamPrompt('gpt-transcribe', 'x'.repeat(700)).length, 500);
+  assert.equal(upstreamPrompt('gpt-4o-transcribe-diarize', 'Should the city trial shared spaces?'), null);
+});
