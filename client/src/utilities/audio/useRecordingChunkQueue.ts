@@ -96,14 +96,15 @@ export function useRecordingChunkQueue(options: Options) {
     setHiddenPeriods([]);
     const queue = new RecordingChunkQueue({
       scope,
-      transcribe: async (audio, labels, signal) => {
+      transcribe: async (audio, labels, signal, knownSpeakers) => {
         const request = { ...latest.current, signal };
         if (labels) {
-          const result = await transcribeGroupAudio(audio, request);
+          const result = await transcribeGroupAudio(audio, { ...request, knownSpeakers });
           return {
             text: result.text,
             speakerTurns: result.segments,
             labelsUnavailableReason: result.labelsUnavailableReason,
+            speakerSamplesRefused: result.speakerSamplesRefused,
           };
         }
         return { text: await transcribeAudio(audio, request) };

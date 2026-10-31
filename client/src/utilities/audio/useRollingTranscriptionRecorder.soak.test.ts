@@ -1,8 +1,8 @@
 /**
  * Thirty minutes of breakout recording through the real recorder hook, chunk queue, transcription client
  * and Worker transport. Only the edges are fake: MediaRecorder and the microphone, timers, the IndexedDB
- * store and the Session Worker's /transcribe replies. A reload loads fresh modules, so nothing survives
- * it that a real reload would lose.
+ * store, audio decoding and the Session Worker's /transcribe replies. A reload loads fresh modules, so
+ * nothing survives it that a real reload would lose.
  */
 import React from 'react';
 import { act, renderHook, type RenderHookResult } from '@testing-library/react';
@@ -15,6 +15,7 @@ type Upload = {
   chunk: number;
   fragments: number;
   labels: boolean;
+  knownSpeakers: string[];
   sentAt: number;
   outcome?: string;
   settledAt?: number;
@@ -64,7 +65,13 @@ const mockWorker = {
   transcribe(init: RequestInit) {
     const form = init.body as FormData;
     const labels = form.get('labelSpeakers') === 'true';
-    const upload: Upload = { ...decodeAudio((form.get('file') as Blob).size), labels, sentAt: Date.now() };
+    const knownSpeakers = form.getAll('known_speaker_names[]').map(String);
+    const upload: Upload = {
+      ...decodeAudio((form.get('file') as Blob).size),
+      labels,
+      knownSpeakers,
+      sentAt: Date.now(),
+    };
     mockWorker.uploads.push(upload);
     return new Promise((resolve, reject) => {
       const settle = (outcome: string, finish: () => void) => {
@@ -101,11 +108,13 @@ const mockWorker = {
               }),
             ),
           );
-        else if (labels && mockWorker.generation === 'current')
+        else if (labels && mockWorker.generation === 'current') {
+          // One voice speaks in each room. With its sample the model gives it the known name; without, "A".
+          const speaker = knownSpeakers[0] || 'A';
           settle('ok', () =>
-            resolve(mockResponse(200, { text, segments: [{ speaker: 'A', start: 0, end: upload.fragments, text }] })),
+            resolve(mockResponse(200, { text, segments: [{ speaker, start: 0, end: upload.fragments, text }] })),
           );
-        else settle('ok', () => resolve(mockResponse(200, { text })));
+        } else settle('ok', () => resolve(mockResponse(200, { text })));
       }, 1500);
     });
   },
@@ -191,11 +200,34 @@ const descriptors = {
   mediaDevices: Object.getOwnPropertyDescriptor(navigator, 'mediaDevices'),
   onLine: Object.getOwnPropertyDescriptor(navigator, 'onLine'),
   visibilityState: Object.getOwnPropertyDescriptor(document, 'visibilityState'),
+  AudioContext: Object.getOwnPropertyDescriptor(window, 'AudioContext'),
+  arrayBuffer: Object.getOwnPropertyDescriptor(Blob.prototype, 'arrayBuffer'),
 };
 const restore = (target: object, name: string, descriptor?: PropertyDescriptor) => {
   if (descriptor) Object.defineProperty(target, name, descriptor);
   else Reflect.deleteProperty(target, name);
 };
+// Decoding gives a second of 16 kHz audio for each fragment, as the recorder delivers one a second.
+class FakeAudioContext {
+  async decodeAudioData(data: ArrayBuffer) {
+    const samples = decodeAudio(data.byteLength).fragments * 16_000;
+    return {
+      numberOfChannels: 1,
+      length: samples,
+      sampleRate: 16_000,
+      getChannelData: () => new Float32Array(samples),
+    };
+  }
+  async close() {}
+}
+function blobBytes(this: Blob) {
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(this);
+  });
+}
 const getUserMedia = jest.fn(async () => {
   const track = { kind: 'audio', label: 'Phone microphone', stop: jest.fn(), addEventListener: jest.fn() };
   return { getTracks: () => [track], getAudioTracks: () => [track] };
@@ -220,6 +252,8 @@ beforeEach(() => {
     configurable: true,
     get: () => (page.visible ? 'visible' : 'hidden'),
   });
+  Object.defineProperty(window, 'AudioContext', { configurable: true, value: FakeAudioContext });
+  Object.defineProperty(Blob.prototype, 'arrayBuffer', { configurable: true, value: blobBytes });
 });
 
 afterEach(() => {
@@ -229,6 +263,8 @@ afterEach(() => {
   restore(navigator, 'mediaDevices', descriptors.mediaDevices);
   restore(navigator, 'onLine', descriptors.onLine);
   restore(document, 'visibilityState', descriptors.visibilityState);
+  restore(window, 'AudioContext', descriptors.AudioContext);
+  restore(Blob.prototype, 'arrayBuffer', descriptors.arrayBuffer);
 });
 
 it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
@@ -327,17 +363,22 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     const rejected = recorder.segments[8];
     expect(FakeMediaRecorder.made).toHaveLength(11);
     expect(statuses(view)).toEqual([...Array(8).fill('complete'), 'failed', 'complete', 'complete']);
+    const speech = (chunks: number[]) => chunks.map((chunk) => `Chunk ${chunk} speech.`).join(' ');
+    const gap = '[Recording gap: chunk 9 could not be transcribed.]';
+    // The room's one voice is Person 1 in every chunk, before and after the reload.
     expect(recorder.transcript).toBe(
-      [1, 2, 3, 4, 5, 6, 7, 8, 0, 10, 11]
-        .map((chunk) => (chunk ? `Chunk ${chunk} speech.` : '[Recording gap: chunk 9 could not be transcribed.]'))
-        .join(' '),
+      generation === 'current'
+        ? [`Person 1: ${speech([1, 2, 3, 4, 5, 6, 7, 8])}`, gap, `Person 1: ${speech([10, 11])}`].join('\n')
+        : [speech([1, 2, 3, 4, 5, 6, 7, 8]), gap, speech([10, 11])].join(' '),
     );
     expect(recorder.pendingSegmentCount).toBe(0);
     expect(recorder.errorMessage).toBe('');
     expect(recorder.elapsedSeconds).toBe(14 * 60 + 30);
     expect(recorder.hiddenPeriods).toEqual([{ startedAt: START + at(20), endedAt: START + at(24) }]);
     const transcribed = recorder.segments.filter((segment) => segment.status === 'complete');
-    expect(transcribed.every((segment) => segment.speakerTurns?.length)).toBe(generation === 'current');
+    expect(transcribed.map((segment) => segment.speakerTurns?.map((turn) => turn.speaker) ?? [])).toEqual(
+      transcribed.map(() => (generation === 'current' ? ['Person 1'] : [])),
+    );
     expect(Boolean(recorder.labelsUnavailableReason)).toBe(generation !== 'current');
     // Two presses of Record, one before and one after the reload; nothing else opened the microphone.
     expect(getUserMedia).toHaveBeenCalledTimes(2);
@@ -373,8 +414,13 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     }
     // No request waited more than two minutes for an answer.
     for (const upload of mockWorker.uploads) expect(upload.settledAt! - upload.sentAt).toBeLessThanOrEqual(120_000);
+    // The voice's five-second sample, cut from the first chunk, is kept with the recording.
+    const voices = [...mockStore.records.values()].find((record) => record.segment.id === 'known-speakers');
+    expect(voices?.knownSpeakers?.map(({ name, sample }) => [name, sample.length])).toEqual(
+      generation === 'current' ? [['Person 1', 'data:audio/wav;base64,'.length + ((44 + 160_000) / 3) * 4]] : undefined,
+    );
     // Device storage keeps every chunk in one recording, and audio only for the rejected one.
-    const stored = [...mockStore.records.values()].filter((record) => record.segment.id !== 'hidden-periods');
+    const stored = [...mockStore.records.values()].filter((record) => record.segment.index >= 0);
     expect(stored).toHaveLength(11);
     expect(new Set(stored.map((record) => record.scope)).size).toBe(1);
     expect(stored.filter((record) => record.audio).map((record) => record.segment)).toEqual([

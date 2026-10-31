@@ -6,7 +6,14 @@ import {
   type RecordingChunk,
 } from './recordingChunkStore';
 import type { RollingTranscriptSegment } from './rollingTranscription';
-import type { SpeakerTranscriptTurn } from './speakerTranscript';
+import { cutSpeakerSamples } from './speakerSamples';
+import {
+  MAX_KNOWN_SPEAKERS,
+  nameSpeakerTurns,
+  planSpeakerTurns,
+  type KnownSpeaker,
+  type SpeakerTranscriptTurn,
+} from './speakerTranscript';
 
 // Unsaved records survive closing and reopening the panel in the same page.
 const memoryRecordings = new Map<string, Map<string, RecordingChunk>>();
@@ -15,17 +22,35 @@ const memoryRecordings = new Map<string, Map<string, RecordingChunk>>();
 // The page's own copy also covers a failed save.
 const HIDDEN_PERIODS_ID = 'hidden-periods';
 const memoryHiddenPeriods = new Map<string, HiddenPeriod[]>();
+// Voices heard so far, with their samples, are kept the same way.
+const SPEAKERS_ID = 'known-speakers';
+type Speakers = { knownSpeakers: KnownSpeaker[]; speakerSamplesRefused: boolean };
+const memorySpeakers = new Map<string, Speakers>();
+// Cutting voice samples must never hold up later chunks for long.
+const SAMPLE_WAIT_MS = 10_000;
 /** Whether a closed recorder left audio that only this page holds for a recording. */
 export const hasUnsavedAudio = (scope: string): boolean =>
   [...(memoryRecordings.get(scope)?.values() || [])].some((record) => record.audio);
 
-type Transcription = { text: string; speakerTurns?: SpeakerTranscriptTurn[]; labelsUnavailableReason?: string };
+type Transcription = {
+  text: string;
+  speakerTurns?: SpeakerTranscriptTurn[];
+  labelsUnavailableReason?: string;
+  speakerSamplesRefused?: boolean;
+};
 type Options = {
   scope: string;
-  transcribe: (audio: Blob, labels: boolean, signal: AbortSignal) => Promise<Transcription>;
+  transcribe: (
+    audio: Blob,
+    labels: boolean,
+    signal: AbortSignal,
+    knownSpeakers: KnownSpeaker[],
+  ) => Promise<Transcription>;
   onChange: () => void;
   // Retry jitter source; tests pass a fixed one instead of patching Math.random.
   random?: () => number;
+  // Cuts a WAV sample from each range of a chunk's audio; tests pass one that doesn't decode audio.
+  sampleVoices?: typeof cutSpeakerSamples;
 };
 const failureText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const storageText = (error: unknown) =>
@@ -41,6 +66,7 @@ export class RecordingChunkQueue {
   storageError = '';
   labelsUnavailableReason = '';
   hiddenPeriods: HiddenPeriod[] = [];
+  speakers: Speakers = { knownSpeakers: [], speakerSamplesRefused: false };
   ready: Promise<void>;
   private disposed = false;
   private writes: Promise<void> = Promise.resolve();
@@ -75,6 +101,13 @@ export class RecordingChunkQueue {
           storedPeriods = entry.hiddenPeriods || [];
           continue;
         }
+        if (entry.segment.id === SPEAKERS_ID) {
+          this.speakers = {
+            knownSpeakers: entry.knownSpeakers || [],
+            speakerSamplesRefused: Boolean(entry.speakerSamplesRefused),
+          };
+          continue;
+        }
         if (entry.audio && !['failed', 'complete'].includes(entry.segment.status))
           entry.segment = { ...entry.segment, status: 'queued', error: undefined };
         else if (!entry.audio && entry.segment.status !== 'complete') continue;
@@ -84,6 +117,7 @@ export class RecordingChunkQueue {
       memoryRecordings.delete(this.options.scope);
       this.resaveKept(kept);
       this.restoreHiddenPeriods(storedPeriods);
+      this.speakers = memorySpeakers.get(this.options.scope) ?? this.speakers;
       this.changed();
       void this.retry();
     } catch (error) {
@@ -97,6 +131,7 @@ export class RecordingChunkQueue {
       memoryRecordings.delete(this.options.scope);
       this.resaveKept(kept);
       this.restoreHiddenPeriods([]);
+      this.speakers = memorySpeakers.get(this.options.scope) ?? this.speakers;
       this.changed();
       void this.retry();
     }
@@ -128,15 +163,23 @@ export class RecordingChunkQueue {
   private saveHiddenPeriods(hiddenPeriods: HiddenPeriod[]) {
     this.hiddenPeriods = hiddenPeriods;
     memoryHiddenPeriods.set(this.options.scope, hiddenPeriods);
+    this.saveReserved(HIDDEN_PERIODS_ID, { hiddenPeriods });
+    this.changed();
+  }
+  private saveSpeakers(speakers: Speakers) {
+    this.speakers = speakers;
+    memorySpeakers.set(this.options.scope, speakers);
+    this.saveReserved(SPEAKERS_ID, speakers);
+  }
+  private saveReserved(id: string, fields: Partial<RecordingChunk>) {
     const record: RecordingChunk = {
       scope: this.options.scope,
       labelSpeakers: false,
-      hiddenPeriods,
-      segment: { id: HIDDEN_PERIODS_ID, index: -1, status: 'recording', text: '', startedAt: 0 },
+      ...fields,
+      segment: { id, index: -1, status: 'recording', text: '', startedAt: 0 },
     };
     // Best effort, in order with chunk writes, so Clear deletes it after any pending save.
     this.writes = this.writes.then(() => putRecordingChunk(record).catch(() => {}));
-    this.changed();
   }
   // Audio kept only in memory stays unsaved until a write succeeds: a failed write keeps the
   // warning (and failedWrites), so a later close or unmount keeps the memory copy instead of dropping it.
@@ -279,8 +322,10 @@ export class RecordingChunkQueue {
           UPLOAD_DEADLINE_MS * (stalls + 1),
         );
         controller.signal.addEventListener('abort', () => reject(new Error(stalledText)), { once: true });
+        const labels = record.labelSpeakers && !this.labelsUnavailableReason;
+        const { knownSpeakers, speakerSamplesRefused } = this.speakers;
         this.options
-          .transcribe(record.audio!, record.labelSpeakers && !this.labelsUnavailableReason, controller.signal)
+          .transcribe(record.audio!, labels, controller.signal, labels && !speakerSamplesRefused ? knownSpeakers : [])
           .then(resolve, reject)
           .finally(() => clearTimeout(deadline));
       }).finally(() => {
@@ -288,6 +333,8 @@ export class RecordingChunkQueue {
       });
       if (this.disposed) return;
       if (result.labelsUnavailableReason) this.labelsUnavailableReason = result.labelsUnavailableReason;
+      const named = result.speakerTurns?.length ? await this.nameSpeakers(record.audio!, result) : null;
+      if (this.disposed) return;
       const complete: RecordingChunk = {
         scope: record.scope,
         labelSpeakers: record.labelSpeakers,
@@ -296,7 +343,8 @@ export class RecordingChunkQueue {
           ...record.segment,
           status: 'complete',
           text: String(result.text || '').trim(),
-          speakerTurns: result.speakerTurns,
+          speakerTurns: named?.turns ?? result.speakerTurns,
+          ...(named?.renumbered ? { speakersRenumbered: true } : {}),
           error: undefined,
           completedAt: Date.now(),
         },
@@ -326,6 +374,46 @@ export class RecordingChunkQueue {
         );
       this.changed();
     }
+  }
+  /**
+   * Names a chunk's voices Person 1, Person 2… Up to four voices first heard here join the known speakers with
+   * a sample of their longest turn, which later chunks send so the model gives them the same names.
+   */
+  private async nameSpeakers(audio: Blob, { speakerTurns = [], speakerSamplesRefused }: Transcription) {
+    if (speakerSamplesRefused) this.saveSpeakers({ ...this.speakers, speakerSamplesRefused: true });
+    const { knownSpeakers } = this.speakers;
+    const known = knownSpeakers.map((speaker) => speaker.name);
+    const plan = planSpeakerTurns(speakerTurns, known);
+    const room = plan.isolated || this.speakers.speakerSamplesRefused ? 0 : MAX_KNOWN_SPEAKERS - known.length;
+    const samples = room > 0 && plan.voices.length ? await this.sampleVoices(audio, plan.voices) : [];
+    const sampled = plan.voices
+      .flatMap(({ label }, index) => {
+        const sample = samples[index];
+        return sample ? [{ label, sample }] : [];
+      })
+      .slice(0, room);
+    const { turns, added } = nameSpeakerTurns(
+      plan,
+      known,
+      sampled.map(({ label }) => label),
+    );
+    // A closed recorder leaves this chunk to upload again when it reopens, sampling its voices then.
+    if (added.length && !this.disposed)
+      this.saveSpeakers({
+        ...this.speakers,
+        knownSpeakers: [...knownSpeakers, ...added.map((name, index) => ({ name, sample: sampled[index].sample }))],
+      });
+    return { turns, renumbered: plan.isolated };
+  }
+  private sampleVoices(audio: Blob, voices: Array<{ start: number; end: number }>) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const sample = this.options.sampleVoices ?? cutSpeakerSamples;
+    return Promise.race([
+      sample(audio, voices).catch(() => []),
+      new Promise<never[]>((resolve) => {
+        timer = setTimeout(() => resolve([]), SAMPLE_WAIT_MS);
+      }),
+    ]).finally(() => clearTimeout(timer));
   }
   /** Back online: a request sent before the outage may never answer, so start it again now. */
   async reconnect() {
@@ -409,7 +497,9 @@ export class RecordingChunkQueue {
     this.records.clear();
     memoryRecordings.delete(this.options.scope);
     memoryHiddenPeriods.delete(this.options.scope);
+    memorySpeakers.delete(this.options.scope);
     this.hiddenPeriods = [];
+    this.speakers = { knownSpeakers: [], speakerSamplesRefused: false };
     this.labelsUnavailableReason = '';
     this.storageError = '';
     this.changed();

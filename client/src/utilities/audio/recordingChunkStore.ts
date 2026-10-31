@@ -1,4 +1,5 @@
 import type { RollingTranscriptSegment } from './rollingTranscription';
+import type { KnownSpeaker } from './speakerTranscript';
 
 /** `endedAt` is unset while the page is still hidden. */
 export type HiddenPeriod = { startedAt: number; endedAt?: number };
@@ -11,6 +12,9 @@ export type RecordingChunk = {
   labelsUnavailableReason?: string;
   // Set only on the recording's hidden-periods record (see recordingChunkQueue).
   hiddenPeriods?: HiddenPeriod[];
+  // Set only on the recording's known-speakers record.
+  knownSpeakers?: KnownSpeaker[];
+  speakerSamplesRefused?: boolean;
 };
 
 const DATABASE = 'ce-recording-chunks';

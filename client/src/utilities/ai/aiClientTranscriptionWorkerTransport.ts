@@ -1,5 +1,5 @@
 import { audioFileExtension } from '../audio/audioFileExtension';
-import { normalizeSpeakerTurns, type SpeakerTranscriptTurn } from '../audio/speakerTranscript';
+import { normalizeSpeakerTurns, type KnownSpeaker, type SpeakerTranscriptTurn } from '../audio/speakerTranscript';
 import { createNamedAudioFile } from './aiClientAudioTranscription';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
@@ -26,6 +26,8 @@ export type TranscriptionUploadOptions = {
   fileName?: string;
   onJsonParseError?: (error: unknown) => void;
   signal?: AbortSignal;
+  // Group labels only: voices from earlier chunks, so the model gives them the same names.
+  knownSpeakers?: KnownSpeaker[];
 };
 
 const asRecord = (value: unknown): UnknownRecord =>
@@ -78,7 +80,7 @@ export class SpeakerLabelsUnavailableError extends Error {
 const requestAudioTranscription = async (
   audioFileOrBlob: unknown,
   transport: TranscriptionWorkerTransport,
-  { fileName = '', signal, onJsonParseError }: TranscriptionUploadOptions = {},
+  { fileName = '', signal, onJsonParseError, knownSpeakers = [] }: TranscriptionUploadOptions = {},
   groupSpeakerLabels = false,
 ): Promise<UnknownRecord> => {
   const maybeBlob = typeof Blob !== 'undefined' && audioFileOrBlob instanceof Blob ? audioFileOrBlob : null;
@@ -95,6 +97,9 @@ const requestAudioTranscription = async (
   if (groupSpeakerLabels) {
     form.append('purpose', 'group-conversation');
     form.append('labelSpeakers', 'true');
+    // Paired by position; Workers before 0.8.2 drop them.
+    for (const { name } of knownSpeakers) form.append('known_speaker_names[]', name);
+    for (const { sample } of knownSpeakers) form.append('known_speaker_references[]', sample);
   }
 
   const resp = await fetchWorkerWithAuth(
@@ -147,6 +152,8 @@ export type DiarizedTranscription = {
   text: string;
   segments: SpeakerTranscriptTurn[];
   labelsUnavailableReason?: string;
+  // The known speaker samples were refused, so this chunk was labelled without them.
+  speakerSamplesRefused?: boolean;
 };
 
 export const uploadAudioForDiarizedTranscription = async (
@@ -157,19 +164,30 @@ export const uploadAudioForDiarizedTranscription = async (
   const config = transport.transcriptionCfg || {};
   if (config.provider && config.provider !== 'openai')
     throw new SpeakerLabelsUnavailableError('Speaker labels require OpenAI transcription.');
-  const data = await requestAudioTranscription(
-    audioFileOrBlob,
-    {
-      ...transport,
-      transcriptionCfg: { ...config, provider: 'openai', model: 'gpt-4o-transcribe-diarize' },
-    },
-    options,
-    true,
-  );
+  const labelled = {
+    ...transport,
+    transcriptionCfg: { ...config, provider: 'openai', model: 'gpt-4o-transcribe-diarize' },
+  };
+  let data: UnknownRecord;
+  let speakerSamplesRefused = false;
+  try {
+    data = await requestAudioTranscription(audioFileOrBlob, labelled, options, true);
+  } catch (error) {
+    // Samples are an extra: their refusal must not end labels for the recording, so send this chunk once more
+    // without them. A refusal of that request too ends labels as before.
+    if (!(error instanceof SpeakerLabelsUnavailableError) || error.chunkOnly || !options.knownSpeakers?.length)
+      throw error;
+    data = await requestAudioTranscription(audioFileOrBlob, labelled, { ...options, knownSpeakers: [] }, true);
+    speakerSamplesRefused = true;
+  }
   if (!Array.isArray(data.segments)) {
     const reason = 'This Worker returned text without speaker labels.';
     if (typeof data.text === 'string') return { text: data.text, segments: [], labelsUnavailableReason: reason };
     throw new SpeakerLabelsUnavailableError(reason);
   }
-  return { text: stringValue(data.text), segments: normalizeSpeakerTurns(data.segments) };
+  return {
+    text: stringValue(data.text),
+    segments: normalizeSpeakerTurns(data.segments),
+    ...(speakerSamplesRefused ? { speakerSamplesRefused } : {}),
+  };
 };

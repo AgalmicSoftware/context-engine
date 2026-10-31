@@ -163,3 +163,61 @@ it('handles silent labeled clips, old Workers, and provider errors explicitly', 
     'Synthetic capacity error',
   );
 });
+
+it('sends known speaker samples and keeps labels when they are refused', async () => {
+  const { uploadAudioForDiarizedTranscription, SpeakerLabelsUnavailableError } =
+    await import('./aiClientTranscriptionWorkerTransport');
+  const transport = { endpoint: 'https://worker.example/transcribe', baseUrl: 'https://worker.example' };
+  const knownSpeakers = [
+    { name: 'Person 1', sample: 'data:audio/wav;base64,UklGRgAAAABXQVZF' },
+    { name: 'Person 2', sample: 'data:audio/wav;base64,UklGRgEAAABXQVZF' },
+  ];
+  const turn = (speaker: string) => ({ speaker, start: 0, end: 1, text: 'Room question.' });
+  const reply = (body: unknown, status = 200) => ({ ok: status < 300, status, json: async () => body }) as Response;
+  const sent = () => mockedFetchWorkerWithAuth.mock.calls.map(([, init]) => init?.body as FormData);
+  mockedFetchWorkerWithAuth.mockReset();
+  mockedFetchWorkerWithAuth.mockResolvedValueOnce(reply({ text: 'Room question.', segments: [turn('Person 2')] }));
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport, { knownSpeakers })).resolves.toEqual(
+    {
+      text: 'Room question.',
+      segments: [turn('Person 2')],
+    },
+  );
+  expect(sent()[0].getAll('known_speaker_names[]')).toEqual(['Person 1', 'Person 2']);
+  expect(sent()[0].getAll('known_speaker_references[]')).toEqual(knownSpeakers.map((speaker) => speaker.sample));
+
+  // A refusal of the samples sends the chunk again with labels but without them.
+  mockedFetchWorkerWithAuth.mockClear();
+  mockedFetchWorkerWithAuth
+    .mockResolvedValueOnce(
+      reply({ error: 'Invalid sample.', details: { error: { param: 'known_speaker_references' } } }, 400),
+    )
+    .mockResolvedValueOnce(reply({ text: 'Room question.', segments: [turn('A')] }));
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport, { knownSpeakers })).resolves.toEqual(
+    {
+      text: 'Room question.',
+      segments: [turn('A')],
+      speakerSamplesRefused: true,
+    },
+  );
+  const [refused, retried] = sent();
+  expect(refused.getAll('known_speaker_names[]')).toHaveLength(2);
+  expect(retried.get('labelSpeakers')).toBe('true');
+  expect(retried.getAll('known_speaker_names[]')).toEqual([]);
+  expect(retried.getAll('known_speaker_references[]')).toEqual([]);
+
+  // A Worker that refuses labels altogether still ends them, as without samples.
+  mockedFetchWorkerWithAuth.mockClear();
+  mockedFetchWorkerWithAuth.mockResolvedValue(reply({ error: 'Model is not allowed' }, 403));
+  await expect(
+    uploadAudioForDiarizedTranscription(new Blob(['audio']), transport, { knownSpeakers }),
+  ).rejects.toBeInstanceOf(SpeakerLabelsUnavailableError);
+  expect(sent()).toHaveLength(2);
+  // A rejection of the audio itself is left to the caller, without a second labelled upload.
+  mockedFetchWorkerWithAuth.mockClear();
+  mockedFetchWorkerWithAuth.mockResolvedValue(reply({ error: 'Too large' }, 413));
+  await expect(
+    uploadAudioForDiarizedTranscription(new Blob(['audio']), transport, { knownSpeakers }),
+  ).rejects.toMatchObject({ chunkOnly: true });
+  expect(sent()).toHaveLength(1);
+});

@@ -6,11 +6,10 @@ const tokenize = (text: string): TranscriptToken[] =>
     end: (match.index || 0) + match[0].length,
   }));
 
-export const mergeTranscriptOverlap = (previous: unknown, next: unknown, maxTokens = Infinity): string => {
+/** What `next` adds after the speech `previous` already ends with, or null when they share none. */
+export const transcriptOverlapTail = (previous: unknown, next: unknown, maxTokens = Infinity): string | null => {
   const a = String(previous || '').trim();
   const b = String(next || '').trim();
-  if (!a) return b;
-  if (!b) return a;
   const left = tokenize(a);
   const right = tokenize(b);
   for (let size = Math.min(left.length, right.length, maxTokens); size > 0; size -= 1) {
@@ -27,9 +26,21 @@ export const mergeTranscriptOverlap = (previous: unknown, next: unknown, maxToke
     let tail = b.slice(right[size - 1].end);
     const leftSuffix = a.slice(left[left.length - 1].end);
     if (leftSuffix && tail.startsWith(leftSuffix)) tail = tail.slice(leftSuffix.length);
-    tail = tail.trimStart();
-    if (!tail) return a;
-    return `${a}${/^[.,!?;:]/.test(tail) ? '' : ' '}${tail}`;
+    return tail.trimStart();
   }
-  return `${a} ${b}`;
+  return null;
+};
+
+/** Joins speech, without a space before punctuation. */
+export const joinTranscriptText = (previous: string, next: string): string =>
+  `${previous}${/^[.,!?;:]/.test(next) ? '' : ' '}${next}`;
+
+export const mergeTranscriptOverlap = (previous: unknown, next: unknown, maxTokens = Infinity): string => {
+  const a = String(previous || '').trim();
+  const b = String(next || '').trim();
+  if (!a) return b;
+  if (!b) return a;
+  const tail = transcriptOverlapTail(a, b, maxTokens);
+  if (tail == null) return `${a} ${b}`;
+  return tail ? joinTranscriptText(a, tail) : a;
 };

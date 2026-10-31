@@ -2,10 +2,17 @@ import { act, renderHook } from '@testing-library/react';
 import { useRollingTranscriptionRecorder } from './useRollingTranscriptionRecorder';
 import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
 import { clearRecordingChunks, listRecordingChunks, putRecordingChunk } from './recordingChunkStore';
+import { cutSpeakerSamples } from './speakerSamples';
 
 jest.mock('../ai/aiClient.js', () => ({
   transcribeAudio: jest.fn(),
   transcribeGroupAudio: jest.fn(),
+}));
+// Voice samples name the voice they came from; tests never decode audio.
+jest.mock('./speakerSamples', () => ({
+  cutSpeakerSamples: jest.fn(async (_audio: Blob, voices: Array<{ label: string }>) =>
+    voices.map((voice) => `data:audio/wav;base64,${voice.label}`),
+  ),
 }));
 
 const mockChunkRecords = new Map<
@@ -1230,9 +1237,11 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
-  it('keeps speaker labels scoped to each independently transcribed chunk', async () => {
-    const turns = [{ speaker: 'A', start: 0, end: 1, text: 'Room question.' }];
-    (transcribeGroupAudio as jest.Mock).mockImplementation(async () => ({ text: 'Room question.', segments: turns }));
+  it('names voices across chunks, sending earlier voices with later chunks', async () => {
+    const turn = (speaker: string, text: string) => ({ speaker, start: 0, end: 4, text });
+    (transcribeGroupAudio as jest.Mock)
+      .mockImplementationOnce(async () => ({ text: 'Room question.', segments: [turn('A', 'Room question.')] }))
+      .mockImplementation(async () => ({ text: 'Room answer.', segments: [turn('Person 1', 'Room answer.')] }));
     const { result, unmount } = renderHook(() =>
       useRollingTranscriptionRecorder({ sessionSlug: 'workshop', labelSpeakers: true }),
     );
@@ -1246,16 +1255,23 @@ describe('useRollingTranscriptionRecorder', () => {
       });
     expect(transcribeGroupAudio).toHaveBeenCalledTimes(2);
     expect(transcribeAudio).not.toHaveBeenCalled();
-    expect(
-      result.current.segments.filter((segment) => segment.status === 'complete').map((segment) => segment.speakerTurns),
-    ).toEqual([turns, turns]);
+    // The first chunk's voice is sampled from its own audio and sent with the next chunk.
+    expect(cutSpeakerSamples).toHaveBeenCalledWith(expect.any(Blob), [expect.objectContaining({ start: 0, end: 4 })]);
+    const requests = (transcribeGroupAudio as jest.Mock).mock.calls as Array<[Blob, { knownSpeakers: unknown }]>;
+    expect(requests.map(([, options]) => options.knownSpeakers)).toEqual([
+      [],
+      [{ name: 'Person 1', sample: 'data:audio/wav;base64,A' }],
+    ]);
+    expect(result.current.transcript).toBe('Person 1: Room question. Room answer.');
     instances[instances.length - 1].state = 'inactive';
     unmount();
     const restored = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'workshop' }));
     await act(async () => {
       await flushPromises();
     });
-    expect(restored.result.current.segments.map((segment) => segment.speakerTurns)).toEqual([turns, turns]);
+    expect(
+      restored.result.current.segments.map((segment) => segment.speakerTurns?.map((entry) => entry.speaker)),
+    ).toEqual([['Person 1'], ['Person 1']]);
     restored.unmount();
   });
 });

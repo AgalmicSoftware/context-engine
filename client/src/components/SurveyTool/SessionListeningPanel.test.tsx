@@ -884,6 +884,39 @@ it('does not generate questions from a transcript that only marks recording gaps
   expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeDisabled();
 });
 
+it('does not count Person labels as speech toward generating questions', () => {
+  const transcript = 'Person 1: Should we?\nPerson 2: Yes.\nPerson 3: Fine.\nPerson 1: Vote now.';
+  expect(transcript.length).toBeGreaterThanOrEqual(50);
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({
+      transcript,
+      segments: [{ id: 'done', index: 0, status: 'complete', text: 'Should we? Yes. Fine. Vote now.', startedAt: 1 }],
+    }),
+  );
+  render(<SessionListeningPanel sessionSlug="room" />);
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeDisabled();
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS));
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveValue(transcript);
+});
+
+it('says which chunks number their speakers on their own, with the reason behind a question mark', async () => {
+  const chunk = (index: number, speakersRenumbered?: boolean) => ({
+    id: `chunk-${index}`,
+    index,
+    status: 'complete',
+    text: 'Speech.',
+    startedAt: index,
+    speakersRenumbered,
+  });
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({ transcript: 'Person 1: Speech.', segments: [chunk(0), chunk(1, true), chunk(2, true)] }),
+  );
+  render(<SessionListeningPanel sessionSlug="room" panelMode="recordGroup" />);
+  expect(await screen.findByText('Person numbers restart in chunks 2, 3.')).toBeInTheDocument();
+  const help = screen.getByRole('button', { name: 'About restarted Person numbers' });
+  expect(help).toHaveAccessibleDescription(/Person 1 there may be someone else/);
+});
+
 it('offers Close and keep the audio only after capture stops, with its explanation behind a question mark', () => {
   const onCaptureChange = jest.fn();
   const pending = { segments: [{ id: 'up', index: 0, status: 'transcribing', text: '', startedAt: 1 }] };

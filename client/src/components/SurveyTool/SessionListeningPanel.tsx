@@ -18,10 +18,7 @@ import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { SessionRecordingChunks } from './SessionRecordingChunks';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
-import {
-  DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
-  removeRecordingGaps,
-} from '../../utilities/audio/rollingTranscription';
+import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS, transcriptSpeech } from '../../utilities/audio/rollingTranscription';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { readThemeToken, subscribeThemeChanges } from '../../utilities/ui/themeRuntime';
 import { generateQuestionsFromListeningTranscript, LISTENING_QUESTION_COUNT } from './sessionListeningQuestions';
@@ -87,6 +84,9 @@ export const formatSessionRecordingElapsed = (secondsRaw: unknown) => {
   const rest = seconds % 60;
   return `${minutes}:${String(rest).padStart(2, '0')}`;
 };
+
+const RENUMBERED_HELP =
+  'No voice in these chunks matched an earlier one, often because the Session Worker predates voice samples. Person 1 there may be someone else. Updating the Worker keeps Person numbers the same across chunks.';
 
 const KEEP_AUDIO_HELP =
   'Closes without waiting for transcription. Audio still waiting for it stays on this device and resumes uploading when you reopen this recording.';
@@ -390,6 +390,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const speakerHelpId = `ce-record-speaker-help-${useId().replace(/:/g, '')}`;
   const labelsHelpId = `ce-speaker-labels-help-${useId().replace(/:/g, '')}`;
   const keepHelpId = `ce-keep-audio-help-${useId().replace(/:/g, '')}`;
+  const renumberedHelpId = `ce-renumbered-help-${useId().replace(/:/g, '')}`;
   const recordingContext = useMemo(
     () => ({
       ...(context && typeof context === 'object' ? context : {}),
@@ -459,7 +460,10 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     if (embeddedInModal && document.activeElement === document.body) panelRef.current?.focus();
   }, [embeddedInModal, isRecorderSessionActive]);
 
-  const spokenLength = useMemo(() => removeRecordingGaps(trimmedTranscript).length, [trimmedTranscript]);
+  const spokenLength = useMemo(() => transcriptSpeech(trimmedTranscript).length, [trimmedTranscript]);
+  const renumberedChunks = recorder.segments
+    .filter((segment) => segment.speakersRenumbered)
+    .map((segment) => segment.index + 1);
   const canGenerate = !isClosing && spokenLength >= 50 && !isGenerating && !hasPendingTranscription;
   // Failed chunks and memory-only copies hold audio no saved transcript covers; Clear asks before deleting it.
   const retainedAudioCount = recorder.downloadableChunkIds?.length ?? 0;
@@ -708,8 +712,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
                 <FontAwesomeIcon icon={faQuestionCircle} />
               </button>
               <UncontrolledTooltip target={labelsHelpId} trigger="hover focus" autohide={false}>
-                Saves speaker turns with the transcript using OpenAI. Labels restart in each three-minute chunk and do
-                not identify people. Speaker review and claiming are not available yet.
+                Shows who spoke as Person 1, Person 2… using OpenAI. Up to four voices keep their number across
+                three-minute chunks; a fifth may change number. Numbers don&apos;t identify people.
               </UncontrolledTooltip>
             </span>
           ) : null}
@@ -759,6 +763,29 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       ) : null}
       {recorder.labelsUnavailableReason ? (
         <div role="status">{recorder.labelsUnavailableReason} Continuing with plain transcription.</div>
+      ) : null}
+      {renumberedChunks.length ? (
+        <span className={styles.sessionRecordingOption}>
+          <span role="status">
+            Person numbers restart in {renumberedChunks.length === 1 ? 'chunk' : 'chunks'} {renumberedChunks.join(', ')}
+            .
+          </span>
+          <button
+            type="button"
+            id={renumberedHelpId}
+            className={styles.sessionInterviewHeaderButton}
+            aria-label="About restarted Person numbers"
+            aria-describedby={`${renumberedHelpId}-about`}
+          >
+            <FontAwesomeIcon icon={faQuestionCircle} />
+          </button>
+          <span id={`${renumberedHelpId}-about`} hidden>
+            {RENUMBERED_HELP}
+          </span>
+          <UncontrolledTooltip target={renumberedHelpId} trigger="hover focus" autohide={false}>
+            {RENUMBERED_HELP}
+          </UncontrolledTooltip>
+        </span>
       ) : null}
       {recorder.hiddenPeriods?.length ? (
         <div className={styles.sessionRecordingWakeNotice} role="status">

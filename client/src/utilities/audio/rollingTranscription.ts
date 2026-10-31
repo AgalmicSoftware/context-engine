@@ -1,4 +1,4 @@
-import { mergeTranscriptOverlap } from './transcriptOverlap';
+import { joinTranscriptText, mergeTranscriptOverlap, transcriptOverlapTail } from './transcriptOverlap';
 import type { SpeakerTranscriptTurn } from './speakerTranscript';
 export const DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS = 3 * 60 * 1000;
 export const LISTENING_MODE_QUERY_VALUE = 'listening';
@@ -15,25 +15,62 @@ export type RollingTranscriptSegment = {
   startedAt: number;
   completedAt?: number;
   speakerTurns?: SpeakerTranscriptTurn[];
+  // No voice matched the samples sent, so this chunk numbers its voices on its own.
+  speakersRenumbered?: boolean;
 };
 
+// A chunk boundary repeats at most a second of speech, so only its last 80 words are compared.
+const OVERLAP_WORDS = 80;
 export const mergeRollingTranscriptText = (previous: string, next: string): string =>
-  mergeTranscriptOverlap(previous, next, 80);
+  mergeTranscriptOverlap(previous, next, OVERLAP_WORDS);
 
 const recordingGap = (index: number) => `[Recording gap: chunk ${index + 1} could not be transcribed.]`;
-/** Gap markers keep a transcript honest about missing audio, but they are not speech. */
-export const removeRecordingGaps = (transcript: string): string =>
-  transcript.replace(/\[Recording gap: chunk \d+ could not be transcribed\.\]/g, '').trim();
+/** The words people said: gap markers keep a transcript honest about missing audio, but they are not speech. */
+export const transcriptSpeech = (transcript: string): string =>
+  transcript
+    .replace(/\[Recording gap: chunk \d+ could not be transcribed\.\]/g, '')
+    .replace(/^Person \d+: /gm, '')
+    .trim();
 
-export const stitchRollingTranscriptSegments = (segments: RollingTranscriptSegment[] = []): string =>
-  [...segments]
-    .filter((segment) => segment.status === 'failed' || (segment.status === 'complete' && segment.text.trim()))
-    .sort((a, b) => a.index - b.index)
-    .reduce(
-      (merged, segment) =>
-        mergeRollingTranscriptText(merged, segment.status === 'failed' ? recordingGap(segment.index) : segment.text),
-      '',
+// A line of the transcript: a voice's turn, or plain text and gap markers (no speaker).
+type TranscriptLine = { speaker: string; text: string };
+const chunkLines = (segment: RollingTranscriptSegment): TranscriptLine[] => {
+  if (segment.status === 'failed') return [{ speaker: '', text: recordingGap(segment.index) }];
+  const turns = (segment.speakerTurns || []).filter((turn) => turn.speaker && turn.text.trim());
+  const lines = turns.length ? turns : [{ speaker: '', text: segment.text }];
+  return lines.map(({ speaker, text }) => ({ speaker, text: text.trim() })).filter((line) => line.text);
+};
+
+/**
+ * Chunks in order, each voice's turns as "Person N: …" lines. Speech that the text so far already ends with
+ * is dropped from a chunk's start, and a voice that carries on, like plain text and gap markers, stays on
+ * the same line.
+ */
+export const stitchRollingTranscriptSegments = (segments: RollingTranscriptSegment[] = []): string => {
+  const lines: TranscriptLine[] = [];
+  for (const segment of [...segments].sort((a, b) => a.index - b.index)) {
+    if (segment.status !== 'complete' && segment.status !== 'failed') continue;
+    let next = chunkLines(segment);
+    const tail = transcriptOverlapTail(
+      lines.map((line) => line.text).join(' '),
+      next.map((line) => line.text).join(' '),
+      OVERLAP_WORDS,
     );
+    // Drop the repeated characters, line by line (lines are joined by one space).
+    let repeated = tail == null ? 0 : next.map((line) => line.text).join(' ').length - tail.length;
+    next = next.flatMap((line) => {
+      const text = line.text.slice(repeated).trimStart();
+      repeated = Math.max(0, repeated - line.text.length - 1);
+      return text ? [{ ...line, text }] : [];
+    });
+    for (const line of next) {
+      const last = lines[lines.length - 1];
+      if (last?.speaker === line.speaker) last.text = joinTranscriptText(last.text, line.text);
+      else lines.push(line);
+    }
+  }
+  return lines.map(({ speaker, text }) => (speaker ? `${speaker}: ${text}` : text)).join('\n');
+};
 
 export const isListeningModeQueryEnabled = (search: unknown): boolean => {
   try {
