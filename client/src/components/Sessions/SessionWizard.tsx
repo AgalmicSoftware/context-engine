@@ -349,6 +349,16 @@ const buildProvisionedSponsoredContextState = (value: unknown): ProvisionedSpons
   };
 };
 
+const isPlainRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+// The draft's own values at a template's fields, unchecked: a draft the template
+// checks refuse, such as one with a blank link row, can still be compared.
+const pickTemplateFields = (value: unknown, like: unknown): unknown =>
+  isPlainRecord(value) && isPlainRecord(like)
+    ? Object.fromEntries(Object.keys(like).map((key) => [key, pickTemplateFields(value[key], like[key])]))
+    : value;
+
 const SessionWizard = ({
   account,
   provider,
@@ -2655,11 +2665,15 @@ const SessionWizard = ({
         const mine = sessionTemplateFromDraft(draftRef.current);
         const sameDraft =
           result.ok && !!result.template.draftId && result.template.draftId === draftRef.current?.draftId;
-        setLinkTemplate({
-          result,
-          changes: result.ok && mine.ok ? diffSessionTemplates(mine.template, result.template) : [],
-          sameDraft,
-        });
+        // Every difference is listed before the link can replace the draft,
+        // including when the draft itself fails the template checks.
+        const changes = result.ok
+          ? diffSessionTemplates(
+              mine.ok ? mine.template : (pickTemplateFields(draftRef.current, result.template) as SessionTemplate),
+              result.template,
+            )
+          : [];
+        setLinkTemplate({ result, changes, sameDraft });
       });
     };
     readLink();

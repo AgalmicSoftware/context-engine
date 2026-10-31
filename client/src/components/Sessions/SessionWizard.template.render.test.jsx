@@ -79,6 +79,25 @@ describe('SessionWizard template links', () => {
     expect(within(notice).getByTestId('ce-template-changes')).toHaveTextContent('sessionName: (empty) → Pasted in');
   });
 
+  it('lists every difference even when the open draft fails the template checks', async () => {
+    renderSessionWizard();
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME, {}, { timeout: 8000 }), {
+      target: { value: 'Mine' },
+    });
+    // A blank link row is enough to fail them.
+    fireEvent.click(screen.getByTestId('ce-setup-more-context'));
+    fireEvent.click(screen.getByTestId('ce-setup-context-add-link'));
+    const fragment = await linkFor({ sessionName: 'Theirs' });
+    await act(async () => {
+      window.history.replaceState({}, '', `/new${fragment}`);
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    const notice = await screen.findByTestId('ce-template-link-notice', {}, { timeout: 8000 });
+    const changes = within(notice).getByTestId('ce-template-changes');
+    expect(changes).toHaveTextContent('sessionName: Mine → Theirs');
+    expect(changes).toHaveTextContent('sessionContext.links: 1 item → 0 items');
+  });
+
   it('opens the link an AI writes (#setup=) for review, then creates nothing until Create', async () => {
     window.history.replaceState({}, '', `/new#setup=${encodeLinkJson(SESSION_SETUP_EXAMPLE)}`);
     renderSessionWizard();
