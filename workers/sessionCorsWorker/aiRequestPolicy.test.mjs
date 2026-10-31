@@ -68,7 +68,7 @@ for (const adapter of adapters) {
   test(`${provider}: feature ceilings preserve generation, report, interview and photo requests`, async () => {
     for (const [taskType, requested, expected] of [
       ['generate', 32768, 16000], ['analysis', 7000, 7000], ['interview-map', 8000, 8000],
-      ['summarize', 1200, 1200], ['interview-opening', 600, 600], ['rewrite', 64000, 16000], ['rank', 64000, 16000], ['summarize', 32768, 16000],
+      ['summarize', 1200, 1200], ['interview-opening', 2000, 2000], ['interview-opening', 8000, 2000], ['rewrite', 64000, 16000], ['rank', 64000, 16000], ['summarize', 32768, 16000],
       ['compare', 16384, 16000], ['categorize', 16384, 16000], ['unknown-task', 64000, 2048],
     ]) {
       const { calls } = await invoke(adapter, { taskType, max_output_tokens: requested });

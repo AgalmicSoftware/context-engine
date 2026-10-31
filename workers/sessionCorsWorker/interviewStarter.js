@@ -9,6 +9,7 @@ import { proxyOpenAI, proxyAnthropic, proxyOpenRouter, proxyCustomRPC } from './
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { buildParticipantContextPrompt } from './contextSourceLoader.js';
 
+const OPENING_MAX_TOKENS = 2000;
 const OPENING_CONTEXT_CHARS = 4000;
 const inFlight = new WeakMap();
 const cacheKey = (slug) => `session:${slug}:interview-opening`;
@@ -74,10 +75,11 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
       payload: {
         model,
         taskType: 'interview-opening',
-        max_tokens: 600,
+        // Models that think spend part of this cap on thinking; the question itself is under 100 tokens.
+        max_tokens: OPENING_MAX_TOKENS,
         reasoning_effort: 'low',
         service_tier: 'default',
-        max_output_tokens: 600,
+        max_output_tokens: OPENING_MAX_TOKENS,
         messages: [
           {
             role: 'user',

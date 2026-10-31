@@ -53,7 +53,7 @@ const fixture = () => {
 for (const [provider, model, secret] of [
   ['openai', 'gpt-4o-mini', 'openaiKey'], ['anthropic', 'claude-sonnet-4-6', 'anthropicKey'],
   ['openrouter', 'openai/gpt-4o-mini', 'openrouterKey'], ['custom', 'owner-model', 'customRpcKey'],
-]) test(`opening generation honors the saved ${provider} model and its 600-token limit`, async () => {
+]) test(`opening generation honors the saved ${provider} model and leaves room to think`, async () => {
   const f = fixture();
   f.args.config.ai = { mode: provider, models: { fast: model } };
   delete f.args.deps.proxyOpenAI;
@@ -68,7 +68,7 @@ for (const [provider, model, secret] of [
   const result = await resolveInterviewStarter(f.args);
   assert.equal(result.openingPrompt, 'What matters to you?');
   assert.equal(body.model, model);
-  assert.equal(body.max_tokens, 600);
+  assert.equal(body.max_tokens, 2000);
 });
 
 test('defaults are stable and settings reject invalid values', () => {

@@ -51,7 +51,9 @@ export const isSessionTranscriptionModelAllowed = ({ config, provider, model, gr
 // default retain up to 16,000; reports and interview tasks keep smaller bounds.
 const operationCeilings = Object.freeze({
   generate: 16000, rewrite: 16000, summarize: 16000, rank: 16000, compare: 16000, categorize: 16000,
-  analysis: 7000, 'interview-map': 8000, 'interview-opening': 600,
+  analysis: 7000, 'interview-map': 8000,
+  // One short question, but models that think spend part of the cap on thinking.
+  'interview-opening': 2000,
   // A context PDF's text, read once by an admin's request.
   'context-read': 8000,
 });
