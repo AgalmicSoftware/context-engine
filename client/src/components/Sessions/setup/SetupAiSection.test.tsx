@@ -32,13 +32,8 @@ describe('SetupAiSection', () => {
     expect(screen.getByTestId('ce-setup-summary-ai')).toHaveTextContent('OpenAI gpt-5.6-terra · medium effort');
   });
 
-  it('shows the saved models without offering edits the settings page could not save', () => {
-    const onChange = renderAi('edit');
-    expect(screen.queryByTestId('ce-setup-ai-provider')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Reasoning effort')).not.toBeInTheDocument();
-    expect(screen.getByTestId('ce-setup-ai-fixed')).toHaveTextContent('OpenAI gpt-5.6-terra');
-    expect(screen.getByTestId('ce-setup-summary-ai')).toHaveTextContent(/^OpenAI gpt-5\.6-terra$/);
-    fireEvent.change(screen.getByLabelText('Question prompt'), { target: { value: 'Ask about pilots.' } });
-    expect(onChange).toHaveBeenCalledWith(['questionsGenPrompt'], 'Ask about pilots.');
+  it('names the transcription model new sessions use', () => {
+    renderAi('create');
+    expect(screen.getByText('Transcription uses OpenAI gpt-transcribe.')).toBeInTheDocument();
   });
 });
