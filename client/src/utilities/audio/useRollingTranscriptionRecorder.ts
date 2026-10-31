@@ -50,16 +50,29 @@ export const useRollingTranscriptionRecorder = ({
     labelSpeakers,
     capturing: status !== 'idle' && status !== 'error',
   });
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const { pageHidden: savePageHidden } = chunks;
+  const onPageHidden = useCallback(
+    (at: number) => {
+      savePageHidden(at);
+      // Hand over the part second not yet delivered, so it is saved too.
+      try {
+        mediaRecorderRef.current?.requestData();
+      } catch (_) {
+        // An inactive recorder has nothing more to give.
+      }
+    },
+    [savePageHidden],
+  );
   const { wakeLockHeld, pageHidden } = useRecordingWakeLock(
     status === 'recording' || status === 'paused',
-    chunks.pageHidden,
+    onPageHidden,
     chunks.pageShown,
   );
   const { segments, transcript, labelsUnavailableReason, beginChunk, prepare, finishTranscription, retryChunk } =
     chunks;
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mountedRef = useRef(false);
   const requestGenerationRef = useRef(0);

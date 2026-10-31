@@ -108,6 +108,13 @@ export class RecordingChunkQueue {
   }
   /** A period opens only during capture, and ends when the page returns, even if capture stopped meanwhile. */
   pageHidden(at: number) {
+    // A phone may suspend or discard a hidden page: save the audio held now, and the next delivery, at once
+    // rather than up to ten seconds later.
+    for (const record of this.records.values())
+      if (record.segment.status === 'recording' && record.audio) {
+        this.lastSnapshotAt.delete(record.segment.id);
+        void this.save(record);
+      }
     if (!this.hiddenPeriods.some((period) => period.endedAt == null))
       this.saveHiddenPeriods([...this.hiddenPeriods, { startedAt: at }]);
   }

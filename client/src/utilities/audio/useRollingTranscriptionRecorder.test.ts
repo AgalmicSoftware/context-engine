@@ -437,6 +437,38 @@ describe('useRollingTranscriptionRecorder', () => {
     }
   });
 
+  it('saves the audio so far as soon as the page is hidden, so a discarded tab loses at most a second', async () => {
+    const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+    const savedAudio = () =>
+      [...mockChunkRecords.values()].find((record) => record.segment.id !== 'hidden-periods')?.audio?.size;
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'hidden-save' }));
+    try {
+      await act(async () => {
+        await result.current.startRecording();
+      });
+      for (let second = 0; second < 5; second++)
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(1000);
+          instances[0].requestData();
+          await flushPromises();
+        });
+      // The first second is saved at once; the next save would wait ten seconds.
+      expect(savedAudio()).toBe(256);
+      await act(async () => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+        document.dispatchEvent(new Event('visibilitychange'));
+        await flushPromises();
+      });
+      // All five seconds, plus the partial second the recorder hands over when asked.
+      expect(savedAudio()).toBe(6 * 256);
+      expect(result.current.isRecording).toBe(true);
+    } finally {
+      unmount();
+      if (visibility) Object.defineProperty(document, 'visibilityState', visibility);
+      else Reflect.deleteProperty(document, 'visibilityState');
+    }
+  });
+
   it('keeps raw audio until a failed upload retries and its transcript is saved', async () => {
     (transcribeAudio as jest.Mock)
       .mockImplementationOnce(async () => {
