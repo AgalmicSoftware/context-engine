@@ -88,3 +88,18 @@ test('plain text joins the title, paragraphs and link labels, never an object', 
   assert.equal(sessionContextPlainText(' already text '), 'already text');
   assert.equal(sessionContextPlainText({ unexpected: true }), '');
 });
+
+test('writers refuse context that looks like a key, token or password', () => {
+  for (const [value, path] of [
+    [{ paragraphs: ['Use sk-live-0123456789abcdefghij for the demo.'] }, 'sessionContext.paragraphs.0'],
+    [{ title: 'Bearer abcdefghijklmnopqrstuvwxyz' }, 'sessionContext.title'],
+    [{ links: [{ label: 'Doc', url: 'https://example.org/doc?api_key=abc123' }] }, 'sessionContext.links.0'],
+    // `${'@'}` keeps the public email scrub from rewriting this credential link.
+    [{ links: [{ label: 'Doc', url: `https://user:pass${'@'}example.org/doc` }] }, 'sessionContext.links.0'],
+  ]) {
+    const result = validateSessionContext(value);
+    assert.equal(result.ok, false, JSON.stringify(value));
+    assert.ok(result.errors.some((error) => error.path === path && /secrets never go in context/.test(error.message)), JSON.stringify(result.errors));
+  }
+  assert.equal(validateSessionContext({ links: [{ label: 'Doc', url: 'https://example.org/doc?page=2' }] }).ok, true);
+});

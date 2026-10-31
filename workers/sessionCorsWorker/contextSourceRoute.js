@@ -9,6 +9,7 @@ import {
   contextTagValue,
   isAdminsOnlyAccess,
 } from '../../shared/sessionContextSources.mjs';
+import { looksSecret } from '../../shared/secretText.mjs';
 import { readPdfWithSessionAi } from './contextDocumentRead.js';
 import { fetchContextSnapshotText } from './fetchExecution.js';
 import {
@@ -69,6 +70,9 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
   try { parsed = url.length <= LIMITS.urlChars ? new URL(url) : null; } catch { parsed = null; }
   if (parsed?.protocol !== 'https:') {
     return json({ error: `Enter an https:// link of at most ${LIMITS.urlChars.toLocaleString('en-US')} characters.` }, 400);
+  }
+  if (looksSecret(url) || looksSecret(trim(body.title))) {
+    return json({ error: 'This link looks like it holds a key, token or password. Remove it: secrets never go in context.' }, 400);
   }
   const replaces = trim(body.replaces) ? await readContextSourceRow({ env, slug, id: body.replaces }) : null;
   if (trim(body.replaces) && (!replaces || contextTagValue(replaces.tags, TAGS.kind) !== 'link')) {

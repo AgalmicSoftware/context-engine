@@ -30244,10 +30244,32 @@ var init_realtimeInterviewConfig = __esm({
   }
 });
 
+// shared/secretText.mjs
+var SECRET_PATTERNS, TOKEN_RUN, looksSecret;
+var init_secretText = __esm({
+  "shared/secretText.mjs"() {
+    SECRET_PATTERNS = [
+      /\bsk-[\w-]{16,}/,
+      /\bAIza[\w-]{30,}/,
+      /\b(?:gsk|ghp|gho|ghu|ghs|ghr|github_pat|glpat|xox[abpr])[-_][\w-]{16,}/,
+      /(?<![/\w])(?:0x)?[0-9a-f]{64,}\b/i,
+      /-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----/,
+      /"kty"\s*:/,
+      /\bBearer\s+[\w.~+/=-]{16,}/i,
+      /\b[a-z][a-z\d+.-]{0,31}:\/\/[^\s/?#@]*@/i,
+      /[?&#](?:access_token|api[_-]?key|key|token|secret|password|sig|signature|auth)=[^&#\s]/i,
+      /#(?:[^\s#]*&)?k=[^&#\s]/
+    ];
+    TOKEN_RUN = /(?<![\w-])[\w-]{40}(?![\w-])/g;
+    looksSecret = (text4) => typeof text4 === "string" && (SECRET_PATTERNS.some((pattern) => pattern.test(text4)) || (text4.match(TOKEN_RUN) || []).some((run) => /[A-Z]/.test(run) && /[a-z]/.test(run) && /\d/.test(run)));
+  }
+});
+
 // shared/sessionContext.mjs
 var SESSION_CONTEXT_LIMITS, L, KEYS, LINK_KEYS, isRecord3, text, isHttpsUrl, normalizeSessionContext, fail, validateSessionContext, sessionContextPlainText;
 var init_sessionContext = __esm({
   "shared/sessionContext.mjs"() {
+    init_secretText();
     SESSION_CONTEXT_LIMITS = Object.freeze({
       titleChars: 80,
       paragraphs: 6,
@@ -30335,6 +30357,14 @@ var init_sessionContext = __esm({
         });
         if (links.length > L.links) fail(errors, "sessionContext.links", `Context holds at most ${L.links} links.`);
       }
+      const SECRET = "looks like a key, token or password. Remove it: secrets never go in context.";
+      if (looksSecret(title)) fail(errors, "sessionContext.title", `The title ${SECRET}`);
+      paragraphs.forEach((paragraph, index) => {
+        if (looksSecret(paragraph)) fail(errors, `sessionContext.paragraphs.${index}`, `Paragraph ${index + 1} ${SECRET}`);
+      });
+      links.forEach(({ label, url }, index) => {
+        if (looksSecret(label) || looksSecret(url)) fail(errors, `sessionContext.links.${index}`, `Link ${index + 1} ${SECRET}`);
+      });
       return errors.length ? { ok: false, errors } : { ok: true, value: { title, paragraphs, links }, errors };
     };
     sessionContextPlainText = (value) => {
@@ -69900,6 +69930,7 @@ var encoder5, trim12, isObj15, clip, commonTags, isReadingOf, readingsOf, storeR
 var init_contextSourceRoute = __esm({
   "workers/sessionCorsWorker/contextSourceRoute.js"() {
     init_sessionContextSources();
+    init_secretText();
     init_contextDocumentRead();
     init_fetchExecution();
     init_storageRouteExecution();
@@ -69938,6 +69969,9 @@ var init_contextSourceRoute = __esm({
       }
       if (parsed?.protocol !== "https:") {
         return json6({ error: `Enter an https:// link of at most ${CONTEXT_SOURCE_LIMITS.urlChars.toLocaleString("en-US")} characters.` }, 400);
+      }
+      if (looksSecret(url) || looksSecret(trim12(body.title))) {
+        return json6({ error: "This link looks like it holds a key, token or password. Remove it: secrets never go in context." }, 400);
       }
       const replaces = trim12(body.replaces) ? await readContextSourceRow({ env, slug, id: body.replaces }) : null;
       if (trim12(body.replaces) && (!replaces || contextTagValue(replaces.tags, CONTEXT_TAGS.kind) !== "link")) {

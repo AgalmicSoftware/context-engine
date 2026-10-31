@@ -373,6 +373,7 @@ test('set-config checks a sent session context and stores its trimmed form', () 
     [{ links: Array.from({ length: 9 }, (_, index) => ({ label: `L${index}`, url: `https://example.org/${index}` })) }, /at most 8 links/],
     [{ title: 'x'.repeat(81) }, /title is longer than 80/],
     [{ paragraphs: [], extra: true }, /unknown field: extra/],
+    [{ paragraphs: ['Key: sk-live-0123456789abcdefghij'] }, /secrets never go in context/],
   ]) {
     const refused = setContext(sessionContext);
     assert.equal(refused.ok, false, JSON.stringify(sessionContext));

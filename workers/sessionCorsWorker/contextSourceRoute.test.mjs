@@ -291,3 +291,14 @@ test('unknown actions and a file name holding the body placeholder are handled',
   assert.equal(parsed.input[0].content[0].filename, 'x__CE_PDF_BASE64__y.pdf');
   assert.equal(parsed.input[0].content[0].file_data, `data:application/pdf;base64,${Buffer.from(PDF_BYTES).toString('base64')}`);
 });
+
+test('a link that looks like it holds a secret is refused before any fetch', async () => {
+  const h = harness();
+  for (const url of ['https://example.org/doc?token=abc123', 'https://example.org/doc#k=abc123']) {
+    const response = await h.context({ action: 'add-link', url });
+    assert.equal(response.status, 400, url);
+    assert.match((await response.json()).error, /secrets never go in context/);
+  }
+  assert.equal((await h.context({ action: 'add-link', url: 'https://example.org/doc', title: 'sk-proj-0123456789abcdefghij' })).status, 400);
+  assert.deepEqual(h.pageCalls, []);
+});

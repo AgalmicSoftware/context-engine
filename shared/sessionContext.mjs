@@ -1,3 +1,5 @@
+import { looksSecret } from './secretText.mjs';
+
 // A session's notes and links ({ title, paragraphs, links }), with the one set
 // of limits the session page, MCP, templates and the Worker's set-config share.
 // Files and fetched pages are doc-library records, not part of this object.
@@ -125,6 +127,15 @@ export const validateSessionContext = (value) => {
     });
     if (links.length > L.links) fail(errors, 'sessionContext.links', `Context holds at most ${L.links} links.`);
   }
+  // Context is public and read by the AI, so nothing in it may look like a key.
+  const SECRET = 'looks like a key, token or password. Remove it: secrets never go in context.';
+  if (looksSecret(title)) fail(errors, 'sessionContext.title', `The title ${SECRET}`);
+  paragraphs.forEach((paragraph, index) => {
+    if (looksSecret(paragraph)) fail(errors, `sessionContext.paragraphs.${index}`, `Paragraph ${index + 1} ${SECRET}`);
+  });
+  links.forEach(({ label, url }, index) => {
+    if (looksSecret(label) || looksSecret(url)) fail(errors, `sessionContext.links.${index}`, `Link ${index + 1} ${SECRET}`);
+  });
   return errors.length ? { ok: false, errors } : { ok: true, value: { title, paragraphs, links }, errors };
 };
 
