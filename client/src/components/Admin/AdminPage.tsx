@@ -1995,10 +1995,13 @@ const AdminPageRuntime = ({
     if (metadataLoadState === 'unavailable') return 'Metadata unavailable; contracts below may be chain defaults';
     return 'No registry metadata URI configured';
   })();
-  // Worker-hosted sessions are edited on their settings page, on the same Session Worker.
+  // Sessions are edited on their settings page: Worker-hosted ones on the same Session Worker,
+  // on-chain ones through the registry, so their link names no Worker.
   const editSettingsUrl = sessionCapabilities.isWorkerCanonical
     ? buildSessionSettingsUrl(selectedSlug, exactSelectedConfigWorkerUrl)
-    : '';
+    : sessionCapabilities.usesChainMetadata
+      ? buildSessionSettingsUrl(selectedSlug)
+      : '';
   const sessionCardTone = selectedConfig ? 'ready' : availableSessions.length ? 'idle' : 'warning';
   const showHeroMedia = !!resolvedSessionHeader && heroHeaderImageReady;
   const metadataOpen = openSection === 'metadata';

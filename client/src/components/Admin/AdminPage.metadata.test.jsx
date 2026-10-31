@@ -200,8 +200,11 @@ describe('AdminPage metadata panel', () => {
     expect(metadataPanel.querySelector(`a[href="/u/${encodeURIComponent(ADMIN_ADDRESS)}"]`)).not.toBeNull();
     expect(metadataPanel.querySelector('a[href*="old-metadata"]')).not.toBeNull();
     expect(within(metadataPanel).getByRole('button', { name: 'Copy raw metadata JSON' })).toBeInTheDocument();
-    // The settings page edits only Worker-hosted sessions, so a registry session gets no link.
-    expect(within(metadataPanel).queryByTestId(EDIT_SETTINGS_LINK_TESTID)).not.toBeInTheDocument();
+    // A registry session is edited on its settings page too, found through the registry.
+    expect(within(metadataPanel).getByTestId(EDIT_SETTINGS_LINK_TESTID)).toHaveAttribute(
+      'href',
+      'http://localhost/session/edge/settings',
+    );
   });
 
   it('warns when registry contract addresses are synthesized from chain defaults', async () => {
