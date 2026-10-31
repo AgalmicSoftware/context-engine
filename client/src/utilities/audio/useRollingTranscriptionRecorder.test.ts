@@ -758,7 +758,7 @@ describe('useRollingTranscriptionRecorder', () => {
       await jest.advanceTimersByTimeAsync(15_000);
     });
     expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete', 'complete', 'recording']);
-    expect((transcribeAudio as jest.Mock).mock.calls.map(([blob]) => blob.size)).toEqual([256, 256]);
+    expect(jest.mocked(transcribeAudio).mock.calls.map(([blob]) => blob.size)).toEqual([256, 256]);
     unmount();
   });
 
