@@ -108,7 +108,7 @@ async function currentResultSourceFingerprint(env, sessionSlug) {
         responses.push({ id, payload: await payload.json() });
       }
       cursor = safeString(body.cursor);
-      complete = body.listComplete === true || (body.listComplete === undefined && !cursor);
+      complete = body.listComplete === true;
       if (!complete && (!cursor || seen.has(cursor))) throw new Error('result_cache_source_incomplete');
       seen.add(cursor);
     }

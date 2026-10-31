@@ -148,9 +148,6 @@ export function inputFromRequest(request, body = {}) {
     result: Object.hasOwn(body, 'result') ? body.result : undefined,
     cache: Object.hasOwn(body, 'cache') ? body.cache : undefined,
     demo: Object.hasOwn(body, 'demo') ? body.demo : url.searchParams.get('demo'),
-    includeLegacySessions: Object.hasOwn(body, 'includeLegacySessions')
-      ? body.includeLegacySessions
-      : body.includeLegacy || url.searchParams.get('includeLegacySessions') || url.searchParams.get('includeLegacy'),
     questionId: safeString(body.questionId || url.searchParams.get('questionId')),
     geoId: safeString(
       body.geoId || body.geoNodeId || url.searchParams.get('geoId') || url.searchParams.get('geoNodeId'),

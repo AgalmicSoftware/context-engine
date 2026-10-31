@@ -65850,7 +65850,7 @@ async function loadWorkerCloudflareQuestions({
     }
     if (Array.isArray(listed.body?.items)) items.push(...listed.body.items);
     cursor = safeString(listed.body?.cursor);
-    listComplete = listed.body?.listComplete === true || listed.body?.listComplete === void 0 && !cursor;
+    listComplete = listed.body?.listComplete === true;
     if (!listComplete && (!cursor || seenCursors.has(cursor))) {
       return {
         ok: false,
@@ -93297,7 +93297,6 @@ function inputFromRequest(request, body = {}) {
     result: Object.hasOwn(body, "result") ? body.result : void 0,
     cache: Object.hasOwn(body, "cache") ? body.cache : void 0,
     demo: Object.hasOwn(body, "demo") ? body.demo : url.searchParams.get("demo"),
-    includeLegacySessions: Object.hasOwn(body, "includeLegacySessions") ? body.includeLegacySessions : body.includeLegacy || url.searchParams.get("includeLegacySessions") || url.searchParams.get("includeLegacy"),
     questionId: safeString(body.questionId || url.searchParams.get("questionId")),
     geoId: safeString(
       body.geoId || body.geoNodeId || url.searchParams.get("geoId") || url.searchParams.get("geoNodeId")
@@ -98219,7 +98218,7 @@ async function currentResultSourceFingerprint(env, sessionSlug) {
         responses.push({ id: id2, payload: await payload.json() });
       }
       cursor = safeString(body.cursor);
-      complete = body.listComplete === true || body.listComplete === void 0 && !cursor;
+      complete = body.listComplete === true;
       if (!complete && (!cursor || seen.has(cursor))) throw new Error("result_cache_source_incomplete");
       seen.add(cursor);
     }

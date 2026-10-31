@@ -71,9 +71,8 @@ export async function loadWorkerCloudflareQuestions({
     }
     if (Array.isArray(listed.body?.items)) items.push(...listed.body.items);
     cursor = safeString(listed.body?.cursor);
-    // A filtered page can be empty and still continue. Workers that predate
-    // pagination send neither field and list everything at once.
-    listComplete = listed.body?.listComplete === true || (listed.body?.listComplete === undefined && !cursor);
+    // A filtered page can be empty and still continue.
+    listComplete = listed.body?.listComplete === true;
     if (!listComplete && (!cursor || seenCursors.has(cursor))) {
       return {
         ok: false,
