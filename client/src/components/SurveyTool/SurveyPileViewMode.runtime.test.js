@@ -672,6 +672,14 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(resolveSessionVoiceMode(window.location.search)).toBe('recordGroup');
   });
 
+  it('ignores a mode no session link uses and strips it from the address', async () => {
+    renderDemoPile({}, { route: '/session/demo?foo=1&mode=recordGroup#keep' });
+    await screen.findByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE);
+    expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument();
+    expect(window.location.search).toBe('?foo=1');
+    expect(window.location.hash).toBe('#keep');
+  });
+
   it('returns embedded interviews to the session Results section without opening raw results', async () => {
     const onViewSessionResults = jest.fn();
     renderDemoPile(

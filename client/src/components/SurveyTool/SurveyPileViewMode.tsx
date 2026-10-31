@@ -113,7 +113,12 @@ import {
   normalizeTransientSubmitFeedbackDurationMs,
 } from './surveyQuestionSubmitFeedback.js';
 import { buildRenderedQuestionIdsFromPileWindow } from './surveyQuestionScope.js';
-import { buildListeningModeSearch, isListeningModeQueryEnabled } from '../../utilities/audio/rollingTranscription';
+import {
+  LISTENING_MODE_QUERY_VALUE,
+  buildListeningModeSearch,
+  isListeningModeQueryEnabled,
+} from '../../utilities/audio/rollingTranscription';
+import { SESSION_VOICE_MODE_QUERY_VALUES } from './sessionVoiceModeQuery';
 import {
   buildSessionVoiceModeSearch,
   clearInterviewPrefillHash,
@@ -1102,8 +1107,26 @@ const consumeInterviewPrefillHashIfPresent = (engine: PileViewModeEngine) => {
   return true;
 };
 
+// Every `mode` a session link may carry. Any other value, such as one from an
+// old link, opens nothing, so it leaves the address too.
+const SESSION_MODE_QUERY_VALUES = [...SESSION_VOICE_MODE_QUERY_VALUES, LISTENING_MODE_QUERY_VALUE];
+const stripUnknownSessionModeQuery = () => {
+  if (typeof window === 'undefined' || !window.history?.replaceState) return;
+  const params = new URLSearchParams(window.location.search || '');
+  const mode = params.get('mode');
+  if (mode === null || SESSION_MODE_QUERY_VALUES.includes(mode)) return;
+  params.delete('mode');
+  const query = params.toString();
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`,
+  );
+};
+
 const runPileComponentDidMount = (engine: PileViewModeEngine) => {
   engine._isMounted = true;
+  stripUnknownSessionModeQuery();
   // Regression guard: consume the prefill during pure initialization, but clear it only after mount.
   // Clearing inside the reducer initializer makes React Strict Mode's second initialization lose the packet.
   if (
