@@ -46,7 +46,6 @@ import {
   buildAiConfigRequest,
   buildArweaveKeyRequest,
   buildTranscriptionConfigRequest,
-  inferAiTaskType,
   normalizeAiClientOptions,
   pickAiRequestOpts,
   readAiErrorMessage,
@@ -54,6 +53,7 @@ import {
   readAiOptionThinking,
   readAiOptionThrowOnError,
   readAiOptionWorkerUrl,
+  readAiTaskType,
   readArweaveJwkOption,
   resolveAudioSummaryOptions,
   resolveAiSessionOptions,
@@ -196,7 +196,7 @@ const callAICompletion = async (prompt: unknown, opts: unknown = {}) => {
     const aiRequestOpts = normalizeAiClientOptions(opts);
     const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
     const ai = await getEffectiveAiConfig(buildAiConfigRequest(opts, { thinking: thinkingRequested }));
-    const taskType = inferAiTaskType(prompt, aiRequestOpts);
+    const taskType = readAiTaskType(aiRequestOpts);
 
     const thinking = thinkingRequested && ai.provider === 'anthropic';
 

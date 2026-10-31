@@ -49,6 +49,8 @@ describe('Context AI prompt model preview', () => {
     await act(async () => findGenerateQuestionsButton().click());
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     const requestOptions = mockCallAI.mock.calls[0][1];
+    // The task is named, so an edited prompt keeps the generation token ceiling and effort.
+    expect(requestOptions.taskType).toBe('generate');
     expect(requestOptions.sessionConfig.ai).toEqual(sessionConfig.ai);
     expect(await getEffectiveAiConfig({ ...requestOptions, resolveSecrets: false })).toMatchObject({
       provider: 'openai',

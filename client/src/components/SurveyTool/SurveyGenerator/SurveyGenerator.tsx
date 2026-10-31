@@ -731,7 +731,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     requestedCount: number = count,
   ) {
     const prompt = buildSinglePrompt(sourceDocContent, overrides);
-    const raw = await callAI(prompt, aiRequestOptions);
+    const raw = await callAI(prompt, { ...aiRequestOptions, taskType: 'generate' });
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('No JSON object found in AI response');
     const parsed = JSON.parse(match[0]) as GeneratedAiQuestionPayload;

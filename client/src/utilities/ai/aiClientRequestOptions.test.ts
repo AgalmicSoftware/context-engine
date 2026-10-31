@@ -2,12 +2,12 @@ import {
   buildAiConfigRequest,
   buildArweaveKeyRequest,
   buildTranscriptionConfigRequest,
-  inferAiTaskType,
   pickAiRequestOpts,
   readAiErrorMessage,
   readAiOptionTaskType,
   readAiOptionThinking,
   readAiOptionThrowOnError,
+  readAiTaskType,
   readArweaveJwkOption,
   resolveAudioSummaryOptions,
   resolveAiSessionOptions,
@@ -38,9 +38,9 @@ describe('aiClientRequestOptions', () => {
     });
   });
 
-  it('infers the seed generation task only when no explicit task type exists', () => {
-    expect(inferAiTaskType('numberOfSeedStatementsOrPrompts: 3\n{"surveyTitle":"Alpha"}')).toBe('generate');
-    expect(inferAiTaskType('anything', { taskType: ' Summarize ' })).toBe('summarize');
+  it('reads the task its caller names and never infers one from prompt wording', () => {
+    expect(readAiTaskType({ taskType: ' Summarize ' })).toBe('summarize');
+    expect(readAiTaskType({})).toBeNull();
   });
 
   it('resolves session options without losing object-valued context', () => {
