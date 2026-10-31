@@ -3,7 +3,6 @@ import {
   countSessionsForChain,
   getChainName,
   getErrorMessage,
-  inferAiProviderFromModel,
   normalizeAiProvider,
   normalizeSlug,
   normalizeWorkerUrl,
@@ -11,6 +10,7 @@ import {
   resolveAdminAiTestModel,
   resolveAdminCapabilities,
 } from './adminPageHelpers';
+import { inferAiProviderFromModel } from '../../../../shared/aiModelFamily.mjs';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 

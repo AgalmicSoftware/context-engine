@@ -1,4 +1,5 @@
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
+import { inferAiProviderFromModel } from '../../../../shared/aiModelFamily.mjs';
 import { getChainById } from '../../variables/chains.js';
 import { getAiModelOptions } from '../Sessions/sessionWizardAiConfig';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
@@ -83,15 +84,6 @@ export const normalizeAiProvider = (raw: unknown, fallback: unknown = 'openai'):
   const provider = toStr(raw).trim().toLowerCase();
   if (['openai', 'anthropic', 'openrouter', 'custom'].includes(provider)) return provider;
   return String(fallback || '');
-};
-
-export const inferAiProviderFromModel = (modelRaw: unknown): string => {
-  const model = toStr(modelRaw).trim().toLowerCase();
-  if (!model) return '';
-  if (model.startsWith('claude')) return 'anthropic';
-  if (/^(gpt-|o[1-9]|chatgpt)/.test(model)) return 'openai';
-  if (model.includes('/')) return 'openrouter';
-  return '';
 };
 
 const asAiRecord = (value: unknown): Record<string, unknown> =>
