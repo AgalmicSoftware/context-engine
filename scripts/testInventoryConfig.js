@@ -7,6 +7,7 @@ const ROOT_NODE_TEST_FILES = Object.freeze([
   'tests/root/protectedResponses.worker.test.mjs',
   'tests/root/questionId.test.mjs',
   'tests/root/sessionTemplate.test.mjs',
+  'tests/root/sessionTemplateLink.test.mjs',
   'tests/root/testEthOffer.test.mjs',
   'tests/root/arweave-metadata-uri.test.js',
   'tests/root/client.package.test.js',
