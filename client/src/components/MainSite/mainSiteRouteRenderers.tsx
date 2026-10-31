@@ -86,6 +86,7 @@ import {
   SBTPage as SBTPageRaw,
   SBTsPage as SBTsPageRaw,
   SessionDocumentsPage as SessionDocumentsPageRaw,
+  SessionSettingsPage as SessionSettingsPageRaw,
   SessionWizard as SessionWizardRaw,
   SimulatedUserPage as SimulatedUserPageRaw,
   SponsorPage as SponsorPageRaw,
@@ -143,6 +144,7 @@ const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
 const SBTPage = asMainSiteRouteComponent(SBTPageRaw);
 const SBTsPage = asMainSiteRouteComponent(SBTsPageRaw);
 const SessionDocumentsPage = asMainSiteRouteComponent(SessionDocumentsPageRaw);
+const SessionSettingsPage = asMainSiteRouteComponent(SessionSettingsPageRaw);
 const SessionWizard = asMainSiteRouteComponent(SessionWizardRaw);
 const SimulatedUserPage = asMainSiteRouteComponent(SimulatedUserPageRaw);
 const SponsorPage = asMainSiteRouteComponent(SponsorPageRaw);
@@ -1064,11 +1066,12 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const sessionTokenRaw = (parts[1] || '').trim();
     const subroute = (parts[2] || '').trim().toLowerCase();
     const isDocsRoute = subroute === 'docs';
+    const isSettingsRoute = subroute === 'settings' && !parts[3];
     const nextSubroute = (parts[3] || '').trim().toLowerCase();
     const isQuestionsRoute = subroute === 'questions' && (!nextSubroute || nextSubroute === 'results');
     const isQuestionResultsRoute = isQuestionsRoute && nextSubroute === 'results' && !parts[4];
     const hasUnsupportedSessionSubroute =
-      (!!parts[2] && !isDocsRoute && !isQuestionsRoute) ||
+      (!!parts[2] && !isDocsRoute && !isSettingsRoute && !isQuestionsRoute) ||
       (subroute === 'questions' && !!nextSubroute && nextSubroute !== 'results') ||
       (subroute === 'questions' && nextSubroute === 'results' && !!parts[4]);
     const workerRoute = resolveMainSiteSessionRouteForRender({
@@ -1091,7 +1094,13 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       const canonicalToken = resolvedSlug || DEFAULT_SESSION_SLUG_ALIAS;
       if (sessionTokenRaw.toLowerCase() !== canonicalToken.toLowerCase()) {
         const nextPath = `/session/${canonicalToken}${
-          isQuestionResultsRoute ? '/questions/results' : isQuestionsRoute ? '/questions' : ''
+          isQuestionResultsRoute
+            ? '/questions/results'
+            : isQuestionsRoute
+              ? '/questions'
+              : isSettingsRoute
+                ? '/settings'
+                : ''
         }`;
         const nextUrl = buildPublicUrl(nextPath, window.location.search || '', window.location.hash || '');
         window.history.replaceState({}, '', nextUrl);
@@ -1169,6 +1178,31 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               sessionConfig={effectiveSessionConfig}
               sessionIdHex={effectiveRegistryInfo.sessionIdHex || null}
               workerOrigin={workerOrigin}
+            />
+          </div>
+        </InitialRouteBoundary>
+      );
+    }
+
+    if (isSettingsRoute) {
+      const resolvedSlug = normalizeSessionSlug(effectiveSessionConfig.slug || slug);
+      const sessionNetwork = resolveExplicitWorkerSessionNetwork({
+        workerOrigin,
+        sessionConfig: effectiveSessionConfig,
+        fallbackNetwork: host.getSessionNetwork(resolvedSlug) || defaultSessionNetwork,
+      });
+      return (
+        <InitialRouteBoundary fallback={<LazyFallback label="Loading settings..." />} resetKey={fullPath}>
+          <div data-testid={E2E_TESTIDS.PAGE_SESSION_SETTINGS_ROOT}>
+            <SessionSettingsPage
+              provider={host.props.provider}
+              account={host.props.account}
+              network={sessionNetwork}
+              toggleLoginModal={(loginModalIsOpen?: boolean) => host.props.toggleLoginModal(loginModalIsOpen)}
+              loginComplete={host.props.loginComplete}
+              sessionSlug={resolvedSlug}
+              sessionConfig={effectiveSessionConfig}
+              workerOrigin={workerOrigin || ''}
             />
           </div>
         </InitialRouteBoundary>

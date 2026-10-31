@@ -14,6 +14,7 @@ export const SessionWizard = React.lazy(() => import('../Sessions/SessionWizard'
 export const OnePageSession = React.lazy(() => import('../OnePageSession/OnePageSession'));
 export const BenchmarksPage = React.lazy(() => import('../Benchmarks/BenchmarksPage'));
 export const SessionDocumentsPage = React.lazy(() => import('../DocumentLibrary/SessionDocumentsPage'));
+export const SessionSettingsPage = React.lazy(() => import('../Sessions/settings/SessionSettingsPage'));
 export const SimulatedUserPage = React.lazy(() => import('../UserPage/SimUserPage'));
 export const UserPage = React.lazy(() => import('../UserPage/UserPage'));
 export const CompareAddresses = React.lazy(() => import('../UserPage/CompareAddresses'));
