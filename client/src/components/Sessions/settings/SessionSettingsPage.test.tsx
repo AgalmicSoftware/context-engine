@@ -9,6 +9,9 @@ import SessionSettingsPage, { buildGroupRecorderLink, isSessionAdmin } from './S
 const mockFetchBootstrap = jest.fn();
 const mockUpsertBootstrap = jest.fn();
 const mockSignAdminAction = jest.fn(async (_options: unknown) => ({ signature: '0xsigned' }));
+const mockUploadMetadata = jest.fn();
+const mockUpdateMetadataOnChain = jest.fn();
+const mockUpsertRegistryCache = jest.fn();
 
 jest.mock('../../../utilities/session/sessionWorkerDiscovery', () => ({
   ...(jest.requireActual('../../../utilities/session/sessionWorkerDiscovery') as object),
@@ -21,6 +24,16 @@ jest.mock('../../../utilities/session/sessionWorkerConfigCache', () => ({
 jest.mock('../../../utilities/worker/workerAuth', () => ({
   ...(jest.requireActual('../../../utilities/worker/workerAuth') as object),
   buildSignedAdminActionAuth: (options: unknown) => mockSignAdminAction(options),
+}));
+
+jest.mock('../../../domains/sessions/registry/sessionRegistryAdminPorts', () => ({
+  adminSessionRegistryPorts: {
+    reads: { upsertSessionRegistryCache: (input: unknown) => mockUpsertRegistryCache(input) },
+    writes: {
+      uploadSessionMetadata: (metadata: unknown, options: unknown) => mockUploadMetadata(metadata, options),
+      updateSessionMetadataOnChain: (input: unknown) => mockUpdateMetadataOnChain(input),
+    },
+  },
 }));
 
 // The live files and links panel reports what the Worker lists.
@@ -306,11 +319,104 @@ describe('SessionSettingsPage', () => {
     expect(screen.getByTestId('ce-settings-content-changes')).not.toHaveTextContent('Description');
   });
 
-  it('says on-chain sessions are not edited here', () => {
+  describe('an on-chain session', () => {
+    const registryConfig = (registry: Record<string, unknown> = {}) => {
+      const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+      return {
+        slug: 'edit-salon',
+        sessionId: '1f1f1f1f-1f1f-1f1f-1f1f-1f1f1f1f1f1f',
+        networkChainId: 11155420,
+        sessionName: 'Chain salon',
+        corsWorkerUrl: WORKER,
+        sessionModeProfile: profile,
+        blockLimits: { start: 100, end: null },
+        contracts: { surveys: { address: `0x${'f1'.repeat(20)}`, chainId: 11155420 } },
+        ai: { models: { fast: { provider: 'openai', model: 'gpt-5' } }, reasoningEffort: 'low' },
+        __registry: {
+          registryChainId: 11155420,
+          chainId: 11155420,
+          metadataURI: 'ar://old-metadata',
+          encryptedMetadataURI: '',
+          adminAddress: ADMIN,
+          sessionIdHex: SESSION_ID,
+          metadataLoadState: 'loaded',
+          metadataDefaultedContractKeys: [],
+          ...registry,
+        },
+      };
+    };
+
+    beforeEach(() => {
+      mockUploadMetadata.mockResolvedValue({ metadataUri: 'ar://new-metadata' });
+      mockUpdateMetadataOnChain.mockResolvedValue({ ok: true, txHash: '0xmetadatahash' });
+    });
+
+    it('uses the same sections, adds the chain fields, and saves through the registry step by step', async () => {
+      renderPage({ sessionConfig: registryConfig(), workerOrigin: '' });
+      expect(mockFetchBootstrap).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByTestId('ce-setup-more-hosting'));
+      expect(screen.getByTestId('ce-settings-registry-chain')).toHaveTextContent('11155420');
+      expect(screen.getByTestId('ce-settings-block-start')).toHaveValue('100');
+      fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
+      expect(screen.getByTestId('ce-setup-ai-fast')).toHaveValue('gpt-5');
+      expect(screen.getByTestId('ce-settings-chain-needs')).toHaveTextContent('11155420');
+
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), { target: { value: 'Renamed' } });
+      fireEvent.change(screen.getByTestId('ce-settings-faucet-amount'), { target: { value: '0.0005' } });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE));
+      });
+
+      await waitFor(() => expect(screen.getByTestId('ce-settings-status')).toHaveTextContent('Saved on chain.'));
+      expect(mockUploadMetadata.mock.calls[0][0]).toMatchObject({
+        sessionName: 'Renamed',
+        faucet: { amountEth: '0.0005' },
+      });
+      expect(mockUpdateMetadataOnChain).toHaveBeenCalledWith(
+        expect.objectContaining({ chainId: 11155420, slug: 'edit-salon', metadataURI: 'ar://new-metadata' }),
+      );
+      expect(mockUpsertRegistryCache).toHaveBeenCalled();
+      const steps = within(screen.getByTestId('ce-settings-chain-steps')).getAllByRole('listitem');
+      expect(steps.map((step) => step.getAttribute('data-state'))).toEqual(['done', 'done', 'done', 'done']);
+      expect(screen.getByTestId('ce-settings-chain-tx')).toHaveAttribute(
+        'href',
+        expect.stringContaining('/tx/0xmetadatahash'),
+      );
+      const sync = posted.find((entry) => String(entry.url).endsWith('/admin/set-config'));
+      expect((sync?.body as Record<string, unknown>).config).toMatchObject({ sessionName: 'Renamed' });
+      expect(mockSignAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionAuthorityMode: 'evm_registry_canonical', sessionId: undefined }),
+      );
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE)).toBeDisabled();
+    });
+
+    it('names the wallet it needs', () => {
+      renderPage({ sessionConfig: registryConfig(), account: '0x00000000000000000000000000000000000000cc' });
+      expect(screen.getByTestId('ce-settings-admin-only')).toHaveTextContent(`registry admin, ${ADMIN},`);
+      cleanup();
+      renderPage({ sessionConfig: registryConfig(), account: '', loginComplete: false });
+      expect(screen.getByTestId('ce-settings-admin-only')).toHaveTextContent(
+        `Connect the session’s registry admin wallet, ${ADMIN},`,
+      );
+    });
+
+    it('refuses to save synthesized contract addresses until the admin confirms them', () => {
+      renderPage({
+        sessionConfig: registryConfig({ metadataLoadState: 'unavailable', metadataDefaultedContractKeys: ['surveys'] }),
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), { target: { value: 'Renamed' } });
+      expect(screen.getByText('Correct the contract addresses or confirm them before saving.')).toBeInTheDocument();
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE)).toBeDisabled();
+      fireEvent.click(screen.getByTestId('ce-setup-more-hosting'));
+      expect(screen.getByTestId('ce-settings-metadata-unavailable')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('ce-settings-contracts-checked'));
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE)).toBeEnabled();
+    });
+  });
+
+  it('says when a session’s profile cannot be edited here', () => {
     renderPage({
-      sessionConfig: workerConfig({
-        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
-      }),
+      sessionConfig: workerConfig({ sessionModeProfile: { profileVersion: 1, authority: { mode: 'other' } } }),
     });
     expect(screen.getByTestId('ce-settings-unsupported')).toBeInTheDocument();
     expect(mockFetchBootstrap).not.toHaveBeenCalled();

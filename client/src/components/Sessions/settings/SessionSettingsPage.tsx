@@ -19,8 +19,10 @@ import type { SetupSectionKey } from '../setup/SetupPrimitives';
 import { editSessionSetupProfile } from '../setup/sessionSetupProfile';
 import type { SetupDraft } from '../setup/setupSectionTypes';
 import { buildSessionWizardAdminUrl, buildSessionWizardSessionUrl } from '../sessionWizardUrlSupport';
+import { canonicalizeSessionWizardJson } from '../sessionWizardCanonicalJson';
 import { setValueAtPath } from '../sessionWizardGateUtils';
 import { buildSessionVoiceModeSearch } from '../../SurveyTool/sessionInterview';
+import { buildTxExplorerUrl } from '../../Admin/adminPageHelpers';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { notify } from '../../../utilities/ui/notify.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
@@ -39,9 +41,18 @@ import {
   rebaseSessionSettingsDraft,
   usesSbtDefaults,
   workerMergesAi,
+  type SessionSettingsSave,
 } from './sessionSettingsEdits';
-import { saveSessionSettings } from './sessionSettingsSave';
+import { contractsNeedChecking, readRegistryFacts } from './sessionSettingsChain';
+import {
+  ON_CHAIN_SAVE_STEPS,
+  saveOnChainSessionSettings,
+  saveSessionSettings,
+  type OnChainSaveStep,
+  type OnChainSaveStepState,
+} from './sessionSettingsSave';
 import { SettingsAiSection } from './SettingsAiSection';
+import { SettingsChainFacts, SettingsChainFields, describeChain } from './SettingsChainFields';
 import { SettingsQuestionListFields, SettingsSbtFields } from './SettingsListFields';
 
 type SessionSettingsPageProps = {
@@ -72,13 +83,17 @@ const AI_LOCKED_REASON =
   'They are read-only here: this Session Worker is older and would drop the AI settings this page can’t see. Update the Worker to edit them.';
 
 const lower = (value: unknown) => toStr(value).trim().toLowerCase();
+const sameJson = (left: unknown, right: unknown) =>
+  JSON.stringify(canonicalizeSessionWizardJson(left ?? null)) ===
+  JSON.stringify(canonicalizeSessionWizardJson(right ?? null));
 
+/** An on-chain session's admin is the registry's; a Worker-hosted session lists its own. */
 export const isSessionAdmin = (config: unknown, account: unknown): boolean => {
   const source = config && typeof config === 'object' ? (config as Record<string, unknown>) : {};
-  const admins = [source.adminAddress, ...(Array.isArray(source.adminAddresses) ? source.adminAddresses : [])]
-    .map(lower)
-    .filter(Boolean);
-  return !!lower(account) && admins.includes(lower(account));
+  const admins = resolveSessionCapabilityProjection(source).isRegistryCanonical
+    ? [readRegistryFacts(source).adminAddress]
+    : [source.adminAddress, ...(Array.isArray(source.adminAddresses) ? source.adminAddresses : [])];
+  return !!lower(account) && admins.map(lower).filter(Boolean).includes(lower(account));
 };
 
 // The session link with ?mode=groupRecording, which opens the group recorder.
@@ -101,9 +116,20 @@ const ChangeList = ({ title, paths, testId }: { title: string; paths: string[]; 
     </div>
   ) : null;
 
+type StepView = { step: OnChainSaveStep; state: OnChainSaveStepState | 'waiting'; detail?: string };
+const STATE_LABELS: Record<StepView['state'], string> = {
+  waiting: 'Waiting',
+  running: 'Running…',
+  done: 'Done',
+  failed: 'Failed',
+  skipped: 'Skipped',
+};
+
 // /session/<slug>/settings: a published session's settings in the setup
-// page's sections. Only fields the Worker's set-config accepts are sent, and
-// the page says beforehand which edits sign participants out.
+// page's sections. A Worker-hosted session saves the changed fields its
+// Worker's set-config accepts; an on-chain session saves new metadata to the
+// SessionRegistry. Either way the page says beforehand which edits sign
+// participants out.
 const SessionSettingsPage = ({
   account = '',
   provider,
@@ -116,6 +142,7 @@ const SessionSettingsPage = ({
   fetchImpl,
 }: SessionSettingsPageProps): React.ReactElement => {
   const capabilities = resolveSessionCapabilityProjection(sessionConfig);
+  const onChain = capabilities.isRegistryCanonical;
   const workerOrigin = toStr(workerOriginProp || sessionConfig?.corsWorkerUrl).trim();
   const [saved, setSaved] = useState<Record<string, unknown> | null>(sessionConfig);
   const savedRef = useRef(saved);
@@ -123,6 +150,8 @@ const SessionSettingsPage = ({
   const [openSections, setOpenSections] = useState(CLOSED);
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
+  const [steps, setSteps] = useState<StepView[]>([]);
+  const [txUrl, setTxUrl] = useState('');
   // The session's files, listed by name in an exported template.
   const [contextSources, setContextSources] = useState<ContextSource[]>([]);
 
@@ -161,14 +190,28 @@ const SessionSettingsPage = ({
     refresh().catch(() => setStatus('Couldn’t load the latest settings from the Session Worker.'));
   }, [refresh]);
 
+  // An on-chain session's config arrives through the registry cache.
+  useEffect(() => {
+    if (onChain && sessionConfig && !sameJson(sessionConfig, savedRef.current)) adopt(sessionConfig, true);
+  }, [adopt, onChain, sessionConfig]);
+
   const conflicts = useMemo(() => listSessionModeConflicts(draft.sessionModeProfile), [draft.sessionModeProfile]);
   const pending = useMemo(() => {
     try {
-      return { save: buildSessionSettingsSave(saved, draft), error: '' };
+      return { save: buildSessionSettingsSave(saved, draft, { onChain }), error: '' };
     } catch (error) {
       return { save: null, error: error instanceof Error ? error.message : 'Check the settings.' };
     }
-  }, [draft, saved]);
+  }, [draft, saved, onChain]);
+  const facts = readRegistryFacts(saved);
+  const needsContractCheck = onChain && contractsNeedChecking(saved, draft);
+  const chainBlocker = !onChain
+    ? ''
+    : !facts.registryChainId
+      ? 'This session’s registry network is unknown, so it can’t be saved here.'
+      : needsContractCheck
+        ? 'Correct the contract addresses or confirm them before saving.'
+        : '';
 
   const updateDraft = (path: string[], value: unknown) =>
     setDraft((prev) => {
@@ -190,7 +233,9 @@ const SessionSettingsPage = ({
     conflicts,
   });
 
-  const groupRecorderLink = buildGroupRecorderLink(sessionSlug, workerOrigin);
+  // An on-chain session's link needs no Worker pin; the registry names its Worker.
+  const linkWorker = onChain ? '' : workerOrigin;
+  const groupRecorderLink = buildGroupRecorderLink(sessionSlug, linkWorker);
   const copyGroupRecorderLink = async () => {
     try {
       await navigator.clipboard.writeText(groupRecorderLink);
@@ -201,23 +246,50 @@ const SessionSettingsPage = ({
     }
   };
 
-  const save = async () => {
-    const patch = pending.save?.patch || {};
-    if (saving || !Object.keys(patch).length || conflicts.length) return;
-    setSaving(true);
+  const saveToWorker = async (patch: Record<string, unknown>) => {
     setStatus('Saving…');
+    await saveSessionSettings({
+      workerOrigin,
+      sessionSlug,
+      sessionIdHex: resolveWorkerCanonicalSessionIdHex(saved),
+      patch,
+      account,
+      provider,
+      chainId: Number(network?.id || 1) || 1,
+    });
+    await refresh(false);
+    setStatus('Settings saved.');
+  };
+
+  const saveOnChain = async ({ patch, after }: SessionSettingsSave) => {
+    setTxUrl('');
+    setSteps(ON_CHAIN_SAVE_STEPS.map((step) => ({ step, state: 'waiting' })));
+    setStatus('Saving on chain…');
+    const result = await saveOnChainSessionSettings({
+      before: saved || {},
+      after,
+      patch,
+      sessionSlug,
+      account,
+      provider,
+      workerOrigin,
+      authorityMode: capabilities.authorityMode,
+      onStep: (step, state, detail) =>
+        setSteps((prev) => prev.map((entry) => (entry.step === step ? { step, state, detail } : entry))),
+    });
+    adopt(result.nextConfig, false);
+    setTxUrl(buildTxExplorerUrl(result.txHash, facts.registryChainId));
+    setStatus(
+      result.workerError ? `Saved on chain. The Session Worker didn’t sync: ${result.workerError}` : 'Saved on chain.',
+    );
+  };
+
+  const save = async () => {
+    const result = pending.save;
+    if (saving || !result || !Object.keys(result.patch).length || conflicts.length || chainBlocker) return;
+    setSaving(true);
     try {
-      await saveSessionSettings({
-        workerOrigin,
-        sessionSlug,
-        sessionIdHex: resolveWorkerCanonicalSessionIdHex(saved),
-        patch,
-        account,
-        provider,
-        chainId: Number(network?.id || 1) || 1,
-      });
-      await refresh(false);
-      setStatus('Settings saved.');
+      await (onChain ? saveOnChain(result) : saveToWorker(result.patch));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Saving failed.';
       setStatus(describeWorkerModeError(message, draft.sessionModeProfile) || message);
@@ -228,6 +300,8 @@ const SessionSettingsPage = ({
 
   const importTemplate = (template: Record<string, unknown>) => {
     const { draft: next, keptHosting } = applyTemplateToSessionSettingsDraft(draft, template);
+    // An on-chain session's questions are published from its session page.
+    if (onChain) next.questions = draft.questions;
     setDraft(next);
     setStatus(
       keptHosting
@@ -235,10 +309,11 @@ const SessionSettingsPage = ({
         : 'Template applied. Review the changes, then save.',
     );
   };
+  const editable = capabilities.isWorkerCanonical || onChain;
   const header = (
     <header className={styles.pageHeader}>
       <h1 className={styles.pageTitle}>Session settings</h1>
-      {capabilities.isWorkerCanonical && isSessionAdmin(saved, account) ? (
+      {editable && isSessionAdmin(saved, account) ? (
         <SessionTemplateActions
           buildTemplate={() =>
             sessionTemplateFromDraft({
@@ -257,13 +332,13 @@ const SessionSettingsPage = ({
     </header>
   );
 
-  if (!capabilities.isWorkerCanonical) {
+  if (!editable) {
     return (
       <div className={wizardStyles.groupWizard} data-testid={E2E_TESTIDS.SESSION_SETTINGS_PAGE}>
         <div className={styles.page}>
           {header}
           <p className={styles.hint} data-testid="ce-settings-unsupported">
-            This page edits sessions hosted on a Session Worker. This session is registered on chain.
+            This session’s mode profile is missing or not supported, so its settings can’t be edited here.
           </p>
         </div>
       </div>
@@ -271,16 +346,22 @@ const SessionSettingsPage = ({
   }
 
   if (!isSessionAdmin(saved, account)) {
+    const signedIn = loginComplete && !!account;
+    const registryAdmin = onChain && facts.adminAddress ? `, ${facts.adminAddress},` : '';
     return (
       <div className={wizardStyles.groupWizard} data-testid={E2E_TESTIDS.SESSION_SETTINGS_PAGE}>
         <div className={styles.page}>
           {header}
           <p className={styles.hint} data-testid="ce-settings-admin-only">
-            {loginComplete && account
-              ? 'Only this session’s admins can change its settings.'
-              : 'Sign in as a session admin to change its settings.'}
+            {onChain
+              ? signedIn
+                ? `Only this session’s registry admin${registryAdmin} can change its settings.`
+                : `Connect the session’s registry admin wallet${registryAdmin} to change its settings.`
+              : signedIn
+                ? 'Only this session’s admins can change its settings.'
+                : 'Sign in as a session admin to change its settings.'}
           </p>
-          {!(loginComplete && account) ? (
+          {!signedIn ? (
             <div className={styles.buttonRow}>
               <button type="button" className={styles.button} onClick={() => toggleLoginModal?.(true)}>
                 Sign in
@@ -294,7 +375,15 @@ const SessionSettingsPage = ({
 
   const changes = pending.save?.classification;
   const hasChanges = !!pending.save && Object.keys(pending.save.patch).length > 0;
-  const sessionUrl = buildSessionWizardSessionUrl({ slug: sessionSlug, workerOrigin });
+  const sessionUrl = buildSessionWizardSessionUrl({ slug: sessionSlug, workerOrigin: linkWorker });
+  const registryChain = describeChain(facts.registryChainId);
+  const stepLabel = (step: OnChainSaveStep) =>
+    ({
+      upload: 'Upload the new metadata to Arweave',
+      registry: `Update the SessionRegistry on ${registryChain}`,
+      cache: 'Update this browser’s copy',
+      worker: 'Sync the Session Worker',
+    })[step];
 
   return (
     <div className={wizardStyles.groupWizard} data-testid={E2E_TESTIDS.SESSION_SETTINGS_PAGE}>
@@ -338,44 +427,74 @@ const SessionSettingsPage = ({
           {...section('questions')}
           publisher={
             <>
-              <SetupQuestionsPublisher
-                questions={readSetupQuestions(draft)}
-                sessionConfig={saved}
-                sessionSlug={sessionSlug}
-                account={account}
-                provider={provider}
-                onPublished={() => updateDraft(['questions'], [])}
-              />
-              <p className={styles.hint}>
-                Questions already in the session are edited on the <a href={sessionUrl}>session page</a>.
-              </p>
+              {onChain ? (
+                <p className={styles.hint}>
+                  An on-chain session’s questions are added and edited on its <a href={sessionUrl}>session page</a>.
+                </p>
+              ) : (
+                <>
+                  <SetupQuestionsPublisher
+                    questions={readSetupQuestions(draft)}
+                    sessionConfig={saved}
+                    sessionSlug={sessionSlug}
+                    account={account}
+                    provider={provider}
+                    onPublished={() => updateDraft(['questions'], [])}
+                  />
+                  <p className={styles.hint}>
+                    Questions already in the session are edited on the <a href={sessionUrl}>session page</a>.
+                  </p>
+                </>
+              )}
               {openSections.questions ? <SettingsQuestionListFields draft={draft} onChange={updateDraft} /> : null}
             </>
           }
         />
-        <SetupParticipationSection {...section('participation')} supportsEndTime />
-        <SetupResultsSection {...section('results')} editProfile={editProfile} registryChainId={null} />
+        <SetupParticipationSection {...section('participation')} supportsEndTime={!onChain} />
+        <SetupResultsSection
+          {...section('results')}
+          editProfile={editProfile}
+          registryChainId={facts.registryChainId || null}
+        />
         <SetupAccessSection
           {...section('access')}
           editProfile={editProfile}
-          registryChainId={null}
-          gates={usesSbtDefaults(draft) ? <SettingsSbtFields draft={draft} onChange={updateDraft} /> : null}
+          registryChainId={facts.registryChainId || null}
+          gates={
+            onChain || usesSbtDefaults(draft) ? (
+              <SettingsSbtFields draft={draft} onChange={updateDraft} onChain={onChain} />
+            ) : null
+          }
         />
         <SetupHostingSection
           {...section('hosting')}
           editProfile={editProfile}
-          registryChainId={null}
+          registryChainId={facts.registryChainId || null}
           locked={
-            <dl className={styles.hint} data-testid="ce-settings-locked">
-              <dt>Link name</dt>
-              <dd className={styles.readOnlyValue}>{sessionSlug}</dd>
-              <dt>Session ID</dt>
-              <dd className={styles.readOnlyValue}>{resolveWorkerCanonicalSessionIdHex(saved)}</dd>
-              <dt>Session Worker</dt>
-              <dd className={styles.readOnlyValue}>{workerOrigin}</dd>
-              <dt>Runs on</dt>
-              <dd className={styles.readOnlyValue}>Session Worker (fixed once published)</dd>
-            </dl>
+            onChain ? (
+              <SettingsChainFacts config={saved} sessionSlug={sessionSlug} workerOrigin={workerOrigin} />
+            ) : (
+              <dl className={styles.hint} data-testid="ce-settings-locked">
+                <dt>Link name</dt>
+                <dd className={styles.readOnlyValue}>{sessionSlug}</dd>
+                <dt>Session ID</dt>
+                <dd className={styles.readOnlyValue}>{resolveWorkerCanonicalSessionIdHex(saved)}</dd>
+                <dt>Session Worker</dt>
+                <dd className={styles.readOnlyValue}>{workerOrigin}</dd>
+                <dt>Runs on</dt>
+                <dd className={styles.readOnlyValue}>Session Worker (fixed once published)</dd>
+              </dl>
+            )
+          }
+          deployment={
+            onChain ? (
+              <SettingsChainFields
+                config={saved}
+                draft={draft}
+                onChange={updateDraft}
+                needsContractCheck={needsContractCheck}
+              />
+            ) : null
           }
         />
         <SettingsAiSection
@@ -383,7 +502,7 @@ const SessionSettingsPage = ({
           onChange={updateDraft}
           open={openSections.ai}
           onToggle={() => setOpenSections((prev) => ({ ...prev, ai: !prev.ai }))}
-          lockedReason={workerMergesAi(saved) ? '' : AI_LOCKED_REASON}
+          lockedReason={onChain || workerMergesAi(saved) ? '' : AI_LOCKED_REASON}
           keys={
             <p className={styles.hint}>
               API keys live on the Session Worker. Change them in{' '}
@@ -397,6 +516,7 @@ const SessionSettingsPage = ({
           </h2>
           {pending.error ? <p className={styles.errorText}>{pending.error}</p> : null}
           {conflicts.length ? <p className={styles.conflict}>Resolve the conflicts above before saving.</p> : null}
+          {chainBlocker ? <p className={styles.conflict}>{chainBlocker}</p> : null}
           {hasChanges && changes ? (
             <>
               <ChangeList
@@ -413,20 +533,45 @@ const SessionSettingsPage = ({
           ) : (
             <p className={styles.hint}>No changes yet.</p>
           )}
+          {onChain ? (
+            <p className={styles.hint} data-testid="ce-settings-chain-needs">
+              Saving uploads new metadata to Arweave, then asks the registry admin’s wallet to sign a transaction on{' '}
+              {registryChain}.
+            </p>
+          ) : null}
           <div className={styles.buttonRow}>
             <button
               type="button"
               className={`${styles.button} ${styles.primaryButton}`}
-              disabled={!hasChanges || conflicts.length > 0 || saving}
+              disabled={!hasChanges || conflicts.length > 0 || !!chainBlocker || saving}
               data-testid={E2E_TESTIDS.SESSION_SETTINGS_SAVE}
               onClick={() => void save()}
             >
               {saving ? 'Saving…' : changes?.signsParticipantsOut ? 'Save and sign participants out' : 'Save'}
             </button>
           </div>
+          {steps.length ? (
+            <ol className={styles.hint} data-testid="ce-settings-chain-steps">
+              {steps.map(({ step, state, detail }) => (
+                <li key={step} data-state={state}>
+                  {stepLabel(step)}: {STATE_LABELS[state]}
+                  {step === 'registry' && state === 'running' ? ' Confirm in your wallet.' : ''}
+                  {detail ? ` ${detail}` : ''}
+                </li>
+              ))}
+            </ol>
+          ) : null}
           {status ? (
             <p className={styles.statusText} role="status" data-testid={E2E_TESTIDS.SESSION_SETTINGS_STATUS}>
               {status}
+              {txUrl ? (
+                <>
+                  {' '}
+                  <a href={txUrl} target="_blank" rel="noreferrer" data-testid="ce-settings-chain-tx">
+                    View the transaction
+                  </a>
+                </>
+              ) : null}
             </p>
           ) : null}
         </section>

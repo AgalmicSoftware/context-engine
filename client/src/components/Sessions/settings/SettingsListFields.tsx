@@ -92,8 +92,9 @@ export const SettingsQuestionListFields = ({ draft, onChange }: FieldsProps) => 
   </>
 );
 
-// Defaults for sessions where SBTs grant access.
-export const SettingsSbtFields = ({ draft, onChange }: FieldsProps) => (
+// Defaults for sessions where SBTs grant access. The SBT lists exist only in
+// on-chain sessions' metadata.
+export const SettingsSbtFields = ({ draft, onChange, onChain }: FieldsProps & { onChain: boolean }) => (
   <>
     <h3 className={styles.subheading}>SBTs</h3>
     <SetupField id="ce-settings-sbt-tags" label="SBT tags" help="Suggested tags for new SBTs. Separate with commas.">
@@ -120,5 +121,23 @@ export const SettingsSbtFields = ({ draft, onChange }: FieldsProps) => (
       testId="ce-settings-sbt-auto-feature"
       onChange={(checked) => onChange(['autoFeatureSBTsBySessionSlug'], checked)}
     />
+    {onChain ? (
+      <>
+        <ListField
+          draft={draft}
+          onChange={onChange}
+          listKey="featured_SBTs_LIST"
+          label="SBT list: featured"
+          help="SBT addresses shown first in the session’s SBT lists, one per line."
+        />
+        <ListField
+          draft={draft}
+          onChange={onChange}
+          listKey="ignored_SBTs_LIST"
+          label="SBT list: ignored"
+          help="SBT addresses left out of the session’s SBT lists, one per line."
+        />
+      </>
+    ) : null}
   </>
 );

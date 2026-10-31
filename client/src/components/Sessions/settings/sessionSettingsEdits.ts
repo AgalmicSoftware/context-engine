@@ -24,6 +24,7 @@ import { resolveSessionCapabilityProjection } from '../../../utilities/session/s
 import { resolveSessionWizardAutoFeatureBySessionSlug } from '../sessionWizardAiConfig';
 import { normalizeSessionWizardContext } from '../sessionWizardWriteNormalization';
 import { asRecord, text, type SetupDraft } from '../setup/setupSectionTypes';
+import { buildSessionSettingsChainDraft, editedChainValues } from './sessionSettingsChain';
 
 type Config = Record<string, unknown>;
 
@@ -41,7 +42,8 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value ?? null));
 export const workerMergesAi = (config: unknown): boolean => asRecord(config)[SET_CONFIG_MERGES_AI_FIELD] === true;
 
 // Lists are edited as text, one item per line (commas work too).
-const LIST_KEYS = [...CURATED_ID_LIST_KEYS, 'defaultFeaturedSBTs'];
+const SBT_LIST_KEYS = ['defaultFeaturedSBTs', 'featured_SBTs_LIST', 'ignored_SBTs_LIST'] as const;
+const LIST_KEYS = [...CURATED_ID_LIST_KEYS, ...SBT_LIST_KEYS];
 const listItem = (entry: unknown) => text(asRecord(entry).address || entry).trim();
 const formatSettingsList = (value: unknown): string =>
   Array.isArray(value) ? value.map(listItem).filter(Boolean).join('\n') : '';
@@ -103,6 +105,7 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     defaultSbtTags: text(source.defaultSbtTags),
     autoFeatureSBTsBySessionSlug: resolveSessionWizardAutoFeatureBySessionSlug(source) !== false,
     lists: Object.fromEntries(LIST_KEYS.map((key) => [key, formatSettingsList(source[key])])),
+    ...buildSessionSettingsChainDraft(source),
   };
 };
 
@@ -143,6 +146,8 @@ const LIST_LABELS: Record<string, string> = {
   HIGHLIGHTED_SURVEY_IDS: 'Highlighted surveys',
   BLOCKED_SURVEY_IDS: 'Hidden surveys',
   defaultFeaturedSBTs: 'Featured SBTs',
+  featured_SBTs_LIST: 'SBT list: featured',
+  ignored_SBTs_LIST: 'SBT list: ignored',
 };
 
 // A text field left as it was keeps the stored value, even one this page
@@ -181,12 +186,14 @@ const changedAiParts = (before: unknown, edited: unknown): Config => {
   );
 };
 
+type EditOptions = { nowMs: number; onChain: boolean };
+
 /** True when the draft's profile lets SBTs grant access, so its SBT defaults apply. */
 export const usesSbtDefaults = (draft: SetupDraft): boolean =>
   resolveSessionCapabilityProjection({ sessionModeProfile: draft.sessionModeProfile }).usesOnChainSbt;
 
 // Each editable field as the session will store it once the draft is saved.
-const editedValues = (before: Config, draft: SetupDraft, nowMs: number): Config => {
+const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: EditOptions): Config => {
   const values: Config = {
     sessionName: trimmed(draft.sessionName),
     sessionInfo: trimmed(draft.sessionInfo),
@@ -217,7 +224,7 @@ const editedValues = (before: Config, draft: SetupDraft, nowMs: number): Config 
     values.sessionEndsAt = normalizeSessionWizardEndsAt(draft.sessionEndsAt, { nowMs });
   }
   // SBT defaults apply only where SBTs grant access; the Worker refuses them elsewhere.
-  if (usesSbtDefaults(draft)) {
+  if (onChain || usesSbtDefaults(draft)) {
     values.defaultSbtTags = trimmed(draft.defaultSbtTags);
     values.defaultFeaturedSBTs = addressList(before, draft, 'defaultFeaturedSBTs');
     const autoFeature = draft.autoFeatureSBTsBySessionSlug !== false;
@@ -225,7 +232,13 @@ const editedValues = (before: Config, draft: SetupDraft, nowMs: number): Config 
       values.autoFeatureSBTsBySessionSlug = autoFeature;
     }
   }
-  if (workerMergesAi(before)) {
+  if (onChain) {
+    // The metadata document holds all of ai, so it is saved whole.
+    values.ai = clone(asRecord(draft.ai));
+    values.featured_SBTs_LIST = addressList(before, draft, 'featured_SBTs_LIST');
+    values.ignored_SBTs_LIST = addressList(before, draft, 'ignored_SBTs_LIST');
+    Object.assign(values, editedChainValues(before, draft));
+  } else if (workerMergesAi(before)) {
     const ai = changedAiParts(before.ai, draft.ai);
     if (Object.keys(ai).length) values.ai = ai;
   }
@@ -247,11 +260,17 @@ const unchanged = (key: string, before: unknown, after: unknown) => {
   if (key === 'sessionContext') return same(storedContext(before), after);
   if (key === 'resultsAnalysis') return same(normalizeResultsAnalysisSettings(before), after);
   if (key === 'appearance') return same(normalizeSessionAppearance(before), after);
+  // Voice interviews are on unless turned off.
+  if (key === 'interviewModeEnabled') return (before !== false) === after;
   return same(before, after) || (isBlank(before) && isBlank(after));
 };
 
 export type SessionSettingsSave = {
-  /** The POST /admin/set-config config: changed fields only, each one the Worker accepts. */
+  /**
+   * The changed fields only. A Worker-hosted session sends them to POST
+   * /admin/set-config (each one it accepts); an on-chain session writes them
+   * into its metadata.
+   */
   patch: Config;
   /** The session's config as it will be after saving, for the preview. */
   after: Config;
@@ -262,13 +281,13 @@ export type SessionSettingsSave = {
 export const buildSessionSettingsSave = (
   beforeConfig: unknown,
   draft: SetupDraft,
-  { nowMs = Date.now() }: { nowMs?: number } = {},
+  { nowMs = Date.now(), onChain = false }: { nowMs?: number; onChain?: boolean } = {},
 ): SessionSettingsSave => {
   const before = asRecord(beforeConfig);
-  const values = editedValues(before, draft, nowMs);
+  const values = editedValues(before, draft, { nowMs, onChain });
   const patch: Config = {};
   Object.entries(values).forEach(([key, value]) => {
-    if (!SET_CONFIG_KEYS.has(key) || unchanged(key, before[key], value)) return;
+    if ((!onChain && !SET_CONFIG_KEYS.has(key)) || unchanged(key, before[key], value)) return;
     patch[key] = value;
   });
   // The Worker checks the profile against its storage profile, so they travel together.
@@ -279,7 +298,7 @@ export const buildSessionSettingsSave = (
     if (same(patch.storageProfile, before.storageProfile)) delete patch.storageProfile;
   }
   const after = { ...before, ...patch };
-  if (patch.ai) after.ai = mergeSetConfigAi(before.ai, patch.ai);
+  if (!onChain && patch.ai) after.ai = mergeSetConfigAi(before.ai, patch.ai);
   return { patch, after, classification: classifySessionConfigEdits(before, after) };
 };
 
@@ -369,6 +388,9 @@ const LABELS: Record<string, string> = {
   defaultFilterState: 'Default filters',
   defaultSbtTags: 'SBT tags',
   autoFeatureSBTsBySessionSlug: 'Feature this session’s SBTs',
+  contracts: 'Contracts',
+  blockLimits: 'Block range',
+  faucet: 'Test ETH faucet',
   ...LIST_LABELS,
 };
 
