@@ -66,6 +66,11 @@ export const resolveSessionWizardMetadataPayloadBase = ({
   }
 
   delete metadata.sponsoredSbtAddress;
+  // A template's own fields: questions are added after creation and files
+  // attached again, so none of them is session metadata.
+  delete metadata.draftId;
+  delete metadata.contextFiles;
+  delete metadata.questions;
   if (metadata.defaultFeaturedSBTs != null) {
     metadata.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(metadata.defaultFeaturedSBTs);
   }

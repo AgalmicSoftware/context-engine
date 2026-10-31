@@ -395,6 +395,7 @@ const useSessionWizardWorkerDeploy = ({
           'sessionId',
           'sessionName',
           'sessionInfo',
+          'sessionContext',
           'appearance',
           'sessionHeaderImg',
           'sessionEndsAt',

@@ -634,6 +634,47 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.contracts.reputation).toBeUndefined();
   });
 
+  test('buildSessionWizardWorkerConfigPayload publishes the setup page context, trimmed', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'context-session',
+      draft: {
+        sessionName: 'Context session',
+        sessionModeProfile,
+        sessionContext: {
+          title: ' Read first ',
+          paragraphs: [' Why it matters. ', '  '],
+          links: [
+            { label: ' Essay ', url: ' https://example.org/essay ' },
+            { label: 'No link', url: '' },
+          ],
+        },
+        questions: [{ prompt: 'Kept out of config.', type: 'binary' }],
+        draftId: 'draft-1',
+        contextFiles: [{ name: 'deck.pdf' }],
+      },
+      deployPayload: { adminAddress: '0xAdmin' },
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example/',
+    });
+
+    expect(payload.sessionContext).toEqual({
+      title: 'Read first',
+      paragraphs: ['Why it matters.'],
+      links: [{ label: 'Essay', url: 'https://example.org/essay' }],
+    });
+    expect(payload).not.toHaveProperty('questions');
+    expect(payload).not.toHaveProperty('draftId');
+    expect(payload).not.toHaveProperty('contextFiles');
+    const empty = buildSessionWizardWorkerConfigPayload({
+      slug: 'context-session',
+      draft: { sessionModeProfile, sessionContext: { title: '', paragraphs: [], links: [] } },
+      deployPayload: { adminAddress: '0xAdmin' },
+      workerUrl: 'https://worker.example/',
+    });
+    expect(empty).not.toHaveProperty('sessionContext');
+  });
+
   test('buildSessionWizardWorkerConfigPayload emits a reload-safe two-key worker-canonical config', () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     const payload = buildSessionWizardWorkerConfigPayload({

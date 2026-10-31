@@ -141,6 +141,21 @@ const buildSessionWizardPublicAiConfig = (value: unknown): AnyRecord => {
   return next;
 };
 
+// sessionContext as the session page reads it: trimmed text, no empty
+// paragraphs or link-less links. null when nothing is left to publish.
+export const normalizeSessionWizardContext = (value: unknown): AnyRecord | null => {
+  const context = isObj(value) ? value : {};
+  const text = (entry: unknown) => (typeof entry === 'string' ? entry.trim() : '');
+  const normalized = {
+    title: text(context.title),
+    paragraphs: (Array.isArray(context.paragraphs) ? context.paragraphs : []).map(text).filter(Boolean),
+    links: (Array.isArray(context.links) ? context.links : [])
+      .map((link) => ({ label: text(isObj(link) ? link.label : ''), url: text(isObj(link) ? link.url : '') }))
+      .filter((link) => link.url),
+  };
+  return normalized.title || normalized.paragraphs.length || normalized.links.length ? normalized : null;
+};
+
 export const sanitizeSessionWizardMetadataPayload = (
   metadata: AnyRecord,
   {
@@ -415,6 +430,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
   const publishedAppearance = Object.prototype.hasOwnProperty.call(resolvedDraft, 'appearance')
     ? normalizeSessionAppearance(resolvedDraft.appearance)
     : null;
+  const publishedContext = normalizeSessionWizardContext(resolvedDraft.sessionContext);
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
@@ -422,6 +438,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
     sessionInfo: trimString(resolvedDraft.sessionInfo),
     sessionHeaderImg: trimString(resolvedDraft.sessionHeader || resolvedDraft.sessionHeaderImg),
     ...(publishedAppearance ? { appearance: publishedAppearance } : {}),
+    ...(publishedContext ? { sessionContext: publishedContext } : {}),
     interviewModeEnabled: resolvedDraft.interviewModeEnabled !== false,
     interviewMode: withoutNewInterviewDefaults({
       ...normalizeInterviewSettings(resolvedDraft.interviewMode),

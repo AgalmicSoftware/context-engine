@@ -12,6 +12,7 @@ import { withoutNewInterviewDefaults } from '../../../utilities/session/intervie
 import { normalizeSessionWizardEndsAt } from '../sessionWizardSessionLifecycle';
 import { normalizeSessionStorageProfileConfig } from '../sessionWizardStorageProfile';
 import { canonicalizeSessionWizardJson } from '../sessionWizardCanonicalJson';
+import { normalizeSessionWizardContext } from '../sessionWizardWriteNormalization';
 import { asRecord, text, type SetupDraft } from '../setup/setupSectionTypes';
 
 type Config = Record<string, unknown>;
@@ -50,16 +51,9 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
 
 const trimmed = (value: unknown) => text(value).trim();
 
-const normalizeContext = (value: unknown) => {
-  const context = asRecord(value);
-  return {
-    title: trimmed(context.title),
-    paragraphs: (Array.isArray(context.paragraphs) ? context.paragraphs : []).map(trimmed).filter(Boolean),
-    links: (Array.isArray(context.links) ? context.links : [])
-      .map((link) => ({ label: trimmed(asRecord(link).label), url: trimmed(asRecord(link).url) }))
-      .filter((link) => link.url),
-  };
-};
+// The setup page's publish normalizer; an emptied context is saved empty.
+const normalizeContext = (value: unknown) =>
+  normalizeSessionWizardContext(value) || { title: '', paragraphs: [], links: [] };
 
 // interviewMode mixes content (the opening and steering prompts) and
 // authority fields, so only the sub-fields the person changed move; the rest
