@@ -99,7 +99,12 @@ test('a template with only its format takes every default', () => {
   assert.equal(template.interviewModeEnabled, true);
   assert.deepEqual(template.interviewMode, { ...DEFAULT_INTERVIEW_SETTINGS, realtimeModel: 'gpt-live-1' });
   assert.deepEqual(template.resultsAnalysis, DEFAULT_RESULTS_ANALYSIS_SETTINGS);
-  assert.deepEqual(template.ai.models.transcription, { provider: 'openai', model: 'whisper-1' });
+  // New sessions default to the current models: Terra and Sol, and gpt-transcribe.
+  assert.deepEqual(template.ai.models, {
+    fast: { provider: 'openai', model: 'gpt-6.1-terra' },
+    thinking: { provider: 'openai', model: 'gpt-6.1-sol' },
+    transcription: { provider: 'openai', model: 'gpt-transcribe' },
+  });
   assert.equal(template.sessionModeProfile, null);
 });
 
@@ -113,7 +118,7 @@ test('missing nested fields take defaults; a mode profile is taken whole', () =>
     sessionModeProfile: { preset: 'custom' },
   });
   assert.deepEqual(template.ai.models.fast, { provider: 'openai', model: 'claude-sonnet-5-5' });
-  assert.equal(template.ai.models.thinking.model, 'gpt-5.6-terra');
+  assert.equal(template.ai.models.thinking.model, 'gpt-6.1-sol');
   assert.equal(template.interviewMode.openingPrompt, 'Welcome');
   assert.equal(template.interviewMode.questionGrowthPercent, 20);
   assert.equal(template.resultsAnalysis.generationMode, 'automatic');

@@ -48,9 +48,9 @@ describe('sessionDemoCompat', () => {
         ai: expect.objectContaining({
           reasoningEffort: 'low',
           models: expect.objectContaining({
-            fast: expect.objectContaining({ provider: 'openai', model: 'gpt-5.6-terra' }),
-            thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-5.6-terra' }),
-            transcription: expect.objectContaining({ provider: 'openai', model: 'whisper-1' }),
+            fast: expect.objectContaining({ provider: 'openai', model: 'gpt-6.1-terra' }),
+            thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-6.1-sol' }),
+            transcription: expect.objectContaining({ provider: 'openai', model: 'gpt-transcribe' }),
           }),
         }),
       }),

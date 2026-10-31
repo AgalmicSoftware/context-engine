@@ -5,6 +5,7 @@ import { createWorkerRuntime } from './worker.js';
 import { putSessionSecrets } from './sessionConfigSecretsStore.js';
 import { buildSiweMessage, installSessionCoordinatorBinding, makeJsonRequest } from '../../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { buildQuestionRecord } from '../../mcp/lib/records.mjs';
+import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
 import { resolveInterviewStarter, dispatchInterviewStarterRequest as boundary } from './interviewStarter.js';
 
 const dispatchInterviewStarterRequest = (args) => boundary({
@@ -32,7 +33,7 @@ const fixture = () => {
     proxyOpenAI: async ({ payload, secrets }) => {
       calls++;
       assert.equal(secrets.openaiKey, 'worker-only-fixture');
-      assert.equal(payload.model, 'gpt-5.6-terra');
+      assert.equal(payload.model, DEFAULT_AI_MODEL);
       assert.equal(payload.service_tier, 'default');
       assert.match(payload.messages[0].content, /Session topic/);
       return Response.json({ completion: `What is your uncommon view on AI? ${calls}` });

@@ -1,4 +1,4 @@
-import { DEFAULT_AI_MODEL } from './aiDefaults.mjs';
+import { DEFAULT_AI_MODELS, DEFAULT_TRANSCRIPTION_MODEL } from './aiDefaults.mjs';
 import { stableCanonicalSerialize } from './canonicalJson.mjs';
 import { looksSecret } from './secretText.mjs';
 import { validateSessionContext } from './sessionContext.mjs';
@@ -105,9 +105,9 @@ const DEFAULTS = Object.freeze({
   ai: {
     reasoningEffort: 'low',
     models: {
-      fast: { provider: 'openai', model: DEFAULT_AI_MODEL },
-      thinking: { provider: 'openai', model: DEFAULT_AI_MODEL },
-      transcription: { provider: 'openai', model: 'whisper-1' },
+      fast: { provider: 'openai', model: DEFAULT_AI_MODELS.fast },
+      thinking: { provider: 'openai', model: DEFAULT_AI_MODELS.thinking },
+      transcription: { provider: 'openai', model: DEFAULT_TRANSCRIPTION_MODEL },
     },
   },
   // null keeps the page's default profile; a profile is never merged with it.

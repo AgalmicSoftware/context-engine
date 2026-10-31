@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { corsHeaders } from './corsPrimitives.js';
+import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
 
 import {
   CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR,
@@ -839,21 +840,21 @@ test('proxyOpenAI defaults missing model and processing options to standard Terr
       return new Response(JSON.stringify({ output_text: 'Group label' }));
     },
   } });
-  assert.equal(body.model, 'gpt-5.6-terra');
+  assert.equal(body.model, 'gpt-6.1-terra');
   assert.equal(body.service_tier, 'default');
   assert.deepEqual(body.reasoning, { effort: 'low' });
 });
 
 test('proxyOpenAI preserves owner-configured medium reasoning for Terra interview mapping', async () => {
   let body;
-  await proxyOpenAI({ config: { ai: { reasoningEffort: 'medium' } }, payload: { model: 'gpt-5.6-terra', prompt: 'Map interview evidence.', reasoning_effort: 'medium', service_tier: 'default' }, secrets: { openaiKey: 'test-worker-key' }, deps: {
+  await proxyOpenAI({ config: { ai: { reasoningEffort: 'medium' } }, payload: { model: DEFAULT_AI_MODEL, prompt: 'Map interview evidence.', reasoning_effort: 'medium', service_tier: 'default' }, secrets: { openaiKey: 'test-worker-key' }, deps: {
     json: createJsonStub(), fetch: async (url, init) => {
       assert.equal(url, 'https://api.openai.com/v1/responses');
       body = JSON.parse(init.body);
       return new Response(JSON.stringify({ output_text: '{"responses":[]}' }));
     },
   } });
-  assert.equal(body.model, 'gpt-5.6-terra');
+  assert.equal(body.model, DEFAULT_AI_MODEL);
   assert.equal(body.service_tier, 'default');
   assert.deepEqual(body.reasoning, { effort: 'medium' });
 });

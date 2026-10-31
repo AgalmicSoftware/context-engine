@@ -89,7 +89,7 @@ jest.mock('../../utilities/ai/aiSettings.js', () => {
     })),
     saveLocalAiSettings: jest.fn((next) => next),
     clearLocalAiSettings: jest.fn(),
-    deriveAiPreset: jest.fn(() => 'gpt-5'),
+    deriveAiPreset: jest.fn(() => 'gpt-6-astra'),
   };
 });
 
@@ -1071,11 +1071,11 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       expect(saveLocalAiSettings).toHaveBeenCalledWith(
         expect.objectContaining({
           useLocal: true,
-          preset: 'gpt-5.6-terra',
+          preset: 'gpt-6.1-terra',
           mode: 'openai',
           models: expect.objectContaining({
-            fast: 'gpt-5.6-terra',
-            thinking: 'gpt-5.6-terra',
+            fast: 'gpt-6.1-terra',
+            thinking: 'gpt-6.1-sol',
           }),
           providers: expect.objectContaining({
             openai: expect.objectContaining({
@@ -1103,8 +1103,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
           preset: 'claude-sonnet',
           mode: 'anthropic',
           models: expect.objectContaining({
-            fast: 'claude-sonnet-4-6',
-            thinking: 'claude-sonnet-4-6',
+            fast: 'claude-sonnet-5-5',
+            thinking: 'claude-sonnet-5-5',
           }),
           providers: expect.objectContaining({
             anthropic: expect.objectContaining({

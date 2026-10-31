@@ -1,4 +1,8 @@
-import { DEFAULT_AI_MODELS as SHARED_AI_MODELS } from '../../../../shared/aiDefaults.mjs';
+import {
+  DEFAULT_AI_MODELS as SHARED_AI_MODELS,
+  DEFAULT_TRANSCRIPTION_MODEL,
+  TRANSCRIPTION_FALLBACK_MODEL,
+} from '../../../../shared/aiDefaults.mjs';
 import { toStr } from '../../utilities/shared/primitives.js';
 import type { AnyRecord } from '../shellTypes';
 
@@ -12,15 +16,15 @@ export const AI_PROVIDER_OPTIONS = [
 ];
 
 // The one model list for setup, editing and the admin AI test. The first entry
-// is each role's default.
+// is each role's default. Sessions keep a stored model that is no longer listed.
 export const AI_MODEL_OPTIONS = Object.freeze({
   anthropic: {
     fast: ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5', 'claude-fable-5-1'],
     thinking: ['claude-opus-5-5', 'claude-fable-5-1', 'claude-sonnet-5-5', 'claude-haiku-5-5'],
   },
   openai: {
-    fast: ['gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-6-astra', 'gpt-5', 'gpt-4o', 'gpt-4o-mini', 'o3-mini'],
-    thinking: ['gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-6-astra', 'gpt-5', 'o3-mini', 'gpt-4o', 'gpt-4o-mini'],
+    fast: ['gpt-6.1-terra', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6-astra'],
+    thinking: ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6.1-terra'],
   },
   openrouter: {
     fast: [],
@@ -30,7 +34,7 @@ export const AI_MODEL_OPTIONS = Object.freeze({
     fast: [],
     thinking: [],
   },
-  transcription: ['whisper-1'],
+  transcription: [DEFAULT_TRANSCRIPTION_MODEL, TRANSCRIPTION_FALLBACK_MODEL],
 });
 
 export const normalizeAiProvider = (value: unknown, fallback = 'openai'): string => {
@@ -56,7 +60,7 @@ const normalizeAiTranscriptionEntry = (entry: AnyRecord | null | undefined): Any
   const obj: AnyRecord = entry && typeof entry === 'object' ? entry : {};
   return {
     provider: normalizeAiProvider(obj.provider || 'openai'),
-    model: toStr(obj.model || 'whisper-1').trim(),
+    model: toStr(obj.model || DEFAULT_TRANSCRIPTION_MODEL).trim(),
     rpcUrl: toStr(obj.rpcUrl || '').trim(),
   };
 };

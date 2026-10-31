@@ -1,5 +1,6 @@
 import { getSessionWizardInterviewValidationError } from './sessionWizardInterviewValidation';
 import { normalizeHostedFaucetSelection } from './sessionWizardHostedFaucet';
+import { DEFAULT_TRANSCRIPTION_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { validateSessionContext, type SessionContext } from '@ce-shared/sessionContext.mjs';
 import { withoutNewInterviewDefaults } from '../../utilities/session/interviewModeWrite';
@@ -253,7 +254,7 @@ export const sanitizeSessionWizardMetadataPayload = (
     if (isObj(ai.models?.transcription)) {
       ai.models.transcription = {
         provider: normalizeAiProvider(ai.models.transcription.provider || 'openai'),
-        model: trimString(ai.models.transcription.model || 'whisper-1'),
+        model: trimString(ai.models.transcription.model || DEFAULT_TRANSCRIPTION_MODEL),
       };
     }
   }

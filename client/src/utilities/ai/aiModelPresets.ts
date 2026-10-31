@@ -14,38 +14,14 @@ export const AI_PROVIDERS = Object.freeze({
   LOCAL: 'local',
 });
 
+const singleModelPreset = (provider: string, model: string): AiPresetConfig =>
+  Object.freeze({ supportsImages: true, provider, models: Object.freeze({ fast: model, thinking: model }) });
+
+// A saved preset follows these models as they change; a saved key that is no
+// longer here falls back to the default preset.
 export const AI_PRESET_CONFIGS: Record<string, AiPresetConfig> = Object.freeze({
   [DEFAULT_AI_MODEL]: Object.freeze({ supportsImages: true, provider: AI_PROVIDERS.OPENAI, models: DEFAULT_AI_MODELS }),
-  'gpt-5': Object.freeze({
-    supportsImages: true,
-    provider: AI_PROVIDERS.OPENAI,
-    models: Object.freeze({
-      fast: 'gpt-5',
-      thinking: 'gpt-5',
-    }),
-  }),
-  'gpt-4o': Object.freeze({
-    supportsImages: true,
-    provider: AI_PROVIDERS.OPENAI,
-    models: Object.freeze({
-      fast: 'gpt-4o',
-      thinking: 'gpt-4o',
-    }),
-  }),
-  'claude-sonnet': Object.freeze({
-    supportsImages: true,
-    provider: AI_PROVIDERS.ANTHROPIC,
-    models: Object.freeze({
-      fast: 'claude-sonnet-4-6',
-      thinking: 'claude-sonnet-4-6',
-    }),
-  }),
-  'claude-opus': Object.freeze({
-    supportsImages: true,
-    provider: AI_PROVIDERS.ANTHROPIC,
-    models: Object.freeze({
-      fast: 'claude-opus-4-6',
-      thinking: 'claude-opus-4-6',
-    }),
-  }),
+  'gpt-6-astra': singleModelPreset(AI_PROVIDERS.OPENAI, 'gpt-6-astra'),
+  'claude-sonnet': singleModelPreset(AI_PROVIDERS.ANTHROPIC, 'claude-sonnet-5-5'),
+  'claude-opus': singleModelPreset(AI_PROVIDERS.ANTHROPIC, 'claude-opus-5-5'),
 });

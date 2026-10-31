@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 
+import { DEFAULT_AI_MODELS, DEFAULT_TRANSCRIPTION_MODEL } from '../../../../shared/aiDefaults.mjs';
 import demoSessions from '../../variables/demo/demo_sessions.json';
 import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
 import demo2QuestionSeed from '../../variables/demo/demo_2_question_seed.json';
@@ -350,14 +351,22 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
   });
 });
 
-it('uses Terra for text tasks in every bundled demo with AI defaults', () => {
+it('uses the default models in bundled demos without a Worker of their own', () => {
+  type Model = { model?: string };
   const sessions = Object.values(demoSessions) as Array<{
-    ai?: { models?: { fast?: { model?: string }; thinking?: { model?: string } } };
+    corsWorkerUrl?: string;
+    ai?: { models?: { fast?: Model; thinking?: Model; transcription?: Model } };
   }>;
   const configured = sessions.filter((session) => session.ai?.models?.fast);
-  expect(configured.length).toBeGreaterThan(0);
-  for (const session of configured) {
+  const defaults = configured.filter((session) => !session.corsWorkerUrl);
+  expect(defaults.length).toBeGreaterThan(0);
+  for (const session of defaults) {
+    expect(session.ai?.models?.fast?.model).toBe(DEFAULT_AI_MODELS.fast);
+    expect(session.ai?.models?.thinking?.model).toBe(DEFAULT_AI_MODELS.thinking);
+    expect(session.ai?.models?.transcription?.model).toBe(DEFAULT_TRANSCRIPTION_MODEL);
+  }
+  // A demo with its own Worker mirrors the models that Worker stores and allows.
+  for (const session of configured.filter((entry) => entry.corsWorkerUrl)) {
     expect(session.ai?.models?.fast?.model).toBe('gpt-5.6-terra');
-    expect(session.ai?.models?.thinking?.model).toBe('gpt-5.6-terra');
   }
 });

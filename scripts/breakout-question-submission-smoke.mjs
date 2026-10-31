@@ -6,6 +6,7 @@ import { createWorkerRuntime } from '../workers/sessionCorsWorker/worker.js';
 import { putSessionSecrets } from '../workers/sessionCorsWorker/sessionConfigSecretsStore.js';
 import { installSessionCoordinatorBinding } from '../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { createWorkerClient } from '../mcp/lib/workerClient.mjs';
+import { DEFAULT_AI_MODELS, DEFAULT_TRANSCRIPTION_MODEL, GROUP_TRANSCRIPTION_MODEL } from '../shared/aiDefaults.mjs';
 
 const base = process.env.BASE_URL || 'http://127.0.0.1:4185';
 assert(['localhost', '127.0.0.1'].includes(new URL(base).hostname), 'Use a local Vite server');
@@ -24,7 +25,7 @@ const kv = { get: async key => values.get(key) ?? null, put: async (key, value) 
 const config = { slug, sessionId: `0x${'a'.repeat(32)}`, sessionIdHex: `0x${'a'.repeat(32)}`, sessionName: 'Recorded breakout fixture',
   adminAddress: admin.address, allowOrigins: [base], corsWorkerUrl: workerOrigin, authzEpoch: 1,
   scopes: { ai: true, transcribe: true, storage: true }, questionsGenPrompt: instruction,
-  ai: { mode: 'openai', models: { fast: 'gpt-4o-mini', thinking: 'gpt-5', transcription: { provider: 'openai', model: 'whisper-1' } } },
+  ai: { mode: 'openai', models: { ...DEFAULT_AI_MODELS, transcription: { provider: 'openai', model: DEFAULT_TRANSCRIPTION_MODEL } } },
   workerAuthority: { version: 1, participantScopes: ['ai', 'transcribe', 'storage'], anonymousScopes: ['ai', 'transcribe'] },
   sessionModeProfile: { profileVersion: 1, preset: 'custom', authority: { mode: 'worker_canonical' }, evm: { registryChainId: null },
     storage: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
@@ -44,7 +45,7 @@ const worker = createWorkerRuntime(env, { rpcFetch: async () => assert.fail('No 
   assert.equal(new URL(url).origin, 'https://api.openai.com');
   providerCalls.push(new URL(url).pathname);
   if (new URL(url).pathname.endsWith('/audio/transcriptions')) {
-    assert.equal(init.body.get('model'), 'gpt-4o-transcribe-diarize', 'Default speaker labels use the permitted Worker diarization route');
+    assert.equal(init.body.get('model'), GROUP_TRANSCRIPTION_MODEL, 'Default speaker labels use the permitted Worker diarization route');
     return Response.json({ text: transcript, segments: [{ speaker: 'A', start: 0, end: 2, text: transcript }] });
   }
   const body = JSON.parse(init.body);

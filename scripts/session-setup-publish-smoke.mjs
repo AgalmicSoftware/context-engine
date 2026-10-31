@@ -9,6 +9,7 @@ import { installSessionCoordinatorBinding } from '../tests/helpers/sessionCorsWo
 import { createWorkerClient } from '../mcp/lib/workerClient.mjs';
 import { buildQuestionRecord } from '../mcp/lib/records.mjs';
 import { buildPasskeyDerivedWallet, toPasskeyEoaSeedRecord } from './lib/passkey-derived-wallet.js';
+import { DEFAULT_AI_MODELS } from '../shared/aiDefaults.mjs';
 
 const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 assert(['127.0.0.1', 'localhost', '[::1]'].includes(new URL(baseUrl).hostname), 'This smoke requires a local client');
@@ -57,7 +58,8 @@ const worker = createWorkerRuntime(env, {
     assert.equal(url, 'https://api.openai.com/v1/responses');
     assert.equal(init.headers.authorization, 'Bearer synthetic-ai-key-not-a-credential');
     const body = JSON.parse(init.body);
-    assert.equal(body.model, 'gpt-5.6-terra');
+    // Group analysis tries the new session's thinking model, then its fast model.
+    assert.ok([DEFAULT_AI_MODELS.thinking, DEFAULT_AI_MODELS.fast].includes(body.model), body.model);
     aiProviderCalls.push({ model: body.model, failed: failSponsoredAnalysis });
     if (failSponsoredAnalysis) return Response.json({ error: { message: 'Synthetic sponsored analysis outage' } }, { status: 503 });
     return Response.json({ output_text: JSON.stringify({
@@ -109,7 +111,7 @@ const fixtureContext = async ({ seed }, { workerEnv = env, failResponseUploadAt 
     if (url.pathname === '/ai') {
       const payload = request.postDataJSON();
       assert.equal(payload.provider, 'openai');
-      assert.equal(payload.model, 'gpt-5.6-terra');
+      assert.ok([DEFAULT_AI_MODELS.thinking, DEFAULT_AI_MODELS.fast].includes(payload.model), payload.model);
       assert.equal(Object.hasOwn(payload, 'apiKey'), false, 'Polis uses the sponsored Worker key');
     }
     const upload = url.pathname === '/storage/upload' && request.method() === 'POST'

@@ -285,11 +285,10 @@ const readChainIdLike = (value: ChainIdLike): unknown =>
 const readWagmiBalanceValue = (value: WagmiBalanceLike): unknown =>
   value && typeof value === 'object' ? (value.data?.value ?? value.value ?? null) : null;
 const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = Object.freeze({
-  [DEFAULT_AI_MODEL]: { label: 'GPT-5.6 Terra (default)', badgeLabel: 'GPT-5.6 Terra' },
-  'gpt-5': { label: 'GPT-5', badgeLabel: 'GPT-5' },
-  'gpt-4o': { label: 'GPT-4o', badgeLabel: 'GPT-4o' },
-  'claude-sonnet': { label: 'Claude Sonnet 4.6', badgeLabel: 'Claude Sonnet 4.6' },
-  'claude-opus': { label: 'Claude Opus 4.6', badgeLabel: 'Claude Opus 4.6' },
+  [DEFAULT_AI_MODEL]: { label: 'GPT-6.1 Terra and Sol (default)', badgeLabel: 'GPT-6.1 Terra and Sol' },
+  'gpt-6-astra': { label: 'GPT-6 Astra', badgeLabel: 'GPT-6 Astra' },
+  'claude-sonnet': { label: 'Claude Sonnet 5.5', badgeLabel: 'Claude Sonnet 5.5' },
+  'claude-opus': { label: 'Claude Opus 5.5', badgeLabel: 'Claude Opus 5.5' },
 });
 
 const AI_PRESET_OPTIONS: readonly AiPresetOption[] = Object.freeze([

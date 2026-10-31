@@ -1,6 +1,6 @@
 import { AI_PRESET_CONFIGS, AI_PROVIDERS } from './aiModelPresets';
 export { AI_PRESET_CONFIGS, AI_PROVIDERS } from './aiModelPresets';
-import { DEFAULT_AI_MODEL, DEFAULT_AI_MODELS } from '../../../../shared/aiDefaults.mjs';
+import { DEFAULT_AI_MODEL, DEFAULT_AI_MODELS, TRANSCRIPTION_FALLBACK_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { toModelLeaf } from '../../../../shared/aiModelFamily.mjs';
 /**
  * @module aiSettings
@@ -124,9 +124,10 @@ const DEFAULT_MODEL_PROVIDERS = Object.freeze({
   thinking: AI_PROVIDERS.OPENAI,
 });
 
+// Read fallback for settings that store no transcription model; new sessions store theirs.
 const DEFAULT_TRANSCRIPTION = Object.freeze({
   provider: AI_PROVIDERS.OPENAI,
-  model: 'whisper-1',
+  model: TRANSCRIPTION_FALLBACK_MODEL,
   rpcUrl: '',
 });
 
@@ -187,7 +188,7 @@ export const deriveAiPreset = ({
   const fastProvider = toLower(modelProviders?.fast || mode || '');
   const thinkingProvider = toLower(modelProviders?.thinking || mode || '');
 
-  if (!fastModel || !thinkingModel || fastModel !== thinkingModel) return 'custom';
+  if (!fastModel || !thinkingModel) return 'custom';
   if (!fastProvider || !thinkingProvider || fastProvider !== thinkingProvider) return 'custom';
 
   const match = Object.entries(AI_PRESET_CONFIGS).find(
@@ -420,6 +421,14 @@ const applyAiPresetConfig = (settings: unknown = {}, presetKey = ''): Normalized
   };
 };
 
+// A saved preset keeps its preset's current models, and a saved key that no
+// longer exists falls back to the default preset. Custom settings keep theirs.
+const applySavedAiPreset = (settings: NormalizedAiSettings, savedPreset: unknown): NormalizedAiSettings => {
+  const key = toStr(savedPreset).trim();
+  if (!key || key === 'custom') return settings;
+  return applyAiPresetConfig(settings, AI_PRESET_CONFIGS[key] ? key : DEFAULT_PRESET);
+};
+
 export const applyPreLoginAiProviderKeyChange = (
   settings: unknown = {},
   { provider, apiKey }: { provider?: unknown; apiKey?: unknown } = {},
@@ -553,7 +562,10 @@ export const normalizeLocalAiSettingsEnvelopeRecord = (raw: unknown = null): Loc
 
   const record = raw as AiSettingsEnvelopeRecord;
   if (Number(record.v || 0) === AI_SETTINGS_ENVELOPE_VERSION && record.kind === AI_SETTINGS_ENVELOPE_KIND) {
-    const settings = normalizeAiSettings(record.settings || {}, { includeUseLocal: true });
+    const settings = applySavedAiPreset(
+      normalizeAiSettings(record.settings || {}, { includeUseLocal: true }),
+      asRecord(record.settings).preset,
+    );
     const secretMeta = summarizeAiSettingsSecretMetadata(settings);
     const metadata = asRecord(record.metadata);
     return {
@@ -568,7 +580,7 @@ export const normalizeLocalAiSettingsEnvelopeRecord = (raw: unknown = null): Loc
     };
   }
 
-  const settings = normalizeAiSettings(record, { includeUseLocal: true });
+  const settings = applySavedAiPreset(normalizeAiSettings(record, { includeUseLocal: true }), record.preset);
   return {
     ok: true,
     status: 'legacy',

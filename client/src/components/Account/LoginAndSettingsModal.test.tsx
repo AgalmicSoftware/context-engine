@@ -69,7 +69,7 @@ jest.mock('../../utilities/ai/aiSettings.js', () => {
     })),
     saveLocalAiSettings: jest.fn(),
     clearLocalAiSettings: jest.fn(),
-    deriveAiPreset: jest.fn(() => 'gpt-5'),
+    deriveAiPreset: jest.fn(() => 'gpt-6-astra'),
   };
 });
 

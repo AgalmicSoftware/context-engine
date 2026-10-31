@@ -82,8 +82,8 @@ describe('sessionWizardDraftState', () => {
       expect.objectContaining({
         reasoningEffort: 'low',
         models: expect.objectContaining({
-          fast: expect.objectContaining({ provider: 'openai', model: 'gpt-5.6-terra' }),
-          thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-5.6-terra' }),
+          fast: expect.objectContaining({ provider: 'openai', model: 'gpt-6.1-terra' }),
+          thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-6.1-sol' }),
         }),
       }),
     );
