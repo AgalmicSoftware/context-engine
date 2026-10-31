@@ -2,7 +2,7 @@ import { cloneSessionModePreset, compileSessionModeProfile } from '../../../util
 import { normalizeSessionStorageProfileConfig } from '../sessionWizardStorageProfile';
 import { buildSessionSettingsDraft, buildSessionSettingsSave } from './sessionSettingsEdits';
 import { buildOnChainSessionMetadata, contractsNeedChecking } from './sessionSettingsChain';
-import { saveOnChainSessionSettings } from './sessionSettingsSave';
+import { saveOnChainSessionSettings, syncOnChainSessionWorker } from './sessionSettingsSave';
 
 const mockUpload = jest.fn();
 const mockUpdateOnChain = jest.fn();
@@ -250,7 +250,12 @@ describe('editing an on-chain session', () => {
       adminAddress: ADMIN,
       registryChainId: 11155420,
     });
-    expect(result).toEqual({ txHash: '0xmetadatahash', nextConfig: cached, workerError: '' });
+    expect(result).toEqual({
+      txHash: '0xmetadatahash',
+      nextConfig: cached,
+      workerError: '',
+      workerSync: expect.objectContaining({ workerOrigin: WORKER, patch: sync.body.config }),
+    });
   });
 
   it('checks the wallet’s account and network before the paid upload', async () => {
@@ -311,6 +316,14 @@ describe('editing an on-chain session', () => {
     expect(steps.at(-1)).toEqual(['worker', 'failed', 'Admin authorization failed.']);
     expect(result.workerError).toBe('Admin authorization failed.');
     expect(result.txHash).toBe('0xmetadatahash');
+
+    // The kept sync is sent again as it was; nothing is uploaded again.
+    mockPostWorker.mockResolvedValue({ data: { ok: true } });
+    await syncOnChainSessionWorker(result.workerSync);
+    expect(mockPostWorker).toHaveBeenCalledTimes(2);
+    expect(mockPostWorker.mock.calls[1][0].body).toEqual(mockPostWorker.mock.calls[0][0].body);
+    expect(mockPostWorker.mock.calls[1][0].body.config).toMatchObject({ sessionInfo: 'After.' });
+    expect(mockUpload).toHaveBeenCalledTimes(1);
   });
 
   it('stops before the registry when the upload fails, and skips the sync without a Worker', async () => {

@@ -78,12 +78,20 @@ type SaveOnChainInput = {
   onStep: (step: OnChainSaveStep, state: OnChainSaveStepState, detail?: string) => void;
 };
 
+/** One signed set-config that brings an on-chain session's Worker up to date. */
+export type OnChainWorkerSync = Omit<SaveSessionSettingsInput, 'sessionIdHex' | 'fetchImpl'>;
+
+/** Sends the kept sync again, after a failed one; nothing is uploaded again. */
+export const syncOnChainSessionWorker = (sync: OnChainWorkerSync) => saveSessionSettings({ ...sync, sessionIdHex: '' });
+
 export type OnChainSaveResult = {
   txHash: string;
   /** The config as the registry now serves it, also written to this browser's registry cache. */
   nextConfig: Config;
   /** '' when the Worker synced or the session has none. */
   workerError: string;
+  /** The Worker sync, kept so a failed one can be retried; null without a Worker. */
+  workerSync: OnChainWorkerSync | null;
 };
 
 const messageOf = (error: unknown, fallback: string) => (error instanceof Error && error.message) || fallback;
@@ -175,23 +183,23 @@ export const saveOnChainSessionSettings = async ({
   ).catch(() => undefined);
 
   let workerError = '';
-  if (!workerOrigin) {
-    onStep('worker', 'skipped', 'This session has no Session Worker.');
-  } else {
-    await step('worker', () =>
-      saveSessionSettings({
+  const workerSync: OnChainWorkerSync | null = workerOrigin
+    ? {
         workerOrigin,
         sessionSlug,
-        sessionIdHex: '',
         sessionAuthorityMode: authorityMode,
         patch: buildRegistryWorkerSync({ nextConfig, patch, metadata, account }),
         account,
         provider,
         chainId: facts.chainId || facts.registryChainId || 1,
-      }),
-    ).catch((error) => {
+      }
+    : null;
+  if (!workerSync) {
+    onStep('worker', 'skipped', 'This session has no Session Worker.');
+  } else {
+    await step('worker', () => syncOnChainSessionWorker(workerSync)).catch((error) => {
       workerError = messageOf(error, 'The Session Worker sync failed.');
     });
   }
-  return { txHash: text(tx?.txHash).trim(), nextConfig, workerError };
+  return { txHash: text(tx?.txHash).trim(), nextConfig, workerError, workerSync };
 };

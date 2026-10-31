@@ -51,8 +51,10 @@ import {
   ON_CHAIN_SAVE_STEPS,
   saveOnChainSessionSettings,
   saveSessionSettings,
+  syncOnChainSessionWorker,
   type OnChainSaveStep,
   type OnChainSaveStepState,
+  type OnChainWorkerSync,
 } from './sessionSettingsSave';
 import { SettingsAiSection } from './SettingsAiSection';
 import { SettingsChainFacts, SettingsChainFields } from './SettingsChainFields';
@@ -149,6 +151,8 @@ const SessionSettingsPage = ({
   const [saving, setSaving] = useState(false);
   const [steps, setSteps] = useState<StepView[]>([]);
   const [txUrl, setTxUrl] = useState('');
+  // A failed Worker sync after an on-chain save, kept for a retry.
+  const [retrySync, setRetrySync] = useState<OnChainWorkerSync | null>(null);
   // The session's files, listed by name in an exported template.
   const [contextSources, setContextSources] = useState<ContextSource[]>([]);
 
@@ -259,8 +263,12 @@ const SessionSettingsPage = ({
     setStatus('Settings saved.');
   };
 
+  const showStep = (step: OnChainSaveStep, state: OnChainSaveStepState, detail?: string) =>
+    setSteps((prev) => prev.map((entry) => (entry.step === step ? { step, state, detail } : entry)));
+
   const saveOnChain = async ({ patch, after }: SessionSettingsSave) => {
     setTxUrl('');
+    setRetrySync(null);
     setSteps(ON_CHAIN_SAVE_STEPS.map((step) => ({ step, state: 'waiting' })));
     setStatus('Saving on chain…');
     const result = await saveOnChainSessionSettings({
@@ -272,14 +280,33 @@ const SessionSettingsPage = ({
       provider,
       workerOrigin,
       authorityMode: capabilities.authorityMode,
-      onStep: (step, state, detail) =>
-        setSteps((prev) => prev.map((entry) => (entry.step === step ? { step, state, detail } : entry))),
+      onStep: showStep,
     });
     adopt(result.nextConfig, false);
     setTxUrl(buildTxExplorerUrl(result.txHash, facts.registryChainId));
+    if (result.workerError) setRetrySync(result.workerSync);
     setStatus(
       result.workerError ? `Saved on chain. The Session Worker didn’t sync: ${result.workerError}` : 'Saved on chain.',
     );
+  };
+
+  // The on-chain update stands; only the Worker's copy is sent again.
+  const retryWorkerSync = async () => {
+    if (!retrySync || saving) return;
+    setSaving(true);
+    showStep('worker', 'running');
+    try {
+      await syncOnChainSessionWorker(retrySync);
+      showStep('worker', 'done');
+      setRetrySync(null);
+      setStatus('Saved on chain. The Session Worker is synced now.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The Session Worker sync failed.';
+      showStep('worker', 'failed', message);
+      setStatus(`Saved on chain. The Session Worker still didn’t sync: ${message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const save = async () => {
@@ -553,6 +580,17 @@ const SessionSettingsPage = ({
             >
               {saving ? 'Saving…' : changes?.signsParticipantsOut ? 'Save and sign participants out' : 'Save'}
             </button>
+            {retrySync ? (
+              <button
+                type="button"
+                className={styles.button}
+                disabled={saving}
+                data-testid="ce-settings-retry-sync"
+                onClick={() => void retryWorkerSync()}
+              >
+                Retry the Worker sync
+              </button>
+            ) : null}
           </div>
           {steps.length ? (
             <ol className={styles.hint} data-testid="ce-settings-chain-steps">

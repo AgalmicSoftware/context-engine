@@ -408,6 +408,33 @@ describe('SessionSettingsPage', () => {
       expect(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE)).toBeDisabled();
     });
 
+    it('keeps a failed Worker sync and retries it without saving on chain again', async () => {
+      mockSignAdminAction.mockRejectedValueOnce(new Error('Admin authorization failed.'));
+      renderPage({ sessionConfig: registryConfig(), workerOrigin: '' });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), { target: { value: 'Renamed' } });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE));
+      });
+      await waitFor(() =>
+        expect(screen.getByTestId('ce-settings-status')).toHaveTextContent(
+          'The Session Worker didn’t sync: Admin authorization failed.',
+        ),
+      );
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE)).toBeDisabled();
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('ce-settings-retry-sync'));
+      });
+      await waitFor(() =>
+        expect(screen.getByTestId('ce-settings-status')).toHaveTextContent('The Session Worker is synced now.'),
+      );
+      const sync = posted.find((entry) => String(entry.url).endsWith('/admin/set-config'));
+      expect((sync?.body as Record<string, unknown>).config).toMatchObject({ sessionName: 'Renamed' });
+      expect(screen.queryByTestId('ce-settings-retry-sync')).not.toBeInTheDocument();
+      expect(mockUploadMetadata).toHaveBeenCalledTimes(1);
+      expect(mockUpdateMetadataOnChain).toHaveBeenCalledTimes(1);
+    });
+
     it('names the wallet it needs', () => {
       renderPage({ sessionConfig: registryConfig(), account: '0x00000000000000000000000000000000000000cc' });
       expect(screen.getByTestId('ce-settings-admin-only')).toHaveTextContent(`registry admin, ${ADMIN},`);
