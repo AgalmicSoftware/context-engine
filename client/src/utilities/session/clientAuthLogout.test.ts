@@ -31,8 +31,10 @@ import { logoutPasskeyWallet } from '../../wallet/passkeyWallet';
 
 jest.mock('../../wallet/passkeyWallet', () => ({ logoutPasskeyWallet: jest.fn(async () => {}) }));
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
+const mockWagmiClient = { clearState: jest.fn(), storage: { removeItem: jest.fn() } };
 jest.mock('wagmi', () => ({
   useAccount: () => ({ address: '0x1111111111111111111111111111111111111111', isDisconnected: false }),
+  useClient: () => mockWagmiClient,
   useDisconnect: () => ({ disconnect: jest.fn() }),
   useBalance: () => ({}),
   useBlockNumber: () => ({}),
@@ -225,6 +227,8 @@ test('agent-screen logout disconnects MetaMask once before reset and the bridge 
     expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
     expect(jest.mocked(disconnect).mock.invocationCallOrder[0]).toBeLessThan(dispatch.mock.invocationCallOrder[0]);
     expect(store.getState().profile.account).toBeFalsy();
+    // The address outlived the disconnect, so the bridge ends that connection instead.
+    expect(mockWagmiClient.clearState).toHaveBeenCalled();
     expect(dispatch.mock.calls.map(([action]) => action)).not.toContainEqual(
       expect.objectContaining({
         type: 'LOGIN_ACCOUNT',

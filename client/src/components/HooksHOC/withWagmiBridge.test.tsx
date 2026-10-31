@@ -3,7 +3,10 @@ import { render, waitFor, cleanup, act } from '@testing-library/react';
 import { WagmiHooksHOC } from './withWagmiBridge';
 import type { WagmiInjectedProps } from './withWagmiBridge';
 import { getSessionNetwork } from '../../utilities/web3/chainGateway.js';
-import { clearUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
+import {
+  clearUserExplicitlyDisconnected,
+  wasUserExplicitlyDisconnected,
+} from '../../utilities/web3/wagmiDisconnectState.js';
 import { logoutPasskeyWallet } from '../../wallet/passkeyWallet.js';
 
 const mockUseAccount = jest.fn();
@@ -12,11 +15,13 @@ const mockUseBlockNumber = jest.fn();
 const mockUseNetwork = jest.fn();
 const mockUseProvider = jest.fn();
 const mockUseDisconnect = jest.fn();
+const mockWagmiClient = { clearState: jest.fn(), storage: { removeItem: jest.fn() } };
 
 jest.mock('wagmi', () => ({
   useAccount: (...args: any[]) => mockUseAccount(...args),
   useBalance: (...args: any[]) => mockUseBalance(...args),
   useBlockNumber: (...args: any[]) => mockUseBlockNumber(...args),
+  useClient: () => mockWagmiClient,
   useNetwork: (...args: any[]) => mockUseNetwork(...args),
   useProvider: (...args: any[]) => mockUseProvider(...args),
   useDisconnect: (...args: any[]) => mockUseDisconnect(...args),
@@ -52,6 +57,7 @@ jest.mock('utilities/logging.js', () => ({
 const mockGetSessionNetwork = getSessionNetwork as jest.Mock;
 const mockLogoutPasskeyWallet = logoutPasskeyWallet as jest.Mock;
 const mockClearUserExplicitlyDisconnected = clearUserExplicitlyDisconnected as jest.Mock;
+const mockWasUserExplicitlyDisconnected = wasUserExplicitlyDisconnected as jest.Mock;
 
 type TypedProbeOwnProps = {
   label: string;
@@ -393,5 +399,66 @@ describe('WagmiHooksHOC wallet-side disconnect', () => {
 
     expect(props.changeAccount).not.toHaveBeenCalled();
     expect(mockLogoutPasskeyWallet).not.toHaveBeenCalled();
+  });
+});
+
+describe('WagmiHooksHOC after a logout whose wallet disconnect failed', () => {
+  const address = '0x000000000000000000000000000000000000000a';
+  let marked = false;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete window.__wagmiReduxBridgeOwner;
+    marked = false;
+    mockWasUserExplicitlyDisconnected.mockImplementation(() => marked);
+    mockClearUserExplicitlyDisconnected.mockImplementation(() => {
+      marked = false;
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    delete window.__wagmiReduxBridgeOwner;
+    mockWasUserExplicitlyDisconnected.mockImplementation(() => false);
+    mockClearUserExplicitlyDisconnected.mockImplementation(() => undefined);
+  });
+
+  it('ends the connection left behind, so a new connection can sign in again', async () => {
+    configureWagmiMocks({ address });
+    const Wrapped = WagmiHooksHOC(() => null);
+    const signedIn = buildProps({ provider: 'wagmi', account: address, loginComplete: true });
+    const { rerender } = render(<Wrapped {...signedIn} />);
+    await act(async () => {});
+    signedIn.changeAccount.mockClear();
+    signedIn.updateLoginInfo.mockClear();
+
+    // Logout records the disconnect and clears the account, but WalletConnect could not be reached.
+    marked = true;
+    const signedOut = { ...signedIn, provider: null, account: '', loginComplete: false };
+    rerender(<Wrapped {...signedOut} />);
+    await waitFor(() => expect(mockWagmiClient.clearState).toHaveBeenCalledTimes(1));
+    expect(mockWagmiClient.storage.removeItem).toHaveBeenCalledWith('connected');
+    expect(signedIn.changeAccount).not.toHaveBeenCalled();
+    expect(signedIn.updateLoginInfo).not.toHaveBeenCalled();
+
+    configureWagmiMocks({ address: undefined });
+    rerender(<Wrapped {...signedOut} />);
+    await act(async () => {});
+    configureWagmiMocks({ address });
+    rerender(<Wrapped {...signedOut} />);
+    await waitFor(() =>
+      expect(signedIn.changeAccount).toHaveBeenCalledWith(expect.objectContaining({ account: address })),
+    );
+    expect(marked).toBe(false);
+  });
+
+  it('leaves the wallet connected where this tab is still signed in with it', async () => {
+    marked = true;
+    configureWagmiMocks({ address });
+    const Wrapped = WagmiHooksHOC(() => null);
+    render(<Wrapped {...buildProps({ provider: 'wagmi', account: address, loginComplete: true })} />);
+    await act(async () => {});
+
+    expect(mockWagmiClient.clearState).not.toHaveBeenCalled();
   });
 });
