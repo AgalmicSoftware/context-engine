@@ -32,7 +32,8 @@ import {
 } from './aiProviderExecution.js';
 import { json as jsonResponse } from './responseKvHelpers.js';
 import { createOutboundUrlSafetyHelpersWithWorkerDeps } from './outboundUrlSafetyBinding.js';
-import { normalizePayloadAccessControl } from './payloadAccessControl.js';
+import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
+import { buildParticipantContextPrompt } from './contextSourceLoader.js';
 import { formatValidAnalysisAnswer, readStoredRating } from './resultsAnalysisAnswerValidation.js';
 import { createResultsAnalysisScanBudget, isStorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
 
@@ -65,6 +66,7 @@ const ANALYSIS_ARTIFACT_VERSION = 1;
 const SOURCE_VERSION = '1';
 const RESULT_SECTION_ORDER = ['argumentMap', 'atlas', 'breakdown', 'riskMatrix'];
 const DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS = 8 * 60 * 1000;
+const RESULTS_CONTEXT_CHARS = 12_000;
 
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
@@ -296,53 +298,6 @@ const compareIdentity = ({ slug, config, suppliedSlug, suppliedSessionId, allowI
   return true;
 };
 
-
-const parseAccessRecord = (value) => {
-  if (isObj(value)) return value;
-  const raw = trim(value);
-  if (!raw || raw[0] !== '{') return {};
-  try {
-    const parsed = JSON.parse(raw);
-    return isObj(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-};
-
-const resolveConfiguredPayloadAccessValue = (config = {}) => (
-  config?.storageProfile?.payloadAccessControl ||
-  config?.sessionModeProfile?.storage?.payloadAccessControl ||
-  config?.storageProfile?.payloadAccessMode ||
-  config?.sessionModeProfile?.storage?.payloadAccessMode
-);
-
-const resolveConfiguredPayloadAccess = (config = {}) => normalizePayloadAccessControl(resolveConfiguredPayloadAccessValue(config));
-
-const normalizeAccessGroupIds = (value) => {
-  const source = Array.isArray(value) ? value : (trim(value) ? [value] : []);
-  return source.map((entry) => trim(entry).toLowerCase()).filter(Boolean).sort();
-};
-
-const normalizeAccessAudienceExtras = ({ value, metadata } = {}) => {
-  const record = parseAccessRecord(value);
-  return {
-    groupIds: normalizeAccessGroupIds(record.groupIds || metadata?.groupIds),
-    role: trim(record.role || metadata?.role).toLowerCase(),
-    accessConditions: stableCanonicalSerialize(record.accessConditions || metadata?.accessConditions || null),
-  };
-};
-
-const metadataAccessMatchesPublishedAudience = (metadata = {}, config = {}) => {
-  if (!isObj(metadata?.payloadAccessControl) && !trim(metadata?.payloadAccessMode)) return true;
-  const expectedValue = resolveConfiguredPayloadAccessValue(config);
-  const actualValue = metadata.payloadAccessControl || metadata.payloadAccessMode;
-  const expected = normalizePayloadAccessControl(expectedValue);
-  const actual = normalizePayloadAccessControl(actualValue);
-  if (actual.gate !== expected.gate || actual.encryption !== expected.encryption) return false;
-  const expectedExtras = normalizeAccessAudienceExtras({ value: expectedValue });
-  const actualExtras = normalizeAccessAudienceExtras({ value: actualValue, metadata });
-  return stableCanonicalSerialize(actualExtras) === stableCanonicalSerialize(expectedExtras);
-};
 
 const participantDigest = async (sourceKey) => sha256Hex(`participant:${trim(sourceKey).toLowerCase()}`);
 
@@ -756,7 +711,7 @@ const sectionShapes = `{
   "atlas": { "nodes": [{ "id": "atlas_1", "label": "node label", "summary": "paraphrased node summary", "participantIds": ["participant_001"], "questionIds": ["q1"] }], "edges": [{ "source": "atlas_1", "target": "atlas_2", "label": "relationship" }] }
 }`;
 
-const buildPrompt = ({ sections, source, exposure }) => `You are generating Context Engine session analysis artifacts.
+const buildPrompt = ({ sections, source, exposure, contextText = '' }) => `You are generating Context Engine session analysis artifacts.
 Return only valid JSON. Do not include markdown fences.
 Generate only these result views: ${sections.join(', ')}.
 
@@ -778,7 +733,10 @@ Generate this JSON shape, including only requested top-level keys:
 ${sectionShapes}
 
 Session input:
-${JSON.stringify(source.aiSnapshot, null, 2)}`;
+${JSON.stringify(source.aiSnapshot, null, 2)}${contextText ? `
+
+The session's hosts gave this background. Use it only to understand the topic. Ground every claim, citation and group in the responses above, never in this background.
+${contextText}` : ''}`;
 
 const normalizeProviderResponse = async (response, now = Date.now()) => {
   const data = await response?.json?.().catch?.(() => ({}));
@@ -1048,7 +1006,14 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
           env,
           slug,
           config,
-          prompt: buildPrompt({ sections, source, exposure }),
+          // Results are shown to participants, so only context they may read is used.
+          // It is outside the source signature: context edits never mark a report stale.
+          prompt: buildPrompt({
+            sections,
+            source,
+            exposure,
+            contextText: await buildParticipantContextPrompt({ env, slug, config, deps, totalChars: RESULTS_CONTEXT_CHARS }),
+          }),
           headers,
           deps,
         });
