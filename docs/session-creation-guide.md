@@ -1084,8 +1084,8 @@ If `/health` or the other worker calls fail with browser network errors, use the
 ### Edit a session
 
 An admin edits a session at `/session/<slug>/settings`, whether it is
-Worker-hosted or on chain; the **Edit settings** link on `/admin` opens it for
-Worker-hosted sessions. The page reuses the setup sections. The slug, session
+Worker-hosted or on chain; the **Edit settings** link on `/admin` opens it. The
+page reuses the setup sections. The slug, session
 ID, Worker URL and hosting are shown as fixed facts, not inputs, and so are an
 on-chain session's registry network, registry admin and metadata URI. Before
 saving, it lists which edits sign participants out (authority changes such as
@@ -1101,7 +1101,8 @@ Besides the setup fields, the page edits:
 - **Questions:** the question list's default filters (a JSON object, or a query
   such as `tag=housing`), whether the pile moves on after an answer, and the
   highlighted and hidden question and survey IDs, one per line (up to 500 in
-  each list). These lists keep everyone signed in.
+  each list). These lists keep everyone signed in. Like AI below, they are
+  read-only on an older Session Worker, which refuses them.
 - **AI:** the provider, the everyday and thinking models, reasoning effort, the
   effort for single tasks, and the transcription model. A saved model that setup
   no longer offers stays selected until you pick another. The page edits AI
@@ -1117,12 +1118,15 @@ A Worker-hosted session saves the changed fields the Worker accepts for
 `set-config`, signed by your passkey. An on-chain session saves new metadata,
 showing each step as it runs and the transaction link at the end:
 
-1. upload the new metadata to Arweave;
-2. update the SessionRegistry from the registry admin's wallet, on the registry
-   network the page names (the encrypted metadata URI is kept);
-3. update this browser's copy of the registry entry;
-4. sync the session's Worker with `set-config`. A failed sync is reported on its
-   own; the on-chain update still stands.
+1. check that the wallet is the registry admin's and is on the registry network
+   the page names, before anything is paid for;
+2. upload the new metadata to Arweave;
+3. update the SessionRegistry from that wallet (the encrypted metadata URI is
+   kept);
+4. update this browser's copy of the registry entry;
+5. sync the session's Worker with `set-config`. A failed sync is reported on its
+   own, since the on-chain update still stands, and **Retry the Worker sync**
+   sends the same sync again without saving on chain again.
 
 Saving needs a start block, and it is refused while the page shows contract
 addresses it took from chain defaults because the metadata could not be read,
