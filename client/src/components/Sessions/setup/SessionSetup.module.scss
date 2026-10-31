@@ -1,15 +1,44 @@
 /* @file SessionSetup.module.scss: the one-page setup and edit layout. */
 
 // Sits inside the wizard's .groupWizard, which sets the width and gutters.
+// Its own surface keeps text readable on themes whose page background is a
+// desktop or gradient.
 .page {
+  background: var(--ce-surface);
   color: var(--ce-panel-text);
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-14, 14px);
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+
+  // The theme's input colors outrank the wizard's, as in .interviewModePanelBody.
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    background: var(--ce-input-bg) !important;
+    border-color: var(--ce-input-border-strong) !important;
+    color: var(--ce-panel-text) !important;
+    -webkit-text-fill-color: var(--ce-panel-text);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--ce-panel-text-muted) !important;
+    -webkit-text-fill-color: var(--ce-panel-text-muted);
+  }
+
+  a {
+    color: inherit;
+    text-decoration: underline;
+  }
 }
 
 .pageTitle {
+  // A global h1 color would otherwise turn it white on light themes.
+  color: inherit;
   font-size: 1.6rem;
   font-weight: 600;
   margin: 0;
@@ -39,6 +68,7 @@
 }
 
 .sectionTitle {
+  color: inherit;
   font-size: 1.1rem;
   font-weight: 600;
   margin: 0;
@@ -64,7 +94,7 @@
   appearance: none;
   border: 1px solid var(--ce-card-border);
   background: transparent;
-  color: var(--ce-action-accent);
+  color: var(--ce-panel-text);
   border-radius: var(--ce-radius-pill, 999px);
   padding: 4px 12px;
   font-size: 0.85rem;
@@ -234,8 +264,12 @@
   font-size: 0.88rem;
   cursor: pointer;
 
+  // Muted text rather than opacity, so disabled labels stay readable.
   &:disabled {
-    opacity: 0.55;
+    background: transparent;
+    border-style: dashed;
+    border-color: var(--ce-card-border);
+    color: var(--ce-panel-text-muted);
     cursor: not-allowed;
   }
 
@@ -249,7 +283,7 @@
 .primaryButton {
   background: var(--ce-action-accent);
   border-color: var(--ce-action-accent);
-  color: var(--ce-text-inverse);
+  color: var(--ce-action-accent-text);
   font-weight: 600;
   padding: 10px 18px;
   font-size: 1rem;

@@ -1644,7 +1644,7 @@ $muted-text: var(--ce-panel-text-muted);
 
   > summary {
     cursor: pointer;
-    color: $clickable-color;
+    color: inherit;
     font-weight: 700;
   }
 
@@ -3093,7 +3093,8 @@ $muted-text: var(--ce-panel-text-muted);
   padding: 16px;
   border: 1px solid color-mix(in srgb, var(--ce-control-text) 28%, transparent);
   border-radius: var(--ce-radius-10);
-  background: color-mix(in srgb, var(--ce-session-chrome) 82%, transparent);
+  // A surface, not the chrome: Classic 95's chrome is navy under black text.
+  background: color-mix(in srgb, var(--ce-surface-raised) 82%, transparent);
   color: var(--ce-control-text);
 }
 
@@ -3157,9 +3158,13 @@ $muted-text: var(--ce-panel-text-muted);
     font-weight: 800;
   }
 
+  // Muted rather than faded, so the label stays readable.
   button:disabled {
     cursor: not-allowed;
-    opacity: 0.5;
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--ce-control-text) 42%, transparent);
+    background: transparent;
+    color: var(--ce-control-text);
   }
 }
 
