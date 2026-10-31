@@ -651,8 +651,13 @@ const repairIdbKeyFromLocalStorage = async (storageKey: string, fallbackValue: C
   }
 };
 
-const persistKey = async (storageKey: string, value: CacheValue): Promise<boolean> => {
-  const generationKey = currentCacheStorageKey(storageKey);
+// generationKey is the storage key when the write was called. A namespace
+// cleared since then refuses the write, even one that waited in a queue.
+const persistKey = async (
+  storageKey: string,
+  value: CacheValue,
+  generationKey = currentCacheStorageKey(storageKey),
+): Promise<boolean> => {
   await ensureBackendReady();
   if (!idbAvailable) {
     await attemptIdbRecovery();
@@ -864,10 +869,17 @@ export const readCache = async <TValue = CacheLegacyNode>(
   return cloneValue(mirrorByKey.get(key)) as TValue;
 };
 
-const writeCacheDirect = async ({ namespace, slug, key, value }: ManagedWriteInput): Promise<boolean> => {
+// admittedKey is the storage key when the write was called (see persistKey).
+const writeCacheDirect = async ({
+  namespace,
+  slug,
+  key,
+  value,
+  admittedKey,
+}: ManagedWriteInput & { admittedKey: string }): Promise<boolean> => {
   await initCacheManager();
-  const ok = await persistKey(key, value);
-  if (!ok) return false;
+  const ok = await persistKey(key, value, admittedKey);
+  if (!ok || admittedKey !== currentCacheStorageKey(key)) return false;
   commitManagedWrite({ namespace, slug, key, value });
   return true;
 };
@@ -881,7 +893,10 @@ export const writeCache = async (
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return false;
   const key = toStorageKey(ns, sl);
-  return enqueueWriteTaskForStorageKey(key, async () => writeCacheDirect({ namespace: ns, slug: sl, key, value }));
+  const admittedKey = currentCacheStorageKey(key);
+  return enqueueWriteTaskForStorageKey(key, async () =>
+    writeCacheDirect({ namespace: ns, slug: sl, key, value, admittedKey }),
+  );
 };
 
 // Optimistic write for read-after-write flows that intentionally do not await persistence.
@@ -896,6 +911,7 @@ export const writeCacheOptimistic = (
   if (!isManagedNamespace(ns)) return Promise.resolve(false);
 
   const key = toStorageKey(ns, sl);
+  const admittedKey = currentCacheStorageKey(key);
   const hadPrevious = mirrorByKey.has(key);
   const previousValue = hadPrevious ? cloneValue(mirrorByKey.get(key)) : null;
   const writeSeq = (optimisticWriteSeqCounter += 1);
@@ -952,11 +968,13 @@ export const writeCacheOptimistic = (
   const run = enqueueWriteTaskForStorageKey(key, async () => {
     await initCacheManager();
     const persistedBeforeWrite = await readPersistentKey(key);
-    const ok = await persistKey(key, value);
+    const ok = await persistKey(key, value, admittedKey);
     if (!ok) {
       await rollback({ persistedSnapshot: persistedBeforeWrite });
       return false;
     }
+    // A clear after the save leaves the value under the old generation, unread.
+    if (admittedKey !== currentCacheStorageKey(key)) return false;
     if (optimisticWriteSeqByKey.get(key) !== writeSeq) {
       return true;
     }
@@ -980,9 +998,10 @@ export const updateCacheAtomic = async <TValue = CacheLegacyNode>(
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return null;
   if (typeof updater !== 'function') throw new Error('updateCacheAtomic requires an updater function');
+  const key = toStorageKey(ns, sl);
+  const admittedKey = currentCacheStorageKey(key);
   await initCacheManager();
 
-  const key = toStorageKey(ns, sl);
   return enqueueWriteTaskForStorageKey(key, async () => {
     // The saved value, not this tab's mirror: another tab may have written since.
     const persisted = await readPersistentKey(key);
@@ -991,7 +1010,7 @@ export const updateCacheAtomic = async <TValue = CacheLegacyNode>(
     const next = await updater(
       current == null ? null : ((ns === 'sbtCache' ? discardOutdatedSbtActivityEntries(current) : current) as TValue),
     );
-    const ok = await writeCacheDirect({ namespace: ns, slug: sl, key, value: next });
+    const ok = await writeCacheDirect({ namespace: ns, slug: sl, key, value: next, admittedKey });
     if (!ok) {
       throw new Error(`[cacheScripts] Failed to persist atomic update for ${key}`);
     }

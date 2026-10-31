@@ -576,6 +576,57 @@ describe('cacheScripts', () => {
     expect([...idbState.keys()].some((key) => key.startsWith('dg:questionsCache:'))).toBe(false);
   });
 
+  it('discards an atomic update whose updater was still running when the namespace was cleared', async () => {
+    const { cacheScripts, idbState } = loadCacheScripts();
+    await cacheScripts.writeCache('questionsCache', 'atomic-clear', { old: true });
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    let started = false;
+    const pending = cacheScripts.updateCacheAtomic('questionsCache', 'atomic-clear', async (current) => {
+      started = true;
+      await gate;
+      return { ...(current || {}), touched: true };
+    });
+    await waitForCondition(() => started, 'updater start');
+    await expect(cacheScripts.clearCacheNamespace('questionsCache')).resolves.toBe(true);
+    release();
+    await expect(pending).rejects.toThrow('Failed to persist atomic update');
+    expect(cacheScripts.peekCacheSync('questionsCache', 'atomic-clear')).toBeNull();
+    expect(await cacheScripts.readCache('questionsCache', 'atomic-clear')).toBeNull();
+    expect([...idbState.keys()].some((key) => key.startsWith('dg:questionsCache:'))).toBe(false);
+  });
+
+  it.each(['writeCache', 'writeCacheOptimistic'])('discards a %s queued before a clear', async (method) => {
+    const { cacheScripts, idb, idbState } = loadCacheScripts();
+    await cacheScripts.initCacheManager();
+    const baseSet = idb.set.getMockImplementation();
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    let started = false;
+    idb.set.mockImplementation(async (...args) => {
+      if (args[0] === 'dg:questionsCache:queued-clear' && !started) {
+        started = true;
+        await gate;
+      }
+      return baseSet(...args);
+    });
+    const first = cacheScripts.writeCache('questionsCache', 'queued-clear', { first: true });
+    await waitForCondition(() => started, 'first write start');
+    const queued = cacheScripts[method]('questionsCache', 'queued-clear', { queued: true });
+    await expect(cacheScripts.clearCacheNamespace('questionsCache')).resolves.toBe(true);
+    release();
+    await expect(Promise.all([first, queued])).resolves.toEqual([false, false]);
+    expect(cacheScripts.peekCacheSync('questionsCache', 'queued-clear')).toBeNull();
+    expect(await cacheScripts.readCache('questionsCache', 'queued-clear')).toBeNull();
+    expect([...idbState.keys()].some((key) => key.startsWith('dg:questionsCache:'))).toBe(false);
+    await expect(cacheScripts.writeCache('questionsCache', 'queued-clear', { fresh: true })).resolves.toBe(true);
+    expect(await cacheScripts.readCache('questionsCache', 'queued-clear')).toEqual({ fresh: true });
+  });
+
   it('keeps all cleared namespaces empty when IndexedDB recovers', async () => {
     const namespaces = ['questionsCache', 'surveysCache', 'bookmarksCache'];
     const { cacheScripts, idb, idbState } = loadCacheScripts();
