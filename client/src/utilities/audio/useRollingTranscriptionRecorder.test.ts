@@ -737,6 +737,90 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
+  it('finishes a rotated-out chunk whose stop event never comes, so later chunks still upload', async () => {
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'lost-rotation-stop', chunkMs: 15_000 }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await act(async () => {
+      instances[0].requestData();
+      await flushPromises();
+    });
+    instances[0].stop.mockImplementation(() => {
+      instances[0].state = 'inactive';
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(15_000);
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(15_000);
+    });
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete', 'complete', 'recording']);
+    expect((transcribeAudio as jest.Mock).mock.calls.map(([blob]) => blob.size)).toEqual([256, 256]);
+    unmount();
+  });
+
+  it('finishes the chunk of a recorder that went quiet without a stop event when Stop is pressed', async () => {
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'went-quiet' }));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await act(async () => {
+      instances[0].requestData();
+      await flushPromises();
+    });
+    instances[0].state = 'inactive';
+    await act(async () => {
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(result.current.status).toBe('idle');
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete']);
+    unmount();
+  });
+
+  it('ignores audio delivered after a chunk was finished without its stop event', async () => {
+    const onLine = Object.getOwnPropertyDescriptor(navigator, 'onLine');
+    let online = false;
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => online });
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'late-fragment' }));
+    try {
+      await act(async () => {
+        await result.current.startRecording();
+      });
+      await act(async () => {
+        instances[0].requestData();
+        await flushPromises();
+      });
+      instances[0].stop.mockImplementation(() => {
+        instances[0].state = 'inactive';
+      });
+      await act(async () => {
+        const stopping = result.current.stopRecording();
+        await jest.advanceTimersByTimeAsync(2000);
+        await stopping;
+      });
+      expect(result.current.segments.map((segment) => segment.status)).toEqual(['retrying']);
+      await act(async () => {
+        instances[0].ondataavailable?.({ data: new Blob([new Uint8Array(256)], { type: 'audio/webm' }) });
+        await flushPromises();
+      });
+      expect(result.current.segments.map((segment) => segment.status)).toEqual(['retrying']);
+      await act(async () => {
+        online = true;
+        window.dispatchEvent(new Event('online'));
+        await flushPromises();
+      });
+      expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete']);
+    } finally {
+      unmount();
+      if (onLine) Object.defineProperty(navigator, 'onLine', onLine);
+      else Reflect.deleteProperty(navigator, 'onLine');
+    }
+  });
+
   it('shows a stop notice when the recorder stops by itself, keeps its audio, and resumes with one tap', async () => {
     (transcribeAudio as jest.Mock).mockImplementation(async () => 'Speech before the stop.');
     const { result, unmount } = renderHook(() =>

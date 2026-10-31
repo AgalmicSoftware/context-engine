@@ -117,6 +117,8 @@ jest.mock('../worker/workerAuth.js', () => ({
 class FakeMediaRecorder {
   static isTypeSupported = () => true;
   static made: FakeMediaRecorder[] = [];
+  // Chunks whose recorder never confirms its stop, as a browser bug can do.
+  static lostStops = new Set<number>();
   readonly chunk: number;
   readonly mimeType = 'audio/webm;codecs=opus';
   state: RecordingState = 'inactive';
@@ -154,6 +156,7 @@ class FakeMediaRecorder {
     if (this.state === 'inactive') return;
     this.state = 'inactive';
     clearInterval(this.ticker);
+    if (FakeMediaRecorder.lostStops.has(this.chunk)) return;
     // The last partial second and the stop event arrive in a later task.
     setTimeout(() => {
       if (this.dead) return;
@@ -207,6 +210,7 @@ beforeEach(() => {
   mockWorker.uploads = [];
   mockWorker.plan.clear();
   FakeMediaRecorder.made = [];
+  FakeMediaRecorder.lostStops = new Set([10]);
   Object.assign(page, { visible: true, online: true });
   getUserMedia.mockClear();
   Object.defineProperty(globalThis, 'MediaRecorder', { configurable: true, value: FakeMediaRecorder });
@@ -234,7 +238,7 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     // A burst of 503s, then a Worker that struggles before one request never answers.
     mockWorker.plan.set(2, ['503', '503', '503', '503']);
     mockWorker.plan.set(7, ['503', '503', 'hang']);
-    // The provider can't decode chunk 9, with labels or without.
+    // The provider can't decode chunk 9, with labels or without, and chunk 10's recorder never confirms its stop.
     mockWorker.plan.set(9, ['corrupt', 'corrupt']);
     // Device storage refuses one write: the commit of chunk 4's transcript.
     mockStore.failNext = (record) => record.segment.index === 3 && record.segment.status === 'complete';

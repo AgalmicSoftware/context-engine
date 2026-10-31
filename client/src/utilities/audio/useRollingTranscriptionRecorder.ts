@@ -31,6 +31,8 @@ const pickSupportedMimeType = () => {
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error || 'Unknown recording error');
+// How long a stopped recorder gets to hand over its last audio and confirm the stop.
+const STOP_WAIT_MS = 2000;
 
 export const useRollingTranscriptionRecorder = ({
   sessionSlug = '',
@@ -138,6 +140,9 @@ export const useRollingTranscriptionRecorder = ({
     }
     try {
       recorder.stop();
+      // The stop event finishes the recorder's chunk. If it never comes, finish the chunk with the audio
+      // already delivered, or it stays Recording and holds up every later upload.
+      setTimeout(() => finishersRef.current.get(recorder)?.(), STOP_WAIT_MS);
       return true;
     } catch (error) {
       if (endSession) {
@@ -161,13 +166,18 @@ export const useRollingTranscriptionRecorder = ({
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
 
       let capture: ReturnType<typeof beginChunk> | undefined;
+      let finished = false;
       const fragments: Blob[] = [];
-      const snapshot = (finished = false) => {
+      const snapshot = (finishing = false) => {
+        // Once the chunk is finished, with or without the stop event, later audio from this recorder is
+        // ignored: it would turn the finished chunk back into Recording.
+        if (finished) return;
+        finished = finishing;
         const audio = new Blob(fragments, {
           type: recorder.mimeType || mimeType || fragments[0]?.type || 'audio/webm',
         });
         if (!capture && audio.size) capture = beginChunk();
-        capture?.(audio, finished);
+        capture?.(audio, finishing);
       };
       recorder.ondataavailable = (event: BlobEvent) => {
         if (event.data && event.data.size > 0) {
@@ -369,6 +379,8 @@ export const useRollingTranscriptionRecorder = ({
       if (waitForTranscription) retryChunk();
       const recorder = mediaRecorderRef.current;
       if (!recorder || recorder.state === 'inactive') {
+        // A recorder that went quiet without a stop event still holds its chunk open.
+        if (recorder) finishersRef.current.get(recorder)?.();
         recordingActiveRef.current = false;
         clearRotationTimer();
         stopTimer();
@@ -399,7 +411,7 @@ export const useRollingTranscriptionRecorder = ({
         timeout = setTimeout(() => {
           stopWaitersRef.current.delete(waiter);
           settle(false);
-        }, 2000);
+        }, STOP_WAIT_MS);
         const stopStarted = stopRecorder(recorder, true);
         if (!stopStarted) {
           stopWaitersRef.current.delete(waiter);
