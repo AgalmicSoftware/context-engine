@@ -3,9 +3,21 @@ import * as idb from './cacheScripts.idb.impl.js';
 const GENERATION_PREFIX = 'ce:cache-generation:';
 const SEPARATOR = '\u0000';
 const namespaceForKey = (key: string): string => key.match(/^dg:([^:]+):/)?.[1] || '';
+// The last generation this tab read or set. When localStorage can't be read
+// (site data blocked, storage denied), the cache keeps working in memory and
+// IndexedDB with it, and a namespace cleared here stays cleared.
+const knownGenerations = new Map<string, string>();
 
-export const cacheNamespaceGeneration = (namespace: string): string =>
-  typeof localStorage === 'undefined' ? '' : localStorage.getItem(`${GENERATION_PREFIX}${namespace}`) || '';
+export const cacheNamespaceGeneration = (namespace: string): string => {
+  try {
+    const generation =
+      (typeof localStorage === 'undefined' ? '' : localStorage.getItem(`${GENERATION_PREFIX}${namespace}`)) || '';
+    knownGenerations.set(namespace, generation);
+    return generation;
+  } catch (_) {
+    return knownGenerations.get(namespace) ?? '';
+  }
+};
 
 export const currentCacheStorageKey = (key: string): string => {
   const namespace = namespaceForKey(key);
@@ -22,6 +34,7 @@ export const advanceCacheNamespace = (namespace: string): boolean => {
   try {
     const generation = crypto.randomUUID();
     localStorage.setItem(`${GENERATION_PREFIX}${namespace}`, generation);
+    knownGenerations.set(namespace, generation);
     return cacheNamespaceGeneration(namespace) === generation;
   } catch (_) {
     return false;

@@ -679,6 +679,40 @@ describe('cacheScripts', () => {
     }
   });
 
+  const denyLocalStorageReads = () =>
+    jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('The operation is insecure.', 'SecurityError');
+    });
+
+  it('keeps memory and IndexedDB access when the generation marker cannot be read', async () => {
+    const { cacheScripts } = loadCacheScripts();
+    await cacheScripts.writeCache('questionsCache', 'marker-denied', { value: 1 });
+    const get = denyLocalStorageReads();
+    try {
+      expect(cacheScripts.peekCacheSync('questionsCache', 'marker-denied')).toEqual({ value: 1 });
+      expect(await cacheScripts.readCache('questionsCache', 'marker-denied')).toEqual({ value: 1 });
+      await expect(cacheScripts.writeCache('questionsCache', 'marker-denied', { value: 2 })).resolves.toBe(true);
+      expect(await cacheScripts.readCache('questionsCache', 'marker-denied')).toEqual({ value: 2 });
+    } finally {
+      get.mockRestore();
+    }
+  });
+
+  it('keeps a namespace cleared in this tab cleared when its marker later cannot be read', async () => {
+    const { cacheScripts, idbState } = loadCacheScripts();
+    await cacheScripts.writeCache('questionsCache', 'marker-cleared', { old: true });
+    await expect(cacheScripts.clearCacheNamespace('questionsCache')).resolves.toBe(true);
+    // The pre-clear entry, as a clear during an IndexedDB outage leaves it.
+    idbState.set('dg:questionsCache:marker-cleared', { old: true });
+    const get = denyLocalStorageReads();
+    try {
+      expect(cacheScripts.peekCacheSync('questionsCache', 'marker-cleared')).toBeNull();
+      expect(await cacheScripts.readCache('questionsCache', 'marker-cleared')).toBeNull();
+    } finally {
+      get.mockRestore();
+    }
+  });
+
   it('reports a generation marker failure without claiming the namespace was cleared', async () => {
     const { cacheScripts } = loadCacheScripts();
     await cacheScripts.writeCache('questionsCache', 'clear-marker-failure', { old: true });
