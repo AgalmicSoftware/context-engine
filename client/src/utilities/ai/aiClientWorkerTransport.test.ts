@@ -182,3 +182,16 @@ it('gives GPT-5 and GPT-6 models on other providers a reasoning budget and no te
   expect(plan.requestBody).not.toHaveProperty('max_tokens');
   expect(plan.requestBody).not.toHaveProperty('temperature');
 });
+
+it('sends a JSON schema only to OpenAI and Claude', () => {
+  const schema = { type: 'json_schema', json_schema: { name: 'result', schema: { type: 'object' }, strict: true } };
+  const formatFor = (provider: string, response_format: unknown) =>
+    buildAiWorkerRequestPlan({ ai: { provider, model: 'model' }, opts: { response_format } }).requestBody
+      .response_format;
+  expect(formatFor('openai', schema)).toEqual(schema);
+  expect(formatFor('anthropic', schema)).toEqual(schema);
+  // Other providers keep their JSON mode but rely on the prompt for a schema.
+  expect(formatFor('openrouter', schema)).toBeUndefined();
+  expect(formatFor('custom', schema)).toBeUndefined();
+  expect(formatFor('openrouter', { type: 'json_object' })).toEqual({ type: 'json_object' });
+});

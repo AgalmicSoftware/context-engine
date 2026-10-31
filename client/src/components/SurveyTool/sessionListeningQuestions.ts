@@ -1,5 +1,5 @@
 import { callAI } from '../../utilities/ai/aiClient.js';
-import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
+import { GENERATED_QUESTIONS_RESPONSE_FORMAT, seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { generateQuestionId as generateSharedQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import {
   buildGeneratedSurveyStatements,
@@ -13,9 +13,9 @@ import {
 export const LISTENING_QUESTION_COUNT = 5;
 
 export const LISTENING_TRANSCRIPT_FOCUS_INSTRUCTIONS = [
-  'For listening transcripts, read the entire transcript before selecting questions.',
-  'Do not overweight the opening topic; compare early, middle, and late sections and choose the most interesting, contentious, or debate-worthy claims across the full conversation.',
-  'Prefer statements that expose disagreement, trade-offs, decision criteria, evidence gaps, or questions that would produce useful debate among informed participants.',
+  'Weigh the whole recorded conversation, its early, middle and late parts alike, and choose its most contested or debate-worthy claims.',
+  'Prefer statements that expose disagreement, trade-offs, decision criteria or evidence gaps.',
+  'Where the group discussed what to do, include statements about concrete next steps it proposed or could take, so participants can back or reject each one.',
 ].join(' ');
 
 export const LISTENING_QUESTION_TYPES: QuestionTypeSelection = Object.freeze({
@@ -145,6 +145,7 @@ export const generateQuestionsFromListeningTranscript = async (
     workerUrl: opts.workerUrl,
     taskType: 'generate',
     thinking: true,
+    response_format: GENERATED_QUESTIONS_RESPONSE_FORMAT,
   });
   const raw = parseListeningQuestionResponse(rawOutput);
   const { statements, surveyTitle } = buildListeningQuestionStatements(raw, opts);

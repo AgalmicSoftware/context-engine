@@ -8,3 +8,15 @@ export const fillPromptTemplate = (template: string, values: Record<string, unkn
   const pattern = new RegExp(placeholders.map(escapeRegExp).join('|'), 'g');
   return template.replace(pattern, (placeholder) => String(values[placeholder] ?? ''));
 };
+
+export type JsonSchemaResponseFormat = {
+  type: 'json_schema';
+  json_schema: { name: string; schema: Record<string, unknown>; strict: true };
+};
+
+// A strict JSON schema for parsed replies. OpenAI and Claude both enforce it;
+// other providers get the prompt's own description of the shape.
+export const jsonSchemaResponseFormat = (name: string, schema: Record<string, unknown>): JsonSchemaResponseFormat => ({
+  type: 'json_schema',
+  json_schema: { name, schema, strict: true },
+});

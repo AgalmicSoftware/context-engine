@@ -341,7 +341,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`).textContent).toBe(
       '15',
     );
-    expect(mockCallAI.mock.calls[0][0]).toMatch(/numberOfSeedStatementsOrPrompts:\s*15\b/);
+    expect(mockCallAI.mock.calls[0][0]).toMatch(/Write 15 questions/);
   });
 
   it('uses webpage source type when only additional URL sources are provided', async () => {
@@ -392,7 +392,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(mockProcessAdditionalSources).toHaveBeenCalledTimes(1);
     expect(mockFetchContentFromURL).not.toHaveBeenCalled();
     expect(mockCallAI).toHaveBeenCalledTimes(1);
-    expect(mockCallAI.mock.calls[0][0]).toMatch(/SourceType:\s*webpage/);
+    expect(mockCallAI.mock.calls[0][0]).toMatch(/Source type: webpage\./);
   });
   it('rejects a PDF alone with an actionable message and no model call', async () => {
     await renderSubject(

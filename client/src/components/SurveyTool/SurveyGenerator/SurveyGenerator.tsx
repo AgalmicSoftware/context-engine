@@ -38,7 +38,7 @@ import SessionChipSelector from '../../Shared/SessionChipSelector';
 import WorkerCanonicalSessionBootstrapBoundary from '../../Sessions/WorkerCanonicalSessionBootstrapBoundary';
 import { useContextSessionConfig } from './useContextSessionConfig';
 
-import { seedGenPrompt } from '../../../prompts/seedGenPrompt.js';
+import { GENERATED_QUESTIONS_RESPONSE_FORMAT, seedGenPrompt } from '../../../prompts/seedGenPrompt.js';
 import {
   buildSbtAccessControlConditions,
   getGlobalLitHooks,
@@ -731,7 +731,11 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     requestedCount: number = count,
   ) {
     const prompt = buildSinglePrompt(sourceDocContent, overrides);
-    const raw = await callAI(prompt, { ...aiRequestOptions, taskType: 'generate' });
+    const raw = await callAI(prompt, {
+      ...aiRequestOptions,
+      taskType: 'generate',
+      response_format: GENERATED_QUESTIONS_RESPONSE_FORMAT,
+    });
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('No JSON object found in AI response');
     const parsed = JSON.parse(match[0]) as GeneratedAiQuestionPayload;

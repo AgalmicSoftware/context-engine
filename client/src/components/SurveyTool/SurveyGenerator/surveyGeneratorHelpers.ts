@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { fillPromptTemplate } from '../../../prompts/promptFormat';
 import { toStr } from '../../../utilities/shared/primitives.js';
 import { generateQuestionId as generateSharedQuestionId } from '../../../utilities/shared/questionUtils.mjs';
 
@@ -564,15 +565,15 @@ export const buildSingleGenerationPrompt = ({
   const sourceType = overrides.sourceTypeOverride || (transcriptMode ? 'transcript' : 'text');
 
   const multiSpeakerHint = overrides.multiSpeakerHintOverride || 'unknown';
-  const literalReplacement = (value: unknown) => () => toStr(value);
 
-  return promptTemplate
-    .replace('<SourceDocContent>', literalReplacement(sourceDocContent))
-    .replace('<NumSeedStatements>', String(count))
-    .replace('<Types>', typesStr)
-    .replace(/<DefaultTags>/g, literalReplacement(defaultTagsStr))
-    .replace(/<SourceType>/g, literalReplacement(sourceType))
-    .replace('<MultiSpeakerHint>', toStr(multiSpeakerHint))
-    .replace('<GroupCustomInstructions>', literalReplacement(sessionInstructions))
-    .replace('<ClipDurationMinutes>', '');
+  // One literal pass: source text that holds a placeholder is never rescanned.
+  return fillPromptTemplate(promptTemplate, {
+    '<SourceDocContent>': toStr(sourceDocContent),
+    '<NumSeedStatements>': String(count),
+    '<Types>': typesStr,
+    '<DefaultTags>': defaultTagsStr || 'none',
+    '<SourceType>': toStr(sourceType),
+    '<MultiSpeakerHint>': toStr(multiSpeakerHint),
+    '<GroupCustomInstructions>': toStr(sessionInstructions).trim() || '(none)',
+  });
 };

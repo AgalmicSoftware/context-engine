@@ -174,7 +174,7 @@ it('uses the one selected type for both the prompt and the resulting questions',
   await screen.findByDisplayValue('Keep the binary question?');
   expect(screen.queryByDisplayValue('Drop the other type?')).not.toBeInTheDocument();
   expect(onQuestionsGenerated.mock.calls[0][0].map((question) => question.type)).toEqual(['binary']);
-  expect(callAI.mock.calls[0][0]).toContain('TypeOfQuestionsToInclude: binary');
+  expect(callAI.mock.calls[0][0]).toContain('using only these types: binary.');
 });
 
 it('explains when a model response has no usable questions', async () => {

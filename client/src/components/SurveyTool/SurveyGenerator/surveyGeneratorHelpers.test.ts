@@ -477,7 +477,6 @@ describe('surveyGeneratorHelpers', () => {
         '<SourceType>',
         '<MultiSpeakerHint>',
         '<GroupCustomInstructions>',
-        '<ClipDurationMinutes>',
       ].join('\n'),
       sourceDocContent: 'Source body',
       count: 15,
@@ -500,7 +499,6 @@ describe('surveyGeneratorHelpers', () => {
         'document',
         'likely_multiple_speakers',
         'Keep prompts concise.',
-        '',
       ].join('\n'),
     );
   });

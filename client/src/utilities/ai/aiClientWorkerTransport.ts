@@ -57,6 +57,11 @@ export const buildAiWorkerRequestPlan = ({
   const maxTokens = opts.max_tokens ?? opts.maxTokens ?? (provider === 'anthropic' ? 32768 : 16384);
   const maxOutputTokens = opts.max_output_tokens ?? (usesResponsesApi ? maxTokens : undefined);
   const maxCompletionTokens = opts.max_completion_tokens ?? (usesCompletionTokens ? maxTokens : undefined);
+  // A JSON schema goes only to OpenAI and Claude; other providers rely on the prompt's description.
+  const responseFormat =
+    asRecord(opts.response_format).type === 'json_schema' && provider !== 'openai' && provider !== 'anthropic'
+      ? null
+      : opts.response_format;
 
   const requestBody: UnknownRecord = {
     action: 'ai',
@@ -67,7 +72,7 @@ export const buildAiWorkerRequestPlan = ({
     ...maybeNumberProp('max_output_tokens', maxOutputTokens),
     ...maybeNumberProp('max_completion_tokens', maxCompletionTokens),
     ...(!usesResponsesApi && !usesCompletionTokens && typeof maxTokens === 'number' ? { max_tokens: maxTokens } : {}),
-    ...(opts.response_format ? { response_format: opts.response_format } : {}),
+    ...(responseFormat ? { response_format: responseFormat } : {}),
     // Current Claude models refuse temperature, and the Worker sends them none.
     ...(!usesResponsesApi && !usesCompletionTokens && provider !== 'anthropic'
       ? typeof opts.temperature === 'number'
