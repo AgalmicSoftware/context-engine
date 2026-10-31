@@ -1145,6 +1145,59 @@ own draft before anything is used; after they accept, the button becomes
 an 8,000-character link offers the `.json` download instead. On the settings
 page, an imported template keeps the session's own hosting.
 
+Two link forms carry a template in the URL fragment, which the browser never
+sends to a server:
+
+- `/new#template=<data>`: share links. The compact JSON is deflated
+  (`deflate-raw`), then written as base64url.
+- `/new#setup=<data>`: links an AI writes. The JSON's UTF-8 bytes are written
+  as unpadded base64url, without compression, because an AI can't deflate.
+
+The page reads both the same way, through the decoder that participant prefill
+links also use. Spaces, line breaks and `=` padding, as wrapped chat links
+have, are ignored. Data that isn't UTF-8 is refused, never repaired. A link cut
+off when it was copied says so, a damaged one says what is wrong, and either
+suggests pasting the template's JSON under **Import** instead. A template with
+an unknown field, a value of the wrong type, or text that looks like a key is
+refused, and the notice names each field. The page removes `#template=` and
+`#setup=` from the address bar as soon as it reads them, so a reload or a
+copied address doesn't carry the draft again; the notice keeps it until you
+answer.
+
+### Set up with your AI
+
+**Set up with your AI**, at the top of `/new`, gives you a prompt for ChatGPT,
+Claude or another AI. **Copy prompt** copies it. **Open in ChatGPT** and **Open
+in Claude** open a new chat with it, and copy it too in case the site doesn't
+fill it in; **Show prompt** shows it to copy by hand. Like the participants'
+prefill prompt, it is your own request, and anything the AI reads is data, not
+instructions.
+
+The AI interviews you about the goal and who will take part, the topics and any
+questions you already have, how people take part (the web page, their own AI,
+or a voice interview), who sees the results, timing, and links to read. It then
+returns a `ce.session-template/v1` template with only the fields the prompt
+lists, each with its allowed values: the name, description, end time, context,
+questions, the question-generation prompt, who may create groups, and the
+interview switch and prompts. It leaves out models, AI providers, hosting,
+sign-in, encryption and anything secret, so the page's defaults apply, and you
+add keys on the page, never in the chat. Who sees results and encryption are
+set on the page; the AI tells you which options to pick.
+
+The AI returns one of two things:
+
+- **A link**, when it can run code and the compact JSON is at most 6,000
+  characters: `/new#setup=...`, about 8,000 characters at most.
+- **The JSON**, otherwise, to paste under **Import** → **Or paste it**, then
+  **Check**. A salon-sized template, with 28 questions, context links and
+  interview prompts, is about 10,000 characters of JSON: about 13,400
+  characters as a `#setup=` link and 5,300 as a `#template=` share link, so the
+  AI gives the JSON.
+
+Either way, the page lists what the template would change before anything is
+used. Nothing is created until you review the page, add the keys your hosting
+needs, press **Create** and confirm with your passkey.
+
 ### Add questions
 
 Once the session exists, you can start populating it:

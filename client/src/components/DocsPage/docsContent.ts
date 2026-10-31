@@ -47,7 +47,7 @@ export const QUICKSTART_STEPS: readonly QuickstartStep[] = Object.freeze(
     {
       id: 'open-session',
       title: 'Open or create a session',
-      body: 'Follow a shared session link, replace `<slug>` in `/session/<slug>` with the session you want to join, or create a session of your own.',
+      body: 'Follow a shared session link, replace `<slug>` in `/session/<slug>` with the session you want to join, or create a session of your own. On the setup page, “Set up with your AI” lets ChatGPT or Claude ask about your session and fill in the page for you to review.',
       links: [
         { href: '/session/general', label: 'Open /session/general' },
         { href: '/session/new', label: 'Create a session' },
@@ -150,7 +150,8 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
         'Chain-scanned sessions use `blockLimits` to bound discovery. Worker-canonical sessions can instead use `sessionEndsAt` to close participant mutations while preserving allowed reads and admin recovery.',
       points: [
         'Use `?mode=voice` to open the voice chooser, `?mode=interview` for one-person conversational response drafting, or `?mode=groupRecording` to turn a recorded discussion into draft questions.',
-        'The optional ChatGPT/Claude memory handoff, offered in the voice chooser, keeps instructions in the pasted user request, fetches only an inert question catalog, shows the exact packet before encoding, and includes explained per-answer confidence; no relevant signal produces a clean interview link.',
+        'Admins copy the `?mode=groupRecording` link, one per breakout room, with “Copy group recorder link” under Join or on the settings page; it keeps any Worker pin, and other `mode` values are ignored and removed.',
+        'The optional ChatGPT/Claude memory handoff, offered in the voice chooser, keeps instructions in the pasted user request, fetches only an inert question catalog, shows the exact packet before encoding, and includes explained per-answer confidence; no relevant signal produces a clean interview link. A cut-off or damaged link says why and accepts the pasted JSON packet instead.',
         'The legacy `?mode=listening` link remains supported for the pile-adjacent group recorder, and recording starts only after you press Record.',
         'Back keeps a running recording on the page, and reloading or closing the tab asks first while audio is still being recorded or uploaded.',
       ],

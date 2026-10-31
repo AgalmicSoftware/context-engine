@@ -24,7 +24,8 @@ without a separate footer. Picking a choice replaces `?mode=voice` with its own
 mode.
 The older
 `?mode=listening` link remains supported and opens the original pile-adjacent
-group recorder.
+group recorder. Any other `mode` value, such as an old `recordGroup` link,
+opens nothing and is removed from the address.
 
 `interviewModeEnabled` is a per-session public config value. It defaults to
 `true`; setting it to `false` hides the microphone entry point and makes the
@@ -352,6 +353,16 @@ history, and validates the AI-authored response drafts against the current
 questions and listed options. Current direct responses are not re-authored by a
 different mapping model, so their source attribution and confidence remain
 faithful to the external AI. Every proposed answer remains a local review draft.
+The link is read by the same decoder as setup links
+([session-creation-guide.md](session-creation-guide.md#templates-and-share-links)):
+spaces, line breaks and `=` padding from a wrapped chat link are ignored, and
+data that isn't UTF-8 is refused rather than repaired. A link that was cut off
+or damaged opens the interview with the reason, even without `?mode=interview`,
+and a box for the JSON packet the AI returned with the link: **Review these
+drafts** imports the pasted packet with the same checks. A packet without a
+required field, such as `questionSetHash`, names it. Drafts are never dropped
+silently: a notice counts those left out because they were incomplete or
+repeated, and those that fit none of the session's questions or their options.
 A prefill link opens the interview on its drafts with one status line, such as
 “Your AI drafted 6 answers · Claude, self-reported”, and the microphone reads
 **Talk through your drafts**.
@@ -397,6 +408,14 @@ available when that platform supports it, but the handoff cannot enable or
 override those settings itself.
 
 ## Group Conversation
+
+`/session/<slug>?mode=groupRecording` opens Group Conversation directly: one
+link per breakout room, for the phone that records it. Admins copy it with
+**Copy group recorder link**, in the session's **Join** panel or on its settings
+page; it keeps the Worker origin that a Worker-hosted session's links carry.
+Opening the link records nothing: recording starts only when someone presses
+Record and the browser grants the microphone. If submitting needs a sign-in, it
+happens in the usual login dialog while capture keeps running.
 
 Group Conversation reuses the rolling transcription recorder. Recording begins
 only after the user clicks Record so microphone permission follows a user
@@ -467,7 +486,7 @@ The complete initial/continued voice instructions fit below the Worker’s 32,00
 
 ### Sharing the voice interview
 
-The session page, admin page and publish result include a compact **Join** panel. Its QR code and **Copy link** action open the voice chooser on another device. A Worker origin is included only for Worker-canonical sessions or when the current session link already carries one; registry session links keep registry routing. **For your AI** copies the same review-only prompt as the voice launcher after checking catalog compatibility. Join links contain only the session path and, when needed, the validated Worker origin; admin tokens and prefill fragments are never copied.
+The session page, admin page and publish result include a compact **Join** panel. Its QR code and **Copy link** action open the voice chooser on another device. A Worker origin is included only for Worker-canonical sessions or when the current session link already carries one; registry session links keep registry routing. **For your AI** copies the same review-only prompt as the voice launcher after checking catalog compatibility. Admins also get **Copy group recorder link**, the same link with `?mode=groupRecording` (see [Group Conversation](#group-conversation)). Join links contain only the session path and, when needed, the validated Worker origin; admin tokens and prefill fragments are never copied.
 
 ### Recording on a phone or with remote speakers
 
