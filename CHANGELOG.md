@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 
 ### Verification and shared rules
 
+- Pin the recovery-key export test's clock to midday UTC so it no longer fails near midnight.
+
 - Separate the voice-mode modal shell and interview panel to keep client components within the release size limits.
 
 - Include catalog completeness in the interview compatibility fixture.
@@ -73,6 +75,10 @@ All notable changes to this project will be documented in this file.
   Evict malformed JSON replies so ordinary reads can retry immediately.
 
 ### Agents and MCP
+
+- Keep up to 50 research runs per agent identity, up from 20, and state the limit in the agent instructions.
+
+- Mark research summaries incomplete when they hold records an earlier Worker wrote without a participant or run, instead of showing an invented participant.
 
 - Prepare MCP 0.1.3 with the package fixes since 0.1.2; application and MCP versions remain independent.
 
@@ -142,6 +148,34 @@ All notable changes to this project will be documented in this file.
 - Add an in-process participation rehearsal for concurrent invite, Wrapped prediction and signed-in browser response flows, with optional KV write throttling.
 
 ### Client — available when the site deploys
+
+- Open the group recorder from `?mode=groupRecording` links; `?mode=recordGroup` no longer opens it.
+
+- Keep a Group Conversation recording running when someone taps outside the dialog or presses Escape, and offer "Close and keep the audio" only after Stop.
+
+- Retry a recording upload that stops responding instead of letting it hold up later chunks, and add Retry to uploading chunks.
+
+- Let Clear work without device storage and with failed chunks, asking before it deletes audio. A recording stays with the account that made it: another account or a signed-out visitor starts fresh, and audio held only on this page stays until it is saved or downloaded.
+
+- Require real speech, not just gap markers, before generating questions from a recording.
+
+- Keep speaker labels on when one chunk's audio is rejected as too large or unreadable; any other refusal, such as an older Worker's, turns them off for the rest of the recording with a notice.
+
+- Stagger chunk retries so rooms sharing a key don't retry together, and apply a slow speaker-label check that answers before Record is pressed.
+
+- Save hidden-page notices with the recording so they survive a reload and reopening the recorder.
+
+- Keep the voice dialog and its recording when someone signs in with a wallet on a different chain from a chain session's.
+
+- Stop the unsaved-answers notice from returning after an interview submission and Clear.
+
+- Report a skipped file once, on the next Generate, instead of on every later run or after the sources change.
+
+- Leave hidden draft facts out of voice interviews wherever they appear, including the summary, while keeping shown facts that contain the same words intact.
+
+- End the wallet connection when logout can't reach the wallet, so the next sign-in starts with a fresh connection.
+
+- Shorten the passkey sign-out error to one sentence, with details behind a "?" button.
 
 - Keep Group Conversation audio held only in memory when stored recordings can't be read on reopening, when the recorder is left without Close and keep the audio, and when Close and keep runs before saved audio has loaded.
 
@@ -450,6 +484,8 @@ All notable changes to this project will be documented in this file.
   voice interviewer asks only about those.
 
 ### Workers — requires redeployment
+
+- Clear saved Lit setup only when Lit confirms it is gone (the saved key is refused, or a complete list lacks the saved group or wallet), including after an operator replaces a revoked key, so setup can start over; network, rate-limit and billing errors keep saved progress.
 
 - Isolate Wrapped and submit permission revocation tests from invite removal.
 
