@@ -144,6 +144,23 @@ describe('editing an on-chain session', () => {
     expect(metadata).not.toHaveProperty('autoFeatureSBTsWithFeaturedSbtTags');
   });
 
+  it('keeps a legacy provider set with ai.mode when the models name none', () => {
+    const config = {
+      ...registryConfig(),
+      ai: {
+        mode: 'anthropic',
+        models: { fast: { model: 'claude-sonnet-5-5' }, thinking: { model: 'claude-opus-5-5' } },
+      },
+    };
+    const { patch } = edit(config, (draft) => {
+      draft.sessionName = 'Renamed';
+    });
+    const metadata = buildOnChainSessionMetadata({ ...config, ...patch });
+    expect(metadata.ai.models.fast).toEqual({ provider: 'anthropic', model: 'claude-sonnet-5-5' });
+    expect(metadata.ai.models.thinking).toEqual({ provider: 'anthropic', model: 'claude-opus-5-5' });
+    expect(metadata.ai).not.toHaveProperty('mode');
+  });
+
   it('saves nothing when nothing changed, and needs a start block before it saves', () => {
     expect(edit(registryConfig(), () => {}).patch).toEqual({});
     const config = { ...registryConfig(), blockLimits: undefined };

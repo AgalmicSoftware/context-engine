@@ -138,9 +138,11 @@ export const buildOnChainSessionMetadata = (after: Config): Config => {
   const autoFeature = resolveSessionWizardAutoFeatureBySessionSlug(metadata);
   delete metadata.autoFeatureSBTsWithFeaturedSbtTags;
   if (autoFeature !== undefined) metadata.autoFeatureSBTsBySessionSlug = autoFeature;
-  const sanitized = sanitizeSessionWizardMetadataPayload(stripSessionWizardMetadataSecretFields(metadata), {
-    defaultAiModels: DEFAULT_AI_MODELS,
-  });
+  // The cleaner reads ai.mode and ai.provider as the models' fallback
+  // provider, so it runs before the secret fields (those included) go.
+  const sanitized = stripSessionWizardMetadataSecretFields(
+    sanitizeSessionWizardMetadataPayload(metadata, { defaultAiModels: DEFAULT_AI_MODELS }),
+  );
   // The cleaner keeps only the contracts setup shows; keep the rest too.
   const contracts = { ...asRecord(metadata.contracts), ...asRecord(sanitized.contracts) };
   if (Object.keys(contracts).length) sanitized.contracts = contracts;
