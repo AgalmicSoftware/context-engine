@@ -2,7 +2,12 @@ import React from 'react';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { Input } from 'reactstrap';
 
-import { AI_PROVIDER_OPTIONS, getAiModelOptions, normalizeAiProvider } from '../sessionWizardAiConfig';
+import {
+  AI_PROVIDER_OPTIONS,
+  getAiModelOptions,
+  normalizeAiModelForProvider,
+  normalizeAiProvider,
+} from '../sessionWizardAiConfig';
 import { SetupField, SetupSection, setupHelpId } from './SetupPrimitives';
 import { asRecord, text, type SetupSectionProps } from './setupSectionTypes';
 import styles from './SessionSetup.module.scss';
@@ -39,12 +44,12 @@ export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null }:
   const ai = asRecord(draft.ai);
   const setProvider = (next: string) => {
     const models = asRecord(ai.models);
-    // The page's model check moves each model onto the new provider's list.
-    onChange(['ai', 'models'], {
-      ...models,
-      fast: { ...asRecord(models.fast), provider: next },
-      thinking: { ...asRecord(models.thinking), provider: next },
-    });
+    // Each model moves onto the new provider's list.
+    const moved = (role: 'fast' | 'thinking') => {
+      const entry = asRecord(models[role]);
+      return { ...entry, provider: next, model: normalizeAiModelForProvider(role, next, entry.model) };
+    };
+    onChange(['ai', 'models'], { ...models, fast: moved('fast'), thinking: moved('thinking') });
   };
   const modelSelect = (role: 'fast' | 'thinking', label: string, value: string, help: string) => {
     const id = `ce-setup-ai-${role}`;
