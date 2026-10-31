@@ -24,6 +24,8 @@ type Options = {
   context?: unknown;
   workerUrl?: string;
   labelSpeakers: boolean;
+  // A sign-out or account switch releases the recording only once capture has stopped.
+  capturing?: boolean;
 };
 
 export function useRecordingChunkQueue(options: Options) {
@@ -39,12 +41,34 @@ export function useRecordingChunkQueue(options: Options) {
     options.context && typeof options.context === 'object' && 'account' in options.context
       ? String(options.context.account || '')
       : '';
+  const normalizedAccount = account.toLowerCase();
   const worker = options.workerUrl || options.sessionConfig?.corsWorkerUrl || options.sessionConfig?.workerUrl || '';
   const identity = JSON.stringify([worker, options.sessionSlug]);
   const pinned = useRef({ identity, scope: readPinnedScope(identity) });
   const [, refreshScope] = useState(0);
   if (pinned.current.identity !== identity) pinned.current = { identity, scope: readPinnedScope(identity) };
-  const scope = pinned.current.scope || JSON.stringify([worker, options.sessionSlug, account.toLowerCase()]);
+  const scope = pinned.current.scope || JSON.stringify([worker, options.sessionSlug, normalizedAccount]);
+  const releasePin = useCallback(() => {
+    pinned.current = { identity, scope: '' };
+    memoryScopes.delete(identity);
+    try {
+      window.sessionStorage.removeItem(scopeStorageKey(identity));
+    } catch {
+      // Clearing the in-memory pin still starts the next recording in the current account scope.
+    }
+    refreshScope((value) => value + 1);
+  }, [identity]);
+  // The pin keeps one recording through sign-in or a late account restore, but never past a sign-out or
+  // account switch: the next person's recording must not append to the previous account's transcript.
+  const accountChange = useRef({ account: normalizedAccount, pending: false });
+  useEffect(() => {
+    const change = accountChange.current;
+    if (change.account && change.account !== normalizedAccount) change.pending = true;
+    change.account = normalizedAccount;
+    if (!change.pending || options.capturing) return;
+    change.pending = false;
+    if (pinned.current.scope) releasePin();
+  }, [normalizedAccount, options.capturing, releasePin]);
 
   useEffect(() => {
     let current = true;
@@ -128,21 +152,17 @@ export function useRecordingChunkQueue(options: Options) {
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, []);
-  const clearDraft = useCallback(async () => {
-    try {
-      await queueRef.current?.clear();
-      pinned.current = { identity, scope: '' };
-      memoryScopes.delete(identity);
+  const clearDraft = useCallback(
+    async (discardAudio = false) => {
       try {
-        window.sessionStorage.removeItem(scopeStorageKey(identity));
-      } catch {
-        // Clearing the in-memory pin still starts the next recording in the current account scope.
+        await queueRef.current?.clear(discardAudio);
+        releasePin();
+      } catch (error) {
+        setStorageError(error instanceof Error ? error.message : String(error));
       }
-      refreshScope((value) => value + 1);
-    } catch (error) {
-      setStorageError(error instanceof Error ? error.message : String(error));
-    }
-  }, [identity]);
+    },
+    [releasePin],
+  );
   return {
     scope,
     prepare,

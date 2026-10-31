@@ -20,18 +20,18 @@ export type RollingTranscriptSegment = {
 export const mergeRollingTranscriptText = (previous: string, next: string): string =>
   mergeTranscriptOverlap(previous, next, 80);
 
+const recordingGap = (index: number) => `[Recording gap: chunk ${index + 1} could not be transcribed.]`;
+/** Gap markers keep a transcript honest about missing audio, but they are not speech. */
+export const removeRecordingGaps = (transcript: string): string =>
+  transcript.replace(/\[Recording gap: chunk \d+ could not be transcribed\.\]/g, '').trim();
+
 export const stitchRollingTranscriptSegments = (segments: RollingTranscriptSegment[] = []): string =>
   [...segments]
     .filter((segment) => segment.status === 'failed' || (segment.status === 'complete' && segment.text.trim()))
     .sort((a, b) => a.index - b.index)
     .reduce(
       (merged, segment) =>
-        mergeRollingTranscriptText(
-          merged,
-          segment.status === 'failed'
-            ? `[Recording gap: chunk ${segment.index + 1} could not be transcribed.]`
-            : segment.text,
-        ),
+        mergeRollingTranscriptText(merged, segment.status === 'failed' ? recordingGap(segment.index) : segment.text),
       '',
     );
 

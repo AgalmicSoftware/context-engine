@@ -45,7 +45,14 @@ export const useRollingTranscriptionRecorder = ({
     status === 'recording' || status === 'paused',
   );
   const [errorMessage, setErrorMessage] = useState('');
-  const chunks = useRecordingChunkQueue({ sessionSlug, sessionConfig, context, workerUrl, labelSpeakers });
+  const chunks = useRecordingChunkQueue({
+    sessionSlug,
+    sessionConfig,
+    context,
+    workerUrl,
+    labelSpeakers,
+    capturing: status !== 'idle' && status !== 'error',
+  });
   const { segments, transcript, labelsUnavailableReason, beginChunk, prepare, finishTranscription, retryChunk } =
     chunks;
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -387,12 +394,15 @@ export const useRollingTranscriptionRecorder = ({
 
   const stopRecording = useCallback(() => finalizeRecording({ waitForTranscription: false }), [finalizeRecording]);
 
-  const clearDraft = useCallback(() => {
-    if (status !== 'idle' && status !== 'error') return;
-    void chunks.clearDraft();
-    setElapsedSeconds(0);
-    setErrorMessage('');
-  }, [chunks.clearDraft, status]);
+  const clearDraft = useCallback(
+    (discardAudio = false) => {
+      if (status !== 'idle' && status !== 'error') return;
+      void chunks.clearDraft(discardAudio);
+      setElapsedSeconds(0);
+      setErrorMessage('');
+    },
+    [chunks.clearDraft, status],
+  );
 
   useEffect(
     () => () => {

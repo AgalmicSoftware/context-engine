@@ -838,6 +838,44 @@ it('generates with a gap warning and offers closing while keeping pending audio'
   expect(keepAudio).toHaveBeenCalledTimes(1);
 });
 
+it('clears a recording with a Failed chunk only after confirming that its audio will be deleted', async () => {
+  const clearDraft = jest.fn();
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({
+      transcript: 'Saved speech before the gap. [Recording gap: chunk 2 could not be transcribed.]',
+      segments: [
+        { id: 'done', index: 0, status: 'complete', text: 'Saved speech before the gap.', startedAt: 1 },
+        { id: 'failed', index: 1, status: 'failed', text: '', startedAt: 2 },
+      ],
+      downloadableChunkIds: ['failed'],
+      clearDraft,
+    }),
+  );
+  render(<SessionListeningPanel sessionSlug="room" />);
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS));
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));
+  expect(clearDraft).not.toHaveBeenCalled();
+  expect(await screen.findByText(/Download any chunk you need first/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Keep recording' }));
+  expect(clearDraft).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));
+  fireEvent.click(await screen.findByRole('button', { name: 'Clear recording' }));
+  expect(clearDraft).toHaveBeenCalledWith(true);
+});
+
+it('does not generate questions from a transcript that only marks recording gaps', () => {
+  const gapOnly = '[Recording gap: chunk 1 could not be transcribed.]';
+  expect(gapOnly.length).toBeGreaterThanOrEqual(50);
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({
+      transcript: gapOnly,
+      segments: [{ id: 'failed', index: 0, status: 'failed', text: '', startedAt: 1 }],
+    }),
+  );
+  render(<SessionListeningPanel sessionSlug="room" />);
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeDisabled();
+});
+
 it('offers Close and keep the audio only after capture stops, with its explanation behind a question mark', () => {
   const onCaptureChange = jest.fn();
   const pending = { segments: [{ id: 'up', index: 0, status: 'transcribing', text: '', startedAt: 1 }] };

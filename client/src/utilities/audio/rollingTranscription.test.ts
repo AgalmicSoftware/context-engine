@@ -2,6 +2,7 @@ import {
   buildListeningModeSearch,
   isListeningModeQueryEnabled,
   mergeRollingTranscriptText,
+  removeRecordingGaps,
   stitchRollingTranscriptSegments,
 } from './rollingTranscription';
 
@@ -61,4 +62,23 @@ it('marks a permanently failed chunk as a gap between successful transcript part
   expect(stitchRollingTranscriptSegments(segments)).toBe(
     'Before. [Recording gap: chunk 2 could not be transcribed.] After.',
   );
+});
+
+it('counts only speech, not gap markers, toward a transcript worth generating from', () => {
+  const failed = (index: number) => ({
+    id: `lost-${index}`,
+    index,
+    status: 'failed' as const,
+    text: '',
+    startedAt: index,
+  });
+  expect(removeRecordingGaps(stitchRollingTranscriptSegments([failed(0), failed(1), failed(11)]))).toBe('');
+  expect(
+    removeRecordingGaps(
+      stitchRollingTranscriptSegments([
+        failed(0),
+        { id: 'said', index: 1, status: 'complete' as const, text: 'Spoken words.', startedAt: 1 },
+      ]),
+    ),
+  ).toBe('Spoken words.');
 });

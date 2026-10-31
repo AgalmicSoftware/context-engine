@@ -288,17 +288,23 @@ export class RecordingChunkQueue {
     if (this.storageError) memoryRecordings.set(this.options.scope, this.records);
     else memoryRecordings.delete(this.options.scope);
   }
-  async clear() {
-    if ([...this.records.values()].some((record) => record.audio && record.segment.status === 'complete')) {
+  /** Deleting audio that has no saved transcript (a Failed chunk, or a memory-only copy) needs `discardAudio`. */
+  async clear(discardAudio = false) {
+    if (this.segments.some((entry) => !['complete', 'failed'].includes(entry.status))) {
+      throw new Error('Transcribe pending audio before clearing the recording. Download any stuck chunks first.');
+    }
+    if (!discardAudio && [...this.records.values()].some((record) => record.audio)) {
       throw new Error(
         'Keep unsaved audio until its transcript is saved. Reconnect to retry storage or download it before leaving.',
       );
     }
-    if (this.segments.some((entry) => entry.status !== 'complete')) {
-      throw new Error('Transcribe pending audio before clearing the recording. Download any stuck chunks first.');
-    }
     await this.writes;
-    await clearRecordingChunks(this.options.scope);
+    try {
+      await clearRecordingChunks(this.options.scope);
+    } catch (error) {
+      // Without working device storage there is nothing saved to delete; otherwise a reload would bring it back.
+      if (!this.storageError) throw error;
+    }
     this.records.clear();
     memoryRecordings.delete(this.options.scope);
     this.labelsUnavailableReason = '';

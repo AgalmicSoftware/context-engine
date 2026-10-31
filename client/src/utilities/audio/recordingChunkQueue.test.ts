@@ -146,7 +146,7 @@ it('skips permanent failures while retaining their exact audio for retry and dow
   expect(queue.segments.map((segment) => segment.status)).toEqual(['complete', 'failed', 'complete']);
   expect(queue.records.get(failed)?.audio).toBe(badAudio);
   expect(saved.get(failed)?.audio).toBe(badAudio);
-  await expect(queue.clear()).rejects.toThrow('pending audio');
+  await expect(queue.clear()).rejects.toThrow('unsaved audio');
   transcribe.mockImplementation(async () => ({ text: 'Recovered.' }));
   queue.retry(failed);
   await queue.finish();
@@ -266,6 +266,38 @@ it('resets speaker fallback when a completed recording is cleared', async () => 
   queue.capture(queue.begin(true), audio, true);
   await queue.finish();
   expect(transcribe).toHaveBeenLastCalledWith(audio, true, expect.any(AbortSignal));
+});
+
+it('clears a recording made without IndexedDB once its memory-only audio is explicitly discarded', async () => {
+  jest.mocked(listRecordingChunks).mockRejectedValue(new Error('No storage'));
+  jest.mocked(putRecordingChunk).mockRejectedValue(new Error('No storage'));
+  jest.mocked(clearRecordingChunks).mockRejectedValue(new Error('No storage'));
+  const queue = create(undefined, 'no-storage-clear');
+  await queue.ready;
+  queue.capture(queue.begin(false), audio, true);
+  await queue.finish();
+  expect(queue.segments[0]).toMatchObject({ status: 'complete', text: 'Speech.' });
+  await expect(queue.clear()).rejects.toThrow('unsaved audio');
+  expect(queue.records.size).toBe(1);
+  await queue.clear(true);
+  expect(queue.records.size).toBe(0);
+  expect(queue.storageError).toBe('');
+});
+
+it('clears a Failed chunk only once its audio is explicitly discarded', async () => {
+  const queue = create(async () => {
+    throw Object.assign(new Error('Undecodable audio'), { status: 400 });
+  });
+  await queue.ready;
+  const id = queue.begin(false);
+  queue.capture(id, audio, true);
+  await queue.finish();
+  expect(queue.segments[0].status).toBe('failed');
+  await expect(queue.clear()).rejects.toThrow('unsaved audio');
+  expect(saved.get(id)?.audio).toBe(audio);
+  await queue.clear(true);
+  expect(queue.records.size).toBe(0);
+  expect(saved.size).toBe(0);
 });
 
 it('reopens kept pending audio even when IndexedDB is unavailable', async () => {

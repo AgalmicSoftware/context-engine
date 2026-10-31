@@ -15,9 +15,13 @@ import {
 import { Button, UncontrolledTooltip } from 'reactstrap';
 import styles from './SurveyTool.module.scss';
 import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
+import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { SessionRecordingChunks } from './SessionRecordingChunks';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
-import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS } from '../../utilities/audio/rollingTranscription';
+import {
+  DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
+  removeRecordingGaps,
+} from '../../utilities/audio/rollingTranscription';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { readThemeToken, subscribeThemeChanges } from '../../utilities/ui/themeRuntime';
 import { generateQuestionsFromListeningTranscript, LISTENING_QUESTION_COUNT } from './sessionListeningQuestions';
@@ -405,6 +409,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const [generatedTitle, setGeneratedTitle] = useState('');
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const closingRef = useRef(false);
   const panelRef = useRef<HTMLElement | null>(null);
@@ -451,7 +456,10 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     if (embeddedInModal && document.activeElement === document.body) panelRef.current?.focus();
   }, [embeddedInModal, isRecorderSessionActive]);
 
-  const canGenerate = !isClosing && trimmedTranscript.length >= 50 && !isGenerating && !hasPendingTranscription;
+  const spokenLength = useMemo(() => removeRecordingGaps(trimmedTranscript).length, [trimmedTranscript]);
+  const canGenerate = !isClosing && spokenLength >= 50 && !isGenerating && !hasPendingTranscription;
+  // Failed chunks and memory-only copies hold audio no saved transcript covers; Clear asks before deleting it.
+  const retainedAudioCount = recorder.downloadableChunkIds?.length ?? 0;
   const isStarting = !isRecorderSessionActive && recorder.isBusy;
   // A stopped recorder leads: an older close or generation error must not hide it.
   const visibleError =
@@ -590,8 +598,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     void handleGenerateQuestions({ auto: true });
   }, [canGenerate, handleGenerateQuestions, latestSuccessfulTranscriptAt, panelMode, trimmedTranscript]);
 
-  const handleClear = () => {
-    recorder.clearDraft();
+  const handleClear = (discardAudio = false) => {
+    recorder.clearDraft(discardAudio);
     activeGenerationRequestRef.current += 1;
     generationInFlightRef.current = false;
     lastAutoRequestedTranscriptRef.current = trimmedTranscript;
@@ -904,11 +912,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             <button
               type="button"
               className={styles.sessionListeningClearTranscript}
-              onClick={handleClear}
+              onClick={() => (retainedAudioCount ? setConfirmClear(true) : handleClear())}
               disabled={
                 isRecorderSessionActive ||
                 recorder.isBusy ||
-                recorder.segments.some((segment) => segment.status !== 'complete')
+                recorder.segments.some((segment) => !['complete', 'failed'].includes(segment.status))
               }
               aria-label="Clear transcript"
               title="Clear transcript"
@@ -919,6 +927,23 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           </div>
         </div>
       )}
+
+      <CEConfirmDialog
+        isOpen={confirmClear}
+        title="Clear this recording?"
+        body={`This deletes the transcript and the audio still kept for ${retainedAudioCount} ${
+          retainedAudioCount === 1 ? 'chunk' : 'chunks'
+        }. Download any chunk you need first.`}
+        confirmLabel="Clear recording"
+        cancelLabel="Keep recording"
+        danger
+        onCancel={() => setConfirmClear(false)}
+        onConfirm={() => {
+          setConfirmClear(false);
+          handleClear(true);
+        }}
+        testId="ce-recording-clear"
+      />
 
       {hasTranscript && (
         <div className={styles.sessionListeningActions}>
