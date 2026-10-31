@@ -327,12 +327,10 @@ describe('AdminPage rendered interactions', () => {
     expect(screen.queryByText('Chain / Registry')).not.toBeInTheDocument();
     expect(screen.queryByText('Metadata URI')).not.toBeInTheDocument();
     expect(screen.queryByText('On-chain default gate')).not.toBeInTheDocument();
-    expect(within(metadataPanel).getByText('AI defaults')).toBeInTheDocument();
-    expect(within(metadataPanel).getByText('Highlighted question IDs')).toBeInTheDocument();
-    expect(within(metadataPanel).queryByText('Contracts')).not.toBeInTheDocument();
-    expect(within(metadataPanel).queryByText('Ignored SBT list')).not.toBeInTheDocument();
-    expect(within(metadataPanel).queryByText('Start block')).not.toBeInTheDocument();
-    expect(within(metadataPanel).queryByText('Faucet amount (ETH)')).not.toBeInTheDocument();
+    expect(within(metadataPanel).getByRole('link', { name: 'Edit settings' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('/session/worker-admin/settings?worker='),
+    );
     expect(screen.getByTestId('ce-admin-worker-groups')).toHaveTextContent(/Native Worker Groups/i);
     expect(screen.getByTestId('ce-admin-worker-groups')).toHaveTextContent(/Worker-owned participant groups/i);
   });

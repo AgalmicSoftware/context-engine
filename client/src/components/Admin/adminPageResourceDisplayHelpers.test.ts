@@ -17,6 +17,7 @@ import {
   buildAdminLitStatusResource,
   buildAdminLitUnavailableResource,
   getAdminLitResourceLabel,
+  shouldShowInlineResourceSummary,
 } from './adminPageResourceDisplayHelpers';
 
 const shortAddress = (address: unknown) => {
@@ -231,5 +232,16 @@ describe('adminPageResourceDisplayHelpers', () => {
     expect(getAdminLitResourceLabel({})).toBe('Lit sponsorship status');
     expect(getAdminLitResourceLabel({ configuredLitActionCid: 'bafy123' })).toBe('Lit Chipotle status');
     expect(getAdminLitResourceLabel({ hasUsageApiKey: true })).toBe('Lit Chipotle status');
+  });
+
+  it('shows inline resource summaries only for balances, loading, errors, or manual refresh', () => {
+    expect(shouldShowInlineResourceSummary({ display: '0.25 ETH' })).toBe(true);
+    expect(shouldShowInlineResourceSummary({ display: '1.5 AR' })).toBe(true);
+    expect(shouldShowInlineResourceSummary({ display: '0 ETH' })).toBe(false);
+    expect(shouldShowInlineResourceSummary({ manualRefreshAvailable: true })).toBe(true);
+    expect(shouldShowInlineResourceSummary(buildAdminArweaveLoadingResource())).toBe(true);
+    expect(shouldShowInlineResourceSummary(buildAdminArweaveInvalidResource())).toBe(true);
+    expect(shouldShowInlineResourceSummary(buildAdminArweaveEmptyResource())).toBe(false);
+    expect(shouldShowInlineResourceSummary()).toBe(false);
   });
 });

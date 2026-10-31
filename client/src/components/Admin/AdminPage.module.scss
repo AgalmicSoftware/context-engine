@@ -815,86 +815,6 @@ $card-shadow: var(--ce-card-shadow);
   word-break: break-word;
 }
 
-.metadataEditorCard {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border-radius: var(--ce-radius-14);
-  background: color-mix(in srgb, var(--ce-overlay-base) 82%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-}
-
-.metadataEditorIntro {
-  font-size: 0.84rem;
-  line-height: 1.55;
-  color: $admin-muted;
-}
-
-.metadataSectionGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.metadataSectionCard {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px;
-  border-radius: var(--ce-radius-14);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-}
-
-.metadataEditorGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.metadataTextAreaGroup {
-  margin-bottom: 0;
-}
-
-.metadataTextAreaGroup :global(textarea.form-control) {
-  min-height: 96px;
-}
-
-.metadataSelectorGroup {
-  margin-bottom: 0;
-}
-
-.metadataReadonlyGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-.metadataReadonlyItem {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-  border-radius: var(--ce-radius-12);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  background: color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
-}
-
-.metadataReadonlyItem span:first-child,
-.metadataReadonlyItem span:last-child {
-  font-size: 0.74rem;
-  line-height: 1.4;
-  color: color-mix(in srgb, var(--ce-text-inverse) 58%, transparent);
-}
-
-.metadataReadonlyItem strong {
-  color: $admin-text;
-  font-size: 0.9rem;
-  line-height: 1.45;
-  word-break: break-word;
-}
-
 .metadataLink {
   color: $admin-accent;
   text-decoration: none;
@@ -904,27 +824,6 @@ $card-shadow: var(--ce-card-shadow);
 .metadataLink:focus-visible {
   color: var(--ce-status-success-text);
   text-decoration: underline;
-}
-
-.metadataToggle {
-  margin-top: 2px;
-}
-
-.metadataToggleLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.88rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  text-transform: none;
-  color: $admin-muted-strong;
-}
-
-.metadataEditorActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
 }
 
 .resultBox {
@@ -1301,10 +1200,6 @@ $card-shadow: var(--ce-card-shadow);
 }
 
 @media (max-width: 900px) {
-  .metadataSectionGrid {
-    grid-template-columns: 1fr;
-  }
-
   .heroSessionPrimaryRow,
   .heroSessionDetailRow {
     grid-template-columns: 1fr;
@@ -1325,10 +1220,6 @@ $card-shadow: var(--ce-card-shadow);
   .hero,
   .panel {
     padding: 16px;
-  }
-
-  .metadataEditorGrid {
-    grid-template-columns: 1fr;
   }
 
   .litActionRow {

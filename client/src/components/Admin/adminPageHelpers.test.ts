@@ -7,6 +7,7 @@ import {
   normalizeAiProvider,
   normalizeSlug,
   normalizeWorkerUrl,
+  parseChainIdInput,
   resolveAdminCapabilities,
 } from './adminPageHelpers';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
@@ -42,6 +43,13 @@ describe('adminPageHelpers', () => {
     expect(buildTxExplorerUrl('0xabc', 84532)).toMatch(/\/tx\/0xabc$/);
     expect(buildTxExplorerUrl('', 84532)).toBe('');
     expect(buildTxExplorerUrl('0xabc', 0)).toBe('');
+  });
+
+  it('parses chain ids from plain and labelled inputs', () => {
+    expect(parseChainIdInput('OP Sepolia (11155420)')).toBe(11155420);
+    expect(parseChainIdInput(84532)).toBe(84532);
+    expect(parseChainIdInput('')).toBe(0);
+    expect(parseChainIdInput(null)).toBe(0);
   });
 
   it('keeps Worker authority projection-bound and does not infer registry authority from stale fields', () => {

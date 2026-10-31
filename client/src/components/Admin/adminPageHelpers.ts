@@ -24,6 +24,13 @@ export const getChainName = (value: unknown): string => {
   return toStr(chain?.name).trim();
 };
 
+// Reads the chain id from inputs like "84532" or "OP Sepolia (11155420)": the last number wins.
+export const parseChainIdInput = (raw: unknown): number => {
+  const matches = toStr(raw).match(/\d+/g);
+  if (!matches || !matches.length) return 0;
+  return Number(matches[matches.length - 1]) || 0;
+};
+
 export const countSessionsForChain = (entries: unknown = [], chainId: unknown = null): number => {
   const list = Array.isArray(entries) ? entries : [];
   if (!chainId) return list.length;
