@@ -31,6 +31,15 @@ All notable changes to this project will be documented in this file.
 - The Context section on `/new`, on the settings page and, for admins, on the session page takes files (PDF, Markdown, text, CSV, JSON) and links for the session's AI. Each item is for everyone or for admins only; others don't see the section while the session has no context.
 - Question generation and the voice interviewer read the session's notes and links, plus the files and links the person may read, as untrusted background.
 - Setup and the settings page check context against shared limits: up to 6 paragraphs of 2,000 characters, 8 https links, and no text that looks like a secret.
+- GPT-5 and GPT-6 requests send their JSON schema in the form every released Session Worker passes to OpenAI, so question generation, summaries, profile analysis, tags and the AI filter keep working on Workers from 0.6 to 0.8.1.
+- A session that stores no AI model, and the admin AI test, let the Worker pick the model, so 0.8.0 and 0.8.1 Workers don't refuse them.
+- Transcription with models other than whisper-1 sends audio in pieces of at most five minutes, so long recordings and uploads aren't cut short.
+- The settings page shows the highlighted and hidden lists read-only on an older Session Worker instead of failing the whole save, and checks only an edited context against the context rules. On-chain saves keep an older "don't feature SBTs" choice and AI provider, check the admin wallet's account and network before the paid upload, and offer "Retry the Worker sync" after a failed sync.
+- When a session's metadata can't be loaded, the page keeps its last usable name, Worker link and settings, so the settings page can't publish a stripped copy.
+- Clearing the cache also drops writes still waiting to save, and the cache keeps working when the browser blocks site storage.
+- SBT pages show the chain's holder count, not 0, until a full count loads.
+- An already-saved interview answer reports "Responses already saved" while another answer has an unsent edit, and a tag removed while AI suggestions load stays removed.
+- A link padded with thousands of `=` no longer freezes the page, and a setup link opened over a draft with a problem lists what it changes.
 
 ### Workers — requires redeployment
 
@@ -44,11 +53,19 @@ All notable changes to this project will be documented in this file.
 - `fetch_url` and `fetch_image` need https on a public host and give up after 10 seconds; `fetch_url` also reads plain text and Markdown.
 - Agent-proposed questions are no longer tagged "object".
 - GPT-6.1 models use the Responses API, and every model is sent a reasoning effort it accepts.
-- Claude requests carry the session's effort and any JSON schema. A refusal or an empty answer returns HTTP 422 instead of an empty reply.
+- Requests to Claude 5.x, Opus 4.5 or later and Sonnet 4.6 or later carry the session's effort and any JSON schema. A refusal or an empty answer returns HTTP 422 instead of an empty reply.
 - Interview mapping can run at medium effort on a low-effort session, and the interview opening allows 2,000 tokens, so models that think have room to answer.
 - Results analysis accepts JSON wrapped in a code fence. Agent results record the model that actually ran.
 - Wrapped posters use gpt-image-2.5-flare.
 - Storage export manifests drop `rewrapRequiredForNewDeployment`, the deprecated copy of `deploymentKekContinuityRequired`, and Lit requests no longer read the retired `gateChainId` field; send `chainId`.
+- After an upgrade from 0.8.0, a restore that 0.8.0 had already published is finished, instead of being offered for abandonment or deleted when it expires.
+- A retried answer upload keeps its own storage ID, so a stalled first attempt that finishes late can't make the saved answer unreadable; the late attempt removes its own copy.
+- An agent's overlapping next-question requests are handled one at a time, so none repeats a question or loses history, and a repeated `requestId` returns the same question. A restore target that holds agent question state is no longer treated as empty.
+- Session context accepts Wikipedia, Notion and block-explorer links. The secret check also refuses Telegram bot tokens, RPC links carrying an Alchemy or Infura key, and Stripe and Hugging Face keys.
+
+### Benchmark
+
+- `answer --resume` asks again when the endpoint, model settings, routing or answer schema change. Answers saved by earlier versions are asked again once.
 
 ## [0.8.1] - 2026-10-30
 
