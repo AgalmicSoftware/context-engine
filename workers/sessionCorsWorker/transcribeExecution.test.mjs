@@ -349,11 +349,17 @@ test('transcribe preserves upstream error message precedence for string and obje
 });
 
 test('group speaker labels use the bounded diarization model and normalize turns', async () => {
+  const wav = new Uint8Array(48);
+  wav.set(new TextEncoder().encode('RIFF'), 0);
+  wav.set(new TextEncoder().encode('WAVE'), 8);
+  const sample = `data:audio/wav;base64,${Buffer.from(wav).toString('base64')}`;
   const run = async (reply, { label = true, status = 200 } = {}) => {
     const form = new FormData();
     form.append('file', new File(['synthetic'], 'room.webm', { type: 'audio/webm' }));
     form.append('model', label ? 'gpt-4o-transcribe-diarize' : 'whisper-1');
     if (label) { form.append('purpose', 'group-conversation'); form.append('labelSpeakers', 'true'); }
+    form.append('known_speaker_names[]', 'Person 1');
+    form.append('known_speaker_references[]', sample);
     return transcribe({
       request: { formData: async () => form }, secrets: { openaiKey: crypto.randomUUID() },
       deps: {
@@ -362,6 +368,8 @@ test('group speaker labels use the bounded diarization model and normalize turns
           assert.equal(options.body.get('response_format'), label ? 'diarized_json' : 'json');
           assert.equal(options.body.get('chunking_strategy'), label ? 'auto' : null);
           assert.equal(options.body.get('purpose'), null);
+          assert.deepEqual(options.body.getAll('known_speaker_names[]'), label ? ['Person 1'] : []);
+          assert.deepEqual(options.body.getAll('known_speaker_references[]'), label ? [sample] : []);
           return Response.json(reply, { status });
         },
       },

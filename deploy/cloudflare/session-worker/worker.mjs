@@ -89107,6 +89107,37 @@ init_aiRequestPolicy();
 init_stringCoercion();
 var MISSING_TRANSCRIBE_FILE_ERROR = 'Missing file (use field "file"; "audio" also accepted).';
 var MISSING_TRANSCRIBE_RPC_URL_ERROR = "Missing rpcUrl for custom transcription.";
+var MAX_KNOWN_SPEAKERS = 4;
+var MAX_SPEAKER_NAME_LENGTH = 32;
+var MAX_SPEAKER_SAMPLE_LENGTH = 450 * 1024;
+var SPEAKER_NAME = /^[\p{L}\p{N}](?:[\p{L}\p{N} .'_-]*[\p{L}\p{N}.])?$/u;
+var WAV_DATA_URL_PREFIX = "data:audio/wav;base64,";
+var BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+var isWavSample = (value) => {
+  if (typeof value !== "string" || value.length > MAX_SPEAKER_SAMPLE_LENGTH || !value.startsWith(WAV_DATA_URL_PREFIX)) {
+    return false;
+  }
+  const data = value.slice(WAV_DATA_URL_PREFIX.length);
+  if (data.length % 4 || !BASE64.test(data)) return false;
+  const header = atob(data.slice(0, 16));
+  return header.startsWith("RIFF") && header.slice(8, 12) === "WAVE";
+};
+var readKnownSpeakers = (form) => {
+  const all = (field) => typeof form.getAll === "function" ? form.getAll(field) : [];
+  const names2 = all("known_speaker_names[]");
+  const samples = all("known_speaker_references[]");
+  const speakers = [];
+  for (let index = 0; index < Math.min(names2.length, samples.length); index += 1) {
+    if (speakers.length === MAX_KNOWN_SPEAKERS) break;
+    const name = typeof names2[index] === "string" ? names2[index].trim() : "";
+    const duplicate = speakers.some((speaker) => speaker.name.toLowerCase() === name.toLowerCase());
+    if (name.length > MAX_SPEAKER_NAME_LENGTH || !SPEAKER_NAME.test(name) || duplicate || !isWavSample(samples[index])) {
+      continue;
+    }
+    speakers.push({ name, sample: samples[index] });
+  }
+  return speakers;
+};
 var normalizeTranscribeRequestPayload = ({ formData } = {}) => {
   const form = formData && typeof formData.get === "function" ? formData : null;
   if (!form) {
@@ -89151,7 +89182,12 @@ var normalizeTranscribeRequestPayload = ({ formData } = {}) => {
   upstreamFormData.append("file", file, file.name || "audio.mp3");
   upstreamFormData.append("model", model);
   upstreamFormData.append("response_format", groupSpeakerLabels ? "diarized_json" : "json");
-  if (groupSpeakerLabels) upstreamFormData.append("chunking_strategy", "auto");
+  if (groupSpeakerLabels) {
+    upstreamFormData.append("chunking_strategy", "auto");
+    const speakers = readKnownSpeakers(form);
+    for (const { name } of speakers) upstreamFormData.append("known_speaker_names[]", name);
+    for (const { sample } of speakers) upstreamFormData.append("known_speaker_references[]", sample);
+  }
   return {
     ok: true,
     status: 200,

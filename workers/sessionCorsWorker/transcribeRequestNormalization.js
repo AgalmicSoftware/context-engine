@@ -3,6 +3,43 @@ import { toTrimmedString } from './stringCoercion.js';
 export const MISSING_TRANSCRIBE_FILE_ERROR = 'Missing file (use field "file"; "audio" also accepted).';
 export const MISSING_TRANSCRIBE_RPC_URL_ERROR = 'Missing rpcUrl for custom transcription.';
 
+// OpenAI matches voices to at most four known speakers, each a WAV sample of 2–10 seconds. A sample URL may
+// use up to 450 KB (10 seconds of 16 kHz mono audio), so four stay under 2 MB in all.
+const MAX_KNOWN_SPEAKERS = 4;
+const MAX_SPEAKER_NAME_LENGTH = 32;
+const MAX_SPEAKER_SAMPLE_LENGTH = 450 * 1024;
+const SPEAKER_NAME = /^[\p{L}\p{N}](?:[\p{L}\p{N} .'_-]*[\p{L}\p{N}.])?$/u;
+const WAV_DATA_URL_PREFIX = 'data:audio/wav;base64,';
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+
+const isWavSample = (value) => {
+  if (typeof value !== 'string' || value.length > MAX_SPEAKER_SAMPLE_LENGTH || !value.startsWith(WAV_DATA_URL_PREFIX)) {
+    return false;
+  }
+  const data = value.slice(WAV_DATA_URL_PREFIX.length);
+  if (data.length % 4 || !BASE64.test(data)) return false;
+  const header = atob(data.slice(0, 16));
+  return header.startsWith('RIFF') && header.slice(8, 12) === 'WAVE';
+};
+
+// Name and sample pairs for group labels. An invalid pair is dropped; it never fails the chunk.
+const readKnownSpeakers = (form) => {
+  const all = (field) => (typeof form.getAll === 'function' ? form.getAll(field) : []);
+  const names = all('known_speaker_names[]');
+  const samples = all('known_speaker_references[]');
+  const speakers = [];
+  for (let index = 0; index < Math.min(names.length, samples.length); index += 1) {
+    if (speakers.length === MAX_KNOWN_SPEAKERS) break;
+    const name = typeof names[index] === 'string' ? names[index].trim() : '';
+    const duplicate = speakers.some((speaker) => speaker.name.toLowerCase() === name.toLowerCase());
+    if (name.length > MAX_SPEAKER_NAME_LENGTH || !SPEAKER_NAME.test(name) || duplicate || !isWavSample(samples[index])) {
+      continue;
+    }
+    speakers.push({ name, sample: samples[index] });
+  }
+  return speakers;
+};
+
 export const normalizeTranscribeRequestPayload = ({ formData } = {}) => {
   const form = formData && typeof formData.get === 'function' ? formData : null;
   if (!form) {
@@ -50,7 +87,13 @@ export const normalizeTranscribeRequestPayload = ({ formData } = {}) => {
   upstreamFormData.append('file', file, file.name || 'audio.mp3');
   upstreamFormData.append('model', model);
   upstreamFormData.append('response_format', groupSpeakerLabels ? 'diarized_json' : 'json');
-  if (groupSpeakerLabels) upstreamFormData.append('chunking_strategy', 'auto');
+  if (groupSpeakerLabels) {
+    upstreamFormData.append('chunking_strategy', 'auto');
+    // Samples of voices from earlier chunks keep their labels the same in this one.
+    const speakers = readKnownSpeakers(form);
+    for (const { name } of speakers) upstreamFormData.append('known_speaker_names[]', name);
+    for (const { sample } of speakers) upstreamFormData.append('known_speaker_references[]', sample);
+  }
 
   return {
     ok: true,
