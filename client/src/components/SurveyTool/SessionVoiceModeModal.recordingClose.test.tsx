@@ -79,6 +79,11 @@ function dismiss(method: string) {
     fireEvent.click(dialog);
   }
 }
+// While capturing, the header close asks first; Stop goes ahead.
+const confirmStop = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: 'Stop' }));
+  await waitFor(() => expect(screen.queryByText('Stop recording?')).not.toBeInTheDocument());
+};
 const originalRecorder = globalThis.MediaRecorder;
 const originalDevices = navigator.mediaDevices;
 beforeEach(() => {
@@ -105,6 +110,7 @@ it('closing with Close saves the final speech and restores it on reopen', async 
   fireEvent.click(screen.getByTestId('ce-session-listening-start'));
   await screen.findByRole('button', { name: 'Stop recording' });
   dismiss('Close');
+  await confirmStop();
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(transcribeAudio).toHaveBeenCalledTimes(1);
   expect(savedTranscript()).toBe(transcript);
@@ -146,6 +152,7 @@ it('waits for delayed transcription and ignores repeated dismissals', async () =
   fireEvent.click(screen.getByTestId('ce-session-listening-start'));
   await screen.findByRole('button', { name: 'Stop recording' });
   dismiss('Close');
+  await confirmStop();
   expect(await screen.findByText('Finalizing recording…')).toBeInTheDocument();
   dismiss('Escape');
   dismiss('outside click');
@@ -177,6 +184,7 @@ it('keeps failed audio in storage and automatically retries it before closing', 
   fireEvent.click(screen.getByTestId('ce-session-listening-start'));
   await screen.findByRole('button', { name: 'Stop recording' });
   dismiss('Close');
+  await confirmStop();
   expect(await screen.findByText('Retrying')).toBeInTheDocument();
   expect(screen.getByRole('dialog')).toBeInTheDocument();
   expect([...mockRecords.values()][0]?.audio?.size).toBe(256);
@@ -194,6 +202,7 @@ it('closes with pending audio and resumes it when the recording reopens', async 
   fireEvent.click(screen.getByTestId('ce-session-listening-start'));
   await screen.findByRole('button', { name: 'Stop recording' });
   dismiss('Close');
+  await confirmStop();
   fireEvent.click(await screen.findByRole('button', { name: 'Close and keep the audio' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect([...mockRecords.values()][0]?.audio?.size).toBe(256);
@@ -203,4 +212,22 @@ it('closes with pending audio and resumes it when the recording reopens', async 
   expect(savedTranscript()).toBe(transcript);
   expect([...mockRecords.values()][0]?.audio).toBeUndefined();
   expect(transcribeAudio).toHaveBeenCalledTimes(2);
+});
+
+it('asks before the header close stops a recording, and Keep recording goes on capturing', async () => {
+  render(<Harness />);
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
+  fireEvent.click(screen.getByTestId('ce-session-listening-start'));
+  await screen.findByRole('button', { name: 'Stop recording' });
+  dismiss('Close');
+  expect(await screen.findByText('Stop recording?')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Keep recording' }));
+  await waitFor(() => expect(screen.queryByText('Stop recording?')).not.toBeInTheDocument());
+  expect(mockStop).not.toHaveBeenCalled();
+  expect(screen.getByRole('button', { name: 'Stop recording' })).toBeInTheDocument();
+  dismiss('Close');
+  await confirmStop();
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(mockStop).toHaveBeenCalledTimes(1);
+  expect(savedTranscript()).toBe(transcript);
 });

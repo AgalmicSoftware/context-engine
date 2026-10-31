@@ -718,7 +718,11 @@ describe('SessionListeningPanel', () => {
 
     render(<SessionListeningPanel sessionSlug="demo" onClose={onClose} />);
 
+    // A paused recording is still open, so closing asks before it stops.
     fireEvent.click(screen.getByLabelText('Close listening panel'));
+    expect(await screen.findByText('Stop recording?')).toBeInTheDocument();
+    expect(finalizeRecording).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
 
     expect(finalizeRecording).toHaveBeenCalledWith({ waitForTranscription: true });
     expect(onClose).not.toHaveBeenCalled();

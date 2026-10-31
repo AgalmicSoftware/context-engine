@@ -414,6 +414,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmStop, setConfirmStop] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const closingRef = useRef(false);
   const panelRef = useRef<HTMLElement | null>(null);
@@ -546,13 +547,20 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     }
   }, [onClose, finalizeRecording, keepAudio]);
 
+  // Closing during capture would end the recording, so it asks first.
+  const capturingAudio = recorder.isRecording || recorder.isPaused;
+  const requestClose = useCallback(async () => {
+    if (capturingAudio) setConfirmStop(true);
+    else await handleClose();
+  }, [capturingAudio, handleClose]);
+
   useEffect(() => {
     if (!closeActionRef) return;
-    closeActionRef.current = handleClose;
+    closeActionRef.current = requestClose;
     return () => {
       closeActionRef.current = null;
     };
-  }, [closeActionRef, handleClose]);
+  }, [closeActionRef, requestClose]);
 
   const handleGenerateQuestions = useCallback(
     async ({ auto = false }: { auto?: boolean } = {}) => {
@@ -648,7 +656,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
               type="button"
               className={styles.sessionListeningClose}
               onClick={() => {
-                void handleClose();
+                void requestClose();
               }}
               disabled={isClosing}
               aria-label={isClosing ? 'Finalizing recording before closing' : 'Close listening panel'}
@@ -965,6 +973,20 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           </div>
         </div>
       )}
+
+      <CEConfirmDialog
+        isOpen={confirmStop}
+        title="Stop recording?"
+        body="Stop ends the recording and closes once its audio has uploaded."
+        confirmLabel="Stop"
+        cancelLabel="Keep recording"
+        onCancel={() => setConfirmStop(false)}
+        onConfirm={() => {
+          setConfirmStop(false);
+          void handleClose();
+        }}
+        testId="ce-recording-stop"
+      />
 
       <CEConfirmDialog
         isOpen={confirmClear}
