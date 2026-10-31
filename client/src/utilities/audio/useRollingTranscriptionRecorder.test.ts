@@ -47,7 +47,10 @@ describe('useRollingTranscriptionRecorder', () => {
   class MockMediaRecorder {
     static isTypeSupported = jest.fn(() => true);
     static failNextStart = false;
+    // Recorders made while this is set never deliver audio, as when a phone's capture dies without an event.
+    static silent = false;
 
+    silent = MockMediaRecorder.silent;
     stream: MediaStream;
     state: RecordingState = 'inactive';
     ondataavailable: ((event: { data: Blob }) => void) | null = null;
@@ -67,14 +70,16 @@ describe('useRollingTranscriptionRecorder', () => {
       this.state = 'recording';
     });
     requestData = jest.fn(() => {
+      if (this.silent) return;
       this.ondataavailable?.({
         data: new Blob([new Uint8Array(256).fill(instances.indexOf(this) + 1)], { type: 'audio/webm' }),
       });
     });
     stop = jest.fn(() => {
-      this.ondataavailable?.({
-        data: new Blob([new Uint8Array(256).fill(instances.indexOf(this) + 1)], { type: 'audio/webm' }),
-      });
+      if (!this.silent)
+        this.ondataavailable?.({
+          data: new Blob([new Uint8Array(256).fill(instances.indexOf(this) + 1)], { type: 'audio/webm' }),
+        });
       this.state = 'inactive';
       this.onstop?.();
     });
@@ -92,6 +97,7 @@ describe('useRollingTranscriptionRecorder', () => {
     mockChunkRecords.clear();
     instances.length = 0;
     MockMediaRecorder.failNextStart = false;
+    MockMediaRecorder.silent = false;
     (transcribeAudio as jest.Mock).mockImplementation(async (_blob: Blob) => `transcript ${instances.length}`);
 
     originalMediaRecorder = (globalThis as any).MediaRecorder;
@@ -1361,5 +1367,76 @@ describe('useRollingTranscriptionRecorder', () => {
     } finally {
       uninstallLocks();
     }
+  });
+
+  it('restarts the microphone when no audio has arrived for a chunk length and 30 seconds', async () => {
+    let uploads = 0;
+    (transcribeAudio as jest.Mock).mockImplementation(async () => `Chunk ${++uploads}.`);
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'stalled', chunkMs: 60_000 }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+      await jest.advanceTimersByTimeAsync(10_000);
+      instances[0].requestData();
+    });
+    // From now on capture dies without any event; rotating the recorder on the same stream doesn't help.
+    instances[0].silent = MockMediaRecorder.silent = true;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(90_000);
+    });
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+    expect(result.current.captureNotice).toBe('');
+    MockMediaRecorder.silent = false;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(5_000);
+      await flushPromises();
+    });
+    // 95 seconds without audio: a fresh microphone stream and recorder take over.
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+    expect(mockTrack.stop).toHaveBeenCalled();
+    expect(result.current.isRecording).toBe(true);
+    expect(result.current.captureNotice).toBe('No audio arrived for a while, so the microphone was restarted.');
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(20_000);
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(result.current.transcript).toBe('Chunk 1. [No audio for 1 min 35 s.] Chunk 2.');
+    unmount();
+  });
+
+  it('expects no audio while the page is hidden or the device holds the microphone', async () => {
+    const listeners: Record<string, () => void> = {};
+    Object.assign(mockTrack, {
+      addEventListener: (name: string, callback: () => void) => {
+        listeners[name] = callback;
+      },
+    });
+    MockMediaRecorder.silent = true;
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'quiet', chunkMs: 60_000 }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    act(() => listeners.mute());
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(5 * 60_000);
+    });
+    const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    try {
+      await act(async () => {
+        listeners.unmute();
+        await jest.advanceTimersByTimeAsync(5 * 60_000);
+      });
+    } finally {
+      if (visibility) Object.defineProperty(document, 'visibilityState', visibility);
+      else Reflect.deleteProperty(document, 'visibilityState');
+    }
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+    expect(result.current.captureNotice).toBe('');
+    unmount();
   });
 });

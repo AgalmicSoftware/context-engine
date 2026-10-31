@@ -33,6 +33,11 @@ const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error || 'Unknown recording error');
 // How long a stopped recorder gets to hand over its last audio and confirm the stop.
 const STOP_WAIT_MS = 2000;
+// How often to check that audio still arrives. A browser may deliver it only at each chunk's end, so the
+// microphone is restarted only after a chunk length and 30 seconds without any.
+const STALL_CHECK_MS = 5000;
+const STALL_GRACE_MS = 30_000;
+const CAPTURE_RESTARTED_NOTICE = 'No audio arrived for a while, so the microphone was restarted.';
 
 export const useRollingTranscriptionRecorder = ({
   sessionSlug = '',
@@ -78,6 +83,8 @@ export const useRollingTranscriptionRecorder = ({
   // The device took the microphone (a call, Siri) without hiding the page; recording goes on when it returns.
   const [microphonePaused, setMicrophonePaused] = useState(false);
   const mutedAtRef = useRef<number | null>(null);
+  const lastAudioAtRef = useRef(0);
+  const [captureRestarts, setCaptureRestarts] = useState(0);
 
   const streamRef = useRef<MediaStream | null>(null);
   const mountedRef = useRef(false);
@@ -184,6 +191,7 @@ export const useRollingTranscriptionRecorder = ({
       };
       recorder.ondataavailable = (event: BlobEvent) => {
         if (event.data && event.data.size > 0) {
+          lastAudioAtRef.current = Date.now();
           // Timeslice fragments share a container header; persist the cumulative chunk.
           fragments.push(event.data);
           snapshot();
@@ -271,6 +279,111 @@ export const useRollingTranscriptionRecorder = ({
     }, chunkDurationMs);
   }, [chunkDurationMs, clearRotationTimer, rotateRecorder]);
 
+  const watchMicrophone = useCallback(
+    (stream: MediaStream) => {
+      stream.getTracks().forEach((track) => {
+        track.addEventListener?.(
+          'ended',
+          () => {
+            if (streamRef.current !== stream || !recordingActiveRef.current) return;
+            setErrorMessage(
+              'Microphone access ended. Restore microphone permission, then press Record to continue. Saved audio remains available.',
+            );
+            setStatus('error');
+            recordingActiveRef.current = false;
+            clearRotationTimer();
+            stopTimer();
+            stopRecorder(mediaRecorderRef.current, true);
+          },
+          { once: true },
+        );
+        track.addEventListener?.('mute', () => {
+          if (streamRef.current !== stream || !recordingActiveRef.current) return;
+          mutedAtRef.current ??= Date.now();
+          setMicrophonePaused(true);
+        });
+        track.addEventListener?.('unmute', () => {
+          const startedAt = mutedAtRef.current;
+          if (streamRef.current !== stream || startedAt == null) return;
+          mutedAtRef.current = null;
+          setMicrophonePaused(false);
+          // Nothing was captured meanwhile: speech carries on in a new chunk, and the transcript notes the gap.
+          if (mediaRecorderRef.current?.state !== 'recording') return;
+          rotateRecorder({ startedAt, endedAt: Date.now(), cause: 'muted' });
+          startRotationTimer();
+        });
+      });
+    },
+    [clearRotationTimer, rotateRecorder, startRotationTimer, stopRecorder, stopTimer],
+  );
+
+  // Audio stopped arriving with no event, as when a phone's capture dies after an interruption. A new recorder
+  // on the same stream would hear nothing either, so take a fresh microphone stream.
+  const restartCapture = useCallback(async () => {
+    const stalledSince = lastAudioAtRef.current;
+    lastAudioAtRef.current = Date.now();
+    const stalled = mediaRecorderRef.current;
+    // The silent recorder's chunk ends with the audio it delivered, and its stop must not end the recording.
+    mediaRecorderRef.current = null;
+    clearRotationTimer();
+    if (stalled) {
+      try {
+        if (stalled.state !== 'inactive') stalled.stop();
+      } catch (_) {
+        // Its chunk is finished below either way.
+      }
+      finishersRef.current.get(stalled)?.();
+    }
+    stopTracks();
+    setCaptureRestarts((restarts) => restarts + 1);
+    try {
+      const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices, {
+        echoCancellation: !recordSpeakerAudio,
+      });
+      if (!mountedRef.current || !recordingActiveRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      streamRef.current = stream;
+      watchMicrophone(stream);
+      mediaRecorderRef.current = createRecorder(stream, {
+        startedAt: stalledSince,
+        endedAt: Date.now(),
+        cause: 'stalled',
+      });
+      lastAudioAtRef.current = Date.now();
+      startRotationTimer();
+    } catch (error) {
+      if (!mountedRef.current || !recordingActiveRef.current) return;
+      recordingActiveRef.current = false;
+      stopTimer();
+      stopTracks();
+      setErrorMessage(
+        `Recording stopped: no audio arrived and the microphone couldn't restart. Press Record to continue. Saved audio remains available. ${describeError(error)}`,
+      );
+      setStatus('error');
+    }
+  }, [
+    clearRotationTimer,
+    createRecorder,
+    recordSpeakerAudio,
+    startRotationTimer,
+    stopTimer,
+    stopTracks,
+    watchMicrophone,
+  ]);
+
+  useEffect(() => {
+    if (status !== 'recording') return undefined;
+    lastAudioAtRef.current = Date.now();
+    const timer = setInterval(() => {
+      // No audio is expected while the page is hidden or the device holds the microphone.
+      if (document.visibilityState === 'hidden' || mutedAtRef.current != null) lastAudioAtRef.current = Date.now();
+      else if (Date.now() - lastAudioAtRef.current > chunkDurationMs + STALL_GRACE_MS) void restartCapture();
+    }, STALL_CHECK_MS);
+    return () => clearInterval(timer);
+  }, [chunkDurationMs, restartCapture, status]);
+
   const startRecording = useCallback(async () => {
     if (status === 'recording' || status === 'paused' || status === 'requesting') return;
     // Another account's recording, or another tab, holds this one; its notice says what to do.
@@ -301,38 +414,7 @@ export const useRollingTranscriptionRecorder = ({
         return;
       }
       streamRef.current = stream;
-      stream.getTracks().forEach((track) => {
-        track.addEventListener?.(
-          'ended',
-          () => {
-            if (!recordingActiveRef.current) return;
-            setErrorMessage(
-              'Microphone access ended. Restore microphone permission, then press Record to continue. Saved audio remains available.',
-            );
-            setStatus('error');
-            recordingActiveRef.current = false;
-            clearRotationTimer();
-            stopTimer();
-            stopRecorder(mediaRecorderRef.current, true);
-          },
-          { once: true },
-        );
-        track.addEventListener?.('mute', () => {
-          if (streamRef.current !== stream || !recordingActiveRef.current) return;
-          mutedAtRef.current ??= Date.now();
-          setMicrophonePaused(true);
-        });
-        track.addEventListener?.('unmute', () => {
-          const startedAt = mutedAtRef.current;
-          if (streamRef.current !== stream || startedAt == null) return;
-          mutedAtRef.current = null;
-          setMicrophonePaused(false);
-          // Nothing was captured meanwhile: speech carries on in a new chunk, and the transcript notes the gap.
-          if (mediaRecorderRef.current?.state !== 'recording') return;
-          rotateRecorder({ startedAt, endedAt: Date.now(), cause: 'muted' });
-          startRotationTimer();
-        });
-      });
+      watchMicrophone(stream);
       recordingActiveRef.current = true;
       const recorder = createRecorder(stream);
       mediaRecorderRef.current = recorder;
@@ -356,13 +438,12 @@ export const useRollingTranscriptionRecorder = ({
     createRecorder,
     recordSpeakerAudio,
     prepare,
-    rotateRecorder,
-    stopRecorder,
     startElapsedTimer,
     startRotationTimer,
     status,
     stopTimer,
     stopTracks,
+    watchMicrophone,
     chunks.ownerNotice,
     chunks.openElsewhereNotice,
   ]);
@@ -498,6 +579,7 @@ export const useRollingTranscriptionRecorder = ({
     if (status !== 'idle' && status !== 'error') return;
     mutedAtRef.current = null;
     setMicrophonePaused(false);
+    setCaptureRestarts(0);
   }, [status]);
 
   const pendingSegmentCount = segments.filter(
@@ -523,6 +605,9 @@ export const useRollingTranscriptionRecorder = ({
     isBusy: status === 'requesting' || status === 'stopping',
     elapsedSeconds,
     microphonePaused,
+    // Counts microphone restarts in this recording, so a waveform can follow the new stream.
+    captureRestarts,
+    captureNotice: captureRestarts ? CAPTURE_RESTARTED_NOTICE : '',
     transcript,
     segments,
     pendingSegmentCount,

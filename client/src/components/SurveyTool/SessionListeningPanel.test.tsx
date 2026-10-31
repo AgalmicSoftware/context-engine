@@ -1031,3 +1031,20 @@ it('keeps Record off while another tab has the recording open', () => {
   expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START)).toBeDisabled();
   expect(screen.getByRole('alert')).toHaveTextContent('This recording is open in another tab.');
 });
+
+it('says when the recorder restarted the microphone because no audio arrived', () => {
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({
+      isRecording: true,
+      status: 'recording',
+      wakeLockHeld: true,
+      captureRestarts: 1,
+      captureNotice: 'No audio arrived for a while, so the microphone was restarted.',
+    }),
+  );
+  render(<SessionListeningPanel sessionSlug="room" panelMode="recordGroup" />);
+  expect(screen.getByText('No audio arrived for a while, so the microphone was restarted.')).toHaveAttribute(
+    'role',
+    'status',
+  );
+});

@@ -819,6 +819,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           </Button>
         </div>
       ) : null}
+      {isRecorderSessionActive && recorder.captureNotice ? (
+        <div className={styles.sessionRecordingWakeNotice} role="status">
+          {recorder.captureNotice}
+        </div>
+      ) : null}
       {isRecorderSessionActive && recorder.microphonePaused ? (
         <div className={styles.sessionRecordingWakeNotice} role="status">
           Microphone paused by the device. Recording resumes when it returns.
@@ -840,6 +845,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         <div className={styles.sessionListeningActiveRecorder}>
           <div className={styles.sessionListeningWaveformShell}>
             <SessionListeningWaveform
+              key={recorder.captureRestarts}
               streamRef={recorder.mediaStreamRef}
               isActive={isRecorderSessionActive}
               isPaused={recorder.isPaused}
