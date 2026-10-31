@@ -1022,3 +1022,12 @@ it('says when the device has paused the microphone, and that recording resumes',
   expect(screen.queryByText(/Microphone paused by the device/)).not.toBeInTheDocument();
   expect(screen.getByText('Recording')).toBeInTheDocument();
 });
+
+it('keeps Record off while another tab has the recording open', () => {
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({ openElsewhere: true, errorMessage: 'This recording is open in another tab.' }),
+  );
+  render(<SessionListeningPanel sessionSlug="room" />);
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START)).toBeDisabled();
+  expect(screen.getByRole('alert')).toHaveTextContent('This recording is open in another tab.');
+});

@@ -273,8 +273,8 @@ export const useRollingTranscriptionRecorder = ({
 
   const startRecording = useCallback(async () => {
     if (status === 'recording' || status === 'paused' || status === 'requesting') return;
-    // Another account's recording is still open; its notice says what to do.
-    if (chunks.ownerNotice) return;
+    // Another account's recording, or another tab, holds this one; its notice says what to do.
+    if (chunks.ownerNotice || chunks.openElsewhereNotice) return;
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setErrorMessage('Microphone recording is not available in this browser.');
       setStatus('error');
@@ -364,6 +364,7 @@ export const useRollingTranscriptionRecorder = ({
     stopTimer,
     stopTracks,
     chunks.ownerNotice,
+    chunks.openElsewhereNotice,
   ]);
 
   const pauseRecording = useCallback(() => {
@@ -514,6 +515,7 @@ export const useRollingTranscriptionRecorder = ({
     dismissHiddenPeriods: chunks.dismissHiddenPeriods,
     downloadableChunkIds: chunks.downloadableChunkIds,
     ownerNotice: chunks.ownerNotice,
+    openElsewhere: Boolean(chunks.openElsewhereNotice),
     status,
     isRecording: status === 'recording',
     isPaused: status === 'paused',
@@ -529,6 +531,7 @@ export const useRollingTranscriptionRecorder = ({
     errorMessage: [
       errorMessage,
       chunks.ownerNotice,
+      chunks.openElsewhereNotice,
       chunks.storageError,
       chunks.offline ? 'Offline. Audio stays on this device; reconnect to resume uploads in order.' : '',
     ]

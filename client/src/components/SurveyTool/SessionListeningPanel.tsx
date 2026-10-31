@@ -894,7 +894,13 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
               recordPressedRef.current = true;
               void recorder.startRecording();
             }}
-            disabled={isClosing || recorder.isBusy || isPreparingRecording || Boolean(recorder.ownerNotice)}
+            disabled={
+              isClosing ||
+              recorder.isBusy ||
+              isPreparingRecording ||
+              Boolean(recorder.ownerNotice) ||
+              recorder.openElsewhere
+            }
             data-testid={E2E_TESTIDS.SESSION_LISTENING_START}
           >
             <span className={styles.sessionListeningRecordIcon}>

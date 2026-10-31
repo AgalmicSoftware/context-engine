@@ -1,12 +1,13 @@
 /**
  * Thirty minutes of breakout recording through the real recorder hook, chunk queue, transcription client
  * and Worker transport. Only the edges are fake: MediaRecorder and the microphone, timers, the IndexedDB
- * store, audio decoding and the Session Worker's /transcribe replies. A reload loads fresh modules, so
- * nothing survives it that a real reload would lose.
+ * store, Web Locks, audio decoding and the Session Worker's /transcribe replies. A reload loads fresh
+ * modules, so nothing survives it that a real reload would lose.
  */
 import React from 'react';
 import { act, renderHook, type RenderHookResult } from '@testing-library/react';
 import type { RecordingChunk } from './recordingChunkStore';
+import { installFakeWebLocks } from './webLocks.testUtils';
 
 type RecorderHook = typeof import('./useRollingTranscriptionRecorder').useRollingTranscriptionRecorder;
 type Recorder = ReturnType<RecorderHook>;
@@ -239,7 +240,9 @@ const getUserMedia = jest.fn(async () => {
   return { getTracks: () => [track], getAudioTracks: () => [track] };
 });
 
+let uninstallLocks = () => {};
 beforeEach(() => {
+  uninstallLocks = installFakeWebLocks();
   jest.useFakeTimers();
   jest.setSystemTime(START);
   window.sessionStorage.clear();
@@ -263,6 +266,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  uninstallLocks();
   jest.clearAllTimers();
   jest.useRealTimers();
   restore(globalThis, 'MediaRecorder', descriptors.MediaRecorder);

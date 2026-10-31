@@ -3,6 +3,7 @@ import { useRollingTranscriptionRecorder } from './useRollingTranscriptionRecord
 import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
 import { clearRecordingChunks, listRecordingChunks, putRecordingChunk } from './recordingChunkStore';
 import { cutSpeakerSamples } from './speakerSamples';
+import { installFakeWebLocks } from './webLocks.testUtils';
 
 jest.mock('../ai/aiClient.js', () => ({
   transcribeAudio: jest.fn(),
@@ -1318,5 +1319,47 @@ describe('useRollingTranscriptionRecorder', () => {
       restored.result.current.segments.map((segment) => segment.speakerTurns?.map((entry) => entry.speaker)),
     ).toEqual([['Person 1'], ['Person 1']]);
     restored.unmount();
+  });
+  it('lets one tab at a time open a recording, and hands it over when that tab closes', async () => {
+    const uninstallLocks = installFakeWebLocks();
+    try {
+      (transcribeAudio as jest.Mock).mockImplementation(() => new Promise(() => {}));
+      const first = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'two-tabs' }));
+      await act(async () => {
+        await flushPromises();
+        await first.result.current.startRecording();
+      });
+      expect(first.result.current.isRecording).toBe(true);
+      const second = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'two-tabs' }));
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1000);
+      });
+      expect(first.result.current.openElsewhere).toBe(false);
+      expect(second.result.current.openElsewhere).toBe(true);
+      expect(second.result.current.errorMessage).toBe('This recording is open in another tab.');
+      await act(async () => {
+        await second.result.current.startRecording();
+      });
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+      // The first tab stops, keeps its unsent chunk and closes; the second takes over and uploads it.
+      await act(async () => {
+        await first.result.current.stopRecording();
+        await first.result.current.keepAudio();
+        await flushPromises();
+      });
+      expect(transcribeAudio).toHaveBeenCalledTimes(1);
+      (transcribeAudio as jest.Mock).mockImplementation(async () => 'Uploaded by the second tab.');
+      first.unmount();
+      await act(async () => {
+        await flushPromises();
+      });
+      expect(second.result.current.openElsewhere).toBe(false);
+      expect(second.result.current.errorMessage).toBe('');
+      expect(second.result.current.transcript).toBe('Uploaded by the second tab.');
+      expect(transcribeAudio).toHaveBeenCalledTimes(2);
+      second.unmount();
+    } finally {
+      uninstallLocks();
+    }
   });
 });

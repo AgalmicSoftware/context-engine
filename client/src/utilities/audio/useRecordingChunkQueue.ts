@@ -38,6 +38,9 @@ const scopeAccount = (scope: string): string => {
     return '';
   }
 };
+const OPEN_ELSEWHERE_NOTICE = 'This recording is open in another tab.';
+// Reopening in the same tab gets the lock back at once; only a longer wait means another tab holds it.
+const OPEN_ELSEWHERE_WAIT_MS = 1000;
 const OWNER_NOTICE =
   'This recording belongs to the account that made it. It closes when its uploads finish and its audio is saved, or when you clear it. Download any audio you need first.';
 
@@ -62,6 +65,7 @@ export function useRecordingChunkQueue(options: Options) {
   const [labelsUnavailableReason, setLabelsUnavailableReason] = useState('');
   const [hiddenPeriods, setHiddenPeriods] = useState<Array<{ startedAt: number; endedAt: number }>>([]);
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && navigator.onLine === false);
+  const [openElsewhere, setOpenElsewhere] = useState(false);
   const account =
     options.context && typeof options.context === 'object' && 'account' in options.context
       ? String(options.context.account || '')
@@ -98,52 +102,93 @@ export function useRecordingChunkQueue(options: Options) {
     openScope.current = scope;
     setSegments([]);
     setHiddenPeriods([]);
-    const queue = new RecordingChunkQueue({
-      scope,
-      transcribe: async (audio, labels, signal, knownSpeakers) => {
-        const request = { ...latest.current, signal };
-        if (labels) {
-          const result = await transcribeGroupAudio(audio, { ...request, knownSpeakers });
-          return {
-            text: result.text,
-            speakerTurns: result.segments,
-            labelsUnavailableReason: result.labelsUnavailableReason,
-            speakerSamplesRefused: result.speakerSamplesRefused,
-          };
-        }
-        return { text: await transcribeAudio(audio, request) };
-      },
-      onChange: () => {
-        if (!current) return;
-        const next = queue.segments;
-        setSegments(next);
-        setDownloadableChunkIds(
-          [...queue.records.values()].filter((record) => record.audio?.size).map((record) => record.segment.id),
-        );
-        setStorageError(queue.storageError);
-        setUnsavedAudio(queue.unsavedAudio);
-        setLabelsUnavailableReason(queue.labelsUnavailableReason);
-        setHiddenPeriods(
-          queue.hiddenPeriods.flatMap(({ startedAt, endedAt }) => (endedAt == null ? [] : [{ startedAt, endedAt }])),
-        );
-      },
-    });
-    queueRef.current = queue;
-    const onOnline = () => {
-      setOffline(false);
-      void queue.reconnect();
+    setOpenElsewhere(false);
+    const open = () => {
+      const queue = new RecordingChunkQueue({
+        scope,
+        transcribe: async (audio, labels, signal, knownSpeakers) => {
+          const request = { ...latest.current, signal };
+          if (labels) {
+            const result = await transcribeGroupAudio(audio, { ...request, knownSpeakers });
+            return {
+              text: result.text,
+              speakerTurns: result.segments,
+              labelsUnavailableReason: result.labelsUnavailableReason,
+              speakerSamplesRefused: result.speakerSamplesRefused,
+            };
+          }
+          return { text: await transcribeAudio(audio, request) };
+        },
+        onChange: () => {
+          if (!current) return;
+          const next = queue.segments;
+          setSegments(next);
+          setDownloadableChunkIds(
+            [...queue.records.values()].filter((record) => record.audio?.size).map((record) => record.segment.id),
+          );
+          setStorageError(queue.storageError);
+          setUnsavedAudio(queue.unsavedAudio);
+          setLabelsUnavailableReason(queue.labelsUnavailableReason);
+          setHiddenPeriods(
+            queue.hiddenPeriods.flatMap(({ startedAt, endedAt }) => (endedAt == null ? [] : [{ startedAt, endedAt }])),
+          );
+        },
+      });
+      queueRef.current = queue;
+      const onOnline = () => {
+        setOffline(false);
+        void queue.reconnect();
+      };
+      const onOffline = () => {
+        setOffline(true);
+      };
+      window.addEventListener('online', onOnline);
+      window.addEventListener('offline', onOffline);
+      return () => {
+        if (queueRef.current === queue) queueRef.current = null;
+        queue.dispose();
+        window.removeEventListener('online', onOnline);
+        window.removeEventListener('offline', onOffline);
+        return queue.settled();
+      };
     };
-    const onOffline = () => {
-      setOffline(true);
-    };
-    window.addEventListener('online', onOnline);
-    window.addEventListener('offline', onOffline);
-    return () => {
+    const finish = () => {
       current = false;
       openScope.current = '';
-      queue.dispose();
-      window.removeEventListener('online', onOnline);
-      window.removeEventListener('offline', onOffline);
+    };
+    // One tab at a time opens a recording, so two never upload the same chunks; another tab waits its turn.
+    // Without Web Locks every tab opens it, as before.
+    const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+    if (!locks?.request) {
+      const close = open();
+      return () => {
+        finish();
+        void close();
+      };
+    }
+    const abort = new AbortController();
+    let close: (() => Promise<unknown>) | undefined;
+    let release = () => {};
+    const waiting = setTimeout(() => setOpenElsewhere(true), OPEN_ELSEWHERE_WAIT_MS);
+    locks
+      .request(`ce-recording:${scope}`, { signal: abort.signal }, () => {
+        clearTimeout(waiting);
+        if (!current) return undefined;
+        setOpenElsewhere(false);
+        close = open();
+        return new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      })
+      .catch(() => {
+        // Closed before this tab's turn came.
+      });
+    return () => {
+      finish();
+      clearTimeout(waiting);
+      abort.abort();
+      // The next tab gets the recording once this one's last saves are done.
+      void Promise.resolve(close?.()).finally(release);
     };
   }, [scope, options.sessionSlug]);
   // An open recording that now belongs to another account is released only once nothing would be lost: no
@@ -163,7 +208,7 @@ export function useRecordingChunkQueue(options: Options) {
 
   const prepare = useCallback(async () => {
     const queue = queueRef.current;
-    if (!queue) throw new Error('Audio storage is not ready. Reopen the recorder.');
+    if (!queue) throw new Error(OPEN_ELSEWHERE_NOTICE);
     // Pin before awaiting storage or microphone access: account hydration can run during either.
     pinned.current = { identity, scope };
     memoryScopes.set(identity, scope);
@@ -232,5 +277,6 @@ export function useRecordingChunkQueue(options: Options) {
     offline,
     labelsUnavailableReason,
     ownerNotice: foreignPin && !options.capturing ? OWNER_NOTICE : '',
+    openElsewhereNotice: openElsewhere ? OPEN_ELSEWHERE_NOTICE : '',
   };
 }
