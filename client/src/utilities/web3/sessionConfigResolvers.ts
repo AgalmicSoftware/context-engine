@@ -165,14 +165,9 @@ export function resolveDemoSessionBySlug(
 // --- Tiny helpers: session config & lists + chain label (additive) ---
 export { normalizeSessionSlug };
 
-// Session-first aliases (legacy group naming remains supported).
-// Legacy alias removed — function is now normalizeSessionSlug directly.
-
 export function getDefaultSessionConfig(): SessionConfigLike | null {
   return normalizeResolvedSessionConfig(resolveSessionConfigEntry(''), { normalizeRegistry: true });
 }
-
-// Legacy alias removed — function is now getDefaultSessionConfig directly.
 
 export function getSessionConfigBySlug(slugOrEmpty: unknown): SessionConfigLike | null {
   const resolved = resolveSessionConfigEntry(slugOrEmpty === undefined ? '' : slugOrEmpty);
@@ -183,8 +178,6 @@ export function getSessionConfigBySlug(slugOrEmpty: unknown): SessionConfigLike 
   }
   return normalizeResolvedSessionConfig(resolved);
 }
-
-// Legacy alias removed — function is now getSessionConfigBySlug directly.
 
 export function getDemoSessionConfigBySlug(
   slugOrEmpty: unknown,
@@ -202,8 +195,6 @@ export function getSessionConfigBySlugOrDefault(slugOrEmpty: unknown): SessionCo
   return null;
 }
 
-// Legacy alias removed — function is now getSessionConfigBySlugOrDefault directly.
-
 export function getAllSessionEntries(): SessionConfigEntry[] {
   const cached = sessionRegistryStore.getAllSessionEntries();
   if (cached && cached.length) {
@@ -215,8 +206,6 @@ export function getAllSessionEntries(): SessionConfigEntry[] {
   if (!defaultStrictAllowDemoFallback()) return [];
   return getAllDemoSessionConfigs() as SessionConfigEntry[];
 }
-
-// Legacy alias removed — function is now getAllSessionEntries directly.
 
 export function getAllSessionSlugs(opts: { includeEmpty?: boolean } = {}): string[] {
   const includeEmpty = opts && Object.prototype.hasOwnProperty.call(opts, 'includeEmpty') ? !!opts.includeEmpty : true;

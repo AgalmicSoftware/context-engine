@@ -298,7 +298,7 @@ test('pure low-level re-export barrels are pass-through facade violations', () =
   });
 });
 
-test('naming-migration aliases may re-export canonical low-level modules', () => {
+test('a naming-migration comment does not exempt a pass-through facade', () => {
   withTempRoot((rootDir) => {
     writeFile(
       rootDir,
@@ -313,7 +313,14 @@ test('naming-migration aliases may re-export canonical low-level modules', () =>
       `
     );
 
-    assert.deepEqual(collectClientBoundaryViolations({ rootDir }), []);
+    assert.deepEqual(collectClientBoundaryViolations({ rootDir }), [
+      {
+        rule: 'no-passthrough-facade',
+        source: 'client/src/utilities/web3/legacyChainReads.ts',
+        import: '<passthrough-facade>',
+        resolved: 'client/src/utilities/web3/legacyChainReads.ts',
+      },
+    ]);
   });
 });
 

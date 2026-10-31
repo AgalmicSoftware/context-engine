@@ -193,8 +193,6 @@ const resolveSessionConfig = (slugIn = ''): SessionConfig | null => {
   return isObj(demoConfig) ? (demoConfig as SessionConfig) : null;
 };
 
-// Legacy alias removed — function is now resolveSessionConfig directly.
-
 const resolveSessionArweaveKey = async (
   sessionCfg: SessionConfig | null,
   context: ResourceKeyResolutionContext = {},

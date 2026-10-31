@@ -675,8 +675,6 @@ const resolveSessionConfigEntry = (slugIn = '', suppliedConfig?: unknown) => {
   };
 };
 
-// Legacy alias removed — function is now resolveSessionConfigEntry directly.
-
 const getActiveSessionSlugFromStore = (): string => {
   try {
     return resolveActiveSessionSlug(asRecord(store?.getState?.()?.sessionState));
@@ -684,8 +682,6 @@ const getActiveSessionSlugFromStore = (): string => {
     return '';
   }
 };
-
-// Legacy alias removed — function is now getActiveSessionSlugFromStore directly.
 
 export const getSessionAiSettings = (slugIn = '', sessionConfig?: unknown): NormalizedAiSettings => {
   const resolved = resolveSessionConfigEntry(slugIn, sessionConfig);
@@ -699,8 +695,6 @@ export const getSessionAiSettings = (slugIn = '', sessionConfig?: unknown): Norm
     _sessionConfigSource: resolved.sessionConfigSource || 'missing',
   };
 };
-
-// Legacy alias removed — function is now getSessionAiSettings directly.
 
 export const getLocalAiSettings = (): NormalizedAiSettings => {
   const result = readLocalAiSettingsEnvelope();
