@@ -57,4 +57,31 @@ describe('omitConcealedInterviewFacts', () => {
 
     expect(voiceContext(packet, edited)).toBe('Lives near the river.\nMy own note.');
   });
+
+  const levy = { fact: 'Backs the transit levy', relatedQuestionIds: ['q-hidden'] };
+
+  it('removes a concealed fact quoted inside the summary, whatever its case', () => {
+    const packet = packetWith([levy], 'Lena rents near the station. Backs the transit levy. Works nights.');
+
+    expect(voiceContext(packet)).toBe('Lena rents near the station. Works nights.');
+    expect(voiceContext(packet, 'Lena backs the transit levy, and works nights.')).toBe('Lena and works nights.');
+  });
+
+  it('removes a concealed fact from edited lines such as "- fact" and "fact."', () => {
+    const packet = packetWith([levy, { fact: 'Has two children' }]);
+
+    expect(voiceContext(packet, '- Backs the transit levy\nHas two children\nBacks the transit levy.')).toBe(
+      'Has two children',
+    );
+  });
+
+  it('keeps a shown fact that contains the concealed words, and words that only start the same', () => {
+    const packet = packetWith(
+      [levy, { fact: 'Backs the transit levy for night buses', relatedQuestionIds: ['q-shown'] }],
+      'Backs the transit levy for night buses. Backs the transit levy.',
+    );
+
+    expect(voiceContext(packet)).toBe('Backs the transit levy for night buses.');
+    expect(voiceContext(packet, 'Backs the transit levying plan.')).toBe('Backs the transit levying plan.');
+  });
 });

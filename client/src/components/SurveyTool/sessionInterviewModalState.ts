@@ -32,6 +32,30 @@ export const displayResponderContext = (packet: InterviewPrefillPacket | null): 
 };
 
 const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const isWordCharacter = (character = ''): boolean => /[\p{L}\p{M}\p{N}_]/u.test(character);
+
+/** Where a phrase appears as whole words, ignoring case, as [start, end) spans. */
+const findWholePhrase = (text: string, phrase: string): Array<[number, number]> => {
+  const spans: Array<[number, number]> = [];
+  const pattern = new RegExp(escapeRegExp(phrase), 'giu');
+  for (let match = pattern.exec(text); match; match = pattern.exec(text)) {
+    const start = match.index;
+    const end = start + match[0].length;
+    // Step one character, so a match rejected below cannot hide a whole-word match inside it.
+    pattern.lastIndex = start + 1;
+    const wholeStart = !isWordCharacter(text[start]) || !isWordCharacter(text[start - 1]);
+    const wholeEnd = !isWordCharacter(text[end - 1]) || !isWordCharacter(text[end]);
+    if (wholeStart && wholeEnd) spans.push([start, end]);
+  }
+  return spans;
+};
+
+// Where a fact was cut, drop the punctuation left standing alone and spare spaces.
+const tidyCutLine = (line: string): string =>
+  line
+    .replace(/(^|\s)[.,;:!?]+(?=\s|$)/g, '$1')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
 
 export const omitConcealedInterviewFacts = (
   context: string,
@@ -45,15 +69,26 @@ export const omitConcealedInterviewFacts = (
     const ids = (entry.relatedQuestionIds || []).filter((id) => questionIds.has(id));
     return { fact: String(entry.fact || '').trim(), concealed: ids.length > 0 && ids.every(isConcealed) };
   });
-  const shown = new Set(facts.filter(({ concealed }) => !concealed).map(({ fact }) => fact));
-  let filtered = context;
+  // A concealed fact goes wherever it appears as whole words, the summary and edited lines included,
+  // except inside a shown fact: those spans stay, so a shown fact with the same words is kept whole.
+  const cut = new Uint8Array(context.length);
   for (const { fact, concealed } of facts) {
-    if (!fact || !concealed || shown.has(fact)) continue;
-    // Imported facts can also have been copied into the editable context field, one per line. A concealed
-    // fact goes only where it stands as whole lines, so the same words inside another fact stay.
-    filtered = filtered.replace(new RegExp(`^[^\\S\\n]*${escapeRegExp(fact)}[^\\S\\n]*(?:\\n|$)`, 'gm'), '');
+    if (fact && concealed) for (const [start, end] of findWholePhrase(context, fact)) cut.fill(1, start, end);
   }
-  return filtered.trim();
+  for (const { fact, concealed } of facts) {
+    if (fact && !concealed) for (const [start, end] of findWholePhrase(context, fact)) cut.fill(0, start, end);
+  }
+  // Line breaks stay, so each line can be compared with the original; a cut line left without words goes.
+  const originalLines = context.split('\n');
+  return context
+    .split('')
+    .filter((character, index) => !cut[index] || character === '\n')
+    .join('')
+    .split('\n')
+    .map((line, index) => (line === originalLines[index] ? line : tidyCutLine(line)))
+    .filter((line, index) => line === originalLines[index] || /[\p{L}\p{N}]/u.test(line))
+    .join('\n')
+    .trim();
 };
 
 /** "ChatGPT", "Claude" or "Other": the platform an AI prefill reports for itself. */
