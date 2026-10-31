@@ -244,6 +244,7 @@
   "SETUP_WITH_AI_COPY": "ce-setup-with-ai-copy",
   "SESSION_SETTINGS_PAGE": "ce-settings-page",
   "SESSION_SETTINGS_GROUP_RECORDER_LINK": "ce-settings-group-recorder-link",
+  "SESSION_JOIN_GROUP_RECORDER_LINK": "ce-join-group-recorder-link",
   "SESSION_SETTINGS_AUTHORITY_CHANGES": "ce-settings-authority-changes",
   "SESSION_SETTINGS_CONTENT_CHANGES": "ce-settings-content-changes",
   "SESSION_SETTINGS_STATUS": "ce-settings-status",

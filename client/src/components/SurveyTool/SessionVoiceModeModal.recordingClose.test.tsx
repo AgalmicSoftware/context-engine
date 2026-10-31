@@ -104,6 +104,22 @@ afterEach(() => {
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: originalDevices });
 });
 
+it('opens the recorder without the microphone, and records only after Record once the microphone is granted', async () => {
+  const getUserMedia = jest.mocked(navigator.mediaDevices.getUserMedia);
+  getUserMedia.mockRejectedValueOnce(new DOMException('Permission denied', 'NotAllowedError'));
+  render(<Harness />);
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
+  expect(getUserMedia).not.toHaveBeenCalled();
+  // A refused microphone records nothing.
+  fireEvent.click(screen.getByTestId('ce-session-listening-start'));
+  await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
+  expect(screen.queryByRole('button', { name: 'Stop recording' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId('ce-session-listening-start'));
+  expect(await screen.findByRole('button', { name: 'Stop recording' })).toBeInTheDocument();
+  expect(getUserMedia).toHaveBeenCalledTimes(2);
+});
+
 it('closing with Close saves the final speech and restores it on reopen', async () => {
   render(<Harness />);
   await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());

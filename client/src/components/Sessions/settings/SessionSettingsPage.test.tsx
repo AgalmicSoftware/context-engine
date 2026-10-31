@@ -4,7 +4,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../../utilities/session/sessionModeProfile';
 import { GROUP_CONVERSATION_MODE_QUERY_VALUE } from '../../SurveyTool/sessionVoiceModeQuery';
-import SessionSettingsPage, { buildGroupRecorderLink, isSessionAdmin } from './SessionSettingsPage';
+import SessionSettingsPage, { isSessionAdmin } from './SessionSettingsPage';
+import { buildGroupRecorderLink } from '../sessionWizardUrlSupport';
 
 const mockFetchBootstrap = jest.fn();
 const mockUpsertBootstrap = jest.fn();
@@ -250,7 +251,7 @@ describe('SessionSettingsPage', () => {
     expect(link.pathname).toBe('/session/edit-salon');
     expect(link.searchParams.get('mode')).toBe(GROUP_CONVERSATION_MODE_QUERY_VALUE);
     expect(link.searchParams.get('worker')).toBe(WORKER);
-    expect(buildGroupRecorderLink('edit-salon', '', 'https://contextengine.sh')).toBe(
+    expect(buildGroupRecorderLink('https://contextengine.sh/session/edit-salon')).toBe(
       `https://contextengine.sh/session/edit-salon?mode=${GROUP_CONVERSATION_MODE_QUERY_VALUE}`,
     );
   });

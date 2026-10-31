@@ -113,3 +113,23 @@ it.each(['not a URL', 'https://wrong.example/path', 'https://fixture:[redacted-e
     expect(screen.queryByText('Checking session compatibility…')).not.toBeInTheDocument();
   },
 );
+
+it.each([
+  ['Worker canonical', 'worker_canonical', `${cleanUrl}&mode=groupRecording`],
+  ['registry', 'registry', 'https://site.example/session/workshop?mode=groupRecording'],
+])('gives admins the group recorder link, with the Worker pin a %s session needs', async (_, mode, expected) => {
+  const props = {
+    sessionUrl: 'https://site.example/session/workshop?mode=recordGroup&token=private',
+    workerUrl: 'https://worker.example/',
+    sessionConfig: { sessionModeProfile: { authority: { mode } } },
+  };
+  const { rerender } = render(<SessionJoinPanel {...props} />);
+  fireEvent.click(screen.getByText('Join'));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeEnabled());
+  // Participants only join; the recorder link is for whoever runs a room.
+  expect(screen.queryByTestId('ce-join-group-recorder-link')).not.toBeInTheDocument();
+  rerender(<SessionJoinPanel {...props} isAdmin />);
+  fireEvent.click(screen.getByTestId('ce-join-group-recorder-link'));
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith(expected));
+  expect(await screen.findByRole('status')).toHaveTextContent('Copied.');
+});

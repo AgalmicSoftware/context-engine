@@ -18,10 +18,13 @@ import { SetupAccessSection, SetupHostingSection, SetupResultsSection } from '..
 import type { SetupSectionKey } from '../setup/SetupPrimitives';
 import { editSessionSetupProfile } from '../setup/sessionSetupProfile';
 import type { SetupDraft } from '../setup/setupSectionTypes';
-import { buildSessionWizardAdminUrl, buildSessionWizardSessionUrl } from '../sessionWizardUrlSupport';
+import {
+  buildGroupRecorderLink,
+  buildSessionWizardAdminUrl,
+  buildSessionWizardSessionUrl,
+} from '../sessionWizardUrlSupport';
 import { canonicalizeSessionWizardJson } from '../sessionWizardCanonicalJson';
 import { setValueAtPath } from '../sessionWizardGateUtils';
-import { buildSessionVoiceModeSearch } from '../../SurveyTool/sessionInterview';
 import { buildTxExplorerUrl } from '../../Admin/adminPageHelpers';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { notify } from '../../../utilities/ui/notify.js';
@@ -94,14 +97,6 @@ export const isSessionAdmin = (config: unknown, account: unknown): boolean => {
     ? [readRegistryFacts(source).adminAddress]
     : [source.adminAddress, ...(Array.isArray(source.adminAddresses) ? source.adminAddresses : [])];
   return !!lower(account) && admins.map(lower).filter(Boolean).includes(lower(account));
-};
-
-// The session link with ?mode=groupRecording, which opens the group recorder.
-export const buildGroupRecorderLink = (slug: string, workerOrigin: string, origin?: string): string => {
-  const sessionUrl = buildSessionWizardSessionUrl({ slug, workerOrigin, origin });
-  if (!sessionUrl) return '';
-  const [base, query = ''] = sessionUrl.split('?');
-  return `${base}${buildSessionVoiceModeSearch(query ? `?${query}` : '', 'recordGroup')}`;
 };
 
 const ChangeList = ({ title, paths, testId }: { title: string; paths: string[]; testId: string }) =>
@@ -235,7 +230,8 @@ const SessionSettingsPage = ({
 
   // An on-chain session's link needs no Worker pin; the registry names its Worker.
   const linkWorker = onChain ? '' : workerOrigin;
-  const groupRecorderLink = buildGroupRecorderLink(sessionSlug, linkWorker);
+  const sessionUrl = buildSessionWizardSessionUrl({ slug: sessionSlug, workerOrigin: linkWorker });
+  const groupRecorderLink = buildGroupRecorderLink(sessionUrl);
   const copyGroupRecorderLink = async () => {
     try {
       await navigator.clipboard.writeText(groupRecorderLink);
@@ -375,7 +371,6 @@ const SessionSettingsPage = ({
 
   const changes = pending.save?.classification;
   const hasChanges = !!pending.save && Object.keys(pending.save.patch).length > 0;
-  const sessionUrl = buildSessionWizardSessionUrl({ slug: sessionSlug, workerOrigin: linkWorker });
   const registryChain = describeChain(facts.registryChainId);
   const stepLabel = (step: OnChainSaveStep) =>
     ({

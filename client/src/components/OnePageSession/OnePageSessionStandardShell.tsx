@@ -475,6 +475,7 @@ export default function OnePageSessionStandardShell({
           sessionUrl={typeof window !== 'undefined' ? window.location.href : undefined}
           sessionSlug={effectiveSlug}
           sessionConfig={resolvedSessionConfig}
+          isAdmin={contextSources.isAdmin}
         />
 
         {showQuestions ? (

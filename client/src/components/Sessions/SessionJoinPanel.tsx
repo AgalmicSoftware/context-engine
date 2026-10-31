@@ -5,14 +5,28 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection';
-import { normalizeShareableWorkerOrigin } from './sessionWizardUrlSupport';
+import { buildGroupRecorderLink, normalizeShareableWorkerOrigin } from './sessionWizardUrlSupport';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildExternalInterviewKickoff } from '../SurveyTool/sessionInterview';
 import { verifyInterviewKickoffCatalog } from '../SurveyTool/sessionInterviewCatalogValidation';
 import styles from './SessionJoinPanel.module.scss';
 
-type Props = { sessionUrl?: string; sessionSlug?: string; workerUrl?: string; sessionConfig?: unknown };
+type Props = {
+  sessionUrl?: string;
+  sessionSlug?: string;
+  workerUrl?: string;
+  sessionConfig?: unknown;
+  /** Admins also get the group recorder link, one per breakout room. */
+  isAdmin?: boolean;
+};
 
-export default function SessionJoinPanel({ sessionUrl, sessionSlug, workerUrl = '', sessionConfig }: Props) {
+export default function SessionJoinPanel({
+  sessionUrl,
+  sessionSlug,
+  workerUrl = '',
+  sessionConfig,
+  isAdmin = false,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [resolvedWorker, setResolvedWorker] = useState({ session: '', url: '' });
   const [attempt, setAttempt] = useState(0);
@@ -41,6 +55,8 @@ export default function SessionJoinPanel({ sessionUrl, sessionSlug, workerUrl = 
       ? `${url.origin}${url.pathname}${pinWorker ? `?${new URLSearchParams({ worker: activeWorker })}` : ''}`
       : '';
   const voiceUrl = returnUrl ? `${returnUrl}${pinWorker ? '&' : '?'}mode=voice` : '';
+  // One recorder link per breakout room; it keeps the voice link's Worker pin.
+  const groupRecorderUrl = isAdmin ? buildGroupRecorderLink(returnUrl) : '';
   const kickoff = returnUrl
     ? buildExternalInterviewKickoff({ workerUrl: activeWorker, sessionSlug: slug, sessionUrl: returnUrl })
     : '';
@@ -113,6 +129,17 @@ export default function SessionJoinPanel({ sessionUrl, sessionSlug, workerUrl = 
                 </button>
               </div>
             </>
+          ) : null}
+          {groupRecorderUrl ? (
+            <button
+              type="button"
+              data-testid={E2E_TESTIDS.SESSION_JOIN_GROUP_RECORDER_LINK}
+              onClick={() => {
+                void copy(groupRecorderUrl);
+              }}
+            >
+              Copy group recorder link
+            </button>
           ) : null}
           <div className={styles.heading}>For your AI</div>
           <button

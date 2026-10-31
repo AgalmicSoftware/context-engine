@@ -2144,7 +2144,12 @@ const AdminPageRuntime = ({
                 </div>
               </div>
               {sessionUrl ? (
-                <SessionJoinPanel sessionUrl={sessionUrl} workerUrl={workerUrl} sessionConfig={selectedConfig} />
+                <SessionJoinPanel
+                  sessionUrl={sessionUrl}
+                  workerUrl={workerUrl}
+                  sessionConfig={selectedConfig}
+                  isAdmin
+                />
               ) : null}
               <div className={styles.heroSessionDetails}>
                 <div className={`${styles.heroSessionDetailRow} ${styles.heroSessionDetailRowAlignStart}`}>

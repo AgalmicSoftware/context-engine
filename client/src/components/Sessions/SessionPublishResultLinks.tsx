@@ -115,7 +115,7 @@ const SessionPublishResultLinks = ({
           </a>
         </div>
       ) : null}
-      {sessionUrl ? <SessionJoinPanel sessionUrl={sessionUrl} /> : null}
+      {sessionUrl ? <SessionJoinPanel sessionUrl={sessionUrl} isAdmin /> : null}
       {onCreateAnotherSession ? (
         <div className={styles.linkRow}>
           <Button type="button" className={styles.secondaryButton} onClick={handleCreateAnotherSession}>
