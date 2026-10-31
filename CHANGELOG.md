@@ -483,6 +483,9 @@ All notable changes to this project will be documented in this file.
   interview no longer replaces them unasked. While questions remain open, the
   voice interviewer asks only about those.
 
+- Update `follow-redirects` to 1.16.2, which fixes a case where custom credential
+  headers could follow a redirect.
+
 ### Workers — requires redeployment
 
 - Clear saved Lit setup only when Lit confirms it is gone (the saved key is refused, or a complete list lacks the saved group or wallet), including after an operator replaces a revoked key, so setup can start over; network, rate-limit and billing errors keep saved progress.
