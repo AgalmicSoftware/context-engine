@@ -31,6 +31,8 @@ Readers drop what a writer would refuse. `set-config` checks a sent
 `sessionContext`, refuses a wrong shape or anything over a limit with `400`,
 and stores the trimmed form; a stored context is never checked, so it cannot
 block other edits.
+Text that looks like a key, token or password (in the title, a paragraph, a
+link or a link source) is refused, as templates already refuse it.
 
 Sources (`shared/sessionContextSources.mjs`):
 
