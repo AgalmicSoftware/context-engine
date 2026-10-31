@@ -21,16 +21,20 @@ export const encodeBase64Url = (bytes) => {
 /** Base64url of the JSON's UTF-8 bytes, without padding. */
 export const encodeLinkJson = (value) => encodeBase64Url(new TextEncoder().encode(JSON.stringify(value)));
 
+const tooLong = (maxLength) =>
+  failure(`This link is longer than ${maxLength.toLocaleString('en-US')} characters, the most this page reads.`);
+
 export const decodeLinkBytes = (value, { maxLength = Infinity } = {}) => {
+  const raw = String(value ?? '');
+  // Measured before any pattern runs, so no regex sees an outsized value;
+  // twice the limit leaves room for a wrapped link's whitespace.
+  if (raw.length > maxLength * 2) return tooLong(maxLength);
   // Wrapped chat links can carry line breaks and spaces (reading the fragment
-  // also turns "+" into a space), so whitespace is dropped, as is "=" padding.
-  const body = String(value ?? '')
-    .replace(/\s+/g, '')
-    .replace(/=+$/, '');
+  // also turns "+" into a space), so whitespace is dropped, as is the at most
+  // two "=" of padding. Each pattern does constant work per character.
+  const body = raw.replace(/\s+/g, '').replace(/={1,2}$/, '');
   if (!body) return failure(damaged('it carries no data'));
-  if (body.length > maxLength) {
-    return failure(`This link is longer than ${maxLength.toLocaleString('en-US')} characters, the most this page reads.`);
-  }
+  if (body.length > maxLength) return tooLong(maxLength);
   if (!/^[\w-]+$/.test(body)) return failure(damaged("it has characters that base64url doesn't use"));
   // A single character left over can't hold a byte, so the text stops partway.
   if (body.length % 4 === 1) return failure(CUT_OFF);

@@ -9,7 +9,10 @@ export function encodeBase64Url(bytes: Uint8Array): string;
 /** Base64url of the JSON's UTF-8 bytes, without padding. */
 export function encodeLinkJson(value: unknown): string;
 
-/** Base64url text to bytes; whitespace and missing or extra `=` padding are tolerated. */
+/**
+ * Base64url text to bytes; whitespace and up to two `=` of padding are
+ * tolerated. A value over twice `maxLength` is refused before it is read.
+ */
 export function decodeLinkBytes(
   value: unknown,
   options?: LinkPayloadOptions,

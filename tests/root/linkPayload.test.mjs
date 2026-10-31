@@ -60,6 +60,22 @@ test('damage is reported, never decoded into something else', () => {
   assert.match(error(parseLinkJson('not json')), /not valid JSON/);
 });
 
+test('outsized or padding-filled values are refused in linear time', () => {
+  const timed = (value, options) => {
+    const started = performance.now();
+    const result = decodeLinkBytes(value, options);
+    assert.ok(performance.now() - started < 1000, `${value.length} characters took too long`);
+    return error(result);
+  };
+  // A long run of "=" before another character once made the padding pattern
+  // quadratic: 80,000 took 2.5 s. The raw length is now checked before any
+  // pattern, with room for a wrapped link's whitespace, and padding is at most two.
+  assert.match(timed(`${'='.repeat(300_000)}A`, { maxLength: 100_000 }), /longer than 100,000 characters/);
+  assert.match(timed(`${'='.repeat(150_000)}A`, { maxLength: 100_000 }), /longer than 100,000 characters/);
+  assert.match(timed(`${'='.repeat(150_000)}A`), /base64url/);
+  assert.match(timed(`${encoded}===`), /base64url/);
+});
+
 test('fragments are read by key, with percent-encoding undone', () => {
   assert.equal(readLinkParam('#a=1&setup=abc%3D%3D', 'setup'), 'abc==');
   assert.equal(readLinkParam('setup=abc', 'setup'), 'abc');
