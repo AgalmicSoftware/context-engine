@@ -225,7 +225,7 @@ const pairwiseSimilaritySum = (question, entries) => {
 // Reading records
 
 // The models in-app interviews draft with by default: today's, and gpt-5.6-terra,
-// the default for records before 0.8.2. A draft records the model that ran.
+// the default for records before 0.9.0. A draft records the model that ran.
 const DEFAULT_DRAFT_MODELS = new Set([DEFAULT_AI_MODELS.fast, DEFAULT_AI_MODELS.thinking, 'gpt-5.6-terra']);
 
 /**

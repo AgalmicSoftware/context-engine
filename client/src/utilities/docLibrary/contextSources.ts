@@ -64,7 +64,7 @@ const workerBaseUrl = async (options: ContextSourceOptions): Promise<string> =>
     .trim()
     .replace(/\/+$/, '');
 
-/** True when this session's Worker stores context sources (Session Workers from 0.8.2). */
+/** True when this session's Worker stores context sources (Session Workers from 0.9.0). */
 export const workerSupportsContextSources = async (options: ContextSourceOptions): Promise<boolean> => {
   try {
     const capabilities = await readWorkerCapabilities(await workerBaseUrl(options), options.sessionSlug);

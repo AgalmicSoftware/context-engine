@@ -1362,7 +1362,7 @@ Setup offers `gpt-6.1-terra`, `gpt-6-luna`, `gpt-6.1-sol` and `gpt-6-astra`
 from OpenAI, and the Claude 5.5 models and Claude Fable 5.1 from Anthropic.
 Existing sessions keep the models they store. A session that stores none names
 no model in its requests, so its Worker chooses: `gpt-6.1-terra` for both lanes
-from 0.8.2, and `gpt-5.6-terra` on earlier Workers. The account presets are
+from 0.9.0, and `gpt-5.6-terra` on earlier Workers. The account presets are
 GPT-6.1 Terra and Sol (the default), GPT-6 Astra, Claude Sonnet 5.5 and Claude
 Opus 5.5; a saved preset follows its current models, and a removed one falls
 back to the default. Claude 5 models, Claude Opus 4.5 or later and Claude

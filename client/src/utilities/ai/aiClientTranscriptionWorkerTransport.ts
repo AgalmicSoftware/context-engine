@@ -98,7 +98,7 @@ const requestAudioTranscription = async (
   if (groupSpeakerLabels) {
     form.append('purpose', 'group-conversation');
     form.append('labelSpeakers', 'true');
-    // Paired by position; Workers before 0.8.2 drop them.
+    // Paired by position; Workers before 0.9.0 drop them.
     for (const { name } of knownSpeakers) form.append('known_speaker_names[]', name);
     for (const { sample } of knownSpeakers) form.append('known_speaker_references[]', sample);
   }

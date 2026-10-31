@@ -71,7 +71,7 @@ test('draft origin falls back on the self-reported source', () => {
   assert.equal(inferDraftOrigin({ source: { platform: 'claude', modelId: 'x' } }), 'external_prefill');
   assert.equal(inferDraftOrigin({ source: { platform: 'other', modelId: 'direct-user-context' } }), 'typed_context');
   assert.equal(inferDraftOrigin({ source: { platform: 'other', modelId: DEFAULT_AI_MODEL } }), 'voice_interview');
-  // In-app interviews draft with the thinking model; records before 0.8.2 name gpt-5.6-terra.
+  // In-app interviews draft with the thinking model; records before 0.9.0 name gpt-5.6-terra.
   assert.equal(inferDraftOrigin({ source: { platform: 'other', modelId: DEFAULT_AI_MODELS.thinking } }), 'voice_interview');
   assert.equal(inferDraftOrigin({ source: { platform: 'other', modelId: 'gpt-5.6-terra' } }), 'voice_interview');
   assert.equal(inferDraftOrigin({ source: { platform: 'other', modelId: 'gemini-3-pro' } }), 'unknown');

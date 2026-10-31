@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Drop the retired Goerli test network from wallet connections and a collection metadata lookup that always failed.
 - Trust a cached Worker sign-in only when it records the Worker, session and account it was issued for; the older unscoped format, which nothing writes, is ignored.
-- Group Conversation shows who spoke as `Person 1:`, `Person 2:` lines. A five-second sample of each new voice goes with later chunks, so up to four voices keep their number across three-minute chunks; a fifth voice, or one heard only briefly, is numbered within its chunk. With a Session Worker before 0.8.2, numbers restart in each chunk and the recorder says so.
+- Group Conversation shows who spoke as `Person 1:`, `Person 2:` lines. A five-second sample of each new voice goes with later chunks, so up to four voices keep their number across three-minute chunks; a fifth voice, or one heard only briefly, is numbered within its chunk. With a Session Worker before 0.9.0, numbers restart in each chunk and the recorder says so.
 - The voice dialog's close button asks before it stops a recording.
 - The recorder notes when the device takes the microphone, as a call can, and marks the gap in the transcript. Capture that stops without telling the page gets a fresh microphone stream.
 - Only one tab at a time opens a recording; another tab says so and takes over once the first closes it.
@@ -31,8 +31,8 @@ All notable changes to this project will be documented in this file.
 - The Context section on `/new`, on the settings page and, for admins, on the session page takes files (PDF, Markdown, text, CSV, JSON) and links for the session's AI. Each item is for everyone or for admins only; others don't see the section while the session has no context.
 - Question generation and the voice interviewer read the session's notes and links, plus the files and links the person may read, as untrusted background.
 - Setup and the settings page check context against shared limits: up to 6 paragraphs of 2,000 characters, 8 https links, and no text that looks like a secret.
-- GPT-5 and GPT-6 requests send their JSON schema in the form every released Session Worker passes to OpenAI, so question generation, summaries, profile analysis, tags and the AI filter keep working on Workers from 0.6 to 0.8.1.
-- A session that stores no AI model, and the admin AI test, let the Worker pick the model, so 0.8.0 and 0.8.1 Workers don't refuse them.
+- GPT-5 and GPT-6 requests send their JSON schema in the form every released Session Worker passes to OpenAI, so question generation, summaries, profile analysis, tags and the AI filter keep working on Workers from 0.6 to 0.8.0.
+- A session that stores no AI model, and the admin AI test, let the Worker pick the model, so Workers from 0.8.0 and earlier don't refuse them.
 - Transcription with models other than whisper-1 sends audio in pieces of at most five minutes, so long recordings and uploads aren't cut short.
 - The settings page shows the highlighted and hidden lists read-only on an older Session Worker instead of failing the whole save, and checks only an edited context against the context rules. On-chain saves keep an older "don't feature SBTs" choice and AI provider, check the admin wallet's account and network before the paid upload, and offer "Retry the Worker sync" after a failed sync.
 - When a session's metadata can't be loaded, the page keeps its last usable name, Worker link and settings, so the settings page can't publish a stripped copy.
