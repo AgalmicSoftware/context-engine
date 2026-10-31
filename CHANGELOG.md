@@ -14,10 +14,15 @@ All notable changes to this project will be documented in this file.
 - Only one tab at a time opens a recording; another tab says so and takes over once the first closes it.
 - The session page says when audio kept by Close and keep the audio is still waiting to upload, after a reload too, and offers Reopen recording.
 - Recorder status, transcript details and errors are readable in every theme; in Civic, the default, "Transcribing…" was white on white.
+- `/new` is one page. Each section shows a summary, a conflict shows as a plain message beside the option, and Create confirms with your passkey, then deploys and saves.
+- Admins edit Worker-hosted sessions at `/session/<slug>/settings`. The page says which edits sign participants out, saves only changed fields and copies the group recorder link. The `/admin` metadata editor is removed, so on-chain sessions can't be edited for now.
+- Session templates: Export, Import and share links (`/new#template=`) carry a setup's questions and context, never keys.
+- Setup lists the current Claude models and is readable in every theme at phone width.
 
 ### Workers — requires redeployment
 
 - Group transcription forwards up to four known-speaker samples (a name and a short WAV) to OpenAI, so voices keep their labels across chunks. Invalid samples are dropped without failing the chunk.
+- Claude requests work on current models. The Worker sends no `temperature`, which Opus 5.5 and Fable 5.1 refuse and Sonnet and Haiku 5.5 refuse at 0.7, so older Claude models also sample at their default. It reads the answer from the reply's text blocks after any thinking, and a request without a model uses `claude-opus-5-5` instead of a model retired in 2025.
 - Storage export manifests drop `rewrapRequiredForNewDeployment`, the deprecated copy of `deploymentKekContinuityRequired`, and Lit requests no longer read the retired `gateChainId` field; send `chainId`.
 
 ## [0.8.1] - 2026-10-30
