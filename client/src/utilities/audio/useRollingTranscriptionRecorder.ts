@@ -82,6 +82,8 @@ export const useRollingTranscriptionRecorder = ({
   const recordingActiveRef = useRef(false);
   const endingRecordersRef = useRef<Set<MediaRecorder>>(new Set());
   const stopWaitersRef = useRef<Set<() => void>>(new Set());
+  // Ends a recorder's chunk with the audio it has delivered, for when it never confirms Stop.
+  const finishersRef = useRef(new WeakMap<MediaRecorder, () => void>());
 
   const chunkDurationMs =
     Number.isFinite(Number(chunkMs)) && Number(chunkMs) > 0
@@ -219,6 +221,7 @@ export const useRollingTranscriptionRecorder = ({
       // A constructor/start failure must not publish an empty chunk to the queue.
       recorder.start(1000);
       capture ??= beginChunk();
+      finishersRef.current.set(recorder, () => snapshot(true));
       return recorder;
     },
     [beginChunk, clearRotationTimer, resolveStopWaiters, stopRecorder, stopTimer, stopTracks],
@@ -405,10 +408,14 @@ export const useRollingTranscriptionRecorder = ({
       });
 
       if (!stopped) {
+        // The browser never confirmed Stop. Finish the chunk with the audio delivered so far, so it uploads,
+        // and leave Stopping; a stop event that turns up later finds the chunk finished.
+        endingRecordersRef.current.delete(recorder);
+        finishersRef.current.get(recorder)?.();
+        if (mediaRecorderRef.current === recorder) mediaRecorderRef.current = null;
         stopTimer();
         stopTracks();
-        if (waitForTranscription)
-          throw new Error('The recorder has not finished saving audio. Keep this dialog open and try closing again.');
+        if (mountedRef.current) setStatus((previous) => (previous === 'error' ? 'error' : 'idle'));
       }
       if (waitForTranscription) {
         await finishTranscription();

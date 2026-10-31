@@ -682,6 +682,39 @@ describe('useRollingTranscriptionRecorder', () => {
     });
   });
 
+  it('finishes the last chunk from the audio so far when the recorder never confirms Stop', async () => {
+    (transcribeAudio as jest.Mock).mockImplementation(async () => 'Speech before Stop.');
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'lost-stop' }));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await act(async () => {
+      instances[0].requestData();
+      await flushPromises();
+    });
+    instances[0].stop.mockImplementation(() => {
+      instances[0].state = 'inactive';
+    });
+    await act(async () => {
+      const stopping = result.current.stopRecording();
+      await jest.advanceTimersByTimeAsync(2000);
+      await stopping;
+      await flushPromises();
+    });
+    expect(result.current.status).toBe('idle');
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete']);
+    expect(result.current.transcript).toBe('Speech before Stop.');
+    expect(mockTrack.stop).toHaveBeenCalledTimes(1);
+    // A stop event that turns up late changes nothing.
+    await act(async () => {
+      instances[0].onstop?.();
+      await flushPromises();
+    });
+    expect(result.current.status).toBe('idle');
+    expect(transcribeAudio).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
   it('shows a stop notice when the recorder stops by itself, keeps its audio, and resumes with one tap', async () => {
     (transcribeAudio as jest.Mock).mockImplementation(async () => 'Speech before the stop.');
     const { result, unmount } = renderHook(() =>
