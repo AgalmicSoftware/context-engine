@@ -4050,7 +4050,7 @@ test('exportCloudflareEncryptedPayloadEnvelopes emits ciphertext and envelope me
 	assert.equal(exported.manifest.wrappedKeysIncluded, true);
 	assert.equal(exported.manifest.keyProvider, 'mixed');
 	assert.equal(exported.manifest.deploymentKekContinuityRequired, true);
-	assert.equal(exported.manifest.rewrapRequiredForNewDeployment, true);
+	assert.equal(Object.hasOwn(exported.manifest, 'rewrapRequiredForNewDeployment'), false);
 	assert.ok(exported.sessionEnvelope.sessionKey.wrappedKey);
 	const dump = JSON.stringify(exported);
 	assert.doesNotMatch(dump, /classified export payload/);
@@ -4079,7 +4079,6 @@ test('exportCloudflareEncryptedPayloadEnvelopes emits ciphertext and envelope me
 	});
 	assert.equal(litOnly.manifest.keyProvider, 'lit');
 	assert.equal(litOnly.manifest.deploymentKekContinuityRequired, false);
-	assert.equal(litOnly.manifest.rewrapRequiredForNewDeployment, false);
 
 	const emptyLit = await exportCloudflareEncryptedPayloadEnvelopes({
 		env,
@@ -4089,7 +4088,6 @@ test('exportCloudflareEncryptedPayloadEnvelopes emits ciphertext and envelope me
 		includeSessionEnvelope: false,
 	});
 	assert.equal(emptyLit.manifest.deploymentKekContinuityRequired, false);
-	assert.equal(emptyLit.manifest.rewrapRequiredForNewDeployment, false);
 });
 
 test('storageRoute /storage/export-envelopes omits session key material', async () => {

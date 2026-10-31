@@ -1293,11 +1293,8 @@ export const executeSessionLitChipotleAction = async ({
   const gateChainId = resolveChainIdWithLegacyFallback(
     requestBody.chainId,
     resolveChainIdWithLegacyFallback(
-      requestBody.gateChainId,
-      resolveChainIdWithLegacyFallback(
-        config?.networkChainId,
-        resolveChainIdWithLegacyFallback(config?.registryChainId, 0),
-      ),
+      config?.networkChainId,
+      resolveChainIdWithLegacyFallback(config?.registryChainId, 0),
     ),
   );
   if (!gateChainId) {

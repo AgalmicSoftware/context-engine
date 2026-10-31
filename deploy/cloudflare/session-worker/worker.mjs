@@ -71162,9 +71162,7 @@ var init_storageRouteExecution = __esm({
         errors: [...storageListError ? [storageListError] : [], ...readErrors],
         wrappedKeysIncluded: !!sessionEnvelope?.sessionKey?.wrappedKey || payloads.some((entry2) => entry2.wrappedKeysIncluded),
         keyProvider,
-        deploymentKekContinuityRequired,
-        // Version-1 consumers still read this continuity warning under its old name.
-        rewrapRequiredForNewDeployment: deploymentKekContinuityRequired
+        deploymentKekContinuityRequired
       };
       return {
         ok: !storageListError,
@@ -76944,11 +76942,8 @@ var init_chipotleClient = __esm({
       const gateChainId = resolveChainIdWithLegacyFallback(
         requestBody.chainId,
         resolveChainIdWithLegacyFallback(
-          requestBody.gateChainId,
-          resolveChainIdWithLegacyFallback(
-            config?.networkChainId,
-            resolveChainIdWithLegacyFallback(config?.registryChainId, 0)
-          )
+          config?.networkChainId,
+          resolveChainIdWithLegacyFallback(config?.registryChainId, 0)
         )
       );
       if (!gateChainId) {

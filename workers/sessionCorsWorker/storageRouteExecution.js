@@ -2508,8 +2508,6 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
     storageListError, readErrors, gatewayErrors: [], errors: [...(storageListError ? [storageListError] : []), ...readErrors],
     wrappedKeysIncluded: !!sessionEnvelope?.sessionKey?.wrappedKey || payloads.some((entry) => entry.wrappedKeysIncluded),
     keyProvider, deploymentKekContinuityRequired,
-    // Version-1 consumers still read this continuity warning under its old name.
-    rewrapRequiredForNewDeployment: deploymentKekContinuityRequired,
   };
   return {
     ok: !storageListError,
