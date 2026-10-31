@@ -203,7 +203,7 @@ test('session publication docs keep Worker-canonical and chain-backed effects se
     assert.match(registryRefreshLine, /chain-backed success/);
     assert.match(hostedSettlementLine, /without the registry publish adapter/);
     assert.match(wizardMap, /Feeds profile-selected Worker config persistence or Arweave metadata\/EVM registration/);
-    assert.match(wizardMap, /selected default\/recommended Hosted profile compiles to Cloudflare/);
+    assert.match(wizardMap, /default Hosted profile, which compiles to Cloudflare/);
     assert.match(wizardMap, /pending on-chain SBT metadata\/deploy\/finalize, independent of the session authority profile/);
     assert.match(wizardMap, /deferred draft held in tab memory[\s\S]{0,120}does not survive reload/);
   }

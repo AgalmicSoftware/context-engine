@@ -114,7 +114,7 @@ the configured session AI to draft questions automatically. New drafts append to
 ID or prompt duplicates are skipped and prior generated prompts are included as avoidance context. Manual retry
 remains available after a generation error; the client does not auto-retry unchanged transcript text in a loop.
 
-Session `interviewMode` settings are available in the wizard and admin metadata editor:
+Session `interviewMode` settings are available on the setup page and the session's settings page:
 
 | Setting | Default | Behavior |
 | --- | --- | --- |

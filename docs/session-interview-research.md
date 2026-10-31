@@ -37,7 +37,7 @@ same neutral color and opacity; active controls remain more prominent.
 | Share AI draft changes for research | Session default; off when unset | Adds the draft comparison, at the session's research detail (below): `originalPrediction`, `predictionRevisions`, `finalSubmitted`, `changedFields`, `userEditedFields`, `redactedFields`, `predictionComparison`, and, at full detail only, `unselectedPredictions`. |
 
 Owners set **Share AI draft changes for research by default** under **Interview
-settings** in the session wizard or admin metadata editor. The boolean
+settings** on the setup page or the session's settings page. The boolean
 `interviewMode.shareDraftChangesByDefault` defaults to `false` and sets the
 initial checkbox for new responses, including imported and voice-generated
 drafts. Participants can change it before submitting. When sharing starts on,

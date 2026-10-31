@@ -13,39 +13,41 @@ Related docs:
 
 ## What a New Session Needs
 
-The first `/new` screen presents the two implemented setup paths as large cards
-with their required inputs. After a creator chooses one, the chosen profile
-appears in the setup title. Use **Back** beside the title to return to the setup
-cards without clearing the current draft, or use **Custom** to open the extra
-settings supported by that profile. The Centralized card summarizes its inputs as
-`Cloudflare account / OpenAI API Key` and explains that session settings and
-responses are stored in Cloudflare. The decentralized card explains that session
-data is stored on Arweave while session identity and question logic are recorded
-in Ethereum smart contracts; its pills list the OpenAI,
-Arweave, Ethereum RPC URL, and Ethereum Gas requirements.
+`/new` is one page. Basics (name, description, image, colors) is always open;
+Context, Questions, Participation, Results visibility, Access and identity,
+Hosting and storage, and AI each show a one-line summary and open from their
+caret. A new draft starts on the default profile: a Session Worker on
+Cloudflare with Worker encryption. Labels stay short; a "?" beside a label opens
+its explanation, which screen readers also get through `aria-describedby`.
 
-For the default `Centralized (Cloudflare)` preset, the user needs a Cloudflare
-account and one API key for the selected AI provider. The native path is a
-guided Cloudflare dashboard handoff: it does not ask for a Cloudflare API token,
-OAuth token, Context Engine deploy helper, or local agent, but it is not a
-browser OAuth callback or a one-click deployment.
+The quick path needs only a name, a Cloudflare API token and the OpenAI key.
+**Create** lists whatever is still missing and stays disabled until it is
+filled. Signing in with your passkey is the confirmation step: Create then
+deploys the Session Worker through the deploy helper, saves the signed session
+config and reads it back. **Deploy the Worker now** runs the deploy step early
+if you want to check the Worker first. The token and keys are request-only:
+they are never stored in the browser, the address bar, templates or the
+session config. The token-free path, a guided Cloudflare dashboard handoff, is
+under Hosting and storage → More; once its Worker is verified, Create needs no
+token.
 
 The app's passkey-derived EOA supplies the admin identity and signs the worker
-config, but it does not submit a transaction and needs no gas. Context Engine
-generates two independent setup values, `TOKEN_HMAC_SECRET` and
-`CE_STORAGE_ENVELOPE_KEK`, for Cloudflare's encrypted Worker-secret fields.
-They are secrets for the new Session Worker, not Cloudflare credentials, and
-stay in the current browser tab during setup. The AI key is written only to the
-worker's session-secrets store. The legacy deploy-helper and sponsored
-deploy-grant paths remain explicit fallbacks.
+config, but it does not submit a transaction and needs no gas. For the
+dashboard handoff, Context Engine generates two independent setup values,
+`TOKEN_HMAC_SECRET` and `CE_STORAGE_ENVELOPE_KEK`, for Cloudflare's encrypted
+Worker-secret fields. They are secrets for the new Session Worker, not
+Cloudflare credentials, and stay in the current browser tab during setup. The
+AI key is written only to the worker's session-secrets store.
 
-Custom hosting settings survive save and reload, including encrypted-storage
-access rules. Changing the session network updates every SBT rule; check each
-contract address on the newly selected network. Switching to a different
-template replaces custom hosting settings, including optional HTTP agent access.
-Draft Group secrets are cleared when the wizard closes or the signed-in account
-changes. An owner-written Interview opening must contain a question before
-the session can be published.
+Every option is checked against the session mode rules as you choose it. A
+choice that conflicts with another, such as Worker encryption with Arweave
+storage, shows a plain explanation beside the option, opens its section and
+blocks Create until it is resolved; Create lists each conflict with a button
+that jumps to its section. Changing the session network updates every SBT
+rule; check each contract address on the newly selected network. Draft Group
+secrets are cleared when the page closes or the signed-in account changes. An
+owner-written Interview opening must contain a question before the session can
+be created.
 
 For private Cloudflare storage, participants can read their own submitted
 responses; admins and authorized agents can read session-wide responses when
@@ -92,31 +94,28 @@ Important:
   sessions even while Settings is closed. Chainless hosted sessions do not
   request funds or probe for a faucet in the background.
 - Selecting Lit keeps the existing Lit credential and chain/RPC requirements.
-  Selecting the decentralized preset keeps the existing Arweave, registry,
+  Choosing the on-chain registry keeps the existing Arweave, registry,
   wallet-transaction, gas, and compatible Session Worker requirements.
 - Secrets live in the worker's secrets store or encrypted sponsored bundles,
   never in public Worker config or Arweave session metadata.
 
-### Mode-aligned optional settings
+### Settings by hosting
 
-**Custom** reveals only settings supported by the selected profile:
+Each section shows only the settings the chosen hosting supports:
 
-| Selected profile | Optional settings shown |
+| Hosting | Settings shown |
 | --- | --- |
-| Pure Cloudflare | Worker session end time, question defaults, Worker Group tag defaults, and Worker-backed privacy/results controls |
-| Cloudflare with explicit on-chain SBT access | The pure Cloudflare settings plus SBT curation and the on-chain Group Factory/network controls required by that access mode |
-| Decentralized | Block/time limits, Surveys, Group Factory and Session Registry contracts, and optional testnet faucet settings |
+| Session Worker on Cloudflare | Session end time, question defaults, Worker Group tag defaults, and Worker-backed privacy and results controls |
+| Session Worker with on-chain SBT access | The Cloudflare settings plus SBT curation and the network controls that access needs |
+| On-chain registry (Arweave) | Registry network, Surveys and Group Factory contracts, and optional testnet faucet settings |
 
-Pure Cloudflare setup does not display or persist block numbers, registry
-contracts, Surveys contracts, faucet settings, or an Ethereum network. Choosing
-**Custom** does not override this capability boundary.
+Worker-hosted setup does not display or persist block numbers, registry
+contracts, Surveys contracts, faucet settings, or an Ethereum network.
 
-The metadata **Optional details** area (**More options** in Custom settings) contains
-the settings that most sessions can leave at their defaults. **Session colors**
-is the final field group and starts collapsed there; expand it to choose a
-curated color scheme and see its preview. **Who can create groups?** is a
-dropdown in the same area, constrained to **All participants** or **Admins
-only** rather than accepting freeform config text. **Voice interview modes**
+Most sessions can leave Participation at its defaults. **Colors** in Basics
+chooses a curated color scheme. **Who can create groups** in Participation is a
+dropdown constrained to **Anyone in the session** or **Admins only** rather
+than accepting freeform config text. **Voice interviews and AI prefill**
 defaults on. Its bordered panel shows the **Interview settings** details only
 while Voice interview modes is enabled; turning it off hides those controls while
 preserving their configured values for re-enable. The details expose the OpenAI
@@ -290,7 +289,7 @@ without publishing the full pool.
 ### 1. Cloudflare account
 
 The session worker is the canonical config, auth, AI, and payload-storage host
-for the default preset. A free Cloudflare account is enough for small sessions.
+for the default profile. A free Cloudflare account is enough for small sessions.
 
 Create or sign in to a Cloudflare account at <https://dash.cloudflare.com/>.
 The native deploy button opens Cloudflare's deployment flow for the isolated
@@ -350,8 +349,8 @@ The same identity is used for:
 
 ### Advanced only: Arweave wallet (JWK)
 
-The default Cloudflare preset does not use Arweave. You need a JWK only after
-choosing the decentralized preset or explicitly switching storage/publish
+The default Cloudflare profile does not use Arweave. You need a JWK only after
+choosing the on-chain registry or explicitly switching storage/publish
 behavior to Arweave.
 
 Generate a wallet:
@@ -395,24 +394,21 @@ Registration cost notes:
 
 Open `/new`. The app canonicalizes that route to `/session/new`, but `/new` is the intended entry point.
 
-The first screen is the session-mode choice. A blank draft has nothing
-preselected. If this browser already has an explicit saved profile, the header
-offers `Resume existing setup` instead of silently discarding or
-replacing it. Choosing a new preset immediately opens the
-four-stage setup with fields prefilled from the chosen mode; there is no
-separate Continue action for a new selection:
+The page opens on the default profile; Hosting and storage → **Runs on**
+switches between the two hosting models, and every other option adjusts that
+profile in place:
 
-- `Centralized (Cloudflare)` compiles to a Cloudflare-backed,
-  worker-canonical session shape with Cloudflare-internal worker encryption
-  (`worker_envelope`) enabled by default. After selection, the requirements
-  banner lists exactly a Cloudflare account and one `OpenAI API Key`. It does
-  not ask for Arweave, Lit, RPC, funding, faucet, or gas inputs.
-- `Decentralized (Ethereum + Arweave)` compiles to the Arweave +
-  Ethereum smart-contract session shape. Its requirements banner lists a compatible
-  Session Worker for the web runtime, the Arweave wallet/JWK, Ethereum RPC URL, Ethereum
-  gas for transaction fees, an `OpenAI API Key`, and an optional Lit key needed when encryption is enabled. The
-  Worker assists the browser runtime; the Ethereum registry and Arweave remain the
-  canonical authority and metadata store.
+- **Session Worker** compiles to a Cloudflare-backed, worker-canonical session
+  shape with Cloudflare-internal worker encryption (`worker_envelope`) enabled
+  by default. Create asks for a name, a Cloudflare API token (or a verified
+  dashboard-deployed Worker) and the OpenAI key. It does not ask for Arweave,
+  Lit, RPC, funding, faucet, or gas inputs.
+- **On-chain registry** compiles to the Arweave + Ethereum smart-contract
+  session shape. It needs a compatible Session Worker for the web runtime, the
+  Arweave wallet/JWK, an Ethereum RPC URL, Ethereum gas for transaction fees,
+  the OpenAI key, and a Lit key when encryption is enabled. The Worker assists
+  the browser runtime; the Ethereum registry and Arweave remain the canonical
+  authority and metadata store.
 
 The validated version-1 profile, rather than legacy top-level fields, determines
 which capabilities are reachable:
@@ -434,35 +430,29 @@ registry compatibility path only when its registry identity and positive chain
 are present; legacy chain fields never turn a validated chain-free Worker
 profile into a hybrid.
 
-After selection, the profile remains visible in the setup title. **Back** returns
-to the setup cards while preserving the draft, and **Custom** opens Privacy
-instead of opening a separate technical popover. When Custom is active,
-**Back to templates** returns to the guided setup while keeping the current
-custom settings in the draft. Profile settings follow the existing stages:
+The profile's settings are grouped by section:
 
-- Privacy owns storage, encryption, decryption access, result visibility, and
-  small-group protection. Switching from Arweave to Cloudflare installs an
-  explicit role gate; switching back removes Cloudflare-only access fields.
+- Results visibility owns who sees results and small-group protection.
   Admin-only and public-redacted result modes remain visible as unavailable
   until their complete read paths are enforced.
-- Worker offers the website and **Agents (HTTP API)** (Agent Session Wrapped).
-  Each channel has a question-mark tooltip explaining its purpose. The website
-  remains enabled. Agent access is off by default and uses the same Session Worker. The **Agent API access** status distinguishes
-  **Off** from **On after deployment**: authorized agents can use the HTTP API
-  once the service is deployed and verified, subject to session access rules.
-  Removed bot and Mini App adapters have no setup controls.
-- **Require users to pay for usage** appears only in the custom Worker settings
-  for decentralized (Ethereum registry + Arweave) sessions. Centralized Cloudflare
-  sessions, including those using Lit, do not show this option. The choice
-  applies only where the option shows: in normal mode and for other profiles,
-  Worker secrets stay on, and the saved choice applies again when you return to
-  the custom settings of a decentralized session.
-- Deploy owns the export policy. Selected-channel export remains visible as
-  unavailable until the export runtime consumes that filter.
+- Access and identity owns sign-in, what grants permissions, encryption and
+  decryption access rules. Switching storage from Arweave to Cloudflare
+  installs an explicit role gate; switching back removes Cloudflare-only access
+  fields.
+- Hosting and storage owns where the session runs and is stored, **Agents (HTTP
+  API)** (Agent Session Wrapped), export policy and the Worker deployment. The
+  website is always enabled. Agent access is off by default and uses the same
+  Session Worker: authorized agents can use the HTTP API once the service is
+  deployed and verified, subject to session access rules. Removed bot and Mini
+  App adapters have no setup controls. Selected-channel export remains visible
+  as unavailable until the export runtime consumes that filter.
+- **Require users to pay for usage** appears only for on-chain registry
+  (Ethereum registry + Arweave) sessions. Worker-hosted Cloudflare sessions,
+  including those using Lit, do not show this option, and their Worker secrets
+  stay on.
 
-Changing one of these values flips the profile to `custom`. Profile-based
-drafts do not also show the older `Session Storage` metadata editor, so storage
-has one visible authority. New session publishes write the
+Changing one of these values flips the profile to `custom`, and storage has one
+visible authority. New session publishes write the
 `sessionModeProfile` profile as the source of truth and compile it down to the
 existing storage profile / payload-access fields for runtime compatibility.
 The publish boundary sends one canonical object-valued `storageProfile`; its
@@ -508,11 +498,8 @@ Enter the core session metadata:
 - `sessionContext` for optional public background shown on the session page as
   plain text and HTTPS links; it is not executable HTML and must not contain
   secrets.
-- **Optional details** (**More options** in Custom settings) → **Session colors** →
-  **Color scheme**. Session colors is the final optional field group and is
-  collapsed by default. Expand it to choose `Context Engine`, `Ocean`, or
-  `Amber`; the compact preview updates immediately. This controls only
-  documented session accents/chrome and does not change the app theme.
+- **Colors** in Basics: `Context Engine`, `Ocean`, or `Amber`. This controls
+  only documented session accents/chrome and does not change the app theme.
 - slug
   Start with a lowercase letter or number, then use only lowercase letters, numbers, `_`, or `-`, up to 128 characters. Participant links open only slugs in this form. Slugs whose link opens a different session are reserved: `general` (the default session), `debate` (the session Worker opens `rxc` instead), `constructor` and `prototype`.
 - session ID
@@ -542,7 +529,7 @@ What gets stored where:
   block limits, contract pointers, featured lists, the same
   `appearance.colorSchemeId`, and any Lit-encrypted fields. The EVM registry
   stores only the metadata pointer; it does not duplicate the scheme ID.
-- The Centralized preset combines `storageProfile.backend = "cloudflare"`
+- The default profile combines `storageProfile.backend = "cloudflare"`
   with `worker_envelope` encryption and Worker-role/agent-grant access.
   Advanced Cloudflare profiles can add an explicit `sbt_onchain` access
   condition, which makes the profile hybrid and requires its configured
@@ -603,7 +590,7 @@ Important:
 
 Use the privacy section to decide who can decrypt locked metadata fields and who can access sponsored resources.
 
-The default worker-canonical preset uses worker roles/groups and the persisted
+The default worker-canonical profile uses worker roles/groups and the persisted
 version-1 `workerAuthority` policy. It does not require an SBT, registry, RPC,
 or Lit key. Participant and anonymous scopes, plus any login gate, are evaluated
 by the session worker.
@@ -651,8 +638,8 @@ Worker/Lit hybrid likewise remains Worker-canonical while exposing only its
 explicit Lit/RPC requirements. Registry-canonical sessions continue to use the
 on-chain SBT group flow below.
 
-The **Who can create groups?** dropdown is available under **More options** for
-every `/new` mode and is persisted as `groupCreationPolicy`:
+The **Who can create groups** dropdown is in Participation for every hosting
+model and is persisted as `groupCreationPolicy`:
 
 - **All participants** is the new-session default. In Worker-native sessions,
   an authenticated participant with the `groups` scope can join or create an
@@ -832,7 +819,8 @@ What gets stored where:
 
 ### 4. Registration and publish
 
-When you click `Publish` with the default worker-canonical profile, the flow is:
+When you click **Create session** with the default worker-canonical profile, after
+your passkey confirms, the flow is:
 
 1. Deploy the per-session worker if it is not already ready
 2. Persist the sanitized, admin-signed canonical config to the session worker
@@ -1090,11 +1078,42 @@ Use the `Worker Tests` panel in `/admin` to run:
 
 If `/health` or the other worker calls fail with browser network errors, use the `/admin` button `Allow this origin (CORS)` and test again.
 
+### Edit a session
+
+An admin edits a Worker-hosted session at `/session/<slug>/settings`; the
+**Edit settings** link on `/admin` opens it. The page reuses the setup sections.
+The slug, session ID, Worker URL and hosting are shown as fixed facts, not
+inputs. Before saving, it lists which edits sign participants out (authority
+changes such as who can create groups or access rules) and which do not
+(content such as the name or prompts), using the same classifier as the Worker,
+and the button reads **Save and sign participants out** when any authority
+edit is pending. Save sends only the changed fields the Worker accepts for
+`set-config`, signed by your passkey. **Copy group recorder link** copies the
+session link with `?mode=groupRecording`. On-chain sessions are not edited on
+this page.
+
+### Templates and share links
+
+**Export** downloads the draft as a `ce.session-template/v1` JSON file;
+**Import** takes an uploaded file or pasted JSON. A template carries only
+portable fields: names, prompts, questions, the session mode profile, context
+text and its URLs. It never carries keys, tokens, files or deployment
+identifiers, and unknown fields are rejected. Before an import is used, the page
+lists every field it would change.
+
+**Copy share link** puts the draft in a `/new#template=` link. Someone who
+opens it sees **This draft came from a link** and the differences from their
+own draft before anything is used; after they accept, the button becomes
+**Copy link with my changes** so the draft can travel back. A draft too long for
+an 8,000-character link offers the `.json` download instead. On the settings
+page, an imported template keeps the session's own hosting.
+
 ### Add questions
 
 Once the session exists, you can start populating it:
 
-- use `/admin` to set session defaults and the question-generation prompt
+- use the session's settings page (`/session/<slug>/settings`) to change its
+  defaults and the question-generation prompt
 - add questions or surveys through the normal authoring flow for that session
 - use the AI audio generator flow if you want AI-assisted question generation
 
@@ -1132,11 +1151,11 @@ A session can measure how well people's own AI assistants predict their
 answers ([agent-fidelity.md](agent-fidelity.md)):
 
 1. Turn on **Measure how well AI represents participants** at the top of the
-   wizard's Interview settings, or later under **Session defaults** in
-   `/admin`. It turns on research sharing by default, hides 1 in 5 of each
+   setup page's Interview settings (Participation), or later on the session's
+   settings page. It turns on research sharing by default, hides 1 in 5 of each
    person's AI-prefill drafts until they answer, and shows people their score.
-   AI prefill needs voice interviews, which are on by default; in `/admin` the
-   switch also turns them back on if they were off. These settings need a
+   AI prefill needs voice interviews, which are on by default; the switch also
+   turns them back on if they were off. These settings need a
    Session Worker newer than 0.8.0.
 2. Before anyone answers, write down the primary measure
    ([Fix the plan before looking](agent-fidelity.md#fix-the-plan-before-looking)).
