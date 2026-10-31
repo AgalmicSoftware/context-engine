@@ -19,8 +19,6 @@ import { buildSessionVoiceModeSearch } from '../../SurveyTool/sessionInterview';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { notify } from '../../../utilities/ui/notify.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
-import { buildSignedAdminActionAuth } from '../../../utilities/worker/workerAuth';
-import { postSignedAdminWorkerRequest } from '../../../utilities/worker/signedAdminWorkerRequest';
 import { resolveSessionCapabilityProjection } from '../../../utilities/session/sessionCapabilityProjection';
 import {
   fetchWorkerCanonicalSessionBootstrap,
@@ -33,6 +31,7 @@ import {
   buildSessionSettingsSave,
   describeSessionSettingsPath,
 } from './sessionSettingsEdits';
+import { saveSessionSettings } from './sessionSettingsSave';
 
 type SessionSettingsPageProps = {
   account?: string;
@@ -180,25 +179,14 @@ const SessionSettingsPage = ({
     setSaving(true);
     setStatus('Saving…');
     try {
-      await postSignedAdminWorkerRequest({
-        action: 'set-config',
-        path: '/admin/set-config',
-        workerUrl: workerOrigin,
-        body: { sessionSlug, config: patch },
-        signAdminAction: ({ action, body, workerUrl }) =>
-          buildSignedAdminActionAuth({
-            action,
-            slug: sessionSlug,
-            sessionId: resolveWorkerCanonicalSessionIdHex(saved) || undefined,
-            sessionAuthorityMode: 'worker_canonical',
-            body,
-            workerUrl,
-            context: {
-              account,
-              chainId: Number(network?.id || 1) || 1,
-              providerLike: typeof provider === 'string' ? provider : undefined,
-            },
-          }),
+      await saveSessionSettings({
+        workerOrigin,
+        sessionSlug,
+        sessionIdHex: resolveWorkerCanonicalSessionIdHex(saved),
+        patch,
+        account,
+        provider,
+        chainId: Number(network?.id || 1) || 1,
       });
       await refresh();
       setStatus('Settings saved.');

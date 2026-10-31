@@ -8,7 +8,6 @@ import {
   type SessionModeProfile,
   type SessionModeResultsVisibility,
 } from '../../../utilities/session/sessionModeProfile';
-import type { AnyRecord } from '../../shellTypes';
 
 // The quick path's profile: Worker-canonical, passkey-first, optional
 // surfaces off. Every option on the page edits a copy of it.
@@ -144,7 +143,7 @@ export const setEncryptionMode = (profile: SessionModeProfile, mode: string, reg
 export type SessionSetupProfileEdit = {
   profile: SessionModeProfile;
   /** Compiled from the edited profile when it is valid, else from the last valid one. */
-  compiled: { storageProfile: AnyRecord };
+  compiled: { storageProfile: Record<string, unknown> };
 };
 
 // Edits a copy of the profile (the quick-path default when there is none).
@@ -165,5 +164,5 @@ export const editSessionSetupProfile = (
     : previous && validateSessionModeProfile(previous).valid
       ? previous
       : defaultSessionSetupProfile();
-  return { profile, compiled: { storageProfile: compileSessionModeProfile(source).storageProfile as AnyRecord } };
+  return { profile, compiled: { storageProfile: compileSessionModeProfile(source).storageProfile } };
 };
