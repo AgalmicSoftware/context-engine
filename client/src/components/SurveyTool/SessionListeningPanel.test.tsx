@@ -1048,3 +1048,14 @@ it('says when the recorder restarted the microphone because no audio arrived', (
     'status',
   );
 });
+
+it('gives the hidden-page Dismiss the readable text-button style of the other recorder actions', () => {
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({ hiddenPeriods: [{ startedAt: 1_000, endedAt: 2_000 }], dismissHiddenPeriods: jest.fn() }),
+  );
+  render(<SessionListeningPanel sessionSlug="room" panelMode="recordGroup" />);
+  // The default secondary button is white on a light dialog.
+  expect(screen.getByRole('button', { name: 'Dismiss hidden-page notice' })).toHaveClass(
+    'sessionInterviewHeaderButton',
+  );
+});

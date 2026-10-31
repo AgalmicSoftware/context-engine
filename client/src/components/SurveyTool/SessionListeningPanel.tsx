@@ -814,7 +814,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
               ; recording may have paused.
             </p>
           ))}
-          <Button size="sm" onClick={recorder.dismissHiddenPeriods} aria-label="Dismiss hidden-page notice">
+          <Button
+            size="sm"
+            className={styles.sessionInterviewHeaderButton}
+            onClick={recorder.dismissHiddenPeriods}
+            aria-label="Dismiss hidden-page notice"
+          >
             Dismiss
           </Button>
         </div>

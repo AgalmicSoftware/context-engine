@@ -14,12 +14,30 @@ import { normalizeInterviewQuestions, type InterviewPrefillPacket } from './sess
 import type { SessionVoiceModeModalProps } from './sessionVoiceModeTypes';
 import styles from './SurveyTool.module.scss';
 
+// The listening panel's anchor stops being fixed on narrow screens, where this notice must still show. Its
+// card is light in every theme, so its small buttons use the transcript pill's dark text.
+const KEPT_AUDIO_NOTICE_POSITION: React.CSSProperties = {
+  position: 'fixed',
+  right: 16,
+  bottom: 16,
+  left: 16,
+  zIndex: 60,
+  display: 'flex',
+  justifyContent: 'flex-end',
+  pointerEvents: 'none',
+};
+
 const KEPT_AUDIO_HELP =
   'Close and keep the audio left it unsent. It stays on this device until it uploads; reopen the recording to finish.';
 
 export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps) {
   const { isOpen, mode, onSelectMode, onClose, questionPool = [], context } = props;
   const keptHelpId = `ce-kept-audio-help-${useId().replace(/:/g, '')}`;
+  // Dismissed until the dialog next closes, so it never covers the page for good.
+  const [keptDismissed, setKeptDismissed] = useState(false);
+  useEffect(() => {
+    if (isOpen) setKeptDismissed(false);
+  }, [isOpen]);
   // While closed, audio a Group Conversation kept on this device still has to be uploaded.
   const keptChunks = useKeptRecordingChunks(
     {
@@ -112,8 +130,8 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
           </>
         )}
       </Modal>
-      {keptChunks > 0 ? (
-        <div className={styles.sessionListeningPanelAnchor}>
+      {keptChunks > 0 && !keptDismissed ? (
+        <div style={KEPT_AUDIO_NOTICE_POSITION}>
           <aside className={styles.sessionListeningPanel} aria-label="Kept recording audio">
             <span className={styles.sessionRecordingOption}>
               <span role="status">
@@ -122,7 +140,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
               <button
                 type="button"
                 id={keptHelpId}
-                className={styles.sessionInterviewHeaderButton}
+                className={styles.sessionListeningTranscriptButton}
                 aria-label="About kept recording audio"
                 aria-describedby={`${keptHelpId}-about`}
               >
@@ -135,9 +153,22 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                 {KEPT_AUDIO_HELP}
               </UncontrolledTooltip>
             </span>
-            <Button type="button" onClick={() => onSelectMode('recordGroup')}>
-              Reopen recording
-            </Button>
+            <span className={styles.sessionRecordingOption}>
+              <Button
+                type="button"
+                className={styles.sessionListeningGenerate}
+                onClick={() => onSelectMode('recordGroup')}
+              >
+                Reopen recording
+              </Button>
+              <button
+                type="button"
+                className={styles.sessionListeningTranscriptButton}
+                onClick={() => setKeptDismissed(true)}
+              >
+                Dismiss
+              </button>
+            </span>
           </aside>
         </div>
       ) : null}

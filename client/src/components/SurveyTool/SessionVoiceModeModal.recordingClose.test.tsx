@@ -245,6 +245,13 @@ it('reminds the session page to reopen while kept audio waits to upload', async 
   expect(screen.getByRole('button', { name: 'About kept recording audio' })).toHaveAccessibleDescription(
     /stays on this device/,
   );
+  // Dismiss hides it until the dialog next closes; it never covers the page for good.
+  fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+  expect(screen.queryByText(/waiting to upload/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText('Open the dialog again'));
+  fireEvent.click(await screen.findByRole('button', { name: 'Close and keep the audio' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(await screen.findByText('1 recording chunk is waiting to upload.')).toBeInTheDocument();
   jest.mocked(transcribeAudio).mockResolvedValue(transcript);
   fireEvent.click(screen.getByRole('button', { name: 'Reopen recording' }));
   await screen.findByText('Transcribed');
