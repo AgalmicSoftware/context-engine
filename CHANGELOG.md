@@ -18,7 +18,11 @@ All notable changes to this project will be documented in this file.
 - Admins edit sessions at `/session/<slug>/settings`, which replaces the `/admin` metadata editor; `/admin` links there. The page says which edits sign participants out, saves only changed fields and copies the group recorder link. For an on-chain session it uploads the new metadata, has the admin's wallet update the SessionRegistry, shows each step and the transaction link, then syncs the session's Worker.
 - The settings page edits every field an admin can change: AI models, reasoning effort (for the session and per task) and transcription model; default question filters; highlighted and hidden questions and surveys; moving on after an answer; and SBT defaults. On-chain sessions also get contracts, block range, faucet amounts and SBT lists. Edits typed while the page loads are kept.
 - Session templates: Export, Import and share links (`/new#template=`) carry a setup's questions and context, never keys. Context files are listed by name and privacy, to attach again. Import refuses a file over 256 KB before reading it.
-- Setup lists the current Claude models and is readable in every theme at phone width.
+- Setup offers only current OpenAI and Claude models and is readable in every theme at phone width. New sessions use GPT-6.1 Terra for everyday tasks and GPT-6.1 Sol for harder ones, and transcribe with gpt-transcribe.
+- The account presets are GPT-6.1 Terra and Sol, GPT-6 Astra, Claude Sonnet 5.5 and Claude Opus 5.5. A saved preset that no longer exists uses the default.
+- Generated questions state one plain, neutral idea each and don't repeat; breakout questions cover concrete next steps.
+- Audio summaries no longer send the transcript twice, and `$&` in typed or spoken text no longer corrupts a prompt.
+- The HTML report uses the same analysis prompt as the Results views.
 - The Context section on `/new`, on the settings page and, for admins, on the session page takes files (PDF, Markdown, text, CSV, JSON) and links for the session's AI. Each item is for everyone or for admins only; others don't see the section while the session has no context.
 - Question generation and the voice interviewer read the session's notes and links, plus the files and links the person may read, as untrusted background.
 - Setup and the settings page check context against shared limits: up to 6 paragraphs of 2,000 characters, 8 https links, and no text that looks like a secret.
@@ -34,6 +38,11 @@ All notable changes to this project will be documented in this file.
 - set-config accepts the highlighted and hidden question and survey lists, up to 500 IDs each. Changing them signs no one out.
 - `fetch_url` and `fetch_image` need https on a public host and give up after 10 seconds; `fetch_url` also reads plain text and Markdown.
 - Agent-proposed questions are no longer tagged "object".
+- GPT-6.1 models use the Responses API, and every model is sent a reasoning effort it accepts.
+- Claude requests carry the session's effort and any JSON schema. A refusal or an empty answer returns HTTP 422 instead of an empty reply.
+- Interview mapping can run at medium effort on a low-effort session, and the interview opening allows 2,000 tokens, so models that think have room to answer.
+- Results analysis accepts JSON wrapped in a code fence. Agent results record the model that actually ran.
+- Wrapped posters use gpt-image-2.5-flare.
 - Storage export manifests drop `rewrapRequiredForNewDeployment`, the deprecated copy of `deploymentKekContinuityRequired`, and Lit requests no longer read the retired `gateChainId` field; send `chainId`.
 
 ## [0.8.1] - 2026-10-30
