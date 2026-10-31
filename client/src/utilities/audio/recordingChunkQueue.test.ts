@@ -99,6 +99,32 @@ it('abandons an upload that never answers, retries it, then uploads later chunks
   expect(queue.segments.map((segment) => segment.status)).toEqual(['complete', 'complete']);
 });
 
+it('waits two minutes for a hung upload after quick failures, and longer only after a stall', async () => {
+  const signals: AbortSignal[] = [];
+  const transcribe = jest.fn((_blob: Blob, _labels: boolean, signal: AbortSignal) => {
+    signals.push(signal);
+    if (signals.length <= 2) return Promise.reject(Object.assign(new Error('Unavailable'), { status: 503 }));
+    return signals.length <= 4 ? new Promise<{ text: string }>(() => {}) : Promise.resolve({ text: 'Answered.' });
+  });
+  const queue = create(transcribe);
+  await queue.ready;
+  queue.capture(queue.begin(false), audio, true);
+  await tick();
+  await jest.advanceTimersByTimeAsync(3000);
+  expect(transcribe).toHaveBeenCalledTimes(3);
+  await jest.advanceTimersByTimeAsync(119_999);
+  expect(signals[2].aborted).toBe(false);
+  await jest.advanceTimersByTimeAsync(1);
+  expect(signals[2].aborted).toBe(true);
+  // The stall suggests a slow connection, so the next request gets four minutes.
+  await jest.advanceTimersByTimeAsync(4000);
+  expect(transcribe).toHaveBeenCalledTimes(4);
+  await jest.advanceTimersByTimeAsync(235_000);
+  expect(signals[3].aborted).toBe(false);
+  await jest.advanceTimersByTimeAsync(5000);
+  expect(signals[3].aborted).toBe(true);
+});
+
 it('restarts the uploading chunk at once when asked to retry it', async () => {
   const signals: AbortSignal[] = [];
   const queue = create((_blob: Blob, _labels: boolean, signal: AbortSignal) => {

@@ -896,8 +896,9 @@ describe('useRollingTranscriptionRecorder', () => {
       audio: expect.objectContaining({ echoCancellation: false, noiseSuppression: true }),
     });
     for (let segment = 0; segment < 15; segment += 1) {
+      // Answers settle between timers, as in a browser; a synchronous advance would hold them for minutes.
       await act(async () => {
-        jest.advanceTimersByTime(3 * 60 * 1000);
+        await jest.advanceTimersByTimeAsync(3 * 60 * 1000);
         await flushPromises();
       });
     }

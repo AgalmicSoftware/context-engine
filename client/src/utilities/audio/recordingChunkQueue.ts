@@ -30,7 +30,8 @@ type Options = {
 const failureText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const storageText = (error: unknown) =>
   `This recording can't be recovered after a reload. Its audio and transcript are kept in memory on this page; download unsaved audio before leaving. ${failureText(error)}`;
-// A request that never answers must not hold later chunks. Each attempt waits longer, so a slow upload still finishes.
+// A request that never answers must not hold later chunks. After each such stall the next request waits two
+// minutes longer, so a slow upload still finishes; quick failures such as a 503 don't lengthen the wait.
 const UPLOAD_DEADLINE_MS = 120_000;
 const stalledText = 'The upload stopped responding. Retrying.';
 
@@ -47,6 +48,7 @@ export class RecordingChunkQueue {
   private uploading: { id: string; controller: AbortController } | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private attempts = new Map<string, number>();
+  private stalls = new Map<string, number>();
   private lastSnapshotAt = new Map<string, number>();
   private failedWrites = new Set<string>();
   private resaving = new Set<string>();
@@ -259,7 +261,14 @@ export class RecordingChunkQueue {
     try {
       if (this.disposed) return;
       const result = await new Promise<Transcription>((resolve, reject) => {
-        const deadline = setTimeout(() => controller.abort(), UPLOAD_DEADLINE_MS * attempt);
+        const stalls = this.stalls.get(id) || 0;
+        const deadline = setTimeout(
+          () => {
+            this.stalls.set(id, stalls + 1);
+            controller.abort();
+          },
+          UPLOAD_DEADLINE_MS * (stalls + 1),
+        );
         controller.signal.addEventListener('abort', () => reject(new Error(stalledText)), { once: true });
         this.options
           .transcribe(record.audio!, record.labelSpeakers && !this.labelsUnavailableReason, controller.signal)
@@ -288,6 +297,7 @@ export class RecordingChunkQueue {
       // A failed durable commit must keep both the paid transcript and original audio in memory.
       this.records.set(id, persisted ? complete : { ...complete, audio: record.audio });
       this.attempts.delete(id);
+      this.stalls.delete(id);
       this.changed();
     } catch (error) {
       if (this.disposed) return;
