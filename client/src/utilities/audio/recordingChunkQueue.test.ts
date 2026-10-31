@@ -18,15 +18,16 @@ const audio = new Blob(['recorded audio'], { type: 'audio/webm' });
 let saved: Map<string, RecordingChunk>;
 let queues: RecordingChunkQueue[];
 type Transcribe = (audio: Blob, labels: boolean, signal: AbortSignal) => Promise<{ text: string }>;
+// Exact backoff timings below assume no jitter; the jitter test sets its own value.
+let random = 0;
 const create = (transcribe: Transcribe = jest.fn(async () => ({ text: 'Speech.' })), scope = 'room') => {
-  const queue = new RecordingChunkQueue({ scope, transcribe, onChange: jest.fn() });
+  const queue = new RecordingChunkQueue({ scope, transcribe, onChange: jest.fn(), random: () => random });
   queues.push(queue);
   return queue;
 };
 beforeEach(() => {
   jest.useFakeTimers();
-  // Exact backoff timings below assume no jitter; the jitter test sets its own values.
-  jest.spyOn(Math, 'random').mockReturnValue(0);
+  random = 0;
   saved = new Map();
   queues = [];
   (listRecordingChunks as jest.MockedFunction<typeof listRecordingChunks>).mockImplementation(async (scope: string) =>
@@ -45,7 +46,6 @@ afterEach(() => {
   queues.forEach((queue) => queue.dispose());
   jest.useRealTimers();
   jest.clearAllMocks();
-  jest.mocked(Math.random).mockRestore();
 });
 
 it('retries the first chunk with backoff before uploading later chunks', async () => {
@@ -119,15 +119,15 @@ it('restarts the uploading chunk at once when asked to retry it', async () => {
 
 it('spreads each retry over the second half of its backoff so rooms sharing a key do not retry in step', async () => {
   const retriedAt: number[] = [];
-  const room = async (random: number) => {
-    jest.mocked(Math.random).mockReturnValue(random);
+  const room = async (value: number) => {
+    random = value;
     const started = Date.now();
     let calls = 0;
     const queue = create(async () => {
       if (++calls === 1) throw Object.assign(new Error('Busy'), { status: 429 });
       retriedAt.push(Date.now() - started);
       return { text: 'Later.' };
-    }, `room-${random}`);
+    }, `room-${value}`);
     await queue.ready;
     queue.capture(queue.begin(false), audio, true);
     await tick();

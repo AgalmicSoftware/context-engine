@@ -21,6 +21,8 @@ type Options = {
   scope: string;
   transcribe: (audio: Blob, labels: boolean, signal: AbortSignal) => Promise<Transcription>;
   onChange: () => void;
+  // Retry jitter source; tests pass a fixed one instead of patching Math.random.
+  random?: () => number;
 };
 const failureText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const storageText = (error: unknown) =>
@@ -276,7 +278,7 @@ export class RecordingChunkQueue {
             this.pump();
           },
           // Rooms sharing a key must not retry in step: wait a random half to all of the backoff.
-          ([1000, 2000, 4000, 8000, 15_000][attempt - 1] ?? 30_000) * (1 - Math.random() / 2),
+          ([1000, 2000, 4000, 8000, 15_000][attempt - 1] ?? 30_000) * (1 - (this.options.random ?? Math.random)() / 2),
         );
       this.changed();
     }
