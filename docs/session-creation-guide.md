@@ -1353,17 +1353,21 @@ with low reasoning effort. Interview mapping asks for medium effort, which the
 Worker allows unless the session sets an effort for that task. New sessions
 transcribe with `gpt-transcribe`; group recordings label speakers with
 `gpt-4o-transcribe-diarize`, which OpenAI shuts down on 2027-02-26 and has
-named no replacement for. OpenAI requests use standard processing
-(`service_tier: default`) unless a caller explicitly selects another tier.
-GPT-Live voice settings are separate.
+named no replacement for. Transcription models after `whisper-1` can stop short
+on long audio, so uploads to them go in pieces of at most five minutes. OpenAI
+requests use standard processing (`service_tier: default`) unless a caller
+explicitly selects another tier. GPT-Live voice settings are separate.
 
 Setup offers `gpt-6.1-terra`, `gpt-6-luna`, `gpt-6.1-sol` and `gpt-6-astra`
 from OpenAI, and the Claude 5.5 models and Claude Fable 5.1 from Anthropic.
-Existing sessions keep the models they store; one that stores none uses
-`gpt-6.1-terra` for both lanes. The account presets are GPT-6.1 Terra and Sol
-(the default), GPT-6 Astra, Claude Sonnet 5.5 and Claude Opus 5.5; a saved
-preset follows its current models, and a removed one falls back to the default.
-Claude requests carry the reasoning effort and any JSON schema, and a Claude
+Existing sessions keep the models they store. A session that stores none names
+no model in its requests, so its Worker chooses: `gpt-6.1-terra` for both lanes
+from 0.8.2, and `gpt-5.6-terra` on earlier Workers. The account presets are
+GPT-6.1 Terra and Sol (the default), GPT-6 Astra, Claude Sonnet 5.5 and Claude
+Opus 5.5; a saved preset follows its current models, and a removed one falls
+back to the default. Claude 5 models, Claude Opus 4.5 or later and Claude
+Sonnet 4.6 or later get the reasoning effort and any JSON schema; older Claude
+models get neither and follow the answer format the prompt describes. A Claude
 refusal or empty answer comes back as an error. Bundled demos without their own
 Worker use these defaults; a demo with its own Worker keeps the models it stores.
 
