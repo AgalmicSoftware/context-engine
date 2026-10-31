@@ -1284,10 +1284,10 @@ const buildSessionConfigFromRegistry = ({
 // The last usable copy of a session's metadata: the document kept with its
 // cached entry or, for an entry saved without one, the entry itself when it
 // was built from its loaded document.
-const lastUsableRegistryMetadata = (cachedConfig: AnyRecord | null) => {
-  const registryMeta = cachedConfig?.__registry || {};
+const lastUsableRegistryMetadata = (cachedConfig: Record<string, unknown> | null) => {
+  const registryMeta = (cachedConfig?.__registry || {}) as { metadata?: unknown; metadataLoadState?: unknown };
   if (registryMeta.metadata && typeof registryMeta.metadata === 'object') return registryMeta.metadata;
-  if (registryMeta.metadataLoadState !== 'loaded') return null;
+  if (!cachedConfig || registryMeta.metadataLoadState !== 'loaded') return null;
   const entry = { ...cachedConfig };
   delete entry.__registry;
   return entry;
@@ -1578,8 +1578,7 @@ export const refreshSessionRegistryFieldsCache = async ({
   const registrySlug = toRegistrySlug(slug || '');
   // The cached entry itself, not its Worker config overlay: a failed metadata
   // load rebuilds from it, and the overlay must not be saved into the registry.
-  const existingConfig: AnyRecord | null =
-    sessionRegistryStore.readCache()?.sessions?.[normalizeRegistrySlug(registrySlug)] || null;
+  const existingConfig = sessionRegistryStore.readCache()?.sessions?.[normalizeRegistrySlug(registrySlug)] || null;
   const existingRegistry =
     existingConfig?.__registry && typeof existingConfig.__registry === 'object' ? existingConfig.__registry : {};
   const resolvedChainId =
