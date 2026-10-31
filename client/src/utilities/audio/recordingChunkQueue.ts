@@ -231,7 +231,8 @@ export class RecordingChunkQueue {
             this.retryTimer = null;
             this.pump();
           },
-          [1000, 2000, 4000, 8000, 15_000][attempt - 1] ?? 30_000,
+          // Rooms sharing a key must not retry in step: wait a random half to all of the backoff.
+          ([1000, 2000, 4000, 8000, 15_000][attempt - 1] ?? 30_000) * (1 - Math.random() / 2),
         );
       this.changed();
     }

@@ -896,6 +896,34 @@ it('offers Close and keep the audio only after capture stops, with its explanati
   expect(help).toHaveAccessibleDescription(/resumes uploading when you reopen this recording/);
 });
 
+it('applies a provider check that answers after two seconds as long as Record has not been pressed', async () => {
+  jest.useFakeTimers();
+  type Config = Awaited<ReturnType<typeof getEffectiveTranscriptionConfig>>;
+  let resolve!: (config: Config) => void;
+  jest.mocked(getEffectiveTranscriptionConfig).mockImplementationOnce(
+    () =>
+      new Promise<Config>((done) => {
+        resolve = done;
+      }),
+  );
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
+  try {
+    render(<SessionListeningPanel sessionSlug="slow-provider" panelMode="recordGroup" />);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(2000);
+    });
+    expect(screen.getByText(/Speaker label check timed out/)).toBeInTheDocument();
+    await act(async () => {
+      resolve({ provider: 'openai' } as Config);
+    });
+    expect(screen.getByRole('checkbox', { name: 'Label speakers' })).toBeChecked();
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+    expect(screen.queryByText(/Speaker label check timed out/)).not.toBeInTheDocument();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 it('makes Record available with plain transcription after two seconds and ignores a late provider result', async () => {
   jest.useFakeTimers();
   type Config = Awaited<ReturnType<typeof getEffectiveTranscriptionConfig>>;

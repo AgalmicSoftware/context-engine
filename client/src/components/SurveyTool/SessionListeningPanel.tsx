@@ -351,23 +351,26 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const [labelSpeakers, setLabelSpeakers] = useState(true);
   const [speakerLabelsSupported, setSpeakerLabelsSupported] = useState<boolean | null>(null);
   const [speakerLabelsCheckTimedOut, setSpeakerLabelsCheckTimedOut] = useState(false);
+  const recordPressedRef = useRef(false);
   useEffect(() => {
     let current = true;
+    let timedOut = false;
     setSpeakerLabelsSupported(null);
     setSpeakerLabelsCheckTimedOut(false);
     const complete = (supported: boolean) => {
-      if (!current) return;
+      // A late result still applies until Record is pressed, so it never switches labels on during capture.
+      if (!current || (timedOut && recordPressedRef.current)) return;
       current = false;
       clearTimeout(timeout);
+      setSpeakerLabelsCheckTimedOut(false);
       setSpeakerLabelsSupported(supported);
     };
     const timeout = setTimeout(() => {
-      if (!current) return;
+      timedOut = true;
       setSpeakerLabelsCheckTimedOut(true);
-      complete(false);
+      setSpeakerLabelsSupported(false);
     }, 2000);
     // Checking availability must not unlock credentials or delay Record indefinitely.
-    // Ignore late results so a timeout cannot switch labels on during capture.
     void getEffectiveTranscriptionConfig({ sessionSlug, sessionConfig }).then(
       (config) => complete(config.provider === 'openai'),
       () => complete(false),
@@ -838,7 +841,10 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           <Button
             type="button"
             className={styles.sessionListeningRecordButton}
-            onClick={recorder.startRecording}
+            onClick={() => {
+              recordPressedRef.current = true;
+              void recorder.startRecording();
+            }}
             disabled={isClosing || recorder.isBusy || isPreparingRecording}
             data-testid={E2E_TESTIDS.SESSION_LISTENING_START}
           >

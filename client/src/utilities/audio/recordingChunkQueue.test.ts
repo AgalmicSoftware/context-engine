@@ -25,6 +25,8 @@ const create = (transcribe: Transcribe = jest.fn(async () => ({ text: 'Speech.' 
 };
 beforeEach(() => {
   jest.useFakeTimers();
+  // Exact backoff timings below assume no jitter; the jitter test sets its own values.
+  jest.spyOn(Math, 'random').mockReturnValue(0);
   saved = new Map();
   queues = [];
   (listRecordingChunks as jest.MockedFunction<typeof listRecordingChunks>).mockImplementation(async (scope: string) =>
@@ -43,6 +45,7 @@ afterEach(() => {
   queues.forEach((queue) => queue.dispose());
   jest.useRealTimers();
   jest.clearAllMocks();
+  jest.mocked(Math.random).mockRestore();
 });
 
 it('retries the first chunk with backoff before uploading later chunks', async () => {
@@ -112,6 +115,27 @@ it('restarts the uploading chunk at once when asked to retry it', async () => {
   expect(signals).toHaveLength(2);
   expect(signals[0].aborted).toBe(true);
   expect(queue.segments[0]).toMatchObject({ status: 'complete', text: 'Answered.' });
+});
+
+it('spreads each retry over the second half of its backoff so rooms sharing a key do not retry in step', async () => {
+  const retriedAt: number[] = [];
+  const room = async (random: number) => {
+    jest.mocked(Math.random).mockReturnValue(random);
+    const started = Date.now();
+    let calls = 0;
+    const queue = create(async () => {
+      if (++calls === 1) throw Object.assign(new Error('Busy'), { status: 429 });
+      retriedAt.push(Date.now() - started);
+      return { text: 'Later.' };
+    }, `room-${random}`);
+    await queue.ready;
+    queue.capture(queue.begin(false), audio, true);
+    await tick();
+    await jest.advanceTimersByTimeAsync(1000);
+  };
+  await room(0);
+  await room(0.9);
+  expect(retriedAt).toEqual([1000, 550]);
 });
 
 it('recovers from a thirty-second outage without manual action', async () => {
