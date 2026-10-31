@@ -133,6 +133,17 @@ describe('editing an on-chain session', () => {
     ['__registry', 'sponsoredKeys', 'rpc', 'corsWorkerUrl'].forEach((key) => expect(metadata).not.toHaveProperty(key));
   });
 
+  it('keeps a legacy choice not to feature the session’s SBTs, under the current key', () => {
+    const { autoFeatureSBTsBySessionSlug: _current, ...legacy } = registryConfig();
+    const config = { ...legacy, autoFeatureSBTsWithFeaturedSbtTags: false };
+    const { patch } = edit(config, (draft) => {
+      draft.sessionName = 'Renamed';
+    });
+    const metadata = buildOnChainSessionMetadata({ ...config, ...patch });
+    expect(metadata.autoFeatureSBTsBySessionSlug).toBe(false);
+    expect(metadata).not.toHaveProperty('autoFeatureSBTsWithFeaturedSbtTags');
+  });
+
   it('saves nothing when nothing changed, and needs a start block before it saves', () => {
     expect(edit(registryConfig(), () => {}).patch).toEqual({});
     const config = { ...registryConfig(), blockLimits: undefined };

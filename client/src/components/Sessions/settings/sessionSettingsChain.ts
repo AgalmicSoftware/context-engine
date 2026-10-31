@@ -1,6 +1,7 @@
 import { DEFAULT_AI_MODELS } from '@ce-shared/aiDefaults.mjs';
 import { normalizeBlockLimitsForConfig } from '../../../utilities/session/blockLimits';
 import { buildWorkerSessionConfigPayload } from '../../Admin/adminPageWorkerSessionConfigHelpers';
+import { resolveSessionWizardAutoFeatureBySessionSlug } from '../sessionWizardAiConfig';
 import { stripSessionWizardMetadataSecretFields } from '../sessionWizardMetadataPayload';
 import { sanitizeSessionWizardMetadataPayload } from '../sessionWizardWriteNormalization';
 import { asRecord, text, type SetupDraft } from '../setup/setupSectionTypes';
@@ -133,7 +134,10 @@ export const buildOnChainSessionMetadata = (after: Config): Config => {
   const metadata = JSON.parse(JSON.stringify(after)) as Config;
   delete metadata.__registry;
   delete metadata.sponsoredKeys;
+  // The legacy alias's choice moves to the current key, so an old "off" stays off.
+  const autoFeature = resolveSessionWizardAutoFeatureBySessionSlug(metadata);
   delete metadata.autoFeatureSBTsWithFeaturedSbtTags;
+  if (autoFeature !== undefined) metadata.autoFeatureSBTsBySessionSlug = autoFeature;
   const sanitized = sanitizeSessionWizardMetadataPayload(stripSessionWizardMetadataSecretFields(metadata), {
     defaultAiModels: DEFAULT_AI_MODELS,
   });
