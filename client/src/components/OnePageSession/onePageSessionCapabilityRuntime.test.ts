@@ -14,6 +14,9 @@ describe('the voice dialog context on a Worker-hosted session', () => {
 
   it('stays the same when someone signs in with a passkey or a wallet on any chain', () => {
     const signedOut = contextFor(null);
+    // Guard against a vacuous pass: the token must carry the session's identity.
+    expect(signedOut).toContain('rxc-ra-test-2|');
+    expect(signedOut).toContain(String(sessionConfig.corsWorkerUrl).replace(/\/$/, ''));
     expect(contextFor({ id: 11155420, chainId: 11155420, name: 'OP Sepolia (Passkey)' })).toBe(signedOut);
     expect(contextFor({ id: 10, name: 'OP Mainnet' })).toBe(signedOut);
   });
