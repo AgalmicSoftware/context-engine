@@ -3,8 +3,10 @@ import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { Input } from 'reactstrap';
 
 import {
+  SESSION_TEMPLATE_FORMAT,
   diffSessionTemplates,
   parseSessionTemplateJson,
+  validateSessionTemplate,
   type SessionTemplate,
   type SessionTemplateChange,
   type SessionTemplateError,
@@ -334,11 +336,16 @@ export const SetupQuestionsPublisher = ({
 }: SetupQuestionsPublisherProps) => {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
+  const [errors, setErrors] = useState<SessionTemplateError[]>([]);
   if (!questions.length) return status ? <p className={styles.statusText}>{status}</p> : null;
   if (!sessionConfig) {
     return <p className={styles.hint}>These questions are added to the session once it is created.</p>;
   }
   const publish = async () => {
+    // Questions edited since import must still pass the template's checks.
+    const checked = validateSessionTemplate({ format: SESSION_TEMPLATE_FORMAT, questions });
+    setErrors(checked.ok ? [] : checked.errors);
+    if (!checked.ok) return;
     setBusy(true);
     setStatus('Adding questions…');
     try {
@@ -369,6 +376,7 @@ export const SetupQuestionsPublisher = ({
           {status}
         </p>
       ) : null}
+      <TemplateErrors errors={errors} />
     </div>
   );
 };

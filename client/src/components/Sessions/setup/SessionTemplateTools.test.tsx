@@ -173,6 +173,30 @@ describe('session template tools', () => {
     expect(onDismiss).toHaveBeenCalled();
   });
 
+  it('does not add a question that is no longer valid', async () => {
+    const questions = [
+      { prompt: 'Parks need shade.', type: 'binary' },
+      { prompt: ' ', type: 'binary' },
+      { prompt: 'Which park?', type: 'multichoice', options: ['North'] },
+    ];
+    render(
+      <SetupQuestionsPublisher
+        questions={questions}
+        sessionSlug="salon"
+        account="0xaa"
+        onPublished={jest.fn()}
+        sessionConfig={{ slug: 'salon', sessionName: 'Salon' }}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('ce-setup-questions-publish'));
+    });
+    const errors = screen.getByTestId('ce-template-errors');
+    expect(errors).toHaveTextContent('questions.1.prompt is required.');
+    expect(errors).toHaveTextContent('questions.2.options needs at least two options.');
+    expect(mockPublishQuestions).not.toHaveBeenCalled();
+  });
+
   it('adds a template’s questions once the session exists', async () => {
     mockPublishQuestions.mockResolvedValue({ uploadedQuestions: [{}, {}] });
     const onPublished = jest.fn();
