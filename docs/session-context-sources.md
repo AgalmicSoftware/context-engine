@@ -32,7 +32,14 @@ Readers drop what a writer would refuse. `set-config` checks a sent
 and stores the trimmed form; a stored context is never checked, so it cannot
 block other edits.
 Text that looks like a key, token or password (in the title, a paragraph, a
-link or a link source) is refused, as templates already refuse it.
+link or a link source) is refused, as templates already refuse it. That covers
+provider keys and tokens (Stripe, Hugging Face and Telegram bot tokens among
+them), RPC links that carry a provider key (Alchemy `/v2/`, Infura `/v3/`),
+private keys, bearer tokens, and credentials or keys in a link (`user:pass@`,
+`?key=`, `?token=`). 64 hex digits outside a link have a private key's shape,
+so they are refused too; to cite a transaction, link to it in a block explorer,
+where the hash in the link's path is fine. Page names and IDs in a link's path,
+as in Wikipedia and Notion links, are not mistaken for tokens.
 
 Sources (`shared/sessionContextSources.mjs`):
 
