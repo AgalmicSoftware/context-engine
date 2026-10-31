@@ -39,6 +39,10 @@ export type SessionInterviewPanelBaseProps = InterviewDraftApplicationProps & {
   onLoadSavedResponses?: InterviewSavedAnswerLoader;
   prefillPacket?: InterviewPrefillPacket | null;
   initialError?: string;
+  /** Drafts the prefill left out before review, said when its review opens. */
+  prefillNotice?: string;
+  /** The paste fallback for a broken prefill link: '' once imported, otherwise why not. */
+  onImportPrefillJson?: (json: string) => string;
   account?: unknown;
   provider?: unknown;
   network?: unknown;

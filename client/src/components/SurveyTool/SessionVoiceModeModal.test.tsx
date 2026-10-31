@@ -1185,6 +1185,49 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Start voice interview');
   });
 
+  it('says which of the AI’s drafts were left out instead of dropping them silently', async () => {
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillNotice="Left out 1 draft from your AI that was incomplete or repeated."
+        prefillPacket={aiPrefill([
+          { questionId: 'q1', answer: 'Drafted one' },
+          { questionId: 'q-not-here', answer: 'Stray draft' },
+        ])}
+      />,
+    );
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+      'Left out 1 draft from your AI that was incomplete or repeated. Left out 1 draft from your AI that doesn’t fit this session’s questions or their options.',
+    );
+    expect(draftIds()).toEqual(['q1']);
+  });
+
+  it('offers a paste box for the AI’s JSON packet when a prefill link is broken', async () => {
+    const onImportPrefillJson = jest.fn((_json: string) => 'This interview prefill belongs to a different session.');
+    const { rerender } = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE)).not.toBeInTheDocument();
+    rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        initialError="This link is incomplete: it was cut off when it was copied."
+        onImportPrefillJson={onImportPrefillJson}
+      />,
+    );
+    const paste = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE);
+    // The link's reason shows even though the review was already open.
+    expect(screen.getByText('This link is incomplete: it was cut off when it was copied.')).toBeInTheDocument();
+    const button = within(paste).getByRole('button', { name: 'Review these drafts' });
+    expect(button).toBeDisabled();
+    fireEvent.change(within(paste).getByLabelText('Paste the JSON packet your AI gave you'), {
+      target: { value: '{"version":1}' },
+    });
+    fireEvent.click(button);
+    expect(onImportPrefillJson).toHaveBeenCalledWith('{"version":1}');
+    expect(within(paste).getByRole('alert')).toHaveTextContent('different session');
+  });
+
   it('after a submit, a voice interview adds drafts only for new questions and keeps updating submitted ones', async () => {
     let instructions = '';
     mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {

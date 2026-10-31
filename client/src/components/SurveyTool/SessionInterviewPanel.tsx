@@ -32,6 +32,7 @@ import styles from './SurveyTool.module.scss';
 import SessionInterviewDraftCard from './SessionInterviewDraftCard';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { ImportedResponderContextEditor, SessionInterviewVoiceControls } from './SessionInterviewVoiceControls';
+import SessionInterviewPrefillPaste from './SessionInterviewPrefillPaste';
 import { buildInterviewReturnSessionUrl } from './sessionInterviewReturnUrl';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { getAnonymousRateId } from '../../utilities/worker/workerAuthAnonymousHeaders.js';
@@ -104,6 +105,8 @@ export default function SessionInterviewPanel({
   onLoadSavedResponses,
   prefillPacket = null,
   initialError = '',
+  prefillNotice = '',
+  onImportPrefillJson,
   account = '',
   provider,
   network,
@@ -175,6 +178,12 @@ export default function SessionInterviewPanel({
   const submitContextTokenRef = useRef('');
   const previousLoginModalToggledRef = useRef(Boolean(loginModalToggled));
   const [error, setError] = useState(initialError);
+  // A broken prefill link can arrive while this review is open.
+  useEffect(() => {
+    if (!initialError) return;
+    setError(initialError);
+    setStatus('Error');
+  }, [initialError]);
   const [suggestedQuestions, setSuggestedQuestions] = useState<GeneratedSurveyStatement[]>([]);
   const [groupRecommendationRequest, setGroupRecommendationRequest] =
     useState<SessionInterviewGroupRecommendationRequest | null>(null);
@@ -573,6 +582,17 @@ export default function SessionInterviewPanel({
         const importedDrafts = nextTranscript.trim()
           ? null
           : readImportedInterviewDraftResponses(prefillPacket, validatedPrefillQuestionsRef.current || questions);
+        // An AI's drafts are never dropped silently: those the link couldn't carry, and those that fit
+        // no question here or none of its options, are counted in the notice.
+        const unmatched = importedDrafts ? (prefillPacket?.responses?.length || 0) - importedDrafts.length : 0;
+        const importNotices = importedDrafts
+          ? [
+              prefillNotice,
+              unmatched > 0
+                ? `Left out ${unmatched} ${unmatched === 1 ? 'draft' : 'drafts'} from your AI that ${unmatched === 1 ? 'doesn’t' : 'don’t'} fit this session’s questions or their options.`
+                : '',
+            ]
+          : [];
         const contextPacket: InterviewPrefillPacket | null =
           (prefillPacket
             ? scopeInterviewPrefillToQuestions(
@@ -729,11 +749,16 @@ export default function SessionInterviewPanel({
           setGroupRecommendationRequest(null);
         }
         setMappingNotice(
-          review.drafts.length || review.leftOut.length
-            ? ''
-            : combinedQuestions.length
-              ? 'No matching answers yet. Review the suggested questions below.'
-              : 'Not enough information to generate response drafts.',
+          [
+            ...importNotices,
+            review.drafts.length || review.leftOut.length
+              ? ''
+              : combinedQuestions.length
+                ? 'No matching answers yet. Review the suggested questions below.'
+                : 'Not enough information to generate response drafts.',
+          ]
+            .filter(Boolean)
+            .join(' '),
         );
         setStatus(review.drafts.length || combinedQuestions.length ? 'Review drafts' : 'Ready');
       } catch (mappingError) {
@@ -758,6 +783,7 @@ export default function SessionInterviewPanel({
       selected,
       suggestedQuestions,
       mappingModelId,
+      prefillNotice,
       prefillPacket,
       questions,
       resolveWorkerUrl,
@@ -1195,6 +1221,9 @@ export default function SessionInterviewPanel({
             <div className={styles.sessionListeningError} role="alert">
               {error}
             </div>
+          ) : null}
+          {initialError && !prefillPacket && onImportPrefillJson ? (
+            <SessionInterviewPrefillPaste onImport={onImportPrefillJson} />
           ) : null}
           <SessionInterviewVoiceControls
             wakeLockHeld={recorder.wakeLockHeld}

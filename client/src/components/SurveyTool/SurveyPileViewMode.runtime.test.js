@@ -879,6 +879,53 @@ describe('SurveyPileViewMode runtime surface', () => {
     rendered.unmount();
   });
 
+  it('opens a broken prefill link in the interview with its reason, even without a mode', async () => {
+    const rendered = renderDemoPile({ activeSessionSlug: 'demo' }, { route: '/session/demo#prefill=eyJ2ZXJzaW9u' });
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
+    expect(mockVoiceModeProps.initialError).toMatch(/cut off/);
+    expect(mockVoiceModeProps.initialError).toMatch(/paste the JSON packet/);
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    rendered.unmount();
+  });
+
+  it('imports a pasted JSON packet the way it imports a link, for this session only', async () => {
+    const packet = {
+      version: 1,
+      sessionSlug: 'demo',
+      questionSetHash: 'e'.repeat(64),
+      promptVersion: 'ce-interview-brief-v6',
+      source: { platform: 'chatgpt', modelId: 'gpt-pasted', verification: 'self_reported' },
+      responderContext: { summary: 'Pasted context.' },
+      responses: [
+        { questionId: 'q1', answer: 'Pasted draft', confidence: 0.6 },
+        { questionId: 'q2', answer: 'No confidence' },
+      ],
+    };
+    const rendered = renderDemoPile(
+      { activeSessionSlug: 'demo' },
+      { route: '/session/demo?mode=interview#prefill=%%%' },
+    );
+    await screen.findByTestId('mock-voice-mode-modal');
+    expect(mockVoiceModeProps.initialError).toMatch(/damaged/);
+    let result;
+    act(() => {
+      result = mockVoiceModeProps.onImportPrefillJson(JSON.stringify({ ...packet, sessionSlug: 'other' }));
+    });
+    expect(result).toMatch(/different session/);
+    act(() => {
+      result = mockVoiceModeProps.onImportPrefillJson(JSON.stringify(packet));
+    });
+    expect(result).toBe('');
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', 'gpt-pasted'),
+    );
+    expect(mockVoiceModeProps.initialError).toBe('');
+    expect(mockVoiceModeProps.prefillNotice).toBe(
+      'Left out 1 draft from your AI that was incomplete or repeated; each needs a question, an answer and a confidence.',
+    );
+    rendered.unmount();
+  });
+
   it('keeps an imported prefill through initialization and clears it only after mount', async () => {
     const encoded = encodeInterviewPrefillPacket({
       version: 1,

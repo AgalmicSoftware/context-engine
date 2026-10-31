@@ -19,6 +19,7 @@ import {
   mapInterviewEvidenceToResponses,
   opensSessionVoiceChooser,
   parseInterviewDraftResponses,
+  parseInterviewPrefillJson,
   readImportedInterviewDraftResponses,
   readInterviewPrefillFromHash,
   resolveRealtimeInterviewSource,
@@ -176,7 +177,7 @@ describe('session interview protocol', () => {
         facts: [{ fact: 'They prefer staged rollouts.', relatedQuestionIds: ['q1'] }],
       },
     });
-    expect(readInterviewPrefillFromHash(`#prefill=${encoded}`)?.source).toEqual(packet.source);
+    expect(readInterviewPrefillFromHash(`#prefill=${encoded}`).packet?.source).toEqual(packet.source);
     expect(hasInterviewPrefillHash(`#prefill=${encoded}`)).toBe(true);
     expect(
       clearInterviewPrefillHash({
@@ -202,6 +203,66 @@ describe('session interview protocol', () => {
         }),
       )?.promptVersion,
     ).toBe('ce-interview-brief-v6');
+  });
+
+  it('reads prefill links the way setup links are read: tolerant of wrapping, strict about damage', () => {
+    const encoded = encodeInterviewPrefillPacket(packet);
+    const expected = decodeInterviewPrefillPacket(encoded);
+    expect(expected).not.toBeNull();
+    // Chat apps wrap long links, and some encoders pad.
+    for (const hash of [
+      `#prefill=${encoded.slice(0, 50)}%0A%20${encoded.slice(50)}`,
+      `#prefill=${encoded.slice(0, 50)}+${encoded.slice(50)}`,
+      `#prefill=${encoded}${'='.repeat((4 - (encoded.length % 4)) % 4)}`,
+    ]) {
+      expect(readInterviewPrefillFromHash(hash)).toEqual({ packet: expected, error: '', notice: '' });
+    }
+    expect(readInterviewPrefillFromHash(`#prefill=${encoded.slice(0, -40)}`).error).toMatch(/cut off/);
+    // Invalid UTF-8 is refused, not replaced with U+FFFD.
+    const json = JSON.stringify({ ...packet, responderContext: { summary: 'X' } });
+    const notUtf8 = Buffer.from([...Buffer.from(json.slice(0, -3)), 0xff, ...Buffer.from(json.slice(-3))]);
+    expect(readInterviewPrefillFromHash(`#prefill=${notUtf8.toString('base64url')}`)).toMatchObject({
+      packet: null,
+      error: expect.stringMatching(/not UTF-8/),
+    });
+  });
+
+  it('names the field a prefill packet lacks, and counts the drafts it leaves out', () => {
+    const encode = (value: Record<string, unknown>) => `#prefill=${encodeInterviewPrefillPacket(value as never)}`;
+    expect(readInterviewPrefillFromHash(encode({ ...packet, version: 2 })).error).toMatch(/version must be 1/);
+    expect(readInterviewPrefillFromHash(encode({ ...packet, sessionSlug: ' ' })).error).toMatch(/no sessionSlug/);
+    expect(readInterviewPrefillFromHash(encode({ ...packet, source: { platform: 'claude' } })).error).toMatch(
+      /no source\.modelId/,
+    );
+    expect(readInterviewPrefillFromHash(encode({ ...packet, questionSetHash: 'abc' })).error).toMatch(
+      /questionSetHash/,
+    );
+    expect(readInterviewPrefillFromHash(encode({ ...packet, promptVersion: 'ce-interview-brief-v9' })).error).toMatch(
+      /promptVersion/,
+    );
+    const read = readInterviewPrefillFromHash(
+      encode({
+        ...packet,
+        responses: [
+          { questionId: 'q1', answer: 'Yes', confidence: 0.8 },
+          { questionId: 'q2', answer: 'No' },
+          { answer: 'Orphan', confidence: 0.5 },
+        ],
+      }),
+    );
+    expect(read.packet?.responses).toEqual([expect.objectContaining({ questionId: 'q1' })]);
+    expect(read.notice).toBe(
+      'Left out 2 drafts from your AI that were incomplete or repeated; each needs a question, an answer and a confidence.',
+    );
+  });
+
+  it('reads a pasted JSON packet when the link breaks', () => {
+    const pasted = parseInterviewPrefillJson(`\n${JSON.stringify(packet, null, 2)}\n`);
+    expect(pasted.packet).toEqual(decodeInterviewPrefillPacket(encodeInterviewPrefillPacket(packet)));
+    expect(parseInterviewPrefillJson('{"version":1').error).toMatch(/not valid JSON/);
+    expect(parseInterviewPrefillJson(JSON.stringify({ ...packet, questionSetHash: '' })).error).toMatch(
+      /questionSetHash/,
+    );
   });
 
   it('builds a user-authored no-install kickoff and confidence-aware mapper prompt', () => {

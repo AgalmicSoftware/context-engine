@@ -121,6 +121,7 @@ import {
   INTERVIEW_PROMPT_VERSION,
   isInterviewFeatureEnabled,
   opensSessionVoiceChooser,
+  parseInterviewPrefillJson,
   readInterviewPrefillFromHash,
   resolveRealtimeInterviewSource,
   resolveSessionVoiceMode,
@@ -212,25 +213,27 @@ export const LazyPileCreateQuestionsAndSurveys = React.lazy(() => import('./Crea
 export const LazySessionListeningPanel = React.lazy(() => import('./SessionListeningPanel'));
 export const LazySessionVoiceModeModal = React.lazy(() => import('./SessionVoiceModeModal'));
 
-const readInterviewPrefillStateForProps = (props: SurveyQuestionsProps = {}, hash: unknown) => {
-  const hasPrefill = hasInterviewPrefillHash(hash);
-  if (!hasPrefill) {
-    return { hasPrefill: false, packet: null as InterviewPrefillPacket | null, error: '' };
-  }
-  const packet = readInterviewPrefillFromHash(hash);
+// A prefill drafted for another session is never applied here.
+const prefillSessionMismatch = (props: SurveyQuestionsProps, packet: InterviewPrefillPacket): string => {
   const effectiveSlug = String(resolveEffectiveSlug(props) || '')
     .trim()
     .toLowerCase();
-  if (packet && (!effectiveSlug || packet.sessionSlug === effectiveSlug)) {
-    return { hasPrefill: true, packet, error: '' };
+  return effectiveSlug && packet.sessionSlug !== effectiveSlug
+    ? 'This interview prefill belongs to a different session.'
+    : '';
+};
+
+const readInterviewPrefillStateForProps = (props: SurveyQuestionsProps = {}, hash: unknown) => {
+  if (!hasInterviewPrefillHash(hash)) {
+    return { hasPrefill: false, packet: null as InterviewPrefillPacket | null, error: '', notice: '' };
   }
-  return {
-    hasPrefill: true,
-    packet: null as InterviewPrefillPacket | null,
-    error: packet
-      ? 'This interview prefill link belongs to a different session.'
-      : 'This interview prefill link is invalid or incomplete. Ask the AI for a fresh link.',
-  };
+  const read = readInterviewPrefillFromHash(hash);
+  const error = read.packet
+    ? prefillSessionMismatch(props, read.packet)
+    : `${read.error} Ask the AI for a fresh link, or paste the JSON packet it gave you below.`;
+  return error
+    ? { hasPrefill: true, packet: null as InterviewPrefillPacket | null, error, notice: '' }
+    : { hasPrefill: true, packet: read.packet, error: '', notice: read.notice };
 };
 
 export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngine) => {
@@ -245,10 +248,12 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
     interviewEnabled && typeof window !== 'undefined' && opensSessionVoiceChooser(window.location.search || '');
   let initialPrefillPacket: InterviewPrefillPacket | null = null;
   let initialInterviewPrefillError = '';
+  let initialInterviewPrefillNotice = '';
   if (interviewEnabled && typeof window !== 'undefined') {
     const prefillState = readInterviewPrefillStateForProps(props, window.location.hash || '');
     initialPrefillPacket = prefillState.packet;
     initialInterviewPrefillError = prefillState.error;
+    initialInterviewPrefillNotice = prefillState.notice;
   }
   let initialFilterState = normalizeSurveyToolFilterState(props.filterState);
   if (Object.keys(initialFilterState).length === 0 && typeof window !== 'undefined') {
@@ -295,10 +300,17 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
     showHologramAssistant: false,
     showListeningPanel:
       typeof window !== 'undefined' ? isListeningModeQueryEnabled(window.location.search || '') : false,
-    showVoiceModeModal: !!(initialVoiceMode || initialPrefillPacket || opensVoiceChooser),
-    sessionVoiceMode: initialPrefillPacket ? 'interview' : initialVoiceMode,
+    // A prefill link opens the interview, where a broken one says why and offers a paste instead.
+    showVoiceModeModal: !!(
+      initialVoiceMode ||
+      initialPrefillPacket ||
+      initialInterviewPrefillError ||
+      opensVoiceChooser
+    ),
+    sessionVoiceMode: initialPrefillPacket || initialInterviewPrefillError ? 'interview' : initialVoiceMode,
     interviewPrefillPacket: initialPrefillPacket,
     interviewPrefillError: initialInterviewPrefillError,
+    interviewPrefillNotice: initialInterviewPrefillNotice,
   };
   const warmSeedState = engine.buildWarmPileSeedState(props);
   if (warmSeedState) {
@@ -449,6 +461,7 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
     toggleSessionVoiceModeModal: bindPileEngineMethod(engine, toggleSessionVoiceModeModal),
     selectSessionVoiceMode: bindPileEngineMethod(engine, selectSessionVoiceMode),
     closeSessionVoiceModeModal: bindPileEngineMethod(engine, closeSessionVoiceModeModal),
+    importInterviewPrefillJson: bindPileEngineMethod(engine, importInterviewPrefillJson),
     viewResultsFromSessionVoiceModeModal: bindPileEngineMethod(engine, viewResultsFromSessionVoiceModeModal),
     recordInterviewProvenance: bindPileEngineMethod(engine, recordInterviewProvenance),
     toggleHologramAssistant: bindPileEngineMethod(engine, toggleHologramAssistant),
@@ -1073,9 +1086,10 @@ const consumeInterviewPrefillHashIfPresent = (engine: PileViewModeEngine) => {
   engine.setState(
     {
       showVoiceModeModal: true,
-      sessionVoiceMode: prefillState.packet ? 'interview' : engine.state.sessionVoiceMode || null,
+      sessionVoiceMode: 'interview',
       interviewPrefillPacket: prefillState.packet,
       interviewPrefillError: prefillState.error,
+      interviewPrefillNotice: prefillState.notice,
     },
     () => {
       try {
@@ -1488,7 +1502,7 @@ const toggleSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   engine.setState({
     showVoiceModeModal: true,
     sessionVoiceMode: resumeInterview ? 'interview' : null,
-    ...(resumeInterview ? {} : { interviewPrefillPacket: null, interviewPrefillError: '' }),
+    ...(resumeInterview ? {} : { interviewPrefillPacket: null, interviewPrefillError: '', interviewPrefillNotice: '' }),
   });
 };
 
@@ -1496,6 +1510,21 @@ const selectSessionVoiceMode = (engine: PileViewModeEngine, mode: SessionVoiceMo
   engine.setState({ showVoiceModeModal: true, sessionVoiceMode: mode }, () => {
     engine.syncSessionVoiceModeQuery(mode);
   });
+};
+
+// The paste fallback for a prefill link that doesn't open: the same checks, then the same review.
+const importInterviewPrefillJson = (engine: PileViewModeEngine, text: string): string => {
+  const read = parseInterviewPrefillJson(text);
+  const error = read.packet ? prefillSessionMismatch(engine.props || {}, read.packet) : read.error;
+  if (error) return error;
+  engine.setState({
+    showVoiceModeModal: true,
+    sessionVoiceMode: 'interview',
+    interviewPrefillPacket: read.packet,
+    interviewPrefillError: '',
+    interviewPrefillNotice: read.notice,
+  });
+  return '';
 };
 
 const closeSessionVoiceModeModal = (engine: PileViewModeEngine) => {
@@ -3147,6 +3176,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     sessionVoiceMode,
     interviewPrefillPacket,
     interviewPrefillError,
+    interviewPrefillNotice,
   } = engine.state;
   // The voice modal and its large chunk load on first open, then stay mounted so closing animates. Unsent
   // recording audio kept on this device mounts it closed, so its notice shows after a reload too.
@@ -3449,6 +3479,8 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                 )}
                 prefillPacket={(interviewPrefillPacket as InterviewPrefillPacket | null) || null}
                 initialError={String(interviewPrefillError || '')}
+                prefillNotice={String(interviewPrefillNotice || '')}
+                onImportPrefillJson={engine.importInterviewPrefillJson}
                 onApplyAnswer={(questionId: string, answer: unknown) =>
                   applySessionInterviewAnswer(engine, questionId, answer)
                 }

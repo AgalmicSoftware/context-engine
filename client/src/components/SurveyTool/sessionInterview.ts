@@ -4,6 +4,7 @@ import {
   validateQuadraticQuestion,
 } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { normalizePublicInterviewQuestions } from '../../../../shared/interviewQuestionCatalog.mjs';
+import { decodeLinkJson, encodeLinkJson, readLinkParam } from '../../../../shared/linkPayload.mjs';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { QUADRATIC_ANSWER_RULE, QUADRATIC_QUESTION_RULE, QUESTION_TAG_RULE } from '../../../../shared/promptRules.mjs';
 import {
@@ -317,29 +318,26 @@ export const hashInterviewQuestions = async (
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
-const bytesToBase64url = (bytes: Uint8Array): string => {
-  let binary = '';
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-};
+export const encodeInterviewPrefillPacket = (packet: InterviewPrefillPacket): string => encodeLinkJson(packet);
 
-const base64urlToBytes = (value: string): Uint8Array => {
-  const base64 = value
-    .replace(/-/g, '+')
-    .replace(/_/g, '/')
-    .padEnd(Math.ceil(value.length / 4) * 4, '=');
-  const binary = atob(base64);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+// The first required field a packet lacks, named so the person can ask their AI to fix it.
+const describePrefillPacketProblem = (value: unknown): string => {
+  const packet = asRecord(value);
+  if (Number(packet.version) !== 1) return 'This is not an interview prefill packet: its version must be 1.';
+  if (!toTrimmedString(packet.sessionSlug)) return 'The prefill packet has no sessionSlug.';
+  if (!toTrimmedString(asRecord(packet.source).modelId)) return 'The prefill packet has no source.modelId.';
+  if (!/^[0-9a-f]{64}$/.test(toTrimmedString(packet.questionSetHash).toLowerCase())) {
+    return 'The prefill packet’s questionSetHash is missing or changed; it must be copied from the catalog as it is.';
+  }
+  if (!SUPPORTED_INTERVIEW_PROMPT_VERSIONS.has(toTrimmedString(packet.promptVersion))) {
+    return 'The prefill packet’s promptVersion is not one this page reads. Ask the AI to fetch the catalog again.';
+  }
+  return '';
 };
-
-export const encodeInterviewPrefillPacket = (packet: InterviewPrefillPacket): string =>
-  bytesToBase64url(new TextEncoder().encode(JSON.stringify(packet)));
 
 export const normalizeInterviewPrefillPacket = (value: unknown): InterviewPrefillPacket | null => {
+  if (describePrefillPacketProblem(value)) return null;
   const packet = asRecord(value);
-  if (Number(packet.version) !== 1) return null;
   const sessionSlug = toTrimmedString(packet.sessionSlug).toLowerCase();
   const source = asRecord(packet.source);
   const researchCoverage = normalizeResearchCoverage(source.researchCoverage);
@@ -369,13 +367,6 @@ export const normalizeInterviewPrefillPacket = (value: unknown): InterviewPrefil
       };
     })
     .filter((entry) => entry.fact);
-  if (
-    !sessionSlug ||
-    !toTrimmedString(source.modelId) ||
-    !/^[0-9a-f]{64}$/.test(questionSetHash) ||
-    !SUPPORTED_INTERVIEW_PROMPT_VERSIONS.has(promptVersion)
-  )
-    return null;
   return {
     version: 1,
     sessionSlug,
@@ -400,22 +391,48 @@ export const normalizeInterviewPrefillPacket = (value: unknown): InterviewPrefil
   };
 };
 
-export const decodeInterviewPrefillPacket = (encoded: unknown): InterviewPrefillPacket | null => {
-  const text = toTrimmedString(encoded);
-  if (!text || text.length > 100_000) return null;
+/** A prefill from a link or a paste: the packet, or why there is none. */
+export type InterviewPrefillRead =
+  { packet: InterviewPrefillPacket; error: ''; notice: string } | { packet: null; error: string; notice: '' };
+
+// Prefill packets are a few kilobytes; no link the AI writes is this long.
+const PREFILL_LINK_MAX_LENGTH = 100_000;
+
+const readInterviewPrefillValue = (value: unknown): InterviewPrefillRead => {
+  const packet = normalizeInterviewPrefillPacket(value);
+  if (!packet) return { packet: null, error: describePrefillPacketProblem(value), notice: '' };
+  // Incomplete or repeated drafts can't be reviewed, so they're left out, and said to be.
+  const offered = asRecord(value).responses;
+  const dropped = (Array.isArray(offered) ? offered.length : 0) - (packet.responses?.length || 0);
+  return {
+    packet,
+    error: '',
+    notice: dropped
+      ? `Left out ${dropped === 1 ? '1 draft' : `${dropped} drafts`} from your AI that ${dropped === 1 ? 'was' : 'were'} incomplete or repeated; each needs a question, an answer and a confidence.`
+      : '',
+  };
+};
+
+/** Reads a #prefill= value: unpadded base64url of the packet's UTF-8 JSON. */
+export const decodeInterviewPrefill = (encoded: unknown): InterviewPrefillRead => {
+  const decoded = decodeLinkJson(encoded, { maxLength: PREFILL_LINK_MAX_LENGTH });
+  return decoded.ok ? readInterviewPrefillValue(decoded.value) : { packet: null, error: decoded.error, notice: '' };
+};
+
+/** Reads the JSON packet a person pastes when the AI's link doesn't work. */
+export const parseInterviewPrefillJson = (text: unknown): InterviewPrefillRead => {
   try {
-    return normalizeInterviewPrefillPacket(JSON.parse(new TextDecoder().decode(base64urlToBytes(text))));
+    return readInterviewPrefillValue(JSON.parse(String(text ?? '')));
   } catch {
-    return null;
+    return { packet: null, error: 'This is not valid JSON. Copy all of the packet your AI gave you.', notice: '' };
   }
 };
 
-export const readInterviewPrefillFromHash = (hash: unknown): InterviewPrefillPacket | null => {
-  const raw = toTrimmedString(hash).replace(/^#/, '');
-  if (!raw) return null;
-  const params = new URLSearchParams(raw);
-  return decodeInterviewPrefillPacket(params.get(INTERVIEW_PREFILL_FRAGMENT_KEY));
-};
+export const decodeInterviewPrefillPacket = (encoded: unknown): InterviewPrefillPacket | null =>
+  decodeInterviewPrefill(encoded).packet;
+
+export const readInterviewPrefillFromHash = (hash: unknown): InterviewPrefillRead =>
+  decodeInterviewPrefill(readLinkParam(hash, INTERVIEW_PREFILL_FRAGMENT_KEY));
 
 export const hasInterviewPrefillHash = (hash: unknown): boolean => {
   const raw = toTrimmedString(hash).replace(/^#/, '');
