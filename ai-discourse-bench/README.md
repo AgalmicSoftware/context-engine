@@ -373,7 +373,10 @@ Rating prompts retain their original whole-number wording when the minimum is an
 integer and the step is 1. Other grids state the step and origin explicitly.
 
 The command has the same retry, concurrency, checkpoint and `--resume`
-behavior as stance runs; `--seed` fixes the option orders.
+behavior as stance runs; `--seed` fixes the option orders. Resuming reuses an
+answer only when its `requestHash` matches: a changed prompt, model, endpoint,
+generation setting, routing or answer schema asks again. Answers saved before
+rows carried a `requestHash` are asked again once.
 
 Completed stance runs can be combined with `build-report --runs file1.json,file2.json`
 when the bank, prompt template, harness, mode, and persona identity agree.

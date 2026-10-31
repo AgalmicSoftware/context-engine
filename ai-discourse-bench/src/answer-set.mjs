@@ -18,10 +18,10 @@ import {
   DEFAULT_OUTPUT_SCHEMA_VERSION,
   DEFAULT_RETRY_BASE_DELAY_MS,
 } from './config.mjs';
-import { callOpenAiCompatibleChat } from './adapters/openai-compatible.mjs';
+import { callOpenAiCompatibleChat, getProviderConfig } from './adapters/openai-compatible.mjs';
 import { assertSafeUniqueIdentifiers, isSafeIdentifier } from './identifiers.mjs';
 import { jsonObjectCandidates, normalizeForCanonicalPolarity, parseModelAnswer } from './normalize.mjs';
-import { sha256 } from './provenance.mjs';
+import { hashJson, sha256 } from './provenance.mjs';
 
 const nowIso = () => new Date().toISOString();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -367,22 +367,33 @@ export const callMockAnswer = async ({ model, prompt, question, order }) => {
 
 const maxTokensFor = (modelEntry, question) => modelEntry.maxTokens ?? (question.type === 'freeform' ? 600 : 300);
 
-const callAnswerModel = async ({ providerOverride, modelEntry, prompt, question, order }) => {
-  const provider = providerOverride || modelEntry.provider;
-  if (provider === 'mock') return callMockAnswer({ model: modelEntry.model, prompt, question, order });
-  if (provider !== 'local' && provider !== 'openrouter') throw new Error(`Unsupported provider: ${provider}`);
-  return callOpenAiCompatibleChat({
-    provider,
-    model: modelEntry.model,
-    prompt,
-    temperature: modelEntry.temperature ?? 0.2,
-    maxTokens: maxTokensFor(modelEntry, question),
-    timeoutMs: modelEntry.timeoutMs,
-    structuredOutput: modelEntry.structuredOutput || 'auto',
-    providerRouting: modelEntry.providerRouting || null,
-    responseSchema: answerJsonSchema({ question, order }),
-    systemPrompt: SYSTEM_PROMPT,
+// Everything that shapes a reply. A saved reply is reused only for the same
+// request, so a changed endpoint, setting, routing or answer schema asks again.
+const answerRequestFor = ({ providerOverride, modelEntry, question, order }) => ({
+  provider: providerOverride || modelEntry.provider,
+  model: modelEntry.model,
+  temperature: modelEntry.temperature ?? 0.2,
+  maxTokens: maxTokensFor(modelEntry, question),
+  structuredOutput: modelEntry.structuredOutput || 'auto',
+  providerRouting: modelEntry.providerRouting || null,
+  responseSchema: answerJsonSchema({ question, order }),
+  systemPrompt: SYSTEM_PROMPT,
+});
+
+const answerRequestHash = (request, prompt) =>
+  hashJson({
+    ...request,
+    endpoint: ['local', 'openrouter'].includes(request.provider) ? getProviderConfig(request.provider).baseUrl : null,
+    promptHash: sha256(prompt),
   });
+
+const callAnswerModel = async ({ providerOverride, modelEntry, prompt, question, order }) => {
+  const request = answerRequestFor({ providerOverride, modelEntry, question, order });
+  if (request.provider === 'mock') return callMockAnswer({ model: request.model, prompt, question, order });
+  if (request.provider !== 'local' && request.provider !== 'openrouter') {
+    throw new Error(`Unsupported provider: ${request.provider}`);
+  }
+  return callOpenAiCompatibleChat({ ...request, prompt, timeoutMs: modelEntry.timeoutMs });
 };
 
 const normalizeModelResponse = (response) =>
@@ -417,8 +428,9 @@ const buildTasks = ({ questionSet, modelRoster, repeats, seed }) => {
 
 /**
  * Asks every model every question, `repeats` times in each of its ways, and
- * returns one row per reply. Rows from an earlier run with the same prompt,
- * model and provider are reused, so an interrupted run can resume.
+ * returns one row per reply. Rows from an earlier run of the same request
+ * (prompt, model, endpoint, settings and answer schema) are reused, so an
+ * interrupted run can resume.
  */
 export const runAnswerSet = async ({
   questionSet,
@@ -446,6 +458,7 @@ export const runAnswerSet = async ({
   const tasks = buildTasks({ questionSet, modelRoster, repeats, seed: effectiveSeed });
   const promptFor = (task) => buildAnswerPrompt(task);
   const providerFor = (task) => providerOverride || task.modelEntry.provider;
+  const requestHashFor = (task) => answerRequestHash(answerRequestFor({ providerOverride, ...task }), promptFor(task));
   const reusable = new Map(
     existingRows
       .filter((row) => row && row.answer !== null && row.answer !== undefined && !row.error && !row.parseError)
@@ -455,12 +468,7 @@ export const runAnswerSet = async ({
   const pending = [];
   for (const task of tasks) {
     const prior = reusable.get(task.runId);
-    if (
-      prior &&
-      prior.promptHash === sha256(promptFor(task)) &&
-      prior.model === task.modelEntry.model &&
-      prior.provider === providerFor(task)
-    ) {
+    if (prior && prior.requestHash === requestHashFor(task)) {
       rowsById.set(task.runId, prior);
     } else {
       pending.push(task);
@@ -513,6 +521,7 @@ export const runAnswerSet = async ({
       ...(options.length ? { presentedOptions: task.order.map((index) => options[index]) } : {}),
       repeatIndex: task.repeatIndex,
       promptHash: sha256(prompt),
+      requestHash: requestHashFor(task),
       answer: reply.answer,
       rawAnswer: reply.rawAnswer,
       confidence: reply.confidence,

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -204,6 +205,56 @@ test('a run answers every question every way, and resumes without asking again',
   });
   assert.equal(calls, 0);
   assert.equal(resumed.resumedRows, result.rows.length);
+});
+
+// A loopback OpenAI-compatible server that records the temperature of each request.
+const startAnswerServer = async () => {
+  const temperatures = [];
+  const server = http.createServer((request, response) => {
+    let body = '';
+    request.on('data', (chunk) => {
+      body += chunk;
+    });
+    request.on('end', () => {
+      const payload = JSON.parse(body || '{}');
+      temperatures.push(payload.temperature);
+      const content = JSON.stringify({ answer: 'Agree', confidence: 0.6, rationale: 'Loopback reply.' });
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ model: payload.model, choices: [{ message: { content }, finish_reason: 'stop' }] }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return {
+    temperatures,
+    baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
+    close: () => new Promise((resolve) => server.close(resolve)),
+  };
+};
+
+test('a resumed run asks again when the endpoint or a model setting changed', async (t) => {
+  const [first, second] = await Promise.all([startAnswerServer(), startAnswerServer()]);
+  const previousBaseUrl = process.env.AIDB_LOCAL_BASE_URL;
+  t.after(async () => {
+    if (previousBaseUrl === undefined) delete process.env.AIDB_LOCAL_BASE_URL;
+    else process.env.AIDB_LOCAL_BASE_URL = previousBaseUrl;
+    await Promise.all([first.close(), second.close()]);
+  });
+  const questionSet = readQuestionSet({ questions: [resultsExport.filteredQuestions[0]] });
+  const run = (baseUrl, temperature, existingRows = []) => {
+    process.env.AIDB_LOCAL_BASE_URL = baseUrl;
+    const model = { id: 'local-model', model: 'loopback-model', provider: 'local', temperature, structuredOutput: 'none' };
+    return runAnswerSet({ questionSet, modelRoster: { models: [model] }, repeats: 1, existingRows });
+  };
+
+  const saved = await run(first.baseUrl, 0.2);
+  assert.equal((await run(first.baseUrl, 0.2, saved.rows)).resumedRows, 1, 'the same request resumes');
+  assert.deepEqual(first.temperatures, [0.2]);
+
+  assert.equal((await run(second.baseUrl, 0.2, saved.rows)).resumedRows, 0);
+  assert.deepEqual(second.temperatures, [0.2], 'a new endpoint is asked');
+
+  assert.equal((await run(first.baseUrl, 1.5, saved.rows)).resumedRows, 0);
+  assert.deepEqual(first.temperatures, [0.2, 1.5], 'a changed temperature is asked again');
 });
 
 test('a reply that fails the checks is asked again, then kept as unanswered', async () => {
