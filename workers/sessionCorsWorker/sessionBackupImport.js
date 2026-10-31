@@ -155,6 +155,8 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const stateKey = `session-backup-import:${page.archiveId}`;
   const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
   const active = await readActiveBackupImport(coordinator, slug, true, budget);
+  // Only 0.8.0 progress lacks a destination, and it started on this Worker.
+  if (active && !active.progress.workerUrl) active.progress.workerUrl = destination;
   if (active && active.progress.workerUrl !== destination) fail('Restore Worker origin cannot change between pages.', 409);
   if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail('Another backup restore is in progress. Check restore status to abandon it.', 409, 'backup_restore_in_progress');
   const pageHash = await sha256Hex(JSON.stringify(page));

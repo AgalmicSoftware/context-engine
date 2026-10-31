@@ -13,7 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
 import { selectCanonicalStorageVersions } from '../../shared/storage/canonicalStorageVersions.mjs';
-import { getSessionSecrets, putSessionSecrets } from './sessionConfigSecretsStore.js';
+import { getSessionSecrets, putSessionConfig, putSessionSecrets } from './sessionConfigSecretsStore.js';
 import { updateSessionSecretsAfterLitRepair } from './sessionLitAuthorizationCoordinator.js';
 import { decryptSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
@@ -1185,6 +1185,80 @@ test('a committed restore cannot expire or be abandoned and status alone finishe
   assertCompletedRestoreClean(target, archiveId);
   assertRestoredFixtureRows(source, target);
   assert.equal([...target.kv.values.keys()].filter((key) => key.startsWith(`ce-storage:${slug}:responses:`)).length, 120);
+});
+
+// 0.8.0 published a restore's config before its cleanup and recorded only
+// {configPublished, finishing}, with no committed authority or destination.
+const legacyPublishedRestore = async () => {
+  const { source, pages } = await completedRestoreSource();
+  const importer = `0x${'2'.repeat(40)}`;
+  const target = fixture(restartOnEveryRequest());
+  target.kv.values.delete(`session:${slug}:config`);
+  const archiveId = pages[0].archiveId;
+  let progress;
+  for (const page of pages) {
+    for (let attempts = 0; attempts < 50 && !progress?.committedAuthority; attempts += 1) {
+      const result = await restorePageAs(target.env, page, importer);
+      assert.equal(result.ok, true, JSON.stringify(result));
+      progress = restoreStore(target.env).get(`session-backup-import:${archiveId}`);
+      if (result.body.pageComplete !== false) break;
+    }
+  }
+  assert.ok(progress?.committedAuthority, 'The fixture stops after commit, before cleanup');
+  const authority = progress.committedAuthority;
+  const legacy = { ...progress, configPublished: true, finishing: true, finished: false };
+  delete legacy.committedAuthority;
+  delete legacy.workerUrl;
+  restoreStore(target.env).set(`session-backup-import:${archiveId}`, legacy);
+  restoreStore(target.env).set('session-config-authority', { ...authority, projectionPending: false });
+  await putSessionConfig(target.env, slug, authority.config);
+  return { source, pages, target, importer, archiveId, revision: authority.revision };
+};
+
+test('a restore 0.8.0 published is finished by status, never abandoned or expired', async () => {
+  const { source, target, archiveId, revision } = await legacyPublishedRestore();
+  // The archive's admin now administers the live config; the importer differs.
+  const control = (operation) => callSessionConfigCoordinator({ env: target.env, slug, path: `backup/${operation}`,
+    archiveId, expectedAuthority: { actor: admin, revision, authzEpoch: 0 } });
+  assert.equal((await control('abandon')).status, 409);
+  assertRestoredFixtureRows(source, target);
+  restoreStore(target.env).get(`session-backup-import:${archiveId}`).expiresAt = 0;
+  for (let attempts = 0; attempts < 50; attempts += 1) {
+    const result = await control('status');
+    assert.equal(result.ok, true, JSON.stringify(result));
+    if (!result.body.restore) break;
+    assert.equal(result.body.restore.canAbandon, false);
+    assert.ok(attempts < 49);
+  }
+  assertCompletedRestoreClean(target, archiveId);
+  assertRestoredFixtureRows(source, target);
+  assert.equal(JSON.parse(await target.kv.get(`session:${slug}:config`)).adminAddress, admin);
+});
+
+test('the importer can resume a restore 0.8.0 published from its final page', async () => {
+  const { source, pages, target, importer, archiveId, revision } = await legacyPublishedRestore();
+  for (let attempts = 0; attempts < 50; attempts += 1) {
+    const result = await restorePageAs(target.env, pages.at(-1), importer, revision);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    if (result.body.complete) break;
+    assert.ok(attempts < 49);
+  }
+  assertCompletedRestoreClean(target, archiveId);
+  assertRestoredFixtureRows(source, target);
+});
+
+test('a restore 0.8.0 published without its authority fails closed and deletes nothing', async () => {
+  const { source, target, archiveId } = await legacyPublishedRestore();
+  restoreStore(target.env).delete('session-config-authority');
+  target.kv.values.delete(`session:${slug}:config`);
+  restoreStore(target.env).get(`session-backup-import:${archiveId}`).expiresAt = 0;
+  for (const operation of ['status', 'abandon']) {
+    const result = await callSessionConfigCoordinator({ env: target.env, slug, path: `backup/${operation}`,
+      archiveId, expectedAuthority: { actor: admin, revision: 0, authzEpoch: 0 } });
+    assert.equal(result.status, 409, operation);
+  }
+  assertRestoredFixtureRows(source, target);
+  assert.ok(restoreStore(target.env).get(`session-backup-import:${archiveId}`));
 });
 
 test('lost replies at commit, cleanup, handoff and projection recover after a coordinator restart', async () => {

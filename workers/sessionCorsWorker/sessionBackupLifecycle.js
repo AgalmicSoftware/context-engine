@@ -106,6 +106,12 @@ export const readActiveBackupImport = async (coordinator, slug, cleanExpired = t
   if (!archiveId) return null;
   const progress = await storage.get(backupImportStateKey(archiveId));
   if (!progress) return null;
+  // 0.8.0 published the restored config before its cleanup and recorded only
+  // configPublished. That config is live, so such a restore can only finish.
+  if (progress.configPublished === true && !progress.committedAuthority) {
+    progress.committedAuthority = await storage.get('session-config-authority');
+    if (!progress.committedAuthority) fail('The published restore has no session authority; nothing was deleted.');
+  }
   const expired = !Number.isFinite(progress.expiresAt) || progress.expiresAt <= coordinator.now();
   if (cleanExpired && (expired || progress.abandoning) && !progress.committedAuthority) {
     if (await cleanup(coordinator, slug, archiveId, progress, budget)) return null;
@@ -136,7 +142,9 @@ export const controlCoordinatorBackupImport = async (coordinator, payload, aband
   if (payload.completedOnly) return Response.json({ error: 'Admin authorization failed.' }, { status: 403 });
   await coordinator.assertSessionAuthority(payload, { allowRestore: true });
   let active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
-  if (active?.progress.committedAuthority && active.progress.actor !== payload.expectedAuthority.actor) {
+  // A 0.8.0 restore already handed its config to that config's admins.
+  if (active?.progress.committedAuthority && !active.progress.configPublished &&
+      active.progress.actor !== payload.expectedAuthority.actor) {
     fail('Only the importing admin can finish this restore.');
   }
   if (abandon) {
