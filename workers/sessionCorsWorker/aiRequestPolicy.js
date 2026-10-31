@@ -46,7 +46,7 @@ export const isSessionTranscriptionModelAllowed = ({ config, provider, model, gr
 
 // These are per-call ceilings, not allowances. Labels are caller-controlled but
 // can select only these bounded operations, never a caller-supplied maximum.
-// Built-ins using the common 16,384-token (Anthropic 32,568) transport
+// Built-ins using the common 16,384-token (Anthropic 32,768) transport
 // default retain up to 16,000; reports and interview tasks keep smaller bounds.
 const operationCeilings = Object.freeze({
   generate: 16000, rewrite: 16000, summarize: 16000, rank: 16000, compare: 16000, categorize: 16000,

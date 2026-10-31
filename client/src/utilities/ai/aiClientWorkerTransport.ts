@@ -53,7 +53,8 @@ export const buildAiWorkerRequestPlan = ({
   const usesResponsesApi = usesOpenAiResponsesApi({ provider, model });
   const usesCompletionTokens = !usesResponsesApi && isOpenAiReasoningModel(model);
   const messages = Array.isArray(opts.messages) ? opts.messages : [{ role: 'user', content: prompt }];
-  const maxTokens = opts.max_tokens ?? opts.maxTokens ?? (provider === 'anthropic' ? 32568 : 16384);
+  // Claude counts its thinking toward max_tokens, so it gets the larger default.
+  const maxTokens = opts.max_tokens ?? opts.maxTokens ?? (provider === 'anthropic' ? 32768 : 16384);
   const maxOutputTokens = opts.max_output_tokens ?? (usesResponsesApi ? maxTokens : undefined);
   const maxCompletionTokens = opts.max_completion_tokens ?? (usesCompletionTokens ? maxTokens : undefined);
 

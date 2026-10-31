@@ -160,6 +160,18 @@ it('sends the new GPT-6 models to Responses with an effort each accepts', () => 
   }
 });
 
+it('sends Claude the request effort and a 32,768-token default budget', () => {
+  const plan = buildAiWorkerRequestPlan({
+    ai: { model: 'claude-opus-5-5', provider: 'anthropic', reasoningEffort: 'medium' },
+  });
+  expect(plan.requestBody).toMatchObject({ max_tokens: 32768, reasoning_effort: 'medium' });
+  // Older Claude models take no effort.
+  const older = buildAiWorkerRequestPlan({
+    ai: { model: 'claude-haiku-4-5', provider: 'anthropic', reasoningEffort: 'low' },
+  });
+  expect(older.requestBody).not.toHaveProperty('reasoning_effort');
+});
+
 it('gives GPT-5 and GPT-6 models on other providers a reasoning budget and no temperature', () => {
   const plan = buildAiWorkerRequestPlan({
     ai: { model: 'openai/gpt-6.1-terra', provider: 'openrouter' },

@@ -145,6 +145,75 @@ test('proxyAnthropic sends no temperature and answers with the text after thinki
   assert.equal(result.body.completion, 'Two points.');
 });
 
+const claudeRequest = async (payload, reply) => {
+  let sent = null;
+  const result = await proxyAnthropic({
+    payload: { apiKey: 'sk-request', messages: [{ role: 'user', content: 'Map this.' }], ...payload },
+    secrets: {},
+    baseHeaders: {},
+    deps: { json: createJsonStub(), fetch: async (_url, init) => { sent = JSON.parse(init.body); return Response.json(reply); } },
+  });
+  return { sent, result };
+};
+
+test('proxyAnthropic sends the effort and a JSON schema in output_config', async () => {
+  const schema = { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'], additionalProperties: false };
+  for (const response_format of [
+    { type: 'json_schema', json_schema: { name: 'result', schema, strict: true } },
+    { type: 'json_schema', name: 'result', schema, strict: true },
+  ]) {
+    const { sent, result } = await claudeRequest(
+      { model: 'claude-sonnet-5-5', reasoning_effort: 'none', response_format },
+      { content: [{ type: 'text', text: '{"ok":true}' }], stop_reason: 'end_turn' },
+    );
+    // Claude has no none level, so the nearest one above it is sent.
+    assert.deepEqual(sent.output_config, { effort: 'low', format: { type: 'json_schema', schema } });
+    assert.equal(result.body.completion, '{"ok":true}');
+  }
+  // A JSON object without a schema has no Claude form; the prompt carries it.
+  const plain = await claudeRequest(
+    { model: 'claude-opus-5-5', reasoning_effort: 'medium', response_format: { type: 'json_object' } },
+    { content: [{ type: 'text', text: '{}' }] },
+  );
+  assert.deepEqual(plain.sent.output_config, { effort: 'medium' });
+  // Older Claude models keep a plain request.
+  const older = await claudeRequest(
+    { model: 'claude-haiku-4-5', reasoning_effort: 'low', response_format: { type: 'json_schema', json_schema: { schema } } },
+    { content: [{ type: 'text', text: '{}' }] },
+  );
+  assert.equal('output_config' in older.sent, false);
+});
+
+test('proxyAnthropic reports a refusal and an empty answer as errors', async () => {
+  const refused = await claudeRequest({ model: 'claude-opus-5-5' }, { content: [], stop_reason: 'refusal' });
+  assert.equal(refused.result.status, 422);
+  assert.equal(refused.result.body.reason, 'ai_refused');
+  assert.match(refused.result.body.error, /declined/);
+  const truncated = await claudeRequest(
+    { model: 'claude-opus-5-5' },
+    { content: [{ type: 'thinking', thinking: '', signature: 'sig' }], stop_reason: 'max_tokens' },
+  );
+  assert.equal(truncated.result.status, 422);
+  assert.equal(truncated.result.body.reason, 'ai_empty');
+  assert.match(truncated.result.body.error, /token budget/);
+  const blank = await claudeRequest({ model: 'claude-opus-5-5' }, { content: [{ type: 'text', text: '  ' }], stop_reason: 'end_turn' });
+  assert.equal(blank.result.status, 422);
+  assert.equal(blank.result.body.reason, 'ai_empty');
+});
+
+test('proxyOpenAI fits the effort to the model and flattens a JSON schema for Responses', async () => {
+  const schema = { type: 'object', properties: {}, additionalProperties: false };
+  let body;
+  await proxyOpenAI({
+    payload: { apiKey: 'sk-request', model: 'gpt-6.1-sol', prompt: 'Analyse.', reasoning_effort: 'none',
+      response_format: { type: 'json_schema', json_schema: { name: 'analysis', schema, strict: true } } },
+    secrets: {},
+    deps: { json: createJsonStub(), fetch: async (_url, init) => { body = JSON.parse(init.body); return Response.json({ output_text: '{}' }); } },
+  });
+  assert.deepEqual(body.reasoning, { effort: 'low' });
+  assert.deepEqual(body.text, { format: { type: 'json_schema', name: 'analysis', schema, strict: true } });
+});
+
 test('proxyAnthropic preserves upstream error fallback to Anthropic error', async () => {
   const result = await proxyAnthropic({
     payload: {
