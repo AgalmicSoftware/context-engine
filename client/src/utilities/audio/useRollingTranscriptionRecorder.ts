@@ -434,9 +434,14 @@ export const useRollingTranscriptionRecorder = ({
     transcript,
     segments,
     pendingSegmentCount,
-    errorMessage:
-      chunks.storageError ||
-      (chunks.offline ? 'Offline. Audio stays on this device; reconnect to resume uploads in order.' : errorMessage),
+    // A capture stop leads; the storage and offline notices only say where the audio is kept.
+    errorMessage: [
+      errorMessage,
+      chunks.storageError,
+      chunks.offline ? 'Offline. Audio stays on this device; reconnect to resume uploads in order.' : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
     labelsUnavailableReason,
     retryChunk,
     downloadChunk: chunks.downloadChunk,

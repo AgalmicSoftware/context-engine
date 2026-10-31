@@ -313,6 +313,55 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
+  it.each(['storage', 'offline'] as const)(
+    'shows a microphone stop ahead of the %s notice, which never says capture continues',
+    async (notice) => {
+      const original = jest.mocked(putRecordingChunk).getMockImplementation()!;
+      const onLine = Object.getOwnPropertyDescriptor(navigator, 'onLine');
+      if (notice === 'storage') {
+        jest.mocked(putRecordingChunk).mockImplementation(async () => {
+          throw new DOMException('Full', 'QuotaExceededError');
+        });
+      }
+      let ended = () => {};
+      Object.assign(mockTrack, {
+        addEventListener: (_name: string, callback: () => void) => {
+          ended = callback;
+        },
+      });
+      (transcribeAudio as jest.Mock).mockImplementation(() => new Promise(() => {}));
+      const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: `${notice}-stop` }));
+      try {
+        await act(async () => {
+          await result.current.startRecording();
+        });
+        await act(async () => {
+          if (notice === 'offline') {
+            Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+            window.dispatchEvent(new Event('offline'));
+          }
+          instances[0].requestData();
+          await flushPromises();
+        });
+        const noticeText = notice === 'storage' ? "This recording can't be recovered after a reload" : 'Offline.';
+        expect(result.current.errorMessage).toContain(noticeText);
+        await act(async () => {
+          ended();
+          await flushPromises();
+        });
+        expect(result.current.status).toBe('error');
+        expect(result.current.errorMessage).toMatch(/^Microphone access ended/);
+        expect(result.current.errorMessage).toContain(noticeText);
+        expect(result.current.errorMessage).not.toMatch(/recording and transcription continue/i);
+      } finally {
+        unmount();
+        jest.mocked(putRecordingChunk).mockImplementation(original);
+        if (onLine) Object.defineProperty(navigator, 'onLine', onLine);
+        else delete (navigator as { onLine?: boolean }).onLine;
+      }
+    },
+  );
+
   it('keeps capturing and transcribing from memory when storage fails', async () => {
     const original = jest.mocked(putRecordingChunk).getMockImplementation()!;
     jest.mocked(putRecordingChunk).mockImplementation(async () => {

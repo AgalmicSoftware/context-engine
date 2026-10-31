@@ -18,7 +18,7 @@ type Options = {
 };
 const failureText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const storageText = (error: unknown) =>
-  `This recording can't be recovered after a reload. Recording and transcription continue in memory; download unsaved audio before leaving. ${failureText(error)}`;
+  `This recording can't be recovered after a reload. Its audio and transcript are kept in memory on this page; download unsaved audio before leaving. ${failureText(error)}`;
 
 /** Raw audio and its completed transcript share one atomic IndexedDB record. */
 export class RecordingChunkQueue {
