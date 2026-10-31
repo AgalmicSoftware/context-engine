@@ -4,7 +4,17 @@ import {
   validateSessionTemplate,
   type SessionTemplate,
 } from '@ce-shared/sessionTemplate.mjs';
-import { applySessionTemplateToDraft, buildSessionWizardDefaultTemplate } from './sessionWizardDraftState';
+import {
+  SESSION_MODE_PRESET_IDS,
+  cloneSessionModePreset,
+  type SessionModeProfile,
+} from '../../utilities/session/sessionModeProfile';
+import {
+  applySessionTemplateToDraft,
+  buildSessionWizardCacheWritePayload,
+  buildSessionWizardDefaultTemplate,
+  buildSessionWizardInitialDraftFromCache,
+} from './sessionWizardDraftState';
 import { realLengthSessionWizardDraft, sessionWizardTemplateProfiles } from './sessionWizardTemplate.testUtils';
 
 const template = (value: unknown): SessionTemplate => {
@@ -18,6 +28,35 @@ const exportDraft = (draft: unknown): SessionTemplate => {
   return result.template;
 };
 const defaults = () => template({ format: SESSION_TEMPLATE_FORMAT });
+// The page's reload: the sessionStorage cache write, then the cache read.
+const reload = (draft: Record<string, unknown>) =>
+  buildSessionWizardInitialDraftFromCache({
+    cachedWizard: { draft: buildSessionWizardCacheWritePayload({ draft }).draft },
+  });
+const edited = (
+  presetId: 'fast_cheap_cloudflare' | 'trustless_public_decentralized',
+  edit: (profile: SessionModeProfile) => void,
+) => {
+  const profile = cloneSessionModePreset(presetId);
+  profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  edit(profile);
+  return profile;
+};
+const importProfiles = (): Array<[string, SessionModeProfile]> => [
+  ...Object.entries(sessionWizardTemplateProfiles()),
+  [
+    'registry sign-in conflict',
+    edited(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED, (profile) => {
+      profile.identity = { default: 'passkey', enabled: ['passkey'] };
+    }),
+  ],
+  [
+    'unexpected chain conflict',
+    edited(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE, (profile) => {
+      profile.evm.registryChainId = 11155420;
+    }),
+  ],
+];
 
 describe('session templates and the setup draft', () => {
   it('exports a fresh setup draft as exactly the template defaults', () => {
@@ -34,6 +73,13 @@ describe('session templates and the setup draft', () => {
       expect(exportDraft(applySessionTemplateToDraft(exported))).toEqual(exported);
     },
   );
+
+  it.each(importProfiles())('imports the %s profile as given and keeps it through a reload', (_name, profile) => {
+    const shared = template({ format: SESSION_TEMPLATE_FORMAT, sessionName: 'Salon', sessionModeProfile: profile });
+    const imported = applySessionTemplateToDraft(shared);
+    expect(imported.sessionModeProfile).toEqual(profile);
+    expect(exportDraft(reload(imported))).toEqual(shared);
+  });
 
   it('keeps the base draft’s deployment fields and rebuilds storage from the imported profile', () => {
     const { cloudflare, decentralized } = sessionWizardTemplateProfiles();

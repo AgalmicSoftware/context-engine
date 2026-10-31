@@ -328,8 +328,8 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
 // mode profile keeps the base draft's profile.
 export const applySessionTemplateToDraft = (
   template: SessionTemplate,
-  baseDraft: AnyRecord = buildSessionWizardDefaultTemplate(),
-): AnyRecord => {
+  baseDraft = buildSessionWizardDefaultTemplate(),
+) => {
   const { format: _format, draftId, sessionModeProfile, ...fields } = template;
   let next = mergeSessionWizardDraftDeep(deepClone(baseDraft), deepClone(fields));
   if (draftId) next.draftId = draftId;
@@ -340,9 +340,9 @@ export const applySessionTemplateToDraft = (
       next = applySessionModeProfileSelectionToDraft(next, profile, compileSessionModeProfile(profile));
     } else {
       next.sessionModeProfile = profile;
-      // Normalizing merges the storage profile into the mode profile, so the
-      // base draft's storage would rewrite the imported profile.
-      delete next.storageProfile;
+      // A conflicting profile cannot be compiled. Every normalization merges
+      // the draft's storage side into the profile, so give it the profile's own.
+      next.storageProfile = normalizeSessionStorageProfileConfig(profile.storage);
     }
   }
   return normalizeSessionWizardDraftShape(next);
