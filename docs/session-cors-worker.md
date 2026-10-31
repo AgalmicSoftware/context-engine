@@ -1755,12 +1755,16 @@ R2 / Durable Objects:
   Switching either clears their retry state in the pile; a late receipt from
   the previous account cannot populate the next account's saved answers.
   An active reservation returns retryable `503 upload_in_progress` for 120 seconds;
-  an expired reservation resumes with a new attempt ID at the original storage ID
-  and metadata timestamp. Pending targets are retained for seven days from the
-  first reservation. A retry rebuilds encryption and metadata for that target, or
-  skips storage writes if its index entry was already published, then settles the
-  same reference. Interruptions between payload, index and settlement writes cannot
-  publish a second storage ID while the receipt is retained.
+  an expired reservation resumes with a new attempt ID and the original metadata
+  timestamp. Pending targets are retained for seven days from the first
+  reservation. A superseded attempt may still be writing, so a retry never writes
+  an earlier attempt's storage ID: it adopts an earlier target whose index entry
+  is already published, without writing, or else writes its own storage ID.
+  Settlement accepts only the current or an earlier target. A superseded attempt
+  that publishes late asks the coordinator to withdraw its target, then deletes
+  its own index entry and payload; the coordinator refuses once a retry has
+  adopted that target. An attempt interrupted before publishing leaves an
+  unlisted payload behind.
   Receipts retain HMACs of request IDs and payload digests, derived from
   `TOKEN_HMAC_SECRET`. Settled references remain for seven days from settlement.
   Pending and settled receipts together have a maximum of 2,000 per participant

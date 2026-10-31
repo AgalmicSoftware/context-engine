@@ -116,6 +116,9 @@ const createMockR2 = () => {
 		async get(key) {
 			return store.get(key) || null;
 		},
+		async delete(key) {
+			store.delete(key);
+		},
 	};
 };
 
@@ -4793,9 +4796,10 @@ test('hide requests validate the resource, id, and flag', async () => {
 });
 
 
-const createResponseReceiptFixture = ({ binding = true, maxKvValueBytes, encrypted = false } = {}) => {
+const createResponseReceiptFixture = ({ binding = true, maxKvValueBytes, encrypted = false, r2 = null } = {}) => {
   const kv = createMockKv();
-  const env = { CE_STORAGE_INDEX_KV: kv, TOKEN_HMAC_SECRET: 'synthetic-receipt-secret', CE_STORAGE_ENVELOPE_KEK: 'fixture envelope key' };
+  const env = { CE_STORAGE_INDEX_KV: kv, TOKEN_HMAC_SECRET: 'synthetic-receipt-secret', CE_STORAGE_ENVELOPE_KEK: 'fixture envelope key',
+    ...(r2 ? { CE_STORAGE_R2: r2 } : {}) };
   let config = encrypted ? createEnvelopeConfig() : { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
   let now = 1_000;
   if (binding) attachSessionCoordinator(env, next => { config = next; }, { now: () => now });
@@ -4836,7 +4840,7 @@ test('response receipts replay the stored reference without writes or another an
   assert.notEqual(other.id, first.id, 'receipt scope belongs to the authenticated participant');
 });
 
-test('pending response uploads wait, and an expired attempt reuses its storage id', async () => {
+test('pending response uploads wait, and an expired attempt writes its own storage id', async () => {
   const f = createResponseReceiptFixture();
   const put = f.kv.put;
   let failed = false;
@@ -4853,8 +4857,12 @@ test('pending response uploads wait, and an expired attempt reuses its storage i
   const retried = await f.upload();
   assert.equal(retried.status, 200);
   const saved = await retried.json();
-  assert.equal(orphanKey, `ce-storage-payload:session-a:${saved.id}`);
+  // The first attempt might still be running, so its unpublished payload is
+  // never rewritten; it stays unlisted because it has no index row.
+  assert.notEqual(orphanKey, `ce-storage-payload:session-a:${saved.id}`);
   assert.equal(f.kv.store.has(orphanKey), true);
+  assert.deepEqual([...f.kv.store.keys()].filter(key => key.startsWith('ce-storage:session-a:responses:')),
+    [`ce-storage:session-a:responses:${saved.id}`]);
   assert.equal(f.queued.length, 1);
 });
 
@@ -4967,13 +4975,54 @@ for (const encrypted of [false, true]) for (const interrupted of ['index', 'sett
     const retried = await f.upload();
     assert.equal(retried.status, 200, await retried.clone().text());
     const result = await retried.json();
-    assert.equal(result.id, firstId);
-    assert.equal(payloadKeys().length, 1); assert.equal(indexKeys().length, 1);
+    // A published row is adopted unchanged; an unpublished target is never
+    // rewritten, because its attempt might still be writing it.
+    assert.equal(result.id === firstId, interrupted === 'settle');
+    assert.equal(payloadKeys().length, interrupted === 'settle' ? 1 : 2); assert.equal(indexKeys().length, 1);
     assert.equal(JSON.parse(f.kv.store.get(indexKeys()[0])).createdAt, firstMetadata.createdAt);
     if (interrupted === 'settle') assert.deepEqual([...f.kv.store], before, 'published payloads are not rewritten');
     const read = await f.read(result.id);
     assert.equal(read.status, 200, await read.clone().text());
     assert.deepEqual(await read.json(), { questionID: 'q1', answer: { value: 'Agree' } });
+    assert.equal(f.queued.length, 1);
+  });
+}
+
+for (const useR2 of [true, false]) {
+  test(`a superseded encrypted attempt that publishes late cannot change the retry's answer (R2 ${useR2})`, async () => {
+    const r2 = useR2 ? createMockR2() : null;
+    const f = createResponseReceiptFixture({ encrypted: true, r2 });
+    const put = f.kv.put;
+    let release, arrived;
+    const stalled = new Promise(resolve => { arrived = resolve; });
+    const gate = new Promise(resolve => { release = resolve; });
+    let held = false;
+    f.kv.put = async (key, value) => {
+      if (!held && key.startsWith('ce-storage:session-a:responses:')) { held = true; arrived(); await gate; }
+      return put(key, value);
+    };
+    // The first attempt writes its payload, then stalls past its lease.
+    const late = f.upload();
+    await stalled;
+    f.advance(120_001);
+    const retried = await f.upload();
+    assert.equal(retried.status, 200, await retried.clone().text());
+    const saved = await retried.json();
+    const indexKey = `ce-storage:session-a:responses:${saved.id}`;
+    const published = f.kv.store.get(indexKey);
+    release();
+    assert.equal((await late).status, 503);
+    assert.equal(f.kv.store.get(indexKey), published, "the retry's row keeps its own envelope");
+    const read = await f.read(saved.id);
+    assert.equal(read.status, 200, await read.clone().text());
+    assert.deepEqual(await read.json(), { questionID: 'q1', answer: { value: 'Agree' } });
+    // The late attempt withdrew its own row and payload: one answer remains.
+    assert.deepEqual([...f.kv.store.keys()].filter(key => key.startsWith('ce-storage:session-a:responses:')), [indexKey]);
+    const payloads = useR2 ? [...r2.store.keys()] : [...f.kv.store.keys()].filter(key => key.startsWith('ce-storage-payload:'));
+    assert.equal(payloads.length, 1);
+    const replay = await (await f.upload()).json();
+    assert.equal(replay.id, saved.id);
+    assert.equal(replay.replayed, true);
     assert.equal(f.queued.length, 1);
   });
 }

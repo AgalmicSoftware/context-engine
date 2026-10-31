@@ -88,6 +88,7 @@ const uploadReceiptExpiresAt = record => record.state === 'settled'
     ? record.reservedAt + UPLOAD_RECEIPT_RETENTION_MS
     : 0;
 const MAX_UPLOAD_RECEIPTS = 2000;
+const MAX_PRIOR_UPLOAD_TARGETS = 8;
 const MAX_RESULTS_ANALYSIS_REQUESTS = 24;
 const RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24_000;
 const RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 64;
@@ -459,15 +460,19 @@ export class SessionWriteCoordinator {
     if (Number.isFinite(nextAlarm) && typeof this.state.storage.setAlarm === 'function') await this.state.storage.setAlarm(nextAlarm);
   }
 
-  async executeUploadReceipt(payload, settle = false) {
+  async executeUploadReceipt(payload, operation = 'reserve') {
+    const reserve = operation === 'reserve';
+    const settle = operation === 'settle';
+    const withdraw = operation === 'withdraw';
     const requestId = toTrimmedString(payload?.requestId);
     let payloadDigest = toTrimmedString(payload?.payloadDigest);
-    if (!requestId || requestId.length > 200 || (!settle && !/^[a-f0-9]{64}$/.test(payloadDigest))) {
+    if (!requestId || requestId.length > 200 || (reserve && !/^[a-f0-9]{64}$/.test(payloadDigest))) {
       return jsonResponse({ error: 'Invalid upload receipt request.' }, 400);
     }
     const storageId = toTrimmedString(payload?.storageId);
     const createdAt = toTrimmedString(payload?.createdAt);
-    if (!settle && (!isSafeCloudflareStorageRefId(storageId) || !Number.isFinite(Date.parse(createdAt)))) {
+    if ((reserve && (!isSafeCloudflareStorageRefId(storageId) || !Number.isFinite(Date.parse(createdAt)))) ||
+        (withdraw && (!isSafeCloudflareStorageRefId(storageId) || !toTrimmedString(payload?.attemptId)))) {
       return jsonResponse({ error: 'Invalid upload receipt target.' }, 400);
     }
     let storageRef;
@@ -481,7 +486,7 @@ export class SessionWriteCoordinator {
     if (!secret) return jsonResponse({ error: 'Upload receipt coordination is unavailable.', reason: 'upload_receipt_unavailable' }, 503);
     // Diagnostics must not block receipt durability. In particular, a daily
     // renewal during settle must never turn an already-stored answer into a retry.
-    if (!settle) {
+    if (reserve) {
       try { await registerUploadReceiptStore(this, payload?.diagnostics); } catch { /* best-effort diagnostics only */ }
     }
     // Low-entropy answers must not be guessable from a copy of coordinator
@@ -493,16 +498,30 @@ export class SessionWriteCoordinator {
     const macKey = await this.crypto.subtle.importKey('raw', derived, algorithm, false, ['sign']);
     const mac = async (domain, value) => bytesToHex(new Uint8Array(await this.crypto.subtle.sign('HMAC', macKey, encoder.encode(`${domain}:${value}`))));
     const key = `${UPLOAD_RECEIPT_PREFIX}${await mac('request', requestId)}`;
-    if (!settle) payloadDigest = await mac('payload', payloadDigest);
+    if (reserve) payloadDigest = await mac('payload', payloadDigest);
     const nowMs = Number(this.now()) || Date.now();
     const result = await this.state.storage.transaction(async (transaction) => {
-      if (!settle) await this.pruneUploadReceipts(transaction, nowMs);
+      if (reserve) await this.pruneUploadReceipts(transaction, nowMs);
       const record = await transaction.get(key);
+      if (withdraw) {
+        // A superseded attempt may remove the row it published late only while
+        // no retry adopted that target; afterwards no retry can adopt it.
+        const adopted = record?.state === 'settled' ? record.storageRef?.id === storageId : record?.storageId === storageId;
+        if (!record || adopted || record.attemptId === payload.attemptId) {
+          return { status: 409, error: 'This upload target is still in use.', reason: 'upload_target_in_use' };
+        }
+        if (record.priorStorageIds?.includes(storageId)) {
+          await transaction.put(key, { ...record, priorStorageIds: record.priorStorageIds.filter(id => id !== storageId) });
+        }
+        return { status: 200, ok: true };
+      }
       if (settle) {
         if (record?.state !== 'pending' || record.attemptId !== payload.attemptId) {
           return { status: 409, error: 'Upload attempt no longer owns this receipt.', reason: 'upload_attempt_superseded' };
         }
-        if (record.storageId !== storageRef.id) return { status: 409, error: 'Upload target does not match this receipt.', reason: 'upload_receipt_target_mismatch' };
+        if (record.storageId !== storageRef.id && !record.priorStorageIds?.includes(storageRef.id)) {
+          return { status: 409, error: 'Upload target does not match this receipt.', reason: 'upload_receipt_target_mismatch' };
+        }
         await transaction.put(key, { state: 'settled', payloadDigest: record.payloadDigest, storageRef, settledAt: nowMs });
         await this.pruneUploadReceipts(transaction, nowMs);
         return { status: 200, ok: true };
@@ -523,12 +542,17 @@ export class SessionWriteCoordinator {
       if ([...records.values()].filter(record => record.state === 'pending' && record.leaseUntil > nowMs).length >= MAX_UPLOAD_RECEIPTS) {
         return { status: 503, error: 'Upload receipt capacity is busy; retry shortly.', reason: 'upload_in_progress' };
       }
-      const target = resumed ? { storageId: record.storageId, createdAt: record.createdAt, reservedAt: record.reservedAt }
+      // A superseded attempt may still be writing its target, so a retry never
+      // writes that target again. It keeps the first timestamp and may adopt an
+      // earlier target only after that target's row was published.
+      const target = resumed ? { storageId, createdAt: record.createdAt, reservedAt: record.reservedAt,
+        priorStorageIds: [...(record.priorStorageIds || []), record.storageId].slice(-MAX_PRIOR_UPLOAD_TARGETS) }
         : { storageId, createdAt, reservedAt: nowMs };
       const attemptId = createAttemptId(this.crypto);
       await transaction.put(key, { state: 'pending', attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS, ...target });
       await this.pruneUploadReceipts(transaction, nowMs);
-      return { status: 200, kind: 'execute', attemptId, storageId: target.storageId, createdAt: target.createdAt, resumed };
+      return { status: 200, kind: 'execute', attemptId, storageId: target.storageId, createdAt: target.createdAt,
+        priorStorageIds: target.priorStorageIds || [], resumed };
     });
     await this.scheduleUploadReceiptCleanup();
     const { status, ...body } = result;
@@ -2921,7 +2945,8 @@ export class SessionWriteCoordinator {
       if (url.pathname.startsWith('/upload-receipts/index/')) return dispatchUploadReceiptIndex(this, url.pathname, payload);
       if (url.pathname === '/upload-receipts/diagnostics') return this.readUploadReceiptDiagnostics();
       if (url.pathname === '/upload-receipts/reserve') return this.executeUploadReceipt(payload);
-      if (url.pathname === '/upload-receipts/settle') return this.executeUploadReceipt(payload, true);
+      if (url.pathname === '/upload-receipts/settle') return this.executeUploadReceipt(payload, 'settle');
+      if (url.pathname === '/upload-receipts/withdraw') return this.executeUploadReceipt(payload, 'withdraw');
     }
     if (url.pathname.startsWith('/session-config/') && url.hostname !== 'session-coordinator.internal') {
       return jsonResponse({ error: 'Not found.' }, 404);
@@ -3194,16 +3219,18 @@ export const coordinateResponseUploadReceipt = async ({ env, slug, responder, op
     const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
     const owner = await sha256Hex(`upload-receipts:${normalizedSlug}:${toTrimmedString(responder).toLowerCase()}`);
     const stub = env.CE_SESSION_COORDINATOR.get(env.CE_SESSION_COORDINATOR.idFromName(owner));
-    if (!stub?.fetch || !['reserve', 'settle'].includes(operation)) return unavailable;
+    if (!stub?.fetch || !['reserve', 'settle', 'withdraw'].includes(operation)) return unavailable;
     const response = await stub.fetch(`https://session-coordinator.internal/upload-receipts/${operation}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, diagnostics: { slug: normalizedSlug, owner } }),
     });
     const body = await response.json();
     if (!isObjectRecord(body) || (!response.ok && ![409, 503].includes(response.status))) return unavailable;
-    if (response.ok && (operation === 'settle' ? body.ok !== true
+    if (response.ok && (operation !== 'reserve' ? body.ok !== true
       : !(body.kind === 'execute' && toTrimmedString(body.attemptId)) && !(body.kind === 'replay' && body.storageRef?.id))) return unavailable;
+    const priorStorageIds = body.priorStorageIds ?? [];
     if (response.ok && body.kind === 'execute' &&
-        (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)))) return unavailable;
+        (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)) ||
+          !Array.isArray(priorStorageIds) || !priorStorageIds.every(isSafeCloudflareStorageRefId))) return unavailable;
     return { ...body, status: response.status };
   } catch {
     return unavailable;

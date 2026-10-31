@@ -1666,31 +1666,50 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     id = uploadReceipt.storageId;
     createdAt = uploadReceipt.createdAt;
     // Envelope AAD, metadata and serialized sizes all belong to the reserved
-    // target, never to the retry's unused provisional id.
+    // target: this attempt's own id with the first reservation's timestamp.
     prepared = await prepareStorageWrite(id, createdAt);
     if (prepared.response) return prepared.response;
   }
   const { objectKey, bytesToStore, metadata, serializedMetadata, serializedKvPayload } = prepared;
+  // A retry took over while this attempt was still writing. Remove the row it
+  // published under its own id unless a later retry adopted that row.
+  const withdrawSupersededUpload = async () => {
+    try {
+      const withdrawn = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'withdraw',
+        payload: { requestId, attemptId: uploadReceipt.attemptId, storageId: id } });
+      if (!withdrawn?.ok) return;
+      await markStorageBackupWrite(env, slug);
+      await index.delete(buildIndexKey({ slug, resource, id }));
+      if (canWriteR2) {
+        if (typeof r2.delete === 'function') await r2.delete(objectKey);
+      } else await index.delete(buildPayloadKey({ slug, id }));
+      await markStorageBackupWrite(env, slug);
+    } catch { /* a row left behind is a readable duplicate, never a broken answer */ }
+  };
   const finishUpload = async (storageRef, publishedMetadata, publishedBytes, replayed = false) => {
     if (uploadReceipt) {
       const settled = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'settle',
         payload: { requestId, attemptId: uploadReceipt.attemptId, storageRef },
       });
-      if (!settled?.ok) return responseJson(deps, { error: 'Upload settlement is unavailable; retry.', reason: 'upload_receipt_unavailable' }, 503, baseHeaders);
+      if (!settled?.ok) {
+        if (!replayed && settled?.reason === 'upload_attempt_superseded') await withdrawSupersededUpload();
+        return responseJson(deps, { error: 'Upload settlement is unavailable; retry.', reason: 'upload_receipt_unavailable' }, 503, baseHeaders);
+      }
     }
     await enqueueResponseAnalysis(storageRef.id, publishedMetadata, publishedBytes);
     return responseJson(deps, { id: storageRef.id, storageRef, ...(replayed ? { replayed: true } : {}) }, 200, baseHeaders);
   };
-  if (uploadReceipt?.resumed) {
-    const stored = await index.get(buildIndexKey({ slug, resource, id }));
-    if (stored != null) {
-      let published;
-      try { published = typeof stored === 'string' ? JSON.parse(stored) : stored; } catch { /* fail closed below */ }
-      const storageRef = published?.id === id && published?.resource === resource && published?.responder === uploader
-        ? normalizeStorageRef(published) : null;
-      if (!storageRef) return responseJson(deps, { error: 'Stored upload metadata is unavailable; retry.' }, 503, baseHeaders);
-      return finishUpload(storageRef, undefined, undefined, true);
-    }
+  // An earlier attempt may still be writing its own target, so a retry only
+  // adopts a target whose row was already published and otherwise writes its own.
+  for (const priorId of uploadReceipt?.resumed ? uploadReceipt.priorStorageIds || [] : []) {
+    const stored = await index.get(buildIndexKey({ slug, resource, id: priorId }));
+    if (stored == null) continue;
+    let published;
+    try { published = typeof stored === 'string' ? JSON.parse(stored) : stored; } catch { /* fail closed below */ }
+    const storageRef = published?.id === priorId && published?.resource === resource && published?.responder === uploader
+      ? normalizeStorageRef(published) : null;
+    if (!storageRef) return responseJson(deps, { error: 'Stored upload metadata is unavailable; retry.' }, 503, baseHeaders);
+    return finishUpload(storageRef, undefined, undefined, true);
   }
 
   await markStorageBackupWrite(env, slug);
