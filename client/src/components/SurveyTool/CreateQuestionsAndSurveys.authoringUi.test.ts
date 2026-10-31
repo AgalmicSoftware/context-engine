@@ -176,6 +176,18 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expectTagSubmitEnabled(instance);
   });
 
+  it('keeps a tag removed while a tag request is pending removed', async () => {
+    const pending = pendingTags();
+    jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);
+    const instance = tagDraft();
+    const run = instance.suggestTagsForQuestion(0);
+    instance.removeTagFromQuestion(0, 0);
+    pending.resolve('{"tags":["first","generated"]}');
+    await run;
+    expect(instance.state.questions[0].tags).toEqual(['generated']);
+    expect(instance.state.questions[0].aiGeneratedTagsFromSource).toEqual(['first', 'generated']);
+  });
+
   it('editing a question discards pending tags and releases its busy state', async () => {
     const pending = pendingTags();
     jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);

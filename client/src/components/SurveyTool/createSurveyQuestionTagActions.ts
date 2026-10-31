@@ -43,13 +43,17 @@ export async function suggestTagsForQuestion(this: CreateQuestionsAndSurveys, in
         const rowIndex = findQuestion(previous.questions);
         if (rowIndex < 0) return null;
         const row = previous.questions[rowIndex];
+        const rowTags = row.tags || [];
+        // Edits made while the request ran win: added tags stay, removed tags stay removed.
+        const removed = owner.tags.filter((tag) => !rowTags.includes(tag));
+        const added = rowTags.filter((tag) => !owner.tags.includes(tag));
         const questions = [...previous.questions];
         questions[rowIndex] = {
           ...row,
           ...(tags && String(row.prompt || '') === owner.prompt
             ? {
                 aiGeneratedTagsFromSource: tags,
-                tags: [...new Set([...tags, ...(row.tags || []).filter((tag) => !owner.tags.includes(tag))])],
+                tags: [...new Set([...tags.filter((tag) => !removed.includes(tag)), ...added])],
               }
             : {}),
           isGeneratingTags: false,
