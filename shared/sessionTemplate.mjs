@@ -66,6 +66,20 @@ const PROFILE = {
 };
 const MODEL = { provider: TEXT, model: TEXT };
 const GROUP_CREATION_POLICIES = ['participants', 'admin_only'];
+// A question's portable fields, as the question editor publishes them. Its ID
+// is derived from these when it is added to a session.
+const QUESTION = {
+  prompt: TEXT,
+  type: TEXT,
+  tags: [TEXT],
+  options: [TEXT],
+  singleSelect: FLAG,
+  scale: { min: NUMBER, max: NUMBER, minLabel: TEXT, maxLabel: TEXT },
+  voiceCredits: NUMBER,
+};
+const QUESTION_TYPES = ['binary', 'freeform', 'rating', 'multichoice', 'quadratic'];
+const MAX_QUESTIONS = 200;
+const MAX_QUESTION_TEXT = 2000;
 
 // Equal to a fresh setup draft (checked by the client's template tests).
 const DEFAULTS = Object.freeze({
@@ -79,6 +93,7 @@ const DEFAULTS = Object.freeze({
   sessionContext: { title: '', paragraphs: [], links: [] },
   contextFiles: [],
   questionsGenPrompt: '',
+  questions: [],
   defaultTags: '',
   defaultGroupTags: 'group, event, idea, demographic, location',
   groupCreationPolicy: 'participants',
@@ -100,6 +115,7 @@ const SHAPE = {
   ...shapeOf(DEFAULTS),
   sessionContext: { title: TEXT, paragraphs: [TEXT], links: [{ label: TEXT, url: TEXT }] },
   contextFiles: [{ name: TEXT }],
+  questions: [QUESTION],
   sessionModeProfile: PROFILE,
 };
 
@@ -165,7 +181,48 @@ const checkInterviewMode = (value, errors) => {
   }
 };
 
+// Each question's fields must suit its type: options for multiple choice and
+// quadratic votes, a scale for ratings, voice credits for quadratic votes.
+const checkQuestions = (questions, errors) => {
+  if (questions.length > MAX_QUESTIONS) {
+    errors.push({ path: 'questions', message: `A template holds at most ${MAX_QUESTIONS} questions.` });
+  }
+  questions.forEach((question, index) => {
+    const path = `questions.${index}`;
+    const fail = (field, message) => errors.push({ path: `${path}.${field}`, message: `${path}.${field} ${message}` });
+    const { prompt, type } = question;
+    if (!prompt?.trim()) fail('prompt', 'is required.');
+    else if (prompt.length > MAX_QUESTION_TEXT) fail('prompt', `is longer than ${MAX_QUESTION_TEXT} characters.`);
+    if (!QUESTION_TYPES.includes(type)) fail('type', `must be one of ${QUESTION_TYPES.join(', ')}.`);
+    const choices = type === 'multichoice' || type === 'quadratic';
+    if (choices) {
+      const options = (question.options || []).map((option) => option.trim());
+      if (options.length < 2 || options.some((option) => !option)) fail('options', 'needs at least two options.');
+      else if (new Set(options.map((option) => option.toLowerCase())).size !== options.length) {
+        fail('options', 'must not repeat an option.');
+      }
+    } else if (question.options) fail('options', `is only for multichoice and quadratic questions.`);
+    if (question.singleSelect !== undefined && type !== 'multichoice') {
+      fail('singleSelect', 'is only for multichoice questions.');
+    }
+    if (question.scale) {
+      if (type !== 'rating') fail('scale', 'is only for rating questions.');
+      else if (!(question.scale.min < question.scale.max)) fail('scale', 'needs min below max.');
+    }
+    if (question.voiceCredits !== undefined) {
+      if (type !== 'quadratic') fail('voiceCredits', 'is only for quadratic questions.');
+      else if (!Number.isInteger(question.voiceCredits) || question.voiceCredits < 1) {
+        fail('voiceCredits', 'must be a whole number of at least 1.');
+      }
+    }
+    (question.tags || []).forEach((tag, tagIndex) => {
+      if (!tag.trim()) fail(`tags.${tagIndex}`, 'must not be empty.');
+    });
+  });
+};
+
 const FIELD_RULES = {
+  questions: checkQuestions,
   draftId: (value, errors) => {
     if (!/^[\w-]{0,64}$/.test(value)) {
       errors.push({ path: 'draftId', message: 'draftId must be at most 64 letters, digits, "-" or "_".' });

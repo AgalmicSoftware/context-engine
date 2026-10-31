@@ -61,6 +61,13 @@ const fullTemplate = () => ({
   },
   contextFiles: [{ name: 'deck.pdf' }],
   questionsGenPrompt: 'Ask about parks',
+  questions: [
+    { prompt: 'Parks need more shade.', type: 'binary', tags: ['parks'] },
+    { prompt: 'How safe do parks feel?', type: 'rating', scale: { min: 0, max: 10, minLabel: 'Not', maxLabel: 'Very' } },
+    { prompt: 'Which park first?', type: 'multichoice', options: ['North', 'South'], singleSelect: true },
+    { prompt: 'Split the budget.', type: 'quadratic', options: ['Trees', 'Benches'], voiceCredits: 16 },
+    { prompt: 'Anything else?', type: 'freeform' },
+  ],
   defaultTags: 'parks',
   sessionModeProfile: {
     ...workerProfile(),
@@ -82,7 +89,7 @@ test('a template with only its format takes every default', () => {
   const template = valid({ format });
   assert.deepEqual(Object.keys(template), [
     'format', 'draftId', 'sessionName', 'sessionInfo', 'sessionHeader', 'sessionEndsAt', 'appearance',
-    'sessionContext', 'contextFiles', 'questionsGenPrompt', 'defaultTags', 'defaultGroupTags', 'groupCreationPolicy',
+    'sessionContext', 'contextFiles', 'questionsGenPrompt', 'questions', 'defaultTags', 'defaultGroupTags', 'groupCreationPolicy',
     'interviewModeEnabled', 'interviewMode', 'resultsAnalysis', 'ai', 'sessionModeProfile',
   ]);
   assert.equal(template.format, format);
@@ -352,4 +359,37 @@ test('a template over the size cap cannot be exported, as it could not be import
   assert.equal(result.ok, false);
   assert.deepEqual(result.errors.map((error) => error.path), ['']);
   assert.match(result.errors[0].message, /larger than 256 KB/);
+});
+
+test('questions keep their portable fields and are checked by type', () => {
+  const template = valid(fullTemplate());
+  assert.equal(template.questions.length, 5);
+  assert.deepEqual(template.questions[1].scale, { min: 0, max: 10, minLabel: 'Not', maxLabel: 'Very' });
+  assert.deepEqual(valid({ format }).questions, []);
+  const invalid = (question) => errorsOf({ format, questions: [question] }).map((error) => error.path);
+  assert.deepEqual(invalid({ prompt: 'A', type: 'binary', answer: { value: '' } }), ['questions.0.answer']);
+  assert.deepEqual(invalid({ prompt: ' ', type: 'binary' }), ['questions.0.prompt']);
+  assert.deepEqual(invalid({ prompt: 'A', type: 'poll' }), ['questions.0.type']);
+  assert.deepEqual(invalid({ prompt: 'A', type: 'multichoice', options: ['Only'] }), ['questions.0.options']);
+  assert.deepEqual(invalid({ prompt: 'A', type: 'multichoice', options: ['Same', 'same'] }), ['questions.0.options']);
+  assert.deepEqual(invalid({ prompt: 'A', type: 'binary', options: ['X', 'Y'] }), ['questions.0.options']);
+  assert.deepEqual(invalid({ prompt: 'A', type: 'binary', singleSelect: true }), ['questions.0.singleSelect']);
+  assert.deepEqual(invalid({ prompt: 'A', type: 'binary', scale: { min: 0, max: 5 } }), ['questions.0.scale']);
+  assert.deepEqual(invalid({ prompt: 'A', type: 'rating', scale: { min: 5, max: 5 } }), ['questions.0.scale']);
+  assert.deepEqual(
+    invalid({ prompt: 'A', type: 'quadratic', options: ['X', 'Y'], voiceCredits: 0 }),
+    ['questions.0.voiceCredits'],
+  );
+  assert.deepEqual(invalid({ prompt: 'A', type: 'binary', tags: [''] }), ['questions.0.tags.0']);
+  assert.deepEqual(
+    errorsOf({ format, questions: Array.from({ length: 201 }, () => ({ prompt: 'A', type: 'binary' })) }).map(
+      (error) => error.path,
+    ),
+    ['questions'],
+  );
+});
+
+test('question text is scanned for secrets like every other field', () => {
+  const errors = errorsOf({ format, questions: [{ prompt: `Use sk-${'a'.repeat(24)}`, type: 'freeform' }] });
+  assert.deepEqual(errors.map((error) => error.path), ['questions.0.prompt']);
 });

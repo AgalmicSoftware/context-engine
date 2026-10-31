@@ -7,6 +7,21 @@ export const SESSION_TEMPLATE_MAX_BYTES: number;
 
 export type SessionTemplateModel = { provider: string; model: string };
 
+/** A question's portable fields; its ID is derived when it is added to a session. */
+export type SessionTemplateQuestion = {
+  prompt: string;
+  type: 'binary' | 'freeform' | 'rating' | 'multichoice' | 'quadratic';
+  tags?: string[];
+  /** multichoice and quadratic: at least two, none repeated. */
+  options?: string[];
+  /** multichoice only. */
+  singleSelect?: boolean;
+  /** rating only. */
+  scale?: { min: number; max: number; minLabel: string; maxLabel: string };
+  /** quadratic only. */
+  voiceCredits?: number;
+};
+
 /** A session setup's portable fields, named as in the setup draft. */
 export type SessionTemplate = {
   format: 'ce.session-template/v1';
@@ -21,6 +36,8 @@ export type SessionTemplate = {
   /** Files are listed by name only, to attach again. */
   contextFiles: Array<{ name: string }>;
   questionsGenPrompt: string;
+  /** Added to the session after it is created; at most 200. */
+  questions: SessionTemplateQuestion[];
   defaultTags: string;
   defaultGroupTags: string;
   groupCreationPolicy: 'participants' | 'admin_only';
