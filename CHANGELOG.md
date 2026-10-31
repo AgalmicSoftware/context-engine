@@ -8,9 +8,16 @@ All notable changes to this project will be documented in this file.
 
 - Drop the retired Goerli test network from wallet connections and a collection metadata lookup that always failed.
 - Trust a cached Worker sign-in only when it records the Worker, session and account it was issued for; the older unscoped format, which nothing writes, is ignored.
+- Group Conversation shows who spoke as `Person 1:`, `Person 2:` lines. A five-second sample of each new voice goes with later chunks, so up to four voices keep their number across three-minute chunks; a fifth voice, or one heard only briefly, is numbered within its chunk. With a Session Worker before 0.8.2, numbers restart in each chunk and the recorder says so.
+- The voice dialog's close button asks before it stops a recording.
+- The recorder notes when the device takes the microphone, as a call can, and marks the gap in the transcript. Capture that stops without telling the page gets a fresh microphone stream.
+- Only one tab at a time opens a recording; another tab says so and takes over once the first closes it.
+- The session page says when audio kept by Close and keep the audio is still waiting to upload, after a reload too, and offers Reopen recording.
+- Recorder status, transcript details and errors are readable in every theme; in Civic, the default, "Transcribing…" was white on white.
 
 ### Workers — requires redeployment
 
+- Group transcription forwards up to four known-speaker samples (a name and a short WAV) to OpenAI, so voices keep their labels across chunks. Invalid samples are dropped without failing the chunk.
 - Storage export manifests drop `rewrapRequiredForNewDeployment`, the deprecated copy of `deploymentKekContinuityRequired`, and Lit requests no longer read the retired `gateChainId` field; send `chainId`.
 
 ## [0.8.1] - 2026-10-30
