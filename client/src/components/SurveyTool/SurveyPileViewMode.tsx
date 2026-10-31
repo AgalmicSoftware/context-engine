@@ -2460,7 +2460,12 @@ const handlePileSubmitWithOwnAnswers = async (
 export const submitSessionInterviewResponses = async (engine: PileViewModeEngine, questionIds: string[] = []) => {
   // A zero edit count alone cannot prove that drafts were saved. Check the
   // persisted responses for every selected question before accepting a no-op.
-  if (engine.props.loginComplete && !engine.state.isSubmitting && engine.getSubmitCount() === 0 && questionIds.length) {
+  // Only the selection counts: an unrelated pending edit isn't part of this submit.
+  const pendingQuestionIds = new Set(
+    Array.from(engine.getChangedQidsAndFields?.(0)?.changedQids || [], (id) => normalizeQuestionIdKey(id)),
+  );
+  const selectionPending = questionIds.some((id) => pendingQuestionIds.has(normalizeQuestionIdKey(id)));
+  if (engine.props.loginComplete && !engine.state.isSubmitting && !selectionPending && questionIds.length) {
     // Saved rows cover only what the last upload or saved-answer read touched;
     // any other question is checked against the saved answers loaded into the form.
     const savedRows = engine.state.userAnswers ? engine.buildSliceFromUserAnswers(engine.state.userAnswers) : null;

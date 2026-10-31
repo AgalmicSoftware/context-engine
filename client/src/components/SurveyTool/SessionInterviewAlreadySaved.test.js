@@ -286,3 +286,31 @@ it('P4 masked encrypted answer + rating envelopes: a consent-only upload re-send
   expect(encryptMultipleAnswers).not.toHaveBeenCalled();
   expect(encryptEnvelopeValue).not.toHaveBeenCalled();
 }, 40000);
+
+it('an unchanged interview selection is already saved while another answer has an unsent edit', async () => {
+  mockCaches(savedResponse(), { q2: { id: 'q2', type: 'binary', prompt: 'Q2' } });
+  jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockResolvedValue([savedResponse()]);
+  const { submitResponses } = mockSubmit();
+  const pile = mountPile();
+  await waitFor(() => expect(pile.getEngine()?.state?.pileQuestions?.length).toBe(2), { timeout: 8000 });
+  await settle();
+  const engine = pile.getEngine();
+  await run(() => loadSessionInterviewOwnAnswers(engine, ['q1'], new AbortController().signal));
+  // The interview re-applies q1's saved answer and consent, while q2 has an unrelated manual edit.
+  await run(() =>
+    recordInterviewProvenance(
+      engine,
+      [{ questionId: 'q1', answer: 'Agree' }],
+      SOURCE,
+      PACKET,
+      true,
+      false,
+      'Participant',
+    ),
+  );
+  await run(() => new Promise((resolve) => engine.handleAnswerPile('q2', 'Disagree', { afterUpdate: resolve })));
+  expect(engine.getChangedQidsAndFields(0).changedMap).toEqual({ q2: { answer: 1 } });
+  expect(await run(() => submitSessionInterviewResponses(engine, ['q1']))).toEqual({ status: 'already-saved' });
+  expect(submitResponses).not.toHaveBeenCalled();
+  expect(engine.getChangedQidsAndFields(0).changedMap).toEqual({ q2: { answer: 1 } });
+}, 40000);
