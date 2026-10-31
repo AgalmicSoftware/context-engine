@@ -496,8 +496,11 @@ Enter the core session metadata:
 - `sessionName`
 - `sessionInfo`
 - `sessionContext` for optional public background shown on the session page as
-  plain text and HTTPS links; it is not executable HTML and must not contain
-  secrets.
+  plain text and HTTPS links (up to 6 paragraphs and 8 links); it is not
+  executable HTML and must not contain secrets. The Context section also takes
+  files (PDF, Markdown, text, CSV, JSON), each for everyone or for admins only;
+  they are added after **Create**, when PDFs can be read by the session's AI and
+  the links' pages read for it. See [Session context](session-context-sources.md).
 - **Colors** in Basics: `Context Engine`, `Ocean`, or `Amber`. This controls
   only documented session accents/chrome and does not change the app theme.
 - slug

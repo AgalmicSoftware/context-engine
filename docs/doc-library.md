@@ -143,6 +143,14 @@ For Tool Explorer `Data -> Add` saved extra sources:
 - the session `docUploads` audience stays on the Chipotle/Lit SBT-gated recipient path
 - when the session `docUploads` gate is unavailable, Tool Explorer falls back to `only me`
 
+## Context Sources
+
+Files and links a session's admins add for its AI are doc-library records on
+Worker-hosted sessions, tagged `CE-DocRole: context` (and `context-text` for
+the text the session's AI read from a PDF). Only admins can add them, each is
+for everyone in the session or for admins only, and `/storage/list?role=context`
+lists only them. See [Session context](session-context-sources.md).
+
 ## “Add URL” Link Records
 
 The UI supports adding a URL without uploading remote content. It stores a small JSON “link record” on Arweave:

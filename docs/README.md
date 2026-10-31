@@ -67,6 +67,7 @@ Encryption:
 - `docs/lit-protocol-information.md`: How Context Engine uses Lit today (worker-mediated Chipotle, no Lit SDK) plus platform background.
 - `docs/lit-v3-design.md`: Worker-mediated Chipotle runtime design, provisioning flow, and migration notes.
 - `docs/doc-library.md`: Doc Library for Sessions + SBT groups (tag schema, listing queries, encryption UX).
+- `docs/session-context-sources.md`: Session context: notes, links and files for the session's AI, privacy per item, link snapshots, PDF reading and limits.
 
 Payload schemas:
 - `docs/arweave-payloads.md`: Example Arweave payload shapes for surveys, questions, and SBT tokenURI JSON.

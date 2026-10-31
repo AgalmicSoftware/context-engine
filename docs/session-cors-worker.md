@@ -734,6 +734,14 @@ Matrix scroll/detail behavior, and Circles hover/drill interactions.
 
 Authenticated clients can use the worker as the session storage boundary:
 
+- `POST /storage/context`: session admins only. `{ action: "add-link", url, title?, adminsOnly?, replaces? }`
+  fetches the page under the public-artifact link policy and stores it as a context link record with its text
+  snapshot and fetch date (`replaces` refreshes an existing one, keeping its title and privacy);
+  `{ action: "read-pdf", id }` sends a context PDF to the session's own Claude or OpenAI model and stores the
+  returned text beside it with the same privacy; `{ action: "remove", id }` deletes a context source and that
+  text. Uploads with a context role on `/storage/upload` must come from an admin, be a PDF (20 MB) or text file
+  (1 MB), carry no access rule other than admins-only, and be readable by the Worker. See
+  [Session context](session-context-sources.md).
 - `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and authorization metadata/index rows to KV when R2 is available. An R2 deployment must provide an index binding with both `get` and `put`; otherwise upload returns `501` before any R2 write. For small JSON/demo deployments where R2 is not enabled, the worker can store opaque payload envelopes in KV-only Cloudflare storage. Both modes return an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
   - Worker-canonical participant submissions preserve the verified session
     config through this call, so response uploads target the session's own
@@ -2994,7 +3002,10 @@ transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
   - Authenticated JSON body parsing for these action routes now shares the same helper used by authenticated `/ai`,
     so `application/json` parse failures and trimmed `action` normalization are handled in one place before fetch/faucet/AI dispatch.
   - `fetch_url` / `fetch_image` target URL parsing now also routes through a shared helper before outbound fetch:
-    it trims the request URL, requires `http(s)`, and preserves the existing blocked-target behavior.
+    it trims the request URL, requires `https`, and preserves the existing blocked-target behavior. The fetch
+    then uses the public-artifact link policy (no credentials, IP literals or private names; every redirect,
+    up to five, is checked again) with one 10-second deadline. `fetch_url` reads HTML, JSON, plain text and
+    Markdown.
   - `request_test_eth` faucet preflight now also routes through a shared helper before proof validation and RPC send:
     it resolves `to|recipient|address`, keeps `faucet.chainId -> networkChainId -> registryChainId` precedence,
     and only applies request `amountEth` / `amount` overrides when they are parseable, positive, and no larger than
