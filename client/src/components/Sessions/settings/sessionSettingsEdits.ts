@@ -185,7 +185,7 @@ const LABELS: Record<string, string> = {
   sessionName: 'Name',
   sessionInfo: 'Description',
   sessionContext: 'Context',
-  appearance: 'Colours',
+  appearance: 'Colors',
   sessionHeaderImg: 'Header image',
   sessionEndsAt: 'End time',
   defaultTags: 'Tag suggestions',

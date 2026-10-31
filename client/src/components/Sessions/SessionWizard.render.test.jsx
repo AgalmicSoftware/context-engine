@@ -605,7 +605,7 @@ describe('SessionWizard rendered validation', () => {
     expect(badges).toEqual([]);
   });
 
-  it('keeps group creation policy and interview settings under Participation and colours in Basics', async () => {
+  it('keeps group creation policy and interview settings under Participation and colors in Basics', async () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);

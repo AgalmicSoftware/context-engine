@@ -68,7 +68,7 @@ export const SetupBasicsSection = ({ draft, onChange, link = null, headerImage =
         />
       </SetupField>
     )}
-    <SetupField id="ce-setup-colors" label="Colours">
+    <SetupField id="ce-setup-colors" label="Colors">
       <Input
         id="ce-setup-colors"
         type="select"
