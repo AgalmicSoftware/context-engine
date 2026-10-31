@@ -166,7 +166,6 @@ export const analyzePhotoForQuestionGeneration = async (file: PhotoUploadFile, o
   const text = await callAI('', {
     ...pickAiRequestOpts(opts),
     provider: ai.provider,
-    model: ai.model,
     messages,
     maxTokens: 1200,
     temperature: 0.2,

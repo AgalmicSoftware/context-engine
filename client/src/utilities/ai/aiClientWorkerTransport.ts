@@ -75,7 +75,8 @@ export const buildAiWorkerRequestPlan = ({
     action: 'ai',
     ...(taskType ? { taskType } : {}),
     provider,
-    model,
+    // A session that names no model lets its Worker pick its own fallback.
+    ...(ai.requestModel === '' ? {} : { model }),
     ...(usesResponsesApi ? { endpoint: 'responses' } : {}),
     ...maybeNumberProp('max_output_tokens', maxOutputTokens),
     ...maybeNumberProp('max_completion_tokens', maxCompletionTokens),

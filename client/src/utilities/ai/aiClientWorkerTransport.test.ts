@@ -206,3 +206,9 @@ it('sends a JSON schema only to OpenAI and Claude', () => {
   expect(formatFor('custom', schema)).toBeUndefined();
   expect(formatFor('openrouter', { type: 'json_object' })).toEqual({ type: 'json_object' });
 });
+
+it('names no model when the session stores none, keeping the default model’s request shape', () => {
+  const plan = buildAiWorkerRequestPlan({ ai: { provider: 'openai', model: 'gpt-6.1-terra', requestModel: '' } });
+  expect(plan.requestBody).not.toHaveProperty('model');
+  expect(plan.requestBody).toMatchObject({ provider: 'openai', endpoint: 'responses', max_output_tokens: 16384 });
+});

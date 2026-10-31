@@ -67,6 +67,29 @@ describe('aiSettings secret resolution', () => {
     }
   });
 
+  it('names no model for a lane the session leaves empty, so each Worker applies its own fallback', async () => {
+    const requestModels = async (ai) => {
+      seedSessionAiSettings(ai);
+      const config = (thinking) =>
+        getEffectiveAiConfig({ sessionSlug: '', preferLocal: false, thinking, resolveSecrets: false });
+      return [(await config(false)).requestModel, (await config(true)).requestModel];
+    };
+    // An older Worker refuses today's default, so a session that stores no model sends none.
+    expect(await requestModels({})).toEqual(['', '']);
+    expect(await requestModels({ models: { fast: { provider: 'openai', model: 'gpt-5.6-terra' } } })).toEqual([
+      'gpt-5.6-terra',
+      '',
+    ]);
+    expect(await requestModels({ model: 'gpt-5.6-terra' })).toEqual(['gpt-5.6-terra', 'gpt-5.6-terra']);
+    const explicit = await getEffectiveAiConfig({
+      sessionSlug: '',
+      preferLocal: false,
+      model: 'gpt-6-luna',
+      resolveSecrets: false,
+    });
+    expect(explicit.requestModel).toBe('gpt-6-luna');
+  });
+
   it('moves a saved preset to its current models, and a removed preset to the default', () => {
     const save = (settings) =>
       localStorage.setItem(

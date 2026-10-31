@@ -56,6 +56,7 @@ type NormalizedAiSettings = UnknownRecord & {
   _sessionSlug?: string;
   _sessionName?: string;
   _sessionConfigSource?: string;
+  _storedModels?: Record<string, boolean>;
 };
 type AiSettingsEnvelopeMetadata = UnknownRecord & {
   encryptedAvailable?: boolean;
@@ -695,6 +696,20 @@ const getActiveSessionSlugFromStore = (): string => {
   }
 };
 
+// The lanes a session names a model for. A request on a lane it leaves empty
+// names no model, so each Worker applies its own fallback: an older Worker
+// refuses today's default model.
+const readStoredModelLanes = (ai: unknown): Record<string, boolean> => {
+  const record = asRecord(ai);
+  const models = asRecord(record.models);
+  const names = (entry: unknown) => !!toStr(isRecord(entry) ? entry.model || entry.name || entry.value : entry).trim();
+  const legacy = names(record.model);
+  return {
+    fast: legacy || names(models.fast || models.default),
+    thinking: legacy || names(models.thinking || models.reasoning),
+  };
+};
+
 export const getSessionAiSettings = (slugIn = '', sessionConfig?: unknown): NormalizedAiSettings => {
   const resolved = resolveSessionConfigEntry(slugIn, sessionConfig);
   const session = resolved.sessionConfig;
@@ -705,6 +720,7 @@ export const getSessionAiSettings = (slugIn = '', sessionConfig?: unknown): Norm
     _sessionSlug: toStr(resolved.sessionSlug || session?.slug || ''),
     _sessionName: toStr(session?.sessionName || ''),
     _sessionConfigSource: resolved.sessionConfigSource || 'missing',
+    _storedModels: readStoredModelLanes(session?.ai),
   };
 };
 
@@ -952,10 +968,13 @@ export const getEffectiveAiConfig = async ({
   const resolvedKey = useLocalKey ? localKey : sessionKey;
   const apiKey = resolvedKey.apiKey || '';
   const selectedModel = useLocalKey ? localModel : sessionModel;
+  const sessionNamesModel = !!toStr(model).trim() || session._storedModels?.[modelType] !== false;
 
   return {
     provider: selectedProvider,
     model: selectedModel,
+    // Empty when the session names no model for this lane: the request then names none.
+    requestModel: useLocalKey || sessionNamesModel ? selectedModel : '',
     modelType,
     preset:
       toStr(
