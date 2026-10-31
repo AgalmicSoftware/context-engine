@@ -120,9 +120,27 @@ export const summarizeContext = (draft: SetupSectionProps['draft']): string => {
   return title ? `${title}: ${parts.join(', ')}` : parts.join(', ');
 };
 
-// sessionContext's title, paragraphs and links. Files can't travel in a
-// template; their names come back as a reminder to attach them again.
-export const SetupContextSection = ({ draft, onChange, open, onToggle }: SetupSectionProps) => {
+type ContextProps = SetupSectionProps & {
+  /** Files and private links: chosen for after Create on /new, managed live on the edit page. */
+  sources?: React.ReactNode;
+  /** After creation: what adds the chosen files and reads the links. */
+  publisher?: React.ReactNode;
+};
+
+const CONTEXT_HELP =
+  'Paragraphs and links show on the session page to everyone who can open it, and the session’s AI reads them. Files and admins-only links go below.';
+
+// sessionContext's title, paragraphs and links, then the session's files and
+// links for its AI. Without `sources`, file names from a template come back
+// as a reminder to attach them again.
+export const SetupContextSection = ({
+  draft,
+  onChange,
+  open,
+  onToggle,
+  sources = null,
+  publisher = null,
+}: ContextProps) => {
   const context = readContext(draft);
   // A link's https problem shows beside the link itself.
   const problems = contextProblems(draft).filter((problem) => !LINK_URL_PATH.test(problem.path));
@@ -139,12 +157,14 @@ export const SetupContextSection = ({ draft, onChange, open, onToggle }: SetupSe
       summary={summarizeContext(draft)}
       open={open}
       onToggle={onToggle}
+      quick={publisher}
     >
-      <SetupField id="ce-setup-context-heading" label="Title">
+      <SetupField id="ce-setup-context-heading" label="Title" help={CONTEXT_HELP}>
         <Input
           id="ce-setup-context-heading"
           value={context.title}
           maxLength={SESSION_CONTEXT_LIMITS.titleChars}
+          aria-describedby={setupHelpId('ce-setup-context-heading')}
           onChange={(event) => save({ title: event.target.value })}
         />
       </SetupField>
@@ -237,7 +257,12 @@ export const SetupContextSection = ({ draft, onChange, open, onToggle }: SetupSe
           ))}
         </ul>
       ) : null}
-      {files.length ? (
+      {sources ? (
+        <>
+          <h3 className={styles.subheading}>Files and links for the AI</h3>
+          {sources}
+        </>
+      ) : files.length ? (
         <p className={styles.hint} data-testid="ce-setup-context-files">
           Attach these files again after setup: {files.join(', ')}.
         </p>

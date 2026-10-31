@@ -89,6 +89,7 @@ import SessionPublishProgressPanel from './SessionPublishProgressPanel';
 import SessionPublishResultLinks from './SessionPublishResultLinks';
 import { SetupVoiceKeyNote } from './setup/SetupAiSection';
 import { describeContextProblem, readSetupQuestions } from './setup/SetupContentSections';
+import { SetupContextFiles, SetupContextPublisher, usePendingContextFiles } from './setup/SetupContextSources';
 import {
   SessionTemplateActions,
   SessionTemplateLinkNotice,
@@ -460,6 +461,8 @@ const SessionWizard = ({
   const [draftFromLink, setDraftFromLink] = useState(false);
   // The created session's public config, for adding a template's questions.
   const [publishedSessionConfig, setPublishedSessionConfig] = useState<Record<string, unknown> | null>(null);
+  // Context files chosen before Create; they are uploaded once the session exists.
+  const pendingContextFiles = usePendingContextFiles();
   const publishBusy = resolveSessionWizardPublishReducerUiState({ state: sessionPublishState }).publishBusy;
   const publishRequestInFlightRef = useRef(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
@@ -2764,6 +2767,23 @@ const SessionWizard = ({
               clearTemplateLink();
             }}
             onDismiss={clearTemplateLink}
+          />
+        ) : null
+      }
+      contextSources={
+        sessionModeRequirements.isWorkerCanonical ? (
+          <SetupContextFiles draft={draft} onChange={updateDraftValue} pending={pendingContextFiles} />
+        ) : null
+      }
+      contextPublisher={
+        sessionModeRequirements.isWorkerCanonical ? (
+          <SetupContextPublisher
+            draft={draft}
+            onChange={updateDraftValue}
+            pending={pendingContextFiles}
+            sessionConfig={sessionCreated ? publishedSessionConfig : null}
+            sessionSlug={toStr(draft.slug).trim()}
+            account={toStr(account).trim()}
           />
         ) : null
       }

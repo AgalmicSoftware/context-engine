@@ -318,6 +318,14 @@
   min-height: 96px;
 }
 
+// A heading inside a section; global heading colors would otherwise win.
+.subheading {
+  color: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 12px 0 0;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;

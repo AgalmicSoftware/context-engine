@@ -3,6 +3,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import wizardStyles from '../SessionWizard.module.scss';
 import styles from '../setup/SessionSetup.module.scss';
 import { SetupAiSection } from '../setup/SetupAiSection';
+import ContextSourcesPanel from '../setup/ContextSourcesPanel';
+import { normalizeSessionContext } from '@ce-shared/sessionContext.mjs';
+import type { ContextSource } from '../../../utilities/docLibrary/contextSources';
 import { SessionTemplateActions, SetupQuestionsPublisher } from '../setup/SessionTemplateTools';
 import { sessionTemplateFromDraft } from '@ce-shared/sessionTemplate.mjs';
 import {
@@ -112,6 +115,8 @@ const SessionSettingsPage = ({
   const [openSections, setOpenSections] = useState(CLOSED);
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
+  // The session's files, listed by name in an exported template.
+  const [contextSources, setContextSources] = useState<ContextSource[]>([]);
 
   // The Worker's own copy is the "before" every edit is compared with.
   const refresh = useCallback(async () => {
@@ -216,7 +221,14 @@ const SessionSettingsPage = ({
       <h1 className={styles.pageTitle}>Session settings</h1>
       {capabilities.isWorkerCanonical && isSessionAdmin(saved, account) ? (
         <SessionTemplateActions
-          buildTemplate={() => sessionTemplateFromDraft(draft)}
+          buildTemplate={() =>
+            sessionTemplateFromDraft({
+              ...draft,
+              contextFiles: contextSources
+                .filter((source) => source.kind === 'file')
+                .map((source) => ({ name: source.title, adminsOnly: source.adminsOnly })),
+            })
+          }
           onImport={importTemplate}
           fromLink={false}
           fileName={sessionSlug}
@@ -291,7 +303,18 @@ const SessionSettingsPage = ({
             </p>
           }
         />
-        <SetupContextSection {...section('context')} />
+        <SetupContextSection
+          {...section('context')}
+          sources={
+            <ContextSourcesPanel
+              sessionSlug={sessionSlug}
+              sessionConfig={saved}
+              account={account}
+              pageLinks={normalizeSessionContext(saved?.sessionContext).links}
+              onSourcesChange={setContextSources}
+            />
+          }
+        />
         <SetupQuestionsSection
           {...section('questions')}
           publisher={

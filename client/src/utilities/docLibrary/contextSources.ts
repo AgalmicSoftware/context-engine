@@ -13,6 +13,7 @@ import {
 import type { SessionContextPromptSource } from '@ce-shared/sessionContextText.mjs';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
+import { readWorkerCapabilities } from '../worker/workerCapabilities';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import {
   listSessionStorageRefsPage,
@@ -62,6 +63,16 @@ const workerBaseUrl = async (options: ContextSourceOptions): Promise<string> =>
   toStr(await getCorsProxyUrlOrThrow(workerOptions(options)))
     .trim()
     .replace(/\/+$/, '');
+
+/** True when this session's Worker stores context sources (Session Workers from 0.8.2). */
+export const workerSupportsContextSources = async (options: ContextSourceOptions): Promise<boolean> => {
+  try {
+    const capabilities = await readWorkerCapabilities(await workerBaseUrl(options), options.sessionSlug);
+    return capabilities.features.includes('context_sources_v1');
+  } catch {
+    return false;
+  }
+};
 
 const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: string }) | null => {
   const record = asRecord(item);

@@ -83,6 +83,22 @@ const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   return null;
 };
 
+// The page's context sources, as the Worker would list them for this reader.
+const mockContextSources = { current: null };
+const emptyContextSources = () => ({
+  sources: [],
+  loading: false,
+  error: '',
+  supported: false,
+  isAdmin: false,
+  reload: () => {},
+});
+jest.mock('../../utilities/docLibrary/useSessionContextSources', () => ({
+  ...jest.requireActual('../../utilities/docLibrary/useSessionContextSources'),
+  useSessionContextSources: () => mockContextSources.current || emptyContextSources(),
+}));
+jest.mock('../Sessions/setup/ContextSourcesPanel', () => () => <div data-testid="mock-context-sources-panel" />);
+
 jest.mock('../SurveyTool/SurveyPage', () => (props) => {
   mockSurveyPage(props);
   if (props.minifiedMode === 'pile') {
@@ -1149,6 +1165,70 @@ describe('OnePageSession results routing', () => {
     expect(await screen.findByTestId('survey-page-full')).toBeVisible();
     await waitFor(() => {
       expect(mockSurveyPage).toHaveBeenLastCalledWith(expect.objectContaining({ autoOpenResults: true }));
+    });
+  });
+
+  describe('context files and links', () => {
+    afterEach(() => {
+      mockContextSources.current = null;
+    });
+    const file = {
+      id: 'file-1',
+      kind: 'file',
+      title: 'deck.pdf',
+      url: '',
+      mime: 'application/pdf',
+      size: 1,
+      createdAt: '2026-10-31T10:00:00.000Z',
+      adminsOnly: true,
+      fetchedAt: '',
+      reading: null,
+    };
+    const link = {
+      ...file,
+      id: 'link-1',
+      kind: 'link',
+      title: 'Essay',
+      url: 'https://example.org/essay',
+      adminsOnly: false,
+    };
+    const renderSession = async (sources, isAdmin) => {
+      mockContextSources.current = { ...emptyContextSources(), supported: true, isAdmin, sources };
+      const props = buildProps();
+      render(
+        <MemoryRouter initialEntries={['/session/edge']}>
+          <OnePageSession {...props} slug="edge" />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    };
+
+    it('keeps the Context section from participants while there is no context', async () => {
+      await renderSession([], false);
+      expect(screen.queryByTestId('ce-demo-documents-section')).not.toBeInTheDocument();
+    });
+
+    it('shows participants the files and links they may read, without admin controls', async () => {
+      await renderSession([file, link], false);
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      const list = screen.getByTestId('ce-session-context-sources');
+      expect(within(list).getByRole('link', { name: /Essay/ })).toHaveAttribute('href', 'https://example.org/essay');
+      expect(
+        within(list)
+          .getByRole('link', { name: /deck\.pdf/ })
+          .getAttribute('href'),
+      ).toContain('__ceDocTx=file-1');
+      expect(within(list).queryByText('Admins only')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('ce-session-context-manage')).not.toBeInTheDocument();
+    });
+
+    it('gives admins the Context section with its controls, even before the first item', async () => {
+      await renderSession([], true);
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      expect(screen.getByTestId('ce-session-context-manage')).toContainElement(
+        screen.getByTestId('mock-context-sources-panel'),
+      );
+      expect(screen.queryByTestId('ce-session-context-sources')).not.toBeInTheDocument();
     });
   });
 

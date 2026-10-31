@@ -12,6 +12,8 @@ export const supportsContextSources = (sessionConfig: unknown): boolean =>
 
 type Input = { sessionSlug: string; sessionConfig: unknown; account?: unknown; enabled?: boolean };
 
+export type SessionContextSourcesState = ReturnType<typeof useSessionContextSources>;
+
 export function useSessionContextSources({ sessionSlug, sessionConfig, account = '', enabled = true }: Input) {
   const supported = supportsContextSources(sessionConfig);
   const isAdmin = isConfiguredAdmin(sessionConfig, { account });

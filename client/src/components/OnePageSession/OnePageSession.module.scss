@@ -416,6 +416,31 @@
   }
 }
 
+// Files and links have no paragraph above them, so no top gap.
+.sessionContextSection > .sessionContextLinks:first-child {
+  margin-top: 0;
+}
+
+.sessionContextBadge {
+  border: 1px solid currentColor;
+  border-radius: var(--ce-radius-pill, 999px);
+  padding: 0 0.45rem;
+  color: var(--ce-session-chrome-contrast);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+// The admin controls keep the setup page's own surface and text colors.
+.sessionContextManage {
+  width: min(100%, 980px);
+  margin: 0 auto 1rem;
+  text-align: left;
+
+  summary {
+    cursor: pointer;
+  }
+}
+
 .workerGroupCardLinkButton {
   display: inline-flex;
   align-items: center;

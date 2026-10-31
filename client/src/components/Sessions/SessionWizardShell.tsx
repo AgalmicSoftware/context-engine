@@ -41,6 +41,9 @@ export type SessionWizardShellProps = {
   renderField: SessionWizardRenderField;
   slugPreview: React.ReactNode;
   questionsPublisher?: React.ReactNode;
+  /** The Context section's files (before Create) and what adds them after it. */
+  contextSources?: React.ReactNode;
+  contextPublisher?: React.ReactNode;
   encryptionPanelProps: EncryptionPanelProps;
   /** On-chain SBT defaults (tags, featured SBTs) shown under the gates. */
   sbtFieldKeys: string[];
@@ -78,6 +81,8 @@ const SessionWizardShell = ({
   renderField,
   slugPreview,
   questionsPublisher = null,
+  contextSources = null,
+  contextPublisher = null,
   encryptionPanelProps,
   sbtFieldKeys,
   hostingQuick,
@@ -115,7 +120,7 @@ const SessionWizardShell = ({
           link={slugPreview}
           headerImage={renderField('sessionHeader', draft.sessionHeader, [])}
         />
-        <SetupContextSection {...section('context')} />
+        <SetupContextSection {...section('context')} sources={contextSources} publisher={contextPublisher} />
         <SetupQuestionsSection {...section('questions')} publisher={questionsPublisher} />
         <SetupParticipationSection {...section('participation')} supportsEndTime={isWorkerCanonical} />
         <SetupResultsSection {...section('results')} {...policy} />

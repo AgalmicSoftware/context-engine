@@ -32,6 +32,8 @@ import type {
 } from '../../domains/sessionResults/sessionResultsAnalysisController';
 import styles from './OnePageSession.module.scss';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
+import SessionContextSources from './SessionContextSources';
+import { useSessionContextSources } from '../../utilities/docLibrary/useSessionContextSources';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: Record<string, unknown>) => <SurveyPage {...props} />);
@@ -393,7 +395,16 @@ export default function OnePageSessionStandardShell({
   const sessionInfoTooltip =
     typeof sessionInfo === 'string' ? formatPolisReportSessionInfo(sessionInfo, displaySessionSlug) : sessionInfo;
   const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
-  const showContextSection = isDemoSlug || !!sessionContext || showContextAtlas;
+  // Files and links this reader may see. Admins also get the Context section
+  // with nothing in it yet, to add the first; everyone else sees it only with context.
+  const contextSources = useSessionContextSources({
+    sessionSlug: effectiveSlug,
+    sessionConfig: resolvedSessionConfig,
+    account: typeof account === 'string' ? account : '',
+  });
+  const canEditContext = contextSources.isAdmin && contextSources.supported;
+  const showContextSection =
+    isDemoSlug || !!sessionContext || showContextAtlas || contextSources.sources.length > 0 || canEditContext;
   const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
     .join(' ');
@@ -682,6 +693,15 @@ export default function OnePageSessionStandardShell({
             {showDocuments && (
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
                 {!showContextAtlas && renderSessionContext(sessionContext)}
+                {!isDemoSlug ? (
+                  <SessionContextSources
+                    sessionSlug={effectiveSlug}
+                    sessionConfig={(resolvedSessionConfig as Record<string, unknown> | null) || null}
+                    account={typeof account === 'string' ? account : ''}
+                    list={contextSources}
+                    pageLinks={sessionContext?.links || []}
+                  />
+                ) : null}
                 {showContextAtlas && (
                   <Suspense fallback={<LazyFallback label="Loading Reverse Alignment Atlas..." minHeight="20vh" />}>
                     <ReverseAlignmentAtlas context={sessionContext} />
