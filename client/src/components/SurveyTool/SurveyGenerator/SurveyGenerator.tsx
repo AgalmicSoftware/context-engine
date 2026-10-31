@@ -58,6 +58,7 @@ import {
   uploadDocLibraryFile,
   uploadDocLibraryUrlRecord,
 } from '../../../utilities/docLibrary/uploads.js';
+import { useSessionContextPrompt } from '../../../utilities/docLibrary/useSessionContextSources';
 import {
   resolveSponsoredGateStateForResource,
   getGateSbtAddresses,
@@ -348,6 +349,8 @@ const LazyCorpusViewer = React.lazy(() => import('../../DemoViews/CorpusViewer')
 // importing it back; it is only needed once questions have been generated.
 const LazyCreateQuestionsAndSurveys = React.lazy(() => import('../CreateQuestionsAndSurveys'));
 
+const GENERATOR_CONTEXT_CHARS = 20_000;
+
 export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {} as SurveyGeneratorProps) {
   const {
     provider,
@@ -550,6 +553,13 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     if (slug) return slug;
     return 'Session';
   }, [resolvedSessionConfig, resolvedSessionSlug]);
+  // The session's notes, links and the sources this person may read, for the questions to draw on.
+  const sessionContextPrompt = useSessionContextPrompt({
+    sessionSlug: resolvedSessionSlug || '',
+    sessionConfig: resolvedSessionConfig,
+    account,
+    totalChars: GENERATOR_CONTEXT_CHARS,
+  });
   const aiRequestOptions = useMemo(
     () => ({
       sessionSlug: resolvedSessionSlug || '',
@@ -1390,7 +1400,8 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
         }
       }
 
-      // 4. Generate Questions
+      // 4. Generate Questions, with the session's context as untrusted background.
+      if (sessionContextPrompt.text) sourceForQuestions = `${sourceForQuestions}\n\n${sessionContextPrompt.text}`;
       const aiData = await makeSingleAiCall(
         sourceForQuestions,
         {

@@ -22,6 +22,8 @@ import {
 } from './useSessionInterviewGroupRecommendations';
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
 import { useInterviewOpening } from './useInterviewOpening';
+import { useSessionContextPrompt } from '../../utilities/docLibrary/useSessionContextSources';
+import { SESSION_CONTEXT_LIMIT } from './sessionInterviewRealtimeInstructions';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Label, ModalBody } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -137,6 +139,13 @@ export default function SessionInterviewPanel({
   const viewResultsRevealRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
   const readiness = useInterviewReadiness(resolvedWorkerUrl, sessionSlug);
+  // What the interviewer may know: the context this participant may read.
+  const sessionContextPrompt = useSessionContextPrompt({
+    sessionSlug,
+    sessionConfig,
+    account,
+    totalChars: SESSION_CONTEXT_LIMIT,
+  });
   const interviewOpening = useInterviewOpening({
     config: sessionConfig,
     workerUrl: resolvedWorkerUrl,
@@ -847,6 +856,7 @@ export default function SessionInterviewPanel({
         responderContext: voiceContext,
         openingPrompt: openQuestions.length === questions.length ? interviewOpening.opening : undefined,
         steeringPrompt: interviewOpening.steeringPrompt,
+        sessionContext: sessionContextPrompt.text,
         previousTranscript: transcriptRef.current,
         prefillPacket: validatedPrefillPacket,
         importedDrafts,
