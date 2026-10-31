@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import { readAgentClientLoginEnvelope, writeAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { cacheAgentClientLoginEnvelope } from '../OnePageSession/onePageSessionAgentController';
@@ -876,11 +876,23 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     });
 
     await expect(subject.handleLogout()).resolves.toBeUndefined();
-    render(subject.getModalDisplay());
-    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(/sign-out could not be completed/i);
+    const view = render(subject.getModalDisplay());
+    // One short visible sentence; the explanation sits behind the "?" button.
+    const status = screen.getByTestId('ce-passkey-wallet-status');
+    expect(status.firstChild?.textContent).toBe('Passkey sign-out could not be completed.');
+    expect(within(status).getByRole('button', { name: 'What does this mean?' })).toHaveAccessibleDescription(
+      'Your app session has been cleared, but disconnecting the saved wallet failed.',
+    );
     expect(subject.state.passkeyWalletStatusTone).toBe('error');
     expect(props.changeAccount).toHaveBeenCalledWith({});
     expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
+
+    // A later notice brings no stale explanation.
+    mockedPasskeyWallet.unlockPasskeyWallet.mockRejectedValueOnce(new Error('No credential chosen'));
+    await subject.handlePasskeyWalletSignIn();
+    view.rerender(subject.getModalDisplay());
+    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent('Login failed: No credential chosen');
+    expect(screen.queryByRole('button', { name: 'What does this mean?' })).not.toBeInTheDocument();
   });
 
   it('sets persistent wagmi disconnect flag on wagmi logout', async () => {

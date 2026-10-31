@@ -390,7 +390,7 @@ Both wallet hydration paths respect that intent while disconnect is pending or
 failed; a later explicit wallet connection clears it. If the wallet cannot be
 reached (WalletConnect offline, for example), the bridge still ends the local
 wagmi connection in a tab that is no longer signed in with it, so the wallet
-button can start that new connection. Passkey disconnect failures appear in the login modal even after the account state has reset; the notice distinguishes the cleared app session from the failed saved-wallet disconnect.
+button can start that new connection. Passkey disconnect failures appear in the login modal even after the account state has reset, as a one-sentence notice; its "?" button explains that the app session is cleared but the saved-wallet disconnect failed.
 
 Logout, deletion, and a replacing create invalidate older wallet operations.
 Late passkey replies cannot save metadata, activate a signer, or retry a signature

@@ -184,6 +184,8 @@ interface LoginAndSettingsModalState {
   testFundsStatusTone: string;
   passkeyWalletStatusMessage: string;
   passkeyWalletStatusTone: string;
+  // Explanation behind the status's "?" button; any new status clears it.
+  passkeyWalletStatusHelp: string;
   passkeyMode: PasskeyWalletActionMode;
   autoRequestTestnetFundsEnabled: boolean;
   autoSendTriggered: boolean;
@@ -354,6 +356,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       testFundsStatusTone: '',
       passkeyWalletStatusMessage: '',
       passkeyWalletStatusTone: '',
+      passkeyWalletStatusHelp: '',
       passkeyMode: '',
       autoRequestTestnetFundsEnabled: DEFAULT_AUTO_REQUEST_TESTNET_FUNDS,
       autoSendTriggered: false,
@@ -418,7 +421,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     setActionMode: (passkeyMode) => this.setStateIfMounted({ passkeyMode }),
     setStatus: (patch) => {
       if (patch.passkeyWalletStatusTone === 'error') this._purposefulPasskeyActionId = null;
-      this.setStateIfMounted(patch);
+      this.setStateIfMounted({ ...patch, passkeyWalletStatusHelp: '' });
     },
     startAction: () => this.startPurposefulPasskeyWalletAction(),
     updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
@@ -881,7 +884,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   handleLogout = async () => {
     const { provider, wagmiDisconnect } = this.props;
-    this.setStateIfMounted({ passkeyWalletStatusMessage: '', passkeyWalletStatusTone: '' });
+    this.setStateIfMounted({
+      passkeyWalletStatusMessage: '',
+      passkeyWalletStatusTone: '',
+      passkeyWalletStatusHelp: '',
+    });
     // Disconnect a saved passkey wallet on every logout, not only a passkey one,
     // so the start-up restore cannot sign the visitor back in as that account.
     try {
@@ -891,8 +898,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     } catch (error) {
       if (provider === 'passkey_eoa') {
         this.setStateIfMounted({
-          passkeyWalletStatusMessage:
-            'Passkey sign-out could not be completed. Your app session has been cleared, but disconnecting the saved wallet failed.',
+          passkeyWalletStatusMessage: 'Passkey sign-out could not be completed.',
+          passkeyWalletStatusHelp: 'Your app session has been cleared, but disconnecting the saved wallet failed.',
           passkeyWalletStatusTone: 'error',
         });
       }
@@ -2589,6 +2596,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       openCryptoModal: this.openCryptoModal,
       passkeyWalletStatusMessage: this.state.passkeyWalletStatusMessage,
       passkeyWalletStatusTone: this.state.passkeyWalletStatusTone,
+      passkeyWalletStatusHelp: this.state.passkeyWalletStatusHelp,
       passkeyMode: this.state.passkeyMode,
       provider: this.props.provider,
       renderAgentTokenLoginPanel: this.renderAgentTokenLoginPanel,

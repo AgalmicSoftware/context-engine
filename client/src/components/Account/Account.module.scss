@@ -3915,6 +3915,31 @@ h1 {
   color: var(--ce-status-danger-text);
 }
 
+.passkeyWalletStatusHelp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin-block: -12px;
+  padding: 8px;
+  border: 0 !important;
+  border-radius: var(--ce-radius-6);
+  box-shadow: none !important;
+  background: transparent !important;
+  color: inherit !important;
+  vertical-align: middle;
+
+  &:hover {
+    background: color-mix(in srgb, currentColor 12%, transparent) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
 .advancedWalletAccessNotice {
   width: min(520px, 100%);
   margin: 16px auto 0;
