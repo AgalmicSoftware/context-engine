@@ -545,6 +545,28 @@ describe('useRollingTranscriptionRecorder', () => {
     next.unmount();
   });
 
+  it('keeps the final audio when a route change unmounts the recorder mid-capture, and uploads it on reopen', async () => {
+    (transcribeAudio as jest.Mock).mockImplementation(async () => 'Words before leaving.');
+    const first = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'route-change' }));
+    await act(async () => {
+      await first.result.current.startRecording();
+    });
+    await act(async () => {
+      instances[0].requestData();
+      await flushPromises();
+    });
+    first.unmount();
+    await act(flushPromises);
+    // The saved snapshot plus the final fragment the recorder delivers on Stop; nothing uploads meanwhile.
+    expect([...mockChunkRecords.values()].find((record) => record.audio)?.audio?.size).toBe(512);
+    expect(transcribeAudio).not.toHaveBeenCalled();
+    const reopened = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'route-change' }));
+    await act(flushPromises);
+    expect(reopened.result.current.transcript).toBe('Words before leaving.');
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+    reopened.unmount();
+  });
+
   it('does not start a microphone request completed after switching sessions', async () => {
     let grant!: (value: MediaStream) => void;
     (navigator.mediaDevices.getUserMedia as jest.Mock).mockImplementation(
