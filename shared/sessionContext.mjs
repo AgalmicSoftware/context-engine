@@ -1,4 +1,4 @@
-import { looksSecret } from './secretText.mjs';
+import { HEX_KEY_HINT, hasHexKey, looksSecret } from './secretText.mjs';
 
 // A session's notes and links ({ title, paragraphs, links }), with the one set
 // of limits the session page, MCP, templates and the Worker's set-config share.
@@ -129,13 +129,13 @@ export const validateSessionContext = (value) => {
   }
   // Context is public and read by the AI, so nothing in it may look like a key.
   const SECRET = 'looks like a key, token or password. Remove it: secrets never go in context.';
-  if (looksSecret(title)) fail(errors, 'sessionContext.title', `The title ${SECRET}`);
-  paragraphs.forEach((paragraph, index) => {
-    if (looksSecret(paragraph)) fail(errors, `sessionContext.paragraphs.${index}`, `Paragraph ${index + 1} ${SECRET}`);
-  });
-  links.forEach(({ label, url }, index) => {
-    if (looksSecret(label) || looksSecret(url)) fail(errors, `sessionContext.links.${index}`, `Link ${index + 1} ${SECRET}`);
-  });
+  const refuse = (path, subject, ...texts) => {
+    if (texts.some(hasHexKey)) fail(errors, path, `${subject} ${HEX_KEY_HINT}`);
+    else if (texts.some(looksSecret)) fail(errors, path, `${subject} ${SECRET}`);
+  };
+  refuse('sessionContext.title', 'The title', title);
+  paragraphs.forEach((paragraph, index) => refuse(`sessionContext.paragraphs.${index}`, `Paragraph ${index + 1}`, paragraph));
+  links.forEach(({ label, url }, index) => refuse(`sessionContext.links.${index}`, `Link ${index + 1}`, label, url));
   return errors.length ? { ok: false, errors } : { ok: true, value: { title, paragraphs, links }, errors };
 };
 

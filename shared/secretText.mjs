@@ -6,7 +6,6 @@ const SECRET_PATTERNS = [
   /\bsk-[\w-]{16,}/,
   /\bAIza[\w-]{30,}/,
   /\b(?:gsk|ghp|gho|ghu|ghs|ghr|github_pat|glpat|xox[abpr])[-_][\w-]{16,}/,
-  /(?<![/\w])(?:0x)?[0-9a-f]{64,}\b/i,
   /-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----/,
   /"kty"\s*:/,
   /\bBearer\s+[\w.~+/=-]{16,}/i,
@@ -14,10 +13,23 @@ const SECRET_PATTERNS = [
   /[?&#](?:access_token|api[_-]?key|key|token|secret|password|sig|signature|auth)=[^&#\s]/i,
   /#(?:[^\s#]*&)?k=[^&#\s]/,
 ];
-const TOKEN_RUN = /(?<![\w-])[\w-]{40}(?![\w-])/g;
+// 64 hex digits outside a link's path: a private key's shape, and a
+// transaction hash's, which belongs in an explorer link instead.
+const HEX_KEY = /(?<![/\w])(?:0x)?[0-9a-f]{64,}\b/i;
+// A 40-character run mixing cases and digits, unless it starts a segment of a
+// link's path, where page names and IDs live.
+const TOKEN_RUN = /(?<![\w/-])[\w-]{40}(?![\w-])/g;
+
+/** Completes "<the field> …" when hasHexKey is true. */
+export const HEX_KEY_HINT =
+  'has 64 hex digits, the shape of a private key. To cite a transaction, link to it in a block explorer instead.';
+
+/** True for 64 hex digits outside a link's path. */
+export const hasHexKey = (text) => typeof text === 'string' && HEX_KEY.test(text);
 
 /** True for text that looks like a key, token or password. */
 export const looksSecret = (text) =>
   typeof text === 'string' &&
-  (SECRET_PATTERNS.some((pattern) => pattern.test(text)) ||
+  (hasHexKey(text) ||
+    SECRET_PATTERNS.some((pattern) => pattern.test(text)) ||
     (text.match(TOKEN_RUN) || []).some((run) => /[A-Z]/.test(run) && /[a-z]/.test(run) && /\d/.test(run)));

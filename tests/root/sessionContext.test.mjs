@@ -7,6 +7,7 @@ import {
   sessionContextPlainText,
   validateSessionContext,
 } from '../../shared/sessionContext.mjs';
+import { looksSecret } from '../../shared/secretText.mjs';
 
 const link = (index) => ({ label: `Link ${index}`, url: `https://example.org/${index}` });
 
@@ -102,4 +103,29 @@ test('writers refuse context that looks like a key, token or password', () => {
     assert.ok(result.errors.some((error) => error.path === path && /secrets never go in context/.test(error.message)), JSON.stringify(result.errors));
   }
   assert.equal(validateSessionContext({ links: [{ label: 'Doc', url: 'https://example.org/doc?page=2' }] }).ok, true);
+});
+
+const TX = `0x${'5c'.repeat(32)}`;
+
+test('page names and IDs in a link path are not mistaken for tokens', () => {
+  for (const url of [
+    'https://en.wikipedia.org/wiki/2024_United_States_presidential_election',
+    'https://www.notion.so/Reading-0b5d7c2e9a314f6c8e1d2a3b4c5d6e7f',
+    `https://etherscan.io/tx/${TX}`,
+  ]) {
+    assert.equal(looksSecret(url), false, url);
+    assert.equal(validateSessionContext({ links: [{ label: 'Read', url }] }).ok, true, url);
+  }
+  // The same 40-character run outside a link's path still looks like a token.
+  assert.equal(looksSecret('Use 2024_United_States_presidential_election to sign in.'), true);
+  assert.equal(looksSecret('https://docs.example.org/view?id=2024_United_States_presidential_election'), true);
+});
+
+test('64 hex digits outside a link are refused, pointing a transaction to an explorer link', () => {
+  const result = validateSessionContext({ paragraphs: [`The vote passed in transaction ${TX}.`] });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.errors.map((error) => error.path), ['sessionContext.paragraphs.0']);
+  assert.match(result.errors[0].message, /^Paragraph 1 has 64 hex digits, the shape of a private key\./);
+  assert.match(result.errors[0].message, /To cite a transaction, link to it in a block explorer/);
+  assert.match(validateSessionContext({ links: [{ label: TX.slice(2), url: 'https://example.org/' }] }).errors[0].message, /block explorer/);
 });
