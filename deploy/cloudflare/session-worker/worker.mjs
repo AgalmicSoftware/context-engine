@@ -73974,54 +73974,6 @@ var init_aiProviderExecution = __esm({
   }
 });
 
-// shared/questions/quadraticAllocation.mjs
-function getVoiceCredits(question = {}) {
-  return question.voiceCredits === void 0 ? DEFAULT_VOICE_CREDITS : question.voiceCredits;
-}
-function validateQuadraticQuestion(question = {}) {
-  const budget = getVoiceCredits(question);
-  if (!Number.isSafeInteger(budget) || budget < 1)
-    return "Voice credits must be a positive whole number.";
-  const options = question.options;
-  if (!Array.isArray(options) || options.length < 2)
-    return "Quadratic allocation requires at least two options.";
-  const labels = Array.from(
-    options,
-    (option) => typeof option === "string" ? option.trim().toLowerCase() : ""
-  );
-  if (labels.some((label) => !label))
-    return "Every quadratic option must have a nonblank label.";
-  if (new Set(labels).size !== labels.length)
-    return "Quadratic option labels must be unique.";
-  return "";
-}
-function validateQuadraticAllocation(value, question = {}) {
-  const questionError = validateQuadraticQuestion(question);
-  if (questionError) return questionError;
-  if (!Array.isArray(value) || value.length !== question.options.length || Array.from(value).some((vote) => !Number.isSafeInteger(vote))) {
-    return "Assign one signed whole-number vote to every option; use 0 for neutral.";
-  }
-  const spent = quadraticCreditsSpent(value);
-  if (!Number.isSafeInteger(spent) || spent > getVoiceCredits(question))
-    return "This allocation exceeds the voice-credit budget.";
-  return "";
-}
-function quadraticCreditsSpent(value) {
-  return value.reduce((total, vote) => total + vote * vote, 0);
-}
-function formatQuadraticAllocation(value, options = []) {
-  if (!Array.isArray(value)) return "";
-  return value.map(
-    (vote, index) => `${options[index] ?? `Option ${index + 1}`}: ${vote > 0 ? "+" : ""}${vote}`
-  ).join("; ");
-}
-var DEFAULT_VOICE_CREDITS;
-var init_quadraticAllocation = __esm({
-  "shared/questions/quadraticAllocation.mjs"() {
-    DEFAULT_VOICE_CREDITS = 99;
-  }
-});
-
 // shared/questions/storedRating.mjs
 var RATING_MIN, RATING_MAX, LEGACY_RATING_MAX, readStoredRating;
 var init_storedRating = __esm({
