@@ -1,4 +1,4 @@
-import { RecordingChunkQueue } from './recordingChunkQueue';
+import { countKeptChunks, RecordingChunkQueue } from './recordingChunkQueue';
 import {
   clearRecordingChunks,
   listRecordingChunks,
@@ -596,6 +596,30 @@ it('keeps memory-only audio when Close and keep runs before the store answers', 
   await third.ready;
   await tick();
   expect(third.records.get(id)?.audio).toBe(audio);
+});
+
+it('counts the kept chunks that reopening will upload, in storage or only in memory', async () => {
+  const chunk = (id: string, status: RecordingChunk['segment']['status'], withAudio = true): RecordingChunk => ({
+    scope: 'kept-room',
+    labelSpeakers: false,
+    ...(withAudio ? { audio } : {}),
+    segment: { id, index: Number(id.slice(-1)), status, text: '', startedAt: 0 },
+  });
+  saved.set('chunk-0', chunk('chunk-0', 'complete', false));
+  saved.set('chunk-1', chunk('chunk-1', 'queued'));
+  // A Failed chunk waits for Retry, so reopening alone won't upload it.
+  saved.set('chunk-2', chunk('chunk-2', 'failed'));
+  await expect(countKeptChunks('kept-room')).resolves.toBe(1);
+  await expect(countKeptChunks('other-room')).resolves.toBe(0);
+  // Without device storage, the copy kept in memory counts.
+  jest.mocked(listRecordingChunks).mockRejectedValue(new Error('No storage'));
+  jest.mocked(putRecordingChunk).mockRejectedValue(new Error('No storage'));
+  const queue = create(async () => new Promise(() => {}), 'kept-room');
+  await queue.ready;
+  queue.capture(queue.begin(false), audio, true);
+  await queue.keepAudio();
+  queue.dispose();
+  await expect(countKeptChunks('kept-room')).resolves.toBe(1);
 });
 
 describe('speaker labels across chunks', () => {

@@ -1,7 +1,7 @@
 import { audioFileExtension } from './audioFileExtension';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
-import { hasUnsavedAudio, RecordingChunkQueue } from './recordingChunkQueue';
+import { countKeptChunks, hasUnsavedAudio, RecordingChunkQueue } from './recordingChunkQueue';
 import {
   stitchRollingTranscriptSegments,
   type CaptureGap,
@@ -38,20 +38,31 @@ const scopeAccount = (scope: string): string => {
     return '';
   }
 };
+const ownedByAnother = (scope: string, account: string) =>
+  Boolean(scopeAccount(scope)) && scopeAccount(scope) !== account;
 const OPEN_ELSEWHERE_NOTICE = 'This recording is open in another tab.';
 // Reopening in the same tab gets the lock back at once; only a longer wait means another tab holds it.
 const OPEN_ELSEWHERE_WAIT_MS = 1000;
 const OWNER_NOTICE =
   'This recording belongs to the account that made it. It closes when its uploads finish and its audio is saved, or when you clear it. Download any audio you need first.';
 
-type Options = {
+type RecordingOptions = {
   sessionSlug: string;
   sessionConfig: Record<string, unknown> | null;
   context?: unknown;
   workerUrl?: string;
+};
+type Options = RecordingOptions & {
   labelSpeakers: boolean;
   // Another account's recording stays open while capture continues.
   capturing?: boolean;
+};
+// A recording belongs to a session on a Worker, and to the account that made it.
+const recordingOwner = ({ sessionSlug, sessionConfig, context, workerUrl }: RecordingOptions) => {
+  const account =
+    context && typeof context === 'object' && 'account' in context ? String(context.account || '').toLowerCase() : '';
+  const worker = workerUrl || sessionConfig?.corsWorkerUrl || sessionConfig?.workerUrl || '';
+  return { account, worker, identity: JSON.stringify([worker, sessionSlug]) };
 };
 
 export function useRecordingChunkQueue(options: Options) {
@@ -66,18 +77,12 @@ export function useRecordingChunkQueue(options: Options) {
   const [hiddenPeriods, setHiddenPeriods] = useState<Array<{ startedAt: number; endedAt: number }>>([]);
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && navigator.onLine === false);
   const [openElsewhere, setOpenElsewhere] = useState(false);
-  const account =
-    options.context && typeof options.context === 'object' && 'account' in options.context
-      ? String(options.context.account || '')
-      : '';
-  const normalizedAccount = account.toLowerCase();
-  const worker = options.workerUrl || options.sessionConfig?.corsWorkerUrl || options.sessionConfig?.workerUrl || '';
-  const identity = JSON.stringify([worker, options.sessionSlug]);
+  const { account: normalizedAccount, worker, identity } = recordingOwner(options);
   const pinned = useRef({ identity, scope: readPinnedScope(identity) });
   const openScope = useRef('');
   const [, refreshScope] = useState(0);
   if (pinned.current.identity !== identity) pinned.current = { identity, scope: readPinnedScope(identity) };
-  const isForeign = (pin: string) => Boolean(scopeAccount(pin)) && scopeAccount(pin) !== normalizedAccount;
+  const isForeign = (pin: string) => ownedByAnother(pin, normalizedAccount);
   // Record pins a recording so signing in or a late account restore neither stops capture nor splits it. A pin
   // made while signed in never reaches another account, which would see its transcript and upload with its own
   // credentials: opening the recorder drops it, unless only this page holds some of its audio (kept below).
@@ -279,4 +284,30 @@ export function useRecordingChunkQueue(options: Options) {
     ownerNotice: foreignPin && !options.capturing ? OWNER_NOTICE : '',
     openElsewhereNotice: openElsewhere ? OPEN_ELSEWHERE_NOTICE : '',
   };
+}
+
+/**
+ * While the recorder is closed (`enabled`), how many chunks of the recording it would open still hold audio to
+ * upload, so the session page can ask for it to be reopened.
+ */
+export function useKeptRecordingChunks(options: RecordingOptions, enabled: boolean): number {
+  const { account, worker, identity } = recordingOwner(options);
+  const pin = readPinnedScope(identity);
+  // As the recorder does on opening, another account's recording gives way unless only this page holds its audio.
+  const scope =
+    pin && (!ownedByAnother(pin, account) || hasUnsavedAudio(pin))
+      ? pin
+      : JSON.stringify([worker, options.sessionSlug, account]);
+  const [kept, setKept] = useState(0);
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let current = true;
+    void countKeptChunks(scope).then((count) => {
+      if (current) setKept(count);
+    });
+    return () => {
+      current = false;
+    };
+  }, [enabled, scope]);
+  return enabled ? kept : 0;
 }

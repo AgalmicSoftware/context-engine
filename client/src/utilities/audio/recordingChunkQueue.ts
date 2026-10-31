@@ -32,6 +32,15 @@ const SAMPLE_WAIT_MS = 10_000;
 export const hasUnsavedAudio = (scope: string): boolean =>
   [...(memoryRecordings.get(scope)?.values() || [])].some((record) => record.audio);
 
+/** How many chunks of a closed recording hold audio that reopening it will upload (Failed ones wait for Retry). */
+export async function countKeptChunks(scope: string): Promise<number> {
+  const saved = await listRecordingChunks(scope).catch((): RecordingChunk[] => []);
+  const kept = new Set<string>();
+  for (const record of [...saved, ...(memoryRecordings.get(scope)?.values() || [])])
+    if (record.audio && record.segment.status !== 'failed') kept.add(record.segment.id);
+  return kept.size;
+}
+
 type Transcription = {
   text: string;
   speakerTurns?: SpeakerTranscriptTurn[];
