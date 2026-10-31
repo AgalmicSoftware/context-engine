@@ -284,7 +284,8 @@ export const fetchChipotleJson = async ({
   const text = await response.text().catch(() => '');
   const parsed = parseJsonIfPossible(text);
   if (!response.ok) {
-    throw new Error(extractChipotleErrorMessage(response.status, parsed, 'Chipotle request failed'));
+    throw Object.assign(new Error(extractChipotleErrorMessage(response.status, parsed, 'Chipotle request failed')),
+      { litStatus: response.status });
   }
   if (isObj(parsed) && toTrimmedString(parsed.error || '').trim()) {
     throw new Error(extractChipotleErrorMessage(response.status, parsed, 'Chipotle request failed'));
@@ -460,6 +461,59 @@ const listWallets = async ({ runtime, fetchImpl } = {}) => {
     fetchImpl,
   });
   return Array.isArray(response) ? response : [];
+};
+
+const MAX_GONE_CHECK_PAGES = 10;
+const GONE_CHECK_STATUSES = new Set([400, 401, 403, 404, 410, 422]);
+
+// Every id in a complete listing, or null when the listing is partial or an
+// item has no recognizable id.
+const listAllIds = async ({ runtime, path, idsOf, fetchImpl } = {}) => {
+  const ids = new Set();
+  for (let page = 0; page < MAX_GONE_CHECK_PAGES; page += 1) {
+    const items = await fetchChipotleJson({
+      apiBase: runtime.litApiBase,
+      apiKey: runtime.litManagementApiKey,
+      allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+      path: buildPagedPath(path, { page_number: page, page_size: DEFAULT_PAGE_SIZE }),
+      fetchImpl,
+    });
+    if (!Array.isArray(items)) return null;
+    for (const item of items) {
+      const itemIds = idsOf(item);
+      if (!itemIds.length) return null;
+      itemIds.forEach((id) => ids.add(id));
+    }
+    if (items.length < DEFAULT_PAGE_SIZE) return ids;
+  }
+  return null;
+};
+
+// Saved setup is gone only when Lit says so: after a setup call fails with a
+// client error, Lit refuses the saved account key, or its complete group or
+// wallet list (read with that key) lacks a saved group or PKP. Network errors,
+// timeouts, 5xx, rate limits, billing refusals and partial or unrecognized
+// listings confirm nothing, so the saved progress stays resumable.
+export const confirmLitSetupGone = async ({ checkpoint = {}, failure, env = {}, fetchImpl = globalThis.fetch } = {}) => {
+  const apiKey = toTrimmedString(checkpoint.litAccountApiKey);
+  if (!GONE_CHECK_STATUSES.has(failure?.litStatus) || !apiKey) return '';
+  const groupId = toTrimmedString(checkpoint.litGroupId);
+  const pkpId = normalizeChipotleMembershipValue(checkpoint.litPkpId);
+  try {
+    const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
+    const runtime = { litApiBase: normalizeLitChipotleApiBase(checkpoint.litApiBase || DEFAULT_LIT_API_BASE, { allowLocalApiBase }),
+      allowLocalApiBase, litManagementApiKey: apiKey };
+    // Listing groups also checks the key. Group ids are decimal.
+    const groups = await listAllIds({ runtime, path: '/list_groups', fetchImpl,
+      idsOf: (group) => [group?.id, group?.group_id].map(toTrimmedString).filter((id) => /^\d+$/.test(id)) });
+    if (groups && /^\d+$/.test(groupId) && !groups.has(groupId)) return 'resources';
+    if (!pkpId) return '';
+    const wallets = await listAllIds({ runtime, path: '/list_wallets', fetchImpl,
+      idsOf: (wallet) => [normalizeValidChipotlePkpId(wallet?.id), wallet?.wallet_address].map(normalizeChipotleMembershipValue).filter(Boolean) });
+    return wallets && !wallets.has(pkpId) ? 'resources' : '';
+  } catch (error) {
+    return [401, 403].includes(error?.litStatus) ? 'account' : '';
+  }
 };
 
 const resolveActionCidMembership = async ({ runtime, actions = [], fetchImpl } = {}) => {

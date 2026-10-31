@@ -2011,7 +2011,12 @@ Runtime:
     checks ownership, with a 30-second request timeout. Pending resources never
     authorize requests; finalization commits their matching secrets and public
     descriptor and clears the pending record in one transaction. Provider errors
-    and checkpoint secrets are not included in admin responses.
+    and checkpoint secrets are not included in admin responses. If a resumed
+    attempt fails with a Lit client error and Lit then refuses the saved account
+    key, or its complete group or wallet list no longer includes the saved group
+    or PKP, the pending record is cleared (keeping an account Lit still accepts)
+    and the admin route returns 409, so the next attempt starts over. Network
+    errors, timeouts, 5xx, rate limits and billing refusals keep the record.
     Lit setup and backup restore update the same document; backup export reads it directly.
   - The Cloudflare API token is never a session secret. A direct `/new` token is
     consumed only by the deploy helper and is not written to either KV record.

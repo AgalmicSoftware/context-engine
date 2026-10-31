@@ -8,6 +8,7 @@ import {
   preflightSessionLitProvisioning,
   checkpointSessionLitProvisioning,
   releaseSessionLitProvisioning,
+  discardSessionLitProvisioning,
   finalizeSessionLitAuthorization,
   updateSessionSecretsAfterLitRepair,
 } from './sessionLitAuthorizationCoordinator.js';
@@ -17,6 +18,7 @@ import {
 } from './adminRequestAuthority.js';
 import {
   bootstrapLitChipotleSession,
+  confirmLitSetupGone,
   ensureChipotleManagementApiKey,
   LIT_PROVISIONING_CREDENTIALS_CONFLICT,
   provisionLitChipotleAction,
@@ -340,6 +342,14 @@ export const dispatchAdminRequest = async ({
   if (action === 'lit-chipotle-provision' || action === 'lit-chipotle-bootstrap-session') {
     let attempt;
     const coordination = { env, slug: targetSlug, baseConfig: existingConfig, expectedAuthority };
+    // Fence and renew the attempt immediately before every remote call;
+    // individual requests expire well before the five-minute lease.
+    const fetchImpl = async (url, init) => {
+      await (deps?.checkpointSessionLitProvisioning || checkpointSessionLitProvisioning)({
+        ...coordination, attemptId: attempt.attemptId, checkpoint: {},
+      });
+      return (deps?.fetchImpl || globalThis.fetch)(url, { ...init, signal: AbortSignal.timeout(30_000) });
+    };
     try {
       const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
       const runtime = action === 'lit-chipotle-provision'
@@ -369,14 +379,7 @@ export const dispatchAdminRequest = async ({
           existingSecrets.litAuthorizationPrivateKey = privateKey;
           return privateKey;
         },
-        fetchImpl: async (url, init) => {
-          // Fence and renew the attempt immediately before every remote call;
-          // individual requests expire well before the five-minute lease.
-          await (deps?.checkpointSessionLitProvisioning || checkpointSessionLitProvisioning)({
-            ...coordination, attemptId: attempt.attemptId, checkpoint: {},
-          });
-          return (deps?.fetchImpl || globalThis.fetch)(url, { ...init, signal: AbortSignal.timeout(30_000) });
-        },
+        fetchImpl,
       };
       let result;
       if (action === 'lit-chipotle-provision') {
@@ -400,6 +403,22 @@ export const dispatchAdminRequest = async ({
       delete responseBody.litCredentials;
       return deps?.json?.(responseBody, 200, headers);
     } catch (error) {
+      // Only Lit confirming that saved resources are gone clears the saved
+      // setup so a retry starts over; any other failure keeps it for Resume.
+      const gone = attempt
+        ? await confirmLitSetupGone({ checkpoint: attempt.checkpoint, failure: error, env, fetchImpl }).catch(() => '')
+        : '';
+      if (gone) {
+        try {
+          await (deps?.discardSessionLitProvisioning || discardSessionLitProvisioning)({
+            ...coordination, attemptId: attempt.attemptId, keepAccount: gone === 'resources',
+          });
+          return deps?.json?.({ error: gone === 'account'
+            ? 'Lit no longer accepts the saved Lit account key, so the saved setup was cleared. Retry to start over.'
+            : 'Lit no longer has the saved Lit group or PKP, so the saved setup was cleared and its account kept. Retry to start over.',
+          }, 409, headers);
+        } catch {}
+      }
       return deps?.json?.({ error: error?.code === 'lit_provisioning_credentials_conflict'
         ? LIT_PROVISIONING_CREDENTIALS_CONFLICT
         : error?.code === 'lit_management_key_missing' ? 'Lit account API key not configured.'

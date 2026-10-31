@@ -9,6 +9,7 @@ import worker from './worker.js';
 import * as provisioning from './sessionLitAuthorizationCoordinator.js';
 import { bootstrapLitChipotleSession } from './chipotleClient.js';
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
+import { dispatchAdminRequest } from './adminRequestDispatch.js';
 
 const KEY_A = `0x${'11'.repeat(32)}`;
 const KEY_B = `0x${'22'.repeat(32)}`;
@@ -464,11 +465,13 @@ test('Lit setup patches the committed full document and later edits retain its k
 
 const PROVISIONING_RECORD = 'session-lit-provisioning-v1';
 const setupResourcePaths = ['/new_account', '/add_group', '/create_wallet', '/get_lit_action_ipfs_id', '/add_action', '/add_action_to_group', '/add_pkp_to_group', '/add_usage_api_key'];
-const litRemoteFixture = () => {
+const litRemoteFixture = (respond) => {
   const calls = new Map();
-  return { calls, fetch: async (url) => {
+  return { calls, fetch: async (url, init = {}) => {
     const path = new URL(url).pathname.replace('/core/v1', '');
     calls.set(path, (calls.get(path) || 0) + 1);
+    const answered = await respond?.(path, new URL(url), init);
+    if (answered) return answered;
     const values = { '/new_account': { api_key: 'recoverable-account-key', wallet_address: 'account-address' },
       '/add_group': { group_id: '7' }, '/create_wallet': { wallet_address: 'wallet-address' },
       '/get_lit_action_ipfs_id': 'action-cid', '/list_actions': [], '/list_wallets': [], '/list_wallets_in_group': [],
@@ -670,4 +673,106 @@ test('resuming setup accepts equivalent normalized API base spellings', async ()
     fetchImpl: litRemoteFixture().fetch,
   });
   assert.equal(result.litCredentials.litApiBase, 'https://api.chipotle.litprotocol.com');
+});
+
+// A simulated Lit account: numbered groups, revocable keys, and an injectable
+// failure for every call. A deleted group answers "not found".
+const simulatedLit = () => {
+  const lit = { groups: new Set(), nextGroup: 1, revoked: new Set(), failure: null };
+  lit.remote = litRemoteFixture(async (path, url, init) => {
+    if (lit.revoked.has(init.headers?.['X-Api-Key'])) return Response.json({ error: 'Invalid API key.' }, { status: 401 });
+    const failed = await lit.failure?.(path);
+    if (failed) return failed;
+    if (path === '/add_group') {
+      const id = String(lit.nextGroup++);
+      lit.groups.add(id);
+      return Response.json({ group_id: id });
+    }
+    if (path === '/list_groups') return Response.json([...lit.groups].map(id => ({ id: Number(id), name: `group-${id}` })));
+    const groupId = url.searchParams.get('group_id') ?? JSON.parse(init.body || '{}').group_id;
+    if (groupId != null && !lit.groups.has(String(groupId))) return Response.json({ error: 'Group not found.' }, { status: 404 });
+    return null;
+  });
+  return lit;
+};
+const provisionThroughRoute = async (f, lit, body = {}) => dispatchAdminRequest({
+  request: { json: async () => body }, env: f.env, baseHeaders: {}, slug: '', action: 'lit-chipotle-bootstrap-session',
+  deps: { json: (payload, status) => ({ body: payload, status }), getSessionSecrets, fetchImpl: lit.remote.fetch,
+    resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig: baseConfig, headers: {}, targetSlug: 'fixture',
+      expectedAuthority: await f.expected() }) },
+});
+const savedSetup = f => decryptSessionSecretsEnvelope(f.store.get(PROVISIONING_RECORD).envelope, { env: f.env, slug: 'fixture' });
+const switchAuthority = async f => provisioning.preflightSessionLitProvisioning({ env: f.env, slug: 'fixture', baseConfig,
+  expectedAuthority: await f.expected(), freshAuthority: true });
+const interruptedSetup = async () => {
+  const f = createFixture();
+  const lit = simulatedLit();
+  lit.failure = path => path === '/create_wallet' ? Response.json({ error: 'Unavailable.' }, { status: 503 }) : null;
+  assert.equal((await provisionThroughRoute(f, lit)).status, 502);
+  lit.failure = null;
+  const saved = await savedSetup(f);
+  assert.equal(saved.litGroupId, '1');
+  assert.equal(saved.accountWalletAddress, 'account-address');
+  return { f, lit, saved };
+};
+
+test('Lit confirming that a saved group is gone lets setup start over and keeps its account', async () => {
+  const { f, lit, saved } = await interruptedSetup();
+  // Network errors, 5xx, billing refusals and a "not found" while Lit still
+  // lists the group confirm nothing: the saved setup stays for Resume.
+  for (const failure of [
+    () => { throw new TypeError('fetch failed'); },
+    () => Response.json({ error: 'Unavailable.' }, { status: 503 }),
+    () => Response.json({ error: 'payment_required' }, { status: 402 }),
+    path => path === '/list_groups' ? null : Response.json({ error: 'Not found.' }, { status: 404 }),
+  ]) {
+    lit.failure = failure;
+    assert.equal((await provisionThroughRoute(f, lit)).status, 502);
+    assert.deepEqual(await savedSetup(f), saved);
+    await assert.rejects(switchAuthority(f), error => error.status === 409);
+  }
+  lit.failure = null;
+  lit.groups.delete('1');
+  const gone = await provisionThroughRoute(f, lit);
+  assert.equal(gone.status, 409);
+  assert.match(gone.body.error, /no longer has the saved Lit group or PKP/);
+  assert.ok(!JSON.stringify(gone).includes('recoverable-account-key'));
+  assert.deepEqual(await savedSetup(f), { litApiBase: saved.litApiBase, litAccountApiKey: saved.litAccountApiKey,
+    accountSecretOutput: saved.accountSecretOutput, accountWalletAddress: saved.accountWalletAddress });
+  await switchAuthority(f);
+  const resumed = await provisionThroughRoute(f, lit);
+  assert.equal(resumed.status, 200, JSON.stringify(resumed.body));
+  assert.equal(resumed.body.litGroupId, '2');
+  assert.equal(lit.remote.calls.get('/new_account'), 1);
+  assert.equal(f.store.has(PROVISIONING_RECORD), false);
+});
+
+test('Lit refusing the saved account key lets an admin start over with a working key', async () => {
+  const { f, lit } = await interruptedSetup();
+  lit.revoked.add('recoverable-account-key');
+  // Until Lit refuses the saved key, a different key conflicts with the saved setup.
+  assert.equal((await provisionThroughRoute(f, lit, { litAccountApiKey: 'replacement-key' })).status, 409);
+  const refused = await provisionThroughRoute(f, lit);
+  assert.equal(refused.status, 409);
+  assert.match(refused.body.error, /no longer accepts the saved Lit account key/);
+  assert.ok(!JSON.stringify(refused).includes('recoverable-account-key'));
+  assert.deepEqual(await savedSetup(f), {});
+  await switchAuthority(f);
+  const restarted = await provisionThroughRoute(f, lit, { litAccountApiKey: 'replacement-key' });
+  assert.equal(restarted.status, 200, JSON.stringify(restarted.body));
+  assert.equal(restarted.body.litGroupId, '2');
+  assert.equal((await getSessionSecrets(f.env, 'fixture')).litAccountApiKey, 'replacement-key');
+  assert.equal(lit.remote.calls.get('/new_account'), 1);
+});
+
+test('only the current attempt can clear saved setup', async () => {
+  const f = createFixture();
+  const first = await beginProvisioning(f);
+  await provisioning.checkpointSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(),
+    attemptId: first.attemptId, checkpoint: { litAccountApiKey: 'saved-key', litGroupId: '7' } });
+  await provisioning.releaseSessionLitProvisioning({ env: f.env, slug: 'fixture', attemptId: first.attemptId });
+  await beginProvisioning(f);
+  await assert.rejects(provisioning.discardSessionLitProvisioning({ env: f.env, slug: 'fixture', expectedAuthority: await f.expected(),
+    attemptId: first.attemptId, keepAccount: false }), error => error.status === 409);
+  assert.equal((await savedSetup(f)).litGroupId, '7');
 });

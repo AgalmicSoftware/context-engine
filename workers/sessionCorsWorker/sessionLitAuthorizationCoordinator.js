@@ -11,6 +11,7 @@ const SETUP_RECORD = 'session-lit-authorization-pending-v1';
 const PROVISIONING_RECORD = 'session-lit-provisioning-v1';
 const PROVISIONING_LEASE_MS = 5 * 60_000;
 const PROVISIONING_FIELDS = new Set(['litApiBase', 'litAccountApiKey', 'accountSecretOutput', 'accountWalletAddress', 'litGroupId', 'litPkpId', 'litActionCid', 'litUsageApiKey', 'registeredAction', 'addedActionToGroup', 'addedPkpToGroup']);
+const ACCOUNT_FIELDS = ['litApiBase', 'litAccountApiKey', 'accountSecretOutput', 'accountWalletAddress'];
 export const hasPendingLitAuthorizationSetup = async (storage) => (await storage.get(SETUP_RECORD)) != null;
 const CONFIG_RECORD = 'session-config-authority';
 const PRIVATE_KEY = 'litAuthorizationPrivateKey';
@@ -119,7 +120,7 @@ export const executeLitProvisioning = async (coordinator, payload, operation) =>
   if (!slug) return json({ error: COORDINATION_ERROR }, 400);
   try {
     if (operation !== 'release') {
-      await coordinator.assertSessionAuthority(payload, { requireRevision: operation !== 'checkpoint' });
+      await coordinator.assertSessionAuthority(payload, { requireRevision: !['checkpoint', 'discard'].includes(operation) });
       await coordinator.repairPendingSessionConfigProjection();
     }
     const result = await coordinator.state.storage.transaction(async transaction => {
@@ -157,8 +158,17 @@ export const executeLitProvisioning = async (coordinator, payload, operation) =>
           await transaction.put(PROVISIONING_RECORD, { ...record, leaseUntilMs: 0 });
         return {};
       }
-      if (operation !== 'checkpoint' || !record || !payload.attemptId || record.attemptId !== payload.attemptId) fail();
+      if (!['checkpoint', 'discard'].includes(operation) || !record || !payload.attemptId || record.attemptId !== payload.attemptId) fail();
       const previous = await readProvisioning(record, coordinator.env, slug);
+      // Lit confirmed that saved resources are gone, so the next attempt starts
+      // over. An account Lit still accepts is kept: a created one has no other copy.
+      if (operation === 'discard') {
+        const kept = payload.keepAccount === true
+          ? Object.fromEntries(ACCOUNT_FIELDS.filter(key => hasOwn(previous, key)).map(key => [key, previous[key]])) : {};
+        const envelope = await buildEncryptedSessionSecretsEnvelope(kept, { env: coordinator.env, slug });
+        await transaction.put(PROVISIONING_RECORD, { ...record, envelope });
+        return {};
+      }
       const checkpoint = payload.checkpoint;
       if (!isRecord(checkpoint) || Object.keys(checkpoint).some(key => !PROVISIONING_FIELDS.has(key)) ||
         Object.values(checkpoint).some(value => typeof value !== 'string' && typeof value !== 'boolean')) fail(400);
@@ -330,3 +340,4 @@ export const preflightSessionLitProvisioning = args => provisionCall(args, 'pref
 export const beginSessionLitProvisioning = args => provisionCall(args, 'begin');
 export const checkpointSessionLitProvisioning = args => provisionCall(args, 'checkpoint');
 export const releaseSessionLitProvisioning = args => provisionCall(args, 'release');
+export const discardSessionLitProvisioning = args => provisionCall(args, 'discard');

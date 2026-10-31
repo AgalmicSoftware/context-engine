@@ -75797,7 +75797,7 @@ var init_litWorkerAuthorization = __esm({
 });
 
 // workers/sessionCorsWorker/chipotleClient.js
-var import_rpcDefaults4, LIT_PROVISIONING_CREDENTIALS_CONFLICT, DEFAULT_LIT_API_BASE, CHIPOTLE_API_PREFIX, APPROVED_LIT_CHIPOTLE_API_HOSTS, LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, DEFAULT_PAGE_NUMBER, DEFAULT_PAGE_SIZE, getPathRpcUrl2, getPublicRpcUrls2, ethersUtils2, toTrimmedString9, isObj18, normalizeChipotleRpcCandidateList, normalizeValidChipotlePkpId, normalizeChipotleMembershipValue, normalizeHostname, parseIpv4Octets2, isPrivateOrLocalIpv4, isPrivateOrLocalIpv6, isPrivateOrLocalHostname, isApprovedLocalChipotleApiHost, isTruthyFlag, isLitChipotleLocalApiBaseAllowed, normalizeLitChipotleApiBase, normalizeChipotleRequestPath, buildChipotleUrl, parseJsonIfPossible, extractChipotleErrorMessage, fetchChipotleJson, resolveLitChipotleRuntime, resolveLitChipotleProvisioningRuntime, ensureChipotleApiKey, ensureChipotleManagementApiKey, buildPagedPath, runtimeAllowsLocalApiBase, listGroupWallets, listActions, listGroupActions, listWallets, resolveActionCidMembership, createStatusWarning, readLitChipotleStatus, deriveLitActionCid, normalizeSessionScopedNameSegment, normalizeGateMode3, isPrivateHostname, validateChipotleRpcUrl, resolveConfigMappedChipotleRpcUrls, resolveDefaultChipotleRpcUrls, resolveSessionChipotleRpcUrl, buildSessionBootstrapMetadata, createLitChipotleAccount, createLitChipotleGroup, createLitChipotleWallet, createLitChipotleUsageKey, readChipotleBillingBalance, ensureActionMetadata, ensureActionInGroup, ensurePkpInGroup, provisionLitChipotleAction, bootstrapLitChipotleSession, bootstrapLitChipotleSessionCore, executeLitChipotleAction, executeSessionLitChipotleAction;
+var import_rpcDefaults4, LIT_PROVISIONING_CREDENTIALS_CONFLICT, DEFAULT_LIT_API_BASE, CHIPOTLE_API_PREFIX, APPROVED_LIT_CHIPOTLE_API_HOSTS, LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, DEFAULT_PAGE_NUMBER, DEFAULT_PAGE_SIZE, getPathRpcUrl2, getPublicRpcUrls2, ethersUtils2, toTrimmedString9, isObj18, normalizeChipotleRpcCandidateList, normalizeValidChipotlePkpId, normalizeChipotleMembershipValue, normalizeHostname, parseIpv4Octets2, isPrivateOrLocalIpv4, isPrivateOrLocalIpv6, isPrivateOrLocalHostname, isApprovedLocalChipotleApiHost, isTruthyFlag, isLitChipotleLocalApiBaseAllowed, normalizeLitChipotleApiBase, normalizeChipotleRequestPath, buildChipotleUrl, parseJsonIfPossible, extractChipotleErrorMessage, fetchChipotleJson, resolveLitChipotleRuntime, resolveLitChipotleProvisioningRuntime, ensureChipotleApiKey, ensureChipotleManagementApiKey, buildPagedPath, runtimeAllowsLocalApiBase, listGroupWallets, listActions, listGroupActions, listWallets, MAX_GONE_CHECK_PAGES, GONE_CHECK_STATUSES, listAllIds, confirmLitSetupGone, resolveActionCidMembership, createStatusWarning, readLitChipotleStatus, deriveLitActionCid, normalizeSessionScopedNameSegment, normalizeGateMode3, isPrivateHostname, validateChipotleRpcUrl, resolveConfigMappedChipotleRpcUrls, resolveDefaultChipotleRpcUrls, resolveSessionChipotleRpcUrl, buildSessionBootstrapMetadata, createLitChipotleAccount, createLitChipotleGroup, createLitChipotleWallet, createLitChipotleUsageKey, readChipotleBillingBalance, ensureActionMetadata, ensureActionInGroup, ensurePkpInGroup, provisionLitChipotleAction, bootstrapLitChipotleSession, bootstrapLitChipotleSessionCore, executeLitChipotleAction, executeSessionLitChipotleAction;
 var init_chipotleClient = __esm({
   "workers/sessionCorsWorker/chipotleClient.js"() {
     init_litChipotleAction();
@@ -76003,7 +76003,10 @@ var init_chipotleClient = __esm({
       const text = await response2.text().catch(() => "");
       const parsed = parseJsonIfPossible(text);
       if (!response2.ok) {
-        throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
+        throw Object.assign(
+          new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed")),
+          { litStatus: response2.status }
+        );
       }
       if (isObj18(parsed) && toTrimmedString9(parsed.error || "").trim()) {
         throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
@@ -76143,6 +76146,59 @@ var init_chipotleClient = __esm({
         fetchImpl
       });
       return Array.isArray(response2) ? response2 : [];
+    };
+    MAX_GONE_CHECK_PAGES = 10;
+    GONE_CHECK_STATUSES = /* @__PURE__ */ new Set([400, 401, 403, 404, 410, 422]);
+    listAllIds = async ({ runtime, path, idsOf, fetchImpl } = {}) => {
+      const ids = /* @__PURE__ */ new Set();
+      for (let page = 0; page < MAX_GONE_CHECK_PAGES; page += 1) {
+        const items = await fetchChipotleJson({
+          apiBase: runtime.litApiBase,
+          apiKey: runtime.litManagementApiKey,
+          allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+          path: buildPagedPath(path, { page_number: page, page_size: DEFAULT_PAGE_SIZE }),
+          fetchImpl
+        });
+        if (!Array.isArray(items)) return null;
+        for (const item of items) {
+          const itemIds = idsOf(item);
+          if (!itemIds.length) return null;
+          itemIds.forEach((id2) => ids.add(id2));
+        }
+        if (items.length < DEFAULT_PAGE_SIZE) return ids;
+      }
+      return null;
+    };
+    confirmLitSetupGone = async ({ checkpoint = {}, failure, env = {}, fetchImpl = globalThis.fetch } = {}) => {
+      const apiKey = toTrimmedString9(checkpoint.litAccountApiKey);
+      if (!GONE_CHECK_STATUSES.has(failure?.litStatus) || !apiKey) return "";
+      const groupId = toTrimmedString9(checkpoint.litGroupId);
+      const pkpId = normalizeChipotleMembershipValue(checkpoint.litPkpId);
+      try {
+        const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
+        const runtime = {
+          litApiBase: normalizeLitChipotleApiBase(checkpoint.litApiBase || DEFAULT_LIT_API_BASE, { allowLocalApiBase }),
+          allowLocalApiBase,
+          litManagementApiKey: apiKey
+        };
+        const groups = await listAllIds({
+          runtime,
+          path: "/list_groups",
+          fetchImpl,
+          idsOf: (group) => [group?.id, group?.group_id].map(toTrimmedString9).filter((id2) => /^\d+$/.test(id2))
+        });
+        if (groups && /^\d+$/.test(groupId) && !groups.has(groupId)) return "resources";
+        if (!pkpId) return "";
+        const wallets = await listAllIds({
+          runtime,
+          path: "/list_wallets",
+          fetchImpl,
+          idsOf: (wallet) => [normalizeValidChipotlePkpId(wallet?.id), wallet?.wallet_address].map(normalizeChipotleMembershipValue).filter(Boolean)
+        });
+        return wallets && !wallets.has(pkpId) ? "resources" : "";
+      } catch (error) {
+        return [401, 403].includes(error?.litStatus) ? "account" : "";
+      }
     };
     resolveActionCidMembership = async ({ runtime, actions = [], fetchImpl } = {}) => {
       const configuredCid = toTrimmedString9(runtime?.litActionCid);
@@ -77013,7 +77069,7 @@ var init_chipotleClient = __esm({
 });
 
 // workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js
-var SIGNER_RECORD, SETUP_RECORD, PROVISIONING_RECORD, PROVISIONING_LEASE_MS, PROVISIONING_FIELDS, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json4, fail7, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, readProvisioning, executeLitProvisioning, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair, provisionCall, preflightSessionLitProvisioning, beginSessionLitProvisioning, checkpointSessionLitProvisioning, releaseSessionLitProvisioning;
+var SIGNER_RECORD, SETUP_RECORD, PROVISIONING_RECORD, PROVISIONING_LEASE_MS, PROVISIONING_FIELDS, ACCOUNT_FIELDS, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json4, fail7, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, readProvisioning, executeLitProvisioning, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair, provisionCall, preflightSessionLitProvisioning, beginSessionLitProvisioning, checkpointSessionLitProvisioning, releaseSessionLitProvisioning, discardSessionLitProvisioning;
 var init_sessionLitAuthorizationCoordinator = __esm({
   "workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js"() {
     init_lib2();
@@ -77028,6 +77084,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     PROVISIONING_RECORD = "session-lit-provisioning-v1";
     PROVISIONING_LEASE_MS = 5 * 6e4;
     PROVISIONING_FIELDS = /* @__PURE__ */ new Set(["litApiBase", "litAccountApiKey", "accountSecretOutput", "accountWalletAddress", "litGroupId", "litPkpId", "litActionCid", "litUsageApiKey", "registeredAction", "addedActionToGroup", "addedPkpToGroup"]);
+    ACCOUNT_FIELDS = ["litApiBase", "litAccountApiKey", "accountSecretOutput", "accountWalletAddress"];
     hasPendingLitAuthorizationSetup = async (storage) => await storage.get(SETUP_RECORD) != null;
     CONFIG_RECORD = "session-config-authority";
     PRIVATE_KEY = "litAuthorizationPrivateKey";
@@ -77133,7 +77190,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       if (!slug) return json4({ error: COORDINATION_ERROR }, 400);
       try {
         if (operation !== "release") {
-          await coordinator.assertSessionAuthority(payload, { requireRevision: operation !== "checkpoint" });
+          await coordinator.assertSessionAuthority(payload, { requireRevision: !["checkpoint", "discard"].includes(operation) });
           await coordinator.repairPendingSessionConfigProjection();
         }
         const result = await coordinator.state.storage.transaction(async (transaction) => {
@@ -77175,8 +77232,14 @@ var init_sessionLitAuthorizationCoordinator = __esm({
               await transaction.put(PROVISIONING_RECORD, { ...record4, leaseUntilMs: 0 });
             return {};
           }
-          if (operation !== "checkpoint" || !record4 || !payload.attemptId || record4.attemptId !== payload.attemptId) fail7();
+          if (!["checkpoint", "discard"].includes(operation) || !record4 || !payload.attemptId || record4.attemptId !== payload.attemptId) fail7();
           const previous = await readProvisioning(record4, coordinator.env, slug);
+          if (operation === "discard") {
+            const kept = payload.keepAccount === true ? Object.fromEntries(ACCOUNT_FIELDS.filter((key) => hasOwn7(previous, key)).map((key) => [key, previous[key]])) : {};
+            const envelope2 = await buildEncryptedSessionSecretsEnvelope(kept, { env: coordinator.env, slug });
+            await transaction.put(PROVISIONING_RECORD, { ...record4, envelope: envelope2 });
+            return {};
+          }
           const checkpoint = payload.checkpoint;
           if (!isRecord3(checkpoint) || Object.keys(checkpoint).some((key) => !PROVISIONING_FIELDS.has(key)) || Object.values(checkpoint).some((value) => typeof value !== "string" && typeof value !== "boolean")) fail7(400);
           for (const [key, value] of Object.entries(previous)) {
@@ -77336,6 +77399,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     beginSessionLitProvisioning = (args) => provisionCall(args, "begin");
     checkpointSessionLitProvisioning = (args) => provisionCall(args, "checkpoint");
     releaseSessionLitProvisioning = (args) => provisionCall(args, "release");
+    discardSessionLitProvisioning = (args) => provisionCall(args, "discard");
   }
 });
 
@@ -79978,7 +80042,7 @@ ${expiry}`);
         }
         if (url.pathname === "/session-config/storage/set-hidden") return this.executeStorageVisibilityMutation(payload);
         if (url.pathname === "/session-config/storage/publish") return this.executeStoragePublication(payload);
-        if (["preflight", "begin", "checkpoint", "release"].some((operation) => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
+        if (["preflight", "begin", "checkpoint", "release", "discard"].some((operation) => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
           return this.serializeSessionConfigOperation(() => executeLitProvisioning(this, payload, url.pathname.split("/").at(-1)));
         }
         if (url.pathname === "/session-config/lit-authorization/ensure") {
@@ -101849,6 +101913,14 @@ var dispatchAdminRequest = async ({
   if (action === "lit-chipotle-provision" || action === "lit-chipotle-bootstrap-session") {
     let attempt;
     const coordination = { env, slug: targetSlug, baseConfig: existingConfig, expectedAuthority };
+    const fetchImpl = async (url, init2) => {
+      await (deps?.checkpointSessionLitProvisioning || checkpointSessionLitProvisioning)({
+        ...coordination,
+        attemptId: attempt.attemptId,
+        checkpoint: {}
+      });
+      return (deps?.fetchImpl || globalThis.fetch)(url, { ...init2, signal: AbortSignal.timeout(3e4) });
+    };
     try {
       const existingSecrets = { ...await deps?.getSessionSecrets?.(env, targetSlug) || {} };
       const runtime = action === "lit-chipotle-provision" ? (deps?.resolveLitChipotleProvisioningRuntime || resolveLitChipotleProvisioningRuntime)({ env, config: existingConfig, secrets: existingSecrets, body }) : null;
@@ -101883,14 +101955,7 @@ var dispatchAdminRequest = async ({
           existingSecrets.litAuthorizationPrivateKey = privateKey;
           return privateKey;
         },
-        fetchImpl: async (url, init2) => {
-          await (deps?.checkpointSessionLitProvisioning || checkpointSessionLitProvisioning)({
-            ...coordination,
-            attemptId: attempt.attemptId,
-            checkpoint: {}
-          });
-          return (deps?.fetchImpl || globalThis.fetch)(url, { ...init2, signal: AbortSignal.timeout(3e4) });
-        }
+        fetchImpl
       };
       let result;
       if (action === "lit-chipotle-provision") {
@@ -101915,6 +101980,20 @@ var dispatchAdminRequest = async ({
       delete responseBody.litCredentials;
       return deps?.json?.(responseBody, 200, headers2);
     } catch (error) {
+      const gone = attempt ? await confirmLitSetupGone({ checkpoint: attempt.checkpoint, failure: error, env, fetchImpl }).catch(() => "") : "";
+      if (gone) {
+        try {
+          await (deps?.discardSessionLitProvisioning || discardSessionLitProvisioning)({
+            ...coordination,
+            attemptId: attempt.attemptId,
+            keepAccount: gone === "resources"
+          });
+          return deps?.json?.({
+            error: gone === "account" ? "Lit no longer accepts the saved Lit account key, so the saved setup was cleared. Retry to start over." : "Lit no longer has the saved Lit group or PKP, so the saved setup was cleared and its account kept. Retry to start over."
+          }, 409, headers2);
+        } catch {
+        }
+      }
       return deps?.json?.({ error: error?.code === "lit_provisioning_credentials_conflict" ? LIT_PROVISIONING_CREDENTIALS_CONFLICT : error?.code === "lit_management_key_missing" ? "Lit account API key not configured." : error?.code === "lit_provisioning_resources_pending" ? error.message : "Lit provisioning did not finish. Retry to resume its saved progress." }, error?.status || 502, headers2);
     } finally {
       if (attempt) {

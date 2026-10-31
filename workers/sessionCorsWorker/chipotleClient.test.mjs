@@ -8,6 +8,7 @@ const ethersV5 = createRequire(new URL('../../package.json', import.meta.url))('
 
 import {
   bootstrapLitChipotleSession,
+  confirmLitSetupGone,
   executeLitChipotleAction,
   executeSessionLitChipotleAction,
   fetchChipotleJson,
@@ -1726,3 +1727,47 @@ for (const request of [{ litAccountApiKey: 'replacement-private-key' }, { litApi
     assert.equal(calls, 0);
   });
 }
+
+test('saved Lit setup counts as gone only on a complete listing without it or a refused saved key', async () => {
+  const group = { litApiBase: 'https://api.chipotle.litprotocol.com', litAccountApiKey: 'saved-key', litGroupId: '7' };
+  const pkp = { ...group, litGroupId: '', litPkpId: 'pkp-7' };
+  const notFound = Object.assign(new Error('Not found.'), { litStatus: 404 });
+  const others = Array.from({ length: 100 }, (_, index) => ({ id: 1000 + index }));
+  const check = async (checkpoint, lists, failure = notFound) => {
+    let calls = 0;
+    const fetchImpl = async (url, options) => {
+      calls += 1;
+      assert.equal(options.headers['X-Api-Key'], 'saved-key');
+      const { pathname, searchParams } = new URL(url);
+      const answer = lists[pathname.replace('/core/v1', '')];
+      const listed = typeof answer === 'function' ? answer(Number(searchParams.get('page_number'))) : answer;
+      return typeof listed === 'number' ? jsonResponse({ error: 'Refused.' }, { ok: false, status: listed }) : jsonResponse(listed);
+    };
+    return [await confirmLitSetupGone({ checkpoint, failure, fetchImpl }), calls];
+  };
+  for (const [checkpoint, lists, expected] of [
+    [group, { '/list_groups': [{ id: 7 }] }, ''],
+    [group, { '/list_groups': [{ group_id: '7', name: 'kept' }] }, ''],
+    [group, { '/list_groups': page => page ? [{ id: 7 }] : others }, ''],
+    [group, { '/list_groups': [] }, 'resources'],
+    [group, { '/list_groups': page => page ? [] : others }, 'resources'],
+    // Partial, unrecognized or failed listings confirm nothing.
+    [group, { '/list_groups': () => others }, ''],
+    [group, { '/list_groups': [{ name: 'no id' }] }, ''],
+    [group, { '/list_groups': { success: true } }, ''],
+    [group, { '/list_groups': 500 }, ''],
+    [group, { '/list_groups': 401 }, 'account'],
+    [pkp, { '/list_groups': [], '/list_wallets': [{ id: 'pkp-7' }] }, ''],
+    [pkp, { '/list_groups': [], '/list_wallets': [{ id: '0', wallet_address: 'PKP-7' }] }, ''],
+    [pkp, { '/list_groups': [], '/list_wallets': [{ id: 'other', wallet_address: 'other' }] }, 'resources'],
+    [pkp, { '/list_groups': [], '/list_wallets': 503 }, ''],
+    [{ ...group, litGroupId: '' }, { '/list_groups': 403 }, 'account'],
+    [{ ...group, litGroupId: '' }, { '/list_groups': [] }, ''],
+  ]) {
+    assert.equal((await check(checkpoint, lists))[0], expected, JSON.stringify(lists, (key, value) => typeof value === 'function' ? 'paged' : value));
+  }
+  // Only a Lit client error on the failed call starts a check.
+  for (const failure of [new Error('fetch failed'), ...[402, 408, 429, 500, 503].map(litStatus => Object.assign(new Error('Failed.'), { litStatus }))]) {
+    assert.deepEqual(await check(group, { '/list_groups': [] }, failure), ['', 0]);
+  }
+});

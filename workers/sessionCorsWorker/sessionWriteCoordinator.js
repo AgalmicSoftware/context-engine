@@ -2979,7 +2979,7 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname === '/session-config/storage/set-hidden') return this.executeStorageVisibilityMutation(payload);
     if (url.pathname === '/session-config/storage/publish') return this.executeStoragePublication(payload);
-    if (['preflight', 'begin', 'checkpoint', 'release'].some(operation => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
+    if (['preflight', 'begin', 'checkpoint', 'release', 'discard'].some(operation => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
       return this.serializeSessionConfigOperation(() => executeLitProvisioning(this, payload, url.pathname.split('/').at(-1)));
     }
     if (url.pathname === '/session-config/lit-authorization/ensure') {
