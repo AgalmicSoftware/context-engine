@@ -15,7 +15,7 @@ test('restore refuses credentials, pending invite journals and an incomplete emp
   for (const suffix of ['agent:credential:v2:hash', 'telegram:answer-draft:principal']) {
     await assert.rejects(assertAgentBackupTargetEmpty({ kv: { list: async () => ({ keys: [{ name: `ce-agent:${sessionId}:${suffix}` }], list_complete: true }) }, storage, sessionId }), { reason: 'backup_target_not_empty' });
   }
-  for (const journalPrefix of ['ce-agent-invite:', 'ce-agent-submit:', 'ce-agent-wrapped:']) {
+  for (const journalPrefix of ['ce-agent-invite:', 'ce-agent-submit:', 'ce-agent-wrapped:', 'ce-agent-question-queue:']) {
     await assert.rejects(assertAgentBackupTargetEmpty({ kv: empty, storage: { list: async ({ prefix }) => prefix === journalPrefix ? new Map([[`${prefix}pending`, {}]]) : new Map() }, sessionId }), { reason: 'backup_target_not_empty' });
   }
   for (const value of [{ keys: [] }, { keys: [], list_complete: false, cursor: 'next' }, { keys: null, list_complete: true }]) {

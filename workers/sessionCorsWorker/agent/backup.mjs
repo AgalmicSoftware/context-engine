@@ -18,7 +18,7 @@ export const assertAgentBackupTargetEmpty = async ({ kv, storage, sessionId }) =
   if (rows.list_complete !== true) unavailable();
   // Admission and submission journals survive partial KV projection and must
   // also prevent reuse of a target after its config has been cleared.
-  for (const journalPrefix of ['ce-agent-invite:', 'ce-agent-submit:', 'ce-agent-wrapped:']) {
+  for (const journalPrefix of ['ce-agent-invite:', 'ce-agent-submit:', 'ce-agent-wrapped:', 'ce-agent-question-queue:']) {
     const journals = await storage.list({ prefix: journalPrefix, limit: 1 });
     if (!(journals instanceof Map)) unavailable();
     if (journals.size) occupied();
