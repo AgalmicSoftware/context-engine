@@ -133,9 +133,9 @@ export const SetupContextSection = ({ draft, onChange, open, onToggle }: SetupSe
       open={open}
       onToggle={onToggle}
     >
-      <SetupField id="ce-setup-context-title" label="Title">
+      <SetupField id="ce-setup-context-heading" label="Title">
         <Input
-          id="ce-setup-context-title"
+          id="ce-setup-context-heading"
           value={context.title}
           onChange={(event) => save({ title: event.target.value })}
         />

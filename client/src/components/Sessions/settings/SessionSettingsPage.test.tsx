@@ -104,6 +104,16 @@ describe('SessionSettingsPage', () => {
     expect(screen.queryByTestId('ce-setup-storage')).not.toBeInTheDocument();
   });
 
+  it('gives every element a unique id with all sections open', async () => {
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    document.querySelectorAll('[data-testid^="ce-setup-more-"]').forEach((caret) => {
+      if (caret.getAttribute('aria-expanded') === 'false') fireEvent.click(caret);
+    });
+    const ids = Array.from(document.querySelectorAll('[id]'), (element) => element.id);
+    expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
+  });
+
   it('lists which edits sign participants out, then saves only the changed fields', async () => {
     renderPage();
     await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());

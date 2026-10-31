@@ -137,6 +137,18 @@ describe('SessionWizardShell', () => {
     expect(screen.queryByTestId('shell-worker')).not.toBeInTheDocument();
   });
 
+  it('gives every element a unique id and every label a field, with all sections open', () => {
+    render(<SessionWizardShell {...baseProps()} />);
+    SECTION_KEYS.slice(1).forEach((key) => fireEvent.click(screen.getByTestId(`ce-setup-more-${key}`)));
+
+    const ids = Array.from(document.querySelectorAll('[id]'), (element) => element.id);
+    expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
+    const unlabelled = Array.from(document.querySelectorAll('label[for]'))
+      .map((label) => label.getAttribute('for') || '')
+      .filter((id) => !document.getElementById(id)?.matches('input, select, textarea, button'));
+    expect(unlabelled).toEqual([]);
+  });
+
   it('places the recovery key dialog, template actions and template notice around the page header', () => {
     render(
       <SessionWizardShell
