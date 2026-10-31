@@ -2696,7 +2696,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   min-width: 0;
   font-size: 0.92rem;
   font-weight: 800;
-  color: var(--ce-overlay-surface);
+  color: var(--ce-document-text);
 }
 
 .sessionListeningClose {
@@ -2949,13 +2949,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  color: color-mix(in srgb, var(--ce-overlay-surface) 72%, transparent);
+  color: var(--ce-document-text);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .sessionListeningMeta > span {
-  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-document-text) 12%, transparent);
   border-radius: var(--ce-radius-pill);
   background: var(--ce-text-inverse);
   padding: 3px 8px;
@@ -2983,7 +2983,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningTranscriptButton span:last-child {
-  color: color-mix(in srgb, var(--ce-overlay-surface) 62%, transparent);
+  color: var(--ce-document-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -3005,8 +3005,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionListeningError {
   border: 1px solid color-mix(in srgb, var(--ce-status-error) 24%, transparent);
   border-radius: var(--ce-radius-8);
-  background: var(--ce-status-danger-text);
-  color: var(--ce-status-error);
+  background: color-mix(in srgb, var(--ce-status-error) 14%, var(--ce-surface-sunken));
+  color: var(--ce-panel-text);
   padding: 8px 10px;
   font-size: 0.86rem;
 }
@@ -3038,7 +3038,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningTranscript::placeholder {
-  color: color-mix(in srgb, var(--ce-overlay-surface) 48%, transparent);
+  color: var(--ce-document-text-muted);
 }
 
 .sessionListeningClearTranscript {
@@ -3947,11 +3947,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   background: var(--ce-control-face) !important;
   color: var(--ce-control-text) !important;
   border-color: var(--ce-input-border);
-}
-
-.sessionInterviewPanel .sessionListeningError {
-  background: color-mix(in srgb, var(--ce-status-error) 14%, var(--ce-surface-sunken));
-  color: var(--ce-panel-text);
 }
 
 .sessionInterviewMappingNotice {
