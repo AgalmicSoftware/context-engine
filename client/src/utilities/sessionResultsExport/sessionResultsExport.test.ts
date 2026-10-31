@@ -463,7 +463,7 @@ describe('sessionResultsExport utilities', () => {
   it('sends the Worker’s results prompt and reads its generated risk axes into the report', () => {
     const payload = buildSessionResultsAnalysisAiPayload({
       questions: [{ id: 'q1', prompt: 'Pilot?', type: 'binary' }],
-    });
+    }).aiPayload;
     expect(buildSessionResultsAnalysisPrompt(payload, 'riskMatrix')).toBe(
       buildResultsAnalysisPrompt({ sections: ['riskMatrix'], input: payload }),
     );

@@ -1,3 +1,5 @@
+import { jsonSchemaResponseFormat } from './promptFormat';
+
 // Ranks candidate questions for the AI filter. Placeholders: {{userQueryJson}},
 // {{questionListJson}} and {{topX}}, filled once each by fillPromptTemplate.
 export const rankQuestionsPrompt = `
@@ -17,3 +19,10 @@ Return one JSON object with no Markdown and no other keys:
   "selectedQuestionIDs": ["id1", "id2"]
 }
 `;
+
+export const RANK_QUESTIONS_RESPONSE_FORMAT = jsonSchemaResponseFormat('question_ranking', {
+  type: 'object',
+  properties: { selectedQuestionIDs: { type: 'array', items: { type: 'string' } } },
+  required: ['selectedQuestionIDs'],
+  additionalProperties: false,
+});

@@ -1,6 +1,6 @@
 import type CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import { callAI } from '../../utilities/ai/aiClient.js';
-import { generateSingleQuestionTagsPrompt } from './createQuestionsAndSurveysHelpers';
+import { generateSingleQuestionTagsPrompt, QUESTION_TAGS_RESPONSE_FORMAT } from './createQuestionsAndSurveysHelpers';
 
 type Question = CreateQuestionsAndSurveys['state']['questions'][number];
 const requestKey = (question: Question): string => String(question.uiKey || question.id || '');
@@ -74,7 +74,11 @@ export async function suggestTagsForQuestion(this: CreateQuestionsAndSurveys, in
       question.options || [],
       defaultTags,
     );
-    const rawResponse = await callAI(prompt, { ...this.buildAiRequestOptions(), taskType: 'categorize' });
+    const rawResponse = await callAI(prompt, {
+      ...this.buildAiRequestOptions(),
+      taskType: 'categorize',
+      response_format: QUESTION_TAGS_RESPONSE_FORMAT,
+    });
     const match = rawResponse.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('No JSON object found in AI response for tags.');
     const parsedResponse = JSON.parse(match[0]);

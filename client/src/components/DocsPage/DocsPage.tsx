@@ -14,7 +14,7 @@ import { audioSummaryPrompt } from '../../prompts/audioSummaryPrompt.js';
 import buildClusterAnalysisPrompt, { CLUSTER_ANALYSIS_SYSTEM_PROMPT } from '../../prompts/clusterAnalysisPrompt.js';
 import buildCompareToolkitPrompt from '../../prompts/compareToolkitPrompt.js';
 import buildPhotoAnalysisPrompt from '../../prompts/photoAnalysisPrompt.js';
-import { questionSelectionPrompt } from '../../prompts/questionSelectionPrompt.js';
+import { rankQuestionsPrompt } from '../../prompts/rankQuestionsPrompt.js';
 import buildUserAnalysisPrompt from '../../prompts/userAnalysisPrompt.js';
 // CSS
 import styles from './DocsPage.module.scss';
@@ -277,10 +277,10 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
     () => [
       { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
       {
-        id: 'questionSelection',
-        title: 'Question Selection',
-        file: 'questionSelectionPrompt.js',
-        content: questionSelectionPrompt,
+        id: 'rankQuestions',
+        title: 'Question Ranking',
+        file: 'rankQuestionsPrompt.js',
+        content: rankQuestionsPrompt,
       },
       { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
       {

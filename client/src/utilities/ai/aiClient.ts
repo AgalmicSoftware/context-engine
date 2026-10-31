@@ -10,11 +10,14 @@ import { audioFileExtension } from '../audio/audioFileExtension';
 // All math/heuristics live in utilities/survey/compareUsers.ts
 
 import { aiRewritePrompt } from '../../prompts/aiRewritePrompt.js';
-import buildClusterAnalysisPrompt, { CLUSTER_ANALYSIS_SYSTEM_PROMPT } from '../../prompts/clusterAnalysisPrompt.js';
+import buildClusterAnalysisPrompt, {
+  CLUSTER_ANALYSIS_RESPONSE_FORMAT,
+  CLUSTER_ANALYSIS_SYSTEM_PROMPT,
+} from '../../prompts/clusterAnalysisPrompt.js';
 import buildCompareToolkitPrompt from '../../prompts/compareToolkitPrompt.js';
 import buildPhotoAnalysisPrompt from '../../prompts/photoAnalysisPrompt.js';
 import { fillPromptTemplate } from '../../prompts/promptFormat.js';
-import { rankQuestionsPrompt } from '../../prompts/rankQuestionsPrompt.js';
+import { RANK_QUESTIONS_RESPONSE_FORMAT, rankQuestionsPrompt } from '../../prompts/rankQuestionsPrompt.js';
 import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSettings.js';
 import {
   TRANSCRIBE_MAX_UPLOAD_BYTES,
@@ -327,6 +330,7 @@ export async function rankQuestionsAI(
 
     const rawOutput = await callAI(finalPrompt.trim(), {
       ...pickAiRequestOpts(opts),
+      response_format: RANK_QUESTIONS_RESPONSE_FORMAT,
       taskType: readAiOptionTaskType(opts, 'rank'),
     });
 
@@ -561,7 +565,10 @@ export async function analyzeClusterOpinions(
     let short = '';
     let long = '';
     let raw = '';
-    const aiCallOpts = withAiTaskTypeFallback(opts, 'summarize');
+    const aiCallOpts = {
+      ...withAiTaskTypeFallback(opts, 'summarize'),
+      response_format: CLUSTER_ANALYSIS_RESPONSE_FORMAT,
+    };
 
     try {
       raw = await callAIQueued(finalPrompt, { ...aiCallOpts, thinking: true });
@@ -613,9 +620,10 @@ export async function analyzeClusterOpinions(
  */
 export async function analyzeUserOpinions(userData: unknown, opts: unknown = {}) {
   try {
-    const { default: buildUserAnalysisPrompt } = await import('../../prompts/userAnalysisPrompt.js');
+    const { default: buildUserAnalysisPrompt, USER_ANALYSIS_RESPONSE_FORMAT } =
+      await import('../../prompts/userAnalysisPrompt.js');
     const prompt = buildUserAnalysisPrompt(userData);
-    const aiCallOpts = withAiTaskTypeFallback(opts, 'summarize');
+    const aiCallOpts = { ...withAiTaskTypeFallback(opts, 'summarize'), response_format: USER_ANALYSIS_RESPONSE_FORMAT };
     const { text: raw, generation } = await enqueueAiCallWithRetry(() =>
       callAICompletion(prompt, { ...aiCallOpts, thinking: true }),
     );
