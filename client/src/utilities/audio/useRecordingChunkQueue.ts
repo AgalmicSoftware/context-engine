@@ -186,7 +186,12 @@ export function useRecordingChunkQueue(options: Options) {
         });
       })
       .catch(() => {
-        // Closed before this tab's turn came.
+        // Closed before this tab's turn came. Otherwise the browser refused the lock (as in an opaque origin, or
+        // with site data blocked): open the recording without one, as browsers without Web Locks do.
+        if (!current) return;
+        clearTimeout(waiting);
+        setOpenElsewhere(false);
+        close = open();
       });
     return () => {
       finish();

@@ -1508,6 +1508,26 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
+  it('records without a lock when the browser refuses Web Locks', async () => {
+    const refuse = jest.fn(async () => {
+      throw new DOMException('Locks are not allowed here.', 'SecurityError');
+    });
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request: refuse } });
+    try {
+      const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'no-locks' }));
+      await act(async () => {
+        await flushPromises();
+        await result.current.startRecording();
+      });
+      expect(refuse).toHaveBeenCalled();
+      expect(result.current.openElsewhere).toBe(false);
+      expect(result.current.isRecording).toBe(true);
+      unmount();
+    } finally {
+      Reflect.deleteProperty(navigator, 'locks');
+    }
+  });
+
   it('expects no audio while the page is hidden or the device holds the microphone', async () => {
     const listeners: Record<string, () => void> = {};
     Object.assign(mockTrack, {
