@@ -82,7 +82,8 @@ passwords in the link, no IP addresses, localhost or private names (such as
 five. It reads HTML (as text), JSON, plain text and Markdown, stops after
 10 seconds or 2 MB, and records the fetch date. **Refresh** reads the page again
 and replaces the snapshot, keeping its title and privacy. The same checks now
-apply to `fetch_url`, which question generation uses for URL sources.
+apply to `fetch_url` and `fetch_image`, which question generation and image
+links use, so an `http://`, IP-address or local link is refused there too.
 
 ## PDFs
 
@@ -121,6 +122,10 @@ items, items with a narrower access than the session's, or items it cannot
 read. Results analysis keeps context out of its source signature, so editing
 context never marks a report stale, and it grounds every claim in responses,
 not in the background.
+
+**Limit:** sources are found by walking the session's doc-library rows. The
+Worker's features stop after 300 rows and then use no sources; the page lists
+up to 500. Sessions with that many documents need a dedicated index first.
 
 ## Templates
 
