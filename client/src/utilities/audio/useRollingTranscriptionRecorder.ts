@@ -84,6 +84,7 @@ export const useRollingTranscriptionRecorder = ({
   const [microphonePaused, setMicrophonePaused] = useState(false);
   const mutedAtRef = useRef<number | null>(null);
   const lastAudioAtRef = useRef(0);
+  const restartingRef = useRef(false);
   const [captureRestarts, setCaptureRestarts] = useState(0);
 
   const streamRef = useRef<MediaStream | null>(null);
@@ -320,27 +321,37 @@ export const useRollingTranscriptionRecorder = ({
   // Audio stopped arriving with no event, as when a phone's capture dies after an interruption. A new recorder
   // on the same stream would hear nothing either, so take a fresh microphone stream.
   const restartCapture = useCallback(async () => {
+    // One restart at a time: asking for the microphone can take longer than another stall.
+    if (restartingRef.current) return;
+    restartingRef.current = true;
+    const generation = requestGenerationRef.current;
     const stalledSince = lastAudioAtRef.current;
     lastAudioAtRef.current = Date.now();
     const stalled = mediaRecorderRef.current;
-    // The silent recorder's chunk ends with the audio it delivered, and its stop must not end the recording.
+    // The silent recorder's stop must not end the recording. Audio it still holds comes with its stop event,
+    // which finishes its chunk; without that event the chunk ends with what it delivered.
     mediaRecorderRef.current = null;
     clearRotationTimer();
-    if (stalled) {
-      try {
-        if (stalled.state !== 'inactive') stalled.stop();
-      } catch (_) {
-        // Its chunk is finished below either way.
+    const finishStalled = () => stalled && finishersRef.current.get(stalled)?.();
+    try {
+      if (stalled?.state === 'inactive') finishStalled();
+      else if (stalled) {
+        stalled.stop();
+        setTimeout(finishStalled, STOP_WAIT_MS);
       }
-      finishersRef.current.get(stalled)?.();
+    } catch (_) {
+      finishStalled();
     }
     stopTracks();
     setCaptureRestarts((restarts) => restarts + 1);
+    // Stop, a new Record press or closing the recorder while the microphone is asked for ends this restart.
+    const superseded = () =>
+      !mountedRef.current || !recordingActiveRef.current || generation !== requestGenerationRef.current;
     try {
       const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices, {
         echoCancellation: !recordSpeakerAudio,
       });
-      if (!mountedRef.current || !recordingActiveRef.current) {
+      if (superseded()) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
@@ -354,7 +365,7 @@ export const useRollingTranscriptionRecorder = ({
       lastAudioAtRef.current = Date.now();
       startRotationTimer();
     } catch (error) {
-      if (!mountedRef.current || !recordingActiveRef.current) return;
+      if (superseded()) return;
       recordingActiveRef.current = false;
       stopTimer();
       stopTracks();
@@ -362,6 +373,8 @@ export const useRollingTranscriptionRecorder = ({
         `Recording stopped: no audio arrived and the microphone couldn't restart. Press Record to continue. Saved audio remains available. ${describeError(error)}`,
       );
       setStatus('error');
+    } finally {
+      restartingRef.current = false;
     }
   }, [
     clearRotationTimer,

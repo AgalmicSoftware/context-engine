@@ -1433,6 +1433,81 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
+  it('keeps the last audio a stalled recorder hands over after its stop', async () => {
+    let uploads = 0;
+    (transcribeAudio as jest.Mock).mockImplementation(async () => `Chunk ${++uploads}.`);
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'late-flush', chunkMs: 60_000 }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+      instances[0].requestData();
+    });
+    instances[0].silent = MockMediaRecorder.silent = true;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60_000);
+    });
+    // As in a browser, the stalled recorder's buffered audio and stop event come in a later task.
+    const stalled = instances[1];
+    stalled.stop.mockImplementation(() => {
+      stalled.state = 'inactive';
+      setTimeout(() => {
+        stalled.ondataavailable?.({ data: new Blob([new Uint8Array(512)], { type: 'audio/webm' }) });
+        stalled.onstop?.();
+      }, 0);
+    });
+    MockMediaRecorder.silent = false;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(35_000);
+      await flushPromises();
+    });
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1_000);
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(result.current.transcript).toBe('Chunk 1. Chunk 2. [No audio for 1 min 35 s.] Chunk 3.');
+    unmount();
+  });
+
+  it('runs one microphone restart at a time, and drops one that answers after Stop', async () => {
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'slow-restart', chunkMs: 60_000 }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    MockMediaRecorder.silent = instances[0].silent = true;
+    let answer = (_stream: MediaStream) => {};
+    jest.mocked(navigator.mediaDevices.getUserMedia).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    );
+    // The restart waits on the microphone for longer than another stall.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10 * 60_000);
+    });
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(result.current.status).toBe('idle');
+    const lateTrack = { stop: jest.fn() };
+    const recorders = instances.length;
+    await act(async () => {
+      answer({ getTracks: () => [lateTrack] } as unknown as MediaStream);
+      await flushPromises();
+    });
+    expect(lateTrack.stop).toHaveBeenCalled();
+    expect(instances).toHaveLength(recorders);
+    expect(instances.some((recorder) => recorder.state === 'recording')).toBe(false);
+    unmount();
+  });
+
   it('expects no audio while the page is hidden or the device holds the microphone', async () => {
     const listeners: Record<string, () => void> = {};
     Object.assign(mockTrack, {
