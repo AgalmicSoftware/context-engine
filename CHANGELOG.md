@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Client — available when the site deploys
+
+- Drop the retired Goerli test network from wallet connections and a collection metadata lookup that always failed.
+
 ## [0.8.1] - 2026-10-30
 
 ### Verification and shared rules

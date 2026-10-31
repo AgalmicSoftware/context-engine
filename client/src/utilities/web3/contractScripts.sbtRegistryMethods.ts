@@ -902,13 +902,9 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
           }
 
           try {
-            return await callWithRetry(() => sbt.tokenURI(), 'SBT.tokenURI()');
+            return await callWithRetry(() => sbt.tokenURI(0), 'SBT.tokenURI(0)');
           } catch {
-            try {
-              return await callWithRetry(() => sbt.tokenURI(0), 'SBT.tokenURI(0)');
-            } catch {
-              return null;
-            }
+            return null;
           }
         };
 

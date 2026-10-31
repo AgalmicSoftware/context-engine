@@ -1,5 +1,5 @@
 import { configureChains, createClient, createStorage } from 'wagmi';
-import { goerli, localhost } from 'wagmi/chains';
+import { localhost } from 'wagmi/chains';
 import {
   mainnet,
   base,
@@ -45,7 +45,7 @@ const buildBackoffJsonRpcProvider = (providerKey: string, resolveUrl: (chain: an
 };
 
 const configuredChains = configureChains(
-  [mainnet, base, optimism, arbitrum, baseSepolia, optimismSepolia, arbitrumSepolia, goerli, localhost],
+  [mainnet, base, optimism, arbitrum, baseSepolia, optimismSepolia, arbitrumSepolia, localhost],
   [
     // NOTE: `publicProvider()` is intentionally not used here.
     // We keep deterministic ordering by resolving primary/fallback RPC URLs ourselves

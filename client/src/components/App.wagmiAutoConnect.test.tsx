@@ -166,7 +166,6 @@ const mockAppDependencies = () => {
     MetaMaskConnector: mockMetaMaskConnector,
   }));
   jest.doMock('wagmi/chains', () => ({
-    goerli: { id: 5, chainId: 5, name: 'Goerli' },
     localhost: { id: 31337, chainId: 31337, name: 'Localhost' },
   }));
   jest.doMock('wagmi/connectors/injected', () => ({
@@ -322,6 +321,13 @@ describe('App wagmi auto-connect persistence', () => {
     expect(mockMetaMaskWalletCreateConnector).toHaveBeenCalledTimes(1);
     expect(mockMetaMaskConnector).not.toHaveBeenCalled();
     expect(connectorConfig.connector).toEqual({ id: 'walletConnect-fallback' });
+  });
+
+  it('configures no retired chains such as Goerli', () => {
+    loadAppModule();
+    const chains = (mockConfigureChains.mock.calls[0]?.[0] || []) as Array<{ id?: number } | undefined>;
+    expect(chains.length).toBeGreaterThan(0);
+    expect(chains.map((chain) => chain?.id)).not.toContain(5);
   });
 
   it('wraps wagmi JSON-RPC providers with RPC rate-limit backoff metadata', () => {
