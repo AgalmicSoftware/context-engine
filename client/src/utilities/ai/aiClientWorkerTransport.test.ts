@@ -145,3 +145,28 @@ it('sends the higher interview mapping effort even when the session default is l
     service_tier: 'default',
   });
 });
+
+it('sends the new GPT-6 models to Responses with an effort each accepts', () => {
+  for (const [model, effort, sent] of [
+    ['gpt-6.1-terra', 'low', 'low'],
+    ['gpt-6-luna', 'none', 'none'],
+    // Sol and Astra have no none level, so the nearest one above it is sent.
+    ['gpt-6.1-sol', 'none', 'low'],
+    ['gpt-6-astra', 'none', 'low'],
+  ]) {
+    const plan = buildAiWorkerRequestPlan({ ai: { model, provider: 'openai', reasoningEffort: effort } });
+    expect(plan.requestBody).toMatchObject({ endpoint: 'responses', max_output_tokens: 16384, reasoning_effort: sent });
+    expect(plan.requestBody).not.toHaveProperty('temperature');
+  }
+});
+
+it('gives GPT-5 and GPT-6 models on other providers a reasoning budget and no temperature', () => {
+  const plan = buildAiWorkerRequestPlan({
+    ai: { model: 'openai/gpt-6.1-terra', provider: 'openrouter' },
+    opts: { maxTokens: 900 },
+  });
+  expect(plan.tokenBudgetKey).toBe('max_completion_tokens');
+  expect(plan.requestBody).toMatchObject({ max_completion_tokens: 900 });
+  expect(plan.requestBody).not.toHaveProperty('max_tokens');
+  expect(plan.requestBody).not.toHaveProperty('temperature');
+});

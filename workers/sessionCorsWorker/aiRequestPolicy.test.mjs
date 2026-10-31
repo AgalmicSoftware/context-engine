@@ -58,7 +58,7 @@ for (const adapter of adapters) {
     assert.equal(byo.response.status, 200);
     const output = byo.calls[0].body;
     assert.equal(output.model, otherModel);
-    assert.equal(output.max_tokens ?? output.max_output_tokens, 64000);
+    assert.equal(output.max_tokens ?? output.max_output_tokens ?? output.max_completion_tokens, 64000);
     if (provider !== 'anthropic') assert.deepEqual(output.tools, tools);
     if (provider === 'openai') {
       assert.equal(output.service_tier, 'priority');

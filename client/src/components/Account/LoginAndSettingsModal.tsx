@@ -1,6 +1,7 @@
 import { logoutClientAuth, CLIENT_AUTH_LOGOUT_EVENT } from '../../utilities/session/clientAuthLogout';
 import { getClientAuthGeneration } from '../../utilities/session/clientAuthGeneration';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
+import { takesReasoningEffort } from '../../../../shared/aiModelFamily.mjs';
 /** @file LoginAndSettingsModal.tsx */
 import React, { Component, Suspense } from 'react';
 import { connect } from 'react-redux';
@@ -67,7 +68,6 @@ import {
   DEFAULT_REASONING_EFFORT,
   applyPreLoginAiProviderKeyChange,
   deriveAiPreset,
-  toModelLeaf,
 } from '../../utilities/ai/aiSettings.js';
 import {
   getLocalSessionResourceKeys,
@@ -334,9 +334,7 @@ const formatAiPresetBadgeLabel = (settings: AiSettingsLike = {}) => {
 };
 
 const settingsSupportReasoning = (settings: AiSettingsLike = {}) =>
-  [settings?.models?.fast, settings?.models?.thinking]
-    .map((model) => toModelLeaf(model))
-    .some((modelLeaf) => /^(gpt-5|o[13])/.test(toStr(modelLeaf)));
+  [settings?.models?.fast, settings?.models?.thinking].some((model) => takesReasoningEffort(model));
 
 export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps, LoginAndSettingsModalState> {
   static displayName = 'LoginAndSettingsModal';

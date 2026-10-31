@@ -257,6 +257,7 @@ describe('aiClient worker auth options', () => {
       .flatMap(([name, preset]) =>
         Object.entries(preset.models).map(([mode, model]) => [name + ':' + mode, preset.provider, model]),
       ),
+    ['GPT-6 model outside the presets', 'openai', 'gpt-6-luna'],
     ['Claude new family', 'anthropic', 'claude-fable-5-1'],
     ['OpenRouter Claude new family', 'openrouter', 'anthropic/claude-fable-5-1'],
     ['Claude future version', 'anthropic', 'claude-6-sonnet'],

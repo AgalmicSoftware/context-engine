@@ -90,12 +90,6 @@ jest.mock('../../utilities/ai/aiSettings.js', () => {
     saveLocalAiSettings: jest.fn((next) => next),
     clearLocalAiSettings: jest.fn(),
     deriveAiPreset: jest.fn(() => 'gpt-5'),
-    toModelLeaf: jest.fn((m) =>
-      String(m || '')
-        .toLowerCase()
-        .split('/')
-        .pop(),
-    ),
   };
 });
 

@@ -1,5 +1,5 @@
 import { boundSessionAiRequest, resolveSessionAiModel } from './aiRequestPolicy.js';
-import { usesOpenAiResponsesApi } from './aiModelParams.js';
+import { fitReasoningEffort, isOpenAiReasoningModel, takesReasoningEffort } from '../../shared/aiModelFamily.mjs';
 import { extractOpenAiCompletion } from './aiProviderExecution.js';
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -45,12 +45,16 @@ const writeBase64 = (bytes, out, offset) => {
 
 // The provider's own PDF input. Claude: a document block before the text
 // block. OpenAI: the Responses API's input_file part with a base64 data URL.
+// Both send the session's effort to models that take one.
 export const buildPdfReadRequest = ({ provider, model, maxTokens, reasoningEffort, bytes, filename }) => {
   const prompt = PDF_READ_PROMPT;
   const body = provider === 'anthropic'
     ? {
       model,
       max_tokens: maxTokens,
+      ...(reasoningEffort && takesReasoningEffort(model)
+        ? { output_config: { effort: fitReasoningEffort(model, reasoningEffort) } }
+        : {}),
       messages: [{
         role: 'user',
         content: [
@@ -62,8 +66,8 @@ export const buildPdfReadRequest = ({ provider, model, maxTokens, reasoningEffor
     : {
       model,
       max_output_tokens: maxTokens,
-      ...(usesOpenAiResponsesApi({ provider, model }) || /^o[134]/.test(model.split('/').pop())
-        ? { reasoning: { effort: reasoningEffort || 'low' } }
+      ...(isOpenAiReasoningModel(model)
+        ? { reasoning: { effort: fitReasoningEffort(model, reasoningEffort || 'low') } }
         : {}),
       input: [{
         role: 'user',

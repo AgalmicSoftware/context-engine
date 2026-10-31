@@ -1,6 +1,7 @@
 import { boundSessionAiRequest } from './aiRequestPolicy.js';
 import { STRICT_HTTPS_NO_CREDENTIALS_POLICY } from './outboundUrlSafetyBinding.js';
 import { DEFAULT_AI_MODEL, DEFAULT_ANTHROPIC_MODEL } from '../../shared/aiDefaults.mjs';
+import { fitReasoningEffort, isOpenAiReasoningModel } from '../../shared/aiModelFamily.mjs';
 import {
   applyChatCompletionBudget,
   isChatReasoningModel,
@@ -184,7 +185,7 @@ export const proxyOpenAI = async ({
         input: messages || prompt || '',
       }
     : {
-        model: model || (isReasoning ? 'o3-mini' : DEFAULT_AI_MODEL),
+        model: defaultModel,
         messages: messages || [{ role: 'user', content: String(prompt || '') }],
       };
 
@@ -194,7 +195,7 @@ export const proxyOpenAI = async ({
     if (response_format) body.text = { format: response_format };
     if (payload?.tools) body.tools = payload.tools;
     if (payload?.functions && !payload?.tools) body.functions = payload.functions;
-    body.reasoning = { effort: reasoning_effort || 'low' };
+    body.reasoning = { effort: fitReasoningEffort(defaultModel, reasoning_effort || 'low') };
     body.max_output_tokens = resolveResponsesOutputTokens({
       max_output_tokens,
       max_completion_tokens,
@@ -205,9 +206,8 @@ export const proxyOpenAI = async ({
     if (response_format) body.response_format = response_format;
     if (payload?.tools) body.tools = payload.tools;
     if (payload?.functions && !payload?.tools) body.functions = payload.functions;
-    const effectiveLeaf = toStr(body.model).toLowerCase().split('/').pop();
-    if (reasoning_effort && /^(gpt-5|o[13])/.test(effectiveLeaf)) {
-      body.reasoning_effort = reasoning_effort;
+    if (reasoning_effort && isOpenAiReasoningModel(body.model)) {
+      body.reasoning_effort = fitReasoningEffort(body.model, reasoning_effort);
     }
     applyChatCompletionBudget({
       body,
@@ -280,7 +280,7 @@ export const proxyOpenRouter = async ({
   if (response_format) body.response_format = response_format;
   if (payload?.tools) body.tools = payload.tools;
   if (payload?.functions && !payload?.tools) body.functions = payload.functions;
-  if (reasoning_effort) body.reasoning_effort = reasoning_effort;
+  if (reasoning_effort) body.reasoning_effort = fitReasoningEffort(body.model, reasoning_effort);
 
   applyChatCompletionBudget({
     body,
@@ -394,9 +394,8 @@ export const proxyCustomRPC = async ({
   if (response_format) body.response_format = response_format;
   if (payload?.tools) body.tools = payload.tools;
   if (payload?.functions && !payload?.tools) body.functions = payload.functions;
-  const effectiveLeaf = toStr(body.model).toLowerCase().split('/').pop();
-  if (reasoning_effort && /^(gpt-5|o[13])/.test(effectiveLeaf)) {
-    body.reasoning_effort = reasoning_effort;
+  if (reasoning_effort && isOpenAiReasoningModel(body.model)) {
+    body.reasoning_effort = fitReasoningEffort(body.model, reasoning_effort);
   }
 
   applyChatCompletionBudget({

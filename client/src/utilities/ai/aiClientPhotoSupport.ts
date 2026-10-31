@@ -1,3 +1,4 @@
+import { takesImageInput, usesOpenAiResponsesApi } from '../../../../shared/aiModelFamily.mjs';
 import { AI_PRESET_CONFIGS } from './aiModelPresets';
 
 type PhotoLike = {
@@ -63,15 +64,6 @@ export const stripDataUrlPrefix = (dataUrl: unknown = ''): string => {
   return commaIndex >= 0 ? raw.slice(commaIndex + 1) : raw;
 };
 
-export const isChatReasoningModel = (modelRaw: unknown = ''): boolean => /^o[13]/.test(modelLeaf(modelRaw));
-
-export const usesOpenAiResponsesApi = (providerRaw: unknown = '', modelRaw: unknown = ''): boolean => {
-  const provider = String(providerRaw || '')
-    .trim()
-    .toLowerCase();
-  return provider === 'openai' && /^(gpt-5|gpt-6-astra(?:$|-))/.test(modelLeaf(modelRaw));
-};
-
 export const resolvePhotoAnalysisSupport = ({
   provider,
   model,
@@ -89,19 +81,19 @@ export const resolvePhotoAnalysisSupport = ({
       (candidate.provider === normalizedProvider || normalizedProvider === 'openrouter') &&
       Object.values(candidate.models).some((modelName) => modelLeaf(modelName) === leaf),
   );
-  const isOpenAiVisionModel = /^(gpt-5|gpt-4o|gpt-4\.1)/.test(leaf);
-  const isClaudeVisionModel = /^claude-/.test(leaf);
+  const isClaudeModel = leaf.startsWith('claude-');
   const customModelSupported =
-    (normalizedProvider === 'openai' && isOpenAiVisionModel) ||
-    (normalizedProvider === 'anthropic' && isClaudeVisionModel) ||
-    (normalizedProvider === 'openrouter' && (isOpenAiVisionModel || isClaudeVisionModel));
+    takesImageInput(leaf) &&
+    ((normalizedProvider === 'openai' && !isClaudeModel) ||
+      (normalizedProvider === 'anthropic' && isClaudeModel) ||
+      normalizedProvider === 'openrouter');
   if (preset ? preset.supportsImages : customModelSupported) {
     return {
       supported: true,
       format:
         normalizedProvider === 'anthropic'
           ? 'anthropic'
-          : usesOpenAiResponsesApi(normalizedProvider, leaf)
+          : usesOpenAiResponsesApi({ provider: normalizedProvider, model: leaf })
             ? 'openai-responses'
             : 'openai-chat',
     };

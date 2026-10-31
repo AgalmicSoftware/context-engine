@@ -219,6 +219,16 @@ test('the request body carries the PDF as base64 bytes without copying it into a
   }
 });
 
+test('a PDF reading sends the session effort to the models that take one', () => {
+  const read = (provider, model, reasoningEffort) => JSON.parse(new TextDecoder().decode(buildPdfReadRequest({
+    provider, model, maxTokens: 10, reasoningEffort, bytes: new Uint8Array(3), filename: 'a.pdf',
+  }).body));
+  assert.deepEqual(read('openai', 'gpt-6.1-terra', 'low').reasoning, { effort: 'low' });
+  assert.deepEqual(read('openai', 'gpt-6.1-sol', 'none').reasoning, { effort: 'low' }, 'Sol has no none level');
+  assert.deepEqual(read('anthropic', 'claude-sonnet-5-5', 'low').output_config, { effort: 'low' });
+  assert.equal('output_config' in read('anthropic', 'claude-haiku-4-5', 'low'), false);
+});
+
 test('removing a PDF removes its reading even when the KV list has not caught up, readings first', async () => {
   const h = harness({ provider: async () => json({ content: [{ type: 'text', text: 'Deck text.' }] }) });
   const pdf = await idOf(await h.uploadFile());

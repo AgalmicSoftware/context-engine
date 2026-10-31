@@ -1,5 +1,8 @@
+import { inferAiProviderFromModel } from '../../shared/aiModelFamily.mjs';
 import { resolveSessionAiModel } from './aiRequestPolicy.js';
 import { toTrimmedString } from './stringCoercion.js';
+
+export { inferAiProviderFromModel };
 
 export const ANONYMOUS_CUSTOM_RPC_URL_REQUIRED_ERROR =
   'Anonymous custom provider requires request rpcUrl when using apiKey bypass.';
@@ -8,15 +11,6 @@ export const DEFAULT_MODEL_WHITELIST = {
   anthropic: ['claude-*'],
   openai: ['gpt-*', 'o1-*', 'o3-*', 'o4-*', 'chatgpt-*'],
   openrouter: null,
-};
-
-export const inferAiProviderFromModel = (modelRaw) => {
-  const model = toTrimmedString(modelRaw).toLowerCase();
-  if (!model) return '';
-  if (model.startsWith('claude')) return 'anthropic';
-  if (/^(gpt-|o[1-9]|chatgpt)/.test(model)) return 'openai';
-  if (model.includes('/')) return 'openrouter';
-  return '';
 };
 
 const matchesModelGlob = (model, pattern) => {

@@ -1,4 +1,9 @@
-import { isChatReasoningModel, usesOpenAiResponsesApi } from './aiClientPhotoSupport';
+import {
+  fitReasoningEffort,
+  isOpenAiReasoningModel,
+  takesReasoningEffort,
+  usesOpenAiResponsesApi,
+} from '../../../../shared/aiModelFamily.mjs';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -45,8 +50,8 @@ export const buildAiWorkerRequestPlan = ({
   const opts = asRecord(optsInput);
   const provider = ai.provider;
   const model = ai.model;
-  const usesResponsesApi = usesOpenAiResponsesApi(provider, model);
-  const usesCompletionTokens = !usesResponsesApi && isChatReasoningModel(model);
+  const usesResponsesApi = usesOpenAiResponsesApi({ provider, model });
+  const usesCompletionTokens = !usesResponsesApi && isOpenAiReasoningModel(model);
   const messages = Array.isArray(opts.messages) ? opts.messages : [{ role: 'user', content: prompt }];
   const maxTokens = opts.max_tokens ?? opts.maxTokens ?? (provider === 'anthropic' ? 32568 : 16384);
   const maxOutputTokens = opts.max_output_tokens ?? (usesResponsesApi ? maxTokens : undefined);
@@ -84,9 +89,8 @@ export const buildAiWorkerRequestPlan = ({
     ai.reasoning_effort ||
     ai.reasoningEffort ||
     'medium';
-  const modelLeaf = asString(model).toLowerCase().split('/').pop();
-  if (modelLeaf && /^(gpt-5|gpt-6-astra(?:$|-)|o[13])/.test(modelLeaf)) {
-    requestBody.reasoning_effort = reasoningEffort;
+  if (takesReasoningEffort(model)) {
+    requestBody.reasoning_effort = fitReasoningEffort(model, reasoningEffort);
   }
 
   const useLocalOverride = ai.apiKeySource === 'local';

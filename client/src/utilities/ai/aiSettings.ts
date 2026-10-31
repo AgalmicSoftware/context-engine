@@ -1,6 +1,7 @@
 import { AI_PRESET_CONFIGS, AI_PROVIDERS } from './aiModelPresets';
 export { AI_PRESET_CONFIGS, AI_PROVIDERS } from './aiModelPresets';
 import { DEFAULT_AI_MODEL, DEFAULT_AI_MODELS } from '../../../../shared/aiDefaults.mjs';
+import { toModelLeaf } from '../../../../shared/aiModelFamily.mjs';
 /**
  * @module aiSettings
  * @description Central AI settings resolver — merges session-level defaults with local user overrides
@@ -172,7 +173,6 @@ const normalizeOptionalReasoningEffort = (value: unknown): string | null => {
   const normalized = toLower(value);
   return normalized ? normalizeReasoningEffort(normalized) : null;
 };
-export const toModelLeaf = (model: unknown): string => toLower(model).split('/').pop() || '';
 export const deriveAiPreset = ({
   mode,
   models,
