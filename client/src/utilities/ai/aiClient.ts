@@ -13,6 +13,7 @@ import { aiRewritePrompt } from '../../prompts/aiRewritePrompt.js';
 import buildClusterAnalysisPrompt, { CLUSTER_ANALYSIS_SYSTEM_PROMPT } from '../../prompts/clusterAnalysisPrompt.js';
 import buildCompareToolkitPrompt from '../../prompts/compareToolkitPrompt.js';
 import buildPhotoAnalysisPrompt from '../../prompts/photoAnalysisPrompt.js';
+import { fillPromptTemplate } from '../../prompts/promptFormat.js';
 import { rankQuestionsPrompt } from '../../prompts/rankQuestionsPrompt.js';
 import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSettings.js';
 import {
@@ -318,10 +319,11 @@ export async function rankQuestionsAI(
       .filter((q) => q.id.trim());
     const questionListJson = JSON.stringify(candidates, null, 2);
 
-    const finalPrompt = rankQuestionsPrompt
-      .replace('{{userQueryJson}}', JSON.stringify(String(userQuery || '')))
-      .replace('{{questionListJson}}', questionListJson)
-      .replace('{{topX}}', String(topX));
+    const finalPrompt = fillPromptTemplate(rankQuestionsPrompt, {
+      '{{userQueryJson}}': JSON.stringify(String(userQuery || '')),
+      '{{questionListJson}}': questionListJson,
+      '{{topX}}': String(topX),
+    });
 
     const rawOutput = await callAI(finalPrompt.trim(), {
       ...pickAiRequestOpts(opts),
@@ -375,7 +377,7 @@ export async function rankQuestionsAI(
  */
 export async function requestAiRewrite(originalText: unknown, opts: unknown = {}): Promise<unknown> {
   try {
-    const finalPrompt = aiRewritePrompt.replace('<USER_TEXT>', String(originalText));
+    const finalPrompt = fillPromptTemplate(aiRewritePrompt, { '<USER_TEXT>': String(originalText) });
     const cleaned = await callAI(finalPrompt, {
       ...(opts && typeof opts === 'object' ? opts : {}),
       taskType: readAiOptionTaskType(opts, 'rewrite'),
@@ -754,11 +756,12 @@ export async function generateAudioDiscussionSummary(transcript: unknown, opts: 
   try {
     const { audioSummaryPrompt } = await import('../../prompts/audioSummaryPrompt.js');
 
-    // Fill placeholders (keep global to replace all occurrences)
-    let prompt = String(audioSummaryPrompt || '');
-    prompt = prompt.replace(/<TRANSCRIPT>/g, t);
-    prompt = prompt.replace(/<STYLE>/g, style);
-    prompt = prompt.replace(/<SESSION_TITLE\?>/g, sessionTitle);
+    const prompt = fillPromptTemplate(String(audioSummaryPrompt || ''), {
+      '<TITLE>':
+        sessionTitle.replace(/\s+/g, ' ') || 'Reading Group Summary — [a short title you derive from the discussion]',
+      '<STYLE>': style,
+      '<TRANSCRIPT>': t,
+    });
 
     const raw = await callAIQueued(prompt, { ...withAiTaskTypeFallback(aiCallOpts, 'summarize'), thinking: true });
     const md = _stripEnclosingMarkdownFences(String(raw || ''));
