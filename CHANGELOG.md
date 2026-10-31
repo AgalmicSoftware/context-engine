@@ -23,6 +23,11 @@ All notable changes to this project will be documented in this file.
 - Generated questions state one plain, neutral idea each and don't repeat; breakout questions cover concrete next steps.
 - Audio summaries no longer send the transcript twice, and `$&` in typed or spoken text no longer corrupts a prompt.
 - The HTML report uses the same analysis prompt as the Results views.
+- "Set up with your AI" on `/new` copies a setup prompt, or opens it in ChatGPT or Claude. Your AI interviews you and returns a link that fills in the page, or JSON to paste under Import. Nothing is created until you review the page, add keys there and press Create.
+- `/new` reads `#setup=` links (plain base64url JSON, which an AI can write) as well as `#template=` share links, and removes either from the address bar once read.
+- Setup, share and prefill links share one decoder: wrapped links and missing padding work, invalid text is refused, and a cut-off or damaged link says which.
+- A broken prefill link opens the interview with its reason and a box to paste the AI's JSON. Drafts the page leaves out are counted instead of disappearing.
+- Admins can copy the group recorder link (`?mode=groupRecording`, with any Worker pin) from the Join panel. Unknown `mode` values are ignored and removed from the address.
 - The Context section on `/new`, on the settings page and, for admins, on the session page takes files (PDF, Markdown, text, CSV, JSON) and links for the session's AI. Each item is for everyone or for admins only; others don't see the section while the session has no context.
 - Question generation and the voice interviewer read the session's notes and links, plus the files and links the person may read, as untrusted background.
 - Setup and the settings page check context against shared limits: up to 6 paragraphs of 2,000 characters, 8 https links, and no text that looks like a secret.
