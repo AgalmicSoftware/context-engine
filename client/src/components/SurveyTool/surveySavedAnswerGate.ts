@@ -29,8 +29,9 @@ export const buildSessionInterviewSubmitContextToken = (props: RecordValue = {})
   const storageProfile = readPlainRecord(sessionConfig.storageProfile);
   const storageResources = readPlainRecord(storageProfile.resources);
   const slug = String(resolveEffectiveSlug(props) || sessionConfig.slug || '').trim();
-  const network = readPlainRecord(props.network);
-  const networkId = String(network.id || network.chainId || sessionConfig.networkChainId || '').trim();
+  // The session's own chain as its host routes it, never the signed-in wallet's network: signing in on
+  // another chain must not change this token, or the voice dialog keyed on it remounts and ends a recording.
+  const networkId = String(props.networkChainId || sessionConfig.networkChainId || '').trim();
   const workerUrl =
     getUsableSessionWorkerUrl({
       slug,
