@@ -81,7 +81,34 @@ test('links that unpack past the size cap are refused without unpacking them who
   const bomb = await linkFor(`{"format":"${format}","sessionInfo":"${'0'.repeat(4 * SESSION_TEMPLATE_MAX_BYTES)}"}`);
   assert.ok(bomb.length < SESSION_TEMPLATE_LINK_MAX_LENGTH, String(bomb.length));
   assert.match((await failure(bomb))[0].message, /larger/);
-  assert.match((await failure(`#template=${'A'.repeat(4 * SESSION_TEMPLATE_MAX_BYTES)}`))[0].message, /larger/);
+  // No share link is longer than the encoder's limit, so nothing longer is unpacked.
+  assert.match((await failure(`#template=${'A'.repeat(SESSION_TEMPLATE_LINK_MAX_LENGTH + 1)}`))[0].message, /longer/);
+});
+
+test('decoding feeds the decompressor small slices, which bounds memory in any browser', async () => {
+  const Native = globalThis.DecompressionStream;
+  const slices = [];
+  globalThis.DecompressionStream = function SpyDecompressionStream(kind) {
+    const native = new Native(kind);
+    const spy = new TransformStream({
+      transform(chunk, controller) {
+        slices.push(chunk.byteLength);
+        controller.enqueue(chunk);
+      },
+    });
+    spy.readable.pipeTo(native.writable).catch(() => {});
+    return { writable: spy.writable, readable: native.readable };
+  };
+  try {
+    const original = template({ sessionInfo: noise(6000) });
+    const encoded = await encodeSessionTemplateLink(original);
+    assert.equal(encoded.ok, true);
+    assert.deepEqual(await decodeSessionTemplateLink(encoded.fragment), { ok: true, template: original });
+  } finally {
+    globalThis.DecompressionStream = Native;
+  }
+  assert.ok(slices.length > 1, String(slices));
+  assert.ok(Math.max(...slices) <= 1024, String(slices));
 });
 
 test('prototype keys are refused and script text stays text', async () => {

@@ -4,10 +4,12 @@ import { SESSION_TEMPLATE_MAX_BYTES, parseSessionTemplateJson, validateSessionTe
 // to a server: compact JSON, deflate-raw, then base64url, as #template=.
 const PARAM = 'template';
 // Beyond this a link breaks in chats and mail; offer a .json download instead.
+// Decoding refuses longer links too, since no share link is longer.
 export const SESSION_TEMPLATE_LINK_MAX_LENGTH = 8000;
-// No link longer than base64url of the largest template is worth unpacking.
-const MAX_ENCODED_LENGTH = Math.ceil((SESSION_TEMPLATE_MAX_BYTES * 4) / 3);
 const TOO_LARGE = `This link's template is larger than ${SESSION_TEMPLATE_MAX_BYTES / 1024} KB.`;
+// A browser unpacks each written chunk whole before the size check can run,
+// so input goes in slices: at most about 1 MB of output per slice.
+const SLICE_BYTES = 1024;
 
 const failure = (message) => ({ ok: false, errors: [{ path: '', message }] });
 
@@ -29,7 +31,12 @@ const fromBase64Url = (text) => {
 // Streams bytes through a (de)compression stream; null once past maxBytes.
 const transform = async (bytes, stream, maxBytes) => {
   const writer = stream.writable.getWriter();
-  const written = writer.write(bytes).then(() => writer.close());
+  const written = (async () => {
+    for (let start = 0; start < bytes.length; start += SLICE_BYTES) {
+      await writer.write(bytes.subarray(start, start + SLICE_BYTES));
+    }
+    await writer.close();
+  })();
   written.catch(() => {}); // a failure surfaces through the reader
   const reader = stream.readable.getReader();
   const chunks = [];
@@ -66,7 +73,9 @@ export const encodeSessionTemplateLink = async (template) => {
 export const decodeSessionTemplateLink = async (hash) => {
   const value = new URLSearchParams(String(hash ?? '').replace(/^#/, '')).get(PARAM);
   if (value === null) return null;
-  if (value.length > MAX_ENCODED_LENGTH) return failure(TOO_LARGE);
+  if (value.length > SESSION_TEMPLATE_LINK_MAX_LENGTH) {
+    return failure(`This link is longer than any share link (${SESSION_TEMPLATE_LINK_MAX_LENGTH} characters).`);
+  }
   const packed = fromBase64Url(value);
   if (!packed) return failure('This link is damaged: its template is not base64url text.');
   let bytes;
