@@ -543,11 +543,14 @@ test('bounded run history refuses a new run without dropping existing coverage',
     body: { run_id: runId, request_id: runId, agent_metadata: metadata,
       answers: page.statements.map(q => ({ statement_id: q.statement_id, statement_version: q.statement_version,
         answer: { value: 'agree' }, confidence: 80 })) } }); };
-  for (let i = 0; i < 20; i++) await jsonOk(await send(`run-${i}`));
+  // Runs 1 to 50 are kept, including the 21st that a 20-run cap refused.
+  for (let i = 0; i < 50; i++) await jsonOk(await send(`run-${i + 1}`));
   const stateKey = [...f.records.keys()].find(key => key.includes('answer-state:'));
   const original = f.records.get(stateKey);
-  const rejected = await send('run-over-limit');
+  assert.equal(JSON.parse(original).runScopes.length, 50);
+  const rejected = await send('run-51');
   assert.equal(rejected.status, 409);
   assert.equal((await rejected.json()).reason, 'wrapped_run_history_full');
   assert.equal(f.records.get(stateKey), original);
+  await jsonOk(await send('run-50'));
 });

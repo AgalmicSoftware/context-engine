@@ -1,12 +1,10 @@
 import { assertExpectedSessionAuthority } from '../sessionConfigAuthority.js';
 import { resolveCanonicalWorkerSessionIdHex } from '../sessionConfigMutation.js';
 import { createAgentStorage } from './storage.mjs';
-import { answerStateKey, voteStateKey, MAX_RECENT_REQUEST_IDS } from './wrappedCore.mjs';
+import { answerStateKey, voteStateKey, MAX_RECENT_REQUEST_IDS, MAX_RESEARCH_RUNS, MAX_RUN_SCOPES_BYTES } from './wrappedCore.mjs';
 import { sha256Hex, safeJsonParse } from './runtimePrimitives.mjs';
 
 const reply = (body, status = 200) => Response.json(body, { status });
-const MAX_RESEARCH_RUNS = 20;
-const MAX_RUN_SCOPES_BYTES = 1024 * 1024;
 const busy = () => reply({ ok: false, status: 503, reason: 'wrapped_storage_busy', retryable: true, retryAfterSeconds: 1 }, 503);
 
 // The coordinator binds a request before its first KV write. KV holds the
