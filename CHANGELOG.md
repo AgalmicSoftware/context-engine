@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Client — available when the site deploys
 
 - Drop the retired Goerli test network from wallet connections and a collection metadata lookup that always failed.
+- Trust a cached Worker sign-in only when it records the Worker, session and account it was issued for; the older unscoped format, which nothing writes, is ignored.
 
 ## [0.8.1] - 2026-10-30
 

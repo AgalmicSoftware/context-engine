@@ -76,7 +76,6 @@ export const normalizeTokenCacheEntry = (
       exp: number;
       expiresAt: number;
       issuedAt: number | null;
-      legacy: boolean;
       ok: true;
       token: string;
     }
@@ -85,9 +84,12 @@ export const normalizeTokenCacheEntry = (
     return { ok: false, status: 'malformed' };
   }
   const record = entry as TokenCacheEntry;
+  // buildTokenCacheEnvelope writes every record, so a record without its
+  // scope fields was not issued by this page and is never trusted.
+  if (record.v !== 1) return { ok: false, status: 'unsupported-version' };
 
   const token = toStr(record.token).trim();
-  const expiresAt = Number(record.expiresAt || record.exp || 0);
+  const expiresAt = Number(record.expiresAt || 0);
   if (!token) return { ok: false, status: 'missing-token' };
   if (!Number.isFinite(expiresAt) || expiresAt <= 0) {
     return { ok: false, status: 'missing-expiry' };
@@ -96,42 +98,29 @@ export const normalizeTokenCacheEntry = (
     return { ok: false, status: 'expired' };
   }
 
+  const issuedAt = Number(record.issuedAt || 0) || null;
+  const maxTtl = Number(maxTtlSeconds || 0);
+  if (issuedAt && Number.isFinite(maxTtl) && maxTtl > 0 && expiresAt > issuedAt + maxTtl) {
+    return { ok: false, status: 'ttl-too-long' };
+  }
+  const expectedWorkerUrl = normalizeWorkerUrl(workerUrl);
+  const expectedSlug = normalizeSessionSlug(sessionSlug);
   const expectedSessionId = normalizeWorkerCanonicalSessionIdHex(sessionId);
-  if (expectedSessionId && Number(record.v || 0) < 1) {
+  const expectedAddress = normalizeAddress(address);
+  const entryWorkerUrl = normalizeWorkerUrl(record.workerUrl);
+  const entrySlug = normalizeSessionSlug(record.sessionSlug);
+  const entrySessionId = normalizeWorkerCanonicalSessionIdHex(record.sessionId);
+  const entryAddress = normalizeAddress(record.address);
+  if (
+    (expectedWorkerUrl && entryWorkerUrl && expectedWorkerUrl !== entryWorkerUrl) ||
+    entrySlug !== expectedSlug ||
+    (expectedSessionId && entrySessionId !== expectedSessionId) ||
+    (expectedAddress && entryAddress && expectedAddress !== entryAddress)
+  ) {
     return { ok: false, status: 'scope-mismatch' };
   }
 
-  if (Number(record.v || 0) >= 1) {
-    const issuedAt = Number(record.issuedAt || 0) || null;
-    const maxTtl = Number(maxTtlSeconds || 0);
-    if (issuedAt && Number.isFinite(maxTtl) && maxTtl > 0 && expiresAt > issuedAt + maxTtl) {
-      return { ok: false, status: 'ttl-too-long' };
-    }
-    const expectedWorkerUrl = normalizeWorkerUrl(workerUrl);
-    const expectedSlug = normalizeSessionSlug(sessionSlug);
-    const expectedAddress = normalizeAddress(address);
-    const entryWorkerUrl = normalizeWorkerUrl(record.workerUrl);
-    const entrySlug = normalizeSessionSlug(record.sessionSlug);
-    const entrySessionId = normalizeWorkerCanonicalSessionIdHex(record.sessionId);
-    const entryAddress = normalizeAddress(record.address);
-    if (
-      (expectedWorkerUrl && entryWorkerUrl && expectedWorkerUrl !== entryWorkerUrl) ||
-      entrySlug !== expectedSlug ||
-      (expectedSessionId && entrySessionId !== expectedSessionId) ||
-      (expectedAddress && entryAddress && expectedAddress !== entryAddress)
-    ) {
-      return { ok: false, status: 'scope-mismatch' };
-    }
-  }
-
-  return {
-    ok: true,
-    token,
-    exp: expiresAt,
-    expiresAt,
-    issuedAt: Number(record.issuedAt || 0) || null,
-    legacy: Number(record.v || 0) < 1,
-  };
+  return { ok: true, token, exp: expiresAt, expiresAt, issuedAt };
 };
 
 export const readScopedTokenCache = (

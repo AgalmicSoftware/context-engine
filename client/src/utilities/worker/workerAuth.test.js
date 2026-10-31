@@ -197,7 +197,6 @@ describe('workerAuth token cache envelopes', () => {
         token: 'token-1',
         expiresAt: 4600,
         issuedAt: 1000,
-        legacy: false,
       }),
     );
   });
@@ -254,54 +253,19 @@ describe('workerAuth token cache envelopes', () => {
     ).toEqual({ ok: false, status: 'scope-mismatch' });
   });
 
-  it('keeps legacy token entries readable only when they still have a valid expiry', () => {
-    expect(
-      __test__workerAuthTokenCache.normalizeTokenCacheEntry(
-        {
-          token: 'legacy-token',
-          exp: 4600,
-        },
-        {
-          nowSeconds: 1200,
-          skewSeconds: 30,
-        },
-      ),
-    ).toEqual(
-      expect.objectContaining({
-        ok: true,
-        token: 'legacy-token',
-        legacy: true,
-      }),
-    );
+  it('rejects unscoped token records, even unexpired ones with no expected scope', () => {
+    const unscoped = { token: 'unscoped-token', exp: 4600, expiresAt: 4600 };
 
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(unscoped, { nowSeconds: 1200 })).toEqual({
+      ok: false,
+      status: 'unsupported-version',
+    });
     expect(
       __test__workerAuthTokenCache.normalizeTokenCacheEntry(
-        {
-          token: 'legacy-token',
-        },
-        {
-          nowSeconds: 1200,
-        },
+        { ...unscoped, v: '1', sessionSlug: 'edge' },
+        { sessionSlug: 'edge', nowSeconds: 1200 },
       ),
-    ).toEqual({ ok: false, status: 'missing-expiry' });
-  });
-
-  it('rejects a legacy cache entry when an exact canonical session identity is expected', () => {
-    expect(
-      __test__workerAuthTokenCache.normalizeTokenCacheEntry(
-        {
-          token: 'legacy-token',
-          exp: 4600,
-        },
-        {
-          workerUrl: 'https://worker.example',
-          sessionId: CANONICAL_SESSION_ID,
-          sessionSlug: 'edge',
-          address: TEST_ADDRESS,
-          nowSeconds: 1200,
-        },
-      ),
-    ).toEqual({ ok: false, status: 'scope-mismatch' });
+    ).toEqual({ ok: false, status: 'unsupported-version' });
   });
 
   it('rejects scoped v1 token envelopes with excessive cache lifetimes', () => {
@@ -335,7 +299,6 @@ describe('workerAuth token cache envelopes', () => {
       expect.objectContaining({
         ok: true,
         token: 'token-1',
-        legacy: false,
       }),
     );
   });
