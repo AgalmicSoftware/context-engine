@@ -1,4 +1,5 @@
 import { safeString } from './runtimePrimitives.mjs';
+import { sessionContextPlainText } from '../../../shared/sessionContext.mjs';
 import { RISK_CEILINGS, RISK_RANK } from './constants.mjs';
 
 export function sessionAuthorityMode(session = {}) {
@@ -16,7 +17,8 @@ export function normalizeSessionPolicy(input = {}) {
     return {
       sessionSlug: safeString(session.sessionSlug), sessionName: safeString(session.sessionName || session.sessionSlug),
       sessionIdHex: session.sessionIdHex, sessionModeProfile: session.sessionModeProfile,
-      sessionContext: safeString(session.sessionContext || session.description).slice(0, 1200),
+      // The stored context is { title, paragraphs, links }; agents read it as text.
+      sessionContext: (sessionContextPlainText(session.sessionContext) || safeString(session.description)).slice(0, 1200),
       createdAt: session.createdAt, createdTimestamp: session.createdTimestamp,
       agentHttpEnabled: session.sessionModeProfile?.surfaces?.agentHttp === true,
       managedAccountSubmitAllowed: session.managedAccountSubmitAllowed === true,

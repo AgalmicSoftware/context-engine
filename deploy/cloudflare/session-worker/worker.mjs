@@ -30245,7 +30245,7 @@ var init_realtimeInterviewConfig = __esm({
 });
 
 // shared/sessionContext.mjs
-var SESSION_CONTEXT_LIMITS, L, KEYS, LINK_KEYS, isRecord3, text, isHttpsUrl, fail, validateSessionContext;
+var SESSION_CONTEXT_LIMITS, L, KEYS, LINK_KEYS, isRecord3, text, isHttpsUrl, normalizeSessionContext, fail, validateSessionContext, sessionContextPlainText;
 var init_sessionContext = __esm({
   "shared/sessionContext.mjs"() {
     SESSION_CONTEXT_LIMITS = Object.freeze({
@@ -30268,6 +30268,12 @@ var init_sessionContext = __esm({
       } catch {
         return false;
       }
+    };
+    normalizeSessionContext = (value) => {
+      const context = isRecord3(value) ? value : {};
+      const paragraphs = (Array.isArray(context.paragraphs) ? context.paragraphs : [context.body]).map(text).filter(Boolean).slice(0, L.paragraphs).map((paragraph) => paragraph.slice(0, L.paragraphChars));
+      const links = (Array.isArray(context.links) ? context.links : []).filter(isRecord3).map((link) => ({ label: text(link.label).slice(0, L.labelChars), url: text(link.url) })).filter((link) => isHttpsUrl(link.url)).slice(0, L.links).map((link) => ({ label: link.label || link.url, url: link.url }));
+      return { title: text(context.title).slice(0, L.titleChars), paragraphs, links };
     };
     fail = (errors, path, message) => errors.push({ path, message });
     validateSessionContext = (value) => {
@@ -30330,6 +30336,11 @@ var init_sessionContext = __esm({
         if (links.length > L.links) fail(errors, "sessionContext.links", `Context holds at most ${L.links} links.`);
       }
       return errors.length ? { ok: false, errors } : { ok: true, value: { title, paragraphs, links }, errors };
+    };
+    sessionContextPlainText = (value) => {
+      if (typeof value === "string") return value.trim();
+      const { title, paragraphs, links } = normalizeSessionContext(value);
+      return [title, ...paragraphs, ...links.map((link) => link.label)].filter(Boolean).join(" ");
     };
   }
 });
@@ -61377,7 +61388,8 @@ function normalizeSessionPolicy(input = {}) {
       sessionName: safeString(session.sessionName || session.sessionSlug),
       sessionIdHex: session.sessionIdHex,
       sessionModeProfile: session.sessionModeProfile,
-      sessionContext: safeString(session.sessionContext || session.description).slice(0, 1200),
+      // The stored context is { title, paragraphs, links }; agents read it as text.
+      sessionContext: (sessionContextPlainText(session.sessionContext) || safeString(session.description)).slice(0, 1200),
       createdAt: session.createdAt,
       createdTimestamp: session.createdTimestamp,
       agentHttpEnabled: session.sessionModeProfile?.surfaces?.agentHttp === true,
@@ -61426,6 +61438,7 @@ var resolveSessionInvocation;
 var init_sessionPolicy = __esm({
   "workers/sessionCorsWorker/agent/sessionPolicy.mjs"() {
     init_runtimePrimitives();
+    init_sessionContext();
     init_constants2();
     resolveSessionInvocation = resolveAgentHttpSessionInvocation;
   }
@@ -65092,12 +65105,12 @@ function normalizeQuestionTags(value = []) {
 function firstString(...values) {
   return values.find((value) => safeString(value) !== "");
 }
-function normalizeSessionContext(value = "") {
-  return safeString(value).replace(/\s+/g, " ").slice(0, 1200);
+function normalizeSessionContext2(value = "") {
+  return safeString(sessionContextPlainText(value)).replace(/\s+/g, " ").slice(0, 1200);
 }
 function sessionContextFromPolicySession(session = {}) {
   const metadata = session?.metadata && typeof session.metadata === "object" && !Array.isArray(session.metadata) ? session.metadata : {};
-  return normalizeSessionContext(firstString(
+  return [
     session.sessionContext,
     session.telegramSessionContext,
     session.context,
@@ -65107,7 +65120,7 @@ function sessionContextFromPolicySession(session = {}) {
     metadata.sessionContext,
     metadata.context,
     metadata.description
-  ));
+  ].map(normalizeSessionContext2).find(Boolean) || "";
 }
 function addQuestionTags(target, tags = []) {
   normalizeQuestionTags(tags).forEach((tag) => {
@@ -65383,7 +65396,7 @@ async function persistAgentProposedQuestion({
   const normalizedRatingScale = type === "rating" ? normalizeRatingScale2(ratingScale) : null;
   const normalizedReferences = normalizeQuestionReferences(references);
   const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
-  const normalizedSessionContext = normalizeSessionContext(sessionContext);
+  const normalizedSessionContext = normalizeSessionContext2(sessionContext);
   const explicitTagList = normalizeQuestionTags([
     ...geoTagsFromRefs(normalizedGeoRefs),
     ...Array.isArray(tags) ? tags : normalizeQuestionTags(tags)
@@ -65589,6 +65602,7 @@ var init_agentQuestionProposals = __esm({
   "workers/sessionCorsWorker/agent/agentQuestionProposals.mjs"() {
     init_ratingScale();
     init_quadraticAllocation();
+    init_sessionContext();
     init_runtimePrimitives();
     init_opaqueActions();
     init_redaction();

@@ -1,5 +1,6 @@
 import { normalizeRatingScale as normalizeQuestionRatingScale, ratingStepFor } from '../../../shared/questions/ratingScale.mjs';
 import { validateQuadraticQuestion } from '../../../shared/questions/quadraticAllocation.mjs';
+import { sessionContextPlainText } from '../../../shared/sessionContext.mjs';
 import {
   safeString,
   lower,
@@ -103,15 +104,16 @@ function firstString(...values) {
   return values.find((value) => safeString(value) !== '');
 }
 
+// Text or a stored { title, paragraphs, links } context, as one line of text.
 export function normalizeSessionContext(value = '') {
-  return safeString(value).replace(/\s+/g, ' ').slice(0, 1200);
+  return safeString(sessionContextPlainText(value)).replace(/\s+/g, ' ').slice(0, 1200);
 }
 
 export function sessionContextFromPolicySession(session = {}) {
   const metadata = session?.metadata && typeof session.metadata === 'object' && !Array.isArray(session.metadata)
     ? session.metadata
     : {};
-  return normalizeSessionContext(firstString(
+  return [
     session.sessionContext,
     session.telegramSessionContext,
     session.context,
@@ -120,8 +122,8 @@ export function sessionContextFromPolicySession(session = {}) {
     session.topic,
     metadata.sessionContext,
     metadata.context,
-    metadata.description
-  ));
+    metadata.description,
+  ].map(normalizeSessionContext).find(Boolean) || '';
 }
 
 function addQuestionTags(target, tags = []) {
