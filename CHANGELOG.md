@@ -16,13 +16,21 @@ All notable changes to this project will be documented in this file.
 - Recorder status, transcript details and errors are readable in every theme; in Civic, the default, "Transcribing…" was white on white.
 - `/new` is one page. Each section shows a summary, a conflict shows as a plain message beside the option, and Create confirms with your passkey, then deploys and saves.
 - Admins edit Worker-hosted sessions at `/session/<slug>/settings`. The page says which edits sign participants out, saves only changed fields and copies the group recorder link. The `/admin` metadata editor is removed, so on-chain sessions can't be edited for now.
-- Session templates: Export, Import and share links (`/new#template=`) carry a setup's questions and context, never keys.
+- Session templates: Export, Import and share links (`/new#template=`) carry a setup's questions and context, never keys. Context files are listed by name and privacy, to attach again.
 - Setup lists the current Claude models and is readable in every theme at phone width.
+- The Context section on `/new`, on the settings page and, for admins, on the session page takes files (PDF, Markdown, text, CSV, JSON) and links for the session's AI. Each item is for everyone or for admins only; others don't see the section while the session has no context.
+- Question generation and the voice interviewer read the session's notes and links, plus the files and links the person may read, as untrusted background.
+- Setup and the settings page check context against shared limits: up to 6 paragraphs of 2,000 characters, 8 https links, and no text that looks like a secret.
 
 ### Workers — requires redeployment
 
 - Group transcription forwards up to four known-speaker samples (a name and a short WAV) to OpenAI, so voices keep their labels across chunks. Invalid samples are dropped without failing the chunk.
 - Claude requests work on current models. The Worker sends no `temperature`, which Opus 5.5 and Fable 5.1 refuse and Sonnet and Haiku 5.5 refuse at 0.7, so older Claude models also sample at their default. It reads the answer from the reply's text blocks after any thinking, and a request without a model uses `claude-opus-5-5` instead of a model retired in 2025.
+- Only admins add context items. For a link, the Worker fetches the page itself: https on a public host only, every redirect re-checked, up to 2 MB and 10 seconds. A PDF can be read by the session's own Claude or OpenAI key. Admins-only items never reach participants through reads, lists or the AI.
+- The interview opening and results analysis use the context every participant may read.
+- set-config checks a `sessionContext` it is sent.
+- `fetch_url` and `fetch_image` need https on a public host and give up after 10 seconds; `fetch_url` also reads plain text and Markdown.
+- Agent-proposed questions are no longer tagged "object".
 - Storage export manifests drop `rewrapRequiredForNewDeployment`, the deprecated copy of `deploymentKekContinuityRequired`, and Lit requests no longer read the retired `gateChainId` field; send `chainId`.
 
 ## [0.8.1] - 2026-10-30
