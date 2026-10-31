@@ -1,5 +1,5 @@
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
-import type { InterviewPrefillPacket, InterviewResearchCoverage } from './sessionInterview';
+import type { InterviewPrefillPacket, InterviewQuestion, InterviewResearchCoverage } from './sessionInterview';
 
 export type SessionInterviewModalRecord = Record<string, unknown>;
 
@@ -31,17 +31,27 @@ export const displayResponderContext = (packet: InterviewPrefillPacket | null): 
     .join('\n');
 };
 
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 export const omitConcealedInterviewFacts = (
   context: string,
   packet: InterviewPrefillPacket | null,
   isConcealed: (questionId: string) => boolean,
+  questions: Array<Pick<InterviewQuestion, 'id'>>,
 ): string => {
+  const questionIds = new Set(questions.map(({ id }) => id));
+  const facts = (packet?.responderContext?.facts || []).map((entry) => {
+    // As in the realtime prefill, related questions outside this interview do not count.
+    const ids = (entry.relatedQuestionIds || []).filter((id) => questionIds.has(id));
+    return { fact: String(entry.fact || '').trim(), concealed: ids.length > 0 && ids.every(isConcealed) };
+  });
+  const shown = new Set(facts.filter(({ concealed }) => !concealed).map(({ fact }) => fact));
   let filtered = context;
-  for (const entry of packet?.responderContext?.facts || []) {
-    const ids = entry.relatedQuestionIds || [];
-    const fact = String(entry.fact || '').trim();
-    // Imported facts can also have been copied into the editable context field.
-    if (fact && ids.length && ids.every(isConcealed)) filtered = filtered.split(fact).join('');
+  for (const { fact, concealed } of facts) {
+    if (!fact || !concealed || shown.has(fact)) continue;
+    // Imported facts can also have been copied into the editable context field, one per line. A concealed
+    // fact goes only where it stands as whole lines, so the same words inside another fact stay.
+    filtered = filtered.replace(new RegExp(`^[^\\S\\n]*${escapeRegExp(fact)}[^\\S\\n]*(?:\\n|$)`, 'gm'), '');
   }
   return filtered.trim();
 };

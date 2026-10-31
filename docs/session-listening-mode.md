@@ -534,4 +534,4 @@ After an interview submission leaves page answers unsaved, a notice beside the o
 
 Hidden-draft help includes a screen-reader description on its question-mark button; its explanation stays open when the pointer moves into the tooltip.
 
-Voice interview context omits imported facts whose related questions all have concealed AI drafts, including those facts copied into the editable background. Facts with a visible related question remain available.
+Voice interview context omits imported facts whose related questions in the interview all have concealed AI drafts, including those facts left on their own lines of the editable background. Facts with a visible related question, and other text containing the same words, remain available.

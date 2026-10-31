@@ -819,7 +819,7 @@ export default function SessionInterviewPanel({
     setSubmitSucceeded(false);
     roundBaseTranscriptRef.current = transcriptRef.current;
     setShowTranscript(false);
-    const voiceContext = omitConcealedInterviewFacts(responderContext, prefillPacket, isDraftConcealed);
+    const voiceContext = omitConcealedInterviewFacts(responderContext, prefillPacket, isDraftConcealed, questions);
     const validatedPrefillPacket =
       prefillPacket && (!prefillPacket.questionSetHash || validatedPrefillRef.current === prefillPacket)
         ? scopeInterviewPrefillToQuestions(
