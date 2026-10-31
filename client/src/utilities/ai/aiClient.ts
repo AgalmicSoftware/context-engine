@@ -75,6 +75,7 @@ import {
   SpeakerLabelsUnavailableError,
   type DiarizedTranscription,
 } from './aiClientTranscriptionWorkerTransport.js';
+import type { KnownSpeaker } from '../audio/speakerTranscript';
 import { enqueueAiCallWithRetry } from './aiClientQueue.js';
 
 import { createLogger } from '../logging.js';
@@ -479,14 +480,18 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
   );
 }
 
-/** Structured group capture keeps labels local to one three-minute upload. */
+/** Structured group capture: samples of voices from earlier uploads (`knownSpeakers`) keep their labels. */
 export async function transcribeGroupAudio(audio: AudioUploadBlob, opts: unknown = {}): Promise<DiarizedTranscription> {
   if (!audio) throw new Error('No audio provided');
   const { signal } = resolveTranscriptionUploadOptions(opts, { defaultMaxUploadBytes: TRANSCRIBE_MAX_UPLOAD_BYTES });
+  const { knownSpeakers } = (opts || {}) as { knownSpeakers?: KnownSpeaker[] };
   try {
     if (audio.size > TRANSCRIBE_MAX_UPLOAD_BYTES)
       throw new SpeakerLabelsUnavailableError('Speaker labels are unavailable for this audio size.', true);
-    return await uploadAudioForDiarizedTranscription(audio, await resolveTranscriptionTransport(opts), { signal });
+    return await uploadAudioForDiarizedTranscription(audio, await resolveTranscriptionTransport(opts), {
+      signal,
+      knownSpeakers,
+    });
   } catch (error) {
     if (!(error instanceof SpeakerLabelsUnavailableError)) throw error;
     // The plain path already normalizes and chunks oversized audio safely.

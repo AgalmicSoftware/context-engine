@@ -401,6 +401,13 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
       transcribed.map(() => (generation === 'current' ? ['Person 1'] : [])),
     );
     expect(Boolean(recorder.labelsUnavailableReason)).toBe(generation !== 'current');
+    // From the second chunk on, before and after the reload, every labelled upload carried the first chunk's
+    // voice and the model named it, so no chunk numbered its voices on its own.
+    const labelled = mockWorker.uploads.filter((upload) => upload.labels);
+    expect(labelled.filter((upload) => upload.chunk > 1).map((upload) => upload.knownSpeakers.join())).toEqual(
+      labelled.filter((upload) => upload.chunk > 1).map(() => 'Person 1'),
+    );
+    expect(recorder.segments.some((segment) => segment.speakersRenumbered)).toBe(false);
     // Two presses of Record, one before and one after the reload; nothing else opened the microphone.
     expect(getUserMedia).toHaveBeenCalledTimes(2);
     // Only the rejected chunk keeps its audio, and it downloads whole.
