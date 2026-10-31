@@ -10,11 +10,12 @@ $input-border: var(--ce-input-border-strong);
 $muted-text: var(--ce-panel-text-muted);
 
 .groupWizard {
-  padding: 24px;
+  padding: 24px 16px 48px;
   color: $user-page-text-color;
   font-family: var(--ce-font-mono);
-  max-width: 1100px;
+  max-width: 760px;
   margin: 0 auto;
+  min-width: 0;
 
   input,
   textarea {

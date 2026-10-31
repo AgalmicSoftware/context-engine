@@ -3,11 +3,13 @@ import {
   TEST_ADMIN_ADDRESS,
   deployVerifiedWorkerForCurrentDraft,
   fireEvent,
+  mockRegisterSessionOnChain,
   rerenderSessionWizard,
   renderSessionWizard,
   resetSessionWizardWorkerPanelTestState,
   screen,
-  enableAdvancedMode,
+  selectRegistryHosting,
+  setCloudflareApiToken,
   waitFor,
 } from './SessionWizard.workerPanel.testUtils';
 
@@ -41,16 +43,14 @@ describe('SessionWizard login guard rendering', () => {
       fireEvent.change(sessionNameInput, {
         target: { value: 'Login Required Publish Session' },
       });
+      selectRegistryHosting();
       await deployVerifiedWorkerForCurrentDraft();
       rerenderSessionWizard(view, {
         account: '',
         loginComplete: false,
         toggleLoginModal,
       });
-      enableAdvancedMode();
 
-      fireEvent.click(screen.getByRole('button', { name: /^Publish$/i }));
-      fireEvent.click(screen.getByLabelText('Advanced publish settings'));
       fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
         target: { value: 'ar://'.concat('a'.repeat(43)) },
       });
@@ -62,11 +62,15 @@ describe('SessionWizard login guard rendering', () => {
 
       fireEvent.click(publishButton);
 
+      // Create asks for sign-in first and resumes only once login completes.
       await waitFor(() => {
         expect(toggleLoginModal).toHaveBeenCalledWith(true);
-        expect(screen.getByText('Connect your wallet to publish this session.')).toBeInTheDocument();
+        expect(screen.getByTestId('ce-setup-create-stage')).toHaveTextContent(
+          'Confirm with your passkey to create the session',
+        );
       });
       expect(providerRequest.mock.calls.map(([payload]) => payload?.method)).not.toContain('eth_requestAccounts');
+      expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
     } finally {
       cryptoUtils._getProvider.mockImplementation(originalGetProvider);
     }
@@ -83,25 +87,16 @@ describe('SessionWizard login guard rendering', () => {
         loginComplete: false,
         toggleLoginModal,
       });
-      enableAdvancedMode();
-      fireEvent.change(screen.getAllByRole('combobox')[0], {
-        target: { value: '84532' },
-      });
 
       const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
-        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
-      }
-
       fireEvent.change(sessionNameInput, {
         target: { value: 'Login Before Deploy Session' },
       });
-      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-        target: { value: 'login-before-deploy-session' },
-      });
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent(
+        '/session/login-before-deploy-session',
+      );
 
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+      setCloudflareApiToken('cf-test-token');
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
       await waitFor(() => {

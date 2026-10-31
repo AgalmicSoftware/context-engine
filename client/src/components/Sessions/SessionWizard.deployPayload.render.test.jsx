@@ -1,13 +1,13 @@
 import {
   E2E_TESTIDS,
   TEST_ADMIN_ADDRESS,
-  act,
   ethers,
   fireEvent,
+  openSetupSection,
   renderLoggedInSessionWizard,
   resetSessionWizardWorkerPanelTestState,
   screen,
-  enableAdvancedMode,
+  setCloudflareApiToken,
   waitFor,
 } from './SessionWizard.workerPanel.testUtils';
 
@@ -29,8 +29,7 @@ describe('SessionWizard deploy payload rendering', () => {
     );
 
     renderLoggedInSessionWizard();
-    enableAdvancedMode();
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+    openSetupSection('hosting');
 
     expect(await screen.findByLabelText('Authenticated requests per wallet per day')).toHaveValue(5);
     expect(screen.getByLabelText('Anonymous requests per IP per day')).toHaveValue(0);
@@ -88,37 +87,18 @@ describe('SessionWizard deploy payload rendering', () => {
         },
         toggleLoginModal: jest.fn(),
       });
-      enableAdvancedMode();
 
       const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
-        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
-      }
-
       fireEvent.change(sessionNameInput, {
         target: { value: 'Deploy Account Id Session' },
       });
-      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-        target: { value: 'deploy-account-id-session' },
-      });
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent(
+        '/session/deploy-account-id-session',
+      );
 
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
-
-      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
-      fireEvent.change(deployHelperInput, {
-        target: { value: 'https://deploy-helper.example.test' },
-      });
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
+      setCloudflareApiToken('cf-test-token');
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-latest' },
-      });
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
-        target: { value: '{"kty":"RSA","n":"abc"}' },
       });
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));

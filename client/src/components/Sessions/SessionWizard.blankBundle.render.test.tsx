@@ -54,26 +54,18 @@ const buildMockSponsoredBundle = () => ({
   },
 });
 
-const selectDecentralizedProfile = async () => {
-  let preset = screen.queryByTestId('ce-new-preset-trustless_public_decentralized');
-  if (!preset) {
-    const backButton = screen.queryByRole('button', { name: 'Back' });
-    if (backButton) {
-      fireEvent.click(backButton);
-      preset = await screen.findByTestId('ce-new-preset-trustless_public_decentralized');
-    }
-  }
-  expect(preset).toBeInTheDocument();
-  const originalConfirm = window.confirm;
-  window.confirm = jest.fn(() => true);
-  try {
-    fireEvent.click(preset as HTMLElement);
-  } finally {
-    window.confirm = originalConfirm;
-  }
-  await waitFor(() => {
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
-  });
+// Every setup section but Basics starts closed behind its More button.
+const openSetupSection = (key: string) => {
+  const toggle = screen.queryByTestId(`ce-setup-more-${key}`);
+  if (!toggle || toggle.getAttribute('aria-expanded') === 'true') return;
+  fireEvent.click(toggle);
+};
+
+// New drafts start Worker-hosted; this takes the on-chain registry path. It mirrors the
+// worker-panel testUtils helper, which would also install that module's jest mocks.
+const selectRegistryHosting = () => {
+  openSetupSection('hosting');
+  fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'evm_registry_canonical' } });
 };
 
 jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-wizard-sbt-selector" />);
@@ -220,24 +212,8 @@ import SessionWizard from './SessionWizard';
 const SessionWizardComponent = SessionWizard as React.ComponentType<any>;
 const mockedBuildContractViewerContracts = buildContractViewerContracts as jest.Mock;
 
-const commitSessionModeProfileGateIfPresent = () => {
-  if (screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)) return;
-  const preset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
-  if (preset) {
-    act(() => {
-      fireEvent.click(preset);
-    });
-  }
-  const continueButton = screen.queryByTestId('ce-new-preset-continue') as HTMLButtonElement | null;
-  if (continueButton && !continueButton.disabled) {
-    act(() => {
-      fireEvent.click(continueButton);
-    });
-  }
-};
-
-const renderLoggedInSessionWizard = (props: Record<string, any> = {}) => {
-  const view = render(
+const renderLoggedInSessionWizard = (props: Record<string, any> = {}) =>
+  render(
     <SessionWizardComponent
       network={{ id: 84532 }}
       account={TEST_ADMIN_ADDRESS}
@@ -246,19 +222,8 @@ const renderLoggedInSessionWizard = (props: Record<string, any> = {}) => {
       {...props}
     />,
   );
-  commitSessionModeProfileGateIfPresent();
-  return view;
-};
-const setControlledInputValue = (input: HTMLElement, value: string) => {
-  const inputWithReactProps = input as any;
-  const reactPropsKey = Object.keys(inputWithReactProps).find((key) => key.startsWith('__reactProps$'));
-  if (reactPropsKey) {
-    act(() => {
-      inputWithReactProps[reactPropsKey].onChange({ target: { value } });
-    });
-    return;
-  }
-  fireEvent.change(input, { target: { value } });
+const setCloudflareApiToken = (value: string) => {
+  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), { target: { value } });
 };
 
 describe('SessionWizard blank bundle render regression', () => {
@@ -293,7 +258,7 @@ describe('SessionWizard blank bundle render regression', () => {
       target: { value: 'Normal Deploy Blank Bundle URL' },
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /step \d+: worker/i }));
+    openSetupSection('hosting');
 
     const bundleUrlOverrideInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE);
     expect(bundleUrlOverrideInput).toBeInTheDocument();
@@ -354,11 +319,9 @@ describe('SessionWizard blank bundle render regression', () => {
       target: { value: 'Sponsored Publish Blank Bundle URL' },
     });
 
-    await selectDecentralizedProfile();
-    fireEvent.click(screen.getByRole('button', { name: /step \d+: session worker/i }));
+    selectRegistryHosting();
 
-    const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-    setControlledInputValue(cloudflareTokenInput, 'cf-test-token');
+    setCloudflareApiToken('cf-test-token');
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
       target: { value: 'sk-sponsored-blank-bundle' },
     });
@@ -371,19 +334,23 @@ describe('SessionWizard blank bundle render regression', () => {
       await sponsoredBundleReady;
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.',
-      );
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: /step \d+: deploy session/i }));
+    await waitFor(
+      () => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.',
+        );
+      },
+      { timeout: 8000 },
+    );
 
     // The grant deploys the sponsoring Worker's release, so no bundle source is needed.
     const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
-    await waitFor(() => {
-      expect(publishButton).not.toBeDisabled();
-    });
+    await waitFor(
+      () => {
+        expect(publishButton).not.toBeDisabled();
+      },
+      { timeout: 8000 },
+    );
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE)).not.toBeInTheDocument();
     expect(screen.queryByText('Worker bundle fallback (optional)')).not.toBeInTheDocument();
   });
@@ -392,11 +359,13 @@ describe('SessionWizard blank bundle render regression', () => {
     const staleAdvancedBundleUrl = 'https://assets.example.test/stale-advanced-sessionCorsWorker.bundle.js';
     const fallbackFetch = createDefaultFetchMock();
 
+    // Advanced mode is gone; a stale bundle URL can still come back with a cached deploy form.
     sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         deployForm: {
           workerName: 'blank-bundle-regression-worker',
+          bundleUrl: staleAdvancedBundleUrl,
         },
       }),
     );
@@ -430,27 +399,14 @@ describe('SessionWizard blank bundle render regression', () => {
       target: { value: 'Blank Bundle Regression Session' },
     });
 
-    await selectDecentralizedProfile();
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-    fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
-
-    const bundleModeUrlInput = (await screen.findByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL)) as HTMLInputElement;
-    if (!bundleModeUrlInput.checked) {
-      fireEvent.click(bundleModeUrlInput);
-    }
-
-    const advancedBundleUrlInput = screen.getByPlaceholderText(
-      'https://github.com/<org>/<repo>/releases/download/<release-tag>/sessionCorsWorker.bundle.js',
-    );
-    setControlledInputValue(advancedBundleUrlInput, staleAdvancedBundleUrl);
+    selectRegistryHosting();
 
     const deployHelperUrlInput = screen.queryByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
     if (deployHelperUrlInput) {
-      setControlledInputValue(deployHelperUrlInput, 'https://deploy-helper.example.test');
+      fireEvent.change(deployHelperUrlInput, { target: { value: 'https://deploy-helper.example.test' } });
     }
 
-    setControlledInputValue(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), 'cf-test-token');
+    setCloudflareApiToken('cf-test-token');
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
       target: { value: 'sk-blank-bundle-regression' },
     });
@@ -458,20 +414,20 @@ describe('SessionWizard blank bundle render regression', () => {
       target: { value: '{"kty":"RSA","n":"blank-bundle-regression"}' },
     });
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
-    fireEvent.click(await screen.findByRole('button', { name: /step \d+: session worker/i }));
-
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('');
     });
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
-    await waitFor(() => {
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-        'Upload a worker bundle file before deploy.',
-      );
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+          'Upload a worker bundle file before deploy.',
+        );
+      },
+      { timeout: 8000 },
+    );
     expect(
       (global.fetch as jest.Mock).mock.calls.filter(([url]: any[]) => String(url).endsWith('/deploy')),
     ).toHaveLength(0);

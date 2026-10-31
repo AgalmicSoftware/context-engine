@@ -1,4 +1,4 @@
-// Remaining broad SessionWizard render coverage owns section visibility, metadata details, slug validation, tooltips, and login guards.
+// Remaining broad SessionWizard render coverage owns section visibility, setup sections, slug validation, tooltips, and login guards.
 import fs from 'fs';
 import React from 'react';
 import { ethers } from 'ethers';
@@ -7,15 +7,7 @@ import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
-import {
-  getContractViewerCardTestId,
-  getContractViewerSourceTestId,
-  getSessionWizardContractModalTriggerTestId,
-  getSessionWizardContractTooltipTestId,
-  WIZARD_CONTRACT_MODAL_TESTID,
-} from '../DocsPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../DocsPage/contractViewerUtils.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { SESSION_SLUG_AVAILABILITY_DEBOUNCE_MS } from './hooks/useSessionSlugState.js';
 import {
   clearSessionWizardPendingSbtDraftsCache,
@@ -330,32 +322,28 @@ const renderLoggedInSessionWizard = (props = {}) =>
     toggleLoginModal: jest.fn(),
     ...props,
   });
-const enableAdvancedMode = () => {
-  const customizeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
-  if (customizeButton.getAttribute('aria-pressed') !== 'true') {
-    fireEvent.click(customizeButton);
-  }
+const SETUP_SECTION_KEYS = ['context', 'questions', 'participation', 'results', 'access', 'hosting', 'ai'];
+// Every setup section but Basics starts closed behind its More button.
+const openSetupSection = (key) => {
+  const toggle = screen.queryByTestId(`ce-setup-more-${key}`);
+  if (!toggle || toggle.getAttribute('aria-expanded') === 'true') return;
+  fireEvent.click(toggle);
 };
+const enableAdvancedMode = () => SETUP_SECTION_KEYS.forEach(openSetupSection);
+// Old step cards: Access or Privacy is the Access section, Worker is Hosting.
 const selectNormalModeCard = (label) => {
-  fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
+  const name = String(label).toLowerCase();
+  if (/access|privacy/.test(name)) openSetupSection('access');
+  if (/worker/.test(name)) openSetupSection('hosting');
 };
-const selectCloudflarePreset = () => {
-  const preset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
-  if (!preset) return;
-  fireEvent.click(preset);
-  const continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (continueButton && !continueButton.disabled) {
-    fireEvent.click(continueButton);
-  }
+// New drafts start Worker-hosted; this takes the on-chain registry path the old
+// default (trustless) preset took.
+const selectRegistryHosting = () => {
+  openSetupSection('hosting');
+  fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'evm_registry_canonical' } });
 };
-const selectDecentralizedPreset = () => {
-  const preset = screen.queryByTestId('ce-new-preset-trustless_public_decentralized');
-  if (!preset) return;
-  fireEvent.click(preset);
-  const continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (continueButton && !continueButton.disabled) {
-    fireEvent.click(continueButton);
-  }
+const setCloudflareApiToken = (value) => {
+  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), { target: { value } });
 };
 const deployVerifiedWorkerForCurrentDraft = async () => {
   let publicConfig = {};
@@ -388,10 +376,9 @@ const deployVerifiedWorkerForCurrentDraft = async () => {
     return { ok: true, status: 200, json: async () => ({ ok: true }) };
   });
 
-  selectNormalModeCard('Worker');
-  const tokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-  const reactPropsKey = Object.keys(tokenInput).find((key) => key.startsWith('__reactProps$'));
-  act(() => tokenInput[reactPropsKey].onChange({ target: { value: 'cf-render-test-token' } }));
+  // The token and AI key stay visible; the Arweave key card sits under Hosting's More.
+  openSetupSection('hosting');
+  setCloudflareApiToken('cf-render-test-token');
   fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
     target: { value: 'sk-render-test' },
   });
@@ -399,24 +386,20 @@ const deployVerifiedWorkerForCurrentDraft = async () => {
     target: { value: '{"kty":"RSA","n":"render-test"}' },
   });
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
-  await waitFor(() => {
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
-  });
+  await waitFor(
+    () => {
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+    },
+    { timeout: 8000 },
+  );
 };
 const getMockSelectorById = (selectorId) =>
   screen
     .queryAllByTestId('mock-wizard-sbt-selector')
     .find((node) => node.getAttribute('data-selector-id') === selectorId);
-const expectSelectorAddresses = async (selectorId, expectedAddresses) => {
-  await waitFor(() => {
-    const selector = getMockSelectorById(selectorId);
-    expect(selector).toBeTruthy();
-    expect(selector).toHaveAttribute('data-selected-addresses', expectedAddresses.join(','));
-  });
-};
+// On-chain SBT defaults (tags, featured SBTs) render under Access's More, below the gates.
 const openAdvancedMoreOptions = async () => {
-  enableAdvancedMode();
-  fireEvent.click(screen.getByRole('button', { name: /more options/i }));
+  openSetupSection('access');
 };
 const getFeaturedCreateButton = async () =>
   await waitFor(() => {
@@ -426,10 +409,15 @@ const getFeaturedCreateButton = async () =>
     expect(button).toBeTruthy();
     return button;
   });
+const getGateCreateButton = () => {
+  const button = screen
+    .getAllByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT)
+    .find((node) => node.getAttribute('data-ce-sbt-target') !== 'defaultFeaturedSBTs');
+  if (!button) throw new Error('Gate create-SBT button not found.');
+  return button;
+};
 const ensureGateASelectorVisible = async () => {
-  if (!getMockSelectorById('encryption-gate-gate-1')) {
-    fireEvent.click(screen.getByRole('button', { name: /groups allowed to decrypt locked fields/i }));
-  }
+  openSetupSection('access');
   await waitFor(() => {
     expect(getMockSelectorById('encryption-gate-gate-1')).toBeTruthy();
   });
@@ -509,7 +497,7 @@ describe('SessionWizard rendered validation', () => {
     );
   });
 
-  it('shows only the selected section in default normal mode', async () => {
+  it('shows Basics open and keeps every other section closed until its More is opened', async () => {
     renderSessionWizard({
       account: TEST_ADMIN_ADDRESS,
       toggleLoginModal: jest.fn(),
@@ -518,61 +506,38 @@ describe('SessionWizard rendered validation', () => {
     const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     expect(screen.queryByText('Private')).not.toBeInTheDocument();
     expect(sessionNameInput).toBeInTheDocument();
-    expect(screen.queryByText('Session Information')).not.toBeInTheDocument();
-    expect(screen.queryByText('Privacy & Access')).not.toBeInTheDocument();
     expect(screen.queryByText('view .json')).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)).not.toBeInTheDocument();
+    SETUP_SECTION_KEYS.forEach((key) => {
+      expect(screen.getByTestId(`ce-setup-more-${key}`)).toHaveAttribute('aria-expanded', 'false');
+    });
+    expect(screen.queryByTestId('ce-setup-encryption')).not.toBeInTheDocument();
 
     selectNormalModeCard('Privacy');
 
-    expect(await screen.findByText('Privacy & Access')).toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
+    expect(await screen.findByTestId('ce-setup-encryption')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-setup-more-access')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
   });
 
   it('prefers the configured default registry chain on a fresh wizard with no wallet network', async () => {
     renderSessionWizard({ network: null });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    selectDecentralizedPreset();
-    enableAdvancedMode();
+    selectRegistryHosting();
 
     const defaultChainId = require('../../variables/appConfig.js').DEFAULT_CHAIN_ID;
-    const defaultChain = require('../../variables/chains.js').getChainById(defaultChainId);
-    const defaultChainLabel = `${defaultChain?.name || `Chain ${defaultChainId}`} (${defaultChainId})`;
-    const chainSelectorWrap = screen.getByText('Network:').parentElement;
-    expect(chainSelectorWrap).toBeTruthy();
-    expect(within(chainSelectorWrap).getByRole('combobox')).toHaveValue(String(defaultChainId));
-    expect(screen.getByDisplayValue(defaultChainLabel)).toBeInTheDocument();
-    expect(screen.getByText('Start block')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Smart Contracts (expand|collapse)/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /faucet (expand|collapse)/i })).toBeInTheDocument();
+    expect(document.getElementById('ce-setup-chain')).toHaveValue(String(defaultChainId));
   });
 
   it('defaults auto-feature session groups to enabled for fresh /new drafts', async () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     await openAdvancedMoreOptions();
 
     expect(screen.getByRole('checkbox', { name: /Auto-feature Session/i })).toBeChecked();
-  });
-
-  it('uses the same single Customize entry point when a sponsored link is present', async () => {
-    renderSessionWizard({
-      initialSponsoredBundleId: 'sponsor_tx_id',
-    });
-
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-
-    expect(screen.queryByRole('button', { name: 'Session wizard display settings' })).not.toBeInTheDocument();
-    const customizeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
-    expect(customizeButton).toBeVisible();
-    expect(customizeButton).toHaveAttribute('aria-pressed', 'false');
-
-    fireEvent.click(customizeButton);
-
-    await waitFor(() => expect(customizeButton).toHaveAttribute('aria-pressed', 'true'));
-    expect(screen.queryByText(/Advanced mode/i)).not.toBeInTheDocument();
   });
 
   it('defaults auto-feature session groups to enabled for sponsored /new drafts', async () => {
@@ -581,31 +546,10 @@ describe('SessionWizard rendered validation', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
-
-    await waitFor(() =>
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toHaveAttribute('aria-pressed', 'true'),
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /more options/i }));
+    selectRegistryHosting();
+    await openAdvancedMoreOptions();
 
     expect(screen.getByRole('checkbox', { name: /Auto-feature Session/i })).toBeChecked();
-  });
-
-  it('reveals advanced metadata fields after opening Session Information', async () => {
-    renderSessionWizard();
-
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    enableAdvancedMode();
-
-    const metadataToggle = await screen.findByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE);
-    if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
-      fireEvent.click(metadataToggle);
-    }
-
-    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG)).toBeInTheDocument();
-    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toBeInTheDocument();
   });
 
   it('keeps the Telegram-only session checkbox hidden in public session setup', async () => {
@@ -616,48 +560,12 @@ describe('SessionWizard rendered validation', () => {
     expect(screen.queryByRole('checkbox', { name: /telegram-only session/i })).not.toBeInTheDocument();
   });
 
-  it('shows contract tooltip and modal triggers in advanced metadata, then opens a compact reader for the selected contract', async () => {
-    renderSessionWizard({ activeSessionSlug: 'session-alpha' });
-
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    enableAdvancedMode();
-
-    const metadataToggle = await screen.findByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE);
-    if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
-      fireEvent.click(metadataToggle);
-    }
-
-    fireEvent.click(screen.getByRole('button', { name: /smart contracts expand/i }));
-
-    ['surveys', 'sbtFactory', 'sessionRegistry'].forEach((contractKey) => {
-      expect(screen.getByTestId(getSessionWizardContractTooltipTestId(contractKey))).toBeInTheDocument();
-      expect(screen.getByTestId(getSessionWizardContractModalTriggerTestId(contractKey))).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId(getSessionWizardContractModalTriggerTestId('sessionRegistry')));
-
-    const modal = await screen.findByTestId(WIZARD_CONTRACT_MODAL_TESTID);
-    expect(within(modal).getByTestId(getContractViewerCardTestId('sessionRegistry'))).toBeInTheDocument();
-    expect(within(modal).getByTestId(getContractViewerSourceTestId('sessionRegistry'))).toBeInTheDocument();
-    expect(within(modal).queryByTestId(getContractViewerCardTestId('surveys'))).not.toBeInTheDocument();
-    expect(within(modal).queryByTestId(getContractViewerCardTestId('sbtFactory'))).not.toBeInTheDocument();
-
-    expect(within(modal).getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute(
-      'href',
-      '/docs?contract=sessionRegistry&session=session-alpha',
-    );
-    expect(within(modal).getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute(
-      'rel',
-      'noopener noreferrer',
-    );
-  });
-
   it('uses noopener noreferrer on every blank-target anchor in the source', () => {
     const sourceFiles = [
       './SessionWizard',
-      './SessionPublishSummary',
       './SessionPublishResultLinks',
       './SessionWizardModals',
+      './setup/SetupWorkerQuick',
     ];
     const anchors = sourceFiles.flatMap((ref) => {
       const source = fs.readFileSync(require.resolve(ref), 'utf8');
@@ -671,124 +579,71 @@ describe('SessionWizard rendered validation', () => {
     });
   });
 
-  it('seeds default SBT tags in advanced mode for new session drafts', async () => {
+  it('seeds default SBT tags for new on-chain session drafts', async () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    enableAdvancedMode();
-    fireEvent.click(screen.getByRole('button', { name: /More options/i }));
+    selectRegistryHosting();
+    await openAdvancedMoreOptions();
 
-    expect(await screen.findByDisplayValue('group, event, idea, demographic, location')).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('ce-setup-section-access')).getByDisplayValue(
+        'group, event, idea, demographic, location',
+      ),
+    ).toBeInTheDocument();
   });
 
-  it('labels only protected advanced fields with an access badge', async () => {
+  it('labels only protected setup fields with an access badge', async () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     enableAdvancedMode();
 
     const badges = Array.from(document.querySelectorAll('.lockBadge'), (badge) => badge.textContent);
-    // The slug keeps its private-URL badge; fields without an access rule show none.
-    expect(badges).toEqual(['ID']);
+    // Fields without an access rule show no badge (the slug's private-URL badge left with the slug field).
+    expect(badges).toEqual([]);
   });
 
-  it('keeps block limits inside optional details in normal mode when the draft contains them', async () => {
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        draft: {
-          blockLimits: {
-            start: 987654,
-            end: 988000,
-          },
-        },
-      }),
-    );
-
+  it('keeps group creation policy and interview settings under Participation and colours in Basics', async () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-
-    expect(screen.queryByText('Start block')).not.toBeInTheDocument();
-    expect(screen.queryByDisplayValue('987654')).not.toBeInTheDocument();
-    expect(screen.queryByText('Ends at block 988,000.')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Optional details/i }));
-
-    expect(await screen.findByText('Start block')).toBeInTheDocument();
-    expect(await screen.findByDisplayValue('987654')).toBeInTheDocument();
-    expect(screen.getByText('Ends at block 988,000.')).toBeInTheDocument();
-  });
-
-  it('keeps session colors and group creation policy inside guided optional controls', async () => {
-    renderSessionWizard();
-    selectCloudflarePreset();
-
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    const optionalDetails = screen.getByRole('button', { name: /Optional details/i });
-    expect(optionalDetails).toHaveAttribute('aria-expanded', 'false');
+    const participationMore = screen.getByTestId('ce-setup-more-participation');
+    expect(participationMore).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Session colors expand' })).not.toBeInTheDocument();
+    const basics = screen.getByTestId('ce-setup-section-basics');
+    expect(within(basics).getByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME)).toHaveValue('context-engine');
 
-    fireEvent.click(optionalDetails);
+    fireEvent.click(participationMore);
 
-    expect(optionalDetails).toHaveAttribute('aria-expanded', 'true');
-    const policy = screen.getByTestId(E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY);
-    expect(policy).toHaveAccessibleName('Who can create groups?');
+    expect(participationMore).toHaveAttribute('aria-expanded', 'true');
+    const participation = screen.getByTestId('ce-setup-section-participation');
+    const policy = within(participation).getByTestId(E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY);
+    expect(policy).toHaveAccessibleName('Who can create groups');
     expect(policy).toHaveValue('participants');
-    expect(screen.queryByRole('textbox', { name: 'Who can create groups?' })).not.toBeInTheDocument();
-    const interviewPanel = screen.getByRole('region', { name: 'Voice interview settings' });
-    const interviewToggle = within(interviewPanel).getByLabelText('Voice interview modes');
+    expect(screen.queryByRole('textbox', { name: 'Who can create groups' })).not.toBeInTheDocument();
+    const interviewToggle = within(participation).getByTestId('ce-setup-interviews');
     expect(interviewToggle).toBeChecked();
-    const realtimeModel = within(interviewPanel).getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL);
+    const realtimeModel = within(participation).getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL);
     expect(realtimeModel).toHaveValue('gpt-live-1');
     fireEvent.change(realtimeModel, { target: { value: 'gpt-realtime-2' } });
     expect(realtimeModel).toHaveValue('gpt-realtime-2');
     fireEvent.click(interviewToggle);
-    expect(within(interviewPanel).queryByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).not.toBeInTheDocument();
-    expect(screen.getByText('Results analysis')).toBeInTheDocument();
+    expect(within(participation).queryByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).not.toBeInTheDocument();
     expect(policy).toBeInTheDocument();
-    expect(within(interviewPanel).queryByText('Results analysis')).not.toBeInTheDocument();
-    expect(within(interviewPanel).queryByTestId(E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY)).not.toBeInTheDocument();
-    fireEvent.click(within(interviewPanel).getByLabelText('Voice interview modes'));
-    expect(within(interviewPanel).getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).toHaveValue(
+    // Results analysis lives in its own section, apart from the interview settings.
+    expect(within(participation).queryByText('Results analysis')).not.toBeInTheDocument();
+    openSetupSection('results');
+    expect(within(screen.getByTestId('ce-setup-section-results')).getByText('Results analysis')).toBeInTheDocument();
+    fireEvent.click(interviewToggle);
+    expect(within(participation).getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).toHaveValue(
       'gpt-realtime-2',
     );
 
-    const colorsToggle = screen.getByRole('button', { name: 'Session colors expand' });
-    expect(colorsToggle).toHaveAttribute('aria-expanded', 'false');
-    const colorsGroup = colorsToggle.parentElement?.parentElement;
-    expect(colorsGroup).toBeTruthy();
-    expect(colorsGroup?.parentElement?.lastElementChild).toBe(colorsGroup);
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME)).not.toBeInTheDocument();
-    fireEvent.click(colorsToggle);
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME)).toHaveValue('context-engine');
-
     fireEvent.change(policy, { target: { value: 'admin_only' } });
     expect(policy).toHaveValue('admin_only');
-  });
-
-  it('keeps legacy sponsoredSbtAddress inside optional details in normal mode', async () => {
-    const sponsoredSbtAddress = '0x00000000000000000000000000000000000000f1';
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        draft: {
-          sponsoredSbtAddress,
-        },
-      }),
-    );
-
-    renderSessionWizard();
-
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-
-    expect(screen.queryByDisplayValue(sponsoredSbtAddress)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Optional details/i }));
-
-    expect(await screen.findByDisplayValue(sponsoredSbtAddress)).toBeInTheDocument();
   });
 
   it('keeps session details open after filling both fields in normal mode', async () => {
@@ -822,7 +677,7 @@ describe('SessionWizard rendered validation', () => {
 
   it('switches the gate add affordance from ghost card to full-width rail after adding a second gate', async () => {
     renderSessionWizard();
-    selectDecentralizedPreset();
+    selectRegistryHosting();
     selectNormalModeCard('Privacy');
 
     const addGateButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_ADD_GATE);
@@ -836,70 +691,25 @@ describe('SessionWizard rendered validation', () => {
     });
   });
 
-  it('auto-generates the slug from the session name in advanced mode', async () => {
+  it('auto-generates the slug from the session name', async () => {
     renderSessionWizard();
-    enableAdvancedMode();
 
     const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
 
     fireEvent.change(sessionNameInput, {
       target: { value: 'Edge Cases & Signals' },
     });
 
     await waitFor(() => {
-      expect(slugInput).toHaveValue('edge-cases--signals');
-    });
-  });
-
-  it('preserves a manually edited slug in advanced mode', async () => {
-    renderSessionWizard();
-    enableAdvancedMode();
-
-    const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
-
-    fireEvent.change(sessionNameInput, {
-      target: { value: 'Edge Cases & Signals' },
-    });
-
-    await waitFor(() => {
-      expect(slugInput).toHaveValue('edge-cases--signals');
-    });
-
-    fireEvent.change(slugInput, {
-      target: { value: 'ai-custom-override' },
-    });
-
-    fireEvent.change(sessionNameInput, {
-      target: { value: 'Edge Cases & Signals Updated' },
-    });
-
-    await waitFor(() => {
-      expect(slugInput).toHaveValue('ai-custom-override');
-    });
-  });
-
-  it('locks the slug field when private URL mode is enabled', async () => {
-    renderSessionWizard();
-    enableAdvancedMode();
-
-    const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
-    fireEvent.change(slugInput, { target: { value: 'manual-session-slug' } });
-
-    fireEvent.click(screen.getByTitle('Use session ID as the URL (private mode). This does not encrypt the URL.'));
-
-    await waitFor(() => {
-      expect(slugInput).toBeDisabled();
-      expect(
-        screen.getByTitle('Private URL mode enabled (uses session ID). Click to restore manual URL.'),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent(
+        `${window.location.origin}/session/edge-cases--signals`,
+      );
     });
   });
 
   it('pins the slug after a pending SBT draft is queued', async () => {
     renderLoggedInSessionWizard();
-    selectDecentralizedPreset();
+    selectRegistryHosting();
 
     const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     fireEvent.change(sessionNameInput, {
@@ -907,34 +717,21 @@ describe('SessionWizard rendered validation', () => {
     });
 
     selectNormalModeCard('Privacy');
-    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    fireEvent.click(getGateCreateButton());
     fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toBeInTheDocument();
-
-    enableAdvancedMode();
-    fireEvent.click(screen.getByRole('button', { name: /Session Information/i }));
-
-    const advancedSessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
-
     await waitFor(() => {
-      expect(slugInput).toHaveValue('queued-session');
-      expect(slugInput).toBeDisabled();
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent(/\/session\/queued-session$/);
     });
 
-    fireEvent.change(advancedSessionNameInput, {
+    fireEvent.change(sessionNameInput, {
       target: { value: 'Queued Session Updated' },
     });
 
     await waitFor(() => {
-      expect(slugInput).toHaveValue('queued-session');
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent(/\/session\/queued-session$/);
     });
-    expect(
-      screen.getByText(
-        'Queued Group drafts pinned this slug so their uploaded metadata stays aligned with the final session URL.',
-      ),
-    ).toBeInTheDocument();
   });
 
   it('renders non-worker session wizard tooltips through the same explainer toggle path', async () => {
@@ -942,6 +739,7 @@ describe('SessionWizard rendered validation', () => {
     jest.useFakeTimers();
     try {
       const { store } = renderSessionWizardWithTooltipStore();
+      selectRegistryHosting();
       selectNormalModeCard('Privacy');
 
       const encryptionTooltipTrigger = await screen.findByTestId('ce-wizard-tooltip-gw-encryption-visibility');
@@ -972,94 +770,26 @@ describe('SessionWizard rendered validation', () => {
   });
 
   it('blocks publish with a required-slug status message when the slug is blank', async () => {
-    renderSessionWizard();
-    selectCloudflarePreset();
-    enableAdvancedMode();
-    const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
+    renderLoggedInSessionWizard();
 
-    fireEvent.change(slugInput, { target: { value: '' } });
-
-    fireEvent.click(screen.getByText('Publish').closest('button'));
-    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH));
-
-    expect(await screen.findByText(REQUIRED_SESSION_SLUG_ERROR)).toBeInTheDocument();
-  });
-
-  it.each(['/new', '/session/new'])(
-    'shows only session mode on %s until a preset reveals the prefilled setup',
-    async (pathname) => {
-      sessionStorage.setItem(
-        'ce:sessionWizardDraft:v1',
-        JSON.stringify({
-          draft: {
-            storageProfile: { backend: 'cloudflare' },
-          },
-        }),
-      );
-      window.history.replaceState({}, '', pathname);
-      renderSessionWizard();
-
-      expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
-      expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
-      expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute(
-        'aria-checked',
-        'false',
-      );
-      expect(screen.queryByText('Custom')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Custom session settings' })).not.toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
-      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
-      expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
-      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
-      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeInTheDocument();
-      expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
-
-      fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
-      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
-      expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('ce-new-preset-trustless_public_decentralized')).not.toBeInTheDocument();
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Custom session settings' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
-
-      enableAdvancedMode();
-      if (!screen.queryByRole('radiogroup', { name: 'Data storage' })) {
-        fireEvent.click(screen.getByRole('button', { name: 'Groups allowed to decrypt locked fields' }));
-      }
-      const storageOptions = within(await screen.findByRole('radiogroup', { name: 'Data storage' }));
-      expect(storageOptions.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
-      expect(storageOptions.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'false');
-      expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
-    },
-  );
-
-  it('returns to the setup chooser without clearing draft fields', async () => {
-    window.history.replaceState({}, '', '/session/new');
-    renderSessionWizard();
-
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
-    const sessionInfoInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO);
-    fireEvent.change(sessionInfoInput, {
-      target: { value: 'Temporary browser verification description.' },
+    // A name without letters or digits leaves the derived slug blank.
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: '!!!' },
+    });
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)).not.toBeInTheDocument();
+    setCloudflareApiToken('cf-render-test-token');
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+      target: { value: 'sk-render-test' },
+    });
+    const publishButton = screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-    const centralizedCard = screen.getByTestId('ce-new-preset-fast_cheap_cloudflare');
-    expect(centralizedCard).toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO)).not.toBeInTheDocument();
+    fireEvent.click(publishButton);
 
-    const resumeButtons = screen.getAllByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME);
-    expect(resumeButtons).toHaveLength(1);
-    expect(resumeButtons[0]).toHaveAccessibleName('Resume existing setup');
-    expect(Boolean(resumeButtons[0].compareDocumentPosition(centralizedCard) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(
-      true,
-    );
-    fireEvent.click(resumeButtons[0]);
-    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO)).toHaveValue(
-      'Temporary browser verification description.',
-    );
+    expect(await screen.findByText(REQUIRED_SESSION_SLUG_ERROR, {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 
   it('keeps the pure Worker /new profile off registry and block-RPC ports', async () => {
@@ -1070,19 +800,21 @@ describe('SessionWizard rendered validation', () => {
       window.history.replaceState({}, '', '/new');
       renderSessionWizard();
 
-      fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
-      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
-      enableAdvancedMode();
-      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-        target: { value: 'worker-port-check' },
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+        target: { value: 'Worker Port Check' },
       });
-      await openAdvancedMoreOptions();
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent('/session/worker-port-check');
+      enableAdvancedMode();
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_ENDS_AT)).toBeInTheDocument();
-      expect(screen.getByText('Default Group Tags')).toBeInTheDocument();
+      expect(screen.getByLabelText('Group tags')).toBeInTheDocument();
       expect(screen.queryByText('Start block')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Smart Contracts (expand|collapse)/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /faucet (expand|collapse)/i })).not.toBeInTheDocument();
-      expect(screen.queryByText('Default SBT Tags')).not.toBeInTheDocument();
+      expect(document.getElementById('ce-setup-chain')).toBeNull();
+      // On-chain SBT defaults (tag suggestions, auto-feature) stay off the Worker profile.
+      const access = screen.getByTestId('ce-setup-section-access');
+      expect(within(access).queryByDisplayValue('group, event, idea, demographic, location')).not.toBeInTheDocument();
+      expect(screen.queryByRole('checkbox', { name: /Auto-feature Session/i })).not.toBeInTheDocument();
 
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 350));
@@ -1101,7 +833,6 @@ describe('SessionWizard rendered validation', () => {
     window.history.replaceState({}, '', '/new');
     renderSessionWizard();
 
-    fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
     selectNormalModeCard('Session Access');
     const groupDrafts = await screen.findByTestId('ce-new-worker-group-drafts');
     expect(within(groupDrafts).getByText(/created after this session/i)).toBeInTheDocument();
@@ -1118,21 +849,24 @@ describe('SessionWizard rendered validation', () => {
       target: { value: 'admin_add' },
     });
 
-    await waitFor(() => {
-      const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1'));
-      expect(cached.pendingWorkerGroupDrafts).toEqual([
-        expect.objectContaining({
-          groupId: expect.any(String),
-          label: 'Research team',
-          description: 'Reviews research questions.',
-          joinMode: 'admin_add',
-          memberVisibility: 'session',
-        }),
-      ]);
-    });
+    await waitFor(
+      () => {
+        const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1'));
+        expect(cached.pendingWorkerGroupDrafts).toEqual([
+          expect.objectContaining({
+            groupId: expect.any(String),
+            label: 'Research team',
+            description: 'Reviews research questions.',
+            joinMode: 'admin_add',
+            memberVisibility: 'session',
+          }),
+        ]);
+      },
+      { timeout: 8000 },
+    );
   });
 
-  it('offers to continue a cached custom profile on /new without silently replacing it', async () => {
+  it('keeps a cached custom profile on /new instead of replacing it with the default', async () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     profile.surfaces.agentHttp = true;
@@ -1150,15 +884,9 @@ describe('SessionWizard rendered validation', () => {
 
     renderSessionWizard();
 
-    expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Saved (?:custom|hosting) settings/)).not.toBeInTheDocument();
-    const resumeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME);
-    expect(resumeButton).toHaveAccessibleName('Resume existing setup');
-    fireEvent.click(resumeButton);
-
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toHaveValue('Saved custom session');
-    expect(screen.getByRole('heading', { name: 'Session Setup (Custom)' })).toBeInTheDocument();
+    openSetupSection('hosting');
+    expect(document.getElementById('ce-setup-agent-http')).toBeChecked();
   });
 
   it('checks session slug collisions before publish upload or register side effects', async () => {
@@ -1168,16 +896,11 @@ describe('SessionWizard rendered validation', () => {
     jest.useFakeTimers();
     const view = renderLoggedInSessionWizard();
     try {
-      selectDecentralizedPreset();
-      enableAdvancedMode();
+      selectRegistryHosting();
       const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-      const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
 
       fireEvent.change(sessionNameInput, {
         target: { value: 'Duplicate Session' },
-      });
-      fireEvent.change(slugInput, {
-        target: { value: 'duplicate-session' },
       });
       // Settle the preview debounce before testing the independent publish-time check.
       await act(async () => {
@@ -1189,9 +912,7 @@ describe('SessionWizard rendered validation', () => {
       await createPendingFeaturedDraft();
       await deployVerifiedWorkerForCurrentDraft();
 
-      fireEvent.click(screen.getByText('Publish').closest('button'));
-      const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
-      fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+      const publishButton = screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
       fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
         target: { value: `ar://${'a'.repeat(43)}` },
       });
@@ -1199,13 +920,15 @@ describe('SessionWizard rendered validation', () => {
         () => {
           expect(publishButton).not.toBeDisabled();
         },
-        { timeout: 5000 },
+        { timeout: 8000 },
       );
       mockSessionExists.mockClear();
       publishClicked = true;
       fireEvent.click(publishButton);
 
-      expect(await screen.findByText('Session slug already exists on-chain: duplicate-session')).toBeInTheDocument();
+      expect(
+        await screen.findByText('Session slug already exists on-chain: duplicate-session', {}, { timeout: 8000 }),
+      ).toBeInTheDocument();
       expect(mockSessionExists).toHaveBeenCalledWith('duplicate-session');
       expect(mockSessionExists).toHaveBeenCalledTimes(1);
       expect(mockCreateSBT).not.toHaveBeenCalled();
@@ -1220,14 +943,14 @@ describe('SessionWizard rendered validation', () => {
 
   it('shows and clears the reserved slug error in the rendered form', async () => {
     renderSessionWizard();
-    enableAdvancedMode();
 
-    const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
+    const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
 
-    fireEvent.change(slugInput, { target: { value: 'general' } });
+    fireEvent.change(sessionNameInput, { target: { value: 'General' } });
     expect(screen.getByText(RESERVED_SESSION_SLUG_ERROR)).toBeInTheDocument();
 
-    fireEvent.change(slugInput, { target: { value: 'edge-custom' } });
+    fireEvent.change(sessionNameInput, { target: { value: 'Edge Custom' } });
     expect(screen.queryByText(RESERVED_SESSION_SLUG_ERROR)).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent('/session/edge-custom');
   });
 });

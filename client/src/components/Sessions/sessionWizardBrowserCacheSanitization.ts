@@ -81,8 +81,3 @@ export const sanitizeSessionWizardDraftForBrowserCache = (value: unknown): AnyRe
 
   return next;
 };
-
-// Copied JSON is often pasted into issues or chats, so it gets the same
-// credential-free view as the browser cache.
-export const serializeSessionWizardDraftForCopy = (value: unknown): string =>
-  JSON.stringify(sanitizeSessionWizardDraftForBrowserCache(value), null, 2);

@@ -56,6 +56,8 @@ const buildNativeVerificationIdentity = ({
   })}`;
 
 export type WorkerDeploySectionProps = {
+  /** The page shows the Cloudflare token and starts deployment itself. */
+  pageOwnsDeployToken?: boolean;
   allowNativeWorkerVerification?: boolean;
   agentHttpEnabled?: boolean;
   isNormalMode: boolean;
@@ -106,6 +108,7 @@ export type WorkerDeploySectionProps = {
 };
 
 const WorkerDeploySection = ({
+  pageOwnsDeployToken = false,
   allowNativeWorkerVerification = false,
   agentHttpEnabled = false,
   isNormalMode,
@@ -722,84 +725,90 @@ const WorkerDeploySection = ({
                   />
                 </FormGroup>
               )}
-              <FormGroup>
-                <Label className={styles.fieldLabelRow}>
-                  <span>Cloudflare API token</span>
-                  {renderTooltip({
-                    id: 'gw-cf-token-tip',
-                    content:
-                      'The default template requests only Workers Scripts: Edit and Workers KV Storage: Edit. KV stores canonical config, encrypted payload envelopes and indexes, groups, audit rows, and deploy state.',
-                    placement: 'right',
-                    testId: 'ce-wizard-worker-tooltip-gw-cf-token-tip',
-                    ariaLabel: 'Cloudflare API token info',
-                  })}
-                </Label>
-                <Input
-                  type="password"
-                  value={deployForm.apiToken ?? ''}
-                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN}
-                  onChange={(e) => updateApiToken(e.target.value)}
-                />
-                {!isNormalMode && showSponsoredDeployAccessNotice && (
-                  <div className={styles.helperText}>
-                    Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here to
-                    override it.
-                  </div>
-                )}
-                <div className={styles.helperText}>
-                  <a
-                    href={cloudflareTokenTemplateHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${styles.secondaryButton} btn btn-secondary`}
-                    data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_CREATE_LINK}
-                  >
-                    Create prefilled API token
-                  </a>
-                </div>
-                <div className={styles.helperText}>
-                  You must be logged into Cloudflare before using the prefilled API token link. Create the token, copy
-                  its generated value, then paste it into the field above.
-                </div>
-                <div className={styles.helperText}>
-                  <a href={CLOUDFLARE_TOKEN_SETUP_GUIDE_URL} target="_blank" rel="noopener noreferrer">
-                    Cloudflare API token setup and security guide
-                  </a>
-                </div>
-              </FormGroup>
-              <FormGroup>
-                <Label for="ce-wizard-admin-address">Admin address</Label>
-                {nativeAdminAddress ? (
-                  <Input
-                    id="ce-wizard-admin-address"
-                    value={nativeAdminAddress}
-                    data-testid={E2E_TESTIDS.WIZARD_ADMIN_ADDRESS}
-                    onChange={(e) => setDeployForm((prev) => ({ ...prev, adminAddress: e.target.value }))}
-                  />
-                ) : (
-                  <Input
-                    id="ce-wizard-admin-address"
-                    type="button"
-                    value="Click to login"
-                    className={styles.adminLoginControl}
-                    data-testid={E2E_TESTIDS.WIZARD_ADMIN_ADDRESS}
-                    onClick={() => toggleLoginModal?.(true)}
-                  />
-                )}
-              </FormGroup>
+              {pageOwnsDeployToken ? null : (
+                <>
+                  <FormGroup>
+                    <Label className={styles.fieldLabelRow}>
+                      <span>Cloudflare API token</span>
+                      {renderTooltip({
+                        id: 'gw-cf-token-tip',
+                        content:
+                          'The default template requests only Workers Scripts: Edit and Workers KV Storage: Edit. KV stores canonical config, encrypted payload envelopes and indexes, groups, audit rows, and deploy state.',
+                        placement: 'right',
+                        testId: 'ce-wizard-worker-tooltip-gw-cf-token-tip',
+                        ariaLabel: 'Cloudflare API token info',
+                      })}
+                    </Label>
+                    <Input
+                      type="password"
+                      value={deployForm.apiToken ?? ''}
+                      data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN}
+                      onChange={(e) => updateApiToken(e.target.value)}
+                    />
+                    {!isNormalMode && showSponsoredDeployAccessNotice && (
+                      <div className={styles.helperText}>
+                        Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here
+                        to override it.
+                      </div>
+                    )}
+                    <div className={styles.helperText}>
+                      <a
+                        href={cloudflareTokenTemplateHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`${styles.secondaryButton} btn btn-secondary`}
+                        data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_CREATE_LINK}
+                      >
+                        Create prefilled API token
+                      </a>
+                    </div>
+                    <div className={styles.helperText}>
+                      You must be logged into Cloudflare before using the prefilled API token link. Create the token,
+                      copy its generated value, then paste it into the field above.
+                    </div>
+                    <div className={styles.helperText}>
+                      <a href={CLOUDFLARE_TOKEN_SETUP_GUIDE_URL} target="_blank" rel="noopener noreferrer">
+                        Cloudflare API token setup and security guide
+                      </a>
+                    </div>
+                  </FormGroup>
+                  <FormGroup>
+                    <Label for="ce-wizard-admin-address">Admin address</Label>
+                    {nativeAdminAddress ? (
+                      <Input
+                        id="ce-wizard-admin-address"
+                        value={nativeAdminAddress}
+                        data-testid={E2E_TESTIDS.WIZARD_ADMIN_ADDRESS}
+                        onChange={(e) => setDeployForm((prev) => ({ ...prev, adminAddress: e.target.value }))}
+                      />
+                    ) : (
+                      <Input
+                        id="ce-wizard-admin-address"
+                        type="button"
+                        value="Click to login"
+                        className={styles.adminLoginControl}
+                        data-testid={E2E_TESTIDS.WIZARD_ADMIN_ADDRESS}
+                        onClick={() => toggleLoginModal?.(true)}
+                      />
+                    )}
+                  </FormGroup>
+                </>
+              )}
             </div>
-            <div className={styles.workerDeployActions}>
-              <Button
-                type="button"
-                className={styles.actionButton}
-                data-testid={E2E_TESTIDS.WIZARD_DEPLOY_WORKER}
-                onClick={handleDeployWorker}
-                disabled={deployButtonDisabled}
-              >
-                Deploy worker
-              </Button>
-            </div>
-            {deployStatusText && (
+            {pageOwnsDeployToken ? null : (
+              <div className={styles.workerDeployActions}>
+                <Button
+                  type="button"
+                  className={styles.actionButton}
+                  data-testid={E2E_TESTIDS.WIZARD_DEPLOY_WORKER}
+                  onClick={handleDeployWorker}
+                  disabled={deployButtonDisabled}
+                >
+                  Deploy worker
+                </Button>
+              </div>
+            )}
+            {!pageOwnsDeployToken && deployStatusText && (
               <div
                 className={`${styles.copyStatus} ${deployStatusIsError ? styles.copyStatusError : ''}`}
                 data-testid={E2E_TESTIDS.WIZARD_DEPLOY_STATUS}

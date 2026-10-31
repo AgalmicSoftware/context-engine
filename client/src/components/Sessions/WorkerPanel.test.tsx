@@ -11,8 +11,6 @@ const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) =>
       isNormalMode
       t={t}
       renderSessionWizardInfoTooltip={() => null}
-      isCollapsed={false}
-      onToggleCollapsed={() => {}}
       showSharedWorkerChoice
       workerMode="default"
       onWorkerModeChange={() => {}}
@@ -78,25 +76,9 @@ describe('WorkerPanel', () => {
   it('renders without crashing with a minimal prop set', () => {
     renderWorkerPanel();
 
-    expect(screen.getByText('Worker Setup')).toBeInTheDocument();
-  });
-
-  it('renders the Worker Setup header as a frameless toggle', () => {
-    renderWorkerPanel();
-
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE)).toHaveAttribute(
-      'data-ce-control-appearance',
-      'frameless',
-    );
-  });
-
-  it('fires the collapse toggle handler when the header button is clicked', () => {
-    const onToggleCollapsed = jest.fn();
-    renderWorkerPanel({ onToggleCollapsed });
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-
-    expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
+    // Hosting's More shows it inline: no panel header to collapse.
+    expect(document.getElementById('session-wizard-section-worker')).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE)).not.toBeInTheDocument();
   });
 
   it('preserves the worker mode toggle test id', () => {

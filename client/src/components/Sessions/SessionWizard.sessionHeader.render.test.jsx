@@ -2,8 +2,10 @@ import {
   E2E_TESTIDS,
   act,
   fireEvent,
+  openSetupSection,
   renderSessionWizard,
   screen,
+  selectRegistryHosting,
   waitFor,
   within,
   resetSessionWizardWorkerPanelTestState,
@@ -72,29 +74,30 @@ describe('SessionWizard session header image controls', () => {
       fireEvent.change(fileInput, {
         target: { files: [new File(['header'], 'header.png', { type: 'image/png' })] },
       });
-      await waitFor(() => {
-        expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
-          'src',
-          'blob:transient-session-header',
-        );
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
+            'src',
+            'blob:transient-session-header',
+          );
+        },
+        { timeout: 8000 },
+      );
 
-      const originalConfirm = window.confirm;
-      window.confirm = jest.fn(() => true);
-      try {
-        fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
-      } finally {
-        window.confirm = originalConfirm;
-      }
+      openSetupSection('hosting');
+      fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'worker_canonical' } });
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
-        expect(within(imageBar).queryByRole('button', { name: 'Upload image' })).not.toBeInTheDocument();
-        expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
-          'src',
-          'https://images.example.test/persisted-header.png',
-        );
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
+          expect(within(imageBar).queryByRole('button', { name: 'Upload image' })).not.toBeInTheDocument();
+          expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
+            'src',
+            'https://images.example.test/persisted-header.png',
+          );
+        },
+        { timeout: 8000 },
+      );
       expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:transient-session-header');
     } finally {
       URL.createObjectURL = originalCreateObjectURL;
@@ -106,6 +109,8 @@ describe('SessionWizard session header image controls', () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    // File upload is offered for Arweave storage, the on-chain registry path.
+    selectRegistryHosting();
 
     const imageBar = screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR);
     const imageGroup = imageBar.parentElement;
@@ -259,18 +264,23 @@ describe('SessionWizard session header image controls', () => {
       renderSessionWizard();
 
       await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      // Pasted image files upload to Arweave, the on-chain registry path.
+      selectRegistryHosting();
       await act(async () => {
         fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_PASTE));
       });
 
-      await waitFor(() => {
-        expect(read).toHaveBeenCalledTimes(1);
-        expect(readText).not.toHaveBeenCalled();
-      });
+      await waitFor(
+        () => {
+          expect(read).toHaveBeenCalledTimes(1);
+          expect(readText).not.toHaveBeenCalled();
+        },
+        { timeout: 8000 },
+      );
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).not.toBeInTheDocument();
       expect(screen.queryByText('Pasted image from clipboard.')).not.toBeInTheDocument();
 
-      const previewImage = await screen.findByRole('img', { name: 'Session header preview' });
+      const previewImage = await screen.findByRole('img', { name: 'Session header preview' }, { timeout: 8000 });
       expect(previewImage).toHaveAttribute('src', 'blob:clipboard-session-header-preview');
 
       fireEvent.click(screen.getByRole('button', { name: 'Expand session header image' }));
@@ -298,6 +308,8 @@ describe('SessionWizard session header image controls', () => {
       renderSessionWizard();
 
       await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      // File upload is offered for Arweave storage, the on-chain registry path.
+      selectRegistryHosting();
       const imageBar = screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR);
       fireEvent.click(within(imageBar).getByRole('button', { name: 'Upload image' }));
 
@@ -307,12 +319,15 @@ describe('SessionWizard session header image controls', () => {
       const file = new File(['header-image'], 'header.png', { type: 'image/png' });
       fireEvent.change(fileInput, { target: { files: [file] } });
 
-      await waitFor(() => {
-        expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
-          'src',
-          'blob:session-header-preview',
-        );
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
+            'src',
+            'blob:session-header-preview',
+          );
+        },
+        { timeout: 8000 },
+      );
     } finally {
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;

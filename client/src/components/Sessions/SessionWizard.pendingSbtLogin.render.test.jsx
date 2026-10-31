@@ -1,7 +1,7 @@
 import fs from 'fs';
 import React from 'react';
 import { ethers } from 'ethers';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -26,7 +26,6 @@ const mockPendingSbtAddress = ethers.utils.getAddress('0x5fbdb2315678afecb367f03
 const mockReplacementSbtAddress = ethers.utils.getAddress('0x8ba1f109551bd432803012645ac136ddd64dba72');
 const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
 const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
-const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
@@ -325,12 +324,17 @@ const getWizardResourceCard = (resourceKey) =>
   screen
     .getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
     .find((card) => card.getAttribute('data-ce-resource-key') === resourceKey);
-const enableAdvancedMode = () => {
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+const openSetupSection = (key) => {
+  const toggle = screen.queryByTestId(`ce-setup-more-${key}`);
+  if (toggle && toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle);
 };
-const selectNormalModeCard = (label) => {
-  fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
+// New drafts start Worker-hosted; SBT gates need the on-chain registry path.
+const selectRegistryHosting = () => {
+  openSetupSection('hosting');
+  fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'evm_registry_canonical' } });
 };
+const getGateCreateSbtButton = () =>
+  within(document.getElementById('session-wizard-section-encryption')).getByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT);
 describe('SessionWizard pending SBT login rendering', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -393,11 +397,10 @@ describe('SessionWizard pending SBT login rendering', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
-    fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
-    selectNormalModeCard('Privacy');
+    selectRegistryHosting();
+    openSetupSection('access');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    fireEvent.click(getGateCreateSbtButton());
 
     expect(toggleLoginModal).toHaveBeenNthCalledWith(1, true);
     expect(screen.queryByTestId('mock-create-sbt-group')).not.toBeInTheDocument();

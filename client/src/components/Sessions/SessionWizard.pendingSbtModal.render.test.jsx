@@ -1,12 +1,14 @@
 import {
   E2E_TESTIDS,
-  enableAdvancedMode,
   fireEvent,
+  getGateCreateSbtButton,
   mockPendingSbtAddress,
+  openSetupSection,
   renderLoggedInSessionWizard,
   resetSessionWizardWorkerPanelTestState,
   screen,
   selectNormalModeCard,
+  selectRegistryHosting,
   waitFor,
 } from './SessionWizard.workerPanel.testUtils';
 
@@ -17,9 +19,10 @@ describe('SessionWizard pending SBT modal rendering', () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     selectNormalModeCard('Privacy');
 
-    const createButton = screen.getByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT);
+    const createButton = getGateCreateSbtButton();
     expect(createButton).toHaveAttribute('data-ce-sbt-target', 'gate-1');
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_ADD_GATE));
@@ -51,18 +54,16 @@ describe('SessionWizard pending SBT modal rendering', () => {
   it('passes the latest slug and Arweave JWK into the inline create-SBT modal', async () => {
     renderLoggedInSessionWizard();
 
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    enableAdvancedMode();
-
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-      target: { value: 'inline-proof' },
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Inline Proof' },
     });
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+    selectRegistryHosting();
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
       target: { value: '{"kty":"RSA"}' },
     });
+    openSetupSection('access');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    fireEvent.click(getGateCreateSbtButton());
 
     const modal = await screen.findByTestId('mock-create-sbt-group');
     expect(modal).toHaveAttribute('data-session-slug', 'inline-proof');
@@ -73,14 +74,13 @@ describe('SessionWizard pending SBT modal rendering', () => {
   it('prefers the draft slug over a stale active session slug in the inline create-SBT modal', async () => {
     renderLoggedInSessionWizard({ activeSessionSlug: 'previous-session' });
 
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    enableAdvancedMode();
-
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-      target: { value: 'draft-session-slug' },
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Draft Session Slug' },
     });
+    selectRegistryHosting();
+    openSetupSection('access');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    fireEvent.click(getGateCreateSbtButton());
 
     const modal = await screen.findByTestId('mock-create-sbt-group');
     expect(modal).toHaveAttribute('data-session-slug', 'draft-session-slug');
@@ -90,19 +90,17 @@ describe('SessionWizard pending SBT modal rendering', () => {
   it('drops the worker Arweave JWK override from the inline create-SBT modal when require-pay is enabled', async () => {
     renderLoggedInSessionWizard();
 
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    enableAdvancedMode();
-
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-      target: { value: 'inline-proof-user-paid' },
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Inline Proof User Paid' },
     });
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+    selectRegistryHosting();
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
       target: { value: '{"kty":"RSA"}' },
     });
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY));
+    openSetupSection('access');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    fireEvent.click(getGateCreateSbtButton());
 
     const modal = await screen.findByTestId('mock-create-sbt-group');
     expect(modal).toHaveAttribute('data-session-slug', 'inline-proof-user-paid');

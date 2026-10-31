@@ -9,63 +9,50 @@ import {
   mockPendingSbtAddress,
   mockRegisterSessionOnChain,
   mockSessionExists,
+  openSetupSection,
   renderLoggedInSessionWizard,
   resetSessionWizardWorkerPanelTestState,
   screen,
-  selectNormalModeCard,
+  selectRegistryHosting,
+  setCloudflareApiToken,
   waitFor,
   within,
-  enableAdvancedMode,
 } from './SessionWizard.workerPanel.testUtils';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { getSessionWizardWorkerSettlementStorageKey } from './sessionWizardWorkerSettlement';
 import { readSessionWizardPendingSbtDraftsCache } from './hooks/usePendingSbtDrafts';
 
-const chooseCustomWorkerWithoutDeploy = async () => {
-  enableAdvancedMode();
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-  fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+const MISSING_WORKER_MESSAGE =
+  'Enter your Cloudflare API token, or verify a Worker you deployed from the Cloudflare dashboard.';
+
+// The Create section holds the publish button and, for on-chain sessions, the metadata settings.
+const getCreateButton = () => screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+
+const setManualMetadataUri = (value) => {
+  fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), { target: { value } });
 };
 
-const openPublishSection = async () => {
-  fireEvent.click(screen.getByText('Publish').closest('button'));
-  return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
-};
+const countConfigWrites = () =>
+  global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config')).length;
 
+// New drafts are Worker-hosted: deploy with the page's token and the AI quick area's key.
 const deployVerifiedCustomWorker = async ({ sessionName, sessionInfo, openaiKey }) => {
-  let fastPreset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
-  if (!fastPreset) {
-    fireEvent.click(screen.getByRole('button', { name: 'Back', exact: true }));
-    fastPreset = await screen.findByTestId('ce-new-preset-fast_cheap_cloudflare');
-  }
-  const previousConfirm = window.confirm;
-  window.confirm = jest.fn(() => true);
-  try {
-    fireEvent.click(fastPreset);
-  } finally {
-    window.confirm = previousConfirm;
-  }
-  const continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (continueButton && !continueButton.disabled) fireEvent.click(continueButton);
   fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
     target: { value: sessionName },
   });
   fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO), {
     target: { value: sessionInfo },
   });
-  await chooseCustomWorkerWithoutDeploy();
-  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL), {
-    target: { value: 'https://deploy-helper.example.test' },
-  });
-  const tokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-  const reactPropsKey = Object.keys(tokenInput).find((key) => key.startsWith('__reactProps$'));
-  act(() => tokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } }));
+  setCloudflareApiToken('cf-test-token');
   const openAiKeyInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY);
   fireEvent.change(openAiKeyInput, { target: { value: openaiKey } });
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
-  await waitFor(() => {
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
-  });
+  await waitFor(
+    () => {
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+    },
+    { timeout: 8000 },
+  );
   return openAiKeyInput;
 };
 
@@ -119,11 +106,11 @@ describe('SessionWizard publish boundary rendering', () => {
     );
 
     renderLoggedInSessionWizard();
-    enableAdvancedMode();
-    const publishButton = await openPublishSection();
+    const publishButton = await getCreateButton();
 
     expect(publishButton).toBeDisabled();
-    expect(screen.queryByLabelText('Advanced publish settings')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-setup-conflicts')).toBeInTheDocument();
+    fireEvent.click(publishButton);
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
     expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
   });
@@ -151,49 +138,43 @@ describe('SessionWizard publish boundary rendering', () => {
 
     renderLoggedInSessionWizard();
     await deployVerifiedWorkerForCurrentDraft();
-    enableAdvancedMode();
-    const publishButton = await openPublishSection();
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: `ar://${'a'.repeat(43)}` },
-    });
+    const publishButton = await getCreateButton();
+    setManualMetadataUri(`ar://${'a'.repeat(43)}`);
     await waitFor(() => expect(publishButton).not.toBeDisabled());
 
     publishStarted = true;
     fireEvent.click(publishButton);
     await waitFor(() => expect(mockSessionExists).toHaveBeenCalled());
 
-    enableAdvancedMode();
-    fireEvent.change(await screen.findByLabelText('Who can see results'), {
-      target: { value: 'private_admin' },
-    });
+    // Dropping the registry's only permission mechanism makes the live profile invalid mid-publish.
+    openSetupSection('access');
+    fireEvent.click(screen.getByLabelText('SBTs grant permissions'));
     await act(async () => {
       resolveDuplicateCheck(false);
       await duplicateCheck;
     });
 
-    expect(await screen.findByText(/Fix the session hosting settings before publishing/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Resolve this conflict first/i)).toBeInTheDocument();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
     expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
   });
 
-  it('keeps advanced publish disabled and inert when metadata upload has no verified worker', async () => {
+  it('keeps publish disabled and inert when metadata upload has no verified worker', async () => {
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
 
     renderLoggedInSessionWizard();
-    enableAdvancedMode();
 
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Blocked Publish Boundary Session' },
     });
-    await chooseCustomWorkerWithoutDeploy();
+    selectRegistryHosting();
 
-    const publishButton = await openPublishSection();
+    const publishButton = await getCreateButton();
 
     await waitFor(() => {
       expect(publishButton).toBeDisabled();
     });
-    expect(screen.getByText('Set a worker URL before uploading metadata.')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-setup-missing')).toHaveTextContent(MISSING_WORKER_MESSAGE);
 
     fireEvent.click(publishButton);
 
@@ -207,26 +188,22 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Manual Metadata Publish Boundary Session' },
     });
+    selectRegistryHosting();
     await deployVerifiedWorkerForCurrentDraft();
-    enableAdvancedMode();
 
-    const publishButton = await openPublishSection();
+    const publishButton = await getCreateButton();
     await waitFor(() => {
       expect(publishButton).not.toBeDisabled();
     });
-
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
 
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: `ar://${'a'.repeat(43)}` },
-    });
+    setManualMetadataUri(`ar://${'a'.repeat(43)}`);
 
     await waitFor(() => {
       expect(publishButton).not.toBeDisabled();
     });
-    expect(screen.queryByText('Set a worker URL before uploading metadata.')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-setup-missing')).not.toBeInTheDocument();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 
@@ -234,27 +211,23 @@ describe('SessionWizard publish boundary rendering', () => {
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
 
     renderLoggedInSessionWizard();
-    enableAdvancedMode();
 
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Blank Manual Metadata Boundary Session' },
     });
-    await chooseCustomWorkerWithoutDeploy();
+    selectRegistryHosting();
 
-    const publishButton = await openPublishSection();
+    const publishButton = await getCreateButton();
     await waitFor(() => {
       expect(publishButton).toBeDisabled();
     });
 
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: '   ' },
-    });
+    setManualMetadataUri('   ');
 
     await waitFor(() => {
       expect(publishButton).toBeDisabled();
     });
-    expect(screen.getByText('Set a worker URL before uploading metadata.')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-setup-missing')).toHaveTextContent(MISSING_WORKER_MESSAGE);
 
     fireEvent.click(publishButton);
 
@@ -275,14 +248,11 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Manual Metadata Progress Boundary Session' },
     });
+    selectRegistryHosting();
     await deployVerifiedWorkerForCurrentDraft();
-    enableAdvancedMode();
 
-    const publishButton = await openPublishSection();
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: manualMetadataUri },
-    });
+    const publishButton = await getCreateButton();
+    setManualMetadataUri(manualMetadataUri);
 
     await waitFor(() => {
       expect(publishButton).not.toBeDisabled();
@@ -321,14 +291,11 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Manual Metadata Reentry Boundary Session' },
     });
+    selectRegistryHosting();
     await deployVerifiedWorkerForCurrentDraft();
-    enableAdvancedMode();
 
-    const publishButton = await openPublishSection();
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: manualMetadataUri },
-    });
+    const publishButton = await getCreateButton();
+    setManualMetadataUri(manualMetadataUri);
 
     await waitFor(() => {
       expect(publishButton).not.toBeDisabled();
@@ -363,13 +330,10 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Published Tab Session' },
     });
+    selectRegistryHosting();
     await deployVerifiedWorkerForCurrentDraft();
-    enableAdvancedMode();
-    const publishButton = await openPublishSection();
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: manualMetadataUri },
-    });
+    const publishButton = await getCreateButton();
+    setManualMetadataUri(manualMetadataUri);
     await waitFor(() => {
       expect(readWizardCache().draft?.slug).toBe('published-tab-session');
       expect(publishButton).not.toBeDisabled();
@@ -397,7 +361,6 @@ describe('SessionWizard publish boundary rendering', () => {
       expect(nextTabDraft.sessionId).not.toBe(publishedSessionId);
     });
 
-    selectNormalModeCard('Session Details');
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Next Tab Session' },
     });
@@ -425,17 +388,15 @@ describe('SessionWizard publish boundary rendering', () => {
       }),
     );
     renderLoggedInSessionWizard();
-    enableAdvancedMode();
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Deferred Group Registry Session' },
     });
-    await chooseCustomWorkerWithoutDeploy();
     await createPendingFeaturedDraft();
 
-    const publishButton = await openPublishSection();
+    const publishButton = await getCreateButton();
 
     expect(publishButton).toBeDisabled();
-    expect(screen.queryByLabelText('Advanced publish settings')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-setup-conflicts')).toHaveTextContent('On-chain sessions use SBTs for permissions.');
     expect(mockCreateSBT).not.toHaveBeenCalled();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
     expect(mockFetchSessionFromRegistry).not.toHaveBeenCalled();
@@ -478,47 +439,40 @@ describe('SessionWizard publish boundary rendering', () => {
 
     try {
       renderLoggedInSessionWizard();
-      enableAdvancedMode();
       const openAiKeyInput = await deployVerifiedCustomWorker({
         sessionName: 'Requirement Proof Session',
         sessionInfo: 'Verified custom worker requirement snapshot.',
         openaiKey: 'sk-remotely-verified',
       });
-      const configWritesAfterDeploy = global.fetch.mock.calls.filter(([url]) =>
-        String(url).endsWith('/admin/set-config'),
-      ).length;
-      const publishButton = await openPublishSection();
+      const configWritesAfterDeploy = countConfigWrites();
+      const publishButton = await getCreateButton();
       await waitFor(() => expect(publishButton).not.toBeDisabled());
+      expect(screen.getByTestId('ce-setup-worker-ready')).toHaveTextContent(workerUrl);
 
+      // A local secret edit un-verifies the Worker: Create now deploys again before publishing.
       fireEvent.change(openAiKeyInput, { target: { value: 'sk-locally-edited' } });
-      await waitFor(() => expect(publishButton).toBeDisabled());
-      fireEvent.click(publishButton);
-      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
-        configWritesAfterDeploy,
-      );
+      await waitFor(() => expect(screen.queryByTestId('ce-setup-worker-ready')).not.toBeInTheDocument());
+      expect(screen.getByTestId('ce-setup-summary-hosting')).toHaveTextContent('Worker deploys on Create');
+      expect(countConfigWrites()).toBe(configWritesAfterDeploy);
 
       fireEvent.change(openAiKeyInput, { target: { value: 'sk-remotely-verified' } });
+      await waitFor(() => expect(screen.getByTestId('ce-setup-worker-ready')).toBeInTheDocument());
       await waitFor(() => expect(publishButton).not.toBeDisabled());
-      fireEvent.click(screen.getByRole('button', { name: 'AI providers and models expand' }));
-      const fastModelGroup = screen.getByText('fast').parentElement?.parentElement;
-      const fastProviderSelect = within(fastModelGroup).getAllByRole('combobox')[1];
-      fireEvent.change(fastProviderSelect, { target: { value: 'anthropic' } });
+      openSetupSection('ai');
+      const providerSelect = screen.getByTestId('ce-setup-ai-provider');
+      fireEvent.change(providerSelect, { target: { value: 'anthropic' } });
       await waitFor(() => expect(publishButton).toBeDisabled());
 
-      fireEvent.change(fastProviderSelect, { target: { value: 'openai' } });
+      fireEvent.change(providerSelect, { target: { value: 'openai' } });
       await waitFor(() => expect(publishButton).not.toBeDisabled());
-      enableAdvancedMode();
-      const encryptionOptions = within(screen.getByRole('radiogroup', { name: /encryption/i }));
-      fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
-      await waitFor(() =>
-        expect(encryptionOptions.getByRole('radio', { name: 'Lit' })).toHaveAttribute('aria-checked', 'true'),
-      );
+      openSetupSection('access');
+      const encryptionSelect = screen.getByTestId('ce-setup-encryption');
+      fireEvent.change(encryptionSelect, { target: { value: 'lit' } });
+      await waitFor(() => expect(encryptionSelect).toHaveValue('lit'));
       await waitFor(() => expect(publishButton).toBeDisabled());
       fireEvent.click(publishButton);
 
-      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
-        configWritesAfterDeploy,
-      );
+      expect(countConfigWrites()).toBe(configWritesAfterDeploy);
       expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
     } finally {
       global.fetch = originalFetch;
@@ -564,26 +518,28 @@ describe('SessionWizard publish boundary rendering', () => {
         sessionInfo: 'One canonical session per worker.',
         openaiKey: 'sk-existing-worker',
       });
-      const configWritesAfterDeploy = global.fetch.mock.calls.filter(([url]) =>
-        String(url).endsWith('/admin/set-config'),
-      ).length;
-      const publishButton = await openPublishSection();
-      const deployButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER);
+      const configWritesAfterDeploy = countConfigWrites();
+      const publishButton = await getCreateButton();
 
       await waitFor(() => {
         expect(publishButton).not.toBeDisabled();
-        expect(deployButton).not.toBeDisabled();
       });
+      // A verified Worker replaces the token and deploy button with its ready line.
+      expect(screen.getByTestId('ce-setup-worker-ready')).toHaveTextContent(workerUrl);
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER)).not.toBeInTheDocument();
       fireEvent.click(publishButton);
 
-      await waitFor(() => {
-        expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
-          configWritesAfterDeploy + 1,
-        );
-        expect(publishButton).toBeDisabled();
-        expect(deployButton).toBeDisabled();
-      });
-      expect(publishButton).toHaveTextContent('Session Created');
+      await waitFor(
+        () => {
+          expect(countConfigWrites()).toBe(configWritesAfterDeploy + 1);
+          expect(publishButton).toBeDisabled();
+        },
+        { timeout: 8000 },
+      );
+      expect(publishButton).toHaveTextContent('Session created');
+      // Publication un-verifies the Worker; its deploy button returns but stays locked even with a token.
+      setCloudflareApiToken('cf-test-token');
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER)).toBeDisabled();
       expect(screen.getByRole('button', { name: 'Create another session' })).toBeInTheDocument();
       const publishedSessionId = persistedConfig.sessionId;
       const expectedSettlement = {
@@ -599,28 +555,24 @@ describe('SessionWizard publish boundary rendering', () => {
       ).toEqual(expect.objectContaining(expectedSettlement));
 
       fireEvent.click(publishButton);
-      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
-        configWritesAfterDeploy + 1,
-      );
+      expect(countConfigWrites()).toBe(configWritesAfterDeploy + 1);
 
       firstView.unmount();
       renderLoggedInSessionWizard();
-      enableAdvancedMode();
-      await chooseCustomWorkerWithoutDeploy();
-      const reloadedPublishButton = await openPublishSection();
+      const reloadedPublishButton = await getCreateButton();
+      setCloudflareApiToken('cf-test-token');
       const reloadedDeployButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER);
       await waitFor(() => {
         expect(reloadedPublishButton).toBeDisabled();
         expect(reloadedDeployButton).toBeDisabled();
       });
+      expect(reloadedPublishButton).toHaveTextContent('Session created');
       const restoredSessionUrl = `${window.location.origin}/session/single-worker-session?worker=${encodeURIComponent(workerUrl)}`;
       const restoredAdminUrl = `${window.location.origin}/admin?sessionId=${publishedSessionId}&sessionSlug=single-worker-session&worker=${encodeURIComponent(workerUrl)}`;
       expect(screen.getByRole('link', { name: restoredSessionUrl })).toHaveAttribute('href', restoredSessionUrl);
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_URL)).toHaveAttribute('href', restoredAdminUrl);
       fireEvent.click(reloadedPublishButton);
-      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
-        configWritesAfterDeploy + 1,
-      );
+      expect(countConfigWrites()).toBe(configWritesAfterDeploy + 1);
       expect(readWizardCache()).toEqual({
         terminalWorkerSettlement: expect.objectContaining(expectedSettlement),
       });
@@ -642,18 +594,15 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Manual Metadata Register Boundary Session' },
     });
+    selectRegistryHosting();
     await deployVerifiedWorkerForCurrentDraft();
-    enableAdvancedMode();
 
-    const publishButton = await openPublishSection();
+    const publishButton = await getCreateButton();
     await waitFor(() => {
       expect(publishButton).not.toBeDisabled();
     });
 
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: manualMetadataUri },
-    });
+    setManualMetadataUri(manualMetadataUri);
 
     await waitFor(() => {
       expect(publishButton).not.toBeDisabled();
@@ -741,10 +690,10 @@ describe('SessionWizard publish boundary rendering', () => {
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
         target: { value: 'Uploaded Metadata Register Boundary Session' },
       });
+      selectRegistryHosting();
       await deployVerifiedWorkerForCurrentDraft();
-      enableAdvancedMode();
 
-      const publishButton = await openPublishSection();
+      const publishButton = await getCreateButton();
       await waitFor(() => {
         expect(publishButton).not.toBeDisabled();
       });
@@ -832,8 +781,8 @@ describe('SessionWizard publish boundary rendering', () => {
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
         target: { value: 'Header Upload Boundary Session' },
       });
+      selectRegistryHosting();
       await deployVerifiedWorkerForCurrentDraft();
-      selectNormalModeCard('Session Details');
       const imageBar = screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR);
       fireEvent.click(within(imageBar).getByRole('button', { name: 'Upload image' }));
       const fileInput = imageBar.querySelector('input[type="file"]');
@@ -841,9 +790,8 @@ describe('SessionWizard publish boundary rendering', () => {
       fireEvent.change(fileInput, {
         target: { files: [new File(['header-image'], 'header.png', { type: 'image/png' })] },
       });
-      enableAdvancedMode();
 
-      const publishButton = await openPublishSection();
+      const publishButton = await getCreateButton();
       await waitFor(() => {
         expect(publishButton).not.toBeDisabled();
       });
@@ -906,10 +854,10 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Secret Gate Boundary Session' },
     });
+    selectRegistryHosting();
     await deployVerifiedWorkerForCurrentDraft();
-    enableAdvancedMode();
 
-    const publishButton = await openPublishSection();
+    const publishButton = await getCreateButton();
     await waitFor(() => {
       expect(publishButton).not.toBeDisabled();
     });
@@ -945,10 +893,10 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Upload Failure Boundary Session' },
     });
+    selectRegistryHosting();
     await deployVerifiedWorkerForCurrentDraft();
-    enableAdvancedMode();
 
-    const publishButton = await openPublishSection();
+    const publishButton = await getCreateButton();
     await waitFor(() => {
       expect(publishButton).not.toBeDisabled();
     });

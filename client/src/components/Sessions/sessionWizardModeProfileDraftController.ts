@@ -38,8 +38,7 @@ const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
 // The storage profile field renders only for drafts without a session mode
-// profile (getSessionWizardOrderedDraftEntries hides it otherwise), so a change
-// never has a mode profile to keep in step.
+// profile, so a change never has a mode profile to keep in step.
 export const applyStorageProfileChangeToModeDraft = <Draft extends SessionWizardModeDraft>(
   prev: Draft,
   nextProfile: unknown,

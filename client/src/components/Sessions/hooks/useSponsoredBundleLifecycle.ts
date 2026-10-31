@@ -446,7 +446,9 @@ const useSponsoredBundleLifecycle = ({
 
   useEffect(() => {
     if (!sponsoredBundleAppliedBundleRef.current) return;
-    syncSponsoredBootstrapFundingContext();
+    // This render's slug: draftRef can lag a slug set by an effect, such as
+    // the one the session name derives.
+    syncSponsoredBootstrapFundingContext(null, toStr(draftSlug));
   }, [draftSlug, syncSponsoredBootstrapFundingContext]);
 
   useEffect(() => {

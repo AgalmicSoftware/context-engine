@@ -56,7 +56,8 @@ const WorkerSecretsSection = ({
 
   return (
     <div className={styles.workerSecretsPanel}>
-      {!isNormalMode && (
+      {/* On-chain sessions keep their pay-for-usage choice on the one-page setup too. */}
+      {(!isNormalMode || showUserPaidUsage) && (
         <div className={styles.workerSecretsHeader}>
           <div className={styles.workerSecretsTitle}>Worker secrets</div>
           {showUserPaidUsage && (

@@ -43,55 +43,6 @@ const HIDDEN_PATHS = new Set([
   'interviewMode.provider',
 ]);
 
-const TOP_LEVEL_FIELD_ORDER = [
-  'networkChainId',
-  'slug',
-  'sessionName',
-  'sessionInfo',
-  'appearance',
-  'groupCreationPolicy',
-  'sessionModeProfile',
-  'interviewModeEnabled',
-  'interviewMode',
-  'resultsAnalysis',
-  'sessionHeader',
-  'sessionEndsAt',
-  'storageProfile',
-  'contracts',
-  'blockLimits',
-  'sponsored',
-  'faucet',
-  'arweave',
-  'ai',
-  'litCredentials',
-  'defaultTags',
-  'defaultGroupTags',
-  'defaultSbtTags',
-  'defaultFeaturedSBTs',
-  'autoFeatureSBTsBySessionSlug',
-  'questionsGenPrompt',
-  'defaultFilterState',
-];
-
-const WORKER_ONLY_DRAFT_FIELDS = new Set(['embeddedDeployHelperEnabled', 'agentSessionWrapped']);
-
-const MORE_OPTIONS_FIELDS = new Set([
-  'appearance',
-  'interviewModeEnabled',
-  'interviewMode',
-  'resultsAnalysis',
-  'groupCreationPolicy',
-  'sessionEndsAt',
-  'defaultTags',
-  'defaultGroupTags',
-  'defaultSbtTags',
-  'defaultFeaturedSBTs',
-  'autoFeatureSBTsBySessionSlug',
-  'questionsGenPrompt',
-  'defaultFilterState',
-  'sponsoredSbtAddress',
-]);
-
 const FIELD_TOOLTIPS: Record<string, string> = {
   slug: 'This becomes the session URL. Leave it unlocked if you want to choose the URL yourself, or lock it to use the generated session ID as a more private link.',
   sessionName: 'The main name people will see for this session across the app.',
@@ -263,44 +214,4 @@ export const shouldHideSessionWizardField = ({
   }
 
   return false;
-};
-
-export const getSessionWizardOrderedDraftEntries = (
-  draft: DraftLike | null | undefined,
-  modeFieldPolicy?: SessionWizardModeFieldPolicy,
-): Array<[string, unknown]> => {
-  const source = draft && typeof draft === 'object' ? draft : {};
-  const keys = Object.keys(source).filter(
-    (key) =>
-      !WORKER_ONLY_DRAFT_FIELDS.has(key) &&
-      !(key === 'storageProfile' && source.sessionModeProfile) &&
-      !isSessionWizardModeHiddenTopLevelField(key, modeFieldPolicy),
-  );
-  const orderedKeys = [
-    ...TOP_LEVEL_FIELD_ORDER.filter((key) => keys.includes(key)),
-    ...keys.filter((key) => !TOP_LEVEL_FIELD_ORDER.includes(key)),
-  ];
-  return orderedKeys.map((key) => [key, source[key]]);
-};
-
-export const splitSessionWizardDraftEntries = (
-  orderedDraftEntries: Array<[string, unknown]>,
-  isNormalMode: boolean,
-): {
-  primaryEntries: Array<[string, unknown]>;
-  moreOptionsEntries: Array<[string, unknown]>;
-} => {
-  const moreOptionsEntries = orderedDraftEntries.filter(
-    ([key]) => MORE_OPTIONS_FIELDS.has(key) || (isNormalMode && key === 'blockLimits'),
-  );
-
-  return {
-    primaryEntries: orderedDraftEntries.filter(
-      ([key]) => !MORE_OPTIONS_FIELDS.has(key) && !(isNormalMode && key === 'blockLimits'),
-    ),
-    moreOptionsEntries: [
-      ...moreOptionsEntries.filter(([key]) => key !== 'appearance'),
-      ...moreOptionsEntries.filter(([key]) => key === 'appearance'),
-    ],
-  };
 };
