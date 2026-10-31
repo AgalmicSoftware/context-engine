@@ -25226,6 +25226,30 @@ var init_sessionAgentConfig = __esm({
   }
 });
 
+// shared/canonicalJson.mjs
+var canonicalizeJsonValue, stableCanonicalSerialize;
+var init_canonicalJson = __esm({
+  "shared/canonicalJson.mjs"() {
+    canonicalizeJsonValue = (value, arrayEntry = false) => {
+      if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+      if (typeof value === "number") return Number.isFinite(value) ? value : null;
+      if (Array.isArray(value)) {
+        return value.map((entry2) => canonicalizeJsonValue(entry2, true));
+      }
+      if (value && typeof value === "object") {
+        return Object.keys(value).sort().reduce((out, key) => {
+          const entry2 = value[key];
+          if (entry2 === void 0 || typeof entry2 === "function" || typeof entry2 === "symbol") return out;
+          out[key] = canonicalizeJsonValue(entry2);
+          return out;
+        }, /* @__PURE__ */ Object.create(null));
+      }
+      return arrayEntry ? null : void 0;
+    };
+    stableCanonicalSerialize = (value) => JSON.stringify(canonicalizeJsonValue(value));
+  }
+});
+
 // shared/crypto/recoveryKeyFingerprint.mjs
 var encoder, recoveryKeyFingerprint;
 var init_recoveryKeyFingerprint = __esm({
@@ -26921,10 +26945,11 @@ var init_workerScriptName = __esm({
 });
 
 // workers/shared/deployHelperCore.mjs
-var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_URL, DEFAULT_FAUCET_AMOUNT_ETH, DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH, DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED, DEFAULT_ALLOWED_ORIGINS, DEPLOYMENT_JOURNAL_PREFIX, DEPLOYMENT_JOURNAL_VERSION, DEPLOYMENT_JOURNAL_TTL_SECONDS, DEPLOYMENT_REQUEST_ID_RE, KV_NAMESPACE_TITLE_MAX_LENGTH, SESSION_SLUG_MAX_LENGTH, TRUE_STRINGS, FALSE_STRINGS, STORAGE_RESOURCE_STAGES, DEFAULT_STORAGE_RESOURCES, DEFAULT_PAYLOAD_ACCESS_RESOURCES, DEFAULT_CLOUDFLARE_PRIMITIVES, PAYLOAD_ACCESS_MODES2, PAYLOAD_ACCESS_GATES2, PAYLOAD_ENCRYPTION_MODES2, STORAGE_ENVELOPE_KEK_SECRET_NAME, DEPLOYMENT_ID_BINDING_NAME, DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, BUNDLE_SHA256_BINDING_NAME, SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME, SESSION_COORDINATOR_MIGRATION_TAG, R2_BUCKET_NAME_RE, ALLOWED_WORKER_AUTHORITY_SCOPES, DEFAULT_WORKER_CANONICAL_AUTHORITY, toStr9, isObj4, hasScheme, ensureHttpUrl, normalizeOrigin, normalizeOriginList, normalizeAllowList, validateInboundSlug, readJsonOrText, cfFetch, NEW_KV_NAMESPACE_RETRY_DELAYS_MS, NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS, FINAL_CONFIG_READBACK_RETRY_DELAYS_MS, isNewKvNamespacePropagationFailure, putFreshKvNamespaceValue, lookupCloudflareAccount, randomSecret, sha256Hex, canonicalizeJsonValue, stableCanonicalSerialize, buildBundleDiagnostics, formatBundleDiagnostics, normalizeSecretValue, sanitizeSecrets, sanitizeBlockLimits, normalizeWorkerAuthorityScopes, normalizeWorkerAuthorityLoginGate, resolveWorkerCanonicalAuthorityForDeploy, workerAuthorityPoliciesMatch, normalizeRequestedWorkerName, buildFreshDeploymentName, buildPreLimitDeploymentName, normalizeDeploymentRequestId, collectKnownRequestCredentials, redactKnownCredentials, buildSafeDeployJournalResult, resolveDeployJournalBinding, buildDeploymentRequestContext, readDeployJournalRecord, writeDeployJournalRecord, writeDurableDeployJournalRecord, normalizeResourceStage, normalizePayloadAccessMode, normalizePayloadAccessGate, normalizePayloadEncryptionMode, deriveLegacyPayloadAccessMode, cloneAccessConditions, normalizePayloadAccessControl, normalizeStorageProfileInput, normalizeDeployStorageProfile, firstTrimmed, resolveRequestedR2BucketName, truthyR2Marker, hasExplicitR2Request, resolveDeployStorageBindingPlan, normalizeEmbeddedDeployHelperEnabled, buildFailure, buildSuccess, shouldAllowFallbackForCloudflareFailure, isAmbiguousCloudflareMutationFailure, isDefinitiveWorkerUploadRejection, ensureWorkersDevAccountSubdomain, ensureWorkersDevSubdomain, resolveDeploymentAccountId, validateDeployHelperPublicConfigInputs, executeDeployHelperRequestCore, resolveDeploymentBundleProvenance, validateDeployHelperLocalInputs, executeDeployHelperRequest;
+var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_URL, DEFAULT_FAUCET_AMOUNT_ETH, DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH, DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED, DEFAULT_ALLOWED_ORIGINS, DEPLOYMENT_JOURNAL_PREFIX, DEPLOYMENT_JOURNAL_VERSION, DEPLOYMENT_JOURNAL_TTL_SECONDS, DEPLOYMENT_REQUEST_ID_RE, KV_NAMESPACE_TITLE_MAX_LENGTH, SESSION_SLUG_MAX_LENGTH, TRUE_STRINGS, FALSE_STRINGS, STORAGE_RESOURCE_STAGES, DEFAULT_STORAGE_RESOURCES, DEFAULT_PAYLOAD_ACCESS_RESOURCES, DEFAULT_CLOUDFLARE_PRIMITIVES, PAYLOAD_ACCESS_MODES2, PAYLOAD_ACCESS_GATES2, PAYLOAD_ENCRYPTION_MODES2, STORAGE_ENVELOPE_KEK_SECRET_NAME, DEPLOYMENT_ID_BINDING_NAME, DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, BUNDLE_SHA256_BINDING_NAME, SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME, SESSION_COORDINATOR_MIGRATION_TAG, R2_BUCKET_NAME_RE, ALLOWED_WORKER_AUTHORITY_SCOPES, DEFAULT_WORKER_CANONICAL_AUTHORITY, toStr9, isObj4, hasScheme, ensureHttpUrl, normalizeOrigin, normalizeOriginList, normalizeAllowList, validateInboundSlug, readJsonOrText, cfFetch, NEW_KV_NAMESPACE_RETRY_DELAYS_MS, NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS, FINAL_CONFIG_READBACK_RETRY_DELAYS_MS, isNewKvNamespacePropagationFailure, putFreshKvNamespaceValue, lookupCloudflareAccount, randomSecret, sha256Hex, buildBundleDiagnostics, formatBundleDiagnostics, normalizeSecretValue, sanitizeSecrets, sanitizeBlockLimits, normalizeWorkerAuthorityScopes, normalizeWorkerAuthorityLoginGate, resolveWorkerCanonicalAuthorityForDeploy, workerAuthorityPoliciesMatch, normalizeRequestedWorkerName, buildFreshDeploymentName, buildPreLimitDeploymentName, normalizeDeploymentRequestId, collectKnownRequestCredentials, redactKnownCredentials, buildSafeDeployJournalResult, resolveDeployJournalBinding, buildDeploymentRequestContext, readDeployJournalRecord, writeDeployJournalRecord, writeDurableDeployJournalRecord, normalizeResourceStage, normalizePayloadAccessMode, normalizePayloadAccessGate, normalizePayloadEncryptionMode, deriveLegacyPayloadAccessMode, cloneAccessConditions, normalizePayloadAccessControl, normalizeStorageProfileInput, normalizeDeployStorageProfile, firstTrimmed, resolveRequestedR2BucketName, truthyR2Marker, hasExplicitR2Request, resolveDeployStorageBindingPlan, normalizeEmbeddedDeployHelperEnabled, buildFailure, buildSuccess, shouldAllowFallbackForCloudflareFailure, isAmbiguousCloudflareMutationFailure, isDefinitiveWorkerUploadRejection, ensureWorkersDevAccountSubdomain, ensureWorkersDevSubdomain, resolveDeploymentAccountId, validateDeployHelperPublicConfigInputs, executeDeployHelperRequestCore, resolveDeploymentBundleProvenance, validateDeployHelperLocalInputs, executeDeployHelperRequest;
 var init_deployHelperCore = __esm({
   "workers/shared/deployHelperCore.mjs"() {
     init_sessionAgentConfig();
+    init_canonicalJson();
     init_recoveryKey();
     init_artifactFetch();
     import_rpcDefaults3 = __toESM(require_rpcDefaults(), 1);
@@ -27190,23 +27215,6 @@ var init_deployHelperCore = __esm({
       const digest2 = await crypto.subtle.digest("SHA-256", input);
       return Array.from(new Uint8Array(digest2)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
     };
-    canonicalizeJsonValue = (value, arrayEntry = false) => {
-      if (value === null || typeof value === "string" || typeof value === "boolean") return value;
-      if (typeof value === "number") return Number.isFinite(value) ? value : null;
-      if (Array.isArray(value)) {
-        return value.map((entry2) => canonicalizeJsonValue(entry2, true));
-      }
-      if (value && typeof value === "object") {
-        return Object.keys(value).sort().reduce((out, key) => {
-          const entry2 = value[key];
-          if (entry2 === void 0 || typeof entry2 === "function" || typeof entry2 === "symbol") return out;
-          out[key] = canonicalizeJsonValue(entry2);
-          return out;
-        }, /* @__PURE__ */ Object.create(null));
-      }
-      return arrayEntry ? null : void 0;
-    };
-    stableCanonicalSerialize = (value) => JSON.stringify(canonicalizeJsonValue(value));
     buildBundleDiagnostics = async (bundleSource, sourceKind) => {
       const normalized = toStr9(bundleSource);
       return {
@@ -30027,11 +30035,59 @@ var init_workerGroupUrl = __esm({
   }
 });
 
-// workers/sessionCorsWorker/sessionConfigAuthorization.js
-var CONTENT_FIELDS, INTERVIEW_CONTENT_FIELDS, record2, same, without, onlyAddsInvites, sessionConfigRequiresReauthorization;
-var init_sessionConfigAuthorization = __esm({
-  "workers/sessionCorsWorker/sessionConfigAuthorization.js"() {
-    init_deployHelperCore();
+// shared/sessionConfigEdits.mjs
+var WORKER_CANONICAL_SET_CONFIG_KEYS, CONTENT_FIELDS, INTERVIEW_CONTENT_FIELDS, record2, same, without, onlyAddsInvites, sessionConfigRequiresReauthorization;
+var init_sessionConfigEdits = __esm({
+  "shared/sessionConfigEdits.mjs"() {
+    init_canonicalJson();
+    WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
+      "slug",
+      "sessionId",
+      "sessionIdHex",
+      "configRevision",
+      "sessionName",
+      "sessionInfo",
+      "sessionContext",
+      "appearance",
+      "sessionHeaderImg",
+      "sessionEndsAt",
+      "defaultTags",
+      "defaultGroupTags",
+      "defaultSbtTags",
+      "questionsGenPrompt",
+      "interviewMode",
+      "interviewModeEnabled",
+      "pileAutoAdvanceEnabled",
+      "defaultFilterState",
+      "defaultFeaturedSBTs",
+      "autoFeatureSBTsBySessionSlug",
+      "adminAddress",
+      "adminAddresses",
+      "corsWorkerUrl",
+      "allowOrigins",
+      "sessionModeProfile",
+      "agentSessionWrapped",
+      "agentHttp",
+      "resultsExposure",
+      "workerAuthority",
+      "workerRoles",
+      "roles",
+      "authorization",
+      "groupCreationPolicy",
+      "storageProfile",
+      "storageEnvelope",
+      "ai",
+      "limits",
+      "scopes",
+      "networkChainId",
+      "contracts",
+      "embeddedDeployHelperEnabled",
+      "litCredentials",
+      "resultsAnalysis",
+      "responseFieldEncryption",
+      "linkedWorkerGroups",
+      "workerGroupsBootstrap"
+    ]);
     CONTENT_FIELDS = /* @__PURE__ */ new Set([
       "sessionName",
       "sessionInfo",
@@ -30189,10 +30245,10 @@ var init_realtimeInterviewConfig = __esm({
 });
 
 // workers/sessionCorsWorker/sessionConfigMutation.js
-var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEYS, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
+var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEY_SET, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
 var init_sessionConfigMutation = __esm({
   "workers/sessionCorsWorker/sessionConfigMutation.js"() {
-    init_sessionConfigAuthorization();
+    init_sessionConfigEdits();
     init_sessionAgentConfig();
     init_interviewSettings();
     init_siweMessage();
@@ -30207,54 +30263,7 @@ var init_sessionConfigMutation = __esm({
     WORKER_CANONICAL_PUBLICATION_REVISION_KEY = "workerCanonicalPublicationRevision";
     WORKER_GROUPS_BOOTSTRAP_KEY = "workerGroupsBootstrap";
     REGISTRY_CANONICAL_AUTHORITY_MODES = /* @__PURE__ */ new Set(["evm_registry_canonical", "registry_canonical"]);
-    WORKER_CANONICAL_SET_CONFIG_KEYS = /* @__PURE__ */ new Set([
-      "slug",
-      "sessionId",
-      "sessionIdHex",
-      "configRevision",
-      "sessionName",
-      "sessionInfo",
-      "sessionContext",
-      "appearance",
-      "sessionHeaderImg",
-      "sessionEndsAt",
-      "defaultTags",
-      "defaultGroupTags",
-      "defaultSbtTags",
-      "questionsGenPrompt",
-      "interviewMode",
-      "interviewModeEnabled",
-      "pileAutoAdvanceEnabled",
-      "defaultFilterState",
-      "defaultFeaturedSBTs",
-      "autoFeatureSBTsBySessionSlug",
-      "adminAddress",
-      "adminAddresses",
-      "corsWorkerUrl",
-      "allowOrigins",
-      "sessionModeProfile",
-      "agentSessionWrapped",
-      "agentHttp",
-      "resultsExposure",
-      "workerAuthority",
-      "workerRoles",
-      "roles",
-      "authorization",
-      "groupCreationPolicy",
-      "storageProfile",
-      "storageEnvelope",
-      "ai",
-      "limits",
-      "scopes",
-      "networkChainId",
-      "contracts",
-      "embeddedDeployHelperEnabled",
-      "litCredentials",
-      "resultsAnalysis",
-      "responseFieldEncryption",
-      "linkedWorkerGroups",
-      WORKER_GROUPS_BOOTSTRAP_KEY
-    ]);
+    WORKER_CANONICAL_SET_CONFIG_KEY_SET = new Set(WORKER_CANONICAL_SET_CONFIG_KEYS);
     toTrimmedString6 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
     hasOwn4 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
     validGroupCreationPolicy = (config) => !hasOwn4(config, "groupCreationPolicy") || config?.groupCreationPolicy === "admin_only" || config?.groupCreationPolicy === "participants";
@@ -30293,7 +30302,7 @@ var init_sessionConfigMutation = __esm({
     validateWorkerCanonicalIncomingFields = ({ incomingConfig, mergedConfig } = {}) => {
       if (getWorkerAuthorityMode(mergedConfig) !== "worker_canonical") return { ok: true };
       const unsupportedKey = Object.keys(incomingConfig || {}).find(
-        (key) => !WORKER_CANONICAL_SET_CONFIG_KEYS.has(key)
+        (key) => !WORKER_CANONICAL_SET_CONFIG_KEY_SET.has(key)
       );
       if (unsupportedKey) {
         return {

@@ -1,4 +1,5 @@
 import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
+import { stableCanonicalSerialize } from '../../shared/canonicalJson.mjs';
 import { recoveryKeyFingerprint, withFreshRecoveryKey } from './recoveryKey.mjs';
 import { fetchArtifactText } from './artifactFetch.mjs';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
@@ -319,26 +320,7 @@ export const sha256Hex = async (value) => {
     .join('');
 };
 
-const canonicalizeJsonValue = (value, arrayEntry = false) => {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (Array.isArray(value)) {
-    return value.map((entry) => canonicalizeJsonValue(entry, true));
-  }
-  if (value && typeof value === 'object') {
-    return Object.keys(value)
-      .sort()
-      .reduce((out, key) => {
-        const entry = value[key];
-        if (entry === undefined || typeof entry === 'function' || typeof entry === 'symbol') return out;
-        out[key] = canonicalizeJsonValue(entry);
-        return out;
-      }, Object.create(null));
-  }
-  return arrayEntry ? null : undefined;
-};
-
-export const stableCanonicalSerialize = (value) => JSON.stringify(canonicalizeJsonValue(value));
+export { stableCanonicalSerialize };
 export const buildBundleDiagnostics = async (bundleSource, sourceKind) => {
   const normalized = toStr(bundleSource);
   return {

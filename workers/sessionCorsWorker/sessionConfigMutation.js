@@ -1,4 +1,7 @@
-import { sessionConfigRequiresReauthorization } from './sessionConfigAuthorization.js';
+import {
+  WORKER_CANONICAL_SET_CONFIG_KEYS,
+  sessionConfigRequiresReauthorization,
+} from '../../shared/sessionConfigEdits.mjs';
 import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from '../../shared/interviewSettings.mjs';
 import { normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
@@ -24,54 +27,7 @@ import {
 const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
 const WORKER_GROUPS_BOOTSTRAP_KEY = 'workerGroupsBootstrap';
 const REGISTRY_CANONICAL_AUTHORITY_MODES = new Set(['evm_registry_canonical', 'registry_canonical']);
-const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
-  'slug',
-  'sessionId',
-  'sessionIdHex',
-  'configRevision',
-  'sessionName',
-  'sessionInfo',
-  'sessionContext',
-  'appearance',
-  'sessionHeaderImg',
-  'sessionEndsAt',
-  'defaultTags',
-  'defaultGroupTags',
-  'defaultSbtTags',
-  'questionsGenPrompt',
-  'interviewMode',
-  'interviewModeEnabled',
-  'pileAutoAdvanceEnabled',
-  'defaultFilterState',
-  'defaultFeaturedSBTs',
-  'autoFeatureSBTsBySessionSlug',
-  'adminAddress',
-  'adminAddresses',
-  'corsWorkerUrl',
-  'allowOrigins',
-  'sessionModeProfile',
-  'agentSessionWrapped',
-  'agentHttp',
-  'resultsExposure',
-  'workerAuthority',
-  'workerRoles',
-  'roles',
-  'authorization',
-  'groupCreationPolicy',
-  'storageProfile',
-  'storageEnvelope',
-  'ai',
-  'limits',
-  'scopes',
-  'networkChainId',
-  'contracts',
-  'embeddedDeployHelperEnabled',
-  'litCredentials',
-  'resultsAnalysis',
-  'responseFieldEncryption',
-  'linkedWorkerGroups',
-  WORKER_GROUPS_BOOTSTRAP_KEY,
-]);
+const WORKER_CANONICAL_SET_CONFIG_KEY_SET = new Set(WORKER_CANONICAL_SET_CONFIG_KEYS);
 
 const toTrimmedString = (value) => (
   typeof value === 'string'
@@ -139,7 +95,7 @@ const workerCanonicalUsesChain = (config) => (
 const validateWorkerCanonicalIncomingFields = ({ incomingConfig, mergedConfig } = {}) => {
   if (getWorkerAuthorityMode(mergedConfig) !== 'worker_canonical') return { ok: true };
   const unsupportedKey = Object.keys(incomingConfig || {}).find(
-    (key) => !WORKER_CANONICAL_SET_CONFIG_KEYS.has(key),
+    (key) => !WORKER_CANONICAL_SET_CONFIG_KEY_SET.has(key),
   );
   if (unsupportedKey) {
     return {
