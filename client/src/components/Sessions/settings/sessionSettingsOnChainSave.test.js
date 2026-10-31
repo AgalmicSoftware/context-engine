@@ -8,6 +8,7 @@ const mockUpload = jest.fn();
 const mockUpdateOnChain = jest.fn();
 const mockUpsertCache = jest.fn();
 const mockPostWorker = jest.fn();
+const mockReadWallet = jest.fn();
 
 jest.mock('../../../domains/sessions/registry/sessionRegistryAdminPorts', () => ({
   adminSessionRegistryPorts: {
@@ -20,6 +21,9 @@ jest.mock('../../../domains/sessions/registry/sessionRegistryAdminPorts', () => 
 }));
 jest.mock('../../../utilities/worker/signedAdminWorkerRequest', () => ({
   postSignedAdminWorkerRequest: (...args) => mockPostWorker(...args),
+}));
+jest.mock('./sessionSettingsWallet', () => ({
+  readSigningWallet: (...args) => mockReadWallet(...args),
 }));
 
 const ADMIN = '0x00000000000000000000000000000000000000aa';
@@ -84,6 +88,7 @@ describe('editing an on-chain session', () => {
     mockUpload.mockResolvedValue({ txId: 'new-metadata', metadataUri: 'ar://new-metadata' });
     mockUpdateOnChain.mockResolvedValue({ ok: true, txHash: '0xmetadatahash' });
     mockPostWorker.mockResolvedValue({ data: { ok: true } });
+    mockReadWallet.mockResolvedValue({ address: ADMIN, chainId: 11155420 });
   });
 
   it('writes every edited field, chain-only ones included, into the new metadata', () => {
@@ -206,6 +211,8 @@ describe('editing an on-chain session', () => {
     });
 
     expect(steps).toEqual([
+      'wallet:running',
+      'wallet:done',
       'upload:running',
       'upload:done',
       'registry:running',
@@ -244,6 +251,44 @@ describe('editing an on-chain session', () => {
       registryChainId: 11155420,
     });
     expect(result).toEqual({ txHash: '0xmetadatahash', nextConfig: cached, workerError: '' });
+  });
+
+  it('checks the wallet’s account and network before the paid upload', async () => {
+    const config = registryConfig();
+    const { patch, after } = edit(config, (draft) => {
+      draft.sessionInfo = 'After.';
+    });
+    const save = () => {
+      const steps = [];
+      return {
+        steps,
+        done: saveOnChainSessionSettings({
+          before: config,
+          after,
+          patch,
+          sessionSlug: 'chain-salon',
+          account: ADMIN,
+          provider: 'wagmi',
+          workerOrigin: WORKER,
+          authorityMode: 'evm_registry_canonical',
+          onStep: (step, state, detail) => steps.push([step, state, detail]),
+        }),
+      };
+    };
+
+    mockReadWallet.mockResolvedValue({ address: ADMIN, chainId: 84532 });
+    const wrongNetwork = save();
+    await expect(wrongNetwork.done).rejects.toThrow('Switch the wallet to');
+    expect(wrongNetwork.steps.at(-1)).toEqual(['wallet', 'failed', expect.stringContaining('(11155420)')]);
+
+    mockReadWallet.mockResolvedValue({ address: address('cc'), chainId: 11155420 });
+    await expect(save().done).rejects.toThrow(`Switch it to the registry admin, ${ADMIN}.`);
+    mockReadWallet.mockResolvedValue({ address: '', chainId: 0 });
+    await expect(save().done).rejects.toThrow(`Connect the registry admin wallet, ${ADMIN}.`);
+
+    expect(mockReadWallet).toHaveBeenCalledWith('wagmi');
+    expect(mockUpload).not.toHaveBeenCalled();
+    expect(mockUpdateOnChain).not.toHaveBeenCalled();
   });
 
   it('reports a failed Worker sync on its own, since the on-chain update stands', async () => {
@@ -298,7 +343,7 @@ describe('editing an on-chain session', () => {
     mockUpload.mockRejectedValue(new Error('Arweave upload failed.'));
     const failed = run(WORKER);
     await expect(failed.done).rejects.toThrow('Arweave upload failed.');
-    expect(failed.steps).toEqual(['upload:running', 'upload:failed']);
+    expect(failed.steps).toEqual(['wallet:running', 'wallet:done', 'upload:running', 'upload:failed']);
     expect(mockUpdateOnChain).toHaveBeenCalledTimes(1);
   });
 });

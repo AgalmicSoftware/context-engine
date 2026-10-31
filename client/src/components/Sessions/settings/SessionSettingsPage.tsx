@@ -46,7 +46,7 @@ import {
   workerMergesAi,
   type SessionSettingsSave,
 } from './sessionSettingsEdits';
-import { contractsNeedChecking, readRegistryFacts } from './sessionSettingsChain';
+import { contractsNeedChecking, describeChain, readRegistryFacts } from './sessionSettingsChain';
 import {
   ON_CHAIN_SAVE_STEPS,
   saveOnChainSessionSettings,
@@ -55,7 +55,7 @@ import {
   type OnChainSaveStepState,
 } from './sessionSettingsSave';
 import { SettingsAiSection } from './SettingsAiSection';
-import { SettingsChainFacts, SettingsChainFields, describeChain } from './SettingsChainFields';
+import { SettingsChainFacts, SettingsChainFields } from './SettingsChainFields';
 import { SettingsQuestionListFields, SettingsSbtFields } from './SettingsListFields';
 
 type SessionSettingsPageProps = {
@@ -376,6 +376,7 @@ const SessionSettingsPage = ({
   const registryChain = describeChain(facts.registryChainId);
   const stepLabel = (step: OnChainSaveStep) =>
     ({
+      wallet: `Check the wallet: the registry admin, on ${registryChain}`,
       upload: 'Upload the new metadata to Arweave',
       registry: `Update the SessionRegistry on ${registryChain}`,
       cache: 'Update this browser’s copy',

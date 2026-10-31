@@ -1,5 +1,6 @@
 import { DEFAULT_AI_MODELS } from '@ce-shared/aiDefaults.mjs';
 import { normalizeBlockLimitsForConfig } from '../../../utilities/session/blockLimits';
+import { getChainById } from '../../../variables/chains';
 import { buildWorkerSessionConfigPayload } from '../../Admin/adminPageWorkerSessionConfigHelpers';
 import { resolveSessionWizardAutoFeatureBySessionSlug } from '../sessionWizardAiConfig';
 import { stripSessionWizardMetadataSecretFields } from '../sessionWizardMetadataPayload';
@@ -17,6 +18,13 @@ export const SETTINGS_CONTRACTS = Object.freeze([
   { key: 'sbtFactory', label: 'SBT factory contract' },
   { key: 'sessionRegistry', label: 'SessionRegistry contract' },
 ] as const);
+
+/** "OP Sepolia (11155420)", or the bare ID for a chain this app doesn't list. */
+export const describeChain = (chainId: number): string => {
+  if (!chainId) return 'unknown';
+  const name = text(getChainById(chainId)?.name).trim();
+  return name ? `${name} (${chainId})` : `Chain ${chainId}`;
+};
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const DECIMAL = /^\d+(\.\d+)?$/;

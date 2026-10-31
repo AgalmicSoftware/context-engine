@@ -13,6 +13,7 @@ const mockSignAdminAction = jest.fn(async (_options: unknown) => ({ signature: '
 const mockUploadMetadata = jest.fn();
 const mockUpdateMetadataOnChain = jest.fn();
 const mockUpsertRegistryCache = jest.fn();
+const mockReadWallet = jest.fn();
 
 jest.mock('../../../utilities/session/sessionWorkerDiscovery', () => ({
   ...(jest.requireActual('../../../utilities/session/sessionWorkerDiscovery') as object),
@@ -35,6 +36,10 @@ jest.mock('../../../domains/sessions/registry/sessionRegistryAdminPorts', () => 
       updateSessionMetadataOnChain: (input: unknown) => mockUpdateMetadataOnChain(input),
     },
   },
+}));
+
+jest.mock('./sessionSettingsWallet', () => ({
+  readSigningWallet: (provider: unknown) => mockReadWallet(provider),
 }));
 
 // The live files and links panel reports what the Worker lists.
@@ -361,6 +366,7 @@ describe('SessionSettingsPage', () => {
     beforeEach(() => {
       mockUploadMetadata.mockResolvedValue({ metadataUri: 'ar://new-metadata' });
       mockUpdateMetadataOnChain.mockResolvedValue({ ok: true, txHash: '0xmetadatahash' });
+      mockReadWallet.mockResolvedValue({ address: ADMIN, chainId: 11155420 });
     });
 
     it('uses the same sections, adds the chain fields, and saves through the registry step by step', async () => {
@@ -389,7 +395,7 @@ describe('SessionSettingsPage', () => {
       );
       expect(mockUpsertRegistryCache).toHaveBeenCalled();
       const steps = within(screen.getByTestId('ce-settings-chain-steps')).getAllByRole('listitem');
-      expect(steps.map((step) => step.getAttribute('data-state'))).toEqual(['done', 'done', 'done', 'done']);
+      expect(steps.map((step) => step.getAttribute('data-state'))).toEqual(['done', 'done', 'done', 'done', 'done']);
       expect(screen.getByTestId('ce-settings-chain-tx')).toHaveAttribute(
         'href',
         expect.stringContaining('/tx/0xmetadatahash'),

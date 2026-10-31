@@ -2,18 +2,10 @@ import React, { useState } from 'react';
 import { Input } from 'reactstrap';
 
 import { rpcProvidersChainReadsPort } from '../../../domains/chain/rpcProvidersChainReadsPort';
-import { getChainById } from '../../../variables/chains';
 import { SetupCheck, SetupField, setupHelpId } from '../setup/SetupPrimitives';
 import { asRecord, text, type SetupDraft } from '../setup/setupSectionTypes';
 import styles from '../setup/SessionSetup.module.scss';
-import { SETTINGS_CONTRACTS, readRegistryFacts } from './sessionSettingsChain';
-
-/** "OP Sepolia (11155420)", or the bare ID for a chain this app doesn't list. */
-export const describeChain = (chainId: number): string => {
-  if (!chainId) return 'unknown';
-  const name = text(getChainById(chainId)?.name).trim();
-  return name ? `${name} (${chainId})` : `Chain ${chainId}`;
-};
+import { SETTINGS_CONTRACTS, describeChain, readRegistryFacts } from './sessionSettingsChain';
 
 // What an on-chain session's registry record fixes: shown, never edited.
 export const SettingsChainFacts = ({

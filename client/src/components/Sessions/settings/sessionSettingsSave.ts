@@ -2,7 +2,13 @@ import { adminSessionRegistryPorts } from '../../../domains/sessions/registry/se
 import { buildSignedAdminActionAuth } from '../../../utilities/worker/workerAuth';
 import { postSignedAdminWorkerRequest } from '../../../utilities/worker/signedAdminWorkerRequest';
 import { asRecord, text } from '../setup/setupSectionTypes';
-import { buildOnChainSessionMetadata, buildRegistryWorkerSync, readRegistryFacts } from './sessionSettingsChain';
+import {
+  buildOnChainSessionMetadata,
+  buildRegistryWorkerSync,
+  describeChain,
+  readRegistryFacts,
+} from './sessionSettingsChain';
+import { readSigningWallet } from './sessionSettingsWallet';
 
 type Config = Record<string, unknown>;
 
@@ -52,7 +58,7 @@ export const saveSessionSettings = ({
       }),
   });
 
-export const ON_CHAIN_SAVE_STEPS = Object.freeze(['upload', 'registry', 'cache', 'worker'] as const);
+export const ON_CHAIN_SAVE_STEPS = Object.freeze(['wallet', 'upload', 'registry', 'cache', 'worker'] as const);
 export type OnChainSaveStep = (typeof ON_CHAIN_SAVE_STEPS)[number];
 export type OnChainSaveStepState = 'running' | 'done' | 'failed' | 'skipped';
 
@@ -82,11 +88,11 @@ export type OnChainSaveResult = {
 
 const messageOf = (error: unknown, fallback: string) => (error instanceof Error && error.message) || fallback;
 
-// The /admin metadata save, restored: upload the new metadata, point the
-// SessionRegistry at it from the admin's wallet (keeping the encrypted
-// metadata URI), update this browser's registry cache, then sync the
-// session's Worker. Cache and Worker failures are reported on their own:
-// the on-chain update still stands.
+// The /admin metadata save, restored: check the signing wallet, upload the
+// new metadata, point the SessionRegistry at it from the admin's wallet
+// (keeping the encrypted metadata URI), update this browser's registry cache,
+// then sync the session's Worker. Cache and Worker failures are reported on
+// their own: the on-chain update still stands.
 export const saveOnChainSessionSettings = async ({
   before,
   after,
@@ -113,6 +119,23 @@ export const saveOnChainSessionSettings = async ({
     }
   };
 
+  // Checked before the paid upload: the registry write refuses another
+  // account or network, but only after the upload is spent.
+  await step('wallet', async () => {
+    const wallet = await readSigningWallet(provider);
+    if (wallet.address.toLowerCase() !== facts.adminAddress.toLowerCase()) {
+      throw new Error(
+        wallet.address
+          ? `The wallet is on ${wallet.address}. Switch it to the registry admin, ${facts.adminAddress}.`
+          : `Connect the registry admin wallet, ${facts.adminAddress}.`,
+      );
+    }
+    if (wallet.chainId !== facts.registryChainId) {
+      throw new Error(
+        `Switch the wallet to ${describeChain(facts.registryChainId)}; it is on ${describeChain(wallet.chainId)}.`,
+      );
+    }
+  });
   const upload = await step('upload', async () => {
     const uploaded = await adminSessionRegistryPorts.writes.uploadSessionMetadata(metadata, {
       sessionConfig: before,
