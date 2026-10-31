@@ -173,5 +173,12 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
         sessionId: ctx.sessionId, revision: ctx.revision, ...payload });
       return { ...result.body, ok: result.ok, status: result.status };
     },
+    async advanceQuestionQueue(step) {
+      await current();
+      const result = await callSessionConfigCoordinator({ env, slug: ctx.slug, path: 'agent-question-queue/advance',
+        ...step, sessionId: ctx.sessionId });
+      if (!result.ok) throw authorityError(result.body?.reason || 'question_queue_unavailable', result.status === 409 ? 409 : 503);
+      return result.body;
+    },
   });
 };

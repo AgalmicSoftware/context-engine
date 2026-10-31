@@ -24,13 +24,13 @@ async function signed(f, path, body = {}, method = 'POST') {
   return f.request(path, { method, body: input });
 }
 async function hosted() {
-  const f = fixture(); f.withCoordinator(); f.env.CE_STORAGE_INDEX_KV = f.env.GROUP_KV;
+  const f = fixture(); const coordinator = f.withCoordinator(); f.env.CE_STORAGE_INDEX_KV = f.env.GROUP_KV;
   f.config.storageProfile = { backend: 'cloudflare', payloadAccessControl: { gate: 'public', encryption: 'none' } };
   const agent = await f.credential({ scopes: ['read_questions', 'draft_answers', 'pose_questions', 'read_groups', 'propose_groups', 'recommend_question_votes', 'apply_question_votes'] });
   await jsonOk(await f.request('/api/agent/questions/create', { method: 'POST', token: agent.token,
     body: { questions: [{ prompt: 'Would a shared garden help?', questionType: 'binary', tags: ['garden'] }, { prompt: 'Choose a season.', questionType: 'freeform' }] } }));
   const questions = (await jsonOk(await f.request('/api/agent/questions', { token: agent.token }))).questions;
-  return { f, agent, questions };
+  return { f, agent, questions, coordinator };
 }
 
 test('public descriptors and skill redirects disclose current same-origin metadata without materializing state', async () => {
@@ -66,6 +66,45 @@ test('question selection, queue planning, voting and auxiliary groups retain the
     body: { decisions: [{ questionId: questions[0].questionId, vote: 'up' }], approvalText: 'Approve this vote' } }));
   f.config.adminAddress = '0x2222222222222222222222222222222222222222';
   assert.equal((await f.request('/api/agent/question-queue/plan', { method: 'POST', token, body: {} })).status, 403);
+});
+
+test('overlapping next-question calls serve different questions, and a repeated requestId replays', async () => {
+  const { f, agent, coordinator } = await hosted(); const token = agent.token;
+  // A slow queue read lets both requests read before either one writes.
+  const get = f.env.GROUP_KV.get;
+  f.env.GROUP_KV.get = async (key, ...rest) => {
+    const value = await get(key, ...rest);
+    if (key.includes('question-queue-state')) await new Promise(resolve => setTimeout(resolve, 10));
+    return value;
+  };
+  const next = (body = {}) => f.request('/api/agent/questions/next', { method: 'POST', token, body });
+  const queueState = () => [...coordinator.durable].filter(([key]) => key.startsWith('ce-agent-question-queue:'));
+  const [first, second] = await Promise.all([next(), next()]);
+  const served = [await jsonOk(first), await jsonOk(second)].map(body => body.question.questionId);
+  assert.notEqual(served[0], served[1], 'one participant is never served the same question twice at once');
+  assert.equal(queueState().length, 1);
+  const history = () => JSON.parse(queueState()[0][1]).history.map(entry => entry.questionId);
+  assert.deepEqual(history().sort(), [...served].sort());
+  const asked = await jsonOk(await next({ requestId: 'retry-1' }));
+  const replayed = await jsonOk(await next({ requestId: 'retry-1' }));
+  assert.equal(replayed.question.questionId, asked.question.questionId);
+  assert.equal(replayed.queue.advanced, false);
+  assert.equal(replayed.queue.replayed, true);
+  assert.equal(history().length, 3, 'a replay records no new event');
+});
+
+test('the first coordinated next-question call continues the participant\'s GROUP_KV queue', async () => {
+  const { f, agent, coordinator } = await hosted(); const token = agent.token;
+  const first = await jsonOk(await f.request('/api/agent/questions/next', { token }));
+  // Move the state back to where earlier releases kept it.
+  const [storageKey, state] = [...coordinator.durable].find(([key]) => key.startsWith('ce-agent-question-queue:'));
+  coordinator.durable.delete(storageKey);
+  const stateKey = storageKey.slice(`ce-agent-question-queue:${sessionId}:`.length);
+  f.records.set(`ce-agent:${sessionId}:${stateKey}`, state);
+  const second = await jsonOk(await f.request('/api/agent/questions/next', { token }));
+  assert.notEqual(second.question.questionId, first.question.questionId, 'no participant is asked again');
+  assert.deepEqual(JSON.parse(coordinator.durable.get(storageKey)).history.map(entry => entry.questionId),
+    [first.question.questionId, second.question.questionId]);
 });
 
 test('Wrapped config, statements, predictions, allocations, poster links and research export use the retained routes', async () => {

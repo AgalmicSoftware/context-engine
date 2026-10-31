@@ -1,5 +1,6 @@
 import { dispatchAgentSubmissionJournal, nextAgentSubmitProjectionAt, repairAgentSubmitProjections } from './agent/submissionJournal.mjs';
 import { dispatchAgentInviteJournal } from './agent/inviteJournal.mjs';
+import { executeAgentQuestionQueueAdvance } from './agent/agentQuestionQueue.mjs';
 import { dispatchWrappedResearch } from './agent/wrappedJournal.mjs';
 import { controlCoordinatorBackupImport, assertNoActiveBackupImport } from './sessionBackupLifecycle.js';
 import { registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispatchUploadReceiptIndex, sweepUploadReceiptIndex } from './sessionDiagnostics.js';
@@ -2958,6 +2959,10 @@ export class SessionWriteCoordinator {
     if (url.pathname.startsWith('/session-config/agent-invite/')) {
       try { return await dispatchAgentInviteJournal(this, url.pathname.split('/').pop(), payload); }
       catch { return jsonResponse({ ok: false, reason: 'invite_coordinator_unavailable' }, 503); }
+    }
+    if (url.pathname === '/session-config/agent-question-queue/advance') {
+      try { return await executeAgentQuestionQueueAdvance(this, payload); }
+      catch { return jsonResponse({ ok: false, reason: 'question_queue_unavailable' }, 503); }
     }
     if (url.pathname === '/session-config/agent-wrapped/commit') {
       try { return await dispatchWrappedResearch(this, payload); }

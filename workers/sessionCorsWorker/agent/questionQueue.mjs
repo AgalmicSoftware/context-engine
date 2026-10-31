@@ -24,6 +24,7 @@ export async function handleNextQuestionRequest({ env = {}, context = {}, input 
     sponsoredQuestionIds: queueConfig.sponsoredQuestionIds,
     input,
     createdAt: input.createdAt || null,
+    advanceState: (step) => env.AGENT_SERVICES.advanceQuestionQueue(step),
   });
   return json(
     {
