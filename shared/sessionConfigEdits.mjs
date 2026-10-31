@@ -22,6 +22,10 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'defaultFilterState',
   'defaultFeaturedSBTs',
   'autoFeatureSBTsBySessionSlug',
+  'HIGHLIGHTED_QUESTION_IDS',
+  'BLOCKED_QUESTION_IDS',
+  'HIGHLIGHTED_SURVEY_IDS',
+  'BLOCKED_SURVEY_IDS',
   'adminAddress',
   'adminAddresses',
   'corsWorkerUrl',
@@ -50,8 +54,20 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'workerGroupsBootstrap',
 ]);
 
+// The question and survey IDs an admin highlights or hides. Curation, not
+// access, so editing them signs no one out.
+export const CURATED_ID_LIST_KEYS = Object.freeze([
+  'HIGHLIGHTED_QUESTION_IDS', 'BLOCKED_QUESTION_IDS', 'HIGHLIGHTED_SURVEY_IDS', 'BLOCKED_SURVEY_IDS',
+]);
+export const MAX_CURATED_IDS = 500;
+const CURATED_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+export const validCuratedIdList = value =>
+  Array.isArray(value) && value.length <= MAX_CURATED_IDS &&
+  value.every(id => typeof id === 'string' && CURATED_ID.test(id));
+
 const CONTENT_FIELDS = new Set([
   'sessionName', 'sessionInfo', 'sessionContext', 'questionsGenPrompt', 'appearance', 'sessionHeaderImg',
+  ...CURATED_ID_LIST_KEYS,
 ]);
 const INTERVIEW_CONTENT_FIELDS = new Set(['openingPrompt', 'steeringPrompt']);
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);

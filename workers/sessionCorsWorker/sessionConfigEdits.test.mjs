@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  CURATED_ID_LIST_KEYS,
+  MAX_CURATED_IDS,
   WORKER_CANONICAL_SET_CONFIG_KEYS,
   classifySessionConfigEdits as classify,
   sessionConfigRequiresReauthorization as revokes,
@@ -94,11 +96,25 @@ test('the shared set-config key list is exactly what a Worker-canonical session 
     assert.notEqual(setConfig({ [key]: 'x' }).error, unsupported(key), key);
   }
   assert.equal(setConfig({ sessionName: 'Renamed' }).ok, true);
-  // The /admin metadata editor sends these lists; the Worker refuses them.
-  for (const key of ['HIGHLIGHTED_QUESTION_IDS', 'BLOCKED_QUESTION_IDS', 'HIGHLIGHTED_SURVEY_IDS',
-    'BLOCKED_SURVEY_IDS', 'blockLimits', 'publicKey']) {
+  for (const key of ['blockLimits', 'publicKey', 'ignored_SBTs_LIST', 'featured_SBTs_LIST']) {
     assert.deepEqual(setConfig({ [key]: [] }), { ok: false, status: 400, error: unsupported(key) }, key);
   }
+});
+
+test('highlighted and hidden ID lists save as checked lists and sign no one out', () => {
+  const questionId = `0x${'ab'.repeat(32)}`;
+  for (const key of CURATED_ID_LIST_KEYS) {
+    assert.ok(WORKER_CANONICAL_SET_CONFIG_KEYS.includes(key), key);
+    const saved = setConfig({ [key]: [questionId, 'survey_2026-10:a.b'] });
+    assert.equal(saved.ok, true, key);
+    assert.deepEqual(saved.config[key], [questionId, 'survey_2026-10:a.b']);
+    assert.deepEqual(classify({}, { [key]: [questionId] }), { content: [key], authority: [], signsParticipantsOut: false });
+    const error = `${key} must be a list of at most ${MAX_CURATED_IDS} IDs.`;
+    for (const invalid of ['q1', [''], ['has space'], [7], ['x'.repeat(129)], Array(MAX_CURATED_IDS + 1).fill('q')]) {
+      assert.deepEqual(setConfig({ [key]: invalid }), { ok: false, status: 400, error }, `${key} ${JSON.stringify(invalid).slice(0, 40)}`);
+    }
+  }
+  assert.equal(setConfig({ BLOCKED_QUESTION_IDS: Array(MAX_CURATED_IDS).fill('q') }).ok, true);
 });
 
 test('lists each edited path as content or as a sign-out', () => {
@@ -182,6 +198,8 @@ test('the preview matches the authorization epoch the Worker assigns on save', (
     [{ sessionName: 'Renamed', defaultTags: 'a, b, c' }, true],
     [{ sessionModeProfile: { ...profile, results: { ...profile.results, exposure: { ...profile.results.exposure, minGroupSize: 3 } } } }, true],
     [{ resultsAnalysis: { generationMode: 'automatic' } }, true],
+    [{ HIGHLIGHTED_QUESTION_IDS: ['q1'], BLOCKED_SURVEY_IDS: ['s1'] }, false],
+    [{ sessionName: 'Renamed', BLOCKED_QUESTION_IDS: ['q2'] }, false],
   ]) {
     const saved = applySessionConfigMutation({
       existingConfig: stored,

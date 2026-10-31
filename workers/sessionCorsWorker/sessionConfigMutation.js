@@ -1,7 +1,10 @@
 import {
+  CURATED_ID_LIST_KEYS,
+  MAX_CURATED_IDS,
   WORKER_CANONICAL_SET_CONFIG_KEYS,
   mergeSetConfigAi,
   sessionConfigRequiresReauthorization,
+  validCuratedIdList,
 } from '../../shared/sessionConfigEdits.mjs';
 import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from '../../shared/interviewSettings.mjs';
@@ -308,6 +311,16 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     }
     if (!validResultsAnalysisSettingsConfig(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid results analysis settings config.' };
+    }
+    const invalidIdList = CURATED_ID_LIST_KEYS.find(
+      (key) => hasOwn(incomingConfig, key) && !validCuratedIdList(incomingConfig[key]),
+    );
+    if (invalidIdList) {
+      return {
+        ok: false,
+        status: 400,
+        error: `${invalidIdList} must be a list of at most ${MAX_CURATED_IDS} IDs.`,
+      };
     }
     // Only a sent context is checked, so a stored one from before these limits
     // never blocks an unrelated edit. The stored form is the writer's output.

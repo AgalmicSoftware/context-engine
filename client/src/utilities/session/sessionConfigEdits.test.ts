@@ -7,6 +7,12 @@ describe('shared session config edits in the client', () => {
       classifySessionConfigEdits(before, { ...before, sessionName: 'Salon, part 2', defaultTags: 'housing, transit' }),
     ).toEqual({ content: ['sessionName'], authority: ['defaultTags'], signsParticipantsOut: true });
     expect(WORKER_CANONICAL_SET_CONFIG_KEYS).toContain('sessionModeProfile');
-    expect(WORKER_CANONICAL_SET_CONFIG_KEYS).not.toContain('HIGHLIGHTED_QUESTION_IDS');
+    // Highlighted and hidden question lists are curation: saving them signs no one out.
+    expect(WORKER_CANONICAL_SET_CONFIG_KEYS).toContain('HIGHLIGHTED_QUESTION_IDS');
+    expect(classifySessionConfigEdits(before, { ...before, BLOCKED_QUESTION_IDS: ['q1'] })).toEqual({
+      content: ['BLOCKED_QUESTION_IDS'],
+      authority: [],
+      signsParticipantsOut: false,
+    });
   });
 });

@@ -1,6 +1,13 @@
 /** The fields POST /admin/set-config accepts for a Worker-canonical session. */
 export const WORKER_CANONICAL_SET_CONFIG_KEYS: readonly string[];
 
+/** The highlighted and hidden question and survey ID lists; editing them signs no one out. */
+export const CURATED_ID_LIST_KEYS: readonly string[];
+/** The most IDs one curated list holds. */
+export const MAX_CURATED_IDS: number;
+/** True for a list of at most MAX_CURATED_IDS IDs, each 1-128 letters, digits or `._:-`. */
+export function validCuratedIdList(value: unknown): value is string[];
+
 export type SessionConfigEditClassification = {
   /** Edited paths that keep participants signed in, such as `sessionName`. */
   content: string[];
