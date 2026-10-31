@@ -366,15 +366,19 @@ export class RecordingChunkQueue {
       );
     }
   }
+  /** Whether only this page holds some audio, so a reload or closing the tab would lose it. */
+  get unsavedAudio(): boolean {
+    return (
+      Boolean(this.storageError || this.failedWrites.size) && [...this.records.values()].some((record) => record.audio)
+    );
+  }
   /** After pending saves: whether no chunk is waiting or uploading, and whether only this page holds some audio. */
   async settled() {
     await this.ready;
     await this.writes;
     return {
       idle: this.segments.every((segment) => ['complete', 'failed'].includes(segment.status)),
-      unsaved:
-        Boolean(this.storageError || this.failedWrites.size) &&
-        [...this.records.values()].some((record) => record.audio),
+      unsaved: this.unsavedAudio,
     };
   }
   async keepAudio() {

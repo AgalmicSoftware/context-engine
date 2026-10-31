@@ -157,6 +157,14 @@ describe('SessionListeningPanel', () => {
     expect(screen.getByText(/Recording page is hidden/)).toBeInTheDocument();
   });
 
+  it('says why Back kept the page while recording', () => {
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({ isRecording: true, status: 'recording', wakeLockHeld: true, backBlocked: true }),
+    );
+    render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" embeddedInModal />);
+    expect(screen.getByText('Still recording. Press Stop before leaving.')).toBeInTheDocument();
+  });
+
   it('removes duplicate recorder chrome only when embedded in the voice modal', () => {
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
 

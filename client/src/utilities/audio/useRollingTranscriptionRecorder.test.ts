@@ -595,6 +595,93 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
+  describe('leaving the page', () => {
+    const leaving = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    beforeEach(() => window.history.replaceState(null, '', '/session/breakout?mode=groupRecording'));
+
+    it('asks before a reload or tab close while capturing, then while the last chunk uploads', async () => {
+      let answer = (_text: string) => {};
+      (transcribeAudio as jest.Mock).mockImplementation(
+        () =>
+          new Promise<string>((resolve) => {
+            answer = resolve;
+          }),
+      );
+      const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'leave-upload' }));
+      expect(leaving()).toBe(false);
+      await act(async () => {
+        await result.current.startRecording();
+      });
+      expect(leaving()).toBe(true);
+      await act(async () => {
+        await result.current.stopRecording();
+        await flushPromises();
+      });
+      expect(result.current.segments.map((segment) => segment.status)).toEqual(['transcribing']);
+      expect(leaving()).toBe(true);
+      await act(async () => {
+        answer('Uploaded.');
+        await flushPromises();
+      });
+      expect(leaving()).toBe(false);
+      unmount();
+    });
+
+    it('asks before leaving while some audio is held only in memory', async () => {
+      const put = jest.mocked(putRecordingChunk).getMockImplementation()!;
+      jest.mocked(putRecordingChunk).mockRejectedValue(new DOMException('Full', 'QuotaExceededError'));
+      const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'leave-memory' }));
+      try {
+        await act(async () => {
+          await result.current.startRecording();
+        });
+        await act(async () => {
+          await result.current.stopRecording();
+          await flushPromises();
+        });
+        expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete']);
+        expect(result.current.downloadableChunkIds).toHaveLength(1);
+        expect(leaving()).toBe(true);
+      } finally {
+        unmount();
+        jest.mocked(putRecordingChunk).mockImplementation(put);
+      }
+    });
+
+    it('keeps the page on Back while capturing, says why, and lets Back leave once capture stops', async () => {
+      const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'leave-back' }));
+      const address = window.location.href;
+      const entries = window.history.length;
+      await act(async () => {
+        await result.current.startRecording();
+      });
+      expect(window.history.length).toBe(entries + 1);
+      await act(async () => {
+        window.history.back();
+        await jest.advanceTimersByTimeAsync(10);
+      });
+      expect(window.location.href).toBe(address);
+      expect(result.current.isRecording).toBe(true);
+      expect(result.current.backBlocked).toBe(true);
+      expect(window.history.length).toBe(entries + 1);
+      await act(async () => {
+        await result.current.stopRecording();
+      });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(10);
+      });
+      expect(result.current.backBlocked).toBe(false);
+      // The extra entry is gone from the top, so one Back leaves.
+      expect(window.history.state).toBeNull();
+      expect(leaving()).toBe(false);
+      unmount();
+    });
+  });
+
   it('shows a stop notice when the recorder stops by itself, keeps its audio, and resumes with one tap', async () => {
     (transcribeAudio as jest.Mock).mockImplementation(async () => 'Speech before the stop.');
     const { result, unmount } = renderHook(() =>

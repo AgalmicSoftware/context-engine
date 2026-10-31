@@ -54,6 +54,7 @@ export function useRecordingChunkQueue(options: Options) {
   const [segments, setSegments] = useState<RollingTranscriptSegment[]>([]);
   const [downloadableChunkIds, setDownloadableChunkIds] = useState<string[]>([]);
   const [storageError, setStorageError] = useState('');
+  const [unsavedAudio, setUnsavedAudio] = useState(false);
   const [labelsUnavailableReason, setLabelsUnavailableReason] = useState('');
   const [hiddenPeriods, setHiddenPeriods] = useState<Array<{ startedAt: number; endedAt: number }>>([]);
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && navigator.onLine === false);
@@ -115,6 +116,7 @@ export function useRecordingChunkQueue(options: Options) {
           [...queue.records.values()].filter((record) => record.audio?.size).map((record) => record.segment.id),
         );
         setStorageError(queue.storageError);
+        setUnsavedAudio(queue.unsavedAudio);
         setLabelsUnavailableReason(queue.labelsUnavailableReason);
         setHiddenPeriods(
           queue.hiddenPeriods.flatMap(({ startedAt, endedAt }) => (endedAt == null ? [] : [{ startedAt, endedAt }])),
@@ -221,6 +223,7 @@ export function useRecordingChunkQueue(options: Options) {
     segments,
     transcript: stitchRollingTranscriptSegments(segments),
     storageError,
+    unsavedAudio,
     offline,
     labelsUnavailableReason,
     ownerNotice: foreignPin && !options.capturing ? OWNER_NOTICE : '',

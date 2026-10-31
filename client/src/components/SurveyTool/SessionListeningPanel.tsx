@@ -784,6 +784,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           </Button>
         </div>
       ) : null}
+      {isRecorderSessionActive && recorder.backBlocked ? (
+        <div className={styles.sessionRecordingWakeNotice} role="status">
+          Still recording. Press Stop before leaving.
+        </div>
+      ) : null}
       {isRecorderSessionActive && (recorder.pageHidden || !recorder.wakeLockHeld) ? (
         <div className={styles.sessionRecordingWakeNotice} role="status">
           {recorder.pageHidden

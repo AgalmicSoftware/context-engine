@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestPreferredSpeechMicrophone } from './microphoneSelection';
 import { useRecordingWakeLock } from './useRecordingWakeLock';
+import { useRecordingLeaveGuard } from './useRecordingLeaveGuard';
 import { useRecordingChunkQueue } from './useRecordingChunkQueue';
 import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS } from './rollingTranscription';
 
@@ -454,6 +455,10 @@ export const useRollingTranscriptionRecorder = ({
   const pendingSegmentCount = segments.filter(
     (segment) => segment.status === 'queued' || segment.status === 'transcribing' || segment.status === 'retrying',
   ).length;
+  const backBlocked = useRecordingLeaveGuard(
+    status === 'recording' || status === 'paused' || status === 'stopping',
+    pendingSegmentCount > 0 || chunks.unsavedAudio,
+  );
 
   return {
     wakeLockHeld,
@@ -471,6 +476,7 @@ export const useRollingTranscriptionRecorder = ({
     transcript,
     segments,
     pendingSegmentCount,
+    backBlocked,
     // A capture stop leads; the storage and offline notices only say where the audio is kept.
     errorMessage: [
       errorMessage,

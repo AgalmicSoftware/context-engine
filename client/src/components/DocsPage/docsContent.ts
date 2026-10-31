@@ -152,6 +152,7 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
         'Use `?mode=voice` to open the voice chooser, `?mode=interview` for one-person conversational response drafting, or `?mode=groupRecording` to turn a recorded discussion into draft questions.',
         'The optional ChatGPT/Claude memory handoff, offered in the voice chooser, keeps instructions in the pasted user request, fetches only an inert question catalog, shows the exact packet before encoding, and includes explained per-answer confidence; no relevant signal produces a clean interview link.',
         'The legacy `?mode=listening` link remains supported for the pile-adjacent group recorder, and recording starts only after you press Record.',
+        'Back keeps a running recording on the page, and reloading or closing the tab asks first while audio is still being recorded or uploaded.',
       ],
     },
     {
