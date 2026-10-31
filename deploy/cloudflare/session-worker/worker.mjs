@@ -92936,9 +92936,14 @@ async function exportAgentOnlyData({
     let firstAttemptAt = "";
     let latestAttemptAt = "";
     let includedAttemptEventCount = 0;
+    let unreadableAttemptEventCount = 0;
+    let unreadableAnswerStateCount = 0;
     for (const entry2 of entries) {
       const metadata = entry2.metadata;
-      if (!metadata) continue;
+      if (!metadata || typeof metadata.u !== "string" || !metadata.u || typeof metadata.run !== "string") {
+        unreadableAttemptEventCount += 1;
+        continue;
+      }
       const record4 = {
         telegramUserId: metadata.u,
         runId: metadata.run,
@@ -92995,8 +93000,12 @@ async function exportAgentOnlyData({
     for (const entry2 of stateEntries) {
       const state = await readKvJson2(env, entry2.key);
       if (!state) continue;
+      if (!Array.isArray(state.runScopes)) {
+        if (Object.values(state.byStatement || {}).some((value) => value?.agent || value?.agentSkip)) unreadableAnswerStateCount += 1;
+        continue;
+      }
       const principalId = await agentOnlyPrincipalId(env, state.telegramUserId);
-      for (const scope of state.runScopes || []) {
+      for (const scope of state.runScopes) {
         coverageByRun.set(`${principalId}	${scope.runId}`, agentOnlyRunResponseCoverage(scope));
       }
     }
@@ -93022,10 +93031,14 @@ async function exportAgentOnlyData({
       if (run.successful) principal.successful_run_count += 1;
     }
     const principals = [...principalRows.values()].sort((left, right) => safeString(left.first_attempt_at).localeCompare(safeString(right.first_attempt_at)));
+    const complete = unreadableAttemptEventCount === 0 && unreadableAnswerStateCount === 0;
     const summary = {
       ok: true,
       session_slug: slug,
       generated_at: nowIsoOrCurrent(now),
+      complete,
+      unreadable_attempt_event_count: unreadableAttemptEventCount,
+      unreadable_answer_state_count: unreadableAnswerStateCount,
       attempt_event_count: includedAttemptEventCount,
       distinct_principal_count: principals.length,
       answer_complete_principal_count: principals.filter((principal) => principal.answer_complete_run_count > 0).length,
@@ -93042,6 +93055,7 @@ async function exportAgentOnlyData({
     };
     const outputFormat2 = lower2(format) === "csv" ? "csv" : lower2(format) === "jsonl" ? "jsonl" : "json";
     if (outputFormat2 === "csv") {
+      if (!complete) return { ok: false, status: 409, reason: "agent_only_summary_incomplete" };
       return {
         ok: true,
         rows: principals,

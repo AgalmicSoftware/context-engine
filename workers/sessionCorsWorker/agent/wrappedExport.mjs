@@ -300,9 +300,17 @@ export async function exportAgentOnlyData({
     let firstAttemptAt = '';
     let latestAttemptAt = '';
     let includedAttemptEventCount = 0;
+    // Records written by an earlier Worker lack the principal and run that
+    // this summary counts by. Count them as unreadable and report the summary
+    // as incomplete; never attribute them to a guessed principal or run.
+    let unreadableAttemptEventCount = 0;
+    let unreadableAnswerStateCount = 0;
     for (const entry of entries) {
       const metadata = entry.metadata;
-      if (!metadata) continue;
+      if (!metadata || typeof metadata.u !== 'string' || !metadata.u || typeof metadata.run !== 'string') {
+        unreadableAttemptEventCount += 1;
+        continue;
+      }
       const record = { telegramUserId: metadata.u, runId: metadata.run, createdAt: metadata.at,
         stage: metadata.st, ok: metadata.ok === 1 };
       includedAttemptEventCount += 1;
@@ -356,8 +364,12 @@ export async function exportAgentOnlyData({
     for (const entry of stateEntries) {
       const state = await readKvJson(env, entry.key);
       if (!state) continue;
+      if (!Array.isArray(state.runScopes)) {
+        if (Object.values(state.byStatement || {}).some(value => value?.agent || value?.agentSkip)) unreadableAnswerStateCount += 1;
+        continue;
+      }
       const principalId = await agentOnlyPrincipalId(env, state.telegramUserId);
-      for (const scope of state.runScopes || []) {
+      for (const scope of state.runScopes) {
         coverageByRun.set(`${principalId}\t${scope.runId}`, agentOnlyRunResponseCoverage(scope));
       }
     }
@@ -384,10 +396,14 @@ export async function exportAgentOnlyData({
     }
     const principals = [...principalRows.values()]
       .sort((left, right) => safeString(left.first_attempt_at).localeCompare(safeString(right.first_attempt_at)));
+    const complete = unreadableAttemptEventCount === 0 && unreadableAnswerStateCount === 0;
     const summary = {
       ok: true,
       session_slug: slug,
       generated_at: nowIso(now),
+      complete,
+      unreadable_attempt_event_count: unreadableAttemptEventCount,
+      unreadable_answer_state_count: unreadableAnswerStateCount,
       attempt_event_count: includedAttemptEventCount,
       distinct_principal_count: principals.length,
       answer_complete_principal_count: principals.filter((principal) => principal.answer_complete_run_count > 0).length,
@@ -404,6 +420,8 @@ export async function exportAgentOnlyData({
     };
     const outputFormat = lower(format) === 'csv' ? 'csv' : lower(format) === 'jsonl' ? 'jsonl' : 'json';
     if (outputFormat === 'csv') {
+      // Principal rows cannot carry the summary's completeness.
+      if (!complete) return { ok: false, status: 409, reason: 'agent_only_summary_incomplete' };
       return {
         ok: true,
         rows: principals,

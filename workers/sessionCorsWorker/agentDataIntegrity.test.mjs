@@ -434,6 +434,42 @@ test('research summaries retain each run own answers and original statement set'
   assert.equal(state.runScopes.find(scope => scope.runId === 'run-one').runStatementIds.length, 2);
 });
 
+test('a research summary reports earlier-Worker records as unreadable instead of guessing their principal or run', async () => {
+  const { f } = readableFixture();
+  const member = await memberToken(f);
+  const admin = await f.credential({ scopes: ['read_questions'] });
+  const page = await jsonOk(await f.request('/api/agent/agent-only/statements', { token: member }));
+  await jsonOk(await f.request('/api/agent/agent-only/answers/bulk', { method: 'POST', token: member,
+    body: { run_id: 'current-run', request_id: 'current-first', agent_metadata: metadata,
+      answers: page.statements.map(q => ({ statement_id: q.statement_id, statement_version: q.statement_version,
+        answer: { value: 'agree' }, confidence: 80 })) } }));
+  const summary = format => f.request(`/api/agent/admin/agent-only/export?view=summary&format=${format}`, { token: admin.token });
+  const clean = await jsonOk(await summary('json'));
+  // What a 0.8.0 Worker wrote: attempt metadata without principal or run, and
+  // an answered state without run scopes.
+  const attemptKey = [...f.records.keys()].find(key => key.includes('attempt-event:'));
+  const stateKey = [...f.records.keys()].find(key => key.includes('answer-state:'));
+  f.records.set(`${attemptKey}-earlier`, f.records.get(attemptKey));
+  f.metadata.set(`${attemptKey}-earlier`, { v: 1, t: 'ao_attempt', sg: 'fixture', st: 'answers_bulk', ok: 1, r: '' });
+  const { runScopes, ...earlierState } = JSON.parse(f.records.get(stateKey));
+  assert.ok(runScopes.length);
+  f.records.set(`${stateKey}-earlier`, JSON.stringify({ ...earlierState, telegramUserId: 'earlier-member' }));
+  const partial = await jsonOk(await summary('json'));
+  assert.deepEqual(partial.principals, clean.principals, 'no principal is derived from a missing id');
+  assert.deepEqual(partial.runs, clean.runs, 'no run is derived from a missing run id');
+  assert.equal(partial.attempt_event_count, clean.attempt_event_count);
+  assert.equal(clean.complete, true);
+  assert.equal(clean.unreadable_attempt_event_count, 0);
+  assert.equal(clean.unreadable_answer_state_count, 0);
+  assert.equal(partial.complete, false);
+  assert.equal(partial.unreadable_attempt_event_count, 1);
+  assert.equal(partial.unreadable_answer_state_count, 1);
+  assert.equal(JSON.parse((await (await summary('jsonl')).text()).trim()).complete, false);
+  const csv = await summary('csv');
+  assert.equal(csv.status, 409, 'principal rows cannot say that they are partial');
+  assert.equal((await csv.json()).reason, 'agent_only_summary_incomplete');
+});
+
 
 test('a summary of over a thousand answer and attempt events stays below the KV operation budget', async () => {
   const { f } = readableFixture();
