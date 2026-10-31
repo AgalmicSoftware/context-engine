@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  fetchContextSnapshotText,
   fetchImage,
   fetchUrl,
 } from './fetchExecution.js';
+import { createOutboundUrlSafetyHelpersWithWorkerDeps } from './outboundUrlSafetyBinding.js';
 
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
@@ -196,7 +198,7 @@ test('fetchUrl preserves upstream status/type validation and json success normal
     headers: baseHeaders,
   });
   assert.deepEqual(typeFailure, {
-    body: { error: 'URL must return HTML or JSON' },
+    body: { error: 'URL must return a web page, JSON or plain text' },
     status: 400,
     headers: baseHeaders,
   });
@@ -338,3 +340,127 @@ for (const contentLength of [null, '1']) {
     });
   }
 }
+
+// The Worker's real outbound guard over a scripted network: each URL answers
+// once with its scripted response, so tests see every hop the guard makes.
+const guardedFetch = (routes) => {
+  const calls = [];
+  const fetch = async (url, init = {}) => {
+    calls.push({ url: String(url), redirect: init.redirect, signal: init.signal });
+    const route = routes[String(url)];
+    if (!route) throw new Error(`unexpected fetch ${url}`);
+    return typeof route === 'function' ? route(init) : route;
+  };
+  const { safeFetch, isBlockedOutboundUrl } = createOutboundUrlSafetyHelpersWithWorkerDeps({ deps: { fetch } });
+  return { calls, deps: { safeFetch, isBlockedOutboundUrl } };
+};
+const redirect = (location) => new Response(null, { status: 302, headers: { location } });
+const page = (body, type = 'text/html; charset=utf-8') => new Response(body, { headers: { 'content-type': type } });
+
+test('link fetches refuse http, credentials, private, loopback and metadata hosts before any request', async () => {
+  for (const url of [
+    'http://example.org/essay',
+    'https://user:[redacted-email]/essay',
+    'https://10.0.0.8/notes',
+    'https://192.168.1.1/',
+    'https://127.0.0.1/admin',
+    'https://localhost/',
+    'https://[::1]/',
+    'https://169.254.169.254/latest/meta-data',
+    'https://metadata.google.internal/computeMetadata/v1/',
+    'https://intranet/wiki',
+    'https://printer.local/status',
+    'https://8.8.8.8/',
+  ]) {
+    const { calls, deps } = guardedFetch({});
+    const result = await fetchContextSnapshotText({ url, deps, maxBytes: 1024 });
+    assert.equal(result.ok, false, url);
+    assert.ok([400, 403].includes(result.status), `${url}: ${result.status}`);
+    assert.equal(calls.length, 0, url);
+  }
+});
+
+test('link fetches check every redirect and stop at the redirect cap', async () => {
+  const toLoopback = guardedFetch({
+    'https://example.org/start': redirect('https://example.org/next'),
+    'https://example.org/next': redirect('https://127.0.0.1/admin'),
+  });
+  const refused = await fetchContextSnapshotText({ url: 'https://example.org/start', deps: toLoopback.deps, maxBytes: 1024 });
+  assert.deepEqual([refused.ok, refused.status, refused.error], [false, 403, 'Redirect to blocked target']);
+  assert.deepEqual(toLoopback.calls.map((call) => call.url), ['https://example.org/start', 'https://example.org/next']);
+  assert.ok(toLoopback.calls.every((call) => call.redirect === 'manual' && call.signal instanceof AbortSignal));
+
+  const toHttp = guardedFetch({ 'https://example.org/start': redirect('http://example.org/plain') });
+  assert.equal((await fetchContextSnapshotText({ url: 'https://example.org/start', deps: toHttp.deps, maxBytes: 1024 })).status, 403);
+
+  const routes = Object.fromEntries(Array.from({ length: 7 }, (_, hop) => [`https://example.org/${hop}`, redirect(`https://example.org/${hop + 1}`)]));
+  const looping = guardedFetch(routes);
+  const tooMany = await fetchContextSnapshotText({ url: 'https://example.org/0', deps: looping.deps, maxBytes: 1024 });
+  assert.deepEqual([tooMany.ok, tooMany.error], [false, 'Too many redirects']);
+  assert.equal(looping.calls.length, 6);
+
+  const followed = guardedFetch({
+    'https://example.org/old': redirect('/new'),
+    'https://example.org/new': page('<html><head><title> The  Essay </title></head><body><p>Kept text.</p></body></html>'),
+  });
+  const read = await fetchContextSnapshotText({ url: 'https://example.org/old', deps: followed.deps, maxBytes: 1024 });
+  assert.deepEqual([read.ok, read.text, read.title], [true, 'Kept text.', 'The Essay']);
+});
+
+test('link fetches keep to text types and the size cap, and read plain text and Markdown as sent', async () => {
+  const fetchOne = (response, maxBytes = 1024) => {
+    const { deps } = guardedFetch({ 'https://example.org/doc': response });
+    return fetchContextSnapshotText({ url: 'https://example.org/doc', deps, maxBytes });
+  };
+  assert.deepEqual(await fetchOne(page('%PDF-1.7', 'application/pdf')), {
+    ok: false, status: 400, error: 'URL must return a web page, JSON or plain text',
+  });
+  assert.equal((await fetchOne(page('x'.repeat(2048), 'text/plain'))).status, 413);
+  assert.equal((await fetchOne(new Response('gone', { status: 404, headers: { 'content-type': 'text/html' } }))).error, 'HTTP 404');
+  const markdown = await fetchOne(page('# Title\r\n\r\n- one\r\n- two\n', 'text/markdown; charset=utf-8'));
+  assert.deepEqual([markdown.ok, markdown.text], [true, '# Title\n\n- one\n- two']);
+  assert.equal((await fetchOne(page('Plain notes.', 'text/plain'))).text, 'Plain notes.');
+  assert.equal((await fetchOne(page('{"a": [1, 2]}', 'application/json'))).text, '{"a":[1,2]}');
+  assert.deepEqual(await fetchOne(page('{"a": ', 'application/json')), {
+    ok: false, status: 400, error: 'The link returned JSON that could not be read',
+  });
+  const latin1 = await fetchOne(new Response(new Uint8Array([0x63, 0x61, 0x66, 0xe9]), {
+    headers: { 'content-type': 'text/plain; charset=iso-8859-1' },
+  }));
+  assert.equal(latin1.text, 'café');
+});
+
+test('link fetches give up after the deadline, headers or body', async (t) => {
+  // AbortSignal.timeout's timer does not hold Node's event loop open; this one does.
+  const keepAlive = setTimeout(() => {}, 5000);
+  t.after(() => clearTimeout(keepAlive));
+  const hang = (init) => new Promise((_, reject) => {
+    init.signal.addEventListener('abort', () => reject(init.signal.reason));
+  });
+  const { deps } = guardedFetch({ 'https://example.org/slow': hang });
+  const started = Date.now();
+  const result = await fetchContextSnapshotText({
+    url: 'https://example.org/slow', deps: { ...deps, fetchTimeoutMs: 50 }, maxBytes: 1024,
+  });
+  assert.deepEqual(result, { ok: false, status: 504, error: 'The link took longer than 10 seconds to answer.' });
+  assert.ok(Date.now() - started < 2000);
+
+  const slowBody = guardedFetch({
+    'https://example.org/drip': (init) => new Response(new ReadableStream({
+      pull: () => new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(init.signal.reason))),
+    }), { headers: { 'content-type': 'text/plain' } }),
+  });
+  const stalled = await fetchContextSnapshotText({
+    url: 'https://example.org/drip', deps: { ...slowBody.deps, fetchTimeoutMs: 50 }, maxBytes: 1024,
+  });
+  assert.equal(stalled.status, 504);
+});
+
+test('fetch_url uses the same guard: an http or private link never reaches the network', async () => {
+  for (const url of ['http://example.org/page', 'https://127.0.0.1/page']) {
+    const { calls, deps } = guardedFetch({});
+    const response = await fetchUrl({ url, deps: { ...deps, json: createJsonStub() } });
+    assert.ok([400, 403].includes(response.status), url);
+    assert.equal(calls.length, 0);
+  }
+});

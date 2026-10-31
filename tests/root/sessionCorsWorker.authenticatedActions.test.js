@@ -407,7 +407,7 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
       makeActionRequest({
         token,
         sessionSlug,
-        body: { action: 'fetch_url', url: 'http://[::ffff:127.0.0.1]/private' },
+        body: { action: 'fetch_url', url: 'https://[::ffff:127.0.0.1]/private' },
       }),
       env,
       {}

@@ -23,11 +23,11 @@ export const normalizeFetchTargetUrl = ({ url, deps } = {}) => {
     };
   }
 
-  if (!/^https?:$/.test(target.protocol)) {
+  if (target.protocol !== 'https:') {
     return {
       ok: false,
       status: 400,
-      error: 'URL must be http(s)',
+      error: 'URL must be https',
       targetUrl: target.toString(),
     };
   }

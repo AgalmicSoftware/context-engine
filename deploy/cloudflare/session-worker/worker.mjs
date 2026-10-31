@@ -82176,7 +82176,7 @@ var require_api = __commonJS({
         const contentType = res.headers.get("content-type");
         const charset = contentType?.match(/charset=([^()<>@,;:\"/[\]?.=\s]*)/i)?.[1];
         const response2 = res;
-        const decodeText = async () => {
+        const decodeText2 = async () => {
           if (charset) {
             try {
               response2.data = new TextDecoder(charset).decode(await res.arrayBuffer());
@@ -82190,20 +82190,20 @@ var require_api = __commonJS({
         if (responseType === "arraybuffer") {
           response2.data = await res.arrayBuffer();
         } else if (responseType === "text") {
-          await decodeText();
+          await decodeText2();
         } else if (responseType === "webstream") {
           response2.data = addAsyncIterator(res.body);
         } else {
           try {
             let test = await res.clone().json();
             if (typeof test !== "object") {
-              await decodeText();
+              await decodeText2();
             } else {
               response2.data = await res.json();
             }
             test = null;
           } catch {
-            await decodeText();
+            await decodeText2();
           }
         }
         return response2;
@@ -88789,11 +88789,11 @@ var normalizeFetchTargetUrl = ({ url, deps } = {}) => {
       targetUrl: ""
     };
   }
-  if (!/^https?:$/.test(target.protocol)) {
+  if (target.protocol !== "https:") {
     return {
       ok: false,
       status: 400,
-      error: "URL must be http(s)",
+      error: "URL must be https",
       targetUrl: target.toString()
     };
   }
@@ -88814,10 +88814,36 @@ var normalizeFetchTargetUrl = ({ url, deps } = {}) => {
 };
 
 // workers/sessionCorsWorker/fetchExecution.js
+init_outboundUrlSafetyBinding();
 init_responseKvHelpers();
 var FETCH_CACHE_TTL_SECONDS = 3600;
 var FETCH_USER_AGENT = "ContextEngineSessionCorsWorker";
 var MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
+var FETCH_TIMEOUT_MS = 1e4;
+var TIMEOUT_ERROR = "The link took longer than 10 seconds to answer.";
+var TEXT_MEDIA_TYPES = /* @__PURE__ */ new Set([
+  "text/html",
+  "application/xhtml+xml",
+  "application/json",
+  "text/plain",
+  "text/markdown",
+  "text/x-markdown"
+]);
+var HTML_MEDIA_TYPES = /* @__PURE__ */ new Set(["text/html", "application/xhtml+xml"]);
+var discardBody = (response2) => {
+  response2.body?.cancel?.()?.catch?.(() => {
+  });
+};
+var isTimeout = (error) => error?.name === "TimeoutError" || error?.name === "AbortError";
+var mediaTypeOf = (contentType) => String(contentType || "").split(";")[0].trim().toLowerCase();
+var decodeText = (bytes3, contentType) => {
+  const charset = /charset\s*=\s*"?([\w.:-]+)/i.exec(String(contentType || ""))?.[1] || "utf-8";
+  try {
+    return new TextDecoder(charset).decode(bytes3);
+  } catch {
+    return new TextDecoder().decode(bytes3);
+  }
+};
 var resolveJson3 = (deps) => deps?.json || json;
 var resolveNormalizedTarget = ({ url, deps } = {}) => (deps?.normalizeFetchTargetUrl || normalizeFetchTargetUrl)({
   url,
@@ -88828,7 +88854,8 @@ var resolveNormalizedTarget = ({ url, deps } = {}) => (deps?.normalizeFetchTarge
 var fetchNormalizedTarget = async ({
   url,
   baseHeaders,
-  deps
+  deps,
+  cacheTtl = FETCH_CACHE_TTL_SECONDS
 } = {}) => {
   const json6 = resolveJson3(deps);
   const normalized = resolveNormalizedTarget({ url, deps });
@@ -88838,10 +88865,24 @@ var fetchNormalizedTarget = async ({
       response: json6({ error: normalized?.error }, normalized?.status || 400, baseHeaders)
     };
   }
-  const response2 = await deps?.safeFetch?.(normalized.targetUrl, {
-    headers: { "user-agent": FETCH_USER_AGENT },
-    cf: { cacheTtl: FETCH_CACHE_TTL_SECONDS }
-  });
+  let response2;
+  try {
+    response2 = await deps?.safeFetch?.(normalized.targetUrl, {
+      outboundUrlPolicy: PUBLIC_HTTPS_ARTIFACT_POLICY,
+      headers: { "user-agent": FETCH_USER_AGENT },
+      ...cacheTtl ? { cf: { cacheTtl } } : {},
+      signal: AbortSignal.timeout(deps?.fetchTimeoutMs || FETCH_TIMEOUT_MS)
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      response: json6(
+        { error: isTimeout(error) ? TIMEOUT_ERROR : "The link could not be fetched." },
+        isTimeout(error) ? 504 : 502,
+        baseHeaders
+      )
+    };
+  }
   if (!(response2 instanceof Response)) {
     return {
       ok: false,
@@ -88854,9 +88895,9 @@ var fetchNormalizedTarget = async ({
     json: json6
   };
 };
-var readFetchBytes = async (response2) => {
+var readFetchBytes = async (response2, maxBytes = MAX_RESPONSE_BYTES) => {
   try {
-    return await readBodyBytes(response2, MAX_RESPONSE_BYTES);
+    return await readBodyBytes(response2, maxBytes);
   } catch (error) {
     if (error instanceof BodyByteLimitError) return null;
     throw error;
@@ -88906,39 +88947,70 @@ var fetchImage = async ({
   if (!type.startsWith("image/")) {
     return json6({ error: "URL must return an image" }, 400, baseHeaders);
   }
-  const bytes3 = await readFetchBytes(response2);
+  let bytes3;
+  try {
+    bytes3 = await readFetchBytes(response2);
+  } catch (error) {
+    if (isTimeout(error)) return json6({ error: TIMEOUT_ERROR }, 504, baseHeaders);
+    throw error;
+  }
   if (!bytes3) return json6({ error: "Response too large" }, 413, baseHeaders);
   const headers2 = new Headers(baseHeaders);
   headers2.set("Content-Type", type);
   return new Response(bytes3, { status: 200, headers: headers2 });
+};
+var fetchPublicText = async ({ url, deps, maxBytes, cacheTtl }) => {
+  const failure = (error, status) => ({ ok: false, error, status });
+  const fetchResult = await fetchNormalizedTarget({
+    url,
+    deps: { ...deps, json: (body, status) => ({ body, status }) },
+    cacheTtl
+  });
+  if (!fetchResult?.ok) return failure(fetchResult?.response?.body?.error, fetchResult?.response?.status);
+  const { response: response2 } = fetchResult;
+  if (!response2.ok) {
+    discardBody(response2);
+    return failure(`HTTP ${response2.status}`, 400);
+  }
+  const contentType = response2.headers.get("content-type") || "";
+  const mediaType = mediaTypeOf(contentType);
+  if (!TEXT_MEDIA_TYPES.has(mediaType)) {
+    discardBody(response2);
+    return failure("URL must return a web page, JSON or plain text", 400);
+  }
+  let bytes3;
+  try {
+    bytes3 = await readFetchBytes(response2, maxBytes);
+  } catch (error) {
+    if (isTimeout(error)) return failure(TIMEOUT_ERROR, 504);
+    throw error;
+  }
+  if (!bytes3) return failure("Response too large", 413);
+  const raw = decodeText(bytes3, contentType);
+  let text2;
+  if (mediaType === "application/json") {
+    try {
+      text2 = JSON.stringify(JSON.parse(raw));
+    } catch {
+      return failure("The link returned JSON that could not be read", 400);
+    }
+  } else if (HTML_MEDIA_TYPES.has(mediaType)) text2 = stripHtml(raw);
+  else text2 = raw.replace(/\r\n?/g, "\n").trim();
+  const title = HTML_MEDIA_TYPES.has(mediaType) ? (/<title\b[^>]*>([^<]{1,500})<\/title>/i.exec(raw)?.[1] || "").replace(/\s+/g, " ").trim() : "";
+  return { ok: true, text: text2, title, contentType, mediaType };
 };
 var fetchUrl = async ({
   url,
   baseHeaders,
   deps
 } = {}) => {
-  const fetchResult = await fetchNormalizedTarget({ url, baseHeaders, deps });
-  if (!fetchResult?.ok) return fetchResult?.response;
-  const { response: response2, json: json6 } = fetchResult;
-  if (!response2.ok) {
-    return json6({ error: `HTTP ${response2.status}` }, 400, baseHeaders);
-  }
-  const type = response2.headers.get("content-type") || "";
-  if (!/text\/html|application\/json/i.test(type)) {
-    return json6({ error: "URL must return HTML or JSON" }, 400, baseHeaders);
-  }
-  const bytes3 = await readFetchBytes(response2);
-  if (!bytes3) return json6({ error: "Response too large" }, 413, baseHeaders);
-  const text2 = new TextDecoder().decode(bytes3);
-  if (type.includes("application/json")) {
-    const data = JSON.parse(text2);
-    return json6({ content: JSON.stringify(data), status: "success", contentType: type }, 200, baseHeaders);
-  }
-  const stripped = stripHtml(text2);
-  if (!stripped || stripped.length < 50) {
+  const json6 = resolveJson3(deps);
+  const result = await fetchPublicText({ url, deps, maxBytes: MAX_RESPONSE_BYTES, cacheTtl: FETCH_CACHE_TTL_SECONDS });
+  if (!result.ok) return json6({ error: result.error }, result.status, baseHeaders);
+  if (HTML_MEDIA_TYPES.has(result.mediaType) && result.text.length < 50) {
     return json6({ error: "Insufficient content extracted" }, 400, baseHeaders);
   }
-  return json6({ content: stripped, status: "success", contentType: type }, 200, baseHeaders);
+  return json6({ content: result.text, status: "success", contentType: result.contentType }, 200, baseHeaders);
 };
 
 // workers/sessionCorsWorker/adminSignatureAuthority.js
