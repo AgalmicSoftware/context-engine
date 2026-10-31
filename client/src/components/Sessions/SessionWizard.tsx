@@ -2637,21 +2637,29 @@ const SessionWizard = ({
     if (typeof window === 'undefined') return;
     window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
   };
+  // On load, and when a link is pasted into this tab (only its hash changes).
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.location.hash.includes('template=')) return;
+    if (typeof window === 'undefined') return;
     let cancelled = false;
-    void decodeSessionTemplateLink(window.location.hash).then((result) => {
-      if (cancelled || !result) return;
-      const mine = sessionTemplateFromDraft(draftRef.current);
-      const sameDraft = result.ok && !!result.template.draftId && result.template.draftId === draftRef.current?.draftId;
-      setLinkTemplate({
-        result,
-        changes: result.ok && mine.ok ? diffSessionTemplates(mine.template, result.template) : [],
-        sameDraft,
+    const readLink = () => {
+      if (!window.location.hash.includes('template=')) return;
+      void decodeSessionTemplateLink(window.location.hash).then((result) => {
+        if (cancelled || !result) return;
+        const mine = sessionTemplateFromDraft(draftRef.current);
+        const sameDraft =
+          result.ok && !!result.template.draftId && result.template.draftId === draftRef.current?.draftId;
+        setLinkTemplate({
+          result,
+          changes: result.ok && mine.ok ? diffSessionTemplates(mine.template, result.template) : [],
+          sameDraft,
+        });
       });
-    });
+    };
+    readLink();
+    window.addEventListener('hashchange', readLink);
     return () => {
       cancelled = true;
+      window.removeEventListener('hashchange', readLink);
     };
   }, []);
 

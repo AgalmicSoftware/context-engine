@@ -63,6 +63,19 @@ describe('SessionWizard template links', () => {
     expect(shared).not.toMatch(/cf-|sk-/);
   });
 
+  it('shows a link pasted into the open setup tab, where only the hash changes', async () => {
+    renderSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME, {}, { timeout: 8000 });
+    expect(screen.queryByTestId('ce-template-link-notice')).not.toBeInTheDocument();
+    const fragment = await linkFor({ sessionName: 'Pasted in' });
+    await act(async () => {
+      window.history.replaceState({}, '', `/new${fragment}`);
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    const notice = await screen.findByTestId('ce-template-link-notice', {}, { timeout: 8000 });
+    expect(within(notice).getByTestId('ce-template-changes')).toHaveTextContent('sessionName: (empty) → Pasted in');
+  });
+
   it('keeps the local draft when the link is dismissed', async () => {
     const fragment = await linkFor({ sessionName: 'Someone else' });
     window.history.replaceState({}, '', `/new${fragment}`);
