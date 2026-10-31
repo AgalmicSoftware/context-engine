@@ -17,7 +17,7 @@ const invoke = async (adapter, payload = {}, config) => {
   const calls = [];
   const fetch = async (url, init) => {
     calls.push({ url, body: JSON.parse(init.body), headers: init.headers });
-    return Response.json({ choices: [{ message: { content: 'answer' } }], content: [{ text: 'answer' }], output_text: 'answer' });
+    return Response.json({ choices: [{ message: { content: 'answer' } }], content: [{ type: 'text', text: 'answer' }], output_text: 'answer' });
   };
   const response = await proxy({ payload: { model, messages: [{ role: 'user', content: 'Synthetic request' }], ...payload },
     config: config || configFor(provider, model), secrets: { [secret]: 'synthetic-session-key', customRpcUrl: 'https://rpc.example.test' },

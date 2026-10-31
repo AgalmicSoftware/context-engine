@@ -61,7 +61,7 @@ for (const [provider, model, secret] of [
   const fetch = async (_, init) => {
     if (provider === 'custom') assert.equal(init.outboundUrlPolicy, 'strict-https-no-credentials');
     body = JSON.parse(init.body);
-    return Response.json({ choices: [{ message: { content: 'What matters to you?' } }], content: [{ text: 'What matters to you?' }] });
+    return Response.json({ choices: [{ message: { content: 'What matters to you?' } }], content: [{ type: 'text', text: 'What matters to you?' }] });
   };
   Object.assign(f.args.deps, { fetch, safeFetch: fetch, log: () => {} });
   const result = await resolveInterviewStarter(f.args);

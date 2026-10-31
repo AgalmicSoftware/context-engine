@@ -73,7 +73,7 @@ test('proxyAnthropic preserves request apiKey precedence, prompt body shaping, a
       fetch: async (...args) => {
         fetchArgs = args;
         return new Response(JSON.stringify({
-          content: [{ text: 'pong' }],
+          content: [{ type: 'text', text: 'pong' }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -92,8 +92,7 @@ test('proxyAnthropic preserves request apiKey precedence, prompt body shaping, a
     'x-api-key': 'sk-request',
   });
   assert.deepEqual(JSON.parse(fetchArgs?.[1]?.body), {
-    model: 'claude-3-5-sonnet-20240620',
-    temperature: 0.4,
+    model: 'claude-opus-5-5',
     max_tokens: 321,
     messages: [{ role: 'user', content: 'hello' }],
   });
@@ -101,12 +100,48 @@ test('proxyAnthropic preserves request apiKey precedence, prompt body shaping, a
     body: {
       completion: 'pong',
       raw: {
-        content: [{ text: 'pong' }],
+        content: [{ type: 'text', text: 'pong' }],
       },
     },
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
+});
+
+test('proxyAnthropic sends no temperature and answers with the text after thinking', async () => {
+  let sent = null;
+  const result = await proxyAnthropic({
+    payload: {
+      apiKey: 'sk-request',
+      model: 'claude-opus-5-5',
+      temperature: 0.2,
+      max_tokens: 900,
+      messages: [{ role: 'user', content: 'Summarize.' }],
+    },
+    secrets: {},
+    baseHeaders: {},
+    deps: {
+      json: createJsonStub(),
+      fetch: async (_url, init) => {
+        sent = JSON.parse(init.body);
+        return Response.json({
+          content: [
+            { type: 'thinking', thinking: '', signature: 'sig' },
+            { type: 'text', text: 'Two ' },
+            { type: 'text', text: 'points.' },
+          ],
+        });
+      },
+    },
+  });
+
+  assert.deepEqual(sent, {
+    model: 'claude-opus-5-5',
+    max_tokens: 900,
+    messages: [{ role: 'user', content: 'Summarize.' }],
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.completion, 'Two points.');
 });
 
 test('proxyAnthropic preserves upstream error fallback to Anthropic error', async () => {

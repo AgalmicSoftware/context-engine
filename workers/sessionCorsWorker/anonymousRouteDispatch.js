@@ -1,5 +1,5 @@
 import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
-import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
+import { DEFAULT_AI_MODEL, DEFAULT_ANTHROPIC_MODEL } from '../../shared/aiDefaults.mjs';
 import { dispatchWorkerCapabilities } from './workerCapabilities.js';
 import { isModelAllowed } from './aiRequestNormalization.js';
 import {
@@ -13,7 +13,7 @@ import {
 } from './realtimeCallExecution.js';
 
 const resolveDefaultModelForProvider = (provider) => {
-  if (provider === 'anthropic') return 'claude-3-5-sonnet-20240620';
+  if (provider === 'anthropic') return DEFAULT_ANTHROPIC_MODEL;
   if (provider === 'openrouter') return 'openrouter/auto';
   if (provider === 'openai' || provider === 'custom') return DEFAULT_AI_MODEL;
   return '';

@@ -9,7 +9,7 @@ test('createWorkerExecutionServicesWithWorkerDeps directly owns the five executi
     deps: {
       fetch: async (url, options) => {
         calls.push({ url, options });
-        return new Response(JSON.stringify({ content: [{ text: 'direct' }] }), {
+        return new Response(JSON.stringify({ content: [{ type: 'text', text: 'direct' }] }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });
@@ -26,7 +26,7 @@ test('createWorkerExecutionServicesWithWorkerDeps directly owns the five executi
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     completion: 'direct',
-    raw: { content: [{ text: 'direct' }] },
+    raw: { content: [{ type: 'text', text: 'direct' }] },
   });
   assert.equal(calls.length, 1);
 });

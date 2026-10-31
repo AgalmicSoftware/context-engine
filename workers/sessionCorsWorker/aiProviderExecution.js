@@ -1,6 +1,6 @@
 import { boundSessionAiRequest } from './aiRequestPolicy.js';
 import { STRICT_HTTPS_NO_CREDENTIALS_POLICY } from './outboundUrlSafetyBinding.js';
-import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
+import { DEFAULT_AI_MODEL, DEFAULT_ANTHROPIC_MODEL } from '../../shared/aiDefaults.mjs';
 import {
   applyChatCompletionBudget,
   isChatReasoningModel,
@@ -93,22 +93,21 @@ export const proxyAnthropic = async ({
 
   const {
     model,
-    temperature,
     max_tokens,
     messages,
     prompt,
     max_tokens_to_sample,
   } = payload || {};
+  // No temperature: current Claude models refuse it (Opus 5.5 and Fable 5.1 any value,
+  // Sonnet and Haiku 5.5 anything but the default), so they sample at their default.
   const body = messages
     ? {
-        model: model || 'claude-3-5-sonnet-20240620',
-        temperature: temperature ?? 0.7,
+        model: model || DEFAULT_ANTHROPIC_MODEL,
         max_tokens: max_tokens ?? 4096,
         messages,
       }
     : {
-        model: model || 'claude-3-5-sonnet-20240620',
-        temperature: temperature ?? 0.7,
+        model: model || DEFAULT_ANTHROPIC_MODEL,
         max_tokens: max_tokens ?? max_tokens_to_sample ?? 4096,
         messages: [{ role: 'user', content: String(prompt || '') }],
       };
@@ -131,7 +130,11 @@ export const proxyAnthropic = async ({
       retryAfter ? responseHeaders : baseHeaders);
   }
 
-  const completion = data?.content?.[0]?.text || '';
+  // Models that think reply with thinking blocks before the answer, so the reply is its text blocks.
+  const completion = (Array.isArray(data?.content) ? data.content : [])
+    .filter((block) => block?.type === 'text')
+    .map((block) => toStr(block.text))
+    .join('');
   return json({ completion, raw: data }, 200, baseHeaders);
 };
 

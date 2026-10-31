@@ -62,7 +62,8 @@ export const buildAiWorkerRequestPlan = ({
     ...maybeNumberProp('max_completion_tokens', maxCompletionTokens),
     ...(!usesResponsesApi && !usesCompletionTokens && typeof maxTokens === 'number' ? { max_tokens: maxTokens } : {}),
     ...(opts.response_format ? { response_format: opts.response_format } : {}),
-    ...(!usesResponsesApi && !usesCompletionTokens
+    // Current Claude models refuse temperature, and the Worker sends them none.
+    ...(!usesResponsesApi && !usesCompletionTokens && provider !== 'anthropic'
       ? typeof opts.temperature === 'number'
         ? { temperature: opts.temperature }
         : { temperature: 0.7 }

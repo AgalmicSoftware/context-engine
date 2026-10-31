@@ -72791,11 +72791,12 @@ var init_sponsoredBootstrapGrantStore = __esm({
 });
 
 // shared/aiDefaults.mjs
-var DEFAULT_AI_MODEL, DEFAULT_AI_MODELS;
+var DEFAULT_AI_MODEL, DEFAULT_AI_MODELS, DEFAULT_ANTHROPIC_MODEL;
 var init_aiDefaults = __esm({
   "shared/aiDefaults.mjs"() {
     DEFAULT_AI_MODEL = "gpt-5.6-terra";
     DEFAULT_AI_MODELS = Object.freeze({ fast: DEFAULT_AI_MODEL, thinking: DEFAULT_AI_MODEL });
+    DEFAULT_ANTHROPIC_MODEL = "claude-opus-5-5";
   }
 });
 
@@ -73663,20 +73664,17 @@ var init_aiProviderExecution = __esm({
       payload = policy.payload;
       const {
         model,
-        temperature,
         max_tokens,
         messages,
         prompt,
         max_tokens_to_sample
       } = payload || {};
       const body = messages ? {
-        model: model || "claude-3-5-sonnet-20240620",
-        temperature: temperature ?? 0.7,
+        model: model || DEFAULT_ANTHROPIC_MODEL,
         max_tokens: max_tokens ?? 4096,
         messages
       } : {
-        model: model || "claude-3-5-sonnet-20240620",
-        temperature: temperature ?? 0.7,
+        model: model || DEFAULT_ANTHROPIC_MODEL,
         max_tokens: max_tokens ?? max_tokens_to_sample ?? 4096,
         messages: [{ role: "user", content: String(prompt || "") }]
       };
@@ -73700,7 +73698,7 @@ var init_aiProviderExecution = __esm({
           retryAfter ? responseHeaders : baseHeaders
         );
       }
-      const completion = data?.content?.[0]?.text || "";
+      const completion = (Array.isArray(data?.content) ? data.content : []).filter((block) => block?.type === "text").map((block) => toStr6(block.text)).join("");
       return json6({ completion, raw: data }, 200, baseHeaders);
     };
     proxyOpenAI = async ({
@@ -101189,7 +101187,7 @@ var proxyOpenAiRealtimeCall = async ({
 
 // workers/sessionCorsWorker/anonymousRouteDispatch.js
 var resolveDefaultModelForProvider = (provider) => {
-  if (provider === "anthropic") return "claude-3-5-sonnet-20240620";
+  if (provider === "anthropic") return DEFAULT_ANTHROPIC_MODEL;
   if (provider === "openrouter") return "openrouter/auto";
   if (provider === "openai" || provider === "custom") return DEFAULT_AI_MODEL;
   return "";
@@ -105129,7 +105127,7 @@ init_aiRequestNormalization();
 init_chipotleClient();
 init_sessionLifecycle();
 var resolveDefaultModelForProvider2 = (provider) => {
-  if (provider === "anthropic") return "claude-3-5-sonnet-20240620";
+  if (provider === "anthropic") return DEFAULT_ANTHROPIC_MODEL;
   if (provider === "openrouter") return "openrouter/auto";
   if (provider === "openai" || provider === "custom") return DEFAULT_AI_MODEL;
   return "";

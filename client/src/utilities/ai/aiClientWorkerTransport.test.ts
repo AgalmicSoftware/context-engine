@@ -112,6 +112,15 @@ it('routes fast Astra mapping through Responses with low effort and no sampling 
   expect(plan.requestBody).not.toHaveProperty('max_tokens');
 });
 
+it('sends Claude requests without a temperature', () => {
+  const plan = buildAiWorkerRequestPlan({
+    ai: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
+    opts: { temperature: 0.2 },
+  });
+  expect(plan.requestBody).toMatchObject({ provider: 'anthropic', model: 'claude-sonnet-5-5' });
+  expect(plan.requestBody).not.toHaveProperty('temperature');
+});
+
 it('requests standard processing for Terra unless explicitly overridden', () => {
   const plan = buildAiWorkerRequestPlan({ ai: { model: 'gpt-5.6-terra', provider: 'openai', reasoningEffort: 'low' } });
   expect(plan.requestBody).toMatchObject({
