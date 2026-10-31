@@ -1933,7 +1933,7 @@ Runtime:
         }
       }
     },
-    "ai": { "models": { "fast": { "provider": "openai", "model": "gpt-5" } } },
+    "ai": { "models": { "fast": { "provider": "openai", "model": "gpt-6.1-terra" } } },
     "limits": { "perWalletPerDay": 1000, "perAnonymousIpPerDay": 0 }
   }
   ```
@@ -2799,8 +2799,9 @@ Signed login/bootstrap requests:
     settings use the shared text-model default. Other models receive HTTP 403
     with `reason: ai_model_not_allowed` before a provider call.
   - Per-call output ceilings are 2,048 for unlabelled ordinary chat and 16,000
-    for reasoning models or Responses. The session's configured thinking model
-    is treated as reasoning regardless of its name or provider. Built-in tasks
+    for reasoning models or Responses. GPT-5, GPT-6 and o-series models reason,
+    by the shared rule in `shared/aiModelFamily.mjs`, and the session's configured
+    thinking model is treated as reasoning regardless of its name or provider. Built-in tasks
     `generate`, `rewrite`, `summarize` (including audio discussions), `rank`,
     `compare`, and `categorize` each allow up to 16,000 tokens. Smaller fixed
     ceilings are `analysis`: 7,000 (HTML report sections and Worker Results),
@@ -2812,7 +2813,13 @@ Signed login/bootstrap requests:
   - OpenAI processing uses `service_tier: default`. Other adapters do not forward
     a caller's service tier. Reasoning effort cannot exceed saved task/global
     `reasoningEffort` (or `reasoning_effort`), defaulting to `low`; analysis also
-    honors its existing `taskReasoningEffort.generate` fallback. Caller tools
+    honors its existing `taskReasoningEffort.generate` fallback, and
+    `interview-map` may use medium unless the session sets an effort for it.
+    Each adapter sends a level the model accepts: one it lacks becomes the
+    nearest level above it, such as `none` becoming `low` on `gpt-6.1-sol`.
+    Claude gets the effort and a request's JSON schema in `output_config`; a
+    Claude refusal or empty answer returns HTTP 422 with `reason: ai_refused` or
+    `ai_empty`. Caller tools
     and Functions are removed. Custom-provider Functions remain available only
     from the owner's saved `ai.providers.custom.functions` configuration.
   - Caller-supplied `apiKey` (or custom `rpcKey`) requests retain their existing
@@ -2936,7 +2943,7 @@ transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
     Worker configuration or secrets. See [Session Voice Modes](session-listening-mode.md)
     for startup, transcript, stop, and review behavior and the official sources.
 - `POST /transcribe` (multipart/form-data, file field `file` or `audio`)
-  - On the stored OpenAI key, the model must equal `ai.models.transcription.model` or `ai.transcription.model` (default `whisper-1`); a swap receives 403 `ai_model_not_allowed`. BYO and custom transcription retain existing behavior. The multipart adapter forwards only file, model, and JSON response format, with no caller token/tier/tool options.
+  - On the stored OpenAI key, the model must equal `ai.models.transcription.model` or `ai.transcription.model` (default `whisper-1`); a swap receives 403 `ai_model_not_allowed`. BYO and custom transcription retain existing behavior. The multipart adapter forwards only file, model, JSON response format and an optional `prompt` of context, such as the question being answered, cut to 500 characters at a word and never sent to the diarization model, with no caller token/tier/tool options.
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
   - Optional overrides: `provider` (`openai` or `custom`), `apiKey`, `rpcUrl` (custom only).
   - Upstream size limit: OpenAI currently caps each speech-to-text file upload at 25 MB.
@@ -3277,7 +3284,7 @@ without changing a contract interface.
 
 ### Group transcription speaker labels
 
-`POST /transcribe` accepts an opt-in multipart group operation: `provider=openai`, `model=gpt-4o-transcribe-diarize`, `purpose=group-conversation`, and `labelSpeakers=true`. Existing authentication, origin, session, gate and quota checks still apply. This adds only the curated diarization model to the configured OpenAI transcription policy. It does not grant arbitrary model access or switch custom-provider sessions to OpenAI.
+`POST /transcribe` accepts an opt-in multipart group operation: `provider=openai`, `model=gpt-4o-transcribe-diarize`, `purpose=group-conversation`, and `labelSpeakers=true`. OpenAI shuts that model down on 2027-02-26 and has named no replacement. Existing authentication, origin, session, gate and quota checks still apply. This adds only the curated diarization model to the configured OpenAI transcription policy. It does not grant arbitrary model access or switch custom-provider sessions to OpenAI.
 
 The Worker sends `response_format=diarized_json` and `chunking_strategy=auto`, returning `{ text, segments: [{ speaker, start, end, text }] }`. Times are seconds within that upload; invalid or silent segments are omitted. Ordinary requests still return exactly `{ text }`. See [OpenAI's transcription reference](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create).
 
