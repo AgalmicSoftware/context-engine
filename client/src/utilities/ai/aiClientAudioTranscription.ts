@@ -1,3 +1,4 @@
+import { TRANSCRIPTION_FALLBACK_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { mergeTranscriptOverlap } from '../audio/transcriptOverlap';
 import { createLogger } from '../logging.js';
 
@@ -7,6 +8,20 @@ const audioLog = createLogger('ai');
 // We stay below that with a 24 MiB client-side ceiling to leave multipart headroom.
 export const TRANSCRIBE_MAX_UPLOAD_BYTES = 24 * 1024 * 1024;
 export const TRANSCRIBE_WAV_TARGET_HZ = 16000;
+// whisper-1 transcribes a whole upload. Later models stop short on long audio:
+// gpt-4o-transcribe writes at most 2,000 tokens, about ten minutes of speech, and
+// gpt-transcribe publishes no limit. So they hear at most five minutes per request.
+export const TRANSCRIBE_MAX_CHUNK_SECONDS = 5 * 60;
+
+/** The most audio, in seconds, one request to `model` may carry; null when only the upload size limits it. */
+export const transcriptionChunkSeconds = (model: unknown): number | null => {
+  // A request that names no model gets whisper-1 from the Worker.
+  const name =
+    String(model ?? '')
+      .trim()
+      .toLowerCase() || TRANSCRIPTION_FALLBACK_MODEL;
+  return name === TRANSCRIPTION_FALLBACK_MODEL ? null : TRANSCRIBE_MAX_CHUNK_SECONDS;
+};
 const TRANSCRIBE_CHUNK_HEADROOM_BYTES = 64 * 1024;
 const TRANSCRIBE_CHUNK_OVERLAP_MS = 250;
 
@@ -28,6 +43,7 @@ type DecodedMonoAudio = {
 
 type SplitAudioOptions = {
   maxUploadBytes?: number;
+  maxSeconds?: number | null;
   targetHz?: number;
   overlapMs?: number;
 };
@@ -189,6 +205,7 @@ export const splitAudioBlobToWavChunks = async (
   inputBlob: AudioBlobLike,
   {
     maxUploadBytes = TRANSCRIBE_MAX_UPLOAD_BYTES,
+    maxSeconds = null,
     targetHz = TRANSCRIBE_WAV_TARGET_HZ,
     overlapMs = TRANSCRIBE_CHUNK_OVERLAP_MS,
   }: SplitAudioOptions = {},
@@ -200,7 +217,13 @@ export const splitAudioBlobToWavChunks = async (
   if (!(downsampled instanceof Float32Array) || downsampled.length === 0) return [];
 
   const safeMaxBytes = Math.max(1024, Math.floor(maxUploadBytes) - TRANSCRIBE_CHUNK_HEADROOM_BYTES);
-  const maxSamplesPerChunk = Math.max(1, Math.floor((safeMaxBytes - 44) / 2));
+  const maxSamplesPerChunk = Math.max(
+    1,
+    Math.min(
+      Math.floor((safeMaxBytes - 44) / 2),
+      maxSeconds && maxSeconds > 0 ? Math.floor(maxSeconds * targetHz) : Number.POSITIVE_INFINITY,
+    ),
+  );
   const overlapSamples = Math.max(
     0,
     Math.min(Math.floor((overlapMs / 1000) * targetHz), Math.floor(maxSamplesPerChunk / 8)),

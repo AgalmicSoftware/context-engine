@@ -656,6 +656,99 @@ describe('aiClient worker auth options', () => {
     }
   });
 
+  describe('transcription length', () => {
+    beforeEach(() => {
+      fetchWorkerWithAuth.mockReset();
+    });
+
+    // A small upload that decodes to `minutes` of 16 kHz audio, as a long low-bitrate recording does.
+    const transcribeRecording = async ({ model, minutes, decode = 'quick' }) => {
+      getEffectiveTranscriptionConfig.mockResolvedValue({ provider: 'openai', model });
+      getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+      const frames = minutes * 60 * 16000;
+      class MockAudioContext {
+        constructor() {
+          if (decode === 'fails') throw new Error('No audio device');
+        }
+        decodeAudioData() {
+          if (decode === 'stuck') return new Promise(() => {});
+          return Promise.resolve({
+            sampleRate: 16000,
+            numberOfChannels: 1,
+            length: frames,
+            getChannelData: () => new Float32Array(frames),
+          });
+        }
+        close() {
+          return Promise.resolve();
+        }
+      }
+      const originalAudioContext = window.AudioContext;
+      Object.defineProperty(window, 'AudioContext', { value: MockAudioContext, configurable: true });
+      try {
+        const audio = new File([new Uint8Array(2048)], 'meeting.m4a', { type: 'audio/mp4' });
+        const text = await transcribeAudio(audio, { sessionSlug: '' });
+        const forms = fetchWorkerWithAuth.mock.calls.map(([, request]) => request.body);
+        return {
+          text,
+          models: forms.map((form) => form.get('model')),
+          files: forms.map((form) => {
+            const { name, type, size } = form.get('file');
+            return { name, type, size };
+          }),
+        };
+      } finally {
+        Object.defineProperty(window, 'AudioContext', { value: originalAudioContext, configurable: true });
+      }
+    };
+    const wavSeconds = ({ size }) => (size - 44) / 2 / 16000;
+
+    it('sends models after whisper-1 at most five minutes of audio per request', async () => {
+      fetchWorkerWithAuth
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ text: 'part one' }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ text: 'part two' }) });
+
+      const { text, models, files } = await transcribeRecording({ model: 'gpt-transcribe', minutes: 6 });
+
+      expect(text).toBe('part one part two');
+      expect(models).toEqual(['gpt-transcribe', 'gpt-transcribe']);
+      expect(files.map(({ name }) => name)).toEqual(['audio-part-0001.wav', 'audio-part-0002.wav']);
+      // The second piece starts a quarter second early, so words at the cut aren't lost.
+      expect(files.map(wavSeconds)).toEqual([300, 60.25]);
+    });
+
+    it.each([
+      ['whisper-1 audio of any length', { model: 'whisper-1', minutes: 6 }],
+      ['five minutes of audio', { model: 'gpt-transcribe', minutes: 5 }],
+      ['audio the browser cannot decode', { model: 'gpt-transcribe', minutes: 6, decode: 'fails' }],
+    ])('sends %s as recorded', async (_label, recording) => {
+      fetchWorkerWithAuth.mockResolvedValueOnce({ ok: true, json: async () => ({ text: 'whole' }) });
+
+      const { text, files } = await transcribeRecording(recording);
+
+      expect(text).toBe('whole');
+      expect(files).toEqual([{ name: 'meeting.m4a', type: 'audio/mp4', size: 2048 }]);
+    });
+
+    it('sends audio as recorded when decoding it takes over 30 seconds', async () => {
+      jest.useFakeTimers();
+      try {
+        fetchWorkerWithAuth.mockResolvedValueOnce({ ok: true, json: async () => ({ text: 'whole' }) });
+
+        const transcribing = transcribeRecording({ model: 'gpt-transcribe', minutes: 6, decode: 'stuck' });
+        await jest.advanceTimersByTimeAsync(29_999);
+        expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+        await jest.advanceTimersByTimeAsync(1);
+        const { text, files } = await transcribing;
+
+        expect(text).toBe('whole');
+        expect(files).toEqual([{ name: 'meeting.m4a', type: 'audio/mp4', size: 2048 }]);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
   it('routes cluster analysis through the provided active session slug', async () => {
     getEffectiveAiConfig.mockResolvedValue({
       provider: 'openai',

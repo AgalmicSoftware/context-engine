@@ -25,6 +25,7 @@ import {
   mergeTranscriptText,
   normalizeAudioToWav,
   splitAudioBlobToWavChunks,
+  transcriptionChunkSeconds,
 } from './aiClientAudioTranscription.js';
 import { getEffectiveArweaveKey } from '../session/resourceKeys.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
@@ -392,13 +393,38 @@ export async function requestAiRewrite(originalText: unknown, opts: unknown = {}
   }
 }
 
+// Cutting audio by length decodes it on the device. Audio within the upload limit that
+// fails to decode, or takes longer than this, goes whole, so decoding never holds an upload.
+const LENGTH_SPLIT_WAIT_MS = 30_000;
+
+const splitWithinWait = async <T>(split: () => Promise<T[]>): Promise<T[]> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      split(),
+      new Promise<T[]>((resolve) => {
+        timer = setTimeout(() => {
+          aiLog.warn('Audio decode is slow; uploading it whole.');
+          resolve([]);
+        }, LENGTH_SPLIT_WAIT_MS);
+      }),
+    ]);
+  } catch (error) {
+    aiLog.warn('Audio decode failed; uploading it whole:', error);
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 /**
  * Audio transcription via Worker -> OpenAI Whisper.
  * Worker must expose POST /transcribe and return { text: "<transcript>" }.
  * Accepts a File or Blob. Preserves original filename/type when possible.
  * If the file uses an odd/unknown container, we try a minimal client-side
  * normalization to mono WAV (~16 kHz) using Web Audio.
- * Files above the upstream 25 MB limit are chunked client-side before upload.
+ * Files above the upstream 25 MB limit are chunked client-side before upload, as is
+ * audio longer than five minutes for models after whisper-1.
  *
  * Return contract unchanged: resolves to string (may be empty) or throws on error.
  */
@@ -447,21 +473,23 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
   }
 
   const transport = await resolveTranscriptionTransport(opts);
+  const maxSeconds = transcriptionChunkSeconds(transport.transcriptionCfg?.model);
+  const exceedsUploadLimit = (uploadFile?.size || 0) > maxUploadBytes || isTooBig;
+  const split = () =>
+    splitAudioBlobToWavChunks(uploadFile, { maxUploadBytes, maxSeconds, targetHz: TRANSCRIBE_WAV_TARGET_HZ });
 
   // Regression guard: OpenAI's /transcribe endpoint accepts at most 25 MB per file.
   // Oversize uploads must be chunked client-side or they fail after multipart wrapping.
-  if ((uploadFile?.size || 0) > maxUploadBytes || isTooBig) {
-    const chunkedUploads = await splitAudioBlobToWavChunks(uploadFile, {
-      maxUploadBytes,
-      targetHz: TRANSCRIBE_WAV_TARGET_HZ,
-    });
-    if (!chunkedUploads.length) {
-      throw Object.assign(
-        new Error('Audio exceeds the /transcribe 25 MB upload limit and could not be decoded into smaller chunks.'),
-        { status: 422 },
-      );
-    }
-
+  // Models after whisper-1 also stop short on long audio, so theirs is cut by length.
+  const chunkedUploads = exceedsUploadLimit ? await split() : maxSeconds ? await splitWithinWait(split) : [];
+  if (exceedsUploadLimit && !chunkedUploads.length) {
+    throw Object.assign(
+      new Error('Audio exceeds the /transcribe 25 MB upload limit and could not be decoded into smaller chunks.'),
+      { status: 422 },
+    );
+  }
+  // Audio that fits in one piece goes as recorded.
+  if (exceedsUploadLimit || chunkedUploads.length > 1) {
     let merged = '';
     for (const chunk of chunkedUploads) {
       const chunkText = await uploadAudioForTranscription(chunk, transport, {
