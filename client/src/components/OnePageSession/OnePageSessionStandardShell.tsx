@@ -17,6 +17,7 @@ import {
 
 import LazyFallback from '../Shared/LazyFallback';
 import { formatPolisReportSessionInfo } from '../PolisReport/polisReportSessionInfo';
+import { hasSessionContext, normalizeSessionContext, type SessionContext } from '@ce-shared/sessionContext.mjs';
 import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
@@ -64,16 +65,7 @@ type ResultsViewOption = {
   icon: React.ReactNode;
 };
 
-type SessionContextLink = {
-  label: string;
-  url: string;
-};
-
-type SessionContextView = {
-  title: string;
-  paragraphs: string[];
-  links: SessionContextLink[];
-};
+type SessionContextView = SessionContext;
 
 type OnePageSessionStandardShellProps = {
   account: unknown;
@@ -206,49 +198,12 @@ const buildResultsViewOptions = (
       : []),
 ];
 
-const toTrimmedText = (value: unknown, maxLength = 2000) => {
-  if (typeof value !== 'string') return '';
-  return value.trim().slice(0, maxLength);
-};
-
-const normalizeSessionContextLinks = (raw: unknown): SessionContextLink[] => {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((entry) => {
-      const record = entry && typeof entry === 'object' ? (entry as UnknownRecord) : {};
-      const label = toTrimmedText(record.label, 120);
-      const url = toTrimmedText(record.url, 500);
-      let parsedUrl: URL;
-      try {
-        parsedUrl = new URL(url);
-      } catch {
-        return null;
-      }
-      if (!label || parsedUrl.protocol !== 'https:') return null;
-      return { label, url };
-    })
-    .filter((entry): entry is SessionContextLink => !!entry)
-    .slice(0, 4);
-};
-
+// The shared reader's limits apply here as in MCP and on the Worker.
 const normalizeSessionContextView = (config: unknown): SessionContextView | null => {
   const record = config && typeof config === 'object' ? (config as UnknownRecord) : {};
-  const rawContext =
-    record.sessionContext && typeof record.sessionContext === 'object'
-      ? (record.sessionContext as UnknownRecord)
-      : null;
-  if (!rawContext) return null;
-  const paragraphs = (Array.isArray(rawContext.paragraphs) ? rawContext.paragraphs : [rawContext.body])
-    .map((entry) => toTrimmedText(entry, 1400))
-    .filter(Boolean)
-    .slice(0, 4);
-  const links = normalizeSessionContextLinks(rawContext.links);
-  if (!paragraphs.length && !links.length) return null;
-  return {
-    title: toTrimmedText(rawContext.title, 80) || 'Context',
-    paragraphs,
-    links,
-  };
+  if (!hasSessionContext(record.sessionContext)) return null;
+  const context = normalizeSessionContext(record.sessionContext);
+  return { ...context, title: context.title || 'Context' };
 };
 
 const renderSessionContext = (context: SessionContextView | null) => {

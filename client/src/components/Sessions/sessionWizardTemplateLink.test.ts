@@ -31,7 +31,11 @@ describe('session template share links from real-length setup drafts', () => {
 
   it('falls back to a .json download when a draft outgrows a link', async () => {
     const draft = realLengthSessionWizardDraft();
-    draft.sessionContext.paragraphs = Array.from({ length: 12 }, (_entry, index) => prose(20 + index, 1300));
+    draft.sessionContext.paragraphs = Array.from({ length: 6 }, (_entry, index) => prose(20 + index, 2000));
+    draft.questions = Array.from({ length: 12 }, (_entry, index) => ({
+      prompt: prose(40 + index, 1000),
+      type: 'freeform',
+    }));
     await expect(encodeSessionTemplateLink(exportDraft(draft))).resolves.toMatchObject({
       ok: false,
       reason: 'too_long',

@@ -1,5 +1,6 @@
 import { DEFAULT_AI_MODEL } from './aiDefaults.mjs';
 import { stableCanonicalSerialize } from './canonicalJson.mjs';
+import { validateSessionContext } from './sessionContext.mjs';
 import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from './interviewSettings.mjs';
 import { DEFAULT_REALTIME_INTERVIEW_MODEL, isRealtimeInterviewModel } from './realtimeInterviewConfig.mjs';
 import {
@@ -151,14 +152,6 @@ const withDefaults = (value, defaults) => {
   return Object.fromEntries(Object.keys(defaults).map((key) => [key, withDefaults(value[key], defaults[key])]));
 };
 
-const isHttpsUrl = (value) => {
-  try {
-    return new URL(value).protocol === 'https:';
-  } catch {
-    return false;
-  }
-};
-
 // Judges each interview setting alone (this base satisfies the rule that an
 // owner-written opening needs its prompt), then that pair together.
 const INTERVIEW_KEY_BASE = { ...DEFAULT_INTERVIEW_SETTINGS, openingPrompt: 'set' };
@@ -228,14 +221,19 @@ const FIELD_RULES = {
       errors.push({ path: 'draftId', message: 'draftId must be at most 64 letters, digits, "-" or "_".' });
     }
   },
-  sessionContext: (value, errors) =>
+  // The writer's limits, so a template never carries what set-config refuses.
+  // A template also keeps no link without its URL.
+  sessionContext: (value, errors) => {
     value.links.forEach((link, index) => {
       link.label ??= '';
-      if (!isHttpsUrl(link.url)) {
+      if (!link.url?.trim()) {
         const path = `sessionContext.links.${index}.url`;
         errors.push({ path, message: `${path} must be an https:// link.` });
       }
-    }),
+    });
+    const checked = validateSessionContext(value);
+    if (!checked.ok) errors.push(...checked.errors);
+  },
   contextFiles: (value, errors) =>
     value.forEach(({ name }, index) => {
       if (!name?.trim()) errors.push({ path: `contextFiles.${index}.name`, message: 'Each context file needs a name.' });

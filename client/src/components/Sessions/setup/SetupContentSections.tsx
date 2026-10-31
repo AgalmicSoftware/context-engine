@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Input } from 'reactstrap';
 
 import InterviewSettingsFields from '../InterviewSettingsFields';
+import { SESSION_CONTEXT_LIMITS, isHttpsUrl, validateSessionContext } from '@ce-shared/sessionContext.mjs';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import {
   SESSION_COLOR_SCHEME_REGISTRY,
@@ -97,13 +98,17 @@ const readContext = (draft: SetupSectionProps['draft']) => {
   };
 };
 
-const isHttpsUrl = (value: string): boolean => {
-  try {
-    return new URL(value).protocol === 'https:';
-  } catch {
-    return false;
-  }
+const LINK_URL_PATH = /^sessionContext\.links\.\d+\.url$/;
+
+// The writer's problems with the draft's context, as Create and Save see them.
+const contextProblems = (draft: SetupSectionProps['draft']) => {
+  const result = validateSessionContext(readContext(draft));
+  return result.ok ? [] : result.errors;
 };
+
+/** The first thing to fix in the context before Create, or ''. */
+export const describeContextProblem = (draft: SetupSectionProps['draft']): string =>
+  contextProblems(draft)[0]?.message || '';
 
 export const summarizeContext = (draft: SetupSectionProps['draft']): string => {
   const { title, paragraphs, links } = readContext(draft);
@@ -119,6 +124,8 @@ export const summarizeContext = (draft: SetupSectionProps['draft']): string => {
 // template; their names come back as a reminder to attach them again.
 export const SetupContextSection = ({ draft, onChange, open, onToggle }: SetupSectionProps) => {
   const context = readContext(draft);
+  // A link's https problem shows beside the link itself.
+  const problems = contextProblems(draft).filter((problem) => !LINK_URL_PATH.test(problem.path));
   const files = asList(draft.contextFiles)
     .map((file) => text(asRecord(file).name))
     .filter(Boolean);
@@ -137,6 +144,7 @@ export const SetupContextSection = ({ draft, onChange, open, onToggle }: SetupSe
         <Input
           id="ce-setup-context-heading"
           value={context.title}
+          maxLength={SESSION_CONTEXT_LIMITS.titleChars}
           onChange={(event) => save({ title: event.target.value })}
         />
       </SetupField>
@@ -151,6 +159,7 @@ export const SetupContextSection = ({ draft, onChange, open, onToggle }: SetupSe
             type="textarea"
             className={styles.textarea}
             value={paragraph}
+            maxLength={SESSION_CONTEXT_LIMITS.paragraphChars}
             onChange={(event) =>
               save({ paragraphs: context.paragraphs.map((entry, at) => (at === index ? event.target.value : entry)) })
             }
@@ -173,6 +182,7 @@ export const SetupContextSection = ({ draft, onChange, open, onToggle }: SetupSe
               <Input
                 id={`ce-setup-context-link-label-${index}`}
                 value={link.label}
+                maxLength={SESSION_CONTEXT_LIMITS.labelChars}
                 onChange={(event) => setLink(index, { label: event.target.value })}
               />
             </SetupField>
@@ -181,11 +191,14 @@ export const SetupContextSection = ({ draft, onChange, open, onToggle }: SetupSe
                 id={`ce-setup-context-link-url-${index}`}
                 type="url"
                 value={link.url}
-                invalid={!!link.url && !isHttpsUrl(link.url)}
+                maxLength={SESSION_CONTEXT_LIMITS.urlChars}
+                invalid={!!link.url && !isHttpsUrl(link.url.trim())}
                 onChange={(event) => setLink(index, { url: event.target.value })}
               />
             </SetupField>
-            {link.url && !isHttpsUrl(link.url) ? <p className={styles.errorText}>Use an https:// link.</p> : null}
+            {link.url && !isHttpsUrl(link.url.trim()) ? (
+              <p className={styles.errorText}>Use an https:// link.</p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -202,6 +215,7 @@ export const SetupContextSection = ({ draft, onChange, open, onToggle }: SetupSe
           type="button"
           className={styles.button}
           data-testid="ce-setup-context-add-paragraph"
+          disabled={context.paragraphs.length >= SESSION_CONTEXT_LIMITS.paragraphs}
           onClick={() => save({ paragraphs: [...context.paragraphs, ''] })}
         >
           Add paragraph
@@ -210,11 +224,19 @@ export const SetupContextSection = ({ draft, onChange, open, onToggle }: SetupSe
           type="button"
           className={styles.button}
           data-testid="ce-setup-context-add-link"
+          disabled={context.links.length >= SESSION_CONTEXT_LIMITS.links}
           onClick={() => save({ links: [...context.links, { label: '', url: '' }] })}
         >
           Add link
         </button>
       </div>
+      {problems.length ? (
+        <ul className={styles.errorText} role="alert" data-testid="ce-setup-context-problems">
+          {problems.map((problem) => (
+            <li key={problem.path}>{problem.message}</li>
+          ))}
+        </ul>
+      ) : null}
       {files.length ? (
         <p className={styles.hint} data-testid="ce-setup-context-files">
           Attach these files again after setup: {files.join(', ')}.

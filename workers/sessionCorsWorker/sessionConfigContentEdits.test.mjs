@@ -14,7 +14,7 @@ const config = () => {
 const contentEdits = [
   ['session name', { sessionName: 'Renamed session' }],
   ['session info', { sessionInfo: 'Updated description' }],
-  ['session context', { sessionContext: 'Updated background' }],
+  ['session context', { sessionContext: { title: 'Background', paragraphs: ['Updated background'], links: [] } }],
   ['question generation prompt', { questionsGenPrompt: 'Ask about shared priorities.' }],
   ['opening prompt', { interviewMode: { openingPrompt: 'Begin with a local question.' } }],
   ['steering prompt', { interviewMode: { steeringPrompt: 'Follow the participant priorities.' } }],

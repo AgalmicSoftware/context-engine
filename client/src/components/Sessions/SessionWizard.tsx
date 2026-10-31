@@ -88,7 +88,7 @@ import SessionPublishAdvancedSettingsPanel from './SessionPublishAdvancedSetting
 import SessionPublishProgressPanel from './SessionPublishProgressPanel';
 import SessionPublishResultLinks from './SessionPublishResultLinks';
 import { SetupVoiceKeyNote } from './setup/SetupAiSection';
-import { readSetupQuestions } from './setup/SetupContentSections';
+import { describeContextProblem, readSetupQuestions } from './setup/SetupContentSections';
 import {
   SessionTemplateActions,
   SessionTemplateLinkNotice,
@@ -2695,8 +2695,10 @@ const SessionWizard = ({
   const needsWorkerDeploy =
     sessionModeRequirements.usesWorkerRuntime && !deployVerifiedInUi && !canUseSponsoredAutoDeployNow;
   const missingSecrets = needsWorkerDeploy && workerSecretsEnabled ? getMissingWorkerSecretsForDeploy() : [];
+  const contextProblem = describeContextProblem(draft);
   const missingInputs = [
     toStr(draft.sessionName).trim() ? '' : 'Enter a session name.',
+    contextProblem ? `Fix the context: ${contextProblem}` : '',
     needsWorkerDeploy && !toStr(deployForm.apiToken).trim()
       ? 'Enter your Cloudflare API token, or verify a Worker you deployed from the Cloudflare dashboard.'
       : '',

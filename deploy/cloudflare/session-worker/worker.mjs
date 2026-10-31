@@ -10637,21 +10637,21 @@ function setify(items) {
   items.forEach((k) => result.add(k));
   return Object.freeze(result);
 }
-function lex(text) {
+function lex(text2) {
   const tokens = [];
   const throwError2 = (message) => {
-    const token = offset < text.length ? JSON.stringify(text[offset]) : "$EOI";
+    const token = offset < text2.length ? JSON.stringify(text2[offset]) : "$EOI";
     throw new Error(`invalid token ${token} at ${offset}: ${message}`);
   };
   let brackets = [];
   let commas = [];
   let offset = 0;
-  while (offset < text.length) {
-    let cur = text.substring(offset);
+  while (offset < text2.length) {
+    let cur = text2.substring(offset);
     let match = cur.match(regexWhitespacePrefix);
     if (match) {
       offset += match[1].length;
-      cur = text.substring(offset);
+      cur = text2.substring(offset);
     }
     const token = { depth: brackets.length, linkBack: -1, linkNext: -1, match: -1, type: "", text: "", offset, value: -1 };
     tokens.push(token);
@@ -12091,8 +12091,8 @@ var init_abi_coder = __esm({
 });
 
 // workers/sessionCorsWorker/node_modules/ethers/lib.esm/abi/bytes32.js
-function encodeBytes32String(text) {
-  const bytes3 = toUtf8Bytes(text);
+function encodeBytes32String(text2) {
+  const bytes3 = toUtf8Bytes(text2);
   if (bytes3.length > 31) {
     throw new Error("bytes32 string must be less than 32 bytes");
   }
@@ -25391,8 +25391,8 @@ var init_storageRefNormalization = __esm({
       return !!id2 && CLOUDFLARE_REF_ID_RE.test(id2) && !CLOUDFLARE_REF_FORBIDDEN_RE.test(id2);
     };
     assertNoCloudflarePrivateMaterial = (value) => {
-      const text = typeof value === "string" ? value : JSON.stringify(value || {});
-      if (/(r2:\/\/|d1:\/\/|kv:\/\/|bucket[-_\s]?name|account[-_\s]?id|api[-_\s]?token|worker[-_\s]?token|secret|private[-_\s]?key)/i.test(text)) {
+      const text2 = typeof value === "string" ? value : JSON.stringify(value || {});
+      if (/(r2:\/\/|d1:\/\/|kv:\/\/|bucket[-_\s]?name|account[-_\s]?id|api[-_\s]?token|worker[-_\s]?token|secret|private[-_\s]?key)/i.test(text2)) {
         throw new Error("Cloudflare storage references must not expose private storage identifiers or credentials.");
       }
       return true;
@@ -25685,11 +25685,11 @@ var init_sessionSecretsEnvelope = __esm({
       return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
     };
     base64urlToBytes = (value) => {
-      const text = toTrimmedString3(value);
-      if (!/^[A-Za-z0-9_-]+$/.test(text)) {
+      const text2 = toTrimmedString3(value);
+      if (!/^[A-Za-z0-9_-]+$/.test(text2)) {
         throw new Error("Invalid encrypted session secrets encoding.");
       }
-      const base64 = text.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(text.length / 4) * 4, "=");
+      const base64 = text2.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(text2.length / 4) * 4, "=");
       if (typeof Buffer !== "undefined") return new Uint8Array(Buffer.from(base64, "base64"));
       const binary = atob(base64);
       return Uint8Array.from(binary, (char) => char.charCodeAt(0));
@@ -26917,12 +26917,12 @@ var init_workerReleaseManifest = __esm({
         return { ok: false, error: "Worker release manifest URL must be an explicit HTTPS manifest asset URL." };
       }
       try {
-        const text = await fetchArtifactText(normalizedUrl, {
+        const text2 = await fetchArtifactText(normalizedUrl, {
           fetchImpl,
           maxBytes: MAX_MANIFEST_BYTES,
           accept: "application/json"
         });
-        const manifest = JSON.parse(text);
+        const manifest = JSON.parse(text2);
         return readWorkerBundleDigestFromManifest(manifest, { artifactFile, artifactKind });
       } catch (error) {
         return { ok: false, error: `Failed to read Worker release manifest: ${toStr8(error?.message || error)}` };
@@ -27096,13 +27096,13 @@ var init_deployHelperCore = __esm({
       return { ok: true, slug: canonicalSlug, error: "" };
     };
     readJsonOrText = async (resp) => {
-      let text = "";
+      let text2 = "";
       try {
-        text = await resp.text();
+        text2 = await resp.text();
       } catch {
         return {};
       }
-      const trimmed = toStr9(text).trim();
+      const trimmed = toStr9(text2).trim();
       if (!trimmed) return {};
       try {
         return JSON.parse(trimmed);
@@ -30244,6 +30244,96 @@ var init_realtimeInterviewConfig = __esm({
   }
 });
 
+// shared/sessionContext.mjs
+var SESSION_CONTEXT_LIMITS, L, KEYS, LINK_KEYS, isRecord3, text, isHttpsUrl, fail, validateSessionContext;
+var init_sessionContext = __esm({
+  "shared/sessionContext.mjs"() {
+    SESSION_CONTEXT_LIMITS = Object.freeze({
+      titleChars: 80,
+      paragraphs: 6,
+      paragraphChars: 2e3,
+      links: 8,
+      labelChars: 120,
+      urlChars: 2e3
+    });
+    L = SESSION_CONTEXT_LIMITS;
+    KEYS = /* @__PURE__ */ new Set(["title", "paragraphs", "links"]);
+    LINK_KEYS = /* @__PURE__ */ new Set(["label", "url"]);
+    isRecord3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    text = (value) => typeof value === "string" ? value.trim() : "";
+    isHttpsUrl = (value) => {
+      if (typeof value !== "string" || !value || value.length > L.urlChars) return false;
+      try {
+        return new URL(value).protocol === "https:";
+      } catch {
+        return false;
+      }
+    };
+    fail = (errors, path, message) => errors.push({ path, message });
+    validateSessionContext = (value) => {
+      if (value === null) return { ok: true, value: null, errors: [] };
+      const errors = [];
+      if (!isRecord3(value)) {
+        fail(errors, "sessionContext", "Context must be an object with a title, paragraphs and links.");
+        return { ok: false, errors };
+      }
+      Object.keys(value).filter((key) => !KEYS.has(key)).forEach((key) => fail(errors, `sessionContext.${key}`, `Context has an unknown field: ${key}.`));
+      if (value.title !== void 0 && typeof value.title !== "string") {
+        fail(errors, "sessionContext.title", "The context title must be text.");
+      }
+      const title = text(value.title);
+      if (title.length > L.titleChars) {
+        fail(errors, "sessionContext.title", `The context title is longer than ${L.titleChars} characters.`);
+      }
+      const rawParagraphs = value.paragraphs === void 0 ? [] : value.paragraphs;
+      const paragraphs = [];
+      if (!Array.isArray(rawParagraphs)) fail(errors, "sessionContext.paragraphs", "Paragraphs must be a list.");
+      else {
+        rawParagraphs.forEach((paragraph, index) => {
+          const path = `sessionContext.paragraphs.${index}`;
+          if (typeof paragraph !== "string") return fail(errors, path, `Paragraph ${index + 1} must be text.`);
+          const trimmed = paragraph.trim();
+          if (!trimmed) return void 0;
+          if (trimmed.length > L.paragraphChars) {
+            fail(errors, path, `Paragraph ${index + 1} is longer than ${L.paragraphChars.toLocaleString("en-US")} characters.`);
+          }
+          paragraphs.push(trimmed);
+          return void 0;
+        });
+        if (paragraphs.length > L.paragraphs) {
+          fail(errors, "sessionContext.paragraphs", `Context holds at most ${L.paragraphs} paragraphs.`);
+        }
+      }
+      const rawLinks = value.links === void 0 ? [] : value.links;
+      const links = [];
+      if (!Array.isArray(rawLinks)) fail(errors, "sessionContext.links", "Links must be a list.");
+      else {
+        rawLinks.forEach((link, index) => {
+          const path = `sessionContext.links.${index}`;
+          if (!isRecord3(link)) return fail(errors, path, `Link ${index + 1} must have a label and a link.`);
+          Object.keys(link).filter((key) => !LINK_KEYS.has(key)).forEach((key) => fail(errors, `${path}.${key}`, `Link ${index + 1} has an unknown field: ${key}.`));
+          if ([link.label, link.url].some((field) => field !== void 0 && typeof field !== "string")) {
+            return fail(errors, path, `Link ${index + 1}'s label and link must be text.`);
+          }
+          const label = text(link.label);
+          const url = text(link.url);
+          if (!url) return void 0;
+          if (url.length > L.urlChars) {
+            fail(errors, `${path}.url`, `Link ${index + 1} is longer than ${L.urlChars.toLocaleString("en-US")} characters.`);
+          } else if (!isHttpsUrl(url)) fail(errors, `${path}.url`, `Link ${index + 1} must be an https:// link.`);
+          if (label.length > L.labelChars) {
+            fail(errors, `${path}.label`, `Link ${index + 1}'s label is longer than ${L.labelChars} characters.`);
+          }
+          links.push({ label, url });
+          return void 0;
+        });
+        if (links.length > L.links) fail(errors, "sessionContext.links", `Context holds at most ${L.links} links.`);
+      }
+      return errors.length ? { ok: false, errors } : { ok: true, value: { title, paragraphs, links }, errors };
+    };
+  }
+});
+
 // workers/sessionCorsWorker/sessionConfigMutation.js
 var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEY_SET, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
 var init_sessionConfigMutation = __esm({
@@ -30258,6 +30348,7 @@ var init_sessionConfigMutation = __esm({
     init_workerConfigModeValidation();
     init_sessionColorSchemeConfig();
     init_resultsAnalysisSettings();
+    init_sessionContext();
     init_sessionConfigNormalization();
     init_authorizationScopeFreshness();
     WORKER_CANONICAL_PUBLICATION_REVISION_KEY = "workerCanonicalPublicationRevision";
@@ -30479,6 +30570,11 @@ var init_sessionConfigMutation = __esm({
         }
         if (!validResultsAnalysisSettingsConfig(incomingConfig)) {
           return { ok: false, status: 400, error: "Invalid results analysis settings config." };
+        }
+        if (hasOwn4(incomingConfig, "sessionContext")) {
+          const context = validateSessionContext(incomingConfig.sessionContext);
+          if (!context.ok) return { ok: false, status: 400, error: `Invalid session context: ${context.errors[0].message}` };
+          incomingConfig = { ...incomingConfig, sessionContext: context.value };
         }
         const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig, {
           allowPartialProfileStorage: true
@@ -32892,22 +32988,22 @@ function sanitizeSessionSlug(value = "") {
   return lower2(value).replace(/[^a-z0-9_-]/g, "").slice(0, 128);
 }
 function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
+  const text2 = safeString(value);
+  if (!text2) return fallback;
   try {
-    return JSON.parse(text);
+    return JSON.parse(text2);
   } catch {
     return fallback;
   }
 }
 function safeEnvJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
+  const text2 = safeString(value);
+  if (!text2) return fallback;
   const parseFailed = Symbol("parse-failed");
-  const parsed = safeJsonParse(text, parseFailed);
+  const parsed = safeJsonParse(text2, parseFailed);
   if (parsed !== parseFailed) return parsed;
-  const dotenvEscaped = text.includes('\\"') ? text.replace(/\\"/g, '"').replace(/\\\\/g, "\\") : "";
-  return dotenvEscaped && dotenvEscaped !== text ? safeJsonParse(dotenvEscaped, fallback) : fallback;
+  const dotenvEscaped = text2.includes('\\"') ? text2.replace(/\\"/g, '"').replace(/\\\\/g, "\\") : "";
+  return dotenvEscaped && dotenvEscaped !== text2 ? safeJsonParse(dotenvEscaped, fallback) : fallback;
 }
 function nowIso2(now = null) {
   if (now instanceof Date) return now.toISOString();
@@ -32939,10 +33035,10 @@ function stableFingerprint(value = {}) {
   return (hash2 >>> 0).toString(36).padStart(10, "0");
 }
 function kvKeySafePart(value = "") {
-  const text = safeString(value);
-  if (!text) return "";
-  const safe = text.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 56);
-  return `${safe || "ref"}_${stableFingerprint(text)}`;
+  const text2 = safeString(value);
+  if (!text2) return "";
+  const safe = text2.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 56);
+  return `${safe || "ref"}_${stableFingerprint(text2)}`;
 }
 function envFlagDisabled(value = "") {
   return ["0", "false", "no", "off"].includes(lower2(value));
@@ -34011,7 +34107,7 @@ function __addDisposableResource(env, value, async) {
   return value;
 }
 function __disposeResources(env) {
-  function fail9(e) {
+  function fail10(e) {
     env.error = env.hasError ? new _SuppressedError(e, env.error, "An error was suppressed during disposal.") : e;
     env.hasError = true;
   }
@@ -34023,12 +34119,12 @@ function __disposeResources(env) {
         if (r.dispose) {
           var result = r.dispose.call(r.value);
           if (r.async) return s |= 2, Promise.resolve(result).then(next, function(e) {
-            fail9(e);
+            fail10(e);
             return next();
           });
         } else s |= 1;
       } catch (e) {
-        fail9(e);
+        fail10(e);
       }
     }
     if (s === 1) return env.hasError ? Promise.reject(env.error) : Promise.resolve();
@@ -40693,8 +40789,8 @@ var require_hash_to_curve = __commonJS({
       isNum(count);
       const DST = validateDST(_DST);
       const log2p = p.toString(2).length;
-      const L = Math.ceil((log2p + k) / 8);
-      const len_in_bytes = count * m * L;
+      const L2 = Math.ceil((log2p + k) / 8);
+      const len_in_bytes = count * m * L2;
       let prb;
       if (expand === "xmd") {
         prb = expand_message_xmd(msg, DST, len_in_bytes, hash2);
@@ -40709,8 +40805,8 @@ var require_hash_to_curve = __commonJS({
       for (let i = 0; i < count; i++) {
         const e = new Array(m);
         for (let j = 0; j < m; j++) {
-          const elm_offset = L * (j + i * m);
-          const tv = prb.subarray(elm_offset, elm_offset + L);
+          const elm_offset = L2 * (j + i * m);
+          const tv = prb.subarray(elm_offset, elm_offset + L2);
           e[j] = (0, modular_js_1.mod)(os2ip(tv), p);
         }
         u[i] = e;
@@ -46257,21 +46353,21 @@ var require_fragments = __commonJS({
       }));
     };
     var TokenString2 = _TokenString2;
-    function lex2(text) {
+    function lex2(text2) {
       const tokens = [];
       const throwError2 = (message) => {
-        const token = offset < text.length ? JSON.stringify(text[offset]) : "$EOI";
+        const token = offset < text2.length ? JSON.stringify(text2[offset]) : "$EOI";
         throw new Error(`invalid token ${token} at ${offset}: ${message}`);
       };
       let brackets = [];
       let commas = [];
       let offset = 0;
-      while (offset < text.length) {
-        let cur = text.substring(offset);
+      while (offset < text2.length) {
+        let cur = text2.substring(offset);
         let match = cur.match(regexWhitespacePrefix2);
         if (match) {
           offset += match[1].length;
-          cur = text.substring(offset);
+          cur = text2.substring(offset);
         }
         const token = { depth: brackets.length, linkBack: -1, linkNext: -1, match: -1, type: "", text: "", offset, value: -1 };
         tokens.push(token);
@@ -47593,8 +47689,8 @@ var require_bytes32 = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.decodeBytes32String = exports.encodeBytes32String = void 0;
     var index_js_1 = require_utils();
-    function encodeBytes32String2(text) {
-      const bytes3 = (0, index_js_1.toUtf8Bytes)(text);
+    function encodeBytes32String2(text2) {
+      const bytes3 = (0, index_js_1.toUtf8Bytes)(text2);
       if (bytes3.length > 31) {
         throw new Error("bytes32 string must be less than 32 bytes");
       }
@@ -61958,11 +62054,11 @@ function decodeBase642(base64) {
   return Buffer.from(base64, "base64").toString("binary");
 }
 function base64urlToHex(value = "") {
-  const text = safeString(value);
-  if (!/^[a-zA-Z0-9_-]{43}$/.test(text)) {
+  const text2 = safeString(value);
+  if (!/^[a-zA-Z0-9_-]{43}$/.test(text2)) {
     throw new Error("invalid_arweave_transaction_id");
   }
-  const base64 = text.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(text.length / 4) * 4, "=");
+  const base64 = text2.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(text2.length / 4) * 4, "=");
   const binary = decodeBase642(base64);
   const bytes3 = Array.from(binary, (char) => char.charCodeAt(0));
   if (bytes3.length !== 32) throw new Error("invalid_arweave_transaction_hash");
@@ -62363,17 +62459,17 @@ function questionId(question = {}) {
   return safeString(question.questionId || question.id);
 }
 function shortQuestionId(value = "") {
-  const text = safeString(value);
-  if (/^0x[0-9a-fA-F]{64}$/.test(text)) return `${text.slice(0, 10)}...${text.slice(-6)}`;
-  return text.length > 18 ? `${text.slice(0, 10)}...${text.slice(-6)}` : text;
+  const text2 = safeString(value);
+  if (/^0x[0-9a-fA-F]{64}$/.test(text2)) return `${text2.slice(0, 10)}...${text2.slice(-6)}`;
+  return text2.length > 18 ? `${text2.slice(0, 10)}...${text2.slice(-6)}` : text2;
 }
 function questionIdSeedPart(value = "") {
-  const text = safeString(value);
-  return /^0x[0-9a-fA-F]{64}$/.test(text) ? `${text.slice(2, 10)}${text.slice(-6)}` : text;
+  const text2 = safeString(value);
+  return /^0x[0-9a-fA-F]{64}$/.test(text2) ? `${text2.slice(2, 10)}${text2.slice(-6)}` : text2;
 }
 function shortAddress(value = "") {
-  const text = safeString(value);
-  return ADDRESS_RE2.test(text) ? `${text.slice(0, 6)}...${text.slice(-4)}` : text;
+  const text2 = safeString(value);
+  return ADDRESS_RE2.test(text2) ? `${text2.slice(0, 6)}...${text2.slice(-4)}` : text2;
 }
 var ANSWER_DRAFT_KV_PREFIX, ANSWER_DRAFT_VIEW_KV_PREFIX, AGENT_SKILL_UPDATE_KV_KEY, DEFAULT_GROUP_SESSION_TTL_SECONDS, MAX_WORKER_QUESTION_LIST_PAGES, ADDRESS_RE2, CANONICAL_ANSWER_KINDS;
 var init_runtimeCore = __esm({
@@ -62772,13 +62868,13 @@ function canonicalDraftAnswerForm(record4 = {}) {
   const parsed = safeEnvJsonParse(raw, null);
   const source = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
   const type = CANONICAL_ANSWER_KINDS[lower2(safeString(source?.questionType))] || CANONICAL_ANSWER_KINDS[lower2(safeString(record4.controlType))] || "unknown";
-  const text = safeString(source ? source.text ?? source.value ?? "" : raw);
+  const text2 = safeString(source ? source.text ?? source.value ?? "" : raw);
   const comments = safeString(source?.comments);
   if (type === "binary") {
-    return { type, value: lower2(safeString(source?.value) || text), comments };
+    return { type, value: lower2(safeString(source?.value) || text2), comments };
   }
   if (type === "rating") {
-    const candidate = source?.value ?? (text === "" ? null : text);
+    const candidate = source?.value ?? (text2 === "" ? null : text2);
     const value = candidate === null || candidate === void 0 || candidate === "" ? NaN : Number(candidate);
     return { type, value: Number.isFinite(value) ? value : null, comments };
   }
@@ -62786,10 +62882,10 @@ function canonicalDraftAnswerForm(record4 = {}) {
     return { type, value: Array.isArray(source?.value) ? source.value : null, comments };
   }
   if (type === "multichoice") {
-    const values = Array.isArray(source?.values) ? source.values.map(safeString).filter(Boolean) : text ? [text] : [];
+    const values = Array.isArray(source?.values) ? source.values.map(safeString).filter(Boolean) : text2 ? [text2] : [];
     return { type, values: [...new Set(values)].sort(), comments };
   }
-  return { type, text, comments };
+  return { type, text: text2, comments };
 }
 function answerDraftSemanticFingerprint(record4 = {}) {
   return stableFingerprint(canonicalDraftAnswerForm(record4));
@@ -63013,7 +63109,7 @@ var init_answerDrafts = __esm({
 });
 
 // shared/questions/answerValue.mjs
-var QUESTION_TYPES2, BINARY_ANSWERS, MAX_FREEFORM_LENGTH, trim5, fail, ratingScaleFor, optionsOf, isSingleSelect, matchOption, normalizeAnswerValue;
+var QUESTION_TYPES2, BINARY_ANSWERS, MAX_FREEFORM_LENGTH, trim5, fail2, ratingScaleFor, optionsOf, isSingleSelect, matchOption, normalizeAnswerValue;
 var init_answerValue = __esm({
   "shared/questions/answerValue.mjs"() {
     init_quadraticAllocation();
@@ -63022,7 +63118,7 @@ var init_answerValue = __esm({
     BINARY_ANSWERS = Object.freeze(["Agree", "Unsure", "Disagree"]);
     MAX_FREEFORM_LENGTH = 8e3;
     trim5 = (value) => typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
-    fail = (error) => ({ ok: false, error });
+    fail2 = (error) => ({ ok: false, error });
     ratingScaleFor = (question = {}) => ({ ...normalizeRatingScale(question) || DEFAULT_RATING_SCALE2, step: ratingStepFor(question) });
     optionsOf = (question) => Array.isArray(question.options) ? question.options.filter((option) => typeof option === "string") : [];
     isSingleSelect = (question) => question.singleSelect === true || question.oneSelectionOnly === true || question.singleChoice === true;
@@ -63034,13 +63130,13 @@ var init_answerValue = __esm({
       switch (question.type) {
         case "binary": {
           const match = BINARY_ANSWERS.find((answer) => answer.toLowerCase() === trim5(value).toLowerCase());
-          return match ? { ok: true, value: match } : fail('Binary answers must be "Agree", "Unsure", or "Disagree".');
+          return match ? { ok: true, value: match } : fail2('Binary answers must be "Agree", "Unsure", or "Disagree".');
         }
         case "rating": {
           const scale = ratingScaleFor(question);
           const number2 = normalizeRatingAnswer(value, question);
           if (number2 === null) {
-            return fail(`Rating answers must be from ${scale.min} to ${scale.max} in increments of ${scale.step} from ${scale.min}.`);
+            return fail2(`Rating answers must be from ${scale.min} to ${scale.max} in increments of ${scale.step} from ${scale.min}.`);
           }
           return { ok: true, value: number2 };
         }
@@ -63050,31 +63146,31 @@ var init_answerValue = __esm({
           const chosen = [];
           for (const pick of picks) {
             const option = matchOption(options, pick);
-            if (!option) return fail(`"${trim5(pick)}" is not one of this question's options: ${options.join(" | ")}`);
+            if (!option) return fail2(`"${trim5(pick)}" is not one of this question's options: ${options.join(" | ")}`);
             if (!chosen.includes(option)) chosen.push(option);
           }
-          if (!chosen.length) return fail("Choose at least one option.");
-          if (isSingleSelect(question) && chosen.length !== 1) return fail("This question accepts exactly one option.");
+          if (!chosen.length) return fail2("Choose at least one option.");
+          if (isSingleSelect(question) && chosen.length !== 1) return fail2("This question accepts exactly one option.");
           const max = Number(question.maxSelections);
-          if (Number.isInteger(max) && max > 0 && chosen.length > max) return fail(`Choose at most ${max} options.`);
+          if (Number.isInteger(max) && max > 0 && chosen.length > max) return fail2(`Choose at most ${max} options.`);
           return { ok: true, value: chosen };
         }
         case "quadratic": {
           const votes = Array.isArray(value) ? value.map((vote) => typeof vote === "string" && trim5(vote) !== "" ? Number(vote) : vote) : value;
           const error = validateQuadraticAllocation(votes, question);
           if (error) {
-            return fail(`${error} Options in order: ${optionsOf(question).join(" | ")}; budget ${getVoiceCredits(question)} credits (sum of squared votes).`);
+            return fail2(`${error} Options in order: ${optionsOf(question).join(" | ")}; budget ${getVoiceCredits(question)} credits (sum of squared votes).`);
           }
           return { ok: true, value: votes };
         }
         case "freeform": {
-          const text = trim5(value);
-          if (!text) return fail("Freeform answers must be non-empty text.");
-          if (text.length > MAX_FREEFORM_LENGTH) return fail(`Freeform answers must be ${MAX_FREEFORM_LENGTH} characters or fewer.`);
-          return { ok: true, value: text };
+          const text2 = trim5(value);
+          if (!text2) return fail2("Freeform answers must be non-empty text.");
+          if (text2.length > MAX_FREEFORM_LENGTH) return fail2(`Freeform answers must be ${MAX_FREEFORM_LENGTH} characters or fewer.`);
+          return { ok: true, value: text2 };
         }
         default:
-          return fail(`Unsupported question type "${trim5(question.type)}".`);
+          return fail2(`Unsupported question type "${trim5(question.type)}".`);
       }
     };
   }
@@ -63326,10 +63422,10 @@ function questionTypeById(questions = []) {
 }
 function qualitativeTextFromResultRecord(record4 = {}, questionTypeLookup = /* @__PURE__ */ new Map()) {
   const type = lower2(record4.questionType || questionTypeLookup.get(record4.questionId));
-  const text = safeAnswerString(record4.text);
+  const text2 = safeAnswerString(record4.text);
   const comments = safeAnswerString(record4.comments);
   const parts = [];
-  if (type === "freeform" && text) parts.push(text);
+  if (type === "freeform" && text2) parts.push(text2);
   if (comments) parts.push(comments);
   return parts.join(" ").trim();
 }
@@ -63343,14 +63439,14 @@ function qualitativeResponsesForGroup({
 } = {}) {
   const responses = [];
   for (const record4 of records) {
-    const text = qualitativeTextFromResultRecord(record4, questionTypeLookup);
-    if (!text) continue;
+    const text2 = qualitativeTextFromResultRecord(record4, questionTypeLookup);
+    if (!text2) continue;
     responses.push({
       participant: aliases.get(record4.telegramUserId) || "Participant",
       questionId: record4.questionId,
       questionLabel: questionIndex.get(record4.questionId) || "Q?",
       prompt: promptMap.get(record4.questionId) || shortQuestionId(record4.questionId),
-      text: text.slice(0, 500)
+      text: text2.slice(0, 500)
     });
     if (responses.length >= limit) break;
   }
@@ -63600,12 +63696,12 @@ function questionPayloadTimeoutMs(env = {}) {
   return DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS;
 }
 function normalizeHexAddress(value = "") {
-  const text = safeString(value);
-  return /^0x[0-9a-fA-F]{40}$/.test(text) ? text : "";
+  const text2 = safeString(value);
+  return /^0x[0-9a-fA-F]{40}$/.test(text2) ? text2 : "";
 }
 function normalizeBytes32(value = "") {
-  const text = safeString(value);
-  return BYTES32_RE2.test(text) ? text.toLowerCase() : "";
+  const text2 = safeString(value);
+  return BYTES32_RE2.test(text2) ? text2.toLowerCase() : "";
 }
 function strip0x(value = "") {
   return safeString(value).replace(/^0x/i, "");
@@ -63768,11 +63864,11 @@ async function ethCall({
     timeoutMs
   });
   if (!result.ok) return result;
-  const text = safeString(result.result);
-  if (!/^0x[0-9a-fA-F]*$/.test(text)) {
+  const text2 = safeString(result.result);
+  if (!/^0x[0-9a-fA-F]*$/.test(text2)) {
     return { ok: false, error: "RPC result was not hex" };
   }
-  return { ...result, result: text };
+  return { ...result, result: text2 };
 }
 function resolveSurveysAddress2(env = {}) {
   return resolveConfiguredSurveysAddress(env);
@@ -64824,10 +64920,10 @@ function scheduleIndexRefresh({
 }
 async function readKvQuestionIndex(env = {}, key = "") {
   if (!key || !env.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== "function") return null;
-  const text = await env.AGENT_ACTION_KV.get(key).catch(() => null);
-  if (!text) return null;
+  const text2 = await env.AGENT_ACTION_KV.get(key).catch(() => null);
+  if (!text2) return null;
   try {
-    return normalizeQuestionIndex(JSON.parse(text));
+    return normalizeQuestionIndex(JSON.parse(text2));
   } catch {
     return null;
   }
@@ -65047,8 +65143,8 @@ function sessionSourceTags(session = {}) {
     metadata.tags
   ];
 }
-function keywordTagsFromText(text = "") {
-  const raw = safeString(text);
+function keywordTagsFromText(text2 = "") {
+  const raw = safeString(text2);
   const tags = [];
   TAG_RULES.forEach(([tag, pattern]) => {
     if (pattern.test(raw)) tags.push(tag);
@@ -65072,7 +65168,7 @@ function inferQuestionTags({
   addQuestionTags(tags, explicitTags);
   questionSourceTags(question).forEach((source) => addQuestionTags(tags, source));
   sessionSourceTags(session).forEach((source) => addQuestionTags(tags, source));
-  const text = [
+  const text2 = [
     prompt,
     question.prompt,
     question.questionText,
@@ -65084,7 +65180,7 @@ function inferQuestionTags({
     session.sessionName,
     session.sessionSlug
   ].map(safeString).filter(Boolean).join(" ");
-  addQuestionTags(tags, keywordTagsFromText(text));
+  addQuestionTags(tags, keywordTagsFromText(text2));
   return tags.slice(0, MAX_QUESTION_TAGS);
 }
 function normalizeOptions3(value = []) {
@@ -65096,10 +65192,10 @@ function normalizeRatingScale2(value = {}) {
   return scale ? { min: scale.min, max: scale.max, step: ratingStepFor(question) } : null;
 }
 function normalizeReferenceUrl(value = "") {
-  const text = safeString(value).slice(0, 2e3);
-  if (!text) return "";
+  const text2 = safeString(value).slice(0, 2e3);
+  if (!text2) return "";
   try {
-    const url = new URL(text);
+    const url = new URL(text2);
     if (!["http:", "https:"].includes(url.protocol)) return "";
     return url.toString();
   } catch {
@@ -65999,8 +66095,8 @@ function lower3(value) {
   return safeString2(value).toLowerCase();
 }
 function questionIdSeedPart2(value = "") {
-  const text = safeString2(value);
-  return /^0x[0-9a-fA-F]{64}$/.test(text) ? `${text.slice(2, 10)}${text.slice(-6)}` : text;
+  const text2 = safeString2(value);
+  return /^0x[0-9a-fA-F]{64}$/.test(text2) ? `${text2.slice(2, 10)}${text2.slice(-6)}` : text2;
 }
 function firstValue(...values) {
   return values.find((value) => safeString2(value) !== "");
@@ -66087,8 +66183,8 @@ function normalizeAnswerForMetric(answer = null, questionType = "") {
   if (type === "multichoice") {
     return { type, values: normalizeChoiceList(source), comments };
   }
-  const text = safeString2(firstValue(source.text, source.value, source.answer, source.label));
-  return { type: "freeform", text, comments };
+  const text2 = safeString2(firstValue(source.text, source.value, source.answer, source.label));
+  return { type: "freeform", text: text2, comments };
 }
 function binaryTransition(from = "", to = "") {
   if (!from || !to) return "unknown";
@@ -67578,9 +67674,9 @@ function answerStatePrefix(sessionSlug = "") {
   return `${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug ? `${slug}:` : ""}`;
 }
 function principalPartFromAnswerStateKey(key = "") {
-  const text = safeString(key);
-  if (!text.startsWith(AGENT_ONLY_ANSWER_STATE_KV_PREFIX)) return "";
-  const rest = text.slice(AGENT_ONLY_ANSWER_STATE_KV_PREFIX.length);
+  const text2 = safeString(key);
+  if (!text2.startsWith(AGENT_ONLY_ANSWER_STATE_KV_PREFIX)) return "";
+  const rest = text2.slice(AGENT_ONLY_ANSWER_STATE_KV_PREFIX.length);
   const parts = rest.split(":");
   return safeString(parts[1]);
 }
@@ -67601,8 +67697,8 @@ function wrappedImagePrefix(sessionSlug = "", telegramUserId = "", mode = "") {
   return slug && user ? `${AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX}${slug}:${user}:${imageMode}:` : "";
 }
 function normalizeAgentOnlyRunId(value = "") {
-  const text = safeString(value).replace(/\s+/g, "-").replace(/[^A-Za-z0-9._:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96);
-  return text.length >= 3 ? text : "";
+  const text2 = safeString(value).replace(/\s+/g, "-").replace(/[^A-Za-z0-9._:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96);
+  return text2.length >= 3 ? text2 : "";
 }
 function runIdFromBody(body = {}) {
   const source = body && typeof body === "object" && !Array.isArray(body) ? body : {};
@@ -67975,9 +68071,9 @@ var init_storageEnvelopeEncryption = __esm({
       return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
     };
     base64urlToBytes2 = (value) => {
-      const text = trim8(value);
-      if (!text) return new Uint8Array();
-      const base64 = text.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(text.length / 4) * 4, "=");
+      const text2 = trim8(value);
+      if (!text2) return new Uint8Array();
+      const base64 = text2.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(text2.length / 4) * 4, "=");
       if (typeof Buffer !== "undefined") return new Uint8Array(Buffer.from(base64, "base64"));
       const binary = atob(base64);
       return Uint8Array.from(binary, (char) => char.charCodeAt(0));
@@ -68670,9 +68766,9 @@ var init_responseFieldKeyRoute = __esm({
       if (Number(request.headers.get("content-length") || 0) > 8192) return response({ error: "Key request too large." }, 413, baseHeaders);
       let body;
       try {
-        const text = await request.text();
-        if (text.length > 8192) return response({ error: "Key request too large." }, 413, baseHeaders);
-        body = JSON.parse(text);
+        const text2 = await request.text();
+        if (text2.length > 8192) return response({ error: "Key request too large." }, 413, baseHeaders);
+        body = JSON.parse(text2);
       } catch {
         return response({ error: "Invalid key request." }, 400, baseHeaders);
       }
@@ -69007,12 +69103,12 @@ var init_storageRouteExecution = __esm({
         const entries = Array.isArray(raw) ? raw : [raw];
         const ids = entries.flatMap((entry2) => {
           if (typeof entry2 !== "string") return invalidUploadPolicy(field, "expected group ID text");
-          const text = entry2.trim();
-          if (!text) return [];
-          let values = [text];
-          if (text.startsWith("[") || text.startsWith("{")) {
+          const text2 = entry2.trim();
+          if (!text2) return [];
+          let values = [text2];
+          if (text2.startsWith("[") || text2.startsWith("{")) {
             try {
-              values = JSON.parse(text);
+              values = JSON.parse(text2);
             } catch {
               return invalidUploadPolicy(field, "malformed group ID JSON");
             }
@@ -71288,7 +71384,7 @@ var init_storageRouteExecution = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupLifecycle.js
-var BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStateKey, backupImportStagePrefix, fail2, backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJournal, clearBackupImportMetadata, cleanupCompletedBackupImport, assertNoActiveBackupImport, cleanup, readActiveBackupImport, readCompletedBackupImport, controlCoordinatorBackupImport;
+var BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStateKey, backupImportStagePrefix, fail3, backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJournal, clearBackupImportMetadata, cleanupCompletedBackupImport, assertNoActiveBackupImport, cleanup, readActiveBackupImport, readCompletedBackupImport, controlCoordinatorBackupImport;
 var init_sessionBackupLifecycle = __esm({
   "workers/sessionCorsWorker/sessionBackupLifecycle.js"() {
     init_authorizationScopeFreshness();
@@ -71299,7 +71395,7 @@ var init_sessionBackupLifecycle = __esm({
     BACKUP_IMPORT_ACTIVE_KEY = "session-backup-import-active";
     backupImportStateKey = (archiveId) => `session-backup-import:${archiveId}`;
     backupImportStagePrefix = (slug, archiveId) => `ce-import-stage:${sessionSlugStorageKey(slug)}:${archiveId}:`;
-    fail2 = (message) => {
+    fail3 = (message) => {
       throw Object.assign(new Error(message), { status: 409 });
     };
     backupImportJournalKey = (archiveId, kind, key) => `${backupImportStateKey(archiveId)}:journal:${kind}:${encodeURIComponent(key)}`;
@@ -71320,7 +71416,7 @@ var init_sessionBackupLifecycle = __esm({
     };
     cleanupCompletedBackupImport = async (coordinator, slug, archiveId, progress, budget) => {
       const { storage } = coordinator.state;
-      if (!progress.committedAuthority) fail2("Only a committed restore can complete.");
+      if (!progress.committedAuthority) fail3("Only a committed restore can complete.");
       if (budget && budget.remaining < 32) return false;
       const groups = await coordinateWorkerGroupBackup({
         env: coordinator.env,
@@ -71432,11 +71528,11 @@ var init_sessionBackupLifecycle = __esm({
       await coordinator.assertSessionAuthority(payload, { allowRestore: true });
       let active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
       if (active?.progress.committedAuthority && active.progress.actor !== payload.expectedAuthority.actor) {
-        fail2("Only the importing admin can finish this restore.");
+        fail3("Only the importing admin can finish this restore.");
       }
       if (abandon) {
         if (!active || active.archiveId !== payload.archiveId || active.progress.committedAuthority) {
-          fail2("Only an uncommitted restore can be abandoned.");
+          fail3("Only an uncommitted restore can be abandoned.");
         }
         const complete = await cleanup(coordinator, payload.slug, active.archiveId, active.progress);
         return Response.json({ ok: true, complete });
@@ -71697,27 +71793,27 @@ var init_recoveryKeyExport = __esm({
 });
 
 // workers/sessionCorsWorker/sessionSecretsAuthority.js
-var SESSION_SECRETS_AUTHORITY_KEY, fail3, readSessionSecretsAuthority, readCommittedSessionSecrets, commitSessionSecrets, repairPendingSessionSecretsProjection;
+var SESSION_SECRETS_AUTHORITY_KEY, fail4, readSessionSecretsAuthority, readCommittedSessionSecrets, commitSessionSecrets, repairPendingSessionSecretsProjection;
 var init_sessionSecretsAuthority = __esm({
   "workers/sessionCorsWorker/sessionSecretsAuthority.js"() {
     init_sessionSecretsEnvelope();
     init_sessionSlugResolution();
     init_responseKvHelpers();
     SESSION_SECRETS_AUTHORITY_KEY = "session-secrets-authority-v1";
-    fail3 = () => {
+    fail4 = () => {
       throw new Error("Invalid session secrets authority.");
     };
     readSessionSecretsAuthority = async (coordinator, storage, slug) => {
       const record4 = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
       if (record4 != null) {
-        if (record4.version !== 1 || record4.slug !== slug || !Number.isSafeInteger(record4.revision) || record4.revision < 1) fail3();
+        if (record4.version !== 1 || record4.slug !== slug || !Number.isSafeInteger(record4.revision) || record4.revision < 1) fail4();
         await decryptSessionSecretsEnvelope(record4.envelope, { env: coordinator.env, slug });
         return record4;
       }
       const raw = await coordinator.env.GROUP_KV.get(`session:${normalizeWorkerSessionSlug(slug)}:secrets`);
       if (raw == null) return null;
       const envelope = JSON.parse(raw);
-      if (!isEncryptedSessionSecretsEnvelope(envelope)) fail3();
+      if (!isEncryptedSessionSecretsEnvelope(envelope)) fail4();
       await decryptSessionSecretsEnvelope(envelope, { env: coordinator.env, slug });
       const adopted = { version: 1, slug, revision: 1, envelope, projectionPending: false };
       await storage.put(SESSION_SECRETS_AUTHORITY_KEY, adopted);
@@ -71788,11 +71884,11 @@ var init_backup = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupGroupSnapshot.js
-var fail4, pad, readBackupGroupSnapshot;
+var fail5, pad, readBackupGroupSnapshot;
 var init_sessionBackupGroupSnapshot = __esm({
   "workers/sessionCorsWorker/sessionBackupGroupSnapshot.js"() {
     init_storageBackupRevision();
-    fail4 = (message) => {
+    fail5 = (message) => {
       throw Object.assign(new Error(message), { status: 409 });
     };
     pad = (n2) => String(n2).padStart(8, "0");
@@ -71800,7 +71896,7 @@ var init_sessionBackupGroupSnapshot = __esm({
       const { storage } = coordinator.state;
       const { slug, sessionId } = payload;
       if ((await storage.list({ prefix: WORKER_GROUP_BACKUP_PENDING_PREFIX, limit: 1 })).size) {
-        fail4("A group mutation is pending. Retry the backup after it settles.");
+        fail5("A group mutation is pending. Retry the backup after it settles.");
       }
       const snapshots = await storage.list({ prefix: "worker-group-backup-meta:", limit: 100 });
       const expired = [...snapshots].find(([, value]) => value.expiresAt <= coordinator.now());
@@ -71812,16 +71908,16 @@ var init_sessionBackupGroupSnapshot = __esm({
       }
       const revision = await storage.get(STORAGE_BACKUP_REVISION_KEY) || 0;
       const snapshotId = payload.snapshotId || crypto.randomUUID();
-      if (!/^[a-f0-9-]{36}$/.test(snapshotId)) fail4("Invalid group snapshot cursor.");
+      if (!/^[a-f0-9-]{36}$/.test(snapshotId)) fail5("Invalid group snapshot cursor.");
       const root = `worker-group-backup:${snapshotId}`;
       const stateKey = `worker-group-backup-meta:${snapshotId}`;
       let state = await storage.get(stateKey);
       if (!state) {
-        if (payload.snapshotId) fail4("The group snapshot expired; export again.");
+        if (payload.snapshotId) fail5("The group snapshot expired; export again.");
         state = { slug, sessionId, revision, phase: 0, cursor: "", batch: 0, expiresAt: coordinator.now() + 7 * 86400 * 1e3 };
       }
       if (state.slug !== slug || state.sessionId !== sessionId || state.expiresAt <= coordinator.now() || state.revision !== revision) {
-        fail4("Session groups changed or the snapshot expired; export again.");
+        fail5("Session groups changed or the snapshot expired; export again.");
       }
       if (payload.checkOnly) return { ok: true, snapshotId, operations: 0 };
       let operations = 0;
@@ -71834,27 +71930,27 @@ var init_sessionBackupGroupSnapshot = __esm({
         let rows;
         let next;
         if (durable2) {
-          if (!(listed instanceof Map)) fail4("Group authority could not be read.");
+          if (!(listed instanceof Map)) fail5("Group authority could not be read.");
           rows = [...listed];
           for (const [key, value] of rows) validateDurable(key, value);
           next = rows.length === 100 ? rows.at(-1)[0] : "";
         } else {
           rows = [];
           for (const { name } of listed.keys || []) {
-            if (!name.startsWith(prefix)) fail4("Invalid group backup key.");
+            if (!name.startsWith(prefix)) fail5("Invalid group backup key.");
             const value = await store.get(name);
             operations += 1;
-            if (value == null) fail4("Group changed during backup; export again.");
+            if (value == null) fail5("Group changed during backup; export again.");
             rows.push([name, value]);
           }
           next = listed.list_complete === false ? String(listed.cursor || "") : "";
-          if (listed.list_complete === false && !next) fail4("Group backup list cursor is unavailable.");
+          if (listed.list_complete === false && !next) fail5("Group backup list cursor is unavailable.");
         }
-        if (next && next === state.cursor) fail4("Group backup list cursor did not advance.");
-        const text2 = `${JSON.stringify({ durable: durable2, rows })}
+        if (next && next === state.cursor) fail5("Group backup list cursor did not advance.");
+        const text3 = `${JSON.stringify({ durable: durable2, rows })}
 `;
-        for (let offset = 0, chunk2 = 0; offset < text2.length; offset += 16384, chunk2 += 1) {
-          await storage.put(`${root}:data:${pad(state.batch)}:${pad(chunk2)}`, text2.slice(offset, offset + 16384));
+        for (let offset = 0, chunk2 = 0; offset < text3.length; offset += 16384, chunk2 += 1) {
+          await storage.put(`${root}:data:${pad(state.batch)}:${pad(chunk2)}`, text3.slice(offset, offset + 16384));
         }
         state.batch += 1;
         state.cursor = next;
@@ -71862,17 +71958,17 @@ var init_sessionBackupGroupSnapshot = __esm({
         await storage.put(stateKey, state);
       }
       if (state.phase <= prefixes2.length) return { ok: true, preparing: true, snapshotId, operations };
-      let text = "";
+      let text2 = "";
       let after = "";
       for (; ; ) {
         const part = await storage.list({ prefix: `${root}:data:`, startAfter: after, limit: 100 });
-        for (const [, value] of part) text += value;
+        for (const [, value] of part) text2 += value;
         if (part.size < 100) break;
         after = [...part.keys()].at(-1);
       }
       const durable = [];
       const records = [];
-      for (const line of text.split("\n").filter(Boolean)) {
+      for (const line of text2.split("\n").filter(Boolean)) {
         const part = JSON.parse(line);
         (part.durable ? durable : records).push(...part.rows);
       }
@@ -71882,7 +71978,7 @@ var init_sessionBackupGroupSnapshot = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupCoordinator.js
-var json3, fail5, object2, groupPrefixes, BACKUP_GROUP_IMPORT_ACTIVE_KEY, scopedGroupRecords, exportCoordinatorBackup, exportWorkerGroupBackup, controlWorkerGroupBackupImport, importWorkerGroupBackup;
+var json3, fail6, object2, groupPrefixes, BACKUP_GROUP_IMPORT_ACTIVE_KEY, scopedGroupRecords, exportCoordinatorBackup, exportWorkerGroupBackup, controlWorkerGroupBackupImport, importWorkerGroupBackup;
 var init_sessionBackupCoordinator = __esm({
   "workers/sessionCorsWorker/sessionBackupCoordinator.js"() {
     init_sessionSecretsAuthority();
@@ -71895,7 +71991,7 @@ var init_sessionBackupCoordinator = __esm({
     init_sessionSecretsEnvelope();
     init_sessionBackupLifecycle();
     json3 = (body, status = 200) => Response.json(body, { status });
-    fail5 = (message, status = 503) => {
+    fail6 = (message, status = 503) => {
       throw Object.assign(new Error(message), { status });
     };
     object2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -71929,13 +72025,13 @@ var init_sessionBackupCoordinator = __esm({
     };
     exportCoordinatorBackup = async (coordinator, payload) => {
       const authority = await coordinator.assertSessionAuthority(payload);
-      if (!authority) fail5("Session config is not initialized.", 409);
+      if (!authority) fail6("Session config is not initialized.", 409);
       await coordinator.repairPendingSessionConfigProjection();
       const current = await coordinator.state.storage.get("session-config-authority");
       const signer = await coordinator.state.storage.get("session-lit-authorization-signer-v1");
       const secretAuthority = await coordinator.state.storage.transaction((transaction) => readSessionSecretsAuthority(coordinator, transaction, current.slug));
       const secrets = secretAuthority?.envelope || null;
-      if (signer && !isEncryptedSessionSecretsEnvelope(signer.envelope)) fail5("Invalid wrapped authorization signer.", 409);
+      if (signer && !isEncryptedSessionSecretsEnvelope(signer.envelope)) fail6("Invalid wrapped authorization signer.", 409);
       return json3({ ok: true, writeRevision: await coordinator.state.storage.get(STORAGE_BACKUP_REVISION_KEY) || 0, coordinator: {
         configAuthority: { ...current, config: stripAgentAdmissionFromBackup(current.config) },
         wrappedSessionKeys: {
@@ -71948,9 +72044,9 @@ var init_sessionBackupCoordinator = __esm({
     exportWorkerGroupBackup = async (coordinator, payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
-      if (!slug || !sessionId) fail5("Invalid backup group identity.", 400);
+      if (!slug || !sessionId) fail6("Invalid backup group identity.", 400);
       const kv = resolveWorkerGroupsKv(coordinator.env);
-      if (!kv?.list || !kv?.get) fail5("Worker group storage is unavailable.");
+      if (!kv?.list || !kv?.get) fail6("Worker group storage is unavailable.");
       return json3(await readBackupGroupSnapshot({
         coordinator,
         payload: { ...payload, slug, sessionId, kv },
@@ -71958,9 +72054,9 @@ var init_sessionBackupCoordinator = __esm({
         scopeRecords: scopedGroupRecords,
         validateDurable: (key, value) => {
           if (!object2(value) || value.pending || ["creating", "updating", "deleting", "reserved", "removing"].includes(value.phase || value.state)) {
-            fail5("A group mutation is pending. Retry the backup after it settles.", 409);
+            fail6("A group mutation is pending. Retry the backup after it settles.", 409);
           }
-          if (key === "worker-group-capacity-meta-v3" && (value.slug !== slug || value.sessionId !== sessionId)) fail5("Group backup identity conflict.", 409);
+          if (key === "worker-group-capacity-meta-v3" && (value.slug !== slug || value.sessionId !== sessionId)) fail6("Group backup identity conflict.", 409);
         }
       }));
     };
@@ -71968,12 +72064,12 @@ var init_sessionBackupCoordinator = __esm({
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const { archiveId } = payload;
-      if (!slug || !sessionId || !/^[a-f0-9]{64}$/.test(archiveId || "")) fail5("Invalid group restore identity.", 400);
+      if (!slug || !sessionId || !/^[a-f0-9]{64}$/.test(archiveId || "")) fail6("Invalid group restore identity.", 400);
       const { storage } = coordinator.state;
       const active = await storage.get(BACKUP_GROUP_IMPORT_ACTIVE_KEY);
-      if (active && active !== archiveId) fail5("Another group restore is in progress.", 409);
+      if (active && active !== archiveId) fail6("Another group restore is in progress.", 409);
       const kv = resolveWorkerGroupsKv(coordinator.env);
-      if (!kv?.list || !kv?.delete) fail5("Group restore storage is unavailable.");
+      if (!kv?.list || !kv?.delete) fail6("Group restore storage is unavailable.");
       if (operation === "begin") {
         if (active) return json3({ ok: true, operations: 0 });
         const nonempty = () => {
@@ -71982,7 +72078,7 @@ var init_sessionBackupCoordinator = __esm({
         if ((await storage.list({ prefix: "worker-group-capacity-", limit: 1 })).size) nonempty();
         for (const prefix of groupPrefixes(slug)) {
           const rows = await kv.list({ prefix, limit: 1 });
-          if (!Array.isArray(rows.keys)) fail5("Group restore storage could not be checked.");
+          if (!Array.isArray(rows.keys)) fail6("Group restore storage could not be checked.");
           if (rows.keys.length || rows.list_complete === false) nonempty();
         }
         if (!payload.checkOnly) await storage.put(BACKUP_GROUP_IMPORT_ACTIVE_KEY, archiveId);
@@ -72006,30 +72102,30 @@ var init_sessionBackupCoordinator = __esm({
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const snapshot = payload?.snapshot;
-      if (!slug || !sessionId || !Array.isArray(snapshot?.durable) || !Array.isArray(snapshot?.records)) fail5("Invalid group backup.", 400);
-      if (!payload.archiveId || await coordinator.state.storage.get(BACKUP_GROUP_IMPORT_ACTIVE_KEY) !== payload.archiveId) fail5("The group restore has not reserved an empty target.", 409);
+      if (!slug || !sessionId || !Array.isArray(snapshot?.durable) || !Array.isArray(snapshot?.records)) fail6("Invalid group backup.", 400);
+      if (!payload.archiveId || await coordinator.state.storage.get(BACKUP_GROUP_IMPORT_ACTIVE_KEY) !== payload.archiveId) fail6("The group restore has not reserved an empty target.", 409);
       const scoped = scopedGroupRecords(snapshot.records, slug, sessionId);
-      if (scoped.length !== snapshot.records.length) fail5("Invalid group backup scope.", 400);
+      if (scoped.length !== snapshot.records.length) fail6("Invalid group backup scope.", 400);
       const seen = /* @__PURE__ */ new Set();
       for (const [key, value] of [...snapshot.durable, ...snapshot.records]) {
-        if (typeof key !== "string" || seen.has(key)) fail5("Invalid or duplicate group backup key.", 400);
+        if (typeof key !== "string" || seen.has(key)) fail6("Invalid or duplicate group backup key.", 400);
         seen.add(key);
         if (key.startsWith("worker-group-capacity-")) {
-          if (!/^(worker-group-capacity-meta-v3|worker-group-capacity-(group|member)-v3:.+)$/.test(key) || !object2(value) || value.pending || ["creating", "updating", "deleting", "reserved", "removing"].includes(value.phase || value.state) || key === "worker-group-capacity-meta-v3" && (value.slug !== slug || value.sessionId !== sessionId)) fail5("Invalid group authority backup.", 400);
-        } else if (typeof value !== "string") fail5("Invalid group backup value.", 400);
+          if (!/^(worker-group-capacity-meta-v3|worker-group-capacity-(group|member)-v3:.+)$/.test(key) || !object2(value) || value.pending || ["creating", "updating", "deleting", "reserved", "removing"].includes(value.phase || value.state) || key === "worker-group-capacity-meta-v3" && (value.slug !== slug || value.sessionId !== sessionId)) fail6("Invalid group authority backup.", 400);
+        } else if (typeof value !== "string") fail6("Invalid group backup value.", 400);
       }
       const kv = resolveWorkerGroupsKv(coordinator.env);
-      if (!kv?.get || !kv?.put) fail5("Group restore storage is unavailable.");
+      if (!kv?.get || !kv?.put) fail6("Group restore storage is unavailable.");
       const counts = { written: 0, skipped: 0 };
       const conflicts = [];
       let phase = payload.cursor?.phase || "check";
       let offset = payload.cursor?.offset || 0;
-      if (!["check", "apply"].includes(phase) || !Number.isSafeInteger(offset) || offset < 0) fail5("Invalid group restore cursor.", 400);
+      if (!["check", "apply"].includes(phase) || !Number.isSafeInteger(offset) || offset < 0) fail6("Invalid group restore cursor.", 400);
       const limit = Math.min(700, Math.max(0, Number(payload.operations) || 700));
       let operations = 0;
       while (true) {
         const rows = phase === "check" ? [...snapshot.durable, ...snapshot.records] : [...snapshot.records, ...snapshot.durable];
-        if (offset > rows.length) fail5("Invalid group restore offset.", 400);
+        if (offset > rows.length) fail6("Invalid group restore offset.", 400);
         for (; offset < rows.length; offset += 1) {
           if (operations + 2 > limit) return json3({ ok: true, counts, conflicts, operations, nextCursor: { phase, offset } });
           const [key, value] = rows[offset];
@@ -72105,7 +72201,7 @@ var init_sessionBackupAuthentication = __esm({
 });
 
 // workers/sessionCorsWorker/sessionBackupImport.js
-var fail6, object3, stable, same2, digest, hashPattern, resources, temporary, workerUrlFields, workerOrigin, assertEmptyTarget, validateSnapshot, validatePage, importCoordinatorBackupPage;
+var fail7, object3, stable, same2, digest, hashPattern, resources, temporary, workerUrlFields, workerOrigin, assertEmptyTarget, validateSnapshot, validatePage, importCoordinatorBackupPage;
 var init_sessionBackupImport = __esm({
   "workers/sessionCorsWorker/sessionBackupImport.js"() {
     init_sessionSecretsAuthority();
@@ -72124,7 +72220,7 @@ var init_sessionBackupImport = __esm({
     init_storageScanBudget();
     init_uploadSizeLimits();
     init_storageRouteExecution();
-    fail6 = (message, status = 400, reason) => {
+    fail7 = (message, status = 400, reason) => {
       throw Object.assign(new Error(message), { status, reason });
     };
     object3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -72154,7 +72250,7 @@ var init_sessionBackupImport = __esm({
       }
     };
     assertEmptyTarget = async ({ coordinator, current, slug, page, index, budget }) => {
-      const nonempty = () => fail6("Restore requires an empty target session. Abandon any unfinished restore before starting again.", 409, "backup_target_not_empty");
+      const nonempty = () => fail7("Restore requires an empty target session. Abandon any unfinished restore before starting again.", 409, "backup_target_not_empty");
       if (current || await coordinator.state.storage.get("session-lit-authorization-signer-v1") || await coordinator.state.storage.get(SESSION_SECRETS_AUTHORITY_KEY)) nonempty();
       const groupKv = budget.wrap(coordinator.env.GROUP_KV);
       await assertAgentBackupTargetEmpty({ kv: groupKv, storage: coordinator.state.storage, sessionId: page.manifest.sessionId });
@@ -72164,14 +72260,14 @@ var init_sessionBackupImport = __esm({
       }
       for (const kind of ["ce-storage", "ce-storage-payload", "ce-storage-owner", "ce-storage-hidden"]) {
         const rows = await index.list({ prefix: `${kind}:${slug}:`, limit: 1 });
-        if (!Array.isArray(rows.keys)) fail6("Restore storage could not be checked.", 503);
+        if (!Array.isArray(rows.keys)) fail7("Restore storage could not be checked.", 503);
         if (rows.keys.length || rows.list_complete === false) nonempty();
       }
       const r2 = getStorageR2Binding(coordinator.env);
       if (r2) {
-        if (!r2.list || !r2.delete) fail6("Restore requires an R2 binding that supports listing and cleanup.", 503);
+        if (!r2.list || !r2.delete) fail7("Restore requires an R2 binding that supports listing and cleanup.", 503);
         const rows = await r2.list({ prefix: `sessions/${slug}/storage/`, limit: 1 });
-        if (!Array.isArray(rows.objects)) fail6("Restore object storage could not be checked.", 503);
+        if (!Array.isArray(rows.objects)) fail7("Restore object storage could not be checked.", 503);
         if (rows.objects.length || rows.truncated) nonempty();
       }
       const groups = await coordinateWorkerGroupBackup({
@@ -72182,43 +72278,43 @@ var init_sessionBackupImport = __esm({
         archiveId: page.archiveId,
         checkOnly: true
       });
-      if (!groups.ok) fail6(groups.error || "Group restore storage could not be checked.", groups.status || 503, groups.reason);
+      if (!groups.ok) fail7(groups.error || "Group restore storage could not be checked.", groups.status || 503, groups.reason);
       budget.consume(groups.operations || 0);
     };
     validateSnapshot = ({ snapshot, manifest, normalizeConfig, normalizeSessionKey }) => {
       const authority = snapshot?.configAuthority;
-      if (authority?.config?.agentHttp?.invites !== void 0) fail6("Agent invite admission material is not restorable.");
+      if (authority?.config?.agentHttp?.invites !== void 0) fail7("Agent invite admission material is not restorable.");
       const slug = manifest.sessionSlug;
       if (!object3(authority) || authority.schemaVersion !== 1 || authority.slug !== slug || Object.keys(authority).some((key) => !["schemaVersion", "slug", "revision", "config", "projectionPending", "activeSessionKey"].includes(key)) || !Number.isSafeInteger(authority.revision) || authority.revision < 1 || authority.projectionPending !== false || !normalizeConfig(authority.config, slug) || resolveCanonicalWorkerSessionIdHex(authority.config) !== manifest.sessionId || !object3(snapshot.wrappedSessionKeys) || !same2(snapshot.wrappedSessionKeys.activeSessionKey, authority.activeSessionKey || null)) {
-        fail6("Invalid backup config authority.");
+        fail7("Invalid backup config authority.");
       }
-      if (authority.activeSessionKey && !normalizeSessionKey(authority.activeSessionKey, slug)) fail6("Invalid wrapped session key.");
+      if (authority.activeSessionKey && !normalizeSessionKey(authority.activeSessionKey, slug)) fail7("Invalid wrapped session key.");
       const signer = snapshot.wrappedSessionKeys.litAuthorizationSigner;
-      if (signer && (signer.version !== 1 || signer.slug !== slug || Object.keys(signer).some((key) => !["version", "slug", "envelope"].includes(key)) || !isEncryptedSessionSecretsEnvelope(signer.envelope))) fail6("Invalid wrapped authorization signer.");
-      if (snapshot.secrets && !isEncryptedSessionSecretsEnvelope(snapshot.secrets)) fail6("Backup secrets must be ciphertext.");
-      if (!Array.isArray(snapshot.workerGroups?.durable) || !Array.isArray(snapshot.workerGroups?.records)) fail6("Invalid backup groups.");
+      if (signer && (signer.version !== 1 || signer.slug !== slug || Object.keys(signer).some((key) => !["version", "slug", "envelope"].includes(key)) || !isEncryptedSessionSecretsEnvelope(signer.envelope))) fail7("Invalid wrapped authorization signer.");
+      if (snapshot.secrets && !isEncryptedSessionSecretsEnvelope(snapshot.secrets)) fail7("Backup secrets must be ciphertext.");
+      if (!Array.isArray(snapshot.workerGroups?.durable) || !Array.isArray(snapshot.workerGroups?.records)) fail7("Invalid backup groups.");
     };
     validatePage = (page, slug) => {
       const m = page?.manifest;
       if (!object3(m) || m.type !== "ce_session_backup" || m.version !== 1 || m.sessionSlug !== slug || resolveCanonicalWorkerSessionIdHex({ sessionId: m.sessionId }) !== m.sessionId || !hashPattern.test(m.kekFingerprint || "") || m.previousKekFingerprint !== void 0 && !hashPattern.test(m.previousKekFingerprint) || !hashPattern.test(page.archiveId || "") || !hashPattern.test(page.snapshotDigest || "") || !Number.isSafeInteger(page.pageNumber) || page.pageNumber < 0 || typeof m.complete !== "boolean" || !Array.isArray(page.entries) || jsonByteLength(page) > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes || !object3(m.counts) || !["records", "payloads", "owners", "hidden", "bytes"].every((key) => Number.isSafeInteger(m.counts[key]) && m.counts[key] >= 0)) {
-        fail6("Invalid session backup page.");
+        fail7("Invalid session backup page.");
       }
       for (const entry2 of page.entries) {
-        if (!object3(entry2)) fail6("Invalid backup entry.");
+        if (!object3(entry2)) fail7("Invalid backup entry.");
         if (entry2.kind === "record") {
-          if (!resources.has(entry2.resource) || !isSafeCloudflareStorageRefId(entry2.id) || !object3(entry2.metadata) || entry2.metadata.id !== entry2.id || entry2.metadata.resource !== entry2.resource || entry2.key !== buildIndexKey({ slug, resource: entry2.resource, id: entry2.id })) fail6("Invalid backup metadata key.");
+          if (!resources.has(entry2.resource) || !isSafeCloudflareStorageRefId(entry2.id) || !object3(entry2.metadata) || entry2.metadata.id !== entry2.id || entry2.metadata.resource !== entry2.resource || entry2.key !== buildIndexKey({ slug, resource: entry2.resource, id: entry2.id })) fail7("Invalid backup metadata key.");
         } else if (entry2.kind === "owner" || entry2.kind === "hidden") {
           const prefix = `ce-storage-${entry2.kind}:${slug}:`;
           const suffix = typeof entry2.key === "string" ? entry2.key.slice(prefix.length) : "";
           const separator = suffix.indexOf(":");
-          if (typeof entry2.key !== "string" || !entry2.key.startsWith(prefix) || !["questions", "surveys"].includes(suffix.slice(0, separator)) || !isStorageResourceId(suffix.slice(separator + 1)) || typeof entry2.value !== "string" || !object3(JSON.parse(entry2.value))) fail6("Invalid backup ownership key.");
+          if (typeof entry2.key !== "string" || !entry2.key.startsWith(prefix) || !["questions", "surveys"].includes(suffix.slice(0, separator)) || !isStorageResourceId(suffix.slice(separator + 1)) || typeof entry2.value !== "string" || !object3(JSON.parse(entry2.value))) fail7("Invalid backup ownership key.");
         } else if (entry2.kind === "payload" || entry2.kind === "chunk") {
-          if (entry2.target !== void 0 && entry2.target !== "coordinator") fail6("Invalid backup payload target.");
-          if (entry2.target === "coordinator" ? entry2.id !== "coordinator" : !isSafeCloudflareStorageRefId(entry2.id)) fail6("Invalid backup payload id.");
+          if (entry2.target !== void 0 && entry2.target !== "coordinator") fail7("Invalid backup payload target.");
+          if (entry2.target === "coordinator" ? entry2.id !== "coordinator" : !isSafeCloudflareStorageRefId(entry2.id)) fail7("Invalid backup payload id.");
           if (entry2.kind === "payload") {
-            if (!Number.isSafeInteger(entry2.size) || entry2.size < 0 || !hashPattern.test(entry2.sha256 || "") || entry2.chunkCount !== Math.max(1, Math.ceil(entry2.size / (256 * 1024))) || entry2.metadata && (!object3(entry2.metadata) || entry2.metadata.id !== entry2.id)) fail6("Invalid backup payload header.");
-          } else if (!Number.isSafeInteger(entry2.index) || entry2.index < 0 || typeof entry2.base64url !== "string" || entry2.base64url.length > Math.ceil(256 * 1024 * 4 / 3) || !/^[A-Za-z0-9_-]*$/.test(entry2.base64url)) fail6("Invalid backup chunk.");
-        } else fail6("Unknown backup entry kind.");
+            if (!Number.isSafeInteger(entry2.size) || entry2.size < 0 || !hashPattern.test(entry2.sha256 || "") || entry2.chunkCount !== Math.max(1, Math.ceil(entry2.size / (256 * 1024))) || entry2.metadata && (!object3(entry2.metadata) || entry2.metadata.id !== entry2.id)) fail7("Invalid backup payload header.");
+          } else if (!Number.isSafeInteger(entry2.index) || entry2.index < 0 || typeof entry2.base64url !== "string" || entry2.base64url.length > Math.ceil(256 * 1024 * 4 / 3) || !/^[A-Za-z0-9_-]*$/.test(entry2.base64url)) fail7("Invalid backup chunk.");
+        } else fail7("Unknown backup entry kind.");
       }
     };
     importCoordinatorBackupPage = async (coordinator, payload, validators) => {
@@ -72226,18 +72322,18 @@ var init_sessionBackupImport = __esm({
       const { page, expectedAuthority } = payload || {};
       const slug = sessionSlugStorageKey(payload?.slug);
       const destination = workerOrigin(payload?.workerUrl);
-      if (!destination || destination !== payload?.requestOrigin) fail6("Restore Worker origin must match the receiving request origin.");
+      if (!destination || destination !== payload?.requestOrigin) fail7("Restore Worker origin must match the receiving request origin.");
       validatePage(page, slug);
       const manifest = page.manifest;
       const fingerprints = await Promise.all([env.CE_STORAGE_ENVELOPE_KEK, env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK].filter(Boolean).map(recoveryKeyFingerprint));
       const required = [manifest.kekFingerprint, manifest.previousKekFingerprint].filter(Boolean);
       const missing = required.filter((fingerprint) => !fingerprints.includes(fingerprint));
-      if (missing.length) fail6(`The target is missing backup recovery keys: ${missing.join(", ")}.`, 409, "recovery_key_mismatch");
-      if (!await verifyBackupPage(page, env)) fail6("Backup page authentication failed. Use the original unmodified archive.", 403, "backup_authentication_failed");
+      if (missing.length) fail7(`The target is missing backup recovery keys: ${missing.join(", ")}.`, 409, "recovery_key_mismatch");
+      if (!await verifyBackupPage(page, env)) fail7("Backup page authentication failed. Use the original unmodified archive.", 403, "backup_authentication_failed");
       const completed = await readCompletedBackupImport(coordinator, { ...payload, archiveId: page.archiveId });
       if (completed) {
         if (completed.pageNumber !== page.pageNumber || completed.pageHash !== await sha256Hex(JSON.stringify(page))) {
-          fail6("Resume completion with the final unchanged backup page.", 409);
+          fail7("Resume completion with the final unchanged backup page.", 409);
         }
         return Response.json({
           ok: true,
@@ -72252,20 +72348,20 @@ var init_sessionBackupImport = __esm({
       }
       const current = await coordinator.assertSessionAuthority(payload, { allowRestore: true });
       if (current && (!workerOrigin(current.config?.corsWorkerUrl) || workerUrlFields.some((key) => Object.hasOwn(current.config, key) && workerOrigin(current.config[key]) !== destination))) {
-        fail6("The target config Worker origin does not match this restore destination.", 409);
+        fail7("The target config Worker origin does not match this restore destination.", 409);
       }
       const targetId = resolveCanonicalWorkerSessionIdHex(current?.config || {});
-      if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail6("The backup session identity does not match this target.", 409, "backup_session_mismatch");
-      if (page.archiveId !== await sha256Hex(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail6("Invalid backup archive identity.");
+      if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail7("The backup session identity does not match this target.", 409, "backup_session_mismatch");
+      if (page.archiveId !== await sha256Hex(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail7("Invalid backup archive identity.");
       const budget = createStorageExportBudget();
       const rawIndex = getStorageIndexBinding(env);
       const index = rawIndex ? budget.wrap(rawIndex) : null;
-      if (!index?.get || !index?.put || !index?.delete || !index?.list) fail6("Restore storage is unavailable.", 503);
+      if (!index?.get || !index?.put || !index?.delete || !index?.list) fail7("Restore storage is unavailable.", 503);
       const stateKey = `session-backup-import:${page.archiveId}`;
       const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
       const active = await readActiveBackupImport(coordinator, slug, true, budget);
-      if (active && active.progress.workerUrl !== destination) fail6("Restore Worker origin cannot change between pages.", 409);
-      if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail6("Another backup restore is in progress. Check restore status to abandon it.", 409, "backup_restore_in_progress");
+      if (active && active.progress.workerUrl !== destination) fail7("Restore Worker origin cannot change between pages.", 409);
+      if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail7("Another backup restore is in progress. Check restore status to abandon it.", 409, "backup_restore_in_progress");
       const pageHash = await sha256Hex(JSON.stringify(page));
       const receiptKey = `${stateKey}:page:${page.pageNumber}`;
       const complete = async (progress2) => {
@@ -72283,13 +72379,13 @@ var init_sessionBackupImport = __esm({
       };
       if (active?.progress.committedAuthority) {
         if (active.progress.actor !== expectedAuthority.actor || active.progress.pageNumber !== page.pageNumber || active.progress.pageHash !== pageHash) {
-          fail6("Resume completion with the final unchanged backup page.", 409);
+          fail7("Resume completion with the final unchanged backup page.", 409);
         }
         return complete(active.progress);
       }
       const receipt = active ? await storage.get(receiptKey) : null;
       if (receipt) {
-        if (receipt.hash !== pageHash) fail6("This backup page differs from the previously imported page.", 409);
+        if (receipt.hash !== pageHash) fail7("This backup page differs from the previously imported page.", 409);
         return Response.json({ ...receipt.result, replayed: true });
       }
       const root = backupImportStagePrefix(slug, page.archiveId);
@@ -72303,7 +72399,7 @@ var init_sessionBackupImport = __esm({
       let progress = active?.progress;
       if (!progress) {
         await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
-        if (page.pageNumber !== 0 || !page.coordinator) fail6("Import must begin with the first backup page.", 409);
+        if (page.pageNumber !== 0 || !page.coordinator) fail7("Import must begin with the first backup page.", 409);
         progress = {
           actor: expectedAuthority.actor,
           workerUrl: destination,
@@ -72321,18 +72417,18 @@ var init_sessionBackupImport = __esm({
         };
         if (page.coordinator.chunked !== true) {
           validateSnapshot({ snapshot: page.coordinator, manifest, ...validators });
-          if (await sha256Hex(JSON.stringify(page.coordinator)) !== page.snapshotDigest) fail6("The coordinator snapshot checksum does not match.");
-        } else if (page.coordinator.sha256 !== page.snapshotDigest) fail6("Invalid coordinator snapshot descriptor.");
+          if (await sha256Hex(JSON.stringify(page.coordinator)) !== page.snapshotDigest) fail7("The coordinator snapshot checksum does not match.");
+        } else if (page.coordinator.sha256 !== page.snapshotDigest) fail7("Invalid coordinator snapshot descriptor.");
         await storage.transaction(async (transaction) => {
           await transaction.put(activeKey, page.archiveId);
           await transaction.put(stateKey, progress);
         });
       }
-      if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.nextEntry > 0 && progress.pageHash !== pageHash || !same2(progress.manifest, { ...manifest, counts: void 0, complete: void 0 })) fail6("Backup pages must be imported unchanged and in order.", 409);
+      if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.nextEntry > 0 && progress.pageHash !== pageHash || !same2(progress.manifest, { ...manifest, counts: void 0, complete: void 0 })) fail7("Backup pages must be imported unchanged and in order.", 409);
       progress.pageHash = pageHash;
       if (!progress.groupsStarted) {
         const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId: manifest.sessionId, operation: "begin", archiveId: page.archiveId });
-        if (!groups.ok) fail6(groups.error || "Group restore is unavailable.", groups.status || 503, groups.reason);
+        if (!groups.ok) fail7(groups.error || "Group restore is unavailable.", groups.status || 503, groups.reason);
         budget.consume(groups.operations || 0);
         progress.groupsStarted = true;
         await storage.put(stateKey, progress);
@@ -72371,13 +72467,13 @@ var init_sessionBackupImport = __esm({
         let offset = 0;
         for (let n2 = 0; n2 < header.chunkCount; n2 += 1) {
           const raw = await index.get(chunkKey(header.id, n2, header.target));
-          if (raw == null) fail6("A restore chunk is missing. Retry the interrupted page.", 409);
+          if (raw == null) fail7("A restore chunk is missing. Retry the interrupted page.", 409);
           const chunk2 = base64urlToBytes2(raw);
-          if (offset + chunk2.length > bytes3.length) fail6("Backup payload size mismatch.");
+          if (offset + chunk2.length > bytes3.length) fail7("Backup payload size mismatch.");
           bytes3.set(chunk2, offset);
           offset += chunk2.length;
         }
-        if (offset !== header.size || await digest(bytes3) !== header.sha256) fail6("Backup payload checksum mismatch.");
+        if (offset !== header.size || await digest(bytes3) !== header.sha256) fail7("Backup payload checksum mismatch.");
         return bytes3;
       };
       const pending = async () => {
@@ -72403,7 +72499,7 @@ var init_sessionBackupImport = __esm({
           await write(index, entry2.key, entry2.value, true);
           progress.observed[entry2.kind === "owner" ? "owners" : "hidden"] += 1;
         } else if (entry2.kind === "record") {
-          if (await storage.get(recordKey2(entry2.id))) fail6("Duplicate backup metadata id.");
+          if (await storage.get(recordKey2(entry2.id))) fail7("Duplicate backup metadata id.");
           const header = await storage.get(descriptorKey(entry2.id));
           if (header?.done) {
             if (header.payloadOk !== false) await write(index, entry2.key, JSON.stringify(entry2.metadata), true);
@@ -72415,9 +72511,9 @@ var init_sessionBackupImport = __esm({
           }
           progress.observed.records += 1;
         } else if (entry2.kind === "payload") {
-          if (await storage.get(descriptorKey(entry2.id, entry2.target))) fail6("Duplicate backup payload id.");
-          if (entry2.chunkCount > STORAGE_EXPORT_PAGE_LIMITS.operations - 64) fail6("This payload exceeds the bounded restore assembly limit.", 413);
-          if (entry2.size > resolveMaxUploadBytes({ env })) fail6("The backup payload exceeds this target\u2019s configured upload limit.", 413);
+          if (await storage.get(descriptorKey(entry2.id, entry2.target))) fail7("Duplicate backup payload id.");
+          if (entry2.chunkCount > STORAGE_EXPORT_PAGE_LIMITS.operations - 64) fail7("This payload exceeds the bounded restore assembly limit.", 413);
+          if (entry2.size > resolveMaxUploadBytes({ env })) fail7("The backup payload exceeds this target\u2019s configured upload limit.", 413);
           const { metadata } = entry2;
           const header = { id: entry2.id, size: entry2.size, sha256: entry2.sha256, chunkCount: entry2.chunkCount, ...entry2.target ? { target: entry2.target } : {} };
           if (metadata) await stage(`${root}metadata:${entry2.id}`, JSON.stringify(metadata));
@@ -72425,8 +72521,8 @@ var init_sessionBackupImport = __esm({
           progress.pendingPayloads += 1;
         } else {
           const header = await storage.get(descriptorKey(entry2.id, entry2.target));
-          if (!header || header.done || header.nextChunk !== entry2.index || entry2.index >= header.chunkCount) fail6("Backup chunks must follow their payload header in order.");
-          if (bytesToBase64url2(base64urlToBytes2(entry2.base64url)) !== entry2.base64url) fail6("Invalid backup chunk encoding.");
+          if (!header || header.done || header.nextChunk !== entry2.index || entry2.index >= header.chunkCount) fail7("Backup chunks must follow their payload header in order.");
+          if (bytesToBase64url2(base64urlToBytes2(entry2.base64url)) !== entry2.base64url) fail7("Invalid backup chunk encoding.");
           await stage(chunkKey(entry2.id, entry2.index, entry2.target), entry2.base64url);
           header.nextChunk += 1;
           if (header.nextChunk === header.chunkCount) {
@@ -72434,7 +72530,7 @@ var init_sessionBackupImport = __esm({
             if (entry2.target === "coordinator") {
               const snapshot = JSON.parse(new TextDecoder().decode(bytes3));
               validateSnapshot({ snapshot, manifest, ...validators });
-              if (header.sha256 !== page.snapshotDigest) fail6("The coordinator snapshot checksum does not match.");
+              if (header.sha256 !== page.snapshotDigest) fail7("The coordinator snapshot checksum does not match.");
               progress.snapshotReady = true;
               progress.chunkedSnapshot = true;
             } else {
@@ -72467,7 +72563,7 @@ var init_sessionBackupImport = __esm({
                 } else {
                   const value = JSON.stringify({ metadata, payloadBase64url: bytesToBase64url2(bytes3) });
                   const tooLarge2 = rejectKvValueOverLimit({ serializedValue: value });
-                  if (tooLarge2) fail6("This payload needs an R2 binding on the restore target.", 413);
+                  if (tooLarge2) fail7("This payload needs an R2 binding on the restore target.", 413);
                   await journalBackupImportWrite(storage, page.archiveId, "index", buildPayloadKey({ slug, id: entry2.id }));
                   await index.put(buildPayloadKey({ slug, id: entry2.id }), value);
                 }
@@ -72509,7 +72605,7 @@ var init_sessionBackupImport = __esm({
         await storage.put(stateKey, progress);
       }
       if (manifest.complete) {
-        if (!progress.snapshotReady || progress.pendingPayloads || progress.pendingRecords || !same2(progress.observed, manifest.counts)) fail6("The backup is incomplete; its records or chunks are missing.", 409);
+        if (!progress.snapshotReady || progress.pendingPayloads || progress.pendingRecords || !same2(progress.observed, manifest.counts)) fail7("The backup is incomplete; its records or chunks are missing.", 409);
         const snapshotHeader = progress.chunkedSnapshot ? await storage.get(descriptorKey("coordinator", "coordinator")) : null;
         if (budget.remaining < (snapshotHeader?.chunkCount || 1) + 32) return pending();
         const snapshot = progress.chunkedSnapshot ? JSON.parse(new TextDecoder().decode(await assemble(snapshotHeader))) : JSON.parse(await index.get(`${root}coordinator`) || "null");
@@ -72530,7 +72626,7 @@ var init_sessionBackupImport = __esm({
               cursor: progress.groupCursor,
               operations: budget.remaining - 16
             });
-            if (!groups.ok) fail6(groups.error || "Group restore is unavailable.", groups.status || 503);
+            if (!groups.ok) fail7(groups.error || "Group restore is unavailable.", groups.status || 503);
             budget.consume(groups.operations || 0);
             progress.counts.written += groups.counts.written;
             progress.counts.skipped += groups.counts.skipped;
@@ -72984,14 +73080,14 @@ var init_resultsAnalysisArtifactValidation = __esm({
     };
     compactWhitespace = (value) => toPrimitiveStr(value).replace(/\s+/g, " ").trim();
     cleanText = (value, maxLength = LIMITS.summaryChars) => {
-      const text = compactWhitespace(value).replace(WALLET_TEXT_RE, "[redacted-address]");
-      if (!text) return "";
-      return text.slice(0, Math.max(0, maxLength));
+      const text2 = compactWhitespace(value).replace(WALLET_TEXT_RE, "[redacted-address]");
+      if (!text2) return "";
+      return text2.slice(0, Math.max(0, maxLength));
     };
     cleanId = (value, fallback = "") => {
-      const text = compactWhitespace(value).slice(0, LIMITS.idChars);
-      if (!text || WALLET_ID_RE.test(text)) return fallback;
-      return [...text].filter((char) => {
+      const text2 = compactWhitespace(value).slice(0, LIMITS.idChars);
+      if (!text2 || WALLET_ID_RE.test(text2)) return fallback;
+      return [...text2].filter((char) => {
         const code = char.codePointAt(0);
         return code > 31 && code !== 127;
       }).join("") || fallback;
@@ -74267,9 +74363,9 @@ var init_resultsAnalysisGeneration = __esm({
       };
     };
     normalizeSubmittedAt = (value) => {
-      const text = trim12(value);
-      if (!text) return "";
-      const ms = Date.parse(text);
+      const text2 = trim12(value);
+      if (!text2) return "";
+      const ms = Date.parse(text2);
       return Number.isFinite(ms) ? new Date(ms).toISOString() : "";
     };
     enabledSectionsFromSettings = (settings) => /* @__PURE__ */ new Set([
@@ -76005,8 +76101,8 @@ var init_chipotleClient = __esm({
       if (response2.status >= 300 && response2.status < 400) {
         throw new Error("Chipotle redirects are not allowed.");
       }
-      const text = await response2.text().catch(() => "");
-      const parsed = parseJsonIfPossible(text);
+      const text2 = await response2.text().catch(() => "");
+      const parsed = parseJsonIfPossible(text2);
       if (!response2.ok) {
         throw Object.assign(
           new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed")),
@@ -76736,12 +76832,12 @@ var init_chipotleClient = __esm({
       };
       for (const [key, candidates] of Object.entries(supplied)) {
         const normalize = (value) => {
-          const text = toTrimmedString9(value);
-          if (key !== "litApiBase" || !text) return text;
+          const text2 = toTrimmedString9(value);
+          if (key !== "litApiBase" || !text2) return text2;
           try {
-            return normalizeLitChipotleApiBase(text, { allowLocalApiBase: isLitChipotleLocalApiBaseAllowed(env) });
+            return normalizeLitChipotleApiBase(text2, { allowLocalApiBase: isLitChipotleLocalApiBaseAllowed(env) });
           } catch {
-            return text;
+            return text2;
           }
         };
         const saved = normalize(progress[key]);
@@ -77072,7 +77168,7 @@ var init_chipotleClient = __esm({
 });
 
 // workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js
-var SIGNER_RECORD, SETUP_RECORD, PROVISIONING_RECORD, PROVISIONING_LEASE_MS, PROVISIONING_FIELDS, ACCOUNT_FIELDS, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord3, hasOwn7, json4, fail7, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, readProvisioning, executeLitProvisioning, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair, provisionCall, preflightSessionLitProvisioning, beginSessionLitProvisioning, checkpointSessionLitProvisioning, releaseSessionLitProvisioning, checkSessionLitProvisioning, discardSessionLitProvisioning;
+var SIGNER_RECORD, SETUP_RECORD, PROVISIONING_RECORD, PROVISIONING_LEASE_MS, PROVISIONING_FIELDS, ACCOUNT_FIELDS, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord4, hasOwn7, json4, fail8, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, readProvisioning, executeLitProvisioning, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair, provisionCall, preflightSessionLitProvisioning, beginSessionLitProvisioning, checkpointSessionLitProvisioning, releaseSessionLitProvisioning, checkSessionLitProvisioning, discardSessionLitProvisioning;
 var init_sessionLitAuthorizationCoordinator = __esm({
   "workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js"() {
     init_lib2();
@@ -77105,47 +77201,47 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     ]);
     COORDINATION_ERROR = "Lit authorization signer coordination failed; retry.";
     PENDING_ERROR = "Lit setup projection is pending; retry before using the new authority.";
-    isRecord3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isRecord4 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     hasOwn7 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
     json4 = (body, status = 200) => new Response(JSON.stringify(body), {
       status,
       headers: { "Content-Type": "application/json", "Cache-Control": "private, no-store" }
     });
-    fail7 = (status = 409) => {
+    fail8 = (status = 409) => {
       throw Object.assign(new Error(COORDINATION_ERROR), { status });
     };
     walletFor = (key) => {
-      if (typeof key !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(key)) fail7();
+      if (typeof key !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(key)) fail8();
       try {
         return new ethers_exports.Wallet(key);
       } catch {
-        return fail7();
+        return fail8();
       }
     };
     authorityConfig = (authority, baseConfig, slug) => {
-      if (authority != null && (!isRecord3(authority) || authority.slug !== slug || !isRecord3(authority.config))) fail7();
+      if (authority != null && (!isRecord4(authority) || authority.slug !== slug || !isRecord4(authority.config))) fail8();
       const config = authority?.config || baseConfig;
-      if (!isRecord3(config)) fail7(400);
+      if (!isRecord4(config)) fail8(400);
       return config;
     };
     assertConfiguredSigner = (config, wallet, hasExistingKey) => {
-      if (config?.litCredentials != null && !isRecord3(config.litCredentials)) fail7();
+      if (config?.litCredentials != null && !isRecord4(config.litCredentials)) fail8();
       const credentials = config?.litCredentials || {};
       const signer = credentials.litAuthorizationSigner;
       const version2 = credentials.litAuthorizationVersion;
       if (signer == null && version2 == null) return;
-      if (!hasExistingKey || version2 !== LIT_AUTHORIZATION_VERSION || typeof signer !== "string" || signer.toLowerCase() !== wallet.address.toLowerCase()) fail7();
+      if (!hasExistingKey || version2 !== LIT_AUTHORIZATION_VERSION || typeof signer !== "string" || signer.toLowerCase() !== wallet.address.toLowerCase()) fail8();
     };
     readSignerSecrets = async (record4, env, slug) => {
-      if (!isRecord3(record4) || record4.version !== 1 || record4.slug !== slug) fail7();
+      if (!isRecord4(record4) || record4.version !== 1 || record4.slug !== slug) fail8();
       const secrets = await decryptSessionSecretsEnvelope(record4.envelope, { env, slug });
-      if (!isRecord3(secrets) || Object.keys(secrets).some((key) => !SECRET_KEYS.includes(key)) || Object.values(secrets).some((value) => typeof value !== "string")) fail7();
+      if (!isRecord4(secrets) || Object.keys(secrets).some((key) => !SECRET_KEYS.includes(key)) || Object.values(secrets).some((value) => typeof value !== "string")) fail8();
       walletFor(secrets[PRIVATE_KEY]);
       return secrets;
     };
     executeLitAuthorizationSignerEnsure = async (coordinator, payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-      if (!slug || !isRecord3(payload?.baseConfig)) return json4({ error: COORDINATION_ERROR }, 400);
+      if (!slug || !isRecord4(payload?.baseConfig)) return json4({ error: COORDINATION_ERROR }, 400);
       try {
         const proposed = walletFor(payload.proposedPrivateKey);
         await coordinator.assertSessionAuthority(payload);
@@ -77173,7 +77269,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       if (pending == null) return;
       const authority = await coordinator.state.storage.get(CONFIG_RECORD);
       const slug = resolveCoordinatorSessionSlugStorageKey(pending.slug);
-      if (!slug || pending.version !== 1 || !Number.isSafeInteger(pending.revision) || authority?.slug !== slug || authority?.revision !== pending.revision) fail7();
+      if (!slug || pending.version !== 1 || !Number.isSafeInteger(pending.revision) || authority?.slug !== slug || authority?.revision !== pending.revision) fail8();
       await decryptSessionSecretsEnvelope(pending.envelope, { env: coordinator.env, slug });
       await repairPendingSessionSecretsProjection(coordinator);
       await coordinator.projectSessionConfigAuthority(authority);
@@ -77183,9 +77279,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       });
     };
     readProvisioning = async (record4, env, slug) => {
-      if (!isRecord3(record4) || record4.version !== 1 || record4.slug !== slug) fail7();
+      if (!isRecord4(record4) || record4.version !== 1 || record4.slug !== slug) fail8();
       const checkpoint = await decryptSessionSecretsEnvelope(record4.envelope, { env, slug });
-      if (!isRecord3(checkpoint) || Object.keys(checkpoint).some((key) => !PROVISIONING_FIELDS.has(key)) || Object.values(checkpoint).some((value) => typeof value !== "string" && typeof value !== "boolean")) fail7();
+      if (!isRecord4(checkpoint) || Object.keys(checkpoint).some((key) => !PROVISIONING_FIELDS.has(key)) || Object.values(checkpoint).some((value) => typeof value !== "string" && typeof value !== "boolean")) fail8();
       return checkpoint;
     };
     executeLitProvisioning = async (coordinator, payload, operation) => {
@@ -77200,7 +77296,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           const record4 = await transaction.get(PROVISIONING_RECORD);
           const now = coordinator.now();
           if (operation === "begin" || operation === "preflight") {
-            if (record4?.leaseUntilMs > now) fail7();
+            if (record4?.leaseUntilMs > now) fail8();
             const saved = record4 ? await readProvisioning(record4, coordinator.env, slug) : {};
             const resourceIds = Object.fromEntries(["litGroupId", "litPkpId", "litActionCid"].filter((key) => typeof saved[key] === "string" && saved[key].trim()).map((key) => [key, saved[key]]));
             const hasResources = !!saved.accountWalletAddress || Object.keys(resourceIds).length > 0;
@@ -77231,7 +77327,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
             return { attemptId, checkpoint: checkpoint2 };
           }
           if (operation === "check") {
-            if (!record4 || record4.leaseUntilMs > now) fail7();
+            if (!record4 || record4.leaseUntilMs > now) fail8();
             const checkpoint2 = await readProvisioning(record4, coordinator.env, slug);
             const attemptId = crypto.randomUUID();
             await transaction.put(PROVISIONING_RECORD, { ...record4, attemptId, leaseUntilMs: now + PROVISIONING_LEASE_MS });
@@ -77242,7 +77338,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
               await transaction.put(PROVISIONING_RECORD, { ...record4, leaseUntilMs: 0 });
             return {};
           }
-          if (!["checkpoint", "discard"].includes(operation) || !record4 || !payload.attemptId || record4.attemptId !== payload.attemptId) fail7();
+          if (!["checkpoint", "discard"].includes(operation) || !record4 || !payload.attemptId || record4.attemptId !== payload.attemptId) fail8();
           const previous = await readProvisioning(record4, coordinator.env, slug);
           if (operation === "discard") {
             const kept = payload.keepAccount === true ? Object.fromEntries(ACCOUNT_FIELDS.filter((key) => hasOwn7(previous, key)).map((key) => [key, previous[key]])) : {};
@@ -77251,9 +77347,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
             return {};
           }
           const checkpoint = payload.checkpoint;
-          if (!isRecord3(checkpoint) || Object.keys(checkpoint).some((key) => !PROVISIONING_FIELDS.has(key)) || Object.values(checkpoint).some((value) => typeof value !== "string" && typeof value !== "boolean")) fail7(400);
+          if (!isRecord4(checkpoint) || Object.keys(checkpoint).some((key) => !PROVISIONING_FIELDS.has(key)) || Object.values(checkpoint).some((value) => typeof value !== "string" && typeof value !== "boolean")) fail8(400);
           for (const [key, value] of Object.entries(previous)) {
-            if (key !== "litPkpId" && hasOwn7(checkpoint, key) && checkpoint[key] !== value) fail7();
+            if (key !== "litPkpId" && hasOwn7(checkpoint, key) && checkpoint[key] !== value) fail8();
           }
           const envelope = await buildEncryptedSessionSecretsEnvelope({ ...previous, ...checkpoint }, { env: coordinator.env, slug });
           await transaction.put(PROVISIONING_RECORD, { ...record4, leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
@@ -77270,7 +77366,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     executeLitAuthorizationFinalize = async (coordinator, payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const outputs = payload?.secretOutputs;
-      if (!slug || !isRecord3(payload?.baseConfig) || !isRecord3(payload?.litCredentials) || !isRecord3(outputs) || Object.keys(outputs).some((key) => !SECRET_KEYS.includes(key)) || Object.values(outputs).some((value) => typeof value !== "string")) {
+      if (!slug || !isRecord4(payload?.baseConfig) || !isRecord4(payload?.litCredentials) || !isRecord4(outputs) || Object.keys(outputs).some((key) => !SECRET_KEYS.includes(key)) || Object.values(outputs).some((value) => typeof value !== "string")) {
         return json4({ error: COORDINATION_ERROR }, 400);
       }
       try {
@@ -77278,20 +77374,20 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         await coordinator.repairPendingSessionConfigProjection();
         await coordinator.state.storage.transaction(async (transaction) => {
           const provisioning = await transaction.get(PROVISIONING_RECORD);
-          if (!payload.attemptId || provisioning?.attemptId !== payload.attemptId) fail7();
+          if (!payload.attemptId || provisioning?.attemptId !== payload.attemptId) fail8();
           const checkpoint = await readProvisioning(provisioning, coordinator.env, slug);
-          if (["litGroupId", "litPkpId", "litActionCid", "litUsageApiKey"].some((key) => typeof checkpoint[key] !== "string" || !checkpoint[key].trim()) || ["registeredAction", "addedActionToGroup", "addedPkpToGroup"].some((key) => checkpoint[key] !== true)) fail7();
+          if (["litGroupId", "litPkpId", "litActionCid", "litUsageApiKey"].some((key) => typeof checkpoint[key] !== "string" || !checkpoint[key].trim()) || ["registeredAction", "addedActionToGroup", "addedPkpToGroup"].some((key) => checkpoint[key] !== true)) fail8();
           for (const key of ["litApiBase", "litGroupId", "litPkpId", "litActionCid"]) {
-            if (hasOwn7(checkpoint, key) && checkpoint[key] !== payload.litCredentials[key]) fail7();
+            if (hasOwn7(checkpoint, key) && checkpoint[key] !== payload.litCredentials[key]) fail8();
           }
-          if (hasOwn7(checkpoint, "litUsageApiKey") && checkpoint.litUsageApiKey !== outputs.litUsageApiKey) fail7();
-          if (hasOwn7(checkpoint, "accountSecretOutput") && checkpoint.accountSecretOutput !== outputs.litAccountApiKey) fail7();
+          if (hasOwn7(checkpoint, "litUsageApiKey") && checkpoint.litUsageApiKey !== outputs.litUsageApiKey) fail8();
+          if (hasOwn7(checkpoint, "accountSecretOutput") && checkpoint.accountSecretOutput !== outputs.litAccountApiKey) fail8();
           const record4 = await transaction.get(SIGNER_RECORD);
           const signerSecrets = await readSignerSecrets(record4, coordinator.env, slug);
           const wallet = walletFor(signerSecrets[PRIVATE_KEY]);
-          if (walletFor(outputs[PRIVATE_KEY]).privateKey !== wallet.privateKey) fail7();
+          if (walletFor(outputs[PRIVATE_KEY]).privateKey !== wallet.privateKey) fail8();
           assertConfiguredSigner({ litCredentials: payload.litCredentials }, wallet, true);
-          if (payload.litCredentials.litAuthorizationVersion !== LIT_AUTHORIZATION_VERSION) fail7();
+          if (payload.litCredentials.litAuthorizationVersion !== LIT_AUTHORIZATION_VERSION) fail8();
           const existing = await transaction.get(CONFIG_RECORD);
           const config = authorityConfig(existing, payload.baseConfig, slug);
           assertConfiguredSigner(config, wallet, true);
@@ -77300,7 +77396,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
             slug,
             mutation: { kind: "merge-lit-credentials", litCredentials: payload.litCredentials }
           });
-          if (!mutation?.ok) fail7(mutation?.status || 400);
+          if (!mutation?.ok) fail8(mutation?.status || 400);
           const secrets = { ...await readCommittedSessionSecrets(coordinator, transaction, slug), ...signerSecrets };
           for (const [key, value] of Object.entries(outputs)) {
             if (value.trim()) secrets[key] = value.trim();
@@ -77338,7 +77434,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     executeSessionSecretsAfterLitRepair = async (coordinator, payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const patch = payload?.incomingSecrets;
-      if (!slug || !isRecord3(patch) || Object.keys(patch).some((key) => !ADMIN_SESSION_SECRET_KEYS.includes(key)) || Object.values(patch).some((value) => typeof value !== "string")) {
+      if (!slug || !isRecord4(patch) || Object.keys(patch).some((key) => !ADMIN_SESSION_SECRET_KEYS.includes(key)) || Object.values(patch).some((value) => typeof value !== "string")) {
         return json4({ error: "Invalid session secrets update." }, 400);
       }
       try {
@@ -84699,10 +84795,10 @@ var createRpcContractProbeHelpersWithWorkerDeps = ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
     });
-    const text = await res.text();
+    const text2 = await res.text();
     let payload = null;
     try {
-      payload = JSON.parse(text);
+      payload = JSON.parse(text2);
     } catch {
       throw createSafeRpcError(
         { rpcStatus: res.status },
@@ -84747,10 +84843,10 @@ var createRpcContractProbeHelpersWithWorkerDeps = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] })
       });
-      const text = await res.text();
+      const text2 = await res.text();
       let parsed = null;
       try {
-        parsed = JSON.parse(text);
+        parsed = JSON.parse(text2);
       } catch {
         parsed = null;
       }
@@ -85797,9 +85893,9 @@ var malformedSiwe = (detail) => ({
   error: `Malformed SIWE message: ${detail}.`
 });
 var parseSiweMessage = (message) => {
-  const text = toStr6(message);
-  if (text.includes("\r")) return malformedSiwe("line breaks must be LF");
-  const lines = text.split("\n");
+  const text2 = toStr6(message);
+  if (text2.includes("\r")) return malformedSiwe("line breaks must be LF");
+  const lines = text2.split("\n");
   const header = lines[0] || "";
   const domain = header.endsWith(SIWE_HEADER_SUFFIX) ? header.slice(0, -SIWE_HEADER_SUFFIX.length) : "";
   if (!SIWE_DOMAIN_RE.test(domain)) return malformedSiwe("missing or invalid header");
@@ -88756,16 +88852,16 @@ var stripHtml = (html) => {
   const source = String(html || "");
   const lower9 = source.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
   const missingClosers = /* @__PURE__ */ new Set();
-  const text = [];
+  const text2 = [];
   let cursor = 0;
   while (cursor < source.length) {
     const start = source.indexOf("<", cursor);
     const end = start < 0 ? -1 : source.indexOf(">", start + 1);
     if (end < 0) {
-      text.push(source.slice(cursor));
+      text2.push(source.slice(cursor));
       break;
     }
-    text.push(source.slice(cursor, start));
+    text2.push(source.slice(cursor, start));
     const hidden = /^<(script|style|head|nav|footer)\b/i.exec(source.slice(start, end + 1))?.[1].toLowerCase();
     if (hidden && !missingClosers.has(hidden)) {
       const closingTag = `</${hidden}>`;
@@ -88776,10 +88872,10 @@ var stripHtml = (html) => {
       }
       missingClosers.add(hidden);
     }
-    text.push(end === start + 1 ? "<>" : " ");
+    text2.push(end === start + 1 ? "<>" : " ");
     cursor = end + 1;
   }
-  return text.join("").replace(/\s+/g, " ").trim();
+  return text2.join("").replace(/\s+/g, " ").trim();
 };
 var fetchImage = async ({
   url,
@@ -88819,12 +88915,12 @@ var fetchUrl = async ({
   }
   const bytes3 = await readFetchBytes(response2);
   if (!bytes3) return json6({ error: "Response too large" }, 413, baseHeaders);
-  const text = new TextDecoder().decode(bytes3);
+  const text2 = new TextDecoder().decode(bytes3);
   if (type.includes("application/json")) {
-    const data = JSON.parse(text);
+    const data = JSON.parse(text2);
     return json6({ content: JSON.stringify(data), status: "success", contentType: type }, 200, baseHeaders);
   }
-  const stripped = stripHtml(text);
+  const stripped = stripHtml(text2);
   if (!stripped || stripped.length < 50) {
     return json6({ error: "Insufficient content extracted" }, 400, baseHeaders);
   }
@@ -89230,10 +89326,10 @@ var resolveOpenAiTranscribeUrl = ({
 init_outboundUrlSafetyBinding();
 var normalizeSpeakerSegments = (segments) => (Array.isArray(segments) ? segments : []).flatMap((segment) => {
   const speaker = typeof segment?.speaker === "string" ? segment.speaker.trim().slice(0, 128) : "";
-  const text = typeof segment?.text === "string" ? segment.text.trim() : "";
+  const text2 = typeof segment?.text === "string" ? segment.text.trim() : "";
   const { start, end } = segment || {};
-  if (!speaker || !text || !Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) return [];
-  return [{ speaker, start, end, text }];
+  if (!speaker || !text2 || !Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) return [];
+  return [{ speaker, start, end, text: text2 }];
 });
 var toTrimmedString14 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
 var transcribe = async ({
@@ -90569,12 +90665,12 @@ function normalizeStatementQuestionType(questionType = "") {
 async function statementFromQuestion(question = {}) {
   if (question.answerable === false || question.locked || question.encrypted) return null;
   const questionId4 = normalizeQuestionId2(question.questionId || question.id);
-  const text = String(question.prompt || question.questionText || question.title || "");
-  if (!questionId4 || !text.trim()) return null;
+  const text2 = String(question.prompt || question.questionText || question.title || "");
+  if (!questionId4 || !text2.trim()) return null;
   const schema = buildAgentQuestionAnswerSchema(question);
   const statement = {
     statement_id: questionId4,
-    text,
+    text: text2,
     question_type: normalizeStatementQuestionType(schema.questionType || question.questionType),
     answer_schema: schema.answerSchema
   };
@@ -90653,11 +90749,11 @@ function answerLabelForSchema(answer = {}, schema = {}) {
   if (schema.kind === "multichoice") return (Array.isArray(answer.values) ? answer.values : []).map(safeString).filter(Boolean).join(", ");
   if (schema.kind === "text") return safeString(answer.text);
   const value = answer.value;
-  const text = answerScalarString(value);
-  if (lower2(text) === "agree") return "Agree";
-  if (lower2(text) === "disagree") return "Disagree";
-  if (lower2(text) === "unsure") return "Unsure";
-  return text;
+  const text2 = answerScalarString(value);
+  if (lower2(text2) === "agree") return "Agree";
+  if (lower2(text2) === "disagree") return "Disagree";
+  if (lower2(text2) === "unsure") return "Unsure";
+  return text2;
 }
 async function reviewSemanticFingerprint(review = {}, schema = {}) {
   if (!review || typeof review !== "object") return "";
@@ -91221,10 +91317,10 @@ function predictionLine(row = {}, { questionChars = 240, answerChars = 80 } = {}
   return `Question: "${wrappedDisplayText(row.question, questionChars)}"; answer format: ${wrappedDisplayText(row.answerFormat || "answer", 40)}; prediction: ${wrappedDisplayText(row.answer || "N/A", answerChars)}; confidence: ${row.confidence}%`;
 }
 function wrappedAnswerIsUnavailable(value = "") {
-  const text = (value === void 0 || value === null ? "" : String(value)).trim().toLowerCase();
-  if (/(^|[^a-z0-9])n\s*\/?\s*a([^a-z0-9]|$)/i.test(text)) return true;
-  if (/\bnot\s+applicable\b|\bnot\s+enough\b|\binsufficient\b|\bunsupported\b|\bunknown\b|\bunavailable\b/.test(text)) return true;
-  const normalized = text.replace(/[^a-z0-9]+/g, "");
+  const text2 = (value === void 0 || value === null ? "" : String(value)).trim().toLowerCase();
+  if (/(^|[^a-z0-9])n\s*\/?\s*a([^a-z0-9]|$)/i.test(text2)) return true;
+  if (/\bnot\s+applicable\b|\bnot\s+enough\b|\binsufficient\b|\bunsupported\b|\bunknown\b|\bunavailable\b/.test(text2)) return true;
+  const normalized = text2.replace(/[^a-z0-9]+/g, "");
   if (!normalized) return true;
   if ([
     "na",
@@ -91395,11 +91491,11 @@ function normalizeAnswerForSchema(answer = {}, schema = {}) {
     return { ok: true, answer: { values: unique2 } };
   }
   if (schema.kind === "text") {
-    const text = safeString(source.text ?? source.value ?? source.answer).replace(/\s+/g, " ");
+    const text2 = safeString(source.text ?? source.value ?? source.answer).replace(/\s+/g, " ");
     const maxChars = Math.max(1, Math.min(1e3, Number(schema.maxChars) || 280));
-    if (!text) return { ok: false, reason: "answer_text_required" };
-    if (text.length > maxChars) return { ok: false, reason: "answer_text_too_long" };
-    return { ok: true, answer: { text } };
+    if (!text2) return { ok: false, reason: "answer_text_required" };
+    if (text2.length > maxChars) return { ok: false, reason: "answer_text_too_long" };
+    return { ok: true, answer: { text: text2 } };
   }
   return { ok: false, reason: "answer_schema_unsupported" };
 }
@@ -92278,8 +92374,8 @@ async function requestOpenAiWrappedImage({
 }
 function shouldRetryWrappedImageWithSaferPrompt(result = {}) {
   const rawText = lower2(`${result.reason || ""} ${result.upstreamReason || ""} ${result.upstreamStatus || ""}`);
-  const text = rawText.replace(/[^a-z0-9]+/g, " ");
-  return /\bsafety\b|\bpolicy\b|\breject|\bmoderation\b|\bcontent\b|\bfiltered\b/.test(text);
+  const text2 = rawText.replace(/[^a-z0-9]+/g, " ");
+  return /\bsafety\b|\bpolicy\b|\breject|\bmoderation\b|\bcontent\b|\bfiltered\b/.test(text2);
 }
 function escapeWrappedPosterXml(value = "") {
   return wrappedDisplayText(value, 180).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
@@ -92760,8 +92856,8 @@ async function buildAgentOnlyMetrics({
 var CSV_FORMULA_START = /^[=+\-@\t\r]/;
 var CSV_PLAIN_NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
 var quoteCsvCell = (value) => {
-  const text = String(value !== void 0 && value !== null ? value : "");
-  const safeText = CSV_FORMULA_START.test(text) && !CSV_PLAIN_NUMBER.test(text) ? `'${text}` : text;
+  const text2 = String(value !== void 0 && value !== null ? value : "");
+  const safeText = CSV_FORMULA_START.test(text2) && !CSV_PLAIN_NUMBER.test(text2) ? `'${text2}` : text2;
   return `"${safeText.replace(/"/g, '""')}"`;
 };
 
@@ -92780,8 +92876,8 @@ async function readKvJson2(env = {}, key = "") {
   return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
 }
 function csvEscape(value) {
-  const text = typeof value === "string" ? value : JSON.stringify(value ?? "");
-  return quoteCsvCell(text);
+  const text2 = typeof value === "string" ? value : JSON.stringify(value ?? "");
+  return quoteCsvCell(text2);
 }
 function rowsToCsv(rows = []) {
   if (!rows.length) return "";
@@ -94045,11 +94141,11 @@ function normalizePreferenceSessionHints(input = {}) {
   const names2 = /* @__PURE__ */ new Set();
   source.forEach((entry2) => {
     const raw = entry2 && typeof entry2 === "object" && !Array.isArray(entry2) ? firstValue2(entry2.sessionSlug, entry2.slug, entry2.id, entry2.sessionName, entry2.name, entry2.title) : entry2;
-    const text = safeString(raw);
-    if (!text) return;
-    const slug = sanitizeSessionSlug(text);
+    const text2 = safeString(raw);
+    if (!text2) return;
+    const slug = sanitizeSessionSlug(text2);
     if (slug) slugs.add(slug);
-    normalizeQuestionTags(text).forEach((tag) => names2.add(tag));
+    normalizeQuestionTags(text2).forEach((tag) => names2.add(tag));
   });
   return { slugs: [...slugs], tags: [...names2] };
 }
@@ -94230,10 +94326,10 @@ function normalizeCreateQuestionBatch(input = {}) {
   );
 }
 function normalizeSourceUrl(value = "") {
-  const text = safeString(value).slice(0, 2e3);
-  if (!text) return "";
+  const text2 = safeString(value).slice(0, 2e3);
+  if (!text2) return "";
   try {
-    const url = new URL(text);
+    const url = new URL(text2);
     if (!["http:", "https:"].includes(url.protocol)) return "";
     return url.toString();
   } catch {
@@ -94879,11 +94975,11 @@ function resolveNaturalQuestionQueueRefs(input = {}, questions = []) {
   return { refs, ids, matches, skipped };
 }
 function topicFromInstruction(value = "") {
-  const text = safeString(value).replace(/\s+/g, " ");
-  if (!text) return "";
-  const quoted = text.match(/["“”']([^"“”']{4,160})["“”']/);
+  const text2 = safeString(value).replace(/\s+/g, " ");
+  if (!text2) return "";
+  const quoted = text2.match(/["“”']([^"“”']{4,160})["“”']/);
   if (quoted?.[1]) return safeString(quoted[1]);
-  const about = text.match(/\babout\s+(.+?)(?:\s+(?:and|then)\s+(?:make|mark|sponsor)|$)/i);
+  const about = text2.match(/\babout\s+(.+?)(?:\s+(?:and|then)\s+(?:make|mark|sponsor)|$)/i);
   if (about?.[1]) {
     return safeString(about[1]).replace(/\b(as|a)?\s*sponsored\s+question\b.*$/i, "").replace(/\b(make|mark)\s+it\s+sponsored\b.*$/i, "").replace(/[.?!]+$/g, "");
   }
@@ -95831,8 +95927,8 @@ function membershipKey({ sessionSlug = "", telegramUserId = "" } = {}) {
   return slug && userId ? `${AGENT_LIGHTWEIGHT_GROUP_MEMBERSHIP_KV_PREFIX}${slug}:${userId}` : "";
 }
 function normalizeAddress2(value = "") {
-  const text = lower2(value);
-  return /^0x[0-9a-f]{40}$/.test(text) ? text : "";
+  const text2 = lower2(value);
+  return /^0x[0-9a-f]{40}$/.test(text2) ? text2 : "";
 }
 function bucketMembershipKey({ sessionSlug = "", accountAddress = "" } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
@@ -96314,9 +96410,9 @@ function normalizeApprovalMode(value = {}) {
   };
 }
 function normalizeIsoString(value = "") {
-  const text = safeString(value);
-  if (!text) return "";
-  const parsed = Date.parse(text);
+  const text2 = safeString(value);
+  if (!text2) return "";
+  const parsed = Date.parse(text2);
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
 }
 function agentSettingsKey({
@@ -96536,8 +96632,8 @@ function plainObject(value = {}) {
 function collectProfileTextParts(value, depth = 0) {
   if (depth > 3 || value === void 0 || value === null) return [];
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    const text = safeString(value);
-    return text ? [text.slice(0, 500)] : [];
+    const text2 = safeString(value);
+    return text2 ? [text2.slice(0, 500)] : [];
   }
   if (Array.isArray(value)) {
     return value.flatMap((entry2) => collectProfileTextParts(entry2, depth + 1)).slice(0, 40);
@@ -96587,31 +96683,31 @@ function explicitProfileRoleText(input = {}) {
   return collectProfileTextParts(values).join(", ").slice(0, 80);
 }
 function inferAttendanceSelectionsFromProfile(input = {}) {
-  const text = onboardingProfileText(input);
+  const text2 = onboardingProfileText(input);
   const selected = [];
-  if (/\b(?:week|wk|w)[\s_-]*1\b|\bfirst\s+week\b/.test(text)) selected.push("week_1");
-  if (/\b(?:week|wk|w)[\s_-]*2\b|\bsecond\s+week\b/.test(text)) selected.push("week_2");
-  if (/\b(?:week|wk|w)[\s_-]*3\b|\bthird\s+week\b/.test(text)) selected.push("week_3");
-  if (/\b(?:week|wk|w)[\s_-]*4\b|\bfourth\s+week\b/.test(text)) selected.push("week_4");
-  if (/\b(?:entire|whole|full)\s+month\b|\ball\s+(?:month|four|4)\b|\bmonth[-\s]*long\b/.test(text)) {
+  if (/\b(?:week|wk|w)[\s_-]*1\b|\bfirst\s+week\b/.test(text2)) selected.push("week_1");
+  if (/\b(?:week|wk|w)[\s_-]*2\b|\bsecond\s+week\b/.test(text2)) selected.push("week_2");
+  if (/\b(?:week|wk|w)[\s_-]*3\b|\bthird\s+week\b/.test(text2)) selected.push("week_3");
+  if (/\b(?:week|wk|w)[\s_-]*4\b|\bfourth\s+week\b/.test(text2)) selected.push("week_4");
+  if (/\b(?:entire|whole|full)\s+month\b|\ball\s+(?:month|four|4)\b|\bmonth[-\s]*long\b/.test(text2)) {
     selected.push("entire_month");
   }
   if (/\bprevious\s+edge\b|\bpast\s+edge\b|\battended\s+edge\s+(?:before|previously)\b|\battended\s+previous\s+edge\b/.test(
-    text
+    text2
   )) {
     selected.push("attended_previous_edge_events");
   }
   return [...new Set(selected)];
 }
 function inferContributionRoleSelectionsFromProfile(input = {}) {
-  const text = onboardingProfileText(input);
+  const text2 = onboardingProfileText(input);
   const selected = [];
-  if (/\b(?:researcher|research|scientist|academic|scholar)\b/.test(text)) selected.push("researcher");
-  if (/\b(?:builder|engineer|developer|hacker|protocol|infrastructure|infra)\b/.test(text)) selected.push("builder");
-  if (/\b(?:founder|operator|startup|operations|product)\b/.test(text)) selected.push("founder_operator");
-  if (/\b(?:investor|vc|venture|fund)\b/.test(text)) selected.push("investor");
-  if (/\b(?:artist|designer|creative)\b/.test(text)) selected.push("artist_designer");
-  if (/\b(?:community|host|organizer|organiser|facilitator|program\s+lead|event\s+lead)\b/.test(text))
+  if (/\b(?:researcher|research|scientist|academic|scholar)\b/.test(text2)) selected.push("researcher");
+  if (/\b(?:builder|engineer|developer|hacker|protocol|infrastructure|infra)\b/.test(text2)) selected.push("builder");
+  if (/\b(?:founder|operator|startup|operations|product)\b/.test(text2)) selected.push("founder_operator");
+  if (/\b(?:investor|vc|venture|fund)\b/.test(text2)) selected.push("investor");
+  if (/\b(?:artist|designer|creative)\b/.test(text2)) selected.push("artist_designer");
+  if (/\b(?:community|host|organizer|organiser|facilitator|program\s+lead|event\s+lead)\b/.test(text2))
     selected.push("community_host");
   if (!selected.length) {
     const explicitRole = explicitProfileRoleText(input);
@@ -97123,9 +97219,9 @@ function strokeCircle(pixels, width, cx, cy, radius, color) {
 function normalizeText(value = "") {
   return String(value || "").normalize("NFKD").replace(/[^\x20-\x7e]/g, " ").replace(/[●•]/g, "*").toUpperCase();
 }
-function drawText(pixels, width, text, x, y, scale = 3, color = TEXT) {
+function drawText(pixels, width, text2, x, y, scale = 3, color = TEXT) {
   let cursor = x;
-  for (const char of normalizeText(text)) {
+  for (const char of normalizeText(text2)) {
     const glyph = FONT[char] || FONT["?"];
     glyph.forEach((row, rowIndex) => {
       for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
@@ -97145,10 +97241,10 @@ function drawText(pixels, width, text, x, y, scale = 3, color = TEXT) {
   }
   return cursor;
 }
-function textPixelWidth(text = "", scale = 3) {
-  return normalizeText(text).length * 6 * scale;
+function textPixelWidth(text2 = "", scale = 3) {
+  return normalizeText(text2).length * 6 * scale;
 }
-function drawPill(pixels, width, text, x, y, {
+function drawPill(pixels, width, text2, x, y, {
   scale = 2,
   color = BLACK,
   fill = PILL_BG,
@@ -97158,7 +97254,7 @@ function drawPill(pixels, width, text, x, y, {
   h = 38
 } = {}) {
   const dotW = dot ? 24 : 0;
-  const pillW = padX * 2 + dotW + textPixelWidth(text, scale);
+  const pillW = padX * 2 + dotW + textPixelWidth(text2, scale);
   fillRoundRect(pixels, width, x, y, pillW, h, 8, fill);
   strokeRect(pixels, width, x, y, pillW, h, border);
   let textX = x + padX;
@@ -97166,7 +97262,7 @@ function drawPill(pixels, width, text, x, y, {
     fillCircle(pixels, width, x + padX + 7, y + Math.round(h / 2), 7, dot);
     textX += dotW;
   }
-  drawText(pixels, width, text, textX, y + Math.round((h - 7 * scale) / 2), scale, color);
+  drawText(pixels, width, text2, textX, y + Math.round((h - 7 * scale) / 2), scale, color);
   return pillW;
 }
 function answerKind(label = "") {
@@ -97831,10 +97927,10 @@ var CONTENT_TOPIC_RULES = Object.freeze([
   }
 ]);
 function kvKeySafePart2(value = "") {
-  const text = safeString(value);
-  if (!text) return "default";
-  const safe = text.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48);
-  return `${safe || "ref"}_${stableFingerprint(text)}`;
+  const text2 = safeString(value);
+  if (!text2) return "default";
+  const safe = text2.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48);
+  return `${safe || "ref"}_${stableFingerprint(text2)}`;
 }
 function questionId3(question = {}) {
   return safeString(question.questionId || question.id || question.key);
@@ -97861,17 +97957,17 @@ function tagIsMeaningful(tag = "") {
   return value && !LOW_SIGNAL_TOPIC_TAGS.has(value) && !STOP_WORDS.has(value);
 }
 function inferKeywordTags(question = {}, session = {}) {
-  const text = questionText2(question);
+  const text2 = questionText2(question);
   const counts = /* @__PURE__ */ new Map();
-  for (const word of lower2(text).split(/[^a-z0-9]+/).filter(Boolean)) {
+  for (const word of lower2(text2).split(/[^a-z0-9]+/).filter(Boolean)) {
     if (word.length < 4 || STOP_WORDS.has(word)) continue;
     if (LOW_SIGNAL_TOPIC_TAGS.has(word)) continue;
     counts.set(word, (counts.get(word) || 0) + 1);
   }
   return Array.from(counts.entries()).sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])).slice(0, 3).map(([word]) => word);
 }
-function contentRuleScore(text = "", rule = {}) {
-  const haystack = lower2(text);
+function contentRuleScore(text2 = "", rule = {}) {
+  const haystack = lower2(text2);
   let score = 0;
   for (const term of rule.terms || []) {
     const needle = lower2(term);
@@ -97881,8 +97977,8 @@ function contentRuleScore(text = "", rule = {}) {
   return score;
 }
 function semanticTopicForQuestion(question = {}) {
-  const text = questionText2(question);
-  const matches = CONTENT_TOPIC_RULES.map((rule) => ({ ...rule, score: contentRuleScore(text, rule) })).filter((rule) => rule.score > 0).sort((left, right) => right.score - left.score || left.label.localeCompare(right.label));
+  const text2 = questionText2(question);
+  const matches = CONTENT_TOPIC_RULES.map((rule) => ({ ...rule, score: contentRuleScore(text2, rule) })).filter((rule) => rule.score > 0).sort((left, right) => right.score - left.score || left.label.localeCompare(right.label));
   return matches[0] || null;
 }
 function topicForQuestion(question = {}, session = {}) {
@@ -99304,25 +99400,25 @@ function explicitApprovalValue(value) {
   return null;
 }
 function approvalFromNaturalLanguage(approvalText = "", questionId4 = "") {
-  const text = lower2(approvalText);
-  if (!text) return null;
+  const text2 = lower2(approvalText);
+  if (!text2) return null;
   const qid = lower2(questionId4);
-  if (qid && text.includes(qid)) {
-    const index = text.indexOf(qid);
-    const local = text.slice(Math.max(0, index - 48), Math.min(text.length, index + qid.length + 48));
+  if (qid && text2.includes(qid)) {
+    const index = text2.indexOf(qid);
+    const local = text2.slice(Math.max(0, index - 48), Math.min(text2.length, index + qid.length + 48));
     if (/\b(reject|rejected|disapprove|decline|skip|do not|don't|no)\b/.test(local)) return false;
     if (/\b(approve|approved|accept|accepted|yes|use|looks good)\b/.test(local)) return true;
   }
-  if (/\b(approve all|accept all|use all|looks good|yes,? apply|apply all)\b/.test(text)) return true;
-  if (/\b(reject all|decline all|do not apply|don't apply|no,? do not)\b/.test(text)) return false;
+  if (/\b(approve all|accept all|use all|looks good|yes,? apply|apply all)\b/.test(text2)) return true;
+  if (/\b(reject all|decline all|do not apply|don't apply|no,? do not)\b/.test(text2)) return false;
   return null;
 }
 function finalVoteFromNaturalLanguage(approvalText = "", questionId4 = "") {
-  const text = lower2(approvalText);
+  const text2 = lower2(approvalText);
   const qid = lower2(questionId4);
-  if (!text || !qid || !text.includes(qid)) return "";
-  const index = text.indexOf(qid);
-  const local = text.slice(Math.max(0, index - 48), Math.min(text.length, index + qid.length + 48));
+  if (!text2 || !qid || !text2.includes(qid)) return "";
+  const index = text2.indexOf(qid);
+  const local = text2.slice(Math.max(0, index - 48), Math.min(text2.length, index + qid.length + 48));
   if (/\b(up|upvote|\+1)\b/.test(local)) return "up";
   if (/\b(down|downvote|-1)\b/.test(local)) return "down";
   return "";
@@ -99684,11 +99780,11 @@ function normalizeDraftForQuestion(answer = {}, question = {}) {
       controlType: "multi_select_toggle"
     };
   }
-  const text = safeString(firstValue2(source.text, source.value, source.answer, source.label));
-  if (!text) return null;
+  const text2 = safeString(firstValue2(source.text, source.value, source.answer, source.label));
+  if (!text2) return null;
   return {
-    label: text.slice(0, 80),
-    value: { questionType: "freeform", text, comments },
+    label: text2.slice(0, 80),
+    value: { questionType: "freeform", text: text2, comments },
     controlType: "freeform_text"
   };
 }
@@ -101161,15 +101257,15 @@ var proxyOpenAiRealtimeCall = async ({
     },
     body: live ? JSON.stringify({ session, transport: { type: "webrtc", sdp: payload.sdp } }) : multipart.body
   });
-  const text = await response2.text();
+  const text2 = await response2.text();
   if (!response2.ok) {
     const message = response2.status === 401 || response2.status === 403 ? "OpenAI denied the interview. Ask the session owner to check the Worker key and model access." : response2.status === 429 ? "OpenAI is at its usage limit. Try again later or contact the session owner." : "OpenAI could not connect the interview. Try again or contact the session owner.";
     return deps?.json?.({ error: message }, response2.status, baseHeaders);
   }
-  let answerSdp = text;
+  let answerSdp = text2;
   if (live) {
     try {
-      answerSdp = JSON.parse(text)?.transport?.sdp;
+      answerSdp = JSON.parse(text2)?.transport?.sdp;
     } catch {
       answerSdp = "";
     }
@@ -101493,7 +101589,7 @@ init_storageRouteExecution();
 init_storageScanBudget();
 var encoder9 = new TextEncoder();
 var CHUNK_BYTES = 256 * 1024;
-var fail8 = (message, status = 409, reason) => {
+var fail9 = (message, status = 409, reason) => {
   throw Object.assign(new Error(message), { status, ...reason ? { reason } : {} });
 };
 var digestBytes = async (bytes3) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes3))].map((v) => v.toString(16).padStart(2, "0")).join("");
@@ -101510,19 +101606,19 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   const budget = createStorageExportBudget();
   const rawIndex = getStorageIndexBinding(env);
   const index = rawIndex ? budget.wrap(rawIndex) : null;
-  if (!index?.list || !index?.get) fail8("Backup storage is unavailable.", 503);
+  if (!index?.list || !index?.get) fail9("Backup storage is unavailable.", 503);
   const current = await callSessionConfigCoordinator({ env, slug, path: "backup/export", expectedAuthority });
-  if (!current.ok) fail8(current.body?.error || "Backup authority is unavailable.", current.status);
+  if (!current.ok) fail9(current.body?.error || "Backup authority is unavailable.", current.status);
   const coordinator = current.body.coordinator;
   const sessionId = resolveCanonicalWorkerSessionIdHex(coordinator.configAuthority.config);
-  if (!sessionId) fail8("The session has no canonical identity.");
+  if (!sessionId) fail9("The session has no canonical identity.");
   const prefix = `ce-backup:${keySlug}:`;
   let parsed;
   try {
     parsed = parseStorageExportCursor({ cursor: authenticatedCursor, prefix, sessionId });
     if (cursor && !parsed.continuation) throw new Error("Missing backup position.");
   } catch {
-    fail8("Invalid backup cursor. Restart the export.", 400, "backup_cursor_invalid");
+    fail9("Invalid backup cursor. Restart the export.", 400, "backup_cursor_invalid");
   }
   const position = parsed.continuation || {
     phase: 0,
@@ -101536,9 +101632,9 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
     counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 }
   };
   const nextCursor = () => signBackupCursor(storageExportCursor({ prefix, sessionId, continuation: position }), env);
-  if (position.configDigest !== await sha256Hex(JSON.stringify(coordinator))) fail8("Session config changed during backup. Restart the export.", 409, "backup_session_changed");
+  if (position.configDigest !== await sha256Hex(JSON.stringify(coordinator))) fail9("Session config changed during backup. Restart the export.", 409, "backup_session_changed");
   const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: "export", snapshotId: position.groupSnapshotId });
-  if (!groups.ok) fail8(groups.error || "Group backup is unavailable.", groups.status, groups.status === 409 ? "backup_session_changed" : void 0);
+  if (!groups.ok) fail9(groups.error || "Group backup is unavailable.", groups.status, groups.status === 409 ? "backup_session_changed" : void 0);
   budget.consume(groups.operations || 0);
   position.groupSnapshotId = groups.snapshotId;
   if (groups.preparing) {
@@ -101551,8 +101647,8 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   if (!position.snapshotDigest) position.snapshotDigest = snapshotDigest;
   position.archiveId = await sha256Hex(`${sessionId}:${position.exportedAt}:${snapshotDigest}`);
   const paths = prefixes(keySlug);
-  if (!Number.isSafeInteger(position.phase) || position.phase < 0 || position.phase > 6 || !Number.isSafeInteger(position.chunk) || position.chunk < -1 || !Number.isSafeInteger(position.pageNumber) || position.pageNumber < 0 || typeof position.listCursor !== "string" || position.listCursor.length > 4096 || typeof position.lastKey !== "string" || position.lastKey && position.phase > 0 && !position.lastKey.startsWith(paths[position.phase]) || !position.counts || !["records", "payloads", "owners", "hidden", "bytes"].every((key) => Number.isSafeInteger(position.counts[key]) && position.counts[key] >= 0) || !Number.isFinite(Date.parse(position.exportedAt))) fail8("Invalid backup cursor.", 400, "backup_cursor_invalid");
-  if (position.snapshotDigest !== snapshotDigest) fail8("Session config or groups changed during backup. Restart the export.", 409, "backup_session_changed");
+  if (!Number.isSafeInteger(position.phase) || position.phase < 0 || position.phase > 6 || !Number.isSafeInteger(position.chunk) || position.chunk < -1 || !Number.isSafeInteger(position.pageNumber) || position.pageNumber < 0 || typeof position.listCursor !== "string" || position.listCursor.length > 4096 || typeof position.lastKey !== "string" || position.lastKey && position.phase > 0 && !position.lastKey.startsWith(paths[position.phase]) || !position.counts || !["records", "payloads", "owners", "hidden", "bytes"].every((key) => Number.isSafeInteger(position.counts[key]) && position.counts[key] >= 0) || !Number.isFinite(Date.parse(position.exportedAt))) fail9("Invalid backup cursor.", 400, "backup_cursor_invalid");
+  if (position.snapshotDigest !== snapshotDigest) fail9("Session config or groups changed during backup. Restart the export.", 409, "backup_session_changed");
   const manifest = {
     type: "ce_session_backup",
     version: 1,
@@ -101578,9 +101674,9 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   };
   const finish = async () => {
     const latest = await callSessionConfigCoordinator({ env, slug, path: "backup/export", expectedAuthority });
-    if (!latest.ok) fail8(latest.body?.error || "Backup authority is unavailable.", latest.status);
+    if (!latest.ok) fail9(latest.body?.error || "Backup authority is unavailable.", latest.status);
     const groupCheck = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: "export", snapshotId: position.groupSnapshotId, checkOnly: true });
-    if (!groupCheck.ok && groupCheck.status !== 409) fail8(groupCheck.error || "Group backup is unavailable.", groupCheck.status);
+    if (!groupCheck.ok && groupCheck.status !== 409) fail9(groupCheck.error || "Group backup is unavailable.", groupCheck.status);
     if (!groupCheck.ok || position.writeRevision !== latest.body.writeRevision) {
       manifest.complete = false;
       page.nextCursor = "";
@@ -101594,7 +101690,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   let rows = 0;
   const append = (entry2) => {
     const size = jsonByteLength(entry2) + 1;
-    if (size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes - 16384) fail8(`Backup metadata record ${entry2.id || entry2.key || "unknown"} exceeds the page limit.`);
+    if (size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes - 16384) fail9(`Backup metadata record ${entry2.id || entry2.key || "unknown"} exceeds the page limit.`);
     if (used + size > STORAGE_EXPORT_PAGE_LIMITS.encodedBytes) return false;
     page.entries.push(entry2);
     used += size;
@@ -101639,10 +101735,10 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
     }
     const listed = await (r2 || index).list({ prefix: paths[position.phase], ...position.listCursor ? { cursor: position.listCursor } : {}, limit: STORAGE_EXPORT_PAGE_LIMITS.rows });
     const keys = r2 ? listed.objects?.map(({ key }) => key) : listed.keys?.map(({ name }) => name);
-    if (!Array.isArray(keys)) fail8("Backup storage listing is unavailable.", 503);
+    if (!Array.isArray(keys)) fail9("Backup storage listing is unavailable.", 503);
     keys.sort();
     for (const key of keys) {
-      if (!key.startsWith(paths[position.phase])) fail8("Invalid backup storage key.", 503);
+      if (!key.startsWith(paths[position.phase])) fail9("Invalid backup storage key.", 503);
       if (key < position.lastKey || key === position.lastKey && position.chunk === -1) continue;
       if (rows >= STORAGE_EXPORT_PAGE_LIMITS.rows || budget.remaining < 16) break outer;
       if (position.phase === 3 || position.phase === 5) {
@@ -101654,7 +101750,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
         }
         const metadata = raw != null ? JSON.parse(raw).metadata : { id: id2 };
         const bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true });
-        if (!bytes3) fail8("A backup payload is missing or unreadable.", 503);
+        if (!bytes3) fail9("A backup payload is missing or unreadable.", 503);
         const priorKey = position.lastKey;
         position.lastKey = key;
         if (!await payload(id2, bytes3, metadata)) {
@@ -101663,7 +101759,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
         }
       } else {
         const value = await index.get(key);
-        if (value == null) fail8("A storage record changed during backup. Restart the export.", 409, "backup_session_changed");
+        if (value == null) fail9("A storage record changed during backup. Restart the export.", 409, "backup_session_changed");
         const metadata = position.phase === 4 ? JSON.parse(value) : null;
         const entry2 = metadata ? { kind: "record", key, id: metadata.id, resource: metadata.resource, metadata } : { kind: position.phase === 1 ? "hidden" : "owner", key, value };
         if (!append(entry2)) break outer;
@@ -101674,7 +101770,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
     }
     const more = r2 ? listed.truncated === true : listed.list_complete === false;
     if (more) {
-      if (!listed.cursor || listed.cursor === position.listCursor) fail8("Backup list cursor did not advance.", 503);
+      if (!listed.cursor || listed.cursor === position.listCursor) fail9("Backup list cursor did not advance.", 503);
       position.listCursor = listed.cursor;
       position.lastKey = "";
     } else {

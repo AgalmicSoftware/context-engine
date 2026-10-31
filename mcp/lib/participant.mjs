@@ -7,6 +7,7 @@ import { describeError } from './mcpServer.mjs';
 import { readAgentState, updateAgentState } from './agentState.mjs';
 import { buildQuestionRecord, buildResponseRecord, isLockedQuestion, isSingleSelect, ratingScaleFor } from './records.mjs';
 import { isPreferredStorageVersion } from '../../shared/storage/canonicalStorageVersions.mjs';
+import { normalizeSessionContext } from '../../shared/sessionContext.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
 import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
@@ -31,9 +32,7 @@ const MAX_CACHED_RECORDS = 20_000;
 const MISSING_RECORD_RETRY_MS = 60_000;
 const MAX_OWN_ANSWER_ITEMS = 5000;
 const MAX_TITLE_LENGTH = 120;
-const MAX_CONTEXT_PARAGRAPHS = 4;
-const MAX_CONTEXT_LENGTH = 2000;
-const MAX_CONTEXT_LINKS = 4;
+const MAX_DESCRIPTION_LENGTH = 2000;
 
 // Agent-supplied arguments may be numbers or strings; Worker data uses text().
 const trim = (value) => (typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : '');
@@ -54,18 +53,8 @@ const mapLimit = async (items, limit, task) => {
   return results;
 };
 
-const contextOf = (config) => {
-  const context = isRecord(config?.sessionContext) ? config.sessionContext : {};
-  const paragraphs = (Array.isArray(context.paragraphs) ? context.paragraphs.map(text) : [text(context.body)])
-    .filter(Boolean)
-    .slice(0, MAX_CONTEXT_PARAGRAPHS)
-    .map((paragraph) => paragraph.slice(0, MAX_CONTEXT_LENGTH));
-  const links = (Array.isArray(context.links) ? context.links : [])
-    .filter((link) => isRecord(link) && /^https?:\/\//i.test(text(link.url)))
-    .slice(0, MAX_CONTEXT_LINKS)
-    .map((link) => ({ label: (text(link.label) || text(link.url)).slice(0, 200), url: text(link.url).slice(0, 2000) }));
-  return { title: text(context.title).slice(0, 200), paragraphs, links };
-};
+// The session page's reader, so agents see the same notes and links people do.
+const contextOf = (config) => normalizeSessionContext(config?.sessionContext);
 
 const idList = (value) => new Set((Array.isArray(value) ? value : []).map((id) => text(id).toLowerCase()).filter(Boolean));
 
@@ -630,7 +619,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           outcome.groupJoinError = describeError(error);
         }
       }
-      outcome.description = text(sessionConfig.sessionInfo).slice(0, MAX_CONTEXT_LENGTH);
+      outcome.description = text(sessionConfig.sessionInfo).slice(0, MAX_DESCRIPTION_LENGTH);
       outcome.context = contextOf(sessionConfig);
       const sessionSbts = listSessionSbts(sessionConfig);
       if (sessionSbts.length) outcome.sessionSbts = sessionSbts;
@@ -652,7 +641,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       return {
         ...sessionSummary(ctx, sessionConfig),
         testEth: await ctx.client.describeTestEth(),
-        description: text(sessionConfig.sessionInfo).slice(0, MAX_CONTEXT_LENGTH),
+        description: text(sessionConfig.sessionInfo).slice(0, MAX_DESCRIPTION_LENGTH),
         context: contextOf(sessionConfig),
         ...(endsAt ? { endsAt } : {}),
         ...(sessionSbts.length ? { sessionSbts } : {}),

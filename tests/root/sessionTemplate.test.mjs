@@ -191,6 +191,22 @@ test('settings with fixed vocabularies or limits are checked', () => {
   ]);
 });
 
+test('a template holds no more context than set-config accepts', () => {
+  const errors = errorsOf({
+    format,
+    sessionContext: {
+      title: 'x'.repeat(81),
+      paragraphs: Array(7).fill('Background.'),
+      links: [{ label: 'No link', url: '' }],
+    },
+  });
+  assert.deepEqual(errors.map((error) => error.path), [
+    'sessionContext.links.0.url',
+    'sessionContext.title',
+    'sessionContext.paragraphs',
+  ]);
+});
+
 const SECRET_SAMPLES = [
   `sk-proj-${'A1b2'.repeat(8)}`,
   `sk-ant-api03-${'x9Y8'.repeat(8)}`,

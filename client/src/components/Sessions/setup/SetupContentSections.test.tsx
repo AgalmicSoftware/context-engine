@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
-import { SetupContextSection, SetupQuestionsSection } from './SetupContentSections';
+import { SetupContextSection, SetupQuestionsSection, describeContextProblem } from './SetupContentSections';
 import type { SetupDraft, SetupSectionProps } from './setupSectionTypes';
 
 let latest: SetupDraft = {};
@@ -55,6 +55,28 @@ describe('setup content sections', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove paragraph' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove link 1' }));
     expect(latest.sessionContext).toEqual({ title: 'Background', paragraphs: [], links: [] });
+  });
+
+  it('names what set-config would refuse and stops adding past the limits', () => {
+    const paragraphs = Array.from({ length: 6 }, (_, index) => `Paragraph ${index}`);
+    render(
+      <Harness
+        Section={SetupContextSection}
+        initial={{ sessionContext: { title: 'x'.repeat(81), paragraphs, links: [] } }}
+      />,
+    );
+    expect(screen.getByTestId('ce-setup-context-problems')).toHaveTextContent(
+      'The context title is longer than 80 characters.',
+    );
+    expect(screen.getByTestId('ce-setup-context-add-paragraph')).toBeDisabled();
+    expect(screen.getByLabelText('Paragraph 1')).toHaveAttribute('maxLength', '2000');
+    expect(describeContextProblem(latest)).toBe('The context title is longer than 80 characters.');
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Background' } });
+    expect(screen.queryByTestId('ce-setup-context-problems')).not.toBeInTheDocument();
+    expect(describeContextProblem(latest)).toBe('');
+    expect(describeContextProblem({ sessionContext: { links: [{ label: 'Plan', url: 'http://plan.example' }] } })).toBe(
+      'Link 1 must be an https:// link.',
+    );
   });
 
   it('adds, edits and removes questions, asking choice questions for two options', () => {

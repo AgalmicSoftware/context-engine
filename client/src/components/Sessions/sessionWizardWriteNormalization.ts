@@ -1,6 +1,7 @@
 import { getSessionWizardInterviewValidationError } from './sessionWizardInterviewValidation';
 import { normalizeHostedFaucetSelection } from './sessionWizardHostedFaucet';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
+import { validateSessionContext, type SessionContext } from '@ce-shared/sessionContext.mjs';
 import { withoutNewInterviewDefaults } from '../../utilities/session/interviewModeWrite';
 import {
   normalizeResultsAnalysisSettings,
@@ -141,19 +142,21 @@ const buildSessionWizardPublicAiConfig = (value: unknown): AnyRecord => {
   return next;
 };
 
-// sessionContext as the session page reads it: trimmed text, no empty
-// paragraphs or link-less links. null when nothing is left to publish.
-export const normalizeSessionWizardContext = (value: unknown): Record<string, unknown> | null => {
+// The draft's context in the stored form the Worker accepts (the shared
+// writer: trimmed text, no blank paragraphs or link-less links, within the
+// limits). Throws the first problem; null when nothing is left to publish.
+export const normalizeSessionWizardContext = (value: unknown): SessionContext | null => {
   const context = isObj(value) ? value : {};
-  const text = (entry: unknown) => (typeof entry === 'string' ? entry.trim() : '');
-  const normalized = {
-    title: text(context.title),
-    paragraphs: (Array.isArray(context.paragraphs) ? context.paragraphs : []).map(text).filter(Boolean),
-    links: (Array.isArray(context.links) ? context.links : [])
-      .map((link) => ({ label: text(isObj(link) ? link.label : ''), url: text(isObj(link) ? link.url : '') }))
-      .filter((link) => link.url),
-  };
-  return normalized.title || normalized.paragraphs.length || normalized.links.length ? normalized : null;
+  const result = validateSessionContext({
+    title: context.title ?? '',
+    paragraphs: context.paragraphs ?? [],
+    links: context.links ?? [],
+  });
+  if (!result.ok) throw new Error(result.errors[0].message);
+  const normalized = result.value;
+  return normalized && (normalized.title || normalized.paragraphs.length || normalized.links.length)
+    ? normalized
+    : null;
 };
 
 export const sanitizeSessionWizardMetadataPayload = (

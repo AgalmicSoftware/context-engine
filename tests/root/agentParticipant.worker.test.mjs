@@ -37,7 +37,11 @@ const sessionConfig = ({ slug = SLUG, sessionId = SESSION_ID, visibility } = {})
   sessionId,
   sessionName: 'Town Hall',
   sessionInfo: 'What do residents owe each other?',
-  sessionContext: { title: 'Context', paragraphs: ['Answer as yourself.'], links: [] },
+  sessionContext: {
+    title: 'Context',
+    paragraphs: ['Answer as yourself.'],
+    links: [{ label: 'Essay', url: 'https://example.org/essay' }, { label: 'Plain', url: 'http://example.org/plain' }],
+  },
   allowOrigins: ['http://localhost:3000', 'https://contextengine.sh'],
   workerAuthority: { version: 1, participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'] },
   sessionModeProfile: publicProfile(visibility),
@@ -239,6 +243,8 @@ test('agents join a public hosted session, add statements, answer, and read resu
   assert.equal(joined.resultsPublic, true);
   assert.ok(joined.scopes.includes('storage'));
   assert.deepEqual(joined.context.paragraphs, ['Answer as yourself.']);
+  // The session page's reader: https links only.
+  assert.deepEqual(joined.context.links, [{ label: 'Essay', url: 'https://example.org/essay' }]);
   // Sign-in carries the app origin; data calls send none, like a non-browser client.
   assert.ok(seen.filter((call) => call.url.includes('/auth/')).every((call) => call.origin === 'https://contextengine.sh'));
   assert.ok(seen.filter((call) => call.url.includes('/storage/')).every((call) => call.origin === ''));

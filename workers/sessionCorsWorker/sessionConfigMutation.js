@@ -14,6 +14,7 @@ import {
 import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
 import { normalizeWorkerSessionAppearance } from '../shared/sessionColorSchemeConfig.mjs';
 import { validResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
+import { validateSessionContext } from '../../shared/sessionContext.mjs';
 import {
   mergeWorkerConfigRecords,
   mergeWorkerLimitRecords,
@@ -306,6 +307,13 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     }
     if (!validResultsAnalysisSettingsConfig(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid results analysis settings config.' };
+    }
+    // Only a sent context is checked, so a stored one from before these limits
+    // never blocks an unrelated edit. The stored form is the writer's output.
+    if (hasOwn(incomingConfig, 'sessionContext')) {
+      const context = validateSessionContext(incomingConfig.sessionContext);
+      if (!context.ok) return { ok: false, status: 400, error: `Invalid session context: ${context.errors[0].message}` };
+      incomingConfig = { ...incomingConfig, sessionContext: context.value };
     }
     // A patch may update the profile without resending the already-persisted
     // canonical storage object. The complete merged record below remains

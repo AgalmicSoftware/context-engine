@@ -1,6 +1,7 @@
 import { normalizeInterviewSettings } from '@ce-shared/interviewSettings.mjs';
 import { isRealtimeInterviewModel } from '@ce-shared/realtimeInterviewConfig.mjs';
 import { normalizeResultsAnalysisSettings } from '@ce-shared/resultsAnalysisSettings.mjs';
+import { normalizeSessionContext } from '@ce-shared/sessionContext.mjs';
 import {
   WORKER_CANONICAL_SET_CONFIG_KEYS,
   classifySessionConfigEdits,
@@ -37,7 +38,8 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     sessionHeader: text(source.sessionHeaderImg || source.sessionHeader),
     appearance: normalizeSessionAppearance(source.appearance),
     sessionEndsAt: text(source.sessionEndsAt),
-    sessionContext: clone(asRecord(source.sessionContext)),
+    // Read leniently: what a writer would refuse is left out, so it is never resent.
+    sessionContext: normalizeSessionContext(source.sessionContext),
     defaultTags: text(source.defaultTags),
     defaultGroupTags: text(source.defaultGroupTags),
     questionsGenPrompt: text(source.questionsGenPrompt),
@@ -55,6 +57,13 @@ const trimmed = (value: unknown) => text(value).trim();
 // The setup page's publish normalizer; an emptied context is saved empty.
 const normalizeContext = (value: unknown) =>
   normalizeSessionWizardContext(value) || { title: '', paragraphs: [], links: [] };
+// The stored context as the draft reads it, so an untouched one is unchanged.
+const storedContext = (value: unknown) => {
+  const context = normalizeSessionContext(value);
+  return context.title || context.paragraphs.length || context.links.length
+    ? context
+    : { title: '', paragraphs: [], links: [] };
+};
 
 // interviewMode mixes content (the opening and steering prompts) and
 // authority fields, so only the sub-fields the person changed move; the rest
@@ -102,9 +111,6 @@ const editedValues = (before: Config, draft: SetupDraft, nowMs: number): Config 
 const isBlank = (value: unknown) =>
   value === undefined || value === null || value === '' || (typeof value === 'object' && !Object.keys(value).length);
 
-// The publish normalizer returns null for a context with nothing left in it.
-const contextIsBlank = (value: unknown) => !normalizeSessionWizardContext(value);
-
 // Every edit marks a profile `custom`; that label alone is not a change.
 const withoutPreset = (profile: unknown) => {
   const { preset: _preset, ...rest } = asRecord(profile);
@@ -113,8 +119,7 @@ const withoutPreset = (profile: unknown) => {
 
 const unchanged = (key: string, before: unknown, after: unknown) => {
   if (key === 'sessionModeProfile') return same(withoutPreset(before), withoutPreset(after));
-  if (key === 'sessionContext')
-    return same(normalizeContext(before), after) || (contextIsBlank(before) && contextIsBlank(after));
+  if (key === 'sessionContext') return same(storedContext(before), after);
   if (key === 'resultsAnalysis') return same(normalizeResultsAnalysisSettings(before), after);
   if (key === 'appearance') return same(normalizeSessionAppearance(before), after);
   return same(before, after) || (isBlank(before) && isBlank(after));

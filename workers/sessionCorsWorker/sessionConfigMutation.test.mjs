@@ -348,6 +348,50 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
   assert.deepEqual(result.config.appearance, { colorSchemeId: 'ocean' });
 });
 
+test('set-config checks a sent session context and stores its trimmed form', () => {
+  const setContext = (sessionContext, existing = profileBearingConfig) => applySessionConfigMutation({
+    existingConfig: cloneJson(existing),
+    mutation: { kind: 'set-config', incomingConfig: { sessionContext } },
+    slug: 'session-a',
+  });
+  const stored = setContext({
+    title: ' Context ',
+    paragraphs: [' Notes. ', ' '],
+    links: [{ label: ' Essay ', url: ' https://example.org/essay ' }, { label: '', url: '' }],
+  });
+  assert.equal(stored.ok, true, JSON.stringify(stored));
+  assert.deepEqual(stored.config.sessionContext, {
+    title: 'Context',
+    paragraphs: ['Notes.'],
+    links: [{ label: 'Essay', url: 'https://example.org/essay' }],
+  });
+  for (const [sessionContext, message] of [
+    ['notes', /must be an object/],
+    [{ paragraphs: ['x'.repeat(2001)] }, /longer than 2,000 characters/],
+    [{ paragraphs: Array(7).fill('p') }, /at most 6 paragraphs/],
+    [{ links: [{ label: 'Plain', url: 'http://example.org' }] }, /must be an https:\/\/ link/],
+    [{ links: Array.from({ length: 9 }, (_, index) => ({ label: `L${index}`, url: `https://example.org/${index}` })) }, /at most 8 links/],
+    [{ title: 'x'.repeat(81) }, /title is longer than 80/],
+    [{ paragraphs: [], extra: true }, /unknown field: extra/],
+  ]) {
+    const refused = setContext(sessionContext);
+    assert.equal(refused.ok, false, JSON.stringify(sessionContext));
+    assert.equal(refused.status, 400);
+    assert.match(refused.error, /^Invalid session context: /);
+    assert.match(refused.error, message);
+  }
+  assert.equal(setContext(null).ok, true);
+  // A stored context from before these limits does not block other edits.
+  const legacy = { ...cloneJson(profileBearingConfig), sessionContext: { links: [{ label: 'Plain', url: 'http://example.org' }] } };
+  const renamed = applySessionConfigMutation({
+    existingConfig: legacy,
+    mutation: { kind: 'set-config', incomingConfig: { sessionName: 'Renamed' } },
+    slug: 'session-a',
+  });
+  assert.equal(renamed.ok, true, JSON.stringify(renamed));
+  assert.deepEqual(renamed.config.sessionContext, legacy.sessionContext);
+});
+
 test('set-config accepts boolean pile navigation overrides and preserves them in later patches', () => {
   for (const pileAutoAdvanceEnabled of [false, true]) {
     const result = applySessionConfigMutation({
