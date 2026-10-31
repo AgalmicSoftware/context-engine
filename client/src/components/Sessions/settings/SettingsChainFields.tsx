@@ -94,8 +94,9 @@ export const SettingsChainFields = ({ config, draft, onChange, needsContractChec
       ))}
       {facts.metadataUnavailable ? (
         <p className={styles.conflict} data-testid="ce-settings-metadata-unavailable">
-          The session’s metadata couldn’t be loaded, so this page shows defaults, including the chain’s default
-          contracts. Saving replaces the metadata with what this page shows.
+          The session’s metadata couldn’t be loaded, so this page shows the last copy this browser kept, or defaults
+          where it has none, such as the chain’s default contracts. Saving replaces the metadata with what this page
+          shows.
         </p>
       ) : null}
       {needsContractCheck || draft.contractsChecked === true ? (
