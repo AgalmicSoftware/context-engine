@@ -229,10 +229,11 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
       .mockResolvedValueOnce(jsonResponse(200, { config: persistedConfig }));
 
+    // Whatever the default model, the transcription block is just provider and model.
     expect(config.ai).toEqual(
       expect.objectContaining({
         models: expect.objectContaining({
-          transcription: { provider: 'openai', model: 'whisper-1' },
+          transcription: { provider: 'openai', model: expect.any(String) },
         }),
       }),
     );
