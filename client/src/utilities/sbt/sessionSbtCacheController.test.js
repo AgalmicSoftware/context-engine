@@ -1535,6 +1535,24 @@ describe('createSessionSbtCacheController', () => {
       expect(host.getStored('sbtCache', 'alpha')[11155420].sbtList['0xsbt'].historySummary).toEqual(summary);
     });
 
+    it('stores the summary read from the chain for an SBT not cached yet', async () => {
+      const summary = {
+        totalMinted: '2',
+        totalBurned: '0',
+        activeSupply: '2',
+        currentHolderCount: '2',
+        historicalHolderCount: '2',
+      };
+      const host = createMockHost({ initialStorage: { sbtCache: {} } });
+      contractScripts.getSbtHistorySummary.mockResolvedValue(summary);
+      await createSessionSbtCacheController(host).refreshSbtDataForGroup('alpha', '0xSBT');
+      // Counts are not loaded, so the SBT page shows this summary instead of zero holders.
+      expect(host.getStored('sbtCache', 'alpha')[11155420].sbtList['0xsbt']).toMatchObject({
+        countsLoaded: false,
+        historySummary: summary,
+      });
+    });
+
     it('fills a gap before a live mint without skipping or double-counting holders', async () => {
       const { buildSbtActivityCacheEntry, mergeSbtActivityCacheEntryCounts } = require('./sbtActivityCacheEntry.js');
       const entry = mergeSbtActivityCacheEntryCounts(

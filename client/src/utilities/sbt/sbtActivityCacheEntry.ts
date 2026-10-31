@@ -5,7 +5,7 @@ import {
   type SbtCountMap,
   type SbtCountsPayload,
 } from './sbtCountHelpers.js';
-import { buildSbtHistorySummaryFromCounts } from './sbtHistoryHelpers.js';
+import { buildSbtHistorySummaryFromCounts, normalizeSbtHistorySummary } from './sbtHistoryHelpers.js';
 
 export const SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION = 2 as const;
 
@@ -87,7 +87,11 @@ const materializeCounts = (entry: SbtActivityCacheEntry): SbtActivityCacheEntry 
   Object.assign(entry, counts, {
     mintedAddresses: Object.keys(counts.mintedCountByAddress),
     burnedAddresses: Object.keys(counts.burnedCountByAddress),
-    historySummary: buildSbtHistorySummaryFromCounts(counts),
+    // Counts give the holders only once a scan has covered the history. Until
+    // then the summary is the one read from the chain, or none, so readers ask
+    // the chain rather than show zero holders.
+    historySummary:
+      entry.countsLoaded === true ? buildSbtHistorySummaryFromCounts(counts) : (entry.historySummary ?? null),
   });
   return entry;
 };
@@ -116,6 +120,8 @@ export const mergeSbtActivityCacheEntryMetadata = (currentIn: unknown, patchIn: 
   const current =
     hydrateSbtActivityCacheEntry(currentIn) ||
     buildSbtActivityCacheEntry({ sbtAddress: String(patch.sbtAddress || '') });
+  // A summary read from the chain stands in for counts that haven't loaded.
+  const fetchedSummary = current.countsLoaded === true ? null : normalizeSbtHistorySummary(patch.historySummary);
   return {
     ...patch,
     ...current,
@@ -123,6 +129,7 @@ export const mergeSbtActivityCacheEntryMetadata = (currentIn: unknown, patchIn: 
     creationBlock: patch.creationBlock ?? current.creationBlock,
     lastActivityBlock: Math.max(current.lastActivityBlock, Number(patch.lastActivityBlock) || 0),
     sbtInfo: current.sbtInfo || patch.sbtInfo ? { ...(current.sbtInfo || {}), ...(patch.sbtInfo || {}) } : null,
+    ...(fetchedSummary ? { historySummary: fetchedSummary } : {}),
     ...(patch.slug !== undefined ? { slug: patch.slug } : {}),
     ...(patch.sessionSlug !== undefined ? { sessionSlug: patch.sessionSlug } : {}),
     ...(patch.sessionSlugExplicit !== undefined ? { sessionSlugExplicit: patch.sessionSlugExplicit } : {}),

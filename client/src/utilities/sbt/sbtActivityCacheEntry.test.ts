@@ -3,6 +3,7 @@ import {
   buildSbtActivityCacheEntry,
   hydrateSbtActivityCacheEntry,
   mergeSbtActivityCacheEntryCounts,
+  mergeSbtActivityCacheEntryMetadata,
   type SbtActivityCacheEntry,
 } from './sbtActivityCacheEntry.js';
 
@@ -86,10 +87,42 @@ describe('sbtActivityCacheEntry', () => {
       pendingActivity: {},
       mintedCountByAddress: {},
       burnedCountByAddress: {},
-      historySummary: { totalMinted: '0', totalBurned: '0' },
+      // No scan has counted holders yet, so there is no summary to show.
+      historySummary: null,
     });
     expect(hydrateSbtActivityCacheEntry(entry)).toBe(entry);
     expect(hydrateSbtActivityCacheEntry({ sbtAddress: '0xsbt' })).toBeNull();
+  });
+
+  it('keeps a summary read from the chain until a scan loads the counts', () => {
+    const fetched = {
+      totalMinted: '2',
+      totalBurned: '0',
+      activeSupply: '2',
+      currentHolderCount: '2',
+      historicalHolderCount: '2',
+    };
+    const hydrated = mergeSbtActivityCacheEntryMetadata(null, { sbtAddress: '0xsbt', historySummary: fetched });
+    expect(hydrated).toMatchObject({ countsLoaded: false, historySummary: fetched });
+    applySbtActivityCacheEntryUpdate(hydrated, {
+      account: '0xddd',
+      burned: false,
+      eventBlockNumber: 5,
+      eventId: 'tx5:0',
+    });
+    expect(mergeSbtActivityCacheEntryMetadata(hydrated, { sbtInfo: { name: 'Renamed' } }).historySummary).toEqual(
+      fetched,
+    );
+    const scanned = mergeSbtActivityCacheEntryCounts(hydrated, {
+      blockNumber: 10,
+      countsLoaded: true,
+      mintedCountByAddress: { '0xaaa': 1, '0xbbb': 1, '0xccc': 1 },
+      mintedEventCount: 3,
+    });
+    expect(scanned.historySummary).toMatchObject({ currentHolderCount: '3', totalMinted: '3' });
+    expect(mergeSbtActivityCacheEntryMetadata(scanned, { historySummary: fetched }).historySummary).toEqual(
+      scanned.historySummary,
+    );
   });
 
   it('applies each pending burn once without changing covered history', () => {
