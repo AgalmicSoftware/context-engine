@@ -234,6 +234,8 @@ export const useRollingTranscriptionRecorder = ({
 
   const startRecording = useCallback(async () => {
     if (status === 'recording' || status === 'paused' || status === 'requesting') return;
+    // Another account's recording is still open; its notice says what to do.
+    if (chunks.ownerNotice) return;
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setErrorMessage('Microphone recording is not available in this browser.');
       setStatus('error');
@@ -306,6 +308,7 @@ export const useRollingTranscriptionRecorder = ({
     status,
     stopTimer,
     stopTracks,
+    chunks.ownerNotice,
   ]);
 
   const pauseRecording = useCallback(() => {
@@ -439,6 +442,7 @@ export const useRollingTranscriptionRecorder = ({
     hiddenPeriods: chunks.hiddenPeriods,
     dismissHiddenPeriods: chunks.dismissHiddenPeriods,
     downloadableChunkIds: chunks.downloadableChunkIds,
+    ownerNotice: chunks.ownerNotice,
     status,
     isRecording: status === 'recording',
     isPaused: status === 'paused',
@@ -451,6 +455,7 @@ export const useRollingTranscriptionRecorder = ({
     // A capture stop leads; the storage and offline notices only say where the audio is kept.
     errorMessage: [
       errorMessage,
+      chunks.ownerNotice,
       chunks.storageError,
       chunks.offline ? 'Offline. Audio stays on this device; reconnect to resume uploads in order.' : '',
     ]

@@ -1,7 +1,7 @@
 import { audioFileExtension } from './audioFileExtension';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
-import { RecordingChunkQueue } from './recordingChunkQueue';
+import { hasUnsavedAudio, RecordingChunkQueue } from './recordingChunkQueue';
 import { stitchRollingTranscriptSegments, type RollingTranscriptSegment } from './rollingTranscription';
 
 const memoryScopes = new Map<string, string>();
@@ -17,6 +17,25 @@ const readPinnedScope = (identity: string): string => {
     return '';
   }
 };
+const forgetPinnedScope = (identity: string) => {
+  memoryScopes.delete(identity);
+  try {
+    window.sessionStorage.removeItem(scopeStorageKey(identity));
+  } catch {
+    // Clearing the in-memory pin still starts the next recording in the current account scope.
+  }
+};
+// The account a recording was made under; empty when made signed out.
+const scopeAccount = (scope: string): string => {
+  try {
+    const parts: unknown = JSON.parse(scope);
+    return Array.isArray(parts) ? String(parts[2] || '') : '';
+  } catch {
+    return '';
+  }
+};
+const OWNER_NOTICE =
+  'This recording belongs to the account that made it. It closes when its uploads finish and its audio is saved, or when you clear it. Download any audio you need first.';
 
 type Options = {
   sessionSlug: string;
@@ -24,7 +43,7 @@ type Options = {
   context?: unknown;
   workerUrl?: string;
   labelSpeakers: boolean;
-  // A sign-out or account switch releases the recording only once capture has stopped.
+  // Another account's recording stays open while capture continues.
   capturing?: boolean;
 };
 
@@ -46,33 +65,32 @@ export function useRecordingChunkQueue(options: Options) {
   const worker = options.workerUrl || options.sessionConfig?.corsWorkerUrl || options.sessionConfig?.workerUrl || '';
   const identity = JSON.stringify([worker, options.sessionSlug]);
   const pinned = useRef({ identity, scope: readPinnedScope(identity) });
+  const openScope = useRef('');
   const [, refreshScope] = useState(0);
   if (pinned.current.identity !== identity) pinned.current = { identity, scope: readPinnedScope(identity) };
+  const isForeign = (pin: string) => Boolean(scopeAccount(pin)) && scopeAccount(pin) !== normalizedAccount;
+  // Record pins a recording so signing in or a late account restore neither stops capture nor splits it. A pin
+  // made while signed in never reaches another account, which would see its transcript and upload with its own
+  // credentials: opening the recorder drops it, unless only this page holds some of its audio (kept below).
+  if (
+    isForeign(pinned.current.scope) &&
+    openScope.current !== pinned.current.scope &&
+    !hasUnsavedAudio(pinned.current.scope)
+  ) {
+    forgetPinnedScope(identity);
+    pinned.current = { identity, scope: '' };
+  }
+  const foreignPin = isForeign(pinned.current.scope);
   const scope = pinned.current.scope || JSON.stringify([worker, options.sessionSlug, normalizedAccount]);
   const releasePin = useCallback(() => {
     pinned.current = { identity, scope: '' };
-    memoryScopes.delete(identity);
-    try {
-      window.sessionStorage.removeItem(scopeStorageKey(identity));
-    } catch {
-      // Clearing the in-memory pin still starts the next recording in the current account scope.
-    }
+    forgetPinnedScope(identity);
     refreshScope((value) => value + 1);
   }, [identity]);
-  // The pin keeps one recording through sign-in or a late account restore, but never past a sign-out or
-  // account switch: the next person's recording must not append to the previous account's transcript.
-  const accountChange = useRef({ account: normalizedAccount, pending: false });
-  useEffect(() => {
-    const change = accountChange.current;
-    if (change.account && change.account !== normalizedAccount) change.pending = true;
-    change.account = normalizedAccount;
-    if (!change.pending || options.capturing) return;
-    change.pending = false;
-    if (pinned.current.scope) releasePin();
-  }, [normalizedAccount, options.capturing, releasePin]);
 
   useEffect(() => {
     let current = true;
+    openScope.current = scope;
     setSegments([]);
     setHiddenPeriods([]);
     const queue = new RecordingChunkQueue({
@@ -115,11 +133,26 @@ export function useRecordingChunkQueue(options: Options) {
     window.addEventListener('offline', onOffline);
     return () => {
       current = false;
+      openScope.current = '';
       queue.dispose();
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
   }, [scope, options.sessionSlug]);
+  // An open recording that now belongs to another account is released only once nothing would be lost: no
+  // capture, no chunk waiting or uploading (closing would drop a paid transcript), and no audio held only by
+  // this page. Until then it stays with its account, the recorder says so, and Record waits.
+  useEffect(() => {
+    const queue = queueRef.current;
+    if (!foreignPin || options.capturing || !queue) return undefined;
+    let current = true;
+    void queue.settled().then(({ idle, unsaved }) => {
+      if (current && idle && !unsaved) releasePin();
+    });
+    return () => {
+      current = false;
+    };
+  }, [foreignPin, options.capturing, segments, storageError, releasePin]);
 
   const prepare = useCallback(async () => {
     const queue = queueRef.current;
@@ -190,5 +223,6 @@ export function useRecordingChunkQueue(options: Options) {
     storageError,
     offline,
     labelsUnavailableReason,
+    ownerNotice: foreignPin && !options.capturing ? OWNER_NOTICE : '',
   };
 }

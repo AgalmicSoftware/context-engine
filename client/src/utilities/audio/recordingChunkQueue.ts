@@ -15,6 +15,9 @@ const memoryRecordings = new Map<string, Map<string, RecordingChunk>>();
 // The page's own copy also covers a failed save.
 const HIDDEN_PERIODS_ID = 'hidden-periods';
 const memoryHiddenPeriods = new Map<string, HiddenPeriod[]>();
+/** Whether a closed recorder left audio that only this page holds for a recording. */
+export const hasUnsavedAudio = (scope: string): boolean =>
+  [...(memoryRecordings.get(scope)?.values() || [])].some((record) => record.audio);
 
 type Transcription = { text: string; speakerTurns?: SpeakerTranscriptTurn[]; labelsUnavailableReason?: string };
 type Options = {
@@ -328,6 +331,17 @@ export class RecordingChunkQueue {
           'Some audio is waiting for transcription. Reconnect or Retry a failed chunk, or download its audio before leaving.',
       );
     }
+  }
+  /** After pending saves: whether no chunk is waiting or uploading, and whether only this page holds some audio. */
+  async settled() {
+    await this.ready;
+    await this.writes;
+    return {
+      idle: this.segments.every((segment) => ['complete', 'failed'].includes(segment.status)),
+      unsaved:
+        Boolean(this.storageError || this.failedWrites.size) &&
+        [...this.records.values()].some((record) => record.audio),
+    };
   }
   async keepAudio() {
     await this.ready;

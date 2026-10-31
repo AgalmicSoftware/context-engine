@@ -18,7 +18,8 @@ jest.mock('./recordingChunkStore', () => ({
   ),
   putRecordingChunk: jest.fn(
     async (record: { scope: string; segment: { id: string; status: string; text: string }; audio?: Blob }) => {
-      mockChunkRecords.set(record.segment.id, { ...record, segment: { ...record.segment } });
+      // Keyed like the real store, by scope and segment id.
+      mockChunkRecords.set(`${record.scope}|${record.segment.id}`, { ...record, segment: { ...record.segment } });
     },
   ),
   clearRecordingChunks: jest.fn(async () => mockChunkRecords.clear()),
@@ -245,6 +246,127 @@ describe('useRollingTranscriptionRecorder', () => {
     expect(result.current.transcript).toBe('Second account speech.');
     unmount();
   });
+
+  it.each([
+    ['another account', '0x2222222222222222222222222222222222222222'],
+    ['a signed-out visitor', ''],
+  ])('starts afresh when the recorder reopens for %s after a sign-out', async (_who, next) => {
+    const first = '0x1111111111111111111111111111111111111111';
+    const sessionSlug = `reopened-for-${next || 'visitor'}`;
+    (transcribeAudio as jest.Mock).mockImplementation(async () => 'First account speech.');
+    const recorder = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug, context: { account: first } }));
+    await act(async () => {
+      await recorder.result.current.startRecording();
+    });
+    await act(async () => {
+      await recorder.result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(recorder.result.current.transcript).toBe('First account speech.');
+    recorder.unmount();
+    (transcribeAudio as jest.Mock).mockImplementation(async () => 'Next speech.');
+    const reopened = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug, context: { account: next } }));
+    await act(flushPromises);
+    expect(reopened.result.current.transcript).toBe('');
+    await act(async () => {
+      await reopened.result.current.startRecording();
+    });
+    await act(async () => {
+      await reopened.result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(reopened.result.current.transcript).toBe('Next speech.');
+    reopened.unmount();
+    if (!next) return;
+    const back = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug, context: { account: first } }));
+    await act(flushPromises);
+    expect(back.result.current.transcript).toBe('First account speech.');
+    back.unmount();
+  });
+
+  it('keeps the recording open after a sign-out until its last upload is saved', async () => {
+    const first = '0x1111111111111111111111111111111111111111';
+    let answer = (_text: string) => {};
+    (transcribeAudio as jest.Mock).mockImplementation(
+      () =>
+        new Promise<string>((resolve) => {
+          answer = resolve;
+        }),
+    );
+    const { result, rerender, unmount } = renderHook(
+      ({ account }) => useRollingTranscriptionRecorder({ sessionSlug: 'sign-out-uploading', context: { account } }),
+      { initialProps: { account: first } },
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    rerender({ account: '' });
+    await act(async () => {
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['transcribing']);
+    await act(async () => {
+      answer('Paid transcript.');
+      await flushPromises();
+    });
+    const [saved] = [...mockChunkRecords.values()];
+    expect(saved).toMatchObject({ segment: { status: 'complete', text: 'Paid transcript.' } });
+    expect(saved.audio).toBeUndefined();
+    expect(result.current.transcript).toBe('');
+    expect(transcribeAudio).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it.each(['while open', 'after reopening'])(
+    'keeps audio only this page holds with its account after a sign-out, %s, and says so',
+    async (when) => {
+      const first = '0x1111111111111111111111111111111111111111';
+      const put = jest.mocked(putRecordingChunk).getMockImplementation()!;
+      jest.mocked(putRecordingChunk).mockRejectedValue(new DOMException('Full', 'QuotaExceededError'));
+      (transcribeAudio as jest.Mock).mockImplementation(async () => 'Unsaved speech.');
+      const sessionSlug = `memory-only-${when}`;
+      let recorder = renderHook(
+        ({ account }) => useRollingTranscriptionRecorder({ sessionSlug, context: { account } }),
+        { initialProps: { account: first } },
+      );
+      try {
+        await act(async () => {
+          await recorder.result.current.startRecording();
+        });
+        await act(async () => {
+          await recorder.result.current.stopRecording();
+          await flushPromises();
+        });
+        if (when === 'while open') recorder.rerender({ account: '' });
+        else {
+          await act(() => recorder.result.current.keepAudio());
+          recorder.unmount();
+          recorder = renderHook(
+            ({ account }) => useRollingTranscriptionRecorder({ sessionSlug, context: { account } }),
+            { initialProps: { account: '' } },
+          );
+        }
+        await act(flushPromises);
+        expect(recorder.result.current.transcript).toBe('Unsaved speech.');
+        expect(recorder.result.current.downloadableChunkIds).toHaveLength(1);
+        expect(recorder.result.current.errorMessage).toContain('belongs to the account that made it');
+        await act(async () => {
+          await recorder.result.current.startRecording();
+        });
+        expect(recorder.result.current.isRecording).toBe(false);
+        await act(async () => {
+          recorder.result.current.clearDraft(true);
+          await flushPromises();
+        });
+        expect(recorder.result.current.transcript).toBe('');
+        expect(recorder.result.current.errorMessage).not.toContain('belongs to the account that made it');
+      } finally {
+        recorder.unmount();
+        jest.mocked(putRecordingChunk).mockImplementation(put);
+      }
+    },
+  );
 
   it('clears a recording made without IndexedDB after its audio is discarded', async () => {
     const list = jest.mocked(listRecordingChunks).getMockImplementation()!;
