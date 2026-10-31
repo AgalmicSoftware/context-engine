@@ -1,11 +1,18 @@
-// Secret-shaped text: provider keys, Cloudflare API tokens, private keys and
-// other 32-byte hex secrets (not hashes in a link's path), JSON Web Keys, PEM
-// keys, bearer tokens and credentials in links, including a setup link's #k=.
+// Secret-shaped text: provider keys, Cloudflare API tokens, Telegram bot
+// tokens (a bot ID, a colon, then about 35 characters), RPC links that carry a
+// provider key, private keys and other 32-byte hex secrets (not hashes in a
+// link's path), JSON Web Keys, PEM keys, bearer tokens and credentials in
+// links, including a setup link's #k=.
 // Every repeat is bounded or anchored by a literal, so scans stay linear.
 const SECRET_PATTERNS = [
   /\bsk-[\w-]{16,}/,
+  /\b[rs]k_(?:live|test)_[A-Za-z\d]{16,}/,
+  /\bhf_[A-Za-z\d]{30,}/,
   /\bAIza[\w-]{30,}/,
   /\b(?:gsk|ghp|gho|ghu|ghs|ghr|github_pat|glpat|xox[abpr])[-_][\w-]{16,}/,
+  /(?<![\w:])\d{6,12}:[\w-]{30,40}(?![\w-])/,
+  /\balchemy(?:api)?\.(?:com|io)\/v2\/[\w-]{16,}/i,
+  /\binfura\.io\/v3\/[\da-f]{32}/i,
   /-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----/,
   /"kty"\s*:/,
   /\bBearer\s+[\w.~+/=-]{16,}/i,

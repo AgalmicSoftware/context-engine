@@ -96,7 +96,6 @@
     "verify:release": "node scripts/run-ci-gates.mjs --profile release",
     "ai:node": "node -r ./scripts/lib/env-loader.js",
     "ai:harness:doctor": "node scripts/ai-harness-doctor.js",
-    "ai:playwright-server": "npm run -s ai:node -- scripts/start-playwright-server.js",
     "ai:wallet": "npm run -s ai:node -- scripts/ai-wallet.js",
     "ai:mint-test-sbt": "npm run -s ai:node -- scripts/mint-test-sbt.js",
     "ai:mint-test-sbt:dry": "DRY_RUN=1 npm run -s ai:node -- scripts/mint-test-sbt.js",

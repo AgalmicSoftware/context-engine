@@ -129,3 +129,27 @@ test('64 hex digits outside a link are refused, pointing a transaction to an exp
   assert.match(result.errors[0].message, /To cite a transaction, link to it in a block explorer/);
   assert.match(validateSessionContext({ links: [{ label: TX.slice(2), url: 'https://example.org/' }] }).errors[0].message, /block explorer/);
 });
+
+test('bot tokens, keyed RPC links, and Stripe and Hugging Face keys look like secrets', () => {
+  // Generate synthetic inputs so the repository contains no full provider-token literals.
+  for (const text of [
+    `${'1'.repeat(9)}:${'a'.repeat(35)}`,
+    `https://eth-mainnet.g.alchemy.com/v2/${'fixture'.repeat(6)}`,
+    `https://opt-sepolia.g.alchemy.com/v2/${'fixture'.repeat(6)}`,
+    `https://mainnet.infura.io/v3/${'a'.repeat(32)}`,
+    ['sk', 'live', 'fixture'.repeat(4)].join('_'),
+    ['rk', 'test', 'fixture'.repeat(4)].join('_'),
+    ['hf', 'fixture'.repeat(6)].join('_'),
+  ]) {
+    assert.equal(looksSecret(text), true, text);
+    assert.equal(looksSecret(`Our notes: ${text} (shared by mistake)`), true, text);
+  }
+  for (const text of [
+    'Meet at 10:30 on 2026-11-20.',
+    'https://docs.alchemy.com/reference/api-overview',
+    'https://infura.io/pricing',
+    'hf_model_card and sk_live_demo are just words.',
+  ]) {
+    assert.equal(looksSecret(text), false, text);
+  }
+});
