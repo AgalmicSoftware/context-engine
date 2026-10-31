@@ -440,7 +440,13 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
 
   const canGenerate = !isClosing && trimmedTranscript.length >= 50 && !isGenerating && !hasPendingTranscription;
   const isStarting = !isRecorderSessionActive && recorder.isBusy;
-  const visibleError = closeError || generationError || recorder.errorMessage || '';
+  // A stopped recorder leads: an older close or generation error must not hide it.
+  const visibleError =
+    (recorder.status === 'error' && recorder.errorMessage) ||
+    closeError ||
+    generationError ||
+    recorder.errorMessage ||
+    '';
   const gapWarning =
     failedCount > 0
       ? `${failedCount} ${failedCount === 1 ? 'part' : 'parts'} of the recording couldn't be transcribed. Retry or download the affected chunks below.`

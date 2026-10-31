@@ -565,6 +565,26 @@ describe('SessionListeningPanel', () => {
     expect(await screen.findByTestId('mock-create-questions')).toHaveAttribute('data-count', '1');
   });
 
+  it('shows a stopped recorder ahead of an earlier question-generation error', async () => {
+    const transcript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    const segments = [{ id: 's1', index: 0, status: 'complete', text: transcript, completedAt: 2 }];
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript, segments }));
+    mockGenerateQuestionsFromListeningTranscript.mockRejectedValueOnce(new Error('AI unavailable'));
+    const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('AI unavailable');
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        segments,
+        status: 'error',
+        errorMessage: 'Microphone access ended. Restore microphone permission, then press Record to continue.',
+      }),
+    );
+    rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    expect(screen.getByRole('alert')).toHaveTextContent(/^Microphone access ended/);
+  });
+
   it('keeps the transcript behind a compact button and clears it from the textarea overlay control', () => {
     const clearDraft = jest.fn();
     const transcript =

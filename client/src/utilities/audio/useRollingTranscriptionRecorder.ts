@@ -204,6 +204,8 @@ export const useRollingTranscriptionRecorder = ({
       const nextRecorder = createRecorder(streamRef.current);
       mediaRecorderRef.current = nextRecorder;
       stopRecorder(previousRecorder, false);
+      // Rotation is the only error raised while capture continues; a successful one clears it.
+      setErrorMessage('');
     } catch (error) {
       setErrorMessage(describeError(error));
       try {

@@ -145,7 +145,7 @@ All notable changes to this project will be documented in this file.
 
 - Keep Group Conversation audio held only in memory when stored recordings can't be read on reopening, when the recorder is left without Close and keep the audio, and when Close and keep runs before saved audio has loaded.
 
-- Show when the microphone or recorder stops ahead of the storage and offline notices, which no longer say that recording continues.
+- Show when the microphone or recorder stops ahead of the storage, offline and question-generation notices; the storage notice no longer says that recording continues. A chunk-rotation error clears once the next chunk starts.
 
 - Keep Group Conversation audio held only in memory when its dialog is closed and reopened more than once, and retry saving it to the device on each reopening.
 

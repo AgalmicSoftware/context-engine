@@ -160,6 +160,7 @@ describe('useRollingTranscriptionRecorder', () => {
       await flushPromises();
     });
     expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete', 'recording']);
+    expect(result.current.errorMessage).toBe('');
     await act(async () => {
       await result.current.stopRecording();
       await flushPromises();
