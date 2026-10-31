@@ -111,7 +111,7 @@ test('dispatchAuthenticatedSecretPathRoute blocks participant writes after the s
     deps,
   };
 
-  for (const path of ['/groups/create', '/groups/join', '/groups/leave', '/storage/context']) {
+  for (const path of ['/groups/create', '/groups/join', '/groups/leave']) {
     const blocked = await dispatchAuthenticatedSecretPathRoute({
       ...base,
       path,
@@ -131,6 +131,15 @@ test('dispatchAuthenticatedSecretPathRoute blocks participant writes after the s
     }, path);
   }
   assert.equal(groupRouteCalls, 0);
+
+  // Context changes are admin-only, so an admin can still remove a private item.
+  const contextChange = await dispatchAuthenticatedSecretPathRoute({
+    ...base,
+    path: '/storage/context',
+    method: 'POST',
+    deps: { ...deps, storageRoute: async () => new Response('context') },
+  });
+  assert.equal(await contextChange.response.text(), 'context');
 
   for (const path of ['/groups/list', '/groups/members']) {
     const readable = await dispatchAuthenticatedSecretPathRoute({

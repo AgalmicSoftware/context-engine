@@ -73,7 +73,12 @@ export const buildPdfReadRequest = ({ provider, model, maxTokens, reasoningEffor
         ],
       }],
     };
-  const [before, after] = JSON.stringify(body).split(PLACEHOLDER);
+  // The PDF's data is the body's last field holding the placeholder; a file
+  // name that happens to contain it comes earlier.
+  const serialized = JSON.stringify(body);
+  const at = serialized.lastIndexOf(PLACEHOLDER);
+  const before = serialized.slice(0, at);
+  const after = serialized.slice(at + PLACEHOLDER.length);
   const encoder = new TextEncoder();
   const head = encoder.encode(before);
   const tail = encoder.encode(after);

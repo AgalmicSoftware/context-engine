@@ -189,7 +189,7 @@ const remove = async ({ body, env, slug, json }) => {
   return json({ ok: true, removed: rows.map((entry) => entry.id) });
 };
 
-const ACTIONS = { 'add-link': addLink, 'read-pdf': readPdf, remove };
+const ACTIONS = Object.freeze({ 'add-link': addLink, 'read-pdf': readPdf, remove });
 
 // POST /storage/context { action, ... }: admin-only changes to context
 // sources. Files are added through /storage/upload with a context role.
@@ -206,8 +206,9 @@ export const contextSourceRoute = async ({
   let body = null;
   try { body = await request.json(); } catch { body = null; }
   if (!isObj(body)) return json({ error: 'Invalid JSON.' }, 400);
-  const action = ACTIONS[trim(body.action)];
-  if (!action) return json({ error: 'Unknown context action.' }, 400);
+  const name = trim(body.action);
+  if (!Object.hasOwn(ACTIONS, name)) return json({ error: 'Unknown context action.' }, 400);
+  const action = ACTIONS[name];
   const now = () => new Date(deps?.now?.() || Date.now()).toISOString();
   return action({ body, env, config, slug, admin, deps, store, json, now });
 };

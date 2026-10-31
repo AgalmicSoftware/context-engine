@@ -69560,7 +69560,10 @@ var init_contextDocumentRead = __esm({
           ]
         }]
       };
-      const [before, after] = JSON.stringify(body).split(PLACEHOLDER);
+      const serialized = JSON.stringify(body);
+      const at = serialized.lastIndexOf(PLACEHOLDER);
+      const before = serialized.slice(0, at);
+      const after = serialized.slice(at + PLACEHOLDER.length);
       const encoder11 = new TextEncoder();
       const head = encoder11.encode(before);
       const tail = encoder11.encode(after);
@@ -70062,7 +70065,7 @@ var init_contextSourceRoute = __esm({
       await removeCloudflareStorageRecords({ env, slug, rows });
       return json6({ ok: true, removed: rows.map((entry2) => entry2.id) });
     };
-    ACTIONS = { "add-link": addLink, "read-pdf": readPdf, remove };
+    ACTIONS = Object.freeze({ "add-link": addLink, "read-pdf": readPdf, remove });
     contextSourceRoute = async ({
       request,
       env,
@@ -70085,8 +70088,9 @@ var init_contextSourceRoute = __esm({
         body = null;
       }
       if (!isObj15(body)) return json6({ error: "Invalid JSON." }, 400);
-      const action = ACTIONS[trim12(body.action)];
-      if (!action) return json6({ error: "Unknown context action." }, 400);
+      const name = trim12(body.action);
+      if (!Object.hasOwn(ACTIONS, name)) return json6({ error: "Unknown context action." }, 400);
+      const action = ACTIONS[name];
       const now = () => new Date(deps?.now?.() || Date.now()).toISOString();
       return action({ body, env, config, slug, admin, deps, store, json: json6, now });
     };
@@ -105826,7 +105830,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
       response: deps?.json?.({ error: "Agent HTTP is disabled for this session." }, 404, headers2)
     };
   }
-  const isParticipantWrite = path === "/storage/response-field-key/wrap" && method === "POST" || isTranscribeRoute || isArweaveUploadRoute || path === "/storage/upload" && method === "POST" || path === "/storage/context" && method === "POST" || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
+  const isParticipantWrite = path === "/storage/response-field-key/wrap" && method === "POST" || isTranscribeRoute || isArweaveUploadRoute || path === "/storage/upload" && method === "POST" || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
   const endedResponse = isParticipantWrite ? buildSessionEndedResponse({ config, headers: headers2, json: deps?.json, now: deps?.now }) : null;
   if (endedResponse) {
     return {

@@ -51,7 +51,6 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     isTranscribeRoute ||
     isArweaveUploadRoute ||
     (path === '/storage/upload' && method === 'POST') ||
-    (path === '/storage/context' && method === 'POST') ||
     (path === '/groups/create' && method === 'POST') ||
     (path === '/groups/join' && method === 'POST') ||
     (path === '/groups/leave' && method === 'POST')

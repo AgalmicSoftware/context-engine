@@ -277,3 +277,17 @@ test('a reading keeps its PDF’s stored rule after the session’s access chang
   const readingRow = JSON.parse([...h.kv.store.entries()].find(([key]) => key.endsWith(`:docsContext:${reading}`))[1]);
   assert.deepEqual(readingRow.accessConditions, pdfRow.accessConditions);
 });
+
+test('unknown actions and a file name holding the body placeholder are handled', async () => {
+  const h = harness();
+  for (const action of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+    const response = await h.context({ action });
+    assert.equal(response.status, 400, action);
+  }
+  const { body } = buildPdfReadRequest({
+    provider: 'openai', model: 'gpt-4.1', maxTokens: 10, bytes: PDF_BYTES, filename: 'x__CE_PDF_BASE64__y.pdf',
+  });
+  const parsed = JSON.parse(new TextDecoder().decode(body));
+  assert.equal(parsed.input[0].content[0].filename, 'x__CE_PDF_BASE64__y.pdf');
+  assert.equal(parsed.input[0].content[0].file_data, `data:application/pdf;base64,${Buffer.from(PDF_BYTES).toString('base64')}`);
+});
