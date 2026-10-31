@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import PolisReportFidelitySection from './PolisReportFidelitySection';
 import { computeFidelityOverview, type FidelityOverviewInput } from './fidelityOverview';
@@ -71,6 +71,10 @@ const renderSection = (rows: ReturnType<typeof row>[], props = {}) =>
   );
 
 describe('PolisReportFidelitySection', () => {
+  // Scores appear after a 150 ms settle plus the bootstrap work, which took
+  // longer than the 1 s default wait on hosted CI under coverage.
+  beforeAll(() => configure({ asyncUtilTimeout: 8000 }));
+
   it('scores AI-prefill drafts from the loaded responses, withholding cells with fewer than 5 people', async () => {
     renderSection(sixPeople().flat());
     const panel = await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);

@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file.
 
 - Pin the recovery-key export test's clock to midday UTC so it no longer fails near midnight.
 
+- Give the AI prediction results tests 8 seconds to show their scores; hosted CI under coverage needed more than 1.
+
 - Separate the voice-mode modal shell and interview panel to keep client components within the release size limits.
 
 - Include catalog completeness in the interview compatibility fixture.
