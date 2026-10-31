@@ -176,7 +176,13 @@ export const useRollingTranscriptionRecorder = ({
       recorder.onstop = () => {
         snapshot(true);
         const shouldEndSession = endingRecordersRef.current.delete(recorder);
-        if (!shouldEndSession) {
+        // A recorder that stops by itself while capturing (no Stop, rotation or error event) has ended the
+        // recording; without this the dialog would keep showing Recording while nothing is captured.
+        const stoppedItself = !shouldEndSession && mediaRecorderRef.current === recorder && recordingActiveRef.current;
+        if (stoppedItself) {
+          setErrorMessage('Recording stopped. Press Record to continue. Saved audio remains available.');
+          setStatus('error');
+        } else if (!shouldEndSession) {
           if (mediaRecorderRef.current === recorder && !recordingActiveRef.current) {
             mediaRecorderRef.current = null;
           }

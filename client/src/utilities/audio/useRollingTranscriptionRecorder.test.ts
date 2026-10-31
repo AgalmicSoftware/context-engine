@@ -563,6 +563,39 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
+  it('shows a stop notice when the recorder stops by itself, keeps its audio, and resumes with one tap', async () => {
+    (transcribeAudio as jest.Mock).mockImplementation(async () => 'Speech before the stop.');
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'self-stop', chunkMs: 15_000 }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await act(async () => {
+      // The browser ends capture with no error event, as when the system takes the microphone.
+      instances[0].state = 'inactive';
+      instances[0].ondataavailable?.({ data: new Blob([new Uint8Array(256)], { type: 'audio/webm' }) });
+      instances[0].onstop?.();
+      await flushPromises();
+    });
+    expect(result.current.status).toBe('error');
+    expect(result.current.errorMessage).toMatch(/^Recording stopped\. Press Record to continue\./);
+    expect(mockTrack.stop).toHaveBeenCalledTimes(1);
+    expect(result.current.transcript).toBe('Speech before the stop.');
+    const elapsed = result.current.elapsedSeconds;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(20_000);
+    });
+    expect(result.current.elapsedSeconds).toBe(elapsed);
+    expect(instances).toHaveLength(1);
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    expect(result.current.status).toBe('recording');
+    expect(result.current.errorMessage).toBe('');
+    unmount();
+  });
+
   it.each(['storage', 'offline'] as const)(
     'shows a microphone stop ahead of the %s notice, which never says capture continues',
     async (notice) => {
