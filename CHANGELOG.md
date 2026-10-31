@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-31
+
+0.9.0 also contains the 0.8.1 changes listed below, which were never released on their own.
+
 ### Client — available when the site deploys
 
 - Drop the retired Goerli test network from wallet connections and a collection metadata lookup that always failed.
@@ -67,7 +71,7 @@ All notable changes to this project will be documented in this file.
 
 - `answer --resume` asks again when the endpoint, model settings, routing or answer schema change. Answers saved by earlier versions are asked again once.
 
-## [0.8.1] - 2026-10-30
+## [0.8.1] - not released; included in 0.9.0
 
 ### Verification and shared rules
 
